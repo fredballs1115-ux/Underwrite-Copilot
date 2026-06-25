@@ -4,6 +4,8 @@ import { downloadOmPdf } from "@/lib/storage";
 import { extractTerms } from "./extract";
 import { challengeAssumptions } from "./challenge";
 import { scrutinizeComps } from "./comps";
+import { reconcileModel } from "./reconcile";
+import { parseModelFile } from "@/lib/model-parse";
 import type { AssetClass } from "./types";
 
 type JobPatch = {
@@ -27,8 +29,9 @@ async function patchJob(dealId: string, patch: JobPatch): Promise<void> {
  * row as each step finishes — the deal page polls that and reveals results as
  * they land.
  *
- * Phases so far: extract → challenge → comps. Phases 5–7 append reconcile →
- * market → verdict into this same pass.
+ * Phases so far: extract → challenge → comps. Reconcile runs separately (it
+ * needs the buyer's own model, uploaded later — see runReconciliation). Phases
+ * 6–7 append market → verdict into this same pass.
  */
 export async function runAnalysis(dealId: string): Promise<void> {
   try {
@@ -86,6 +89,59 @@ export async function runAnalysis(dealId: string): Promise<void> {
     await patchJob(dealId, {
       status: "error",
       error: err instanceof Error ? err.message : "Analysis failed.",
+    });
+  }
+}
+
+/**
+ * Reconcile the OM against the buyer's own underwriting model. Unlike the main
+ * pipeline this is user-initiated (it needs a model file), so it runs on its
+ * own via `after()` and reuses the same job row to drive the progress UI. The
+ * raw model isn't persisted — only the reconciliation result is.
+ */
+export async function runReconciliation(
+  dealId: string,
+  model: { name: string; buffer: Buffer },
+): Promise<void> {
+  try {
+    const admin = createSupabaseAdminClient();
+    const { data: deal, error } = await admin
+      .from("deals")
+      .select("id, om_storage_path")
+      .eq("id", dealId)
+      .single();
+
+    if (error || !deal) throw new Error("Deal not found.");
+    if (!deal.om_storage_path) {
+      throw new Error("No OM file is attached to this deal.");
+    }
+
+    await patchJob(dealId, {
+      status: "running",
+      step: "reconcile",
+      progress: 35,
+      error: null,
+    });
+
+    const omPdf = await downloadOmPdf(deal.om_storage_path as string);
+    const parsed = await parseModelFile(model.name, model.buffer);
+    const reconciliation = await reconcileModel(omPdf, parsed);
+
+    await admin
+      .from("deals")
+      .update({ reconciliation, updated_at: new Date().toISOString() })
+      .eq("id", dealId);
+
+    await patchJob(dealId, {
+      status: "done",
+      step: "reconcile",
+      progress: 100,
+      error: null,
+    });
+  } catch (err) {
+    await patchJob(dealId, {
+      status: "error",
+      error: err instanceof Error ? err.message : "Reconciliation failed.",
     });
   }
 }

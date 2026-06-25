@@ -7,16 +7,27 @@ import {
   type ChallengerResult,
   type BrokerCompsResult,
   type BrokerComp,
+  type ReconciliationResult,
 } from "@/lib/anthropic/types";
 import { AnalysisProgress } from "./analysis-progress";
-import { rerunAnalysis } from "../actions";
+import { rerunAnalysis, reconcileWithModel } from "../actions";
+
+const MODEL_ERRORS: Record<string, string> = {
+  modelfile: "Please choose your model file to upload.",
+  modeltype: "Please upload your model as .xlsx, .csv, or PDF.",
+  modelsize: "That file is larger than 22 MB — please try a smaller export.",
+};
 
 export default async function DealPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
   const { id } = await params;
+  const { error: errorCode } = await searchParams;
+  const modelError = errorCode ? MODEL_ERRORS[errorCode] : null;
 
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
@@ -37,6 +48,9 @@ export default async function DealPage({
     ? (deal.challenges as ChallengerResult)
     : null;
   const comps = deal.comps ? (deal.comps as BrokerCompsResult) : null;
+  const reconciliation = deal.reconciliation
+    ? (deal.reconciliation as ReconciliationResult)
+    : null;
 
   const { data: jobData } = await supabase
     .from("analysis_jobs")
@@ -97,6 +111,16 @@ export default async function DealPage({
       {extraction && <ExtractedTerms result={extraction} />}
       {challenges && <ChallengerResults result={challenges} />}
       {comps && <BrokerComps result={comps} />}
+      {reconciliation && <Reconciliation result={reconciliation} />}
+
+      {/* Reconcile-your-model upload — available once the OM screen has run. */}
+      {extraction && !active && (
+        <ReconcileSection
+          dealId={id}
+          hasResult={!!reconciliation}
+          error={modelError}
+        />
+      )}
 
       {/* The six-step loop */}
       <section>
@@ -312,5 +336,119 @@ function CompGroup({ title, comps }: { title: string; comps: BrokerComp[] }) {
         })}
       </div>
     </div>
+  );
+}
+
+function Reconciliation({ result }: { result: ReconciliationResult }) {
+  // Direction is from the BUYER's perspective: unfavorable = their model is
+  // worse than the OM claims (the gap that kills deals).
+  const dir = {
+    unfavorable: { badge: "bg-kill/10 text-kill", label: "Unfavorable" },
+    favorable: { badge: "bg-pass/10 text-pass", label: "Favorable" },
+    neutral: { badge: "bg-brand/10 text-brand", label: "Neutral" },
+  } as const;
+
+  return (
+    <section>
+      <h2 className="text-xs font-medium uppercase tracking-wider text-muted">
+        Reconciliation — your model vs. the OM
+      </h2>
+      <div className="mt-3 overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+        <table className="w-full min-w-[34rem] text-sm">
+          <thead>
+            <tr className="border-b border-line text-left text-xs text-muted">
+              <th className="px-4 py-2.5 font-medium">Metric</th>
+              <th className="px-4 py-2.5 font-medium">OM says</th>
+              <th className="px-4 py-2.5 font-medium">Your model</th>
+              <th className="px-4 py-2.5 font-medium">Gap</th>
+            </tr>
+          </thead>
+          <tbody>
+            {result.rows.map((r, i) => {
+              const d = dir[r.direction] ?? dir.neutral;
+              return (
+                <tr
+                  key={i}
+                  className="border-b border-line align-top last:border-0"
+                >
+                  <td className="px-4 py-3 font-medium">{r.metric}</td>
+                  <td className="px-4 py-3 tabular-nums text-muted">
+                    {r.omValue}
+                  </td>
+                  <td className="px-4 py-3 tabular-nums text-muted">
+                    {r.myValue}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${d.badge}`}
+                    >
+                      {d.label}
+                    </span>
+                    {r.gap && (
+                      <p className="mt-1 text-muted">{r.gap}</p>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {result.takeaway && (
+        <p className="mt-3 rounded-xl border border-line bg-paper p-4 text-sm leading-relaxed">
+          <span className="font-medium">Takeaway: </span>
+          <span className="text-muted">{result.takeaway}</span>
+        </p>
+      )}
+    </section>
+  );
+}
+
+function ReconcileSection({
+  dealId,
+  hasResult,
+  error,
+}: {
+  dealId: string;
+  hasResult: boolean;
+  error: string | null;
+}) {
+  return (
+    <section className="rounded-xl border border-line bg-surface p-5">
+      <h2 className="font-medium">
+        {hasResult ? "Reconcile a different model" : "Reconcile your model"}
+      </h2>
+      <p className="mt-1 text-sm leading-relaxed text-muted">
+        Upload your own underwriting — Excel (.xlsx), CSV, or a PDF / ARGUS
+        export — and we’ll line it up against the OM and surface every gap, from
+        your perspective. This is the part the OM can’t tell you.
+      </p>
+
+      {error && (
+        <p className="mt-3 rounded-lg bg-kill/10 px-3 py-2 text-sm text-kill">
+          {error}
+        </p>
+      )}
+
+      <form
+        action={reconcileWithModel}
+        className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center"
+      >
+        <input type="hidden" name="dealId" value={dealId} />
+        <input
+          type="file"
+          name="model"
+          accept=".xlsx,.xls,.csv,application/pdf"
+          required
+          className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-brand-strong"
+        />
+        <button
+          type="submit"
+          className="shrink-0 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+        >
+          Reconcile
+        </button>
+      </form>
+    </section>
   );
 }
