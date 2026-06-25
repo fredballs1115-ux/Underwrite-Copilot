@@ -4,30 +4,40 @@
   Design tokens for Underwrite Copilot.
 
   Tailwind v4 reads this @theme block and auto-generates utility classes for
-  every token. For example, `--color-brand` gives you `bg-brand`, `text-brand`,
-  and `border-brand`. Change a value here and the whole app restyles.
+  every token. `--color-brand` gives you `bg-brand`, `text-brand`,
+  `border-brand`, `border-l-brand`, etc. Change a value here and the whole app
+  restyles.
 */
 @theme {
   --color-paper: #fbfbf9; /* page background — a warm off-white */
+  --color-faint: #f3f5f4; /* tinted band background */
   --color-surface: #ffffff; /* cards and panels */
-  --color-ink: #1a1a1a; /* primary text */
-  --color-muted: #6b7280; /* secondary text */
-  --color-line: #e7e5e0; /* borders and dividers */
+  --color-ink: #18211f; /* primary text — near-black with a faint warmth */
+  --color-muted: #5f6b69; /* secondary text */
+  --color-line: #e7e4dd; /* borders and dividers */
 
-  --color-brand: #14505c; /* deep teal — primary accent */
-  --color-brand-strong: #0e3a43;
+  --color-brand: #114e54; /* deep teal — primary accent */
+  --color-brand-strong: #0c383d;
 
   /* Verdict / status colors, reused across the app */
   --color-pass: #15803d;
   --color-caution: #b45309;
-  --color-kill: #b91c1c;
+  --color-kill: #b3261e;
 
   /* Map the Geist fonts (loaded in layout.tsx) onto Tailwind's font utilities */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background-color: var(--color-paper);
   color: var(--color-ink);
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-brand) 18%, transparent);
 }

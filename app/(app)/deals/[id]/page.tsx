@@ -133,7 +133,7 @@ function RetryForm({ dealId, label }: { dealId: string; label: string }) {
       <input type="hidden" name="dealId" value={dealId} />
       <button
         type="submit"
-        className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong"
+        className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
       >
         {label}
       </button>

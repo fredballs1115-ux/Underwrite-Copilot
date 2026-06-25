@@ -14,7 +14,7 @@ export function LoginForm() {
   );
 
   return (
-    <form action={formAction} className="mt-8 flex flex-col gap-4">
+    <form action={formAction} className="mt-6 flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         <label htmlFor="email" className="text-sm font-medium">
           Email
@@ -56,7 +56,7 @@ export function LoginForm() {
           name="intent"
           value="signin"
           disabled={pending}
-          className="flex-1 rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-strong disabled:opacity-60"
+          className="flex-1 rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong disabled:opacity-60"
         >
           Sign in
         </button>
@@ -65,7 +65,7 @@ export function LoginForm() {
           name="intent"
           value="signup"
           disabled={pending}
-          className="flex-1 rounded-lg border border-line px-4 py-2.5 text-sm font-medium hover:bg-paper disabled:opacity-60"
+          className="flex-1 rounded-lg border border-line px-4 py-2.5 text-sm font-medium transition-colors hover:bg-faint disabled:opacity-60"
         >
           Create account
         </button>

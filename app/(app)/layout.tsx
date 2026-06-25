@@ -21,10 +21,10 @@ export default async function AppLayout({
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="border-b border-line">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
+      <header className="sticky top-0 z-10 border-b border-line/80 bg-paper/80 backdrop-blur">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-3.5">
           <Link href="/deals" className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-brand text-sm font-semibold text-white">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-sm font-semibold text-white">
               UC
             </div>
             <span className="font-semibold tracking-tight">
@@ -38,7 +38,7 @@ export default async function AppLayout({
             <form action={signOut}>
               <button
                 type="submit"
-                className="rounded-md border border-line px-3 py-1.5 text-sm hover:bg-paper"
+                className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium transition-colors hover:bg-faint"
               >
                 Sign out
               </button>

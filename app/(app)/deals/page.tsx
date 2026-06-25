@@ -86,7 +86,7 @@ export default async function DealsPage({
           />
           <button
             type="submit"
-            className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong"
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
           >
             Create &amp; analyze
           </button>
@@ -107,7 +107,7 @@ export default async function DealsPage({
               <li key={d.id}>
                 <Link
                   href={`/deals/${d.id}`}
-                  className="flex items-center justify-between px-5 py-4 hover:bg-paper"
+                  className="flex items-center justify-between px-5 py-4 transition-colors hover:bg-faint"
                 >
                   <span className="font-medium">{d.name}</span>
                   <span className="text-xs capitalize text-muted">
