@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { signedSupplementUrl } from "@/lib/storage";
 import { type DealRow } from "@/lib/deals";
 import {
   type ExtractionResult,
@@ -96,6 +97,31 @@ export default async function DealPage({
   const keyStats = extraction ? pickKeyStats(extraction.metrics) : [];
   const pill = verdict ? VERDICT_PILL[verdict.verdict] : null;
 
+  // User-added supplements, with short-lived signed URLs minted for any files.
+  type RawSupp = {
+    notes?: { id: string; text: string; createdAt: string }[];
+    files?: { id: string; name: string; path: string; createdAt: string }[];
+  };
+  const rawSupp = (deal.supplements as Record<string, RawSupp> | null) ?? {};
+  const supplements: Record<
+    string,
+    {
+      notes: { id: string; text: string; createdAt: string }[];
+      files: { id: string; name: string; createdAt: string; url: string | null }[];
+    }
+  > = {};
+  for (const [tabKey, s] of Object.entries(rawSupp)) {
+    const files = await Promise.all(
+      (s.files ?? []).map(async (f) => ({
+        id: f.id,
+        name: f.name,
+        createdAt: f.createdAt,
+        url: await signedSupplementUrl(f.path),
+      })),
+    );
+    supplements[tabKey] = { notes: s.notes ?? [], files };
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <Link
@@ -174,6 +200,7 @@ export default async function DealPage({
         modelErrorCode={errorCode ?? null}
         job={job}
         results={{ extraction, challenges, comps, reconciliation, market, verdict }}
+        supplements={supplements}
       />
     </div>
   );

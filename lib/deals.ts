@@ -15,6 +15,8 @@ export interface DealRow {
   reconciliation: unknown;
   market: unknown;
   verdict: unknown;
+  // User-added data per section (notes + uploaded files). See migration 0002.
+  supplements: unknown;
   created_at: string;
   updated_at: string;
 }

@@ -25,3 +25,32 @@ export async function downloadOmPdf(path: string): Promise<Buffer> {
   }
   return Buffer.from(await data.arrayBuffer());
 }
+
+/** Store a user-uploaded supplement file (any type) and its content type. */
+export async function uploadSupplement(
+  path: string,
+  body: Buffer,
+  contentType: string,
+): Promise<void> {
+  const admin = createSupabaseAdminClient();
+  const { error } = await admin.storage.from(BUCKET).upload(path, body, {
+    contentType: contentType || "application/octet-stream",
+    upsert: true,
+  });
+  if (error) {
+    throw new Error(`Supplement upload failed: ${error.message}`);
+  }
+}
+
+/** Remove a supplement file from Storage (best-effort). */
+export async function removeSupplementFile(path: string): Promise<void> {
+  const admin = createSupabaseAdminClient();
+  await admin.storage.from(BUCKET).remove([path]);
+}
+
+/** A short-lived signed URL so the user can download their supplement file. */
+export async function signedSupplementUrl(path: string): Promise<string | null> {
+  const admin = createSupabaseAdminClient();
+  const { data } = await admin.storage.from(BUCKET).createSignedUrl(path, 3600);
+  return data?.signedUrl ?? null;
+}

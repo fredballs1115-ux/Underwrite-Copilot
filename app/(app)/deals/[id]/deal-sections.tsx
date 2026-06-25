@@ -2,6 +2,11 @@
 
 import { useState, type ReactNode } from "react";
 import { rerunAnalysis, reconcileWithModel } from "../actions";
+import {
+  addSupplementNote,
+  addSupplementFile,
+  removeSupplement,
+} from "./supplement-actions";
 import type {
   ExtractionResult,
   ChallengerResult,
@@ -101,6 +106,24 @@ const IconFlag = (p: { className?: string }) => (
 const IconChevron = (p: { className?: string }) => (
   <Svg {...p}>
     <path d="m9 18 6-6-6-6" />
+  </Svg>
+);
+const IconPlus = (p: { className?: string }) => (
+  <Svg {...p}>
+    <path d="M5 12h14" />
+    <path d="M12 5v14" />
+  </Svg>
+);
+const IconTrash = (p: { className?: string }) => (
+  <Svg {...p}>
+    <path d="M3 6h18" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </Svg>
+);
+const IconPaperclip = (p: { className?: string }) => (
+  <Svg {...p}>
+    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
   </Svg>
 );
 
@@ -622,9 +645,15 @@ export function BrokerComps({ result }: { result: BrokerCompsResult }) {
         <CompTable title="Lease comps" comps={result.leaseComps} />
       )}
       {!hasComps && (
-        <p className="text-sm text-muted">
-          No comparable sales or leases were included in this OM.
-        </p>
+        <div className="rounded-xl border border-line bg-surface p-5 shadow-sm">
+          <p className="text-sm font-medium">No comps in this OM</p>
+          <p className="mt-1 text-sm leading-relaxed text-muted">
+            This offering memorandum didn’t include sale or lease comps. Add the
+            comps you’ve found, or upload a comp sheet (Excel / PDF), using
+            <span className="font-medium text-ink"> “Add info” </span>
+            below — they’ll live alongside this deal.
+          </p>
+        </div>
       )}
     </section>
   );
@@ -1041,6 +1070,160 @@ function VerdictHero({
 
 export function VerdictView({ result }: { result: VerdictResult }) {
   return <VerdictHero result={result} />;
+}
+
+/* ================================================================== */
+/* Per-tab supplements — add your own data to any section              */
+/* ================================================================== */
+
+export type TabSupplement = {
+  notes: { id: string; text: string; createdAt: string }[];
+  files: { id: string; name: string; createdAt: string; url: string | null }[];
+};
+
+export function Supplements({
+  dealId,
+  tab,
+  data,
+}: {
+  dealId: string;
+  tab: string;
+  data: TabSupplement;
+}) {
+  if (data.notes.length === 0 && data.files.length === 0) return null;
+  return (
+    <section>
+      <h3 className="text-xs font-medium uppercase tracking-wider text-muted">
+        Your additions
+      </h3>
+      <div className="mt-3 space-y-2">
+        {data.notes.map((n) => (
+          <div
+            key={n.id}
+            className="flex items-start gap-3 rounded-xl border border-line border-l-2 border-l-brand bg-surface p-4 shadow-sm"
+          >
+            <p className="flex-1 whitespace-pre-wrap text-sm leading-relaxed">
+              {n.text}
+            </p>
+            <RemoveButton dealId={dealId} tab={tab} id={n.id} kind="note" />
+          </div>
+        ))}
+        {data.files.map((f) => (
+          <div
+            key={f.id}
+            className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3 shadow-sm"
+          >
+            <IconPaperclip className="h-4 w-4 shrink-0 text-muted" />
+            {f.url ? (
+              <a
+                href={f.url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex-1 truncate text-sm font-medium text-brand hover:underline"
+              >
+                {f.name}
+              </a>
+            ) : (
+              <span className="flex-1 truncate text-sm">{f.name}</span>
+            )}
+            <RemoveButton dealId={dealId} tab={tab} id={f.id} kind="file" />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function RemoveButton({
+  dealId,
+  tab,
+  id,
+  kind,
+}: {
+  dealId: string;
+  tab: string;
+  id: string;
+  kind: "note" | "file";
+}) {
+  return (
+    <form action={removeSupplement}>
+      <input type="hidden" name="dealId" value={dealId} />
+      <input type="hidden" name="tab" value={tab} />
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="kind" value={kind} />
+      <button
+        type="submit"
+        aria-label="Remove"
+        className="shrink-0 rounded p-1 text-muted transition-colors hover:text-kill"
+      >
+        <IconTrash className="h-4 w-4" />
+      </button>
+    </form>
+  );
+}
+
+export function AddData({ dealId, tab }: { dealId: string; tab: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <section className="rounded-xl border border-dashed border-line p-4">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-2 text-sm font-medium text-muted transition-colors hover:text-ink"
+      >
+        <IconPlus
+          className={`h-4 w-4 transition-transform ${open ? "rotate-45" : ""}`}
+        />
+        Add info or upload to this section
+      </button>
+      {open && (
+        <div className="mt-4 space-y-4">
+          <form action={addSupplementNote} className="space-y-2">
+            <input type="hidden" name="dealId" value={dealId} />
+            <input type="hidden" name="tab" value={tab} />
+            <textarea
+              name="text"
+              required
+              rows={2}
+              placeholder="Add a note, a correction, or a figure the analysis missed…"
+              className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-brand"
+            />
+            <button
+              type="submit"
+              className="rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-strong"
+            >
+              Add note
+            </button>
+          </form>
+          <div className="border-t border-line pt-3">
+            <form
+              action={addSupplementFile}
+              className="flex flex-col gap-2 sm:flex-row sm:items-center"
+            >
+              <input type="hidden" name="dealId" value={dealId} />
+              <input type="hidden" name="tab" value={tab} />
+              <input
+                type="file"
+                name="file"
+                required
+                className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-faint file:px-3 file:py-1.5 file:text-xs file:font-medium hover:file:bg-line"
+              />
+              <button
+                type="submit"
+                className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
+              >
+                Upload
+              </button>
+            </form>
+            <p className="mt-1.5 text-[11px] text-muted">
+              Rent roll, T-12, comp sheet, anything — PDF, Excel, CSV, or image
+              (up to 22 MB).
+            </p>
+          </div>
+        </div>
+      )}
+    </section>
+  );
 }
 
 export function RetryForm({ dealId, label }: { dealId: string; label: string }) {

@@ -21,7 +21,12 @@ import {
   VerdictView,
   RetryForm,
   EmptyState,
+  Supplements,
+  AddData,
+  type TabSupplement,
 } from "./deal-sections";
+
+type SupplementsMap = Partial<Record<string, TabSupplement>>;
 
 type Job = {
   status: string;
@@ -92,6 +97,7 @@ export function DealView({
   modelErrorCode,
   job: initialJob,
   results,
+  supplements,
 }: {
   dealId: string;
   initialTab: string | null;
@@ -99,6 +105,7 @@ export function DealView({
   modelErrorCode: string | null;
   job: Job;
   results: Results;
+  supplements: SupplementsMap;
 }) {
   const router = useRouter();
 
@@ -230,6 +237,7 @@ export function DealView({
           modelError={
             modelErrorCode ? MODEL_ERRORS[modelErrorCode] ?? null : null
           }
+          supplements={supplements}
         />
       </div>
     </div>
@@ -354,6 +362,7 @@ function TabPanel({
   active,
   onNavigate,
   modelError,
+  supplements,
 }: {
   tab: TabKey;
   state: "done" | "running" | "pending" | "idle";
@@ -363,6 +372,7 @@ function TabPanel({
   active: boolean;
   onNavigate: (tab: string) => void;
   modelError: string | null;
+  supplements: SupplementsMap;
 }) {
   if (tab === "overview") {
     return (
@@ -370,10 +380,19 @@ function TabPanel({
     );
   }
 
-  // The reconciler tab always offers the upload, plus the result if present.
+  // Every detail tab gets a place to add your own data (notes + uploads).
+  const tabSupp = supplements[tab];
+  const footer = (
+    <>
+      {tabSupp && <Supplements dealId={dealId} tab={tab} data={tabSupp} />}
+      <AddData dealId={dealId} tab={tab} />
+    </>
+  );
+
+  // The reconciler tab always offers the model upload, plus the result if present.
   if (tab === "reconciler") {
     return (
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-6">
         {results.reconciliation && (
           <Reconciliation result={results.reconciliation} />
         )}
@@ -385,6 +404,7 @@ function TabPanel({
           />
         )}
         {active && !results.reconciliation && <TableSkeleton />}
+        {footer}
       </div>
     );
   }
@@ -392,38 +412,43 @@ function TabPanel({
   const def = TABS.find((t) => t.key === tab)!;
   const data = def.result ? results[def.result] : null;
 
+  let content: React.ReactNode;
   if (data) {
-    switch (tab) {
-      case "terms":
-        return <TermsView result={results.extraction!} />;
-      case "challenger":
-        return <ChallengerView result={results.challenges!} />;
-      case "comps":
-        return <BrokerComps result={results.comps!} />;
-      case "market":
-        return <MarketCheck result={results.market!} />;
-      case "verdict":
-        return <VerdictView result={results.verdict!} />;
-    }
-  }
-
-  // No data yet — skeleton while the step is running/pending, otherwise an
-  // empty state (with a run affordance on the Terms tab).
-  if (state === "running" || state === "pending") {
-    return <TabSkeleton tab={tab} />;
-  }
-  if (tab === "terms" && hasOm) {
-    return (
+    content =
+      tab === "terms" ? (
+        <TermsView result={results.extraction!} />
+      ) : tab === "challenger" ? (
+        <ChallengerView result={results.challenges!} />
+      ) : tab === "comps" ? (
+        <BrokerComps result={results.comps!} />
+      ) : tab === "market" ? (
+        <MarketCheck result={results.market!} />
+      ) : tab === "verdict" ? (
+        <VerdictView result={results.verdict!} />
+      ) : null;
+  } else if (state === "running" || state === "pending") {
+    content = <TabSkeleton tab={tab} />;
+  } else if (tab === "terms" && hasOm) {
+    content = (
       <EmptyState
         title="Analysis hasn’t run for this deal yet."
         action={<RetryForm dealId={dealId} label="Run analysis" />}
       />
     );
+  } else if (tab === "terms") {
+    content = <EmptyState title="No OM uploaded for this deal." />;
+  } else {
+    content = (
+      <EmptyState title="Nothing here from the OM yet — add your own below." />
+    );
   }
-  if (tab === "terms") {
-    return <EmptyState title="No OM uploaded for this deal." />;
-  }
-  return <EmptyState title="Run the analysis to populate this section." />;
+
+  return (
+    <div className="flex flex-col gap-6">
+      {content}
+      {footer}
+    </div>
+  );
 }
 
 /* ------------------------------------------------------------------ */
