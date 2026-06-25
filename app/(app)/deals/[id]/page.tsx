@@ -5,6 +5,8 @@ import { DEAL_STEPS, type DealRow } from "@/lib/deals";
 import {
   type ExtractionResult,
   type ChallengerResult,
+  type BrokerCompsResult,
+  type BrokerComp,
 } from "@/lib/anthropic/types";
 import { AnalysisProgress } from "./analysis-progress";
 import { rerunAnalysis } from "../actions";
@@ -34,6 +36,7 @@ export default async function DealPage({
   const challenges = deal.challenges
     ? (deal.challenges as ChallengerResult)
     : null;
+  const comps = deal.comps ? (deal.comps as BrokerCompsResult) : null;
 
   const { data: jobData } = await supabase
     .from("analysis_jobs")
@@ -93,6 +96,7 @@ export default async function DealPage({
 
       {extraction && <ExtractedTerms result={extraction} />}
       {challenges && <ChallengerResults result={challenges} />}
+      {comps && <BrokerComps result={comps} />}
 
       {/* The six-step loop */}
       <section>
@@ -216,5 +220,97 @@ function ChallengerResults({ result }: { result: ChallengerResult }) {
         </div>
       )}
     </section>
+  );
+}
+
+function BrokerComps({ result }: { result: BrokerCompsResult }) {
+  const hasComps =
+    result.saleComps.length > 0 || result.leaseComps.length > 0;
+
+  return (
+    <section>
+      <h2 className="text-xs font-medium uppercase tracking-wider text-muted">
+        Broker-comp scrutiny
+      </h2>
+
+      {result.summary && (
+        <p className="mt-3 rounded-xl border border-line bg-surface p-4 text-sm leading-relaxed shadow-sm">
+          {result.summary}
+        </p>
+      )}
+
+      {hasComps && (
+        <div className="mt-3 space-y-5">
+          <CompGroup title="Sale comps" comps={result.saleComps} />
+          <CompGroup title="Lease comps" comps={result.leaseComps} />
+        </div>
+      )}
+
+      {result.redFlags.length > 0 && (
+        <div className="mt-3 rounded-xl border border-line border-l-4 border-l-kill bg-surface p-4 shadow-sm">
+          <p className="text-sm font-medium">Cherry-picking & omissions</p>
+          <ul className="mt-2 space-y-1.5">
+            {result.redFlags.map((flag, i) => (
+              <li
+                key={i}
+                className="flex gap-2 text-sm leading-relaxed text-muted"
+              >
+                <span aria-hidden className="text-kill">
+                  ⚑
+                </span>
+                <span>{flag}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CompGroup({ title, comps }: { title: string; comps: BrokerComp[] }) {
+  // Rating → how strongly the comp actually backs the subject deal's pricing.
+  const rating = {
+    supports: { label: "Supports", badge: "bg-pass/10 text-pass" },
+    favorable: { label: "Favorable", badge: "bg-caution/10 text-caution" },
+    stretched: { label: "Stretched", badge: "bg-kill/10 text-kill" },
+  } as const;
+
+  if (comps.length === 0) return null;
+
+  return (
+    <div>
+      <h3 className="text-xs font-medium text-muted">{title}</h3>
+      <div className="mt-2 space-y-2">
+        {comps.map((c, i) => {
+          const r = rating[c.support] ?? rating.favorable;
+          return (
+            <div
+              key={i}
+              className="rounded-xl border border-line bg-surface p-4 shadow-sm"
+            >
+              <div className="flex items-start gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{c.name}</p>
+                  {c.detail && (
+                    <p className="mt-0.5 text-xs text-muted">{c.detail}</p>
+                  )}
+                </div>
+                <span
+                  className={`ml-auto shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${r.badge}`}
+                >
+                  {r.label}
+                </span>
+              </div>
+              {c.note && (
+                <p className="mt-2 text-sm leading-relaxed text-muted">
+                  {c.note}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

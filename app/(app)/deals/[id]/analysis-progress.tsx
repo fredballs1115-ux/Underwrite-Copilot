@@ -8,6 +8,7 @@ type Status = { status: string; step: string | null; progress: number };
 const STEP_LABELS: Record<string, string> = {
   extract: "Reading the OM and extracting the key terms…",
   challenge: "Red-teaming the assumptions like an investment committee…",
+  comps: "Scrutinizing the broker’s comps for cherry-picking…",
 };
 
 /**

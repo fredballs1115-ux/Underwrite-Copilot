@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { downloadOmPdf } from "@/lib/storage";
 import { extractTerms } from "./extract";
 import { challengeAssumptions } from "./challenge";
+import { scrutinizeComps } from "./comps";
 import type { AssetClass } from "./types";
 
 type JobPatch = {
@@ -26,7 +27,7 @@ async function patchJob(dealId: string, patch: JobPatch): Promise<void> {
  * row as each step finishes — the deal page polls that and reveals results as
  * they land.
  *
- * Phases so far: extract → challenge. Phases 4–7 append comps → reconcile →
+ * Phases so far: extract → challenge → comps. Phases 5–7 append reconcile →
  * market → verdict into this same pass.
  */
 export async function runAnalysis(dealId: string): Promise<void> {
@@ -50,7 +51,7 @@ export async function runAnalysis(dealId: string): Promise<void> {
     await patchJob(dealId, {
       status: "running",
       step: "extract",
-      progress: 15,
+      progress: 12,
       error: null,
     });
     const extraction = await extractTerms(pdf, assetClass);
@@ -60,16 +61,24 @@ export async function runAnalysis(dealId: string): Promise<void> {
       .eq("id", dealId);
 
     // Step 2 — assumption challenger
-    await patchJob(dealId, { status: "running", step: "challenge", progress: 60 });
+    await patchJob(dealId, { status: "running", step: "challenge", progress: 42 });
     const challenges = await challengeAssumptions(pdf, assetClass);
     await admin
       .from("deals")
       .update({ challenges, updated_at: new Date().toISOString() })
       .eq("id", dealId);
 
+    // Step 3 — broker-comp scrutiny (reads the comps out of the OM itself)
+    await patchJob(dealId, { status: "running", step: "comps", progress: 72 });
+    const comps = await scrutinizeComps(pdf);
+    await admin
+      .from("deals")
+      .update({ comps, updated_at: new Date().toISOString() })
+      .eq("id", dealId);
+
     await patchJob(dealId, {
       status: "done",
-      step: "challenge",
+      step: "comps",
       progress: 100,
       error: null,
     });
