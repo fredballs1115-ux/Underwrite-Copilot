@@ -43,6 +43,10 @@ export async function extractTerms(
         role: "user",
         content: [
           // Document first, then the instruction (recommended ordering).
+          // `cache_control` caches the prefix up to here — the system prompt +
+          // this OM — so the next pipeline steps (challenge / comps / market),
+          // which re-send the same OM back-to-back, read it from cache at a
+          // fraction of the input cost instead of re-uploading it each time.
           {
             type: "document",
             source: {
@@ -50,6 +54,7 @@ export async function extractTerms(
               media_type: "application/pdf",
               data,
             },
+            cache_control: { type: "ephemeral" },
           },
           { type: "text", text: extractionInstruction(assetClass) },
         ],

@@ -43,6 +43,8 @@ export async function checkMarket(
           {
             type: "document",
             source: { type: "base64", media_type: "application/pdf", data },
+            // Reads the OM from the prompt cache the extraction step wrote.
+            cache_control: { type: "ephemeral" },
           },
           { type: "text", text: marketCheckInstruction(assetClass) },
         ],
