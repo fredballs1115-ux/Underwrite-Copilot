@@ -26,6 +26,8 @@ export interface ExtractedMetric {
   value: string;
   /** true = the buyer must verify this against the source document */
   flagged: boolean;
+  /** OM page where the figure was found, e.g. "p. 12" ("" if unknown) */
+  page: string;
 }
 export interface ExtractionResult {
   dealName: string | null;

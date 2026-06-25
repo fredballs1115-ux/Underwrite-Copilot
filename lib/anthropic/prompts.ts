@@ -36,7 +36,7 @@ export function extractionInstruction(assetClass: AssetClass): string {
 
 Capture: asking price (and per-unit / per-SF if given), NOI (year 1 and stabilized), going-in and pro forma cap rates, occupancy, in-place and pro forma rents, expense ratio, exit cap, IRR, financing (LTV, rate, lender), hold period, seller, and broker. Also capture the property / deal name if present.
 
-For each figure, set \`flagged\` to true if it is a number the buyer must independently verify against source documents rather than trust the OM on — anything forward-looking, sponsor-projected, or easily inflated (pro forma rents, stabilized NOI, projected growth, exit cap, IRR). Set it false for hard, present-day facts.`;
+For each figure, set \`flagged\` to true if it is a number the buyer must independently verify against source documents rather than trust the OM on — anything forward-looking, sponsor-projected, or easily inflated (pro forma rents, stabilized NOI, projected growth, exit cap, IRR). Set it false for hard, present-day facts. Also record, for each figure, the page in the OM where you found it as a short string like "p. 12" (use an empty string if you can't tell).`;
 }
 
 /** Step 2 — Assumption Challenger */

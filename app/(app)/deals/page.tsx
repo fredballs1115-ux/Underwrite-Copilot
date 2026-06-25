@@ -5,15 +5,28 @@ import { createDeal } from "./actions";
 
 type DealListItem = Pick<DealRow, "id" | "name" | "asset_class" | "created_at">;
 
-export default async function DealsPage() {
+const ERRORS: Record<string, string> = {
+  name: "Please give the deal a name.",
+  file: "Please choose a PDF offering memorandum to upload.",
+  pdf: "That file isn’t a PDF — please upload the OM as a PDF.",
+  size: "That PDF is larger than 22 MB — please try a smaller file for now.",
+  save: "Couldn’t save the deal. Please try again.",
+};
+
+export default async function DealsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error: errorCode } = await searchParams;
+  const errorMessage = errorCode ? ERRORS[errorCode] : null;
+
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("deals")
     .select("id, name, asset_class, created_at")
     .order("created_at", { ascending: false });
 
-  // Most likely error here is "table doesn't exist yet" — guide the user to the
-  // one-time database setup instead of crashing.
   if (error) {
     return (
       <div className="rounded-xl border border-line bg-surface p-5 text-sm">
@@ -34,35 +47,48 @@ export default async function DealsPage() {
       <section className="rounded-xl border border-line bg-surface p-5">
         <h2 className="font-medium">New deal</h2>
         <p className="mt-1 text-sm text-muted">
-          Name it now; uploading the OM and running the analysis comes in the
-          next phase.
+          Upload the offering memorandum (PDF). We’ll extract the key terms and
+          flag what to verify against the source.
         </p>
-        <form
-          action={createDeal}
-          className="mt-4 flex flex-col gap-3 sm:flex-row"
-        >
+
+        {errorMessage && (
+          <p className="mt-3 rounded-lg bg-kill/10 px-3 py-2 text-sm text-kill">
+            {errorMessage}
+          </p>
+        )}
+
+        <form action={createDeal} className="mt-4 space-y-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <input
+              name="name"
+              required
+              placeholder="Deal name — e.g. The Maddox at Highland Park"
+              className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-brand"
+            />
+            <select
+              name="assetClass"
+              defaultValue="auto"
+              className="rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-brand"
+            >
+              <option value="auto">Auto-detect</option>
+              <option value="multifamily">Multifamily</option>
+              <option value="office">Office</option>
+              <option value="industrial">Industrial</option>
+              <option value="retail">Retail</option>
+            </select>
+          </div>
           <input
-            name="name"
+            type="file"
+            name="om"
+            accept="application/pdf"
             required
-            placeholder="e.g. The Maddox at Highland Park"
-            className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-brand"
+            className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-brand-strong"
           />
-          <select
-            name="assetClass"
-            defaultValue="auto"
-            className="rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-brand"
-          >
-            <option value="auto">Auto-detect</option>
-            <option value="multifamily">Multifamily</option>
-            <option value="office">Office</option>
-            <option value="industrial">Industrial</option>
-            <option value="retail">Retail</option>
-          </select>
           <button
             type="submit"
             className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong"
           >
-            Create
+            Create &amp; analyze
           </button>
         </form>
       </section>
@@ -73,7 +99,7 @@ export default async function DealsPage() {
         </h2>
         {deals.length === 0 ? (
           <p className="mt-3 text-sm text-muted">
-            No deals yet. Create one above to get started.
+            No deals yet. Upload your first OM above to get started.
           </p>
         ) : (
           <ul className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
