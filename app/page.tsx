@@ -16,16 +16,21 @@ const STEPS = [
   },
   {
     n: 3,
+    title: "Scrutinize the broker comps",
+    body: "Pull the sale and lease comps out of the OM itself, rate whether each actually supports the price, and flag the cherry-picking — stale comps, only the best submarkets shown, weak trades omitted.",
+  },
+  {
+    n: 4,
     title: "Reconcile your model",
     body: "Upload your own ARGUS export or Excel model and surface the gap between what the OM claims and what your underwriting says. The differentiator.",
   },
   {
-    n: 4,
+    n: 5,
     title: "Sanity-check the market",
     body: "Are the rent and cap-rate assumptions even plausible? A gut-check against market norms — flagged clearly as rules-of-thumb, not pulled comps.",
   },
   {
-    n: 5,
+    n: 6,
     title: "Get the verdict",
     body: "One screen synthesizing all of it: pass, caution, or kill — with the top risks and the next steps if you decide to pursue.",
   },

@@ -8,11 +8,15 @@ runs the **whole screen** on one deal:
    verify against the source.
 2. **Challenge** — red-team the pro forma like an investment committee, with the
    exact question to ask the broker, plus a stress test.
-3. **Reconcile** — compare the OM against _your own_ ARGUS/Excel model and
+3. **Scrutinize the broker comps** — pull the sale and lease comps out of the OM
+   itself, rate whether each actually supports the price, and flag the
+   cherry-picking (no external comps data — sidesteps licensing).
+4. **Reconcile** — compare the OM against _your own_ ARGUS/Excel model and
    surface the gap. _(the differentiator)_
-4. **Market check** — sanity-test the rent and cap assumptions against market
+5. **Market check** — sanity-test the rent and cap assumptions against market
    norms (rules-of-thumb, not pulled comps).
-5. **Verdict** — one screen: pass / caution / kill, top risks, next steps.
+6. **Verdict** — one screen synthesizing all of it: pass / caution / kill, top
+   risks, next steps.
 
 Plus accounts and saved deals so you can come back to a deal later.
 
@@ -43,7 +47,7 @@ lib/
     client.ts        server-only Anthropic client (reads your API key)
     models.ts        which model each step uses (cost/quality lever)
     types.ts         output shape for every step (the shared contract)
-    prompts.ts       the analysis prompts (extract/challenge/reconcile/market/verdict)
+    prompts.ts       the analysis prompts (extract/challenge/comps/reconcile/market/verdict)
   supabase/          database + auth helpers (server + browser)
 worker/              background job runner for the long analysis (Phase 2)
 supabase/
@@ -95,9 +99,10 @@ repo). See `render.yaml` for details.
 - **Phase 1** — accounts (Supabase Auth) + saved deals.
 - **Phase 2** — OM upload + extraction + the background-job engine.
 - **Phase 3** — Assumption Challenger.
-- **Phase 4** — Reconciler.
-- **Phase 5** — Market plausibility check.
-- **Phase 6** — One-screen verdict.
+- **Phase 4** — Broker-comp scrutiny.
+- **Phase 5** — Reconciler.
+- **Phase 6** — Market plausibility check.
+- **Phase 7** — One-screen verdict.
 - **Later** — Stripe billing, polish.
 
 ## Scripts

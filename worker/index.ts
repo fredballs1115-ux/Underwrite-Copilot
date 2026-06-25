@@ -7,7 +7,7 @@
  * service) picks it up and does the slow work:
  *
  *   poll `analysis_jobs` for a queued job
- *     → run the pipeline: extract → challenge → reconcile → market → verdict
+ *     → run the pipeline: extract → challenge → comps → reconcile → market → verdict
  *     → update progress as each step finishes
  *     → save results back onto the deal
  *

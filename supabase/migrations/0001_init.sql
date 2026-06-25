@@ -28,6 +28,7 @@ create table if not exists public.deals (
   -- Each pipeline step's result, stored as JSON (shapes mirror lib/anthropic/types.ts).
   extraction jsonb,
   challenges jsonb,
+  comps jsonb,
   reconciliation jsonb,
   market jsonb,
   verdict jsonb,
@@ -41,7 +42,7 @@ create table if not exists public.analysis_jobs (
   deal_id uuid not null references public.deals (id) on delete cascade,
   -- queued → running → done | error
   status text not null default 'queued',
-  -- which step is in flight: 'extract' | 'challenge' | 'reconcile' | 'market' | 'verdict'
+  -- which step is in flight: 'extract' | 'challenge' | 'comps' | 'reconcile' | 'market' | 'verdict'
   step text,
   progress int not null default 0,
   error text,

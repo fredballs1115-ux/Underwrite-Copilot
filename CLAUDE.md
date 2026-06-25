@@ -3,8 +3,8 @@
 # Underwrite Copilot — project orientation
 
 CRE deal-screening web app. One uploaded offering memorandum (OM) flows through a
-five-step analysis loop, all sharing one "deal":
-**extract → challenge → reconcile (vs the user's own model) → market check → verdict.**
+six-step analysis loop, all sharing one "deal":
+**extract → challenge → scrutinize broker comps → reconcile (vs the user's own model) → market check → verdict.**
 Plus accounts + saved deals. (Stripe billing is a later phase.)
 
 ## Architecture
@@ -33,11 +33,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   read PDFs up to ~600 pages / 32MB in one request; enable Citations for
   page-level "verify against source"; cache the OM across the pipeline steps to
   keep cost down. These models use adaptive thinking (no `budget_tokens`).
+- The broker-comp scrutiny step reads comps OUT of the OM itself — no external
+  comps data source (deliberate: avoids data-licensing constraints).
 - This is **Next.js 16** — see AGENTS.md; check `node_modules/next/dist/docs/`
   before using unfamiliar Next APIs.
 
 ## Build roadmap
 
 Phase 0 ✅ scaffold. Phase 1 auth + saved deals. Phase 2 OM upload + extraction +
-worker engine. Phase 3 challenger. Phase 4 reconciler. Phase 5 market check.
-Phase 6 verdict. Later: Stripe billing, polish.
+worker engine. Phase 3 challenger. Phase 4 broker-comp scrutiny. Phase 5 reconciler.
+Phase 6 market check. Phase 7 verdict. Later: Stripe billing, polish.
