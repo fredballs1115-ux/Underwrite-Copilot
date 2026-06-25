@@ -1,0 +1,58 @@
+# Render Blueprint — defines the cloud service(s) for Underwrite Copilot.
+#
+# To use it: push this repo to GitHub, then in Render choose
+# "New → Blueprint" and point it at the repo. Render reads this file and
+# creates the service below. You fill in the secret values in the dashboard
+# (they're marked `sync: false`, so they are never read from the repo).
+#
+# Why Render: it runs the app as a normal always-on server, so the long OM
+# analysis can run as a background job without the function timeouts a
+# serverless host would hit.
+
+services:
+  # ── The web app (Next.js) ─────────────────────────────────────────────────
+  - type: web
+    name: underwrite-copilot-web
+    runtime: node
+    plan: starter # always-on. Use "free" for cheap testing (it sleeps when idle).
+    branch: main
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: ANTHROPIC_API_KEY
+        sync: false # set in the dashboard; never committed
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false
+
+  # ── Phase 2: the background worker that runs the long OM analysis ──────────
+  # Uncomment when we build the pipeline. It shares this repo and the same env
+  # vars (repeat the keys above, or move them into a Render "env group").
+  #
+  # - type: worker
+  #   name: underwrite-copilot-worker
+  #   runtime: node
+  #   plan: starter
+  #   branch: main
+  #   buildCommand: npm install && npm run build:worker
+  #   startCommand: npm run start:worker
+  #   envVars:
+  #     - key: NODE_VERSION
+  #       value: "22"
+  #     - key: ANTHROPIC_API_KEY
+  #       sync: false
+  #     - key: NEXT_PUBLIC_SUPABASE_URL
+  #       sync: false
+  #     - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+  #       sync: false
+  #     - key: SUPABASE_SERVICE_ROLE_KEY
+  #       sync: false
