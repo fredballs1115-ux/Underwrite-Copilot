@@ -2,6 +2,7 @@ import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { downloadOmPdf } from "@/lib/storage";
 import { extractTerms } from "./extract";
+import { challengeAssumptions } from "./challenge";
 import type { AssetClass } from "./types";
 
 type JobPatch = {
@@ -21,15 +22,16 @@ async function patchJob(dealId: string, patch: JobPatch): Promise<void> {
 
 /**
  * The analysis pipeline. Runs in the background (kicked off via `after()` once
- * the upload response is sent) so it never blocks the page. It updates the
- * job row as it goes, which the deal page polls for live progress.
+ * the upload response is sent) so it never blocks the page. It updates the job
+ * row as each step finishes — the deal page polls that and reveals results as
+ * they land.
  *
- * Phase 2 wires the first step (extraction). Phases 3–6 append the remaining
- * steps (challenge → comps → reconcile → market → verdict) into this same pass.
+ * Phases so far: extract → challenge. Phases 4–7 append comps → reconcile →
+ * market → verdict into this same pass.
  */
 export async function runAnalysis(dealId: string): Promise<void> {
-  const admin = createSupabaseAdminClient();
   try {
+    const admin = createSupabaseAdminClient();
     const { data: deal, error } = await admin
       .from("deals")
       .select("id, asset_class, om_storage_path")
@@ -41,27 +43,33 @@ export async function runAnalysis(dealId: string): Promise<void> {
       throw new Error("No OM file is attached to this deal.");
     }
 
+    const assetClass = (deal.asset_class as AssetClass) ?? "auto";
+    const pdf = await downloadOmPdf(deal.om_storage_path as string);
+
+    // Step 1 — extraction
     await patchJob(dealId, {
       status: "running",
       step: "extract",
       progress: 15,
       error: null,
     });
-
-    const pdf = await downloadOmPdf(deal.om_storage_path as string);
-    const extraction = await extractTerms(
-      pdf,
-      (deal.asset_class as AssetClass) ?? "auto",
-    );
-
+    const extraction = await extractTerms(pdf, assetClass);
     await admin
       .from("deals")
       .update({ extraction, updated_at: new Date().toISOString() })
       .eq("id", dealId);
 
+    // Step 2 — assumption challenger
+    await patchJob(dealId, { status: "running", step: "challenge", progress: 60 });
+    const challenges = await challengeAssumptions(pdf, assetClass);
+    await admin
+      .from("deals")
+      .update({ challenges, updated_at: new Date().toISOString() })
+      .eq("id", dealId);
+
     await patchJob(dealId, {
       status: "done",
-      step: "extract",
+      step: "challenge",
       progress: 100,
       error: null,
     });

@@ -1,35 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { rerunAnalysis } from "../actions";
 
-type Status = {
-  status: string;
-  step: string | null;
-  progress: number;
-  error: string | null;
-};
+type Status = { status: string; step: string | null; progress: number };
 
 const STEP_LABELS: Record<string, string> = {
-  extract: "Reading the OM and extracting terms…",
+  extract: "Reading the OM and extracting the key terms…",
+  challenge: "Red-teaming the assumptions like an investment committee…",
 };
 
+/**
+ * Shown only while analysis is queued/running. Polls the status endpoint and
+ * refreshes the page when a step finishes (so results appear one at a time) or
+ * when the run ends (success or error).
+ */
 export function AnalysisProgress({
   dealId,
-  hasOm,
   initial,
 }: {
   dealId: string;
-  hasOm: boolean;
   initial: Status;
 }) {
   const router = useRouter();
   const [state, setState] = useState<Status>(initial);
+  const lastStep = useRef<string | null>(initial.step);
 
   useEffect(() => {
-    const active = state.status === "queued" || state.status === "running";
-    if (!active) return;
+    if (state.status !== "queued" && state.status !== "running") return;
 
     let cancelled = false;
     const poll = async () => {
@@ -39,10 +37,17 @@ export function AnalysisProgress({
         });
         if (!res.ok || cancelled) return;
         const data = (await res.json()) as Status;
+        if (cancelled) return;
+
+        const stepChanged = data.step !== lastStep.current;
+        lastStep.current = data.step;
         setState(data);
-        // Results are written before the job is marked done, so a refresh now
-        // re-renders the page with the extracted terms.
-        if (data.status === "done") router.refresh();
+
+        // Refresh to reveal a finished step's results, or to swap in the final
+        // state (results or error) when the run ends.
+        if (stepChanged || data.status === "done" || data.status === "error") {
+          router.refresh();
+        }
       } catch {
         // transient network blip — keep polling
       }
@@ -55,54 +60,18 @@ export function AnalysisProgress({
     };
   }, [dealId, state.status, router]);
 
-  if (state.status === "error") {
-    return (
-      <div className="rounded-xl border border-line bg-surface p-5">
-        <p className="text-sm font-medium text-kill">Analysis failed</p>
-        {state.error && <p className="mt-1 text-sm text-muted">{state.error}</p>}
-        <RerunButton dealId={dealId} label="Try again" />
-      </div>
-    );
-  }
-
-  if (state.status === "queued" || state.status === "running") {
-    return (
-      <div className="flex items-center gap-3 rounded-xl border border-line bg-surface p-5">
-        <span className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-brand" />
-        <span className="text-sm">
-          {STEP_LABELS[state.step ?? "extract"] ?? "Analyzing…"}
-        </span>
-        <span className="ml-auto text-xs text-muted">{state.progress}%</span>
-      </div>
-    );
-  }
-
   return (
-    <div className="rounded-xl border border-line bg-surface p-5">
-      {hasOm ? (
-        <>
-          <p className="text-sm text-muted">
-            Analysis hasn’t run for this deal yet.
-          </p>
-          <RerunButton dealId={dealId} label="Run analysis" />
-        </>
-      ) : (
-        <p className="text-sm text-muted">No OM uploaded for this deal.</p>
-      )}
+    <div className="flex items-center gap-3 rounded-xl border border-line bg-surface p-5 shadow-sm">
+      <span
+        className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-brand"
+        aria-hidden
+      />
+      <span className="text-sm">
+        {STEP_LABELS[state.step ?? "extract"] ?? "Analyzing…"}
+      </span>
+      <span className="ml-auto text-xs tabular-nums text-muted">
+        {state.progress}%
+      </span>
     </div>
-  );
-}
-
-function RerunButton({ dealId, label }: { dealId: string; label: string }) {
-  return (
-    <form action={rerunAnalysis} className="mt-3">
-      <input type="hidden" name="dealId" value={dealId} />
-      <button
-        type="submit"
-        className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong"
-      >
-        {label}
-      </button>
-    </form>
   );
 }
