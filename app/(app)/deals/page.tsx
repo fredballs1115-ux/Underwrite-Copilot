@@ -3,7 +3,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { type DealRow } from "@/lib/deals";
 import { createDeal } from "./actions";
 
-type DealListItem = Pick<DealRow, "id" | "name" | "asset_class" | "created_at">;
+type DealListItem = Pick<
+  DealRow,
+  "id" | "name" | "asset_class" | "created_at" | "verdict"
+>;
 
 const ERRORS: Record<string, string> = {
   name: "Please give the deal a name.",
@@ -12,6 +15,20 @@ const ERRORS: Record<string, string> = {
   size: "That PDF is larger than 22 MB — please try a smaller file for now.",
   save: "Couldn’t save the deal. Please try again.",
 };
+
+const VERDICT_PILL: Record<string, { label: string; cls: string }> = {
+  pass: { label: "Pass", cls: "bg-pass/15 text-pass" },
+  caution: { label: "Caution", cls: "bg-caution/15 text-caution" },
+  pass_on: { label: "Pass on", cls: "bg-kill/15 text-kill" },
+};
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 export default async function DealsPage({
   searchParams,
@@ -24,7 +41,7 @@ export default async function DealsPage({
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("deals")
-    .select("id, name, asset_class, created_at")
+    .select("id, name, asset_class, created_at, verdict")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -44,8 +61,8 @@ export default async function DealsPage({
 
   return (
     <div className="space-y-10">
-      <section className="rounded-xl border border-line bg-surface p-5">
-        <h2 className="font-medium">New deal</h2>
+      <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
+        <h2 className="text-sm font-semibold tracking-tight">New deal</h2>
         <p className="mt-1 text-sm text-muted">
           Upload the offering memorandum (PDF). We’ll extract the key terms and
           flag what to verify against the source.
@@ -94,28 +111,69 @@ export default async function DealsPage({
       </section>
 
       <section>
-        <h2 className="text-xs font-medium uppercase tracking-wider text-muted">
-          Your deals
-        </h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xs font-medium uppercase tracking-wider text-muted">
+            Your pipeline
+          </h2>
+          {deals.length > 0 && (
+            <span className="font-mono text-xs tabular-nums text-muted">
+              {deals.length} {deals.length === 1 ? "deal" : "deals"}
+            </span>
+          )}
+        </div>
+
         {deals.length === 0 ? (
           <p className="mt-3 text-sm text-muted">
             No deals yet. Upload your first OM above to get started.
           </p>
         ) : (
-          <ul className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
-            {deals.map((d) => (
-              <li key={d.id}>
-                <Link
-                  href={`/deals/${d.id}`}
-                  className="flex items-center justify-between px-5 py-4 transition-colors hover:bg-faint"
-                >
-                  <span className="font-medium">{d.name}</span>
-                  <span className="text-xs capitalize text-muted">
-                    {d.asset_class}
-                  </span>
-                </Link>
-              </li>
-            ))}
+          <ul className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+            {deals.map((d) => {
+              const v = d.verdict as { verdict?: string } | null;
+              const pill = v?.verdict ? VERDICT_PILL[v.verdict] : null;
+              return (
+                <li key={d.id}>
+                  <Link
+                    href={`/deals/${d.id}`}
+                    className="group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-faint"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{d.name}</p>
+                      <p className="mt-0.5 text-xs text-muted">
+                        <span className="capitalize">{d.asset_class}</span>
+                        {" · "}
+                        <span className="font-mono tabular-nums">
+                          {formatDate(d.created_at)}
+                        </span>
+                      </p>
+                    </div>
+                    {pill ? (
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${pill.cls}`}
+                      >
+                        {pill.label}
+                      </span>
+                    ) : (
+                      <span className="shrink-0 text-[11px] text-muted">
+                        Screening
+                      </span>
+                    )}
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-4 w-4 shrink-0 text-line transition-colors group-hover:text-muted"
+                      aria-hidden
+                    >
+                      <path d="m9 18 6-6-6-6" />
+                    </svg>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

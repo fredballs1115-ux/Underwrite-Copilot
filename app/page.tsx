@@ -230,7 +230,9 @@ function DealPreview() {
                 {m.k}
                 {m.flag && <span className="ml-0.5 text-caution">⚑</span>}
               </p>
-              <p className="mt-0.5 text-sm font-medium tabular-nums">{m.v}</p>
+              <p className="mt-0.5 font-mono text-sm font-medium tabular-nums">
+                {m.v}
+              </p>
             </div>
           ))}
         </div>
