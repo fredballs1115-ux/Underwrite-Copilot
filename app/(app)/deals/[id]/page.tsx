@@ -114,13 +114,37 @@ export default async function DealPage({
               {deal.asset_class}
             </p>
           </div>
-          {pill && (
-            <span
-              className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${pill.cls}`}
-            >
-              {pill.label}
-            </span>
-          )}
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            {pill && (
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${pill.cls}`}
+              >
+                {pill.label}
+              </span>
+            )}
+            {verdict && (
+              <a
+                href={`/api/deals/${id}/memo`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-3.5 w-3.5"
+                  aria-hidden
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <path d="m7 10 5 5 5-5" />
+                  <path d="M12 15V3" />
+                </svg>
+                Download memo
+              </a>
+            )}
+          </div>
         </div>
 
         {keyStats.length > 0 && (
