@@ -1,14 +1,18 @@
 -- ============================================================================
 -- Underwrite Copilot — initial schema
 --
--- Apply this in Phase 1, when we add accounts. Run it once in the Supabase
--- dashboard (SQL Editor) or via the Supabase CLI.
+-- Run this ONCE in the Supabase dashboard (SQL Editor) or via the Supabase CLI.
+-- It is idempotent: safe to run again if a previous attempt only half-applied.
+--
+-- IMPORTANT: run the WHOLE file. The SQL editor only runs highlighted text if
+-- anything is selected — click once at the end so nothing is highlighted.
 --
 -- Supabase gives every project an `auth.users` table out of the box. We build
 -- our app tables alongside it and use Row-Level Security (RLS) so each user can
--- only ever see their own rows — enforced by the database itself, not just by
--- application code.
+-- only ever see their own rows — enforced by the database itself.
 -- ============================================================================
+
+-- 1. Tables ------------------------------------------------------------------
 
 -- One profile row per signed-up user.
 create table if not exists public.profiles (
@@ -50,10 +54,33 @@ create table if not exists public.analysis_jobs (
   updated_at timestamptz not null default now()
 );
 
--- ----------------------------------------------------------------------------
--- Auto-create a profile row whenever a new user signs up.
+-- 2. Row-Level Security ------------------------------------------------------
+
+alter table public.profiles enable row level security;
+alter table public.deals enable row level security;
+alter table public.analysis_jobs enable row level security;
+
+-- Policies (drop-then-create so re-running this file is safe).
+drop policy if exists "own profile" on public.profiles;
+create policy "own profile" on public.profiles
+  for all using (auth.uid() = id) with check (auth.uid() = id);
+
+drop policy if exists "own deals" on public.deals;
+create policy "own deals" on public.deals
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "own jobs" on public.analysis_jobs;
+create policy "own jobs" on public.analysis_jobs
+  for all using (
+    exists (
+      select 1 from public.deals d
+      where d.id = analysis_jobs.deal_id and d.user_id = auth.uid()
+    )
+  );
+
+-- 3. Auto-create a profile row whenever a new user signs up ------------------
 -- `security definer` lets the trigger insert past RLS.
--- ----------------------------------------------------------------------------
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -70,30 +97,6 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
-
--- ----------------------------------------------------------------------------
--- Row-Level Security: lock every table to its owner.
--- ----------------------------------------------------------------------------
-alter table public.profiles enable row level security;
-alter table public.deals enable row level security;
-alter table public.analysis_jobs enable row level security;
-
--- Profiles: a user can see and edit only their own profile.
-create policy "own profile" on public.profiles
-  for all using (auth.uid() = id) with check (auth.uid() = id);
-
--- Deals: a user can do anything with their own deals, nothing with others'.
-create policy "own deals" on public.deals
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
--- Jobs: reachable only through a deal the user owns.
-create policy "own jobs" on public.analysis_jobs
-  for all using (
-    exists (
-      select 1 from public.deals d
-      where d.id = analysis_jobs.deal_id and d.user_id = auth.uid()
-    )
-  );
 
 -- ----------------------------------------------------------------------------
 -- Storage (Phase 2): the OM PDFs go in a PRIVATE bucket named
