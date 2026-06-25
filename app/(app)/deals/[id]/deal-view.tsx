@@ -11,6 +11,7 @@ import type {
   VerdictResult,
 } from "@/lib/anthropic/types";
 import {
+  OverviewView,
   TermsView,
   ChallengerView,
   BrokerComps,
@@ -39,6 +40,7 @@ type Results = {
 };
 
 type TabKey =
+  | "overview"
   | "terms"
   | "challenger"
   | "comps"
@@ -50,8 +52,9 @@ const TABS: {
   key: TabKey;
   label: string;
   step: string;
-  result: keyof Results;
+  result: keyof Results | null;
 }[] = [
+  { key: "overview", label: "Overview", step: "", result: null },
   { key: "terms", label: "Terms", step: "extract", result: "extraction" },
   { key: "challenger", label: "Challenger", step: "challenge", result: "challenges" },
   { key: "comps", label: "Comps", step: "comps", result: "comps" },
@@ -144,9 +147,7 @@ export function DealView({
   // Default tab: an explicit ?tab wins; otherwise the verdict if it's ready,
   // else the first tab (which fills in first as analysis runs).
   const validInitial = TABS.find((t) => t.key === initialTab)?.key;
-  const [activeTab, setActiveTab] = useState<TabKey>(
-    validInitial ?? (results.verdict ? "verdict" : "terms"),
-  );
+  const [activeTab, setActiveTab] = useState<TabKey>(validInitial ?? "overview");
 
   function selectTab(key: TabKey) {
     setActiveTab(key);
@@ -160,7 +161,11 @@ export function DealView({
   function tabState(
     t: (typeof TABS)[number],
   ): "done" | "running" | "pending" | "idle" {
-    if (results[t.result] != null) return "done";
+    if (t.key === "overview") {
+      if (results.verdict || results.extraction) return "done";
+      return active ? "running" : "idle";
+    }
+    if (t.result && results[t.result] != null) return "done";
     if (active) {
       if (job?.step === t.step) return "running";
       const cur = PIPELINE.indexOf(job?.step ?? "");
@@ -171,7 +176,9 @@ export function DealView({
   }
 
   const activeDef = TABS.find((t) => t.key === activeTab)!;
-  const activeHasData = results[activeDef.result] != null;
+  const activeHasData = activeDef.result
+    ? results[activeDef.result] != null
+    : true;
 
   return (
     <div className="flex flex-col gap-5">
@@ -219,6 +226,7 @@ export function DealView({
           dealId={dealId}
           hasOm={hasOm}
           active={active}
+          onNavigate={(t) => selectTab(t as TabKey)}
           modelError={
             modelErrorCode ? MODEL_ERRORS[modelErrorCode] ?? null : null
           }
@@ -344,6 +352,7 @@ function TabPanel({
   dealId,
   hasOm,
   active,
+  onNavigate,
   modelError,
 }: {
   tab: TabKey;
@@ -352,8 +361,15 @@ function TabPanel({
   dealId: string;
   hasOm: boolean;
   active: boolean;
+  onNavigate: (tab: string) => void;
   modelError: string | null;
 }) {
+  if (tab === "overview") {
+    return (
+      <OverviewView results={results} active={active} onNavigate={onNavigate} />
+    );
+  }
+
   // The reconciler tab always offers the upload, plus the result if present.
   if (tab === "reconciler") {
     return (
@@ -374,7 +390,7 @@ function TabPanel({
   }
 
   const def = TABS.find((t) => t.key === tab)!;
-  const data = results[def.result];
+  const data = def.result ? results[def.result] : null;
 
   if (data) {
     switch (tab) {
