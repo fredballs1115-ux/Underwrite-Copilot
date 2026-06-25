@@ -1,7 +1,8 @@
+import Link from "next/link";
+
 // The landing page. This is a React Server Component (the default in the App
 // Router): it renders to HTML on the server, ships zero JavaScript for this
-// page, and never touches your API keys. Pure marketing for now — the actual
-// app screens arrive in later phases.
+// page, and never touches your API keys.
 
 const STEPS = [
   {
@@ -50,7 +51,12 @@ export default function Home() {
               Underwrite Copilot
             </span>
           </div>
-          <span className="text-sm text-muted">Sign in · coming soon</span>
+          <Link
+            href="/login"
+            className="text-sm font-medium text-brand hover:text-brand-strong"
+          >
+            Sign in
+          </Link>
         </div>
       </header>
 
@@ -59,7 +65,7 @@ export default function Home() {
         <section className="py-20 sm:py-28">
           <span className="inline-flex items-center gap-2 rounded-full bg-brand/10 px-3 py-1 text-xs font-medium text-brand">
             <span className="h-1.5 w-1.5 rounded-full bg-brand" />
-            In development · Phase 0
+            Private beta
           </span>
           <h1 className="mt-5 max-w-3xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
             Screen a CRE deal from every angle — in minutes, not a weekend.
@@ -74,9 +80,17 @@ export default function Home() {
             Built for the analysts and small acquisitions shops the enterprise
             tools don&apos;t serve.
           </p>
+          <div className="mt-8">
+            <Link
+              href="/login"
+              className="inline-flex items-center rounded-lg bg-brand px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-strong"
+            >
+              Get started free
+            </Link>
+          </div>
         </section>
 
-        {/* The five-step loop */}
+        {/* The six-step loop */}
         <section className="pb-20">
           <p className="text-xs font-medium uppercase tracking-wider text-muted">
             The whole loop — one deal
