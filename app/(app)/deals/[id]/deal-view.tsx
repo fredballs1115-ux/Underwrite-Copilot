@@ -1,17 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { rerunAnalysis, reconcileWithModel } from "../actions";
 import type {
   ExtractionResult,
   ChallengerResult,
   BrokerCompsResult,
-  BrokerComp,
   ReconciliationResult,
   MarketResult,
   VerdictResult,
 } from "@/lib/anthropic/types";
+import {
+  TermsView,
+  ChallengerView,
+  BrokerComps,
+  Reconciliation,
+  ReconcileSection,
+  MarketCheck,
+  VerdictView,
+  RetryForm,
+  EmptyState,
+} from "./deal-sections";
 
 type Job = {
   status: string;
@@ -148,7 +157,9 @@ export function DealView({
     window.history.replaceState(null, "", url);
   }
 
-  function tabState(t: (typeof TABS)[number]): "done" | "running" | "pending" | "idle" {
+  function tabState(
+    t: (typeof TABS)[number],
+  ): "done" | "running" | "pending" | "idle" {
     if (results[t.result] != null) return "done";
     if (active) {
       if (job?.step === t.step) return "running";
@@ -208,7 +219,9 @@ export function DealView({
           dealId={dealId}
           hasOm={hasOm}
           active={active}
-          modelError={modelErrorCode ? MODEL_ERRORS[modelErrorCode] ?? null : null}
+          modelError={
+            modelErrorCode ? MODEL_ERRORS[modelErrorCode] ?? null : null
+          }
         />
       </div>
     </div>
@@ -232,9 +245,7 @@ function TabDot({
   }
   if (state === "running") {
     return (
-      <span
-        className={`${base} pulse-bar ${active ? "bg-white" : "bg-brand"}`}
-      />
+      <span className={`${base} pulse-bar ${active ? "bg-white" : "bg-brand"}`} />
     );
   }
   if (state === "pending") {
@@ -242,7 +253,9 @@ function TabDot({
   }
   return (
     <span
-      className={`${base} ${active ? "bg-white/40" : "bg-transparent ring-1 ring-inset ring-line"}`}
+      className={`${base} ${
+        active ? "bg-white/40" : "bg-transparent ring-1 ring-inset ring-line"
+      }`}
     />
   );
 }
@@ -274,7 +287,9 @@ function ProgressRail({ job }: { job: NonNullable<Job> }) {
     <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
       <div className="flex items-center gap-3">
         <Spinner />
-        <span className="text-sm">{STEP_LABELS[job.step ?? ""] ?? "Analyzing…"}</span>
+        <span className="text-sm">
+          {STEP_LABELS[job.step ?? ""] ?? "Analyzing…"}
+        </span>
         <span className="ml-auto font-mono text-xs tabular-nums text-muted">
           {job.progress}%
         </span>
@@ -339,8 +354,7 @@ function TabPanel({
   active: boolean;
   modelError: string | null;
 }) {
-  // The reconciler tab is special: it always offers the upload, plus the
-  // result if present.
+  // The reconciler tab always offers the upload, plus the result if present.
   if (tab === "reconciler") {
     return (
       <div className="flex flex-col gap-5">
@@ -382,7 +396,6 @@ function TabPanel({
   if (state === "running" || state === "pending") {
     return <TabSkeleton tab={tab} />;
   }
-
   if (tab === "terms" && hasOm) {
     return (
       <EmptyState
@@ -394,24 +407,7 @@ function TabPanel({
   if (tab === "terms") {
     return <EmptyState title="No OM uploaded for this deal." />;
   }
-  return (
-    <EmptyState title="Run the analysis to populate this section." />
-  );
-}
-
-function EmptyState({
-  title,
-  action,
-}: {
-  title: string;
-  action?: ReactNode;
-}) {
-  return (
-    <div className="rounded-xl border border-line bg-surface p-6 text-center shadow-sm">
-      <p className="text-sm text-muted">{title}</p>
-      {action && <div className="mt-3 flex justify-center">{action}</div>}
-    </div>
-  );
+  return <EmptyState title="Run the analysis to populate this section." />;
 }
 
 /* ------------------------------------------------------------------ */
@@ -485,447 +481,5 @@ function VerdictSkeleton() {
         ))}
       </div>
     </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Redesigned tabs (Slice 1): Terms + Verdict                          */
-/* ------------------------------------------------------------------ */
-
-function TermsView({ result }: { result: ExtractionResult }) {
-  return (
-    <section>
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold tracking-tight">Extracted terms</h2>
-        <span className="text-xs text-caution">⚑ verify against source</span>
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        {result.metrics.map((m, i) => (
-          <div
-            key={i}
-            className="rounded-xl border border-line bg-surface p-4 shadow-sm transition-shadow hover:shadow-md"
-          >
-            <p className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-muted">
-              <span className="truncate">{m.label}</span>
-              {m.flagged && <span className="shrink-0 text-caution">⚑</span>}
-            </p>
-            <p className="mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums">
-              {m.value}
-            </p>
-            {m.page && <p className="mt-2 text-[10px] text-muted">{m.page}</p>}
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function VerdictView({ result }: { result: VerdictResult }) {
-  const v =
-    {
-      pass: {
-        word: "Pass",
-        sub: "Worth deeper work",
-        dot: "bg-pass",
-        tint: "from-pass/10",
-      },
-      caution: {
-        word: "Caution",
-        sub: "Proceed only with named conditions",
-        dot: "bg-caution",
-        tint: "from-caution/10",
-      },
-      pass_on: {
-        word: "Pass on",
-        sub: "Kill it",
-        dot: "bg-kill",
-        tint: "from-kill/10",
-      },
-    }[result.verdict] ?? {
-      word: "Caution",
-      sub: "",
-      dot: "bg-caution",
-      tint: "from-caution/10",
-    };
-
-  return (
-    <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
-      <div className={`bg-gradient-to-b ${v.tint} to-transparent p-6`}>
-        <div className="flex items-center gap-2">
-          <span className={`h-2 w-2 rounded-full ${v.dot}`} />
-          <span className="text-xs font-medium uppercase tracking-wider text-muted">
-            Verdict
-          </span>
-        </div>
-        <p className="mt-3 text-3xl font-semibold tracking-tight">{v.word}</p>
-        {v.sub && <p className="mt-0.5 text-sm text-muted">{v.sub}</p>}
-        <p className="mt-4 max-w-2xl text-sm leading-relaxed">{result.reason}</p>
-      </div>
-      {(result.topRisks.length > 0 || result.nextSteps.length > 0) && (
-        <div className="grid gap-px bg-line sm:grid-cols-2">
-          <div className="bg-surface p-5">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted">
-              Top risks
-            </p>
-            <ul className="mt-3 space-y-2">
-              {result.topRisks.map((r, i) => (
-                <li key={i} className="flex gap-2.5 text-sm leading-relaxed">
-                  <span aria-hidden className="mt-2 h-1 w-1 shrink-0 rounded-full bg-kill" />
-                  <span className="text-muted">{r}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="bg-surface p-5">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted">
-              Next steps
-            </p>
-            <ul className="mt-3 space-y-2">
-              {result.nextSteps.map((n, i) => (
-                <li key={i} className="flex gap-2.5 text-sm leading-relaxed">
-                  <span aria-hidden className="text-brand">
-                    →
-                  </span>
-                  <span className="text-muted">{n}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-    </section>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Ported tabs (restyled in later slices): Challenger / Comps /        */
-/* Market / Reconciler                                                 */
-/* ------------------------------------------------------------------ */
-
-function ChallengerView({ result }: { result: ChallengerResult }) {
-  const sev = {
-    high: { ring: "border-l-kill", badge: "bg-kill/10 text-kill" },
-    medium: { ring: "border-l-caution", badge: "bg-caution/10 text-caution" },
-    low: { ring: "border-l-brand", badge: "bg-brand/10 text-brand" },
-  } as const;
-
-  return (
-    <section>
-      <h2 className="text-sm font-semibold tracking-tight">
-        Assumption challenger
-      </h2>
-      <div className="mt-4 space-y-3">
-        {result.challenges.map((c, i) => {
-          const s = sev[c.severity] ?? sev.medium;
-          return (
-            <div
-              key={i}
-              className={`rounded-xl border border-line border-l-4 ${s.ring} bg-surface p-4 shadow-sm`}
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">{c.assumption}</span>
-                <span
-                  className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${s.badge}`}
-                >
-                  {c.severity}
-                </span>
-              </div>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted">
-                {c.challenge}
-              </p>
-              {c.question && (
-                <p className="mt-2 text-sm leading-relaxed">
-                  <span className="font-medium">Ask the broker:</span>{" "}
-                  <span className="text-muted">{c.question}</span>
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      {result.stressTest && (
-        <div className="mt-3 rounded-xl border border-line bg-paper p-4">
-          <p className="text-sm font-medium">Stress test</p>
-          <p className="mt-1 text-sm leading-relaxed text-muted">
-            {result.stressTest}
-          </p>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function BrokerComps({ result }: { result: BrokerCompsResult }) {
-  const hasComps =
-    result.saleComps.length > 0 || result.leaseComps.length > 0;
-
-  return (
-    <section>
-      <h2 className="text-sm font-semibold tracking-tight">
-        Broker-comp scrutiny
-      </h2>
-
-      {result.summary && (
-        <p className="mt-4 rounded-xl border border-line bg-surface p-4 text-sm leading-relaxed shadow-sm">
-          {result.summary}
-        </p>
-      )}
-
-      {hasComps && (
-        <div className="mt-3 space-y-5">
-          <CompGroup title="Sale comps" comps={result.saleComps} />
-          <CompGroup title="Lease comps" comps={result.leaseComps} />
-        </div>
-      )}
-
-      {result.redFlags.length > 0 && (
-        <div className="mt-3 rounded-xl border border-line border-l-4 border-l-kill bg-surface p-4 shadow-sm">
-          <p className="text-sm font-medium">Cherry-picking &amp; omissions</p>
-          <ul className="mt-2 space-y-1.5">
-            {result.redFlags.map((flag, i) => (
-              <li
-                key={i}
-                className="flex gap-2 text-sm leading-relaxed text-muted"
-              >
-                <span aria-hidden className="text-kill">
-                  ⚑
-                </span>
-                <span>{flag}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function CompGroup({ title, comps }: { title: string; comps: BrokerComp[] }) {
-  const rating = {
-    supports: { label: "Supports", badge: "bg-pass/10 text-pass" },
-    favorable: { label: "Favorable", badge: "bg-caution/10 text-caution" },
-    stretched: { label: "Stretched", badge: "bg-kill/10 text-kill" },
-  } as const;
-
-  if (comps.length === 0) return null;
-
-  return (
-    <div>
-      <h3 className="text-xs font-medium text-muted">{title}</h3>
-      <div className="mt-2 space-y-2">
-        {comps.map((c, i) => {
-          const r = rating[c.support] ?? rating.favorable;
-          return (
-            <div
-              key={i}
-              className="rounded-xl border border-line bg-surface p-4 shadow-sm"
-            >
-              <div className="flex items-start gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">{c.name}</p>
-                  {c.detail && (
-                    <p className="mt-0.5 text-xs text-muted">{c.detail}</p>
-                  )}
-                </div>
-                <span
-                  className={`ml-auto shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${r.badge}`}
-                >
-                  {r.label}
-                </span>
-              </div>
-              {c.note && (
-                <p className="mt-2 text-sm leading-relaxed text-muted">
-                  {c.note}
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function MarketCheck({ result }: { result: MarketResult }) {
-  const tone = {
-    "in-line": { badge: "bg-pass/10 text-pass", label: "In-line" },
-    aggressive: { badge: "bg-kill/10 text-kill", label: "Aggressive" },
-    conservative: { badge: "bg-brand/10 text-brand", label: "Conservative" },
-  } as const;
-
-  return (
-    <section>
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold tracking-tight">
-          Market plausibility check
-        </h2>
-        <span className="text-xs text-muted">rules-of-thumb, not pulled comps</span>
-      </div>
-      <div className="mt-4 space-y-2">
-        {result.checks.map((c, i) => {
-          const t = tone[c.assessment] ?? tone["in-line"];
-          return (
-            <div
-              key={i}
-              className="rounded-xl border border-line bg-surface p-4 shadow-sm"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">{c.assumption}</span>
-                <span
-                  className={`ml-auto shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${t.badge}`}
-                >
-                  {t.label}
-                </span>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted">
-                <span>
-                  OM: <span className="font-mono tabular-nums text-ink">{c.omSays}</span>
-                </span>
-                <span>
-                  Typical:{" "}
-                  <span className="font-mono tabular-nums text-ink">
-                    {c.typicalRange}
-                  </span>
-                </span>
-              </div>
-              {c.note && (
-                <p className="mt-2 text-sm leading-relaxed text-muted">
-                  {c.note}
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      {result.summary && (
-        <p className="mt-3 rounded-xl border border-line bg-paper p-4 text-sm leading-relaxed text-muted">
-          {result.summary}
-        </p>
-      )}
-    </section>
-  );
-}
-
-function Reconciliation({ result }: { result: ReconciliationResult }) {
-  const dir = {
-    unfavorable: { badge: "bg-kill/10 text-kill", label: "Unfavorable" },
-    favorable: { badge: "bg-pass/10 text-pass", label: "Favorable" },
-    neutral: { badge: "bg-brand/10 text-brand", label: "Neutral" },
-  } as const;
-
-  return (
-    <section>
-      <h2 className="text-sm font-semibold tracking-tight">
-        Reconciliation — your model vs. the OM
-      </h2>
-      <div className="mt-4 overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
-        <table className="w-full min-w-[34rem] text-sm">
-          <thead>
-            <tr className="border-b border-line text-left text-xs text-muted">
-              <th className="px-4 py-2.5 font-medium">Metric</th>
-              <th className="px-4 py-2.5 font-medium">OM says</th>
-              <th className="px-4 py-2.5 font-medium">Your model</th>
-              <th className="px-4 py-2.5 font-medium">Gap</th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.rows.map((r, i) => {
-              const d = dir[r.direction] ?? dir.neutral;
-              return (
-                <tr
-                  key={i}
-                  className="border-b border-line align-top last:border-0"
-                >
-                  <td className="px-4 py-3 font-medium">{r.metric}</td>
-                  <td className="px-4 py-3 font-mono tabular-nums text-muted">
-                    {r.omValue}
-                  </td>
-                  <td className="px-4 py-3 font-mono tabular-nums text-muted">
-                    {r.myValue}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${d.badge}`}
-                    >
-                      {d.label}
-                    </span>
-                    {r.gap && <p className="mt-1 text-muted">{r.gap}</p>}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      {result.takeaway && (
-        <p className="mt-3 rounded-xl border border-line bg-paper p-4 text-sm leading-relaxed">
-          <span className="font-medium">Takeaway: </span>
-          <span className="text-muted">{result.takeaway}</span>
-        </p>
-      )}
-    </section>
-  );
-}
-
-function ReconcileSection({
-  dealId,
-  hasResult,
-  error,
-}: {
-  dealId: string;
-  hasResult: boolean;
-  error: string | null;
-}) {
-  return (
-    <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
-      <h2 className="text-sm font-semibold tracking-tight">
-        {hasResult ? "Reconcile a different model" : "Reconcile your model"}
-      </h2>
-      <p className="mt-1 text-sm leading-relaxed text-muted">
-        Upload your own underwriting — Excel (.xlsx), CSV, or a PDF / ARGUS
-        export — and we’ll line it up against the OM and surface every gap, from
-        your perspective. This is the part the OM can’t tell you.
-      </p>
-
-      {error && (
-        <p className="mt-3 rounded-lg bg-kill/10 px-3 py-2 text-sm text-kill">
-          {error}
-        </p>
-      )}
-
-      <form
-        action={reconcileWithModel}
-        className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center"
-      >
-        <input type="hidden" name="dealId" value={dealId} />
-        <input
-          type="file"
-          name="model"
-          accept=".xlsx,.xls,.csv,application/pdf"
-          required
-          className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-brand-strong"
-        />
-        <button
-          type="submit"
-          className="shrink-0 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
-        >
-          Reconcile
-        </button>
-      </form>
-    </section>
-  );
-}
-
-function RetryForm({ dealId, label }: { dealId: string; label: string }) {
-  return (
-    <form action={rerunAnalysis} className="mt-3">
-      <input type="hidden" name="dealId" value={dealId} />
-      <button
-        type="submit"
-        className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
-      >
-        {label}
-      </button>
-    </form>
   );
 }
