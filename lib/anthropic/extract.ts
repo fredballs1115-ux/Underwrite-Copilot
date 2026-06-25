@@ -12,6 +12,7 @@ import type { AssetClass, ExtractionResult } from "./types";
 const ExtractionSchema = z.object({
   dealName: z.string(),
   assetClass: z.string(),
+  market: z.string(),
   metrics: z.array(
     z.object({
       label: z.string(),
@@ -71,6 +72,7 @@ export async function extractTerms(
   return {
     dealName: out.dealName.trim() ? out.dealName.trim() : null,
     assetClass: out.assetClass,
+    market: out.market,
     metrics: out.metrics,
   };
 }

@@ -34,7 +34,7 @@ export function extractionInstruction(assetClass: AssetClass): string {
     assetClass,
   )}
 
-Capture: asking price (and per-unit / per-SF if given), NOI (year 1 and stabilized), going-in and pro forma cap rates, occupancy, in-place and pro forma rents, expense ratio, exit cap, IRR, financing (LTV, rate, lender), hold period, seller, and broker. Also capture the property / deal name if present.
+Capture: asking price (and per-unit / per-SF if given), NOI (year 1 and stabilized), going-in and pro forma cap rates, occupancy, in-place and pro forma rents, expense ratio, exit cap, IRR, financing (LTV, rate, lender), hold period, seller, and broker. Also capture the property / deal name if present, and the \`market\` — the submarket and metro the property sits in, as a short string like "North Dallas, TX" (empty string if you can't tell).
 
 Set \`flagged\` to true ONLY for the figures most worth independent verification — forward-looking or sponsor-controlled numbers that drive returns and are easy to inflate (pro forma rents, stabilized NOI, projected rent growth, exit cap, IRR, expense ratios). Do NOT flag hard, present-day, third-party-verifiable facts (asking price, unit or SF count, year built, in-place occupancy, seller, broker, stated loan terms). Flag selectively: if nearly everything is flagged, the flags stop being useful. Also record, for each figure, the page in the OM where you found it as a short string like "p. 12" (use an empty string if you can't tell).`;
 }

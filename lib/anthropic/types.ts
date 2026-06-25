@@ -32,6 +32,9 @@ export interface ExtractedMetric {
 export interface ExtractionResult {
   dealName: string | null;
   assetClass: string;
+  /** Submarket / metro, e.g. "North Dallas, TX" ("" if unclear). Optional for
+   *  backward-compatibility with extractions saved before this field existed. */
+  market?: string;
   metrics: ExtractedMetric[];
 }
 
