@@ -8,6 +8,8 @@ import {
   type BrokerCompsResult,
   type BrokerComp,
   type ReconciliationResult,
+  type MarketResult,
+  type VerdictResult,
 } from "@/lib/anthropic/types";
 import { AnalysisProgress } from "./analysis-progress";
 import { rerunAnalysis, reconcileWithModel } from "../actions";
@@ -51,6 +53,8 @@ export default async function DealPage({
   const reconciliation = deal.reconciliation
     ? (deal.reconciliation as ReconciliationResult)
     : null;
+  const market = deal.market ? (deal.market as MarketResult) : null;
+  const verdict = deal.verdict ? (deal.verdict as VerdictResult) : null;
 
   const { data: jobData } = await supabase
     .from("analysis_jobs")
@@ -108,9 +112,13 @@ export default async function DealPage({
         </div>
       ) : null}
 
+      {/* The headline — synthesizes everything below it. */}
+      {verdict && <Verdict result={verdict} />}
+
       {extraction && <ExtractedTerms result={extraction} />}
       {challenges && <ChallengerResults result={challenges} />}
       {comps && <BrokerComps result={comps} />}
+      {market && <MarketCheck result={market} />}
       {reconciliation && <Reconciliation result={reconciliation} />}
 
       {/* Reconcile-your-model upload — available once the OM screen has run. */}
@@ -449,6 +457,142 @@ function ReconcileSection({
           Reconcile
         </button>
       </form>
+    </section>
+  );
+}
+
+function MarketCheck({ result }: { result: MarketResult }) {
+  const tone = {
+    "in-line": { badge: "bg-pass/10 text-pass", label: "In-line" },
+    aggressive: { badge: "bg-kill/10 text-kill", label: "Aggressive" },
+    conservative: { badge: "bg-brand/10 text-brand", label: "Conservative" },
+  } as const;
+
+  return (
+    <section>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-xs font-medium uppercase tracking-wider text-muted">
+          Market plausibility check
+        </h2>
+        <span className="text-xs text-muted">rules-of-thumb, not pulled comps</span>
+      </div>
+      <div className="mt-3 space-y-2">
+        {result.checks.map((c, i) => {
+          const t = tone[c.assessment] ?? tone["in-line"];
+          return (
+            <div
+              key={i}
+              className="rounded-xl border border-line bg-surface p-4 shadow-sm"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">{c.assumption}</span>
+                <span
+                  className={`ml-auto shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${t.badge}`}
+                >
+                  {t.label}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted">
+                <span>
+                  OM: <span className="text-ink">{c.omSays}</span>
+                </span>
+                <span>
+                  Typical: <span className="text-ink">{c.typicalRange}</span>
+                </span>
+              </div>
+              {c.note && (
+                <p className="mt-2 text-sm leading-relaxed text-muted">
+                  {c.note}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {result.summary && (
+        <p className="mt-3 rounded-xl border border-line bg-paper p-4 text-sm leading-relaxed text-muted">
+          {result.summary}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function Verdict({ result }: { result: VerdictResult }) {
+  const v = {
+    pass: {
+      card: "border-pass/30 bg-pass/5",
+      badge: "bg-pass/15 text-pass",
+      label: "Pass — worth deeper work",
+    },
+    caution: {
+      card: "border-caution/30 bg-caution/5",
+      badge: "bg-caution/15 text-caution",
+      label: "Caution — proceed with conditions",
+    },
+    pass_on: {
+      card: "border-kill/30 bg-kill/5",
+      badge: "bg-kill/15 text-kill",
+      label: "Pass on — kill it",
+    },
+  } as const;
+  const s = v[result.verdict] ?? v.caution;
+
+  return (
+    <section className={`rounded-2xl border p-5 shadow-sm ${s.card}`}>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-xs font-medium uppercase tracking-wider text-muted">
+          Verdict
+        </h2>
+        <span
+          className={`rounded-full px-3 py-1 text-xs font-semibold ${s.badge}`}
+        >
+          {s.label}
+        </span>
+      </div>
+      <p className="mt-3 text-sm leading-relaxed">{result.reason}</p>
+      <div className="mt-4 grid gap-5 sm:grid-cols-2">
+        {result.topRisks.length > 0 && (
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-muted">
+              Top risks
+            </p>
+            <ul className="mt-2 space-y-1.5">
+              {result.topRisks.map((r, i) => (
+                <li
+                  key={i}
+                  className="flex gap-2 text-sm leading-relaxed text-muted"
+                >
+                  <span aria-hidden className="text-kill">
+                    •
+                  </span>
+                  <span>{r}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {result.nextSteps.length > 0 && (
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-muted">
+              Next steps
+            </p>
+            <ul className="mt-2 space-y-1.5">
+              {result.nextSteps.map((n, i) => (
+                <li
+                  key={i}
+                  className="flex gap-2 text-sm leading-relaxed text-muted"
+                >
+                  <span aria-hidden className="text-brand">
+                    →
+                  </span>
+                  <span>{n}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </section>
   );
 }

@@ -5,8 +5,17 @@ import { extractTerms } from "./extract";
 import { challengeAssumptions } from "./challenge";
 import { scrutinizeComps } from "./comps";
 import { reconcileModel } from "./reconcile";
+import { checkMarket } from "./market";
+import { synthesizeVerdict } from "./verdict";
 import { parseModelFile } from "@/lib/model-parse";
-import type { AssetClass } from "./types";
+import type {
+  AssetClass,
+  ExtractionResult,
+  ChallengerResult,
+  BrokerCompsResult,
+  ReconciliationResult,
+  MarketResult,
+} from "./types";
 
 type JobPatch = {
   status?: string;
@@ -24,14 +33,43 @@ async function patchJob(dealId: string, patch: JobPatch): Promise<void> {
 }
 
 /**
+ * Re-synthesize the one-screen verdict from whatever results the deal currently
+ * has stored. Called at the end of the main run and again after a reconcile, so
+ * the verdict always reflects the latest evidence.
+ */
+async function regenerateVerdict(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  dealId: string,
+): Promise<void> {
+  const { data } = await admin
+    .from("deals")
+    .select("extraction, challenges, comps, reconciliation, market")
+    .eq("id", dealId)
+    .single();
+
+  const verdict = await synthesizeVerdict({
+    extraction: (data?.extraction as ExtractionResult) ?? null,
+    challenges: (data?.challenges as ChallengerResult) ?? null,
+    comps: (data?.comps as BrokerCompsResult) ?? null,
+    reconciliation: (data?.reconciliation as ReconciliationResult) ?? null,
+    market: (data?.market as MarketResult) ?? null,
+  });
+
+  await admin
+    .from("deals")
+    .update({ verdict, updated_at: new Date().toISOString() })
+    .eq("id", dealId);
+}
+
+/**
  * The analysis pipeline. Runs in the background (kicked off via `after()` once
  * the upload response is sent) so it never blocks the page. It updates the job
  * row as each step finishes — the deal page polls that and reveals results as
  * they land.
  *
- * Phases so far: extract → challenge → comps. Reconcile runs separately (it
- * needs the buyer's own model, uploaded later — see runReconciliation). Phases
- * 6–7 append market → verdict into this same pass.
+ * The automatic pass: extract → challenge → comps → market → verdict.
+ * Reconcile runs separately (it needs the buyer's own model, uploaded later —
+ * see runReconciliation), and regenerates the verdict when it lands.
  */
 export async function runAnalysis(dealId: string): Promise<void> {
   try {
@@ -54,7 +92,7 @@ export async function runAnalysis(dealId: string): Promise<void> {
     await patchJob(dealId, {
       status: "running",
       step: "extract",
-      progress: 12,
+      progress: 10,
       error: null,
     });
     const extraction = await extractTerms(pdf, assetClass);
@@ -64,7 +102,7 @@ export async function runAnalysis(dealId: string): Promise<void> {
       .eq("id", dealId);
 
     // Step 2 — assumption challenger
-    await patchJob(dealId, { status: "running", step: "challenge", progress: 42 });
+    await patchJob(dealId, { status: "running", step: "challenge", progress: 30 });
     const challenges = await challengeAssumptions(pdf, assetClass);
     await admin
       .from("deals")
@@ -72,16 +110,28 @@ export async function runAnalysis(dealId: string): Promise<void> {
       .eq("id", dealId);
 
     // Step 3 — broker-comp scrutiny (reads the comps out of the OM itself)
-    await patchJob(dealId, { status: "running", step: "comps", progress: 72 });
+    await patchJob(dealId, { status: "running", step: "comps", progress: 50 });
     const comps = await scrutinizeComps(pdf);
     await admin
       .from("deals")
       .update({ comps, updated_at: new Date().toISOString() })
       .eq("id", dealId);
 
+    // Step 4 — market plausibility check (rules-of-thumb, no live comps feed)
+    await patchJob(dealId, { status: "running", step: "market", progress: 70 });
+    const market = await checkMarket(pdf, assetClass);
+    await admin
+      .from("deals")
+      .update({ market, updated_at: new Date().toISOString() })
+      .eq("id", dealId);
+
+    // Step 5 — verdict (synthesizes everything gathered above)
+    await patchJob(dealId, { status: "running", step: "verdict", progress: 90 });
+    await regenerateVerdict(admin, dealId);
+
     await patchJob(dealId, {
       status: "done",
-      step: "comps",
+      step: "verdict",
       progress: 100,
       error: null,
     });
@@ -132,9 +182,13 @@ export async function runReconciliation(
       .update({ reconciliation, updated_at: new Date().toISOString() })
       .eq("id", dealId);
 
+    // Fold the reconciliation into the verdict so the headline reflects it.
+    await patchJob(dealId, { status: "running", step: "verdict", progress: 80 });
+    await regenerateVerdict(admin, dealId);
+
     await patchJob(dealId, {
       status: "done",
-      step: "reconcile",
+      step: "verdict",
       progress: 100,
       error: null,
     });
