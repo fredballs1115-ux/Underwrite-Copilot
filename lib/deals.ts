@@ -19,6 +19,8 @@ export interface DealRow {
   supplements: unknown;
   // Generated first-draft underwriting model (UnderwritingModel). Migration 0003.
   model: unknown;
+  // Public-web comp search results (unverified fallback). Migration 0004.
+  comp_search: unknown;
   created_at: string;
   updated_at: string;
 }

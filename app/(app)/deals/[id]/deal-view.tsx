@@ -28,6 +28,7 @@ import {
 import { ModelView } from "./model-view";
 import type { UnderwritingModel } from "@/lib/model/types";
 import type { DealDocument } from "@/lib/documents";
+import type { CompSearchResult } from "@/lib/anthropic/comps-search";
 
 type SupplementsMap = Partial<Record<string, TabSupplement>>;
 
@@ -84,6 +85,7 @@ const STEP_LABELS: Record<string, string> = {
   reconcile: "Reconciling your model against the OM…",
   verdict: "Writing the one-screen verdict…",
   model: "Reconciling your documents into a first-draft model…",
+  comps_search: "Searching the public web for comparable sales…",
 };
 
 const MODEL_ERRORS: Record<string, string> = {
@@ -106,6 +108,7 @@ export function DealView({
   supplements,
   model,
   documents,
+  compSearch,
 }: {
   dealId: string;
   initialTab: string | null;
@@ -116,6 +119,7 @@ export function DealView({
   supplements: SupplementsMap;
   model: UnderwritingModel | null;
   documents: DealDocument[];
+  compSearch: CompSearchResult | null;
 }) {
   const router = useRouter();
 
@@ -255,6 +259,7 @@ export function DealView({
           supplements={supplements}
           model={model}
           documents={documents}
+          compSearch={compSearch}
         />
       </div>
     </div>
@@ -296,7 +301,11 @@ function TabDot({
 function ProgressRail({ job }: { job: NonNullable<Job> }) {
   // Reconcile and model generation run on their own — a simple indicator, not
   // the 5-step pipeline rail.
-  if (job.step === "reconcile" || job.step === "model") {
+  if (
+    job.step === "reconcile" ||
+    job.step === "model" ||
+    job.step === "comps_search"
+  ) {
     return (
       <div className="flex items-center gap-3 rounded-xl border border-line bg-surface p-4 shadow-sm">
         <Spinner />
@@ -385,6 +394,7 @@ function TabPanel({
   supplements,
   model,
   documents,
+  compSearch,
 }: {
   tab: TabKey;
   state: "done" | "running" | "pending" | "idle";
@@ -397,6 +407,7 @@ function TabPanel({
   supplements: SupplementsMap;
   model: UnderwritingModel | null;
   documents: DealDocument[];
+  compSearch: CompSearchResult | null;
 }) {
   if (tab === "overview") {
     return (
@@ -455,7 +466,12 @@ function TabPanel({
       ) : tab === "challenger" ? (
         <ChallengerView result={results.challenges!} />
       ) : tab === "comps" ? (
-        <BrokerComps result={results.comps!} />
+        <BrokerComps
+          result={results.comps!}
+          dealId={dealId}
+          compSearch={compSearch}
+          active={active}
+        />
       ) : tab === "market" ? (
         <MarketCheck result={results.market!} />
       ) : tab === "verdict" ? (

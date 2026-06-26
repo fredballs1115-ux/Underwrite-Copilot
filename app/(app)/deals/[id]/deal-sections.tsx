@@ -7,6 +7,8 @@ import {
   addSupplementFile,
   removeSupplement,
 } from "./supplement-actions";
+import { searchPublicComps } from "./comps-actions";
+import type { CompSearchResult } from "@/lib/anthropic/comps-search";
 import type {
   ExtractionResult,
   ChallengerResult,
@@ -611,7 +613,17 @@ const COMP_RATING = {
   stretched: { label: "Stretched", badge: "bg-kill/10 text-kill" },
 } as const;
 
-export function BrokerComps({ result }: { result: BrokerCompsResult }) {
+export function BrokerComps({
+  result,
+  dealId,
+  compSearch,
+  active,
+}: {
+  result: BrokerCompsResult;
+  dealId: string;
+  compSearch: CompSearchResult | null;
+  active: boolean;
+}) {
   const hasComps = result.saleComps.length > 0 || result.leaseComps.length > 0;
   return (
     <section className="space-y-4">
@@ -648,14 +660,115 @@ export function BrokerComps({ result }: { result: BrokerCompsResult }) {
         <div className="rounded-xl border border-line bg-surface p-5 shadow-sm">
           <p className="text-sm font-medium">No comps in this OM</p>
           <p className="mt-1 text-sm leading-relaxed text-muted">
-            This offering memorandum didn’t include sale or lease comps. Add the
-            comps you’ve found, or upload a comp sheet (Excel / PDF), using
-            <span className="font-medium text-ink"> “Add info” </span>
-            below — they’ll live alongside this deal.
+            This offering memorandum didn’t include sale or lease comps. Try a
+            public-web search below, add the comps you’ve found, or upload a comp
+            sheet via <span className="font-medium text-ink">“Add info”</span>.
           </p>
         </div>
       )}
+
+      <PublicWebComps
+        dealId={dealId}
+        compSearch={compSearch}
+        active={active}
+        hasOmComps={hasComps}
+      />
     </section>
+  );
+}
+
+function PublicWebComps({
+  dealId,
+  compSearch,
+  active,
+  hasOmComps,
+}: {
+  dealId: string;
+  compSearch: CompSearchResult | null;
+  active: boolean;
+  hasOmComps: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-dashed border-line p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium">
+            Public-web comps{" "}
+            {!hasOmComps && (
+              <span className="font-normal text-muted">(OM has none)</span>
+            )}
+          </p>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted">
+            Best-effort search of publicly-reported sales — unverified, and never
+            from CoStar or any licensed source.
+          </p>
+        </div>
+        <form action={searchPublicComps}>
+          <input type="hidden" name="dealId" value={dealId} />
+          <button
+            type="submit"
+            disabled={active}
+            className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-medium transition-colors hover:bg-faint disabled:opacity-50"
+          >
+            {compSearch ? "Search again" : "Search public web"}
+          </button>
+        </form>
+      </div>
+
+      {compSearch && (
+        <div className="mt-3">
+          <p className="text-xs leading-relaxed text-muted">
+            {compSearch.summary}
+          </p>
+          {compSearch.candidates.length > 0 && (
+            <div className="mt-2 space-y-2">
+              {compSearch.candidates.map((c, i) => (
+                <div
+                  key={i}
+                  className="rounded-lg border border-line bg-surface p-3 shadow-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium">
+                      {c.name}
+                    </span>
+                    <span className="ml-auto shrink-0 rounded-full bg-caution/10 px-2 py-0.5 text-[10px] font-medium uppercase text-caution">
+                      unverified
+                    </span>
+                  </div>
+                  {(c.location || c.date) && (
+                    <p className="mt-0.5 text-xs text-muted">
+                      {c.location}
+                      {c.location && c.date ? " · " : ""}
+                      {c.date}
+                    </p>
+                  )}
+                  {c.detail && (
+                    <p className="mt-1 font-mono text-xs tabular-nums">
+                      {c.detail}
+                    </p>
+                  )}
+                  {c.note && (
+                    <p className="mt-1 text-xs leading-relaxed text-muted">
+                      {c.note}
+                    </p>
+                  )}
+                  {c.sourceUrl && (
+                    <a
+                      href={c.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-1.5 inline-block text-xs font-medium text-brand hover:underline"
+                    >
+                      {c.sourceName || "Source"} →
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -5,6 +5,7 @@ import { signedSupplementUrl } from "@/lib/storage";
 import { type DealRow } from "@/lib/deals";
 import { type DealDocument } from "@/lib/documents";
 import type { UnderwritingModel } from "@/lib/model/types";
+import type { CompSearchResult } from "@/lib/anthropic/comps-search";
 import {
   type ExtractionResult,
   type ChallengerResult,
@@ -82,6 +83,9 @@ export default async function DealPage({
   const market = deal.market ? (deal.market as MarketResult) : null;
   const verdict = deal.verdict ? (deal.verdict as VerdictResult) : null;
   const model = deal.model ? (deal.model as UnderwritingModel) : null;
+  const compSearch = deal.comp_search
+    ? (deal.comp_search as CompSearchResult)
+    : null;
 
   const { data: docsData } = await supabase
     .from("deal_documents")
@@ -213,6 +217,7 @@ export default async function DealPage({
         supplements={supplements}
         model={model}
         documents={documents}
+        compSearch={compSearch}
       />
     </div>
   );
