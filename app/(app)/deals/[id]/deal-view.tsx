@@ -25,6 +25,9 @@ import {
   AddData,
   type TabSupplement,
 } from "./deal-sections";
+import { ModelView } from "./model-view";
+import type { UnderwritingModel } from "@/lib/model/types";
+import type { DealDocument } from "@/lib/documents";
 
 type SupplementsMap = Partial<Record<string, TabSupplement>>;
 
@@ -51,7 +54,8 @@ type TabKey =
   | "comps"
   | "reconciler"
   | "market"
-  | "verdict";
+  | "verdict"
+  | "model";
 
 const TABS: {
   key: TabKey;
@@ -66,6 +70,7 @@ const TABS: {
   { key: "reconciler", label: "Reconciler", step: "reconcile", result: "reconciliation" },
   { key: "market", label: "Market", step: "market", result: "market" },
   { key: "verdict", label: "Verdict", step: "verdict", result: "verdict" },
+  { key: "model", label: "Model", step: "model", result: null },
 ];
 
 // The automatic pass, in order — drives the progress rail and pending/done logic.
@@ -78,6 +83,7 @@ const STEP_LABELS: Record<string, string> = {
   market: "Sanity-checking the assumptions against market norms…",
   reconcile: "Reconciling your model against the OM…",
   verdict: "Writing the one-screen verdict…",
+  model: "Reconciling your documents into a first-draft model…",
 };
 
 const MODEL_ERRORS: Record<string, string> = {
@@ -98,6 +104,8 @@ export function DealView({
   job: initialJob,
   results,
   supplements,
+  model,
+  documents,
 }: {
   dealId: string;
   initialTab: string | null;
@@ -106,6 +114,8 @@ export function DealView({
   job: Job;
   results: Results;
   supplements: SupplementsMap;
+  model: UnderwritingModel | null;
+  documents: DealDocument[];
 }) {
   const router = useRouter();
 
@@ -171,6 +181,11 @@ export function DealView({
     if (t.key === "overview") {
       if (results.verdict || results.extraction) return "done";
       return active ? "running" : "idle";
+    }
+    if (t.key === "model") {
+      if (model) return "done";
+      if (active && job?.step === "model") return "running";
+      return "idle";
     }
     if (t.result && results[t.result] != null) return "done";
     if (active) {
@@ -238,6 +253,8 @@ export function DealView({
             modelErrorCode ? MODEL_ERRORS[modelErrorCode] ?? null : null
           }
           supplements={supplements}
+          model={model}
+          documents={documents}
         />
       </div>
     </div>
@@ -277,12 +294,15 @@ function TabDot({
 }
 
 function ProgressRail({ job }: { job: NonNullable<Job> }) {
-  // Reconcile runs after the main pass — show a simple indicator, not the rail.
-  if (job.step === "reconcile") {
+  // Reconcile and model generation run on their own — a simple indicator, not
+  // the 5-step pipeline rail.
+  if (job.step === "reconcile" || job.step === "model") {
     return (
       <div className="flex items-center gap-3 rounded-xl border border-line bg-surface p-4 shadow-sm">
         <Spinner />
-        <span className="text-sm">{STEP_LABELS.reconcile}</span>
+        <span className="text-sm">
+          {STEP_LABELS[job.step] ?? "Working…"}
+        </span>
         <span className="ml-auto font-mono text-xs tabular-nums text-muted">
           {job.progress}%
         </span>
@@ -363,6 +383,8 @@ function TabPanel({
   onNavigate,
   modelError,
   supplements,
+  model,
+  documents,
 }: {
   tab: TabKey;
   state: "done" | "running" | "pending" | "idle";
@@ -373,10 +395,23 @@ function TabPanel({
   onNavigate: (tab: string) => void;
   modelError: string | null;
   supplements: SupplementsMap;
+  model: UnderwritingModel | null;
+  documents: DealDocument[];
 }) {
   if (tab === "overview") {
     return (
       <OverviewView results={results} active={active} onNavigate={onNavigate} />
+    );
+  }
+
+  if (tab === "model") {
+    return (
+      <ModelView
+        dealId={dealId}
+        model={model}
+        documents={documents}
+        active={active}
+      />
     );
   }
 

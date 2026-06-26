@@ -17,6 +17,8 @@ export interface DealRow {
   verdict: unknown;
   // User-added data per section (notes + uploaded files). See migration 0002.
   supplements: unknown;
+  // Generated first-draft underwriting model (UnderwritingModel). Migration 0003.
+  model: unknown;
   created_at: string;
   updated_at: string;
 }

@@ -26,6 +26,16 @@ export async function downloadOmPdf(path: string): Promise<Buffer> {
   return Buffer.from(await data.arrayBuffer());
 }
 
+/** Download any file in the bucket as a Buffer (model source documents). */
+export async function downloadDealFile(path: string): Promise<Buffer> {
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin.storage.from(BUCKET).download(path);
+  if (error || !data) {
+    throw new Error(`Storage download failed: ${error?.message ?? "no data"}`);
+  }
+  return Buffer.from(await data.arrayBuffer());
+}
+
 /** Store a user-uploaded supplement file (any type) and its content type. */
 export async function uploadSupplement(
   path: string,

@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { signedSupplementUrl } from "@/lib/storage";
 import { type DealRow } from "@/lib/deals";
+import { type DealDocument } from "@/lib/documents";
+import type { UnderwritingModel } from "@/lib/model/types";
 import {
   type ExtractionResult,
   type ChallengerResult,
@@ -79,6 +81,14 @@ export default async function DealPage({
     : null;
   const market = deal.market ? (deal.market as MarketResult) : null;
   const verdict = deal.verdict ? (deal.verdict as VerdictResult) : null;
+  const model = deal.model ? (deal.model as UnderwritingModel) : null;
+
+  const { data: docsData } = await supabase
+    .from("deal_documents")
+    .select("id, deal_id, kind, filename, storage_path, content_type, created_at")
+    .eq("deal_id", id)
+    .order("created_at", { ascending: true });
+  const documents = (docsData ?? []) as DealDocument[];
 
   const { data: jobData } = await supabase
     .from("analysis_jobs")
@@ -201,6 +211,8 @@ export default async function DealPage({
         job={job}
         results={{ extraction, challenges, comps, reconciliation, market, verdict }}
         supplements={supplements}
+        model={model}
+        documents={documents}
       />
     </div>
   );

@@ -21,4 +21,7 @@ export const MAX_TOKENS = {
   extraction: 8000,
   analysis: 8000,
   verdict: 4000,
+  // The model reconciliation emits a large audit (every metric + sources +
+  // numeric inputs), so it gets more room.
+  model: 16000,
 } as const;

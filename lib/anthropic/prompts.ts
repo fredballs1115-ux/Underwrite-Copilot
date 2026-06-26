@@ -79,6 +79,51 @@ You do NOT have a live comps feed — reason from typical ranges and explicitly 
 Be clear throughout that these are rules-of-thumb, not pulled comps, and must be verified against real market data.`;
 }
 
+/** Model generator — pass 1: extract underwriting facts from ONE document. */
+export function docExtractionInstruction(kind: string, name: string): string {
+  const kindLabel =
+    {
+      om: "offering memorandum",
+      rent_roll: "rent roll",
+      t12: "T-12 / trailing operating statement",
+      financials: "offering financials",
+      loan_terms: "loan term sheet",
+      other: "supporting document",
+    }[kind] ?? "supporting document";
+
+  return `You are reading ONE source document for a CRE deal — a ${kindLabel} ("${name}"). Extract every fact relevant to building an underwriting model. Be faithful to THIS document only; do not infer from anything outside it.
+
+For each fact, give:
+- \`key\`: a canonical snake_case key. Use these where they apply: units, sf, purchase_price, price_per_unit, going_in_cap, exit_cap, in_place_occupancy, economic_occupancy, gross_potential_rent, in_place_rent, market_rent, vacancy_pct, other_income, total_opex, expense_ratio, real_estate_taxes, insurance, noi_actual, noi_proforma, rent_growth, expense_growth, loan_amount, ltv, interest_rate, amortization_years, io_years, loan_term, hold_period. Otherwise pick a sensible key.
+- \`label\`: a short human label.
+- \`value\`: the value exactly as written in the document.
+- \`numeric\`: the value as a plain number with no symbols (convert "$1,250,000" to 1250000 and "92%" to 92), or null if not numeric.
+- \`unit\`: one of "%", "$", "$/unit/mo", "$/sf", "units", "sf", "years", "x", or "".
+- \`locator\`: where in the document (e.g. "p. 7", "Sheet1!B12"), or "" if unknown.
+- \`basis\`: the single most important field — whether this number is an "actual" (historical / in-place — what rent rolls and T-12s report), a "pro forma" (the sponsor's forward projection — what OM pro formas report), a "term sheet" figure (loan terms), or "appraisal"/other.
+
+Capture BOTH actuals and pro forma figures when the document shows both (e.g. a statement with actual and projected columns). Getting \`basis\` right is essential: the model uses it to decide which source wins when documents disagree.`;
+}
+
+/** Model generator — pass 2: reconcile across sources and produce model inputs. */
+export function reconciliationInstruction(): string {
+  return `You are building a FIRST-DRAFT underwriting model for a BUYER by reconciling facts extracted from several source documents (provided below as JSON). These documents frequently DISAGREE — the OM's pro forma will not match the rent roll's in-place figures or the T-12's actuals. Reconcile every disagreement transparently. NEVER silently merge conflicting numbers.
+
+Source-authority rules — apply them, and explain each choice:
+- IN-PLACE / ACTUAL operations (current occupancy, in-place rents, actual income and expenses, trailing NOI): the RENT ROLL and T-12 actuals are authoritative over the OM's pro forma claims.
+- FORWARD-LOOKING figures (pro forma rents, rent and expense growth, stabilized NOI, exit cap): these are the sponsor's ASSUMPTIONS, not facts. Treat them as lower-confidence; carry a defensible, market-grounded or actuals-derived value rather than the sponsor's most optimistic number, and flag it.
+- DEBT terms (rate, LTV, amortization, IO, term): a loan term sheet is authoritative over an OM summary.
+- PHYSICAL facts (unit count, SF, year built): cross-check; if the rent roll's unit count differs from the OM, flag the conflict and prefer the rent roll.
+
+For EVERY metric that matters to the model, output a reconciled entry: key, label, chosenValue (string including the unit), unit, the full list of sources (each with doc, value, locator, basis), authority (which document won), a one-sentence rationale, confidence (high/medium/low), and isConflict. Set isConflict=true whenever two sources gave materially different values for the same metric — surface it, do not bury it.
+
+Then produce \`inputs\`: the numeric inputs the cash-flow math needs, derived from your CHOSEN values, all as plain numbers:
+- units, purchasePrice (if not stated, derive from year-1 NOI ÷ going-in cap), year1Gpr (annual gross potential rent), vacancyPct, otherIncomeAnnual, year1Opex (annual total), rentGrowthPct, expenseGrowthPct, otherIncomeGrowthPct, exitCapPct, sellingCostPct (use 2 if unstated), holdYears (use 5 if unstated), and loan { ltvPct, ratePct, amortYears (use 30 if unstated), ioYears (use 0 if unstated) }.
+Pick conservative, defensible inputs consistent with your reconciliation; where a figure is the sponsor's forward assumption, prefer an actuals-derived or market-reasonable value.
+
+Finally: a one-paragraph \`summary\` of how the sources reconciled and what drives the returns, and \`caveats\` — what the buyer must verify, what was uncertain or missing, and the model's simplifications. Everything is a first draft to verify, with every number traceable to a source.`;
+}
+
 /** Step 6 — Verdict (synthesizes everything above) */
 export function verdictInstruction(): string {
   return `You are the head of acquisitions making a first-pass screen decision. Using the gathered analysis provided below — the extracted terms, the challenges and stress test, the broker-comp scrutiny, the reconciliation against the buyer's model, and the market plausibility check — give a clear go / no-go for spending more time on this deal.
