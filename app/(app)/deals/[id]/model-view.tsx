@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { DOC_KINDS, DOC_KIND_LABEL, type DealDocument } from "@/lib/documents";
 import { MODEL_INPUTS, MODEL_PASTES } from "@/lib/model/inputs";
@@ -32,11 +33,13 @@ export function ModelView({
   model,
   documents,
   active,
+  isPro,
 }: {
   dealId: string;
   model: UnderwritingModel | null;
   documents: DealDocument[];
   active: boolean;
+  isPro: boolean;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -59,6 +62,7 @@ export function ModelView({
         documents={documents}
         active={active}
         hasModel={!!model}
+        isPro={isPro}
       />
     </div>
   );
@@ -445,11 +449,13 @@ function DocumentsPanel({
   documents,
   active,
   hasModel,
+  isPro,
 }: {
   dealId: string;
   documents: DealDocument[];
   active: boolean;
   hasModel: boolean;
+  isPro: boolean;
 }) {
   return (
     <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
@@ -527,15 +533,33 @@ function DocumentsPanel({
         </button>
       </form>
 
-      <form action={generateModel} className="mt-4 border-t border-line pt-4">
-        <input type="hidden" name="dealId" value={dealId} />
-        <Generate disabled={documents.length === 0 || active} hasModel={hasModel} />
-        {documents.length === 0 && (
-          <p className="mt-1.5 text-xs text-muted">
-            Add at least one document to generate a model.
+      {isPro ? (
+        <form action={generateModel} className="mt-4 border-t border-line pt-4">
+          <input type="hidden" name="dealId" value={dealId} />
+          <Generate
+            disabled={documents.length === 0 || active}
+            hasModel={hasModel}
+          />
+          {documents.length === 0 && (
+            <p className="mt-1.5 text-xs text-muted">
+              Add at least one document to generate a model.
+            </p>
+          )}
+        </form>
+      ) : (
+        <div className="mt-4 flex flex-col gap-2 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted">
+            Building the Excel model is a{" "}
+            <span className="font-medium text-ink">Pro</span> feature.
           </p>
-        )}
-      </form>
+          <Link
+            href="/billing"
+            className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+          >
+            Upgrade to Pro
+          </Link>
+        </div>
+      )}
     </section>
   );
 }

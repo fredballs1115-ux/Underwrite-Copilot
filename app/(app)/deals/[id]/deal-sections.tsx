@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { rerunAnalysis, reconcileWithModel } from "../actions";
 import {
@@ -618,11 +619,13 @@ export function BrokerComps({
   dealId,
   compSearch,
   active,
+  isPro,
 }: {
   result: BrokerCompsResult;
   dealId: string;
   compSearch: CompSearchResult | null;
   active: boolean;
+  isPro: boolean;
 }) {
   const hasComps = result.saleComps.length > 0 || result.leaseComps.length > 0;
   return (
@@ -672,6 +675,7 @@ export function BrokerComps({
         compSearch={compSearch}
         active={active}
         hasOmComps={hasComps}
+        isPro={isPro}
       />
     </section>
   );
@@ -682,11 +686,13 @@ function PublicWebComps({
   compSearch,
   active,
   hasOmComps,
+  isPro,
 }: {
   dealId: string;
   compSearch: CompSearchResult | null;
   active: boolean;
   hasOmComps: boolean;
+  isPro: boolean;
 }) {
   return (
     <div className="rounded-xl border border-dashed border-line p-4">
@@ -703,16 +709,25 @@ function PublicWebComps({
             from CoStar or any licensed source.
           </p>
         </div>
-        <form action={searchPublicComps}>
-          <input type="hidden" name="dealId" value={dealId} />
-          <button
-            type="submit"
-            disabled={active}
-            className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-medium transition-colors hover:bg-faint disabled:opacity-50"
+        {isPro ? (
+          <form action={searchPublicComps}>
+            <input type="hidden" name="dealId" value={dealId} />
+            <button
+              type="submit"
+              disabled={active}
+              className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm font-medium transition-colors hover:bg-faint disabled:opacity-50"
+            >
+              {compSearch ? "Search again" : "Search public web"}
+            </button>
+          </form>
+        ) : (
+          <Link
+            href="/billing"
+            className="shrink-0 rounded-lg border border-caution/30 bg-caution/5 px-3 py-1.5 text-sm font-medium text-caution transition-colors hover:bg-caution/10"
           >
-            {compSearch ? "Search again" : "Search public web"}
-          </button>
-        </form>
+            Upgrade to search
+          </Link>
+        )}
       </div>
 
       {compSearch && (

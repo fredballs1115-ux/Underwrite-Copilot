@@ -109,6 +109,7 @@ export function DealView({
   model,
   documents,
   compSearch,
+  isPro,
 }: {
   dealId: string;
   initialTab: string | null;
@@ -120,6 +121,7 @@ export function DealView({
   model: UnderwritingModel | null;
   documents: DealDocument[];
   compSearch: CompSearchResult | null;
+  isPro: boolean;
 }) {
   const router = useRouter();
 
@@ -260,6 +262,7 @@ export function DealView({
           model={model}
           documents={documents}
           compSearch={compSearch}
+          isPro={isPro}
         />
       </div>
     </div>
@@ -395,6 +398,7 @@ function TabPanel({
   model,
   documents,
   compSearch,
+  isPro,
 }: {
   tab: TabKey;
   state: "done" | "running" | "pending" | "idle";
@@ -408,6 +412,7 @@ function TabPanel({
   model: UnderwritingModel | null;
   documents: DealDocument[];
   compSearch: CompSearchResult | null;
+  isPro: boolean;
 }) {
   if (tab === "overview") {
     return (
@@ -422,6 +427,7 @@ function TabPanel({
         model={model}
         documents={documents}
         active={active}
+        isPro={isPro}
       />
     );
   }
@@ -471,6 +477,7 @@ function TabPanel({
           dealId={dealId}
           compSearch={compSearch}
           active={active}
+          isPro={isPro}
         />
       ) : tab === "market" ? (
         <MarketCheck result={results.market!} />

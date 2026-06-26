@@ -8,6 +8,7 @@ import {
   removeSupplementFile,
 } from "@/lib/storage";
 import { DOC_KIND_KEYS } from "@/lib/documents";
+import { isPro } from "@/lib/billing";
 import { runModelGeneration } from "@/lib/model/build-model";
 
 const MAX_FILE = 22 * 1024 * 1024;
@@ -85,6 +86,12 @@ export async function generateModel(formData: FormData) {
 
   const supabase = await requireDeal(dealId);
   if (!supabase) return;
+
+  // Pro-only feature (UI hides the button for free users; this is the backstop).
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || !(await isPro(supabase, user.id))) return;
 
   const { data: existing } = await supabase
     .from("analysis_jobs")

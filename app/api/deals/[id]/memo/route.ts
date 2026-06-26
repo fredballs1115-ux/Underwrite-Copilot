@@ -1,6 +1,7 @@
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isPro } from "@/lib/billing";
 import { MemoDocument, buildMemoData } from "@/lib/memo/memo-document";
 import type { DealRow } from "@/lib/deals";
 
@@ -12,7 +13,7 @@ export const runtime = "nodejs";
  * Supabase client guarantees the caller can only export their own deals.
  */
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
@@ -22,6 +23,11 @@ export async function GET(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
+
+  // The PDF memo is a Pro feature.
+  if (!(await isPro(supabase, user.id))) {
+    return Response.redirect(new URL("/billing", req.url), 302);
+  }
 
   const { data, error } = await supabase
     .from("deals")

@@ -35,18 +35,31 @@ function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+type BillingInfo = {
+  isPro: boolean;
+  canCreateDeal: boolean;
+  dealCount: number;
+  dealLimit: number;
+};
+
 export function Pipeline({
   deals,
   errorMessage,
+  billing,
 }: {
   deals: DealCard[];
   errorMessage: string | null;
+  billing: BillingInfo | null;
 }) {
   const [verdict, setVerdict] = useState("all");
   const [asset, setAsset] = useState("all");
   const [market, setMarket] = useState("all");
   const [sort, setSort] = useState("newest");
   const [showForm, setShowForm] = useState(!!errorMessage);
+
+  // Free users who've hit the cap can't open the create form — they upgrade.
+  const atLimit = !!billing && !billing.canCreateDeal;
+  const showUsage = !!billing && !billing.isPro;
 
   const assets = useMemo(
     () => Array.from(new Set(deals.map((d) => d.assetClass).filter(Boolean))).sort(),
@@ -95,18 +108,46 @@ export function Pipeline({
           <h1 className="text-3xl font-semibold tracking-tight">Pipeline</h1>
           <p className="mt-1 text-sm text-muted">
             {deals.length} {deals.length === 1 ? "deal" : "deals"} screened
+            {showUsage && (
+              <>
+                {" · "}
+                <span className={atLimit ? "text-caution" : ""}>
+                  {billing!.dealCount} of {billing!.dealLimit} free
+                </span>
+              </>
+            )}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowForm((s) => !s)}
-          className="shadow-card hover-lift shrink-0 rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white"
-        >
-          {showForm ? "Close" : "+ New deal"}
-        </button>
+        {atLimit ? (
+          <Link
+            href="/billing"
+            className="shadow-card hover-lift shrink-0 rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white"
+          >
+            Upgrade for more
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowForm((s) => !s)}
+            className="shadow-card hover-lift shrink-0 rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white"
+          >
+            {showForm ? "Close" : "+ New deal"}
+          </button>
+        )}
       </div>
 
-      {showForm && <NewDealForm errorMessage={errorMessage} />}
+      {showForm && !atLimit && <NewDealForm errorMessage={errorMessage} />}
+      {atLimit && errorMessage && (
+        <section className="rounded-xl border border-caution/30 bg-caution/5 p-5">
+          <p className="text-sm font-medium text-caution">{errorMessage}</p>
+          <Link
+            href="/billing"
+            className="mt-3 inline-flex rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+          >
+            See plans
+          </Link>
+        </section>
+      )}
 
       {deals.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">

@@ -3,6 +3,7 @@
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isPro } from "@/lib/billing";
 import { runCompSearch } from "@/lib/anthropic/comps-search";
 
 /** Kick off a public-web comp search in the background, reusing the job row. */
@@ -21,6 +22,9 @@ export async function searchPublicComps(formData: FormData) {
     .eq("id", dealId)
     .maybeSingle();
   if (!deal) return;
+
+  // Pro-only feature.
+  if (!(await isPro(supabase, user.id))) return;
 
   const { data: existing } = await supabase
     .from("analysis_jobs")

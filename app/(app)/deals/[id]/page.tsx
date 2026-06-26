@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { signedSupplementUrl } from "@/lib/storage";
+import { isPro } from "@/lib/billing";
 import { type DealRow } from "@/lib/deals";
 import { type DealDocument } from "@/lib/documents";
 import type { UnderwritingModel } from "@/lib/model/types";
@@ -59,6 +60,11 @@ export default async function DealPage({
   const { error: errorCode, tab } = await searchParams;
 
   const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const pro = user ? await isPro(supabase, user.id) : false;
+
   const { data, error } = await supabase
     .from("deals")
     .select("*")
@@ -162,28 +168,36 @@ export default async function DealPage({
                 {pill.label}
               </span>
             )}
-            {verdict && (
-              <a
-                href={`/api/deals/${id}/memo`}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-3.5 w-3.5"
-                  aria-hidden
+            {verdict &&
+              (pro ? (
+                <a
+                  href={`/api/deals/${id}/memo`}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
                 >
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <path d="m7 10 5 5 5-5" />
-                  <path d="M12 15V3" />
-                </svg>
-                Download memo
-              </a>
-            )}
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-3.5 w-3.5"
+                    aria-hidden
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <path d="m7 10 5 5 5-5" />
+                    <path d="M12 15V3" />
+                  </svg>
+                  Download memo
+                </a>
+              ) : (
+                <Link
+                  href="/billing"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-caution/30 bg-caution/5 px-3 py-1.5 text-xs font-medium text-caution transition-colors hover:bg-caution/10"
+                >
+                  Upgrade for PDF memo
+                </Link>
+              ))}
           </div>
         </div>
 
@@ -218,6 +232,7 @@ export default async function DealPage({
         model={model}
         documents={documents}
         compSearch={compSearch}
+        isPro={pro}
       />
     </div>
   );

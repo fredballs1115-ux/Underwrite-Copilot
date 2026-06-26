@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getBilling } from "@/lib/billing";
 import { type DealRow } from "@/lib/deals";
 import type { ExtractionResult, ExtractedMetric } from "@/lib/anthropic/types";
 import { Pipeline, type DealCard } from "./pipeline";
@@ -9,6 +10,8 @@ const ERRORS: Record<string, string> = {
   pdf: "That file isn’t a PDF — please upload the OM as a PDF.",
   size: "That PDF is larger than 22 MB — please try a smaller file for now.",
   save: "Couldn’t save the deal. Please try again.",
+  limit:
+    "You’ve reached the 3-deal limit on the Free plan. Upgrade to Pro for unlimited deals.",
 };
 
 // Up to two headline figures to show on each pipeline row.
@@ -32,6 +35,13 @@ export default async function DealsPage({
   const errorMessage = errorCode ? (ERRORS[errorCode] ?? null) : null;
 
   const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const billing = user
+    ? await getBilling(supabase, user.id)
+    : null;
+
   const { data, error } = await supabase
     .from("deals")
     .select("id, name, asset_class, created_at, verdict, extraction")
@@ -69,5 +79,20 @@ export default async function DealsPage({
     };
   });
 
-  return <Pipeline deals={deals} errorMessage={errorMessage} />;
+  return (
+    <Pipeline
+      deals={deals}
+      errorMessage={errorMessage}
+      billing={
+        billing
+          ? {
+              isPro: billing.isPro,
+              canCreateDeal: billing.canCreateDeal,
+              dealCount: billing.dealCount,
+              dealLimit: billing.dealLimit,
+            }
+          : null
+      }
+    />
+  );
 }

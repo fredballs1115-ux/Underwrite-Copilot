@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { uploadOmPdf } from "@/lib/storage";
+import { getBilling } from "@/lib/billing";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 
 // Keep PDFs comfortably under Claude's ~32MB per-request limit (base64 inflates
@@ -30,6 +31,10 @@ export async function createDeal(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  // Free-tier deal cap (enforced server-side; the UI also prompts to upgrade).
+  const billing = await getBilling(supabase, user.id);
+  if (!billing.canCreateDeal) redirect("/deals?error=limit");
 
   if (!(file instanceof File) || file.size === 0) {
     redirect("/deals?error=file");

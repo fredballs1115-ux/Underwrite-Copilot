@@ -17,21 +17,40 @@ function Logo({ small = false }: { small?: boolean }) {
   );
 }
 
+function NavIcon({
+  className,
+  children,
+}: {
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      {children}
+    </svg>
+  );
+}
 const IconLayers = (p: { className?: string }) => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={2}
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={p.className}
-    aria-hidden
-  >
+  <NavIcon className={p.className}>
     <path d="m12 2 9 5-9 5-9-5 9-5Z" />
     <path d="m3 12 9 5 9-5" />
     <path d="m3 17 9 5 9-5" />
-  </svg>
+  </NavIcon>
+);
+const IconCard = (p: { className?: string }) => (
+  <NavIcon className={p.className}>
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+    <path d="M2 10h20" />
+  </NavIcon>
 );
 
 /** The signed-in app chrome: a deep-teal sidebar on desktop, a top bar on mobile. */
@@ -44,6 +63,7 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const inPipeline = pathname.startsWith("/deals");
+  const inBilling = pathname.startsWith("/billing");
 
   return (
     <div className="flex min-h-screen bg-canvas">
@@ -67,6 +87,17 @@ export function AppShell({
           >
             <IconLayers className="h-4 w-4" />
             Pipeline
+          </Link>
+          <Link
+            href="/billing"
+            className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              inBilling
+                ? "bg-white/12 text-white"
+                : "text-white/65 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            <IconCard className="h-4 w-4" />
+            Billing
           </Link>
         </nav>
 
