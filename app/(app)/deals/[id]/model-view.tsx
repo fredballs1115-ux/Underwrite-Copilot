@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { DOC_KINDS, DOC_KIND_LABEL, type DealDocument } from "@/lib/documents";
+import { MODEL_INPUTS, MODEL_PASTES } from "@/lib/model/inputs";
 import type {
   UnderwritingModel,
   ReconciledMetric,
@@ -52,6 +53,7 @@ export function ModelView({
       ) : (
         <Intro />
       )}
+      <InputsNeeded documents={documents} />
       <DocumentsPanel
         dealId={dealId}
         documents={documents}
@@ -77,6 +79,63 @@ function Intro() {
         start.
       </p>
     </div>
+  );
+}
+
+function InputsNeeded({ documents }: { documents: DealDocument[] }) {
+  const have = new Set(documents.map((d) => d.kind));
+  return (
+    <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
+      <h2 className="text-sm font-semibold tracking-tight">
+        Inputs needed to complete the model
+      </h2>
+      <p className="mt-1 text-sm leading-relaxed text-muted">
+        The generated Excel matches your master template. Assumption cells are
+        filled from your documents — provide these to fill the rest. Nothing is
+        left blank or guessed; each gap is labeled in the workbook.
+      </p>
+      <ul className="mt-4 space-y-3">
+        {MODEL_INPUTS.map((inp) => {
+          const ok = have.has(inp.kind);
+          return (
+            <li key={inp.kind} className="flex items-start gap-3">
+              <span
+                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                  ok ? "bg-pass/15 text-pass" : "bg-caution/15 text-caution"
+                }`}
+              >
+                {ok ? "✓" : "!"}
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-medium">
+                  {inp.label}{" "}
+                  <span
+                    className={`ml-1 text-xs font-normal ${ok ? "text-pass" : "text-caution"}`}
+                  >
+                    {ok ? "provided" : "needed"}
+                  </span>
+                </p>
+                <p className="text-xs leading-relaxed text-muted">{inp.fills}</p>
+              </div>
+            </li>
+          );
+        })}
+        {MODEL_PASTES.map((p, i) => (
+          <li key={i} className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand/15 text-[11px] font-bold text-brand">
+              →
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium">
+                {p.label}{" "}
+                <span className="ml-1 text-xs font-normal text-brand">action</span>
+              </p>
+              <p className="text-xs leading-relaxed text-muted">{p.fills}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

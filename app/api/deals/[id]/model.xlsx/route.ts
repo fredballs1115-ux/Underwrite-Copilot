@@ -1,5 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { buildModelWorkbook } from "@/lib/model/excel";
+import { fillModelTemplate } from "@/lib/model/template-fill";
 import type { DealRow } from "@/lib/deals";
 import type { UnderwritingModel } from "@/lib/model/types";
 
@@ -29,7 +29,14 @@ export async function GET(
   const model = deal.model as UnderwritingModel | null;
   if (!model) return new Response("No model generated yet", { status: 404 });
 
-  const buffer = await buildModelWorkbook(model, deal.name);
+  // The document kinds the deal has, to drive the "inputs needed" sheet.
+  const { data: docs } = await supabase
+    .from("deal_documents")
+    .select("kind")
+    .eq("deal_id", id);
+  const kinds = ((docs ?? []) as { kind: string }[]).map((d) => d.kind);
+
+  const buffer = await fillModelTemplate(model, deal.name, kinds);
   const safe =
     (deal.name || "deal")
       .replace(/[^a-z0-9]+/gi, "-")
