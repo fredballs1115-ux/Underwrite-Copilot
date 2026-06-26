@@ -78,6 +78,8 @@ function buildSummary(
     ["Year-1 NOI", r.year1Noi, USD],
     ["Exit NOI (forward)", r.exitNoi, USD],
     ["Exit value", r.exitValue, USD],
+    ["  less selling costs", -(r.exitValue - r.netSaleProceeds - r.exitLoanBalance), USD],
+    ["  less loan payoff", -r.exitLoanBalance, USD],
     ["Net sale proceeds", r.netSaleProceeds, USD],
     ["Levered IRR", r.leveredIrrPct, PCT],
     ["Unlevered IRR", r.unleveredIrrPct, PCT],
@@ -142,6 +144,8 @@ function buildAssumptions(wb: ExcelJS.Workbook, model: UnderwritingModel) {
     ]);
     row.alignment = { vertical: "top", wrapText: true };
     row.getCell(1).font = { bold: true };
+    // Every figure traceable: hovering the value shows where it came from.
+    row.getCell(2).note = `Chosen from ${m.authority}.\n${sourceText(m)}\n\n${m.rationale}`;
     const conf = row.getCell(5);
     conf.fill = {
       type: "pattern",
@@ -251,6 +255,7 @@ function buildConflicts(wb: ExcelJS.Workbook, model: UnderwritingModel) {
     row.alignment = { vertical: "top", wrapText: true };
     row.getCell(1).font = { bold: true, color: { argb: "FFB3261E" } };
     row.getCell(3).font = { bold: true };
+    row.getCell(3).note = `Chosen from ${m.authority}.\n${sourceText(m)}\n\n${m.rationale}`;
   }
 }
 
