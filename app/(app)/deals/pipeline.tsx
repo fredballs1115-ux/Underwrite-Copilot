@@ -92,15 +92,15 @@ export function Pipeline({
     <div className="space-y-6">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Pipeline</h1>
-          <p className="mt-0.5 text-sm text-muted">
+          <h1 className="text-3xl font-semibold tracking-tight">Pipeline</h1>
+          <p className="mt-1 text-sm text-muted">
             {deals.length} {deals.length === 1 ? "deal" : "deals"} screened
           </p>
         </div>
         <button
           type="button"
           onClick={() => setShowForm((s) => !s)}
-          className="shrink-0 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+          className="shadow-card hover-lift shrink-0 rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white"
         >
           {showForm ? "Close" : "+ New deal"}
         </button>
@@ -193,9 +193,9 @@ export function Pipeline({
               </button>
             </p>
           )}
-          <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
-            {filtered.map((d) => (
-              <DealRow key={d.id} d={d} />
+          <ul className="stagger divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+            {filtered.map((d, idx) => (
+              <DealRow key={d.id} d={d} i={idx} />
             ))}
           </ul>
         </>
@@ -204,10 +204,10 @@ export function Pipeline({
   );
 }
 
-function DealRow({ d }: { d: DealCard }) {
+function DealRow({ d, i }: { d: DealCard; i: number }) {
   const v = d.verdict ? VERDICT_META[d.verdict] : null;
   return (
-    <li>
+    <li style={{ "--i": i } as React.CSSProperties}>
       <Link
         href={`/deals/${d.id}`}
         className="group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-faint"

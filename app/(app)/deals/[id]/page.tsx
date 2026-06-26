@@ -146,10 +146,10 @@ export default async function DealPage({
       </Link>
 
       {/* Persistent deal header — the anchor that stays put across tabs. */}
-      <header className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+      <header className="shadow-card rounded-2xl border border-line bg-surface p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight">{deal.name}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">{deal.name}</h1>
             <p className="mt-0.5 text-sm capitalize text-muted">
               {deal.asset_class}
             </p>

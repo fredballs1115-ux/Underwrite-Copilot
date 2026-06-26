@@ -9,7 +9,8 @@
   restyles.
 */
 @theme {
-  --color-paper: #fbfbf9; /* page background — a warm off-white */
+  --color-paper: #fbfbf9; /* marketing pages — a warm off-white */
+  --color-canvas: #eceeec; /* the app work surface — cards lift off it */
   --color-faint: #f3f5f4; /* tinted band background */
   --color-surface: #ffffff; /* cards and panels */
   --color-ink: #18211f; /* primary text — near-black with a faint warmth */
@@ -18,6 +19,8 @@
 
   --color-brand: #114e54; /* deep teal — primary accent */
   --color-brand-strong: #0c383d;
+  --color-sidebar: #0c3338; /* deep teal app chrome */
+  --color-sidebar-line: #1d4a4f;
 
   /* Verdict / status colors, reused across the app */
   --color-pass: #15803d;
@@ -40,6 +43,38 @@ body {
 
 ::selection {
   background: color-mix(in oklab, var(--color-brand) 18%, transparent);
+}
+
+/* Elevation — soft, layered shadows so cards sit *on* the canvas (premium
+   depth, not a flat template). */
+.shadow-card {
+  box-shadow:
+    0 1px 2px rgba(17, 33, 31, 0.04),
+    0 1px 3px rgba(17, 33, 31, 0.06);
+}
+.shadow-float {
+  box-shadow:
+    0 6px 16px -4px rgba(17, 33, 31, 0.1),
+    0 2px 6px -2px rgba(17, 33, 31, 0.06);
+}
+.hover-lift {
+  transition:
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 8px 20px -6px rgba(17, 33, 31, 0.12),
+    0 3px 8px -3px rgba(17, 33, 31, 0.07);
+}
+
+/* Staggered entrance for lists/grids (set --i on each child). */
+@media (prefers-reduced-motion: no-preference) {
+  .stagger > * {
+    animation: uc-rise 0.32s ease-out both;
+    animation-delay: calc(var(--i, 0) * 40ms);
+  }
 }
 
 /*
