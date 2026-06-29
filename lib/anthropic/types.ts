@@ -95,10 +95,43 @@ export interface MarketResult {
   summary: string;
 }
 
+/**
+ * The pre-model screen: the deal-killer inputs as RANGES (never single hero
+ * numbers), each tied to where it came from, plus the three deal-killers
+ * stressed in order. This is what makes the verdict reproducible — same deal
+ * in, same ranges out — and what "shows the work" before anyone opens a model.
+ */
+export interface ScreenRange {
+  /** e.g. "Market rent / unit / mo", "Expense load", "Exit cap", "Basis / unit" */
+  label: string;
+  low: string;
+  base: string;
+  high: string;
+  /** where the range comes from — a public/market source or the OM, named explicitly */
+  source: string;
+  /** one line on what drives the low vs. high end */
+  basis: string;
+  confidence: Severity;
+}
+export type DealKillerLever = "basis" | "exit" | "debt";
+export interface DealKiller {
+  lever: DealKillerLever;
+  /** the current read on this lever */
+  read: string;
+  /** what would break the deal here */
+  risk: string;
+}
+export interface ScreenResult {
+  ranges: ScreenRange[];
+  dealKillers: DealKiller[];
+}
+
 /** Step 6 — Verdict (synthesizes all of the above) */
 export interface VerdictResult {
   verdict: VerdictCall;
   reason: string;
   topRisks: string[];
   nextSteps: string[];
+  /** The pre-model screen. Optional for verdicts saved before this existed. */
+  screen?: ScreenResult;
 }

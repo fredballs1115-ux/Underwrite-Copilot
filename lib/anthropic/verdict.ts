@@ -13,11 +13,31 @@ import type {
   VerdictResult,
 } from "./types";
 
+const ScreenRangeSchema = z.object({
+  label: z.string(),
+  low: z.string(),
+  base: z.string(),
+  high: z.string(),
+  source: z.string(),
+  basis: z.string(),
+  confidence: z.enum(["high", "medium", "low"]),
+});
+
+const DealKillerSchema = z.object({
+  lever: z.enum(["basis", "exit", "debt"]),
+  read: z.string(),
+  risk: z.string(),
+});
+
 const VerdictSchema = z.object({
   verdict: z.enum(["pass", "caution", "pass_on"]),
   reason: z.string(),
   topRisks: z.array(z.string()),
   nextSteps: z.array(z.string()),
+  screen: z.object({
+    ranges: z.array(ScreenRangeSchema),
+    dealKillers: z.array(DealKillerSchema),
+  }),
 });
 
 export interface VerdictInputs {

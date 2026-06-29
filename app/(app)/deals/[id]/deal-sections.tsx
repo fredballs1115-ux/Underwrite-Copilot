@@ -20,6 +20,9 @@ import type {
   MarketResult,
   MarketCheck as MarketCheckType,
   VerdictResult,
+  ScreenResult,
+  ScreenRange,
+  DealKiller,
 } from "@/lib/anthropic/types";
 
 /* ================================================================== */
@@ -1197,7 +1200,144 @@ function VerdictHero({
 }
 
 export function VerdictView({ result }: { result: VerdictResult }) {
-  return <VerdictHero result={result} />;
+  return (
+    <div className="flex flex-col gap-6">
+      <VerdictHero result={result} />
+      {result.screen && <ScreeningRanges screen={result.screen} />}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* The pre-model screen: ranges + provenance + the three deal-killers */
+/* ------------------------------------------------------------------ */
+
+const LEVER_META: Record<
+  DealKiller["lever"],
+  { label: string; blurb: string }
+> = {
+  basis: { label: "Basis", blurb: "Are you buying right?" },
+  exit: { label: "Exit", blurb: "Does the exit cap hold?" },
+  debt: { label: "Debt", blurb: "Does the financing survive a shock?" },
+};
+const LEVER_ORDER: DealKiller["lever"][] = ["basis", "exit", "debt"];
+
+function ScreeningRanges({ screen }: { screen: ScreenResult }) {
+  const killers = [...screen.dealKillers].sort(
+    (a, b) => LEVER_ORDER.indexOf(a.lever) - LEVER_ORDER.indexOf(b.lever),
+  );
+  return (
+    <section className="space-y-5">
+      <div>
+        <SectionHeader title="The screen, before the model" />
+        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">
+          Rent, expenses, and cap as ranges — not single hero numbers — each
+          traced to where it came from. Same deal in, same ranges out.
+        </p>
+      </div>
+
+      {screen.ranges.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {screen.ranges.map((r, i) => (
+            <RangeCard key={i} r={r} />
+          ))}
+        </div>
+      )}
+
+      {killers.length > 0 && (
+        <div>
+          <h3 className="text-xs font-medium uppercase tracking-wider text-muted">
+            Stress the three deal-killers first
+          </h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            {killers.map((k, i) => (
+              <DealKillerCard key={i} k={k} index={i} />
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+const RANGE_CONF: Record<ScreenRange["confidence"], { label: string; cls: string }> = {
+  high: { label: "High", cls: "bg-pass/10 text-pass" },
+  medium: { label: "Med", cls: "bg-caution/10 text-caution" },
+  low: { label: "Low", cls: "bg-kill/10 text-kill" },
+};
+
+function RangeCard({ r }: { r: ScreenRange }) {
+  const conf = RANGE_CONF[r.confidence] ?? RANGE_CONF.medium;
+  return (
+    <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-medium">{r.label}</p>
+        <span
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${conf.cls}`}
+        >
+          {conf.label}
+        </span>
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-line bg-line">
+        <RangeCell label="Low" value={r.low} />
+        <RangeCell label="Base" value={r.base} emphasized />
+        <RangeCell label="High" value={r.high} />
+      </div>
+      <p className="mt-2.5 text-xs leading-relaxed text-muted">
+        <span className="font-medium text-ink">Source:</span> {r.source}
+      </p>
+      {r.basis && (
+        <p className="mt-1 text-xs leading-relaxed text-muted">{r.basis}</p>
+      )}
+    </div>
+  );
+}
+
+function RangeCell({
+  label,
+  value,
+  emphasized = false,
+}: {
+  label: string;
+  value: string;
+  emphasized?: boolean;
+}) {
+  return (
+    <div className={`px-3 py-2 ${emphasized ? "bg-brand/5" : "bg-surface"}`}>
+      <p className="text-[10px] uppercase tracking-wide text-muted">{label}</p>
+      <p
+        className={`mt-0.5 font-mono tabular-nums ${
+          emphasized
+            ? "text-base font-semibold text-brand"
+            : "text-sm text-ink"
+        }`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function DealKillerCard({ k, index }: { k: DealKiller; index: number }) {
+  const meta = LEVER_META[k.lever] ?? { label: k.lever, blurb: "" };
+  return (
+    <div className="rounded-xl border border-line border-t-2 border-t-brand bg-surface p-4 shadow-sm">
+      <div className="flex items-baseline gap-2">
+        <span className="font-mono text-xs tabular-nums text-muted">
+          {index + 1}
+        </span>
+        <p className="text-sm font-semibold">{meta.label}</p>
+      </div>
+      {meta.blurb && (
+        <p className="mt-0.5 text-[11px] text-muted">{meta.blurb}</p>
+      )}
+      <p className="mt-2.5 text-sm leading-relaxed">{k.read}</p>
+      <p className="mt-2 flex gap-1.5 text-xs leading-relaxed text-muted">
+        <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-kill" />
+        <span>{k.risk}</span>
+      </p>
+    </div>
+  );
 }
 
 /* ================================================================== */

@@ -130,5 +130,9 @@ export function verdictInstruction(): string {
 
 Choose a verdict: \`pass\` (worth deeper work), \`caution\` (proceed only with named conditions), or \`pass_on\` (kill it). Give a two-sentence rationale, the top risks, and — if pursuing — the 2–3 concrete next steps.
 
-This is a first-pass screen, not investment advice.`;
+Then produce the pre-model \`screen\` — the part that makes this reproducible instead of a coin flip:
+- \`ranges\`: the deal-defining inputs as RANGES, never single hero numbers. Always include market rent (per unit/mo or per SF), the expense load (ratio or per-unit), and the exit cap; add basis (price per unit/SF) and any other input that swings the deal. For each give a \`low\`, \`base\`, and \`high\` (low = conservative, base = your defensible pick, high = the sponsor's optimistic end), the \`source\` it traces to (name it explicitly — a public/market norm, a comp, or the OM page; if it's only the sponsor's claim, say so), a one-line \`basis\` for what drives the spread, and a \`confidence\`. A 10% drift hides inside a single number — the range is the honesty.
+- \`dealKillers\`: stress the three that kill deals first, in this order — \`basis\` (are you buying right?), \`exit\` (does the exit cap hold?), \`debt\` (does the financing pencil and survive a shock?). For each give the current \`read\` and the \`risk\` that would break it.
+
+Every figure must name where it came from. This is a first-pass screen, not investment advice.`;
 }

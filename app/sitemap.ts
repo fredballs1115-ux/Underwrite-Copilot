@@ -1,0 +1,24 @@
+import type { MetadataRoute } from "next";
+
+// Generated at /sitemap.xml. Only the public, indexable pages belong here —
+// the app itself sits behind auth and is disallowed in robots.txt.
+const APP_URL =
+  process.env.NEXT_PUBLIC_APP_URL ?? "https://underwrite-copilot.onrender.com";
+
+export default function sitemap(): MetadataRoute.Sitemap {
+  const now = new Date();
+  return [
+    {
+      url: APP_URL,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 1,
+    },
+    {
+      url: `${APP_URL}/login`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.4,
+    },
+  ];
+}
