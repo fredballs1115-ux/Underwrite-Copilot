@@ -24,10 +24,13 @@ const VERDICT_META: Record<
 };
 
 function fmtDate(iso: string): string {
+  // Pin to UTC so the server and client render the same string (no hydration
+  // mismatch from differing timezones).
   return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
+    timeZone: "UTC",
   });
 }
 
@@ -315,7 +318,7 @@ function FilterSelect({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className={`rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink shadow-sm outline-none transition-colors hover:bg-faint focus:border-brand ${className}`}
+      className={`rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink shadow-sm outline-none transition-colors hover:bg-faint focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40 ${className}`}
     >
       {options.map(([val, label]) => (
         <option key={val} value={val}>
@@ -345,12 +348,12 @@ function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
             name="name"
             required
             placeholder="Deal name — e.g. The Maddox at Highland Park"
-            className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-brand"
+            className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
           />
           <select
             name="assetClass"
             defaultValue="auto"
-            className="rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-brand"
+            className="rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
           >
             <option value="auto">Auto-detect</option>
             <option value="multifamily">Multifamily</option>

@@ -55,10 +55,11 @@ export async function addSupplementNote(formData: FormData) {
     text: text.slice(0, 4000),
     createdAt: new Date().toISOString(),
   });
-  await ctx.supabase
+  const { error } = await ctx.supabase
     .from("deals")
     .update({ supplements: ctx.map, updated_at: new Date().toISOString() })
     .eq("id", dealId);
+  if (error) throw new Error(`Couldn't save your change: ${error.message}`);
   revalidatePath(`/deals/${dealId}`);
 }
 
@@ -84,10 +85,11 @@ export async function addSupplementFile(formData: FormData) {
     path,
     createdAt: new Date().toISOString(),
   });
-  await ctx.supabase
+  const { error } = await ctx.supabase
     .from("deals")
     .update({ supplements: ctx.map, updated_at: new Date().toISOString() })
     .eq("id", dealId);
+  if (error) throw new Error(`Couldn't save your change: ${error.message}`);
   revalidatePath(`/deals/${dealId}`);
 }
 
@@ -112,9 +114,10 @@ export async function removeSupplement(formData: FormData) {
   } else {
     supp.notes = supp.notes.filter((x) => x.id !== id);
   }
-  await ctx.supabase
+  const { error } = await ctx.supabase
     .from("deals")
     .update({ supplements: ctx.map, updated_at: new Date().toISOString() })
     .eq("id", dealId);
+  if (error) throw new Error(`Couldn't save your change: ${error.message}`);
   revalidatePath(`/deals/${dealId}`);
 }

@@ -259,7 +259,7 @@ function DealPreview() {
   return (
     <div className="relative">
       <div className="absolute -inset-4 -z-10 rounded-3xl bg-brand/5 blur-2xl" />
-      <div className="rounded-2xl border border-line bg-surface p-5 shadow-xl shadow-brand/5">
+      <div className="shadow-float rounded-2xl border border-line bg-surface p-5">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-sm font-medium">The Maddox at Highland Park</p>

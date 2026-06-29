@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   getBilling,
@@ -5,6 +6,8 @@ import {
   PRO_PRICE_LABEL,
 } from "@/lib/billing";
 import { startCheckout, openPortal } from "./actions";
+
+export const metadata: Metadata = { title: "Billing" };
 
 const PRO_FEATURES = [
   "Unlimited deals",

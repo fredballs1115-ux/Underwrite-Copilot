@@ -37,6 +37,13 @@ const VerdictSchema = z.object({
   screen: z.object({
     ranges: z.array(ScreenRangeSchema),
     dealKillers: z.array(DealKillerSchema),
+    sensitivity: z.array(
+      z.object({
+        scenario: z.enum(["conservative", "base", "sponsor"]),
+        call: z.enum(["pass", "caution", "pass_on"]),
+        note: z.string(),
+      }),
+    ),
   }),
 });
 

@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getBilling } from "@/lib/billing";
 import { type DealRow } from "@/lib/deals";
 import type { ExtractionResult, ExtractedMetric } from "@/lib/anthropic/types";
 import { Pipeline, type DealCard } from "./pipeline";
+
+export const metadata: Metadata = { title: "Pipeline" };
 
 const ERRORS: Record<string, string> = {
   name: "Please give the deal a name.",

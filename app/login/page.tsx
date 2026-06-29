@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { LoginForm } from "./login-form";
+
+export const metadata: Metadata = { title: "Sign in" };
 
 export default function LoginPage() {
   return (
@@ -16,7 +19,7 @@ export default function LoginPage() {
         </span>
       </Link>
 
-      <div className="mt-8 rounded-2xl border border-line bg-surface p-7 shadow-xl shadow-brand/5">
+      <div className="shadow-float mt-8 rounded-2xl border border-line bg-surface p-7">
         <h1 className="text-xl font-semibold tracking-tight">
           Sign in or create an account
         </h1>

@@ -164,8 +164,11 @@ export function DealView({
       cancelled = true;
       clearInterval(timer);
     };
+    // Depend on `active` (not the raw status) so the interval isn't torn down
+    // and recreated on every step change — only when polling starts/stops.
+    // `router` is a stable app-router ref, so it's intentionally omitted.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dealId, job?.status, router]);
+  }, [dealId, active]);
 
   // Default tab: an explicit ?tab wins; otherwise the verdict if it's ready,
   // else the first tab (which fills in first as analysis runs).
@@ -375,8 +378,9 @@ function ProgressRail({ job }: { job: NonNullable<Job> }) {
 function Spinner() {
   return (
     <span
+      role="status"
+      aria-label="Working"
       className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-brand"
-      aria-hidden
     />
   );
 }

@@ -102,7 +102,12 @@ export function AppShell({
         </nav>
 
         <div className="border-t border-sidebar-line px-3 py-4">
-          <p className="truncate px-2 text-xs text-white/55">{userEmail}</p>
+          <p
+            title={userEmail}
+            className="truncate px-2 text-xs text-white/55"
+          >
+            {userEmail}
+          </p>
           <form action={signOut} className="mt-1.5">
             <button
               type="submit"
@@ -125,7 +130,10 @@ export function AppShell({
             </span>
           </Link>
           <form action={signOut}>
-            <button type="submit" className="text-sm text-white/80">
+            <button
+              type="submit"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+            >
               Sign out
             </button>
           </form>

@@ -121,9 +121,20 @@ export interface DealKiller {
   /** what would break the deal here */
   risk: string;
 }
+/** How the call moves across the ranges — the honest "where does this flip?" */
+export type ScenarioKey = "conservative" | "base" | "sponsor";
+export interface VerdictScenario {
+  scenario: ScenarioKey;
+  /** the resulting call at this end of the range */
+  call: VerdictCall;
+  /** one line on what drives the call here */
+  note: string;
+}
 export interface ScreenResult {
   ranges: ScreenRange[];
   dealKillers: DealKiller[];
+  /** the verdict at the conservative / base / sponsor ends of the range */
+  sensitivity: VerdictScenario[];
 }
 
 /** Step 6 — Verdict (synthesizes all of the above) */

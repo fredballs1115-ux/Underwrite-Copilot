@@ -20,9 +20,11 @@ import type {
   MarketResult,
   MarketCheck as MarketCheckType,
   VerdictResult,
+  VerdictCall,
   ScreenResult,
   ScreenRange,
   DealKiller,
+  VerdictScenario,
 } from "@/lib/anthropic/types";
 
 /* ================================================================== */
@@ -1256,7 +1258,66 @@ function ScreeningRanges({ screen }: { screen: ScreenResult }) {
           </div>
         </div>
       )}
+
+      {screen.sensitivity && screen.sensitivity.length > 0 && (
+        <VerdictSensitivity scenarios={screen.sensitivity} />
+      )}
     </section>
+  );
+}
+
+const SCENARIO_META: Record<VerdictScenario["scenario"], string> = {
+  conservative: "Conservative",
+  base: "Base case",
+  sponsor: "Sponsor's case",
+};
+const SCENARIO_ORDER: VerdictScenario["scenario"][] = [
+  "conservative",
+  "base",
+  "sponsor",
+];
+const CALL_META: Record<VerdictCall, { label: string; cls: string; dot: string }> = {
+  pass: { label: "Pass", cls: "text-pass", dot: "bg-pass" },
+  caution: { label: "Caution", cls: "text-caution", dot: "bg-caution" },
+  pass_on: { label: "Pass on", cls: "text-kill", dot: "bg-kill" },
+};
+
+function VerdictSensitivity({ scenarios }: { scenarios: VerdictScenario[] }) {
+  const ordered = [...scenarios].sort(
+    (a, b) =>
+      SCENARIO_ORDER.indexOf(a.scenario) - SCENARIO_ORDER.indexOf(b.scenario),
+  );
+  return (
+    <div>
+      <h3 className="text-xs font-medium uppercase tracking-wider text-muted">
+        Where the call flips
+      </h3>
+      <p className="mt-1 text-sm leading-relaxed text-muted">
+        The same deal, read across the range — from conservative to the
+        sponsor&apos;s optimistic end.
+      </p>
+      <div className="mt-3 grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-3">
+        {ordered.map((s, i) => {
+          const call = CALL_META[s.call] ?? CALL_META.caution;
+          return (
+            <div key={i} className="bg-surface p-4">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                {SCENARIO_META[s.scenario] ?? s.scenario}
+              </p>
+              <p
+                className={`mt-1.5 flex items-center gap-1.5 text-sm font-semibold ${call.cls}`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${call.dot}`} />
+                {call.label}
+              </p>
+              <p className="mt-1.5 text-xs leading-relaxed text-muted">
+                {s.note}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -1303,7 +1364,7 @@ function RangeCell({
   emphasized?: boolean;
 }) {
   return (
-    <div className={`px-3 py-2 ${emphasized ? "bg-brand/5" : "bg-surface"}`}>
+    <div className={`px-3 py-2 ${emphasized ? "bg-brand/10" : "bg-surface"}`}>
       <p className="text-[10px] uppercase tracking-wide text-muted">{label}</p>
       <p
         className={`mt-0.5 font-mono tabular-nums ${
@@ -1437,6 +1498,7 @@ export function AddData({ dealId, tab }: { dealId: string; tab: string }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
         className="flex w-full items-center gap-2 text-sm font-medium text-muted transition-colors hover:text-ink"
       >
         <IconPlus
@@ -1454,7 +1516,7 @@ export function AddData({ dealId, tab }: { dealId: string; tab: string }) {
               required
               rows={2}
               placeholder="Add a note, a correction, or a figure the analysis missed…"
-              className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none focus:border-brand"
+              className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
             />
             <button
               type="submit"
