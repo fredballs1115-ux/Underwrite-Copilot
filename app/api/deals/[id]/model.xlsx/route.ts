@@ -1,5 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { fillModelTemplate } from "@/lib/model/template-fill";
+import { buildModelWorkbook } from "@/lib/model/excel-build";
 import type { DealRow } from "@/lib/deals";
 import type { UnderwritingModel } from "@/lib/model/types";
 
@@ -36,7 +36,7 @@ export async function GET(
     .eq("deal_id", id);
   const kinds = ((docs ?? []) as { kind: string }[]).map((d) => d.kind);
 
-  const buffer = await fillModelTemplate(model, deal.name, kinds);
+  const buffer = await buildModelWorkbook(model, deal.name, kinds);
   const safe =
     (deal.name || "deal")
       .replace(/[^a-z0-9]+/gi, "-")

@@ -1,44 +1,35 @@
-// Which document/action feeds which part of the template-driven model. Shared
-// by the server-side Excel fill and the in-app "inputs needed" checklist, so
-// the requirements shown on screen exactly match the generated workbook.
+// Which document feeds which part of the generated model. Shared by the
+// server-side Excel builder (Start Here sheet) and the in-app "add more to the
+// model" checklist, so what's shown on screen matches the workbook.
 
 export const MODEL_INPUTS = [
   {
     kind: "om",
     label: "Offering memorandum",
-    fills: "Deal name, price, and the base investment & sale assumptions",
+    fills: "Deal name, purchase price, and the headline sale & return assumptions",
   },
   {
     kind: "rent_roll",
     label: "Rent roll",
-    fills:
-      "Rent Roll tab — tenants, suites, square footage, in-place rents, occupancy",
+    fills: "In-place rents, units / SF, and occupancy that drive Year-1 income",
   },
   {
     kind: "t12",
     label: "T-12 / operating statement",
-    fills: "Trailing operating expenses on the Cash Flow tab",
+    fills: "Trailing operating expenses behind the NOI on the Cash Flow tab",
   },
   {
     kind: "loan_terms",
     label: "Loan terms",
-    fills: "LOAN ASSUMPTIONS — rate, loan-to-cost, amortization",
+    fills: "Loan sizing on Deal Summary — rate, loan-to-value, amortization, IO",
   },
   {
     kind: "financials",
     label: "Offering financials",
-    fills: "Historical income & expense detail",
+    fills: "Historical income & expense detail to reconcile against",
   },
 ] as const;
 
-export const MODEL_PASTES = [
-  {
-    label: "ARGUS cash-flow export",
-    fills:
-      "The monthly projection and the IRR / returns — paste into the ARGUS Paste regions (Cash Flow, MLAs, Lease-Up, Rent Roll, Lease Audit tabs)",
-  },
-  {
-    label: "Capital plan / PCA (optional)",
-    fills: "CapEx Detail tab — the capital-budget line items",
-  },
-];
+// No paste-in steps any more — the workbook is generated and fully populated
+// from the deal. Kept as an (empty) export so existing imports stay valid.
+export const MODEL_PASTES: { label: string; fills: string }[] = [];
