@@ -75,12 +75,12 @@ function Intro() {
         Build a first-draft underwriting model
       </h2>
       <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted">
-        Upload everything you have on the deal — the OM, the rent roll, the
-        T-12, offering financials, loan terms. We’ll reconcile the figures
-        across them (actuals beat pro forma, and every conflict is surfaced, not
-        hidden) and generate a complete first-draft Excel model: cash flows,
-        sourced assumptions, and returns. Add at least the OM and a rent roll to
-        start.
+        Upload whatever you have on the deal — the OM, a rent roll, a T-12,
+        offering financials, loan terms, or your own Argus export. We build the
+        model around what you give us: actuals beat pro forma, every conflict is
+        surfaced (not hidden), and you get a first-draft Excel model with sourced
+        assumptions and returns. Start with one document — you can always add
+        more to deepen it.
       </p>
     </div>
   );
@@ -91,12 +91,13 @@ function InputsNeeded({ documents }: { documents: DealDocument[] }) {
   return (
     <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
       <h2 className="text-sm font-semibold tracking-tight">
-        Inputs needed to complete the model
+        Add more to the model
       </h2>
       <p className="mt-1 text-sm leading-relaxed text-muted">
-        The generated Excel matches your master template. Assumption cells are
-        filled from your documents — provide these to fill the rest. Nothing is
-        left blank or guessed; each gap is labeled in the workbook.
+        The model is built around whatever you upload — that&apos;s usually
+        exactly the deal you mean. None of these are required, but adding them
+        makes the model fuller and sharpens the reconciliation. Drop in any of
+        them anytime.
       </p>
       <ul className="mt-4 space-y-3">
         {MODEL_INPUTS.map((inp) => {
@@ -105,18 +106,18 @@ function InputsNeeded({ documents }: { documents: DealDocument[] }) {
             <li key={inp.kind} className="flex items-start gap-3">
               <span
                 className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                  ok ? "bg-pass/15 text-pass" : "bg-caution/15 text-caution"
+                  ok ? "bg-pass/15 text-pass" : "bg-brand/10 text-brand"
                 }`}
               >
-                {ok ? "✓" : "!"}
+                {ok ? "✓" : "+"}
               </span>
               <div className="min-w-0">
                 <p className="text-sm font-medium">
                   {inp.label}{" "}
                   <span
-                    className={`ml-1 text-xs font-normal ${ok ? "text-pass" : "text-caution"}`}
+                    className={`ml-1 text-xs font-normal ${ok ? "text-pass" : "text-muted"}`}
                   >
-                    {ok ? "provided" : "needed"}
+                    {ok ? "added" : "optional"}
                   </span>
                 </p>
                 <p className="text-xs leading-relaxed text-muted">{inp.fills}</p>
@@ -126,13 +127,15 @@ function InputsNeeded({ documents }: { documents: DealDocument[] }) {
         })}
         {MODEL_PASTES.map((p, i) => (
           <li key={i} className="flex items-start gap-3">
-            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand/15 text-[11px] font-bold text-brand">
-              →
+            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[11px] font-bold text-brand">
+              +
             </span>
             <div className="min-w-0">
               <p className="text-sm font-medium">
                 {p.label}{" "}
-                <span className="ml-1 text-xs font-normal text-brand">action</span>
+                <span className="ml-1 text-xs font-normal text-muted">
+                  optional
+                </span>
               </p>
               <p className="text-xs leading-relaxed text-muted">{p.fills}</p>
             </div>
