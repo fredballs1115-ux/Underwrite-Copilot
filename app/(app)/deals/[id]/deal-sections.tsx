@@ -150,7 +150,7 @@ function SectionHeader({ title, aside }: { title: string; aside?: ReactNode }) {
 
 function Callout({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex gap-3 rounded-xl border border-line bg-surface p-4 shadow-sm">
+    <div className="flex gap-3 rounded-xl border border-line border-l-[3px] border-l-brand bg-faint/70 p-4">
       {icon && <span className="mt-0.5 shrink-0 text-brand">{icon}</span>}
       <p className="text-sm leading-relaxed">{children}</p>
     </div>
@@ -904,7 +904,7 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
               return (
                 <tr
                   key={i}
-                  className="border-b border-line align-top last:border-0"
+                  className="border-b border-line align-top transition-colors last:border-0 hover:bg-faint/60"
                 >
                   <td className="px-4 py-3 font-medium">{r.metric}</td>
                   <td className="px-4 py-3 font-mono tabular-nums text-muted">
