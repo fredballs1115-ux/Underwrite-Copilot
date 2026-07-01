@@ -633,7 +633,9 @@ commodity = [
 eastdil_matrix(s, 1.72, 5.12, commodity,
                ["Size (SF)", "Year Built", "% Leased", "WALT", "Cap Rate", "Price (PSF)", "Buyer", "Seller"],
                label_w=0.92, data_fs=5.6, name_fs=6.0, name_h=0.46, photo_h=0.46, status_h=0.32,
-               photos={1: "comp_700_6th.jpg"})
+               photos={1: "comp_700_6th.jpg", 3: "comp_1775_Penn.jpg",
+                       4: "comp_Sumner_Square.jpg", 5: "comp_2445_M.jpg",
+                       6: "comp_Watergate.jpg"})
 
 # ============================================================ 16 – SELECT ES OFFICE FINANCINGS (BOV p16)
 s = slide(); bg(s, WHITE)
@@ -654,7 +656,9 @@ fins = [
 ]
 eastdil_matrix(s, 1.72, 5.12, fins,
                ["Sponsor", "SF", "WALT", "% Leased", "Loan Amount", "Loan PSF", "LTV / LTC", "In-Place DY", "Lender", "Pricing"],
-               label_w=1.28, data_fs=6.0, name_fs=6.6, name_h=0.40, photo_h=0.40, status_h=0.28)
+               label_w=1.28, data_fs=6.0, name_fs=6.6, name_h=0.40, photo_h=0.40, status_h=0.28,
+               photos={2: "comp_799_9th.jpg", 4: "comp_2001_M.jpg",
+                       5: "comp_1401_New_York.jpg", 7: "comp_901_K.jpg"})
 
 # ============================================================ 17 – CONTACT
 s = slide(); bg(s, BLACK)
