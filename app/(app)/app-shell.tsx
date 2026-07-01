@@ -52,6 +52,12 @@ const IconCard = (p: { className?: string }) => (
     <path d="M2 10h20" />
   </NavIcon>
 );
+const IconUser = (p: { className?: string }) => (
+  <NavIcon className={p.className}>
+    <path d="M20 21a8 8 0 0 0-16 0" />
+    <circle cx="12" cy="7" r="4" />
+  </NavIcon>
+);
 
 /** The signed-in app chrome: a deep-teal sidebar on desktop, a top bar on mobile. */
 export function AppShell({
@@ -64,6 +70,7 @@ export function AppShell({
   const pathname = usePathname();
   const inPipeline = pathname.startsWith("/deals");
   const inBilling = pathname.startsWith("/billing");
+  const inAccount = pathname.startsWith("/account");
 
   return (
     <div className="flex min-h-screen bg-canvas">
@@ -98,6 +105,17 @@ export function AppShell({
           >
             <IconCard className="h-4 w-4" />
             Billing
+          </Link>
+          <Link
+            href="/account"
+            className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              inAccount
+                ? "bg-white/12 text-white"
+                : "text-white/65 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            <IconUser className="h-4 w-4" />
+            Account
           </Link>
         </nav>
 
