@@ -113,7 +113,13 @@ html=(f'<!doctype html><html><head><meta charset="utf-8"><style>*{{margin:0;padd
 
 hp=os.path.join(tempfile.gettempdir(),"westend_map.html"); open(hp,"w").write(html)
 out=os.path.join(HERE,"assets","location_map.png"); os.makedirs(os.path.dirname(out),exist_ok=True)
+# render a TALLER window so the full 800-unit height is captured (the viewport
+# otherwise clips ~90 units), then crop back to the exact viewBox aspect.
+tmp=os.path.join(tempfile.gettempdir(),"westend_raw.png")
 subprocess.run([CHROME,"--headless=new","--disable-gpu","--no-sandbox","--hide-scrollbars",
-    "--force-device-scale-factor=2",f"--window-size={VBW},{VBH}",f"--screenshot={out}",f"file://{hp}"],
+    "--force-device-scale-factor=2",f"--window-size={VBW},{VBH+140}",f"--screenshot={tmp}",f"file://{hp}"],
     check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-print("wrote",out,os.path.getsize(out),"bytes")
+from PIL import Image
+img=Image.open(tmp).convert("RGB").crop((0,0,VBW*2,VBH*2))   # top 1165x800 (x2)
+img.save(out)
+print("wrote",out,img.size,os.path.getsize(out),"bytes")
