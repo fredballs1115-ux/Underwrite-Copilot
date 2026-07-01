@@ -59,6 +59,17 @@ export function Pipeline({
   const [market, setMarket] = useState("all");
   const [sort, setSort] = useState("newest");
   const [showForm, setShowForm] = useState(!!errorMessage);
+  const [compareMode, setCompareMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   // Free users who've hit the cap can't open the create form — they upgrade.
   const atLimit = !!billing && !billing.canCreateDeal;
@@ -121,23 +132,63 @@ export function Pipeline({
             )}
           </p>
         </div>
-        {atLimit ? (
-          <Link
-            href="/billing"
-            className="shadow-card hover-lift shrink-0 rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white"
-          >
-            Upgrade for more
-          </Link>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setShowForm((s) => !s)}
-            className="shadow-card hover-lift shrink-0 rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white"
-          >
-            {showForm ? "Close" : "+ New deal"}
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {deals.length >= 2 && (
+            <button
+              type="button"
+              onClick={() => {
+                setCompareMode((c) => !c);
+                setSelected(new Set());
+              }}
+              className={`rounded-lg border px-3.5 py-2.5 text-sm font-medium transition-colors ${
+                compareMode
+                  ? "border-brand bg-brand/5 text-brand"
+                  : "border-line bg-surface hover:bg-faint"
+              }`}
+            >
+              {compareMode ? "Done" : "Compare"}
+            </button>
+          )}
+          {atLimit ? (
+            <Link
+              href="/billing"
+              className="shadow-card hover-lift rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white"
+            >
+              Upgrade for more
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowForm((s) => !s)}
+              className="shadow-card hover-lift rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white"
+            >
+              {showForm ? "Close" : "+ New deal"}
+            </button>
+          )}
+        </div>
       </div>
+
+      {compareMode && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-brand/30 bg-brand/5 px-4 py-3">
+          <p className="text-sm font-medium">
+            {selected.size === 0
+              ? "Select two or more deals to compare."
+              : `${selected.size} selected`}
+          </p>
+          {selected.size >= 2 ? (
+            <Link
+              href={`/deals/compare?ids=${[...selected].join(",")}`}
+              className="ml-auto rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+            >
+              Compare {selected.size} deals
+            </Link>
+          ) : (
+            <span className="ml-auto text-xs text-muted">
+              {selected.size === 1 ? "Pick one more" : ""}
+            </span>
+          )}
+        </div>
+      )}
 
       {showForm && !atLimit && <NewDealForm errorMessage={errorMessage} />}
       {atLimit && errorMessage && (
@@ -239,7 +290,14 @@ export function Pipeline({
           )}
           <ul className="stagger divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
             {filtered.map((d, idx) => (
-              <DealRow key={d.id} d={d} i={idx} />
+              <DealRow
+                key={d.id}
+                d={d}
+                i={idx}
+                compareMode={compareMode}
+                checked={selected.has(d.id)}
+                onToggle={() => toggleSelected(d.id)}
+              />
             ))}
           </ul>
         </>
@@ -248,44 +306,78 @@ export function Pipeline({
   );
 }
 
-function DealRow({ d, i }: { d: DealCard; i: number }) {
+function DealRow({
+  d,
+  i,
+  compareMode,
+  checked,
+  onToggle,
+}: {
+  d: DealCard;
+  i: number;
+  compareMode: boolean;
+  checked: boolean;
+  onToggle: () => void;
+}) {
   const v = d.verdict ? VERDICT_META[d.verdict] : null;
-  return (
-    <li style={{ "--i": i } as React.CSSProperties}>
-      <Link
-        href={`/deals/${d.id}`}
-        className="group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-faint"
-      >
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-medium">{d.name}</p>
-          <p className="mt-0.5 truncate text-xs text-muted">
-            {d.market && <>{d.market} · </>}
-            <span className="capitalize">{d.assetClass}</span>
-            {" · "}
-            <span className="font-mono tabular-nums">{fmtDate(d.createdAt)}</span>
-          </p>
+
+  const inner = (
+    <>
+      {compareMode && (
+        <span
+          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
+            checked
+              ? "border-brand bg-brand text-white"
+              : "border-line bg-surface"
+          }`}
+          aria-hidden
+        >
+          {checked && (
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={3}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-3 w-3"
+            >
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+          )}
+        </span>
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-medium">{d.name}</p>
+        <p className="mt-0.5 truncate text-xs text-muted">
+          {d.market && <>{d.market} · </>}
+          <span className="capitalize">{d.assetClass}</span>
+          {" · "}
+          <span className="font-mono tabular-nums">{fmtDate(d.createdAt)}</span>
+        </p>
+      </div>
+      {d.stats.length > 0 && (
+        <div className="hidden shrink-0 items-center gap-5 md:flex">
+          {d.stats.map((s, idx) => (
+            <div key={idx} className="text-right">
+              <p className="text-[10px] uppercase tracking-wide text-muted">
+                {s.label}
+              </p>
+              <p className="font-mono text-sm tabular-nums">{s.value}</p>
+            </div>
+          ))}
         </div>
-        {d.stats.length > 0 && (
-          <div className="hidden shrink-0 items-center gap-5 md:flex">
-            {d.stats.map((s, i) => (
-              <div key={i} className="text-right">
-                <p className="text-[10px] uppercase tracking-wide text-muted">
-                  {s.label}
-                </p>
-                <p className="font-mono text-sm tabular-nums">{s.value}</p>
-              </div>
-            ))}
-          </div>
-        )}
-        {v ? (
-          <span
-            className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${v.cls}`}
-          >
-            {v.label}
-          </span>
-        ) : (
-          <span className="shrink-0 text-[11px] text-muted">Screening</span>
-        )}
+      )}
+      {v ? (
+        <span
+          className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${v.cls}`}
+        >
+          {v.label}
+        </span>
+      ) : (
+        <span className="shrink-0 text-[11px] text-muted">Screening</span>
+      )}
+      {!compareMode && (
         <svg
           viewBox="0 0 24 24"
           fill="none"
@@ -298,7 +390,31 @@ function DealRow({ d, i }: { d: DealCard; i: number }) {
         >
           <path d="m9 18 6-6-6-6" />
         </svg>
-      </Link>
+      )}
+    </>
+  );
+
+  return (
+    <li style={{ "--i": i } as React.CSSProperties}>
+      {compareMode ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-pressed={checked}
+          className={`group flex w-full items-center gap-4 px-5 py-4 text-left transition-colors ${
+            checked ? "bg-brand/5" : "hover:bg-faint"
+          }`}
+        >
+          {inner}
+        </button>
+      ) : (
+        <Link
+          href={`/deals/${d.id}`}
+          className="group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-faint"
+        >
+          {inner}
+        </Link>
+      )}
     </li>
   );
 }
