@@ -12,12 +12,37 @@ Sources: Eastdil Secured BOV (Jun-2026); CoStar reports (7/1/2026); ownership em
 (loan balance $100M).
 """
 
+import os, tempfile
+from PIL import Image
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.oxml.ns import qn
+
+ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+_TMP = tempfile.mkdtemp(prefix="deckimg_")
+
+def fit_image(path, w_in, h_in):
+    """Center-crop an image to the target aspect ratio; return a temp path."""
+    img = Image.open(path).convert("RGB")
+    iw, ih = img.size
+    target = w_in / h_in
+    if iw / ih > target:
+        nw = int(ih * target); x0 = (iw - nw) // 2
+        img = img.crop((x0, 0, x0 + nw, ih))
+    else:
+        nh = int(iw / target); y0 = (ih - nh) // 2
+        img = img.crop((0, y0, iw, y0 + nh))
+    out = os.path.join(_TMP, "c_%x.jpg" % (abs(hash((path, round(w_in, 3), round(h_in, 3)))),))
+    img.save(out, quality=88)
+    return out
+
+def photo(s, name, x_in, y_in, w_in, h_in):
+    """Place an asset image, center-cropped to fill the target rectangle."""
+    s.shapes.add_picture(fit_image(os.path.join(ASSETS, name), w_in, h_in),
+                         Inches(x_in), Inches(y_in), Inches(w_in), Inches(h_in))
 
 # ----------------------------------------------------------------------------- brand
 GOLD      = RGBColor(0xF5, 0xB4, 0x00)
@@ -143,7 +168,7 @@ def comp_table(s, x, y, w, h, cols, widths, rows, fontsize=7.6):
     return t
 
 def eastdil_matrix(s, y_top, y_bot, columns, row_labels, label_w, data_fs,
-                   name_fs, name_h, photo_h, status_h):
+                   name_fs, name_h, photo_h, status_h, photos=None):
     """Eastdil-style comp matrix: properties as columns; name/photo/status bands
     on top; light-blue row labels down the left. `columns` = list of dicts with
     keys name, status, closed(bool), vals(list aligned to row_labels)."""
@@ -163,11 +188,19 @@ def eastdil_matrix(s, y_top, y_bot, columns, row_labels, label_w, data_fs,
     # corner cells (blank) above the labels
     for r in range(3):
         set_cell(t.cell(r, 0), "", data_fs, WHITE, fill=WHITE)
+    photos = photos or {}
     for ci, col in enumerate(columns, start=1):
         set_cell(t.cell(0, ci), col["name"], name_fs, WHITE, bold=True, fill=HDR_DARK, align=PP_ALIGN.CENTER)
-        set_cell(t.cell(1, ci), "[ photo ]", 6, GREY_TXT, fill=PHOTO_BG, align=PP_ALIGN.CENTER, ital=True)
+        if ci in photos:
+            set_cell(t.cell(1, ci), "", 6, GREY_TXT, fill=WHITE)
+        else:
+            set_cell(t.cell(1, ci), "[ photo ]", 6, GREY_TXT, fill=PHOTO_BG, align=PP_ALIGN.CENTER, ital=True)
         set_cell(t.cell(2, ci), col["status"], data_fs, HDR_BROWN if col["closed"] else WHITE, bold=True,
                  fill=GOLD if col["closed"] else GREY_MED, align=PP_ALIGN.CENTER)
+    # overlay real photos onto their photo-row cells
+    for ci, fname in photos.items():
+        x_in = 0.42 + label_w + (ci - 1) * data_w
+        photo(s, fname, x_in, y_top + name_h, data_w, photo_h)
     for ri, lab in enumerate(row_labels):
         r = 3 + ri
         set_cell(t.cell(r, 0), lab, data_fs, DARK, bold=True, fill=GOLD_LT)
@@ -189,10 +222,7 @@ def bullets(s, x, y, w, h, items, size=12, gap=6, lh=1.02, lead_color=GOLD):
 
 # ============================================================ 1 – COVER
 s = slide(); bg(s, BLACK)
-rect(s, Inches(4.55), 0, Inches(5.45), Inches(5.625), PANEL)
-txt(s, Inches(4.55), Inches(2.5), Inches(5.45), Inches(0.6),
-    [[Rn("[ Insert 2300 N Street property photograph ]", 11, RGBColor(0x8C,0x8C,0x8C), False, True)]],
-    align=PP_ALIGN.CENTER)
+photo(s, "cover_2300_N.jpg", 4.55, 0, 5.45, 5.625)
 txt(s, Inches(0.55), Inches(0.95), Inches(3.8), Inches(0.9),
     [[Rn("Lincoln", 40, GOLD, True, False, SERIF_FONT)]])
 txt(s, Inches(0.6), Inches(1.95), Inches(3.8), Inches(0.5),
@@ -248,19 +278,16 @@ for i, (a, b, c, d) in enumerate(rows, start=1):
     set_cell(table.cell(i, 1), b, 9.5, DARK, fill=fill)
     set_cell(table.cell(i, 2), c, 9.5, DARK, bold=True, fill=fill)
     set_cell(table.cell(i, 3), d, 9.5, DARK, fill=fill)
-rect(s, Inches(6.05), Inches(1.05), Inches(3.53), Inches(1.9), PH_GREY)
-txt(s, Inches(6.05), Inches(1.9), Inches(3.53), Inches(0.4),
-    [[Rn("[ Property exterior photograph ]", 10, GREY_TXT, False, True)]], align=PP_ALIGN.CENTER)
-rect(s, Inches(6.05), Inches(3.05), Inches(3.53), Inches(1.9), PH_GREY)
-txt(s, Inches(6.05), Inches(3.9), Inches(3.53), Inches(0.4),
-    [[Rn("[ Roof terrace / lobby photograph ]", 10, GREY_TXT, False, True)]], align=PP_ALIGN.CENTER)
+photo(s, "2300_N_exterior.jpg", 6.05, 1.05, 3.53, 1.9)
+photo(s, "2300_N_roofterrace.jpg", 6.05, 3.05, 3.53, 1.9)
 
 # ============================================================ 4 – LOCATION OVERVIEW
 s = slide(); bg(s, WHITE)
 content_header(s, "Location Overview", 4)
-rect(s, Inches(0.42), Inches(1.05), Inches(5.75), Inches(3.95), PH_GREY)
-txt(s, Inches(0.42), Inches(2.9), Inches(5.75), Inches(0.4),
-    [[Rn("[ Insert West End aerial / location map ]", 11, GREY_TXT, False, True)]], align=PP_ALIGN.CENTER)
+if not os.path.exists(os.path.join(ASSETS, "location_map.png")):
+    import runpy
+    runpy.run_path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "make_map.py"))
+photo(s, "location_map.png", 0.42, 1.05, 5.75, 3.95)
 rect(s, Inches(6.35), Inches(1.05), Inches(3.23), Inches(0.4), GOLD)
 txt(s, Inches(6.35), Inches(1.10), Inches(3.23), Inches(0.3),
     [[Rn("Location Highlights", 13, HDR_BROWN, True)]], align=PP_ALIGN.CENTER)
@@ -272,7 +299,8 @@ bullets(s, Inches(6.35), Inches(1.62), Inches(3.25), Inches(3.4), [
     ("Regional access", " — Reagan National 12-min drive; Union Station / L'Enfant ~6–7 min."),
 ], size=10, gap=9, lh=1.0)
 txt(s, Inches(0.42), Inches(5.05), Inches(9), Inches(0.25),
-    [[Rn("Source: CoStar (7/1/2026).", 8, GREY_TXT, False, True)]])
+    [[Rn("Location highlights per CoStar (7/1/2026). Map is a schematic for orientation, not to scale.",
+        8, GREY_TXT, False, True)]])
 
 # ============================================================ 5 – VALUE CONSIDERATIONS (BOV p19)
 s = slide(); bg(s, WHITE)
@@ -419,7 +447,7 @@ for r, row in enumerate(data, start=2):
         set_cell(t.cell(r, c), val, 8.7, HDR_BROWN if total else DARK, bold=total, fill=fill,
                  align=PP_ALIGN.LEFT if c == 0 else PP_ALIGN.CENTER)
 txt(s, Inches(6.2), Inches(1.05), Inches(3.4), Inches(0.35),
-    [[Rn("Key Considerations", 14, DARK, True, False, TITLE_FONT)]])
+    [[Rn("Key Considerations", 13, DARK, True, False, TITLE_FONT)]])
 bullets(s, Inches(6.2), Inches(1.45), Inches(3.4), Inches(3.4), [
     "88% leased today, stepping to 77% after Aspen's 6th-floor downsize — nearly 10 years of WALT.",
     "65,000+ SF (23% of NRA) of new leasing since Q4 2024; ~$1.3M of TI/LCs credited to a buyer at close.",
@@ -570,7 +598,8 @@ classA = [
 ]
 eastdil_matrix(s, 1.72, 5.12, classA,
                ["Size (SF)", "% Leased", "WALT", "Cap Rate", "Price (PSF)", "Buyer", "Seller", "Notes"],
-               label_w=0.98, data_fs=6.2, name_fs=6.5, name_h=0.48, photo_h=0.56, status_h=0.24)
+               label_w=0.98, data_fs=6.2, name_fs=6.5, name_h=0.48, photo_h=0.56, status_h=0.24,
+               photos={1: "comp_888_16th.jpg", 2: "comp_Hamilton_Square.jpg"})
 
 # ============================================================ 15 – RECENT DATA POINTS: COMMODITY (BOV p15)
 s = slide(); bg(s, WHITE)

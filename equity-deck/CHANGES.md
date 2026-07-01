@@ -45,9 +45,13 @@ financing data-point pages — for the Oaktree/LPC recapitalization.
 17. **Contact** — LPC deal team: Matt Nicholson (EVP), Jake Guttman (Director),
     Jackson Coviello (AVP), Jared Hicks (Analyst).
 
-## Photos to drop in
-Each comp column on slides 14–16 has a labeled "[ photo ]" cell — drop the building photos there.
-The cover, Property Overview, and Location Overview (aerial/map) also have photo placeholders.
+## Photos (in `assets/`, embedded by `build_deck.py`)
+Placed so far: cover (2300 N hero), Property Overview exterior + roof terrace, and the first two
+Class-A comp columns (888 16th, Hamilton Square). Remaining comp columns still show a "[ photo ]"
+placeholder cell — drop images in as they arrive (add to `assets/` and map them in the
+`photos={...}` arg of the relevant `eastdil_matrix` call).
+The Location slide uses `make_map.py`, a generated schematic locator map (swap for a real aerial
+anytime by replacing `assets/location_map.png`).
 
 ## What changed vs. the first draft (per feedback)
 - Removed the invented "Opportunity / business-plan" page; replaced with Eastdil's own
