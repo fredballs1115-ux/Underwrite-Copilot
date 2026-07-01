@@ -28,8 +28,8 @@ TOP_TONES = ["#EFE7D7", "#EAE0CC", "#E5DAC2", "#E0D3BB", "#E7DCC6",
              "#DECDB4", "#E4D3BB",              # warm taupe
              "#E0C9AC", "#DAC1A2",              # soft terracotta accent
              "#DCCDB2", "#D6C6AC"]              # deeper warm taupe (was cool slate)
-LEFT_MUL  = 0.88        # left/west face shade multiplier (lit side)
-RIGHT_MUL = 0.71        # right/south face shade (darker, in shadow)
+LEFT_MUL  = 0.86        # left/west face shade multiplier (lit side)
+RIGHT_MUL = 0.66        # right/south face shade (darker, in shadow — deeper for 3D depth)
 
 PARK      = "#C2D3A6"   # sage green (a touch deeper for contrast)
 PARK_ED   = "#AFC191"
@@ -125,24 +125,42 @@ def poly(pts, fill, stroke=None, sw=1.0, op=1.0):
     st = f' stroke="{stroke}" stroke-width="{sw}"' if stroke else ""
     return f'<polygon points="{p}" fill="{fill}"{st} fill-opacity="{op}"/>'
 
-# Park band (west), organic wavy world strip running the full height
-park_pts = []
-pw_inner = WX0 - 55
-for wy in range(WY0-gm, WY1+gm+1, 45):
-    wig = math.sin(wy*0.011)*26
-    park_pts.append(proj(pw_inner+wig, wy))
-for wy in range(WY1+gm, WY0-gm-1, -45):
-    park_pts.append(proj(WX0-260 - abs(math.cos(wy*0.01))*30, wy))
-s.append(poly(park_pts, PARK, PARK_ED, 1.8))
+# The scene is a diamond: NW(523,192) top, SW(115,396) left, SE(659,668) bottom.
+# The WEST edge is the NW->SW diagonal (upper-left). Everything left of it is off-grid
+# ground we dress with a green park mass (upper/mid-left) and blue water (lower-left).
+# We author these directly in SCREEN space for precise, reliable placement.
 
-# Potomac: broad wedge across the SW / lower-left corner
-riv_pts = [proj(WX0-140, WY1+gm)]
-for t in [0.0,0.25,0.5,0.75,1.0]:
-    wx = (WX0-40) + t*(-560)
-    wy = (WY1+140) + t*(gm-140)
-    riv_pts.append(proj(wx, wy))
-riv_pts.append(proj(WX0-gm, WY1+gm))
-s.append(poly(riv_pts, WATER, WATER_ED, 1.8))
+# --- ROCK CREEK PARK: an organic green mass filling the WEST / left edge ---
+# hugs the NW->SW grid edge on its right side, spills off the left frame edge.
+park_pts = [
+    (-30, -30), (250, -30),                  # top edge runs off the top frame (no hard line)
+    (360, 90), (390, 200),                   # gentle bulge, tucked left of the NW grid corner
+    (300, 285), (215, 375), (150, 435),      # inner boundary hugging the west grid edge
+    (95, 470), (35, 515), (-30, 540),        # down toward lower-left, meeting the water
+    (-30, -30),
+]
+park_svg = poly(park_pts, PARK, PARK_ED, 2.0)
+s.append(park_svg)
+# darker tree-canopy lobes for depth — soft-blurred, kept well inside the green mass
+s.append(f'<g filter="url(#blur)">'
+         f'<ellipse cx="120" cy="215" rx="130" ry="88" fill="{PARK_DK}" opacity="0.42"/>'
+         f'<ellipse cx="60" cy="360" rx="105" ry="78" fill="{PARK_DK}" opacity="0.38"/></g>')
+
+# --- POTOMAC RIVER: a soft-blue water mass across the SW / lower-left corner ---
+# sits below the park, filling the lower-left, sweeping off the bottom + left frame.
+water_pts = [
+    (-30, 545), (30, 520), (120, 490),        # top of water meets base of park
+    (240, 520), (340, 585), (420, 660),       # a broad diagonal bank sweeping SE
+    (470, 740), (500, 830),                    # off the bottom edge
+    (-30, 830),                                # bottom-left frame
+    (-30, 545),
+]
+s.append(poly(water_pts, WATER, WATER_ED, 2.0))
+# subtle current highlight lines on the water
+s.append(f'<path d="M20,600 Q160,590 300,650" stroke="#C9DEE9" stroke-width="3" '
+         f'fill="none" opacity="0.55" stroke-linecap="round"/>')
+s.append(f'<path d="M10,690 Q150,685 280,740" stroke="#C9DEE9" stroke-width="2.5" '
+         f'fill="none" opacity="0.45" stroke-linecap="round"/>')
 
 # =============================================================================
 #  STREET CHANNELS  — draw as projected quads (surfaces) so streets read as
@@ -187,7 +205,7 @@ def wline_seg(p0, p1, w, fill, ed=None):
     return out
 
 WC = (360, 630)     # Washington Circle (23rd & K) — SW
-DUP = (860, 60)     # Dupont Circle — NE
+DUP = (462, -250)   # Dupont Circle — NE (projects to upper-right, under its label)
 PENN_END = (900, 700)  # Pennsylvania Ave to SE
 # New Hampshire Ave SW->NE
 s.append(wline_seg(WC, DUP, 22, AVE_FILL, AVE_ED))
@@ -252,9 +270,11 @@ GUT = 30  # gutter from street centerline to block edge
 parcels = []  # (x0,y0,x1,y1,h,toptone,hero)
 
 # subject building: 23rd & N. Substantial WIDE hero footprint, tallest tower.
-SUBJ_X0, SUBJ_Y0 = 300, 205
-SUBJ_X1, SUBJ_Y1 = 392, 285
-SUBJ_H = 235
+# ONE clean confident extrusion — a broad footprint, moderate height so proportions
+# read as a stately tower (not a needle wearing a hat). No setback crown.
+SUBJ_X0, SUBJ_Y0 = 292, 200
+SUBJ_X1, SUBJ_Y1 = 400, 292
+SUBJ_H = 205
 
 # Hotel POI positions live in a cleared strip on M St so no extrusion overlaps them.
 # The strip is widened on BOTH sides of the row and buildings near it are trimmed,
@@ -344,7 +364,7 @@ for (x0,y0,x1,y1,h,tone,hero) in parcels:
     # offset shadow toward lower-right
     sh2 = [(x+off, y+off*0.7) for (x,y) in sh]
     shp = " ".join(f"{x:.1f},{y:.1f}" for x,y in sh2)
-    shadow_svg.append(f'<polygon points="{shp}" fill="#000" opacity="0.06"/>')
+    shadow_svg.append(f'<polygon points="{shp}" fill="#000" opacity="0.09"/>')
 s.append(f'<g filter="url(#blur)">{"".join(shadow_svg)}</g>')
 
 # ---- BUILDING PASS (painter's order back-to-front) ----
@@ -369,26 +389,11 @@ def hero_corner(x1, y1, zbase, ztop, w=2.6, col=GOLD_EDGE, op=0.95):
     return (f'<line x1="{a[0]:.1f}" y1="{a[1]:.1f}" x2="{b[0]:.1f}" y2="{b[1]:.1f}" '
             f'stroke="{col}" stroke-width="{w}" stroke-linecap="round" opacity="{op}"/>')
 
-# HERO crown: a setback upper tier for an elegant, architectural silhouette
-cin = 12  # inset
-def draw_building_now(x0,y0,x1,y1,zbase,h,top_f,left_f,right_f,edge,ew):
-    tA=proj(x0,y0,zbase+h); tB=proj(x1,y0,zbase+h); tC=proj(x1,y1,zbase+h); tD=proj(x0,y1,zbase+h)
-    bB=proj(x1,y0,zbase); bC=proj(x1,y1,zbase); bD=proj(x0,y1,zbase)
-    rp=f"{bD[0]:.1f},{bD[1]:.1f} {bC[0]:.1f},{bC[1]:.1f} {tC[0]:.1f},{tC[1]:.1f} {tD[0]:.1f},{tD[1]:.1f}"
-    lp=f"{bB[0]:.1f},{bB[1]:.1f} {bC[0]:.1f},{bC[1]:.1f} {tC[0]:.1f},{tC[1]:.1f} {tB[0]:.1f},{tB[1]:.1f}"
-    tp=f"{tA[0]:.1f},{tA[1]:.1f} {tB[0]:.1f},{tB[1]:.1f} {tC[0]:.1f},{tC[1]:.1f} {tD[0]:.1f},{tD[1]:.1f}"
-    return (f'<polygon points="{rp}" fill="{right_f}" stroke="{edge}" stroke-width="{ew}" stroke-linejoin="round"/>'
-            f'<polygon points="{lp}" fill="{left_f}" stroke="{edge}" stroke-width="{ew}" stroke-linejoin="round"/>'
-            f'<polygon points="{tp}" fill="{top_f}" stroke="{edge}" stroke-width="{ew}" stroke-linejoin="round"/>')
-# faint crown glow on the setback — a soft warm bloom that haloes the top tier
-cr_c = proj((SUBJ_X0+SUBJ_X1)/2, (SUBJ_Y0+SUBJ_Y1)/2, SUBJ_H+19)
-s.append(f'<ellipse cx="{cr_c[0]:.1f}" cy="{cr_c[1]:.1f}" rx="86" ry="60" fill="url(#crownglow)" opacity="0.7"/>')
-s.append(draw_building_now(SUBJ_X0+cin, SUBJ_Y0+cin, SUBJ_X1-cin, SUBJ_Y1-cin,
-                          SUBJ_H, 38, GOLD_HI, "url(#goldface)", GOLD_DK, GOLD_LINE, 1.1))
-# crisp corner highlights on the front vertical edges — drawn on the visible tower/crown
-# faces only (start above the foreground rooftops so no bright streak spills to ground).
-s.append(hero_corner(SUBJ_X1, SUBJ_Y1, 40, SUBJ_H, w=3.2, op=0.8))
-s.append(hero_corner(SUBJ_X1-cin, SUBJ_Y1-cin, SUBJ_H, SUBJ_H+38, w=2.4, op=0.92))
+# The hero is ONE clean extruded tower (drawn in the building pass). No setback crown.
+# A single crisp corner highlight runs up the front vertical edge, from just above the
+# foreground rooftops to the roofline, so the tower reads as one confident volume.
+s.append(hero_corner(SUBJ_X1, SUBJ_Y1, 40, SUBJ_H, w=3.4, op=0.85))
+# a soft grounding shadow anchor is already provided by the shadow pass + gold pool.
 
 # --- balance the frame: faint warm atmospheric haze in the sparse upper-right
 # (Dupont) quadrant so the composition doesn't feel heavier on the left. ---
@@ -423,13 +428,18 @@ def hood(sx, sy, t, size=17, ls="5", rot=0, fill=HOOD_DK):
 def hood_w(wx, wy, t, size=17, ls="5", fill=HOOD_DK):
     p = proj(wx, wy)
     return hood(p[0], p[1], t, size, ls, fill=fill)
-s.append(hood(150, 300, "GEORGETOWN", 18, ls="4"))             # west/left (fixed)
-s.append(txt(196, 452, "ROCK  CREEK  PARK", size=12, fill="#5F7049",
-             weight="700", ls="2.2", hw=3.4, family="'Helvetica Neue', Arial, sans-serif"))
-s.append(hood(150, 700, "POTOMAC  RIVER", 13, ls="2.5", fill="#3E6C8A"))  # SW (fixed, inboard)
+s.append(hood(415, 330, "GEORGETOWN", 17, ls="4"))             # west, on open ground E of the park
+# ROCK CREEK PARK — sits ON the green mass (west/left), angled down the band.
+s.append(txt(165, 235, "ROCK CREEK PARK", size=13, fill="#3F5330",
+             weight="700", ls="1.6", hw=3.6, rot=-26,
+             family="'Helvetica Neue', Arial, sans-serif"))
+# POTOMAC RIVER — sits ON the blue water in the lower-left.
+s.append(txt(175, 690, "POTOMAC RIVER", size=13, fill="#2C5A76",
+             weight="700", ls="1.8", hw=3.6, rot=-16,
+             family="'Helvetica Neue', Arial, sans-serif"))
 s.append(hood(1000, 110, "DUPONT  CIRCLE", 16, ls="3"))        # NE / upper-right (fixed, clear)
 s.append(hood(1015, 560, "DOWNTOWN · CBD", 14, ls="2"))        # east/right (fixed, clear)
-s.append(hood(770, 118, "WEST  END", 20, ls="6"))              # open sky above hero, to the right
+s.append(hood(775, 235, "WEST  END", 19, ls="6"))              # open sky, right of the hero callout
 s.append(hood(430, 690, "FOGGY  BOTTOM · GWU", 15, ls="3"))    # south, clear of cards
 
 # street labels — small rotated tags in the open pavement at the grid's perimeter,
@@ -459,14 +469,20 @@ for (wy,l) in H:
     p = proj(PILL_LANE_E, wy)
     s.append(st_tag(p[0], p[1], l, ang_let))
 
-# avenue labels along the diagonals
+# avenue labels along the diagonals — high contrast: a soft warm pill under the text
+# so the italic serif name reads cleanly over the sunlit avenue and adjacent fabric.
 def ave_label(p0, p1, t, tpar=0.5, dy=-14):
     a=proj(*p0); b=proj(*p1)
     ang=math.degrees(math.atan2(b[1]-a[1], b[0]-a[0]))
-    mx=a[0]+(b[0]-a[0])*tpar; my=a[1]+(b[1]-a[1])*tpar
-    return txt(mx, my+dy, t, size=11.5, fill=INK_SOFT, weight="600", ls="0.4",
-               rot=ang, family="'Georgia', serif", hw=2.8)
-s.append(ave_label(WC, DUP, "New Hampshire Ave", 0.40, -12))
+    mx=a[0]+(b[0]-a[0])*tpar; my=a[1]+(b[1]-a[1])*tpar+dy
+    w = len(t)*7.4 + 20
+    return (f'<g transform="translate({mx:.1f},{my:.1f}) rotate({ang:.1f})" filter="url(#pillshadow)">'
+            f'<rect x="{-w/2:.1f}" y="-12" width="{w:.1f}" height="24" rx="12" '
+            f'fill="#FBF4E6" fill-opacity="0.94" stroke="#E7D3A6" stroke-width="1"/>'
+            f'<text x="0" y="5" text-anchor="middle" font-size="13" font-weight="700" '
+            f'letter-spacing="0.3" fill="#7A5A18" '
+            f'font-family="\'Georgia\', serif" font-style="italic">{t}</text></g>')
+s.append(ave_label(WC, DUP, "New Hampshire Ave", 0.44, -12))
 s.append(ave_label(WC, PENN_END, "Pennsylvania Ave", 0.55, -11))
 
 # =============================================================================
@@ -531,8 +547,8 @@ for hw_ in hotel_world:
 # =============================================================================
 #  SUBJECT HERO — elegant gold pin above the extruded gold tower + callout
 # =============================================================================
-# top of hero crown in screen space
-htx = proj((SUBJ_X0+SUBJ_X1)/2, (SUBJ_Y0+SUBJ_Y1)/2, SUBJ_H+38)
+# top of hero tower in screen space (single clean roofline, no crown)
+htx = proj((SUBJ_X0+SUBJ_X1)/2, (SUBJ_Y0+SUBJ_Y1)/2, SUBJ_H)
 px, py = htx[0], htx[1]
 
 # refined gold pin floating above the tower
