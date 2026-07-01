@@ -1,6 +1,6 @@
 # 2300 N Street, NW — Investment Overview Deck: Change Log
 
-**Deliverable:** `2300_N_Street_NW_Investment_Overview.pptx` (14 slides, 16:9)
+**Deliverable:** `2300_N_Street_NW_Investment_Overview.pptx` (17 slides, 16:9)
 **Built by:** `build_deck.py` (re-run to regenerate)
 **Date:** July 2026
 
@@ -23,26 +23,31 @@ financing data-point pages — for the Oaktree/LPC recapitalization.
 1. **Cover** — 2300 N Street, NW / Washington, DC / West End; LPC + Oaktree; photo placeholder.
 2. **Contents** — Property Overview / Tenancy / Market.
 3. **Property Overview** — office asset-summary table + two photo placeholders.
-4. **Value Considerations** — Eastdil's 8 value drivers verbatim (hold, returns, capital,
+4. **Location Overview** — West End map placeholder + location highlights (Metro, walkability,
+   hotels, regional access). *(CoStar)*
+5. **Value Considerations** — Eastdil's 8 value drivers verbatim (hold, returns, capital,
    rents, stabilized occupancy, taxes, financing, exit cap). *(BOV p19)*
-5. **Valuation** — levered-IRR price × exit-cap sensitivity grid + key return metrics; notes
+6. **Valuation** — levered-IRR price × exit-cap sensitivity grid + key return metrics; notes
    the $100M loan implies a ~25–35% discount to par at the ES value range. *(BOV p20)*
-6. **Tenancy divider.**
-7. **Tenant Overview** — 10-tenant rent roll + total + key considerations. *(BOV p18)*
-8. **Recent Leasing Activity** — trailing-24-month executed leasing (10 deals + avg). *(BOV p23)*
-9. **Market divider.**
-10. **Washington, DC Metro Office Market** — "The Good / What's Challenging." *(BOV p5)*
-11. **Recent Data Points — Class-A** — 11 recent/active DC Class-A sale comps, rebuilt in
+7. **Operating Cash Flow** — 5-year EGI → NOI → net-cash-flow bridge. *(BOV p21)*
+8. **Tenancy divider.**
+9. **Tenant Overview** — 10-tenant rent roll + total + key considerations. *(BOV p18)*
+10. **Recent Leasing Activity** — trailing-24-month executed leasing (10 deals + avg). *(BOV p23)*
+11. **Market Leasing Assumptions & Capital** — market rents by floor tier + the $21.5M invested
+    and $3.0M go-forward capital plan. *(BOV p22–23)*
+12. **Market divider.**
+13. **Washington, DC Metro Office Market** — "The Good / What's Challenging." *(BOV p5)*
+14. **Recent Data Points — Class-A** — 11 recent/active DC Class-A sale comps, rebuilt in
     Eastdil's exact matrix layout (properties as columns; navy name headers; green "Closed" /
     teal pipeline status band; light-blue row labels; per-column photo placeholder). *(BOV p14)*
-12. **Recent Data Points — Commodity** — 15 DC commodity sale comps, same Eastdil matrix. *(BOV p15)*
-13. **Select ES Office Financings** — 8 recent Eastdil office financings, same Eastdil matrix. *(BOV p16)*
-14. **Contact** — LPC deal team: Matt Nicholson (EVP), Jake Guttman (Director),
+15. **Recent Data Points — Commodity** — 15 DC commodity sale comps, same Eastdil matrix. *(BOV p15)*
+16. **Select ES Office Financings** — 8 recent Eastdil office financings, same Eastdil matrix. *(BOV p16)*
+17. **Contact** — LPC deal team: Matt Nicholson (EVP), Jake Guttman (Director),
     Jackson Coviello (AVP), Jared Hicks (Analyst).
 
 ## Photos to drop in
-Each comp column on slides 11–13 has a labeled "[ photo ]" cell — drop the building photos there.
-The cover and Property Overview also have photo placeholders.
+Each comp column on slides 14–16 has a labeled "[ photo ]" cell — drop the building photos there.
+The cover, Property Overview, and Location Overview (aerial/map) also have photo placeholders.
 
 ## What changed vs. the first draft (per feedback)
 - Removed the invented "Opportunity / business-plan" page; replaced with Eastdil's own

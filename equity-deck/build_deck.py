@@ -223,7 +223,7 @@ txt(s, Inches(0.62), Inches(5.15), Inches(3.8), Inches(0.3),
 s = slide(); bg(s, BLACK)
 txt(s, Inches(0.42), Inches(1.85), Inches(2.6), Inches(0.8),
     [[Rn("Contents", 40, GOLD, False, False, TITLE_FONT)]])
-items = [("Property Overview", "03"), ("Tenancy", "07"), ("Market", "10")]
+items = [("Property Overview", "03"), ("Tenancy", "08"), ("Market", "12")]
 y = 1.9
 for name, pg in items:
     txt(s, Inches(3.6), Inches(y), Inches(5), Inches(0.5),
@@ -268,9 +268,28 @@ rect(s, Inches(6.05), Inches(3.05), Inches(3.53), Inches(1.9), PH_GREY)
 txt(s, Inches(6.05), Inches(3.9), Inches(3.53), Inches(0.4),
     [[Rn("[ Roof terrace / lobby photograph ]", 10, GREY_TXT, False, True)]], align=PP_ALIGN.CENTER)
 
-# ============================================================ 4 – VALUE CONSIDERATIONS (BOV p19)
+# ============================================================ 4 – LOCATION OVERVIEW
 s = slide(); bg(s, WHITE)
-content_header(s, "Value Considerations", 4)
+content_header(s, "Location Overview", 4)
+rect(s, Inches(0.42), Inches(1.05), Inches(5.75), Inches(3.95), PH_GREY)
+txt(s, Inches(0.42), Inches(2.9), Inches(5.75), Inches(0.4),
+    [[Rn("[ Insert West End aerial / location map ]", 11, GREY_TXT, False, True)]], align=PP_ALIGN.CENTER)
+rect(s, Inches(6.35), Inches(1.05), Inches(3.23), Inches(0.4), GOLD)
+txt(s, Inches(6.35), Inches(1.10), Inches(3.23), Inches(0.3),
+    [[Rn("Location Highlights", 13, HDR_BROWN, True)]], align=PP_ALIGN.CENTER)
+bullets(s, Inches(6.35), Inches(1.62), Inches(3.25), Inches(3.4), [
+    ("West End", " — DC's premier office submarket, bordering Georgetown, Foggy Bottom and the CBD."),
+    ("Metro", " — Foggy Bottom-GWU (9-min walk), Dupont Circle (13-min), Farragut North (15-min)."),
+    ("Walkability", " — Walk Score 100, Transit 90, Bike 90 (“Exceptionally friendly”)."),
+    ("Hotels", " — Fairmont, Park Hyatt, Westin Georgetown, Ritz-Carlton and Marriott within 2–3 blocks."),
+    ("Regional access", " — Reagan National 12-min drive; Union Station / L'Enfant ~6–7 min."),
+], size=10, gap=9, lh=1.0)
+txt(s, Inches(0.42), Inches(5.05), Inches(9), Inches(0.25),
+    [[Rn("Source: CoStar (7/1/2026).", 8, GREY_TXT, False, True)]])
+
+# ============================================================ 5 – VALUE CONSIDERATIONS (BOV p19)
+s = slide(); bg(s, WHITE)
+content_header(s, "Value Considerations", 5)
 vc = [
     ("Hold Period:  ", "A 5-year hold is consistent with target investment horizons for active office "
         "capital and aligns with available financing."),
@@ -295,9 +314,9 @@ txt(s, Inches(0.42), Inches(1.10), Inches(9.16), Inches(4.0),
     space_after=7, line_spacing=1.0)
 txt(s, Inches(0.42), Inches(5.02), Inches(9), Inches(0.25), [[Rn(SRC, 8, GREY_TXT, False, True)]])
 
-# ============================================================ 5 – VALUATION (BOV p20)
+# ============================================================ 6 – VALUATION (BOV p20)
 s = slide(); bg(s, WHITE)
-content_header(s, "Valuation", 5)
+content_header(s, "Valuation", 6)
 txt(s, Inches(0.42), Inches(1.05), Inches(9.15), Inches(0.5),
     [[Rn("Levered-IRR sensitivity — 5-year hold beginning October 2026; 65% LTV / 65% future funding "
         "at SOFR + 3.75% (7.43% coupon).", 12, DARK)]], line_spacing=1.03)
@@ -341,7 +360,38 @@ txt(s, Inches(0.42), Inches(4.55), Inches(6.0), Inches(0.7),
     [[Rn("Loan balance of $100M implies a ~25–35% discount to par at the ES value range. " + SRC,
         8, GREY_TXT, False, True)]], line_spacing=1.0)
 
-# ============================================================ 6 – TENANCY DIVIDER
+# ============================================================ 7 – OPERATING CASH FLOW (BOV p21)
+s = slide(); bg(s, WHITE)
+content_header(s, "Operating Cash Flow", 7)
+txt(s, Inches(0.42), Inches(1.05), Inches(9.15), Inches(0.5),
+    [[Rn("Eastdil Secured five-year projection (years ending September 30). In-place NOI at "
+        "10/1/2026 is $8.35M; near-term dips reflect lease-up downtime and abatement before "
+        "stabilization.", 12, DARK)]], line_spacing=1.03)
+cf_cols = ["($)", "FY 2027", "FY 2028", "FY 2029", "FY 2030", "FY 2031"]
+cf_rows = [
+    ("Effective Gross Income", "13,455,822", "13,177,239", "13,974,199", "15,774,954", "16,704,339"),
+    ("Total Operating Expenses", "(6,942,899)", "(6,538,241)", "(6,703,809)", "(6,904,521)", "(7,083,080)"),
+    ("Net Operating Income", "6,468,929", "6,472,555", "7,032,831", "8,616,206", "9,367,363"),
+    ("Total Capital (TI/LC + CapEx)", "(1,748,577)", "(4,070,547)", "(3,217,200)", "(71,398)", "(215,515)"),
+    ("Net Cash Flow", "4,720,352", "2,402,008", "3,815,631", "8,544,808", "9,151,849"),
+]
+tshape = s.shapes.add_table(len(cf_rows)+1, len(cf_cols), Inches(0.42), Inches(2.0), Inches(9.16), Inches(2.5))
+t = tshape.table; no_style(t)
+t.columns[0].width = Inches(2.56)
+for c in range(1, 6): t.columns[c].width = Inches(1.32)
+for c, h in enumerate(cf_cols):
+    set_cell(t.cell(0, c), h, 10, WHITE, bold=True, fill=HDR_DARK, align=PP_ALIGN.LEFT if c == 0 else PP_ALIGN.RIGHT)
+for r, row in enumerate(cf_rows, start=1):
+    emph = row[0] in ("Net Operating Income", "Net Cash Flow")
+    fill = GOLD if emph else (ROW_GREY if r % 2 == 0 else WHITE)
+    for c, val in enumerate(row):
+        set_cell(t.cell(r, c), val, 10, HDR_BROWN if emph else DARK, bold=emph, fill=fill,
+                 align=PP_ALIGN.LEFT if c == 0 else PP_ALIGN.RIGHT)
+txt(s, Inches(0.42), Inches(4.75), Inches(9), Inches(0.4),
+    [[Rn("Capital reflects ~$3.0M ($10 PSF) of building CapEx (front-loaded FY27–29) plus tenant "
+        "TI/LCs. " + SRC, 8, GREY_TXT, False, True)]], line_spacing=1.0)
+
+# ============================================================ 8 – TENANCY DIVIDER
 def divider(title):
     s = slide(); bg(s, PURPLE)
     txt(s, Inches(1.1), Inches(0.6), Inches(9), Inches(4.5),
@@ -351,9 +401,9 @@ def divider(title):
     return s
 divider("Tenancy")
 
-# ============================================================ 7 – TENANT OVERVIEW (BOV p18)
+# ============================================================ 9 – TENANT OVERVIEW (BOV p18)
 s = slide(); bg(s, WHITE)
-content_header(s, "Tenant Overview", 7)
+content_header(s, "Tenant Overview", 9)
 cols = ["Tenant", "Floors", "SF", "% NRA", "Expiration", "Gross Rent ($/SF)"]
 data = [
     ("Aspen Institute ¹", "6-8", "91,395", "32.3%", "May-41", "$71.56"),
@@ -394,9 +444,9 @@ txt(s, Inches(0.42), Inches(5.02), Inches(9), Inches(0.25),
     [[Rn("¹ Gives back 15,536 SF Dec-2026, extends through May-2041.   ² 100% of space on sublease market; "
         "ES assumes vacate at expiry.   ³ Subleased; termination effective Nov-2027.", 7.5, GREY_TXT, False, True)]])
 
-# ============================================================ 8 – RECENT LEASING ACTIVITY (BOV p23)
+# ============================================================ 10 – RECENT LEASING ACTIVITY (BOV p23)
 s = slide(); bg(s, WHITE)
-content_header(s, "Recent Leasing Activity", 8)
+content_header(s, "Recent Leasing Activity", 10)
 gold_band(s, Inches(1.02), "2300 N STREET, NW", "Executed Leasing — Trailing 24 Months")
 lcols = ["Tenant", "Suite", "NRA", "% NRA", "Commence", "Rent ($/SF)", "Term", "Free Rent", "TI ($/SF)", "Reimb."]
 lrows = [
@@ -426,12 +476,69 @@ for r, row in enumerate(lrows, start=1):
                  align=PP_ALIGN.LEFT if c == 0 else PP_ALIGN.CENTER)
 txt(s, Inches(0.42), Inches(5.05), Inches(9), Inches(0.25), [[Rn(SRC + "  Rents shown gross.", 8, GREY_TXT, False, True)]])
 
-# ============================================================ 9 – MARKET DIVIDER
+# ============================================================ 11 – LEASING ASSUMPTIONS & CAPITAL (BOV p22-23)
+s = slide(); bg(s, WHITE)
+content_header(s, "Market Leasing Assumptions & Capital", 11)
+# left: market leasing assumptions
+txt(s, Inches(0.42), Inches(1.05), Inches(5.0), Inches(0.3),
+    [[Rn("Market Leasing Assumptions", 13, DARK, True, False, TITLE_FONT)]])
+la_cols = ["Space Type", "Rent", "Renew", "Down", "Term", "TI (N/R)"]
+la_rows = [
+    ("Office (Floors 7-8)", "$63.50", "70%", "18 mo", "11 Yr", "$120/$80"),
+    ("Office (Floor 6)", "$59.00", "70%", "18 mo", "11 Yr", "$120/$80"),
+    ("Office (Floors 4-5)", "$57.50", "70%", "18 mo", "11 Yr", "$120/$80"),
+    ("Office (Floor 3)", "$55.00", "70%", "18 mo", "11 Yr", "$120/$80"),
+    ("Town Hall Suites (4-5)", "$54.00", "70%", "12 mo", "8 Yr", "$75/$25"),
+    ("Spec Suite (Floor 6)", "$52.00", "70%", "12 mo", "5.7 Yr", "$50/$35"),
+    ("$36 Gross (Fl 2, 4-6)", "$36.00", "70%", "18 mo", "8 Yr", "$100/$30"),
+    ("Retail", "$45.00", "75%", "12 mo", "10 Yr", "$95/$20"),
+]
+tshape = s.shapes.add_table(len(la_rows)+1, len(la_cols), Inches(0.42), Inches(1.45), Inches(5.2), Inches(3.1))
+t = tshape.table; no_style(t)
+for i, wd in enumerate([1.75, 0.72, 0.62, 0.62, 0.65, 0.84]): t.columns[i].width = Inches(wd)
+for c, h in enumerate(la_cols):
+    set_cell(t.cell(0, c), h, 8.5, WHITE, bold=True, fill=HDR_DARK, align=PP_ALIGN.LEFT if c == 0 else PP_ALIGN.CENTER)
+for r, row in enumerate(la_rows, start=1):
+    fill = ROW_GREY if r % 2 == 0 else WHITE
+    for c, val in enumerate(row):
+        set_cell(t.cell(r, c), val, 8.3, DARK, fill=fill, align=PP_ALIGN.LEFT if c == 0 else PP_ALIGN.CENTER)
+txt(s, Inches(0.42), Inches(4.55), Inches(5.2), Inches(0.5),
+    [[Rn("Global: 2.5% inflation, 3.0% mgmt fee, $0.25 PSF reserves, 2.5% in-term bumps. " + SRC,
+        7.5, GREY_TXT, False, True)]], line_spacing=1.0)
+# right: capital plan
+txt(s, Inches(5.9), Inches(1.05), Inches(3.7), Inches(0.3),
+    [[Rn("Capital Plan", 13, DARK, True, False, TITLE_FONT)]])
+cap_rows = [
+    ("Prior Ownership Renovation", "$21.5M", "$76"),
+    ("   Roof Terrace", "$4.6M", "$16"),
+    ("   Common Areas", "$2.3M", "$8"),
+    ("   Main Lobby / AC Units", "$4.0M", "$14"),
+    ("   Fitness / Elevators / Garage", "$4.0M", "$14"),
+    ("   Other base-building", "$6.6M", "$23"),
+    ("Future Capital Plan (2026-28)", "$3.0M", "$11"),
+]
+tshape = s.shapes.add_table(len(cap_rows)+1, 3, Inches(5.9), Inches(1.45), Inches(3.68), Inches(2.7))
+t = tshape.table; no_style(t)
+for i, wd in enumerate([2.48, 0.7, 0.5]): t.columns[i].width = Inches(wd)
+for c, h in enumerate(["Project", "Amount", "PSF"]):
+    set_cell(t.cell(0, c), h, 8.5, WHITE, bold=True, fill=HDR_DARK, align=PP_ALIGN.LEFT if c == 0 else PP_ALIGN.RIGHT)
+for r, row in enumerate(cap_rows, start=1):
+    tot = row[0].startswith("Prior") or row[0].startswith("Future")
+    fill = GOLD if tot else (ROW_GREY if r % 2 == 0 else WHITE)
+    for c, val in enumerate(row):
+        set_cell(t.cell(r, c), val, 8.3, HDR_BROWN if tot else DARK, bold=tot, fill=fill,
+                 align=PP_ALIGN.LEFT if c == 0 else PP_ALIGN.RIGHT)
+txt(s, Inches(5.9), Inches(4.25), Inches(3.7), Inches(0.7),
+    [[Rn("RE taxes: ES assumes a 20% assessment reduction post-sale to $104.6M ($370 PSF), "
+        "growing at inflation. $1.3M of outstanding TI/LCs credited at close.", 7.5, GREY_TXT, False, True)]],
+    line_spacing=1.0)
+
+# ============================================================ 12 – MARKET DIVIDER
 divider("Market")
 
-# ============================================================ 10 – DC METRO OFFICE MARKET (BOV p5)
+# ============================================================ 13 – DC METRO OFFICE MARKET (BOV p5)
 s = slide(); bg(s, WHITE)
-content_header(s, "Washington, DC Metro Office Market", 10)
+content_header(s, "Washington, DC Metro Office Market", 13)
 rect(s, Inches(0.42), Inches(1.05), Inches(4.5), Inches(0.4), GOLD)
 txt(s, Inches(0.42), Inches(1.10), Inches(4.5), Inches(0.3), [[Rn("The Good", 15, HDR_BROWN, True)]], align=PP_ALIGN.CENTER)
 rect(s, Inches(5.08), Inches(1.05), Inches(4.5), Inches(0.4), HDR_DARK)
@@ -454,9 +561,9 @@ bullets(s, Inches(0.42), Inches(1.6), Inches(4.45), Inches(3.4), good, size=10.5
 bullets(s, Inches(5.08), Inches(1.6), Inches(4.5), Inches(3.4), chall, size=10.5, gap=9, lh=1.0, lead_color=HDR_DARK)
 txt(s, Inches(0.42), Inches(5.05), Inches(9), Inches(0.25), [[Rn(SRC, 8, GREY_TXT, False, True)]])
 
-# ============================================================ 11 – RECENT DATA POINTS: CLASS-A (BOV p14)
+# ============================================================ 14 – RECENT DATA POINTS: CLASS-A (BOV p14)
 s = slide(); bg(s, WHITE)
-eastdil_header(s, "Class-A", 11)
+eastdil_header(s, "Class-A", 14)
 def CA(name, status, closed, sz, lsd, walt, cap, price, buyer, seller, notes):
     return {"name": name, "status": status, "closed": closed,
             "vals": [sz, lsd, walt, cap, price, buyer, seller, notes]}
@@ -477,9 +584,9 @@ eastdil_matrix(s, 1.5, 5.12, classA,
                ["Size (SF)", "% Leased", "WALT", "Cap Rate", "Price (PSF)", "Buyer", "Seller", "Notes"],
                label_w=0.98, data_fs=6.2, name_fs=6.5, name_h=0.5, photo_h=0.62, status_h=0.24)
 
-# ============================================================ 12 – RECENT DATA POINTS: COMMODITY (BOV p15)
+# ============================================================ 15 – RECENT DATA POINTS: COMMODITY (BOV p15)
 s = slide(); bg(s, WHITE)
-eastdil_header(s, "Commodity", 12)
+eastdil_header(s, "Commodity", 15)
 def CM(name, status, closed, sz, yr, lsd, walt, cap, price, buyer, seller):
     return {"name": name, "status": status, "closed": closed,
             "vals": [sz, yr, lsd, walt, cap, price, buyer, seller]}
@@ -504,9 +611,9 @@ eastdil_matrix(s, 1.45, 5.12, commodity,
                ["Size (SF)", "Year Built", "% Leased", "WALT", "Cap Rate", "Price (PSF)", "Buyer", "Seller"],
                label_w=0.92, data_fs=5.6, name_fs=6.0, name_h=0.5, photo_h=0.5, status_h=0.34)
 
-# ============================================================ 13 – SELECT ES OFFICE FINANCINGS (BOV p16)
+# ============================================================ 16 – SELECT ES OFFICE FINANCINGS (BOV p16)
 s = slide(); bg(s, WHITE)
-eastdil_header(s, "Select ES Office Financings", 13)
+eastdil_header(s, "Select ES Office Financings", 16)
 def FN(name, sponsor, status, closed, sf, walt, lsd, loan, loanpsf, ltv, dy, lender, pricing):
     return {"name": name, "status": status, "closed": closed,
             "vals": [sponsor, sf, walt, lsd, loan, loanpsf, ltv, dy, lender, pricing]}
@@ -524,7 +631,7 @@ eastdil_matrix(s, 1.45, 5.12, fins,
                ["Sponsor", "SF", "WALT", "% Leased", "Loan Amount", "Loan PSF", "LTV / LTC", "In-Place DY", "Lender", "Pricing"],
                label_w=1.28, data_fs=6.2, name_fs=6.8, name_h=0.44, photo_h=0.46, status_h=0.30)
 
-# ============================================================ 14 – CONTACT
+# ============================================================ 17 – CONTACT
 s = slide(); bg(s, BLACK)
 txt(s, Inches(0.42), Inches(1.55), Inches(3), Inches(0.8),
     [[Rn("Contact", 40, GOLD, False, False, TITLE_FONT)]])
