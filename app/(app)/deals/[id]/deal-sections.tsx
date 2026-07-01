@@ -9,6 +9,7 @@ import {
   removeSupplement,
 } from "./supplement-actions";
 import { searchPublicComps } from "./comps-actions";
+import { FileDrop } from "../../file-drop";
 import type { CompSearchResult } from "@/lib/anthropic/comps-search";
 import type {
   ExtractionResult,
@@ -956,21 +957,16 @@ export function ReconcileSection({
           {error}
         </p>
       )}
-      <form
-        action={reconcileWithModel}
-        className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center"
-      >
+      <form action={reconcileWithModel} className="mt-4 space-y-3">
         <input type="hidden" name="dealId" value={dealId} />
-        <input
-          type="file"
+        <FileDrop
           name="model"
           accept=".xlsx,.xls,.csv,application/pdf"
-          required
-          className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-brand-strong"
+          hint="Excel (.xlsx), CSV, or a PDF / ARGUS export"
         />
         <button
           type="submit"
-          className="shrink-0 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+          className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
         >
           Reconcile
         </button>

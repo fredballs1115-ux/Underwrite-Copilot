@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { createDeal, createSampleDeal } from "./actions";
+import { FileDrop } from "../file-drop";
 
 export type DealCard = {
   id: string;
@@ -528,12 +529,10 @@ function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
             <option value="retail">Retail</option>
           </select>
         </div>
-        <input
-          type="file"
+        <FileDrop
           name="om"
           accept="application/pdf"
-          required
-          className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-brand-strong"
+          hint="PDF offering memorandum, up to 22 MB"
         />
         <button
           type="submit"
