@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode } from "react";
 import { signOut } from "@/app/login/actions";
+import { ToastProvider } from "./toaster";
 
 function Logo({ small = false }: { small?: boolean }) {
   return (
@@ -73,6 +74,7 @@ export function AppShell({
   const inAccount = pathname.startsWith("/account");
 
   return (
+    <ToastProvider>
     <div className="flex min-h-screen bg-canvas">
       {/* Sidebar — desktop */}
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-sidebar text-white md:flex">
@@ -164,5 +166,6 @@ export function AppShell({
         </main>
       </div>
     </div>
+    </ToastProvider>
   );
 }

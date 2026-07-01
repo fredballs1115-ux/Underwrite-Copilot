@@ -26,6 +26,7 @@ import {
   type TabSupplement,
 } from "./deal-sections";
 import { ModelView } from "./model-view";
+import { useToast } from "../../toaster";
 import type { UnderwritingModel } from "@/lib/model/types";
 import type { DealDocument } from "@/lib/documents";
 import type { CompSearchResult } from "@/lib/anthropic/comps-search";
@@ -98,6 +99,19 @@ function isActive(status: string | undefined): boolean {
   return status === "queued" || status === "running";
 }
 
+function completionMessage(step: string | null): string {
+  switch (step) {
+    case "model":
+      return "Your model is ready.";
+    case "reconcile":
+      return "Reconciliation complete.";
+    case "comps_search":
+      return "Public-web comp search complete.";
+    default:
+      return "Screening complete — the verdict is ready.";
+  }
+}
+
 export function DealView({
   dealId,
   initialTab,
@@ -124,11 +138,14 @@ export function DealView({
   isPro: boolean;
 }) {
   const router = useRouter();
+  const toast = useToast();
 
   // Live job status, kept fresh by polling. Server data (results) arrives via
   // props on each router.refresh(); this just tracks the in-flight step/%.
   const [job, setJob] = useState<Job>(initialJob);
   const lastStep = useRef<string | null>(initialJob?.step ?? null);
+  // Fire the "complete" toast once per run.
+  const notified = useRef(false);
 
   const active = isActive(job?.status);
 
@@ -148,8 +165,23 @@ export function DealView({
         if (cancelled) return;
 
         const stepChanged = data.step !== lastStep.current;
+        const endedStep = data.step ?? lastStep.current;
         lastStep.current = data.step;
         setJob(data);
+
+        if (data.status === "running" || data.status === "queued") {
+          notified.current = false;
+        } else if (
+          (data.status === "done" || data.status === "error") &&
+          !notified.current
+        ) {
+          notified.current = true;
+          if (data.status === "error") {
+            toast("Analysis hit a problem — open the deal for details.", "error");
+          } else {
+            toast(completionMessage(endedStep), "success");
+          }
+        }
 
         if (stepChanged || data.status === "done" || data.status === "error") {
           router.refresh();
