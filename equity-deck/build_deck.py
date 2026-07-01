@@ -599,7 +599,10 @@ classA = [
 eastdil_matrix(s, 1.72, 5.12, classA,
                ["Size (SF)", "% Leased", "WALT", "Cap Rate", "Price (PSF)", "Buyer", "Seller", "Notes"],
                label_w=0.98, data_fs=6.2, name_fs=6.5, name_h=0.48, photo_h=0.56, status_h=0.24,
-               photos={1: "comp_888_16th.jpg", 2: "comp_Hamilton_Square.jpg"})
+               photos={1: "comp_888_16th.jpg", 2: "comp_Hamilton_Square.jpg",
+                       3: "comp_799_9th.jpg", 4: "comp_1330_Connecticut.jpg",
+                       5: "comp_2001_M.jpg", 6: "comp_1401_New_York.jpg",
+                       7: "comp_901_K.jpg"})
 
 # ============================================================ 15 – RECENT DATA POINTS: COMMODITY (BOV p15)
 s = slide(); bg(s, WHITE)
