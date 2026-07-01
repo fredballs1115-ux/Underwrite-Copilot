@@ -55,7 +55,7 @@ def hood(x,y,t,size=22,anchor="middle",rot=0):
     return f'<text x="{x}" y="{y}" text-anchor="{anchor}" font-size="{size}" fill="{HOOD}" font-weight="700" letter-spacing="2.5"{tr}>{t}</text>'
 s.append(hood(120,180,"GEORGETOWN",19,rot=-62))
 s.append(hood(60,730,"POTOMAC RIVER",14,anchor="start",rot=-36))
-s.append(hood(975,155,"DUPONT CIRCLE",18))
+s.append(hood(956,140,"DUPONT CIRCLE",17))
 s.append(hood(1088,400,"CBD",19,rot=90))
 s.append(hood(775,320,"WEST END",21))
 s.append(hood(690,742,"FOGGY BOTTOM · GWU",16))
@@ -64,7 +64,7 @@ s.append(hood(690,742,"FOGGY BOTTOM · GWU",16))
 for x,l in V: s.append(f'<text x="{x+4}" y="110" font-size="12.5" fill="{STLBL}">{l}</text>')
 for y,l in H: s.append(f'<text x="1058" y="{y+4}" font-size="12.5" fill="{STLBL}">{l}</text>')
 s.append(f'<text x="720" y="292" font-size="12" fill="{STLBL}" transform="rotate(-46 720 292)">New Hampshire Ave</text>')
-s.append(f'<text x="650" y="742" font-size="12" fill="{STLBL}" transform="rotate(9 650 742)">Pennsylvania Ave</text>')
+s.append(f'<text x="512" y="712" font-size="12" fill="{STLBL}" transform="rotate(9 512 712)">Pennsylvania Ave</text>')
 
 # metro markers
 def metro(cx,cy,bars):
