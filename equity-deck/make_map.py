@@ -1,170 +1,410 @@
 #!/usr/bin/env python3
-"""Editorial-minimal (high-end brochure) locator map for 2300 N Street, NW — West End, Washington DC.
-Builds an inline-SVG HTML string, screenshots with headless Chromium, crops to exactly 2330x1600.
-North is up. Numbered streets increase going WEST; lettered streets advance going NORTH."""
+"""Premium soft-isometric (2.5D extruded) city map for 2300 N Street, NW — West End, Washington DC.
+North is up. Numbered streets increase going WEST; lettered streets advance going NORTH.
+Buildings are extruded blocks (top face + two shaded side faces + soft ground shadow).
+The SUBJECT building is the gold-lit hero. Screenshots headless Chromium, crops to 2330x1600."""
 import os, subprocess, tempfile, math, random
 
 CHROME = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 VBW, VBH = 1165, 800
 
-# ---- Editorial-minimal palette (muted, warm, lots of paper) --------------------
-PAPER   = "#F4F1EA"   # warm ivory land
-PAPER2  = "#EFEBE1"   # faint tonal panel
-BLOCK   = "#DED6C5"   # building footprint fill (darker warm-gray for value contrast)
-BLOCK2  = "#D6CCB8"   # alt footprint (deeper)
-BLOCK3  = "#E4DDCE"   # lighter footprint for variation
-BLOCKED = "#C7BCA4"   # footprint edge (stronger)
-PARK    = "#DCE3D0"   # muted sage green
-PARKED  = "#CBD4BC"
-WATER   = "#CFDDE4"   # soft dusty blue
-WATERED = "#BFD1DA"
-ST_FILL = "#FFFFFF"   # street fill (hairline white)
-ST_CASE = "#E4DED2"   # street casing
-AVE_FILL= "#F8F2E4"   # warm avenue (lightened so the dashed walk path reads over it)
-AVE_CASE= "#EBE1C9"
-GOLD    = "#C8A24B"   # refined muted gold
-GOLD_D  = "#A9812E"   # deep gold line
-GOLD_HI = "#E4C877"
-INK     = "#33302A"   # warm near-black
-INK_SOFT= "#6A6357"
-HOOD    = "#8A8271"   # neighborhood label warm grey
-STLBL   = "#B4AC9C"   # street label faint
-HALO    = "#F4F1EA"   # halo = paper
-METRO   = "#2A2622"
-RED     = "#BF0D3E"; BLUE="#0072CE"; ORANGE="#F7941E"; SILVER="#A2A4A1"
+# =============================================================================
+#  PALETTE  — warm, sophisticated, magazine-quality dusk
+# =============================================================================
+SKY_TOP   = "#F3EEE6"   # warm ivory sky at top
+SKY_BOT   = "#E7DFD2"   # ground haze
+GROUND    = "#E4DCCC"   # base ground plane (warm sand)
+GROUND2   = "#DED5C2"
+STREET    = "#EFE9DD"   # street channel surface (light, warm)
+STREET_ED = "#D8CFBB"
+AVE_FILL  = "#F1E4C6"   # warm sunlit avenue
+AVE_ED    = "#E1CFA6"
 
-# ---- Grid geometry (numbered N-S increase WEST; lettered E-W advance NORTH) -----
-# x increases to the right; higher street numbers on LEFT.
-V = [(228,"25th"),(372,"24th"),(540,"23rd"),(706,"22nd"),(864,"21st"),(1012,"20th")]
-# y increases downward; letters advance NORTH so P at top, K at bottom.
-H = [(138,"P St"),(252,"O St"),(370,"N St"),(490,"M St"),(608,"L St"),(710,"K St")]
-GX0, GX1 = 195, 1055
-GY0, GY1 = 108, 710
+# building face tones — one harmonious WARM family: creams, sand, warm taupe, soft
+# terracotta. NO cool greys — everything sits in the warm dusk palette so the gold hero pops.
+TOP_TONES = ["#EFE7D7", "#EAE0CC", "#E5DAC2", "#E0D3BB", "#E7DCC6",
+             "#E8DABE", "#E1D0B4",              # warm sand
+             "#DECDB4", "#E4D3BB",              # warm taupe
+             "#E0C9AC", "#DAC1A2",              # soft terracotta accent
+             "#DCCDB2", "#D6C6AC"]              # deeper warm taupe (was cool slate)
+LEFT_MUL  = 0.88        # left/west face shade multiplier (lit side)
+RIGHT_MUL = 0.71        # right/south face shade (darker, in shadow)
 
-random.seed(7)
+PARK      = "#C2D3A6"   # sage green (a touch deeper for contrast)
+PARK_ED   = "#AFC191"
+PARK_DK   = "#B7C99B"
+WATER     = "#B4CDDB"   # dusty blue potomac (slightly deeper)
+WATER_ED  = "#9EBBCB"
+
+GOLD      = "#E7B44C"   # hero gold
+GOLD_HI   = "#FBDE95"   # gold highlight top face (brighter)
+GOLD_MID  = "#DB9C2E"   # gold side (lit) — start of gradient
+GOLD_MID2 = "#C6851F"   # gold side (lit) — deeper amber end of gradient
+GOLD_DK   = "#A96C16"   # gold deep side (shadow face)
+GOLD_LINE = "#9A6E22"
+GOLD_EDGE = "#FFE9BE"   # crisp warm corner-highlight line
+
+INK       = "#332F28"
+INK_SOFT  = "#6E6656"
+HOOD      = "#9A9080"   # neighborhood label warm grey
+HOOD_DK   = "#847A69"
+STLBL     = "#B3AA98"
+HALO      = "#F1ECE3"
+METRO     = "#26221E"
+RED="#D01F4E"; BLUE="#0A78D0"; ORANGE="#F79420"; SILVER="#A8AAA6"
+
+def shade(hexc, mul):
+    h = hexc.lstrip("#")
+    r,g,b = int(h[0:2],16),int(h[2:4],16),int(h[4:6],16)
+    r=max(0,min(255,int(r*mul))); g=max(0,min(255,int(g*mul))); b=max(0,min(255,int(b*mul)))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+# =============================================================================
+#  ISOMETRIC PROJECTION
+#  World coords: x -> east(right), y -> south(down/toward viewer), z -> up(height)
+#  We use a gentle axonometric tilt: screen = origin + x*ex + y*ey - z*ez
+# =============================================================================
+random.seed(11)
+
+# Projection basis — true 2:1 dimetric isometric (SimCity look), premium + readable.
+# East (+x) goes right-and-down; South (+y) goes left-and-down. North ends up "up".
+ISO = 0.50              # 2:1 vertical squash
+EX = ( 1.00,  ISO)      # per world-x  (right, down)
+EY = (-1.00,  ISO)      # per world-y  (left,  down)
+EZ = 1.15               # per world-z (height -> up on screen)
+SCALE = 0.68            # global world->screen scale
+
+ORIGIN = (516.0, 168.0)  # tuned so the diamond fills the frame, hero near center
+
+def proj(wx, wy, wz=0.0):
+    sx = ORIGIN[0] + (wx*EX[0] + wy*EY[0])*SCALE
+    sy = ORIGIN[1] + (wx*EX[1] + wy*EY[1])*SCALE - wz*EZ*SCALE
+    return (sx, sy)
+
+# =============================================================================
+#  GRID (world coordinates)  — plan grid, then projected.
+#  Numbered streets N-S, increase WEST => higher number = smaller world-x (left).
+#  Lettered streets E-W, advance NORTH => north(top) = smaller world-y.
+# =============================================================================
+# vertical (numbered) street world-x positions, left(west/high#) -> right(east/low#)
+V = [( 40,"25th"),(200,"24th"),(360,"23rd"),(520,"22nd"),(680,"21st"),(840,"20th")]
+# horizontal (lettered) street world-y positions, top(north) -> bottom(south)
+H = [( 30,"P St"),(150,"O St"),(270,"N St"),(390,"M St"),(510,"L St"),(630,"K St")]
+
+VX = [v[0] for v in V]; VLBL=[v[1] for v in V]
+HY = [h[0] for h in H]; HLBL=[h[1] for h in H]
+
+WX0, WX1 = VX[0], VX[-1]
+WY0, WY1 = HY[0], HY[-1]
+
+ROAD = 26   # street channel half-width-ish (gap between block edges)
 
 s = []
 
-# ============================ BASE PAPER ========================================
-s.append(f'<rect width="{VBW}" height="{VBH}" fill="{PAPER}"/>')
+# =============================================================================
+#  BACKDROP  — vertical sky gradient + soft vignette
+# =============================================================================
+s.append('<rect width="{}" height="{}" fill="url(#sky)"/>'.format(VBW,VBH))
 
-# ---- Rock Creek Park along WEST/left edge (organic) ----------------------------
-s.append(f'<path d="M0,0 L118,0 C96,150 128,250 92,360 '
-         f'C120,470 70,560 108,650 C64,720 40,760 0,780 Z" '
-         f'fill="{PARK}"/>')
-s.append(f'<path d="M118,0 C96,150 128,250 92,360 C120,470 70,560 108,650 C64,720 40,760 0,780" '
-         f'fill="none" stroke="{PARKED}" stroke-width="1.4"/>')
+# =============================================================================
+#  GROUND PLANE  — a large projected quad tinted warm, giving the whole scene a base.
+# =============================================================================
+gm = 600  # ground margin in world units around grid (large so no edge shows)
+g_corners = [proj(WX0-gm, WY0-gm), proj(WX1+gm, WY0-gm),
+             proj(WX1+gm, WY1+gm), proj(WX0-gm, WY1+gm)]
+gp = " ".join(f"{x:.1f},{y:.1f}" for x,y in g_corners)
+s.append(f'<polygon points="{gp}" fill="url(#ground)"/>')
 
-# ---- Potomac River at SW / lower-left ------------------------------------------
-s.append(f'<path d="M0,632 C120,662 214,712 292,800 L0,800 Z" fill="{WATER}"/>')
-s.append(f'<path d="M0,632 C120,662 214,712 292,800" fill="none" stroke="{WATERED}" stroke-width="1.6"/>')
+# =============================================================================
+#  ROCK CREEK PARK (west/left edge) + POTOMAC (southwest) as projected shapes
+# =============================================================================
+# Park: a band running along the far-west world edge (small world-x), full height.
+def poly(pts, fill, stroke=None, sw=1.0, op=1.0):
+    p = " ".join(f"{x:.1f},{y:.1f}" for x,y in pts)
+    st = f' stroke="{stroke}" stroke-width="{sw}"' if stroke else ""
+    return f'<polygon points="{p}" fill="{fill}"{st} fill-opacity="{op}"/>'
 
-# ============================ BUILDING FOOTPRINTS ===============================
-# Fill each grid cell with a subtle mass of small building blocks -> city texture.
-def cell_blocks(x0, x1, y0, y1, road=7):
-    """Emit small rounded footprints densely tiling a block, leaving street gutters.
-    Denser + darker than before so every block reads as developed urban fabric."""
-    out = []
-    ix0, ix1 = x0 + road, x1 - road
-    iy0, iy1 = y0 + road, y1 - road
-    if ix1 - ix0 < 12 or iy1 - iy0 < 12:
-        return out
-    # finer subdivision -> more parcels per block (denser fabric)
-    ncols = max(2, round((ix1 - ix0) / 34))
-    nrows = max(2, round((iy1 - iy0) / 32))
-    cw = (ix1 - ix0) / ncols
-    ch = (iy1 - iy0) / nrows
-    for r in range(nrows):
-        for c in range(ncols):
-            # rarely skip so blocks read full, not half-empty
-            if random.random() < 0.05:
-                continue
-            pad_x = 1.4 + random.random() * 1.6
-            pad_y = 1.4 + random.random() * 1.6
-            bx = ix0 + c * cw + pad_x
-            by = iy0 + r * ch + pad_y
-            bw = cw - pad_x * 2
-            bh = ch - pad_y * 2
-            if bw < 6 or bh < 6:
-                continue
-            # weighted mix of tones: mostly mid warm-gray, some deep, some light
-            rr = random.random()
-            fill = BLOCK2 if rr < 0.32 else (BLOCK3 if rr > 0.82 else BLOCK)
-            out.append(f'<rect x="{bx:.1f}" y="{by:.1f}" width="{bw:.1f}" height="{bh:.1f}" '
-                       f'rx="1.8" fill="{fill}" stroke="{BLOCKED}" stroke-width="0.7"/>')
+# Park band (west), organic wavy world strip running the full height
+park_pts = []
+pw_inner = WX0 - 55
+for wy in range(WY0-gm, WY1+gm+1, 45):
+    wig = math.sin(wy*0.011)*26
+    park_pts.append(proj(pw_inner+wig, wy))
+for wy in range(WY1+gm, WY0-gm-1, -45):
+    park_pts.append(proj(WX0-260 - abs(math.cos(wy*0.01))*30, wy))
+s.append(poly(park_pts, PARK, PARK_ED, 1.8))
+
+# Potomac: broad wedge across the SW / lower-left corner
+riv_pts = [proj(WX0-140, WY1+gm)]
+for t in [0.0,0.25,0.5,0.75,1.0]:
+    wx = (WX0-40) + t*(-560)
+    wy = (WY1+140) + t*(gm-140)
+    riv_pts.append(proj(wx, wy))
+riv_pts.append(proj(WX0-gm, WY1+gm))
+s.append(poly(riv_pts, WATER, WATER_ED, 1.8))
+
+# =============================================================================
+#  STREET CHANNELS  — draw as projected quads (surfaces) so streets read as
+#  channels between the extruded massing. Draw BEFORE buildings.
+# =============================================================================
+def street_quad(x0,y0,x1,y1, fill, ed):
+    # a thick line in world space => a quad; approximate by offsetting perpendicular
+    a=proj(x0,y0); b=proj(x1,y1)
+    return a,b
+
+# Base street plane: fill each avenue corridor. Simpler: draw wide projected lines.
+def wline_h(wy, wx0, wx1, w, fill, ed=None):
+    a=proj(wx0,wy); b=proj(wx1,wy)
+    out=""
+    if ed:
+        out+=f'<line x1="{a[0]:.1f}" y1="{a[1]:.1f}" x2="{b[0]:.1f}" y2="{b[1]:.1f}" stroke="{ed}" stroke-width="{w+4}" stroke-linecap="round"/>'
+    out+=f'<line x1="{a[0]:.1f}" y1="{a[1]:.1f}" x2="{b[0]:.1f}" y2="{b[1]:.1f}" stroke="{fill}" stroke-width="{w}" stroke-linecap="round"/>'
+    return out
+def wline_v(wx, wy0, wy1, w, fill, ed=None):
+    a=proj(wx,wy0); b=proj(wx,wy1)
+    out=""
+    if ed:
+        out+=f'<line x1="{a[0]:.1f}" y1="{a[1]:.1f}" x2="{b[0]:.1f}" y2="{b[1]:.1f}" stroke="{ed}" stroke-width="{w+4}" stroke-linecap="round"/>'
+    out+=f'<line x1="{a[0]:.1f}" y1="{a[1]:.1f}" x2="{b[0]:.1f}" y2="{b[1]:.1f}" stroke="{fill}" stroke-width="{w}" stroke-linecap="round"/>'
     return out
 
-# Subject parcel rect (24th–23rd & N–M). Clear footprints here so the gold reads clean.
-PARCEL_X, PARCEL_W = 380, 152
-PARCEL_Y, PARCEL_H = 378, 106
+# lay street grid surfaces
+for wy in HY:
+    s.append(wline_h(wy, WX0-40, WX1+40, 20 if wy!=270 else 24, STREET, STREET_ED))
+for wx in VX:
+    s.append(wline_v(wx, WY0-40, WY1+40, 20 if wx!=360 else 24, STREET, STREET_ED))
 
-# Include peripheral margin bands so the WHOLE frame reads as developed fabric,
-# not just the interior grid (top above P St, bottom below K St, far-east strip).
-xs = [136, GX0] + [x for x, _ in V] + [GX1, 1132]
-ys = [46, GY0] + [y for y, _ in H] + [GY1, 792]
-xs = sorted(set(xs)); ys = sorted(set(ys))
-for xi in range(len(xs) - 1):
-    for yi in range(len(ys) - 1):
-        cx = (xs[xi] + xs[xi + 1]) / 2
-        cy = (ys[yi] + ys[yi + 1]) / 2
-        # skip cells over the park (far west) so texture doesn't spill into green
-        if cx < 150:
+# =============================================================================
+#  DIAGONAL AVENUES + CIRCLES (world coords), drawn as warm sunlit corridors
+# =============================================================================
+def wline_seg(p0, p1, w, fill, ed=None):
+    a=proj(*p0); b=proj(*p1)
+    out=""
+    if ed:
+        out+=f'<line x1="{a[0]:.1f}" y1="{a[1]:.1f}" x2="{b[0]:.1f}" y2="{b[1]:.1f}" stroke="{ed}" stroke-width="{w+4}" stroke-linecap="round"/>'
+    out+=f'<line x1="{a[0]:.1f}" y1="{a[1]:.1f}" x2="{b[0]:.1f}" y2="{b[1]:.1f}" stroke="{fill}" stroke-width="{w}" stroke-linecap="round"/>'
+    return out
+
+WC = (360, 630)     # Washington Circle (23rd & K) — SW
+DUP = (860, 60)     # Dupont Circle — NE
+PENN_END = (900, 700)  # Pennsylvania Ave to SE
+# New Hampshire Ave SW->NE
+s.append(wline_seg(WC, DUP, 22, AVE_FILL, AVE_ED))
+# Pennsylvania Ave SE
+s.append(wline_seg(WC, PENN_END, 22, AVE_FILL, AVE_ED))
+
+# traffic circles (projected ellipses)
+def wcircle(cw, r, fill, ed):
+    c=proj(*cw)
+    return (f'<ellipse cx="{c[0]:.1f}" cy="{c[1]:.1f}" rx="{r:.1f}" ry="{r*0.62:.1f}" '
+            f'fill="{fill}" stroke="{ed}" stroke-width="2"/>')
+s.append(wcircle(WC, 26, PARK, PARK_ED))
+s.append(wcircle(DUP, 30, PARK, PARK_ED))
+
+# =============================================================================
+#  EXTRUDED BUILDING BLOCKS
+#  Each parcel: a footprint rect (world x0,y0,x1,y1) extruded to height h.
+#  We draw ground shadow, then right(south) face, left(west) face, then top face.
+#  Painter's order: sort parcels back-to-front (north/back first).
+# =============================================================================
+def building(x0, y0, x1, y1, h, toptone, hero=False):
+    """Return (depth_key, svg) for one extruded block."""
+    # world corners of footprint (top face at z=h)
+    # top face corners
+    tA = proj(x0, y0, h); tB = proj(x1, y0, h)
+    tC = proj(x1, y1, h); tD = proj(x0, y1, h)
+    # base corners (z=0)
+    bA = proj(x0, y0, 0); bB = proj(x1, y0, 0)
+    bC = proj(x1, y1, 0); bD = proj(x0, y1, 0)
+
+    if hero:
+        top_f, left_f, right_f = GOLD_HI, "url(#goldface)", GOLD_DK
+        edge = GOLD_LINE; ew = 1.1
+    else:
+        top_f = toptone
+        left_f = shade(toptone, LEFT_MUL)
+        right_f = shade(toptone, RIGHT_MUL)
+        edge = shade(toptone, 0.60); ew = 0.5
+
+    out = []
+    # ground shadow (offset toward lower-right = away from light)
+    sh = [proj(x0, y1, 0), proj(x1, y1, 0),
+          proj(x1+18, y1+18, 0), proj(x0+18, y1+18, 0)]
+    shp = " ".join(f"{x:.1f},{y:.1f}" for x,y in sh)
+    # (shadows drawn separately in a pass to stay under all blocks)
+
+    # RIGHT (south, +y) face: corners bD-bC-tC-tD
+    rp = f"{bD[0]:.1f},{bD[1]:.1f} {bC[0]:.1f},{bC[1]:.1f} {tC[0]:.1f},{tC[1]:.1f} {tD[0]:.1f},{tD[1]:.1f}"
+    out.append(f'<polygon points="{rp}" fill="{right_f}" stroke="{edge}" stroke-width="{ew}" stroke-linejoin="round"/>')
+    # LEFT (east, +x) face: corners bB-bC-tC-tB  -> this is the east face (right side of screen)
+    lp = f"{bB[0]:.1f},{bB[1]:.1f} {bC[0]:.1f},{bC[1]:.1f} {tC[0]:.1f},{tC[1]:.1f} {tB[0]:.1f},{tB[1]:.1f}"
+    out.append(f'<polygon points="{lp}" fill="{left_f}" stroke="{edge}" stroke-width="{ew}" stroke-linejoin="round"/>')
+    # TOP face
+    tp = f"{tA[0]:.1f},{tA[1]:.1f} {tB[0]:.1f},{tB[1]:.1f} {tC[0]:.1f},{tC[1]:.1f} {tD[0]:.1f},{tD[1]:.1f}"
+    out.append(f'<polygon points="{tp}" fill="{top_f}" stroke="{edge}" stroke-width="{ew}" stroke-linejoin="round"/>')
+    # depth key: larger (x+y) = closer to viewer -> draw later
+    depth = (x0 + y0)
+    return depth, "".join(out), shp
+
+# Build parcels tiling each block between streets, leaving street gutters.
+GUT = 30  # gutter from street centerline to block edge
+parcels = []  # (x0,y0,x1,y1,h,toptone,hero)
+
+# subject building: 23rd & N. Substantial WIDE hero footprint, tallest tower.
+SUBJ_X0, SUBJ_Y0 = 300, 205
+SUBJ_X1, SUBJ_Y1 = 392, 285
+SUBJ_H = 235
+
+# Hotel POI positions live in a cleared strip on M St so no extrusion overlaps them.
+# The strip is widened on BOTH sides of the row and buildings near it are trimmed,
+# so the dots read as sitting on open pavement, never stuck to a wall.
+HOTEL_Y = 390                      # world-y of the hotel row (on the M St line)
+HOTEL_XS = [250, 322, 394, 466]    # world-x of the four hotels
+HOTEL_X_LO, HOTEL_X_HI = 224, 492
+HOTEL_CLEAR_Y0, HOTEL_CLEAR_Y1 = HOTEL_Y-40, HOTEL_Y+40    # generous keep-clear band
+
+def blocks_between(wx_a, wx_b, wy_a, wy_b):
+    """Tile the block area with 1-3 parcels; return list of parcel tuples."""
+    x0 = wx_a + GUT; x1 = wx_b - GUT
+    y0 = wy_a + GUT; y1 = wy_b - GUT
+    if x1-x0 < 20 or y1-y0 < 20: return []
+    res=[]
+    ncol = max(1, round((x1-x0)/60))
+    nrow = max(1, round((y1-y0)/58))
+    cw=(x1-x0)/ncol; ch=(y1-y0)/nrow
+    for r in range(nrow):
+        for c in range(ncol):
+            if random.random()<0.08: continue
+            px0 = x0 + c*cw + random.uniform(1,4)
+            py0 = y0 + r*ch + random.uniform(1,4)
+            px1 = x0 + (c+1)*cw - random.uniform(1,4)
+            py1 = y0 + (r+1)*ch - random.uniform(1,4)
+            if px1-px0<12 or py1-py0<12: continue
+            # keep the hotel strip clear of any building that would occlude a dot
+            if not (px1 < HOTEL_X_LO or px0 > HOTEL_X_HI) and py1 > HOTEL_CLEAR_Y0 and py0 < HOTEL_CLEAR_Y1:
+                continue
+            h = random.uniform(58, 132)
+            tone = random.choice(TOP_TONES)
+            res.append((px0,py0,px1,py1,h,tone,False))
+    return res
+
+# Reserve clean "label lanes" of open pavement at the south + east edges so the
+# rotated street pills sit on ground, never grazing an extrusion.
+PILL_LANE_S = WY1 + 55   # numbered pills ride this southern lane
+PILL_LANE_E = WX1 + 60   # lettered pills ride this eastern lane
+
+# iterate grid cells (including margins so frame reads developed)
+margin_v = [WX0-200] + VX + [WX1+200]
+margin_h = [WY0-160] + HY + [WY1+160]
+for xi in range(len(margin_v)-1):
+    for yi in range(len(margin_h)-1):
+        wx_a, wx_b = margin_v[xi], margin_v[xi+1]
+        wy_a, wy_b = margin_h[yi], margin_h[yi+1]
+        cx=(wx_a+wx_b)/2; cy=(wy_a+wy_b)/2
+        # skip park (far west)
+        if cx < WX0-40: continue
+        # skip potomac (SW)
+        if cx < WX0+120 and cy > WY1+40: continue
+        # keep the SOUTHERN margin band low-rise & sparse so it can't overlap pills
+        if cy > WY1 + 25:
+            for p in blocks_between(wx_a,wx_b,wy_a,wy_b):
+                px0,py0,px1,py1,h,tone,hero=p
+                if py1 > WY1 + 30:   # trim any parcel that would reach the pill lane
+                    continue
+                parcels.append((px0,py0,px1,py1,min(h,70),tone,hero))
             continue
-        # skip cells over the Potomac (SW / lower-left): river reaches ~x<300,y>640
-        if cx < 320 and cy > 636:
+        # keep the EASTERN margin band low-rise & clear of the lettered pill lane
+        if cx > WX1 + 25:
+            for p in blocks_between(wx_a,wx_b,wy_a,wy_b):
+                px0,py0,px1,py1,h,tone,hero=p
+                if px1 > WX1 + 30:
+                    continue
+                parcels.append((px0,py0,px1,py1,min(h,72),tone,hero))
             continue
-        # skip the cell that holds the subject parcel (kept clear for the gold)
-        if PARCEL_X - 6 < cx < PARCEL_X + PARCEL_W + 6 and PARCEL_Y - 6 < cy < PARCEL_Y + PARCEL_H + 6:
+        # skip the subject cell (handled specially)
+        if wx_a < (SUBJ_X0+SUBJ_X1)/2 < wx_b and wy_a < (SUBJ_Y0+SUBJ_Y1)/2 < wy_b:
+            # fill rest of this block with a couple normal parcels but leave hero clear
+            for p in blocks_between(wx_a,wx_b,wy_a,wy_b):
+                # drop parcels overlapping the hero footprint
+                if not (p[2] < SUBJ_X0-6 or p[0] > SUBJ_X1+6 or p[3] < SUBJ_Y0-6 or p[1] > SUBJ_Y1+6):
+                    continue
+                parcels.append(p)
             continue
-        s += cell_blocks(xs[xi], xs[xi + 1], ys[yi], ys[yi + 1])
+        parcels.extend(blocks_between(wx_a,wx_b,wy_a,wy_b))
 
-# ============================ STREETS (hairlines) ===============================
-def hline(y, x0, x1, major=False):
-    w = 9 if major else 5.5
-    return (f'<line x1="{x0}" y1="{y}" x2="{x1}" y2="{y}" stroke="{ST_CASE}" stroke-width="{w+2.4}" stroke-linecap="round"/>'
-            f'<line x1="{x0}" y1="{y}" x2="{x1}" y2="{y}" stroke="{ST_FILL}" stroke-width="{w}" stroke-linecap="round"/>')
-def vline(x, y0, y1, major=False):
-    w = 9 if major else 5.5
-    return (f'<line x1="{x}" y1="{y0}" x2="{x}" y2="{y1}" stroke="{ST_CASE}" stroke-width="{w+2.4}" stroke-linecap="round"/>'
-            f'<line x1="{x}" y1="{y0}" x2="{x}" y2="{y1}" stroke="{ST_FILL}" stroke-width="{w}" stroke-linecap="round"/>')
-def avenue(x0, y0, x1, y1):
-    return (f'<line x1="{x0}" y1="{y0}" x2="{x1}" y2="{y1}" stroke="{AVE_CASE}" stroke-width="12" stroke-linecap="round"/>'
-            f'<line x1="{x0}" y1="{y0}" x2="{x1}" y2="{y1}" stroke="{AVE_FILL}" stroke-width="8" stroke-linecap="round"/>')
+# add hero
+parcels.append((SUBJ_X0,SUBJ_Y0,SUBJ_X1,SUBJ_Y1,SUBJ_H,GOLD_HI,True))
 
-for x, _ in V:
-    vline(x, GY0, GY1, major=(x == 540))
-    s.append(vline(x, GY0, GY1, major=(x == 540)))
-for y, _ in H:
-    s.append(hline(y, GX0, GX1, major=(y == 398)))
+# ---- SHADOW PASS (all soft ground shadows first, under everything) ----
+shadow_svg=[]
+for (x0,y0,x1,y1,h,tone,hero) in parcels:
+    off = 6 + h*0.10
+    sh = [proj(x0, y0, 0), proj(x1, y0, 0), proj(x1, y1, 0), proj(x0, y1, 0)]
+    # offset shadow toward lower-right
+    sh2 = [(x+off, y+off*0.7) for (x,y) in sh]
+    shp = " ".join(f"{x:.1f},{y:.1f}" for x,y in sh2)
+    shadow_svg.append(f'<polygon points="{shp}" fill="#000" opacity="0.06"/>')
+s.append(f'<g filter="url(#blur)">{"".join(shadow_svg)}</g>')
 
-# ---- Diagonal avenues (drawn over grid) ----------------------------------------
-# New Hampshire Ave SW->NE : Washington Circle (~23rd & K) up to Dupont Circle (NE)
-WC = (540, 710)       # Washington Circle (23rd & K)
-DUP = (992, 186)      # Dupont Circle
-s.append(avenue(WC[0], WC[1], DUP[0], DUP[1]))
-# Pennsylvania Ave: Washington Circle to the SE (terminate inside the frame)
-PENN_END = (1030, 758)
-s.append(avenue(WC[0], WC[1], PENN_END[0], PENN_END[1]))
+# ---- BUILDING PASS (painter's order back-to-front) ----
+built=[]
+for p in parcels:
+    d, svg, shp = building(*p)
+    built.append((d, svg, p[6]))
+built.sort(key=lambda t:t[0])
+for d,svg,hero in built:
+    s.append(svg)
 
-# ---- Traffic circles -----------------------------------------------------------
-def circle(cx, cy, r):
-    return (f'<circle cx="{cx}" cy="{cy}" r="{r+6}" fill="{ST_FILL}" stroke="{ST_CASE}" stroke-width="2.4"/>'
-            f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="{PARK}" stroke="{PARKED}" stroke-width="1.2"/>')
-s.append(circle(DUP[0], DUP[1], 22))
-s.append(circle(WC[0], WC[1], 19))
+# hero glow pool of light at base — wider + softer so the eye locks onto the tower.
+# Two stacked pools: a broad warm wash + a tighter bright core.
+hc = proj((SUBJ_X0+SUBJ_X1)/2, (SUBJ_Y0+SUBJ_Y1)/2, 0)
+s.append(f'<ellipse cx="{hc[0]:.1f}" cy="{hc[1]+14:.1f}" rx="184" ry="104" fill="url(#goldpool)" opacity="0.5"/>')
+s.append(f'<ellipse cx="{hc[0]:.1f}" cy="{hc[1]+8:.1f}" rx="146" ry="82" fill="url(#goldpool)" opacity="0.55"/>')
+s.append(f'<ellipse cx="{hc[0]:.1f}" cy="{hc[1]:.1f}" rx="94" ry="55" fill="url(#goldglow)" opacity="0.68"/>')
 
-# ============================ SUBJECT PARCEL ====================================
-# Block bounded by 24th–23rd and N–M (cleared of footprints above).
-s.append(f'<rect x="{PARCEL_X}" y="{PARCEL_Y}" width="{PARCEL_W}" height="{PARCEL_H}" '
-         f'rx="3" fill="{GOLD}" fill-opacity="0.16" stroke="{GOLD_D}" stroke-width="1.8" stroke-opacity="0.85"/>')
-# a couple of faint gold-tinted footprints inside so the parcel isn't an empty box
-s.append(f'<rect x="{PARCEL_X+12}" y="{PARCEL_Y+12}" width="{PARCEL_W-24}" height="{PARCEL_H*0.42:.0f}" '
-         f'rx="2.5" fill="{GOLD}" fill-opacity="0.13" stroke="{GOLD_D}" stroke-width="0.9" stroke-opacity="0.5"/>')
+# crisp corner highlight on the MAIN tower's front vertical edge (between lit + shadow faces)
+def hero_corner(x1, y1, zbase, ztop, w=2.6, col=GOLD_EDGE, op=0.95):
+    a = proj(x1, y1, zbase); b = proj(x1, y1, ztop)
+    return (f'<line x1="{a[0]:.1f}" y1="{a[1]:.1f}" x2="{b[0]:.1f}" y2="{b[1]:.1f}" '
+            f'stroke="{col}" stroke-width="{w}" stroke-linecap="round" opacity="{op}"/>')
 
-# ============================ LABELS w/ HALOS ===================================
+# HERO crown: a setback upper tier for an elegant, architectural silhouette
+cin = 12  # inset
+def draw_building_now(x0,y0,x1,y1,zbase,h,top_f,left_f,right_f,edge,ew):
+    tA=proj(x0,y0,zbase+h); tB=proj(x1,y0,zbase+h); tC=proj(x1,y1,zbase+h); tD=proj(x0,y1,zbase+h)
+    bB=proj(x1,y0,zbase); bC=proj(x1,y1,zbase); bD=proj(x0,y1,zbase)
+    rp=f"{bD[0]:.1f},{bD[1]:.1f} {bC[0]:.1f},{bC[1]:.1f} {tC[0]:.1f},{tC[1]:.1f} {tD[0]:.1f},{tD[1]:.1f}"
+    lp=f"{bB[0]:.1f},{bB[1]:.1f} {bC[0]:.1f},{bC[1]:.1f} {tC[0]:.1f},{tC[1]:.1f} {tB[0]:.1f},{tB[1]:.1f}"
+    tp=f"{tA[0]:.1f},{tA[1]:.1f} {tB[0]:.1f},{tB[1]:.1f} {tC[0]:.1f},{tC[1]:.1f} {tD[0]:.1f},{tD[1]:.1f}"
+    return (f'<polygon points="{rp}" fill="{right_f}" stroke="{edge}" stroke-width="{ew}" stroke-linejoin="round"/>'
+            f'<polygon points="{lp}" fill="{left_f}" stroke="{edge}" stroke-width="{ew}" stroke-linejoin="round"/>'
+            f'<polygon points="{tp}" fill="{top_f}" stroke="{edge}" stroke-width="{ew}" stroke-linejoin="round"/>')
+# faint crown glow on the setback — a soft warm bloom that haloes the top tier
+cr_c = proj((SUBJ_X0+SUBJ_X1)/2, (SUBJ_Y0+SUBJ_Y1)/2, SUBJ_H+19)
+s.append(f'<ellipse cx="{cr_c[0]:.1f}" cy="{cr_c[1]:.1f}" rx="86" ry="60" fill="url(#crownglow)" opacity="0.7"/>')
+s.append(draw_building_now(SUBJ_X0+cin, SUBJ_Y0+cin, SUBJ_X1-cin, SUBJ_Y1-cin,
+                          SUBJ_H, 38, GOLD_HI, "url(#goldface)", GOLD_DK, GOLD_LINE, 1.1))
+# crisp corner highlights on the front vertical edges — drawn on the visible tower/crown
+# faces only (start above the foreground rooftops so no bright streak spills to ground).
+s.append(hero_corner(SUBJ_X1, SUBJ_Y1, 40, SUBJ_H, w=3.2, op=0.8))
+s.append(hero_corner(SUBJ_X1-cin, SUBJ_Y1-cin, SUBJ_H, SUBJ_H+38, w=2.4, op=0.92))
+
+# --- balance the frame: faint warm atmospheric haze in the sparse upper-right
+# (Dupont) quadrant so the composition doesn't feel heavier on the left. ---
+s.append(f'<ellipse cx="1560" cy="330" rx="640" ry="440" fill="url(#haze)" opacity="0.9"/>')
+
+# --- subtle atmospheric vignette: lift the hero center, gently deepen far corners ---
+s.append(f'<rect width="{VBW}" height="{VBH}" fill="url(#vign)" opacity="0.9"/>')
+# a soft warm glow halo behind the hero to make it sing
+s.append(f'<ellipse cx="{px if False else hc[0]:.1f}" cy="300" rx="300" ry="220" '
+         f'fill="url(#herohalo)" opacity="0.45"/>')
+
+# =============================================================================
+#  LABELS
+# =============================================================================
 def txt(x, y, t, size=13, fill=INK, weight="400", ls="0", anchor="middle",
-        rot=0, halo=True, hw=3.2, family="'Georgia', serif", opacity="1"):
+        rot=0, halo=True, hw=3.4, family="'Georgia', serif", opacity="1"):
     tr = f' transform="rotate({rot} {x} {y})"' if rot else ""
     base = (f'font-size="{size}" font-family="{family}" font-weight="{weight}" '
             f'letter-spacing="{ls}" text-anchor="{anchor}"')
@@ -175,240 +415,258 @@ def txt(x, y, t, size=13, fill=INK, weight="400", ls="0", anchor="middle",
     out += f'<text x="{x}" y="{y}" {base} fill="{fill}"{tr} opacity="{opacity}">{t}</text>'
     return out
 
-# ---- Neighborhood labels (light sans, generous tracking) -----------------------
-def hood(x, y, t, size=17, rot=0, anchor="middle"):
-    return txt(x, y, t, size=size, fill=HOOD, weight="600", ls="4.5",
-               anchor=anchor, rot=rot, hw=4.0,
-               family="'Helvetica Neue', Arial, sans-serif")
+def hood(sx, sy, t, size=17, ls="5", rot=0, fill=HOOD_DK):
+    return txt(sx, sy, t, size=size, fill=fill, weight="700", ls=ls,
+               rot=rot, hw=4.2, family="'Helvetica Neue', Arial, sans-serif")
 
-s.append(hood(70, 300, "GEORGETOWN", 17, rot=-90))
-# Rock Creek Park: small muted label inside the green wedge (upper-left), rotated
-# vertically to fit the narrow band, in a sage-grey so it reads as parkland.
-s.append(txt(30, 210, "ROCK  CREEK  PARK", size=10, fill="#8C9A7C", weight="600",
-             ls="1.6", anchor="middle", rot=-90, hw=2.6,
-             family="'Helvetica Neue', Arial, sans-serif"))
-s.append(hood(214, 668, "POTOMAC  RIVER", 12, rot=-33, anchor="middle"))
-s.append(hood(946, 120, "DUPONT  CIRCLE", 15))
-# CBD east-edge label: bump size/weight to match GEORGETOWN and pull inboard off the
-# frame, sitting in the right margin clear of the (retightened) street labels.
-s.append(txt(1120, 430, "CENTRAL  BUSINESS  DISTRICT", size=16, fill=HOOD, weight="700",
-             ls="3.0", anchor="middle", rot=90, hw=4.0,
-             family="'Helvetica Neue', Arial, sans-serif"))
-s.append(hood(718, 330, "WEST  END", 20))
-s.append(hood(520, 756, "FOGGY  BOTTOM  ·  GWU", 14))
+# neighborhoods — project real-world anchor points so geography is correct.
+def hood_w(wx, wy, t, size=17, ls="5", fill=HOOD_DK):
+    p = proj(wx, wy)
+    return hood(p[0], p[1], t, size, ls, fill=fill)
+s.append(hood(150, 300, "GEORGETOWN", 18, ls="4"))             # west/left (fixed)
+s.append(txt(196, 452, "ROCK  CREEK  PARK", size=12, fill="#5F7049",
+             weight="700", ls="2.2", hw=3.4, family="'Helvetica Neue', Arial, sans-serif"))
+s.append(hood(150, 700, "POTOMAC  RIVER", 13, ls="2.5", fill="#3E6C8A"))  # SW (fixed, inboard)
+s.append(hood(1000, 110, "DUPONT  CIRCLE", 16, ls="3"))        # NE / upper-right (fixed, clear)
+s.append(hood(1015, 560, "DOWNTOWN · CBD", 14, ls="2"))        # east/right (fixed, clear)
+s.append(hood(770, 118, "WEST  END", 20, ls="6"))              # open sky above hero, to the right
+s.append(hood(430, 690, "FOGGY  BOTTOM · GWU", 15, ls="3"))    # south, clear of cards
 
-# ---- Street labels (faint, tracked) --------------------------------------------
-for x, l in V:
-    s.append(txt(x, GY0 - 12, l, size=11.5, fill=STLBL, weight="500", ls="0.6",
-                 family="'Helvetica Neue', Arial, sans-serif", hw=2.6))
-for y, l in H:
-    s.append(txt(GX1 + 6, y + 4, l, size=11.5, fill=STLBL, weight="500", ls="0.6",
-                 anchor="start", family="'Helvetica Neue', Arial, sans-serif", hw=2.6))
+# street labels — small rotated tags in the open pavement at the grid's perimeter,
+# clear of buildings. Numbered at their SOUTH-WEST end (down-left, along river side);
+# lettered at their EAST end (down-right edge). Skip any that fall in busy zones.
+ang_num = math.degrees(math.atan2(EY[1], EY[0]))   # numbered streets run down-left
+ang_let = math.degrees(math.atan2(EX[1], EX[0]))   # lettered streets run down-right
+STL = "#B0A794"
+def st_tag(sx, sy, l, ang):
+    # street-name pill: soft white ground plate + subtle halo so the label sits
+    # cleanly on the pavement, never on an extrusion. A hair more leading (taller pill).
+    w = len(l)*7.0 + 18
+    return (f'<g transform="translate({sx:.1f},{sy:.1f}) rotate({ang:.1f})" filter="url(#pillshadow)">'
+            f'<rect x="{-w/2:.1f}" y="-11" width="{w:.1f}" height="22" rx="11" '
+            f'fill="#FFFFFF" fill-opacity="0.88" stroke="#EFE7D6" stroke-width="1"/>'
+            f'<text x="0" y="4.5" text-anchor="middle" font-size="11" font-weight="700" '
+            f'letter-spacing="0.5" fill="{INK_SOFT}" '
+            f'font-family="\'Helvetica Neue\', Arial, sans-serif">{l}</text></g>')
+# numbered: ride the reserved southern lane, on open pavement clear of all buildings
+for (wx,l) in V:
+    p = proj(wx, PILL_LANE_S)
+    s.append(st_tag(p[0], p[1], l, ang_num))
+# lettered: ride the reserved eastern lane (skip N St — clashes w/ CBD label)
+for (wy,l) in H:
+    if l == "N St":
+        continue
+    p = proj(PILL_LANE_E, wy)
+    s.append(st_tag(p[0], p[1], l, ang_let))
 
-# ---- Avenue labels (rotated along the line) ------------------------------------
-ang_nh = math.degrees(math.atan2(DUP[1] - WC[1], DUP[0] - WC[0]))
-# place NH label on the diagonal, in a clear stretch NE of the parcel
-nh_t = 0.44
-nhx = WC[0] + (DUP[0] - WC[0]) * nh_t
-nhy = WC[1] + (DUP[1] - WC[1]) * nh_t
-s.append(txt(nhx, nhy - 12, "New Hampshire Ave", size=11.5, fill=INK_SOFT, weight="500",
-             ls="0.4", rot=ang_nh, family="'Georgia', serif", hw=2.8))
-ang_pa = math.degrees(math.atan2(PENN_END[1] - WC[1], PENN_END[0] - WC[0]))
-pa_t = 0.62
-pax = WC[0] + (PENN_END[0] - WC[0]) * pa_t
-pay = WC[1] + (PENN_END[1] - WC[1]) * pa_t
-s.append(txt(pax, pay - 11, "Pennsylvania Ave", size=11.5, fill=INK_SOFT, weight="500",
-             ls="0.4", rot=ang_pa, family="'Georgia', serif", hw=2.8))
+# avenue labels along the diagonals
+def ave_label(p0, p1, t, tpar=0.5, dy=-14):
+    a=proj(*p0); b=proj(*p1)
+    ang=math.degrees(math.atan2(b[1]-a[1], b[0]-a[0]))
+    mx=a[0]+(b[0]-a[0])*tpar; my=a[1]+(b[1]-a[1])*tpar
+    return txt(mx, my+dy, t, size=11.5, fill=INK_SOFT, weight="600", ls="0.4",
+               rot=ang, family="'Georgia', serif", hw=2.8)
+s.append(ave_label(WC, DUP, "New Hampshire Ave", 0.40, -12))
+s.append(ave_label(WC, PENN_END, "Pennsylvania Ave", 0.55, -11))
 
-# ============================ HOTELS (M St, one block south) =====================
-# Gold dots stay on M St (their true location); the caption is DOCKED along the
-# bottom edge (right of the legend card) in clear space so it never covers a dot
-# or the map fabric.
-hx = [452, 512, 572, 632]
-hnames = ["Ritz-Carlton", "Park Hyatt", "Fairmont", "Westin"]
-for x in hx:
-    s.append(f'<circle cx="{x}" cy="490" r="4.4" fill="{GOLD}" stroke="#FFFFFF" stroke-width="1.4"/>')
-# Docked caption plate: same height/y as the legend card, sitting in the clear
-# band below K St, to the right of the legend.
-HCAP_X = 372
-HCAP_Y = 752
-HCAP_W = 342
-HCAP_H = 30
-s.append(f'<g filter="url(#soft)"><rect x="{HCAP_X}" y="{HCAP_Y}" width="{HCAP_W}" height="{HCAP_H}" rx="9" '
-         f'fill="#FFFFFF" fill-opacity="0.94" stroke="{ST_CASE}" stroke-width="1"/></g>')
-# small gold dot glyph at the left of the plate to tie it to the map dots
-s.append(f'<circle cx="{HCAP_X+18}" cy="{HCAP_Y+HCAP_H/2:.0f}" r="4.4" fill="{GOLD}" '
-         f'stroke="#FFFFFF" stroke-width="1.3"/>')
-s.append(f'<text x="{HCAP_X+32}" y="{HCAP_Y+HCAP_H/2+4:.0f}" font-size="11.5" '
-         f'font-family="\'Georgia\', serif" letter-spacing="0.3">'
-         f'<tspan fill="{GOLD_D}" font-weight="700" letter-spacing="1">LUXURY HOTELS&#160;&#160;</tspan>'
-         f'<tspan fill="{INK_SOFT}">Ritz-Carlton · Park Hyatt · Fairmont · Westin</tspan></text>')
-
-# ============================ WALK ROUTES =======================================
-# Legible dashed walk lines from the subject block to each Metro. Styled a deep
-# charcoal-ink dash on a bright white casing so the PATH is unmistakably distinct
-# from the cream New Hampshire Ave ROAD it runs beside (see NH_SHIFT offset below).
-WALK   = "#4A443B"    # deep charcoal-taupe, clearly reads as a route (not a road)
-def walk_route(pts, smooth=False):
-    if smooth and len(pts) >= 3:
-        # Catmull-Rom -> cubic Bézier for a gently flowing (non-kinked) path
-        d = f"M{pts[0][0]:.0f},{pts[0][1]:.0f}"
-        P = [pts[0]] + list(pts) + [pts[-1]]
-        for i in range(1, len(P) - 2):
-            p0, p1, p2, p3 = P[i-1], P[i], P[i+1], P[i+2]
-            c1x = p1[0] + (p2[0] - p0[0]) / 6.0
-            c1y = p1[1] + (p2[1] - p0[1]) / 6.0
-            c2x = p2[0] - (p3[0] - p1[0]) / 6.0
-            c2y = p2[1] - (p3[1] - p1[1]) / 6.0
-            d += f" C{c1x:.1f},{c1y:.1f} {c2x:.1f},{c2y:.1f} {p2[0]:.0f},{p2[1]:.0f}"
-    else:
-        d = "M" + " L".join(f"{x:.0f},{y:.0f}" for x, y in pts)
-    # bright white casing under the dash so it separates cleanly from the grid AND
-    # from the avenue, then a bold charcoal dash on top
-    return (f'<path d="{d}" fill="none" stroke="#FFFFFF" stroke-width="7.5" '
-            f'stroke-opacity="0.85" stroke-linecap="round" stroke-linejoin="round"/>'
-            f'<path d="{d}" fill="none" stroke="{WALK}" stroke-width="3.0" '
-            f'stroke-linecap="round" stroke-linejoin="round" '
-            f'stroke-dasharray="0.5 8"/>')
-# to Foggy Bottom–GWU (south): smooth flowing curve down toward the roundel
-s.append(walk_route([(470, 496), (512, 556), (556, 608), (588, 636)], smooth=True))
-# to Dupont Circle (NE): step east off the block, then climb toward the station.
-# Offset the mid segment NORTH of New Hampshire Ave so the dashed PATH sits clearly
-# beside (not on top of) the cream avenue diagonal.
-s.append(walk_route([(536, 428), (700, 400), (838, 318), (958, 254)], smooth=True))
-
-# ============================ METRO ROUNDELS ====================================
-def metro(cx, cy, bars):
-    g = f'<g filter="url(#soft)"><circle cx="{cx}" cy="{cy}" r="13.5" fill="{METRO}"/></g>'
-    g += (f'<text x="{cx}" y="{cy+5.5}" text-anchor="middle" font-size="17" font-weight="800" '
+# =============================================================================
+#  METRO ROUNDELS (WMATA-style) + walk chip
+# =============================================================================
+# A premium floating "station card": roundel on the left, name + colored line bar
+# + walk-time chip on the right, all on one soft white rounded card. Always legible.
+# One clean UI system: both station cards share identical width, corner radius,
+# internal padding, chip alignment, and drop shadow. x0 = left edge of the card.
+CARD_W = 188
+CARD_H = 48
+CARD_R = 14
+PAD    = 16          # internal padding
+def metro_card(x0, cy, bars, name, walk):
+    y0 = cy - CARD_H/2
+    g = (f'<g filter="url(#cardshadow)">'
+         f'<rect x="{x0:.1f}" y="{y0:.1f}" width="{CARD_W}" height="{CARD_H}" rx="{CARD_R}" '
+         f'fill="#FFFFFF" stroke="#EFE7D9" stroke-width="1"/></g>')
+    # roundel — vertically centered, left-padded
+    rcx = x0 + PAD + 15; rcy = cy
+    g += f'<circle cx="{rcx:.1f}" cy="{rcy:.1f}" r="15" fill="{METRO}"/>'
+    g += (f'<text x="{rcx:.1f}" y="{rcy+6.5:.1f}" text-anchor="middle" font-size="19" font-weight="800" '
           f'fill="#FFFFFF" font-family="Georgia, serif">M</text>')
-    n = len(bars); total = 24; bw = total / n
-    for i, c in enumerate(bars):
-        g += (f'<rect x="{cx-12+i*bw:.2f}" y="{cy+15}" width="{bw:.2f}" height="4.4" '
-              f'rx="1" fill="{c}"/>')
+    tx = rcx + 15 + 12          # text column start, consistent gap from roundel
+    # name (upper row)
+    g += (f'<text x="{tx:.1f}" y="{cy-5:.1f}" font-size="12.5" font-weight="700" fill="{INK}" '
+          f'letter-spacing="0.15" font-family="\'Helvetica Neue\', Arial, sans-serif">{name}</text>')
+    # line color chips (lower row) — consistent size/rounding, left-aligned under name
+    n=len(bars); bw=7; gap=2.5; by=cy+4
+    for i,c in enumerate(bars):
+        g += (f'<rect x="{tx+i*(bw+gap):.1f}" y="{by:.1f}" width="{bw}" height="7" rx="2" '
+              f'fill="{c}" stroke="#FFFFFF" stroke-width="0.6"/>')
+    # walk chip — right-anchored to a consistent inset from the card's right edge
+    ww = len(walk)*5.9 + 16
+    chx = x0 + CARD_W - PAD - ww
+    g += (f'<rect x="{chx:.1f}" y="{cy+2:.1f}" width="{ww:.1f}" height="17" rx="8.5" fill="{GOLD}"/>')
+    g += (f'<text x="{chx+ww/2:.1f}" y="{cy+14:.1f}" text-anchor="middle" font-size="10" font-weight="700" '
+          f'fill="#4A3410" letter-spacing="0.2" font-family="\'Helvetica Neue\', Arial, sans-serif">{walk}</text>')
     return g
 
-# Foggy Bottom-GWU (Blue/Orange/Silver) — SOUTH of property, 9-min walk
-fb = (600, 650)
-s.append(metro(fb[0], fb[1], [BLUE, ORANGE, SILVER]))
-s.append(txt(fb[0] + 24, fb[1] - 2, "Foggy Bottom–GWU", size=12.5, fill=INK, weight="700",
-             ls="0.2", anchor="start", family="'Helvetica Neue', Arial, sans-serif", hw=3.2))
-s.append(txt(fb[0] + 24, fb[1] + 15, "9-min walk", size=11.5, fill=INK_SOFT, weight="400",
-             ls="0.2", anchor="start", family="'Georgia', serif", hw=3.0))
+# Foggy Bottom-GWU (south) — placed in open pavement south of the grid.
+# center the fixed-width card on the station anchor.
+fb = proj(360, 640)
+s.append(metro_card(fb[0]-CARD_W/2, fb[1], [BLUE,ORANGE,SILVER], "Foggy Bottom–GWU", "9 min walk"))
+# Dupont Circle (NE) — upper-right, right edge tucked inboard of the frame.
+s.append(metro_card(1108-CARD_W, 210, [RED], "Dupont Circle", "13 min walk"))
 
-# Dupont Circle (Red) — NORTHEAST, 13-min walk. Roundel offset from circle center.
-dm = (992, 234)
-s.append(metro(dm[0], dm[1], [RED]))
-s.append(txt(dm[0], dm[1] + 30, "Dupont Circle", size=12.5, fill=INK, weight="700",
-             ls="0.2", family="'Helvetica Neue', Arial, sans-serif", hw=3.2))
-s.append(txt(dm[0], dm[1] + 46, "13-min walk", size=11.5, fill=INK_SOFT, weight="400",
-             ls="0.2", family="'Georgia', serif", hw=3.0))
+# =============================================================================
+#  HOTELS one block south on M St — small gold dots + docked caption
+# =============================================================================
+# Hotels on M St, sitting in the cleared strip so none collide with an extrusion.
+hotel_world = [(x, HOTEL_Y) for x in HOTEL_XS]
+def hotel_dot(sx, sy):
+    return (f'<g filter="url(#dotshadow)">'
+            f'<circle cx="{sx:.1f}" cy="{sy:.1f}" r="6.6" fill="#FFFFFF"/></g>'
+            f'<circle cx="{sx:.1f}" cy="{sy:.1f}" r="5.0" fill="{GOLD}"/>'
+            f'<circle cx="{sx:.1f}" cy="{sy:.1f}" r="5.0" fill="none" stroke="#B8791F" stroke-width="0.7" stroke-opacity="0.5"/>')
+for hw_ in hotel_world:
+    hp_=proj(*hw_)
+    s.append(hotel_dot(hp_[0], hp_[1]))
 
-# ============================ SUBJECT PIN =======================================
-# Pin TIP lands on the parcel centroid; the address callout sits ABOVE the pin
-# (institutional convention) so its bottom clears the gold parcel outline entirely
-# and the pin/parcel/label stack no longer feels compressed.
-CENT_X = PARCEL_X + PARCEL_W / 2          # parcel centroid X (456)
-CENT_Y = PARCEL_Y + PARCEL_H / 2          # parcel centroid Y (431)
-px, py = CENT_X, CENT_Y                    # tip location = centroid
-s.append(f'<ellipse cx="{px}" cy="{py+3}" rx="12" ry="4" fill="#000" opacity="0.16"/>')
-s.append(f'<g filter="url(#soft)"><path d="M{px},{py+5} '
-         f'C{px-20},{py-24} {px-20},{py-56} {px},{py-56} '
-         f'C{px+20},{py-56} {px+20},{py-24} {px},{py+5} Z" '
-         f'fill="{GOLD}" stroke="#FFFFFF" stroke-width="3.2"/></g>')
-s.append(f'<circle cx="{px}" cy="{py-35}" r="8.4" fill="#FFFFFF"/>'
-         f'<circle cx="{px}" cy="{py-35}" r="3.8" fill="{GOLD_D}"/>')
+# =============================================================================
+#  SUBJECT HERO — elegant gold pin above the extruded gold tower + callout
+# =============================================================================
+# top of hero crown in screen space
+htx = proj((SUBJ_X0+SUBJ_X1)/2, (SUBJ_Y0+SUBJ_Y1)/2, SUBJ_H+38)
+px, py = htx[0], htx[1]
 
-# ---- Address callout ABOVE the pin (with downward tail) -------------------------
+# refined gold pin floating above the tower
+pin_y = py - 30
+s.append(f'<ellipse cx="{px:.1f}" cy="{py-2:.1f}" rx="10" ry="4" fill="#000" opacity="0.14"/>')
+s.append(f'<g filter="url(#soft)"><path d="M{px:.1f},{py-6:.1f} '
+         f'C{px-18:.1f},{pin_y-4:.1f} {px-18:.1f},{pin_y-34:.1f} {px:.1f},{pin_y-34:.1f} '
+         f'C{px+18:.1f},{pin_y-34:.1f} {px+18:.1f},{pin_y-4:.1f} {px:.1f},{py-6:.1f} Z" '
+         f'fill="{GOLD}" stroke="#FFFFFF" stroke-width="3"/></g>')
+s.append(f'<circle cx="{px:.1f}" cy="{pin_y-19:.1f}" r="7.6" fill="#FFFFFF"/>'
+         f'<circle cx="{px:.1f}" cy="{pin_y-19:.1f}" r="3.4" fill="{GOLD_DK}"/>')
+
+# callout plate ABOVE the pin
 lbl = "2300 N Street, NW"
-lw = len(lbl) * 8.4 + 28
-plate_h = 30
-# plate bottom sits ~14px above the pin head; tail points down toward the pin
-ly = py - 56 - 20 - plate_h              # plate top, clearly above the pin body
-tail_y = ly + plate_h                    # plate bottom
-s.append(f'<g filter="url(#soft)"><rect x="{px-lw/2:.0f}" y="{ly:.0f}" width="{lw:.0f}" height="{plate_h}" '
-         f'rx="7" fill="{INK}"/>'
-         f'<path d="M{px-8},{tail_y-1} L{px+8},{tail_y-1} L{px},{tail_y+9} Z" fill="{INK}"/></g>')
-s.append(f'<text x="{px}" y="{ly+20:.0f}" text-anchor="middle" font-size="15" font-weight="700" '
+sub = "West End · Washington, DC"
+lw = max(len(lbl), len(sub))*8.6 + 34
+plate_h = 44
+ly = pin_y - 34 - 16 - plate_h
+tail_y = ly + plate_h
+s.append(f'<g filter="url(#soft)"><rect x="{px-lw/2:.1f}" y="{ly:.1f}" width="{lw:.1f}" height="{plate_h}" '
+         f'rx="9" fill="{INK}"/>'
+         f'<path d="M{px-8:.1f},{tail_y-1:.1f} L{px+8:.1f},{tail_y-1:.1f} L{px:.1f},{tail_y+9:.1f} Z" fill="{INK}"/></g>')
+s.append(f'<text x="{px:.1f}" y="{ly+20:.1f}" text-anchor="middle" font-size="16" font-weight="700" '
          f'fill="#FFFFFF" font-family="\'Georgia\', serif" letter-spacing="0.4">{lbl}</text>')
+s.append(f'<text x="{px:.1f}" y="{ly+36:.1f}" text-anchor="middle" font-size="10.5" font-weight="600" '
+         f'fill="{GOLD_HI}" font-family="\'Helvetica Neue\', Arial, sans-serif" letter-spacing="1.4">{sub.upper()}</text>')
 
-# ============================ NORTH ARROW + SCALE ================================
-# North arrow top-right, clear of labels.
-s.append(f'<g transform="translate(1112,92)">'
-         f'<circle cx="0" cy="-4" r="22" fill="#FFFFFF" fill-opacity="0.75" stroke="{ST_CASE}" stroke-width="1"/>'
-         f'<path d="M0,-22 L8,4 L0,-2 L-8,4 Z" fill="{INK}"/>'
-         f'<path d="M0,-22 L8,4 L0,-2 Z" fill="{INK_SOFT}"/>'
-         f'<text x="0" y="24" text-anchor="middle" font-size="12" font-weight="800" '
+# =============================================================================
+#  NORTH ARROW + SCALE + LEGEND
+# =============================================================================
+s.append(f'<g transform="translate(1108,86)">'
+         f'<circle cx="0" cy="0" r="22" fill="#FFFFFF" fill-opacity="0.82" stroke="{STREET_ED}" stroke-width="1"/>'
+         f'<path d="M0,-16 L7,8 L0,2 L-7,8 Z" fill="{INK}"/>'
+         f'<path d="M0,-16 L7,8 L0,2 Z" fill="{INK_SOFT}"/>'
+         f'<text x="0" y="-22" text-anchor="middle" font-size="12" font-weight="800" '
          f'fill="{INK}" font-family="Georgia, serif">N</text></g>')
 
-# ---- Lower-left institutional block: legend chip + graduated scale bar ----------
-# A compact white card (matches Map D's convention) with a one-line legend
-# (Subject / Metro / Hotel) and a graduated 0–1/8–1/4-mile scale bar.
-LEG_X, LEG_Y = 40, 726
-LEG_W, LEG_H = 306, 56
+# legend card lower-left
+LEG_X,LEG_Y,LEG_W,LEG_H = 40, 720, 300, 62
 s.append(f'<g filter="url(#soft)"><rect x="{LEG_X}" y="{LEG_Y}" width="{LEG_W}" height="{LEG_H}" '
-         f'rx="9" fill="#FFFFFF" fill-opacity="0.94" stroke="{ST_CASE}" stroke-width="1"/></g>')
-
-# Row 1: legend chips (Subject / Metro / Hotel)
-lgy = LEG_Y + 20
-# Subject: mini gold pin glyph
-s.append(f'<path d="M{LEG_X+22},{lgy+4} C{LEG_X+15},{lgy-6} {LEG_X+15},{lgy-15} {LEG_X+22},{lgy-15} '
-         f'C{LEG_X+29},{lgy-15} {LEG_X+29},{lgy-6} {LEG_X+22},{lgy+4} Z" fill="{GOLD}" '
-         f'stroke="#FFFFFF" stroke-width="1.4"/>'
-         f'<circle cx="{LEG_X+22}" cy="{lgy-9}" r="2.6" fill="#FFFFFF"/>')
-s.append(txt(LEG_X+34, lgy+1, "Subject", size=11.5, fill=INK, weight="600", ls="0.2",
+         f'rx="11" fill="#FFFFFF" fill-opacity="0.95" stroke="{STREET_ED}" stroke-width="1"/></g>')
+lgy=LEG_Y+22
+# subject pin glyph
+s.append(f'<path d="M{LEG_X+22},{lgy+3} C{LEG_X+15},{lgy-6} {LEG_X+15},{lgy-15} {LEG_X+22},{lgy-15} '
+         f'C{LEG_X+29},{lgy-15} {LEG_X+29},{lgy-6} {LEG_X+22},{lgy+3} Z" fill="{GOLD}" stroke="#FFFFFF" stroke-width="1.3"/>'
+         f'<circle cx="{LEG_X+22}" cy="{lgy-9}" r="2.5" fill="#FFFFFF"/>')
+s.append(txt(LEG_X+34, lgy, "Subject Property", size=11.5, fill=INK, weight="700", ls="0.2",
              anchor="start", halo=False, family="'Helvetica Neue', Arial, sans-serif"))
-# Metro: mini M roundel
-s.append(f'<circle cx="{LEG_X+132}" cy="{lgy-5}" r="8.5" fill="{METRO}"/>'
-         f'<text x="{LEG_X+132}" y="{lgy-1}" text-anchor="middle" font-size="11" font-weight="800" '
+s.append(f'<circle cx="{LEG_X+178}" cy="{lgy-5}" r="8.5" fill="{METRO}"/>'
+         f'<text x="{LEG_X+178}" y="{lgy-1}" text-anchor="middle" font-size="11" font-weight="800" '
          f'fill="#FFFFFF" font-family="Georgia, serif">M</text>')
-s.append(txt(LEG_X+146, lgy+1, "Metro", size=11.5, fill=INK, weight="600", ls="0.2",
+s.append(txt(LEG_X+192, lgy, "Metro", size=11.5, fill=INK, weight="700", ls="0.2",
              anchor="start", halo=False, family="'Helvetica Neue', Arial, sans-serif"))
-# Hotel: mini gold dot
-s.append(f'<circle cx="{LEG_X+228}" cy="{lgy-5}" r="4.6" fill="{GOLD}" stroke="#FFFFFF" stroke-width="1.3"/>')
-s.append(txt(LEG_X+240, lgy+1, "Hotel", size=11.5, fill=INK, weight="600", ls="0.2",
+s.append(f'<circle cx="{LEG_X+250}" cy="{lgy-5}" r="4.6" fill="{GOLD}" stroke="#FFFFFF" stroke-width="1.2"/>')
+s.append(txt(LEG_X+260, lgy, "Hotel", size=11.5, fill=INK, weight="700", ls="0.2",
              anchor="start", halo=False, family="'Helvetica Neue', Arial, sans-serif"))
+# scale bar
+sby=LEG_Y+46; sbx=LEG_X+20; sbw=92
+s.append(f'<line x1="{sbx}" y1="{sby}" x2="{sbx+sbw}" y2="{sby}" stroke="{INK}" stroke-width="2.4"/>'
+         f'<line x1="{sbx}" y1="{sby-4}" x2="{sbx}" y2="{sby+4}" stroke="{INK}" stroke-width="2.4"/>'
+         f'<line x1="{sbx+sbw}" y1="{sby-4}" x2="{sbx+sbw}" y2="{sby+4}" stroke="{INK}" stroke-width="2.4"/>')
+s.append(txt(sbx, sby+15, "0", size=10, fill=INK_SOFT, weight="600", anchor="middle", halo=False, family="'Georgia', serif"))
+s.append(txt(sbx+sbw, sby+15, "¼ mile", size=10, fill=INK_SOFT, weight="500", ls="0.3", anchor="middle", halo=False, family="'Georgia', serif"))
 
-# Row 2: clean scale bar — single hairline bar with end ticks, centered "¼ mile"
-sby = LEG_Y + 40
-sbx = LEG_X + 18
-sbw = 88                                   # bar length = ¼ mile
-# main bar
-s.append(f'<line x1="{sbx}" y1="{sby}" x2="{sbx+sbw}" y2="{sby}" stroke="{INK}" '
-         f'stroke-width="2.2" stroke-linecap="butt"/>')
-# end ticks
-s.append(f'<line x1="{sbx}" y1="{sby-4}" x2="{sbx}" y2="{sby+4}" stroke="{INK}" stroke-width="2.2"/>'
-         f'<line x1="{sbx+sbw}" y1="{sby-4}" x2="{sbx+sbw}" y2="{sby+4}" stroke="{INK}" stroke-width="2.2"/>')
-# "0" at left end, "¼ mile" at right end
-s.append(txt(sbx, sby+16, "0", size=10, fill=INK_SOFT, weight="500", ls="0",
-             anchor="middle", halo=False, family="'Georgia', serif"))
-s.append(txt(sbx+sbw, sby+16, "¼ mile", size=10.5, fill=INK_SOFT, weight="400", ls="0.4",
-             anchor="middle", halo=False, family="'Georgia', serif"))
+# hotels caption plate (bottom center-right)
+HCX,HCY,HCW,HCH = 360, 748, 380, 30
+s.append(f'<g filter="url(#soft)"><rect x="{HCX}" y="{HCY}" width="{HCW}" height="{HCH}" rx="9" '
+         f'fill="#FFFFFF" fill-opacity="0.95" stroke="{STREET_ED}" stroke-width="1"/></g>')
+s.append(f'<circle cx="{HCX+18}" cy="{HCY+HCH/2:.0f}" r="4.6" fill="{GOLD}" stroke="#FFFFFF" stroke-width="1.3"/>')
+s.append(f'<text x="{HCX+32}" y="{HCY+HCH/2+4:.0f}" font-size="11.5" font-family="\'Georgia\', serif">'
+         f'<tspan fill="{GOLD_DK}" font-weight="700" letter-spacing="1">LUXURY HOTELS&#160;&#160;</tspan>'
+         f'<tspan fill="{INK_SOFT}">Ritz-Carlton · Park Hyatt · Fairmont · Westin</tspan></text>')
 
-# ---- Thin editorial inner frame -------------------------------------------------
-s.append(f'<rect x="14" y="14" width="{VBW-28}" height="{VBH-28}" fill="none" '
-         f'stroke="{GOLD_D}" stroke-width="1" stroke-opacity="0.35"/>')
-s.append(f'<rect x="19" y="19" width="{VBW-38}" height="{VBH-38}" fill="none" '
-         f'stroke="{INK_SOFT}" stroke-width="0.5" stroke-opacity="0.25"/>')
+# editorial frame
+s.append(f'<rect x="15" y="15" width="{VBW-30}" height="{VBH-30}" fill="none" '
+         f'stroke="{GOLD_LINE}" stroke-width="1" stroke-opacity="0.30"/>')
 
-# ============================ ASSEMBLE ==========================================
+# =============================================================================
+#  DEFS + ASSEMBLE
+# =============================================================================
 defs = ('<defs>'
+        f'<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">'
+        f'<stop offset="0" stop-color="{SKY_TOP}"/><stop offset="1" stop-color="{SKY_BOT}"/></linearGradient>'
+        f'<radialGradient id="ground" cx="0.5" cy="0.42" r="0.75">'
+        f'<stop offset="0" stop-color="{GROUND}"/><stop offset="1" stop-color="{GROUND2}"/></radialGradient>'
+        f'<radialGradient id="goldglow" cx="0.5" cy="0.5" r="0.5">'
+        f'<stop offset="0" stop-color="{GOLD_HI}" stop-opacity="0.95"/>'
+        f'<stop offset="1" stop-color="{GOLD_HI}" stop-opacity="0"/></radialGradient>'
+        f'<radialGradient id="goldpool" cx="0.5" cy="0.5" r="0.5">'
+        f'<stop offset="0" stop-color="#F7CE72" stop-opacity="0.8"/>'
+        f'<stop offset="0.55" stop-color="#EFC066" stop-opacity="0.28"/>'
+        f'<stop offset="1" stop-color="#EFC066" stop-opacity="0"/></radialGradient>'
+        f'<radialGradient id="crownglow" cx="0.5" cy="0.5" r="0.5">'
+        f'<stop offset="0" stop-color="#FFE9B4" stop-opacity="0.75"/>'
+        f'<stop offset="0.6" stop-color="#FBDE95" stop-opacity="0.18"/>'
+        f'<stop offset="1" stop-color="#FBDE95" stop-opacity="0"/></radialGradient>'
+        # lit-face gradient: gold at top -> deeper amber toward the base
+        f'<linearGradient id="goldface" x1="0" y1="0" x2="0" y2="1">'
+        f'<stop offset="0" stop-color="{GOLD_MID}"/>'
+        f'<stop offset="0.55" stop-color="{GOLD_MID}"/>'
+        f'<stop offset="1" stop-color="{GOLD_MID2}"/></linearGradient>'
+        f'<radialGradient id="vign" cx="0.48" cy="0.40" r="0.78">'
+        f'<stop offset="0" stop-color="#000000" stop-opacity="0"/>'
+        f'<stop offset="0.62" stop-color="#000000" stop-opacity="0"/>'
+        f'<stop offset="1" stop-color="#3A2E1C" stop-opacity="0.16"/></radialGradient>'
+        f'<radialGradient id="herohalo" cx="0.5" cy="0.5" r="0.5">'
+        f'<stop offset="0" stop-color="#FBE6B0" stop-opacity="0.55"/>'
+        f'<stop offset="0.55" stop-color="#F4D488" stop-opacity="0.14"/>'
+        f'<stop offset="1" stop-color="#F4D488" stop-opacity="0"/></radialGradient>'
+        f'<radialGradient id="haze" cx="0.5" cy="0.5" r="0.5">'
+        f'<stop offset="0" stop-color="#F6EFE2" stop-opacity="0.42"/>'
+        f'<stop offset="0.5" stop-color="#F2E9D8" stop-opacity="0.20"/>'
+        f'<stop offset="1" stop-color="#F2E9D8" stop-opacity="0"/></radialGradient>'
         '<filter id="soft" x="-40%" y="-40%" width="180%" height="180%">'
-        '<feDropShadow dx="0" dy="1.6" stdDeviation="1.8" flood-color="#000" flood-opacity="0.22"/>'
-        '</filter>'
+        '<feDropShadow dx="0" dy="2" stdDeviation="2.2" flood-color="#000" flood-opacity="0.24"/></filter>'
+        '<filter id="cardshadow" x="-40%" y="-40%" width="180%" height="180%">'
+        '<feDropShadow dx="0" dy="3" stdDeviation="4.5" flood-color="#3A2A12" flood-opacity="0.22"/></filter>'
+        '<filter id="dotshadow" x="-80%" y="-80%" width="260%" height="260%">'
+        '<feDropShadow dx="0" dy="1.4" stdDeviation="1.6" flood-color="#000" flood-opacity="0.30"/></filter>'
+        '<filter id="pillshadow" x="-60%" y="-60%" width="220%" height="220%">'
+        '<feDropShadow dx="0" dy="1" stdDeviation="1.6" flood-color="#4A3A1E" flood-opacity="0.16"/></filter>'
+        '<filter id="blur" x="-30%" y="-30%" width="160%" height="160%">'
+        '<feGaussianBlur stdDeviation="4"/></filter>'
         '</defs>')
 
 html = (f'<!doctype html><html><head><meta charset="utf-8"><style>'
-        f'*{{margin:0;padding:0}}'
-        f'body{{width:{VBW}px;height:{VBH}px;overflow:hidden;background:{PAPER};}}'
+        f'*{{margin:0;padding:0}}body{{width:{VBW}px;height:{VBH}px;overflow:hidden;background:{SKY_TOP};}}'
         f'</style></head><body>'
-        f'<svg width="{VBW}" height="{VBH}" viewBox="0 0 {VBW} {VBH}" '
-        f'xmlns="http://www.w3.org/2000/svg">{defs}{"".join(s)}</svg>'
-        f'</body></html>')
+        f'<svg width="{VBW}" height="{VBH}" viewBox="0 0 {VBW} {VBH}" xmlns="http://www.w3.org/2000/svg">'
+        f'{defs}{"".join(s)}</svg></body></html>')
 
-hp = os.path.join(tempfile.gettempdir(), "map_B_final.html")
-open(hp, "w").write(html)
-tmp = os.path.join(tempfile.gettempdir(), "map_B_final_raw.png")
+hp = os.path.join(tempfile.gettempdir(), "iso_map.html")
+open(hp,"w").write(html)
+tmp = os.path.join(tempfile.gettempdir(), "iso_map_raw.png")
 os.makedirs(OUT_DIR, exist_ok=True)
 out = os.path.join(OUT_DIR, "location_map.png")
 
@@ -418,7 +676,6 @@ subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--no-sandbox", "--hi
                check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 from PIL import Image
-img = Image.open(tmp).convert("RGB")
-img = img.crop((0, 0, 2330, 1600))
+img = Image.open(tmp).convert("RGB").crop((0,0,2330,1600))
 img.save(out)
-print("wrote", out, img.size, os.path.getsize(out), "bytes")
+print("wrote", out, img.size)
