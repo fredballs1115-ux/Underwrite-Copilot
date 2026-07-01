@@ -61,6 +61,14 @@ export function LoginForm() {
           {state.error}
         </p>
       )}
+      {state?.notice && (
+        <p
+          className="rounded-lg bg-pass/10 px-3 py-2 text-sm text-pass"
+          role="status"
+        >
+          {state.notice}
+        </p>
+      )}
 
       <div className="mt-2 flex gap-3">
         <button

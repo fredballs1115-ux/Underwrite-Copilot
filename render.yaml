@@ -33,6 +33,13 @@ services:
         sync: false
       - key: NEXT_PUBLIC_APP_URL
         sync: false
+      # Stripe billing — set in the dashboard (see .env.example for how to get each).
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PRICE_ID
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
 
   # ── Phase 2: the background worker that runs the long OM analysis ──────────
   # Uncomment when we build the pipeline. It shares this repo and the same env
