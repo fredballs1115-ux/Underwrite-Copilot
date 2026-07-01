@@ -33,6 +33,13 @@ PURPLE    = RGBColor(0xB0, 0xA4, 0xC6)
 PURPLE_LT = RGBColor(0xBE, 0xB2, 0xD2)
 PANEL     = RGBColor(0x1A, 0x1A, 0x1A)
 PH_GREY   = RGBColor(0xD9, 0xD9, 0xD9)
+# Eastdil data-point palette (for the comp matrices)
+NAVY      = RGBColor(0x1F, 0x38, 0x64)
+TEAL      = RGBColor(0x2C, 0xA9, 0xC7)
+GREEN     = RGBColor(0x57, 0xA6, 0x39)
+LTBLUE    = RGBColor(0xD9, 0xE2, 0xF3)
+ALT       = RGBColor(0xF2, 0xF2, 0xF2)
+PHOTO_BG  = RGBColor(0xDD, 0xDD, 0xDD)
 
 TITLE_FONT = "Calibri Light"
 BODY_FONT  = "Calibri"
@@ -135,6 +142,51 @@ def comp_table(s, x, y, w, h, cols, widths, rows, fontsize=7.6):
         for c, val in enumerate(row):
             set_cell(t.cell(r, c), val, fontsize, DARK, fill=fill,
                      align=PP_ALIGN.LEFT if c == 0 else PP_ALIGN.CENTER)
+    return t
+
+def eastdil_header(s, subtitle, page_num):
+    """Navy title + teal subtitle, matching Eastdil's Recent Data Points pages."""
+    txt(s, Inches(6.0), Inches(0.20), Inches(3.6), Inches(0.25),
+        [[Rn("2300 N STREET, NW  |  ES OPINION OF VALUE  |  JUN-26", 7.5, GREY_TXT, True)]],
+        align=PP_ALIGN.RIGHT)
+    txt(s, Inches(0.42), Inches(0.42), Inches(9), Inches(0.55),
+        [[Rn("Washington, DC Recent Data Points", 27, NAVY, True)]])
+    txt(s, Inches(0.44), Inches(0.98), Inches(9), Inches(0.4),
+        [[Rn(subtitle, 17, TEAL, True)]])
+    footer(s, page_num)
+
+def eastdil_matrix(s, y_top, y_bot, columns, row_labels, label_w, data_fs,
+                   name_fs, name_h, photo_h, status_h):
+    """Eastdil-style comp matrix: properties as columns; name/photo/status bands
+    on top; light-blue row labels down the left. `columns` = list of dicts with
+    keys name, status, closed(bool), vals(list aligned to row_labels)."""
+    ncol = 1 + len(columns)
+    nrow = 3 + len(row_labels)
+    x = Inches(0.42); total_w = Inches(9.16)
+    tshape = s.shapes.add_table(nrow, ncol, x, Inches(y_top), total_w, Inches(y_bot - y_top))
+    t = tshape.table; no_style(t)
+    t.columns[0].width = Inches(label_w)
+    data_w = (9.16 - label_w) / len(columns)
+    for c in range(1, ncol): t.columns[c].width = Inches(data_w)
+    attr_h = (y_bot - y_top - name_h - photo_h - status_h) / len(row_labels)
+    t.rows[0].height = Inches(name_h)
+    t.rows[1].height = Inches(photo_h)
+    t.rows[2].height = Inches(status_h)
+    for r in range(3, nrow): t.rows[r].height = Inches(attr_h)
+    # corner cells (blank) above the labels
+    for r in range(3):
+        set_cell(t.cell(r, 0), "", data_fs, WHITE, fill=WHITE)
+    for ci, col in enumerate(columns, start=1):
+        set_cell(t.cell(0, ci), col["name"], name_fs, WHITE, bold=True, fill=NAVY, align=PP_ALIGN.CENTER)
+        set_cell(t.cell(1, ci), "[ photo ]", 6, GREY_TXT, fill=PHOTO_BG, align=PP_ALIGN.CENTER, ital=True)
+        set_cell(t.cell(2, ci), col["status"], data_fs, WHITE, bold=True,
+                 fill=GREEN if col["closed"] else TEAL, align=PP_ALIGN.CENTER)
+    for ri, lab in enumerate(row_labels):
+        r = 3 + ri
+        set_cell(t.cell(r, 0), lab, data_fs, NAVY, bold=True, fill=LTBLUE)
+        for ci, col in enumerate(columns, start=1):
+            fill = ALT if ri % 2 == 1 else WHITE
+            set_cell(t.cell(r, ci), col["vals"][ri], data_fs, DARK, fill=fill, align=PP_ALIGN.CENTER)
     return t
 
 def bullets(s, x, y, w, h, items, size=12, gap=6, lh=1.02, lead_color=GOLD):
@@ -404,73 +456,73 @@ txt(s, Inches(0.42), Inches(5.05), Inches(9), Inches(0.25), [[Rn(SRC, 8, GREY_TX
 
 # ============================================================ 11 – RECENT DATA POINTS: CLASS-A (BOV p14)
 s = slide(); bg(s, WHITE)
-content_header(s, "Recent Data Points", 11)
-gold_band(s, Inches(1.02), "WASHINGTON, DC — CLASS-A SALES", "Recent & Active Comparable Transactions")
-cols = ["Property", "Status", "SF", "% Leased", "WALT", "Cap Rate", "Price", "$/SF", "Buyer", "Seller"]
-rows = [
-    ("2001 M", "Closed Jan-26", "284,000", "93%", "9.0 Yr", "8.90%", "$163.3M", "$577", "Stream Realty", "Brookfield"),
-    ("1401 New York", "Closed Jan-26", "211,000", "94%→81%", "4.7 Yr", "11.5%→9.0%", "$85.0M", "$402", "Carr / Barings", "AXA"),
-    ("901 K", "Closed Jun-25", "220,000", "68%", "6.3 Yr", "8.00%", "$85.0M", "$386", "Shorenstein", "Carr Properties"),
-    ("District Wharf (670/680/1000 Maine)", "Closed May-25", "750,000", "92%", "13.0 Yr", "6.50%", "$628.0M", "$835", "PSP", "Hoffman / Madison"),
-    ("District Wharf (800 Maine)", "Closed May-25", "150,000", "100%", "8.5 Yr", "8.00%", "$63.2M", "$425", "PSP", "Hoffman / Madison"),
-    ("2000 K", "Closed Jul-24", "233,000", "88%", "7.0 Yr", "8.00%", "$140.2M", "$600", "Spear Street", "Tishman / Deka"),
-    ("1099 New York", "Closed Mar-24", "181,000", "95%", "9.0 Yr", "9.25%", "$95.0M", "$525", "FarmView / Quad.", "Credit Suisse"),
-    ("1330 Connecticut", "Awarded", "259,000", "80%", "11.1 Yr", "9.00%", "$92.5M", "$358", "Confidential", "BXP"),
-    ("799 9th", "Awarded", "205,000", "82%", "6.6 Yr", "9.75%", "$100.0M", "$488", "Confidential", "Brookfield / AussieSuper"),
-    ("Hamilton Square", "Awarded", "248,000", "100%", "6.6 Yr", "8.90%", "$127.5M", "$514", "Confidential", "CommonWealth / CalPERS"),
-    ("888 16th", "Bidding", "107,000", "95%", "8.6 Yr", "8.50%", "$75.0M", "$700", "TBD", "Trammell Crow / Meadow"),
+eastdil_header(s, "Class-A", 11)
+def CA(name, status, closed, sz, lsd, walt, cap, price, buyer, seller, notes):
+    return {"name": name, "status": status, "closed": closed,
+            "vals": [sz, lsd, walt, cap, price, buyer, seller, notes]}
+classA = [
+    CA("888 16th", "Bidding", False, "107,000", "95%", "8.6 Yr", "8.50%", "$75.0M\n$700 PSF", "TBD", "Trammell Crow /\nMeadow", "Condo Regime"),
+    CA("Hamilton Square", "Awarded", False, "248,000", "100%", "6.6 Yr", "8.90%", "$127.5M\n$514 PSF", "Confidential", "CommonWealth /\nCalPERS", "–"),
+    CA("799 9th", "Awarded", False, "205,000", "82%", "6.6 Yr", "9.75%", "$100.0M\n$488 PSF", "Confidential", "Brookfield /\nAussieSuper", "–"),
+    CA("1330 Connecticut", "Awarded", False, "259,000", "80%", "11.1 Yr", "9.00%", "$92.5M\n$358 PSF", "Confidential", "BXP", "–"),
+    CA("2001 M", "Closed Jan-26", True, "284,000", "93%", "9.0 Yr", "8.90%", "$163.3M\n$577 PSF", "Stream Realty", "Brookfield", "Market Debt\n(Debt Fund)"),
+    CA("1401 New York", "Closed Jan-26", True, "211,000", "94%→81%", "4.7 Yr", "11.50→9.00%", "$85.0M\n$402 PSF", "Carr / Barings", "AXA", "Market Debt\n(Debt Fund)"),
+    CA("901 K", "Closed Jun-25", True, "220,000", "68%", "6.3 Yr", "8.00%", "$85.0M\n$386 PSF", "Shorenstein", "Carr Properties", "Market Debt\n(Debt Fund)"),
+    CA("District Wharf\n(670/680/1000 Maine)", "Closed May-25", True, "750,000", "92%", "13.0 Yr", "6.50%", "$628.0M\n$835 PSF", "PSP", "Hoffman /\nMadison", "Market Debt\n(CMBS)"),
+    CA("District Wharf\n(800 Maine)", "Closed May-25", True, "150,000", "100%", "8.5 Yr", "8.00%", "$63.2M\n$425 PSF", "PSP", "Hoffman /\nMadison", "Market Debt\n(CMBS)"),
+    CA("2000 K", "Closed Jul-24", True, "233,000", "88%", "7.0 Yr", "8.00%", "$140.2M\n$600 PSF", "Spear Street", "Tishman /\nDeka", "Seller\nFinancing"),
+    CA("1099 New York", "Closed Mar-24", True, "181,000", "95%", "9.0 Yr", "9.25%", "$95.0M\n$525 PSF", "FarmView /\nQuadrangle", "Credit Suisse", "Market Debt\n(CMBS)"),
 ]
-comp_table(s, Inches(0.42), Inches(1.75), Inches(9.16), Inches(3.4),
-           cols, [1.75, 0.9, 0.72, 0.78, 0.62, 0.85, 0.72, 0.5, 1.1, 1.22], rows, fontsize=7.4)
-txt(s, Inches(0.42), Inches(5.05), Inches(9), Inches(0.25),
-    [[Rn("Class-A pricing: $400–$600 PSF, ~82% average occupancy, ~8.8% in-place cap. " + SRC, 8, GREY_TXT, False, True)]])
+eastdil_matrix(s, 1.5, 5.12, classA,
+               ["Size (SF)", "% Leased", "WALT", "Cap Rate", "Price (PSF)", "Buyer", "Seller", "Notes"],
+               label_w=0.98, data_fs=6.2, name_fs=6.5, name_h=0.5, photo_h=0.62, status_h=0.24)
 
 # ============================================================ 12 – RECENT DATA POINTS: COMMODITY (BOV p15)
 s = slide(); bg(s, WHITE)
-content_header(s, "Recent Data Points", 12)
-gold_band(s, Inches(1.02), "WASHINGTON, DC — COMMODITY SALES", "Recent & Active Comparable Transactions")
-cols = ["Property", "Status", "Yr Built", "SF", "% Leased", "WALT", "Cap Rate", "Price / $PSF", "Buyer", "Seller"]
-rows = [
-    ("2445 M", "Closed Apr-26", "1986/19", "300,000", "80%→75%", "7.7 Yr", "9.0%→8.5%", "$101.0M / $337", "Eagle Cliff", "Mesa West"),
-    ("Watergate", "Closed Mar-26", "1972/02", "309,000", "93%→20%", "N/A", "N/A", "$52.5M / $170", "JetSet", "Elme"),
-    ("1400 K", "Closed Oct-25", "1982/24", "200,000", "65%", "5.3 Yr", "9.5%", "$35.5M / $180", "Taicoon", "Brookfield / AussieSuper"),
-    ("2033 K", "Closed Jul-25", "1975/19", "128,767", "38%", "–", "N/A", "$20.3M / $170", "In-Rel", "ARA"),
-    ("1325 G", "Closed Jun-25", "1969/04", "305,259", "62%", "2.5 Yr", "TBD", "$25.0M / $82", "Farmview / Newbond", "US Bank"),
-    ("1750 H", "Closed Jun-25", "2002", "124,000", "55%", "3.8 Yr", "TBD", "$28.8M / $232", "Douglas Dev.", "State Farm"),
-    ("300 M", "Closed Jun-25", "2001", "282,354", "50%", "3.8 Yr", "11.5%", "$28.0M / $100", "Confidential", "Potomac Inv."),
-    ("2101 L", "Closed Dec-24", "1975/07", "375,000", "75%", "8.0 Yr", "10.0%", "$110.0M / $293", "ELV / Beckham", "JBGS / NW Mutual"),
-    ("1250 H", "Closed Nov-24", "1992", "196,490", "53%", "7.4 Yr", "10.7%", "$27.5M / $137", "Banyan", "Equity CW"),
-    ("2001 L", "Closed Oct-24", "1986/14", "172,135", "66%", "6.3 Yr", "10.7%", "$30.6M / $180", "Melrose / Cambridge", "AEW o/b/o Swiss RE"),
-    ("1899 L", "Closed Mar-24", "1978/22", "150,502", "56%", "4.5 Yr", "9.5%", "$26.7M / $180", "Taicoon", "BlackRock"),
-    ("700 6th", "Bidding", "2009", "306,000", "79%", "7.8 Yr", "11.8%", "$85.0M / $278", "TBD", "Principal (Lender)"),
-    ("1350 Eye", "Bidding", "1989/14", "415,861", "75%", "8.0 Yr", "10.0%", "$130.0M / $348", "TBD", "MetLife"),
-    ("1775 Penn", "Awarded", "1975/09", "156,482", "41%", "5.5 Yr", "12.8% (ROC)", "$37.5M / $240", "Confidential", "Woodwind"),
-    ("Sumner Square", "Under Contract", "1985", "242,000", "100%", "TBD", "TBD", "$63.0M / $261", "Vireon Capital", "BXP"),
+eastdil_header(s, "Commodity", 12)
+def CM(name, status, closed, sz, yr, lsd, walt, cap, price, buyer, seller):
+    return {"name": name, "status": status, "closed": closed,
+            "vals": [sz, yr, lsd, walt, cap, price, buyer, seller]}
+commodity = [
+    CM("700 6th", "Bidding", False, "306,000", "2009", "79%", "7.8 Yr", "11.8%", "$85M\n$278", "TBD", "Principal\n(Lender)"),
+    CM("1350 Eye", "Bidding", False, "415,861", "1989/14", "75%", "8.0 Yr", "10.0%", "$130M\n$348", "TBD", "MetLife"),
+    CM("1775 Penn", "Awarded", False, "156,482", "1975/09", "41%", "5.5 Yr", "12.8%\n(ROC)", "$37.5M\n$240", "Confid.", "Woodwind"),
+    CM("Sumner\nSquare", "Under\nContract", False, "242,000", "1985", "100%", "TBD", "TBD", "$63.0M\n$261", "Vireon", "BXP"),
+    CM("2445 M", "Closed\nApr-26", True, "300,000", "1986/19", "80→75%", "7.7 Yr", "9.0→8.5%", "$101.0M\n$337", "Eagle Cliff", "Mesa West"),
+    CM("Watergate", "Closed\nMar-26", True, "309,000", "1972/02", "93→20%", "N/A", "N/A", "$52.5M\n$170", "JetSet", "Elme"),
+    CM("1400 K", "Closed\nOct-25", True, "200,000", "1982/24", "65%", "5.3 Yr", "9.5%", "$35.5M\n$180", "Taicoon", "Brookfield"),
+    CM("2033 K", "Closed\nJul-25", True, "128,767", "1975/19", "38%", "–", "N/A", "$20.3M\n$170", "In-Rel", "ARA"),
+    CM("1325 G", "Closed\nJun-25", True, "305,259", "1969/04", "62%", "2.5 Yr", "TBD", "$25.0M\n$82", "Farmview", "US Bank"),
+    CM("1750 H", "Closed\nJun-25", True, "124,000", "2002", "55%", "3.8 Yr", "TBD", "$28.8M\n$232", "Douglas", "State Farm"),
+    CM("300 M", "Closed\nJun-25", True, "282,354", "2001", "50%", "3.8 Yr", "11.5%", "$28.0M\n$100", "Confid.", "Potomac"),
+    CM("2101 L", "Closed\nDec-24", True, "375,000", "1975/07", "75%", "8.0 Yr", "10.0%", "$110.0M\n$293", "ELV", "JBGS /\nNW Mutual"),
+    CM("1250 H", "Closed\nNov-24", True, "196,490", "1992", "53%", "7.4 Yr", "10.7%", "$27.5M\n$137", "Banyan", "Equity CW"),
+    CM("2001 L", "Closed\nOct-24", True, "172,135", "1986/14", "66%", "6.3 Yr", "10.7%", "$30.55M\n$180", "Melrose", "AEW /\nSwiss RE"),
+    CM("1899 L", "Closed\nMar-24", True, "150,502", "1978/22", "56%", "4.5 Yr", "9.5%", "$26.65M\n$180", "Taicoon", "BlackRock"),
 ]
-comp_table(s, Inches(0.42), Inches(1.68), Inches(9.16), Inches(3.30),
-           cols, [1.35, 1.05, 0.68, 0.78, 0.78, 0.6, 0.9, 1.18, 1.05, 0.79], rows, fontsize=7.0)
-txt(s, Inches(0.42), Inches(5.08), Inches(9), Inches(0.25),
-    [[Rn("Commodity pricing: $100–$200 PSF, ~58% average occupancy, ~10.0% in-place cap. " + SRC, 8, GREY_TXT, False, True)]])
+eastdil_matrix(s, 1.45, 5.12, commodity,
+               ["Size (SF)", "Year Built", "% Leased", "WALT", "Cap Rate", "Price (PSF)", "Buyer", "Seller"],
+               label_w=0.92, data_fs=5.6, name_fs=6.0, name_h=0.5, photo_h=0.5, status_h=0.34)
 
 # ============================================================ 13 – SELECT ES OFFICE FINANCINGS (BOV p16)
 s = slide(); bg(s, WHITE)
-content_header(s, "Select ES Office Financings", 13)
-gold_band(s, Inches(1.02), "WASHINGTON, DC METRO — DEBT DATA POINTS", "Recent Eastdil Secured Office Financings")
-cols = ["Property", "Sponsor", "Status", "SF", "% Leased", "WALT", "Loan Amt", "Loan PSF", "LTV / LTC", "In-Place DY", "Pricing"]
-rows = [
-    ("2001 M", "Stream Realty", "Closed Jan-26", "283,190", "93%", "9.0 Yr", "$118.5M", "$418", "69% LTC", "13.3%", "S+2.90%"),
-    ("1401 New York", "Carr / Barings", "Closed Jan-26", "201,976", "94%→81%", "4.7 Yr", "$73.4M", "$344", "68% LTC", "13.9%", "S+4.05%"),
-    ("Three-Asset Portfolio", "Carr Properties", "Closed Jul-25", "791,098", "89%", "9.3 Yr", "$278.3M", "$352", "60% LTV", "12.0%", "S+3.25%"),
-    ("901 K", "Shorenstein", "Closed Jun-25", "220,000", "68%", "6.3 Yr", "$76.1M", "$346", "67.5% LTC", "12.6%", "S+4.15%"),
-    ("Boro Tower", "Rockefeller / TMG", "Closed May-25", "436,795", "98%→88%", "7.3 Yr", "$175.0M", "$401", "70% LTV", "11.5%→10.0%", "S+4.75%"),
-    ("Market Square", "Elliott / MC / PRP", "Under Contract", "694,436", "90%", "5.3 Yr", "$340.0M", "$490", "70% LTV", "12.0%", "S+~2.75%"),
-    ("799 9th", "Jemal Equities", "Awarding", "203,329", "82%", "6.5 Yr", "$83.1M", "$409", "75% LTC", "13.4%", "S+~4.25%"),
-    ("Reston Metro Plaza", "Comstock", "Marketing", "769,830", "99%", "8.3 Yr", "$299.1M", "$389", "75% LTV", "9.6%", "TBD"),
+eastdil_header(s, "Select ES Office Financings", 13)
+def FN(name, sponsor, status, closed, sf, walt, lsd, loan, loanpsf, ltv, dy, lender, pricing):
+    return {"name": name, "status": status, "closed": closed,
+            "vals": [sponsor, sf, walt, lsd, loan, loanpsf, ltv, dy, lender, pricing]}
+fins = [
+    FN("Reston Metro\nPlaza", "Comstock", "Marketing", False, "769,830", "8.3 Yr", "99%", "$299.1M", "$389", "75% LTV", "9.6%", "TBD", "TBD"),
+    FN("799 9th\nSt, NW", "Jemal Equities", "Awarding", False, "203,329", "6.5 Yr", "82%", "$83.1M", "$409", "75% LTC", "13.4%", "Debt Fund", "SOFR +\n~4.25%"),
+    FN("Market\nSquare", "Elliott / MC /\nPRP", "Under\nContract", False, "694,436", "5.3 Yr", "90%", "$340.0M", "$490", "70% LTV", "12.0%", "SASB", "SOFR +\n~2.75%"),
+    FN("2001 M", "Stream Realty", "Closed\nJan-26", True, "283,190", "9.0 Yr", "93%", "$118.5M", "$418", "69% LTC\n(68%I/75%FF)", "13.3%", "Debt Fund", "SOFR +\n2.90%"),
+    FN("1401\nNew York", "Carr / Barings", "Closed\nJan-26", True, "201,976", "4.7 Yr", "94→81%", "$73.4M", "$344", "68% LTC\n(65%I/84%FF)", "13.9%", "Debt Fund", "SOFR +\n4.05%"),
+    FN("Three-Asset\nPortfolio", "Carr Properties", "Closed\nJul-25", True, "791,098", "9.3 Yr", "89%", "$278.3M", "$352", "60% LTV", "12.0%", "Bank\nBalance Sheet", "SOFR +\n3.25%"),
+    FN("901 K St", "Shorenstein", "Closed\nJun-25", True, "220,000", "6.3 Yr", "68%", "$76.1M", "$346", "67.5% LTC\n(60%I/100%FF)", "12.6%", "Debt Fund", "SOFR +\n4.15%"),
+    FN("Boro Tower", "Rockefeller /\nTMG", "Closed\nMay-25", True, "436,795", "7.3 Yr", "98→88%", "$175.0M", "$401", "70% LTV", "11.5→10.0%", "Debt Fund", "SOFR + 4.75%\n(+4.40% b/d)"),
 ]
-comp_table(s, Inches(0.42), Inches(1.75), Inches(9.16), Inches(2.7),
-           cols, [1.35, 1.2, 1.02, 0.72, 0.72, 0.55, 0.78, 0.62, 0.82, 0.82, 0.56], rows, fontsize=7.4)
-txt(s, Inches(0.42), Inches(4.75), Inches(9), Inches(0.4),
-    [[Rn("Pricing shown as spread over 1-mo SOFR (S). " + SRC, 8, GREY_TXT, False, True)]])
+eastdil_matrix(s, 1.45, 5.12, fins,
+               ["Sponsor", "SF", "WALT", "% Leased", "Loan Amount", "Loan PSF", "LTV / LTC", "In-Place DY", "Lender", "Pricing"],
+               label_w=1.28, data_fs=6.2, name_fs=6.8, name_h=0.44, photo_h=0.46, status_h=0.30)
 
 # ============================================================ 14 – CONTACT
 s = slide(); bg(s, BLACK)
@@ -478,14 +530,15 @@ txt(s, Inches(0.42), Inches(1.55), Inches(3), Inches(0.8),
     [[Rn("Contact", 40, GOLD, False, False, TITLE_FONT)]])
 contacts = [
     ("Matt Nicholson", "Executive Vice President", "mnicholson@lpc.com"),
+    ("Jake Guttman", "Director", "jguttman@lpc.com"),
     ("Jackson Coviello", "Assistant Vice President", "jcoviello@lpc.com"),
     ("Jared Hicks", "Analyst", "jahicks@lpc.com"),
 ]
 for i, (nm, title, email) in enumerate(contacts):
-    x = Inches(0.62 + i*3.0)
-    txt(s, x, Inches(3.0), Inches(2.9), Inches(0.4), [[Rn(nm, 19, WHITE, False, False, TITLE_FONT)]])
-    txt(s, x, Inches(3.4), Inches(2.9), Inches(0.3), [[Rn(title, 12, WHITE)]])
-    txt(s, x, Inches(3.7), Inches(2.9), Inches(0.3), [[Rn(email, 12, WHITE)]])
+    x = Inches(0.5 + i*2.35)
+    txt(s, x, Inches(3.0), Inches(2.3), Inches(0.4), [[Rn(nm, 17, WHITE, False, False, TITLE_FONT)]])
+    txt(s, x, Inches(3.42), Inches(2.3), Inches(0.3), [[Rn(title, 11, WHITE)]])
+    txt(s, x, Inches(3.70), Inches(2.3), Inches(0.3), [[Rn(email, 11, WHITE)]])
 txt(s, Inches(0.62), Inches(4.55), Inches(6), Inches(1.0),
     [[Rn("Lincoln Property Company", 10, WHITE)], [Rn("101 Constitution Ave. NW, Suite 325 East", 10, WHITE)],
      [Rn("Washington, DC 20001", 10, WHITE)], [Rn("www.lpc.com", 10, WHITE)]], space_after=3)

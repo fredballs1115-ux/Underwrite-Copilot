@@ -32,10 +32,17 @@ financing data-point pages — for the Oaktree/LPC recapitalization.
 8. **Recent Leasing Activity** — trailing-24-month executed leasing (10 deals + avg). *(BOV p23)*
 9. **Market divider.**
 10. **Washington, DC Metro Office Market** — "The Good / What's Challenging." *(BOV p5)*
-11. **Recent Data Points — Class-A** — 11 recent/active DC Class-A sale comps. *(BOV p14)*
-12. **Recent Data Points — Commodity** — 15 DC commodity sale comps. *(BOV p15)*
-13. **Select ES Office Financings** — 8 recent Eastdil office financings. *(BOV p16)*
-14. **Contact** — LPC deal team.
+11. **Recent Data Points — Class-A** — 11 recent/active DC Class-A sale comps, rebuilt in
+    Eastdil's exact matrix layout (properties as columns; navy name headers; green "Closed" /
+    teal pipeline status band; light-blue row labels; per-column photo placeholder). *(BOV p14)*
+12. **Recent Data Points — Commodity** — 15 DC commodity sale comps, same Eastdil matrix. *(BOV p15)*
+13. **Select ES Office Financings** — 8 recent Eastdil office financings, same Eastdil matrix. *(BOV p16)*
+14. **Contact** — LPC deal team: Matt Nicholson (EVP), Jake Guttman (Director),
+    Jackson Coviello (AVP), Jared Hicks (Analyst).
+
+## Photos to drop in
+Each comp column on slides 11–13 has a labeled "[ photo ]" cell — drop the building photos there.
+The cover and Property Overview also have photo placeholders.
 
 ## What changed vs. the first draft (per feedback)
 - Removed the invented "Opportunity / business-plan" page; replaced with Eastdil's own
