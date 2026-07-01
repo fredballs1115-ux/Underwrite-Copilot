@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { createDeal } from "./actions";
+import { createDeal, createSampleDeal } from "./actions";
 
 export type DealCard = {
   id: string;
@@ -259,17 +259,29 @@ export function Pipeline({
       )}
 
       {deals.length === 0 ? (
-        <div className="rounded-xl border border-line bg-surface p-8 text-center shadow-sm">
-          <p className="text-sm text-muted">
-            No deals yet. Add your first OM to start your pipeline.
+        <div className="rounded-2xl border border-line bg-surface p-8 text-center shadow-card">
+          <p className="text-sm font-medium">Start your pipeline</p>
+          <p className="mx-auto mt-1 max-w-md text-sm text-muted">
+            Upload an offering memorandum to screen your first deal — or explore
+            a fully-worked sample to see the whole thing first.
           </p>
-          <button
-            type="button"
-            onClick={() => setShowForm(true)}
-            className="mt-3 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
-          >
-            + New deal
-          </button>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setShowForm(true)}
+              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+            >
+              + New deal
+            </button>
+            <form action={createSampleDeal}>
+              <button
+                type="submit"
+                className="rounded-lg border border-line px-4 py-2 text-sm font-medium transition-colors hover:bg-faint"
+              >
+                Try a sample deal
+              </button>
+            </form>
+          </div>
         </div>
       ) : filtered.length === 0 ? (
         <p className="text-sm text-muted">
@@ -498,6 +510,14 @@ function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
           className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
         >
           Create &amp; analyze
+        </button>
+      </form>
+      <form action={createSampleDeal} className="mt-3 border-t border-line pt-3">
+        <button
+          type="submit"
+          className="text-sm font-medium text-brand transition-colors hover:text-brand-strong"
+        >
+          Or explore a sample deal →
         </button>
       </form>
     </section>

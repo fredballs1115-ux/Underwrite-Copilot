@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { uploadOmPdf, removeStorageFiles } from "@/lib/storage";
 import { getBilling } from "@/lib/billing";
+import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 
 // Keep PDFs comfortably under Claude's ~32MB per-request limit (base64 inflates
@@ -68,6 +69,40 @@ export async function createDeal(formData: FormData) {
   after(() => runAnalysis(dealId));
 
   redirect(`/deals/${dealId}`);
+}
+
+/**
+ * Seed a fully-populated sample deal so a new user can explore every tab, the
+ * model, and the verdict without an OM. No AI calls, no file — just the demo
+ * dataset. Doesn't count against the free cap (it's a generous first-run demo).
+ */
+export async function createSampleDeal() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: deal, error } = await supabase
+    .from("deals")
+    .insert({
+      user_id: user.id,
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      reconciliation: SAMPLE_DEAL.reconciliation,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      model: SAMPLE_DEAL.model,
+    })
+    .select("id")
+    .single();
+  if (error || !deal) redirect("/deals?error=save");
+
+  revalidatePath("/deals");
+  redirect(`/deals/${deal.id}`);
 }
 
 /** Rename a deal. RLS scopes the update to the caller's own deal. */
