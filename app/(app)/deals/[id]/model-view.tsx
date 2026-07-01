@@ -8,7 +8,7 @@ import type {
   UnderwritingModel,
   ReconciledMetric,
 } from "@/lib/model/types";
-import type { CashFlowYear } from "@/lib/model/compute";
+import { computeModel, type CashFlowYear } from "@/lib/model/compute";
 import {
   addDealDocument,
   removeDealDocument,
@@ -47,6 +47,7 @@ export function ModelView({
         <>
           <FirstDraftBanner />
           <ReturnsHeadline model={model} />
+          <Sensitivity model={model} />
           <Conflicts conflicts={model.conflicts} />
           <Assumptions metrics={model.metrics} />
           <CashFlow cashFlow={model.cashFlow} />
@@ -190,6 +191,100 @@ function ReturnsHeadline({ model }: { model: UnderwritingModel }) {
         <Stat label="Equity" value={usd(r.equity)} />
         <Stat label="Year-1 NOI" value={usd(r.year1Noi)} />
         <Stat label="Exit value" value={usd(r.exitValue)} />
+      </div>
+    </section>
+  );
+}
+
+const PRICE_FACTORS = [0.9, 0.95, 1, 1.05, 1.1];
+const EXIT_DELTAS = [-0.5, -0.25, 0, 0.25, 0.5]; // percentage points
+
+function compactUsd(n: number): string {
+  if (n >= 1_000_000) return "$" + (n / 1_000_000).toFixed(1) + "M";
+  if (n >= 1_000) return "$" + Math.round(n / 1_000) + "k";
+  return "$" + Math.round(n).toLocaleString();
+}
+
+function irrTone(v: number | null): string {
+  if (v == null) return "text-muted";
+  if (v >= 15) return "text-pass";
+  if (v >= 8) return "text-ink";
+  if (v >= 0) return "text-caution";
+  return "text-kill";
+}
+
+// Live exit-cap × price IRR grid — re-runs the deterministic cash-flow engine
+// at each grid point (same math the Excel sensitivity table uses).
+function Sensitivity({ model }: { model: UnderwritingModel }) {
+  const base = model.inputs;
+  if (!base?.exitCapPct || !base?.purchasePrice) return null;
+
+  const rows = EXIT_DELTAS.map((ed) => {
+    const exit = base.exitCapPct + ed;
+    const cells = PRICE_FACTORS.map((pf) => {
+      const inp = {
+        ...base,
+        exitCapPct: exit,
+        purchasePrice: base.purchasePrice * pf,
+        loan: { ...base.loan },
+      };
+      const irr = computeModel(inp).returns.leveredIrrPct;
+      return { irr, isBase: ed === 0 && pf === 1 };
+    });
+    return { exit, cells };
+  });
+
+  return (
+    <section>
+      <h2 className="text-sm font-semibold tracking-tight">
+        Return sensitivity{" "}
+        <span className="font-normal text-muted">· levered IRR</span>
+      </h2>
+      <p className="mt-1 text-sm leading-relaxed text-muted">
+        How the IRR moves across exit cap and price. Your base case is
+        highlighted; the rest re-run the same math.
+      </p>
+      <div className="mt-3 overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+        <table className="w-full min-w-[34rem] text-sm">
+          <thead>
+            <tr className="border-b border-line text-right text-[10px] uppercase tracking-wide text-muted">
+              <th className="px-3 py-2.5 text-left font-medium">
+                Exit cap ↓ / price →
+              </th>
+              {PRICE_FACTORS.map((pf) => (
+                <th
+                  key={pf}
+                  className={`px-3 py-2.5 font-mono font-medium tabular-nums ${
+                    pf === 1 ? "text-ink" : ""
+                  }`}
+                >
+                  {compactUsd(base.purchasePrice * pf)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.exit} className="border-b border-line last:border-0">
+                <td className="px-3 py-2.5 font-mono text-xs font-medium tabular-nums">
+                  {r.exit.toFixed(2)}%
+                </td>
+                {r.cells.map((c, i) => (
+                  <td
+                    key={i}
+                    className={`px-3 py-2.5 text-right font-mono tabular-nums ${
+                      c.isBase
+                        ? "bg-brand/10 font-semibold text-brand"
+                        : irrTone(c.irr)
+                    }`}
+                  >
+                    {c.irr == null ? "—" : c.irr.toFixed(1) + "%"}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </section>
   );
