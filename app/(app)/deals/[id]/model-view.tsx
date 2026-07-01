@@ -419,6 +419,7 @@ function CashFlow({ cashFlow }: { cashFlow: CashFlowYear[] }) {
     ["Effective gross income", (c) => c.egi],
     ["Operating expenses", (c) => -c.opex],
     ["Net operating income", (c) => c.noi],
+    ["Capital reserve", (c) => -(c.capexReserve ?? 0)],
     ["Debt service", (c) => -c.debtService],
     ["Levered cash flow", (c) => c.cashFlow],
   ];

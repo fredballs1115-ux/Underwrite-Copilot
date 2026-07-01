@@ -263,6 +263,7 @@ function buildCashFlow(ws: WS, model: UnderwritingModel) {
     { label: "Effective gross income", pick: (c) => c.egi, bold: true },
     { label: "Operating expenses", pick: (c) => -c.opex, neg: true },
     { label: "Net operating income", pick: (c) => c.noi, bold: true },
+    { label: "Capital reserve", pick: (c) => -(c.capexReserve ?? 0), neg: true },
     { label: "Debt service", pick: (c) => -c.debtService, neg: true },
     { label: "Levered cash flow", pick: (c) => c.cashFlow, bold: true },
   ];

@@ -23,6 +23,7 @@ export interface ModelInputs {
   vacancyPct: number;
   otherIncomeAnnual: number;
   year1Opex: number; // annual operating expenses (total)
+  capexReserveAnnual: number; // annual capital reserve, deducted below NOI
   rentGrowthPct: number;
   expenseGrowthPct: number;
   otherIncomeGrowthPct: number;
@@ -40,8 +41,9 @@ export interface CashFlowYear {
   egi: number;
   opex: number;
   noi: number;
+  capexReserve: number; // capital reserve, below NOI
   debtService: number;
-  cashFlow: number; // levered, before sale
+  cashFlow: number; // levered, after reserve, before sale
 }
 
 export interface ModelReturns {
@@ -164,6 +166,11 @@ export function computeModel(inp: ModelInputs): {
     const egi = gpr - vacancyLoss + otherIncome;
     const opex = grow(inp.year1Opex, inp.expenseGrowthPct, gi);
     const noi = egi - opex;
+    const capexReserve = grow(
+      inp.capexReserveAnnual ?? 0,
+      inp.expenseGrowthPct,
+      gi,
+    );
     const inIo = y <= inp.loan.ioYears;
     const debtService = inIo
       ? loanAmount * (inp.loan.ratePct / 100)
@@ -176,8 +183,9 @@ export function computeModel(inp: ModelInputs): {
       egi,
       opex,
       noi,
+      capexReserve,
       debtService,
-      cashFlow: noi - debtService,
+      cashFlow: noi - capexReserve - debtService,
     });
   }
 
@@ -202,7 +210,9 @@ export function computeModel(inp: ModelInputs): {
   const unleveredFlows = [
     -inp.purchasePrice,
     ...cashFlow.map((c, i) =>
-      i === cashFlow.length - 1 ? c.noi + (exitValue - sellingCosts) : c.noi,
+      i === cashFlow.length - 1
+        ? c.noi - c.capexReserve + (exitValue - sellingCosts)
+        : c.noi - c.capexReserve,
     ),
   ];
 

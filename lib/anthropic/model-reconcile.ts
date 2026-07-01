@@ -32,6 +32,7 @@ const InputsSchema = z.object({
   vacancyPct: z.number(),
   otherIncomeAnnual: z.number(),
   year1Opex: z.number(),
+  capexReserveAnnual: z.number(),
   rentGrowthPct: z.number(),
   expenseGrowthPct: z.number(),
   otherIncomeGrowthPct: z.number(),
