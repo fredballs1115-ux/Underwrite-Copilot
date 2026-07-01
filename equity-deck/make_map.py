@@ -21,8 +21,8 @@ WATER   = "#CFDDE4"   # soft dusty blue
 WATERED = "#BFD1DA"
 ST_FILL = "#FFFFFF"   # street fill (hairline white)
 ST_CASE = "#E4DED2"   # street casing
-AVE_FILL= "#F6EFDC"   # warm avenue
-AVE_CASE= "#E7DBBE"
+AVE_FILL= "#F8F2E4"   # warm avenue (lightened so the dashed walk path reads over it)
+AVE_CASE= "#EBE1C9"
 GOLD    = "#C8A24B"   # refined muted gold
 GOLD_D  = "#A9812E"   # deep gold line
 GOLD_HI = "#E4C877"
@@ -182,6 +182,11 @@ def hood(x, y, t, size=17, rot=0, anchor="middle"):
                family="'Helvetica Neue', Arial, sans-serif")
 
 s.append(hood(70, 300, "GEORGETOWN", 17, rot=-90))
+# Rock Creek Park: small muted label inside the green wedge (upper-left), rotated
+# vertically to fit the narrow band, in a sage-grey so it reads as parkland.
+s.append(txt(30, 210, "ROCK  CREEK  PARK", size=10, fill="#8C9A7C", weight="600",
+             ls="1.6", anchor="middle", rot=-90, hw=2.6,
+             family="'Helvetica Neue', Arial, sans-serif"))
 s.append(hood(214, 668, "POTOMAC  RIVER", 12, rot=-33, anchor="middle"))
 s.append(hood(946, 120, "DUPONT  CIRCLE", 15))
 # CBD east-edge label: bump size/weight to match GEORGETOWN and pull inboard off the
@@ -216,37 +221,61 @@ s.append(txt(pax, pay - 11, "Pennsylvania Ave", size=11.5, fill=INK_SOFT, weight
              ls="0.4", rot=ang_pa, family="'Georgia', serif", hw=2.8))
 
 # ============================ HOTELS (M St, one block south) =====================
+# Gold dots stay on M St (their true location); the caption is DOCKED along the
+# bottom edge (right of the legend card) in clear space so it never covers a dot
+# or the map fabric.
 hx = [452, 512, 572, 632]
 hnames = ["Ritz-Carlton", "Park Hyatt", "Fairmont", "Westin"]
 for x in hx:
     s.append(f'<circle cx="{x}" cy="490" r="4.4" fill="{GOLD}" stroke="#FFFFFF" stroke-width="1.4"/>')
-# refined caption plate under M St, centered on the four dots
-cap_cx = sum(hx) / len(hx)
-plate_w = 372
-s.append(f'<rect x="{cap_cx-plate_w/2:.0f}" y="512" width="{plate_w}" height="26" rx="6" '
-         f'fill="#FFFFFF" fill-opacity="0.88" stroke="{ST_CASE}" stroke-width="1"/>')
-s.append(f'<text x="{cap_cx-plate_w/2+14:.0f}" y="529" font-size="11.5" '
+# Docked caption plate: same height/y as the legend card, sitting in the clear
+# band below K St, to the right of the legend.
+HCAP_X = 372
+HCAP_Y = 752
+HCAP_W = 342
+HCAP_H = 30
+s.append(f'<g filter="url(#soft)"><rect x="{HCAP_X}" y="{HCAP_Y}" width="{HCAP_W}" height="{HCAP_H}" rx="9" '
+         f'fill="#FFFFFF" fill-opacity="0.94" stroke="{ST_CASE}" stroke-width="1"/></g>')
+# small gold dot glyph at the left of the plate to tie it to the map dots
+s.append(f'<circle cx="{HCAP_X+18}" cy="{HCAP_Y+HCAP_H/2:.0f}" r="4.4" fill="{GOLD}" '
+         f'stroke="#FFFFFF" stroke-width="1.3"/>')
+s.append(f'<text x="{HCAP_X+32}" y="{HCAP_Y+HCAP_H/2+4:.0f}" font-size="11.5" '
          f'font-family="\'Georgia\', serif" letter-spacing="0.3">'
          f'<tspan fill="{GOLD_D}" font-weight="700" letter-spacing="1">LUXURY HOTELS&#160;&#160;</tspan>'
          f'<tspan fill="{INK_SOFT}">Ritz-Carlton · Park Hyatt · Fairmont · Westin</tspan></text>')
 
 # ============================ WALK ROUTES =======================================
-# Legible dot-dash walk lines from the subject block to each Metro so the
-# walkability story reads at slide scale (previously faint cream avenue ribbons).
-WALK   = "#7C7161"    # warm dark taupe, reads clearly on the ivory basemap
-def walk_route(pts):
-    d = "M" + " L".join(f"{x:.0f},{y:.0f}" for x, y in pts)
-    # soft light casing under the dash so it separates from the grid, then dashes
-    return (f'<path d="{d}" fill="none" stroke="#FFFFFF" stroke-width="6.5" '
-            f'stroke-opacity="0.55" stroke-linecap="round" stroke-linejoin="round"/>'
-            f'<path d="{d}" fill="none" stroke="{WALK}" stroke-width="2.6" '
+# Legible dashed walk lines from the subject block to each Metro. Styled a deep
+# charcoal-ink dash on a bright white casing so the PATH is unmistakably distinct
+# from the cream New Hampshire Ave ROAD it runs beside (see NH_SHIFT offset below).
+WALK   = "#4A443B"    # deep charcoal-taupe, clearly reads as a route (not a road)
+def walk_route(pts, smooth=False):
+    if smooth and len(pts) >= 3:
+        # Catmull-Rom -> cubic Bézier for a gently flowing (non-kinked) path
+        d = f"M{pts[0][0]:.0f},{pts[0][1]:.0f}"
+        P = [pts[0]] + list(pts) + [pts[-1]]
+        for i in range(1, len(P) - 2):
+            p0, p1, p2, p3 = P[i-1], P[i], P[i+1], P[i+2]
+            c1x = p1[0] + (p2[0] - p0[0]) / 6.0
+            c1y = p1[1] + (p2[1] - p0[1]) / 6.0
+            c2x = p2[0] - (p3[0] - p1[0]) / 6.0
+            c2y = p2[1] - (p3[1] - p1[1]) / 6.0
+            d += f" C{c1x:.1f},{c1y:.1f} {c2x:.1f},{c2y:.1f} {p2[0]:.0f},{p2[1]:.0f}"
+    else:
+        d = "M" + " L".join(f"{x:.0f},{y:.0f}" for x, y in pts)
+    # bright white casing under the dash so it separates cleanly from the grid AND
+    # from the avenue, then a bold charcoal dash on top
+    return (f'<path d="{d}" fill="none" stroke="#FFFFFF" stroke-width="7.5" '
+            f'stroke-opacity="0.85" stroke-linecap="round" stroke-linejoin="round"/>'
+            f'<path d="{d}" fill="none" stroke="{WALK}" stroke-width="3.0" '
             f'stroke-linecap="round" stroke-linejoin="round" '
-            f'stroke-dasharray="1.5 7"/>')
-# to Foggy Bottom–GWU (south): down toward the roundel
-s.append(walk_route([(476, 490), (528, 560), (588, 634)]))
-# to Dupont Circle (NE): step east off the block, then climb diagonally to the
-# station (reads as a route, clear of the WEST END label and the grid lines).
-s.append(walk_route([(536, 432), (700, 424), (860, 350), (960, 258)]))
+            f'stroke-dasharray="0.5 8"/>')
+# to Foggy Bottom–GWU (south): smooth flowing curve down toward the roundel
+s.append(walk_route([(470, 496), (512, 556), (556, 608), (588, 636)], smooth=True))
+# to Dupont Circle (NE): step east off the block, then climb toward the station.
+# Offset the mid segment NORTH of New Hampshire Ave so the dashed PATH sits clearly
+# beside (not on top of) the cream avenue diagonal.
+s.append(walk_route([(536, 428), (700, 400), (838, 318), (958, 254)], smooth=True))
 
 # ============================ METRO ROUNDELS ====================================
 def metro(cx, cy, bars):
@@ -340,19 +369,21 @@ s.append(f'<circle cx="{LEG_X+228}" cy="{lgy-5}" r="4.6" fill="{GOLD}" stroke="#
 s.append(txt(LEG_X+240, lgy+1, "Hotel", size=11.5, fill=INK, weight="600", ls="0.2",
              anchor="start", halo=False, family="'Helvetica Neue', Arial, sans-serif"))
 
-# Row 2: graduated scale bar (0 – 1/8 – 1/4 mile)
-sby = LEG_Y + 42
+# Row 2: clean scale bar — single hairline bar with end ticks, centered "¼ mile"
+sby = LEG_Y + 40
 sbx = LEG_X + 18
-seg = 44                                  # px per 1/8-mile segment
-s.append(f'<rect x="{sbx}" y="{sby-4}" width="{seg}" height="7" fill="{INK}" stroke="{INK}" stroke-width="0.8"/>'
-         f'<rect x="{sbx+seg}" y="{sby-4}" width="{seg}" height="7" fill="#FFFFFF" stroke="{INK}" stroke-width="0.8"/>')
-for i, lab in enumerate(["0", "⅛", "¼"]):
-    tx = sbx + i * seg
-    s.append(f'<line x1="{tx}" y1="{sby-6}" x2="{tx}" y2="{sby+4}" stroke="{INK}" stroke-width="1"/>')
-    s.append(txt(tx, sby+16, lab, size=10, fill=INK_SOFT, weight="500", ls="0",
-                 anchor="middle", halo=False, family="'Georgia', serif"))
-s.append(txt(sbx + 2*seg + 24, sby+3, "mile", size=10.5, fill=INK_SOFT, weight="400", ls="0.5",
-             anchor="start", halo=False, family="'Georgia', serif"))
+sbw = 88                                   # bar length = ¼ mile
+# main bar
+s.append(f'<line x1="{sbx}" y1="{sby}" x2="{sbx+sbw}" y2="{sby}" stroke="{INK}" '
+         f'stroke-width="2.2" stroke-linecap="butt"/>')
+# end ticks
+s.append(f'<line x1="{sbx}" y1="{sby-4}" x2="{sbx}" y2="{sby+4}" stroke="{INK}" stroke-width="2.2"/>'
+         f'<line x1="{sbx+sbw}" y1="{sby-4}" x2="{sbx+sbw}" y2="{sby+4}" stroke="{INK}" stroke-width="2.2"/>')
+# "0" at left end, "¼ mile" at right end
+s.append(txt(sbx, sby+16, "0", size=10, fill=INK_SOFT, weight="500", ls="0",
+             anchor="middle", halo=False, family="'Georgia', serif"))
+s.append(txt(sbx+sbw, sby+16, "¼ mile", size=10.5, fill=INK_SOFT, weight="400", ls="0.4",
+             anchor="middle", halo=False, family="'Georgia', serif"))
 
 # ---- Thin editorial inner frame -------------------------------------------------
 s.append(f'<rect x="14" y="14" width="{VBW-28}" height="{VBH-28}" fill="none" '
