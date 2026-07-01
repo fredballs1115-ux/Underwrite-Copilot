@@ -56,6 +56,7 @@ export function Pipeline({
   notice?: string | null;
   billing: BillingInfo | null;
 }) {
+  const [query, setQuery] = useState("");
   const [verdict, setVerdict] = useState("all");
   const [asset, setAsset] = useState("all");
   const [market, setMarket] = useState("all");
@@ -87,7 +88,9 @@ export function Pipeline({
   );
 
   const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
     const list = deals.filter((d) => {
+      if (q && !`${d.name} ${d.market}`.toLowerCase().includes(q)) return false;
       if (verdict !== "all") {
         if (verdict === "screening") {
           if (d.verdict) return false;
@@ -107,15 +110,19 @@ export function Pipeline({
       }
       return b.createdAt.localeCompare(a.createdAt); // newest
     });
-  }, [deals, verdict, asset, market, sort]);
+  }, [deals, query, verdict, asset, market, sort]);
 
   function clearFilters() {
+    setQuery("");
     setVerdict("all");
     setAsset("all");
     setMarket("all");
   }
   const filtersActive =
-    verdict !== "all" || asset !== "all" || market !== "all";
+    query.trim() !== "" ||
+    verdict !== "all" ||
+    asset !== "all" ||
+    market !== "all";
 
   return (
     <div className="space-y-6">
@@ -213,6 +220,29 @@ export function Pipeline({
 
       {deals.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
+              aria-hidden
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search deals…"
+              aria-label="Search deals"
+              className="w-48 rounded-lg border border-line bg-surface py-1.5 pl-9 pr-3 text-sm shadow-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
+            />
+          </div>
           <FilterSelect
             value={verdict}
             onChange={setVerdict}
