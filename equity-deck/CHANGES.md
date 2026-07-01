@@ -37,11 +37,11 @@ financing data-point pages — for the Oaktree/LPC recapitalization.
     and $3.0M go-forward capital plan. *(BOV p22–23)*
 12. **Market divider.**
 13. **Washington, DC Metro Office Market** — "The Good / What's Challenging." *(BOV p5)*
-14. **Recent Data Points — Class-A** — 11 recent/active DC Class-A sale comps, rebuilt in
-    Eastdil's exact matrix layout (properties as columns; navy name headers; green "Closed" /
-    teal pipeline status band; light-blue row labels; per-column photo placeholder). *(BOV p14)*
-15. **Recent Data Points — Commodity** — 15 DC commodity sale comps, same Eastdil matrix. *(BOV p15)*
-16. **Select ES Office Financings** — 8 recent Eastdil office financings, same Eastdil matrix. *(BOV p16)*
+14. **Recent Data Points — Class-A** — 11 recent/active DC Class-A sale comps, in Eastdil's
+    matrix layout re-skinned to the Lincoln theme (properties as columns; black name headers;
+    gold "Closed" / gray pipeline status bands; pale-gold row labels; per-column photo placeholder). *(BOV p14)*
+15. **Recent Data Points — Commodity** — 15 DC commodity sale comps, same Lincoln-themed matrix. *(BOV p15)*
+16. **Select ES Office Financings** — 8 recent Eastdil office financings, same Lincoln-themed matrix. *(BOV p16)*
 17. **Contact** — LPC deal team: Matt Nicholson (EVP), Jake Guttman (Director),
     Jackson Coviello (AVP), Jared Hicks (Analyst).
 

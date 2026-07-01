@@ -33,11 +33,9 @@ PURPLE    = RGBColor(0xB0, 0xA4, 0xC6)
 PURPLE_LT = RGBColor(0xBE, 0xB2, 0xD2)
 PANEL     = RGBColor(0x1A, 0x1A, 0x1A)
 PH_GREY   = RGBColor(0xD9, 0xD9, 0xD9)
-# Eastdil data-point palette (for the comp matrices)
-NAVY      = RGBColor(0x1F, 0x38, 0x64)
-TEAL      = RGBColor(0x2C, 0xA9, 0xC7)
-GREEN     = RGBColor(0x57, 0xA6, 0x39)
-LTBLUE    = RGBColor(0xD9, 0xE2, 0xF3)
+# Lincoln-themed comp-matrix palette (Eastdil layout, Lincoln colors)
+GOLD_LT   = RGBColor(0xFB, 0xEF, 0xCB)   # pale-gold row-label column
+GREY_MED  = RGBColor(0x8C, 0x8C, 0x8C)   # pipeline (non-closed) status band
 ALT       = RGBColor(0xF2, 0xF2, 0xF2)
 PHOTO_BG  = RGBColor(0xDD, 0xDD, 0xDD)
 
@@ -144,17 +142,6 @@ def comp_table(s, x, y, w, h, cols, widths, rows, fontsize=7.6):
                      align=PP_ALIGN.LEFT if c == 0 else PP_ALIGN.CENTER)
     return t
 
-def eastdil_header(s, subtitle, page_num):
-    """Navy title + teal subtitle, matching Eastdil's Recent Data Points pages."""
-    txt(s, Inches(6.0), Inches(0.20), Inches(3.6), Inches(0.25),
-        [[Rn("2300 N STREET, NW  |  ES OPINION OF VALUE  |  JUN-26", 7.5, GREY_TXT, True)]],
-        align=PP_ALIGN.RIGHT)
-    txt(s, Inches(0.42), Inches(0.42), Inches(9), Inches(0.55),
-        [[Rn("Washington, DC Recent Data Points", 27, NAVY, True)]])
-    txt(s, Inches(0.44), Inches(0.98), Inches(9), Inches(0.4),
-        [[Rn(subtitle, 17, TEAL, True)]])
-    footer(s, page_num)
-
 def eastdil_matrix(s, y_top, y_bot, columns, row_labels, label_w, data_fs,
                    name_fs, name_h, photo_h, status_h):
     """Eastdil-style comp matrix: properties as columns; name/photo/status bands
@@ -177,13 +164,13 @@ def eastdil_matrix(s, y_top, y_bot, columns, row_labels, label_w, data_fs,
     for r in range(3):
         set_cell(t.cell(r, 0), "", data_fs, WHITE, fill=WHITE)
     for ci, col in enumerate(columns, start=1):
-        set_cell(t.cell(0, ci), col["name"], name_fs, WHITE, bold=True, fill=NAVY, align=PP_ALIGN.CENTER)
+        set_cell(t.cell(0, ci), col["name"], name_fs, WHITE, bold=True, fill=HDR_DARK, align=PP_ALIGN.CENTER)
         set_cell(t.cell(1, ci), "[ photo ]", 6, GREY_TXT, fill=PHOTO_BG, align=PP_ALIGN.CENTER, ital=True)
-        set_cell(t.cell(2, ci), col["status"], data_fs, WHITE, bold=True,
-                 fill=GREEN if col["closed"] else TEAL, align=PP_ALIGN.CENTER)
+        set_cell(t.cell(2, ci), col["status"], data_fs, HDR_BROWN if col["closed"] else WHITE, bold=True,
+                 fill=GOLD if col["closed"] else GREY_MED, align=PP_ALIGN.CENTER)
     for ri, lab in enumerate(row_labels):
         r = 3 + ri
-        set_cell(t.cell(r, 0), lab, data_fs, NAVY, bold=True, fill=LTBLUE)
+        set_cell(t.cell(r, 0), lab, data_fs, DARK, bold=True, fill=GOLD_LT)
         for ci, col in enumerate(columns, start=1):
             fill = ALT if ri % 2 == 1 else WHITE
             set_cell(t.cell(r, ci), col["vals"][ri], data_fs, DARK, fill=fill, align=PP_ALIGN.CENTER)
@@ -563,7 +550,8 @@ txt(s, Inches(0.42), Inches(5.05), Inches(9), Inches(0.25), [[Rn(SRC, 8, GREY_TX
 
 # ============================================================ 14 – RECENT DATA POINTS: CLASS-A (BOV p14)
 s = slide(); bg(s, WHITE)
-eastdil_header(s, "Class-A", 14)
+content_header(s, "Recent Data Points", 14)
+gold_band(s, Inches(1.00), "WASHINGTON, DC — CLASS-A SALES", "Recent & Active Comparable Transactions")
 def CA(name, status, closed, sz, lsd, walt, cap, price, buyer, seller, notes):
     return {"name": name, "status": status, "closed": closed,
             "vals": [sz, lsd, walt, cap, price, buyer, seller, notes]}
@@ -580,13 +568,14 @@ classA = [
     CA("2000 K", "Closed Jul-24", True, "233,000", "88%", "7.0 Yr", "8.00%", "$140.2M\n$600 PSF", "Spear Street", "Tishman /\nDeka", "Seller\nFinancing"),
     CA("1099 New York", "Closed Mar-24", True, "181,000", "95%", "9.0 Yr", "9.25%", "$95.0M\n$525 PSF", "FarmView /\nQuadrangle", "Credit Suisse", "Market Debt\n(CMBS)"),
 ]
-eastdil_matrix(s, 1.5, 5.12, classA,
+eastdil_matrix(s, 1.72, 5.12, classA,
                ["Size (SF)", "% Leased", "WALT", "Cap Rate", "Price (PSF)", "Buyer", "Seller", "Notes"],
-               label_w=0.98, data_fs=6.2, name_fs=6.5, name_h=0.5, photo_h=0.62, status_h=0.24)
+               label_w=0.98, data_fs=6.2, name_fs=6.5, name_h=0.48, photo_h=0.56, status_h=0.24)
 
 # ============================================================ 15 – RECENT DATA POINTS: COMMODITY (BOV p15)
 s = slide(); bg(s, WHITE)
-eastdil_header(s, "Commodity", 15)
+content_header(s, "Recent Data Points", 15)
+gold_band(s, Inches(1.00), "WASHINGTON, DC — COMMODITY SALES", "Recent & Active Comparable Transactions")
 def CM(name, status, closed, sz, yr, lsd, walt, cap, price, buyer, seller):
     return {"name": name, "status": status, "closed": closed,
             "vals": [sz, yr, lsd, walt, cap, price, buyer, seller]}
@@ -607,13 +596,14 @@ commodity = [
     CM("2001 L", "Closed\nOct-24", True, "172,135", "1986/14", "66%", "6.3 Yr", "10.7%", "$30.55M\n$180", "Melrose", "AEW /\nSwiss RE"),
     CM("1899 L", "Closed\nMar-24", True, "150,502", "1978/22", "56%", "4.5 Yr", "9.5%", "$26.65M\n$180", "Taicoon", "BlackRock"),
 ]
-eastdil_matrix(s, 1.45, 5.12, commodity,
+eastdil_matrix(s, 1.72, 5.12, commodity,
                ["Size (SF)", "Year Built", "% Leased", "WALT", "Cap Rate", "Price (PSF)", "Buyer", "Seller"],
-               label_w=0.92, data_fs=5.6, name_fs=6.0, name_h=0.5, photo_h=0.5, status_h=0.34)
+               label_w=0.92, data_fs=5.6, name_fs=6.0, name_h=0.46, photo_h=0.46, status_h=0.32)
 
 # ============================================================ 16 – SELECT ES OFFICE FINANCINGS (BOV p16)
 s = slide(); bg(s, WHITE)
-eastdil_header(s, "Select ES Office Financings", 16)
+content_header(s, "Recent Data Points", 16)
+gold_band(s, Inches(1.00), "WASHINGTON, DC METRO — DEBT DATA POINTS", "Recent Eastdil Secured Office Financings")
 def FN(name, sponsor, status, closed, sf, walt, lsd, loan, loanpsf, ltv, dy, lender, pricing):
     return {"name": name, "status": status, "closed": closed,
             "vals": [sponsor, sf, walt, lsd, loan, loanpsf, ltv, dy, lender, pricing]}
@@ -627,9 +617,9 @@ fins = [
     FN("901 K St", "Shorenstein", "Closed\nJun-25", True, "220,000", "6.3 Yr", "68%", "$76.1M", "$346", "67.5% LTC\n(60%I/100%FF)", "12.6%", "Debt Fund", "SOFR +\n4.15%"),
     FN("Boro Tower", "Rockefeller /\nTMG", "Closed\nMay-25", True, "436,795", "7.3 Yr", "98→88%", "$175.0M", "$401", "70% LTV", "11.5→10.0%", "Debt Fund", "SOFR + 4.75%\n(+4.40% b/d)"),
 ]
-eastdil_matrix(s, 1.45, 5.12, fins,
+eastdil_matrix(s, 1.72, 5.12, fins,
                ["Sponsor", "SF", "WALT", "% Leased", "Loan Amount", "Loan PSF", "LTV / LTC", "In-Place DY", "Lender", "Pricing"],
-               label_w=1.28, data_fs=6.2, name_fs=6.8, name_h=0.44, photo_h=0.46, status_h=0.30)
+               label_w=1.28, data_fs=6.0, name_fs=6.6, name_h=0.40, photo_h=0.40, status_h=0.28)
 
 # ============================================================ 17 – CONTACT
 s = slide(); bg(s, BLACK)
