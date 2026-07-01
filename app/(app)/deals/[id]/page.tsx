@@ -17,6 +17,7 @@ import {
   type ExtractedMetric,
 } from "@/lib/anthropic/types";
 import { DealView } from "./deal-view";
+import { DealActions } from "./deal-actions";
 
 const VERDICT_PILL = {
   pass: { label: "Pass", cls: "bg-pass/15 text-pass" },
@@ -161,6 +162,7 @@ export default async function DealPage({
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
+            <DealActions dealId={id} dealName={deal.name} />
             {pill && (
               <span
                 className={`rounded-full px-3 py-1 text-xs font-semibold ${pill.cls}`}

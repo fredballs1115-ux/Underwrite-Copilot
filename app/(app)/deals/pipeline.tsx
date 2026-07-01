@@ -48,10 +48,12 @@ type BillingInfo = {
 export function Pipeline({
   deals,
   errorMessage,
+  notice,
   billing,
 }: {
   deals: DealCard[];
   errorMessage: string | null;
+  notice?: string | null;
   billing: BillingInfo | null;
 }) {
   const [verdict, setVerdict] = useState("all");
@@ -167,6 +169,12 @@ export function Pipeline({
           )}
         </div>
       </div>
+
+      {notice && (
+        <p className="rounded-lg bg-pass/10 px-3 py-2 text-sm text-pass">
+          {notice}
+        </p>
+      )}
 
       {compareMode && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-brand/30 bg-brand/5 px-4 py-3">

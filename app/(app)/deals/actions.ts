@@ -2,8 +2,9 @@
 
 import { after } from "next/server";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { uploadOmPdf } from "@/lib/storage";
+import { uploadOmPdf, removeStorageFiles } from "@/lib/storage";
 import { getBilling } from "@/lib/billing";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 
@@ -67,6 +68,72 @@ export async function createDeal(formData: FormData) {
   after(() => runAnalysis(dealId));
 
   redirect(`/deals/${dealId}`);
+}
+
+/** Rename a deal. RLS scopes the update to the caller's own deal. */
+export async function renameDeal(formData: FormData) {
+  const dealId = String(formData.get("dealId") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  if (!dealId || !name) redirect(`/deals/${dealId}`);
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  await supabase
+    .from("deals")
+    .update({ name: name.slice(0, 120), updated_at: new Date().toISOString() })
+    .eq("id", dealId);
+  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/deals");
+  redirect(`/deals/${dealId}`);
+}
+
+/**
+ * Delete a deal: sweep its Storage files (OM, documents, supplements), then
+ * delete the row — analysis_jobs and deal_documents cascade in the DB. RLS
+ * scopes every read/write to the caller's own deal.
+ */
+export async function deleteDeal(formData: FormData) {
+  const dealId = String(formData.get("dealId") ?? "");
+  if (!dealId) redirect("/deals");
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: deal } = await supabase
+    .from("deals")
+    .select("id, om_storage_path, supplements")
+    .eq("id", dealId)
+    .maybeSingle();
+  if (!deal) redirect("/deals");
+
+  // Collect every storage path this deal owns.
+  const paths: string[] = [];
+  if (deal.om_storage_path) paths.push(deal.om_storage_path as string);
+  const supp = (deal.supplements as Record<
+    string,
+    { files?: { path: string }[] }
+  > | null) ?? {};
+  for (const tab of Object.values(supp))
+    for (const f of tab.files ?? []) if (f.path) paths.push(f.path);
+  const { data: docs } = await supabase
+    .from("deal_documents")
+    .select("storage_path")
+    .eq("deal_id", dealId);
+  for (const d of (docs ?? []) as { storage_path: string }[])
+    if (d.storage_path) paths.push(d.storage_path);
+
+  await removeStorageFiles(paths);
+  await supabase.from("deals").delete().eq("id", dealId);
+
+  revalidatePath("/deals");
+  redirect("/deals?deleted=1");
 }
 
 /** Re-run (or first-run) the analysis for an existing deal that has an OM. */

@@ -32,10 +32,11 @@ function pickStats(metrics: ExtractedMetric[]): { label: string; value: string }
 export default async function DealsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; deleted?: string }>;
 }) {
-  const { error: errorCode } = await searchParams;
+  const { error: errorCode, deleted } = await searchParams;
   const errorMessage = errorCode ? (ERRORS[errorCode] ?? null) : null;
+  const notice = deleted ? "Deal deleted." : null;
 
   const supabase = await createSupabaseServerClient();
   const {
@@ -86,6 +87,7 @@ export default async function DealsPage({
     <Pipeline
       deals={deals}
       errorMessage={errorMessage}
+      notice={notice}
       billing={
         billing
           ? {

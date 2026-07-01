@@ -58,6 +58,14 @@ export async function removeSupplementFile(path: string): Promise<void> {
   await admin.storage.from(BUCKET).remove([path]);
 }
 
+/** Remove several files at once (best-effort — used when deleting a deal). */
+export async function removeStorageFiles(paths: string[]): Promise<void> {
+  const clean = paths.filter(Boolean);
+  if (clean.length === 0) return;
+  const admin = createSupabaseAdminClient();
+  await admin.storage.from(BUCKET).remove(clean);
+}
+
 /** A short-lived signed URL so the user can download their supplement file. */
 export async function signedSupplementUrl(path: string): Promise<string | null> {
   const admin = createSupabaseAdminClient();
