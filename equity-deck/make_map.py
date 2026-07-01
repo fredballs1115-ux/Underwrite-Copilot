@@ -116,6 +116,14 @@ g_corners = [proj(WX0-gm, WY0-gm), proj(WX1+gm, WY0-gm),
 gp = " ".join(f"{x:.1f},{y:.1f}" for x,y in g_corners)
 s.append(f'<polygon points="{gp}" fill="url(#ground)"/>')
 
+# --- NE / Dupont quadrant ground texture: a faint warm tonal wedge under the sparse
+# upper-right so it reads as landscaped ground, not flat beige. (Scattered tree-dots
+# are drawn AFTER the buildings, near the Dupont park, so none get occluded.) ---
+s.append(f'<g filter="url(#blur)">'
+         f'<ellipse cx="1050" cy="330" rx="150" ry="86" fill="{GROUND2}" opacity="0.55"/>'
+         f'<ellipse cx="880" cy="260" rx="120" ry="70" fill="{GROUND2}" opacity="0.40"/>'
+         f'<ellipse cx="960" cy="215" rx="110" ry="58" fill="{GROUND2}" opacity="0.34"/></g>')
+
 # =============================================================================
 #  ROCK CREEK PARK (west/left edge) + POTOMAC (southwest) as projected shapes
 # =============================================================================
@@ -218,7 +226,9 @@ def wcircle(cw, r, fill, ed):
     return (f'<ellipse cx="{c[0]:.1f}" cy="{c[1]:.1f}" rx="{r:.1f}" ry="{r*0.62:.1f}" '
             f'fill="{fill}" stroke="{ed}" stroke-width="2"/>')
 s.append(wcircle(WC, 26, PARK, PARK_ED))
-s.append(wcircle(DUP, 30, PARK, PARK_ED))
+# (Dupont Circle park is drawn AFTER the building pass — see DUP_PARK below — so it
+# always sits cleanly on the open ground below the metro card, never occluded.)
+DUP_PARK = (554, -262)   # projects to open ground just below the Dupont metro card
 
 # =============================================================================
 #  EXTRUDED BUILDING BLOCKS
@@ -353,6 +363,17 @@ for xi in range(len(margin_v)-1):
             continue
         parcels.extend(blocks_between(wx_a,wx_b,wy_a,wy_b))
 
+# --- NE / Dupont quadrant: a few low off-grid blocks so the upper-right doesn't
+# read as empty beige next to the dense E/SE fabric. Placed in the wedge left of &
+# below the Dupont metro card, well clear of the card and the DUPONT CIRCLE label. ---
+NE_FILL = [
+    (350, -120, 432,  -48, 60, "#E6DBC6"),
+    (280, -108, 352,  -46, 52, "#E1D2B8"),
+    (452,  -95, 528,  -28, 54, "#E8DCC5"),
+]
+for (nx0,ny0,nx1,ny1,nh,ntone) in NE_FILL:
+    parcels.append((nx0,ny0,nx1,ny1,nh,ntone,False))
+
 # add hero
 parcels.append((SUBJ_X0,SUBJ_Y0,SUBJ_X1,SUBJ_Y1,SUBJ_H,GOLD_HI,True))
 
@@ -375,6 +396,23 @@ for p in parcels:
 built.sort(key=lambda t:t[0])
 for d,svg,hero in built:
     s.append(svg)
+
+# --- DUPONT CIRCLE park — drawn AFTER the buildings so it always reads as a clean
+# little circular park on the open ground below the Dupont metro card (never a blob
+# half-hidden behind the card or punched through by an extrusion). ---
+dpc = proj(*DUP_PARK)
+s.append(f'<ellipse cx="{dpc[0]:.1f}" cy="{dpc[1]+4:.1f}" rx="34" ry="21" fill="#000" opacity="0.06"/>')
+s.append(f'<ellipse cx="{dpc[0]:.1f}" cy="{dpc[1]:.1f}" rx="32" ry="20" fill="{PARK}" '
+         f'stroke="{PARK_ED}" stroke-width="2"/>')
+s.append(f'<ellipse cx="{dpc[0]-6:.1f}" cy="{dpc[1]-4:.1f}" rx="17" ry="10" fill="{PARK_DK}" opacity="0.45"/>')
+
+# a few scattered street-trees dressing the open NE ground (drawn here, after the
+# buildings, only on verified-open pavement so none get occluded or read as clutter).
+for (tcx,tcy,trr) in [(1128,304,12),(946,224,10),(1004,222,9),(1132,246,10)]:
+    s.append(f'<ellipse cx="{tcx}" cy="{tcy+5}" rx="{trr+3}" ry="{trr*0.5:.0f}" fill="#000" opacity="0.05"/>'
+             f'<ellipse cx="{tcx}" cy="{tcy}" rx="{trr}" ry="{trr*0.8:.0f}" fill="{PARK}" opacity="0.66"/>'
+             f'<ellipse cx="{tcx-trr*0.3:.0f}" cy="{tcy-trr*0.25:.0f}" rx="{trr*0.55:.0f}" ry="{trr*0.42:.0f}" '
+             f'fill="{PARK_DK}" opacity="0.5"/>')
 
 # hero glow pool of light at base — wider + softer so the eye locks onto the tower.
 # Two stacked pools: a broad warm wash + a tighter bright core.
@@ -527,8 +565,9 @@ def metro_card(x0, cy, bars, name, walk):
 # center the fixed-width card on the station anchor.
 fb = proj(360, 640)
 s.append(metro_card(fb[0]-CARD_W/2, fb[1], [BLUE,ORANGE,SILVER], "Foggy Bottom–GWU", "9 min walk"))
-# Dupont Circle (NE) — upper-right, right edge tucked inboard of the frame.
-s.append(metro_card(1108-CARD_W, 210, [RED], "Dupont Circle", "13 min walk"))
+# Dupont Circle (NE) — upper-right, right edge tucked inboard of the frame. Raised
+# so the Dupont Circle park below it is no longer half-hidden behind the card.
+s.append(metro_card(1108-CARD_W, 178, [RED], "Dupont Circle", "13 min walk"))
 
 # =============================================================================
 #  HOTELS one block south on M St — small gold dots + docked caption
