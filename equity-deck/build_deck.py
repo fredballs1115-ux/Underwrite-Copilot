@@ -602,7 +602,9 @@ eastdil_matrix(s, 1.72, 5.12, classA,
                photos={1: "comp_888_16th.jpg", 2: "comp_Hamilton_Square.jpg",
                        3: "comp_799_9th.jpg", 4: "comp_1330_Connecticut.jpg",
                        5: "comp_2001_M.jpg", 6: "comp_1401_New_York.jpg",
-                       7: "comp_901_K.jpg"})
+                       7: "comp_901_K.jpg", 8: "comp_DW_670_Maine.jpg",
+                       9: "comp_DW_800_Maine.jpg", 10: "comp_2000_K.jpg",
+                       11: "comp_1099_New_York.jpg"})
 
 # ============================================================ 15 – RECENT DATA POINTS: COMMODITY (BOV p15)
 s = slide(); bg(s, WHITE)
@@ -630,7 +632,8 @@ commodity = [
 ]
 eastdil_matrix(s, 1.72, 5.12, commodity,
                ["Size (SF)", "Year Built", "% Leased", "WALT", "Cap Rate", "Price (PSF)", "Buyer", "Seller"],
-               label_w=0.92, data_fs=5.6, name_fs=6.0, name_h=0.46, photo_h=0.46, status_h=0.32)
+               label_w=0.92, data_fs=5.6, name_fs=6.0, name_h=0.46, photo_h=0.46, status_h=0.32,
+               photos={1: "comp_700_6th.jpg"})
 
 # ============================================================ 16 – SELECT ES OFFICE FINANCINGS (BOV p16)
 s = slide(); bg(s, WHITE)
