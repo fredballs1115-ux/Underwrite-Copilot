@@ -13,6 +13,7 @@ const ERRORS: Record<string, string> = {
   pdf: "That file isn’t a PDF — please upload the OM as a PDF.",
   size: "That PDF is larger than 22 MB — please try a smaller file for now.",
   save: "Couldn’t save the deal. Please try again.",
+  upload: "The upload didn’t complete — nothing was saved. Please try again.",
   limit:
     "You’ve reached the 3-deal limit on the Free plan. Upgrade to Pro for unlimited deals.",
 };

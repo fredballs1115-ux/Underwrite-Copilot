@@ -36,7 +36,11 @@ export default async function BillingPage({
         ? { cls: "bg-faint text-muted", text: "Checkout cancelled — no charge was made." }
         : error === "config"
           ? { cls: "bg-kill/10 text-kill", text: "Billing isn't fully configured yet (missing Stripe price). Add STRIPE_PRICE_ID." }
-          : null;
+          : error === "nocustomer"
+            ? { cls: "bg-faint text-muted", text: "No subscription on file yet — start with Upgrade to Pro below." }
+            : error === "save"
+              ? { cls: "bg-kill/10 text-kill", text: "Couldn't save your billing profile — please try again." }
+              : null;
 
   return (
     <div className="space-y-6">

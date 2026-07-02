@@ -52,7 +52,16 @@ export function ModelView({
           <Assumptions metrics={model.metrics} />
           <CashFlow cashFlow={model.cashFlow} />
           <SummaryCaveats summary={model.summary} caveats={model.caveats} />
-          <DownloadRow dealId={dealId} />
+          {isPro ? (
+            <DownloadRow dealId={dealId} />
+          ) : (
+            <Link
+              href="/billing"
+              className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-caution/30 bg-caution/5 px-4 py-2.5 text-sm font-medium text-caution transition-colors hover:bg-caution/10"
+            >
+              Upgrade to Pro to download the Excel model
+            </Link>
+          )}
         </>
       ) : (
         <Intro />

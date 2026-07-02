@@ -46,9 +46,87 @@ const PILLARS = [
   },
 ];
 
+const FREE_FEATURES = [
+  "3 deals, the full six-step screen on each",
+  "Sourced ranges + the three deal-killers",
+  "Risk digest and side-by-side deal comparison",
+  "Reconcile your own underwriting model",
+];
+
+const PRO_FEATURES = [
+  "Unlimited deals",
+  "First-draft Excel model with IRR sensitivity",
+  "One-page PDF screening memo",
+  "Public-web comp search",
+  "Everything in Free",
+];
+
+const FAQ: { q: string; a: string }[] = [
+  {
+    q: "What do I need to get started?",
+    a: "Just an offering memorandum as a PDF. Upload it and the six-step screen runs on its own — extraction, assumption challenges, comp scrutiny, market check, and a verdict. Add a rent roll, T-12, or loan terms later to deepen the model. You can also explore a fully-worked sample deal before uploading anything.",
+  },
+  {
+    q: "Where do the numbers come from?",
+    a: "Every figure traces to a named source — an OM page, your rent roll, a market norm — and conflicting sources are reconciled openly (actuals beat pro forma), never silently merged. The return math is deterministic code, not a language model guessing at arithmetic.",
+  },
+  {
+    q: "Are my documents private?",
+    a: "Yes. Documents are stored in private storage with per-user isolation enforced at the database level. Your deals are visible only to you, and your documents are never shared with other users or resold.",
+  },
+  {
+    q: "Is this investment advice?",
+    a: "No. Underwrite Copilot is a first-pass screen that tells you whether a deal earns more of your time. Always verify flagged figures against source documents before acting.",
+  },
+  {
+    q: "What's in the Excel model?",
+    a: "A multi-tab first-draft workbook: deal summary with sources & uses and returns, an exit-cap × price IRR sensitivity grid, a year-by-year cash flow, every assumption with its source and confidence, and a conflicts sheet showing how disagreements between your documents were resolved.",
+  },
+  {
+    q: "Can I cancel anytime?",
+    a: "Yes. Pro is a monthly subscription managed through Stripe — upgrade, downgrade, or cancel from the billing page whenever you like. The free tier stays free.",
+  },
+];
+
+// Structured data so search engines understand the product and pricing.
+const JSON_LD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      name: "Underwrite Copilot",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      description:
+        "CRE deal screening that runs every offering memorandum through the same disciplined screen: sourced ranges, the three deal-killers, and a reproducible Go / No-Go before you open a model.",
+      offers: [
+        { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD" },
+        {
+          "@type": "Offer",
+          name: "Pro",
+          price: "79",
+          priceCurrency: "USD",
+        },
+      ],
+    },
+    {
+      "@type": "FAQPage",
+      mainEntity: FAQ.map((f) => ({
+        "@type": "Question",
+        name: f.q,
+        acceptedAnswer: { "@type": "Answer", text: f.a },
+      })),
+    },
+  ],
+};
+
 export default function Home() {
   return (
     <div className="flex flex-1 flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
+      />
       {/* Nav */}
       <header className="sticky top-0 z-10 border-b border-line/80 bg-paper/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
@@ -60,6 +138,21 @@ export default function Home() {
               Underwrite Copilot
             </span>
           </div>
+          <nav className="hidden items-center gap-1 md:flex">
+            {[
+              ["#screen", "How it works"],
+              ["#pricing", "Pricing"],
+              ["#faq", "FAQ"],
+            ].map(([href, label]) => (
+              <a
+                key={href}
+                href={href}
+                className="rounded-lg px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:text-ink"
+              >
+                {label}
+              </a>
+            ))}
+          </nav>
           <div className="flex items-center gap-2">
             <Link
               href="/login"
@@ -120,7 +213,7 @@ export default function Home() {
         </section>
 
         {/* The problem */}
-        <section id="problem" className="border-y border-line bg-faint">
+        <section id="problem" className="scroll-mt-16 border-y border-line bg-faint">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <p className="text-xs font-medium uppercase tracking-wider text-muted">
               The hidden risk
@@ -164,7 +257,7 @@ export default function Home() {
         </section>
 
         {/* The 5-step screen */}
-        <section id="screen" className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
+        <section id="screen" className="scroll-mt-16 mx-auto max-w-6xl px-6 py-16 sm:py-20">
           <p className="text-xs font-medium uppercase tracking-wider text-muted">
             The 5-step screen
           </p>
@@ -213,6 +306,115 @@ export default function Home() {
                     {p.body}
                   </p>
                 </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Pricing */}
+        <section id="pricing" className="scroll-mt-16 mx-auto max-w-6xl px-6 py-16 sm:py-20">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted">
+            Pricing
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+            Start free. Upgrade when the screen earns it.
+          </h2>
+          <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:max-w-3xl">
+            {/* Free */}
+            <div className="shadow-card flex flex-col rounded-2xl border border-line bg-surface p-6">
+              <p className="text-sm font-semibold">Free</p>
+              <p className="mt-2 flex items-baseline gap-1">
+                <span className="text-3xl font-semibold tracking-tight">$0</span>
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                The full screen, on your next three deals.
+              </p>
+              <ul className="mt-5 flex-1 space-y-2.5">
+                {FREE_FEATURES.map((f) => (
+                  <li key={f} className="flex items-start gap-2.5 text-sm">
+                    <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-faint text-[10px] font-bold text-muted">
+                      ✓
+                    </span>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/login"
+                className="mt-6 rounded-lg border border-line px-4 py-2.5 text-center text-sm font-medium transition-colors hover:bg-faint"
+              >
+                Get started free
+              </Link>
+            </div>
+
+            {/* Pro */}
+            <div className="shadow-float relative flex flex-col rounded-2xl border-2 border-brand bg-surface p-6">
+              <span className="absolute -top-3 left-6 rounded-full bg-brand px-2.5 py-0.5 text-[11px] font-semibold text-white">
+                For active pipelines
+              </span>
+              <p className="text-sm font-semibold">Pro</p>
+              <p className="mt-2 flex items-baseline gap-1">
+                <span className="text-3xl font-semibold tracking-tight">$79</span>
+                <span className="text-sm text-muted">/month</span>
+              </p>
+              <p className="mt-1 text-sm text-muted">
+                Unlimited screening, plus the artifacts you hand to your IC.
+              </p>
+              <ul className="mt-5 flex-1 space-y-2.5">
+                {PRO_FEATURES.map((f) => (
+                  <li key={f} className="flex items-start gap-2.5 text-sm">
+                    <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-pass/15 text-[10px] font-bold text-pass">
+                      ✓
+                    </span>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/login"
+                className="mt-6 rounded-lg bg-brand px-4 py-2.5 text-center text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+              >
+                Start with Pro
+              </Link>
+            </div>
+          </div>
+          <p className="mt-5 text-xs text-muted">
+            Cancel anytime · billed monthly through Stripe · no card required for
+            Free.
+          </p>
+        </section>
+
+        {/* FAQ */}
+        <section id="faq" className="scroll-mt-16 border-y border-line bg-faint">
+          <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted">
+              FAQ
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+              The questions we&apos;d ask too.
+            </h2>
+            <div className="mt-8 max-w-3xl divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+              {FAQ.map((f) => (
+                <details key={f.q} className="group">
+                  <summary className="flex cursor-pointer items-center justify-between gap-4 px-5 py-4 text-sm font-medium transition-colors hover:bg-faint [&::-webkit-details-marker]:hidden">
+                    {f.q}
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-4 w-4 shrink-0 text-muted transition-transform group-open:rotate-180"
+                      aria-hidden
+                    >
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </summary>
+                  <p className="px-5 pb-4 text-sm leading-relaxed text-muted">
+                    {f.a}
+                  </p>
+                </details>
               ))}
             </div>
           </div>

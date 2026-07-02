@@ -31,10 +31,12 @@ export async function getBilling(
     .eq("id", userId)
     .maybeSingle();
 
+  // Sample deals are a free demo — they never count toward the cap.
   const { count } = await supabase
     .from("deals")
     .select("id", { count: "exact", head: true })
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .eq("is_sample", false);
 
   const plan = (profile?.plan as Plan) === "pro" ? "pro" : "free";
   const isPro = plan === "pro";

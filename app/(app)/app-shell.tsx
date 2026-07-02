@@ -142,21 +142,43 @@ export function AppShell({
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar — mobile */}
-        <header className="sticky top-0 z-10 flex items-center justify-between bg-sidebar px-4 py-3 text-white md:hidden">
-          <Link href="/deals" className="flex items-center gap-2">
-            <Logo small />
-            <span className="font-semibold tracking-tight">
-              Underwrite Copilot
-            </span>
-          </Link>
-          <form action={signOut}>
-            <button
-              type="submit"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-            >
-              Sign out
-            </button>
-          </form>
+        <header className="sticky top-0 z-10 bg-sidebar text-white md:hidden">
+          <div className="flex items-center justify-between px-4 py-3">
+            <Link href="/deals" className="flex items-center gap-2">
+              <Logo small />
+              <span className="font-semibold tracking-tight">
+                Underwrite Copilot
+              </span>
+            </Link>
+            <form action={signOut}>
+              <button
+                type="submit"
+                className="rounded-lg px-3 py-2 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                Sign out
+              </button>
+            </form>
+          </div>
+          {/* Mobile nav — the sidebar is desktop-only, so these live here. */}
+          <nav className="flex gap-1 border-t border-sidebar-line px-3 py-2">
+            {[
+              { href: "/deals", label: "Pipeline", active: inPipeline },
+              { href: "/billing", label: "Billing", active: inBilling },
+              { href: "/account", label: "Account", active: inAccount },
+            ].map((n) => (
+              <Link
+                key={n.href}
+                href={n.href}
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                  n.active
+                    ? "bg-white/12 text-white"
+                    : "text-white/65 hover:bg-white/5 hover:text-white"
+                }`}
+              >
+                {n.label}
+              </Link>
+            ))}
+          </nav>
         </header>
 
         <main className="flex-1">

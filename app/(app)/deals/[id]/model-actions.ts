@@ -9,6 +9,7 @@ import {
 } from "@/lib/storage";
 import { DOC_KIND_KEYS } from "@/lib/documents";
 import { isPro } from "@/lib/billing";
+import { jobInFlight } from "@/lib/jobs";
 import { runModelGeneration } from "@/lib/model/build-model";
 
 const MAX_FILE = 22 * 1024 * 1024;
@@ -92,6 +93,9 @@ export async function generateModel(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user || !(await isPro(supabase, user.id))) return;
+
+  // One pipeline at a time per deal (double-click / overlap guard).
+  if (await jobInFlight(supabase, dealId)) return;
 
   const { data: existing } = await supabase
     .from("analysis_jobs")

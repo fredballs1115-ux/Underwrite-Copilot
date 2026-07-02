@@ -10,6 +10,7 @@ import {
 } from "./supplement-actions";
 import { searchPublicComps } from "./comps-actions";
 import { FileDrop } from "../../file-drop";
+import { useToast } from "../../toaster";
 import type { CompSearchResult } from "@/lib/anthropic/comps-search";
 import type {
   ExtractionResult,
@@ -600,13 +601,49 @@ function ChallengeCard({ c }: { c: Challenge }) {
           <span className="mt-0.5 shrink-0 text-brand">
             <IconAsk className="h-4 w-4" />
           </span>
-          <p className="text-sm leading-relaxed">
+          <p className="flex-1 text-sm leading-relaxed">
             <span className="font-medium">Ask the broker — </span>
             <span className="text-muted">{c.question}</span>
           </p>
+          <CopyButton text={c.question} label="Copy broker question" />
         </div>
       )}
     </div>
+  );
+}
+
+/** Copy a snippet to the clipboard with toast feedback — for the questions
+ *  analysts paste straight into a broker email. */
+function CopyButton({ text, label }: { text: string; label: string }) {
+  const toast = useToast();
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          toast("Copied — paste it into your broker email.", "success");
+        } catch {
+          toast("Couldn't copy — select the text instead.", "error");
+        }
+      }}
+      className="mt-0.5 shrink-0 rounded-md p-1 text-muted transition-colors hover:bg-line/60 hover:text-ink"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-3.5 w-3.5"
+        aria-hidden
+      >
+        <rect width="14" height="14" x="8" y="8" rx="2" />
+        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+      </svg>
+    </button>
   );
 }
 

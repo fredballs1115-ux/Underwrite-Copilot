@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { uploadOmPdf, removeStorageFiles } from "@/lib/storage";
 import { getBilling } from "@/lib/billing";
+import { jobInFlight } from "@/lib/jobs";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 
@@ -58,13 +59,27 @@ export async function createDeal(formData: FormData) {
   const dealId = deal.id as string;
   const path = `${user.id}/${dealId}.pdf`;
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await uploadOmPdf(path, buffer);
+  // If the upload or the follow-up writes fail, remove the half-created deal —
+  // otherwise the user is stranded with a ghost row that eats a free slot.
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    await uploadOmPdf(path, buffer);
 
-  await supabase.from("deals").update({ om_storage_path: path }).eq("id", dealId);
-  await supabase
-    .from("analysis_jobs")
-    .insert({ deal_id: dealId, status: "queued", step: "extract", progress: 0 });
+    const { error: pathErr } = await supabase
+      .from("deals")
+      .update({ om_storage_path: path })
+      .eq("id", dealId);
+    if (pathErr) throw new Error(pathErr.message);
+
+    const { error: jobErr } = await supabase
+      .from("analysis_jobs")
+      .insert({ deal_id: dealId, status: "queued", step: "extract", progress: 0 });
+    if (jobErr) throw new Error(jobErr.message);
+  } catch {
+    await supabase.from("deals").delete().eq("id", dealId);
+    await removeStorageFiles([path]);
+    redirect("/deals?error=upload");
+  }
 
   after(() => runAnalysis(dealId));
 
@@ -74,7 +89,8 @@ export async function createDeal(formData: FormData) {
 /**
  * Seed a fully-populated sample deal so a new user can explore every tab, the
  * model, and the verdict without an OM. No AI calls, no file — just the demo
- * dataset. Doesn't count against the free cap (it's a generous first-run demo).
+ * dataset. Flagged `is_sample` so it never consumes a free slot (migration
+ * 0006), and idempotent: a second click just opens the existing sample.
  */
 export async function createSampleDeal() {
   const supabase = await createSupabaseServerClient();
@@ -83,10 +99,21 @@ export async function createSampleDeal() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // Already have one? Open it instead of inserting a duplicate.
+  const { data: existing } = await supabase
+    .from("deals")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("is_sample", true)
+    .limit(1)
+    .maybeSingle();
+  if (existing) redirect(`/deals/${existing.id}`);
+
   const { data: deal, error } = await supabase
     .from("deals")
     .insert({
       user_id: user.id,
+      is_sample: true,
       name: SAMPLE_DEAL.name,
       asset_class: SAMPLE_DEAL.asset_class,
       extraction: SAMPLE_DEAL.extraction,
@@ -164,8 +191,14 @@ export async function deleteDeal(formData: FormData) {
   for (const d of (docs ?? []) as { storage_path: string }[])
     if (d.storage_path) paths.push(d.storage_path);
 
+  // Delete the row FIRST (checked) — a row pointing at deleted files is an
+  // unrecoverable state, while orphaned storage objects are sweepable later.
+  const { error: delErr } = await supabase
+    .from("deals")
+    .delete()
+    .eq("id", dealId);
+  if (delErr) redirect(`/deals/${dealId}?error=delete`);
   await removeStorageFiles(paths);
-  await supabase.from("deals").delete().eq("id", dealId);
 
   revalidatePath("/deals");
   redirect("/deals?deleted=1");
@@ -188,6 +221,11 @@ export async function rerunAnalysis(formData: FormData) {
     .eq("id", dealId)
     .maybeSingle();
   if (!deal?.om_storage_path) redirect(`/deals/${dealId}`);
+
+  // Refuse to stack a second pipeline on a live job (double-click guard).
+  if (await jobInFlight(supabase, dealId)) {
+    redirect(`/deals/${dealId}?error=busy`);
+  }
 
   const { data: existing } = await supabase
     .from("analysis_jobs")
@@ -233,6 +271,11 @@ export async function reconcileWithModel(formData: FormData) {
     .eq("id", dealId)
     .maybeSingle();
   if (!deal?.om_storage_path) redirect(`/deals/${dealId}`);
+
+  // Refuse to stack a second pipeline on a live job (double-click guard).
+  if (await jobInFlight(supabase, dealId)) {
+    redirect(`/deals/${dealId}?error=busy`);
+  }
 
   const file = formData.get("model");
   if (!(file instanceof File) || file.size === 0) {

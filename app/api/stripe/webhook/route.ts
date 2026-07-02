@@ -48,9 +48,31 @@ export async function POST(req: Request) {
         ? new Date(periodEndUnix * 1000).toISOString()
         : null,
     };
-    const query = admin.from("profiles").update(update);
-    if (userId) await query.eq("id", userId);
-    else await query.eq("stripe_customer_id", customerId);
+    // A failed or zero-row write here would strand a paying customer on Free.
+    // Throw so the handler 500s and Stripe retries the event with backoff.
+    if (userId) {
+      const { error, count } = await admin
+        .from("profiles")
+        .update(update, { count: "exact" })
+        .eq("id", userId);
+      if (error) throw new Error(`profiles update failed: ${error.message}`);
+      if (count === 0) {
+        // Fall back to the customer id if the metadata user is gone/wrong.
+        const { error: e2, count: c2 } = await admin
+          .from("profiles")
+          .update(update, { count: "exact" })
+          .eq("stripe_customer_id", customerId);
+        if (e2 || c2 === 0)
+          throw new Error(`no profile matched user ${userId} / ${customerId}`);
+      }
+    } else {
+      const { error, count } = await admin
+        .from("profiles")
+        .update(update, { count: "exact" })
+        .eq("stripe_customer_id", customerId);
+      if (error) throw new Error(`profiles update failed: ${error.message}`);
+      if (count === 0) throw new Error(`no profile for customer ${customerId}`);
+    }
   }
 
   try {

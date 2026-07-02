@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { renameDeal, deleteDeal } from "../actions";
 
 const itemCls =
@@ -20,6 +20,16 @@ export function DealActions({
     setOpen(false);
     setMode("menu");
   }
+
+  // Escape closes the menu (standard popover behavior).
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   return (
     <div className="relative">

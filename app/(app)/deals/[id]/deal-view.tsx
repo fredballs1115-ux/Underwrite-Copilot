@@ -93,6 +93,8 @@ const MODEL_ERRORS: Record<string, string> = {
   modelfile: "Please choose your model file to upload.",
   modeltype: "Please upload your model as .xlsx, .csv, or PDF.",
   modelsize: "That file is larger than 22 MB — please try a smaller export.",
+  busy: "An analysis is already running on this deal — let it finish first.",
+  delete: "Couldn’t delete the deal — please try again.",
 };
 
 function isActive(status: string | undefined): boolean {

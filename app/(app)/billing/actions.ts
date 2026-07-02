@@ -34,10 +34,15 @@ export async function startCheckout() {
       metadata: { user_id: user.id },
     });
     customerId = customer.id;
-    await supabase
+    // Billing columns are service-role-only (migration 0006), so persist the
+    // customer id with the admin client — and fail loudly if it doesn't land,
+    // or every future checkout mints a duplicate Stripe customer.
+    const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
+    const { error: saveErr } = await createSupabaseAdminClient()
       .from("profiles")
       .update({ stripe_customer_id: customerId })
       .eq("id", user.id);
+    if (saveErr) redirect("/billing?error=save");
   }
 
   const session = await stripe.checkout.sessions.create({
@@ -69,7 +74,7 @@ export async function openPortal() {
     .eq("id", user.id)
     .maybeSingle();
   const customerId = (profile?.stripe_customer_id as string) ?? null;
-  if (!customerId) redirect("/billing");
+  if (!customerId) redirect("/billing?error=nocustomer");
 
   const stripe = getStripe();
   const session = await stripe.billingPortal.sessions.create({

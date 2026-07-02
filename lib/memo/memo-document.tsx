@@ -31,6 +31,11 @@ const SEV_COLOR: Record<string, string> = {
   medium: C.caution,
   low: C.brand,
 };
+const CALL_COLOR: Record<string, string> = {
+  Pass: C.pass,
+  Caution: C.caution,
+  "Pass on": C.kill,
+};
 
 export type MemoData = {
   name: string;
@@ -45,6 +50,10 @@ export type MemoData = {
   topRisks: string[];
   challenges: { severity: string; assumption: string; challenge: string }[];
   flags: { label: string; text: string }[];
+  // The pre-model screen — ranges, deal-killers, and where the call flips.
+  ranges: { label: string; low: string; base: string; high: string; source: string }[];
+  dealKillers: { label: string; read: string }[];
+  sensitivity: { scenario: string; call: string }[];
 };
 
 /** Shape the stored analysis into the flat data the one-page memo renders. */
@@ -98,6 +107,43 @@ export function buildMemoData(deal: DealRow, dateStr: string): MemoData {
     }
   }
 
+  // The pre-model screen (added to verdicts later — older deals won't have it).
+  const screen = verdict?.screen;
+  const LEVER_LABEL: Record<string, string> = {
+    basis: "Basis",
+    exit: "Exit",
+    debt: "Debt",
+  };
+  const SCENARIO_LABEL: Record<string, string> = {
+    conservative: "Conservative",
+    base: "Base",
+    sponsor: "Sponsor",
+  };
+  const CALL_LABEL: Record<string, string> = {
+    pass: "Pass",
+    caution: "Caution",
+    pass_on: "Pass on",
+  };
+  const ranges = (screen?.ranges ?? []).slice(0, 4).map((r) => ({
+    label: r.label,
+    low: r.low,
+    base: r.base,
+    high: r.high,
+    source: r.source,
+  }));
+  const dealKillers = (screen?.dealKillers ?? []).slice(0, 3).map((k) => ({
+    label: LEVER_LABEL[k.lever] ?? k.lever,
+    read: k.read,
+  }));
+  const sensitivity = (screen?.sensitivity ?? []).map((sc) => ({
+    scenario: SCENARIO_LABEL[sc.scenario] ?? sc.scenario,
+    call: CALL_LABEL[sc.call] ?? sc.call,
+  }));
+
+  // When the screen is present it earns the page space — tighten the older
+  // sections so the memo stays one page.
+  const hasScreen = ranges.length > 0;
+
   return {
     name: deal.name,
     market: extraction?.market ?? "",
@@ -107,21 +153,26 @@ export function buildMemoData(deal: DealRow, dateStr: string): MemoData {
     verdictColor: vmeta?.color ?? C.muted,
     verdictSub: vmeta?.sub ?? "",
     verdictReason: verdict?.reason ?? "",
-    keyTerms,
-    topRisks: (verdict?.topRisks ?? []).slice(0, 4),
-    challenges: ch,
-    flags: flags.slice(0, 4),
+    keyTerms: hasScreen ? keyTerms.slice(0, 6) : keyTerms,
+    topRisks: (verdict?.topRisks ?? []).slice(0, hasScreen ? 3 : 4),
+    challenges: hasScreen ? ch.slice(0, 2) : ch,
+    // With the screen present, the ranges + risks already carry the comp/market
+    // story — drop the flags section to keep the memo one page.
+    flags: hasScreen ? [] : flags.slice(0, 4),
+    ranges,
+    dealKillers,
+    sensitivity,
   };
 }
 
 const s = StyleSheet.create({
   page: {
-    paddingVertical: 40,
+    paddingVertical: 32,
     paddingHorizontal: 44,
     fontSize: 10,
     fontFamily: "Helvetica",
     color: C.ink,
-    lineHeight: 1.4,
+    lineHeight: 1.32,
   },
   header: {
     flexDirection: "row",
@@ -148,12 +199,12 @@ const s = StyleSheet.create({
   sub: { fontSize: 10, color: C.muted, marginTop: 2 },
 
   verdictBox: {
-    marginTop: 14,
+    marginTop: 10,
     borderWidth: 1,
     borderColor: C.line,
     borderLeftWidth: 4,
     borderRadius: 6,
-    padding: 12,
+    padding: 10,
   },
   eyebrow: {
     fontSize: 8,
@@ -165,7 +216,7 @@ const s = StyleSheet.create({
   verdictSub: { fontSize: 10, color: C.muted, marginTop: 1 },
   verdictReason: { marginTop: 6, fontSize: 10, color: C.ink },
 
-  section: { marginTop: 16 },
+  section: { marginTop: 13 },
   sectionTitle: {
     fontSize: 9,
     fontFamily: "Helvetica-Bold",
@@ -179,7 +230,7 @@ const s = StyleSheet.create({
   term: {
     width: "25%",
     paddingRight: 10,
-    marginBottom: 9,
+    marginBottom: 7,
   },
   termLabel: { fontSize: 7.5, color: C.muted, textTransform: "uppercase" },
   termValue: { fontSize: 11, fontFamily: "Helvetica-Bold", marginTop: 1 },
@@ -189,7 +240,7 @@ const s = StyleSheet.create({
   bullet: { width: 10, color: C.muted },
   itemText: { flex: 1, fontSize: 9.5 },
 
-  challenge: { marginBottom: 8 },
+  challenge: { marginBottom: 6 },
   chHead: { flexDirection: "row", alignItems: "center", marginBottom: 2 },
   chTag: {
     fontSize: 7,
@@ -212,6 +263,55 @@ const s = StyleSheet.create({
     width: 38,
     textTransform: "uppercase",
   },
+
+  // The screen: ranges table
+  rangeHead: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: C.line,
+    paddingBottom: 3,
+    marginBottom: 3,
+  },
+  rangeRow: {
+    flexDirection: "row",
+    borderBottomWidth: 0.5,
+    borderBottomColor: C.line,
+    paddingVertical: 3,
+  },
+  rangeLabel: { width: "26%", fontSize: 8.5, fontFamily: "Helvetica-Bold" },
+  rangeCell: { width: "13%", fontSize: 8.5, textAlign: "right", paddingRight: 6 },
+  rangeCellBase: {
+    width: "13%",
+    fontSize: 8.5,
+    textAlign: "right",
+    paddingRight: 6,
+    fontFamily: "Helvetica-Bold",
+    color: C.brand,
+  },
+  rangeSource: { width: "35%", fontSize: 7.5, color: C.muted },
+  rangeHeadText: {
+    fontSize: 7,
+    color: C.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  // The screen: deal-killers + sensitivity
+  killersRow: { flexDirection: "row", marginTop: 8 },
+  killerCol: { flex: 1, paddingRight: 10 },
+  killerName: { fontSize: 8.5, fontFamily: "Helvetica-Bold", color: C.brand },
+  killerRead: { fontSize: 8, color: C.muted, marginTop: 1.5 },
+  sensRow: { flexDirection: "row", marginTop: 8, alignItems: "center" },
+  sensLabel: {
+    fontSize: 7,
+    color: C.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginRight: 8,
+  },
+  sensChip: { flexDirection: "row", alignItems: "center", marginRight: 12 },
+  sensScenario: { fontSize: 8, color: C.muted, marginRight: 3 },
+  sensCall: { fontSize: 8.5, fontFamily: "Helvetica-Bold" },
 
   footer: {
     position: "absolute",
@@ -281,6 +381,56 @@ export function MemoDocument({ data }: { data: MemoData }) {
               <Text style={s.verdictReason}>{data.verdictReason}</Text>
             ) : null}
           </View>
+        )}
+
+        {data.ranges.length > 0 && (
+          <Section title="The screen — ranges, not hero numbers">
+            <View style={s.rangeHead}>
+              <Text style={[s.rangeLabel, s.rangeHeadText]}>Assumption</Text>
+              <Text style={[s.rangeCell, s.rangeHeadText]}>Low</Text>
+              <Text style={[s.rangeCell, s.rangeHeadText]}>Base</Text>
+              <Text style={[s.rangeCell, s.rangeHeadText]}>High</Text>
+              <Text style={[s.rangeSource, s.rangeHeadText]}>Source</Text>
+            </View>
+            {data.ranges.map((r, i) => (
+              <View key={i} style={s.rangeRow}>
+                <Text style={s.rangeLabel}>{r.label}</Text>
+                <Text style={s.rangeCell}>{r.low}</Text>
+                <Text style={s.rangeCellBase}>{r.base}</Text>
+                <Text style={s.rangeCell}>{r.high}</Text>
+                <Text style={s.rangeSource}>{r.source}</Text>
+              </View>
+            ))}
+
+            {data.dealKillers.length > 0 && (
+              <View style={s.killersRow}>
+                {data.dealKillers.map((k, i) => (
+                  <View key={i} style={s.killerCol}>
+                    <Text style={s.killerName}>
+                      {i + 1}. {k.label}
+                    </Text>
+                    <Text style={s.killerRead}>{k.read}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {data.sensitivity.length > 0 && (
+              <View style={s.sensRow}>
+                <Text style={s.sensLabel}>Where the call flips</Text>
+                {data.sensitivity.map((sc, i) => (
+                  <View key={i} style={s.sensChip}>
+                    <Text style={s.sensScenario}>{sc.scenario}:</Text>
+                    <Text
+                      style={[s.sensCall, { color: CALL_COLOR[sc.call] ?? C.ink }]}
+                    >
+                      {sc.call}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </Section>
         )}
 
         {data.keyTerms.length > 0 && (
