@@ -28,9 +28,9 @@ const MUTED = "FF5F6B69";
 const LINE = "FFE7E4DD";
 const FAINT = "FFF3F5F4";
 const WHITE = "FFFFFFFF";
-const PASS = "FF15803D";
-const CAUTION = "FFB45309";
-const KILL = "FFB3261E";
+const PASS = "FF1B7A5E";
+const CAUTION = "FFA05A1C";
+const KILL = "FFB23A30";
 
 const USD = "$#,##0;($#,##0)";
 const PCT1 = "0.0%";

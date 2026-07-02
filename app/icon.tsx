@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-// Generated favicon — the "UC" mark on the brand teal. Replaces the default.
+// Generated favicon — the range-bars mark on the brand teal.
 export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
 
@@ -12,17 +12,33 @@ export default function Icon() {
           width: "100%",
           height: "100%",
           display: "flex",
-          alignItems: "center",
+          alignItems: "flex-end",
           justifyContent: "center",
-          background: "#114e54",
-          color: "white",
-          fontSize: 15,
-          fontWeight: 700,
-          letterSpacing: -0.5,
+          gap: 3,
+          background: "linear-gradient(180deg, #19606a, #0c383d)",
           borderRadius: 7,
+          paddingBottom: 7,
         }}
       >
-        UC
+        <div
+          style={{
+            width: 4,
+            height: 7,
+            borderRadius: 2,
+            background: "rgba(255,255,255,0.85)",
+          }}
+        />
+        <div
+          style={{ width: 4, height: 15, borderRadius: 2, background: "#7fd6cc" }}
+        />
+        <div
+          style={{
+            width: 4,
+            height: 11,
+            borderRadius: 2,
+            background: "rgba(255,255,255,0.85)",
+          }}
+        />
       </div>
     ),
     { ...size },

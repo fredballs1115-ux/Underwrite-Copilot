@@ -20,9 +20,9 @@ const C = {
   muted: "#5f6b69",
   line: "#e7e4dd",
   faint: "#f3f5f4",
-  pass: "#15803d",
-  caution: "#b45309",
-  kill: "#b3261e",
+  pass: "#1b7a5e",
+  caution: "#a05a1c",
+  kill: "#b23a30",
 };
 
 const SEV_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };

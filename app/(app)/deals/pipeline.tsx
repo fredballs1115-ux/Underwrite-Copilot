@@ -158,9 +158,18 @@ export function Pipeline({
             {showUsage && (
               <>
                 {" · "}
-                <span className={atLimit ? "text-caution" : ""}>
-                  {billing!.dealCount} of {billing!.dealLimit} free
-                </span>
+                <Link
+                  href="/billing"
+                  className={`font-medium underline-offset-2 hover:underline ${
+                    atLimit ? "text-caution" : ""
+                  }`}
+                >
+                  {Math.max(0, billing!.dealLimit - billing!.dealCount)} free{" "}
+                  {billing!.dealLimit - billing!.dealCount === 1
+                    ? "deal"
+                    : "deals"}{" "}
+                  left
+                </Link>
               </>
             )}
           </p>
@@ -190,13 +199,16 @@ export function Pipeline({
               Upgrade for more
             </Link>
           ) : (
-            <button
-              type="button"
-              onClick={() => setShowForm((s) => !s)}
-              className="shadow-card hover-lift rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white"
-            >
-              {showForm ? "Close" : "+ New deal"}
-            </button>
+            // The empty state carries its own CTA — don't show two primaries.
+            deals.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowForm((s) => !s)}
+                className="shadow-card hover-lift rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white"
+              >
+                {showForm ? "Close" : "+ New deal"}
+              </button>
+            )
           )}
         </div>
       </div>
@@ -361,8 +373,11 @@ export function Pipeline({
       )}
 
       {deals.length === 0 ? (
-        <div className="rounded-2xl border border-line bg-surface p-8 text-center shadow-card">
-          <p className="text-sm font-medium">Start your pipeline</p>
+        <div className="rounded-2xl border border-line bg-surface p-10 text-center shadow-card">
+          <EmptyArt />
+          <p className="mt-5 text-base font-semibold tracking-tight">
+            Start your pipeline
+          </p>
           <p className="mx-auto mt-1 max-w-md text-sm text-muted">
             Upload an offering memorandum to screen your first deal — or explore
             a fully-worked sample to see the whole thing first.
@@ -428,6 +443,42 @@ export function Pipeline({
   );
 }
 
+/** Empty-pipeline illustration: an OM becoming ranges and a verdict. */
+function EmptyArt() {
+  return (
+    <svg viewBox="0 0 170 120" className="mx-auto h-28 w-auto" aria-hidden>
+      <g transform="rotate(-8 62 65)">
+        <rect
+          x="30"
+          y="18"
+          width="70"
+          height="92"
+          rx="8"
+          fill="#f3f5f4"
+          stroke="#e7e4dd"
+        />
+      </g>
+      <rect x="58" y="8" width="74" height="96" rx="8" fill="#fff" stroke="#e7e4dd" />
+      <rect x="68" y="20" width="36" height="5" rx="2.5" fill="#e7e4dd" />
+      <rect x="68" y="32" width="54" height="4" rx="2" fill="#f0efe9" />
+      <rect x="68" y="40" width="46" height="4" rx="2" fill="#f0efe9" />
+      <rect x="70" y="72" width="7" height="16" rx="3" fill="#114e54" opacity="0.35" />
+      <rect x="82" y="60" width="7" height="28" rx="3" fill="#114e54" />
+      <rect x="94" y="66" width="7" height="22" rx="3" fill="#114e54" opacity="0.55" />
+      <line x1="68" y1="94" x2="122" y2="94" stroke="#e7e4dd" />
+      <circle cx="132" cy="98" r="15" fill="#114e54" />
+      <path
+        d="M125 98l5 5 9-10"
+        stroke="#7fd6cc"
+        strokeWidth="2.6"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function DealRow({
   d,
   i,
@@ -478,36 +529,47 @@ function DealRow({
           <span className="font-mono tabular-nums">{fmtDate(d.createdAt)}</span>
         </p>
       </div>
-      {d.stats.length > 0 && (
-        <div className="hidden shrink-0 items-center gap-5 md:flex">
-          {d.stats.map((s, idx) => (
+      {/* Fixed three-slot grid, right-anchored, so numbers align into
+          scannable columns across rows even when a deal is missing a stat. */}
+      <div className="hidden w-[19rem] shrink-0 grid-cols-3 gap-3 md:grid">
+        {Array.from({ length: 3 }).map((_, idx) => {
+          const s = d.stats[idx];
+          return (
             <div key={idx} className="text-right">
-              <p className="text-[10px] uppercase tracking-wide text-muted">
-                {s.label}
-              </p>
-              <p className="font-mono text-sm tabular-nums">{s.value}</p>
+              {s ? (
+                <>
+                  <p className="truncate text-[10px] uppercase tracking-wide text-muted">
+                    {s.label}
+                  </p>
+                  <p className="font-mono text-sm tabular-nums">{s.value}</p>
+                </>
+              ) : d.stats.length > 0 ? (
+                <p className="font-mono text-sm text-line">—</p>
+              ) : null}
             </div>
-          ))}
-        </div>
-      )}
-      {v ? (
-        <span
-          className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${v.cls}`}
-        >
-          {v.label}
-        </span>
-      ) : d.jobStatus === "failed" ? (
-        <span className="shrink-0 rounded-full bg-kill/10 px-2.5 py-1 text-[11px] font-medium text-kill">
-          Analysis failed
-        </span>
-      ) : d.jobStatus === "running" ? (
-        <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted">
-          <span className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
-          Screening…
-        </span>
-      ) : (
-        <span className="shrink-0 text-[11px] text-muted">Not screened</span>
-      )}
+          );
+        })}
+      </div>
+      <span className="flex w-24 shrink-0 justify-end">
+        {v ? (
+          <span
+            className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${v.cls}`}
+          >
+            {v.label}
+          </span>
+        ) : d.jobStatus === "failed" ? (
+          <span className="rounded-full bg-kill/10 px-2.5 py-1 text-center text-[11px] font-medium leading-tight text-kill">
+            Failed
+          </span>
+        ) : d.jobStatus === "running" ? (
+          <span className="flex items-center gap-1.5 text-[11px] text-muted">
+            <span className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
+            Screening…
+          </span>
+        ) : (
+          <span className="text-[11px] text-muted">Not screened</span>
+        )}
+      </span>
       {!compareMode && (
         <svg
           viewBox="0 0 24 24"
@@ -565,7 +627,14 @@ function FilterSelect({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className={`rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink shadow-sm outline-none transition-colors hover:bg-faint focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40 ${className}`}
+      style={{
+        backgroundImage:
+          "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235f6b69' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>\")",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "right 0.6rem center",
+        backgroundSize: "0.85rem",
+      }}
+      className={`appearance-none rounded-lg border border-line bg-surface py-1.5 pl-3 pr-8 text-sm text-ink shadow-sm outline-none transition-colors hover:bg-faint focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40 ${className}`}
     >
       {options.map(([val, label]) => (
         <option key={val} value={val}>

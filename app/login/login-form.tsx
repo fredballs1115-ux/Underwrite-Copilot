@@ -24,10 +24,15 @@ const inputCls =
 
 type Mode = "signin" | "signup" | "reset";
 
-export function LoginForm() {
+export function LoginForm({
+  initialMode = "signin",
+}: {
+  initialMode?: Mode;
+}) {
   // Explicit mode: password managers get the right autocomplete for signup,
-  // and there's exactly one primary action on screen at a time.
-  const [mode, setMode] = useState<Mode>("signin");
+  // and there's exactly one primary action on screen at a time. Marketing
+  // CTAs deep-link to /login?mode=signup so "Get started" lands on signup.
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [state, formAction, pending] = useActionState(
     authenticate,
     initialState,

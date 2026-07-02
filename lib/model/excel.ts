@@ -153,7 +153,7 @@ function buildAssumptions(wb: ExcelJS.Workbook, model: UnderwritingModel) {
       fgColor: { argb: CONF_FILL[m.confidence] ?? "FFFFFFFF" },
     };
     if (m.isConflict) {
-      row.getCell(1).font = { bold: true, color: { argb: "FFB3261E" } };
+      row.getCell(1).font = { bold: true, color: { argb: "FFB23A30" } };
     }
   }
 }
@@ -253,7 +253,7 @@ function buildConflicts(wb: ExcelJS.Workbook, model: UnderwritingModel) {
       m.rationale,
     ]);
     row.alignment = { vertical: "top", wrapText: true };
-    row.getCell(1).font = { bold: true, color: { argb: "FFB3261E" } };
+    row.getCell(1).font = { bold: true, color: { argb: "FFB23A30" } };
     row.getCell(3).font = { bold: true };
     row.getCell(3).note = `Chosen from ${m.authority}.\n${sourceText(m)}\n\n${m.rationale}`;
   }

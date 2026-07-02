@@ -21,11 +21,13 @@
   --color-brand-strong: #0c383d;
   --color-sidebar: #0c3338; /* deep teal app chrome */
   --color-sidebar-line: #1d4a4f;
+  --color-mint: #7fd6cc; /* light aqua — accent on dark surfaces only */
 
-  /* Verdict / status colors, reused across the app */
-  --color-pass: #15803d;
-  --color-caution: #b45309;
-  --color-kill: #b3261e;
+  /* Verdict / status colors, reused across the app. Deliberately warm-tinted
+     toward the teal/paper system rather than stock framework green/red. */
+  --color-pass: #1b7a5e;
+  --color-caution: #a05a1c;
+  --color-kill: #b23a30;
 
   /* Map the Geist fonts (loaded in layout.tsx) onto Tailwind's font utilities */
   --font-sans: var(--font-geist-sans);
@@ -139,6 +141,55 @@ body {
   .skeleton::after {
     animation: uc-shimmer 1.5s infinite;
   }
+}
+
+/*
+  Surface treatments — where the visual identity lives.
+
+  .band-dark: deep-teal band with soft aqua glows and a faint graph-paper
+  grid (an underwriting motif). Used for the landing hero, the "why not
+  ChatGPT" band, and the closing CTA.
+*/
+.band-dark {
+  background-color: var(--color-sidebar);
+  background-image:
+    radial-gradient(
+      56rem 30rem at 82% -18%,
+      rgba(127, 214, 204, 0.16),
+      transparent 62%
+    ),
+    radial-gradient(
+      44rem 28rem at 4% 118%,
+      rgba(127, 214, 204, 0.1),
+      transparent 60%
+    ),
+    linear-gradient(rgba(127, 214, 204, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(127, 214, 204, 0.06) 1px, transparent 1px);
+  background-size:
+    auto,
+    auto,
+    52px 52px,
+    52px 52px;
+}
+
+/* Subtle dot grid for the signed-in work canvas — texture, not noise. */
+.canvas-dots {
+  background-image: radial-gradient(
+    rgba(17, 78, 84, 0.07) 1px,
+    transparent 1.4px
+  );
+  background-size: 22px 22px;
+}
+
+/* Sidebar gets a gentle vertical gradient + top glow so it isn't a flat slab. */
+.sidebar-grad {
+  background-image:
+    radial-gradient(
+      18rem 12rem at 20% -4%,
+      rgba(127, 214, 204, 0.12),
+      transparent 60%
+    ),
+    linear-gradient(180deg, #0e3d43 0%, #0c3338 42%, #092a2e 100%);
 }
 
 /* A shimmering placeholder block. Size/radius come from utility classes. */

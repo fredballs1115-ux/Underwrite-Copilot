@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LogoMark } from "@/app/logo";
 
 export const metadata: Metadata = {
   title: "Terms of service",
@@ -78,9 +79,7 @@ export default function TermsPage() {
       <header className="border-b border-line">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand text-sm font-semibold text-white">
-              UC
-            </div>
+            <LogoMark className="h-8 w-8" />
             <span className="font-semibold tracking-tight">
               Underwrite Copilot
             </span>

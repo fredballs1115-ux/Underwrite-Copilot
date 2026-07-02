@@ -4,19 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode } from "react";
 import { signOut } from "@/app/login/actions";
+import { LogoMark } from "@/app/logo";
 import { ToastProvider } from "./toaster";
-
-function Logo({ small = false }: { small?: boolean }) {
-  return (
-    <div
-      className={`flex items-center justify-center rounded-lg bg-white/10 font-semibold text-white ring-1 ring-white/15 ${
-        small ? "h-7 w-7 text-xs" : "h-8 w-8 text-sm"
-      }`}
-    >
-      UC
-    </div>
-  );
-}
 
 function NavIcon({
   className,
@@ -83,61 +72,57 @@ export function AppShell({
     </a>
     <div className="flex min-h-screen bg-canvas">
       {/* Sidebar — desktop */}
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-sidebar text-white md:flex">
+      <aside className="sidebar-grad sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-sidebar text-white md:flex">
         <Link href="/deals" className="flex items-center gap-2.5 px-5 py-5">
-          <Logo />
+          <LogoMark className="h-8 w-8" />
           <span className="font-semibold tracking-tight">
             Underwrite Copilot
           </span>
         </Link>
 
         <nav className="mt-2 flex-1 space-y-1 px-3">
-          <Link
-            href="/deals"
-            aria-current={inPipeline ? "page" : undefined}
-            className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              inPipeline
-                ? "bg-white/12 text-white"
-                : "text-white/65 hover:bg-white/5 hover:text-white"
-            }`}
-          >
-            <IconLayers className="h-4 w-4" />
-            Pipeline
-          </Link>
-          <Link
-            href="/billing"
-            aria-current={inBilling ? "page" : undefined}
-            className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              inBilling
-                ? "bg-white/12 text-white"
-                : "text-white/65 hover:bg-white/5 hover:text-white"
-            }`}
-          >
-            <IconCard className="h-4 w-4" />
-            Billing
-          </Link>
-          <Link
-            href="/account"
-            aria-current={inAccount ? "page" : undefined}
-            className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              inAccount
-                ? "bg-white/12 text-white"
-                : "text-white/65 hover:bg-white/5 hover:text-white"
-            }`}
-          >
-            <IconUser className="h-4 w-4" />
-            Account
-          </Link>
+          {(
+            [
+              ["/deals", "Pipeline", inPipeline, IconLayers],
+              ["/billing", "Billing", inBilling, IconCard],
+              ["/account", "Account", inAccount, IconUser],
+            ] as const
+          ).map(([href, label, active, Icon]) => (
+            <Link
+              key={href}
+              href={href}
+              aria-current={active ? "page" : undefined}
+              className={`relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                active
+                  ? "bg-white/12 text-white"
+                  : "text-white/65 hover:bg-white/5 hover:text-white"
+              }`}
+            >
+              {active && (
+                <span
+                  className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-full bg-mint"
+                  aria-hidden
+                />
+              )}
+              <Icon className={`h-4 w-4 ${active ? "text-mint" : ""}`} />
+              {label}
+            </Link>
+          ))}
         </nav>
 
-        <div className="border-t border-sidebar-line px-3 py-4">
-          <p
-            title={userEmail}
-            className="truncate px-2 text-xs text-white/55"
-          >
-            {userEmail}
-          </p>
-          <form action={signOut} className="mt-1.5">
+        <div className="border-t border-white/10 px-3 py-4">
+          <div className="flex items-center gap-2.5 px-2">
+            <span
+              aria-hidden
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold uppercase text-mint ring-1 ring-white/15"
+            >
+              {userEmail.charAt(0)}
+            </span>
+            <p title={userEmail} className="min-w-0 truncate text-xs text-white/60">
+              {userEmail}
+            </p>
+          </div>
+          <form action={signOut} className="mt-2">
             <button
               type="submit"
               className="w-full rounded-lg px-2 py-1.5 text-left text-sm text-white/80 transition-colors hover:bg-white/10 hover:text-white"
@@ -151,10 +136,10 @@ export function AppShell({
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar — mobile */}
-        <header className="sticky top-0 z-10 bg-sidebar text-white md:hidden">
+        <header className="sidebar-grad sticky top-0 z-10 bg-sidebar text-white md:hidden">
           <div className="flex items-center justify-between px-4 py-3">
             <Link href="/deals" className="flex items-center gap-2">
-              <Logo small />
+              <LogoMark className="h-7 w-7" />
               <span className="font-semibold tracking-tight">
                 Underwrite Copilot
               </span>
@@ -169,7 +154,7 @@ export function AppShell({
             </form>
           </div>
           {/* Mobile nav — the sidebar is desktop-only, so these live here. */}
-          <nav className="flex gap-1 border-t border-sidebar-line px-3 py-2">
+          <nav className="flex gap-1 border-t border-white/10 px-3 py-2">
             {[
               { href: "/deals", label: "Pipeline", active: inPipeline },
               { href: "/billing", label: "Billing", active: inBilling },
@@ -191,7 +176,7 @@ export function AppShell({
           </nav>
         </header>
 
-        <main id="main" className="flex-1">
+        <main id="main" className="canvas-dots flex-1">
           <div className="mx-auto w-full max-w-5xl px-5 py-8 sm:px-8">
             {children}
           </div>
