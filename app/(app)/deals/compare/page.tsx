@@ -26,6 +26,8 @@ function toCol(deal: DealRow): Col {
     assetClass: deal.asset_class,
     market: ex?.market || "—",
     verdict: verdict?.verdict ?? null,
+    reason: verdict?.reason ?? null,
+    hasModel: model != null,
     irr: r?.leveredIrrPct ?? null,
     em: r?.equityMultiple ?? null,
     coc: r?.cashOnCashPct ?? null,
@@ -92,8 +94,8 @@ export default async function ComparePage({
       <CompareTable cols={cols} />
 
       <p className="text-xs leading-relaxed text-muted">
-        First-pass screen, not investment advice. Deals without a generated
-        model show blanks for the return metrics.
+        First-pass screen, not investment advice. &ldquo;Best&rdquo; is only
+        awarded among deals the screen didn&apos;t reject.
       </p>
     </div>
   );

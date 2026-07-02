@@ -203,8 +203,8 @@ export default function Home() {
               </Link>
             </div>
             <p className="mt-5 text-sm text-muted">
-              Self-serve · upload a PDF · a reproducible Go / No-Go before you
-              open a model.
+              First 3 deals free · no credit card · a reproducible Go / No-Go
+              before you open a model.
             </p>
           </div>
 
@@ -444,12 +444,73 @@ export default function Home() {
       </main>
 
       <footer className="border-t border-line">
-        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-6 py-8 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-sm font-medium">Underwrite Copilot</span>
-          <p className="max-w-md text-xs leading-relaxed text-muted">
-            First-pass screen, not investment advice. Always verify flagged
-            figures against source documents before acting.
-          </p>
+        <div className="mx-auto grid max-w-6xl gap-8 px-6 py-10 sm:grid-cols-3">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand text-xs font-semibold text-white">
+                UC
+              </div>
+              <span className="text-sm font-semibold tracking-tight">
+                Underwrite Copilot
+              </span>
+            </div>
+            <p className="mt-3 max-w-xs text-xs leading-relaxed text-muted">
+              First-pass screen, not investment advice. Always verify flagged
+              figures against source documents before acting.
+            </p>
+          </div>
+          <nav aria-label="Product">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted">
+              Product
+            </p>
+            <ul className="mt-3 space-y-2 text-sm">
+              <li>
+                <a href="#screen" className="text-muted transition-colors hover:text-ink">
+                  How it works
+                </a>
+              </li>
+              <li>
+                <a href="#pricing" className="text-muted transition-colors hover:text-ink">
+                  Pricing
+                </a>
+              </li>
+              <li>
+                <a href="#faq" className="text-muted transition-colors hover:text-ink">
+                  FAQ
+                </a>
+              </li>
+              <li>
+                <Link href="/login" className="text-muted transition-colors hover:text-ink">
+                  Sign in
+                </Link>
+              </li>
+            </ul>
+          </nav>
+          <nav aria-label="Legal">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted">
+              Legal &amp; support
+            </p>
+            <ul className="mt-3 space-y-2 text-sm">
+              <li>
+                <Link href="/terms" className="text-muted transition-colors hover:text-ink">
+                  Terms of service
+                </Link>
+              </li>
+              <li>
+                <Link href="/privacy" className="text-muted transition-colors hover:text-ink">
+                  Privacy policy
+                </Link>
+              </li>
+              <li>
+                <a
+                  href="mailto:support@underwritecopilot.com"
+                  className="text-muted transition-colors hover:text-ink"
+                >
+                  support@underwritecopilot.com
+                </a>
+              </li>
+            </ul>
+          </nav>
         </div>
       </footer>
     </div>
@@ -484,7 +545,7 @@ function DealPreview() {
           </div>
           <div className="mt-2 grid grid-cols-3 gap-px overflow-hidden rounded-md border border-line bg-line">
             {[
-              { k: "Low", v: "5.00%", e: false },
+              { k: "Low", v: "5.25%", e: false },
               { k: "Base", v: "5.50%", e: true },
               { k: "High", v: "5.75%", e: false },
             ].map((c) => (

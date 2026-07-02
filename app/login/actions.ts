@@ -5,9 +5,23 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type AuthState = { error?: string; notice?: string } | null;
 
+/** Map raw Supabase auth errors onto copy a person can act on. */
+function friendly(message: string): string {
+  const m = message.toLowerCase();
+  if (m.includes("invalid login credentials"))
+    return "Wrong email or password. If you're new, switch to Create account.";
+  if (m.includes("already registered") || m.includes("already been registered"))
+    return "That email already has an account — sign in instead.";
+  if (m.includes("rate limit"))
+    return "Too many attempts — wait a minute and try again.";
+  if (m.includes("email not confirmed"))
+    return "Confirm your email first — check your inbox for the link.";
+  return message;
+}
+
 /**
- * One server action handles both sign-in and sign-up — the clicked button sends
- * an `intent` field so we know which. Server Actions always run on the server,
+ * One server action handles both sign-in and sign-up — the form sends an
+ * `intent` field so we know which. Server Actions always run on the server,
  * so credentials never get handled in the browser.
  */
 export async function authenticate(
@@ -23,13 +37,20 @@ export async function authenticate(
   }
 
   const supabase = await createSupabaseServerClient();
-  const { data, error } =
-    intent === "signup"
-      ? await supabase.auth.signUp({ email, password })
-      : await supabase.auth.signInWithPassword({ email, password });
+  let data, error;
+  try {
+    ({ data, error } =
+      intent === "signup"
+        ? await supabase.auth.signUp({ email, password })
+        : await supabase.auth.signInWithPassword({ email, password }));
+  } catch {
+    // Network failure or a non-JSON response from the auth service — don't
+    // surface a raw parse error to the person signing in.
+    return { error: "Couldn't reach the sign-in service — try again in a moment." };
+  }
 
   if (error) {
-    return { error: error.message };
+    return { error: friendly(error.message) };
   }
 
   // If the project requires email confirmation, sign-up succeeds but no session
@@ -44,6 +65,32 @@ export async function authenticate(
 
   // Success — the session cookie is set; send them into the app.
   redirect("/deals");
+}
+
+/** Email a password-recovery link. The link signs the user in; they then set a
+ *  new password on the Account page (which the redirect points at). */
+export async function requestPasswordReset(
+  _prev: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email) return { error: "Enter your account email first." };
+
+  const supabase = await createSupabaseServerClient();
+  const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  let error;
+  try {
+    ({ error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${origin}/account?reset=1`,
+    }));
+  } catch {
+    return { error: "Couldn't reach the sign-in service — try again in a moment." };
+  }
+  if (error) return { error: friendly(error.message) };
+  return {
+    notice:
+      "If that email has an account, a reset link is on its way. It signs you in — set a new password on the Account page.",
+  };
 }
 
 export async function signOut() {

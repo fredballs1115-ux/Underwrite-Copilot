@@ -20,12 +20,10 @@ export default function LoginPage() {
       </Link>
 
       <div className="shadow-float mt-8 rounded-2xl border border-line bg-surface p-7">
-        <h1 className="text-xl font-semibold tracking-tight">
-          Sign in or create an account
-        </h1>
+        <h1 className="text-xl font-semibold tracking-tight">Welcome</h1>
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          Screen your first deal in minutes. New here? Just pick a password and
-          hit “Create account.”
+          Screen your first deal in minutes. Your first 3 deals are free — no
+          card required, and a fully-worked sample deal is waiting inside.
         </p>
         <LoginForm />
       </div>

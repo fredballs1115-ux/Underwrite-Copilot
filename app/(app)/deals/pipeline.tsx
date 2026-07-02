@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createDeal, createSampleDeal } from "./actions";
 import { FileDrop } from "../file-drop";
 
@@ -13,15 +14,17 @@ export type DealCard = {
   verdict: string | null; // "pass" | "caution" | "pass_on" | null
   market: string;
   stats: { label: string; value: string }[];
+  /** latest analysis-job state, for deals still screening */
+  jobStatus?: "running" | "failed" | null;
 };
 
 const VERDICT_META: Record<
   string,
   { label: string; cls: string; rank: number }
 > = {
-  pass_on: { label: "Pass on", cls: "bg-kill/15 text-kill", rank: 0 },
+  pass_on: { label: "No-go", cls: "bg-kill/15 text-kill", rank: 0 },
   caution: { label: "Caution", cls: "bg-caution/15 text-caution", rank: 1 },
-  pass: { label: "Pass", cls: "bg-pass/15 text-pass", rank: 2 },
+  pass: { label: "Go", cls: "bg-pass/15 text-pass", rank: 2 },
 };
 
 function fmtDate(iso: string): string {
@@ -66,11 +69,22 @@ export function Pipeline({
   const [compareMode, setCompareMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  // While any deal is mid-screen, refresh the list every few seconds so the
+  // verdict lands without a manual reload.
+  const router = useRouter();
+  const anyRunning = deals.some((d) => !d.verdict && d.jobStatus === "running");
+  useEffect(() => {
+    if (!anyRunning) return;
+    const t = setInterval(() => router.refresh(), 7000);
+    return () => clearInterval(t);
+  }, [anyRunning, router]);
+
+  const COMPARE_MAX = 4;
   function toggleSelected(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
-      else next.add(id);
+      else if (next.size < COMPARE_MAX) next.add(id);
       return next;
     });
   }
@@ -112,6 +126,15 @@ export function Pipeline({
       return b.createdAt.localeCompare(a.createdAt); // newest
     });
   }, [deals, query, verdict, asset, market, sort]);
+
+  const verdictCounts = useMemo(() => {
+    const c = { pass: 0, caution: 0, pass_on: 0, screening: 0 };
+    for (const d of deals) {
+      if (d.verdict && d.verdict in c) c[d.verdict as keyof typeof c]++;
+      else if (!d.verdict) c.screening++;
+    }
+    return c;
+  }, [deals]);
 
   function clearFilters() {
     setQuery("");
@@ -184,12 +207,60 @@ export function Pipeline({
         </p>
       )}
 
+      {/* The one number a pipeline exists to answer: how do the calls split?
+          Each chip is also a one-tap filter. */}
+      {deals.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {(
+            [
+              ["pass", verdictCounts.pass],
+              ["caution", verdictCounts.caution],
+              ["pass_on", verdictCounts.pass_on],
+            ] as const
+          )
+            .filter(([, n]) => n > 0)
+            .map(([key, n]) => {
+              const meta = VERDICT_META[key];
+              const on = verdict === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setVerdict(on ? "all" : key)}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${meta.cls} ${
+                    on ? "ring-2 ring-current" : "hover:opacity-80"
+                  }`}
+                >
+                  {n} {meta.label}
+                </button>
+              );
+            })}
+          {verdictCounts.screening > 0 && (
+            <button
+              type="button"
+              aria-pressed={verdict === "screening"}
+              onClick={() =>
+                setVerdict(verdict === "screening" ? "all" : "screening")
+              }
+              className={`rounded-full bg-faint px-3 py-1 text-xs font-semibold text-muted transition-all ${
+                verdict === "screening" ? "ring-2 ring-current" : "hover:opacity-80"
+              }`}
+            >
+              {verdictCounts.screening} Screening
+            </button>
+          )}
+        </div>
+      )}
+
       {compareMode && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-brand/30 bg-brand/5 px-4 py-3">
           <p className="text-sm font-medium">
             {selected.size === 0
-              ? "Select two or more deals to compare."
-              : `${selected.size} selected`}
+              ? "Select 2–4 deals to compare."
+              : selected.size >= COMPARE_MAX
+                ? `${selected.size} of ${COMPARE_MAX} selected`
+                : `${selected.size} selected`}
           </p>
           {selected.size >= 2 ? (
             <Link
@@ -249,9 +320,9 @@ export function Pipeline({
             onChange={setVerdict}
             options={[
               ["all", "All verdicts"],
-              ["pass", "Pass"],
+              ["pass", "Go"],
               ["caution", "Caution"],
-              ["pass_on", "Pass on"],
+              ["pass_on", "No-go"],
               ["screening", "Screening"],
             ]}
           />
@@ -425,8 +496,17 @@ function DealRow({
         >
           {v.label}
         </span>
+      ) : d.jobStatus === "failed" ? (
+        <span className="shrink-0 rounded-full bg-kill/10 px-2.5 py-1 text-[11px] font-medium text-kill">
+          Analysis failed
+        </span>
+      ) : d.jobStatus === "running" ? (
+        <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted">
+          <span className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
+          Screening…
+        </span>
       ) : (
-        <span className="shrink-0 text-[11px] text-muted">Screening</span>
+        <span className="shrink-0 text-[11px] text-muted">Not screened</span>
       )}
       {!compareMode && (
         <svg

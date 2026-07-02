@@ -230,7 +230,6 @@ function buildDealSummary(ws: WS, model: UnderwritingModel, dealName: string) {
 
   // ---- Return summary (formulas referencing Cash Flow) --------------------
   const N = model.cashFlow.length;
-  const cfLastOp = columnLetter(3 + N - 1); // last operating-year column
   const flowsLast = columnLetter(3 + N); // levered-flows block includes year 0
   sectionHeader(ws, 33, "Return summary", "C");
   const ret: [string, F, string, boolean, string?][] = [

@@ -75,6 +75,12 @@ export function AppShell({
 
   return (
     <ToastProvider>
+    <a
+      href="#main"
+      className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-brand focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
+    >
+      Skip to content
+    </a>
     <div className="flex min-h-screen bg-canvas">
       {/* Sidebar — desktop */}
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-sidebar text-white md:flex">
@@ -88,6 +94,7 @@ export function AppShell({
         <nav className="mt-2 flex-1 space-y-1 px-3">
           <Link
             href="/deals"
+            aria-current={inPipeline ? "page" : undefined}
             className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
               inPipeline
                 ? "bg-white/12 text-white"
@@ -99,6 +106,7 @@ export function AppShell({
           </Link>
           <Link
             href="/billing"
+            aria-current={inBilling ? "page" : undefined}
             className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
               inBilling
                 ? "bg-white/12 text-white"
@@ -110,6 +118,7 @@ export function AppShell({
           </Link>
           <Link
             href="/account"
+            aria-current={inAccount ? "page" : undefined}
             className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
               inAccount
                 ? "bg-white/12 text-white"
@@ -169,6 +178,7 @@ export function AppShell({
               <Link
                 key={n.href}
                 href={n.href}
+                aria-current={n.active ? "page" : undefined}
                 className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                   n.active
                     ? "bg-white/12 text-white"
@@ -181,7 +191,7 @@ export function AppShell({
           </nav>
         </header>
 
-        <main className="flex-1">
+        <main id="main" className="flex-1">
           <div className="mx-auto w-full max-w-5xl px-5 py-8 sm:px-8">
             {children}
           </div>

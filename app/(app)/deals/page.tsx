@@ -52,6 +52,21 @@ export default async function DealsPage({
     .select("id, name, asset_class, created_at, verdict, extraction")
     .order("created_at", { ascending: false });
 
+  // Latest job per deal so the list can show "Screening…" vs "Analysis failed"
+  // instead of an inert label.
+  const ids = ((data ?? []) as { id: string }[]).map((d) => d.id);
+  const { data: jobsData } = ids.length
+    ? await supabase
+        .from("analysis_jobs")
+        .select("deal_id, status, created_at")
+        .in("deal_id", ids)
+        .order("created_at", { ascending: false })
+    : { data: [] };
+  const jobByDeal = new Map<string, string>();
+  for (const j of (jobsData ?? []) as { deal_id: string; status: string }[]) {
+    if (!jobByDeal.has(j.deal_id)) jobByDeal.set(j.deal_id, j.status);
+  }
+
   if (error) {
     return (
       <div className="rounded-xl border border-line bg-surface p-5 text-sm">
@@ -73,6 +88,7 @@ export default async function DealsPage({
   const deals: DealCard[] = ((data ?? []) as Row[]).map((d) => {
     const extraction = d.extraction as ExtractionResult | null;
     const verdict = d.verdict as { verdict?: string } | null;
+    const job = jobByDeal.get(d.id);
     return {
       id: d.id,
       name: d.name,
@@ -81,6 +97,12 @@ export default async function DealsPage({
       verdict: verdict?.verdict ?? null,
       market: extraction?.market ?? "",
       stats: extraction ? pickStats(extraction.metrics) : [],
+      jobStatus:
+        job === "queued" || job === "running"
+          ? ("running" as const)
+          : job === "error"
+            ? ("failed" as const)
+            : null,
     };
   });
 

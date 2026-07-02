@@ -25,13 +25,19 @@ let counter = 0;
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const push = useCallback((message: string, tone: Tone = "info") => {
-    const id = ++counter;
-    setToasts((t) => [...t, { id, message, tone }]);
-    setTimeout(() => {
-      setToasts((t) => t.filter((x) => x.id !== id));
-    }, 4500);
+  const dismiss = useCallback((id: number) => {
+    setToasts((t) => t.filter((x) => x.id !== id));
   }, []);
+
+  const push = useCallback(
+    (message: string, tone: Tone = "info") => {
+      const id = ++counter;
+      setToasts((t) => [...t, { id, message, tone }]);
+      // Errors carry instructions, so they linger; happy-path toasts don't.
+      setTimeout(() => dismiss(id), tone === "error" ? 10000 : 4500);
+    },
+    [dismiss],
+  );
 
   return (
     <ToastCtx.Provider value={push}>
@@ -41,7 +47,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-[min(20rem,calc(100vw-2rem))] flex-col gap-2"
       >
         {toasts.map((t) => (
-          <ToastCard key={t.id} toast={t} />
+          <ToastCard key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />
         ))}
       </div>
     </ToastCtx.Provider>
@@ -91,7 +97,13 @@ const TONE: Record<Tone, { accent: string; icon: ReactNode }> = {
   },
 };
 
-function ToastCard({ toast }: { toast: Toast }) {
+function ToastCard({
+  toast,
+  onDismiss,
+}: {
+  toast: Toast;
+  onDismiss: () => void;
+}) {
   const t = TONE[toast.tone];
   return (
     <div
@@ -99,7 +111,27 @@ function ToastCard({ toast }: { toast: Toast }) {
       className={`shadow-float animate-rise pointer-events-auto flex items-start gap-2.5 rounded-xl border border-line border-l-4 ${t.accent} bg-surface px-4 py-3`}
     >
       <span className="mt-0.5 shrink-0">{t.icon}</span>
-      <p className="text-sm leading-relaxed">{toast.message}</p>
+      <p className="min-w-0 flex-1 text-sm leading-relaxed">{toast.message}</p>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss notification"
+        className="shrink-0 rounded p-0.5 text-muted transition-colors hover:text-ink"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-3.5 w-3.5"
+          aria-hidden
+        >
+          <path d="M18 6 6 18" />
+          <path d="m6 6 12 12" />
+        </svg>
+      </button>
     </div>
   );
 }

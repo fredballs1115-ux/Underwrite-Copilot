@@ -246,6 +246,57 @@ export function DealView({
     ? results[activeDef.result] != null
     : true;
 
+  // How many findings each tab holds — so a finished run still shows where
+  // the problems live without opening every tab.
+  function tabCount(key: TabKey): number {
+    switch (key) {
+      case "challenger":
+        return (
+          results.challenges?.challenges.filter((c) => c.severity === "high")
+            .length ?? 0
+        );
+      case "comps": {
+        const c = results.comps;
+        if (!c) return 0;
+        return (
+          c.redFlags.length +
+          [...c.saleComps, ...c.leaseComps].filter(
+            (x) => x.support === "stretched",
+          ).length
+        );
+      }
+      case "market":
+        return (
+          results.market?.checks.filter((c) => c.assessment === "aggressive")
+            .length ?? 0
+        );
+      case "reconciler":
+        return (
+          results.reconciliation?.rows.filter(
+            (r) => r.direction === "unfavorable",
+          ).length ?? 0
+        );
+      default:
+        return 0;
+    }
+  }
+
+  // Arrow-key navigation across the tablist (standard tabs pattern).
+  function onTabKeyDown(e: React.KeyboardEvent) {
+    const idx = TABS.findIndex((t) => t.key === activeTab);
+    let next = -1;
+    if (e.key === "ArrowRight") next = (idx + 1) % TABS.length;
+    else if (e.key === "ArrowLeft") next = (idx - 1 + TABS.length) % TABS.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = TABS.length - 1;
+    if (next >= 0) {
+      e.preventDefault();
+      selectTab(TABS[next].key);
+      const el = document.getElementById(`tab-${TABS[next].key}`);
+      el?.focus();
+    }
+  }
+
   return (
     <div className="flex flex-col gap-5">
       {active && <ProgressRail job={job!} />}
@@ -260,14 +311,25 @@ export function DealView({
 
       {/* Tab bar */}
       <div className="overflow-x-auto">
-        <div className="flex min-w-max gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm">
+        <div
+          role="tablist"
+          aria-label="Deal analysis sections"
+          onKeyDown={onTabKeyDown}
+          className="flex min-w-max gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm"
+        >
           {TABS.map((t) => {
             const state = tabState(t);
             const isActiveTab = t.key === activeTab;
+            const count = tabCount(t.key);
             return (
               <button
                 key={t.key}
+                id={`tab-${t.key}`}
                 type="button"
+                role="tab"
+                aria-selected={isActiveTab}
+                aria-controls="deal-tabpanel"
+                tabIndex={isActiveTab ? 0 : -1}
                 onClick={() => selectTab(t.key)}
                 className={`relative flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
                   isActiveTab
@@ -277,6 +339,16 @@ export function DealView({
               >
                 <TabDot state={state} active={isActiveTab} />
                 {t.label}
+                {count > 0 && (
+                  <span
+                    title={`${count} finding${count === 1 ? "" : "s"}`}
+                    className={`rounded-full px-1.5 py-px font-mono text-[10px] tabular-nums ${
+                      isActiveTab ? "bg-white/20 text-white" : "bg-kill/10 text-kill"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -284,7 +356,13 @@ export function DealView({
       </div>
 
       {/* Active tab content — re-keyed so it eases in on switch and on data arrival */}
-      <div key={`${activeTab}-${activeHasData}`} className="animate-rise">
+      <div
+        key={`${activeTab}-${activeHasData}`}
+        id="deal-tabpanel"
+        role="tabpanel"
+        aria-labelledby={`tab-${activeTab}`}
+        className="animate-rise"
+      >
         <TabPanel
           tab={activeTab}
           state={tabState(activeDef)}
@@ -339,7 +417,22 @@ function TabDot({
   );
 }
 
+/** mm:ss elapsed since mount — a moving number so a long step never reads as
+ *  "hung" the way a frozen percentage does. */
+function useElapsed(): string {
+  const [secs, setSecs] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setSecs((v) => v + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const m = Math.floor(secs / 60);
+  const sec = String(secs % 60).padStart(2, "0");
+  return `${m}:${sec}`;
+}
+
 function ProgressRail({ job }: { job: NonNullable<Job> }) {
+  const elapsed = useElapsed();
+
   // Reconcile and model generation run on their own — a simple indicator, not
   // the 5-step pipeline rail.
   if (
@@ -348,14 +441,20 @@ function ProgressRail({ job }: { job: NonNullable<Job> }) {
     job.step === "comps_search"
   ) {
     return (
-      <div className="flex items-center gap-3 rounded-xl border border-line bg-surface p-4 shadow-sm">
-        <Spinner />
-        <span className="text-sm">
-          {STEP_LABELS[job.step] ?? "Working…"}
-        </span>
-        <span className="ml-auto font-mono text-xs tabular-nums text-muted">
-          {job.progress}%
-        </span>
+      <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+        <div className="flex items-center gap-3">
+          <Spinner />
+          <span className="text-sm">
+            {STEP_LABELS[job.step] ?? "Working…"}
+          </span>
+          <span className="ml-auto font-mono text-xs tabular-nums text-muted">
+            {elapsed}
+          </span>
+        </div>
+        <p className="mt-2 text-xs text-muted">
+          Usually a minute or two — you can keep browsing; a toast will tell
+          you when it lands.
+        </p>
       </div>
     );
   }
@@ -377,7 +476,8 @@ function ProgressRail({ job }: { job: NonNullable<Job> }) {
           {STEP_LABELS[job.step ?? ""] ?? "Analyzing…"}
         </span>
         <span className="ml-auto font-mono text-xs tabular-nums text-muted">
-          {job.progress}%
+          {cur >= 0 ? `Step ${cur + 1} of ${steps.length} · ` : ""}
+          {elapsed}
         </span>
       </div>
       <ol className="mt-4 flex items-end gap-2">
@@ -387,14 +487,12 @@ function ProgressRail({ job }: { job: NonNullable<Job> }) {
           return (
             <li key={s.key} className="flex-1">
               <div
-                className={`h-1 rounded-full ${
-                  done
-                    ? "bg-brand"
-                    : current
-                      ? "bg-brand/50 pulse-bar"
-                      : "bg-line"
+                className={`h-1 overflow-hidden rounded-full ${
+                  done ? "bg-brand" : current ? "skeleton" : "bg-line"
                 }`}
-              />
+              >
+                {current && <div className="h-full w-1/3 bg-brand/60" />}
+              </div>
               <p
                 className={`mt-1.5 text-[10px] ${
                   done || current ? "text-ink" : "text-muted"
@@ -406,6 +504,10 @@ function ProgressRail({ job }: { job: NonNullable<Job> }) {
           );
         })}
       </ol>
+      <p className="mt-3 text-xs text-muted">
+        A full screen typically takes 2–4 minutes — finished sections open as
+        they land, so feel free to explore them meanwhile.
+      </p>
     </div>
   );
 }
@@ -480,21 +582,26 @@ function TabPanel({
     </>
   );
 
-  // The reconciler tab always offers the model upload, plus the result if present.
+  // The reconciler tab always offers the model upload, plus the result if
+  // present. Reconcile is NOT part of the automatic pipeline — only show its
+  // skeleton when a reconcile run is genuinely in flight, and keep the upload
+  // form visible (disabled) while other steps run.
   if (tab === "reconciler") {
+    const reconciling = state === "running";
     return (
       <div className="flex flex-col gap-6">
         {results.reconciliation && (
           <Reconciliation result={results.reconciliation} />
         )}
-        {hasOm && !active && (
+        {reconciling && !results.reconciliation && <TableSkeleton />}
+        {hasOm && !reconciling && (
           <ReconcileSection
             dealId={dealId}
             hasResult={!!results.reconciliation}
             error={modelError}
+            disabled={active}
           />
         )}
-        {active && !results.reconciliation && <TableSkeleton />}
         {footer}
       </div>
     );
@@ -525,7 +632,9 @@ function TabPanel({
       ) : null;
   } else if (state === "running" || state === "pending") {
     content = <TabSkeleton tab={tab} />;
-  } else if (tab === "terms" && hasOm) {
+  } else if (hasOm) {
+    // The OM exists but this step has no result — the fix is one click, not
+    // "add your own data".
     content = (
       <EmptyState
         title="Analysis hasn’t run for this deal yet."
@@ -602,6 +711,7 @@ function TableSkeleton() {
 
 function VerdictSkeleton() {
   return (
+    <div className="flex flex-col gap-5">
     <div className="overflow-hidden rounded-2xl border border-line bg-surface">
       <div className="p-6">
         <div className="skeleton h-2.5 w-16 rounded" />
@@ -618,6 +728,33 @@ function VerdictSkeleton() {
           </div>
         ))}
       </div>
+    </div>
+    {/* The screen: range cards + deal-killers, so the final layout doesn't pop in */}
+    <div className="grid gap-3 sm:grid-cols-2">
+      {[0, 1].map((i) => (
+        <div key={i} className="rounded-xl border border-line bg-surface p-4">
+          <div className="skeleton h-3 w-32 rounded" />
+          <div className="mt-3 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-line bg-line">
+            {[0, 1, 2].map((j) => (
+              <div key={j} className="bg-surface px-3 py-2">
+                <div className="skeleton h-2 w-8 rounded" />
+                <div className="skeleton mt-1.5 h-3.5 w-12 rounded" />
+              </div>
+            ))}
+          </div>
+          <div className="skeleton mt-2.5 h-2 w-3/4 rounded" />
+        </div>
+      ))}
+    </div>
+    <div className="grid gap-3 sm:grid-cols-3">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="rounded-xl border border-line bg-surface p-4">
+          <div className="skeleton h-3 w-16 rounded" />
+          <div className="skeleton mt-2.5 h-2.5 w-full rounded" />
+          <div className="skeleton mt-2 h-2.5 w-5/6 rounded" />
+        </div>
+      ))}
+    </div>
     </div>
   );
 }

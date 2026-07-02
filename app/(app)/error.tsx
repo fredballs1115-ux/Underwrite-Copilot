@@ -42,6 +42,11 @@ export default function AppError({
         This screen hit an unexpected error. Try again — if it keeps happening,
         head back to your pipeline.
       </p>
+      {error.digest && (
+        <p className="mt-2 font-mono text-xs text-muted/70">
+          Error ID: {error.digest}
+        </p>
+      )}
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
         <button
           type="button"

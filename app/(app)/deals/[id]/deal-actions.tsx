@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { renameDeal, deleteDeal } from "../actions";
 
 const itemCls =
@@ -15,10 +15,13 @@ export function DealActions({
 }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"menu" | "rename" | "delete">("menu");
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   function close() {
     setOpen(false);
     setMode("menu");
+    // Hand keyboard focus back to the button that opened the menu.
+    triggerRef.current?.focus();
   }
 
   // Escape closes the menu (standard popover behavior).
@@ -34,8 +37,11 @@ export function DealActions({
   return (
     <div className="relative">
       <button
+        ref={triggerRef}
         type="button"
         aria-label="Deal actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
         onClick={() => {
           setOpen((o) => !o);
           setMode("menu");

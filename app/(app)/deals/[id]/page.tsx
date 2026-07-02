@@ -20,9 +20,9 @@ import { DealView } from "./deal-view";
 import { DealActions } from "./deal-actions";
 
 const VERDICT_PILL = {
-  pass: { label: "Pass", cls: "bg-pass/15 text-pass" },
+  pass: { label: "Go", cls: "bg-pass/15 text-pass" },
   caution: { label: "Caution", cls: "bg-caution/15 text-caution" },
-  pass_on: { label: "Pass on", cls: "bg-kill/15 text-kill" },
+  pass_on: { label: "No-go", cls: "bg-kill/15 text-kill" },
 } as const;
 
 // Headline figures for the persistent deal header. Prefer the deal-defining
@@ -157,8 +157,10 @@ export default async function DealPage({
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold tracking-tight">{deal.name}</h1>
-            <p className="mt-0.5 text-sm capitalize text-muted">
-              {deal.asset_class}
+            <p className="mt-0.5 text-sm text-muted">
+              <span className="capitalize">{deal.asset_class}</span>
+              {extraction?.market ? <> · {extraction.market}</> : null}
+              {extraction?.address ? <> · {extraction.address}</> : null}
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">

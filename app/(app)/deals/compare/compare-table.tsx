@@ -1,9 +1,9 @@
 import Link from "next/link";
 
 export const VERDICT_PILL: Record<string, { label: string; cls: string }> = {
-  pass: { label: "Pass", cls: "bg-pass/15 text-pass" },
+  pass: { label: "Go", cls: "bg-pass/15 text-pass" },
   caution: { label: "Caution", cls: "bg-caution/15 text-caution" },
-  pass_on: { label: "Pass on", cls: "bg-kill/15 text-kill" },
+  pass_on: { label: "No-go", cls: "bg-kill/15 text-kill" },
 };
 
 export const usd = (n: number | null | undefined) =>
@@ -19,6 +19,8 @@ export type Col = {
   assetClass: string;
   market: string;
   verdict: string | null;
+  reason: string | null;
+  hasModel: boolean;
   irr: number | null;
   em: number | null;
   coc: number | null;
@@ -28,8 +30,11 @@ export type Col = {
 };
 
 export function CompareTable({ cols }: { cols: Col[] }) {
-  const bestIrr = Math.max(...cols.map((c) => c.irr ?? -Infinity));
-  const bestEm = Math.max(...cols.map((c) => c.em ?? -Infinity));
+  // Never crown a hero number on a deal the screen rejected — that's the
+  // exact broker-math trap the product exists to counter.
+  const eligible = cols.filter((c) => c.verdict !== "pass_on");
+  const bestIrr = Math.max(...eligible.map((c) => c.irr ?? -Infinity));
+  const bestEm = Math.max(...eligible.map((c) => c.em ?? -Infinity));
 
   const metricRows: {
     label: string;
@@ -45,13 +50,13 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     {
       label: "Levered IRR",
       get: (c) => pct(c.irr),
-      best: (c) => c.irr != null && c.irr === bestIrr,
+      best: (c) => c.verdict !== "pass_on" && c.irr != null && c.irr === bestIrr,
       mono: true,
     },
     {
       label: "Equity multiple",
       get: (c) => mult(c.em),
-      best: (c) => c.em != null && c.em === bestEm,
+      best: (c) => c.verdict !== "pass_on" && c.em != null && c.em === bestEm,
       mono: true,
     },
     { label: "Cash-on-cash (Yr 1)", get: (c) => pct(c.coc), mono: true },
@@ -90,6 +95,19 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                       <span className="text-[11px] text-muted">Screening</span>
                     )}
                   </div>
+                  {c.reason && (
+                    <p className="mt-2 max-w-[16rem] text-xs font-normal leading-relaxed text-muted">
+                      {c.reason}
+                    </p>
+                  )}
+                  {!c.hasModel && (
+                    <Link
+                      href={`/deals/${c.id}?tab=model`}
+                      className="mt-2 inline-block text-[11px] font-medium text-brand hover:text-brand-strong"
+                    >
+                      No model yet — generate →
+                    </Link>
+                  )}
                 </th>
               );
             })}
@@ -109,11 +127,11 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                     key={c.id}
                     className={`border-l border-line px-4 py-3 ${
                       mr.mono ? "font-mono tabular-nums" : ""
-                    } ${isBest ? "font-semibold text-pass" : "text-ink"}`}
+                    } ${isBest ? "font-semibold text-brand" : "text-ink"}`}
                   >
                     {val ?? <span className="text-muted">—</span>}
                     {isBest && (
-                      <span className="ml-1.5 text-[10px] font-medium uppercase text-pass">
+                      <span className="ml-1.5 rounded-full bg-brand/10 px-1.5 py-0.5 text-[10px] font-medium uppercase text-brand">
                         best
                       </span>
                     )}
