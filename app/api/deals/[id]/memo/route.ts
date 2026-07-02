@@ -37,6 +37,13 @@ export async function GET(
   if (error || !data) return new Response("Not found", { status: 404 });
 
   const deal = data as DealRow;
+  // A memo without a verdict is a near-blank, brand-damaging PDF — refuse it.
+  if (!deal.verdict) {
+    return Response.redirect(
+      new URL(`/deals/${id}?error=memoempty`, req.url),
+      302,
+    );
+  }
   const dateStr = new Date().toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
@@ -59,7 +66,7 @@ export async function GET(
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${safe}-screening-memo.pdf"`,
+      "Content-Disposition": `attachment; filename="${safe}-screening-memo-${new Date().toISOString().slice(0, 10)}.pdf"`,
       "Cache-Control": "no-store",
     },
   });

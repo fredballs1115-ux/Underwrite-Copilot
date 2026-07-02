@@ -94,6 +94,7 @@ const MODEL_ERRORS: Record<string, string> = {
   modeltype: "Please upload your model as .xlsx, .csv, or PDF.",
   modelsize: "That file is larger than 22 MB — please try a smaller export.",
   busy: "An analysis is already running on this deal — let it finish first.",
+  memoempty: "Run the analysis first — the memo needs a verdict to export.",
   delete: "Couldn’t delete the deal — please try again.",
 };
 

@@ -32,9 +32,9 @@ const SEV_COLOR: Record<string, string> = {
   low: C.brand,
 };
 const CALL_COLOR: Record<string, string> = {
-  Pass: C.pass,
+  Go: C.pass,
   Caution: C.caution,
-  "Pass on": C.kill,
+  "No-go": C.kill,
 };
 
 export type MemoData = {
@@ -52,9 +52,13 @@ export type MemoData = {
   flags: { label: string; text: string }[];
   // The pre-model screen — ranges, deal-killers, and where the call flips.
   ranges: { label: string; low: string; base: string; high: string; source: string }[];
-  dealKillers: { label: string; read: string }[];
-  sensitivity: { scenario: string; call: string }[];
+  dealKillers: { label: string; read: string; risk: string }[];
+  sensitivity: { scenario: string; call: string; note: string }[];
+  nextSteps: string[];
 };
+
+const clamp = (s: string, n: number) =>
+  s.length > n ? s.slice(0, n - 1).trimEnd() + "\u2026" : s;
 
 /** Shape the stored analysis into the flat data the one-page memo renders. */
 export function buildMemoData(deal: DealRow, dateStr: string): MemoData {
@@ -67,13 +71,13 @@ export function buildMemoData(deal: DealRow, dateStr: string): MemoData {
   const vmeta = verdict
     ? (
         {
-          pass: { word: "Pass", color: C.pass, sub: "Worth deeper work" },
+          pass: { word: "Go", color: C.pass, sub: "Worth deeper work" },
           caution: {
             word: "Caution",
             color: C.caution,
             sub: "Proceed only with named conditions",
           },
-          pass_on: { word: "Pass on", color: C.kill, sub: "Recommend passing" },
+          pass_on: { word: "No-go", color: C.kill, sub: "Recommend passing" },
         } as const
       )[verdict.verdict]
     : null;
@@ -120,24 +124,26 @@ export function buildMemoData(deal: DealRow, dateStr: string): MemoData {
     sponsor: "Sponsor",
   };
   const CALL_LABEL: Record<string, string> = {
-    pass: "Pass",
+    pass: "Go",
     caution: "Caution",
-    pass_on: "Pass on",
+    pass_on: "No-go",
   };
   const ranges = (screen?.ranges ?? []).slice(0, 4).map((r) => ({
-    label: r.label,
+    label: clamp(r.label, 28),
     low: r.low,
     base: r.base,
     high: r.high,
-    source: r.source,
+    source: clamp(r.source, 62),
   }));
   const dealKillers = (screen?.dealKillers ?? []).slice(0, 3).map((k) => ({
     label: LEVER_LABEL[k.lever] ?? k.lever,
-    read: k.read,
+    read: clamp(k.read, 72),
+    risk: clamp(k.risk ?? "", 72),
   }));
   const sensitivity = (screen?.sensitivity ?? []).map((sc) => ({
     scenario: SCENARIO_LABEL[sc.scenario] ?? sc.scenario,
     call: CALL_LABEL[sc.call] ?? sc.call,
+    note: clamp(sc.note ?? "", 90),
   }));
 
   // When the screen is present it earns the page space — tighten the older
@@ -152,22 +158,24 @@ export function buildMemoData(deal: DealRow, dateStr: string): MemoData {
     verdictWord: vmeta?.word ?? null,
     verdictColor: vmeta?.color ?? C.muted,
     verdictSub: vmeta?.sub ?? "",
-    verdictReason: verdict?.reason ?? "",
-    keyTerms: hasScreen ? keyTerms.slice(0, 6) : keyTerms,
-    topRisks: (verdict?.topRisks ?? []).slice(0, hasScreen ? 3 : 4),
-    challenges: hasScreen ? ch.slice(0, 2) : ch,
-    // With the screen present, the ranges + risks already carry the comp/market
-    // story — drop the flags section to keep the memo one page.
+    verdictReason: clamp(verdict?.reason ?? "", 280),
+    keyTerms: hasScreen ? keyTerms.slice(0, 4) : keyTerms,
+    topRisks: (verdict?.topRisks ?? []).slice(0, hasScreen ? 2 : 4),
+    // With the screen present, the deal-killers + top risks already carry the
+    // critique and the ranges carry the comp/market story — drop the two
+    // overlapping sections so the memo stays one page.
+    challenges: hasScreen ? [] : ch,
     flags: hasScreen ? [] : flags.slice(0, 4),
     ranges,
     dealKillers,
     sensitivity,
+    nextSteps: (verdict?.nextSteps ?? []).slice(0, hasScreen ? 2 : 4),
   };
 }
 
 const s = StyleSheet.create({
   page: {
-    paddingVertical: 32,
+    paddingVertical: 28,
     paddingHorizontal: 44,
     fontSize: 10,
     fontFamily: "Helvetica",
@@ -194,7 +202,7 @@ const s = StyleSheet.create({
   },
   brandText: { fontSize: 11, fontFamily: "Helvetica-Bold" },
   metaRight: { textAlign: "right", color: C.muted, fontSize: 9 },
-  divider: { borderBottomWidth: 1, borderBottomColor: C.line, marginVertical: 12 },
+  divider: { borderBottomWidth: 1, borderBottomColor: C.line, marginVertical: 10 },
   title: { fontSize: 18, fontFamily: "Helvetica-Bold" },
   sub: { fontSize: 10, color: C.muted, marginTop: 2 },
 
@@ -217,6 +225,8 @@ const s = StyleSheet.create({
   verdictReason: { marginTop: 6, fontSize: 10, color: C.ink },
 
   section: { marginTop: 13 },
+  twoCol: { flexDirection: "row", marginTop: 13, gap: 14 },
+  col: { flex: 1 },
   sectionTitle: {
     fontSize: 9,
     fontFamily: "Helvetica-Bold",
@@ -301,17 +311,19 @@ const s = StyleSheet.create({
   killerCol: { flex: 1, paddingRight: 10 },
   killerName: { fontSize: 8.5, fontFamily: "Helvetica-Bold", color: C.brand },
   killerRead: { fontSize: 8, color: C.muted, marginTop: 1.5 },
-  sensRow: { flexDirection: "row", marginTop: 8, alignItems: "center" },
+  killerRisk: { fontSize: 7.5, color: C.kill, marginTop: 1.5 },
+  sensBlock: { marginTop: 8 },
   sensLabel: {
     fontSize: 7,
     color: C.muted,
     textTransform: "uppercase",
     letterSpacing: 0.5,
-    marginRight: 8,
+    marginBottom: 2,
   },
-  sensChip: { flexDirection: "row", alignItems: "center", marginRight: 12 },
-  sensScenario: { fontSize: 8, color: C.muted, marginRight: 3 },
-  sensCall: { fontSize: 8.5, fontFamily: "Helvetica-Bold" },
+  sensLine: { flexDirection: "row", alignItems: "baseline", marginBottom: 1.5 },
+  sensScenario: { fontSize: 8, color: C.muted, width: 62 },
+  sensCall: { fontSize: 8.5, fontFamily: "Helvetica-Bold", width: 46 },
+  sensNote: { fontSize: 7.5, color: C.muted, flex: 1 },
 
   footer: {
     position: "absolute",
@@ -410,22 +422,26 @@ export function MemoDocument({ data }: { data: MemoData }) {
                       {i + 1}. {k.label}
                     </Text>
                     <Text style={s.killerRead}>{k.read}</Text>
+                    {k.risk ? (
+                      <Text style={s.killerRisk}>Breaks if: {k.risk}</Text>
+                    ) : null}
                   </View>
                 ))}
               </View>
             )}
 
             {data.sensitivity.length > 0 && (
-              <View style={s.sensRow}>
+              <View style={s.sensBlock}>
                 <Text style={s.sensLabel}>Where the call flips</Text>
                 {data.sensitivity.map((sc, i) => (
-                  <View key={i} style={s.sensChip}>
-                    <Text style={s.sensScenario}>{sc.scenario}:</Text>
+                  <View key={i} style={s.sensLine}>
+                    <Text style={s.sensScenario}>{sc.scenario}</Text>
                     <Text
                       style={[s.sensCall, { color: CALL_COLOR[sc.call] ?? C.ink }]}
                     >
                       {sc.call}
                     </Text>
+                    {sc.note ? <Text style={s.sensNote}>— {sc.note}</Text> : null}
                   </View>
                 ))}
               </View>
@@ -447,15 +463,31 @@ export function MemoDocument({ data }: { data: MemoData }) {
           </Section>
         )}
 
-        {data.topRisks.length > 0 && (
-          <Section title="Top risks">
-            {data.topRisks.map((r, i) => (
-              <View key={i} style={s.row}>
-                <Text style={s.bullet}>•</Text>
-                <Text style={s.itemText}>{r}</Text>
+        {(data.topRisks.length > 0 || data.nextSteps.length > 0) && (
+          <View style={s.twoCol}>
+            {data.topRisks.length > 0 && (
+              <View style={s.col}>
+                <Text style={s.sectionTitle}>Top risks</Text>
+                {data.topRisks.map((r, i) => (
+                  <View key={i} style={s.row}>
+                    <Text style={s.bullet}>•</Text>
+                    <Text style={s.itemText}>{r}</Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </Section>
+            )}
+            {data.nextSteps.length > 0 && (
+              <View style={s.col}>
+                <Text style={s.sectionTitle}>Next steps</Text>
+                {data.nextSteps.map((n, i) => (
+                  <View key={i} style={s.row}>
+                    <Text style={s.bullet}>{i + 1}.</Text>
+                    <Text style={s.itemText}>{n}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
         )}
 
         {data.challenges.length > 0 && (

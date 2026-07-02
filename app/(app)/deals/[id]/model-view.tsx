@@ -8,7 +8,11 @@ import type {
   UnderwritingModel,
   ReconciledMetric,
 } from "@/lib/model/types";
-import { computeModel, type CashFlowYear } from "@/lib/model/compute";
+import { type CashFlowYear } from "@/lib/model/compute";
+import {
+  computeSensitivityGrid,
+  SENSITIVITY_PRICE_FACTORS,
+} from "@/lib/model/sensitivity";
 import {
   addDealDocument,
   removeDealDocument,
@@ -205,9 +209,6 @@ function ReturnsHeadline({ model }: { model: UnderwritingModel }) {
   );
 }
 
-const PRICE_FACTORS = [0.9, 0.95, 1, 1.05, 1.1];
-const EXIT_DELTAS = [-0.5, -0.25, 0, 0.25, 0.5]; // percentage points
-
 function compactUsd(n: number): string {
   if (n >= 1_000_000) return "$" + (n / 1_000_000).toFixed(1) + "M";
   if (n >= 1_000) return "$" + Math.round(n / 1_000) + "k";
@@ -228,20 +229,12 @@ function Sensitivity({ model }: { model: UnderwritingModel }) {
   const base = model.inputs;
   if (!base?.exitCapPct || !base?.purchasePrice) return null;
 
-  const rows = EXIT_DELTAS.map((ed) => {
-    const exit = base.exitCapPct + ed;
-    const cells = PRICE_FACTORS.map((pf) => {
-      const inp = {
-        ...base,
-        exitCapPct: exit,
-        purchasePrice: base.purchasePrice * pf,
-        loan: { ...base.loan },
-      };
-      const irr = computeModel(inp).returns.leveredIrrPct;
-      return { irr, isBase: ed === 0 && pf === 1 };
-    });
-    return { exit, cells };
-  });
+  // Same shared engine + grid definition the Excel builder uses — "same math
+  // as the workbook" is true by construction.
+  const rows = computeSensitivityGrid(base).map((g) => ({
+    exit: g.exitCapPct,
+    cells: g.cells.map((c) => ({ irr: c.irrPct, isBase: c.isBase })),
+  }));
 
   return (
     <section>
@@ -260,7 +253,7 @@ function Sensitivity({ model }: { model: UnderwritingModel }) {
               <th className="px-3 py-2.5 text-left font-medium">
                 Exit cap ↓ / price →
               </th>
-              {PRICE_FACTORS.map((pf) => (
+              {SENSITIVITY_PRICE_FACTORS.map((pf) => (
                 <th
                   key={pf}
                   className={`px-3 py-2.5 font-mono font-medium tabular-nums ${

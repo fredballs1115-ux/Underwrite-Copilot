@@ -28,20 +28,8 @@ const data: MemoData = {
     "Pro forma rents assume a $180/mo premium the comps don't support.",
     "Stabilized vacancy of 6% ignores the 9% in-place reality.",
   ],
-  challenges: [
-    {
-      severity: "high",
-      assumption: "Exit cap compression to 5.25%",
-      challenge:
-        "The model exits tighter than going-in with no stated thesis for compression.",
-    },
-    {
-      severity: "high",
-      assumption: "$180/mo renovation premium",
-      challenge:
-        "Pro forma rents jump 13% on a renovation program the comps don't yet support.",
-    },
-  ],
+  // buildMemoData drops challenges when the screen is present (one-page budget).
+  challenges: [],
   // buildMemoData drops flags when the screen is present (one-page budget).
   flags: [],
   ranges: [
@@ -75,14 +63,34 @@ const data: MemoData = {
     },
   ],
   dealKillers: [
-    { label: "Basis", read: "Buying above the last comparable trades." },
-    { label: "Exit", read: "Underwritten inside going-in; flat exit cuts ~200 bps." },
-    { label: "Debt", read: "60% LTV at 6.0%; refi window is the pressure point." },
+    {
+      label: "Basis",
+      read: "Buying above the last comparable trades.",
+      risk: "No renovation premium yet justifies the spread.",
+    },
+    {
+      label: "Exit",
+      read: "Underwritten inside going-in; flat exit cuts ~200 bps.",
+      risk: "A flat 5.5% exit pushes the IRR under the hurdle.",
+    },
+    {
+      label: "Debt",
+      read: "60% LTV at 6.0%; refi window is the pressure point.",
+      risk: "A 50 bp rate move pressures the takeout.",
+    },
   ],
   sensitivity: [
-    { scenario: "Conservative", call: "Pass on" },
-    { scenario: "Base", call: "Caution" },
-    { scenario: "Sponsor", call: "Pass" },
+    {
+      scenario: "Conservative",
+      call: "No-go",
+      note: "Flat exit + real vacancy: single-digit IRR.",
+    },
+    { scenario: "Base", call: "Caution", note: "Pencils only if the seller moves on price." },
+    { scenario: "Sponsor", call: "Go", note: "Ramp + exit hold: clears the hurdle." },
+  ],
+  nextSteps: [
+    "Pull three renovated-comp leases to test the rent premium.",
+    "Re-run returns at a flat 5.5% exit and real in-place vacancy.",
   ],
 };
 
