@@ -5,8 +5,10 @@
  * every figure here is reproducible from the inputs.
  *
  * Simplifications (surfaced as caveats in the model): straight-line growth,
- * no capex/reserves line, single tranche of debt, sale at a forward-NOI / exit-
- * cap value net of selling costs. A first-draft to verify, not a final model.
+ * annual (not monthly) flows, a single tranche of debt, a flat capital reserve
+ * grown with expenses, and sale at a forward-NOI / exit-cap value net of
+ * selling costs. Acquisition costs and loan fees ARE capitalized into equity.
+ * A first-draft to verify, not a final model.
  */
 
 export interface LoanTerms {
@@ -19,6 +21,11 @@ export interface LoanTerms {
 export interface ModelInputs {
   units: number;
   purchasePrice: number;
+  /** due diligence + closing costs, % of price (0-100 scale). Optional for
+   *  models stored before this existed. */
+  closingCostPct?: number;
+  /** financing / origination fees, % of the loan (0-100 scale). Optional. */
+  loanFeePct?: number;
   year1Gpr: number; // annual gross potential rent
   vacancyPct: number;
   otherIncomeAnnual: number;
@@ -155,7 +162,11 @@ export function computeModel(inp: ModelInputs): {
   returns: ModelReturns;
 } {
   const loanAmount = inp.purchasePrice * (inp.loan.ltvPct / 100);
-  const equity = inp.purchasePrice - loanAmount;
+  // Day-0 equity carries the real check size: price + closing costs + loan
+  // fees - loan proceeds. Omitting costs is how brokers flatter an IRR.
+  const closingCosts = inp.purchasePrice * ((inp.closingCostPct ?? 0) / 100);
+  const loanFees = loanAmount * ((inp.loanFeePct ?? 0) / 100);
+  const equity = inp.purchasePrice + closingCosts + loanFees - loanAmount;
 
   const cashFlow: CashFlowYear[] = [];
   for (let y = 1; y <= inp.holdYears; y++) {
@@ -208,7 +219,7 @@ export function computeModel(inp: ModelInputs): {
     ),
   ];
   const unleveredFlows = [
-    -inp.purchasePrice,
+    -(inp.purchasePrice + closingCosts),
     ...cashFlow.map((c, i) =>
       i === cashFlow.length - 1
         ? c.noi - c.capexReserve + (exitValue - sellingCosts)

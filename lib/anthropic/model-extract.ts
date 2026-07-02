@@ -15,9 +15,9 @@ const FactsSchema = z.object({
       label: z.string(),
       value: z.string(),
       numeric: z.number().nullable(),
-      unit: z.string(),
+      unit: z.enum(["%", "$", "$/unit/mo", "$/sf", "units", "sf", "years", "x", ""]),
       locator: z.string(),
-      basis: z.string(),
+      basis: z.enum(["actual", "pro_forma", "term_sheet", "appraisal", "other"]),
     }),
   ),
 });

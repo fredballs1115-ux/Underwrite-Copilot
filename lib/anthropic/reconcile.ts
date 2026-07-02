@@ -33,8 +33,11 @@ export async function reconcileModel(
 ): Promise<ReconciliationResult> {
   const client = getAnthropic();
 
+  // OM document FIRST with cache_control — byte-identical to the prefix the
+  // extract/challenge/comps/market steps send, so this step reads the OM from
+  // the prompt cache (and re-warms it) instead of paying a full re-read of a
+  // 150-200pp PDF. The label text moves after the document for that reason.
   const content: Anthropic.ContentBlockParam[] = [
-    { type: "text", text: "The broker's offering memorandum (OM):" },
     {
       type: "document",
       source: {
@@ -42,6 +45,11 @@ export async function reconcileModel(
         media_type: "application/pdf",
         data: omPdf.toString("base64"),
       },
+      cache_control: { type: "ephemeral" },
+    },
+    {
+      type: "text",
+      text: "The document above is the broker's offering memorandum (OM).",
     },
   ];
 

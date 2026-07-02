@@ -11,6 +11,7 @@ const CompSchema = z.object({
   detail: z.string(),
   support: z.enum(["supports", "favorable", "stretched"]),
   note: z.string(),
+  page: z.string(),
 });
 
 const BrokerCompsSchema = z.object({

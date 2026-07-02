@@ -28,6 +28,9 @@ export interface ExtractedMetric {
   flagged: boolean;
   /** OM page where the figure was found, e.g. "p. 12" ("" if unknown) */
   page: string;
+  /** in-place reality vs. the sponsor's forward story. Optional for results
+   *  saved before this field existed. */
+  basis?: "in_place" | "pro_forma" | "na";
 }
 export interface ExtractionResult {
   dealName: string | null;
@@ -35,6 +38,9 @@ export interface ExtractionResult {
   /** Submarket / metro, e.g. "North Dallas, TX" ("" if unclear). Optional for
    *  backward-compatibility with extractions saved before this field existed. */
   market?: string;
+  /** Full street address ("" if the OM never states it). Optional for
+   *  backward-compatibility. The screen anchors on the address. */
+  address?: string;
   metrics: ExtractedMetric[];
 }
 
@@ -45,6 +51,8 @@ export interface Challenge {
   challenge: string;
   /** the exact question to put to the broker */
   question: string;
+  /** OM page of the challenged figure ("" if unknown). Optional pre-cites. */
+  page?: string;
 }
 export interface ChallengerResult {
   challenges: Challenge[];
@@ -59,6 +67,8 @@ export interface BrokerComp {
   support: CompSupport;
   /** how it compares to the subject deal, and whether it's cherry-picked */
   note: string;
+  /** OM page the comp appears on ("" if unknown). Optional pre-cites. */
+  page?: string;
 }
 export interface BrokerCompsResult {
   saleComps: BrokerComp[];
@@ -89,6 +99,8 @@ export interface MarketCheck {
   typicalRange: string;
   assessment: MarketAssessment;
   note: string;
+  /** OM page of the assumption ("" if unknown). Optional pre-cites. */
+  page?: string;
 }
 export interface MarketResult {
   checks: MarketCheck[];

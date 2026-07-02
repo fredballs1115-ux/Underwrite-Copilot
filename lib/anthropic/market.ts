@@ -14,6 +14,7 @@ const MarketSchema = z.object({
       typicalRange: z.string(),
       assessment: z.enum(["in-line", "aggressive", "conservative"]),
       note: z.string(),
+      page: z.string(),
     }),
   ),
   summary: z.string(),

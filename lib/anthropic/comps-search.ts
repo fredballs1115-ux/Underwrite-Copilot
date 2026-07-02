@@ -39,6 +39,7 @@ function extractJson(text: string): { summary?: string; candidates?: PublicComp[
  */
 export async function findPublicComps(subject: {
   name: string;
+  address: string;
   market: string;
   assetClass: string;
 }): Promise<CompSearchResult> {
@@ -48,9 +49,10 @@ export async function findPublicComps(subject: {
   const asset = subject.assetClass && subject.assetClass !== "auto"
     ? `${subject.assetClass} `
     : "";
+  const at = subject.address ? `, ${subject.address}` : "";
   const prompt = `Use web search to find PUBLICLY-REPORTED comparable sale transactions for this commercial real estate property.
 
-Subject: ${subject.name} — a ${asset}property${where}.
+Subject: ${subject.name}${at} — a ${asset}property${where}. Anchor the search on the property's actual address and submarket, not the deal's marketing name.
 
 Rules:
 - Search ONLY publicly available sources: news articles, press releases, public county records, brokerage marketing pages, and trade publications.
@@ -69,11 +71,11 @@ If you find nothing credible, return an empty candidates array and say so in the
     messages: [{ role: "user", content: prompt }],
     tools: [
       {
-        type: "web_search_20250305",
+        type: "web_search_20260209",
         name: "web_search",
         max_uses: 6,
       },
-    ] as unknown as Anthropic.ToolUnion[],
+    ],
   });
 
   const text = response.content
@@ -82,10 +84,21 @@ If you find nothing credible, return an empty candidates array and say so in the
     .join("\n");
   const parsed = extractJson(text);
 
+  // A parse failure is NOT the same as "no comps exist" — say so, so the user
+  // knows a retry may succeed.
+  if (!parsed) {
+    return {
+      candidates: [],
+      summary:
+        "The search ran but its results couldn't be read — try searching again.",
+      searchedAt: new Date().toISOString(),
+    };
+  }
+
   return {
-    candidates: Array.isArray(parsed?.candidates) ? parsed!.candidates : [],
+    candidates: Array.isArray(parsed.candidates) ? parsed.candidates : [],
     summary:
-      parsed?.summary ??
+      parsed.summary ??
       "No publicly-reported comps could be confirmed. Add comps manually or upload a comp sheet.",
     searchedAt: new Date().toISOString(),
   };
@@ -123,6 +136,7 @@ export async function runCompSearch(dealId: string): Promise<void> {
     const extraction = deal.extraction as ExtractionResult | null;
     const result = await findPublicComps({
       name: (deal.name as string) ?? "the subject property",
+      address: extraction?.address ?? "",
       market: extraction?.market ?? "",
       assetClass: (deal.asset_class as string) ?? "",
     });

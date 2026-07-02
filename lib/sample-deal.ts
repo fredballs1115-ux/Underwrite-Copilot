@@ -18,6 +18,8 @@ export const SAMPLE_DEAL_NAME = "Sample — The Maddox at Highland Park";
 const inputs: ModelInputs = {
   units: 248,
   purchasePrice: 68000000,
+  closingCostPct: 2,
+  loanFeePct: 1,
   year1Gpr: 7150000,
   vacancyPct: 9,
   otherIncomeAnnual: 300000,

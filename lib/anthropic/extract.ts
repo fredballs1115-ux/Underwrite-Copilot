@@ -13,12 +13,14 @@ const ExtractionSchema = z.object({
   dealName: z.string(),
   assetClass: z.string(),
   market: z.string(),
+  address: z.string(),
   metrics: z.array(
     z.object({
       label: z.string(),
       value: z.string(),
       flagged: z.boolean(),
       page: z.string(),
+      basis: z.enum(["in_place", "pro_forma", "na"]),
     }),
   ),
 });

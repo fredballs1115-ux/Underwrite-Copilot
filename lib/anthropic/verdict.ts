@@ -59,11 +59,33 @@ export interface VerdictInputs {
 function buildBrief(input: VerdictInputs): string {
   const sections: string[] = [];
 
+  // Deal identity first — the ranges must be grounded in the actual asset,
+  // asset class, and submarket, not synthesized in a vacuum.
+  const ex = input.extraction;
+  sections.push(
+    "## Deal",
+    ex
+      ? [
+          `${ex.dealName ?? "(unnamed)"} — ${ex.assetClass}${ex.market ? ` — ${ex.market}` : ""}`,
+          ex.address ? `Address: ${ex.address}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : "Not available.",
+  );
+
+  const cite = (page?: string) => (page ? ` [${page}]` : "");
+  const basisTag = (b?: string) =>
+    b === "in_place" ? " (in-place)" : b === "pro_forma" ? " (pro forma)" : "";
+
   sections.push(
     "## Extracted terms",
     input.extraction
       ? input.extraction.metrics
-          .map((m) => `- ${m.label}: ${m.value}${m.flagged ? " (flagged)" : ""}`)
+          .map(
+            (m) =>
+              `- ${m.label}: ${m.value}${basisTag(m.basis)}${cite(m.page)}${m.flagged ? " (flagged)" : ""}`,
+          )
           .join("\n")
       : "Not available.",
   );
@@ -73,7 +95,8 @@ function buildBrief(input: VerdictInputs): string {
     input.challenges
       ? [
           ...input.challenges.challenges.map(
-            (c) => `- [${c.severity}] ${c.assumption}: ${c.challenge}`,
+            (c) =>
+              `- [${c.severity}] ${c.assumption}${cite(c.page)}: ${c.challenge}`,
           ),
           `Stress test: ${input.challenges.stressTest}`,
         ].join("\n")
@@ -85,10 +108,12 @@ function buildBrief(input: VerdictInputs): string {
     input.comps
       ? [
           ...input.comps.saleComps.map(
-            (c) => `- Sale [${c.support}] ${c.name}: ${c.note}`,
+            (c) =>
+              `- Sale [${c.support}] ${c.name}${c.detail ? ` (${c.detail})` : ""}${cite(c.page)}: ${c.note}`,
           ),
           ...input.comps.leaseComps.map(
-            (c) => `- Lease [${c.support}] ${c.name}: ${c.note}`,
+            (c) =>
+              `- Lease [${c.support}] ${c.name}${c.detail ? ` (${c.detail})` : ""}${cite(c.page)}: ${c.note}`,
           ),
           ...input.comps.redFlags.map((f) => `- Red flag: ${f}`),
           `Summary: ${input.comps.summary}`,
@@ -115,7 +140,7 @@ function buildBrief(input: VerdictInputs): string {
       ? [
           ...input.market.checks.map(
             (c) =>
-              `- ${c.assumption}: OM says ${c.omSays}, typical ${c.typicalRange} (${c.assessment}) — ${c.note}`,
+              `- ${c.assumption}${cite(c.page)}: OM says ${c.omSays}, typical ${c.typicalRange} (${c.assessment}) — ${c.note}`,
           ),
           `Summary: ${input.market.summary}`,
         ].join("\n")

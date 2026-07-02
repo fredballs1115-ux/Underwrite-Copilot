@@ -34,7 +34,9 @@ export function extractionInstruction(assetClass: AssetClass): string {
     assetClass,
   )}
 
-Capture: asking price (and per-unit / per-SF if given), NOI (year 1 and stabilized), going-in and pro forma cap rates, occupancy, in-place and pro forma rents, expense ratio, exit cap, IRR, financing (LTV, rate, lender), hold period, seller, and broker. Also capture the property / deal name if present, and the \`market\` — the submarket and metro the property sits in, as a short string like "North Dallas, TX" (empty string if you can't tell).
+Capture: asking price (and per-unit / per-SF if given), NOI (year 1 and stabilized), going-in and pro forma cap rates, occupancy, in-place and pro forma rents, expense ratio, exit cap, IRR, financing (LTV, rate, lender), hold period, unit count and/or total SF, year built / renovated, seller, and broker. Also capture the property / deal name if present, the \`market\` — the submarket and metro the property sits in, as a short string like "North Dallas, TX" (empty string if you can't tell) — and the \`address\`: the property's full street address (street, city, state; empty string if the OM never states it). The screen anchors on the address, not the deck's narrative.
+
+Tag each figure's \`basis\`: "in_place" for current / historical facts the property is actually producing (in-place rents, current occupancy, T-12 NOI, taxes paid), "pro_forma" for the sponsor's forward projections (stabilized NOI, pro forma rents, rent growth, exit cap, IRR), "na" for identity facts (price, seller, broker, year built, unit count). The buyer must be able to tell the property's reality from the sponsor's story at a glance.
 
 Set \`flagged\` to true ONLY for the figures most worth independent verification — forward-looking or sponsor-controlled numbers that drive returns and are easy to inflate (pro forma rents, stabilized NOI, projected rent growth, exit cap, IRR, expense ratios). Do NOT flag hard, present-day, third-party-verifiable facts (asking price, unit or SF count, year built, in-place occupancy, seller, broker, stated loan terms). Flag selectively: if nearly everything is flagged, the flags stop being useful. Also record, for each figure, the page in the OM where you found it as a short string like "p. 12" (use an empty string if you can't tell).`;
 }
@@ -45,16 +47,16 @@ export function challengerInstruction(assetClass: AssetClass): string {
     assetClass,
   )}
 
-Focus on: exit cap vs. going-in cap (compression is a red flag), pro forma rent growth vs. realistic market growth, thin or understated expense ratios, vacancy and lease-up optimism, real-estate taxes held flat despite reassessment on sale, renovation / value-add premium claims, and financing assumptions that may not hold at current rates.
+Grill the deal in the order deals die: (1) BASIS — is the asking price per unit / per SF defensible against the OM's own comps and any replacement-cost logic, or is the buyer overpaying going in; (2) EXIT — exit cap vs. going-in cap (compression is a red flag) and how much of the return the residual carries; (3) DEBT — financing assumptions at current rates, DSCR headroom, and refinance risk. Then the supporting assumptions: pro forma rent growth vs. realistic market growth, thin or understated expense ratios, vacancy and lease-up optimism, real-estate taxes held flat despite reassessment on sale, and renovation / value-add premium claims.
 
-Give 3–6 challenges, most severe first. For each, give a specific, numerate critique and the exact question to put to the broker. Then give a one-paragraph stress test: what happens to returns if the one or two most aggressive assumptions revert to market.`;
+Give 3–6 challenges, most severe first. For each, give a specific, numerate critique, the exact question to put to the broker, and \`page\` — the OM page where the challenged figure appears, as a short string like "p. 12" (empty string if unknown). Then give a one-paragraph stress test: what happens to returns if the one or two most aggressive assumptions revert to market.`;
 }
 
 /** Step 3 — Broker-comp scrutiny (the sale & lease comps inside the OM) */
 export function brokerCompsInstruction(): string {
   return `Scrutinize the comparable sales and lease comps the broker included in the attached offering memorandum. These come from the OM itself — do NOT use any outside data source. Brokers cherry-pick comps to justify pricing; your job is to extract every comp shown, judge how well each actually supports the subject deal's pricing and rents, and flag the cherry-picking.
 
-Extract both sale comps and lease comps if present. For each comp, compare it to the subject property and rate it: \`supports\` (genuinely backs the broker's numbers), \`favorable\` (leans the broker's way), or \`stretched\` (doesn't really support the deal). Also identify what's conspicuously missing — recent weaker trades omitted, only the best submarkets shown, or stale comps used because recent ones are unfavorable.
+Extract both sale comps and lease comps if present. For each comp, record \`page\` — the OM page it appears on, as a short string like "p. 31" (empty string if unknown) — then compare it to the subject property and rate it: \`supports\` (genuinely backs the broker's numbers), \`favorable\` (leans the broker's way), or \`stretched\` (doesn't really support the deal). Also identify what's conspicuously missing — recent weaker trades omitted, only the best submarkets shown, or stale comps used because recent ones are unfavorable.
 
 If the OM contains no comps at all, say so clearly in the summary and return empty comp lists. Finish with a one-sentence verdict: do the broker's comps actually justify the pricing, or are they stretched?`;
 }
@@ -74,7 +76,7 @@ export function marketCheckInstruction(assetClass: AssetClass): string {
     assetClass,
   )}
 
-You do NOT have a live comps feed — reason from typical ranges and explicitly flag anything that looks off-market. For each assumption, give what the OM says, a typical range, an assessment (\`in-line\`, \`aggressive\`, or \`conservative\`), and short reasoning. Finish with a one-sentence overall plausibility summary.
+You do NOT have a live comps feed — reason from typical ranges and explicitly flag anything that looks off-market. For each assumption, give what the OM says, a typical range, an assessment (\`in-line\`, \`aggressive\`, or \`conservative\`), short reasoning, and \`page\` — the OM page where the assumption appears, as a short string like "p. 40" (empty string if unknown). Finish with a one-sentence overall plausibility summary.
 
 Be clear throughout that these are rules-of-thumb, not pulled comps, and must be verified against real market data.`;
 }
@@ -100,7 +102,7 @@ For each fact, give:
 - \`numeric\`: the value as a plain number with no symbols (convert "$1,250,000" to 1250000 and "92%" to 92), or null if not numeric.
 - \`unit\`: one of "%", "$", "$/unit/mo", "$/sf", "units", "sf", "years", "x", or "".
 - \`locator\`: where in the document (e.g. "p. 7", "Sheet1!B12"), or "" if unknown.
-- \`basis\`: the single most important field — whether this number is an "actual" (historical / in-place — what rent rolls and T-12s report), a "pro forma" (the sponsor's forward projection — what OM pro formas report), a "term sheet" figure (loan terms), or "appraisal"/other.
+- \`basis\`: the single most important field. Use exactly one of: "actual" (historical / in-place — what rent rolls and T-12s report), "pro_forma" (the sponsor's forward projection — what OM pro formas report), "term_sheet" (loan terms), "appraisal", or "other".
 
 Capture BOTH actuals and pro forma figures when the document shows both (e.g. a statement with actual and projected columns). Getting \`basis\` right is essential: the model uses it to decide which source wins when documents disagree.`;
 }
@@ -118,8 +120,8 @@ Source-authority rules — apply them, and explain each choice:
 For EVERY metric that matters to the model, output a reconciled entry: key, label, chosenValue (string including the unit), unit, the full list of sources (each with doc, value, locator, basis), authority (which document won), a one-sentence rationale, confidence (high/medium/low), and isConflict. Set isConflict=true whenever two sources gave materially different values for the same metric — surface it, do not bury it.
 
 Then produce \`inputs\`: the numeric inputs the cash-flow math needs, derived from your CHOSEN values, all as plain numbers:
-- units, purchasePrice (if not stated, derive from year-1 NOI ÷ going-in cap), year1Gpr (annual gross potential rent), vacancyPct, otherIncomeAnnual, year1Opex (annual total), capexReserveAnnual (annual capital / replacement reserve, deducted BELOW NOI — from a capital plan or PCA if provided; otherwise a market-reasonable reserve: multifamily ≈ $250–300/unit/yr, commercial ≈ $0.15–0.25/SF/yr; use 0 only if you truly cannot ground it), rentGrowthPct, expenseGrowthPct, otherIncomeGrowthPct, exitCapPct, sellingCostPct (use 2 if unstated), holdYears (use 5 if unstated), and loan { ltvPct, ratePct, amortYears (use 30 if unstated), ioYears (use 0 if unstated) }.
-Pick conservative, defensible inputs consistent with your reconciliation; where a figure is the sponsor's forward assumption, prefer an actuals-derived or market-reasonable value. The capital reserve is a single flat annual figure — note in a caveat if a detailed capital plan is needed.
+- units, purchasePrice (if not stated, derive from year-1 NOI ÷ going-in cap), closingCostPct (due diligence + closing costs as % of price — use 2 if unstated), loanFeePct (financing/origination fees as % of the loan — use 1 when there is debt, 0 otherwise), year1Gpr (annual gross potential rent), vacancyPct, otherIncomeAnnual, year1Opex (annual total), capexReserveAnnual (annual capital / replacement reserve, deducted BELOW NOI — from a capital plan or PCA if provided; otherwise a market-reasonable reserve: multifamily ≈ $250–300/unit/yr, commercial ≈ $0.15–0.25/SF/yr; use 0 only if you truly cannot ground it), rentGrowthPct, expenseGrowthPct, otherIncomeGrowthPct, exitCapPct, sellingCostPct (use 2 if unstated), holdYears (use 5 if unstated), and loan { ltvPct, ratePct, amortYears (use 30 if unstated), ioYears (use 0 if unstated) }.
+CONVENTION: every field ending in Pct (including ltvPct and ratePct) is a percentage on a 0–100 scale — write 5.5% as 5.5, NEVER 0.055; an exit cap of 5.25% is 5.25. Pick conservative, defensible inputs consistent with your reconciliation; where a figure is the sponsor's forward assumption, prefer an actuals-derived or market-reasonable value. The capital reserve is a single flat annual figure — note in a caveat if a detailed capital plan is needed.
 
 Finally: a one-paragraph \`summary\` of how the sources reconciled and what drives the returns, and \`caveats\` — what the buyer must verify, what was uncertain or missing, and the model's simplifications. Everything is a first draft to verify, with every number traceable to a source.`;
 }

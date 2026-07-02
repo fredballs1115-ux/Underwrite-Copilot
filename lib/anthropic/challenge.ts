@@ -13,6 +13,7 @@ const ChallengerSchema = z.object({
       severity: z.enum(["high", "medium", "low"]),
       challenge: z.string(),
       question: z.string(),
+      page: z.string(),
     }),
   ),
   stressTest: z.string(),

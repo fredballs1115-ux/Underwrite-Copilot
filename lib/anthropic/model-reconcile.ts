@@ -28,6 +28,8 @@ const MetricSchema = z.object({
 const InputsSchema = z.object({
   units: z.number(),
   purchasePrice: z.number(),
+  closingCostPct: z.number(),
+  loanFeePct: z.number(),
   year1Gpr: z.number(),
   vacancyPct: z.number(),
   otherIncomeAnnual: z.number(),
@@ -91,5 +93,18 @@ export async function reconcileDocs(
   if (!out) {
     throw new Error("Reconciliation did not return structured output.");
   }
+
+  // Percent-convention guard: the prompt demands 0-100 scale ("5.5% -> 5.5"),
+  // but a fraction slipping through (0.055) silently corrupts the whole model.
+  // Rates and caps below 1% don't exist in CRE, so treat sub-1 values as
+  // fractions and rescale.
+  const inp = out.inputs;
+  const rescale = (v: number, floor: number) =>
+    v > 0 && v < floor ? v * 100 : v;
+  inp.exitCapPct = rescale(inp.exitCapPct, 1);
+  inp.loan.ratePct = rescale(inp.loan.ratePct, 1);
+  inp.loan.ltvPct = rescale(inp.loan.ltvPct, 1.5);
+  inp.vacancyPct = rescale(inp.vacancyPct, 0.5);
+
   return out;
 }
