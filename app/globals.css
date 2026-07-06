@@ -1,0 +1,249 @@
+@import "tailwindcss";
+
+/*
+  Design tokens for Underwrite Copilot.
+
+  Tailwind v4 reads this @theme block and auto-generates utility classes for
+  every token. `--color-brand` gives you `bg-brand`, `text-brand`,
+  `border-brand`, `border-l-brand`, etc. Change a value here and the whole app
+  restyles.
+*/
+@theme {
+  --color-paper: #fbfbf9; /* marketing pages — a warm off-white */
+  --color-canvas: #eceeec; /* the app work surface — cards lift off it */
+  --color-faint: #f3f5f4; /* tinted band background */
+  --color-surface: #ffffff; /* cards and panels */
+  --color-ink: #18211f; /* primary text — near-black with a faint warmth */
+  --color-muted: #5f6b69; /* secondary text */
+  --color-line: #e7e4dd; /* borders and dividers */
+
+  --color-brand: #114e54; /* deep teal — primary accent */
+  --color-brand-strong: #0c383d;
+  --color-sidebar: #0c3338; /* deep teal app chrome */
+  --color-sidebar-line: #1d4a4f;
+  --color-mint: #7fd6cc; /* light aqua — accent on dark surfaces only */
+
+  /* Verdict / status colors, reused across the app. Deliberately warm-tinted
+     toward the teal/paper system rather than stock framework green/red. */
+  --color-pass: #1b7a5e;
+  --color-caution: #a05a1c;
+  --color-kill: #b23a30;
+
+  /* Map the Geist fonts (loaded in layout.tsx) onto Tailwind's font utilities */
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-brand) 18%, transparent);
+}
+
+/* Keyboard-visible focus everywhere. Elements that opt into Tailwind ring
+   utilities set `outline-none`, so this is the baseline, not a double ring.
+   The sidebar is deep teal, so its focus ring flips to white. */
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+.bg-sidebar :focus-visible {
+  outline-color: rgba(255, 255, 255, 0.85);
+}
+
+/* Elevation — soft, layered shadows so cards sit *on* the canvas (premium
+   depth, not a flat template). */
+.shadow-card {
+  box-shadow:
+    0 1px 2px rgba(17, 33, 31, 0.04),
+    0 1px 3px rgba(17, 33, 31, 0.06);
+}
+.shadow-float {
+  box-shadow:
+    0 6px 16px -4px rgba(17, 33, 31, 0.1),
+    0 2px 6px -2px rgba(17, 33, 31, 0.06);
+}
+.hover-lift {
+  transition:
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 8px 20px -6px rgba(17, 33, 31, 0.12),
+    0 3px 8px -3px rgba(17, 33, 31, 0.07);
+}
+
+/* Staggered entrance for lists/grids (set --i on each child). */
+@media (prefers-reduced-motion: no-preference) {
+  .stagger > * {
+    animation: uc-rise 0.32s ease-out both;
+    animation-delay: calc(var(--i, 0) * 40ms);
+  }
+}
+
+/*
+  Motion — deliberately restrained (finance-tool, not consumer-bouncy).
+  Content eases in; tab panels cross-fade; skeletons shimmer. All of it is
+  suppressed under prefers-reduced-motion.
+*/
+@keyframes uc-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes uc-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes uc-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+@keyframes uc-pulse-bar {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .animate-rise {
+    animation: uc-rise 0.24s ease-out both;
+  }
+  .animate-fade {
+    animation: uc-fade 0.2s ease-out both;
+  }
+  .pulse-bar {
+    animation: uc-pulse-bar 1.4s ease-in-out infinite;
+  }
+  .skeleton::after {
+    animation: uc-shimmer 1.5s infinite;
+  }
+}
+
+/*
+  Surface treatments — where the visual identity lives.
+
+  .band-dark: deep-teal band with soft aqua glows and a faint graph-paper
+  grid (an underwriting motif). Used for the landing hero, the "why not
+  ChatGPT" band, and the closing CTA.
+*/
+.band-dark {
+  background-color: var(--color-sidebar);
+  background-image:
+    radial-gradient(
+      56rem 30rem at 82% -18%,
+      rgba(127, 214, 204, 0.16),
+      transparent 62%
+    ),
+    radial-gradient(
+      44rem 28rem at 4% 118%,
+      rgba(127, 214, 204, 0.1),
+      transparent 60%
+    ),
+    linear-gradient(rgba(127, 214, 204, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(127, 214, 204, 0.06) 1px, transparent 1px);
+  background-size:
+    auto,
+    auto,
+    52px 52px,
+    52px 52px;
+}
+
+/* Subtle dot grid for the signed-in work canvas — texture, not noise. */
+.canvas-dots {
+  background-image: radial-gradient(
+    rgba(17, 78, 84, 0.07) 1px,
+    transparent 1.4px
+  );
+  background-size: 22px 22px;
+}
+
+/* Sidebar gets a gentle vertical gradient + top glow so it isn't a flat slab. */
+.sidebar-grad {
+  background-image:
+    radial-gradient(
+      18rem 12rem at 20% -4%,
+      rgba(127, 214, 204, 0.12),
+      transparent 60%
+    ),
+    linear-gradient(180deg, #0e3d43 0%, #0c3338 42%, #092a2e 100%);
+}
+
+/* Scroll-reveal: elements fade/rise in the first time they enter the
+   viewport (driven by the Reveal client component). Static under
+   prefers-reduced-motion. */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.55s ease,
+    transform 0.55s ease;
+}
+.reveal-in {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* A slow-drifting aqua glow for the hero — alive, not busy. */
+@keyframes uc-drift {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    transform: translate(4rem, 2rem) scale(1.15);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-drift {
+    animation: uc-drift 16s ease-in-out infinite alternate;
+  }
+}
+
+/* A shimmering placeholder block. Size/radius come from utility classes. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--color-faint);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--color-surface) 65%, transparent),
+    transparent
+  );
+}
