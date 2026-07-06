@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createDeal, createSampleDeal } from "./actions";
 import { FileDrop } from "../file-drop";
+
+export type Stage = "screening" | "reviewing" | "pursuing" | "dead";
 
 export type DealCard = {
   id: string;
@@ -12,10 +14,21 @@ export type DealCard = {
   assetClass: string;
   createdAt: string;
   verdict: string | null; // "pass" | "caution" | "pass_on" | null
+  /** the user's own tracker, independent of the verdict */
+  stage: Stage;
+  /** teammate who added this team deal (null when it's yours) */
+  addedBy: string | null;
   market: string;
   stats: { label: string; value: string }[];
   /** latest analysis-job state, for deals still screening */
   jobStatus?: "running" | "failed" | null;
+};
+
+export const STAGE_LABEL: Record<Stage, string> = {
+  screening: "Screening",
+  reviewing: "Reviewing",
+  pursuing: "Pursuing",
+  dead: "Dead",
 };
 
 const VERDICT_META: Record<
@@ -62,9 +75,11 @@ export function Pipeline({
 }) {
   const [query, setQuery] = useState("");
   const [verdict, setVerdict] = useState("all");
+  const [stage, setStage] = useState("all");
   const [asset, setAsset] = useState("all");
   const [market, setMarket] = useState("all");
   const [sort, setSort] = useState("newest");
+  const searchRef = useRef<HTMLInputElement>(null);
   const [showForm, setShowForm] = useState(!!errorMessage);
   const [compareMode, setCompareMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -78,6 +93,36 @@ export function Pipeline({
     const t = setInterval(() => router.refresh(), 7000);
     return () => clearInterval(t);
   }, [anyRunning, router]);
+
+  // Keyboard shortcuts: "/" jumps to search, "n" opens the new-deal form,
+  // Escape closes it. Ignored while typing in any field.
+  const atLimitRef = !!billing && !billing.canCreateDeal;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const typing =
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.tagName === "SELECT" ||
+          t.isContentEditable);
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "Escape") {
+        setShowForm(false);
+        return;
+      }
+      if (typing) return;
+      if (e.key === "/") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      } else if (e.key === "n" && !atLimitRef) {
+        e.preventDefault();
+        setShowForm(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [atLimitRef]);
 
   const COMPARE_MAX = 4;
   function toggleSelected(id: string) {
@@ -111,6 +156,7 @@ export function Pipeline({
           if (d.verdict) return false;
         } else if (d.verdict !== verdict) return false;
       }
+      if (stage !== "all" && d.stage !== stage) return false;
       if (asset !== "all" && d.assetClass !== asset) return false;
       if (market !== "all" && d.market !== market) return false;
       return true;
@@ -125,7 +171,7 @@ export function Pipeline({
       }
       return b.createdAt.localeCompare(a.createdAt); // newest
     });
-  }, [deals, query, verdict, asset, market, sort]);
+  }, [deals, query, verdict, stage, asset, market, sort]);
 
   const verdictCounts = useMemo(() => {
     const c = { pass: 0, caution: 0, pass_on: 0, screening: 0 };
@@ -139,14 +185,43 @@ export function Pipeline({
   function clearFilters() {
     setQuery("");
     setVerdict("all");
+    setStage("all");
     setAsset("all");
     setMarket("all");
   }
   const filtersActive =
     query.trim() !== "" ||
     verdict !== "all" ||
+    stage !== "all" ||
     asset !== "all" ||
     market !== "all";
+
+  // Export the current (filtered) view as a CSV — opens in Excel/Sheets.
+  function exportCsv() {
+    const esc = (v: string) => `"${v.replaceAll('"', '""')}"`;
+    const header = ["Deal", "Market", "Asset class", "Added", "Verdict", "Stage", "Added by", "Key stats"];
+    const lines = filtered.map((d) =>
+      [
+        d.name,
+        d.market,
+        d.assetClass,
+        fmtDate(d.createdAt),
+        d.verdict ? (VERDICT_META[d.verdict]?.label ?? d.verdict) : d.jobStatus === "running" ? "Screening" : "Not screened",
+        STAGE_LABEL[d.stage],
+        d.addedBy ?? "You",
+        d.stats.map((s) => `${s.label}: ${s.value}`).join(" · "),
+      ]
+        .map(esc)
+        .join(","),
+    );
+    const csv = [header.map(esc).join(","), ...lines].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "pipeline.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div className="space-y-6">
@@ -319,10 +394,11 @@ export function Pipeline({
               <path d="m21 21-4.3-4.3" />
             </svg>
             <input
+              ref={searchRef}
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search deals…"
+              placeholder="Search deals…  ( / )"
               aria-label="Search deals"
               className="w-48 rounded-lg border border-line bg-surface py-1.5 pl-9 pr-3 text-sm shadow-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
             />
@@ -336,6 +412,17 @@ export function Pipeline({
               ["caution", "Caution"],
               ["pass_on", "No-go"],
               ["screening", "Screening"],
+            ]}
+          />
+          <FilterSelect
+            value={stage}
+            onChange={setStage}
+            options={[
+              ["all", "All stages"],
+              ["screening", "Screening"],
+              ["reviewing", "Reviewing"],
+              ["pursuing", "Pursuing"],
+              ["dead", "Dead"],
             ]}
           />
           {assets.length > 1 && (
@@ -369,6 +456,14 @@ export function Pipeline({
               ["name", "Name A–Z"],
             ]}
           />
+          <button
+            type="button"
+            onClick={exportCsv}
+            title="Download the current view as a CSV"
+            className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-faint"
+          >
+            Export CSV
+          </button>
         </div>
       )}
 
@@ -527,6 +622,21 @@ function DealRow({
           <span className="capitalize">{d.assetClass}</span>
           {" · "}
           <span className="font-mono tabular-nums">{fmtDate(d.createdAt)}</span>
+          {d.stage !== "screening" && (
+            <>
+              {" · "}
+              <span
+                className={
+                  d.stage === "dead"
+                    ? "text-muted"
+                    : "font-medium text-brand"
+                }
+              >
+                {STAGE_LABEL[d.stage]}
+              </span>
+            </>
+          )}
+          {d.addedBy && <> · added by {d.addedBy}</>}
         </p>
       </div>
       {/* Fixed three-slot grid, right-anchored, so numbers align into

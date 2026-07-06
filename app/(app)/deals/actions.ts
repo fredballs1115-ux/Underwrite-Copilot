@@ -35,9 +35,12 @@ export async function createDeal(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // Free-tier deal cap (enforced server-side; the UI also prompts to upgrade).
+  // Deal caps (also enforced by a DB trigger): personal free cap, or the
+  // team's trial/plan when the user is on a team.
   const billing = await getBilling(supabase, user.id);
-  if (!billing.canCreateDeal) redirect("/deals?error=limit");
+  if (!billing.canCreateDeal) {
+    redirect(billing.team ? "/deals?error=teamlimit" : "/deals?error=limit");
+  }
 
   if (!(file instanceof File) || file.size === 0) {
     redirect("/deals?error=file");
@@ -49,9 +52,15 @@ export async function createDeal(formData: FormData) {
     redirect("/deals?error=size");
   }
 
+  // On a team, new deals land in the shared pipeline.
   const { data: deal, error: insertErr } = await supabase
     .from("deals")
-    .insert({ name, asset_class: assetClass, user_id: user.id })
+    .insert({
+      name,
+      asset_class: assetClass,
+      user_id: user.id,
+      team_id: billing.team?.id ?? null,
+    })
     .select("id")
     .single();
   if (insertErr || !deal) redirect("/deals?error=save");
@@ -130,6 +139,32 @@ export async function createSampleDeal() {
 
   revalidatePath("/deals");
   redirect(`/deals/${deal.id}`);
+}
+
+const STAGES = ["screening", "reviewing", "pursuing", "dead"] as const;
+
+/** Track where a deal sits in YOUR process — independent of the verdict.
+ *  RLS lets the creator or any teammate move it. */
+export async function setStage(formData: FormData) {
+  const dealId = String(formData.get("dealId") ?? "");
+  const stage = String(formData.get("stage") ?? "");
+  if (!dealId || !STAGES.includes(stage as (typeof STAGES)[number])) {
+    redirect(dealId ? `/deals/${dealId}` : "/deals");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  await supabase
+    .from("deals")
+    .update({ stage, updated_at: new Date().toISOString() })
+    .eq("id", dealId);
+  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/deals");
+  redirect(`/deals/${dealId}`);
 }
 
 /** Rename a deal. RLS scopes the update to the caller's own deal. */

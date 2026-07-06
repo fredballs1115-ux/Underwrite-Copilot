@@ -25,13 +25,13 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "Your account",
     body: [
-      "Keep your credentials to yourself and give us accurate account information. You're responsible for activity under your account. One account is for one person; don't share a login across a team.",
+      "Keep your credentials to yourself and give us accurate account information. You're responsible for activity under your account. One account is for one person — to share a pipeline with colleagues, use the Team plan rather than sharing a login.",
     ],
   },
   {
     h: "Your documents",
     body: [
-      "You keep ownership of everything you upload. You give us the limited rights needed to run the service on it: storing your documents, and processing them with AI models to produce your analysis. We don't sell your documents, share them with other users, or use them to train models.",
+      "You keep ownership of everything you upload. You give us the limited rights needed to run the service on it: storing your documents, and processing them with AI models to produce your analysis. We don't sell your documents, share them with anyone outside your account or team, or use them to train models.",
       "Only upload documents you have the right to use. Offering memoranda are often shared under confidentiality terms — those terms are between you and whoever gave you the document, and staying within them is your responsibility.",
     ],
   },
@@ -44,7 +44,7 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "Billing",
     body: [
-      "The free tier includes a limited number of deals. Pro is a monthly subscription billed through Stripe. You can cancel anytime from the billing page; cancellation takes effect at the end of the paid period and no further charges are made. Downgrading never deletes your deals or documents.",
+      "The free tier includes a limited number of deals. Pro is a monthly subscription and the Team plan is billed monthly per seat, both through Stripe; team billing adjusts automatically as members join or leave. You can cancel anytime from the billing page; cancellation takes effect at the end of the paid period and no further charges are made. Downgrading never deletes your deals or documents.",
     ],
   },
   {

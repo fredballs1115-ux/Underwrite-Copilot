@@ -192,6 +192,43 @@ body {
     linear-gradient(180deg, #0e3d43 0%, #0c3338 42%, #092a2e 100%);
 }
 
+/* Scroll-reveal: elements fade/rise in the first time they enter the
+   viewport (driven by the Reveal client component). Static under
+   prefers-reduced-motion. */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.55s ease,
+    transform 0.55s ease;
+}
+.reveal-in {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* A slow-drifting aqua glow for the hero — alive, not busy. */
+@keyframes uc-drift {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    transform: translate(4rem, 2rem) scale(1.15);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-drift {
+    animation: uc-drift 16s ease-in-out infinite alternate;
+  }
+}
+
 /* A shimmering placeholder block. Size/radius come from utility classes. */
 .skeleton {
   position: relative;

@@ -177,7 +177,7 @@ export default async function BillingPage({
             )}
           </div>
           <p className="mt-2 flex items-baseline gap-1">
-            <span className="text-3xl font-semibold tracking-tight">$79</span>
+            <span className="text-3xl font-semibold tracking-tight">$39</span>
             <span className="text-sm text-muted">/month</span>
           </p>
           <p className="mt-1 text-sm text-muted">
@@ -208,7 +208,12 @@ export default async function BillingPage({
 
       <p className="text-xs text-muted">
         Cancel anytime · billed monthly through Stripe · your deals and
-        documents are never deleted when you downgrade.
+        documents are never deleted when you downgrade. Working as a group?
+        The{" "}
+        <a href="/team" className="font-medium text-brand hover:text-brand-strong">
+          Team plan
+        </a>{" "}
+        is $29/seat with one shared pipeline.
       </p>
     </div>
   );

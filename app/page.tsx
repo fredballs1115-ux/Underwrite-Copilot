@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { LogoMark } from "./logo";
+import { Reveal, CountUp, DemoTabs } from "./landing-interactive";
 
 // Landing page — a React Server Component (zero client JS, no secrets).
 // The pitch is consistency: same deal in, same answer out.
@@ -94,11 +95,11 @@ const PILLARS = [
   },
 ];
 
-const STATS: [string, string][] = [
-  ["6", "analysis stages on every OM"],
-  ["3", "deal-killers stressed first"],
-  ["100%", "of figures traced to a source"],
-  ["1", "page of memo for your IC"],
+const STATS: { value: number; suffix: string; label: string }[] = [
+  { value: 6, suffix: "", label: "analysis stages on every OM" },
+  { value: 3, suffix: "", label: "deal-killers stressed first" },
+  { value: 0, suffix: "", label: "black-box numbers — every figure carries its source" },
+  { value: 1, suffix: "", label: "page of memo for your IC" },
 ];
 
 const FREE_FEATURES = [
@@ -127,7 +128,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Are my documents private?",
-    a: "Yes. Documents are stored in private storage with per-user isolation enforced at the database level. Your deals are visible only to you, and your documents are never shared with other users or resold.",
+    a: "Yes. Documents are stored in private storage with isolation enforced at the database level. Your deals are visible only to you — or to your teammates if you join a team — and your documents are never shared beyond that or resold.",
   },
   {
     q: "Is this investment advice?",
@@ -136,6 +137,10 @@ const FAQ: { q: string; a: string }[] = [
   {
     q: "What's in the Excel model?",
     a: "A multi-tab first-draft workbook: deal summary with sources & uses and returns, an exit-cap × price IRR sensitivity grid, a year-by-year cash flow, every assumption with its source and confidence, and a conflicts sheet showing how disagreements between your documents were resolved.",
+  },
+  {
+    q: "Can my team share one pipeline?",
+    a: "Yes. Create a team, send teammates an invite link, and every deal anyone uploads lands in one shared pipeline — same screens, verdicts, models, and memos for everyone. The Team plan is $29 per seat per month, billed only for the seats you have, and it adjusts automatically as people join or leave.",
   },
   {
     q: "Can I cancel anytime?",
@@ -156,10 +161,11 @@ const JSON_LD = {
         "CRE deal screening that runs every offering memorandum through the same disciplined screen: sourced ranges, the three deal-killers, and a reproducible Go / No-Go before you open a model.",
       offers: [
         { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD" },
+        { "@type": "Offer", name: "Pro", price: "39", priceCurrency: "USD" },
         {
           "@type": "Offer",
-          name: "Pro",
-          price: "79",
+          name: "Team (per seat)",
+          price: "29",
           priceCurrency: "USD",
         },
       ],
@@ -267,8 +273,12 @@ export default function Home() {
 
       <main className="flex-1">
         {/* Hero — deep teal, graph-paper grid, the product floating on it. */}
-        <section className="band-dark overflow-hidden text-white">
-          <div className="mx-auto max-w-6xl px-6 pb-14 pt-16 sm:pt-24">
+        <section className="band-dark relative overflow-hidden text-white">
+          <div
+            aria-hidden
+            className="hero-drift pointer-events-none absolute -top-24 right-[8%] h-[26rem] w-[26rem] rounded-full bg-mint/10 blur-3xl"
+          />
+          <div className="relative mx-auto max-w-6xl px-6 pb-14 pt-16 sm:pt-24">
             <div className="grid items-center gap-12 lg:grid-cols-2">
               <div>
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-xs font-medium text-mint">
@@ -331,19 +341,24 @@ export default function Home() {
               </div>
 
               {/* Product preview */}
-              <DealPreview />
+              <div>
+                <DealPreview />
+                <p className="mt-4 text-center text-[11px] text-white/40">
+                  Illustrative sample deal — not a real listing.
+                </p>
+              </div>
             </div>
 
             {/* Stat strip — the screen, quantified. */}
             <dl className="mt-16 grid grid-cols-2 gap-x-6 gap-y-8 border-t border-white/10 pt-8 sm:grid-cols-4">
-              {STATS.map(([value, label]) => (
-                <div key={label}>
-                  <dt className="sr-only">{label}</dt>
+              {STATS.map((st) => (
+                <div key={st.label}>
+                  <dt className="sr-only">{st.label}</dt>
                   <dd className="font-mono text-3xl font-semibold tabular-nums text-mint">
-                    {value}
+                    <CountUp value={st.value} suffix={st.suffix} />
                   </dd>
                   <dd className="mt-1 text-xs leading-relaxed text-white/60">
-                    {label}
+                    {st.label}
                   </dd>
                 </div>
               ))}
@@ -370,6 +385,7 @@ export default function Home() {
             {/* The spread, drawn instead of described. Both ends are neutral
                 on purpose: neither analyst is "right" — the spread is the
                 problem. */}
+            <Reveal>
             <div className="shadow-card mt-8 rounded-2xl border border-line bg-surface p-6">
               <div className="flex items-end justify-between gap-4">
                 <div>
@@ -411,6 +427,7 @@ export default function Home() {
               </p>
             </div>
 
+            </Reveal>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div className="rounded-xl border border-line bg-surface p-5 shadow-card">
                 <div className="flex items-center justify-between">
@@ -439,8 +456,37 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Inside the screen — interactive walkthrough on sample data */}
+        <section className="border-y border-line bg-faint">
+          <div className="mx-auto grid max-w-6xl items-center gap-10 px-6 py-16 sm:py-20 lg:grid-cols-2">
+            <Reveal>
+              <p className="text-xs font-medium uppercase tracking-wider text-muted">
+                Inside the screen
+              </p>
+              <h2 className="mt-2 max-w-md text-2xl font-semibold tracking-tight sm:text-3xl">
+                Click through what the verdict is built on.
+              </h2>
+              <p className="mt-3 max-w-md text-sm leading-relaxed text-muted">
+                Every tab below is a real output shape from the product —
+                ranges instead of hero numbers, the three deal-killers graded,
+                the broker&apos;s own comps ranked, and a verdict that holds
+                across scenarios. Shown here with illustrative sample data.
+              </p>
+              <Link
+                href="/login?mode=signup"
+                className="mt-6 inline-flex rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+              >
+                Run it on a real OM
+              </Link>
+            </Reveal>
+            <Reveal delay={120}>
+              <DemoTabs />
+            </Reveal>
+          </div>
+        </section>
+
         {/* The six-stage screen */}
-        <section id="screen" className="scroll-mt-16 border-y border-line bg-faint">
+        <section id="screen" className="scroll-mt-16">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <p className="text-xs font-medium uppercase tracking-wider text-muted">
               The six-stage screen
@@ -448,6 +494,7 @@ export default function Home() {
             <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
               What happens to every OM you upload.
             </h2>
+            <Reveal delay={60}>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {SCREEN.map((s) => (
                 <div
@@ -469,6 +516,7 @@ export default function Home() {
                 </div>
               ))}
             </div>
+            </Reveal>
             {/* Put the screen to work — full-width row under the grid. */}
             <Link
               href="/login?mode=signup"
@@ -488,6 +536,169 @@ export default function Home() {
           </div>
         </section>
 
+        {/* The artifacts — a bento of what you actually walk away with. */}
+        <section className="border-y border-line bg-faint">
+          <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
+            <Reveal>
+              <p className="text-xs font-medium uppercase tracking-wider text-muted">
+                The artifacts
+              </p>
+              <h2 className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">
+                What you walk away with.
+              </h2>
+            </Reveal>
+            <Reveal delay={80}>
+              <div className="mt-8 grid gap-4 lg:grid-cols-3">
+                {/* Excel model — the flagship tile */}
+                <div className="hover-lift rounded-2xl border border-line bg-surface p-5 shadow-card lg:col-span-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-sm font-semibold">
+                      First-draft Excel model, alive
+                    </h3>
+                    <span className="rounded-full bg-faint px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
+                      Sample
+                    </span>
+                  </div>
+                  <p className="mt-1 max-w-md text-xs leading-relaxed text-muted">
+                    Not a static report — the workbook carries live formulas.
+                    Edit the tinted inputs and IRR, equity multiple, and the
+                    whole cash flow recalculate.
+                  </p>
+                  <div className="mt-4 overflow-hidden rounded-lg border border-line font-mono text-[11px]">
+                    <div className="grid grid-cols-4 border-b border-line bg-faint px-3 py-1.5 text-[9px] font-semibold uppercase tracking-wide text-muted">
+                      <span className="col-span-2">Input</span>
+                      <span className="text-right">Value</span>
+                      <span className="text-right">Effect</span>
+                    </div>
+                    {[
+                      ["Purchase price", "$70.7M", "IRR 8.7%"],
+                      ["Exit cap", "5.50%", "IRR 8.7%"],
+                      ["Exit cap (flexed)", "5.75%", "IRR 7.1%"],
+                    ].map(([k, v, e], i) => (
+                      <div
+                        key={k}
+                        className={`grid grid-cols-4 px-3 py-1.5 ${i === 2 ? "bg-caution/5" : "bg-surface"}`}
+                      >
+                        <span className="col-span-2 text-muted">{k}</span>
+                        <span
+                          className={`text-right tabular-nums ${i !== 0 ? "bg-[#fdf6e7] px-1" : ""}`}
+                        >
+                          {v}
+                        </span>
+                        <span className="text-right tabular-nums">{e}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Memo */}
+                <div className="hover-lift rounded-2xl border border-line bg-surface p-5 shadow-card">
+                  <h3 className="text-sm font-semibold">One-page IC memo</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">
+                    The verdict, the ranges, the deal-killers, and next steps —
+                    exactly one page, ready to forward.
+                  </p>
+                  <div className="mt-4 rounded-lg border border-line bg-paper p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="h-2 w-20 rounded bg-ink/70" />
+                      <span className="rounded-full bg-caution/10 px-2 py-0.5 text-[9px] font-semibold text-caution">
+                        Caution
+                      </span>
+                    </div>
+                    <div className="mt-2.5 space-y-1.5">
+                      <div className="h-1.5 w-full rounded bg-line" />
+                      <div className="h-1.5 w-5/6 rounded bg-line" />
+                      <div className="h-1.5 w-full rounded bg-line" />
+                      <div className="h-1.5 w-2/3 rounded bg-line" />
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-1.5">
+                      <div className="h-8 rounded bg-faint" />
+                      <div className="h-8 rounded bg-faint" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Comps */}
+                <div className="hover-lift rounded-2xl border border-line bg-surface p-5 shadow-card">
+                  <h3 className="text-sm font-semibold">Comps, graded</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">
+                    The broker&apos;s comps ranked by how hard they support the
+                    price — plus a public-web search when the deck has none.
+                  </p>
+                  <div className="mt-4 space-y-1.5 text-[10px]">
+                    {[
+                      ["Preston Creek", "Genuine support", "text-pass bg-pass/10"],
+                      ["Lakeline Commons", "Leans favorable", "text-caution bg-caution/10"],
+                      ["Axis on Fifth", "Stretched", "text-kill bg-kill/10"],
+                    ].map(([n, r, c]) => (
+                      <div
+                        key={n}
+                        className="flex items-center justify-between rounded-md border border-line px-2.5 py-1.5"
+                      >
+                        <span className="font-medium">{n}</span>
+                        <span className={`rounded-full px-1.5 py-0.5 font-medium ${c}`}>
+                          {r}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Reconcile */}
+                <div className="hover-lift rounded-2xl border border-line bg-surface p-5 shadow-card">
+                  <h3 className="text-sm font-semibold">
+                    Your model vs the OM
+                  </h3>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">
+                    Upload your own underwriting and every gap gets called —
+                    favorable, unfavorable, or noise.
+                  </p>
+                  <div className="mt-4 space-y-1.5 font-mono text-[10px]">
+                    {[
+                      ["Exit cap", "you 5.75 · OM 5.25", "+50 bps"],
+                      ["Yr-1 rents", "you $1.41k · OM $1.54k", "−8.4%"],
+                    ].map(([k, v, d]) => (
+                      <div
+                        key={k}
+                        className="flex items-center justify-between gap-2 rounded-md border border-line px-2.5 py-1.5"
+                      >
+                        <span className="text-muted">{k}</span>
+                        <span className="truncate text-muted">{v}</span>
+                        <span className="font-semibold text-caution">{d}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Team */}
+                <div className="hover-lift rounded-2xl border border-line bg-surface p-5 shadow-card">
+                  <h3 className="text-sm font-semibold">One team, one pipeline</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">
+                    Invite your team with a link — everyone screens into the
+                    same pipeline, with the same verdicts. $29/seat.
+                  </p>
+                  <div className="mt-4 flex items-center gap-3">
+                    <div className="flex -space-x-2">
+                      {["A", "M", "J"].map((c, i) => (
+                        <span
+                          key={i}
+                          className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-surface bg-brand/10 text-xs font-semibold text-brand"
+                        >
+                          {c}
+                        </span>
+                      ))}
+                    </div>
+                    <span className="text-[10px] leading-tight text-muted">
+                      same deals ·<br />
+                      same answers
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
         {/* Precision, not language — the differentiator gets the dark band. */}
         <section className="band-dark text-white">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
@@ -503,6 +714,7 @@ export default function Home() {
               put a deterministic workflow on top of the AI — one that shows its
               work.
             </p>
+            <Reveal delay={60}>
             <div className="mt-10 grid gap-8 sm:grid-cols-3">
               {PILLARS.map((p) => (
                 <div key={p.title}>
@@ -516,81 +728,121 @@ export default function Home() {
                 </div>
               ))}
             </div>
+            </Reveal>
           </div>
         </section>
 
         {/* Pricing */}
         <section id="pricing" className="scroll-mt-16 mx-auto max-w-6xl px-6 py-16 sm:py-20">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted">
-            Pricing
-          </p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
-            Start free. Upgrade when the screen earns it.
-          </h2>
-          <div className="mx-auto mt-8 grid gap-5 sm:grid-cols-2 lg:max-w-3xl">
-            {/* Free */}
-            <div className="shadow-card flex flex-col rounded-2xl border border-line bg-surface p-6">
-              <p className="text-sm font-semibold">Free</p>
-              <p className="mt-2 flex items-baseline gap-1">
-                <span className="text-4xl font-semibold tracking-tight">$0</span>
-              </p>
-              <p className="mt-1 text-sm text-muted">
-                The full screen, on your next three deals.
-              </p>
-              <ul className="mt-5 flex-1 space-y-2.5">
-                {FREE_FEATURES.map((f) => (
-                  <li key={f} className="flex items-start gap-2.5 text-sm">
-                    <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-faint text-[10px] font-bold text-muted">
-                      ✓
-                    </span>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href="/login?mode=signup"
-                className="mt-6 rounded-lg border border-line px-4 py-2.5 text-center text-sm font-medium transition-colors hover:bg-faint"
-              >
-                Get started free
-              </Link>
-            </div>
+          <Reveal>
+            <p className="text-xs font-medium uppercase tracking-wider text-muted">
+              Pricing
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+              Start free. Upgrade when the screen earns it.
+            </h2>
+          </Reveal>
+          <Reveal delay={80}>
+            <div className="mt-8 grid gap-5 md:grid-cols-3">
+              {/* Free */}
+              <div className="shadow-card flex flex-col rounded-2xl border border-line bg-surface p-6">
+                <p className="text-sm font-semibold">Free</p>
+                <p className="mt-2 flex items-baseline gap-1">
+                  <span className="text-4xl font-semibold tracking-tight">$0</span>
+                </p>
+                <p className="mt-1 text-sm text-muted">
+                  The full screen, on your next three deals.
+                </p>
+                <ul className="mt-5 flex-1 space-y-2.5">
+                  {FREE_FEATURES.map((f) => (
+                    <li key={f} className="flex items-start gap-2.5 text-sm">
+                      <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-faint text-[10px] font-bold text-muted">
+                        ✓
+                      </span>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/login?mode=signup"
+                  className="mt-6 rounded-lg border border-line px-4 py-2.5 text-center text-sm font-medium transition-colors hover:bg-faint"
+                >
+                  Get started free
+                </Link>
+              </div>
 
-            {/* Pro */}
-            <div className="shadow-float relative flex flex-col rounded-2xl border-2 border-brand bg-surface bg-gradient-to-b from-brand/[0.05] via-transparent to-transparent p-6">
-              <span className="absolute -top-3 left-6 rounded-full bg-brand px-2.5 py-0.5 text-[11px] font-semibold text-white">
-                For active pipelines
-              </span>
-              <p className="text-sm font-semibold">Pro</p>
-              <p className="mt-2 flex items-baseline gap-1">
-                <span className="text-4xl font-semibold tracking-tight">$79</span>
-                <span className="text-sm text-muted">/month</span>
-              </p>
-              <p className="mt-1 text-sm text-muted">
-                Unlimited screening, plus the artifacts you hand to your IC.
-              </p>
-              <ul className="mt-5 flex-1 space-y-2.5">
-                {PRO_FEATURES.map((f) => (
-                  <li key={f} className="flex items-start gap-2.5 text-sm">
-                    <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-pass/15 text-[10px] font-bold text-pass">
-                      ✓
-                    </span>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href="/login?mode=signup"
-                className="mt-6 rounded-lg bg-brand px-4 py-2.5 text-center text-sm font-medium text-white transition-colors hover:bg-brand-strong"
-              >
-                Start with Pro
-              </Link>
-              <p className="mt-2.5 text-center text-xs text-muted">
-                Cancel anytime — your deals and exports stay yours.
-              </p>
+              {/* Pro */}
+              <div className="shadow-float relative flex flex-col rounded-2xl border-2 border-brand bg-surface bg-gradient-to-b from-brand/[0.05] via-transparent to-transparent p-6">
+                <span className="absolute -top-3 left-6 rounded-full bg-brand px-2.5 py-0.5 text-[11px] font-semibold text-white">
+                  For active pipelines
+                </span>
+                <p className="text-sm font-semibold">Pro</p>
+                <p className="mt-2 flex items-baseline gap-1">
+                  <span className="text-4xl font-semibold tracking-tight">$39</span>
+                  <span className="text-sm text-muted">/month</span>
+                </p>
+                <p className="mt-1 text-sm text-muted">
+                  Unlimited screening, plus the artifacts you hand to your IC.
+                </p>
+                <ul className="mt-5 flex-1 space-y-2.5">
+                  {PRO_FEATURES.map((f) => (
+                    <li key={f} className="flex items-start gap-2.5 text-sm">
+                      <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-pass/15 text-[10px] font-bold text-pass">
+                        ✓
+                      </span>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/login?mode=signup"
+                  className="mt-6 rounded-lg bg-brand px-4 py-2.5 text-center text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+                >
+                  Start with Pro
+                </Link>
+                <p className="mt-2.5 text-center text-xs text-muted">
+                  Cancel anytime — your deals and exports stay yours.
+                </p>
+              </div>
+
+              {/* Team */}
+              <div className="shadow-card flex flex-col rounded-2xl border border-line bg-surface p-6">
+                <p className="text-sm font-semibold">Team</p>
+                <p className="mt-2 flex items-baseline gap-1">
+                  <span className="text-4xl font-semibold tracking-tight">$29</span>
+                  <span className="text-sm text-muted">/seat/month</span>
+                </p>
+                <p className="mt-1 text-sm text-muted">
+                  One shared pipeline for the whole shop.
+                </p>
+                <ul className="mt-5 flex-1 space-y-2.5">
+                  {[
+                    "Everything in Pro, for every member",
+                    "One shared pipeline — same deals, same verdicts",
+                    "Invite teammates with a link",
+                    "Billing follows your seat count automatically",
+                    "3 shared deals free to try it",
+                  ].map((f) => (
+                    <li key={f} className="flex items-start gap-2.5 text-sm">
+                      <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[10px] font-bold text-brand">
+                        ✓
+                      </span>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/login?mode=signup"
+                  className="mt-6 rounded-lg border border-brand/40 px-4 py-2.5 text-center text-sm font-medium text-brand transition-colors hover:bg-brand/5"
+                >
+                  Start a team
+                </Link>
+              </div>
             </div>
-          </div>
-          <p className="mx-auto mt-5 max-w-3xl text-center text-xs text-muted">
-            Billed monthly through Stripe · no card required for Free.
+          </Reveal>
+          <p className="mt-5 text-center text-xs text-muted">
+            Billed monthly through Stripe · cancel anytime · no card required
+            for Free.
           </p>
         </section>
 

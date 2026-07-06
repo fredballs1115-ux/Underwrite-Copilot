@@ -18,6 +18,7 @@ import {
 } from "@/lib/anthropic/types";
 import { DealView } from "./deal-view";
 import { DealActions } from "./deal-actions";
+import { StageSelect } from "./stage-select";
 
 const VERDICT_PILL = {
   pass: { label: "Go", cls: "bg-pass/15 text-pass" },
@@ -164,7 +165,13 @@ export default async function DealPage({
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
-            <DealActions dealId={id} dealName={deal.name} />
+            <div className="flex items-center gap-2">
+              <StageSelect
+                dealId={id}
+                stage={((deal as { stage?: string }).stage as string) ?? "screening"}
+              />
+              <DealActions dealId={id} dealName={deal.name} />
+            </div>
             {pill && (
               <span
                 className={`rounded-full px-3 py-1 text-xs font-semibold ${pill.cls}`}

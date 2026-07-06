@@ -16,6 +16,8 @@ const ERRORS: Record<string, string> = {
   upload: "The upload didn’t complete — nothing was saved. Please try again.",
   limit:
     "You’ve reached the 3-deal limit on the Free plan. Upgrade to Pro for unlimited deals.",
+  teamlimit:
+    "Your team has used its 3 trial deals. Start the Team plan for unlimited shared deals.",
 };
 
 // Up to two headline figures to show on each pipeline row.
@@ -33,11 +35,15 @@ function pickStats(metrics: ExtractedMetric[]): { label: string; value: string }
 export default async function DealsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; deleted?: string }>;
+  searchParams: Promise<{ error?: string; deleted?: string; joined?: string }>;
 }) {
-  const { error: errorCode, deleted } = await searchParams;
+  const { error: errorCode, deleted, joined } = await searchParams;
   const errorMessage = errorCode ? (ERRORS[errorCode] ?? null) : null;
-  const notice = deleted ? "Deal deleted." : null;
+  const notice = deleted
+    ? "Deal deleted."
+    : joined
+      ? "Welcome to the team — this pipeline is now shared with your teammates."
+      : null;
 
   const supabase = await createSupabaseServerClient();
   const {
@@ -49,7 +55,9 @@ export default async function DealsPage({
 
   const { data, error } = await supabase
     .from("deals")
-    .select("id, name, asset_class, created_at, verdict, extraction")
+    .select(
+      "id, name, asset_class, created_at, verdict, extraction, user_id, team_id, stage",
+    )
     .order("created_at", { ascending: false });
 
   // Latest job per deal so the list can show "Screening…" vs "Analysis failed"
@@ -72,8 +80,8 @@ export default async function DealsPage({
       <div className="rounded-xl border border-line bg-surface p-5 text-sm">
         <p className="font-medium">Database isn’t set up yet</p>
         <p className="mt-1 text-muted">
-          Run <code>supabase/migrations/0001_init.sql</code> in your Supabase SQL
-          editor, then refresh this page.
+          Run every file in <code>supabase/migrations/</code> (0001 through
+          0007) in your Supabase SQL editor, then refresh this page.
         </p>
         <p className="mt-2 text-xs text-muted">({error.message})</p>
       </div>
@@ -83,9 +91,30 @@ export default async function DealsPage({
   type Row = Pick<
     DealRow,
     "id" | "name" | "asset_class" | "created_at" | "verdict" | "extraction"
-  >;
+  > & { user_id: string; team_id: string | null; stage: string | null };
 
-  const deals: DealCard[] = ((data ?? []) as Row[]).map((d) => {
+  // Who added each team deal — teammate profiles are readable under RLS.
+  const rows = (data ?? []) as Row[];
+  const teammateIds = Array.from(
+    new Set(
+      rows
+        .filter((d) => d.team_id && d.user_id !== user?.id)
+        .map((d) => d.user_id),
+    ),
+  );
+  const { data: mates } = teammateIds.length
+    ? await supabase
+        .from("profiles")
+        .select("id, email, full_name")
+        .in("id", teammateIds)
+    : { data: [] };
+  const nameById = new Map(
+    ((mates ?? []) as { id: string; email: string | null; full_name: string | null }[]).map(
+      (m) => [m.id, m.full_name || m.email || "Teammate"],
+    ),
+  );
+
+  const deals: DealCard[] = rows.map((d) => {
     const extraction = d.extraction as ExtractionResult | null;
     const verdict = d.verdict as { verdict?: string } | null;
     const job = jobByDeal.get(d.id);
@@ -95,6 +124,11 @@ export default async function DealsPage({
       assetClass: d.asset_class,
       createdAt: d.created_at,
       verdict: verdict?.verdict ?? null,
+      stage: (d.stage as DealCard["stage"]) ?? "screening",
+      addedBy:
+        d.team_id && d.user_id !== user?.id
+          ? (nameById.get(d.user_id) ?? "Teammate")
+          : null,
       market: extraction?.market ?? "",
       stats: extraction ? pickStats(extraction.metrics) : [],
       jobStatus:

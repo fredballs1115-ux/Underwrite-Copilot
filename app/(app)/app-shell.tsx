@@ -48,6 +48,14 @@ const IconUser = (p: { className?: string }) => (
     <circle cx="12" cy="7" r="4" />
   </NavIcon>
 );
+const IconUsers = (p: { className?: string }) => (
+  <NavIcon className={p.className}>
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </NavIcon>
+);
 
 /** The signed-in app chrome: a deep-teal sidebar on desktop, a top bar on mobile. */
 export function AppShell({
@@ -59,6 +67,7 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const inPipeline = pathname.startsWith("/deals");
+  const inTeam = pathname.startsWith("/team");
   const inBilling = pathname.startsWith("/billing");
   const inAccount = pathname.startsWith("/account");
 
@@ -84,6 +93,7 @@ export function AppShell({
           {(
             [
               ["/deals", "Pipeline", inPipeline, IconLayers],
+              ["/team", "Team", inTeam, IconUsers],
               ["/billing", "Billing", inBilling, IconCard],
               ["/account", "Account", inAccount, IconUser],
             ] as const
@@ -157,6 +167,7 @@ export function AppShell({
           <nav className="flex gap-1 border-t border-white/10 px-3 py-2">
             {[
               { href: "/deals", label: "Pipeline", active: inPipeline },
+              { href: "/team", label: "Team", active: inTeam },
               { href: "/billing", label: "Billing", active: inBilling },
               { href: "/account", label: "Account", active: inAccount },
             ].map((n) => (

@@ -30,6 +30,7 @@ export async function POST(req: Request) {
 
   async function sync(sub: Stripe.Subscription) {
     const userId = sub.metadata?.user_id ?? null;
+    const teamId = sub.metadata?.team_id ?? null;
     const customerId =
       typeof sub.customer === "string" ? sub.customer : sub.customer.id;
     const active = sub.status === "active" || sub.status === "trialing";
@@ -39,6 +40,34 @@ export async function POST(req: Request) {
       (sub as unknown as { current_period_end?: number }).current_period_end ??
       (sub.items?.data?.[0] as unknown as { current_period_end?: number })
         ?.current_period_end;
+
+    // Team subscriptions carry team_id metadata and sync to the teams table.
+    if (teamId) {
+      const teamUpdate = {
+        plan: active ? "active" : "inactive",
+        subscription_status: sub.status,
+        stripe_subscription_id: sub.id,
+        stripe_customer_id: customerId,
+        current_period_end: periodEndUnix
+          ? new Date(periodEndUnix * 1000).toISOString()
+          : null,
+      };
+      const { error, count } = await admin
+        .from("teams")
+        .update(teamUpdate, { count: "exact" })
+        .eq("id", teamId);
+      if (error) throw new Error(`teams update failed: ${error.message}`);
+      if (count === 0) {
+        const { error: e2, count: c2 } = await admin
+          .from("teams")
+          .update(teamUpdate, { count: "exact" })
+          .eq("stripe_customer_id", customerId);
+        if (e2 || c2 === 0)
+          throw new Error(`no team matched ${teamId} / ${customerId}`);
+      }
+      return;
+    }
+
     const update = {
       plan: active ? "pro" : "free",
       subscription_status: sub.status,

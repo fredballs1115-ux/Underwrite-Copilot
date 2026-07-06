@@ -18,14 +18,14 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "How your documents are used",
     body: [
-      "Documents exist to produce your analysis and for no other purpose. They're stored in private storage with per-user isolation enforced at the database level — no other user can query or access them.",
+      "Documents exist to produce your analysis and for no other purpose. They're stored in private storage with isolation enforced at the database level — no one outside your account (or your team, if you join one) can query or access them.",
       "To generate the analysis, document contents are sent to Anthropic's Claude API. Under Anthropic's commercial API terms, that data is not used to train models. We don't use your documents to train anything either.",
     ],
   },
   {
     h: "What we never do",
     body: [
-      "We don't sell your data. We don't share your documents or analyses with other users. We don't run ads or hand your information to ad networks. We don't use your deal documents to build datasets or benchmarks.",
+      "We don't sell your data. We don't share your documents or analyses with anyone outside your account — or outside your team, if you join one. We don't run ads or hand your information to ad networks. We don't use your deal documents to build datasets or benchmarks.",
     ],
   },
   {
