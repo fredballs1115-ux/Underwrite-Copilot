@@ -1,5 +1,6 @@
 "use client";
 
+import { useFormStatus } from "react-dom";
 import { useToast } from "../toaster";
 
 /** Copy an invite URL to the clipboard with toast feedback. */
@@ -33,19 +34,22 @@ export function ConfirmSubmit({
   confirmText: string;
   danger?: boolean;
 }) {
+  const { pending } = useFormStatus();
   return (
     <button
       type="submit"
+      disabled={pending}
+      aria-busy={pending}
       onClick={(e) => {
         if (!window.confirm(confirmText)) e.preventDefault();
       }}
-      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
         danger
           ? "text-kill hover:bg-kill/5"
           : "border border-line hover:bg-faint"
       }`}
     >
-      {label}
+      {pending ? "Working…" : label}
     </button>
   );
 }

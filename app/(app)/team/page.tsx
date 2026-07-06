@@ -12,6 +12,7 @@ import {
   openTeamPortal,
 } from "./actions";
 import { CopyLinkButton, ConfirmSubmit } from "./team-client";
+import { PendingButton } from "../pending-button";
 
 export const metadata: Metadata = { title: "Team" };
 
@@ -101,12 +102,12 @@ export default async function TeamPage({
                 placeholder="Team name — e.g. Meridian Acquisitions"
                 className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
               />
-              <button
-                type="submit"
+              <PendingButton
+                pendingLabel="Creating…"
                 className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
               >
                 Create team
-              </button>
+              </PendingButton>
             </form>
           </section>
 
@@ -231,12 +232,12 @@ export default async function TeamPage({
                   </p>
                 </div>
                 <form action={createInvite}>
-                  <button
-                    type="submit"
+                  <PendingButton
+                    pendingLabel="Creating link…"
                     className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
                   >
                     + New invite link
-                  </button>
+                  </PendingButton>
                 </form>
               </div>
               {invites.length > 0 && (
@@ -288,12 +289,12 @@ export default async function TeamPage({
                 </p>
                 {team.role === "owner" && (
                   <form action={openTeamPortal} className="mt-4">
-                    <button
-                      type="submit"
+                    <PendingButton
+                      pendingLabel="Opening Stripe…"
                       className="rounded-lg border border-line px-4 py-2 text-sm font-medium transition-colors hover:bg-faint"
                     >
                       Manage subscription
-                    </button>
+                    </PendingButton>
                   </form>
                 )}
               </>
@@ -328,12 +329,12 @@ export default async function TeamPage({
                 </p>
                 {team.role === "owner" ? (
                   <form action={startTeamCheckout} className="mt-4">
-                    <button
-                      type="submit"
+                    <PendingButton
+                      pendingLabel="Opening secure checkout…"
                       className="shadow-card hover-lift rounded-lg bg-brand px-5 py-2.5 text-sm font-medium text-white"
                     >
                       Start Team plan — {TEAM_PRICE_LABEL}
-                    </button>
+                    </PendingButton>
                   </form>
                 ) : (
                   <p className="mt-3 text-xs text-muted">

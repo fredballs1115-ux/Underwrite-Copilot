@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { rerunAnalysis, reconcileWithModel } from "../actions";
+import { PendingButton } from "../../pending-button";
 import {
   addSupplementNote,
   addSupplementFile,
@@ -1084,14 +1085,15 @@ export function ReconcileSection({
           name="model"
           accept=".xlsx,.xls,.csv,application/pdf"
           hint="Excel (.xlsx), CSV, or a PDF / ARGUS export"
+          maxBytes={22 * 1024 * 1024}
         />
-        <button
-          type="submit"
+        <PendingButton
           disabled={disabled}
-          className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50"
+          pendingLabel="Uploading your model…"
+          className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
         >
           Reconcile
-        </button>
+        </PendingButton>
         {disabled && (
           <p className="text-xs text-muted">
             Available once the running analysis finishes.
@@ -1819,12 +1821,12 @@ export function RetryForm({ dealId, label }: { dealId: string; label: string }) 
   return (
     <form action={rerunAnalysis} className="mt-3">
       <input type="hidden" name="dealId" value={dealId} />
-      <button
-        type="submit"
+      <PendingButton
+        pendingLabel="Starting the screen…"
         className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
       >
         {label}
-      </button>
+      </PendingButton>
     </form>
   );
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createDeal, createSampleDeal } from "./actions";
 import { FileDrop } from "../file-drop";
+import { PendingButton } from "../pending-button";
 
 export type Stage = "screening" | "reviewing" | "pursuing" | "dead";
 
@@ -501,12 +502,12 @@ export function Pipeline({
               + New deal
             </button>
             <form action={createSampleDeal}>
-              <button
-                type="submit"
+              <PendingButton
+                pendingLabel="Setting up your sample…"
                 className="rounded-lg border border-line px-4 py-2 text-sm font-medium transition-colors hover:bg-faint"
               >
                 Try a sample deal
-              </button>
+              </PendingButton>
             </form>
           </div>
         </div>
@@ -807,21 +808,22 @@ function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
           name="om"
           accept="application/pdf"
           hint="PDF offering memorandum, up to 22 MB"
+          maxBytes={22 * 1024 * 1024}
         />
-        <button
-          type="submit"
+        <PendingButton
+          pendingLabel="Uploading your OM — hang tight…"
           className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
         >
           Create &amp; analyze
-        </button>
+        </PendingButton>
       </form>
       <form action={createSampleDeal} className="mt-3 border-t border-line pt-3">
-        <button
-          type="submit"
+        <PendingButton
+          pendingLabel="Setting up your sample deal…"
           className="text-sm font-medium text-brand transition-colors hover:text-brand-strong"
         >
           Or explore a sample deal →
-        </button>
+        </PendingButton>
       </form>
     </section>
   );
