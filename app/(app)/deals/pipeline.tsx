@@ -494,13 +494,22 @@ export function Pipeline({
             a fully-worked sample to see the whole thing first.
           </p>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => setShowForm(true)}
-              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
-            >
-              + New deal
-            </button>
+            {atLimit ? (
+              <Link
+                href="/billing"
+                className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+              >
+                See plans
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowForm(true)}
+                className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+              >
+                + New deal
+              </button>
+            )}
             <form action={createSampleDeal}>
               <PendingButton
                 pendingLabel="Setting up your sample…"

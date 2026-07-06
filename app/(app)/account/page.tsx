@@ -4,15 +4,26 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getBilling } from "@/lib/billing";
 import { signOut } from "@/app/login/actions";
 import { ChangePasswordForm } from "./change-password-form";
+import { DeleteAccountForm } from "./delete-account-form";
 
 export const metadata: Metadata = { title: "Account" };
+
+const DELETE_ERRORS: Record<string, string> = {
+  confirm: 'Type DELETE (all caps) in the box to confirm deletion.',
+  ownerdelete:
+    "You own a team, so self-deletion is disabled — it would take the team down with you. Email support and we'll handle it.",
+  cancelsub:
+    "We couldn't cancel your subscription automatically — nothing was deleted. Cancel it from the Billing page first, then try again.",
+  delete: "Deletion failed — nothing was removed. Please try again or email support.",
+};
 
 export default async function AccountPage({
   searchParams,
 }: {
-  searchParams: Promise<{ reset?: string }>;
+  searchParams: Promise<{ reset?: string; error?: string }>;
 }) {
-  const { reset } = await searchParams;
+  const { reset, error } = await searchParams;
+  const deleteError = error ? (DELETE_ERRORS[error] ?? null) : null;
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -30,6 +41,11 @@ export default async function AccountPage({
       {reset && (
         <p className="rounded-lg bg-pass/10 px-3 py-2 text-sm text-pass">
           You&apos;re signed in via your reset link — set a new password below.
+        </p>
+      )}
+      {deleteError && (
+        <p className="rounded-lg bg-kill/10 px-3 py-2 text-sm text-kill">
+          {deleteError}
         </p>
       )}
 
@@ -103,6 +119,19 @@ export default async function AccountPage({
             </button>
           </form>
         </div>
+      </section>
+
+      {/* Danger zone */}
+      <section className="rounded-2xl border border-kill/25 bg-surface p-6 shadow-card">
+        <h2 className="text-sm font-semibold tracking-tight text-kill">
+          Delete account
+        </h2>
+        <p className="mt-1 max-w-lg text-sm leading-relaxed text-muted">
+          Permanently deletes your account, your deals, your documents, and
+          your analyses, and cancels any active subscription. Deals you shared
+          with a team stay with the team. This cannot be undone.
+        </p>
+        <DeleteAccountForm />
       </section>
     </div>
   );
