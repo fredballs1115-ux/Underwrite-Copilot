@@ -24,10 +24,14 @@ export async function syncTeamSeats(teamId: string): Promise<void> {
     ]);
     const subId = (team?.stripe_subscription_id as string) ?? null;
     const seats = count ?? 0;
-    if (!subId || team?.plan !== "active" || seats < 1) return;
+    if (!subId || seats < 1) return;
 
+    // Gate on Stripe's own view of the subscription, not the local mirror —
+    // the mirror lags the webhook and would strand seat counts during the
+    // checkout→webhook window or a past_due dunning period.
     const stripe = getStripe();
     const sub = await stripe.subscriptions.retrieve(subId);
+    if (["canceled", "incomplete_expired"].includes(sub.status)) return;
     const item = sub.items?.data?.[0];
     if (!item || item.quantity === seats) return;
     await stripe.subscriptionItems.update(item.id, { quantity: seats });

@@ -137,7 +137,11 @@ alter table public.team_invites enable row level security;
 drop policy if exists "team members read team" on public.teams;
 create policy "team members read team" on public.teams
   for select using (public.is_team_member(id));
-revoke insert, update, delete on public.teams from anon, authenticated;
+-- Members read the team, but Stripe identifiers are owner/server business —
+-- column-level grants keep them out of member REST reads entirely.
+revoke all on public.teams from anon, authenticated;
+grant select (id, name, owner_id, plan, subscription_status, current_period_end, created_at)
+  on public.teams to authenticated;
 
 -- Memberships: members see the roster; the owner can remove others; a member
 -- can remove themself (leave). Joining happens only through the RPCs.
@@ -184,6 +188,42 @@ create policy "update own or team deals" on public.deals
     user_id is not null
     and (team_id is null or public.is_team_member(team_id))
   );
+
+-- Teammates may edit a shared deal's CONTENT, but its identity (who created
+-- it, which team it belongs to) is not theirs to rewrite — otherwise a member
+-- could seize creator-only delete rights or eject a deal from the shared
+-- pipeline. auth.uid() is null for service-role/internal writes (including
+-- the FK's on-delete-set-null), which stay unrestricted.
+create or replace function public.protect_deal_identity()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+  if new.user_id is distinct from old.user_id then
+    raise exception 'deal_creator_immutable';
+  end if;
+  if new.team_id is distinct from old.team_id
+     and auth.uid() <> old.user_id
+     and not (old.team_id is not null and public.is_team_owner(old.team_id)) then
+    raise exception 'deal_team_change_denied';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists protect_deal_identity on public.deals;
+create trigger protect_deal_identity
+  before update on public.deals
+  for each row execute function public.protect_deal_identity();
+
+-- One sample deal per user, enforced in the schema — closes the direct-REST
+-- loophole where is_sample=true rows dodge the free cap without limit.
+create unique index if not exists deals_one_sample_per_user
+  on public.deals (user_id) where is_sample;
 drop policy if exists "delete own deals or team owner" on public.deals;
 create policy "delete own deals or team owner" on public.deals
   for delete using (

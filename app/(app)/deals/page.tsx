@@ -17,7 +17,7 @@ const ERRORS: Record<string, string> = {
   limit:
     "You’ve reached the 3-deal limit on the Free plan. Upgrade to Pro for unlimited deals.",
   teamlimit:
-    "Your team has used its 3 trial deals. Start the Team plan for unlimited shared deals.",
+    "Your team's 3 trial deals and your personal free deals are used up. Start the Team plan for unlimited shared deals, or upgrade to Pro.",
 };
 
 // Up to two headline figures to show on each pipeline row.

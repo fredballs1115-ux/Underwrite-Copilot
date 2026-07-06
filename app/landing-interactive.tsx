@@ -32,8 +32,8 @@ export function Reveal({
     const el = ref.current;
     if (!el) return;
     if (prefersReducedMotion()) {
-      setShown(true);
-      return;
+      const id = requestAnimationFrame(() => setShown(true));
+      return () => cancelAnimationFrame(id);
     }
     const io = new IntersectionObserver(
       ([entry]) => {
@@ -77,9 +77,10 @@ export function CountUp({
     const el = ref.current;
     if (!el) return;
     if (prefersReducedMotion() || value === 0) {
-      setN(value);
-      return;
+      const id = requestAnimationFrame(() => setN(value));
+      return () => cancelAnimationFrame(id);
     }
+    let cancelled = false;
     const io = new IntersectionObserver(
       ([entry]) => {
         if (!entry.isIntersecting || started.current) return;
@@ -88,6 +89,7 @@ export function CountUp({
         const t0 = performance.now();
         const dur = 900;
         const tick = (t: number) => {
+          if (cancelled) return;
           const p = Math.min(1, (t - t0) / dur);
           const eased = 1 - Math.pow(1 - p, 3);
           setN(Math.round(eased * value));
@@ -98,7 +100,10 @@ export function CountUp({
       { threshold: 0.4 },
     );
     io.observe(el);
-    return () => io.disconnect();
+    return () => {
+      cancelled = true;
+      io.disconnect();
+    };
   }, [value]);
 
   return (

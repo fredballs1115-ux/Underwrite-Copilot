@@ -78,7 +78,9 @@ export async function joinTeam(formData: FormData) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) {
+    redirect(`/login?next=${encodeURIComponent(`/team/join/${token}`)}`);
+  }
 
   const { data: teamId, error } = await supabase.rpc("join_team_with_token", {
     tok: token,
@@ -163,13 +165,28 @@ export async function startTeamCheckout() {
 
   const stripe = getStripe();
 
-  let customerId = team.stripeCustomerId;
+  // Stripe identifiers are hidden from user-client reads (column grants) —
+  // the owner-only actions fetch them with the service role.
+  const { createSupabaseAdminClient: adminFactory } = await import(
+    "@/lib/supabase/admin"
+  );
+  const { data: trow } = await adminFactory()
+    .from("teams")
+    .select("stripe_customer_id")
+    .eq("id", team.id)
+    .maybeSingle();
+
+  let customerId = (trow?.stripe_customer_id as string) ?? null;
   if (!customerId) {
-    const customer = await stripe.customers.create({
-      email: user.email ?? undefined,
-      name: team.name,
-      metadata: { team_id: team.id },
-    });
+    // Idempotency key prevents two-tab races from minting duplicate customers.
+    const customer = await stripe.customers.create(
+      {
+        email: user.email ?? undefined,
+        name: team.name,
+        metadata: { team_id: team.id },
+      },
+      { idempotencyKey: `uc-team-customer-${team.id}` },
+    );
     customerId = customer.id;
     // Billing columns on teams are service-role-only — persist via admin, and
     // fail loudly so we never mint duplicate customers on retries.
@@ -179,6 +196,21 @@ export async function startTeamCheckout() {
       .update({ stripe_customer_id: customerId })
       .eq("id", team.id);
     if (saveErr) redirect("/team?error=save");
+  }
+
+  // A live subscription already on file means the webhook just hasn't landed
+  // yet (or the owner double-clicked) — never sell a second one.
+  const existing = await stripe.subscriptions.list({
+    customer: customerId,
+    status: "all",
+    limit: 10,
+  });
+  if (
+    existing.data.some((sub) =>
+      ["active", "trialing", "past_due", "incomplete"].includes(sub.status),
+    )
+  ) {
+    redirect("/team?error=exists");
   }
 
   const session = await stripe.checkout.sessions.create({
@@ -206,11 +238,19 @@ export async function openTeamPortal() {
 
   const team = await getTeam(supabase, user.id);
   if (!team || team.role !== "owner") redirect("/team?error=owner");
-  if (!team.stripeCustomerId) redirect("/team?error=nocustomer");
+
+  const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
+  const { data: trow } = await createSupabaseAdminClient()
+    .from("teams")
+    .select("stripe_customer_id")
+    .eq("id", team.id)
+    .maybeSingle();
+  const customerId = (trow?.stripe_customer_id as string) ?? null;
+  if (!customerId) redirect("/team?error=nocustomer");
 
   const stripe = getStripe();
   const session = await stripe.billingPortal.sessions.create({
-    customer: team.stripeCustomerId,
+    customer: customerId,
     return_url: `${appUrl()}/team`,
   });
   redirect(session.url);

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { uploadOmPdf, removeStorageFiles } from "@/lib/storage";
 import { getBilling } from "@/lib/billing";
+import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { jobInFlight } from "@/lib/jobs";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
@@ -52,14 +53,19 @@ export async function createDeal(formData: FormData) {
     redirect("/deals?error=size");
   }
 
-  // On a team, new deals land in the shared pipeline.
+  // On a team, new deals land in the shared pipeline while the team plan or
+  // trial allows it; otherwise fall back to a personal deal so a personal-Pro
+  // (or under-cap) member is never blocked by the team's spent trial.
+  const teamAllowed =
+    !!billing.team &&
+    (billing.team.active || billing.team.dealCount < TEAM_TRIAL_DEALS);
   const { data: deal, error: insertErr } = await supabase
     .from("deals")
     .insert({
       name,
       asset_class: assetClass,
       user_id: user.id,
-      team_id: billing.team?.id ?? null,
+      team_id: teamAllowed ? billing.team!.id : null,
     })
     .select("id")
     .single();
@@ -158,10 +164,11 @@ export async function setStage(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  await supabase
+  const { error } = await supabase
     .from("deals")
     .update({ stage, updated_at: new Date().toISOString() })
     .eq("id", dealId);
+  if (error) redirect(`/deals/${dealId}?error=stage`);
   revalidatePath(`/deals/${dealId}`);
   revalidatePath("/deals");
   redirect(`/deals/${dealId}`);

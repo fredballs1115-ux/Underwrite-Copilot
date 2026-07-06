@@ -70,7 +70,7 @@ export async function getBilling(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<Billing> {
-  const [{ data: profile }, { count }, team] = await Promise.all([
+  const [{ data: profile }, countRes, team] = await Promise.all([
     supabase
       .from("profiles")
       .select("plan, subscription_status, stripe_customer_id, current_period_end")
@@ -86,16 +86,28 @@ export async function getBilling(
     getTeamState(supabase, userId),
   ]);
 
+  let dealCount = countRes.count ?? 0;
+  if (countRes.error) {
+    // Pre-migration-0007 the team_id column doesn't exist — fall back to a
+    // plain count so the usage numbers stay honest.
+    const retry = await supabase
+      .from("deals")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("is_sample", false);
+    dealCount = retry.count ?? 0;
+  }
+
   const plan = (profile?.plan as Plan) === "pro" ? "pro" : "free";
   const personalPro = plan === "pro";
-  const dealCount = count ?? 0;
 
-  // New deals land in the team pipeline when the user is on a team, so the
-  // create gate follows the team's plan/trial there — the personal cap
-  // otherwise.
-  const canCreateDeal = team
-    ? team.active || team.dealCount < TEAM_TRIAL_DEALS
-    : personalPro || dealCount < FREE_DEAL_LIMIT;
+  // New deals land in the team pipeline while the team plan/trial allows it;
+  // otherwise they fall back to the personal pipeline under the personal cap —
+  // a Pro subscriber is never locked out by their team's spent trial.
+  const personalAllowed = personalPro || dealCount < FREE_DEAL_LIMIT;
+  const teamAllowed =
+    !!team && (team.active || team.dealCount < TEAM_TRIAL_DEALS);
+  const canCreateDeal = teamAllowed || personalAllowed;
 
   return {
     plan,

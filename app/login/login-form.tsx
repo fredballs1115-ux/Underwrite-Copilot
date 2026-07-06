@@ -26,8 +26,10 @@ type Mode = "signin" | "signup" | "reset";
 
 export function LoginForm({
   initialMode = "signin",
+  next = null,
 }: {
   initialMode?: Mode;
+  next?: string | null;
 }) {
   // Explicit mode: password managers get the right autocomplete for signup,
   // and there's exactly one primary action on screen at a time. Marketing
@@ -124,6 +126,7 @@ export function LoginForm({
       ) : (
         <form action={formAction} className="mt-5 flex flex-col gap-4">
           <input type="hidden" name="intent" value={mode} />
+          {next && <input type="hidden" name="next" value={next} />}
           <div className="flex flex-col gap-1.5">
             <label htmlFor="email" className="text-sm font-medium">
               Email

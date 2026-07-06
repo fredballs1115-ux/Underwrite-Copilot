@@ -26,7 +26,12 @@ export function StageSelect({
       <select
         name="stage"
         defaultValue={stage}
-        onChange={() => formRef.current?.requestSubmit()}
+        onChange={() => {
+          const f = formRef.current;
+          if (!f) return;
+          if (typeof f.requestSubmit === "function") f.requestSubmit();
+          else f.submit();
+        }}
         aria-label="Deal stage"
         title="Track where this deal sits in your process"
         style={{

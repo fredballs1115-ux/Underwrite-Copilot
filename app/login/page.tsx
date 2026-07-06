@@ -8,9 +8,9 @@ export const metadata: Metadata = { title: "Sign in" };
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string }>;
+  searchParams: Promise<{ mode?: string; next?: string }>;
 }) {
-  const { mode } = await searchParams;
+  const { mode, next } = await searchParams;
   return (
     <div className="band-dark flex flex-1 flex-col">
       <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16">
@@ -27,7 +27,10 @@ export default async function LoginPage({
             Screen your first deal in minutes. Your first 3 deals are free — no
             card required, and a fully-worked sample deal is waiting inside.
           </p>
-          <LoginForm initialMode={mode === "signup" ? "signup" : "signin"} />
+          <LoginForm
+            initialMode={mode === "signup" ? "signup" : "signin"}
+            next={next ?? null}
+          />
         </div>
 
         <p className="mt-6 text-center text-xs leading-relaxed text-white/50">

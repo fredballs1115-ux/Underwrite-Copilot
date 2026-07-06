@@ -96,6 +96,7 @@ const MODEL_ERRORS: Record<string, string> = {
   busy: "An analysis is already running on this deal — let it finish first.",
   memoempty: "Run the analysis first — the memo needs a verdict to export.",
   delete: "Couldn’t delete the deal — please try again.",
+  stage: "Couldn’t save the stage — please try again.",
 };
 
 function isActive(status: string | undefined): boolean {

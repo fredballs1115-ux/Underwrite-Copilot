@@ -29,10 +29,14 @@ export async function startCheckout() {
     .maybeSingle();
   let customerId = (profile?.stripe_customer_id as string) ?? null;
   if (!customerId) {
-    const customer = await stripe.customers.create({
-      email: user.email ?? undefined,
-      metadata: { user_id: user.id },
-    });
+    // Idempotency key prevents two-tab races from minting duplicate customers.
+    const customer = await stripe.customers.create(
+      {
+        email: user.email ?? undefined,
+        metadata: { user_id: user.id },
+      },
+      { idempotencyKey: `uc-customer-${user.id}` },
+    );
     customerId = customer.id;
     // Billing columns are service-role-only (migration 0006), so persist the
     // customer id with the admin client — and fail loudly if it doesn't land,
@@ -43,6 +47,21 @@ export async function startCheckout() {
       .update({ stripe_customer_id: customerId })
       .eq("id", user.id);
     if (saveErr) redirect("/billing?error=save");
+  }
+
+  // A live subscription already on file means the webhook just hasn't landed
+  // yet (or the user double-clicked) — never sell a second one.
+  const existing = await stripe.subscriptions.list({
+    customer: customerId,
+    status: "all",
+    limit: 10,
+  });
+  if (
+    existing.data.some((sub) =>
+      ["active", "trialing", "past_due", "incomplete"].includes(sub.status),
+    )
+  ) {
+    redirect("/billing?error=exists");
   }
 
   const session = await stripe.checkout.sessions.create({

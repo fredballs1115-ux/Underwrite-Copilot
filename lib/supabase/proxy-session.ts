@@ -5,12 +5,23 @@ import { NextResponse, type NextRequest } from "next/server";
  * Runs on every request (from proxy.ts) to keep the Supabase auth session
  * fresh — it reads the auth cookie, refreshes the token if needed, and writes
  * the updated cookie back onto the response. It also does a fast "optimistic"
- * redirect: signed-out users hitting /deals go to /login, and signed-in users
- * hitting /login go to /deals.
+ * redirect: signed-out users hitting the app go to /login (carrying a `next`
+ * param so invite links survive the sign-in), and signed-in users hitting
+ * /login go where they were headed.
  *
  * (The real security check still happens inside the app layout + Row-Level
  * Security — this is just the first gate.)
  */
+
+/** Only ever bounce to a same-origin path — never an absolute URL. */
+export function safeNextPath(next: string | null): string | null {
+  if (!next) return null;
+  if (!/^\/[a-zA-Z0-9/_\-?=&%.]*$/.test(next) || next.startsWith("//")) {
+    return null;
+  }
+  return next;
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -50,14 +61,19 @@ export async function updateSession(request: NextRequest) {
   }
 
   const { pathname } = request.nextUrl;
-  const isProtected = pathname.startsWith("/deals");
+  const isProtected = ["/deals", "/team", "/billing", "/account"].some((p) =>
+    pathname.startsWith(p),
+  );
   const isAuthPage = pathname === "/login";
 
   if (!signedIn && isProtected) {
-    return redirectWithCookies(request, supabaseResponse, "/login");
+    return redirectWithCookies(request, supabaseResponse, "/login", {
+      next: pathname,
+    });
   }
   if (signedIn && isAuthPage) {
-    return redirectWithCookies(request, supabaseResponse, "/deals");
+    const next = safeNextPath(request.nextUrl.searchParams.get("next"));
+    return redirectWithCookies(request, supabaseResponse, next ?? "/deals");
   }
 
   return supabaseResponse;
@@ -68,9 +84,14 @@ function redirectWithCookies(
   request: NextRequest,
   response: NextResponse,
   pathname: string,
+  params?: Record<string, string>,
 ) {
   const url = request.nextUrl.clone();
   url.pathname = pathname;
+  url.search = "";
+  for (const [k, v] of Object.entries(params ?? {})) {
+    url.searchParams.set(k, v);
+  }
   const redirectRes = NextResponse.redirect(url);
   response.cookies.getAll().forEach((cookie) => {
     redirectRes.cookies.set(cookie);

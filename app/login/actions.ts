@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { safeNextPath } from "@/lib/supabase/proxy-session";
 
 export type AuthState = { error?: string; notice?: string } | null;
 
@@ -63,8 +64,10 @@ export async function authenticate(
     };
   }
 
-  // Success — the session cookie is set; send them into the app.
-  redirect("/deals");
+  // Success — the session cookie is set; send them into the app (or back to
+  // the invite/deep link they were headed to — same-origin paths only).
+  const next = safeNextPath(String(formData.get("next") ?? "") || null);
+  redirect(next ?? "/deals");
 }
 
 /** Email a password-recovery link. The link signs the user in; they then set a

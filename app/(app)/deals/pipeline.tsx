@@ -106,12 +106,14 @@ export function Pipeline({
           t.tagName === "TEXTAREA" ||
           t.tagName === "SELECT" ||
           t.isContentEditable);
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
+      // Never let Escape nuke the form while the user is in a field — that's
+      // how browsers cancel autofill/IME, and search inputs clear on Escape.
+      if (typing) return;
       if (e.key === "Escape") {
         setShowForm(false);
         return;
       }
-      if (typing) return;
       if (e.key === "/") {
         e.preventDefault();
         searchRef.current?.focus();
@@ -198,7 +200,12 @@ export function Pipeline({
 
   // Export the current (filtered) view as a CSV — opens in Excel/Sheets.
   function exportCsv() {
-    const esc = (v: string) => `"${v.replaceAll('"', '""')}"`;
+    // Neutralize formula-leading cells (=, +, -, @) — deal names and OM-derived
+    // text are untrusted and must never execute when the CSV opens in Excel.
+    const esc = (v: string) => {
+      const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+      return `"${safe.replaceAll('"', '""')}"`;
+    };
     const header = ["Deal", "Market", "Asset class", "Added", "Verdict", "Stage", "Added by", "Key stats"];
     const lines = filtered.map((d) =>
       [
@@ -214,8 +221,11 @@ export function Pipeline({
         .map(esc)
         .join(","),
     );
-    const csv = [header.map(esc).join(","), ...lines].join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    // BOM so Excel on Windows reads UTF-8 (names/markets can be non-ASCII).
+    const csv = "\ufeff" + [header.map(esc).join(","), ...lines].join("\n");
+    const url = URL.createObjectURL(
+      new Blob([csv], { type: "text/csv;charset=utf-8" }),
+    );
     const a = document.createElement("a");
     a.href = url;
     a.download = "pipeline.csv";
@@ -459,8 +469,13 @@ export function Pipeline({
           <button
             type="button"
             onClick={exportCsv}
-            title="Download the current view as a CSV"
-            className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-faint"
+            disabled={filtered.length === 0}
+            title={
+              filtered.length === 0
+                ? "Nothing to export — clear the filters first"
+                : "Download the current view as a CSV"
+            }
+            className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-faint disabled:cursor-not-allowed disabled:opacity-50"
           >
             Export CSV
           </button>

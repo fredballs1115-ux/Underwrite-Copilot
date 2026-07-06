@@ -21,7 +21,6 @@ export interface TeamInfo {
   role: TeamRole;
   planActive: boolean;
   subscriptionStatus: string | null;
-  stripeCustomerId: string | null;
   currentPeriodEnd: string | null;
   members: TeamMemberInfo[];
   seatCount: number;
@@ -45,9 +44,7 @@ export async function getTeam(
   const [{ data: team }, { data: memberRows }, { count }] = await Promise.all([
     supabase
       .from("teams")
-      .select(
-        "id, name, plan, subscription_status, stripe_customer_id, current_period_end",
-      )
+      .select("id, name, plan, subscription_status, current_period_end")
       .eq("id", teamId)
       .maybeSingle(),
     supabase
@@ -85,7 +82,6 @@ export async function getTeam(
     role: mem.role as TeamRole,
     planActive: (team.plan as string) === "active",
     subscriptionStatus: (team.subscription_status as string) ?? null,
-    stripeCustomerId: (team.stripe_customer_id as string) ?? null,
     currentPeriodEnd: (team.current_period_end as string) ?? null,
     members: rows.map((r) => ({
       userId: r.user_id,

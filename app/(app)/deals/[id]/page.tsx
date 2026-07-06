@@ -167,6 +167,7 @@ export default async function DealPage({
           <div className="flex shrink-0 flex-col items-end gap-2">
             <div className="flex items-center gap-2">
               <StageSelect
+                key={((deal as { stage?: string }).stage as string) ?? "screening"}
                 dealId={id}
                 stage={((deal as { stage?: string }).stage as string) ?? "screening"}
               />
