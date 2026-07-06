@@ -78,10 +78,10 @@ export default async function AccountPage({
       <p className="text-xs text-muted">
         Need help?{" "}
         <a
-          href="mailto:support@underwritecopilot.com"
+          href="mailto:underwritecopilot.support@gmail.com"
           className="font-medium text-brand hover:text-brand-strong"
         >
-          support@underwritecopilot.com
+          underwritecopilot.support@gmail.com
         </a>
       </p>
 

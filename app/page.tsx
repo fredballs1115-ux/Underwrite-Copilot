@@ -971,10 +971,10 @@ export default function Home() {
               </li>
               <li>
                 <a
-                  href="mailto:support@underwritecopilot.com"
+                  href="mailto:underwritecopilot.support@gmail.com"
                   className="text-muted transition-colors hover:text-ink"
                 >
-                  support@underwritecopilot.com
+                  underwritecopilot.support@gmail.com
                 </a>
               </li>
             </ul>
