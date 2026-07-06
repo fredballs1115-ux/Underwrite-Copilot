@@ -65,13 +65,28 @@ export default async function DealPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const pro = user ? await isPro(supabase, user.id) : false;
 
-  const { data, error } = await supabase
-    .from("deals")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+  // These four don't depend on each other — fetch them in one round trip's
+  // worth of wall clock instead of four.
+  const [pro, { data, error }, { data: docsData }, { data: jobData }] =
+    await Promise.all([
+      user ? isPro(supabase, user.id) : Promise.resolve(false),
+      supabase.from("deals").select("*").eq("id", id).maybeSingle(),
+      supabase
+        .from("deal_documents")
+        .select(
+          "id, deal_id, kind, filename, storage_path, content_type, created_at",
+        )
+        .eq("deal_id", id)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("analysis_jobs")
+        .select("status, step, progress, error")
+        .eq("deal_id", id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
   if (error || !data) {
     notFound();
@@ -95,20 +110,8 @@ export default async function DealPage({
     ? (deal.comp_search as CompSearchResult)
     : null;
 
-  const { data: docsData } = await supabase
-    .from("deal_documents")
-    .select("id, deal_id, kind, filename, storage_path, content_type, created_at")
-    .eq("deal_id", id)
-    .order("created_at", { ascending: true });
   const documents = (docsData ?? []) as DealDocument[];
 
-  const { data: jobData } = await supabase
-    .from("analysis_jobs")
-    .select("status, step, progress, error")
-    .eq("deal_id", id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
   const job = jobData as {
     status: string;
     step: string | null;
@@ -132,17 +135,19 @@ export default async function DealPage({
       files: { id: string; name: string; createdAt: string; url: string | null }[];
     }
   > = {};
-  for (const [tabKey, s] of Object.entries(rawSupp)) {
-    const files = await Promise.all(
-      (s.files ?? []).map(async (f) => ({
-        id: f.id,
-        name: f.name,
-        createdAt: f.createdAt,
-        url: await signedSupplementUrl(f.path),
-      })),
-    );
-    supplements[tabKey] = { notes: s.notes ?? [], files };
-  }
+  await Promise.all(
+    Object.entries(rawSupp).map(async ([tabKey, s]) => {
+      const files = await Promise.all(
+        (s.files ?? []).map(async (f) => ({
+          id: f.id,
+          name: f.name,
+          createdAt: f.createdAt,
+          url: await signedSupplementUrl(f.path),
+        })),
+      );
+      supplements[tabKey] = { notes: s.notes ?? [], files };
+    }),
+  );
 
   return (
     <div className="flex flex-col gap-6">
