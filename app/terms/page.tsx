@@ -44,7 +44,7 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "Billing",
     body: [
-      "The free tier includes a limited number of deals. Pro is a monthly subscription and the Team plan is billed monthly per seat, both through Stripe; team billing adjusts automatically as members join or leave. You can cancel anytime from the billing page; cancellation takes effect at the end of the paid period and no further charges are made. Downgrading never deletes your deals or documents.",
+      "The free tier includes a limited number of deals. Pro is a monthly subscription; the Team plan is one monthly subscription covering the owner's seat plus each added member, and it adjusts automatically as members join or leave. Both are billed through Stripe. You can cancel anytime from the billing page; cancellation takes effect at the end of the paid period and no further charges are made. Downgrading never deletes your deals or documents.",
     ],
   },
   {

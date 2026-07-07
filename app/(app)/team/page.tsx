@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getTeam, memberLabel, TEAM_TRIAL_DEALS } from "@/lib/teams";
-import { TEAM_PRICE_LABEL } from "@/lib/billing";
+import { TEAM_PRICE_LABEL, teamMonthlyTotal, fmtUsd } from "@/lib/billing";
 import {
   createTeam,
   createInvite,
@@ -280,12 +280,14 @@ export default async function TeamPage({
             {team.planActive ? (
               <>
                 <p className="mt-2 text-sm text-muted">
-                  Team plan · {TEAM_PRICE_LABEL} · billed for {team.seatCount}{" "}
-                  {team.seatCount === 1 ? "seat" : "seats"}
+                  Team plan · {TEAM_PRICE_LABEL} ·{" "}
+                  {fmtUsd(teamMonthlyTotal(team.seatCount))}/mo for{" "}
+                  {team.seatCount} {team.seatCount === 1 ? "seat" : "seats"}
                   {team.currentPeriodEnd
                     ? ` · renews ${new Date(team.currentPeriodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`
                     : ""}
-                  . Seats adjust automatically when members join or leave.
+                  . Adding or removing a member updates the seat count and
+                  Stripe prorates automatically.
                 </p>
                 {team.role === "owner" && (
                   <form action={openTeamPortal} className="mt-4">
@@ -322,10 +324,11 @@ export default async function TeamPage({
                   </div>
                 </div>
                 <p className="mt-3 text-sm text-muted">
-                  The Team plan is {TEAM_PRICE_LABEL}, billed only for the
-                  seats you have ({team.seatCount} today). Unlimited shared
-                  deals, and every member gets the Excel model, PDF memo, and
-                  comp search.
+                  The Team plan is {TEAM_PRICE_LABEL} — with{" "}
+                  {team.seatCount} {team.seatCount === 1 ? "seat" : "seats"}{" "}
+                  today that&apos;s {fmtUsd(teamMonthlyTotal(team.seatCount))}
+                  /mo. Unlimited shared deals, and every member gets the Excel
+                  model, PDF memo, and comp search.
                 </p>
                 {team.role === "owner" ? (
                   <form action={startTeamCheckout} className="mt-4">
