@@ -184,7 +184,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ReturnsHeadline({ model }: { model: UnderwritingModel }) {
+export function ReturnsHeadline({ model }: { model: UnderwritingModel }) {
   const r = model.returns;
   return (
     <section>
@@ -352,7 +352,7 @@ function StressDelta({
   );
 }
 
-function StressPanel({ model }: { model: UnderwritingModel }) {
+export function StressPanel({ model }: { model: UnderwritingModel }) {
   const base = model.inputs;
   const ok = !!base?.purchasePrice && !!base?.exitCapPct && !!base?.loan;
   const initial: StressAdjust = {
