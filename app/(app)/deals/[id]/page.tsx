@@ -410,33 +410,50 @@ export default async function DealPage({
               <div
                 key={c.label}
                 className={`rounded-lg border p-2.5 ${
-                  c.status === "fail"
+                  c.status === "miss"
                     ? "border-kill/25 bg-kill/[0.04]"
-                    : c.status === "pass"
-                      ? "border-line bg-surface"
-                      : "border-line bg-faint"
+                    : c.status === "near"
+                      ? "border-caution/30 bg-caution/[0.05]"
+                      : c.status === "pass"
+                        ? "border-line bg-surface"
+                        : "border-line bg-faint"
                 }`}
               >
                 <p className="flex items-center gap-1.5 text-xs font-medium">
                   <span
                     aria-hidden
                     className={
-                      c.status === "fail"
+                      c.status === "miss"
                         ? "text-kill"
-                        : c.status === "pass"
-                          ? "text-pass"
-                          : "text-muted"
+                        : c.status === "near"
+                          ? "text-caution"
+                          : c.status === "pass"
+                            ? "text-pass"
+                            : "text-muted"
                     }
                   >
-                    {c.status === "fail" ? "✕" : c.status === "pass" ? "✓" : "—"}
+                    {c.status === "miss"
+                      ? "✕"
+                      : c.status === "near"
+                        ? "≈"
+                        : c.status === "pass"
+                          ? "✓"
+                          : "—"}
                   </span>
                   {c.label}
+                  {c.status === "near" && (
+                    <span className="rounded-full bg-caution/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-caution">
+                      Near-miss
+                    </span>
+                  )}
                   <span className="sr-only">
-                    {c.status === "fail"
-                      ? "outside your criteria"
-                      : c.status === "pass"
-                        ? "within your criteria"
-                        : "not determinable yet"}
+                    {c.status === "miss"
+                      ? "outside the mandate"
+                      : c.status === "near"
+                        ? "a near-miss against the mandate"
+                        : c.status === "pass"
+                          ? "inside the mandate"
+                          : "not determinable yet"}
                   </span>
                 </p>
                 <p className="mt-1 text-[11px] leading-relaxed text-muted">
