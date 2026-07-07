@@ -7,8 +7,14 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { uploadOmPdf, removeStorageFiles } from "@/lib/storage";
 import { getBilling } from "@/lib/billing";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
-import { jobInFlight, claimJob, releaseClaim } from "@/lib/jobs";
+import { claimJob, releaseClaim } from "@/lib/jobs";
 import { parseStructuredAddress } from "@/lib/address";
+import {
+  STAGES,
+  normalizeStage,
+  parseStageHistory,
+  type Stage,
+} from "@/lib/stages";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 
@@ -194,16 +200,68 @@ export async function createSampleDeal() {
   redirect(`/deals/${deal.id}`);
 }
 
-const STAGES = ["screening", "reviewing", "pursuing", "dead"] as const;
-
 /** Track where a deal sits in YOUR process — independent of the verdict.
- *  RLS lets the creator or any teammate move it. */
+ *  RLS lets the creator or any teammate move it. Every change is appended to
+ *  the deal's stage history with its date. */
 export async function setStage(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
   const stage = String(formData.get("stage") ?? "");
-  if (!dealId || !STAGES.includes(stage as (typeof STAGES)[number])) {
-    redirect(dealId ? `/deals/${dealId}` : "/deals");
+  // A change made from a pipeline row returns to the pipeline; from the deal
+  // page it stays on the deal.
+  const backTo =
+    formData.get("next") === "pipeline" ? "/deals" : `/deals/${dealId}`;
+  if (!dealId || !STAGES.includes(stage as Stage)) {
+    redirect(dealId ? backTo : "/deals");
   }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  // Read the current stage + history so the change is logged with its date.
+  const { data: current } = await supabase
+    .from("deals")
+    .select("stage, stage_history")
+    .eq("id", dealId)
+    .maybeSingle();
+  if (!current) redirect(backTo);
+  if (normalizeStage(current!.stage as string) === stage) redirect(backTo);
+
+  const history = [
+    ...parseStageHistory(current!.stage_history),
+    { stage: stage as Stage, at: new Date().toISOString() },
+  ];
+
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("deals")
+    .update({ stage, stage_history: history, updated_at: now })
+    .eq("id", dealId);
+  if (error) {
+    // Pre-0013 schema: the history column may not exist yet — the stage value
+    // itself should still save where the old constraint allows it.
+    const { error: retryErr } = await supabase
+      .from("deals")
+      .update({ stage, updated_at: now })
+      .eq("id", dealId);
+    if (retryErr) redirect(`/deals/${dealId}?error=stage`);
+  }
+  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/deals");
+  redirect(backTo);
+}
+
+/** Set or clear the broker's call-for-offers date. */
+export async function setOffersDue(formData: FormData) {
+  const dealId = String(formData.get("dealId") ?? "");
+  const raw = String(formData.get("offersDue") ?? "").trim();
+  if (!dealId) redirect("/deals");
+  // Empty clears the deadline; otherwise require a plain ISO date.
+  const offersDue =
+    raw === "" ? null : /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : undefined;
+  if (offersDue === undefined) redirect(`/deals/${dealId}?error=deadline`);
 
   const supabase = await createSupabaseServerClient();
   const {
@@ -213,9 +271,9 @@ export async function setStage(formData: FormData) {
 
   const { error } = await supabase
     .from("deals")
-    .update({ stage, updated_at: new Date().toISOString() })
+    .update({ offers_due: offersDue, updated_at: new Date().toISOString() })
     .eq("id", dealId);
-  if (error) redirect(`/deals/${dealId}?error=stage`);
+  if (error) redirect(`/deals/${dealId}?error=deadline`);
   revalidatePath(`/deals/${dealId}`);
   revalidatePath("/deals");
   redirect(`/deals/${dealId}`);

@@ -21,6 +21,8 @@ import { DealView } from "./deal-view";
 import { DealActions } from "./deal-actions";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import { StageSelect } from "./stage-select";
+import { OffersDueControl } from "../offers-due";
+import { parseStageHistory } from "@/lib/stages";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
 
@@ -103,6 +105,14 @@ export default async function DealPage({
   const compSearch = deal.comp_search
     ? (deal.comp_search as CompSearchResult)
     : null;
+  // Both columns arrived in migration 0013 — select("*") simply won't carry
+  // them on an older schema, so these read null/[] gracefully.
+  const offersDue =
+    ((deal as { offers_due?: string | null }).offers_due as string | null) ??
+    null;
+  const stageHistory = parseStageHistory(
+    (deal as { stage_history?: unknown }).stage_history,
+  );
 
   const documents = (docsData ?? []) as DealDocument[];
 
@@ -291,7 +301,12 @@ export default async function DealPage({
               <span className="capitalize">{deal.asset_class}</span>
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <OffersDueControl
+              key={`due-${offersDue ?? "unset"}`}
+              dealId={id}
+              value={offersDue}
+            />
             <StageSelect
               key={((deal as { stage?: string }).stage as string) ?? "screening"}
               dealId={id}
@@ -348,6 +363,7 @@ export default async function DealPage({
           hasBox: !!buyBox,
         }}
         screenDiff={screenDiff}
+        stageHistory={stageHistory}
         omUrl={omUrl}
       />
     </div>
