@@ -3,7 +3,10 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
 import { MemoDocument, buildMemoData } from "@/lib/memo/memo-document";
+import { getBuyBoxForDeal } from "@/lib/criteria-server";
+import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
 import type { DealRow } from "@/lib/deals";
+import type { ExtractionResult } from "@/lib/anthropic/types";
 
 // PDF generation needs the Node runtime (not edge).
 export const runtime = "nodejs";
@@ -49,7 +52,28 @@ export async function GET(
     month: "long",
     day: "numeric",
   });
-  const memo = buildMemoData(deal, dateStr);
+
+  // The buyer's standing criteria, so the forwarded page carries the fit call.
+  // Best-effort: no box (or a pre-0008 schema) just means no buy-box row.
+  let buyBoxChecks: BuyBoxCheck[] = [];
+  try {
+    const ownership = deal as unknown as {
+      user_id: string;
+      team_id: string | null;
+    };
+    const box = await getBuyBoxForDeal(ownership.user_id, ownership.team_id);
+    if (box) {
+      buyBoxChecks = evaluateBuyBox(
+        deal.asset_class,
+        (deal.extraction as ExtractionResult) ?? null,
+        box,
+      );
+    }
+  } catch {
+    buyBoxChecks = [];
+  }
+
+  const memo = buildMemoData(deal, dateStr, buyBoxChecks);
   // MemoDocument renders a <Document>; cast to the element type renderToBuffer
   // expects (it's typed for a Document element, not a wrapping component).
   const element = React.createElement(MemoDocument, {

@@ -82,8 +82,10 @@ export function Pipeline({
   deals: DealCard[];
   errorMessage: string | null;
   notice?: string | null;
-  /** open the new-deal form on mount (?new=1 — the ⌘K "New deal…" action) */
-  openNew?: boolean;
+  /** open the new-deal form (?new=<nonce> — the ⌘K "New deal…" action). A
+   *  fresh nonce per invocation re-triggers the effect even when the form
+   *  was closed and the param is still in the URL. */
+  openNew?: string;
   onboarding?: OnboardingState;
   billing: BillingInfo | null;
 }) {
@@ -122,7 +124,11 @@ export function Pipeline({
   const atLimitRef = !!billing && !billing.canCreateDeal;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Another handler (the ⌘K palette's Escape) already consumed this key,
+      // or focus sits inside an open dialog — the page shortcuts stand down.
+      if (e.defaultPrevented) return;
       const t = e.target as HTMLElement | null;
+      if (t && t.closest('[role="dialog"]')) return;
       const typing =
         t &&
         (t.tagName === "INPUT" ||
@@ -377,7 +383,7 @@ export function Pipeline({
                 verdict === "screening" ? "ring-2 ring-current" : "hover:opacity-80"
               }`}
             >
-              {verdictCounts.screening} Screening
+              {verdictCounts.screening} No verdict
             </button>
           )}
           {/* The funnel's business end — deals you're actually chasing. */}
@@ -467,7 +473,7 @@ export function Pipeline({
               ["pass", "Go"],
               ["caution", "Caution"],
               ["pass_on", "No-go"],
-              ["screening", "Screening"],
+              ["screening", "No verdict yet"],
             ]}
           />
           <FilterSelect

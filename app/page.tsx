@@ -4,7 +4,9 @@ import { LogoMark } from "./logo";
 import { Reveal, CountUp, DemoTabs } from "./landing-interactive";
 
 // Landing page — a React Server Component (zero client JS, no secrets).
-// The pitch is consistency: same deal in, same answer out.
+// The pitch is consistency: one method on every deal, with the work shown.
+// (Never claim "same answer every run" — LLM stages vary run to run, and the
+// retrade diff would happily display that contradiction to a skeptic.)
 
 // The actual six-stage pipeline every OM runs through — not slogans.
 const SCREEN = [
@@ -26,17 +28,17 @@ const SCREEN = [
   {
     n: 4,
     title: "Reconcile against your model",
-    body: "Upload your own numbers and see every gap. Conflicts resolve openly — actuals beat pro forma, never silently merged.",
+    body: "Optional, whenever you're ready: upload your own numbers and see every gap. Conflicts resolve openly — actuals beat pro forma, never silently merged.",
   },
   {
     n: 5,
     title: "Check the market",
-    body: "Public-web signals on rents, caps, and supply — sourced and labeled, so you know exactly what's verified and what isn't.",
+    body: "Every assumption graded against typical ranges for the asset class — in-line, aggressive, or conservative — and labeled as rules-of-thumb to verify, never dressed up as pulled comps.",
   },
   {
     n: 6,
     title: "Get the verdict",
-    body: "Go / Caution / No-Go with the reasons attached. Reproducible — the same OM gets the same answer every run.",
+    body: "Go / Caution / No-Go with the reasons attached — and where the call flips across the ranges, so you see the honest edges.",
   },
 ];
 
@@ -82,8 +84,8 @@ const PILLARS = [
     ),
   },
   {
-    title: "Reproducible verdict",
-    body: "The same deal produces the same screen, whoever runs it. Your rigor stops depending on who opened the model that day.",
+    title: "One rubric, every deal",
+    body: "Every OM runs the same gauntlet in the same order, and the verdict shows its work. Your rigor stops depending on who opened the model that day.",
     icon: (
       <PillarIcon>
         <path d="M3 12a9 9 0 0 1 15.6-6.2L21 8" />
@@ -120,7 +122,7 @@ const PRO_FEATURES = [
 const FAQ: { q: string; a: string }[] = [
   {
     q: "What do I need to get started?",
-    a: "Just an offering memorandum as a PDF. Upload it and the screen runs on its own — a first read with the headline numbers lands in seconds, then extraction, assumption challenges, comp scrutiny, market check, and a verdict. Add a rent roll, T-12, or loan terms later to deepen the model. You can also explore a fully-worked sample deal before uploading anything.",
+    a: "Just an offering memorandum as a PDF. Upload it and the screen runs on its own — a first read with the headline numbers lands in about half a minute, then extraction, assumption challenges, comp scrutiny, market check, and a verdict. Add a rent roll, T-12, or loan terms later to deepen the model. You can also explore a fully-worked sample deal before uploading anything.",
   },
   {
     q: "Where do the numbers come from?",
@@ -158,7 +160,7 @@ const JSON_LD = {
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web",
       description:
-        "CRE deal screening that runs every offering memorandum through the same disciplined screen: sourced ranges, the three deal-killers, and a reproducible Go / No-Go before you open a model.",
+        "CRE deal screening that runs every offering memorandum through the same disciplined screen: sourced ranges, the three deal-killers, and a Go / No-Go that shows its work before you open a model.",
       offers: [
         { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD" },
         { "@type": "Offer", name: "Pro", price: "39", priceCurrency: "USD" },
@@ -190,10 +192,12 @@ export default function Home() {
       />
       {/* Nav — dark, so it reads as one piece with the hero. */}
       <header className="sticky top-0 z-10 border-b border-white/10 bg-sidebar text-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
-          <div className="flex items-center gap-2.5">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-3.5">
+          {/* min-w-0 + truncate: on narrow phones the wordmark gives way
+              instead of colliding with the CTA (the logo always stays). */}
+          <div className="flex min-w-0 items-center gap-2.5">
             <LogoMark className="h-8 w-8 shrink-0" />
-            <span className="whitespace-nowrap font-semibold tracking-tight">
+            <span className="truncate font-semibold tracking-tight">
               Underwrite Copilot
             </span>
           </div>
@@ -458,7 +462,7 @@ export default function Home() {
 
         {/* Inside the screen — interactive walkthrough on sample data */}
         <section className="border-y border-line bg-faint">
-          <div className="mx-auto grid max-w-6xl items-center gap-10 px-6 py-16 sm:py-20 lg:grid-cols-2">
+          <div className="mx-auto grid max-w-6xl items-start gap-10 px-6 py-16 sm:py-20 lg:grid-cols-2">
             <Reveal>
               <p className="text-xs font-medium uppercase tracking-wider text-muted">
                 Inside the screen
@@ -495,8 +499,8 @@ export default function Home() {
               What happens to every OM you upload.
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
-              A first read — headline numbers and buy-box fit — lands in
-              seconds, while the six deeper stages keep working.
+              A first read — headline numbers and buy-box fit — lands in about
+              half a minute, while the six deeper stages keep working.
             </p>
             <Reveal delay={60}>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -554,7 +558,7 @@ export default function Home() {
             <Reveal delay={80}>
               <div className="mt-8 grid gap-4 lg:grid-cols-3">
                 {/* Excel model — the flagship tile */}
-                <div className="hover-lift rounded-2xl border border-line bg-surface p-5 shadow-card lg:col-span-2">
+                <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card lg:col-span-2">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="text-sm font-semibold">
                       First-draft Excel model, alive
@@ -568,7 +572,8 @@ export default function Home() {
                     Edit the tinted inputs and IRR, equity multiple, and the
                     whole cash flow recalculate.
                   </p>
-                  <div className="mt-4 overflow-hidden rounded-lg border border-line font-mono text-[11px]">
+                  <div className="mt-auto pt-4">
+                  <div className="overflow-hidden rounded-lg border border-line font-mono text-[11px]">
                     <div className="grid grid-cols-4 border-b border-line bg-faint px-3 py-1.5 text-[9px] font-semibold uppercase tracking-wide text-muted">
                       <span className="col-span-2">Input</span>
                       <span className="text-right">Value</span>
@@ -578,10 +583,11 @@ export default function Home() {
                       ["Purchase price", "$70.7M", "IRR 8.7%"],
                       ["Exit cap", "5.50%", "IRR 8.7%"],
                       ["Exit cap (flexed)", "5.75%", "IRR 7.1%"],
+                      ["Rent growth (flexed)", "3.0%", "IRR 7.6%"],
                     ].map(([k, v, e], i) => (
                       <div
                         key={k}
-                        className={`grid grid-cols-4 px-3 py-1.5 ${i === 2 ? "bg-caution/5" : "bg-surface"}`}
+                        className={`grid grid-cols-4 px-3 py-1.5 ${i >= 2 ? "bg-caution/5" : "bg-surface"}`}
                       >
                         <span className="col-span-2 text-muted">{k}</span>
                         <span
@@ -593,16 +599,18 @@ export default function Home() {
                       </div>
                     ))}
                   </div>
+                  </div>
                 </div>
 
                 {/* Memo */}
-                <div className="hover-lift rounded-2xl border border-line bg-surface p-5 shadow-card">
+                <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
                   <h3 className="text-sm font-semibold">One-page IC memo</h3>
                   <p className="mt-1 text-xs leading-relaxed text-muted">
                     The verdict, the ranges, the deal-killers, and next steps —
                     exactly one page, ready to forward.
                   </p>
-                  <div className="mt-4 rounded-lg border border-line bg-paper p-3">
+                  <div className="mt-auto pt-4">
+                  <div className="rounded-lg border border-line bg-paper p-3">
                     <div className="flex items-center justify-between">
                       <div className="h-2 w-20 rounded bg-ink/70" />
                       <span className="rounded-full bg-caution/10 px-2 py-0.5 text-[9px] font-semibold text-caution">
@@ -620,16 +628,17 @@ export default function Home() {
                       <div className="h-8 rounded bg-faint" />
                     </div>
                   </div>
+                  </div>
                 </div>
 
                 {/* Comps */}
-                <div className="hover-lift rounded-2xl border border-line bg-surface p-5 shadow-card">
+                <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
                   <h3 className="text-sm font-semibold">Comps, graded</h3>
                   <p className="mt-1 text-xs leading-relaxed text-muted">
                     The broker&apos;s comps ranked by how hard they support the
                     price — plus a public-web search when the deck has none.
                   </p>
-                  <div className="mt-4 space-y-1.5 text-[10px]">
+                  <div className="mt-auto space-y-1.5 pt-4 text-[10px]">
                     {[
                       ["Preston Creek", "Genuine support", "text-pass bg-pass/10"],
                       ["Lakeline Commons", "Leans favorable", "text-caution bg-caution/10"],
@@ -649,7 +658,7 @@ export default function Home() {
                 </div>
 
                 {/* Reconcile */}
-                <div className="hover-lift rounded-2xl border border-line bg-surface p-5 shadow-card">
+                <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
                   <h3 className="text-sm font-semibold">
                     Your model vs the OM
                   </h3>
@@ -657,7 +666,7 @@ export default function Home() {
                     Upload your own underwriting and every gap gets called —
                     favorable, unfavorable, or noise.
                   </p>
-                  <div className="mt-4 space-y-1.5 font-mono text-[10px]">
+                  <div className="mt-auto space-y-1.5 pt-4 font-mono text-[10px]">
                     {[
                       ["Exit cap", "you 5.75 · OM 5.25", "+50 bps"],
                       ["Yr-1 rents", "you $1.41k · OM $1.54k", "−8.4%"],
@@ -675,13 +684,13 @@ export default function Home() {
                 </div>
 
                 {/* Team */}
-                <div className="hover-lift rounded-2xl border border-line bg-surface p-5 shadow-card">
+                <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
                   <h3 className="text-sm font-semibold">One team, one pipeline</h3>
                   <p className="mt-1 text-xs leading-relaxed text-muted">
                     Invite your team with a link — everyone screens into the
                     same pipeline, with the same verdicts. $29/seat.
                   </p>
-                  <div className="mt-4 flex items-center gap-3">
+                  <div className="mt-auto flex items-center gap-3 pt-4">
                     <div className="flex -space-x-2">
                       {["A", "M", "J"].map((c, i) => (
                         <span
@@ -694,20 +703,20 @@ export default function Home() {
                     </div>
                     <span className="text-[10px] leading-tight text-muted">
                       same deals ·<br />
-                      same answers
+                      same screen
                     </span>
                   </div>
                 </div>
 
                 {/* Retrade watch */}
-                <div className="hover-lift rounded-2xl border border-line bg-surface p-5 shadow-card">
+                <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
                   <h3 className="text-sm font-semibold">Built for the retrade</h3>
                   <p className="mt-1 text-xs leading-relaxed text-muted">
                     Broker cut the price and reissued the deck? Replace the OM,
                     re-screen, and see exactly what moved — and whether the
                     verdict flips.
                   </p>
-                  <div className="mt-4 space-y-1.5">
+                  <div className="mt-auto space-y-1.5 pt-4">
                     <div className="flex items-center gap-1.5 text-[10px] font-semibold">
                       <span className="rounded-full bg-caution/10 px-2 py-0.5 text-caution">
                         Caution
@@ -725,7 +734,7 @@ export default function Home() {
                 </div>
 
                 {/* Buy box */}
-                <div className="hover-lift rounded-2xl border border-line bg-surface p-5 shadow-card lg:col-span-2">
+                <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card lg:col-span-2">
                   <h3 className="text-sm font-semibold">Your buy box, enforced</h3>
                   <p className="mt-1 max-w-md text-xs leading-relaxed text-muted">
                     Set your criteria once — asset classes, markets, max price,
@@ -733,7 +742,7 @@ export default function Home() {
                     code, off-box deals get flagged within the first read, and
                     the verdict judges the fit out loud.
                   </p>
-                  <div className="mt-4 flex flex-wrap gap-1.5 text-[10px] font-medium">
+                  <div className="mt-auto flex flex-wrap gap-1.5 pt-4 text-[10px] font-medium">
                     {(
                       [
                         ["✓", "Market", "text-pass border-line"],
@@ -954,7 +963,7 @@ export default function Home() {
               The whole point
             </p>
             <h2 className="mx-auto mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
-              Same deal in, same answer out.
+              Every deal gets your sharpest screen.
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-white/65 sm:text-base">
               Make every analyst underwrite like your sharpest principal — the
@@ -1041,6 +1050,12 @@ export default function Home() {
               </li>
             </ul>
           </nav>
+        </div>
+        <div className="border-t border-line">
+          <p className="mx-auto max-w-6xl px-6 py-4 text-xs text-muted">
+            © 2026 Underwrite Copilot. A first-pass screen, not investment
+            advice.
+          </p>
         </div>
       </footer>
     </div>

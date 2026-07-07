@@ -193,7 +193,10 @@ export default async function DealPage({
             { label: "Asking price", value: firstSignal.askPrice },
             { label: "Going-in cap rate", value: firstSignal.goingInCap },
             {
-              label: /sf/i.test(firstSignal.perUnit)
+              // Broad per-area test: "sf", "psf", "sq ft", "square foot", "/ft"
+              // must all count — a per-SF figure misread as per-unit would give
+              // the buy-box check a confidently wrong basis.
+              label: /sf|sq|square|psf|\/\s?ft/i.test(firstSignal.perUnit)
                 ? "Price per SF"
                 : "Price per unit",
               value: firstSignal.perUnit,
@@ -218,7 +221,19 @@ export default async function DealPage({
       <header className="shadow-card rounded-2xl border border-line bg-surface p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-2xl font-semibold tracking-tight">{deal.name}</h1>
+            {/* The verdict lives with the title — it's the headline, not an action. */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="text-2xl font-semibold tracking-tight">
+                {deal.name}
+              </h1>
+              {pill && (
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${pill.cls}`}
+                >
+                  {pill.label}
+                </span>
+              )}
+            </div>
             <p className="mt-0.5 text-sm text-muted">
               <span className="capitalize">{deal.asset_class}</span>
               {extraction?.market ? (
@@ -229,25 +244,19 @@ export default async function DealPage({
               {extraction?.address ? <> · {extraction.address}</> : null}
             </p>
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-2">
-            <div className="flex items-center gap-2">
-              <StageSelect
-                key={((deal as { stage?: string }).stage as string) ?? "screening"}
-                dealId={id}
-                stage={((deal as { stage?: string }).stage as string) ?? "screening"}
-              />
-              <DealActions dealId={id} dealName={deal.name} />
-            </div>
-            {pill && (
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold ${pill.cls}`}
-              >
-                {pill.label}
-              </span>
-            )}
-            {deal.om_storage_path && (
-              <ReplaceOm dealId={id} disabled={jobActive} />
-            )}
+          <div className="flex shrink-0 items-center gap-2">
+            <StageSelect
+              key={((deal as { stage?: string }).stage as string) ?? "screening"}
+              dealId={id}
+              stage={((deal as { stage?: string }).stage as string) ?? "screening"}
+            />
+            <DealActions dealId={id} dealName={deal.name} />
+          </div>
+        </div>
+
+        {/* One horizontal action row instead of a stacked right rail. */}
+        {(omUrl || verdict || deal.om_storage_path) && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             {omUrl && (
               <a
                 href={omUrl}
@@ -303,8 +312,11 @@ export default async function DealPage({
                   Upgrade for PDF memo
                 </Link>
               ))}
+            {deal.om_storage_path && (
+              <ReplaceOm dealId={id} disabled={jobActive} />
+            )}
           </div>
-        </div>
+        )}
 
         {keyStats.length > 0 && (
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -332,8 +344,26 @@ export default async function DealPage({
       {/* Retrade watch — what moved since the previous screen of this deal. */}
       {screenDiff && <SinceLastScreen diff={screenDiff} />}
 
-      {/* The buy box — this deal against YOUR standing criteria. */}
-      {buyBoxChecks.length > 0 ? (
+      {/* The buy box — this deal against YOUR standing criteria. When every
+          check passes it collapses to one quiet row; misses earn the card. */}
+      {buyBoxChecks.length > 0 &&
+      buyBoxChecks.every((c) => c.status === "pass") ? (
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-xl border border-pass/25 bg-pass/[0.04] px-4 py-2.5 text-sm">
+          <span aria-hidden className="font-bold text-pass">
+            ✓
+          </span>
+          <span className="font-medium">Fits your buy box</span>
+          <span className="text-xs text-muted">
+            {buyBoxChecks.map((c) => c.label).join(" · ")}
+          </span>
+          <Link
+            href="/criteria"
+            className="ml-auto text-xs font-medium text-brand transition-colors hover:text-brand-strong"
+          >
+            Edit criteria →
+          </Link>
+        </div>
+      ) : buyBoxChecks.length > 0 ? (
         <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">

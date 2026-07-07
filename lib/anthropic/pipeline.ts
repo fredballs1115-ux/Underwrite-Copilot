@@ -89,7 +89,15 @@ async function regenerateVerdict(
  * Reconcile runs separately (it needs the buyer's own model, uploaded later —
  * see runReconciliation), and regenerates the verdict when it lands.
  */
-export async function runAnalysis(dealId: string): Promise<void> {
+export async function runAnalysis(
+  dealId: string,
+  opts?: {
+    /** snapshot the previous results for the retrade diff — pass false when
+     *  the last run failed, so a half-written generation is never diffed */
+    snapshotPrior?: boolean;
+  },
+): Promise<void> {
+  const snapshotPrior = opts?.snapshotPrior ?? true;
   try {
     const admin = createSupabaseAdminClient();
     const { data: deal, error } = await admin
@@ -110,7 +118,7 @@ export async function runAnalysis(dealId: string): Promise<void> {
     // before they're overwritten, so the deal page can show what moved
     // (price cuts, cap drift, verdict flips). Best-effort — a pre-0010
     // schema without the column must never sink the run.
-    try {
+    if (snapshotPrior) try {
       const { data: prev } = await admin
         .from("deals")
         .select("extraction, verdict")

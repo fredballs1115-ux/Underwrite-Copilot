@@ -6,6 +6,8 @@ import {
   StyleSheet,
 } from "@react-pdf/renderer";
 import type { DealRow } from "@/lib/deals";
+import type { BuyBoxCheck } from "@/lib/criteria";
+import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import type {
   ExtractionResult,
   ChallengerResult,
@@ -55,13 +57,26 @@ export type MemoData = {
   dealKillers: { label: string; read: string; risk: string }[];
   sensitivity: { scenario: string; call: string; note: string }[];
   nextSteps: string[];
+  // The buyer's standing criteria, checked deterministically (empty = no box set).
+  buyBox: { label: string; status: "pass" | "fail" | "unknown" }[];
+  // One-line retrade summary ("Caution → Go · Price −$1.8M (−2.5%) · …"), or null.
+  sinceLast: string | null;
 };
 
 const clamp = (s: string, n: number) =>
   s.length > n ? s.slice(0, n - 1).trimEnd() + "\u2026" : s;
 
+// The PDF's standard Helvetica only carries WinAnsi glyphs \u2014 swap the web
+// UI's arrows/minus signs for safe equivalents or they silently drop.
+const pdfSafe = (s: string) =>
+  s.replace(/\u2192/g, "\u203a").replace(/[\u2212\u2013]/g, "-");
+
 /** Shape the stored analysis into the flat data the one-page memo renders. */
-export function buildMemoData(deal: DealRow, dateStr: string): MemoData {
+export function buildMemoData(
+  deal: DealRow,
+  dateStr: string,
+  buyBoxChecks?: BuyBoxCheck[] | null,
+): MemoData {
   const extraction = deal.extraction as ExtractionResult | null;
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
@@ -150,6 +165,37 @@ export function buildMemoData(deal: DealRow, dateStr: string): MemoData {
   // sections so the memo stays one page.
   const hasScreen = ranges.length > 0;
 
+  // Retrade line: what moved since the previous screen, compressed to one
+  // sentence-length string. Only when something actually moved.
+  let sinceLast: string | null = null;
+  const prior = (deal.prior_screen as PriorScreen | undefined) ?? null;
+  if (prior && extraction) {
+    try {
+      const diff = computeScreenDiff(prior, extraction, verdict);
+      if (diff && (!diff.allFlat || diff.verdictChanged)) {
+        const parts: string[] = [];
+        if (diff.verdictFrom && diff.verdictTo) {
+          parts.push(
+            `${CALL_LABEL_GLOBAL[diff.verdictFrom] ?? diff.verdictFrom} › ${CALL_LABEL_GLOBAL[diff.verdictTo] ?? diff.verdictTo}`,
+          );
+        }
+        for (const r of diff.rows.filter((x) => x.direction !== "flat").slice(0, 3)) {
+          parts.push(`${r.label} ${r.delta}`);
+        }
+        const when = new Date(diff.at).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          timeZone: "UTC",
+        });
+        sinceLast = pdfSafe(
+          clamp(`Since last screen (${when}): ${parts.join("  ·  ")}`, 150),
+        );
+      }
+    } catch {
+      sinceLast = null;
+    }
+  }
+
   return {
     name: deal.name,
     market: extraction?.market ?? "",
@@ -170,8 +216,20 @@ export function buildMemoData(deal: DealRow, dateStr: string): MemoData {
     dealKillers,
     sensitivity,
     nextSteps: (verdict?.nextSteps ?? []).slice(0, hasScreen ? 2 : 4),
+    buyBox: (buyBoxChecks ?? []).map((c) => ({
+      label: clamp(c.label, 20),
+      status: c.status,
+    })),
+    sinceLast,
   };
 }
+
+// Verdict-call display names, shared by the retrade line above.
+const CALL_LABEL_GLOBAL: Record<string, string> = {
+  pass: "Go",
+  caution: "Caution",
+  pass_on: "No-go",
+};
 
 const s = StyleSheet.create({
   page: {
@@ -220,9 +278,33 @@ const s = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1,
   },
-  verdictWord: { fontSize: 20, fontFamily: "Helvetica-Bold", marginTop: 3 },
-  verdictSub: { fontSize: 10, color: C.muted, marginTop: 1 },
+  verdictWord: {
+    fontSize: 20,
+    fontFamily: "Helvetica-Bold",
+    marginTop: 3,
+    lineHeight: 1.05,
+  },
+  verdictSub: { fontSize: 10, color: C.muted, marginTop: 2 },
   verdictReason: { marginTop: 6, fontSize: 10, color: C.ink },
+  sinceLast: { marginTop: 6, fontSize: 8, color: C.muted },
+
+  buyBoxRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  buyBoxTitle: {
+    fontSize: 7.5,
+    fontFamily: "Helvetica-Bold",
+    color: C.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginRight: 8,
+  },
+  buyBoxChip: { flexDirection: "row", marginRight: 10, marginBottom: 2 },
+  buyBoxMark: { fontSize: 8.5, fontFamily: "Helvetica-Bold", marginRight: 2.5 },
+  buyBoxLabel: { fontSize: 8.5, color: C.ink },
 
   section: { marginTop: 13 },
   twoCol: { flexDirection: "row", marginTop: 13, gap: 14 },
@@ -392,6 +474,35 @@ export function MemoDocument({ data }: { data: MemoData }) {
             {data.verdictReason ? (
               <Text style={s.verdictReason}>{data.verdictReason}</Text>
             ) : null}
+            {data.sinceLast ? (
+              <Text style={s.sinceLast}>{data.sinceLast}</Text>
+            ) : null}
+          </View>
+        )}
+
+        {data.buyBox.length > 0 && (
+          <View style={s.buyBoxRow}>
+            <Text style={s.buyBoxTitle}>Buy box</Text>
+            {data.buyBox.map((c, i) => (
+              <View key={i} style={s.buyBoxChip}>
+                <Text
+                  style={[
+                    s.buyBoxMark,
+                    {
+                      color:
+                        c.status === "fail"
+                          ? C.kill
+                          : c.status === "pass"
+                            ? C.pass
+                            : C.muted,
+                    },
+                  ]}
+                >
+                  {c.status === "fail" ? "×" : c.status === "pass" ? "•" : "—"}
+                </Text>
+                <Text style={s.buyBoxLabel}>{c.label}</Text>
+              </View>
+            ))}
           </View>
         )}
 

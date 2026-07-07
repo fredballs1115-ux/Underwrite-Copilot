@@ -10,7 +10,10 @@ export function FirstReadCard({ signal }: { signal: FirstSignal }) {
       ["Ask", signal.askPrice],
       ["Size", signal.size],
       ["Going-in cap", signal.goingInCap],
-      [/sf/i.test(signal.perUnit) ? "Per SF" : "Per unit", signal.perUnit],
+      [
+        /sf|sq|square|psf|\/\s?ft/i.test(signal.perUnit) ? "Per SF" : "Per unit",
+        signal.perUnit,
+      ],
     ] as const
   ).filter(([, v]) => v.trim());
 
@@ -20,7 +23,7 @@ export function FirstReadCard({ signal }: { signal: FirstSignal }) {
         <span className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" aria-hidden />
         <h2 className="text-sm font-semibold tracking-tight">First read</h2>
         <span className="text-[11px] text-muted">
-          landed in seconds — the full screen is still running
+          the quick first pass — the full screen is still running
         </span>
       </div>
       {signal.take && (

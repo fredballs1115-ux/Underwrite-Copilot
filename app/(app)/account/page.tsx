@@ -11,10 +11,10 @@ export const metadata: Metadata = { title: "Account" };
 const DELETE_ERRORS: Record<string, string> = {
   confirm: 'Type DELETE (all caps) in the box to confirm deletion.',
   ownerdelete:
-    "You own a team, so self-deletion is disabled — it would take the team down with you. Email support and we'll handle it.",
+    "You own a team, so self-deletion is disabled — it would take the team down with you. Email underwritecopilot.support@gmail.com and we'll handle it.",
   cancelsub:
     "We couldn't cancel your subscription automatically — nothing was deleted. Cancel it from the Billing page first, then try again.",
-  delete: "Deletion failed — nothing was removed. Please try again or email support.",
+  delete: "Deletion failed — nothing was removed. Please try again, or email underwritecopilot.support@gmail.com.",
 };
 
 export default async function AccountPage({

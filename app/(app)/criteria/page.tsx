@@ -37,7 +37,7 @@ export default async function CriteriaPage({
     : error === "owner"
       ? { cls: "bg-kill/10 text-kill", text: "Only the team owner can edit the team's buy box." }
       : error === "save"
-        ? { cls: "bg-kill/10 text-kill", text: "Couldn't save — make sure migration 0008 has been run, then try again." }
+        ? { cls: "bg-kill/10 text-kill", text: "Couldn't save your buy box — please try again. If it keeps failing, email underwritecopilot.support@gmail.com." }
         : null;
 
   return (
@@ -106,7 +106,7 @@ export default async function CriteriaPage({
                         name="assetClasses"
                         value={value}
                         defaultChecked={box.assetClasses?.includes(value)}
-                        className="h-3.5 w-3.5 accent-[#114e54]"
+                        className="h-3.5 w-3.5 accent-brand"
                       />
                       {label}
                     </label>
@@ -196,18 +196,21 @@ export default async function CriteriaPage({
               defaultValue={box.notes ?? ""}
               className={`mt-3 ${inputCls} resize-y`}
             />
-            <div className="mt-4 flex items-center gap-3">
-              <PendingButton
-                pendingLabel="Saving…"
-                className="rounded-lg bg-brand px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
-              >
-                Save buy box
-              </PendingButton>
-              <p className="text-xs text-muted">
-                Applies to every new screen and verdict from now on.
-              </p>
-            </div>
           </section>
+
+          {/* Persistent action bar OUTSIDE the cards — the submit saves the
+              whole form, not just the card it used to sit in. */}
+          <div className="sticky bottom-4 flex items-center gap-3 rounded-xl border border-line bg-surface/95 px-4 py-3 shadow-card backdrop-blur">
+            <PendingButton
+              pendingLabel="Saving…"
+              className="rounded-lg bg-brand px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+            >
+              Save buy box
+            </PendingButton>
+            <p className="text-xs text-muted">
+              Saves everything above — applies to every new screen and verdict.
+            </p>
+          </div>
         </form>
       )}
     </div>

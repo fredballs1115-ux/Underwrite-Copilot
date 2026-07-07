@@ -60,6 +60,9 @@ export function CommandPalette({
         e.preventDefault();
         onOpenChange(!open);
       } else if (e.key === "Escape" && open) {
+        // preventDefault so other global Escape handlers (e.g. the pipeline's
+        // close-form shortcut) don't ALSO fire from the same keystroke.
+        e.preventDefault();
         onOpenChange(false);
       }
     };
@@ -102,17 +105,20 @@ export function CommandPalette({
 
   // Clamp instead of a state-syncing effect: as the filter narrows, the
   // highlighted row is derived from the raw index, never reset via setState.
-  const activeIdx = Math.min(active, Math.max(0, items.length - 1));
+  // Floored at 0 so an empty result list can never park the index at −1.
+  const activeIdx = Math.max(0, Math.min(active, items.length - 1));
 
   function go(item: Item) {
     onOpenChange(false);
-    router.push(item.href);
+    // "New deal…" carries a fresh nonce each time so re-selecting it re-opens
+    // the form even when ?new= is already in the URL.
+    router.push(item.key === "a-new" ? `/deals?new=${Date.now()}` : item.href);
   }
 
   function onInputKey(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActive(Math.min(activeIdx + 1, items.length - 1));
+      setActive(Math.max(0, Math.min(activeIdx + 1, items.length - 1)));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setActive(Math.max(activeIdx - 1, 0));
@@ -209,7 +215,7 @@ export function CommandPalette({
             </li>
           )}
           {groups.map((g) => (
-            <li key={g.title}>
+            <li key={g.title} role="presentation">
               <p className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-muted">
                 {g.title}
               </p>
@@ -246,6 +252,21 @@ export function CommandPalette({
             </li>
           ))}
         </ul>
+
+        <div className="flex items-center gap-3 border-t border-line bg-faint/60 px-4 py-2 text-[10px] text-muted">
+          <span>
+            <kbd className="rounded border border-line bg-surface px-1">↑↓</kbd>{" "}
+            navigate
+          </span>
+          <span>
+            <kbd className="rounded border border-line bg-surface px-1">↵</kbd>{" "}
+            open
+          </span>
+          <span>
+            <kbd className="rounded border border-line bg-surface px-1">esc</kbd>{" "}
+            close
+          </span>
+        </div>
       </div>
     </div>
   );

@@ -47,7 +47,7 @@ export default async function BillingPage({
       : status === "cancelled"
         ? { cls: "bg-faint text-muted", text: "Checkout cancelled — no charge was made." }
         : error === "config"
-          ? { cls: "bg-kill/10 text-kill", text: "Billing isn't fully configured yet (missing Stripe price). Add STRIPE_PRICE_ID." }
+          ? { cls: "bg-kill/10 text-kill", text: "Checkout isn't available right now — email underwritecopilot.support@gmail.com and we'll get you upgraded." }
           : error === "nocustomer"
             ? { cls: "bg-faint text-muted", text: "No subscription on file yet — start with Upgrade to Pro below." }
             : error === "save"

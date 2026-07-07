@@ -99,12 +99,46 @@ const TRACKED: Tracked[] = [
   },
 ];
 
-function find(metrics: MetricLike[], t: Tracked): MetricLike | null {
-  return (
-    metrics.find(
-      (m) => t.include.test(m.label) && !(t.exclude && t.exclude.test(m.label)),
-    ) ?? null
-  );
+const normLabel = (s: string) =>
+  s.toLowerCase().replace(/[^a-z0-9%$/]+/g, " ").trim();
+
+/**
+ * Pick the before/after metric pair for a tracker. Extractions often carry
+ * several candidates per tracker (T-12 NOI vs Year-1 NOI, current vs
+ * stabilized occupancy) and their order isn't stable run to run — naively
+ * taking the first match on each side can diff two DIFFERENT figures and
+ * manufacture a phantom retrade. So: an exact (normalized) label match wins;
+ * otherwise only an unambiguous single candidate on each side with the SAME
+ * tagged basis qualifies; otherwise the tracker is skipped for this deal.
+ */
+function pickPair(
+  before: MetricLike[],
+  after: MetricLike[],
+  t: Tracked,
+): [MetricLike, MetricLike] | null {
+  const match = (m: MetricLike) =>
+    t.include.test(m.label) && !(t.exclude && t.exclude.test(m.label));
+  const bs = before.filter(match);
+  const as_ = after.filter(match);
+  if (!bs.length || !as_.length) return null;
+
+  for (const b of bs) {
+    const a = as_.find((x) => normLabel(x.label) === normLabel(b.label));
+    if (a) {
+      if (b.basis && a.basis && b.basis !== a.basis) continue;
+      return [b, a];
+    }
+  }
+  if (
+    bs.length === 1 &&
+    as_.length === 1 &&
+    bs[0].basis &&
+    as_[0].basis &&
+    bs[0].basis === as_[0].basis
+  ) {
+    return [bs[0], as_[0]];
+  }
+  return null;
 }
 
 const fmtMoney = (d: number) => {
@@ -125,11 +159,9 @@ export function computeScreenDiff(
 
   const rows: DiffRow[] = [];
   for (const t of TRACKED) {
-    const b = find(before, t);
-    const a = find(after, t);
-    if (!b || !a) continue;
-    // Never compare across bases (in-place vs pro forma) when both are tagged.
-    if (b.basis && a.basis && b.basis !== a.basis) continue;
+    const pair = pickPair(before, after, t);
+    if (!pair) continue;
+    const [b, a] = pair;
 
     const parse = t.kind === "money" ? parseMoney : parsePct;
     const bv = parse(b.value);
@@ -139,10 +171,12 @@ export function computeScreenDiff(
     const delta = av - bv;
     // Tolerances so run-to-run formatting noise never reads as a retrade:
     // money within 0.5% relative is flat; rates within 0.05pt are flat.
+    // (delta === 0 is always flat — including a $0 → $0 baseline.)
     const flat =
-      t.kind === "money"
+      delta === 0 ||
+      (t.kind === "money"
         ? bv !== 0 && Math.abs(delta / bv) < 0.005
-        : Math.abs(delta) < 0.05;
+        : Math.abs(delta) < 0.05);
 
     let deltaText: string;
     if (flat) {

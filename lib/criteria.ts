@@ -64,7 +64,9 @@ export function parsePct(raw: string): number | null {
 const fmtM = (dollars: number) =>
   dollars >= 1e6
     ? `$${(dollars / 1e6).toFixed(1)}M`
-    : `$${Math.round(dollars / 1e3)}k`;
+    : dollars >= 1e3
+      ? `$${Math.round(dollars / 1e3)}k`
+      : `$${Math.round(dollars)}`;
 
 interface MetricLike {
   label: string;
