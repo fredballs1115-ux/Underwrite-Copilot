@@ -155,7 +155,7 @@ export default async function DealsPage({
         const box = d.team_id ? teamBox : personalBox;
         if (!box || !extraction) return false;
         return evaluateBuyBox(d.asset_class, extraction, box).some(
-          (c) => c.status === "fail",
+          (c) => c.status === "miss",
         );
       })(),
       addedBy:

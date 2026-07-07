@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getActiveBuyBox } from "@/lib/criteria-server";
-import { buyBoxLines } from "@/lib/criteria";
+import { buyBoxLines, geoTargets, priceBand } from "@/lib/criteria";
 import { saveBuyBox } from "./actions";
 import { PendingButton } from "../pending-button";
+import { GeoPicker } from "./geo-picker";
 
 export const metadata: Metadata = { title: "Buy box" };
 
@@ -45,8 +46,9 @@ export default async function CriteriaPage({
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Buy box</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          Your standing criteria. Every deal you screen is checked against
-          them — deterministically, in code — and the verdict weighs the fit.
+          The firm&apos;s mandate. Every deal you screen is checked against it —
+          deterministically, in code — with a pass, near-miss, or miss call per
+          criterion, and the verdict weighs the fit.
           {active.scope === "team" && (
             <>
               {" "}
@@ -114,19 +116,14 @@ export default async function CriteriaPage({
                 </div>
               </div>
               <div>
-                <label htmlFor="markets" className="text-sm font-medium">
-                  Target markets
-                </label>
+                <p className="text-sm font-medium">Geography</p>
                 <p className="text-xs text-muted">
-                  Comma-separated — matched against the deal&apos;s market and address.
+                  The mandate&apos;s territory — matched against each deal&apos;s
+                  market, address, and county.
                 </p>
-                <input
-                  id="markets"
-                  name="markets"
-                  defaultValue={box.markets ?? ""}
-                  placeholder="e.g. Dallas, Fort Worth, Austin"
-                  className={`mt-2 ${inputCls}`}
-                />
+                <div className="mt-2">
+                  <GeoPicker initial={geoTargets(box)} />
+                </div>
               </div>
             </div>
           </section>
@@ -138,20 +135,29 @@ export default async function CriteriaPage({
             <p className="mt-1 text-xs text-muted">
               Leave anything blank to skip that check.
             </p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div>
-                <label htmlFor="maxPriceM" className="text-sm font-medium">
-                  Max price
-                </label>
+                <p className="text-sm font-medium">Price range</p>
                 <div className="mt-1.5 flex items-center gap-1.5">
                   <span className="text-sm text-muted">$</span>
-                  <input id="maxPriceM" name="maxPriceM" type="number" min="0" step="0.1" defaultValue={box.maxPriceM ?? ""} placeholder="60" className={inputCls} />
+                  <input aria-label="Minimum price, millions" name="priceMinM" type="number" min="0" step="0.1" defaultValue={box.priceMinM ?? ""} placeholder="10" className={inputCls} />
+                  <span className="text-sm text-muted">–</span>
+                  <input aria-label="Maximum price, millions" name="priceMaxM" type="number" min="0" step="0.1" defaultValue={priceBand(box).max != null ? priceBand(box).max! / 1e6 : ""} placeholder="80" className={inputCls} />
                   <span className="text-sm text-muted">M</span>
                 </div>
               </div>
               <div>
+                <p className="text-sm font-medium">Size range</p>
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <input aria-label="Minimum square feet, thousands" name="sfMinK" type="number" min="0" step="1" defaultValue={box.sfMin != null ? box.sfMin / 1e3 : ""} placeholder="50" className={inputCls} />
+                  <span className="text-sm text-muted">–</span>
+                  <input aria-label="Maximum square feet, thousands" name="sfMaxK" type="number" min="0" step="1" defaultValue={box.sfMax != null ? box.sfMax / 1e3 : ""} placeholder="300" className={inputCls} />
+                  <span className="text-sm text-muted">k SF</span>
+                </div>
+              </div>
+              <div>
                 <label htmlFor="maxPerUnitK" className="text-sm font-medium">
-                  Max price / unit
+                  Max basis / unit
                 </label>
                 <div className="mt-1.5 flex items-center gap-1.5">
                   <span className="text-sm text-muted">$</span>
@@ -170,9 +176,10 @@ export default async function CriteriaPage({
               </div>
               <div>
                 <label htmlFor="minIrrPct" className="text-sm font-medium">
-                  Min base IRR
+                  Target return (IRR)
                 </label>
                 <div className="mt-1.5 flex items-center gap-1.5">
+                  <span className="text-sm text-muted">≥</span>
                   <input id="minIrrPct" name="minIrrPct" type="number" min="0" step="0.5" defaultValue={box.minIrrPct ?? ""} placeholder="14" className={inputCls} />
                   <span className="text-sm text-muted">%</span>
                 </div>

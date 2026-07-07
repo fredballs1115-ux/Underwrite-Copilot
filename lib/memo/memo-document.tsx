@@ -58,7 +58,7 @@ export type MemoData = {
   sensitivity: { scenario: string; call: string; note: string }[];
   nextSteps: string[];
   // The buyer's standing criteria, checked deterministically (empty = no box set).
-  buyBox: { label: string; status: "pass" | "fail" | "unknown" }[];
+  buyBox: { label: string; status: "pass" | "near" | "miss" | "unknown" }[];
   // One-line retrade summary ("Caution → Go · Price −$1.8M (−2.5%) · …"), or null.
   sinceLast: string | null;
 };
@@ -490,15 +490,23 @@ export function MemoDocument({ data }: { data: MemoData }) {
                     s.buyBoxMark,
                     {
                       color:
-                        c.status === "fail"
+                        c.status === "miss"
                           ? C.kill
-                          : c.status === "pass"
-                            ? C.pass
-                            : C.muted,
+                          : c.status === "near"
+                            ? C.caution
+                            : c.status === "pass"
+                              ? C.pass
+                              : C.muted,
                     },
                   ]}
                 >
-                  {c.status === "fail" ? "×" : c.status === "pass" ? "•" : "—"}
+                  {c.status === "miss"
+                    ? "×"
+                    : c.status === "near"
+                      ? "±"
+                      : c.status === "pass"
+                        ? "•"
+                        : "—"}
                 </Text>
                 <Text style={s.buyBoxLabel}>{c.label}</Text>
               </View>
