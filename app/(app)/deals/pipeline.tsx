@@ -179,10 +179,11 @@ export function Pipeline({
   }, [deals, query, verdict, stage, asset, market, sort]);
 
   const verdictCounts = useMemo(() => {
-    const c = { pass: 0, caution: 0, pass_on: 0, screening: 0 };
+    const c = { pass: 0, caution: 0, pass_on: 0, screening: 0, pursuing: 0 };
     for (const d of deals) {
       if (d.verdict && d.verdict in c) c[d.verdict as keyof typeof c]++;
       else if (!d.verdict) c.screening++;
+      if (d.stage === "pursuing") c.pursuing++;
     }
     return c;
   }, [deals]);
@@ -209,7 +210,7 @@ export function Pipeline({
       const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
       return `"${safe.replaceAll('"', '""')}"`;
     };
-    const header = ["Deal", "Market", "Asset class", "Added", "Verdict", "Stage", "Added by", "Key stats"];
+    const header = ["Deal", "Market", "Asset class", "Added", "Verdict", "Stage", "Buy box", "Added by", "Key stats"];
     const lines = filtered.map((d) =>
       [
         d.name,
@@ -218,6 +219,7 @@ export function Pipeline({
         fmtDate(d.createdAt),
         d.verdict ? (VERDICT_META[d.verdict]?.label ?? d.verdict) : d.jobStatus === "running" ? "Screening" : "Not screened",
         STAGE_LABEL[d.stage],
+        d.outsideBuyBox ? "Outside" : "",
         d.addedBy ?? "You",
         d.stats.map((s) => `${s.label}: ${s.value}`).join(" · "),
       ]
@@ -348,6 +350,19 @@ export function Pipeline({
               }`}
             >
               {verdictCounts.screening} Screening
+            </button>
+          )}
+          {/* The funnel's business end — deals you're actually chasing. */}
+          {verdictCounts.pursuing > 0 && (
+            <button
+              type="button"
+              aria-pressed={stage === "pursuing"}
+              onClick={() => setStage(stage === "pursuing" ? "all" : "pursuing")}
+              className={`rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand transition-all ${
+                stage === "pursuing" ? "ring-2 ring-current" : "hover:opacity-80"
+              }`}
+            >
+              {verdictCounts.pursuing} Pursuing
             </button>
           )}
         </div>

@@ -8,6 +8,9 @@ export interface DealRow {
   name: string;
   asset_class: string;
   om_storage_path: string | null;
+  // The fast headline read that lands ~30s into a run (FirstSignal).
+  // Migration 0009; null on rows screened before it existed.
+  first_signal?: unknown;
   // Per-step results (filled in by the analysis pipeline in Phase 2).
   extraction: unknown;
   challenges: unknown;

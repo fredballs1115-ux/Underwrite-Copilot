@@ -537,7 +537,13 @@ export function TermsView({ result }: { result: ExtractionResult }) {
 /* 2 — Assumption challenger                                           */
 /* ================================================================== */
 
-export function ChallengerView({ result }: { result: ChallengerResult }) {
+export function ChallengerView({
+  result,
+  dealName,
+}: {
+  result: ChallengerResult;
+  dealName?: string;
+}) {
   const ordered = [...result.challenges].sort(
     (a, b) => SEV[a.severity].rank - SEV[b.severity].rank,
   );
@@ -549,7 +555,7 @@ export function ChallengerView({ result }: { result: ChallengerResult }) {
           <div className="flex items-center gap-3">
             <SeverityTally challenges={result.challenges} />
             {ordered.some((c) => c.question) && (
-              <CopyAllQuestions challenges={ordered} />
+              <CopyAllQuestions challenges={ordered} dealName={dealName} />
             )}
           </div>
         }
@@ -629,26 +635,67 @@ function ChallengeCard({ c }: { c: Challenge }) {
 }
 
 /** One click → a numbered, email-ready list of every broker question. */
-function CopyAllQuestions({ challenges }: { challenges: Challenge[] }) {
+/** Assemble the challenges into a ready-to-send broker email: subject line,
+ *  questions grouped by severity, OM page refs — paste and hit send. */
+function buildBrokerEmail(challenges: Challenge[], dealName?: string): string {
+  const deal = dealName?.trim() || "the deal";
+  const groups: [Challenge["severity"], string][] = [
+    ["high", "Deal-critical"],
+    ["medium", "Important"],
+    ["low", "Also worth clarifying"],
+  ];
+  let n = 0;
+  const sections = groups
+    .map(([sev, heading]) => {
+      const qs = challenges.filter((c) => c.severity === sev && c.question);
+      if (!qs.length) return null;
+      const lines = qs.map((c) => {
+        const page = c.page?.trim() ? ` (OM ${c.page.trim()})` : "";
+        return `${++n}. ${c.question}${page}`;
+      });
+      return `${heading}:\n${lines.join("\n")}`;
+    })
+    .filter(Boolean);
+
+  return [
+    `Subject: ${deal} — questions from our initial screen`,
+    "",
+    "Hi,",
+    "",
+    `We've taken a first pass at ${deal} and have ${n === 1 ? "one question" : `${n} questions`} before going further:`,
+    "",
+    sections.join("\n\n"),
+    "",
+    "Anything you can share in writing helps — happy to get on a call for the rest.",
+    "",
+    "Thanks,",
+  ].join("\n");
+}
+
+function CopyAllQuestions({
+  challenges,
+  dealName,
+}: {
+  challenges: Challenge[];
+  dealName?: string;
+}) {
   const toast = useToast();
-  const text = challenges
-    .filter((c) => c.question)
-    .map((c, i) => `${i + 1}. [${c.assumption}] ${c.question}`)
-    .join("\n");
   return (
     <button
       type="button"
       onClick={async () => {
         try {
-          await navigator.clipboard.writeText(text);
-          toast("All questions copied — paste into your broker email.", "success");
+          await navigator.clipboard.writeText(
+            buildBrokerEmail(challenges, dealName),
+          );
+          toast("Broker email copied — subject line and all.", "success");
         } catch {
           toast("Couldn't copy — select the text instead.", "error");
         }
       }}
       className="text-xs font-medium text-brand transition-colors hover:text-brand-strong"
     >
-      Copy all questions
+      Copy broker email
     </button>
   );
 }

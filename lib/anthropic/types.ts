@@ -20,6 +20,29 @@ export type ReconDirection = "favorable" | "unfavorable" | "neutral";
 export type MarketAssessment = "in-line" | "aggressive" | "conservative";
 export type VerdictCall = "pass" | "caution" | "pass_on";
 
+/**
+ * Step 0 — First signal. A fast headline read that lands well before the full
+ * extraction, so the buyer sees what the deal IS (and whether it's even in
+ * their buy box) while the six-stage screen is still running. Superseded by
+ * the extraction; every field is "as the OM states it", nothing verified.
+ */
+export interface FirstSignal {
+  dealName: string | null;
+  assetClass: string;
+  /** submarket + metro, e.g. "North Dallas, TX" ("" if unclear) */
+  market: string;
+  /** asking price as stated, e.g. "$70,700,000" ("" if unpriced) */
+  askPrice: string;
+  /** e.g. "312 units" or "182,400 SF" ("" if unclear) */
+  size: string;
+  /** going-in cap as stated, e.g. "4.9%" ("" if not stated) */
+  goingInCap: string;
+  /** price per unit or per SF as stated ("" if not derivable) */
+  perUnit: string;
+  /** one skeptical sentence: what kind of deal this is and the first thing to check */
+  take: string;
+}
+
 /** Step 1 — Extraction */
 export interface ExtractedMetric {
   label: string;

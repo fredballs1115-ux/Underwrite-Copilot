@@ -15,8 +15,10 @@ import {
   type MarketResult,
   type VerdictResult,
   type ExtractedMetric,
+  type FirstSignal,
 } from "@/lib/anthropic/types";
 import { DealView } from "./deal-view";
+import { FirstReadCard } from "./first-read";
 import { DealActions } from "./deal-actions";
 import { StageSelect } from "./stage-select";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
@@ -95,6 +97,9 @@ export default async function DealPage({
   }
 
   const deal = data as DealRow;
+  const firstSignal = deal.first_signal
+    ? (deal.first_signal as FirstSignal)
+    : null;
   const extraction = deal.extraction
     ? (deal.extraction as ExtractionResult)
     : null;
@@ -161,8 +166,30 @@ export default async function DealPage({
     }),
   ]);
 
+  // Judge the buy box against the full extraction when it's in; until then,
+  // the first signal stands in — so "outside your box" can surface ~30s into
+  // a screen instead of minutes later. The per-unit figure only counts as a
+  // per-unit basis when it isn't actually a per-SF number.
+  const checkSource =
+    extraction ??
+    (firstSignal
+      ? {
+          assetClass: firstSignal.assetClass,
+          market: firstSignal.market,
+          metrics: [
+            { label: "Asking price", value: firstSignal.askPrice },
+            { label: "Going-in cap rate", value: firstSignal.goingInCap },
+            {
+              label: /sf/i.test(firstSignal.perUnit)
+                ? "Price per SF"
+                : "Price per unit",
+              value: firstSignal.perUnit,
+            },
+          ].filter((m) => m.value.trim()),
+        }
+      : null);
   const buyBoxChecks: BuyBoxCheck[] = buyBox
-    ? evaluateBuyBox(deal.asset_class, extraction, buyBox)
+    ? evaluateBuyBox(deal.asset_class, checkSource, buyBox)
     : [];
 
   return (
@@ -181,7 +208,11 @@ export default async function DealPage({
             <h1 className="text-2xl font-semibold tracking-tight">{deal.name}</h1>
             <p className="mt-0.5 text-sm text-muted">
               <span className="capitalize">{deal.asset_class}</span>
-              {extraction?.market ? <> · {extraction.market}</> : null}
+              {extraction?.market ? (
+                <> · {extraction.market}</>
+              ) : firstSignal?.market ? (
+                <> · {firstSignal.market}</>
+              ) : null}
               {extraction?.address ? <> · {extraction.address}</> : null}
             </p>
           </div>
@@ -279,6 +310,9 @@ export default async function DealPage({
         )}
       </header>
 
+      {/* First read — the instant signal, until the full extraction lands. */}
+      {!extraction && firstSignal && <FirstReadCard signal={firstSignal} />}
+
       {/* The buy box — this deal against YOUR standing criteria. */}
       {buyBoxChecks.length > 0 ? (
         <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
@@ -290,6 +324,11 @@ export default async function DealPage({
               <span className="rounded-full bg-faint px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
                 {ownership.team_id ? "Team" : "Personal"}
               </span>
+              {!extraction && firstSignal && (
+                <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand">
+                  First read
+                </span>
+              )}
             </div>
             <Link
               href="/criteria"
@@ -357,6 +396,7 @@ export default async function DealPage({
 
       <DealView
         dealId={id}
+        dealName={deal.name}
         initialTab={tab ?? null}
         hasOm={!!deal.om_storage_path}
         modelErrorCode={errorCode ?? null}

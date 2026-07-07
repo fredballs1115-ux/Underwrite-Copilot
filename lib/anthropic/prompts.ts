@@ -28,6 +28,17 @@ function assetClassClause(assetClass: AssetClass): string {
     : `The asset class is ${assetClass}; apply its norms.`;
 }
 
+/** Step 0 — First signal: the 30-second headline read, before the deep pass. */
+export function firstSignalInstruction(assetClass: AssetClass): string {
+  return `Give ONLY the headline read of the attached offering memorandum — the 30-second version an analyst gives when a deal first hits their desk. ${assetClassClause(
+    assetClass,
+  )}
+
+These are look-up facts from the OM's summary pages — answer immediately, no deep analysis: the property/deal name, the asset class, the \`market\` (submarket + metro, like "North Dallas, TX"), the asking price exactly as stated (empty string if the OM is unpriced), the size ("312 units" or "182,400 SF"), the going-in cap rate as stated, and the price per unit or per SF as stated. Use an empty string for anything the summary doesn't give — do NOT compute or estimate figures the OM doesn't state.
+
+Then \`take\`: ONE skeptical sentence — what kind of deal this is and the first thing worth checking. The full six-stage screen runs next; this is just the instant signal.`;
+}
+
 /** Step 1 — Extraction */
 export function extractionInstruction(assetClass: AssetClass): string {
   return `Extract the key terms from the attached offering memorandum. ${assetClassClause(
