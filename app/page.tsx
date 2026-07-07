@@ -225,7 +225,7 @@ export default function Home() {
             </Link>
             <Link
               href="/login?mode=signup"
-              className="whitespace-nowrap rounded-lg bg-white px-3.5 py-1.5 text-sm font-semibold text-brand-strong transition-colors hover:bg-mint"
+              className="whitespace-nowrap rounded-lg bg-white px-3.5 py-1.5 text-sm font-semibold text-brand-strong transition-colors hover:bg-accent"
             >
               Get started
             </Link>
@@ -276,17 +276,13 @@ export default function Home() {
       </header>
 
       <main className="flex-1">
-        {/* Hero — deep teal, graph-paper grid, the product floating on it. */}
+        {/* Hero — flat dark navy; the product itself is the visual. */}
         <section className="band-dark relative overflow-hidden text-white">
-          <div
-            aria-hidden
-            className="hero-drift pointer-events-none absolute -top-24 right-[8%] h-[26rem] w-[26rem] rounded-full bg-mint/10 blur-3xl"
-          />
           <div className="relative mx-auto max-w-6xl px-6 pb-14 pt-16 sm:pt-24">
             <div className="grid items-center gap-12 lg:grid-cols-2">
               <div>
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-xs font-medium text-mint">
-                  <span className="h-1.5 w-1.5 rounded-full bg-mint" />
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-xs font-medium text-accent">
+                  <span className="h-1.5 w-1.5 rounded-full bg-accent" />
                   AI deal screening for CRE acquisitions
                 </span>
                 <h1 className="mt-6 text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.4rem]">
@@ -302,7 +298,7 @@ export default function Home() {
                       <path
                         d="M3 9c40-6 84-7 112-4s72 5 102-3"
                         fill="none"
-                        stroke="#7fd6cc"
+                        stroke="#8ab4f8"
                         strokeWidth="4"
                         strokeLinecap="round"
                         opacity="0.75"
@@ -326,7 +322,7 @@ export default function Home() {
                 <div className="mt-8 flex flex-wrap items-center gap-3">
                   <Link
                     href="/login?mode=signup"
-                    className="rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-brand-strong transition-colors hover:bg-mint"
+                    className="rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-brand-strong transition-colors hover:bg-accent"
                   >
                     Get started free
                   </Link>
@@ -358,7 +354,7 @@ export default function Home() {
               {STATS.map((st) => (
                 <div key={st.label}>
                   <dt className="sr-only">{st.label}</dt>
-                  <dd className="font-mono text-3xl font-semibold tabular-nums text-mint">
+                  <dd className="font-mono text-3xl font-semibold tabular-nums text-accent">
                     <CountUp value={st.value} suffix={st.suffix} />
                   </dd>
                   <dd className="mt-1 text-xs leading-relaxed text-white/60">
@@ -537,7 +533,7 @@ export default function Home() {
                 Upload an OM and the whole screen — ranges, deal-killers,
                 verdict — comes back in minutes.
               </p>
-              <p className="text-sm font-semibold text-mint transition-transform group-hover:translate-x-0.5">
+              <p className="text-sm font-semibold text-accent transition-transform group-hover:translate-x-0.5">
                 Screen a deal free →
               </p>
             </Link>
@@ -591,7 +587,7 @@ export default function Home() {
                       >
                         <span className="col-span-2 text-muted">{k}</span>
                         <span
-                          className={`text-right tabular-nums ${i !== 0 ? "bg-[#fdf6e7] px-1" : ""}`}
+                          className={`text-right tabular-nums ${i !== 0 ? "bg-[#e9eefb] px-1" : ""}`}
                         >
                           {v}
                         </span>
@@ -773,7 +769,7 @@ export default function Home() {
         {/* Precision, not language — the differentiator gets the dark band. */}
         <section className="band-dark text-white">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-            <p className="text-xs font-medium uppercase tracking-wider text-mint/90">
+            <p className="text-xs font-medium uppercase tracking-wider text-accent/90">
               Why not just ChatGPT?
             </p>
             <h2 className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -789,7 +785,7 @@ export default function Home() {
             <div className="mt-10 grid gap-8 sm:grid-cols-3">
               {PILLARS.map((p) => (
                 <div key={p.title}>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/12 text-mint ring-1 ring-white/20">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/12 text-accent ring-1 ring-white/20">
                     {p.icon}
                   </div>
                   <h3 className="mt-4 font-medium">{p.title}</h3>
@@ -959,7 +955,7 @@ export default function Home() {
         {/* Closing CTA — bookends the dark hero. */}
         <section className="band-dark text-white">
           <div className="mx-auto max-w-6xl px-6 py-16 text-center sm:py-20">
-            <p className="text-xs font-medium uppercase tracking-wider text-mint/90">
+            <p className="text-xs font-medium uppercase tracking-wider text-accent/90">
               The whole point
             </p>
             <h2 className="mx-auto mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -972,7 +968,7 @@ export default function Home() {
             <div className="mt-8 flex justify-center">
               <Link
                 href="/login?mode=signup"
-                className="rounded-lg bg-white px-6 py-3 text-sm font-semibold text-brand-strong transition-colors hover:bg-mint"
+                className="rounded-lg bg-white px-6 py-3 text-sm font-semibold text-brand-strong transition-colors hover:bg-accent"
               >
                 Screen your first deal free
               </Link>
@@ -1067,7 +1063,6 @@ function DealPreview() {
   return (
     <div className="relative">
       {/* Glow + a second sheet behind, so the card reads as a stack. */}
-      <div className="absolute -inset-8 -z-10 rounded-[3rem] bg-mint/15 blur-3xl" />
       <div
         className="absolute inset-0 translate-x-3 translate-y-3 rounded-2xl border border-white/10 bg-white/[0.04]"
         aria-hidden

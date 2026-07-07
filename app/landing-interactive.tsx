@@ -59,7 +59,8 @@ export function Reveal({
   );
 }
 
-/** Counts a stat up from 0 when it scrolls into view. */
+/** A stat, rendered statically — single-digit figures earn no animation.
+ *  (Kept as a component so callers and tests didn't have to change.) */
 export function CountUp({
   value,
   suffix = "",
@@ -69,46 +70,9 @@ export function CountUp({
   suffix?: string;
   className?: string;
 }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const [n, setN] = useState(0);
-  const started = useRef(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (prefersReducedMotion() || value === 0) {
-      const id = requestAnimationFrame(() => setN(value));
-      return () => cancelAnimationFrame(id);
-    }
-    let cancelled = false;
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting || started.current) return;
-        started.current = true;
-        io.disconnect();
-        const t0 = performance.now();
-        const dur = 900;
-        const tick = (t: number) => {
-          if (cancelled) return;
-          const p = Math.min(1, (t - t0) / dur);
-          const eased = 1 - Math.pow(1 - p, 3);
-          setN(Math.round(eased * value));
-          if (p < 1) requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-      },
-      { threshold: 0.4 },
-    );
-    io.observe(el);
-    return () => {
-      cancelled = true;
-      io.disconnect();
-    };
-  }, [value]);
-
   return (
-    <span ref={ref} className={className}>
-      {n}
+    <span className={className}>
+      {value}
       {suffix}
     </span>
   );

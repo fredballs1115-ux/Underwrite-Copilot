@@ -15,7 +15,7 @@ export default function Icon() {
           alignItems: "flex-end",
           justifyContent: "center",
           gap: 3,
-          background: "linear-gradient(180deg, #19606a, #0c383d)",
+          background: "linear-gradient(180deg, #2b4a80, #1a3054)",
           borderRadius: 7,
           paddingBottom: 7,
         }}
@@ -29,7 +29,7 @@ export default function Icon() {
           }}
         />
         <div
-          style={{ width: 4, height: 15, borderRadius: 2, background: "#7fd6cc" }}
+          style={{ width: 4, height: 15, borderRadius: 2, background: "#8ab4f8" }}
         />
         <div
           style={{

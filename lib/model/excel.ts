@@ -2,7 +2,7 @@ import "server-only";
 import ExcelJS from "exceljs";
 import type { UnderwritingModel, ReconciledMetric } from "./types";
 
-const BRAND = "FF114E54";
+const BRAND = "FF24406E";
 const INK = "FF18211F";
 const MUTED = "FF5F6B69";
 const HEADER_FILL = "FFF3F5F4";

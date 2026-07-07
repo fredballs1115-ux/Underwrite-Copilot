@@ -65,7 +65,7 @@ const IconUsers = (p: { className?: string }) => (
   </NavIcon>
 );
 
-/** The signed-in app chrome: a deep-teal sidebar on desktop, a top bar on mobile. */
+/** The signed-in app chrome: a dark navy sidebar on desktop, a top bar on mobile. */
 export function AppShell({
   userEmail,
   children,
@@ -92,7 +92,7 @@ export function AppShell({
     </a>
     <div className="flex min-h-screen bg-canvas">
       {/* Sidebar — desktop */}
-      <aside className="sidebar-grad sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-sidebar text-white md:flex">
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-sidebar text-white md:flex">
         <Link href="/deals" className="flex items-center gap-2.5 px-5 py-5">
           <LogoMark className="h-8 w-8" />
           <span className="font-semibold tracking-tight">
@@ -148,11 +148,11 @@ export function AppShell({
             >
               {active && (
                 <span
-                  className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-full bg-mint"
+                  className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-full bg-accent"
                   aria-hidden
                 />
               )}
-              <Icon className={`h-4 w-4 ${active ? "text-mint" : ""}`} />
+              <Icon className={`h-4 w-4 ${active ? "text-accent" : ""}`} />
               {label}
             </Link>
           ))}
@@ -162,7 +162,7 @@ export function AppShell({
           <div className="flex items-center gap-2.5 px-2">
             <span
               aria-hidden
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold uppercase text-mint ring-1 ring-white/15"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold uppercase text-accent ring-1 ring-white/15"
             >
               {userEmail.charAt(0)}
             </span>
@@ -184,7 +184,7 @@ export function AppShell({
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar — mobile */}
-        <header className="sidebar-grad sticky top-0 z-10 bg-sidebar text-white md:hidden">
+        <header className="sticky top-0 z-10 bg-sidebar text-white md:hidden">
           <div className="flex items-center justify-between px-4 py-3">
             <Link href="/deals" className="flex items-center gap-2">
               <LogoMark className="h-7 w-7" />
@@ -248,7 +248,7 @@ export function AppShell({
           </nav>
         </header>
 
-        <main id="main" className="canvas-dots flex-1">
+        <main id="main" className="flex-1">
           <div className="mx-auto w-full max-w-5xl px-5 py-8 sm:px-8">
             {children}
           </div>
