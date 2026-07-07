@@ -1,12 +1,16 @@
 import "server-only";
 import { getStripe } from "@/lib/stripe/client";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { planSeatSync } from "@/lib/stripe/team-billing";
+import { knownPrices } from "@/lib/stripe/prices";
 
 /**
- * Keep the team subscription's seat quantity in step with the roster.
- * Called after a member joins or is removed. Best-effort: billing drift is
- * corrected on the next call (or manually in the Stripe portal), so a Stripe
- * hiccup here must never break the join/remove action itself.
+ * Keep the team subscription's seat item in step with the roster.
+ * Called after a member joins or is removed. Handles both structures:
+ * base + per-seat items (current) and the legacy single graduated item.
+ * Best-effort: billing drift is corrected on the next call (or manually in
+ * the Stripe portal), so a Stripe hiccup here must never break the
+ * join/remove action itself.
  */
 export async function syncTeamSeats(teamId: string): Promise<void> {
   try {
@@ -32,9 +36,28 @@ export async function syncTeamSeats(teamId: string): Promise<void> {
     const stripe = getStripe();
     const sub = await stripe.subscriptions.retrieve(subId);
     if (["canceled", "incomplete_expired"].includes(sub.status)) return;
-    const item = sub.items?.data?.[0];
-    if (!item || item.quantity === seats) return;
-    await stripe.subscriptionItems.update(item.id, { quantity: seats });
+
+    const prices = knownPrices();
+    const plan = planSeatSync(sub, prices.teamBase, prices.teamSeat, seats);
+    switch (plan.action) {
+      case "update":
+        await stripe.subscriptionItems.update(plan.itemId, {
+          quantity: plan.quantity,
+        });
+        break;
+      case "create":
+        await stripe.subscriptionItems.create({
+          subscription: subId,
+          price: plan.price,
+          quantity: plan.quantity,
+        });
+        break;
+      case "delete":
+        await stripe.subscriptionItems.del(plan.itemId);
+        break;
+      case "none":
+        break;
+    }
   } catch {
     // Best-effort by design — see above.
   }
