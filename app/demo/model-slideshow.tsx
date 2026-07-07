@@ -26,7 +26,7 @@ export function ModelSlideshow({ model }: { model: UnderwritingModel }) {
         key: "returns",
         label: "Returns",
         blurb:
-          "Levered IRR, equity multiple, and average cash-on-cash — computed from the reconciled inputs, not the broker's pro forma.",
+          "Levered IRR, equity multiple, and year-one cash-on-cash — computed from the reconciled inputs, not the broker's pro forma.",
         node: <ReturnsHeadline model={model} />,
       },
       {
@@ -71,6 +71,17 @@ export function ModelSlideshow({ model }: { model: UnderwritingModel }) {
   const [index, setIndex] = useState(0);
   const [auto, setAuto] = useState(true);
 
+  // Under reduced motion nothing ever plays — reflect that in the control
+  // instead of showing a pause button for a stopped show.
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        setAuto(false);
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   useEffect(() => {
     if (!auto) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -84,8 +95,6 @@ export function ModelSlideshow({ model }: { model: UnderwritingModel }) {
     setAuto(false); // the reader has taken the wheel
     setIndex(((next % slides.length) + slides.length) % slides.length);
   }
-
-  const slide = slides[index];
 
   return (
     <section
@@ -172,14 +181,24 @@ export function ModelSlideshow({ model }: { model: UnderwritingModel }) {
         ))}
       </div>
 
-      <div
-        key={slide.key}
-        role="tabpanel"
-        aria-label={slide.label}
-        className="animate-fade mt-4 min-h-80"
-      >
-        <p className="mb-3 text-sm leading-relaxed text-muted">{slide.blurb}</p>
-        {slide.node}
+      {/* Every slide stays mounted in the same grid cell, so the section is
+          always as tall as the TALLEST slide — autoplay never reflows the
+          page under the reader. Only the active one is visible. */}
+      <div className="mt-4 grid grid-cols-[minmax(0,1fr)]">
+        {slides.map((s, i) => (
+          <div
+            key={s.key}
+            role="tabpanel"
+            aria-label={s.label}
+            aria-hidden={i !== index}
+            className={`col-start-1 row-start-1 min-w-0 ${
+              i === index ? "animate-fade" : "invisible pointer-events-none"
+            }`}
+          >
+            <p className="mb-3 text-sm leading-relaxed text-muted">{s.blurb}</p>
+            {s.node}
+          </div>
+        ))}
       </div>
     </section>
   );

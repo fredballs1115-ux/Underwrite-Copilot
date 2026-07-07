@@ -11,6 +11,7 @@ import {
 } from "./supplement-actions";
 import { searchPublicComps } from "./comps-actions";
 import { FileDrop } from "../../file-drop";
+import { FileField } from "../../file-field";
 import { useToast } from "../../toaster";
 import type { CompSearchResult } from "@/lib/anthropic/comps-search";
 import type {
@@ -264,7 +265,7 @@ export function deriveRisks(results: Results): RiskItem[] {
     if (r.direction === "unfavorable") {
       risks.push({
         severity: "high",
-        title: `${r.metric}: model below the OM`,
+        title: `${r.metric}: model less favorable than the OM`,
         detail: r.gap,
         source: "Reconciler",
         tab: "reconciler",
@@ -312,7 +313,7 @@ export function deriveRisks(results: Results): RiskItem[] {
   if (flagged.length > 0) {
     risks.push({
       severity: "low",
-      title: `${flagged.length} figures to verify against source`,
+      title: `${flagged.length} figure${flagged.length === 1 ? "" : "s"} to verify against source`,
       detail: flagged
         .slice(0, 6)
         .map((m) => m.label)
@@ -1146,7 +1147,7 @@ export function ReconcileSection({
         <FileDrop
           name="model"
           accept=".xlsx,.xls,.csv,application/pdf"
-          hint="Excel (.xlsx), CSV, or a PDF / ARGUS export"
+          hint="Excel (.xlsx), CSV, or a PDF / Argus export"
           maxBytes={22 * 1024 * 1024}
         />
         <PendingButton
@@ -1889,12 +1890,7 @@ export function AddData({ dealId, tab }: { dealId: string; tab: string }) {
             >
               <input type="hidden" name="dealId" value={dealId} />
               <input type="hidden" name="tab" value={tab} />
-              <input
-                type="file"
-                name="file"
-                required
-                className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-faint file:px-3 file:py-1.5 file:text-xs file:font-medium hover:file:bg-line"
-              />
+              <FileField name="file" />
               <button
                 type="submit"
                 className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"

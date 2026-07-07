@@ -10,6 +10,22 @@ export const metadata: Metadata = {
   title: "Sample screen — a complete analysis, worked end to end",
   description:
     "Browse a full Underwrite Copilot screening: verdict, challenged assumptions, broker-comp scrutiny, market check, reconciliation, and a live stress panel — on an illustrative sample deal.",
+  alternates: { canonical: "/demo" },
+  // Child `openGraph`/`twitter` REPLACE the root objects wholesale, so the
+  // image and card type must be restated or shares lose their preview.
+  openGraph: {
+    title: "A complete CRE screen, worked end to end",
+    description:
+      "Verdict, challenged assumptions, graded comps, market check, and a live model — on an illustrative sample deal.",
+    images: ["/opengraph-image"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "A complete CRE screen, worked end to end",
+    description:
+      "Verdict, challenged assumptions, graded comps, market check, and a live model — on an illustrative sample deal.",
+    images: ["/opengraph-image"],
+  },
 };
 
 // Same slot-picking the deal page's summary bar uses — the demo should read

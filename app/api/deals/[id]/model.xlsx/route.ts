@@ -17,7 +17,12 @@ export async function GET(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return new Response("Unauthorized", { status: 401 });
+  if (!user) {
+    return Response.redirect(
+      new URL(`/login?next=${encodeURIComponent(`/deals/${id}`)}`, req.url),
+      302,
+    );
+  }
 
   // The Excel model is a Pro deliverable — mirror the memo route's gate.
   if (!(await isPro(supabase, user.id))) {
@@ -29,7 +34,8 @@ export async function GET(
     .select("*")
     .eq("id", id)
     .maybeSingle();
-  if (error || !data) return new Response("Not found", { status: 404 });
+  if (error) return Response.redirect(new URL(`/deals/${id}?error=exportfail`, req.url), 302);
+  if (!data) return new Response("Not found", { status: 404 });
 
   const deal = data as DealRow;
   const model = deal.model as UnderwritingModel | null;

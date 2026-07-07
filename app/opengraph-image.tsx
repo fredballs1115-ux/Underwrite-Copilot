@@ -7,9 +7,9 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 const SCENARIOS: [string, string, string][] = [
-  ["Conservative", "No-go", "#f87171"],
-  ["Base", "Caution", "#fbbf24"],
-  ["Sponsor", "Go", "#4ade80"],
+  ["Conservative", "No-go", "#b23a30"],
+  ["Base", "Caution", "#a05a1c"],
+  ["Sponsor", "Go", "#1b7a5e"],
 ];
 
 export default function Image() {

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   uploadSupplement,
+  signatureMismatch,
   removeSupplementFile,
 } from "@/lib/storage";
 import { DOC_KIND_KEYS } from "@/lib/documents";
@@ -20,7 +21,7 @@ async function requireDeal(dealId: string) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!user) redirect("/login");
   const { data } = await supabase
     .from("deals")
     .select("id")
@@ -53,6 +54,10 @@ export async function addDealDocument(formData: FormData) {
   const safeName = file.name.replace(/[^a-z0-9._-]+/gi, "_").slice(0, 80) || "file";
   const path = `documents/${dealId}/${id}-${safeName}`;
   const buffer = Buffer.from(await file.arrayBuffer());
+  // Trust the bytes, not the name: reject a mislabeled known format early.
+  if (signatureMismatch(file.name, buffer)) {
+    redirect(`/deals/${dealId}?error=docformat`);
+  }
   await uploadSupplement(path, buffer, file.type);
 
   await supabase.from("deal_documents").insert({

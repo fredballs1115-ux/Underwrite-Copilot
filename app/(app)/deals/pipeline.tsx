@@ -2,6 +2,9 @@
 
 import {
   Fragment,
+  memo,
+  useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -105,15 +108,18 @@ const VERDICT_META: Record<
   pass: { label: "Go", cls: "bg-pass/15 text-pass", rank: 2 },
 };
 
+// One cached formatter — constructing Intl.DateTimeFormat per call costs
+// ~50ms per full-list render at 500 rows. Pinned to UTC so the server and
+// client render the same string (no hydration mismatch from timezones).
+const DATE_FMT = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
 function fmtDate(iso: string): string {
-  // Pin to UTC so the server and client render the same string (no hydration
-  // mismatch from differing timezones).
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+  return DATE_FMT.format(new Date(iso));
 }
 
 function cap(s: string): string {
@@ -271,14 +277,15 @@ export function Pipeline({
   }, [atLimitRef]);
 
   const COMPARE_MAX = 4;
-  function toggleSelected(id: string) {
+  // Stable identity so memoized rows don't re-render on unrelated changes.
+  const toggleSelected = useCallback((id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else if (next.size < COMPARE_MAX) next.add(id);
       return next;
     });
-  }
+  }, []);
 
   // Free users who've hit the cap can't open the create form — they upgrade.
   const atLimit = !!billing && !billing.canCreateDeal;
@@ -293,8 +300,11 @@ export function Pipeline({
     [deals],
   );
 
+  // Typing stays instant even with hundreds of rows: the list follows the
+  // query at deferred priority.
+  const deferredQuery = useDeferredValue(query);
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = deferredQuery.trim().toLowerCase();
     const list = deals.filter((d) => {
       const dealStage = normalizeStage(d.stage);
       if (q && !`${d.name} ${d.market}`.toLowerCase().includes(q)) return false;
@@ -322,7 +332,7 @@ export function Pipeline({
       const tie = sortKey === "added" ? 0 : b.createdAt.localeCompare(a.createdAt);
       return (sortDir === "asc" ? cmp : -cmp) || tie;
     });
-  }, [deals, query, verdict, stage, asset, market, sortKey, sortDir, showDead]);
+  }, [deals, deferredQuery, verdict, stage, asset, market, sortKey, sortDir, showDead]);
 
   // The pipeline reads as one ladder: deals grouped by stage, in stage order,
   // each group internally sorted by the active column sort.
@@ -410,7 +420,8 @@ export function Pipeline({
               : "Not screened",
         STAGE_LABEL[normalizeStage(d.stage)],
         d.offersDue ?? "",
-        fmtDate(d.createdAt),
+        // ISO like the deadline column, so both parse as dates in Excel.
+        d.createdAt.slice(0, 10),
         d.addedBy ?? "You",
       ]
         .map(esc)
@@ -434,7 +445,7 @@ export function Pipeline({
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Pipeline</h1>
           <p className="mt-1 text-sm text-muted">
-            {deals.length} {deals.length === 1 ? "deal" : "deals"} screened
+            {deals.length} {deals.length === 1 ? "deal" : "deals"} in your pipeline
             {showUsage && (
               <>
                 {" · "}
@@ -778,16 +789,16 @@ export function Pipeline({
             </button>
           </p>
         ) : (
-          <p className="text-sm text-muted">
-            No deals match these filters.{" "}
+          <div className="rounded-2xl border border-dashed border-line bg-surface px-6 py-10 text-center">
+            <p className="text-sm text-muted">No deals match these filters.</p>
             <button
               type="button"
               onClick={clearFilters}
-              className="font-medium text-brand hover:text-brand-strong"
+              className="mt-2 text-sm font-medium text-brand hover:text-brand-strong"
             >
               Clear filters
             </button>
-          </p>
+          </div>
         )
       ) : (
         <>
@@ -878,7 +889,7 @@ export function Pipeline({
                             i={idx}
                             compareMode={compareMode}
                             checked={selected.has(d.id)}
-                            onToggle={() => toggleSelected(d.id)}
+                            onToggle={toggleSelected}
                           />
                         ))}
                       </ul>
@@ -952,8 +963,8 @@ function EmptyArt() {
       </g>
       <rect x="58" y="8" width="74" height="96" rx="8" fill="#fff" stroke="#e7e4dd" />
       <rect x="68" y="20" width="36" height="5" rx="2.5" fill="#e7e4dd" />
-      <rect x="68" y="32" width="54" height="4" rx="2" fill="#f0efe9" />
-      <rect x="68" y="40" width="46" height="4" rx="2" fill="#f0efe9" />
+      <rect x="68" y="32" width="54" height="4" rx="2" fill="#e7e4dd" />
+      <rect x="68" y="40" width="46" height="4" rx="2" fill="#e7e4dd" />
       <rect x="70" y="72" width="7" height="16" rx="3" fill="#114e54" opacity="0.35" />
       <rect x="82" y="60" width="7" height="28" rx="3" fill="#114e54" />
       <rect x="94" y="66" width="7" height="22" rx="3" fill="#114e54" opacity="0.55" />
@@ -995,7 +1006,9 @@ function MetaLine({
   );
 }
 
-function DealRow({
+// Memoized: a keystroke in the search box or a compare toggle must not
+// re-render every row of a large pipeline.
+const DealRow = memo(function DealRow({
   d,
   i,
   compareMode,
@@ -1006,7 +1019,7 @@ function DealRow({
   i: number;
   compareMode: boolean;
   checked: boolean;
-  onToggle: () => void;
+  onToggle: (id: string) => void;
 }) {
   const v = d.verdict ? VERDICT_META[d.verdict] : null;
   const isDead = normalizeStage(d.stage) === "dead";
@@ -1134,7 +1147,7 @@ function DealRow({
       {compareMode ? (
         <button
           type="button"
-          onClick={onToggle}
+          onClick={() => onToggle(d.id)}
           aria-pressed={checked}
           className={`group flex w-full items-center gap-3 px-5 py-4 text-left transition-colors ${
             checked ? "bg-brand/5" : "hover:bg-faint"
@@ -1172,7 +1185,7 @@ function DealRow({
       )}
     </li>
   );
-}
+});
 
 const ONBOARD_KEY = "uc-onboard-dismissed";
 
@@ -1577,7 +1590,7 @@ function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
           pendingLabel="Uploading your OM — hang tight…"
           className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
         >
-          Create &amp; analyze
+          Create &amp; screen
         </PendingButton>
       </form>
       <BatchUpload />

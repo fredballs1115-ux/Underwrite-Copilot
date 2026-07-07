@@ -18,8 +18,12 @@ const ERRORS: Record<string, string> = {
   upload: "The upload didn’t complete — nothing was saved. Please try again.",
   limit:
     "You’ve reached the 3-deal limit on the Free plan. Upgrade to Pro for unlimited deals.",
+  exportfail:
+    "Couldn’t build that export just now — please try again in a moment.",
+  auth:
+    "You were signed out, so the upload didn’t start. You’re back in now — everything you typed is still filled in below; just re-attach the PDF.",
   teamlimit:
-    "Your team's 3 trial deals and your personal free deals are used up. Start the Team plan for unlimited shared deals, or upgrade to Pro.",
+    "Your team’s 3 trial deals and your personal free deals are used up. Start the Team plan for unlimited shared deals, or upgrade to Pro.",
 };
 
 // Fixed metric slots for the pipeline table — every row fills the SAME
@@ -128,35 +132,35 @@ export default async function DealsPage({
         .map((d) => d.user_id),
     ),
   );
-  const [{ data: jobsData }, { data: mates }] = await Promise.all([
+  const [{ data: jobsData }, { data: mates }, { data: dueRows }] = await Promise.all([
     ids.length
       ? supabase
           .from("analysis_jobs")
           .select("deal_id, status, created_at")
           .in("deal_id", ids)
           .order("created_at", { ascending: false })
+          // Only the newest row per deal is read below — cap the fetch so a
+          // long re-screen history can't grow this query without bound.
+          .limit(Math.max(100, ids.length * 3))
       : Promise.resolve({ data: [] as { deal_id: string; status: string }[] }),
     teammateIds.length
       ? supabase.from("profiles").select("id, email, full_name").in("id", teammateIds)
       : Promise.resolve({ data: [] as { id: string; email: string | null; full_name: string | null }[] }),
+    // Call-for-offers deadlines are best-effort: the column arrived in
+    // migration 0013, and the pipeline must keep working on a database that
+    // hasn't run it yet (the query just errors and every deadline reads null).
+    ids.length
+      ? supabase.from("deals").select("id, offers_due").in("id", ids)
+      : Promise.resolve({ data: [] as { id: string; offers_due: string | null }[] }),
   ]);
   const jobByDeal = new Map<string, string>();
   for (const j of (jobsData ?? []) as { deal_id: string; status: string }[]) {
     if (!jobByDeal.has(j.deal_id)) jobByDeal.set(j.deal_id, j.status);
   }
 
-  // Call-for-offers deadlines are best-effort: the column arrived in
-  // migration 0013, and the pipeline must keep working on a database that
-  // hasn't run it yet (the query just errors and every deadline reads null).
   const dueById = new Map<string, string>();
-  if (ids.length) {
-    const { data: dueRows } = await supabase
-      .from("deals")
-      .select("id, offers_due")
-      .in("id", ids);
-    for (const r of (dueRows ?? []) as { id: string; offers_due: string | null }[]) {
-      if (r.offers_due) dueById.set(r.id, r.offers_due);
-    }
+  for (const r of (dueRows ?? []) as { id: string; offers_due: string | null }[]) {
+    if (r.offers_due) dueById.set(r.id, r.offers_due);
   }
   const nameById = new Map(
     ((mates ?? []) as { id: string; email: string | null; full_name: string | null }[]).map(

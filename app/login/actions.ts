@@ -55,7 +55,16 @@ export async function authenticate(
   try {
     ({ data, error } =
       intent === "signup"
-        ? await supabase.auth.signUp({ email, password })
+        ? await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              // The confirmation email's link lands back here with a banner
+              // instead of dead-ending on the marketing homepage. The URL
+              // must be on the Supabase project's redirect allowlist.
+              emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/login?confirmed=1`,
+            },
+          })
         : await supabase.auth.signInWithPassword({ email, password }));
   } catch {
     // Network failure or a non-JSON response from the auth service — don't

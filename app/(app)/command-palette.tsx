@@ -147,6 +147,7 @@ export function CommandPalette({
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [deals, setDeals] = useState<PaletteDeal[] | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -178,9 +179,19 @@ export function CommandPalette({
       inputRef.current?.focus();
     });
     fetch("/api/palette", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : { deals: [] }))
-      .then((d: { deals: PaletteDeal[] }) => setDeals(d.deals))
-      .catch(() => setDeals([]));
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
+      .then((d: { deals: PaletteDeal[] }) => {
+        setDeals(d.deals);
+        setLoadFailed(false);
+      })
+      .catch(() => {
+        // "No matches." would read as "your deals are gone" — say what broke.
+        setDeals([]);
+        setLoadFailed(true);
+      });
     return () => cancelAnimationFrame(raf);
   }, [open]);
 
@@ -310,7 +321,11 @@ export function CommandPalette({
         >
           {items.length === 0 && (
             <li className="px-3 py-6 text-center text-sm text-muted">
-              {deals === null ? "Loading…" : "No matches."}
+              {deals === null
+                ? "Loading…"
+                : loadFailed
+                  ? "Search is unreachable right now — close and try again."
+                  : "No matches."}
             </li>
           )}
           {groups.map((g) => (

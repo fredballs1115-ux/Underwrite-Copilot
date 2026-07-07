@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { getStripe } from "@/lib/stripe/client";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -34,13 +35,18 @@ export async function startCheckout() {
   let customerId = (profile?.stripe_customer_id as string) ?? null;
   if (!customerId) {
     // Idempotency key prevents two-tab races from minting duplicate customers.
-    const customer = await stripe.customers.create(
-      {
-        email: user.email ?? undefined,
-        metadata: { user_id: user.id },
-      },
-      { idempotencyKey: `uc-customer-${user.id}` },
-    );
+    let customer;
+    try {
+      customer = await stripe.customers.create(
+        {
+          email: user.email ?? undefined,
+          metadata: { user_id: user.id },
+        },
+        { idempotencyKey: `uc-customer-${user.id}` },
+      );
+    } catch {
+      redirect("/billing?error=checkout");
+    }
     customerId = customer.id;
     // Billing columns are service-role-only (migration 0006), so persist the
     // customer id with the admin client — and fail loudly if it doesn't land,
@@ -54,30 +60,37 @@ export async function startCheckout() {
   }
 
   // A live subscription already on file means the webhook just hasn't landed
-  // yet (or the user double-clicked) — never sell a second one.
-  const existing = await stripe.subscriptions.list({
-    customer: customerId,
-    status: "all",
-    limit: 10,
-  });
-  if (
-    existing.data.some((sub) =>
-      ["active", "trialing", "past_due", "incomplete"].includes(sub.status),
-    )
-  ) {
-    redirect("/billing?error=exists");
-  }
+  // yet (or the user double-clicked) — never sell a second one. A Stripe
+  // outage lands on the mapped "try again" copy instead of the error boundary.
+  let session;
+  try {
+    const existing = await stripe.subscriptions.list({
+      customer: customerId,
+      status: "all",
+      limit: 10,
+    });
+    if (
+      existing.data.some((sub) =>
+        ["active", "trialing", "past_due", "incomplete"].includes(sub.status),
+      )
+    ) {
+      redirect("/billing?error=exists");
+    }
 
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    customer: customerId,
-    line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${appUrl()}/billing?status=success`,
-    cancel_url: `${appUrl()}/billing?status=cancelled`,
-    metadata: { user_id: user.id },
-    subscription_data: { metadata: { user_id: user.id } },
-    allow_promotion_codes: true,
-  });
+    session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      customer: customerId,
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${appUrl()}/billing?status=success`,
+      cancel_url: `${appUrl()}/billing?status=cancelled`,
+      metadata: { user_id: user.id },
+      subscription_data: { metadata: { user_id: user.id } },
+      allow_promotion_codes: true,
+    });
+  } catch (err) {
+    if (isRedirectError(err)) throw err;
+    redirect("/billing?error=checkout");
+  }
 
   if (session.url) redirect(session.url);
   redirect("/billing?error=checkout");
@@ -103,9 +116,14 @@ export async function openPortal() {
   if (!customerId) redirect("/billing?error=nocustomer");
 
   const stripe = getStripe();
-  const session = await stripe.billingPortal.sessions.create({
-    customer: customerId,
-    return_url: `${appUrl()}/billing`,
-  });
+  let session;
+  try {
+    session = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: `${appUrl()}/billing`,
+    });
+  } catch {
+    redirect("/billing?error=checkout");
+  }
   redirect(session.url);
 }

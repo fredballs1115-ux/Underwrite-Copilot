@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "Terms of service",
   description:
     "The plain-English terms for using Underwrite Copilot's CRE deal-screening service.",
+  alternates: { canonical: "/terms" },
 };
 
 const SECTIONS: { h: string; body: string[] }[] = [

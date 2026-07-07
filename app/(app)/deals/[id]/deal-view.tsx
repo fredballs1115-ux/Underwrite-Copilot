@@ -137,12 +137,16 @@ const MODEL_ERRORS: Record<string, string> = {
     "The upload didn’t complete — the stored OM is unchanged. Please try again.",
   ompermission:
     "Only the deal’s creator or the team owner can replace its OM.",
-  busy: "An analysis is already running on this deal — let it finish first.",
+  busy: "A screen is already running on this deal — let it finish first.",
   memoempty: "Run the analysis first — the memo needs a verdict to export.",
   memofail: "Couldn’t build the memo just now — please try again in a moment.",
   modelfail: "Couldn’t build the Excel just now — please try again in a moment.",
   docfile: "Please choose a file to add.",
   docsize: "That file is larger than 22 MB — please try a smaller one.",
+  exportfail:
+    "Couldn’t build that export just now — please try again in a moment.",
+  docformat:
+    "That file’s contents don’t match its extension — re-export it and try again.",
   supp: "Couldn’t save your change — please try again.",
   delete: "Couldn’t delete the deal — please try again.",
   stage: "Couldn’t save the stage — please try again.",
@@ -278,7 +282,7 @@ export function DealView({
         ) {
           notified.current = true;
           if (data.status === "error") {
-            toast("Analysis hit a problem — open the deal for details.", "error");
+            toast("The screen hit a problem — open the deal for details.", "error");
           } else {
             toast(completionMessage(endedStep), "success");
           }
@@ -669,8 +673,8 @@ function FinancialsPanel({
         <StatGridSkeleton />
       ) : hasOm ? (
         <EmptyState
-          title="Analysis hasn’t run for this deal yet."
-          action={<RetryForm dealId={dealId} label="Run analysis" />}
+          title="The screen hasn’t run for this deal yet."
+          action={<RetryForm dealId={dealId} label="Run the screen" />}
         />
       ) : (
         <EmptyState title="No OM uploaded for this deal." />
@@ -790,7 +794,7 @@ function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
               {c.label}
               {c.status === "near" && (
                 <span className="rounded-full bg-caution/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-caution">
-                  Near-miss
+                  Near miss
                 </span>
               )}
               <span className="sr-only">
@@ -912,11 +916,16 @@ function AnalysesPanel({
       );
   } else if (running || pending) {
     content = analysis === "verdict" ? <VerdictSkeleton /> : <CardListSkeleton />;
+  } else if (hasOm && analysis === "comps" && (results.verdict || results.market)) {
+    // The screen DID run — this OM just offered no comps to scrutinize.
+    content = (
+      <EmptyState title="The OM offered no comps to scrutinize — add your own below, or search the public web." />
+    );
   } else if (hasOm) {
     content = (
       <EmptyState
-        title="Analysis hasn’t run for this deal yet."
-        action={<RetryForm dealId={dealId} label="Run analysis" />}
+        title="The screen hasn’t run for this deal yet."
+        action={<RetryForm dealId={dealId} label="Run the screen" />}
       />
     );
   } else {
@@ -1182,7 +1191,7 @@ function InternalCompsBlock({ comps }: { comps: InternalComp[] }) {
         Same asset class, as extracted from each OM you&rsquo;ve screened —
         your own frame of reference, not third-party comp data.
       </p>
-      <div className="mt-3 overflow-x-auto">
+      <div className="scroll-shadows-x mt-3 overflow-x-auto">
         <table className="w-full min-w-105 text-sm">
           <thead>
             <tr className="text-left text-[10px] font-medium uppercase tracking-wide text-muted">

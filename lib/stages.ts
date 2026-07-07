@@ -17,9 +17,9 @@ export type Stage = (typeof STAGES)[number];
 export const STAGE_LABEL: Record<Stage, string> = {
   screening: "Screening",
   tracking: "Tracking",
-  active_pursuit: "Active Pursuit",
-  loi_submitted: "LOI Submitted",
-  under_contract: "Under Contract / DD",
+  active_pursuit: "Active pursuit",
+  loi_submitted: "LOI submitted",
+  under_contract: "Under contract / DD",
   closed: "Closed",
   dead: "Dead",
 };

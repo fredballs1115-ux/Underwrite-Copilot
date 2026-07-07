@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { FileField } from "../../file-field";
 import { useMemo, useState, type ReactNode } from "react";
 import { DOC_KINDS, DOC_KIND_LABEL, type DealDocument } from "@/lib/documents";
 import { MODEL_INPUTS, MODEL_PASTES } from "@/lib/model/inputs";
@@ -20,7 +21,9 @@ import {
 } from "./model-actions";
 
 const usd = (n: number | null | undefined) =>
-  n == null ? "—" : "$" + Math.round(n).toLocaleString();
+  n == null
+    ? "—"
+    : (n < 0 ? "−$" : "$") + Math.abs(Math.round(n)).toLocaleString();
 const pct = (n: number | null | undefined) =>
   n == null ? "—" : n.toFixed(2) + "%";
 const mult = (n: number | null | undefined) =>
@@ -902,12 +905,7 @@ function DocumentsPanel({
             </option>
           ))}
         </select>
-        <input
-          type="file"
-          name="file"
-          required
-          className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-faint file:px-3 file:py-1.5 file:text-xs file:font-medium hover:file:bg-line"
-        />
+        <FileField name="file" />
         <button
           type="submit"
           className="shrink-0 rounded-lg border border-line px-3 py-2 text-sm font-medium transition-colors hover:bg-faint"
