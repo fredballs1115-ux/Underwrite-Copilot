@@ -88,7 +88,7 @@ export async function createDeal(formData: FormData) {
 
     const { error: jobErr } = await supabase
       .from("analysis_jobs")
-      .insert({ deal_id: dealId, status: "queued", step: "extract", progress: 0 });
+      .insert({ deal_id: dealId, status: "queued", step: "signal", progress: 0 });
     if (jobErr) throw new Error(jobErr.message);
   } catch {
     await supabase.from("deals").delete().eq("id", dealId);
@@ -279,12 +279,12 @@ export async function rerunAnalysis(formData: FormData) {
   if (existing) {
     await supabase
       .from("analysis_jobs")
-      .update({ status: "queued", step: "extract", progress: 0, error: null })
+      .update({ status: "queued", step: "signal", progress: 0, error: null })
       .eq("deal_id", dealId);
   } else {
     await supabase
       .from("analysis_jobs")
-      .insert({ deal_id: dealId, status: "queued", step: "extract", progress: 0 });
+      .insert({ deal_id: dealId, status: "queued", step: "signal", progress: 0 });
   }
 
   after(() => runAnalysis(dealId));

@@ -89,7 +89,7 @@ export default async function DealsPage({
         <p className="font-medium">Database isn’t set up yet</p>
         <p className="mt-1 text-muted">
           Run every file in <code>supabase/migrations/</code> (0001 through
-          0007) in your Supabase SQL editor, then refresh this page.
+          0009) in your Supabase SQL editor, then refresh this page.
         </p>
         <p className="mt-2 text-xs text-muted">({error.message})</p>
       </div>

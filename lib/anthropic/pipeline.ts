@@ -1,6 +1,7 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { downloadOmPdf } from "@/lib/storage";
+import { readFirstSignal } from "./first-signal";
 import { extractTerms } from "./extract";
 import { challengeAssumptions } from "./challenge";
 import { scrutinizeComps } from "./comps";
@@ -104,6 +105,30 @@ export async function runAnalysis(dealId: string): Promise<void> {
 
     const assetClass = (deal.asset_class as AssetClass) ?? "auto";
     const pdf = await downloadOmPdf(deal.om_storage_path as string);
+
+    // Step 0 — first signal: the fast headline read, stored the moment it
+    // lands so the deal page shows what the deal IS while the deep pass runs.
+    // Best-effort: a failure here (or a pre-0009 schema without the column)
+    // must never sink the real screen. This call also warms the prompt cache
+    // for the OM, so extraction and the later steps read it cheaply.
+    await patchJob(dealId, {
+      status: "running",
+      step: "signal",
+      progress: 4,
+      error: null,
+    });
+    try {
+      // Clear the previous run's signal first so a re-run never shows a stale
+      // headline next to fresh results if the read below fails.
+      await admin.from("deals").update({ first_signal: null }).eq("id", dealId);
+      const firstSignal = await readFirstSignal(pdf, assetClass);
+      await admin
+        .from("deals")
+        .update({ first_signal: firstSignal, updated_at: new Date().toISOString() })
+        .eq("id", dealId);
+    } catch {
+      // No signal — the pipeline continues to the full extraction regardless.
+    }
 
     // Step 1 — extraction
     await patchJob(dealId, {

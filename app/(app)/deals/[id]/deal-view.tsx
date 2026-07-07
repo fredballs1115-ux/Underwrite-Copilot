@@ -76,9 +76,10 @@ const TABS: {
 ];
 
 // The automatic pass, in order — drives the progress rail and pending/done logic.
-const PIPELINE = ["extract", "challenge", "comps", "market", "verdict"];
+const PIPELINE = ["signal", "extract", "challenge", "comps", "market", "verdict"];
 
 const STEP_LABELS: Record<string, string> = {
+  signal: "First pass — pulling the headline read in seconds…",
   extract: "Reading the OM and extracting the key terms…",
   challenge: "Red-teaming the assumptions like an investment committee…",
   comps: "Scrutinizing the broker’s comps for cherry-picking…",
@@ -118,6 +119,7 @@ function completionMessage(step: string | null): string {
 
 export function DealView({
   dealId,
+  dealName,
   initialTab,
   hasOm,
   modelErrorCode,
@@ -130,6 +132,7 @@ export function DealView({
   isPro,
 }: {
   dealId: string;
+  dealName: string;
   initialTab: string | null;
   hasOm: boolean;
   modelErrorCode: string | null;
@@ -369,6 +372,7 @@ export function DealView({
           state={tabState(activeDef)}
           results={results}
           dealId={dealId}
+          dealName={dealName}
           hasOm={hasOm}
           active={active}
           onNavigate={(t) => selectTab(t as TabKey)}
@@ -461,6 +465,7 @@ function ProgressRail({ job }: { job: NonNullable<Job> }) {
   }
 
   const steps = [
+    { key: "signal", label: "Signal" },
     { key: "extract", label: "Extract" },
     { key: "challenge", label: "Challenge" },
     { key: "comps", label: "Comps" },
@@ -532,6 +537,7 @@ function TabPanel({
   state,
   results,
   dealId,
+  dealName,
   hasOm,
   active,
   onNavigate,
@@ -546,6 +552,7 @@ function TabPanel({
   state: "done" | "running" | "pending" | "idle";
   results: Results;
   dealId: string;
+  dealName: string;
   hasOm: boolean;
   active: boolean;
   onNavigate: (tab: string) => void;
@@ -617,7 +624,7 @@ function TabPanel({
       tab === "terms" ? (
         <TermsView result={results.extraction!} />
       ) : tab === "challenger" ? (
-        <ChallengerView result={results.challenges!} />
+        <ChallengerView result={results.challenges!} dealName={dealName} />
       ) : tab === "comps" ? (
         <BrokerComps
           result={results.comps!}
