@@ -2,8 +2,46 @@ import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe/client";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { syncTeamSeats } from "@/lib/stripe/seats";
+import { assertKnownPrices } from "@/lib/stripe/prices";
 
 export const runtime = "nodejs";
+
+/**
+ * Price-ID assertion failed: log loudly and alert (email via Resend when
+ * configured), then SKIP processing — never silently sync a subscription
+ * carrying prices this app doesn't sell. Read-and-verify only: no Stripe
+ * object is ever written here.
+ */
+async function alertUnknownPrices(
+  event: Stripe.Event,
+  sub: Stripe.Subscription,
+  unknown: string[],
+  seen: string[],
+): Promise<void> {
+  const line =
+    `[stripe] ALERT unknown price id(s) [${unknown.join(", ")}] on subscription ` +
+    `${sub.id} (customer ${typeof sub.customer === "string" ? sub.customer : sub.customer.id}, ` +
+    `event ${event.id} ${event.type}); saw [${seen.join(", ")}]; ` +
+    `expected the ids in STRIPE_PRICE_ID / STRIPE_TEAM_PRICE_ID / STRIPE_TEAM_SEAT_PRICE_ID. ` +
+    `Event NOT processed.`;
+  console.error(line);
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return;
+  try {
+    await fetch(`${process.env.RESEND_BASE_URL ?? "https://api.resend.com"}/emails`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: process.env.RESEND_FROM ?? "Underwrite Copilot <onboarding@resend.dev>",
+        to: [process.env.BILLING_ALERT_EMAIL ?? "underwritecopilot.support@gmail.com"],
+        subject: `Stripe webhook: unknown price on ${sub.id}`,
+        text: line,
+      }),
+    });
+  } catch {
+    // The console.error above is the fallback alert channel.
+  }
+}
 
 /**
  * Stripe webhook — keeps profiles (personal Pro) and teams (per-seat plan) in
@@ -156,6 +194,13 @@ export async function POST(req: Request) {
           const sub = await stripe.subscriptions.retrieve(
             s.subscription as string,
           );
+          const priceCheck = assertKnownPrices(sub);
+          if (!priceCheck.ok) {
+            await alertUnknownPrices(event, sub, priceCheck.unknown, priceCheck.seen);
+            // 200: the event is understood and deliberately not processed —
+            // retrying wouldn't change the verdict, the alert is the signal.
+            return new Response("skipped: unknown price id", { status: 200 });
+          }
           await sync(sub);
         }
         break;
@@ -169,6 +214,11 @@ export async function POST(req: Request) {
         // subscription.
         const evSub = event.data.object as Stripe.Subscription;
         const sub = await stripe.subscriptions.retrieve(evSub.id);
+        const priceCheck = assertKnownPrices(sub);
+        if (!priceCheck.ok) {
+          await alertUnknownPrices(event, sub, priceCheck.unknown, priceCheck.seen);
+          return new Response("skipped: unknown price id", { status: 200 });
+        }
         await sync(sub);
         break;
       }

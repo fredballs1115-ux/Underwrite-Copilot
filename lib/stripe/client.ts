@@ -12,8 +12,25 @@ export function getStripe(): Stripe {
     );
   }
   if (!client) {
-    // Pin nothing — use the account's default API version.
-    client = new Stripe(process.env.STRIPE_SECRET_KEY);
+    // STRIPE_API_BASE is a TEST hook only: it points the SDK at a local mock
+    // (e.g. http://localhost:4571) so billing flows can be exercised without
+    // touching Stripe. Never set it in production.
+    const base = process.env.STRIPE_API_BASE
+      ? new URL(process.env.STRIPE_API_BASE)
+      : null;
+    client = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      // Pinned so a Stripe account default-version bump can never silently
+      // change webhook/API payload shapes under us. This matches the version
+      // the installed SDK (stripe@22) is generated against.
+      apiVersion: "2026-06-24.dahlia",
+      ...(base
+        ? {
+            host: base.hostname,
+            port: Number(base.port || (base.protocol === "https:" ? 443 : 80)),
+            protocol: base.protocol === "https:" ? "https" : "http",
+          }
+        : {}),
+    });
   }
   return client;
 }

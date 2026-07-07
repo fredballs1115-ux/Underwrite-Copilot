@@ -10,7 +10,9 @@ import {
   leaveTeam,
   startTeamCheckout,
   openTeamPortal,
+  deleteTeam,
 } from "./actions";
+import { getBilling } from "@/lib/billing";
 import { CopyLinkButton, ConfirmSubmit } from "./team-client";
 import { PendingButton } from "../pending-button";
 
@@ -33,6 +35,12 @@ const MESSAGES: Record<string, { cls: string; text: string }> = {
   checkout: { cls: "bg-kill/10 text-kill", text: "Couldn't start checkout — please try again." },
   nocustomer: { cls: "bg-faint text-muted", text: "No team subscription on file yet — start with the Team plan below." },
   exists: { cls: "bg-faint text-muted", text: "Your team already has an active plan — if it still shows a trial, activation can take a moment; refresh shortly." },
+  upgraded: { cls: "bg-pass/10 text-pass", text: "Done — your Pro subscription became the Team plan on the same billing history, prorated automatically. No new checkout needed." },
+  teamdeleted: { cls: "bg-pass/10 text-pass", text: "Team deleted. Shared deals went back to whoever uploaded them, and any team subscription became your personal Pro plan (prorated) — manage it from Billing." },
+  upgrade: { cls: "bg-kill/10 text-kill", text: "Couldn't convert your Pro subscription to the Team plan — nothing was changed. Please try again, or email underwritecopilot.support@gmail.com." },
+  confirmdelete: { cls: "bg-kill/10 text-kill", text: "Type DELETE (all caps) in the box to confirm deleting the team." },
+  deletesub: { cls: "bg-kill/10 text-kill", text: "We couldn't convert the team's subscription, so nothing was deleted. Try again, or email underwritecopilot.support@gmail.com." },
+  delete: { cls: "bg-kill/10 text-kill", text: "Couldn't delete the team — nothing was removed. Please try again." },
 };
 
 export default async function TeamPage({
@@ -54,6 +62,12 @@ export default async function TeamPage({
     data: { user },
   } = await supabase.auth.getUser();
   const team = user ? await getTeam(supabase, user.id) : null;
+  // Whether the owner personally pays for Pro — decides which upgrade path
+  // the Start-Team button takes (in-place conversion vs a new checkout).
+  const ownerIsPersonalPro =
+    team?.role === "owner" && user
+      ? (await getBilling(supabase, user.id)).plan === "pro"
+      : false;
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const invites = team && team.role === "owner"
@@ -335,11 +349,24 @@ export default async function TeamPage({
                 {team.role === "owner" ? (
                   <form action={startTeamCheckout} className="mt-4">
                     <PendingButton
-                      pendingLabel="Opening secure checkout…"
+                      pendingLabel={
+                        ownerIsPersonalPro
+                          ? "Converting your Pro subscription…"
+                          : "Opening secure checkout…"
+                      }
                       className="shadow-card hover-lift rounded-lg bg-brand px-5 py-2.5 text-sm font-medium text-white"
                     >
-                      Start Team plan — {TEAM_PRICE_LABEL}
+                      {ownerIsPersonalPro
+                        ? "Convert Pro → Team plan"
+                        : `Start Team plan — ${TEAM_PRICE_LABEL}`}
                     </PendingButton>
+                    {ownerIsPersonalPro && (
+                      <p className="mt-2 max-w-md text-xs text-muted">
+                        You&apos;re on Pro, so there&apos;s no second checkout:
+                        your existing subscription switches to the Team plan in
+                        place and Stripe prorates the difference.
+                      </p>
+                    )}
                   </form>
                 ) : (
                   <p className="mt-3 text-xs text-muted">
@@ -349,6 +376,36 @@ export default async function TeamPage({
               </>
             )}
           </section>
+
+          {/* Danger zone — owner only */}
+          {team.role === "owner" && (
+            <section className="rounded-2xl border border-kill/25 bg-surface p-6 shadow-card">
+              <h2 className="text-sm font-semibold tracking-tight text-kill">
+                Delete team
+              </h2>
+              <p className="mt-1 max-w-lg text-sm leading-relaxed text-muted">
+                Deletes the team for everyone. Shared deals go back to whoever
+                uploaded them. If the team has an active subscription it
+                becomes your personal Pro plan on the same billing history
+                (prorated) — you can cancel it any time from Billing.
+              </p>
+              <form action={deleteTeam} className="mt-4 flex max-w-md gap-2">
+                <input
+                  name="confirm"
+                  required
+                  placeholder="Type DELETE to confirm"
+                  aria-label="Type DELETE to confirm deleting the team"
+                  className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-kill focus-visible:ring-2 focus-visible:ring-kill/30"
+                />
+                <PendingButton
+                  pendingLabel="Deleting team…"
+                  className="rounded-lg border border-kill/40 px-4 py-2 text-sm font-medium text-kill transition-colors hover:bg-kill/5"
+                >
+                  Delete team
+                </PendingButton>
+              </form>
+            </section>
+          )}
         </>
       )}
     </div>
