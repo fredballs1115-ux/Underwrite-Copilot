@@ -22,13 +22,12 @@ const ERRORS: Record<string, string> = {
     "Your team's 3 trial deals and your personal free deals are used up. Start the Team plan for unlimited shared deals, or upgrade to Pro.",
 };
 
-// Fixed metric slots for the pipeline table — every row fills the SAME three
+// Fixed metric slots for the pipeline table — every row fills the SAME
 // columns (or shows —), so one header labels them all and values align into
 // scannable columns instead of repeating micro-labels in every row.
 function pickSlots(metrics: ExtractedMetric[]): {
   cap: string | null;
   price: string | null;
-  noi: string | null;
 } {
   const find = (inc: RegExp, exc?: RegExp) =>
     metrics.find((m) => inc.test(m.label) && !(exc && exc.test(m.label)))
@@ -38,7 +37,6 @@ function pickSlots(metrics: ExtractedMetric[]): {
       find(/going[- ]?in cap/i) ??
       find(/\bcap rate\b/i, /exit|terminal|reversion|pro ?forma/i),
     price: find(/purchase price|asking price|\bprice\b/i, /unit|\/sf|per sf|per unit|psf/i),
-    noi: find(/\bnoi\b/i, /stabilized|pro ?forma/i) ?? find(/\bnoi\b/i),
   };
 }
 
@@ -151,12 +149,17 @@ export default async function DealsPage({
       createdAt: d.created_at,
       verdict: verdict?.verdict ?? null,
       stage: (d.stage as DealCard["stage"]) ?? "screening",
-      outsideBuyBox: (() => {
+      // Deterministic mandate check, same engine as the deal page: any miss
+      // → outside; else any near-miss → near; all-pass → fits. Unknown-only
+      // results (nothing checkable yet) stay null and render as —.
+      fit: (() => {
         const box = d.team_id ? teamBox : personalBox;
-        if (!box || !extraction) return false;
-        return evaluateBuyBox(d.asset_class, extraction, box).some(
-          (c) => c.status === "miss",
-        );
+        if (!box || !extraction) return null;
+        const checks = evaluateBuyBox(d.asset_class, extraction, box);
+        if (checks.some((c) => c.status === "miss")) return "outside" as const;
+        if (checks.some((c) => c.status === "near")) return "near" as const;
+        if (checks.some((c) => c.status === "pass")) return "fits" as const;
+        return null;
       })(),
       addedBy:
         d.team_id && d.user_id !== user?.id
@@ -165,7 +168,7 @@ export default async function DealsPage({
       market: extraction?.market ?? "",
       slots: extraction
         ? pickSlots(extraction.metrics)
-        : { cap: null, price: null, noi: null },
+        : { cap: null, price: null },
       jobStatus:
         job === "queued" || job === "running"
           ? ("running" as const)
