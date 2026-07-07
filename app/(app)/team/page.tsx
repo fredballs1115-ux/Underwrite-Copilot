@@ -60,9 +60,10 @@ export default async function TeamPage({
     ? ((
         await supabase
           .from("team_invites")
-          .select("id, token, created_at, expires_at")
+          .select("id, token, created_at, expires_at, used_at")
           .eq("team_id", team.id)
           .gt("expires_at", new Date().toISOString())
+          .is("used_at", null)
           .order("created_at", { ascending: false })
       ).data ?? [])
     : [];
