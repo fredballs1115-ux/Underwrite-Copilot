@@ -143,6 +143,8 @@ const MODEL_ERRORS: Record<string, string> = {
   modelfail: "Couldn’t build the Excel just now — please try again in a moment.",
   docfile: "Please choose a file to add.",
   docsize: "That file is larger than 22 MB — please try a smaller one.",
+  docformat:
+    "That file's contents don't match its extension — re-export it and try again.",
   supp: "Couldn’t save your change — please try again.",
   delete: "Couldn’t delete the deal — please try again.",
   stage: "Couldn’t save the stage — please try again.",
