@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createDeal, createSampleDeal } from "./actions";
 import { FileDrop } from "../file-drop";
 import { PendingButton } from "../pending-button";
+import { AddressAutocomplete } from "../address-autocomplete";
 
 export type Stage = "screening" | "reviewing" | "pursuing" | "dead";
 
@@ -1067,6 +1068,18 @@ function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
             <option value="industrial">Industrial</option>
             <option value="retail">Retail</option>
           </select>
+        </div>
+        <div>
+          <AddressAutocomplete
+            name="address"
+            textName="addressText"
+            placeholder="Property address (optional) — start typing for suggestions"
+            className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
+          />
+          <p className="mt-1 text-xs text-muted">
+            Picking a suggestion fills street, city, state, ZIP, and county —
+            and your buy-box location check applies from the moment you upload.
+          </p>
         </div>
         <FileDrop
           name="om"

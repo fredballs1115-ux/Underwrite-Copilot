@@ -181,29 +181,44 @@ export default async function DealPage({
 
   // Judge the buy box against the full extraction when it's in; until then,
   // the first signal stands in — so "outside your box" can surface ~30s into
-  // a screen instead of minutes later. The per-unit figure only counts as a
-  // per-unit basis when it isn't actually a per-SF number.
+  // a screen instead of minutes later. The user-entered property address
+  // widens the location haystack in every case (city, county, state).
+  const dealAddress =
+    (deal.address as import("@/lib/address").StructuredAddress | undefined) ??
+    null;
+  const addressHaystack = [
+    extraction?.address,
+    dealAddress?.label,
+    dealAddress?.county,
+    dealAddress?.state,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const signalMetrics = firstSignal
+    ? [
+        { label: "Asking price", value: firstSignal.askPrice },
+        { label: "Going-in cap rate", value: firstSignal.goingInCap },
+        {
+          // Broad per-area test: "sf", "psf", "sq ft", "square foot", "/ft"
+          // must all count — a per-SF figure misread as per-unit would give
+          // the buy-box check a confidently wrong basis.
+          label: /sf|sq|square|psf|\/\s?ft/i.test(firstSignal.perUnit)
+            ? "Price per SF"
+            : "Price per unit",
+          value: firstSignal.perUnit,
+        },
+      ].filter((m) => m.value.trim())
+    : [];
   const checkSource =
-    extraction ??
-    (firstSignal
+    extraction || firstSignal || dealAddress
       ? {
-          assetClass: firstSignal.assetClass,
-          market: firstSignal.market,
-          metrics: [
-            { label: "Asking price", value: firstSignal.askPrice },
-            { label: "Going-in cap rate", value: firstSignal.goingInCap },
-            {
-              // Broad per-area test: "sf", "psf", "sq ft", "square foot", "/ft"
-              // must all count — a per-SF figure misread as per-unit would give
-              // the buy-box check a confidently wrong basis.
-              label: /sf|sq|square|psf|\/\s?ft/i.test(firstSignal.perUnit)
-                ? "Price per SF"
-                : "Price per unit",
-              value: firstSignal.perUnit,
-            },
-          ].filter((m) => m.value.trim()),
+          assetClass:
+            extraction?.assetClass ?? firstSignal?.assetClass ?? "",
+          market: extraction?.market ?? firstSignal?.market ?? "",
+          address: addressHaystack,
+          metrics: extraction?.metrics ?? signalMetrics,
         }
-      : null);
+      : null;
   const buyBoxChecks: BuyBoxCheck[] = buyBox
     ? evaluateBuyBox(deal.asset_class, checkSource, buyBox)
     : [];
@@ -241,7 +256,11 @@ export default async function DealPage({
               ) : firstSignal?.market ? (
                 <> · {firstSignal.market}</>
               ) : null}
-              {extraction?.address ? <> · {extraction.address}</> : null}
+              {extraction?.address ? (
+                <> · {extraction.address}</>
+              ) : dealAddress?.label ? (
+                <> · {dealAddress.label}</>
+              ) : null}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">

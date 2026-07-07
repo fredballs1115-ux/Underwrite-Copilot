@@ -8,6 +8,7 @@ import { uploadOmPdf, removeStorageFiles } from "@/lib/storage";
 import { getBilling } from "@/lib/billing";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { jobInFlight, claimJob, releaseClaim } from "@/lib/jobs";
+import { parseStructuredAddress } from "@/lib/address";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 
@@ -73,6 +74,24 @@ export async function createDeal(formData: FormData) {
 
   const dealId = deal.id as string;
   const path = `${user.id}/${dealId}.pdf`;
+
+  // Optional property address from the autocomplete: the structured pick
+  // when the user selected a suggestion, else the raw text as a bare label.
+  // Best-effort separate update so a pre-0011 schema can't sink the create.
+  const structured = parseStructuredAddress(formData.get("address"));
+  const rawText = String(formData.get("addressText") ?? "").trim().slice(0, 160);
+  const address =
+    structured ??
+    (rawText
+      ? { label: rawText, street: "", city: "", state: "", zip: "", county: "", submarket: "" }
+      : null);
+  if (address) {
+    try {
+      await supabase.from("deals").update({ address }).eq("id", dealId);
+    } catch {
+      // pre-0011 schema — the deal still works without the address column
+    }
+  }
 
   // If the upload or the follow-up writes fail, remove the half-created deal —
   // otherwise the user is stranded with a ghost row that eats a free slot.
