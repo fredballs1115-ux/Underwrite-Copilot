@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type {
   ExtractionResult,
@@ -10,6 +11,8 @@ import type {
   MarketResult,
   VerdictResult,
 } from "@/lib/anthropic/types";
+import type { BuyBoxCheck } from "@/lib/criteria";
+import type { ScreenDiff } from "@/lib/screen-diff";
 import {
   OverviewView,
   TermsView,
@@ -26,6 +29,8 @@ import {
   type TabSupplement,
 } from "./deal-sections";
 import { ModelView } from "./model-view";
+import { SinceLastScreen } from "./since-last-screen";
+import { ReplaceOm } from "./replace-om";
 import { useToast } from "../../toaster";
 import type { UnderwritingModel } from "@/lib/model/types";
 import type { DealDocument } from "@/lib/documents";
@@ -49,33 +54,54 @@ type Results = {
   verdict: VerdictResult | null;
 };
 
-type TabKey =
+/*
+  Information hierarchy: five top-level sections, ONE visible at a time.
+  Inside Analyses, the five analysis views sit behind a secondary pill nav
+  in the order an acquisitions analyst checks them — the verdict first,
+  then the critique that produced it.
+*/
+type SectionKey =
   | "overview"
-  | "terms"
-  | "challenger"
-  | "comps"
-  | "reconciler"
-  | "market"
-  | "verdict"
-  | "model";
+  | "financials"
+  | "buybox"
+  | "analyses"
+  | "documents";
+type AnalysisKey = "verdict" | "challenger" | "comps" | "market" | "reconciler";
 
-const TABS: {
-  key: TabKey;
-  label: string;
-  step: string;
-  result: keyof Results | null;
-}[] = [
-  { key: "overview", label: "Overview", step: "", result: null },
-  { key: "terms", label: "Terms", step: "extract", result: "extraction" },
-  { key: "challenger", label: "Challenger", step: "challenge", result: "challenges" },
-  { key: "comps", label: "Comps", step: "comps", result: "comps" },
-  { key: "reconciler", label: "Reconciler", step: "reconcile", result: "reconciliation" },
-  { key: "market", label: "Market", step: "market", result: "market" },
-  { key: "verdict", label: "Verdict", step: "verdict", result: "verdict" },
-  { key: "model", label: "Model", step: "model", result: null },
+const SECTIONS: { key: SectionKey; label: string }[] = [
+  { key: "overview", label: "Overview" },
+  { key: "financials", label: "Financials" },
+  { key: "buybox", label: "Buy Box Screen" },
+  { key: "analyses", label: "Analyses" },
+  { key: "documents", label: "Documents" },
 ];
 
-// The automatic pass, in order — drives the progress rail and pending/done logic.
+const ANALYSES: { key: AnalysisKey; label: string; result: keyof Results }[] = [
+  { key: "verdict", label: "Verdict", result: "verdict" },
+  { key: "challenger", label: "Challenger", result: "challenges" },
+  { key: "comps", label: "Comps", result: "comps" },
+  { key: "market", label: "Market", result: "market" },
+  { key: "reconciler", label: "Reconciler", result: "reconciliation" },
+];
+
+/** Old ?tab= values (bookmarks, memo links, OverviewView jump links) map
+ *  onto the new section structure instead of 404-ing to Overview. */
+const LEGACY_TABS: Record<string, { section: SectionKey; analysis?: AnalysisKey }> = {
+  overview: { section: "overview" },
+  terms: { section: "financials" },
+  model: { section: "financials" },
+  financials: { section: "financials" },
+  buybox: { section: "buybox" },
+  analyses: { section: "analyses" },
+  verdict: { section: "analyses", analysis: "verdict" },
+  challenger: { section: "analyses", analysis: "challenger" },
+  comps: { section: "analyses", analysis: "comps" },
+  market: { section: "analyses", analysis: "market" },
+  reconciler: { section: "analyses", analysis: "reconciler" },
+  documents: { section: "documents" },
+};
+
+// The automatic pass, in order — drives the progress rail and pending logic.
 const PIPELINE = ["signal", "extract", "challenge", "comps", "market", "verdict"];
 
 const STEP_LABELS: Record<string, string> = {
@@ -124,10 +150,28 @@ function completionMessage(step: string | null): string {
   }
 }
 
+/** Which analyses/steps light which section while a run is in flight. */
+const SECTION_STEPS: Record<SectionKey, string[]> = {
+  overview: ["signal"],
+  financials: ["extract", "model"],
+  buybox: [],
+  analyses: ["challenge", "comps", "market", "verdict", "reconcile", "comps_search"],
+  documents: [],
+};
+
+export interface BuyBoxPanelData {
+  checks: BuyBoxCheck[];
+  scope: "team" | "personal";
+  /** the checks came from the first signal, not the full extraction yet */
+  provisional: boolean;
+  hasBox: boolean;
+}
+
 export function DealView({
   dealId,
   dealName,
   initialTab,
+  initialAnalysis,
   hasOm,
   modelErrorCode,
   job: initialJob,
@@ -137,10 +181,14 @@ export function DealView({
   documents,
   compSearch,
   isPro,
+  buyBox,
+  screenDiff,
+  omUrl,
 }: {
   dealId: string;
   dealName: string;
   initialTab: string | null;
+  initialAnalysis: string | null;
   hasOm: boolean;
   modelErrorCode: string | null;
   job: Job;
@@ -150,6 +198,9 @@ export function DealView({
   documents: DealDocument[];
   compSearch: CompSearchResult | null;
   isPro: boolean;
+  buyBox: BuyBoxPanelData;
+  screenDiff: ScreenDiff | null;
+  omUrl: string | null;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -216,95 +267,133 @@ export function DealView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dealId, active]);
 
-  // Default tab: an explicit ?tab wins; otherwise the verdict if it's ready,
-  // else the first tab (which fills in first as analysis runs).
-  const validInitial = TABS.find((t) => t.key === initialTab)?.key;
-  const [activeTab, setActiveTab] = useState<TabKey>(validInitial ?? "overview");
+  // Initial selection: an explicit ?tab wins (legacy values map onto the new
+  // sections), else Overview.
+  const initial = initialTab ? LEGACY_TABS[initialTab] : undefined;
+  const [section, setSection] = useState<SectionKey>(
+    initial?.section ?? "overview",
+  );
+  const [analysis, setAnalysis] = useState<AnalysisKey>(
+    (initialAnalysis && ANALYSES.some((a) => a.key === initialAnalysis)
+      ? (initialAnalysis as AnalysisKey)
+      : undefined) ??
+      initial?.analysis ??
+      (results.verdict ? "verdict" : "challenger"),
+  );
 
-  function selectTab(key: TabKey) {
-    setActiveTab(key);
-    // Reflect the tab in the URL (shareable / back-button) without a server
-    // round-trip, so switching stays instant.
+  function syncUrl(nextSection: SectionKey, nextAnalysis?: AnalysisKey) {
+    // Reflect the selection in the URL (shareable / back-button) without a
+    // server round-trip, so switching stays instant.
     const url = new URL(window.location.href);
-    url.searchParams.set("tab", key);
+    url.searchParams.set("tab", nextSection);
+    if (nextSection === "analyses") {
+      url.searchParams.set("a", nextAnalysis ?? analysis);
+    } else {
+      url.searchParams.delete("a");
+    }
     window.history.replaceState(null, "", url);
   }
 
-  function tabState(
-    t: (typeof TABS)[number],
+  function selectSection(key: SectionKey) {
+    setSection(key);
+    syncUrl(key);
+  }
+  function selectAnalysis(key: AnalysisKey) {
+    setAnalysis(key);
+    setSection("analyses");
+    syncUrl("analyses", key);
+  }
+
+  /** Jump links from Overview still use the old keys — map and go. */
+  function navigateLegacy(key: string) {
+    const target = LEGACY_TABS[key];
+    if (!target) return;
+    if (target.analysis) selectAnalysis(target.analysis);
+    else selectSection(target.section);
+  }
+
+  function sectionState(
+    key: SectionKey,
   ): "done" | "running" | "pending" | "idle" {
-    if (t.key === "overview") {
-      if (results.verdict || results.extraction) return "done";
-      return active ? "running" : "idle";
+    const steps = SECTION_STEPS[key];
+    if (active && job?.step && steps.includes(job.step)) return "running";
+    switch (key) {
+      case "overview":
+        return results.verdict || results.extraction
+          ? "done"
+          : active
+            ? "running"
+            : "idle";
+      case "financials":
+        if (results.extraction) return "done";
+        break;
+      case "analyses":
+        if (
+          results.verdict ||
+          results.challenges ||
+          results.comps ||
+          results.market
+        )
+          return "done";
+        break;
+      case "buybox":
+        return buyBox.hasBox && buyBox.checks.length ? "done" : "idle";
+      case "documents":
+        return "idle";
     }
-    if (t.key === "model") {
-      if (model) return "done";
-      if (active && job?.step === "model") return "running";
-      return "idle";
-    }
-    if (t.result && results[t.result] != null) return "done";
-    if (active) {
-      if (job?.step === t.step) return "running";
+    if (active && steps.length) {
       const cur = PIPELINE.indexOf(job?.step ?? "");
-      const mine = PIPELINE.indexOf(t.step);
-      if (mine >= 0 && (cur < 0 || mine > cur)) return "pending";
+      const first = PIPELINE.indexOf(steps[0]);
+      if (first >= 0 && (cur < 0 || first > cur)) return "pending";
     }
     return "idle";
   }
 
-  const activeDef = TABS.find((t) => t.key === activeTab)!;
-  const activeHasData = activeDef.result
-    ? results[activeDef.result] != null
-    : true;
-
-  // How many findings each tab holds — so a finished run still shows where
-  // the problems live without opening every tab.
-  function tabCount(key: TabKey): number {
-    switch (key) {
-      case "challenger":
-        return (
-          results.challenges?.challenges.filter((c) => c.severity === "high")
-            .length ?? 0
-        );
-      case "comps": {
-        const c = results.comps;
-        if (!c) return 0;
-        return (
-          c.redFlags.length +
-          [...c.saleComps, ...c.leaseComps].filter(
-            (x) => x.support === "stretched",
-          ).length
-        );
-      }
-      case "market":
-        return (
-          results.market?.checks.filter((c) => c.assessment === "aggressive")
-            .length ?? 0
-        );
-      case "reconciler":
-        return (
-          results.reconciliation?.rows.filter(
-            (r) => r.direction === "unfavorable",
-          ).length ?? 0
-        );
-      default:
-        return 0;
-    }
-  }
+  // Finding counts, so a finished run shows where the problems live without
+  // opening every section.
+  const analysisCounts: Record<AnalysisKey, number> = {
+    verdict: 0,
+    challenger:
+      results.challenges?.challenges.filter((c) => c.severity === "high")
+        .length ?? 0,
+    comps: results.comps
+      ? results.comps.redFlags.length +
+        [...results.comps.saleComps, ...results.comps.leaseComps].filter(
+          (x) => x.support === "stretched",
+        ).length
+      : 0,
+    market:
+      results.market?.checks.filter((c) => c.assessment === "aggressive")
+        .length ?? 0,
+    reconciler:
+      results.reconciliation?.rows.filter((r) => r.direction === "unfavorable")
+        .length ?? 0,
+  };
+  const sectionCounts: Record<SectionKey, number> = {
+    overview: 0,
+    financials: 0,
+    buybox: buyBox.checks.filter((c) => c.status === "miss").length,
+    analyses:
+      analysisCounts.challenger +
+      analysisCounts.comps +
+      analysisCounts.market +
+      analysisCounts.reconciler,
+    documents: 0,
+  };
 
   // Arrow-key navigation across the tablist (standard tabs pattern).
   function onTabKeyDown(e: React.KeyboardEvent) {
-    const idx = TABS.findIndex((t) => t.key === activeTab);
+    const idx = SECTIONS.findIndex((t) => t.key === section);
     let next = -1;
-    if (e.key === "ArrowRight") next = (idx + 1) % TABS.length;
-    else if (e.key === "ArrowLeft") next = (idx - 1 + TABS.length) % TABS.length;
+    if (e.key === "ArrowRight") next = (idx + 1) % SECTIONS.length;
+    else if (e.key === "ArrowLeft")
+      next = (idx - 1 + SECTIONS.length) % SECTIONS.length;
     else if (e.key === "Home") next = 0;
-    else if (e.key === "End") next = TABS.length - 1;
+    else if (e.key === "End") next = SECTIONS.length - 1;
     if (next >= 0) {
       e.preventDefault();
-      selectTab(TABS[next].key);
-      const el = document.getElementById(`tab-${TABS[next].key}`);
-      el?.focus();
+      selectSection(SECTIONS[next].key);
+      document.getElementById(`tab-${SECTIONS[next].key}`)?.focus();
     }
   }
 
@@ -336,19 +425,18 @@ export function DealView({
         </div>
       )}
 
-      {/* Tab bar — on mobile the strip scrolls; the right-edge fade plus
-          trailing padding signal there's more without hiding the last tab. */}
-      <div className="overflow-x-auto max-md:[mask-image:linear-gradient(90deg,#000_calc(100%-1.75rem),transparent)]">
+      {/* Section bar — one section visible at a time. */}
+      <div className="overflow-x-auto max-md:[mask-image:linear-gradient(90deg,#000_calc(100%_-_1.75rem),transparent)]">
         <div
           role="tablist"
-          aria-label="Deal analysis sections"
+          aria-label="Deal sections"
           onKeyDown={onTabKeyDown}
           className="flex min-w-max gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm max-md:mr-8"
         >
-          {TABS.map((t) => {
-            const state = tabState(t);
-            const isActiveTab = t.key === activeTab;
-            const count = tabCount(t.key);
+          {SECTIONS.map((t) => {
+            const state = sectionState(t.key);
+            const isActiveTab = t.key === section;
+            const count = sectionCounts[t.key];
             return (
               <button
                 key={t.key}
@@ -358,7 +446,7 @@ export function DealView({
                 aria-selected={isActiveTab}
                 aria-controls="deal-tabpanel"
                 tabIndex={isActiveTab ? 0 : -1}
-                onClick={() => selectTab(t.key)}
+                onClick={() => selectSection(t.key)}
                 className={`relative flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
                   isActiveTab
                     ? "bg-brand text-white shadow-sm"
@@ -383,33 +471,518 @@ export function DealView({
         </div>
       </div>
 
-      {/* Active tab content — re-keyed so it eases in on switch and on data arrival */}
+      {/* Active section — re-keyed so it eases in on switch */}
       <div
-        key={`${activeTab}-${activeHasData}`}
+        key={section}
         id="deal-tabpanel"
         role="tabpanel"
-        aria-labelledby={`tab-${activeTab}`}
+        aria-labelledby={`tab-${section}`}
         className="animate-rise"
       >
-        <TabPanel
-          tab={activeTab}
-          state={tabState(activeDef)}
-          results={results}
+        {section === "overview" && (
+          <div className="flex flex-col gap-6">
+            {screenDiff && <SinceLastScreen diff={screenDiff} />}
+            <OverviewView
+              results={results}
+              active={active}
+              onNavigate={navigateLegacy}
+            />
+          </div>
+        )}
+
+        {section === "financials" && (
+          <FinancialsPanel
+            results={results}
+            active={active}
+            step={job?.step ?? null}
+            hasOm={hasOm}
+            dealId={dealId}
+            model={model}
+            documents={documents}
+            isPro={isPro}
+            supplement={supplements["terms"]}
+          />
+        )}
+
+        {section === "buybox" && <BuyBoxPanel data={buyBox} />}
+
+        {section === "analyses" && (
+          <AnalysesPanel
+            analysis={analysis}
+            onSelect={selectAnalysis}
+            counts={analysisCounts}
+            results={results}
+            active={active}
+            step={job?.step ?? null}
+            dealId={dealId}
+            dealName={dealName}
+            hasOm={hasOm}
+            compSearch={compSearch}
+            isPro={isPro}
+            modelError={modelErrorCode ? MODEL_ERRORS[modelErrorCode] ?? null : null}
+            supplements={supplements}
+          />
+        )}
+
+        {section === "documents" && (
+          <DocumentsPanel
+            dealId={dealId}
+            hasOm={hasOm}
+            omUrl={omUrl}
+            canMemo={isPro && !!results.verdict}
+            hasVerdict={!!results.verdict}
+            documents={documents}
+            supplements={supplements}
+            active={active}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Section panels                                                      */
+/* ------------------------------------------------------------------ */
+
+/** Financials: the extracted terms first; the Excel model workflow lives in a
+ *  collapsed block below — supporting detail, one click away. */
+function FinancialsPanel({
+  results,
+  active,
+  step,
+  hasOm,
+  dealId,
+  model,
+  documents,
+  isPro,
+  supplement,
+}: {
+  results: Results;
+  active: boolean;
+  step: string | null;
+  hasOm: boolean;
+  dealId: string;
+  model: UnderwritingModel | null;
+  documents: DealDocument[];
+  isPro: boolean;
+  supplement: TabSupplement | undefined;
+}) {
+  return (
+    <div className="flex flex-col gap-6">
+      {results.extraction ? (
+        <TermsView result={results.extraction} />
+      ) : active && (step === "extract" || step === "signal") ? (
+        <StatGridSkeleton />
+      ) : hasOm ? (
+        <EmptyState
+          title="Analysis hasn’t run for this deal yet."
+          action={<RetryForm dealId={dealId} label="Run analysis" />}
+        />
+      ) : (
+        <EmptyState title="No OM uploaded for this deal." />
+      )}
+
+      <details
+        className="rounded-2xl border border-line bg-surface shadow-card"
+        open={!!model}
+      >
+        <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold tracking-tight [&::-webkit-details-marker]:hidden">
+          <span className="flex items-center justify-between gap-2">
+            Excel model {model ? "— ready" : ""}
+            <span className="text-xs font-normal text-muted">
+              {model ? "download or regenerate" : "generate from your documents"}
+            </span>
+          </span>
+        </summary>
+        <div className="border-t border-line p-5">
+          <ModelView
+            dealId={dealId}
+            model={model}
+            documents={documents}
+            active={active}
+            isPro={isPro}
+          />
+        </div>
+      </details>
+
+      {supplement && <Supplements dealId={dealId} tab="terms" data={supplement} />}
+      <AddData dealId={dealId} tab="terms" />
+    </div>
+  );
+}
+
+/** The mandate check, full detail — the bar carries only the chip. */
+function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
+  if (!data.hasBox) {
+    return (
+      <EmptyState
+        title="No buy box set yet."
+        action={
+          <Link
+            href="/criteria"
+            className="mt-3 inline-flex rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+          >
+            Set your buy box
+          </Link>
+        }
+      />
+    );
+  }
+  if (!data.checks.length) {
+    return (
+      <EmptyState title="The screen hasn’t produced anything to check against your mandate yet." />
+    );
+  }
+  return (
+    <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold tracking-tight">
+            The deal against your mandate
+          </h2>
+          <span className="rounded-full bg-faint px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
+            {data.scope === "team" ? "Team" : "Personal"}
+          </span>
+          {data.provisional && (
+            <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand">
+              First read
+            </span>
+          )}
+        </div>
+        <Link
+          href="/criteria"
+          className="text-xs font-medium text-brand transition-colors hover:text-brand-strong"
+        >
+          Edit criteria →
+        </Link>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {data.checks.map((c) => (
+          <div
+            key={c.label}
+            className={`rounded-lg border p-3 ${
+              c.status === "miss"
+                ? "border-kill/25 bg-kill/[0.04]"
+                : c.status === "near"
+                  ? "border-caution/30 bg-caution/[0.05]"
+                  : c.status === "pass"
+                    ? "border-line bg-surface"
+                    : "border-line bg-faint"
+            }`}
+          >
+            <p className="flex items-center gap-1.5 text-xs font-medium">
+              <span
+                aria-hidden
+                className={
+                  c.status === "miss"
+                    ? "text-kill"
+                    : c.status === "near"
+                      ? "text-caution"
+                      : c.status === "pass"
+                        ? "text-pass"
+                        : "text-muted"
+                }
+              >
+                {c.status === "miss"
+                  ? "✕"
+                  : c.status === "near"
+                    ? "≈"
+                    : c.status === "pass"
+                      ? "✓"
+                      : "—"}
+              </span>
+              {c.label}
+              {c.status === "near" && (
+                <span className="rounded-full bg-caution/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-caution">
+                  Near-miss
+                </span>
+              )}
+              <span className="sr-only">
+                {c.status === "miss"
+                  ? "outside the mandate"
+                  : c.status === "near"
+                    ? "a near-miss against the mandate"
+                    : c.status === "pass"
+                      ? "inside the mandate"
+                      : "not determinable yet"}
+              </span>
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">{c.detail}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** Analyses: secondary pill nav over the five analysis views — verdict first,
+ *  then the critique behind it. One at a time here too. */
+function AnalysesPanel({
+  analysis,
+  onSelect,
+  counts,
+  results,
+  active,
+  step,
+  dealId,
+  dealName,
+  hasOm,
+  compSearch,
+  isPro,
+  modelError,
+  supplements,
+}: {
+  analysis: AnalysisKey;
+  onSelect: (key: AnalysisKey) => void;
+  counts: Record<AnalysisKey, number>;
+  results: Results;
+  active: boolean;
+  step: string | null;
+  dealId: string;
+  dealName: string;
+  hasOm: boolean;
+  compSearch: CompSearchResult | null;
+  isPro: boolean;
+  modelError: string | null;
+  supplements: SupplementsMap;
+}) {
+  const STEP_FOR: Record<AnalysisKey, string> = {
+    verdict: "verdict",
+    challenger: "challenge",
+    comps: "comps",
+    market: "market",
+    reconciler: "reconcile",
+  };
+
+  const def = ANALYSES.find((a) => a.key === analysis)!;
+  const data = results[def.result];
+  const running = active && step === STEP_FOR[analysis];
+  const pending =
+    active &&
+    !data &&
+    !running &&
+    PIPELINE.indexOf(STEP_FOR[analysis]) > PIPELINE.indexOf(step ?? "");
+
+  const supp = supplements[analysis];
+  const footer = (
+    <>
+      {supp && <Supplements dealId={dealId} tab={analysis} data={supp} />}
+      <AddData dealId={dealId} tab={analysis} />
+    </>
+  );
+
+  let content: React.ReactNode;
+  if (analysis === "reconciler") {
+    const reconciling = running;
+    content = (
+      <>
+        {results.reconciliation && (
+          <Reconciliation result={results.reconciliation} />
+        )}
+        {reconciling && !results.reconciliation && <TableSkeleton />}
+        {hasOm && !reconciling && (
+          <ReconcileSection
+            dealId={dealId}
+            hasResult={!!results.reconciliation}
+            error={modelError}
+            disabled={active}
+          />
+        )}
+      </>
+    );
+  } else if (data) {
+    content =
+      analysis === "verdict" ? (
+        <VerdictView result={results.verdict!} />
+      ) : analysis === "challenger" ? (
+        <ChallengerView result={results.challenges!} dealName={dealName} />
+      ) : analysis === "comps" ? (
+        <BrokerComps
+          result={results.comps!}
           dealId={dealId}
-          dealName={dealName}
-          hasOm={hasOm}
-          active={active}
-          onNavigate={(t) => selectTab(t as TabKey)}
-          modelError={
-            modelErrorCode ? MODEL_ERRORS[modelErrorCode] ?? null : null
-          }
-          supplements={supplements}
-          model={model}
-          documents={documents}
           compSearch={compSearch}
+          active={active}
           isPro={isPro}
         />
+      ) : (
+        <MarketCheck result={results.market!} />
+      );
+  } else if (running || pending) {
+    content = analysis === "verdict" ? <VerdictSkeleton /> : <CardListSkeleton />;
+  } else if (hasOm) {
+    content = (
+      <EmptyState
+        title="Analysis hasn’t run for this deal yet."
+        action={<RetryForm dealId={dealId} label="Run analysis" />}
+      />
+    );
+  } else {
+    content = (
+      <EmptyState title="Nothing here from the OM yet — add your own below." />
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div
+        role="tablist"
+        aria-label="Analyses"
+        className="flex flex-wrap gap-1.5"
+      >
+        {ANALYSES.map((a) => {
+          const on = a.key === analysis;
+          const has = results[a.result] != null;
+          return (
+            <button
+              key={a.key}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={() => onSelect(a.key)}
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                on
+                  ? "border-brand bg-brand/10 text-brand"
+                  : has
+                    ? "border-line bg-surface text-ink hover:bg-faint"
+                    : "border-line bg-surface text-muted hover:bg-faint"
+              }`}
+            >
+              {a.label}
+              {counts[a.key] > 0 && (
+                <span className="rounded-full bg-kill/10 px-1.5 py-px font-mono text-[10px] tabular-nums text-kill">
+                  {counts[a.key]}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
+      <div key={analysis} className="animate-fade flex flex-col gap-6">
+        {content}
+        {footer}
+      </div>
+    </div>
+  );
+}
+
+/** Documents: the OM itself, the memo export, uploaded documents, and every
+ *  note/file added along the way — one home for all of it. */
+function DocumentsPanel({
+  dealId,
+  hasOm,
+  omUrl,
+  canMemo,
+  hasVerdict,
+  documents,
+  supplements,
+  active,
+}: {
+  dealId: string;
+  hasOm: boolean;
+  omUrl: string | null;
+  canMemo: boolean;
+  hasVerdict: boolean;
+  documents: DealDocument[];
+  supplements: SupplementsMap;
+  active: boolean;
+}) {
+  const KIND_LABEL: Record<string, string> = {
+    om: "Offering memorandum",
+    rent_roll: "Rent roll",
+    t12: "T-12",
+    financials: "Financials",
+    loan_terms: "Loan terms",
+    other: "Document",
+  };
+  const SUPP_LABEL: Record<string, string> = {
+    terms: "Financials",
+    challenger: "Challenger",
+    comps: "Comps",
+    reconciler: "Reconciler",
+    market: "Market",
+    verdict: "Verdict",
+    documents: "General",
+  };
+  const suppEntries = Object.entries(supplements).filter(
+    ([, s]) => s && ((s.notes?.length ?? 0) > 0 || (s.files?.length ?? 0) > 0),
+  );
+
+  return (
+    <div className="flex flex-col gap-6">
+      <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
+        <h2 className="text-sm font-semibold tracking-tight">Source documents</h2>
+        <ul className="mt-3 divide-y divide-line rounded-lg border border-line">
+          <li className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm">
+            <span className="min-w-0 flex-1 truncate font-medium">
+              Offering memorandum
+            </span>
+            {omUrl && (
+              <a
+                href={omUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Opens the uploaded OM (link valid for 1 hour)"
+                className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
+              >
+                View
+              </a>
+            )}
+            {hasOm && <ReplaceOm dealId={dealId} disabled={active} />}
+            {!hasOm && (
+              <span className="text-xs text-muted">none uploaded</span>
+            )}
+          </li>
+          {documents.map((d) => (
+            <li
+              key={d.id}
+              className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm"
+            >
+              <span className="min-w-0 flex-1 truncate">{d.filename}</span>
+              <span className="shrink-0 text-xs text-muted">
+                {KIND_LABEL[d.kind] ?? d.kind}
+              </span>
+            </li>
+          ))}
+        </ul>
+        {hasVerdict && (
+          <div className="mt-3">
+            {canMemo ? (
+              <a
+                href={`/api/deals/${dealId}/memo`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
+              >
+                Download the one-page memo (PDF)
+              </a>
+            ) : (
+              <Link
+                href="/billing"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-caution/30 bg-caution/5 px-3 py-1.5 text-xs font-medium text-caution transition-colors hover:bg-caution/10"
+              >
+                Upgrade for the PDF memo
+              </Link>
+            )}
+          </div>
+        )}
+      </section>
+
+      {suppEntries.length > 0 && (
+        <section className="flex flex-col gap-4">
+          <h2 className="text-sm font-semibold tracking-tight">
+            Your notes &amp; files
+          </h2>
+          {suppEntries.map(([key, s]) => (
+            <div key={key}>
+              <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
+                {SUPP_LABEL[key] ?? key}
+              </p>
+              <Supplements dealId={dealId} tab={key} data={s!} />
+            </div>
+          ))}
+        </section>
+      )}
+
+      <AddData dealId={dealId} tab="documents" />
     </div>
   );
 }
@@ -463,7 +1036,7 @@ function ProgressRail({ job }: { job: NonNullable<Job> }) {
   const elapsed = useElapsed();
 
   // Reconcile and model generation run on their own — a simple indicator, not
-  // the 5-step pipeline rail.
+  // the 6-step pipeline rail.
   if (
     job.step === "reconcile" ||
     job.step === "model" ||
@@ -553,151 +1126,8 @@ function Spinner() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Tab content router                                                  */
-/* ------------------------------------------------------------------ */
-
-function TabPanel({
-  tab,
-  state,
-  results,
-  dealId,
-  dealName,
-  hasOm,
-  active,
-  onNavigate,
-  modelError,
-  supplements,
-  model,
-  documents,
-  compSearch,
-  isPro,
-}: {
-  tab: TabKey;
-  state: "done" | "running" | "pending" | "idle";
-  results: Results;
-  dealId: string;
-  dealName: string;
-  hasOm: boolean;
-  active: boolean;
-  onNavigate: (tab: string) => void;
-  modelError: string | null;
-  supplements: SupplementsMap;
-  model: UnderwritingModel | null;
-  documents: DealDocument[];
-  compSearch: CompSearchResult | null;
-  isPro: boolean;
-}) {
-  if (tab === "overview") {
-    return (
-      <OverviewView results={results} active={active} onNavigate={onNavigate} />
-    );
-  }
-
-  if (tab === "model") {
-    return (
-      <ModelView
-        dealId={dealId}
-        model={model}
-        documents={documents}
-        active={active}
-        isPro={isPro}
-      />
-    );
-  }
-
-  // Every detail tab gets a place to add your own data (notes + uploads).
-  const tabSupp = supplements[tab];
-  const footer = (
-    <>
-      {tabSupp && <Supplements dealId={dealId} tab={tab} data={tabSupp} />}
-      <AddData dealId={dealId} tab={tab} />
-    </>
-  );
-
-  // The reconciler tab always offers the model upload, plus the result if
-  // present. Reconcile is NOT part of the automatic pipeline — only show its
-  // skeleton when a reconcile run is genuinely in flight, and keep the upload
-  // form visible (disabled) while other steps run.
-  if (tab === "reconciler") {
-    const reconciling = state === "running";
-    return (
-      <div className="flex flex-col gap-6">
-        {results.reconciliation && (
-          <Reconciliation result={results.reconciliation} />
-        )}
-        {reconciling && !results.reconciliation && <TableSkeleton />}
-        {hasOm && !reconciling && (
-          <ReconcileSection
-            dealId={dealId}
-            hasResult={!!results.reconciliation}
-            error={modelError}
-            disabled={active}
-          />
-        )}
-        {footer}
-      </div>
-    );
-  }
-
-  const def = TABS.find((t) => t.key === tab)!;
-  const data = def.result ? results[def.result] : null;
-
-  let content: React.ReactNode;
-  if (data) {
-    content =
-      tab === "terms" ? (
-        <TermsView result={results.extraction!} />
-      ) : tab === "challenger" ? (
-        <ChallengerView result={results.challenges!} dealName={dealName} />
-      ) : tab === "comps" ? (
-        <BrokerComps
-          result={results.comps!}
-          dealId={dealId}
-          compSearch={compSearch}
-          active={active}
-          isPro={isPro}
-        />
-      ) : tab === "market" ? (
-        <MarketCheck result={results.market!} />
-      ) : tab === "verdict" ? (
-        <VerdictView result={results.verdict!} />
-      ) : null;
-  } else if (state === "running" || state === "pending") {
-    content = <TabSkeleton tab={tab} />;
-  } else if (hasOm) {
-    // The OM exists but this step has no result — the fix is one click, not
-    // "add your own data".
-    content = (
-      <EmptyState
-        title="Analysis hasn’t run for this deal yet."
-        action={<RetryForm dealId={dealId} label="Run analysis" />}
-      />
-    );
-  } else if (tab === "terms") {
-    content = <EmptyState title="No OM uploaded for this deal." />;
-  } else {
-    content = (
-      <EmptyState title="Nothing here from the OM yet — add your own below." />
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-6">
-      {content}
-      {footer}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
 /* Skeletons                                                           */
 /* ------------------------------------------------------------------ */
-
-function TabSkeleton({ tab }: { tab: TabKey }) {
-  if (tab === "terms") return <StatGridSkeleton />;
-  if (tab === "verdict") return <VerdictSkeleton />;
-  return <CardListSkeleton />;
-}
 
 function StatGridSkeleton() {
   return (
@@ -744,49 +1174,26 @@ function TableSkeleton() {
 function VerdictSkeleton() {
   return (
     <div className="flex flex-col gap-5">
-    <div className="overflow-hidden rounded-2xl border border-line bg-surface">
-      <div className="p-6">
-        <div className="skeleton h-2.5 w-16 rounded" />
-        <div className="skeleton mt-3 h-8 w-40 rounded" />
-        <div className="skeleton mt-4 h-2.5 w-full max-w-xl rounded" />
-        <div className="skeleton mt-2 h-2.5 w-2/3 rounded" />
-      </div>
-      <div className="grid gap-px bg-line sm:grid-cols-2">
-        {[0, 1].map((i) => (
-          <div key={i} className="bg-surface p-5">
-            <div className="skeleton h-2.5 w-20 rounded" />
-            <div className="skeleton mt-3 h-2.5 w-full rounded" />
-            <div className="skeleton mt-2 h-2.5 w-5/6 rounded" />
+      <div className="overflow-hidden rounded-2xl border border-line bg-surface">
+        <div className="p-6">
+          <div className="skeleton h-2.5 w-16 rounded" />
+          <div className="mt-4 flex items-center gap-3">
+            <div className="skeleton h-11 w-11 rounded-full" />
+            <div className="skeleton h-7 w-40 rounded" />
           </div>
-        ))}
+          <div className="skeleton mt-5 h-2.5 w-full rounded" />
+          <div className="skeleton mt-2 h-2.5 w-3/4 rounded" />
+        </div>
+        <div className="grid gap-px bg-line sm:grid-cols-2">
+          {[0, 1].map((i) => (
+            <div key={i} className="bg-surface p-5">
+              <div className="skeleton h-2.5 w-20 rounded" />
+              <div className="skeleton mt-3 h-2.5 w-full rounded" />
+              <div className="skeleton mt-2 h-2.5 w-5/6 rounded" />
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
-    {/* The screen: range cards + deal-killers, so the final layout doesn't pop in */}
-    <div className="grid gap-3 sm:grid-cols-2">
-      {[0, 1].map((i) => (
-        <div key={i} className="rounded-xl border border-line bg-surface p-4">
-          <div className="skeleton h-3 w-32 rounded" />
-          <div className="mt-3 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-line bg-line">
-            {[0, 1, 2].map((j) => (
-              <div key={j} className="bg-surface px-3 py-2">
-                <div className="skeleton h-2 w-8 rounded" />
-                <div className="skeleton mt-1.5 h-3.5 w-12 rounded" />
-              </div>
-            ))}
-          </div>
-          <div className="skeleton mt-2.5 h-2 w-3/4 rounded" />
-        </div>
-      ))}
-    </div>
-    <div className="grid gap-3 sm:grid-cols-3">
-      {[0, 1, 2].map((i) => (
-        <div key={i} className="rounded-xl border border-line bg-surface p-4">
-          <div className="skeleton h-3 w-16 rounded" />
-          <div className="skeleton mt-2.5 h-2.5 w-full rounded" />
-          <div className="skeleton mt-2 h-2.5 w-5/6 rounded" />
-        </div>
-      ))}
-    </div>
     </div>
   );
 }

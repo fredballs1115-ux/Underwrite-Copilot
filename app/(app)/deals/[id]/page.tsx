@@ -18,9 +18,6 @@ import {
   type FirstSignal,
 } from "@/lib/anthropic/types";
 import { DealView } from "./deal-view";
-import { FirstReadCard } from "./first-read";
-import { SinceLastScreen } from "./since-last-screen";
-import { ReplaceOm } from "./replace-om";
 import { DealActions } from "./deal-actions";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import { StageSelect } from "./stage-select";
@@ -33,29 +30,17 @@ const VERDICT_PILL = {
   pass_on: { label: "No-go", cls: "bg-kill/15 text-kill" },
 } as const;
 
-// Headline figures for the persistent deal header. Prefer the deal-defining
-// metrics; fall back to the first few so the strip is never empty.
-function pickKeyStats(metrics: ExtractedMetric[]): ExtractedMetric[] {
-  const priority = [
-    /going[- ]?in cap/i,
-    /pro ?forma cap/i,
-    /exit cap/i,
-    /\bprice\b/i,
-    /\bnoi\b/i,
-    /\birr\b/i,
-    /occupancy/i,
-  ];
-  const chosen: ExtractedMetric[] = [];
-  for (const re of priority) {
-    const m = metrics.find((x) => re.test(x.label) && !chosen.includes(x));
-    if (m) chosen.push(m);
-    if (chosen.length >= 4) break;
-  }
-  for (const m of metrics) {
-    if (chosen.length >= 4) break;
-    if (!chosen.includes(m)) chosen.push(m);
-  }
-  return chosen.slice(0, 4);
+/** First metric matching the pattern — for the three summary-bar figures. */
+function findValue(
+  metrics: ExtractedMetric[],
+  include: RegExp,
+  exclude?: RegExp,
+): string | null {
+  return (
+    metrics.find(
+      (m) => include.test(m.label) && !(exclude && exclude.test(m.label)),
+    )?.value ?? null
+  );
 }
 
 export default async function DealPage({
@@ -63,10 +48,10 @@ export default async function DealPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; tab?: string }>;
+  searchParams: Promise<{ error?: string; tab?: string; a?: string }>;
 }) {
   const { id } = await params;
-  const { error: errorCode, tab } = await searchParams;
+  const { error: errorCode, tab, a: analysisParam } = await searchParams;
 
   const supabase = await createSupabaseServerClient();
   const {
@@ -129,7 +114,6 @@ export default async function DealPage({
     error: string | null;
   } | null;
 
-  const keyStats = extraction ? pickKeyStats(extraction.metrics) : [];
   const pill = verdict ? VERDICT_PILL[verdict.verdict] : null;
 
   // Retrade watch: once a RE-screen finishes, diff it against the snapshot the
@@ -223,6 +207,45 @@ export default async function DealPage({
     ? evaluateBuyBox(deal.asset_class, checkSource, buyBox)
     : [];
 
+  // The three summary-bar figures — a 5-second read, nothing more. The full
+  // metric set lives one click away in Financials.
+  const metrics = extraction?.metrics ?? [];
+  const summaryPrice =
+    findValue(metrics, /purchase price|asking price|\bprice\b/i, /unit|\/sf|per sf|per unit|psf/i) ??
+    (firstSignal?.askPrice.trim() || null);
+  const summarySize =
+    findValue(
+      metrics,
+      /\b(total sf|square (foot|feet|footage)|sq\.? ?ft|rentable|nra|gla|building size|\bsf\b)/i,
+      /price|\$|per|\/|psf/i,
+    ) ??
+    findValue(metrics, /\bunits?\b|unit count/i, /price|\$|per|\//i) ??
+    (firstSignal?.size.trim() || null);
+  const summaryCap =
+    findValue(metrics, /going[- ]?in cap/i) ??
+    findValue(metrics, /\bcap rate\b/i, /exit|terminal|reversion/i) ??
+    (firstSignal?.goingInCap.trim() || null);
+
+  // The buy-box verdict as one chip: any hard miss → Outside; else near
+  // misses → Near; else all pass → Fits; else unverified.
+  const buyBoxChip = !buyBox
+    ? null
+    : buyBoxChecks.some((c) => c.status === "miss")
+      ? { label: "Outside buy box", cls: "bg-kill/10 text-kill" }
+      : buyBoxChecks.some((c) => c.status === "near")
+        ? { label: "Near buy box", cls: "bg-caution/10 text-caution" }
+        : buyBoxChecks.length > 0 &&
+            buyBoxChecks.every((c) => c.status === "pass")
+          ? { label: "Fits buy box", cls: "bg-pass/10 text-pass" }
+          : { label: "Buy box unverified", cls: "bg-faint text-muted" };
+
+  const addressLine =
+    extraction?.address ||
+    dealAddress?.label ||
+    extraction?.market ||
+    firstSignal?.market ||
+    null;
+
   return (
     <div className="flex flex-col gap-6">
       <Link
@@ -232,35 +255,34 @@ export default async function DealPage({
         ← All deals
       </Link>
 
-      {/* Persistent deal header — the anchor that stays put across tabs. */}
-      <header className="shadow-card rounded-2xl border border-line bg-surface p-6">
-        <div className="flex items-start justify-between gap-4">
+      {/* THE summary bar — the deal in five seconds, no scrolling:
+          name, verdict, buy-box call, address, asset type, and exactly
+          three figures. Everything else is one click below. */}
+      <header className="shadow-card rounded-2xl border border-line bg-surface px-6 py-5">
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
           <div className="min-w-0">
-            {/* The verdict lives with the title — it's the headline, not an action. */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="text-2xl font-semibold tracking-tight">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl font-semibold tracking-tight">
                 {deal.name}
               </h1>
               {pill && (
                 <span
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ${pill.cls}`}
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${pill.cls}`}
                 >
                   {pill.label}
                 </span>
               )}
+              {buyBoxChip && (
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${buyBoxChip.cls}`}
+                >
+                  {buyBoxChip.label}
+                </span>
+              )}
             </div>
-            <p className="mt-0.5 text-sm text-muted">
+            <p className="mt-0.5 truncate text-sm text-muted">
+              {addressLine ? <>{addressLine} · </> : null}
               <span className="capitalize">{deal.asset_class}</span>
-              {extraction?.market ? (
-                <> · {extraction.market}</>
-              ) : firstSignal?.market ? (
-                <> · {firstSignal.market}</>
-              ) : null}
-              {extraction?.address ? (
-                <> · {extraction.address}</>
-              ) : dealAddress?.label ? (
-                <> · {dealAddress.label}</>
-              ) : null}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -273,216 +295,37 @@ export default async function DealPage({
           </div>
         </div>
 
-        {/* One horizontal action row instead of a stacked right rail. */}
-        {(omUrl || verdict || deal.om_storage_path) && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {omUrl && (
-              <a
-                href={omUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Open the offering memorandum you uploaded (link valid for 1 hour)"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-3.5 w-3.5"
-                  aria-hidden
-                >
-                  <path d="M14 3h7v7" />
-                  <path d="M10 14 21 3" />
-                  <path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" />
-                </svg>
-                View OM
-              </a>
-            )}
-            {verdict &&
-              (pro ? (
-                <a
-                  href={`/api/deals/${id}/memo`}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-3.5 w-3.5"
-                    aria-hidden
-                  >
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <path d="m7 10 5 5 5-5" />
-                    <path d="M12 15V3" />
-                  </svg>
-                  Download memo
-                </a>
-              ) : (
-                <Link
-                  href="/billing"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-caution/30 bg-caution/5 px-3 py-1.5 text-xs font-medium text-caution transition-colors hover:bg-caution/10"
-                >
-                  Upgrade for PDF memo
-                </Link>
-              ))}
-            {deal.om_storage_path && (
-              <ReplaceOm dealId={id} disabled={jobActive} />
-            )}
-          </div>
-        )}
+        <dl className="mt-4 flex flex-wrap gap-x-10 gap-y-2">
+          {(
+            [
+              ["Price", summaryPrice],
+              ["Size", summarySize],
+              ["Going-in cap", summaryCap],
+            ] as const
+          ).map(([label, value]) => (
+            <div key={label}>
+              <dt className="text-[11px] uppercase tracking-wide text-muted">
+                {label}
+              </dt>
+              <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums">
+                {value ?? "—"}
+              </dd>
+            </div>
+          ))}
+        </dl>
 
-        {keyStats.length > 0 && (
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {keyStats.map((m, i) => (
-              <div
-                key={i}
-                className="rounded-lg border border-line bg-faint px-3 py-2"
-              >
-                <p className="flex items-center gap-1 text-[11px] text-muted">
-                  <span className="truncate">{m.label}</span>
-                  {m.flagged && <span className="shrink-0 text-caution">⚑</span>}
-                </p>
-                <p className="mt-0.5 font-mono text-sm font-medium tabular-nums">
-                  {m.value}
-                </p>
-              </div>
-            ))}
-          </div>
+        {!extraction && firstSignal?.take && (
+          <p className="mt-3 border-t border-line pt-3 text-sm leading-relaxed text-muted">
+            {firstSignal.take}
+          </p>
         )}
       </header>
-
-      {/* First read — the instant signal, until the full extraction lands. */}
-      {!extraction && firstSignal && <FirstReadCard signal={firstSignal} />}
-
-      {/* Retrade watch — what moved since the previous screen of this deal. */}
-      {screenDiff && <SinceLastScreen diff={screenDiff} />}
-
-      {/* The buy box — this deal against YOUR standing criteria. When every
-          check passes it collapses to one quiet row; misses earn the card. */}
-      {buyBoxChecks.length > 0 &&
-      buyBoxChecks.every((c) => c.status === "pass") ? (
-        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 rounded-xl border border-pass/25 bg-pass/[0.04] px-4 py-2.5 text-sm">
-          <span aria-hidden className="font-bold text-pass">
-            ✓
-          </span>
-          <span className="font-medium">Fits your buy box</span>
-          <span className="text-xs text-muted">
-            {buyBoxChecks.map((c) => c.label).join(" · ")}
-          </span>
-          <Link
-            href="/criteria"
-            className="ml-auto text-xs font-medium text-brand transition-colors hover:text-brand-strong"
-          >
-            Edit criteria →
-          </Link>
-        </div>
-      ) : buyBoxChecks.length > 0 ? (
-        <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold tracking-tight">
-                Your buy box
-              </h2>
-              <span className="rounded-full bg-faint px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
-                {ownership.team_id ? "Team" : "Personal"}
-              </span>
-              {!extraction && firstSignal && (
-                <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand">
-                  First read
-                </span>
-              )}
-            </div>
-            <Link
-              href="/criteria"
-              className="text-xs font-medium text-brand transition-colors hover:text-brand-strong"
-            >
-              Edit criteria →
-            </Link>
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {buyBoxChecks.map((c) => (
-              <div
-                key={c.label}
-                className={`rounded-lg border p-2.5 ${
-                  c.status === "miss"
-                    ? "border-kill/25 bg-kill/[0.04]"
-                    : c.status === "near"
-                      ? "border-caution/30 bg-caution/[0.05]"
-                      : c.status === "pass"
-                        ? "border-line bg-surface"
-                        : "border-line bg-faint"
-                }`}
-              >
-                <p className="flex items-center gap-1.5 text-xs font-medium">
-                  <span
-                    aria-hidden
-                    className={
-                      c.status === "miss"
-                        ? "text-kill"
-                        : c.status === "near"
-                          ? "text-caution"
-                          : c.status === "pass"
-                            ? "text-pass"
-                            : "text-muted"
-                    }
-                  >
-                    {c.status === "miss"
-                      ? "✕"
-                      : c.status === "near"
-                        ? "≈"
-                        : c.status === "pass"
-                          ? "✓"
-                          : "—"}
-                  </span>
-                  {c.label}
-                  {c.status === "near" && (
-                    <span className="rounded-full bg-caution/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-caution">
-                      Near-miss
-                    </span>
-                  )}
-                  <span className="sr-only">
-                    {c.status === "miss"
-                      ? "outside the mandate"
-                      : c.status === "near"
-                        ? "a near-miss against the mandate"
-                        : c.status === "pass"
-                          ? "inside the mandate"
-                          : "not determinable yet"}
-                  </span>
-                </p>
-                <p className="mt-1 text-[11px] leading-relaxed text-muted">
-                  {c.detail}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : (
-        !buyBox && (
-          <p className="text-xs text-muted">
-            Tip: set your{" "}
-            <Link
-              href="/criteria"
-              className="font-medium text-brand hover:text-brand-strong"
-            >
-              buy box
-            </Link>{" "}
-            and every screen gets checked against your own criteria
-            automatically.
-          </p>
-        )
-      )}
 
       <DealView
         dealId={id}
         dealName={deal.name}
         initialTab={tab ?? null}
+        initialAnalysis={analysisParam ?? null}
         hasOm={!!deal.om_storage_path}
         modelErrorCode={errorCode ?? null}
         job={job}
@@ -492,6 +335,14 @@ export default async function DealPage({
         documents={documents}
         compSearch={compSearch}
         isPro={pro}
+        buyBox={{
+          checks: buyBoxChecks,
+          scope: ownership.team_id ? "team" : "personal",
+          provisional: !extraction && !!firstSignal,
+          hasBox: !!buyBox,
+        }}
+        screenDiff={screenDiff}
+        omUrl={omUrl}
       />
     </div>
   );
