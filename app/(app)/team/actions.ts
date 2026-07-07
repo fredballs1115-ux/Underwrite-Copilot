@@ -7,6 +7,11 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe/client";
 import { getTeam } from "@/lib/teams";
 import { syncTeamSeats } from "@/lib/stripe/seats";
+import {
+  teamCheckoutLineItems,
+  proToTeamItems,
+  teamToProItems,
+} from "@/lib/stripe/team-billing";
 
 function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -149,7 +154,17 @@ export async function leaveTeam() {
   redirect("/deals");
 }
 
-/** Start Stripe Checkout for the per-seat Team plan (owner only). */
+/**
+ * Start the Team plan (owner only). Two paths:
+ *
+ *  · The owner already pays for personal Pro → UPDATE that subscription in
+ *    place: drop the Pro item, add the Team base + per-seat items, Stripe
+ *    prorates. Never cancel-and-recreate — that breaks billing history and
+ *    risks double-charging. No second checkout.
+ *  · Otherwise → Stripe Checkout for ONE subscription with two items: the
+ *    Team base (covers the owner) and the per-seat price with quantity =
+ *    added members.
+ */
 export async function startTeamCheckout() {
   const supabase = await createSupabaseServerClient();
   const {
@@ -160,8 +175,9 @@ export async function startTeamCheckout() {
   const team = await getTeam(supabase, user.id);
   if (!team || team.role !== "owner") redirect("/team?error=owner");
 
-  const priceId = process.env.STRIPE_TEAM_PRICE_ID;
-  if (!priceId) redirect("/team?error=config");
+  const basePriceId = process.env.STRIPE_TEAM_PRICE_ID;
+  if (!basePriceId) redirect("/team?error=config");
+  const seatPriceId = process.env.STRIPE_TEAM_SEAT_PRICE_ID ?? null;
 
   const stripe = getStripe();
 
@@ -170,7 +186,72 @@ export async function startTeamCheckout() {
   const { createSupabaseAdminClient: adminFactory } = await import(
     "@/lib/supabase/admin"
   );
-  const { data: trow } = await adminFactory()
+  const admin = adminFactory();
+
+  // Pro → Team, in place. Verify against Stripe's CURRENT state, not the
+  // local mirror, before touching anything.
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("stripe_subscription_id")
+    .eq("id", user.id)
+    .maybeSingle();
+  const proSubId = (profile?.stripe_subscription_id as string) ?? null;
+  if (proSubId) {
+    let proSub: Awaited<ReturnType<typeof stripe.subscriptions.retrieve>> | null =
+      null;
+    try {
+      proSub = await stripe.subscriptions.retrieve(proSubId);
+    } catch {
+      proSub = null; // stale mirror — fall through to checkout
+    }
+    if (proSub && ["active", "trialing", "past_due"].includes(proSub.status)) {
+      const customerId =
+        typeof proSub.customer === "string" ? proSub.customer : proSub.customer.id;
+      // Persist the team's customer FIRST so the webhook that follows the
+      // update can match this team even by customer-id fallback.
+      const { error: custErr } = await admin
+        .from("teams")
+        .update({ stripe_customer_id: customerId })
+        .eq("id", team.id);
+      if (custErr) redirect("/team?error=save");
+
+      try {
+        await stripe.subscriptions.update(proSubId, {
+          items: proToTeamItems(proSub, basePriceId, seatPriceId, team.seatCount),
+          metadata: { team_id: team.id, user_id: "" },
+          proration_behavior: "create_prorations",
+        });
+      } catch {
+        redirect("/team?error=upgrade");
+      }
+
+      // Mirror the handover locally so no window shows both plans active;
+      // the subscription.updated webhook re-confirms from Stripe's state.
+      await admin
+        .from("teams")
+        .update({
+          stripe_subscription_id: proSubId,
+          subscription_status: proSub.status,
+          plan: "active",
+        })
+        .eq("id", team.id);
+      await admin
+        .from("profiles")
+        .update({
+          plan: "free",
+          stripe_subscription_id: null,
+          subscription_status: null,
+          current_period_end: null,
+        })
+        .eq("id", user.id);
+
+      revalidatePath("/team");
+      revalidatePath("/billing");
+      redirect("/team?status=upgraded");
+    }
+  }
+
+  const { data: trow } = await admin
     .from("teams")
     .select("stripe_customer_id")
     .eq("id", team.id)
@@ -190,8 +271,7 @@ export async function startTeamCheckout() {
     customerId = customer.id;
     // Billing columns on teams are service-role-only — persist via admin, and
     // fail loudly so we never mint duplicate customers on retries.
-    const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
-    const { error: saveErr } = await createSupabaseAdminClient()
+    const { error: saveErr } = await admin
       .from("teams")
       .update({ stripe_customer_id: customerId })
       .eq("id", team.id);
@@ -216,7 +296,7 @@ export async function startTeamCheckout() {
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: customerId,
-    line_items: [{ price: priceId, quantity: Math.max(1, team.seatCount) }],
+    line_items: teamCheckoutLineItems(basePriceId, seatPriceId, team.seatCount),
     success_url: `${appUrl()}/team?status=success`,
     cancel_url: `${appUrl()}/team?status=cancelled`,
     metadata: { team_id: team.id },
@@ -226,6 +306,89 @@ export async function startTeamCheckout() {
 
   if (session.url) redirect(session.url);
   redirect("/team?error=checkout");
+}
+
+/**
+ * Delete the team (owner only, typed confirmation). The reverse of the
+ * Pro → Team upgrade, on the SAME subscription: drop the Team base + seat
+ * items, add the Pro item, let Stripe prorate — the owner keeps one
+ * continuous billing history and lands on a personal Pro plan they can
+ * manage from Billing. Shared deals return to whoever uploaded them
+ * (deals.team_id is ON DELETE SET NULL); members and invites cascade away.
+ */
+export async function deleteTeam(formData: FormData) {
+  const confirm = String(formData.get("confirm") ?? "").trim();
+  if (confirm !== "DELETE") redirect("/team?error=confirmdelete");
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const team = await getTeam(supabase, user.id);
+  if (!team || team.role !== "owner") redirect("/team?error=owner");
+
+  const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createSupabaseAdminClient();
+  const { data: trow } = await admin
+    .from("teams")
+    .select("stripe_subscription_id, stripe_customer_id")
+    .eq("id", team.id)
+    .maybeSingle();
+  const subId = (trow?.stripe_subscription_id as string) ?? null;
+
+  if (subId) {
+    const stripe = getStripe();
+    let sub: Awaited<ReturnType<typeof stripe.subscriptions.retrieve>> | null =
+      null;
+    try {
+      sub = await stripe.subscriptions.retrieve(subId);
+    } catch {
+      sub = null; // already gone on Stripe's side — nothing to convert
+    }
+    if (
+      sub &&
+      ["active", "trialing", "past_due", "incomplete"].includes(sub.status)
+    ) {
+      const proPriceId = process.env.STRIPE_PRICE_ID;
+      if (!proPriceId) redirect("/team?error=config");
+      try {
+        await stripe.subscriptions.update(subId, {
+          items: teamToProItems(sub, proPriceId!),
+          metadata: { team_id: "", user_id: user.id },
+          proration_behavior: "create_prorations",
+        });
+      } catch {
+        // Stop BEFORE deleting anything — never leave a live team
+        // subscription billing for a team that no longer exists.
+        redirect("/team?error=deletesub");
+      }
+      // The subscription is the owner's personal Pro now. The customer id
+      // must follow the subscription so the Billing portal finds it.
+      await admin
+        .from("profiles")
+        .update({
+          plan: "pro",
+          stripe_subscription_id: subId,
+          stripe_customer_id:
+            typeof sub.customer === "string" ? sub.customer : sub.customer.id,
+          subscription_status: sub.status,
+        })
+        .eq("id", user.id);
+    }
+  }
+
+  const { error: delErr } = await admin
+    .from("teams")
+    .delete()
+    .eq("id", team.id);
+  if (delErr) redirect("/team?error=delete");
+
+  revalidatePath("/team");
+  revalidatePath("/deals");
+  revalidatePath("/billing");
+  redirect("/team?status=teamdeleted");
 }
 
 /** Open the Stripe portal for the team subscription (owner only). */
