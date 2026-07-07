@@ -21,8 +21,12 @@ export async function startCheckout() {
 
   const stripe = getStripe();
 
-  // Reuse or create the Stripe customer for this user.
-  const { data: profile } = await supabase
+  // Reuse or create the Stripe customer for this user. Billing columns are
+  // service-role-only reads (migration 0008).
+  const { createSupabaseAdminClient: adminReader } = await import(
+    "@/lib/supabase/admin"
+  );
+  const { data: profile } = await adminReader()
     .from("profiles")
     .select("stripe_customer_id")
     .eq("id", user.id)
@@ -87,7 +91,10 @@ export async function openPortal() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
+  const { createSupabaseAdminClient: adminReader2 } = await import(
+    "@/lib/supabase/admin"
+  );
+  const { data: profile } = await adminReader2()
     .from("profiles")
     .select("stripe_customer_id")
     .eq("id", user.id)
