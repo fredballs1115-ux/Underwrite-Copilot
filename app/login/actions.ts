@@ -17,7 +17,20 @@ function friendly(message: string): string {
     return "Too many attempts — wait a minute and try again.";
   if (m.includes("email not confirmed"))
     return "Confirm your email first — check your inbox for the link.";
-  return message;
+  // supabase-js returns network/backend-unreachable failures as an error whose
+  // message is a raw fetch or JSON-parse string ("not valid JSON", "fetch
+  // failed", "Host not …"). Never show that gibberish at the front door.
+  if (
+    m.includes("not valid json") ||
+    m.includes("fetch failed") ||
+    m.includes("failed to fetch") ||
+    m.includes("network") ||
+    m.includes("host not")
+  )
+    return "Couldn't reach the sign-in service — please try again in a moment.";
+  // Anything still unmapped is an unexpected backend message; keep it generic
+  // rather than leaking internals.
+  return "Something went wrong signing you in — please try again.";
 }
 
 /**

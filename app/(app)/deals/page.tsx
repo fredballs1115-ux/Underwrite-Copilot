@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { getBilling } from "@/lib/billing";
 import { type DealRow } from "@/lib/deals";
 import type { ExtractionResult, ExtractedMetric } from "@/lib/anthropic/types";
@@ -59,9 +59,8 @@ export default async function DealsPage({
       : null;
 
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Request-cached: shares the layout's auth call instead of a second hop.
+  const user = await getCurrentUser();
 
   // Billing state, the deal list, and the personal buy box are independent —
   // fetch them together.
@@ -79,30 +78,30 @@ export default async function DealsPage({
     ? await getBuyBoxForDeal("", billing.team.id).catch(() => null)
     : null;
 
-  // Latest job per deal so the list can show "Screening…" vs "Analysis failed"
-  // instead of an inert label.
-  const ids = ((data ?? []) as { id: string }[]).map((d) => d.id);
-  const { data: jobsData } = ids.length
-    ? await supabase
-        .from("analysis_jobs")
-        .select("deal_id, status, created_at")
-        .in("deal_id", ids)
-        .order("created_at", { ascending: false })
-    : { data: [] };
-  const jobByDeal = new Map<string, string>();
-  for (const j of (jobsData ?? []) as { deal_id: string; status: string }[]) {
-    if (!jobByDeal.has(j.deal_id)) jobByDeal.set(j.deal_id, j.status);
-  }
-
   if (error) {
+    // "Relation does not exist" means the migrations haven't run (a setup
+    // state); anything else is a transient outage — don't tell a user in
+    // production to go run SQL.
+    const schemaMissing = /relation|does not exist|schema/i.test(error.message);
     return (
       <div className="rounded-xl border border-line bg-surface p-5 text-sm">
-        <p className="font-medium">Database isn’t set up yet</p>
-        <p className="mt-1 text-muted">
-          Run every file in <code>supabase/migrations/</code> (0001 through
-          0010) in your Supabase SQL editor, then refresh this page.
-        </p>
-        <p className="mt-2 text-xs text-muted">({error.message})</p>
+        {schemaMissing ? (
+          <>
+            <p className="font-medium">Database isn’t set up yet</p>
+            <p className="mt-1 text-muted">
+              Run every file in <code>supabase/migrations/</code> (0001 through
+              the latest) in your Supabase SQL editor, then refresh this page.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="font-medium">Couldn’t load your pipeline</p>
+            <p className="mt-1 text-muted">
+              We couldn’t reach your data just now. Please refresh in a moment —
+              if it keeps happening, email underwritecopilot.support@gmail.com.
+            </p>
+          </>
+        )}
       </div>
     );
   }
@@ -117,8 +116,11 @@ export default async function DealsPage({
     is_sample: boolean | null;
   };
 
-  // Who added each team deal — teammate profiles are readable under RLS.
+  // The latest job per deal (Screening… / Failed labels) and the teammate
+  // names for shared deals both depend only on the deal list, not on each
+  // other — fetch them together instead of one after the other.
   const rows = (data ?? []) as Row[];
+  const ids = rows.map((d) => d.id);
   const teammateIds = Array.from(
     new Set(
       rows
@@ -126,12 +128,22 @@ export default async function DealsPage({
         .map((d) => d.user_id),
     ),
   );
-  const { data: mates } = teammateIds.length
-    ? await supabase
-        .from("profiles")
-        .select("id, email, full_name")
-        .in("id", teammateIds)
-    : { data: [] };
+  const [{ data: jobsData }, { data: mates }] = await Promise.all([
+    ids.length
+      ? supabase
+          .from("analysis_jobs")
+          .select("deal_id, status, created_at")
+          .in("deal_id", ids)
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [] as { deal_id: string; status: string }[] }),
+    teammateIds.length
+      ? supabase.from("profiles").select("id, email, full_name").in("id", teammateIds)
+      : Promise.resolve({ data: [] as { id: string; email: string | null; full_name: string | null }[] }),
+  ]);
+  const jobByDeal = new Map<string, string>();
+  for (const j of (jobsData ?? []) as { deal_id: string; status: string }[]) {
+    if (!jobByDeal.has(j.deal_id)) jobByDeal.set(j.deal_id, j.status);
+  }
   const nameById = new Map(
     ((mates ?? []) as { id: string; email: string | null; full_name: string | null }[]).map(
       (m) => [m.id, m.full_name || m.email || "Teammate"],

@@ -42,19 +42,26 @@ export async function GET(
     .eq("deal_id", id);
   const kinds = ((docs ?? []) as { kind: string }[]).map((d) => d.kind);
 
-  const buffer = await buildModelWorkbook(model, deal.name, kinds);
-  const safe =
-    (deal.name || "deal")
-      .replace(/[^a-z0-9]+/gi, "-")
-      .replace(/^-+|-+$/g, "")
-      .toLowerCase() || "deal";
+  // Opened via a plain <a> — catch a build failure and bounce to the deal with
+  // a friendly error rather than surfacing a raw 500 body in the browser.
+  try {
+    const buffer = await buildModelWorkbook(model, deal.name, kinds);
+    const safe =
+      (deal.name || "deal")
+        .replace(/[^a-z0-9]+/gi, "-")
+        .replace(/^-+|-+$/g, "")
+        .toLowerCase() || "deal";
 
-  return new Response(new Uint8Array(buffer), {
-    headers: {
-      "Content-Type":
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="${safe}-model-draft.xlsx"`,
-      "Cache-Control": "no-store",
-    },
-  });
+    return new Response(new Uint8Array(buffer), {
+      headers: {
+        "Content-Type":
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="${safe}-model-draft.xlsx"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (err) {
+    console.error("model workbook build failed", err);
+    return Response.redirect(new URL(`/deals/${id}?error=modelfail`, req.url), 302);
+  }
 }

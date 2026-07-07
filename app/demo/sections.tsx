@@ -103,6 +103,7 @@ export function DemoSections({ data }: { data: DemoData }) {
             compSearch={null}
             active={false}
             isPro={false}
+            publicDemo
           />
         )}
         {tab === "market" && <MarketCheck result={data.market} />}

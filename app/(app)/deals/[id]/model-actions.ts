@@ -1,6 +1,7 @@
 "use server";
 
 import { after } from "next/server";
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -9,7 +10,7 @@ import {
 } from "@/lib/storage";
 import { DOC_KIND_KEYS } from "@/lib/documents";
 import { isPro } from "@/lib/billing";
-import { jobInFlight } from "@/lib/jobs";
+import { claimJob } from "@/lib/jobs";
 import { runModelGeneration } from "@/lib/model/build-model";
 
 const MAX_FILE = 22 * 1024 * 1024;
@@ -36,7 +37,14 @@ export async function addDealDocument(formData: FormData) {
   const kind = DOC_KIND_KEYS.has(kindRaw) ? kindRaw : "other";
   const file = formData.get("file");
   if (!dealId) return;
-  if (!(file instanceof File) || file.size === 0 || file.size > MAX_FILE) return;
+  // Surface a bad file instead of silently swallowing it — a user attaching a
+  // 30MB rent roll deserves to know it was rejected, not to believe it worked.
+  if (!(file instanceof File) || file.size === 0) {
+    redirect(`/deals/${dealId}?error=docfile`);
+  }
+  if (file.size > MAX_FILE) {
+    redirect(`/deals/${dealId}?error=docsize`);
+  }
 
   const supabase = await requireDeal(dealId);
   if (!supabase) return;
@@ -94,27 +102,22 @@ export async function generateModel(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user || !(await isPro(supabase, user.id))) return;
 
-  // One pipeline at a time per deal (double-click / overlap guard).
-  if (await jobInFlight(supabase, dealId)) return;
-
-  const { data: existing } = await supabase
-    .from("analysis_jobs")
-    .select("id")
-    .eq("deal_id", dealId)
-    .limit(1)
-    .maybeSingle();
-  if (existing) {
-    await supabase
-      .from("analysis_jobs")
-      .update({ status: "running", step: "model", progress: 5, error: null })
-      .eq("deal_id", dealId);
-  } else {
+  // Atomic claim (not a check-then-act read) so two overlapping triggers on
+  // the same deal can't both schedule a run.
+  const claim = await claimJob(supabase, dealId, "model");
+  if (claim.outcome === "busy") return;
+  if (claim.outcome === "none") {
     await supabase.from("analysis_jobs").insert({
       deal_id: dealId,
       status: "running",
       step: "model",
       progress: 5,
     });
+  } else {
+    await supabase
+      .from("analysis_jobs")
+      .update({ status: "running", step: "model", progress: 5, error: null })
+      .eq("deal_id", dealId);
   }
 
   after(() => runModelGeneration(dealId));

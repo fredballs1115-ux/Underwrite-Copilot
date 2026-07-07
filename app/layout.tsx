@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     template: "%s · Underwrite Copilot",
   },
   description:
-    "Run every commercial real estate deal through the same disciplined screen: rent, expenses, and cap as sourced ranges; the three deal-killers stressed first; a Go / No-Go that shows its work before you open a model. One method, every deal.",
+    "Run every commercial real estate deal through the same disciplined screen: rent, expenses, and cap as sourced ranges; the three deal-killers stressed first; a Go / No-go that shows its work before you open a model. One method, every deal.",
   keywords: [
     "CRE underwriting",
     "commercial real estate underwriting software",
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Stop underwriting like a coin flip.",
     description:
-      "Every CRE deal through the same disciplined screen — sourced ranges, deal-killers first, a Go / No-Go that shows its work. One method, every deal.",
+      "Every CRE deal through the same disciplined screen — sourced ranges, deal-killers first, a Go / No-go that shows its work. One method, every deal.",
   },
   robots: { index: true, follow: true },
 };
@@ -61,8 +61,22 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      // The inline script below adds a `js` class before hydration; suppress
+      // the resulting className diff warning (the standard theme-script pattern).
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full`}
     >
+      <head>
+        {/* Cut the mustard: mark the document as JS-capable before first
+            paint, so scroll-reveal sections only start hidden when JS can
+            reveal them. Without JS (or if it fails) the content stays
+            visible instead of blanking forever. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: "document.documentElement.classList.add('js')",
+          }}
+        />
+      </head>
       <body className="flex min-h-full flex-col font-sans antialiased">
         {children}
       </body>

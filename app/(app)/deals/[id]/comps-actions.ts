@@ -4,7 +4,7 @@ import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
-import { jobInFlight } from "@/lib/jobs";
+import { claimJob } from "@/lib/jobs";
 import { runCompSearch } from "@/lib/anthropic/comps-search";
 
 /** Kick off a public-web comp search in the background, reusing the job row. */
@@ -27,16 +27,18 @@ export async function searchPublicComps(formData: FormData) {
   // Pro-only feature.
   if (!(await isPro(supabase, user.id))) return;
 
-  // One pipeline at a time per deal (double-click / overlap guard).
-  if (await jobInFlight(supabase, dealId)) return;
-
-  const { data: existing } = await supabase
-    .from("analysis_jobs")
-    .select("id")
-    .eq("deal_id", dealId)
-    .limit(1)
-    .maybeSingle();
-  if (existing) {
+  // Atomic claim (not a check-then-act read) so overlapping triggers can't
+  // both schedule a run on the same deal.
+  const claim = await claimJob(supabase, dealId, "comps_search");
+  if (claim.outcome === "busy") return;
+  if (claim.outcome === "none") {
+    await supabase.from("analysis_jobs").insert({
+      deal_id: dealId,
+      status: "running",
+      step: "comps_search",
+      progress: 5,
+    });
+  } else {
     await supabase
       .from("analysis_jobs")
       .update({
@@ -46,13 +48,6 @@ export async function searchPublicComps(formData: FormData) {
         error: null,
       })
       .eq("deal_id", dealId);
-  } else {
-    await supabase.from("analysis_jobs").insert({
-      deal_id: dealId,
-      status: "running",
-      step: "comps_search",
-      progress: 5,
-    });
   }
 
   after(() => runCompSearch(dealId));
