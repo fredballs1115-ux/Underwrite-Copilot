@@ -8,6 +8,8 @@ export interface DealRow {
   name: string;
   asset_class: string;
   om_storage_path: string | null;
+  // User-entered property address (StructuredAddress). Migration 0011.
+  address?: unknown;
   // The fast headline read that lands ~30s into a run (FirstSignal).
   // Migration 0009; null on rows screened before it existed.
   first_signal?: unknown;
