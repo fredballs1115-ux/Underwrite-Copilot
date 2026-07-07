@@ -20,7 +20,7 @@ export default function Image() {
           width: "100%",
           height: "100%",
           display: "flex",
-          background: "#0c3338",
+          background: "#101c33",
           fontFamily: "sans-serif",
           position: "relative",
         }}
@@ -50,7 +50,7 @@ export default function Image() {
             position: "absolute",
             inset: 0,
             backgroundImage:
-              "radial-gradient(circle at 85% 0%, rgba(127,214,204,0.28), transparent 55%)",
+              "radial-gradient(circle at 85% 0%, rgba(138,180,248,0.25), transparent 55%)",
           }}
         />
 
@@ -76,7 +76,7 @@ export default function Image() {
                 width: 56,
                 height: 56,
                 borderRadius: 14,
-                background: "linear-gradient(180deg, #19606a, #0c383d)",
+                background: "linear-gradient(180deg, #2b4a80, #1a3054)",
                 border: "1px solid rgba(255,255,255,0.2)",
                 paddingBottom: 12,
               }}
@@ -94,7 +94,7 @@ export default function Image() {
                   width: 7,
                   height: 26,
                   borderRadius: 4,
-                  background: "#7fd6cc",
+                  background: "#8ab4f8",
                 }}
               />
               <div
