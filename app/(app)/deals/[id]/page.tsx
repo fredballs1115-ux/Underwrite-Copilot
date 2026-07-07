@@ -23,6 +23,7 @@ import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import { StageSelect } from "./stage-select";
 import { OffersDueControl } from "../offers-due";
 import { parseStageHistory } from "@/lib/stages";
+import { deriveInternalComps } from "@/lib/internal-comps";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
 
@@ -59,9 +60,9 @@ export default async function DealPage({
   // Request-cached: shares the layout's auth call instead of a second hop.
   const user = await getCurrentUser();
 
-  // These four don't depend on each other — fetch them in one round trip's
-  // worth of wall clock instead of four.
-  const [pro, { data, error }, { data: docsData }, { data: jobData }] =
+  // These five don't depend on each other — fetch them in one round trip's
+  // worth of wall clock instead of five.
+  const [pro, { data, error }, { data: docsData }, { data: jobData }, siblings] =
     await Promise.all([
       user ? isPro(supabase, user.id) : Promise.resolve(false),
       supabase.from("deals").select("*").eq("id", id).maybeSingle(),
@@ -79,6 +80,15 @@ export default async function DealPage({
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      // Internal comps memory: the user's other screened deals (RLS scopes to
+      // own + shared team deals). Derivation filters to this asset class.
+      supabase
+        .from("deals")
+        .select("id, name, asset_class, created_at, is_sample, verdict, extraction")
+        .neq("id", id)
+        .not("extraction", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(40),
     ]);
 
   if (error || !data) {
@@ -112,6 +122,14 @@ export default async function DealPage({
     null;
   const stageHistory = parseStageHistory(
     (deal as { stage_history?: unknown }).stage_history,
+  );
+
+  // What the user's own past screens said about deals like this one.
+  const internalComps = deriveInternalComps(
+    deal.id,
+    (deal.asset_class as string | null) ?? "auto",
+    extraction,
+    (siblings.data ?? []) as Parameters<typeof deriveInternalComps>[3],
   );
 
   const documents = (docsData ?? []) as DealDocument[];
@@ -364,6 +382,7 @@ export default async function DealPage({
         }}
         screenDiff={screenDiff}
         stageHistory={stageHistory}
+        internalComps={internalComps}
         omUrl={omUrl}
       />
     </div>

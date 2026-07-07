@@ -25,33 +25,52 @@ const MAX_BYTES = 22 * 1024 * 1024;
 // Accepted formats for the buyer's own underwriting model (Phase 5 reconciler).
 const MODEL_EXT = /\.(xlsx|xls|csv|pdf)$/i;
 
+/** Everything that can go wrong creating a deal, as codes the callers map to
+ *  copy: the single form redirects with ?error=, the batch panel shows inline. */
+export type CreateDealError =
+  | "name"
+  | "auth"
+  | "limit"
+  | "teamlimit"
+  | "file"
+  | "pdf"
+  | "size"
+  | "save"
+  | "upload";
+
+export type CreateDealResult =
+  | { ok: true; dealId: string; deduped?: boolean }
+  | { ok: false; error: CreateDealError };
+
 /**
- * Create a deal from the new-deal form: store the OM PDF, then kick off the
- * background analysis. `after()` runs the pipeline once the redirect response
- * is sent, so the page returns instantly and the deal screen shows progress.
+ * The create-deal core shared by the single form and the batch panel: validate,
+ * store the OM PDF, then kick off the background analysis. `after()` runs the
+ * pipeline once the response is sent, so the request returns instantly and the
+ * deal row shows progress. Returns codes instead of redirecting so each caller
+ * can surface failures its own way.
  */
-export async function createDeal(formData: FormData) {
+async function createDealCore(formData: FormData): Promise<CreateDealResult> {
   const name = String(formData.get("name") ?? "").trim();
   const assetClass = String(formData.get("assetClass") ?? "auto");
   const file = formData.get("om");
 
-  if (!name) redirect("/deals?error=name");
+  if (!name) return { ok: false, error: "name" };
 
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) return { ok: false, error: "auth" };
 
   // Deal caps (also enforced by a DB trigger): personal free cap, or the
   // team's trial/plan when the user is on a team.
   const billing = await getBilling(supabase, user.id);
   if (!billing.canCreateDeal) {
-    redirect(billing.team ? "/deals?error=teamlimit" : "/deals?error=limit");
+    return { ok: false, error: billing.team ? "teamlimit" : "limit" };
   }
 
   if (!(file instanceof File) || file.size === 0) {
-    redirect("/deals?error=file");
+    return { ok: false, error: "file" };
   }
   // Accept when the browser says PDF, says nothing (some drag sources report an
   // empty type for a real PDF), or the name ends in .pdf — then let the magic
@@ -61,17 +80,17 @@ export async function createDeal(formData: FormData) {
     file.type === "" ||
     /\.pdf$/i.test(file.name);
   if (!looksPdf) {
-    redirect("/deals?error=pdf");
+    return { ok: false, error: "pdf" };
   }
   if (file.size > MAX_BYTES) {
-    redirect("/deals?error=size");
+    return { ok: false, error: "size" };
   }
   // Trust the bytes, not the browser-declared MIME: a renamed non-PDF wastes
   // an upload + a full Claude run failing at extraction. Reject anything
   // without the %PDF- signature up front.
   const buffer = Buffer.from(await file.arrayBuffer());
   if (!buffer.subarray(0, 5).toString("latin1").startsWith("%PDF-")) {
-    redirect("/deals?error=pdf");
+    return { ok: false, error: "pdf" };
   }
 
   // Idempotency: a raced double-submit (fast double-click, back-then-resubmit)
@@ -87,7 +106,7 @@ export async function createDeal(formData: FormData) {
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (recent?.id) redirect(`/deals/${recent.id}`);
+  if (recent?.id) return { ok: true, dealId: recent.id as string, deduped: true };
 
   // On a team, new deals land in the shared pipeline while the team plan or
   // trial allows it; otherwise fall back to a personal deal so a personal-Pro
@@ -105,7 +124,7 @@ export async function createDeal(formData: FormData) {
     })
     .select("id")
     .single();
-  if (insertErr || !deal) redirect("/deals?error=save");
+  if (insertErr || !deal) return { ok: false, error: "save" };
 
   const dealId = deal.id as string;
   const path = `${user.id}/${dealId}.pdf`;
@@ -146,12 +165,32 @@ export async function createDeal(formData: FormData) {
   } catch {
     await supabase.from("deals").delete().eq("id", dealId);
     await removeStorageFiles([path]);
-    redirect("/deals?error=upload");
+    return { ok: false, error: "upload" };
   }
 
   after(() => runAnalysis(dealId));
 
-  redirect(`/deals/${dealId}`);
+  return { ok: true, dealId };
+}
+
+/** Create a deal from the new-deal form, then land on it. */
+export async function createDeal(formData: FormData) {
+  const result = await createDealCore(formData);
+  if (result.ok) redirect(`/deals/${result.dealId}`);
+  if (result.error === "auth") redirect("/login");
+  redirect(`/deals?error=${result.error}`);
+}
+
+/**
+ * One file of a batch upload (call-for-offers triage). The batch panel calls
+ * this once per OM, sequentially, so each request stays within the normal
+ * upload size and every existing gate — caps, magic bytes, idempotency —
+ * applies per deal. Returns the outcome instead of redirecting.
+ */
+export async function createDealFromBatch(
+  formData: FormData,
+): Promise<CreateDealResult> {
+  return createDealCore(formData);
 }
 
 /**

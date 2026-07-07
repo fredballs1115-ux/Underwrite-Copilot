@@ -226,7 +226,7 @@ function irrTone(v: number | null): string {
 
 // Live exit-cap × price IRR grid — re-runs the deterministic cash-flow engine
 // at each grid point (same math the Excel sensitivity table uses).
-function Sensitivity({ model }: { model: UnderwritingModel }) {
+export function Sensitivity({ model }: { model: UnderwritingModel }) {
   const base = model.inputs;
   if (!base?.exitCapPct || !base?.purchasePrice) return null;
 
@@ -523,7 +523,7 @@ function sourceLine(m: ReconciledMetric): string {
     .join("  ·  ");
 }
 
-function Conflicts({ conflicts }: { conflicts: ReconciledMetric[] }) {
+export function Conflicts({ conflicts }: { conflicts: ReconciledMetric[] }) {
   if (conflicts.length === 0) {
     return (
       <section>
@@ -573,7 +573,7 @@ function Conflicts({ conflicts }: { conflicts: ReconciledMetric[] }) {
   );
 }
 
-function Assumptions({ metrics }: { metrics: ReconciledMetric[] }) {
+export function Assumptions({ metrics }: { metrics: ReconciledMetric[] }) {
   const [open, setOpen] = useState(false);
   const shown = open ? metrics : metrics.slice(0, 8);
   return (
@@ -636,8 +636,15 @@ function Assumptions({ metrics }: { metrics: ReconciledMetric[] }) {
   );
 }
 
-function CashFlow({ cashFlow }: { cashFlow: CashFlowYear[] }) {
-  const [open, setOpen] = useState(false);
+export function CashFlow({
+  cashFlow,
+  defaultOpen = false,
+}: {
+  cashFlow: CashFlowYear[];
+  /** the demo slideshow shows the table straight away */
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   if (cashFlow.length === 0) return null;
   const rows: [string, (c: CashFlowYear) => number][] = [
     ["Gross potential rent", (c) => c.gpr],

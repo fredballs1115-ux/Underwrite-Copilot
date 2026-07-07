@@ -117,7 +117,7 @@ interface ExtractionLike {
   metrics: MetricLike[];
 }
 
-function findMetric(
+export function findMetric(
   metrics: MetricLike[],
   include: RegExp,
   exclude?: RegExp,
