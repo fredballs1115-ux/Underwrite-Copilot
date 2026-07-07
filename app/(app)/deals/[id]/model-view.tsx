@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { DOC_KINDS, DOC_KIND_LABEL, type DealDocument } from "@/lib/documents";
 import { MODEL_INPUTS, MODEL_PASTES } from "@/lib/model/inputs";
 import type {
   UnderwritingModel,
   ReconciledMetric,
 } from "@/lib/model/types";
-import { type CashFlowYear } from "@/lib/model/compute";
+import { computeModel, type CashFlowYear } from "@/lib/model/compute";
 import {
   computeSensitivityGrid,
   SENSITIVITY_PRICE_FACTORS,
@@ -51,6 +51,7 @@ export function ModelView({
         <>
           <FirstDraftBanner />
           <ReturnsHeadline model={model} />
+          <StressPanel model={model} />
           <Sensitivity model={model} />
           <Conflicts conflicts={model.conflicts} />
           <Assumptions metrics={model.metrics} />
@@ -288,6 +289,230 @@ function Sensitivity({ model }: { model: UnderwritingModel }) {
           </tbody>
         </table>
       </div>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Stress the assumptions — the four levers a screen turns on,         */
+/* recomputed live through the same deterministic engine as the Excel. */
+/* ------------------------------------------------------------------ */
+
+type StressAdjust = {
+  exitCapPct: number;
+  rentGrowthPct: number;
+  ratePct: number;
+  holdYears: number;
+};
+
+const STRESS_CONTROLS: {
+  key: keyof StressAdjust;
+  label: string;
+  step: number;
+  lo: number;
+  hi: number;
+  fmt: (v: number) => string;
+}[] = [
+  { key: "exitCapPct", label: "Exit cap", step: 0.25, lo: 3, hi: 12, fmt: (v) => v.toFixed(2) + "%" },
+  { key: "rentGrowthPct", label: "Rent growth", step: 0.25, lo: -5, hi: 10, fmt: (v) => v.toFixed(2) + "%" },
+  { key: "ratePct", label: "Interest rate", step: 0.25, lo: 0, hi: 12, fmt: (v) => v.toFixed(2) + "%" },
+  { key: "holdYears", label: "Hold period", step: 1, lo: 1, hi: 15, fmt: (v) => v + (v === 1 ? " year" : " years") },
+];
+
+function clampStep(v: number, lo: number, hi: number): number {
+  // Steps are quarter-points — round away float drift so 5.25 stays 5.25.
+  return Math.min(hi, Math.max(lo, Math.round(v * 100) / 100));
+}
+
+/** "+1.3pt" / "−0.21x" deltas, colored by whether the move helps returns. */
+function StressDelta({
+  now,
+  was,
+  unit,
+}: {
+  now: number | null;
+  was: number | null;
+  unit: "pt" | "x";
+}) {
+  if (now == null || was == null) return null;
+  const d = now - was;
+  if (Math.abs(d) < 0.005) return null;
+  const text =
+    (d > 0 ? "+" : "−") +
+    Math.abs(d).toFixed(unit === "pt" ? 1 : 2) +
+    (unit === "pt" ? "pt" : "x");
+  return (
+    <span
+      className={`ml-1.5 font-mono text-[11px] font-medium tabular-nums ${
+        d > 0 ? "text-pass" : "text-kill"
+      }`}
+    >
+      {text}
+    </span>
+  );
+}
+
+function StressPanel({ model }: { model: UnderwritingModel }) {
+  const base = model.inputs;
+  const ok = !!base?.purchasePrice && !!base?.exitCapPct && !!base?.loan;
+  const initial: StressAdjust = {
+    exitCapPct: base?.exitCapPct ?? 5,
+    rentGrowthPct: base?.rentGrowthPct ?? 3,
+    ratePct: base?.loan?.ratePct ?? 6,
+    holdYears: base?.holdYears ?? 5,
+  };
+  const [adj, setAdj] = useState<StressAdjust>(initial);
+
+  const baseline = useMemo(() => (ok ? computeModel(base) : null), [base, ok]);
+  const stressed = useMemo(() => {
+    if (!ok) return null;
+    return computeModel({
+      ...base,
+      exitCapPct: adj.exitCapPct,
+      rentGrowthPct: adj.rentGrowthPct,
+      holdYears: adj.holdYears,
+      loan: { ...base.loan, ratePct: adj.ratePct },
+    });
+  }, [base, adj, ok]);
+
+  if (!ok || !baseline || !stressed) return null;
+
+  const dirty = STRESS_CONTROLS.some((c) => adj[c.key] !== initial[c.key]);
+  const r = stressed.returns;
+  const b = baseline.returns;
+  const dscr = (cf: CashFlowYear[] | undefined): number | null => {
+    const y1 = cf?.[0];
+    if (!y1 || y1.debtService <= 0) return null;
+    return y1.noi / y1.debtService;
+  };
+  const dscrNow = dscr(stressed.cashFlow);
+  const dscrBase = dscr(baseline.cashFlow);
+
+  return (
+    <section>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold tracking-tight">
+          Stress the assumptions{" "}
+          <span className="font-normal text-muted">
+            · live, same math as the Excel
+          </span>
+        </h2>
+        {dirty && (
+          <button
+            type="button"
+            onClick={() => setAdj(initial)}
+            className="text-xs font-medium text-brand transition-colors hover:text-brand-strong"
+          >
+            Reset to model
+          </button>
+        )}
+      </div>
+      <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">
+        Nudge the levers a screen turns on — exit cap, rent growth, rate, hold
+        — and watch the returns move. The saved model doesn&apos;t change.
+      </p>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
+        {STRESS_CONTROLS.map((c) => {
+          const v = adj[c.key];
+          const changed = v !== initial[c.key];
+          return (
+            <div
+              key={c.key}
+              className="rounded-xl border border-line bg-surface p-3 shadow-sm"
+            >
+              <p className="text-[11px] uppercase tracking-wide text-muted">
+                {c.label}
+              </p>
+              <div className="mt-1.5 flex items-center justify-between gap-1">
+                <button
+                  type="button"
+                  aria-label={`Decrease ${c.label.toLowerCase()}`}
+                  disabled={v - c.step < c.lo}
+                  onClick={() =>
+                    setAdj((a) => ({
+                      ...a,
+                      [c.key]: clampStep(a[c.key] - c.step, c.lo, c.hi),
+                    }))
+                  }
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-line text-sm font-semibold transition-colors hover:bg-faint disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  −
+                </button>
+                <span
+                  className={`font-mono text-sm font-semibold tabular-nums ${
+                    changed ? "text-brand" : ""
+                  }`}
+                >
+                  {c.fmt(v)}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Increase ${c.label.toLowerCase()}`}
+                  disabled={v + c.step > c.hi}
+                  onClick={() =>
+                    setAdj((a) => ({
+                      ...a,
+                      [c.key]: clampStep(a[c.key] + c.step, c.lo, c.hi),
+                    }))
+                  }
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-line text-sm font-semibold transition-colors hover:bg-faint disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div
+        aria-live="polite"
+        className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4"
+      >
+        <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+          <p className="text-[11px] uppercase tracking-wide text-muted">
+            Levered IRR
+          </p>
+          <p className="mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums">
+            {pct(r.leveredIrrPct)}
+            <StressDelta now={r.leveredIrrPct} was={b.leveredIrrPct} unit="pt" />
+          </p>
+        </div>
+        <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+          <p className="text-[11px] uppercase tracking-wide text-muted">
+            Equity multiple
+          </p>
+          <p className="mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums">
+            {mult(r.equityMultiple)}
+            <StressDelta now={r.equityMultiple} was={b.equityMultiple} unit="x" />
+          </p>
+        </div>
+        <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+          <p className="text-[11px] uppercase tracking-wide text-muted">
+            Cash-on-cash (Yr 1)
+          </p>
+          <p className="mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums">
+            {pct(r.cashOnCashPct)}
+            <StressDelta now={r.cashOnCashPct} was={b.cashOnCashPct} unit="pt" />
+          </p>
+        </div>
+        <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
+          <p className="text-[11px] uppercase tracking-wide text-muted">
+            DSCR (Yr 1)
+          </p>
+          <p className="mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums">
+            {dscrNow == null ? "—" : dscrNow.toFixed(2) + "x"}
+            <StressDelta now={dscrNow} was={dscrBase} unit="x" />
+          </p>
+        </div>
+      </div>
+      {dscrNow != null && dscrNow < 1.2 && (
+        <p className="mt-2 text-xs font-medium text-caution">
+          DSCR under 1.20x — most agency lenders won&apos;t size to this.
+          Coverage, not the equity story, is the binding constraint here.
+        </p>
+      )}
     </section>
   );
 }
