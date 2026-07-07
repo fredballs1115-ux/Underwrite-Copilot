@@ -298,7 +298,7 @@ export default function Home() {
                       <path
                         d="M3 9c40-6 84-7 112-4s72 5 102-3"
                         fill="none"
-                        stroke="#8ab4f8"
+                        stroke="#7fd6cc"
                         strokeWidth="4"
                         strokeLinecap="round"
                         opacity="0.75"
@@ -587,7 +587,7 @@ export default function Home() {
                       >
                         <span className="col-span-2 text-muted">{k}</span>
                         <span
-                          className={`text-right tabular-nums ${i !== 0 ? "bg-[#e9eefb] px-1" : ""}`}
+                          className={`text-right tabular-nums ${i !== 0 ? "bg-[#fdf6e7] px-1" : ""}`}
                         >
                           {v}
                         </span>

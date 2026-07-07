@@ -17,11 +17,11 @@ import type {
 } from "@/lib/anthropic/types";
 
 const C = {
-  brand: "#24406e",
-  ink: "#16202e",
-  muted: "#5a6472",
-  line: "#e3e7ed",
-  faint: "#f2f4f7",
+  brand: "#114e54",
+  ink: "#18211f",
+  muted: "#5f6b69",
+  line: "#e7e4dd",
+  faint: "#f3f5f4",
   pass: "#1b7a5e",
   caution: "#a05a1c",
   kill: "#b23a30",

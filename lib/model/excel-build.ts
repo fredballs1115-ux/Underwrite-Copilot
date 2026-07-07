@@ -20,7 +20,7 @@ import { MODEL_INPUTS } from "./inputs";
  * the whole engine per cell), refreshed on every regeneration.
  */
 
-const BRAND = "FF24406E";
+const BRAND = "FF114E54";
 const BRAND_SOFT = "FFE7EEEC";
 const INPUT_TINT = "FFFDF6E7"; // warm tint marking editable input cells
 const INK = "FF18211F";
