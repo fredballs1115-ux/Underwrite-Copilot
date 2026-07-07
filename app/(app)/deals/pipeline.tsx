@@ -14,9 +14,15 @@ import { createDeal, createSampleDeal } from "./actions";
 import { FileDrop } from "../file-drop";
 import { PendingButton } from "../pending-button";
 import { AddressAutocomplete } from "../address-autocomplete";
+import { StageSelect } from "./[id]/stage-select";
+import { OffersDueBit } from "./offers-due";
 import { parseMoney, parsePct } from "@/lib/criteria";
-
-export type Stage = "screening" | "reviewing" | "pursuing" | "dead";
+import {
+  STAGES,
+  STAGE_LABEL,
+  normalizeStage,
+  type Stage,
+} from "@/lib/stages";
 
 export type DealCard = {
   id: string;
@@ -24,13 +30,16 @@ export type DealCard = {
   assetClass: string;
   createdAt: string;
   verdict: string | null; // "pass" | "caution" | "pass_on" | null
-  /** the user's own tracker, independent of the verdict */
-  stage: Stage;
+  /** the user's own tracker, independent of the verdict (raw DB value —
+   *  normalized via lib/stages when read) */
+  stage: string;
   /** teammate who added this team deal (null when it's yours) */
   addedBy: string | null;
   /** deterministic buy-box result against the user's mandate */
   fit: "fits" | "near" | "outside" | null;
   market: string;
+  /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
+  offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
   slots: { cap: string | null; price: string | null };
   /** latest analysis-job state, for deals still screening */
@@ -85,13 +94,6 @@ const DEFAULT_DIR: Record<SortKey, "asc" | "desc"> = {
   added: "desc",
 };
 
-export const STAGE_LABEL: Record<Stage, string> = {
-  screening: "Screening",
-  reviewing: "Reviewing",
-  pursuing: "Pursuing",
-  dead: "Dead",
-};
-
 const VERDICT_META: Record<
   string,
   { label: string; cls: string; rank: number }
@@ -115,6 +117,8 @@ function fmtDate(iso: string): string {
 function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
+
+const PERSIST_KEY = "uc-pipeline-view";
 
 type BillingInfo = {
   isPro: boolean;
@@ -154,8 +158,58 @@ export function Pipeline({
   const [market, setMarket] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("added");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  // Dead deals stay out of the pipeline until asked for (or filtered to).
+  const [showDead, setShowDead] = useState(false);
+  // Which stage sections the user has explicitly collapsed/expanded — until
+  // touched, a section's default is open-when-populated / collapsed-when-empty.
+  const [collapsed, setCollapsed] = useState<Partial<Record<Stage, boolean>>>({});
   const searchRef = useRef<HTMLInputElement>(null);
   const [showForm, setShowForm] = useState(!!errorMessage || !!openNew);
+
+  // Filters and view state persist across navigation (deal page and back)
+  // within the tab. Restored after mount so server and client first paint
+  // identically; saves are gated until the restore has run, otherwise the
+  // very first render would overwrite the saved state with defaults.
+  const viewRestored = useRef(false);
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      try {
+        const saved = sessionStorage.getItem(PERSIST_KEY);
+        if (saved) {
+          const v = JSON.parse(saved) as Partial<{
+            verdict: string;
+            stage: string;
+            asset: string;
+            market: string;
+            showDead: boolean;
+            collapsed: Partial<Record<Stage, boolean>>;
+          }>;
+          if (typeof v.verdict === "string") setVerdict(v.verdict);
+          if (typeof v.stage === "string") setStage(v.stage);
+          if (typeof v.asset === "string") setAsset(v.asset);
+          if (typeof v.market === "string") setMarket(v.market);
+          if (typeof v.showDead === "boolean") setShowDead(v.showDead);
+          if (v.collapsed && typeof v.collapsed === "object")
+            setCollapsed(v.collapsed);
+        }
+      } catch {
+        // corrupt/absent state — defaults stand
+      }
+      viewRestored.current = true;
+    });
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  useEffect(() => {
+    if (!viewRestored.current) return;
+    try {
+      sessionStorage.setItem(
+        PERSIST_KEY,
+        JSON.stringify({ verdict, stage, asset, market, showDead, collapsed }),
+      );
+    } catch {
+      // storage unavailable — view state is per-visit only
+    }
+  }, [verdict, stage, asset, market, showDead, collapsed]);
 
   // The ⌘K "New deal…" action lands here as ?new=1 — honor it even when the
   // pipeline is already mounted (client-side navigation keeps state). The
@@ -240,13 +294,17 @@ export function Pipeline({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = deals.filter((d) => {
+      const dealStage = normalizeStage(d.stage);
       if (q && !`${d.name} ${d.market}`.toLowerCase().includes(q)) return false;
       if (verdict !== "all") {
         if (verdict === "screening") {
           if (d.verdict) return false;
         } else if (d.verdict !== verdict) return false;
       }
-      if (stage !== "all" && d.stage !== stage) return false;
+      if (stage !== "all" && dealStage !== stage) return false;
+      // Dead deals stay out of the clean pipeline unless the user asked for
+      // them — explicitly filtering to Dead counts as asking.
+      if (dealStage === "dead" && !showDead && stage !== "dead") return false;
       if (asset !== "all" && d.assetClass !== asset) return false;
       if (market !== "all" && d.market !== market) return false;
       return true;
@@ -262,7 +320,31 @@ export function Pipeline({
       const tie = sortKey === "added" ? 0 : b.createdAt.localeCompare(a.createdAt);
       return (sortDir === "asc" ? cmp : -cmp) || tie;
     });
-  }, [deals, query, verdict, stage, asset, market, sortKey, sortDir]);
+  }, [deals, query, verdict, stage, asset, market, sortKey, sortDir, showDead]);
+
+  // The pipeline reads as one ladder: deals grouped by stage, in stage order,
+  // each group internally sorted by the active column sort.
+  const groups = useMemo(() => {
+    const byStage = new Map<Stage, DealCard[]>(STAGES.map((s) => [s, []]));
+    for (const d of filtered) byStage.get(normalizeStage(d.stage))!.push(d);
+    return byStage;
+  }, [filtered]);
+
+  const deadCount = useMemo(
+    () => deals.filter((d) => normalizeStage(d.stage) === "dead").length,
+    [deals],
+  );
+
+  /** A section is open unless the user collapsed it; an EMPTY section starts
+   *  collapsed until the user opens it. */
+  function isOpen(s: Stage): boolean {
+    const explicit = collapsed[s];
+    if (explicit !== undefined) return !explicit;
+    return (groups.get(s)?.length ?? 0) > 0;
+  }
+  function toggleSection(s: Stage) {
+    setCollapsed((c) => ({ ...c, [s]: isOpen(s) }));
+  }
 
   function toggleSort(k: SortKey) {
     if (sortKey === k) {
@@ -278,7 +360,7 @@ export function Pipeline({
     for (const d of deals) {
       if (d.verdict && d.verdict in c) c[d.verdict as keyof typeof c]++;
       else if (!d.verdict) c.screening++;
-      if (d.stage === "pursuing") c.pursuing++;
+      if (normalizeStage(d.stage) === "active_pursuit") c.pursuing++;
     }
     return c;
   }, [deals]);
@@ -296,6 +378,9 @@ export function Pipeline({
     stage !== "all" ||
     asset !== "all" ||
     market !== "all";
+  // Empty stage sections render (collapsed) on the clean view, but hide while
+  // filters narrow the list — a run of "(0)" headers under a filter is noise.
+  const hideEmptySections = filtersActive;
 
   // Export the current (filtered) view as a CSV — opens in Excel/Sheets.
   function exportCsv() {
@@ -305,7 +390,7 @@ export function Pipeline({
       const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
       return `"${safe.replaceAll('"', '""')}"`;
     };
-    const header = ["Deal", "Asset class", "Market", "Price", "Cap rate", "Buy box", "Status", "Stage", "Added", "Added by"];
+    const header = ["Deal", "Asset class", "Market", "Price", "Cap rate", "Buy box", "Status", "Stage", "Offers due", "Added", "Added by"];
     const lines = filtered.map((d) =>
       [
         d.name,
@@ -321,7 +406,8 @@ export function Pipeline({
             : d.jobStatus === "failed"
               ? "Failed"
               : "Not screened",
-        STAGE_LABEL[d.stage],
+        STAGE_LABEL[normalizeStage(d.stage)],
+        d.offersDue ?? "",
         fmtDate(d.createdAt),
         d.addedBy ?? "You",
       ]
@@ -462,17 +548,21 @@ export function Pipeline({
               {verdictCounts.screening} No verdict
             </button>
           )}
-          {/* The funnel's business end — deals you're actually chasing. */}
+          {/* The funnel's business end — deals you're actively chasing. */}
           {verdictCounts.pursuing > 0 && (
             <button
               type="button"
-              aria-pressed={stage === "pursuing"}
-              onClick={() => setStage(stage === "pursuing" ? "all" : "pursuing")}
+              aria-pressed={stage === "active_pursuit"}
+              onClick={() =>
+                setStage(stage === "active_pursuit" ? "all" : "active_pursuit")
+              }
               className={`rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand transition-all ${
-                stage === "pursuing" ? "ring-2 ring-current" : "hover:opacity-80"
+                stage === "active_pursuit"
+                  ? "ring-2 ring-current"
+                  : "hover:opacity-80"
               }`}
             >
-              {verdictCounts.pursuing} Pursuing
+              {verdictCounts.pursuing} In pursuit
             </button>
           )}
         </div>
@@ -557,10 +647,7 @@ export function Pipeline({
             onChange={setStage}
             options={[
               ["all", "All stages"],
-              ["screening", "Screening"],
-              ["reviewing", "Reviewing"],
-              ["pursuing", "Pursuing"],
-              ["dead", "Dead"],
+              ...STAGES.map((s) => [s, STAGE_LABEL[s]] as [string, string]),
             ]}
           />
           {assets.length > 1 && (
@@ -582,6 +669,20 @@ export function Pipeline({
                 ...markets.map((m) => [m, m] as [string, string]),
               ]}
             />
+          )}
+          {deadCount > 0 && (
+            <button
+              type="button"
+              aria-pressed={showDead}
+              onClick={() => setShowDead((v) => !v)}
+              className={`rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm transition-colors ${
+                showDead
+                  ? "border-brand bg-brand/5 text-brand"
+                  : "border-line bg-surface text-muted hover:bg-faint hover:text-ink"
+              }`}
+            >
+              {showDead ? "Hide dead" : `Show dead (${deadCount})`}
+            </button>
           )}
           {/* Below md the column headers are hidden, so sorting lives here. */}
           <FilterSelect
@@ -656,16 +757,29 @@ export function Pipeline({
           </div>
         </div>
       ) : filtered.length === 0 ? (
-        <p className="text-sm text-muted">
-          No deals match these filters.{" "}
-          <button
-            type="button"
-            onClick={clearFilters}
-            className="font-medium text-brand hover:text-brand-strong"
-          >
-            Clear filters
-          </button>
-        </p>
+        deadCount === deals.length && !showDead && stage !== "dead" ? (
+          <p className="text-sm text-muted">
+            All your deals are marked Dead.{" "}
+            <button
+              type="button"
+              onClick={() => setShowDead(true)}
+              className="font-medium text-brand hover:text-brand-strong"
+            >
+              Show dead deals
+            </button>
+          </p>
+        ) : (
+          <p className="text-sm text-muted">
+            No deals match these filters.{" "}
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="font-medium text-brand hover:text-brand-strong"
+            >
+              Clear filters
+            </button>
+          </p>
+        )
       ) : (
         <>
           {filtersActive && (
@@ -681,9 +795,10 @@ export function Pipeline({
             </p>
           )}
           <div>
-            {/* One header row labels the columns for every deal — each label
-                is a sort control. Widths/gaps mirror DealRow exactly; the
-                narrower columns only join in at lg (the sidebar eats md). */}
+            {/* One header row labels the columns for every group — each label
+                is a sort control (sorting applies within each stage group).
+                Widths/gaps mirror DealRow exactly; narrower columns join at
+                lg, the Added column at xl (the Stage select takes its slot). */}
             <div className="hidden items-center gap-3 px-5 pb-1.5 md:flex">
               {compareMode && <span className="w-5 shrink-0" />}
               <div className="min-w-0 flex-1">
@@ -694,21 +809,75 @@ export function Pipeline({
               <SortHead label="Cap" k="cap" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="w-12" right />
               <SortHead label="Buy box" k="fit" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="hidden w-16 lg:flex" right />
               <SortHead label="Status" k="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="w-22" right />
-              <SortHead label="Added" k="added" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="hidden w-22 lg:flex" right />
-              {!compareMode && <span className="h-4 w-4 shrink-0" />}
+              <SortHead label="Added" k="added" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="hidden w-24 xl:flex" right />
+              {!compareMode && (
+                <span className="hidden w-36 shrink-0 text-right text-[10px] font-medium uppercase tracking-wide text-muted lg:block">
+                  Stage
+                </span>
+              )}
+              {!compareMode && <span className="h-4 w-4 shrink-0 lg:hidden" />}
             </div>
-            <ul className="stagger divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
-            {filtered.map((d, idx) => (
-              <DealRow
-                key={d.id}
-                d={d}
-                i={idx}
-                compareMode={compareMode}
-                checked={selected.has(d.id)}
-                onToggle={() => toggleSelected(d.id)}
-              />
-            ))}
-            </ul>
+
+            <div className="space-y-4">
+              {STAGES.map((s) => {
+                const sectionDeals = groups.get(s) ?? [];
+                // Dead lives behind its toggle; empty sections hide while
+                // filters narrow, otherwise render collapsed.
+                if (s === "dead" && !showDead && stage !== "dead") return null;
+                if (sectionDeals.length === 0 && hideEmptySections) return null;
+                const open = isOpen(s) && sectionDeals.length > 0;
+                return (
+                  <section key={s}>
+                    <button
+                      type="button"
+                      onClick={() => toggleSection(s)}
+                      aria-expanded={open}
+                      disabled={sectionDeals.length === 0}
+                      className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 text-left transition-colors enabled:hover:bg-faint disabled:cursor-default"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className={`h-3.5 w-3.5 shrink-0 text-muted transition-transform ${
+                          open ? "rotate-90" : ""
+                        }`}
+                        aria-hidden
+                      >
+                        <path d="m9 18 6-6-6-6" />
+                      </svg>
+                      <span
+                        className={`text-sm font-semibold tracking-tight ${
+                          s === "dead" ? "text-muted" : ""
+                        }`}
+                      >
+                        {STAGE_LABEL[s]}
+                      </span>
+                      <span className="rounded-full bg-faint px-2 py-0.5 font-mono text-[11px] tabular-nums text-muted">
+                        {sectionDeals.length}
+                      </span>
+                    </button>
+                    {open && (
+                      <ul className="stagger mt-1.5 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+                        {sectionDeals.map((d, idx) => (
+                          <DealRow
+                            key={d.id}
+                            d={d}
+                            i={idx}
+                            compareMode={compareMode}
+                            checked={selected.has(d.id)}
+                            onToggle={() => toggleSelected(d.id)}
+                          />
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
           </div>
         </>
       )}
@@ -831,9 +1000,12 @@ function DealRow({
   onToggle: () => void;
 }) {
   const v = d.verdict ? VERDICT_META[d.verdict] : null;
+  const isDead = normalizeStage(d.stage) === "dead";
 
   // Figures whose columns are hidden on narrower screens fold back into the
-  // meta line there — same information, no duplication at any width.
+  // meta line there — same information, no duplication at any width. The
+  // stage itself lives in the group header (and the row's Stage select), so
+  // it no longer repeats here.
   const marketBit = d.market || null;
   const assetBit = d.assetClass ? (
     <span className="capitalize">{d.assetClass}</span>
@@ -854,12 +1026,7 @@ function DealRow({
   const dateBit = (
     <span className="font-mono tabular-nums">{fmtDate(d.createdAt)}</span>
   );
-  const stageBit =
-    d.stage !== "screening" ? (
-      <span className={d.stage === "dead" ? undefined : "font-medium text-brand"}>
-        {STAGE_LABEL[d.stage]}
-      </span>
-    ) : null;
+  const dueBit = d.offersDue ? <OffersDueBit iso={d.offersDue} /> : null;
   const addedByBit = d.addedBy ? `added by ${d.addedBy}` : null;
 
   const inner = (
@@ -892,15 +1059,19 @@ function DealRow({
         <p className="truncate font-medium">{d.name}</p>
         <MetaLine
           className="md:hidden"
-          bits={[marketBit, assetBit, priceBit, capBit, fitBit, stageBit, dateBit, addedByBit]}
+          bits={[dueBit, marketBit, assetBit, priceBit, capBit, fitBit, dateBit, addedByBit]}
         />
         <MetaLine
           className="hidden md:block lg:hidden"
-          bits={[marketBit, assetBit, fitBit, stageBit, dateBit, addedByBit]}
+          bits={[dueBit, marketBit, assetBit, fitBit, dateBit, addedByBit]}
         />
         <MetaLine
-          className="hidden lg:block"
-          bits={[marketBit, stageBit, addedByBit]}
+          className="hidden lg:block xl:hidden"
+          bits={[dueBit, marketBit, dateBit, addedByBit]}
+        />
+        <MetaLine
+          className="hidden xl:block"
+          bits={[dueBit, marketBit, addedByBit]}
         />
       </div>
       {/* Column cells — widths, order, and gaps mirror the header row. */}
@@ -940,28 +1111,17 @@ function DealRow({
           <span className="text-[11px] text-muted">Not screened</span>
         )}
       </span>
-      <span className="hidden w-22 shrink-0 text-right font-mono text-xs tabular-nums text-muted lg:block">
+      <span className="hidden w-24 shrink-0 whitespace-nowrap text-right font-mono text-xs tabular-nums text-muted xl:block">
         {fmtDate(d.createdAt)}
       </span>
-      {!compareMode && (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-4 w-4 shrink-0 text-line transition-colors group-hover:text-muted"
-          aria-hidden
-        >
-          <path d="m9 18 6-6-6-6" />
-        </svg>
-      )}
     </>
   );
 
   return (
-    <li style={{ "--i": i } as React.CSSProperties}>
+    <li
+      style={{ "--i": i } as React.CSSProperties}
+      className={isDead ? "opacity-60" : undefined}
+    >
       {compareMode ? (
         <button
           type="button"
@@ -974,12 +1134,32 @@ function DealRow({
           {inner}
         </button>
       ) : (
-        <Link
-          href={`/deals/${d.id}`}
-          className="group flex items-center gap-3 px-5 py-4 transition-colors hover:bg-faint"
-        >
-          {inner}
-        </Link>
+        // The stage select is a form, so it sits BESIDE the link (nesting
+        // interactive elements is invalid) — the row still reads and hovers
+        // as one unit, and everything except the select navigates.
+        <div className="group flex items-center gap-3 px-5 py-4 transition-colors hover:bg-faint">
+          <Link
+            href={`/deals/${d.id}`}
+            className="flex min-w-0 flex-1 items-center gap-3"
+          >
+            {inner}
+          </Link>
+          <span className="hidden w-36 shrink-0 justify-end lg:flex">
+            <StageSelect dealId={d.id} stage={d.stage} next="pipeline" compact />
+          </span>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4 shrink-0 text-line transition-colors group-hover:text-muted lg:hidden"
+            aria-hidden
+          >
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+        </div>
       )}
     </li>
   );

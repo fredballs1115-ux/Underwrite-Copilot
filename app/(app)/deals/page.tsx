@@ -144,6 +144,20 @@ export default async function DealsPage({
   for (const j of (jobsData ?? []) as { deal_id: string; status: string }[]) {
     if (!jobByDeal.has(j.deal_id)) jobByDeal.set(j.deal_id, j.status);
   }
+
+  // Call-for-offers deadlines are best-effort: the column arrived in
+  // migration 0013, and the pipeline must keep working on a database that
+  // hasn't run it yet (the query just errors and every deadline reads null).
+  const dueById = new Map<string, string>();
+  if (ids.length) {
+    const { data: dueRows } = await supabase
+      .from("deals")
+      .select("id, offers_due")
+      .in("id", ids);
+    for (const r of (dueRows ?? []) as { id: string; offers_due: string | null }[]) {
+      if (r.offers_due) dueById.set(r.id, r.offers_due);
+    }
+  }
   const nameById = new Map(
     ((mates ?? []) as { id: string; email: string | null; full_name: string | null }[]).map(
       (m) => [m.id, m.full_name || m.email || "Teammate"],
@@ -178,6 +192,7 @@ export default async function DealsPage({
           ? (nameById.get(d.user_id) ?? "Teammate")
           : null,
       market: extraction?.market ?? "",
+      offersDue: dueById.get(d.id) ?? null,
       slots: extraction
         ? pickSlots(extraction.metrics)
         : { cap: null, price: null },

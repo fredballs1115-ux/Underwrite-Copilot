@@ -12,6 +12,7 @@ import type {
   VerdictResult,
 } from "@/lib/anthropic/types";
 import type { BuyBoxCheck } from "@/lib/criteria";
+import { STAGE_LABEL, type StageChange } from "@/lib/stages";
 import type { ScreenDiff } from "@/lib/screen-diff";
 import {
   OverviewView,
@@ -143,6 +144,7 @@ const MODEL_ERRORS: Record<string, string> = {
   supp: "Couldn’t save your change — please try again.",
   delete: "Couldn’t delete the deal — please try again.",
   stage: "Couldn’t save the stage — please try again.",
+  deadline: "Couldn’t save the offers-due date — please try again.",
 };
 
 // Errors from the Reconciler tab's own upload are shown inline there; every
@@ -199,6 +201,7 @@ export function DealView({
   isPro,
   buyBox,
   screenDiff,
+  stageHistory,
   omUrl,
 }: {
   dealId: string;
@@ -216,6 +219,7 @@ export function DealView({
   isPro: boolean;
   buyBox: BuyBoxPanelData;
   screenDiff: ScreenDiff | null;
+  stageHistory: StageChange[];
   omUrl: string | null;
 }) {
   const router = useRouter();
@@ -570,6 +574,7 @@ export function DealView({
               active={active}
               onNavigate={navigateLegacy}
             />
+            {stageHistory.length > 0 && <StageHistory entries={stageHistory} />}
           </div>
         )}
 
@@ -1113,6 +1118,35 @@ function useElapsed(): string {
   const m = Math.floor(secs / 60);
   const sec = String(secs % 60).padStart(2, "0");
   return `${m}:${sec}`;
+}
+
+/** Where the deal has been: every stage change with its date, newest first.
+ *  Simple by design — a paper trail, not a timeline visualization. */
+function StageHistory({ entries }: { entries: StageChange[] }) {
+  const ordered = [...entries].reverse();
+  return (
+    <section className="rounded-2xl border border-line bg-surface p-5 shadow-card">
+      <h2 className="text-sm font-semibold tracking-tight">Stage history</h2>
+      <ul className="mt-3 space-y-1.5">
+        {ordered.map((e, i) => (
+          <li key={`${e.at}-${i}`} className="flex items-baseline gap-3 text-sm">
+            <span className="w-24 shrink-0 font-mono text-xs tabular-nums text-muted">
+              {new Date(e.at).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+                timeZone: "UTC",
+              })}
+            </span>
+            <span>
+              Moved to{" "}
+              <span className="font-medium">{STAGE_LABEL[e.stage]}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
 
 /** A dismissible top-of-page banner for deal-level action errors (replace-OM,
