@@ -5,7 +5,7 @@ import {
   getBilling,
   FREE_DEAL_LIMIT,
   PRO_PRICE_LABEL,
-  TEAM_OWNER_PRICE,
+  TEAM_BASE_PRICE,
   TEAM_MEMBER_PRICE,
   teamMonthlyTotal,
   fmtUsd,
@@ -240,8 +240,8 @@ export default async function BillingPage({
           {/* The invoice math, spelled out. */}
           <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
             <div className="flex items-center justify-between rounded-lg border border-line bg-faint px-3 py-2">
-              <dt className="text-muted">Owner seat</dt>
-              <dd className="font-mono tabular-nums">{fmtUsd(TEAM_OWNER_PRICE)}/mo</dd>
+              <dt className="text-muted">Base (includes the owner)</dt>
+              <dd className="font-mono tabular-nums">{fmtUsd(TEAM_BASE_PRICE)}/mo</dd>
             </div>
             <div className="flex items-center justify-between rounded-lg border border-line bg-faint px-3 py-2">
               <dt className="text-muted">
@@ -297,7 +297,7 @@ export default async function BillingPage({
                   </span>
                   <span className="shrink-0 text-xs text-muted">
                     {m.role === "owner"
-                      ? `owner · ${fmtUsd(TEAM_OWNER_PRICE)}/mo`
+                      ? "owner · in the base"
                       : fmtUsd(TEAM_MEMBER_PRICE) + "/mo"}
                   </span>
                   {team.role === "owner" && m.role !== "owner" && (
@@ -339,7 +339,7 @@ export default async function BillingPage({
           <a href="/team" className="font-medium text-brand hover:text-brand-strong">
             Team plan
           </a>{" "}
-          is {fmtUsd(TEAM_OWNER_PRICE)}/mo for the owner plus{" "}
+          is {fmtUsd(TEAM_BASE_PRICE)}/mo (that covers the owner) plus{" "}
           {fmtUsd(TEAM_MEMBER_PRICE)}/mo per added member — one shared
           pipeline, one subscription.
         </p>

@@ -7,18 +7,18 @@ export type Plan = "free" | "pro";
 
 export const FREE_DEAL_LIMIT = 3;
 export const PRO_PRICE_LABEL = "$29.99/mo";
-// Team pricing: the account owner's seat at $29.99, each ADDED member at
-// $20.99. In Stripe this is ONE subscription item with a graduated tiered
-// price (first unit $29.99, units 2+ $20.99) and quantity = member count —
-// so seat syncing stays a single quantity update and can never drift.
-export const TEAM_OWNER_PRICE = 29.99;
-export const TEAM_MEMBER_PRICE = 20.99;
-export const TEAM_PRICE_LABEL = "$29.99 + $20.99 per added member";
+// Team pricing: a $49.99 base that INCLUDES the account owner, each ADDED
+// member at $9.99. In Stripe this is ONE subscription item with a graduated
+// tiered price (first unit $49.99, units 2+ $9.99) and quantity = member
+// count — so seat syncing stays a single quantity update and can never drift.
+export const TEAM_BASE_PRICE = 49.99;
+export const TEAM_MEMBER_PRICE = 9.99;
+export const TEAM_PRICE_LABEL = "$49.99 + $9.99 per added member";
 
 /** Monthly team total for a given member count (owner included). */
 export function teamMonthlyTotal(seatCount: number): number {
   if (seatCount <= 0) return 0;
-  return TEAM_OWNER_PRICE + (seatCount - 1) * TEAM_MEMBER_PRICE;
+  return TEAM_BASE_PRICE + (seatCount - 1) * TEAM_MEMBER_PRICE;
 }
 
 export const fmtUsd = (n: number) =>
