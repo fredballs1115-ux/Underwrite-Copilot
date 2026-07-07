@@ -5,10 +5,15 @@ import { getBilling } from "@/lib/billing";
 import { signOut } from "@/app/login/actions";
 import { ChangePasswordForm } from "./change-password-form";
 import { DeleteAccountForm } from "./delete-account-form";
+import { EmailToggle } from "./email-toggle";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { emailEnabled } from "@/lib/email";
 
 export const metadata: Metadata = { title: "Account" };
 
 const DELETE_ERRORS: Record<string, string> = {
+  emailpref:
+    "Couldn't save your notification preference just now — please try again.",
   confirm: 'Type DELETE (all caps) in the box to confirm deletion.',
   ownerdelete:
     "You own a team, so self-deletion is disabled — it would take the team down with you. Email underwritecopilot.support@gmail.com and we'll handle it.",
@@ -30,6 +35,24 @@ export default async function AccountPage({
   } = await supabase.auth.getUser();
   const billing = user ? await getBilling(supabase, user.id) : null;
   const isPro = billing?.isPro ?? false;
+
+  // Analysis-email preference — ON by default; a pre-0014 schema (column
+  // missing) reads as ON too, matching what the sender assumes.
+  let emailOnAnalysis = true;
+  if (user) {
+    try {
+      const { data: prefs, error: prefErr } = await createSupabaseAdminClient()
+        .from("profiles")
+        .select("email_on_analysis")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (!prefErr && prefs && prefs.email_on_analysis === false) {
+        emailOnAnalysis = false;
+      }
+    } catch {
+      // default stands
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -78,6 +101,25 @@ export default async function AccountPage({
               {isPro ? "Manage plan" : "Upgrade"}
             </Link>
           </div>
+        </div>
+      </section>
+
+      {/* Notifications */}
+      <section className="rounded-2xl border border-line bg-surface p-6 shadow-card">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-sm font-semibold tracking-tight">
+              Email when an analysis finishes
+            </h2>
+            <p className="mt-1 max-w-md text-sm text-muted">
+              One email per completed screen — the verdict, the buy-box call,
+              and a link to the report.
+              {!emailEnabled() && (
+                <> Sending is currently paused while email is being configured.</>
+              )}
+            </p>
+          </div>
+          <EmailToggle enabled={emailOnAnalysis} />
         </div>
       </section>
 
