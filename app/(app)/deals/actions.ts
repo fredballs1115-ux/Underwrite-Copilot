@@ -53,6 +53,28 @@ export async function createDeal(formData: FormData) {
   if (file.size > MAX_BYTES) {
     redirect("/deals?error=size");
   }
+  // Trust the bytes, not the browser-declared MIME: a renamed non-PDF passes
+  // the type check above but wastes an upload + a full Claude run failing at
+  // extraction. Reject anything without the %PDF- signature up front.
+  const buffer = Buffer.from(await file.arrayBuffer());
+  if (!buffer.subarray(0, 5).toString("latin1").startsWith("%PDF-")) {
+    redirect("/deals?error=pdf");
+  }
+
+  // Idempotency: a raced double-submit (fast double-click, back-then-resubmit)
+  // would otherwise create duplicate deals and duplicate Claude runs. If an
+  // identically-named deal for this user appeared in the last 15s, treat this
+  // as the same intent and go to it instead of creating a twin.
+  const { data: recent } = await supabase
+    .from("deals")
+    .select("id, created_at")
+    .eq("user_id", user.id)
+    .eq("name", name)
+    .gte("created_at", new Date(Date.now() - 15_000).toISOString())
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (recent?.id) redirect(`/deals/${recent.id}`);
 
   // On a team, new deals land in the shared pipeline while the team plan or
   // trial allows it; otherwise fall back to a personal deal so a personal-Pro
@@ -96,7 +118,6 @@ export async function createDeal(formData: FormData) {
   // If the upload or the follow-up writes fail, remove the half-created deal —
   // otherwise the user is stranded with a ghost row that eats a free slot.
   try {
-    const buffer = Buffer.from(await file.arrayBuffer());
     await uploadOmPdf(path, buffer);
 
     const { error: pathErr } = await supabase
@@ -355,6 +376,11 @@ export async function replaceOm(formData: FormData) {
   if (file.size > MAX_BYTES) {
     redirect(`/deals/${dealId}?error=omsize`);
   }
+  // Verify the %PDF- signature, not just the browser-declared MIME.
+  const replacementBytes = Buffer.from(await file.arrayBuffer());
+  if (!replacementBytes.subarray(0, 5).toString("latin1").startsWith("%PDF-")) {
+    redirect(`/deals/${dealId}?error=ompdf`);
+  }
 
   // Claim the run BEFORE the multi-second upload — the claim is a single
   // conditional UPDATE, so a concurrent replace/re-run on the same deal gets
@@ -374,8 +400,7 @@ export async function replaceOm(formData: FormData) {
   // the pipeline download, deletion cleanup — stays valid.
   const path = (deal.om_storage_path as string) ?? `${user.id}/${dealId}.pdf`;
   try {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    await uploadOmPdf(path, buffer);
+    await uploadOmPdf(path, replacementBytes);
   } catch {
     // Release the claim or the deal reads "queued" with no runner.
     await releaseClaim(
@@ -418,11 +443,8 @@ export async function reconcileWithModel(formData: FormData) {
     .maybeSingle();
   if (!deal?.om_storage_path) redirect(`/deals/${dealId}`);
 
-  // Refuse to stack a second pipeline on a live job (double-click guard).
-  if (await jobInFlight(supabase, dealId)) {
-    redirect(`/deals/${dealId}?error=busy`);
-  }
-
+  // Validate the file BEFORE claiming, so a rejected upload can't leave the
+  // job row wedged in a claimed state.
   const file = formData.get("model");
   if (!(file instanceof File) || file.size === 0) {
     redirect(`/deals/${dealId}?error=modelfile`);
@@ -437,26 +459,26 @@ export async function reconcileWithModel(formData: FormData) {
   const buffer = Buffer.from(await file.arrayBuffer());
   const name = file.name;
 
-  // Reuse the deal's single job row so the deal page treats the deal as
-  // "active" and the existing poller surfaces the reconcile step.
-  const { data: existing } = await supabase
-    .from("analysis_jobs")
-    .select("id")
-    .eq("deal_id", dealId)
-    .limit(1)
-    .maybeSingle();
-  if (existing) {
-    await supabase
-      .from("analysis_jobs")
-      .update({ status: "running", step: "reconcile", progress: 10, error: null })
-      .eq("deal_id", dealId);
-  } else {
-    await supabase.from("analysis_jobs").insert({
+  // Atomic claim (not a check-then-act read): two concurrent triggers on the
+  // same deal can't both win, so two pipelines never interleave writes.
+  const claim = await claimJob(supabase, dealId, "reconcile");
+  if (claim.outcome === "busy") {
+    redirect(`/deals/${dealId}?error=busy`);
+  }
+  if (claim.outcome === "none") {
+    const { error: insErr } = await supabase.from("analysis_jobs").insert({
       deal_id: dealId,
       status: "running",
       step: "reconcile",
       progress: 10,
     });
+    if (insErr) redirect(`/deals/${dealId}?error=busy`);
+  } else {
+    // We own the row now — surface the reconcile step immediately.
+    await supabase
+      .from("analysis_jobs")
+      .update({ status: "running", step: "reconcile", progress: 10, error: null })
+      .eq("deal_id", dealId);
   }
 
   after(() => runReconciliation(dealId, { name, buffer }));

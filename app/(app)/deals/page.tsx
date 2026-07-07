@@ -95,14 +95,29 @@ export default async function DealsPage({
   }
 
   if (error) {
+    // "Relation does not exist" means the migrations haven't run (a setup
+    // state); anything else is a transient outage — don't tell a user in
+    // production to go run SQL.
+    const schemaMissing = /relation|does not exist|schema/i.test(error.message);
     return (
       <div className="rounded-xl border border-line bg-surface p-5 text-sm">
-        <p className="font-medium">Database isn’t set up yet</p>
-        <p className="mt-1 text-muted">
-          Run every file in <code>supabase/migrations/</code> (0001 through
-          0010) in your Supabase SQL editor, then refresh this page.
-        </p>
-        <p className="mt-2 text-xs text-muted">({error.message})</p>
+        {schemaMissing ? (
+          <>
+            <p className="font-medium">Database isn’t set up yet</p>
+            <p className="mt-1 text-muted">
+              Run every file in <code>supabase/migrations/</code> (0001 through
+              the latest) in your Supabase SQL editor, then refresh this page.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="font-medium">Couldn’t load your pipeline</p>
+            <p className="mt-1 text-muted">
+              We couldn’t reach your data just now. Please refresh in a moment —
+              if it keeps happening, email underwritecopilot.support@gmail.com.
+            </p>
+          </>
+        )}
       </div>
     );
   }

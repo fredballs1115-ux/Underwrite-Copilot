@@ -22,20 +22,21 @@ export async function GET(
 
   const { data, error } = await supabase
     .from("analysis_jobs")
-    .select("status, step, progress, error")
+    .select("status, step, progress, error, updated_at")
     .eq("deal_id", id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (error) {
+    // Don't leak the raw DB message; the poller only needs the shape.
     return Response.json(
-      { status: "none", step: null, progress: 0, error: error.message },
+      { status: "none", step: null, progress: 0, error: null },
       { status: 500 },
     );
   }
 
   return Response.json(
-    data ?? { status: "none", step: null, progress: 0, error: null },
+    data ?? { status: "none", step: null, progress: 0, error: null, updated_at: null },
   );
 }

@@ -73,25 +73,33 @@ export async function GET(
     buyBoxChecks = [];
   }
 
-  const memo = buildMemoData(deal, dateStr, buyBoxChecks);
-  // MemoDocument renders a <Document>; cast to the element type renderToBuffer
-  // expects (it's typed for a Document element, not a wrapping component).
-  const element = React.createElement(MemoDocument, {
-    data: memo,
-  }) as unknown as Parameters<typeof renderToBuffer>[0];
-  const buffer = await renderToBuffer(element);
+  // This link opens in a plain <a> navigation, so an unhandled throw would put
+  // a raw "Internal Server Error" in the browser. Catch it and bounce back to
+  // the deal with a friendly, mapped error instead.
+  try {
+    const memo = buildMemoData(deal, dateStr, buyBoxChecks);
+    // MemoDocument renders a <Document>; cast to the element type renderToBuffer
+    // expects (it's typed for a Document element, not a wrapping component).
+    const element = React.createElement(MemoDocument, {
+      data: memo,
+    }) as unknown as Parameters<typeof renderToBuffer>[0];
+    const buffer = await renderToBuffer(element);
 
-  const safe =
-    (deal.name || "deal")
-      .replace(/[^a-z0-9]+/gi, "-")
-      .replace(/^-+|-+$/g, "")
-      .toLowerCase() || "deal";
+    const safe =
+      (deal.name || "deal")
+        .replace(/[^a-z0-9]+/gi, "-")
+        .replace(/^-+|-+$/g, "")
+        .toLowerCase() || "deal";
 
-  return new Response(new Uint8Array(buffer), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${safe}-screening-memo-${new Date().toISOString().slice(0, 10)}.pdf"`,
-      "Cache-Control": "no-store",
-    },
-  });
+    return new Response(new Uint8Array(buffer), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${safe}-screening-memo-${new Date().toISOString().slice(0, 10)}.pdf"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (err) {
+    console.error("memo render failed", err);
+    return Response.redirect(new URL(`/deals/${id}?error=memofail`, req.url), 302);
+  }
 }

@@ -43,7 +43,14 @@ type Job = {
   step: string | null;
   progress: number;
   error: string | null;
+  /** last write to the job row — used to detect a crashed/stalled run */
+  updated_at?: string | null;
 } | null;
+
+// A run that hasn't written progress in this long is treated as stalled: the
+// background process likely died (a deploy/restart), so we offer a restart
+// instead of spinning the rail forever. Matches the server's stale-reclaim.
+const STALL_MS = 10 * 60 * 1000;
 
 type Results = {
   extraction: ExtractionResult | null;
@@ -129,9 +136,18 @@ const MODEL_ERRORS: Record<string, string> = {
     "Only the deal’s creator or the team owner can replace its OM.",
   busy: "An analysis is already running on this deal — let it finish first.",
   memoempty: "Run the analysis first — the memo needs a verdict to export.",
+  memofail: "Couldn’t build the memo just now — please try again in a moment.",
+  modelfail: "Couldn’t build the Excel just now — please try again in a moment.",
+  docfile: "Please choose a file to add.",
+  docsize: "That file is larger than 22 MB — please try a smaller one.",
+  supp: "Couldn’t save your change — please try again.",
   delete: "Couldn’t delete the deal — please try again.",
   stage: "Couldn’t save the stage — please try again.",
 };
+
+// Errors from the Reconciler tab's own upload are shown inline there; every
+// other code lands the user on Overview, so it needs a top-level banner.
+const RECONCILE_ERROR_CODES = new Set(["modelfile", "modeltype", "modelsize"]);
 
 function isActive(status: string | undefined): boolean {
   return status === "queued" || status === "running";
@@ -417,14 +433,47 @@ export function DealView({
     }
   }
 
+  // A deal-level action error (replace-OM, delete, stage, busy, memo…) lands
+  // the user back on Overview — surface it as a banner here, not only on the
+  // Reconciler tab where MODEL_ERRORS was previously the sole render site.
+  const bannerError =
+    modelErrorCode &&
+    !RECONCILE_ERROR_CODES.has(modelErrorCode) &&
+    MODEL_ERRORS[modelErrorCode]
+      ? MODEL_ERRORS[modelErrorCode]
+      : null;
+
+  // A run whose job row hasn't advanced in STALL_MS almost certainly lost its
+  // background process (Render restart/deploy). Offer a restart rather than
+  // spinning forever — the server's claimJob reclaims a stale row.
+  const stalled =
+    active &&
+    !!job?.updated_at &&
+    Date.now() - Date.parse(job.updated_at) > STALL_MS;
+
   return (
     <div className="flex flex-col gap-5">
-      {active && (
+      {active && !stalled && (
         <div className="flex flex-col gap-2">
           <ProgressRail job={job!} />
           <NotifyOffer />
         </div>
       )}
+
+      {stalled && (
+        <div className="rounded-xl border border-caution/30 bg-caution/5 p-4">
+          <p className="text-sm font-medium text-caution">
+            This screen stalled
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            It hasn&apos;t made progress in a while — the run may have been
+            interrupted. Nothing was lost; start it again to pick back up.
+          </p>
+          <RetryForm dealId={dealId} label="Start it again" />
+        </div>
+      )}
+
+      {bannerError && <DealErrorBanner message={bannerError} />}
 
       {job?.status === "error" && (
         <div className="rounded-xl border border-kill/30 bg-kill/5 p-4">
@@ -442,9 +491,14 @@ export function DealView({
             and we&apos;ll dig in.
           </p>
           {job.error && (
-            <p className="mt-2 break-words font-mono text-[11px] text-muted/80">
-              {job.error}
-            </p>
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs font-medium text-muted hover:text-ink">
+                Technical details
+              </summary>
+              <p className="mt-1 break-words font-mono text-[11px] text-muted/80">
+                {job.error}
+              </p>
+            </details>
           )}
           <RetryForm dealId={dealId} label="Try again" />
         </div>
@@ -1055,6 +1109,44 @@ function useElapsed(): string {
   const m = Math.floor(secs / 60);
   const sec = String(secs % 60).padStart(2, "0");
   return `${m}:${sec}`;
+}
+
+/** A dismissible top-of-page banner for deal-level action errors (replace-OM,
+ *  delete, stage, busy…). Dismissing also strips ?error= from the URL so a
+ *  refresh doesn't resurrect it. */
+function DealErrorBanner({ message }: { message: string }) {
+  const [shown, setShown] = useState(true);
+  if (!shown) return null;
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-kill/30 bg-kill/5 p-4">
+      <p className="flex-1 text-sm font-medium text-kill">{message}</p>
+      <button
+        type="button"
+        aria-label="Dismiss"
+        onClick={() => {
+          setShown(false);
+          const url = new URL(window.location.href);
+          url.searchParams.delete("error");
+          window.history.replaceState(null, "", url);
+        }}
+        className="shrink-0 rounded-md p-1 text-kill/70 transition-colors hover:bg-kill/10 hover:text-kill"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-4 w-4"
+          aria-hidden
+        >
+          <path d="M18 6 6 18" />
+          <path d="m6 6 12 12" />
+        </svg>
+      </button>
+    </div>
+  );
 }
 
 /** Opt-in browser notification for the minute-long screen. Renders only

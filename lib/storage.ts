@@ -36,15 +36,32 @@ export async function downloadDealFile(path: string): Promise<Buffer> {
   return Buffer.from(await data.arrayBuffer());
 }
 
-/** Store a user-uploaded supplement file (any type) and its content type. */
+// Content types safe to serve inline from a signed URL. Everything else is
+// stored as octet-stream so the browser downloads it rather than rendering it
+// — a user-uploaded text/html or SVG must never execute inline on the storage
+// origin (stored-XSS defense). Note SVG is deliberately excluded (script vector).
+const INLINE_SAFE_TYPES = new Set([
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+]);
+
+/** Store a user-uploaded supplement file. The browser-declared content type is
+ *  honored only if it's on the inline-safe allowlist; anything else is stored
+ *  as octet-stream so it can't render as active content when opened. */
 export async function uploadSupplement(
   path: string,
   body: Buffer,
   contentType: string,
 ): Promise<void> {
+  const safeType = INLINE_SAFE_TYPES.has(contentType)
+    ? contentType
+    : "application/octet-stream";
   const admin = createSupabaseAdminClient();
   const { error } = await admin.storage.from(BUCKET).upload(path, body, {
-    contentType: contentType || "application/octet-stream",
+    contentType: safeType,
     upsert: true,
   });
   if (error) {
