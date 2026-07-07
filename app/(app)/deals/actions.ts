@@ -292,6 +292,79 @@ export async function rerunAnalysis(formData: FormData) {
 }
 
 /**
+ * Retrade: swap in a reissued OM and re-screen. Brokers cut price and resend
+ * the deck constantly — this overwrites the stored OM (same storage path) and
+ * runs the full pipeline again. The pipeline snapshots the previous results
+ * first, so the deal page then shows exactly what moved since the last screen.
+ */
+export async function replaceOm(formData: FormData) {
+  const dealId = String(formData.get("dealId") ?? "");
+  if (!dealId) redirect("/deals");
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  // RLS scopes this read — a deal the caller can't see comes back null.
+  const { data: deal } = await supabase
+    .from("deals")
+    .select("id, om_storage_path")
+    .eq("id", dealId)
+    .maybeSingle();
+  if (!deal) redirect("/deals");
+
+  if (await jobInFlight(supabase, dealId)) {
+    redirect(`/deals/${dealId}?error=busy`);
+  }
+
+  const file = formData.get("om");
+  if (!(file instanceof File) || file.size === 0) {
+    redirect(`/deals/${dealId}?error=omfile`);
+  }
+  if (file.type !== "application/pdf") {
+    redirect(`/deals/${dealId}?error=ompdf`);
+  }
+  if (file.size > MAX_BYTES) {
+    redirect(`/deals/${dealId}?error=omsize`);
+  }
+
+  // Keep the same storage path (upsert) so every reference — signed URLs,
+  // the pipeline download, deletion cleanup — stays valid.
+  const path = (deal.om_storage_path as string) ?? `${user.id}/${dealId}.pdf`;
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    await uploadOmPdf(path, buffer);
+  } catch {
+    redirect(`/deals/${dealId}?error=omupload`);
+  }
+  if (!deal.om_storage_path) {
+    await supabase.from("deals").update({ om_storage_path: path }).eq("id", dealId);
+  }
+
+  const { data: existing } = await supabase
+    .from("analysis_jobs")
+    .select("id")
+    .eq("deal_id", dealId)
+    .limit(1)
+    .maybeSingle();
+  if (existing) {
+    await supabase
+      .from("analysis_jobs")
+      .update({ status: "queued", step: "signal", progress: 0, error: null })
+      .eq("deal_id", dealId);
+  } else {
+    await supabase
+      .from("analysis_jobs")
+      .insert({ deal_id: dealId, status: "queued", step: "signal", progress: 0 });
+  }
+
+  after(() => runAnalysis(dealId));
+  redirect(`/deals/${dealId}`);
+}
+
+/**
  * Phase 5 — reconcile the deal against the buyer's own model. Takes the
  * uploaded model (Excel / CSV / PDF), kicks off the reconciler in the
  * background, and reuses the deal's job row so the existing progress UI shows

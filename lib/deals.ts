@@ -11,6 +11,9 @@ export interface DealRow {
   // The fast headline read that lands ~30s into a run (FirstSignal).
   // Migration 0009; null on rows screened before it existed.
   first_signal?: unknown;
+  // Snapshot of the previous run's extraction + verdict (PriorScreen),
+  // written by the pipeline at the start of every re-screen. Migration 0010.
+  prior_screen?: unknown;
   // Per-step results (filled in by the analysis pipeline in Phase 2).
   extraction: unknown;
   challenges: unknown;

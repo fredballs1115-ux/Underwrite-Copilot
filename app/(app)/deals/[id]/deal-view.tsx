@@ -94,6 +94,11 @@ const MODEL_ERRORS: Record<string, string> = {
   modelfile: "Please choose your model file to upload.",
   modeltype: "Please upload your model as .xlsx, .csv, or PDF.",
   modelsize: "That file is larger than 22 MB — please try a smaller export.",
+  omfile: "Choose the reissued OM (PDF) to upload.",
+  ompdf: "The replacement OM must be a PDF.",
+  omsize: "That PDF is larger than 22 MB — please try a smaller file.",
+  omupload:
+    "The upload didn’t complete — the stored OM is unchanged. Please try again.",
   busy: "An analysis is already running on this deal — let it finish first.",
   memoempty: "Run the analysis first — the memo needs a verdict to export.",
   delete: "Couldn’t delete the deal — please try again.",

@@ -120,7 +120,7 @@ const PRO_FEATURES = [
 const FAQ: { q: string; a: string }[] = [
   {
     q: "What do I need to get started?",
-    a: "Just an offering memorandum as a PDF. Upload it and the six-stage screen runs on its own — extraction, assumption challenges, comp scrutiny, market check, and a verdict. Add a rent roll, T-12, or loan terms later to deepen the model. You can also explore a fully-worked sample deal before uploading anything.",
+    a: "Just an offering memorandum as a PDF. Upload it and the screen runs on its own — a first read with the headline numbers lands in seconds, then extraction, assumption challenges, comp scrutiny, market check, and a verdict. Add a rent roll, T-12, or loan terms later to deepen the model. You can also explore a fully-worked sample deal before uploading anything.",
   },
   {
     q: "Where do the numbers come from?",
@@ -494,6 +494,10 @@ export default function Home() {
             <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
               What happens to every OM you upload.
             </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
+              A first read — headline numbers and buy-box fit — lands in
+              seconds, while the six deeper stages keep working.
+            </p>
             <Reveal delay={60}>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {SCREEN.map((s) => (
@@ -691,6 +695,64 @@ export default function Home() {
                     <span className="text-[10px] leading-tight text-muted">
                       same deals ·<br />
                       same answers
+                    </span>
+                  </div>
+                </div>
+
+                {/* Retrade watch */}
+                <div className="hover-lift rounded-2xl border border-line bg-surface p-5 shadow-card">
+                  <h3 className="text-sm font-semibold">Built for the retrade</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">
+                    Broker cut the price and reissued the deck? Replace the OM,
+                    re-screen, and see exactly what moved — and whether the
+                    verdict flips.
+                  </p>
+                  <div className="mt-4 space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-[10px] font-semibold">
+                      <span className="rounded-full bg-caution/10 px-2 py-0.5 text-caution">
+                        Caution
+                      </span>
+                      <span aria-hidden className="text-muted">→</span>
+                      <span className="rounded-full bg-pass/10 px-2 py-0.5 text-pass">
+                        Go
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-md border border-pass/25 bg-pass/[0.04] px-2.5 py-1.5 font-mono text-[10px]">
+                      <span className="text-muted">Asking price</span>
+                      <span className="font-semibold text-pass">−$1.8M (−2.5%)</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Buy box */}
+                <div className="hover-lift rounded-2xl border border-line bg-surface p-5 shadow-card lg:col-span-2">
+                  <h3 className="text-sm font-semibold">Your buy box, enforced</h3>
+                  <p className="mt-1 max-w-md text-xs leading-relaxed text-muted">
+                    Set your criteria once — asset classes, markets, max price,
+                    minimum cap and IRR. Every screen is checked against them in
+                    code, off-box deals get flagged within the first read, and
+                    the verdict judges the fit out loud.
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-1.5 text-[10px] font-medium">
+                    {(
+                      [
+                        ["✓", "Market", "text-pass border-line"],
+                        ["✓", "Price", "text-pass border-line"],
+                        ["✓", "Asset class", "text-pass border-line"],
+                        ["✕", "Going-in cap", "text-kill border-kill/30 bg-kill/[0.04]"],
+                      ] as const
+                    ).map(([mark, label, cls]) => (
+                      <span
+                        key={label}
+                        className={`flex items-center gap-1 rounded-md border px-2 py-1 ${cls}`}
+                      >
+                        <span aria-hidden>{mark}</span>
+                        <span className="text-ink">{label}</span>
+                      </span>
+                    ))}
+                    <span className="ml-1 self-center text-muted">
+                      …a deal can be well-underwritten and still be outside the
+                      box. It says so.
                     </span>
                   </div>
                 </div>

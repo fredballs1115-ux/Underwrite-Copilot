@@ -1365,8 +1365,28 @@ function FlipStrip({
     base: "Base",
     sponsor: "Sponsor",
   };
+
+  // The one-line answer to "where does this flip?" — derived, not generated.
+  const [cons, base, sponsor] = ordered;
+  let flipLine: string | null = null;
+  if (cons && base && sponsor) {
+    const c = CALL_META[cons.call]?.label ?? cons.call;
+    const b = CALL_META[base.call]?.label ?? base.call;
+    const s = CALL_META[sponsor.call]?.label ?? sponsor.call;
+    if (cons.call === base.call && base.call === sponsor.call) {
+      flipLine = `Holds at ${b} across the whole range — conservative through sponsor.`;
+    } else if (cons.call !== base.call && base.call !== sponsor.call) {
+      flipLine = `Reads ${c} / ${b} / ${s} across the range — the call lives on which end of the ranges you believe.`;
+    } else if (cons.call !== base.call) {
+      flipLine = `Doesn't survive the conservative end — drops to ${c} when the soft numbers hit.`;
+    } else {
+      flipLine = `Holds at ${b} through your base case; only the sponsor's own numbers read ${s}.`;
+    }
+  }
+
   return (
-    <div className="mt-4 flex max-w-md items-center gap-0">
+    <div className="mt-4 max-w-md">
+    <div className="flex items-center gap-0">
       {ordered.map((sc, i) => {
         const call = CALL_META[sc.call] ?? CALL_META.caution;
         return (
@@ -1387,6 +1407,10 @@ function FlipStrip({
           </div>
         );
       })}
+    </div>
+    {flipLine && (
+      <p className="mt-1.5 text-xs leading-relaxed text-muted">{flipLine}</p>
+    )}
     </div>
   );
 }

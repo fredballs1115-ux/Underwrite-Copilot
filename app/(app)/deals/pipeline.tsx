@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createDeal, createSampleDeal } from "./actions";
@@ -65,15 +65,26 @@ type BillingInfo = {
   dealLimit: number;
 };
 
+export type OnboardingState = {
+  hasBuyBox: boolean;
+  sampleId: string | null;
+  hasRealDeal: boolean;
+};
+
 export function Pipeline({
   deals,
   errorMessage,
   notice,
+  openNew,
+  onboarding,
   billing,
 }: {
   deals: DealCard[];
   errorMessage: string | null;
   notice?: string | null;
+  /** open the new-deal form on mount (?new=1 — the ⌘K "New deal…" action) */
+  openNew?: boolean;
+  onboarding?: OnboardingState;
   billing: BillingInfo | null;
 }) {
   const [query, setQuery] = useState("");
@@ -83,7 +94,16 @@ export function Pipeline({
   const [market, setMarket] = useState("all");
   const [sort, setSort] = useState("newest");
   const searchRef = useRef<HTMLInputElement>(null);
-  const [showForm, setShowForm] = useState(!!errorMessage);
+  const [showForm, setShowForm] = useState(!!errorMessage || !!openNew);
+
+  // The ⌘K "New deal…" action lands here as ?new=1 — honor it even when the
+  // pipeline is already mounted (client-side navigation keeps state). The
+  // setState is rAF-deferred so the effect body stays synchronous-free.
+  useEffect(() => {
+    if (!openNew) return;
+    const raf = requestAnimationFrame(() => setShowForm(true));
+    return () => cancelAnimationFrame(raf);
+  }, [openNew]);
   const [compareMode, setCompareMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -307,6 +327,14 @@ export function Pipeline({
         <p className="rounded-lg bg-pass/10 px-3 py-2 text-sm text-pass">
           {notice}
         </p>
+      )}
+
+      {onboarding && (
+        <GettingStarted
+          state={onboarding}
+          atLimit={atLimit}
+          onNewDeal={() => setShowForm(true)}
+        />
       )}
 
       {/* The one number a pipeline exists to answer: how do the calls split?
@@ -767,6 +795,171 @@ function DealRow({
         </Link>
       )}
     </li>
+  );
+}
+
+const ONBOARD_KEY = "uc-onboard-dismissed";
+
+/** Three real steps to a working account — every check reflects actual data,
+ *  and the card retires itself (or can be dismissed) once the account is set. */
+function GettingStarted({
+  state,
+  atLimit,
+  onNewDeal,
+}: {
+  state: OnboardingState;
+  atLimit: boolean;
+  onNewDeal: () => void;
+}) {
+  // Hidden until mount so a stored dismissal never flashes the card.
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      try {
+        setShow(localStorage.getItem(ONBOARD_KEY) !== "1");
+      } catch {
+        setShow(true);
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  const steps: {
+    key: string;
+    label: string;
+    done: boolean;
+    action: ReactNode;
+  }[] = [
+    {
+      key: "buybox",
+      label: "Set your buy box — every screen gets judged against it",
+      done: state.hasBuyBox,
+      action: (
+        <Link
+          href="/criteria"
+          className="text-xs font-medium text-brand hover:text-brand-strong"
+        >
+          Set it →
+        </Link>
+      ),
+    },
+    {
+      key: "sample",
+      label: "Explore the sample deal — every tab, no upload needed",
+      done: !!state.sampleId,
+      action: state.sampleId ? (
+        <Link
+          href={`/deals/${state.sampleId}`}
+          className="text-xs font-medium text-brand hover:text-brand-strong"
+        >
+          Open it →
+        </Link>
+      ) : (
+        <form action={createSampleDeal}>
+          <PendingButton
+            pendingLabel="Adding…"
+            className="text-xs font-medium text-brand hover:text-brand-strong"
+          >
+            Add it →
+          </PendingButton>
+        </form>
+      ),
+    },
+    {
+      key: "screen",
+      label: "Screen your first OM — verdict in a few minutes",
+      done: state.hasRealDeal,
+      action: atLimit ? (
+        <Link
+          href="/billing"
+          className="text-xs font-medium text-brand hover:text-brand-strong"
+        >
+          See plans →
+        </Link>
+      ) : (
+        <button
+          type="button"
+          onClick={onNewDeal}
+          className="text-xs font-medium text-brand hover:text-brand-strong"
+        >
+          Upload →
+        </button>
+      ),
+    },
+  ];
+
+  const remaining = steps.filter((s) => !s.done);
+  if (!show || remaining.length === 0) return null;
+
+  function dismiss() {
+    try {
+      localStorage.setItem(ONBOARD_KEY, "1");
+    } catch {
+      // storage unavailable — hide for this visit only
+    }
+    setShow(false);
+  }
+
+  return (
+    <section className="animate-rise rounded-2xl border border-brand/20 bg-brand/[0.03] p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold tracking-tight">
+            Get set up ({steps.length - remaining.length}/{steps.length})
+          </h2>
+          <p className="mt-0.5 text-xs text-muted">
+            Three steps and the copilot is working the way it should.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={dismiss}
+          aria-label="Hide the setup checklist"
+          className="rounded-md p-1 text-muted transition-colors hover:bg-faint hover:text-ink"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4"
+            aria-hidden
+          >
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
+        </button>
+      </div>
+      <ul className="mt-3 space-y-2">
+        {steps.map((s, i) => (
+          <li
+            key={s.key}
+            className="flex items-center gap-2.5 rounded-lg border border-line bg-surface px-3 py-2"
+          >
+            <span
+              aria-hidden
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                s.done
+                  ? "bg-pass/15 text-pass"
+                  : "bg-faint text-muted ring-1 ring-inset ring-line"
+              }`}
+            >
+              {s.done ? "✓" : i + 1}
+            </span>
+            <span
+              className={`min-w-0 flex-1 text-sm ${
+                s.done ? "text-muted line-through decoration-line" : ""
+              }`}
+            >
+              {s.label}
+            </span>
+            {!s.done && <span className="shrink-0">{s.action}</span>}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
