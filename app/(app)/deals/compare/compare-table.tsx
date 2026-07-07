@@ -21,12 +21,21 @@ export type Col = {
   verdict: string | null;
   reason: string | null;
   hasModel: boolean;
+  /** deterministic mandate fit + a one-line why (misses / near-misses) */
+  fit: "fits" | "near" | "outside" | null;
+  fitNote: string | null;
   irr: number | null;
   em: number | null;
   coc: number | null;
   cap: number | null;
   price: string | null;
   noi: string | null;
+};
+
+const FIT_LABEL: Record<NonNullable<Col["fit"]>, { text: string; cls: string }> = {
+  fits: { text: "Fits", cls: "text-pass" },
+  near: { text: "Near miss", cls: "text-caution" },
+  outside: { text: "Outside", cls: "text-kill" },
 };
 
 export function CompareTable({ cols }: { cols: Col[] }) {
@@ -114,6 +123,33 @@ export function CompareTable({ cols }: { cols: Col[] }) {
           </tr>
         </thead>
         <tbody>
+          {/* Mandate fit leads — an analyst checks the box before the returns.
+              Hidden entirely until a buy box exists to check against. */}
+          {cols.some((c) => c.fit) && (
+            <tr className="border-b border-line">
+              <td className="sticky left-0 z-10 whitespace-nowrap bg-surface px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted">
+                Buy box
+              </td>
+              {cols.map((c) => (
+                <td key={c.id} className="border-l border-line px-4 py-3 align-top">
+                  {c.fit ? (
+                    <>
+                      <span className={`font-semibold ${FIT_LABEL[c.fit].cls}`}>
+                        {FIT_LABEL[c.fit].text}
+                      </span>
+                      {c.fitNote && (
+                        <p className="mt-0.5 max-w-[16rem] text-xs leading-relaxed text-muted">
+                          {c.fitNote}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-muted">—</span>
+                  )}
+                </td>
+              ))}
+            </tr>
+          )}
           {metricRows.map((mr) => (
             <tr key={mr.label} className="border-b border-line last:border-0">
               <td className="sticky left-0 z-10 whitespace-nowrap bg-surface px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted">

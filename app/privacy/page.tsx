@@ -49,7 +49,7 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "Third parties we rely on",
     body: [
-      "Supabase (database, authentication, and document storage), Anthropic (AI analysis via the Claude API), Stripe (payments), and Render (hosting). Each receives only what it needs to do its job.",
+      "Supabase (database, authentication, and document storage), Anthropic (AI analysis via the Claude API), Stripe (payments), Render (hosting), and Photon by OpenStreetMap (address autocomplete — it receives only the address text you type into an address field, never your documents). Each receives only what it needs to do its job.",
     ],
   },
   {
@@ -90,7 +90,7 @@ export default function PrivacyPage() {
         <h1 className="text-3xl font-semibold tracking-tight">
           Privacy policy
         </h1>
-        <p className="mt-2 text-sm text-muted">Last updated: July 2, 2026</p>
+        <p className="mt-2 text-sm text-muted">Last updated: July 7, 2026</p>
         <p className="mt-5 text-sm leading-relaxed text-muted">
           Deal documents are sensitive — most OMs travel under confidentiality
           terms. This page says exactly what we collect, where it goes, and
@@ -123,6 +123,9 @@ export default function PrivacyPage() {
             </Link>
             <Link href="/privacy" className="transition-colors hover:text-ink">
               Privacy
+            </Link>
+            <Link href="/security" className="transition-colors hover:text-ink">
+              Security
             </Link>
             <Link href="/" className="transition-colors hover:text-ink">
               Home

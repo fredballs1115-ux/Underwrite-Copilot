@@ -4,6 +4,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult, VerdictResult } from "@/lib/anthropic/types";
 import type { UnderwritingModel } from "@/lib/model/types";
+import { getBuyBoxForDeal } from "@/lib/criteria-server";
+import { evaluateBuyBox, type BuyBox } from "@/lib/criteria";
 import { CompareTable, usd, type Col } from "./compare-table";
 
 export const metadata: Metadata = { title: "Compare deals" };
@@ -15,11 +17,30 @@ function fromExtraction(ex: ExtractionResult | null, re: RegExp): string | null 
   return m ? m.value : null;
 }
 
-function toCol(deal: DealRow): Col {
+function toCol(deal: DealRow, box: BuyBox | null): Col {
   const ex = (deal.extraction as ExtractionResult | null) ?? null;
   const verdict = (deal.verdict as VerdictResult | null) ?? null;
   const model = (deal.model as UnderwritingModel | null) ?? null;
   const r = model?.returns;
+
+  // Mandate fit — same engine and grading as the pipeline and deal page.
+  let fit: Col["fit"] = null;
+  let fitNote: string | null = null;
+  if (box && ex) {
+    const checks = evaluateBuyBox(deal.asset_class, ex, box);
+    const misses = checks.filter((c) => c.status === "miss");
+    const nears = checks.filter((c) => c.status === "near");
+    if (misses.length) {
+      fit = "outside";
+      fitNote = `Misses: ${misses.map((c) => c.label.toLowerCase()).join(", ")}`;
+    } else if (nears.length) {
+      fit = "near";
+      fitNote = `Near on ${nears.map((c) => c.label.toLowerCase()).join(", ")}`;
+    } else if (checks.some((c) => c.status === "pass")) {
+      fit = "fits";
+    }
+  }
+
   return {
     id: deal.id,
     name: deal.name,
@@ -28,6 +49,8 @@ function toCol(deal: DealRow): Col {
     verdict: verdict?.verdict ?? null,
     reason: verdict?.reason ?? null,
     hasModel: model != null,
+    fit,
+    fitNote,
     irr: r?.leveredIrrPct ?? null,
     em: r?.equityMultiple ?? null,
     coc: r?.cashOnCashPct ?? null,
@@ -56,7 +79,25 @@ export default async function ComparePage({
   const rows = ((data ?? []) as DealRow[]).sort(
     (a, b) => ids.indexOf(a.id) - ids.indexOf(b.id),
   );
-  const cols = rows.map(toCol);
+
+  // One buy box per owning scope (team or personal) — fetch each scope once.
+  type Scoped = DealRow & { user_id: string; team_id: string | null };
+  const scopeKey = (d: Scoped) => (d.team_id ? `t:${d.team_id}` : `u:${d.user_id}`);
+  const scopes = Array.from(new Set((rows as Scoped[]).map(scopeKey)));
+  const boxEntries = await Promise.all(
+    scopes.map(async (key) => {
+      const [kind, id] = [key[0], key.slice(2)];
+      const box = await getBuyBoxForDeal(
+        kind === "u" ? id : "",
+        kind === "t" ? id : null,
+      ).catch(() => null);
+      return [key, box] as const;
+    }),
+  );
+  const boxByScope = new Map(boxEntries);
+  const cols = (rows as Scoped[]).map((d) =>
+    toCol(d, boxByScope.get(scopeKey(d)) ?? null),
+  );
 
   const backLink = (
     <Link
@@ -96,6 +137,18 @@ export default async function ComparePage({
       <p className="text-xs leading-relaxed text-muted">
         First-pass screen, not investment advice. &ldquo;Best&rdquo; is only
         awarded among deals the screen didn&apos;t reject.
+        {cols.every((c) => !c.fit) && (
+          <>
+            {" "}
+            <Link
+              href="/criteria"
+              className="font-medium text-brand hover:text-brand-strong"
+            >
+              Set a buy box
+            </Link>{" "}
+            to see each deal&apos;s mandate fit here.
+          </>
+        )}
       </p>
     </div>
   );
