@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { removeStorageFiles } from "@/lib/storage";
@@ -9,6 +10,27 @@ import { getStripe } from "@/lib/stripe/client";
 import { syncTeamSeats } from "@/lib/stripe/seats";
 
 export type PwState = { error?: string; ok?: boolean } | null;
+
+/** Flip the analysis-ready email preference (migration 0014). The column is
+ *  service-role-written like the billing fields, so authenticate first. */
+export async function setEmailPrefs(formData: FormData) {
+  const value = String(formData.get("value") ?? "") === "on";
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { error } = await createSupabaseAdminClient()
+    .from("profiles")
+    .update({ email_on_analysis: value })
+    .eq("id", user.id);
+  if (error) redirect("/account?error=emailpref");
+
+  revalidatePath("/account");
+  redirect("/account");
+}
 
 /** Change the signed-in user's password. Returns a state for useActionState. */
 export async function changePassword(

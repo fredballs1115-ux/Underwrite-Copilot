@@ -15,6 +15,7 @@ import { BatchUpload } from "./batch-upload";
 import { FileDrop } from "../file-drop";
 import { PendingButton } from "../pending-button";
 import { AddressAutocomplete } from "../address-autocomplete";
+import type { StructuredAddress } from "@/lib/address";
 import { StageSelect } from "./[id]/stage-select";
 import { OffersDueBit } from "./offers-due";
 import { parseMoney, parsePct } from "@/lib/criteria";
@@ -1364,7 +1365,99 @@ function FilterSelect({
   );
 }
 
+/** The new-deal form's typed fields, mirrored to localStorage so an upload
+ *  failure — or a full page refresh — never costs the user their typing.
+ *  (The chosen FILE can't be restored; browsers forbid it.) */
+interface DealDraft {
+  name: string;
+  assetClass: string;
+  address: StructuredAddress | null;
+  /** set when a submit starts; a return WITHOUT an error means it succeeded */
+  submittedAt: number | null;
+}
+
+const DRAFT_KEY = "uc:new-deal-draft";
+
+function readDraft(): DealDraft | null {
+  try {
+    const raw = window.localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw) as DealDraft;
+    return d && typeof d === "object" ? d : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(d: DealDraft | null) {
+  try {
+    if (!d || (!d.name.trim() && !d.address)) {
+      window.localStorage.removeItem(DRAFT_KEY);
+    } else {
+      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+    }
+  } catch {
+    // Private mode / quota — drafts are a convenience, never a blocker.
+  }
+}
+
 function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
+  const [name, setName] = useState("");
+  const [assetClass, setAssetClass] = useState("auto");
+  // The address field manages its own text; we mirror its latest value here
+  // and remount it (key) when a draft restores.
+  const addressRef = useRef<StructuredAddress | null>(null);
+  const [restoredAddress, setRestoredAddress] = useState<StructuredAddress | null>(null);
+  const [addrKey, setAddrKey] = useState(0);
+  const [restored, setRestored] = useState(false);
+
+  // Restore once on mount (an effect, so SSR markup stays draft-free; the
+  // rAF defers the setState burst out of the effect body per hooks rules).
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      const d = readDraft();
+      if (!d) return;
+      if (d.submittedAt && !errorMessage) {
+        // Last submit came back without an error — the deal was created and
+        // this draft is spent.
+        writeDraft(null);
+        return;
+      }
+      if (d.name) setName(d.name);
+      if (d.assetClass) setAssetClass(d.assetClass);
+      if (d.address) {
+        addressRef.current = d.address;
+        setRestoredAddress(d.address);
+        setAddrKey((k) => k + 1);
+      }
+      if (d.name || d.address) setRestored(true);
+      if (d.submittedAt) writeDraft({ ...d, submittedAt: null });
+    });
+    return () => cancelAnimationFrame(raf);
+    // errorMessage is fixed for the lifetime of this render of the page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function persist(next: Partial<DealDraft>) {
+    writeDraft({
+      name,
+      assetClass,
+      address: addressRef.current,
+      submittedAt: null,
+      ...next,
+    });
+  }
+
+  function clearDraft() {
+    writeDraft(null);
+    setName("");
+    setAssetClass("auto");
+    addressRef.current = null;
+    setRestoredAddress(null);
+    setAddrKey((k) => k + 1);
+    setRestored(false);
+  }
+
   return (
     <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
       <h2 className="text-sm font-semibold tracking-tight">New deal</h2>
@@ -1377,18 +1470,56 @@ function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
           {errorMessage}
         </p>
       )}
-      <form action={createDeal} className="mt-4 space-y-3">
+      {restored && errorMessage && (
+        <p className="mt-2 text-sm text-muted" role="status">
+          Everything you typed is still filled in below — just re-attach the
+          PDF and resubmit.
+        </p>
+      )}
+      {restored && !errorMessage && (
+        <p className="mt-2 text-sm text-muted" role="status">
+          Restored your unsaved draft.{" "}
+          <button
+            type="button"
+            onClick={clearDraft}
+            className="font-medium text-brand transition-colors hover:text-brand-strong"
+          >
+            Start fresh
+          </button>
+        </p>
+      )}
+      <form
+        action={createDeal}
+        onSubmit={() =>
+          writeDraft({
+            name,
+            assetClass,
+            address: addressRef.current,
+            submittedAt: Date.now(),
+          })
+        }
+        className="mt-4 space-y-3"
+      >
         <div className="flex flex-col gap-3 sm:flex-row">
           <input
             name="name"
             required
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              persist({ name: e.target.value });
+            }}
             aria-label="Deal name"
             placeholder="Deal name — e.g. The Maddox at Highland Park"
             className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
           />
           <select
             name="assetClass"
-            defaultValue="auto"
+            value={assetClass}
+            onChange={(e) => {
+              setAssetClass(e.target.value);
+              persist({ assetClass: e.target.value });
+            }}
             aria-label="Asset class"
             className="rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
           >
@@ -1401,8 +1532,26 @@ function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
         </div>
         <div>
           <AddressAutocomplete
+            key={addrKey}
             name="address"
             textName="addressText"
+            defaultValue={restoredAddress}
+            onDraft={(text, picked) => {
+              addressRef.current =
+                picked ??
+                (text.trim()
+                  ? {
+                      label: text.trim(),
+                      street: "",
+                      city: "",
+                      state: "",
+                      zip: "",
+                      county: "",
+                      submarket: "",
+                    }
+                  : null);
+              persist({ address: addressRef.current });
+            }}
             placeholder="Property address (optional) — start typing for suggestions"
             className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
           />

@@ -11,6 +11,7 @@ import { synthesizeVerdict } from "./verdict";
 import { parseModelFile } from "@/lib/model-parse";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxLines } from "@/lib/criteria";
+import { notifyAnalysisReady } from "@/lib/email";
 import type {
   AssetClass,
   ExtractionResult,
@@ -211,6 +212,10 @@ export async function runAnalysis(
       progress: 100,
       error: null,
     });
+
+    // Heads-up email (key-ready; silently off without RESEND_API_KEY, and
+    // best-effort by design — the screen itself is already complete).
+    await notifyAnalysisReady(admin, dealId);
   } catch (err) {
     await patchJob(dealId, {
       status: "error",
