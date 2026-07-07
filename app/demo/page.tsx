@@ -4,6 +4,7 @@ import { LogoMark } from "@/app/logo";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import type { ExtractedMetric } from "@/lib/anthropic/types";
 import { DemoSections, type DemoData } from "./sections";
+import { ModelSlideshow } from "./model-slideshow";
 
 export const metadata: Metadata = {
   title: "Sample screen — a complete analysis, worked end to end",
@@ -138,6 +139,12 @@ export default function DemoPage() {
 
         <div className="mt-8">
           <DemoSections data={data} />
+        </div>
+
+        {/* The model, worked through as a slideshow — the artifact that
+            makes the screen concrete. */}
+        <div className="mt-10">
+          <ModelSlideshow model={data.model} />
         </div>
 
         {/* The conversion moment — after they've seen the whole screen. */}

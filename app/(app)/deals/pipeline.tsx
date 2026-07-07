@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createDeal, createSampleDeal } from "./actions";
+import { BatchUpload } from "./batch-upload";
 import { FileDrop } from "../file-drop";
 import { PendingButton } from "../pending-button";
 import { AddressAutocomplete } from "../address-autocomplete";
@@ -1423,6 +1424,7 @@ function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
           Create &amp; analyze
         </PendingButton>
       </form>
+      <BatchUpload />
       <form action={createSampleDeal} className="mt-3 border-t border-line pt-3">
         <PendingButton
           pendingLabel="Setting up your sample deal…"

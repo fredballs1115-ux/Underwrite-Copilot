@@ -13,6 +13,8 @@ import type {
 } from "@/lib/anthropic/types";
 import type { BuyBoxCheck } from "@/lib/criteria";
 import { STAGE_LABEL, type StageChange } from "@/lib/stages";
+import type { InternalComp } from "@/lib/internal-comps";
+import { DebtSizer } from "./debt-sizer";
 import type { ScreenDiff } from "@/lib/screen-diff";
 import {
   OverviewView,
@@ -202,6 +204,7 @@ export function DealView({
   buyBox,
   screenDiff,
   stageHistory,
+  internalComps = [],
   omUrl,
 }: {
   dealId: string;
@@ -220,6 +223,7 @@ export function DealView({
   buyBox: BuyBoxPanelData;
   screenDiff: ScreenDiff | null;
   stageHistory: StageChange[];
+  internalComps?: InternalComp[];
   omUrl: string | null;
 }) {
   const router = useRouter();
@@ -609,6 +613,7 @@ export function DealView({
             isPro={isPro}
             modelError={modelErrorCode ? MODEL_ERRORS[modelErrorCode] ?? null : null}
             supplements={supplements}
+            internalComps={internalComps}
           />
         )}
 
@@ -693,6 +698,8 @@ function FinancialsPanel({
           />
         </div>
       </details>
+
+      <DebtSizer model={model} extraction={results.extraction} />
 
       {supplement && <Supplements dealId={dealId} tab="terms" data={supplement} />}
       <AddData dealId={dealId} tab="terms" />
@@ -820,6 +827,7 @@ function AnalysesPanel({
   isPro,
   modelError,
   supplements,
+  internalComps,
 }: {
   analysis: AnalysisKey;
   onSelect: (key: AnalysisKey) => void;
@@ -834,6 +842,7 @@ function AnalysesPanel({
   isPro: boolean;
   modelError: string | null;
   supplements: SupplementsMap;
+  internalComps: InternalComp[];
 }) {
   const STEP_FOR: Record<AnalysisKey, string> = {
     verdict: "verdict",
@@ -855,6 +864,11 @@ function AnalysesPanel({
   const supp = supplements[analysis];
   const footer = (
     <>
+      {/* Comp memory renders in every state — it comes from OTHER deals, so
+          it's useful even before this deal's own comps scrutiny has run. */}
+      {analysis === "comps" && internalComps.length > 0 && (
+        <InternalCompsBlock comps={internalComps} />
+      )}
       {supp && <Supplements dealId={dealId} tab={analysis} data={supp} />}
       <AddData dealId={dealId} tab={analysis} />
     </>
@@ -1145,6 +1159,93 @@ function StageHistory({ entries }: { entries: StageChange[] }) {
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+const COMP_CALL: Record<string, { label: string; cls: string }> = {
+  pass: { label: "Go", cls: "bg-pass/15 text-pass" },
+  caution: { label: "Caution", cls: "bg-caution/15 text-caution" },
+  pass_on: { label: "No-go", cls: "bg-kill/15 text-kill" },
+};
+
+/** Internal comps memory: what the user's OWN screens extracted from other
+ *  OMs of the same asset class. A private frame of reference — deliberately
+ *  not third-party comp data (and labeled so nobody mistakes it for that). */
+function InternalCompsBlock({ comps }: { comps: InternalComp[] }) {
+  return (
+    <section className="rounded-2xl border border-line bg-surface p-5 shadow-card">
+      <h2 className="text-sm font-semibold tracking-tight">
+        From your pipeline
+      </h2>
+      <p className="mt-1 text-sm text-muted">
+        Same asset class, as extracted from each OM you&rsquo;ve screened —
+        your own frame of reference, not third-party comp data.
+      </p>
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full min-w-105 text-sm">
+          <thead>
+            <tr className="text-left text-[10px] font-medium uppercase tracking-wide text-muted">
+              <th className="py-1.5 pr-3 font-medium">Deal</th>
+              <th className="py-1.5 pr-3 font-medium">Screened</th>
+              <th className="py-1.5 pr-3 text-right font-medium">Price</th>
+              <th className="py-1.5 pr-3 text-right font-medium">Cap</th>
+              <th className="py-1.5 pr-3 text-right font-medium">Basis</th>
+              <th className="py-1.5 text-right font-medium">Call</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {comps.map((c) => {
+              const call = c.call ? COMP_CALL[c.call] : null;
+              return (
+                <tr key={c.dealId}>
+                  <td className="max-w-50 py-2 pr-3">
+                    <Link
+                      href={`/deals/${c.dealId}`}
+                      className="block truncate font-medium text-brand hover:underline"
+                    >
+                      {c.name}
+                    </Link>
+                    {c.market && (
+                      <span className="block truncate text-xs text-muted">
+                        {c.market}
+                      </span>
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap py-2 pr-3 font-mono text-xs tabular-nums text-muted">
+                    {new Date(c.screenedAt).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      timeZone: "UTC",
+                    })}
+                  </td>
+                  <td className="whitespace-nowrap py-2 pr-3 text-right font-mono text-xs tabular-nums">
+                    {c.priceLabel ?? <span className="text-line">—</span>}
+                  </td>
+                  <td className="whitespace-nowrap py-2 pr-3 text-right font-mono text-xs tabular-nums">
+                    {c.capLabel ?? <span className="text-line">—</span>}
+                  </td>
+                  <td className="whitespace-nowrap py-2 pr-3 text-right font-mono text-xs tabular-nums">
+                    {c.basisLabel ?? <span className="text-line">—</span>}
+                  </td>
+                  <td className="py-2 text-right">
+                    {call ? (
+                      <span
+                        className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${call.cls}`}
+                      >
+                        {call.label}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted">—</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
