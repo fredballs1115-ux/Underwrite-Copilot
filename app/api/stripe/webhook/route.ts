@@ -18,14 +18,23 @@ export async function POST(req: Request) {
     return new Response("Missing webhook secret or signature", { status: 400 });
   }
 
-  const stripe = getStripe();
-  const body = await req.text();
-
+  // getStripe() throws if STRIPE_SECRET_KEY is unset — keep it inside the guard
+  // so a misconfig returns a clean 500 (Stripe retries) instead of an uncaught
+  // exception. Signature verification stays first: nothing is trusted until it
+  // passes.
+  let stripe: ReturnType<typeof getStripe>;
   let event: Stripe.Event;
+  const body = await req.text();
   try {
+    stripe = getStripe();
     event = stripe.webhooks.constructEvent(body, sig, secret);
-  } catch {
-    return new Response("Invalid signature", { status: 400 });
+  } catch (err) {
+    // A signature/parse failure is the client's fault (400); a missing key is
+    // ours (500, so Stripe retries once it's configured).
+    const isConfig = err instanceof Error && /secret key/i.test(err.message);
+    return new Response(isConfig ? "Stripe not configured" : "Invalid signature", {
+      status: isConfig ? 500 : 400,
+    });
   }
 
   const admin = createSupabaseAdminClient();

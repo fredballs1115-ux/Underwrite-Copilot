@@ -43,7 +43,7 @@ export function GeoPicker({ initial }: { initial: GeoTarget[] }) {
           {chips.map((c) => (
             <li
               key={c.label}
-              className="flex items-center gap-1.5 rounded-full border border-line bg-faint py-1 pl-3 pr-1.5 text-xs font-medium"
+              className="flex items-center gap-1 rounded-full border border-line bg-faint py-1 pl-3 pr-1 text-xs font-medium"
             >
               {c.label}
               <button
@@ -52,7 +52,7 @@ export function GeoPicker({ initial }: { initial: GeoTarget[] }) {
                 onClick={() =>
                   setChips((prev) => prev.filter((x) => x.label !== c.label))
                 }
-                className="flex h-4 w-4 items-center justify-center rounded-full text-muted transition-colors hover:bg-line hover:text-ink"
+                className="flex h-6 w-6 items-center justify-center rounded-full text-base leading-none text-muted transition-colors hover:bg-line hover:text-ink"
               >
                 ×
               </button>

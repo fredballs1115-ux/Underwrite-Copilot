@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { uploadSupplement, removeSupplementFile } from "@/lib/storage";
 
@@ -59,7 +60,7 @@ export async function addSupplementNote(formData: FormData) {
     .from("deals")
     .update({ supplements: ctx.map, updated_at: new Date().toISOString() })
     .eq("id", dealId);
-  if (error) throw new Error(`Couldn't save your change: ${error.message}`);
+  if (error) redirect(`/deals/${dealId}?error=supp`);
   revalidatePath(`/deals/${dealId}`);
 }
 
@@ -68,7 +69,13 @@ export async function addSupplementFile(formData: FormData) {
   const tab = String(formData.get("tab") ?? "");
   const file = formData.get("file");
   if (!dealId || !VALID_TABS.has(tab)) return;
-  if (!(file instanceof File) || file.size === 0 || file.size > MAX_FILE) return;
+  // Surface a bad file instead of silently dropping it.
+  if (!(file instanceof File) || file.size === 0) {
+    redirect(`/deals/${dealId}?error=docfile`);
+  }
+  if (file.size > MAX_FILE) {
+    redirect(`/deals/${dealId}?error=docsize`);
+  }
 
   const ctx = await loadDeal(dealId);
   if (!ctx) return;
@@ -89,7 +96,7 @@ export async function addSupplementFile(formData: FormData) {
     .from("deals")
     .update({ supplements: ctx.map, updated_at: new Date().toISOString() })
     .eq("id", dealId);
-  if (error) throw new Error(`Couldn't save your change: ${error.message}`);
+  if (error) redirect(`/deals/${dealId}?error=supp`);
   revalidatePath(`/deals/${dealId}`);
 }
 
@@ -118,6 +125,6 @@ export async function removeSupplement(formData: FormData) {
     .from("deals")
     .update({ supplements: ctx.map, updated_at: new Date().toISOString() })
     .eq("id", dealId);
-  if (error) throw new Error(`Couldn't save your change: ${error.message}`);
+  if (error) redirect(`/deals/${dealId}?error=supp`);
   revalidatePath(`/deals/${dealId}`);
 }

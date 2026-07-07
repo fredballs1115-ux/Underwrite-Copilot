@@ -440,7 +440,7 @@ export function StressPanel({ model }: { model: UnderwritingModel }) {
                   −
                 </button>
                 <span
-                  className={`font-mono text-sm font-semibold tabular-nums ${
+                  className={`whitespace-nowrap font-mono text-sm font-semibold tabular-nums ${
                     changed ? "text-brand" : ""
                   }`}
                 >

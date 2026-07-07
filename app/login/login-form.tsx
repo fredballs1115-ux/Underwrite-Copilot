@@ -214,6 +214,26 @@ export function LoginForm({
             {pending && <ButtonSpinner />}
             {mode === "signup" ? "Create account" : "Sign in"}
           </button>
+
+          {mode === "signup" && (
+            <p className="text-center text-xs leading-relaxed text-white/55">
+              By creating an account you agree to our{" "}
+              <a
+                href="/terms"
+                className="font-medium text-white/80 underline-offset-2 hover:underline"
+              >
+                Terms
+              </a>{" "}
+              and{" "}
+              <a
+                href="/privacy"
+                className="font-medium text-white/80 underline-offset-2 hover:underline"
+              >
+                Privacy Policy
+              </a>
+              .
+            </p>
+          )}
         </form>
       )}
     </div>

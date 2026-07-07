@@ -14,7 +14,10 @@ export default async function LoginPage({
   return (
     <div className="band-dark flex flex-1 flex-col">
       <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16">
-        <Link href="/" className="flex items-center justify-center gap-2.5">
+        <Link
+          href="/"
+          className="flex items-center justify-center gap-2.5 transition-opacity hover:opacity-80"
+        >
           <LogoMark className="h-8 w-8" />
           <span className="font-semibold tracking-tight text-white">
             Underwrite Copilot

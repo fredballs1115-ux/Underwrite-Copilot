@@ -78,7 +78,7 @@ export default function PrivacyPage() {
             </span>
           </Link>
           <Link
-            href="/login"
+            href="/login?mode=signup"
             className="rounded-lg bg-brand px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
           >
             Get started

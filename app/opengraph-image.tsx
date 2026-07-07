@@ -7,7 +7,7 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 const SCENARIOS: [string, string, string][] = [
-  ["Conservative", "No-Go", "#f87171"],
+  ["Conservative", "No-go", "#f87171"],
   ["Base", "Caution", "#fbbf24"],
   ["Sponsor", "Go", "#4ade80"],
 ];
@@ -132,7 +132,7 @@ export default function Image() {
               }}
             >
               Every CRE deal through the same disciplined screen — sourced
-              ranges, the three deal-killers first, a Go / No-Go that shows
+              ranges, the three deal-killers first, a Go / No-go that shows
               its work.
             </div>
           </div>

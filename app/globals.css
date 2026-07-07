@@ -59,7 +59,8 @@ body {
   outline: 2px solid var(--color-brand);
   outline-offset: 2px;
 }
-.bg-sidebar :focus-visible {
+.bg-sidebar :focus-visible,
+.band-dark :focus-visible {
   outline-color: rgba(255, 255, 255, 0.85);
 }
 
@@ -154,9 +155,11 @@ body {
 }
 
 /* Scroll-reveal: elements fade/rise in the first time they enter the
-   viewport (driven by the Reveal client component). Static under
-   prefers-reduced-motion. */
-.reveal {
+   viewport (driven by the Reveal client component). The hidden start state
+   is scoped to `.js` so that without JavaScript (or before hydration on a
+   slow connection) the server-rendered content stays visible instead of
+   blanking out. Static under prefers-reduced-motion. */
+.js .reveal {
   opacity: 0;
   transform: translateY(14px);
   transition:
@@ -168,7 +171,7 @@ body {
   transform: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .reveal {
+  .js .reveal {
     opacity: 1;
     transform: none;
     transition: none;

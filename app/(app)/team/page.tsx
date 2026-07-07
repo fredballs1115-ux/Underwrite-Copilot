@@ -32,6 +32,7 @@ const MESSAGES: Record<string, { cls: string; text: string }> = {
   save: { cls: "bg-kill/10 text-kill", text: "Couldn't save the team's billing profile — please try again." },
   checkout: { cls: "bg-kill/10 text-kill", text: "Couldn't start checkout — please try again." },
   nocustomer: { cls: "bg-faint text-muted", text: "No team subscription on file yet — start with the Team plan below." },
+  exists: { cls: "bg-faint text-muted", text: "Your team already has an active plan — if it still shows a trial, activation can take a moment; refresh shortly." },
 };
 
 export default async function TeamPage({
@@ -59,9 +60,10 @@ export default async function TeamPage({
     ? ((
         await supabase
           .from("team_invites")
-          .select("id, token, created_at, expires_at")
+          .select("id, token, created_at, expires_at, used_at")
           .eq("team_id", team.id)
           .gt("expires_at", new Date().toISOString())
+          .is("used_at", null)
           .order("created_at", { ascending: false })
       ).data ?? [])
     : [];

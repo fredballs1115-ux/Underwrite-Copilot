@@ -1201,12 +1201,14 @@ function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
           <input
             name="name"
             required
+            aria-label="Deal name"
             placeholder="Deal name — e.g. The Maddox at Highland Park"
             className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
           />
           <select
             name="assetClass"
             defaultValue="auto"
+            aria-label="Asset class"
             className="rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
           >
             <option value="auto">Auto-detect</option>

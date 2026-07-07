@@ -38,7 +38,7 @@ const SCREEN = [
   {
     n: 6,
     title: "Get the verdict",
-    body: "Go / Caution / No-Go with the reasons attached — and where the call flips across the ranges, so you see the honest edges.",
+    body: "Go / Caution / No-go with the reasons attached — and where the call flips across the ranges, so you see the honest edges.",
   },
 ];
 
@@ -160,7 +160,7 @@ const JSON_LD = {
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web",
       description:
-        "CRE deal screening that runs every offering memorandum through the same disciplined screen: sourced ranges, the three deal-killers, and a Go / No-Go that shows its work before you open a model.",
+        "CRE deal screening that runs every offering memorandum through the same disciplined screen: sourced ranges, the three deal-killers, and a Go / No-go that shows its work before you open a model.",
       offers: [
         { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD" },
         { "@type": "Offer", name: "Pro", price: "29.99", priceCurrency: "USD" },
@@ -197,7 +197,7 @@ export default function Home() {
               instead of colliding with the CTA (the logo always stays). */}
           <div className="flex min-w-0 items-center gap-2.5">
             <LogoMark className="h-8 w-8 shrink-0" />
-            <span className="truncate font-semibold tracking-tight">
+            <span className="font-semibold tracking-tight max-[360px]:hidden">
               Underwrite Copilot
             </span>
           </div>
@@ -337,7 +337,7 @@ export default function Home() {
                 </div>
                 <p className="mt-5 max-w-xl text-sm leading-relaxed text-white/55">
                   Upload an OM → sourced ranges, the three deal-killers, and a
-                  Go / Caution / No-Go in minutes. First 3 deals free · no
+                  Go / Caution / No-go in minutes. First 3 deals free · no
                   card.
                 </p>
               </div>
@@ -345,7 +345,7 @@ export default function Home() {
               {/* Product preview */}
               <div>
                 <DealPreview />
-                <p className="mt-4 text-center text-[11px] text-white/40">
+                <p className="mt-4 text-center text-[11px] text-white/55">
                   Illustrative sample deal — not a real listing.{" "}
                   <Link
                     href="/demo"
@@ -595,7 +595,7 @@ export default function Home() {
                       >
                         <span className="col-span-2 text-muted">{k}</span>
                         <span
-                          className={`text-right tabular-nums ${i !== 0 ? "bg-[#fdf6e7] px-1" : ""}`}
+                          className={`text-right tabular-nums ${i !== 0 ? "bg-caution/10 px-1" : ""}`}
                         >
                           {v}
                         </span>
