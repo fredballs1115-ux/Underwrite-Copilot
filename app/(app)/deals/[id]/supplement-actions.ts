@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { uploadSupplement, removeSupplementFile } from "@/lib/storage";
+import { uploadSupplement, removeSupplementFile, signatureMismatch } from "@/lib/storage";
 
 type Supp = {
   notes: { id: string; text: string; createdAt: string }[];
@@ -27,7 +27,7 @@ async function loadDeal(dealId: string) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!user) redirect("/login");
   // RLS scopes this to the caller's own deal.
   const { data } = await supabase
     .from("deals")
@@ -84,6 +84,11 @@ export async function addSupplementFile(formData: FormData) {
   const safeName = file.name.replace(/[^a-z0-9._-]+/gi, "_").slice(0, 80) || "file";
   const path = `supplements/${dealId}/${id}-${safeName}`;
   const buffer = Buffer.from(await file.arrayBuffer());
+  // Same trust-the-bytes gate the OM upload applies: a file whose name
+  // claims a known format must actually be that format.
+  if (signatureMismatch(file.name, buffer)) {
+    redirect(`/deals/${dealId}?error=docformat`);
+  }
   await uploadSupplement(path, buffer, file.type);
 
   tabBucket(ctx.map, tab).files.push({

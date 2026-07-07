@@ -14,7 +14,7 @@ export function EmailToggle({ enabled }: { enabled: boolean }) {
         aria-checked={enabled}
         aria-label="Email me when an analysis finishes"
         className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ${
-          enabled ? "bg-brand" : "bg-line"
+          enabled ? "bg-brand" : "bg-ink/25"
         }`}
       >
         <span

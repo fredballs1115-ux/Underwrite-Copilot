@@ -10,7 +10,17 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/api/", "/deals", "/deals/", "/billing"],
+      // Everything behind auth stays out of the index.
+      disallow: [
+        "/api/",
+        "/deals",
+        "/deals/",
+        "/billing",
+        "/account",
+        "/team",
+        "/criteria",
+        "/preview-shell",
+      ],
     },
     sitemap: `${APP_URL}/sitemap.xml`,
     host: APP_URL,

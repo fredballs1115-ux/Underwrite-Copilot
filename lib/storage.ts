@@ -48,6 +48,23 @@ const INLINE_SAFE_TYPES = new Set([
   "image/webp",
 ]);
 
+/** Magic-byte check for the formats we recognize by extension: a file whose
+ *  NAME claims a known format must carry that format's signature (the same
+ *  gate the OM upload applies to PDFs). Unknown extensions pass — they're
+ *  stored as octet-stream anyway. Returns the offending format, or null. */
+export function signatureMismatch(fileName: string, body: Buffer): string | null {
+  const ext = fileName.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? "";
+  const head = body.subarray(0, 8);
+  const startsWith = (bytes: number[]) =>
+    bytes.every((b, i) => head[i] === b);
+  if (ext === "pdf" && !head.toString("latin1").startsWith("%PDF-")) return "PDF";
+  if (ext === "xlsx" && !startsWith([0x50, 0x4b, 0x03, 0x04])) return "Excel (.xlsx)";
+  if (ext === "xls" && !startsWith([0xd0, 0xcf, 0x11, 0xe0])) return "Excel (.xls)";
+  if (ext === "png" && !startsWith([0x89, 0x50, 0x4e, 0x47])) return "PNG";
+  if ((ext === "jpg" || ext === "jpeg") && !startsWith([0xff, 0xd8])) return "JPEG";
+  return null;
+}
+
 /** Store a user-uploaded supplement file. The browser-declared content type is
  *  honored only if it's on the inline-safe allowlist; anything else is stored
  *  as octet-stream so it can't render as active content when opened. */

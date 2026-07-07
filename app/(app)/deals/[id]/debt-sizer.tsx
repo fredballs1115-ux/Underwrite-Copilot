@@ -26,6 +26,13 @@ const fmtUsd = (n: number) =>
     ? `$${(n / 1e6).toFixed(2).replace(/\.?0+$/, "")}M`
     : `$${Math.round(n).toLocaleString("en-US")}`;
 
+// Tabular contexts keep a fixed two decimals so columns don't jitter
+// ($2.26M / $2.23M / $2.20M, never $2.2M).
+const fmtUsdCol = (n: number) =>
+  n >= 1e6
+    ? `$${(n / 1e6).toFixed(2)}M`
+    : `$${Math.round(n).toLocaleString("en-US")}`;
+
 // Inputs seed with exact dollars ("$3,456,000"), not the compact display
 // form — "$3.46M" would silently shave the sizing by the rounding.
 const fmtInput = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
@@ -449,7 +456,7 @@ export function DebtSizer({
             {rateStrip.length > 0 && (
               <>
                 <SubHead>If rates move</SubHead>
-                <div className="mt-2 overflow-x-auto">
+                <div className="scroll-shadows-x mt-2 overflow-x-auto">
                   <table className="w-full min-w-105 text-sm">
                     <thead>
                       <tr className="text-left text-[10px] font-medium uppercase tracking-wide text-muted">
@@ -466,7 +473,7 @@ export function DebtSizer({
                             {s.rate.toFixed(2)}%{s.d === 0 ? " (today)" : ""}
                           </td>
                           <td className="whitespace-nowrap py-1.5 pr-3 text-right font-mono text-xs tabular-nums">
-                            {s.sizedLoan != null ? fmtUsd(s.sizedLoan) : "—"}
+                            {s.sizedLoan != null ? fmtUsdCol(s.sizedLoan) : "—"}
                           </td>
                           <td className={`whitespace-nowrap py-1.5 pr-3 text-right font-mono text-xs tabular-nums ${s.sizedLoan != null && s.sizedLoan < maxLoan ? "text-kill" : "text-muted"}`}>
                             {s.sizedLoan != null
@@ -507,10 +514,10 @@ export function DebtSizer({
 
             {amortRows.length > 0 && !io && (
               <details className="mt-5">
-                <summary className="cursor-pointer text-sm font-medium text-brand transition-colors hover:text-brand-strong [&::-webkit-details-marker]:hidden">
-                  Amortization preview ({amortRows.length} years) →
+                <summary className="cursor-pointer list-none text-sm font-medium text-brand transition-colors hover:text-brand-strong [&::-webkit-details-marker]:hidden [&::marker]:content-none">
+                  Amortization preview ({amortRows.length} years)
                 </summary>
-                <div className="mt-2 overflow-x-auto">
+                <div className="scroll-shadows-x mt-2 overflow-x-auto">
                   <table className="w-full min-w-105 text-sm">
                     <thead>
                       <tr className="text-left text-[10px] font-medium uppercase tracking-wide text-muted">
@@ -525,10 +532,10 @@ export function DebtSizer({
                       {amortRows.map((r) => (
                         <tr key={r.year}>
                           <td className="py-1.5 pr-3 font-mono text-xs tabular-nums">{r.year}</td>
-                          <td className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums">{fmtUsd(r.begin)}</td>
-                          <td className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums">{fmtUsd(r.interest)}</td>
-                          <td className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums">{fmtUsd(r.principal)}</td>
-                          <td className="py-1.5 text-right font-mono text-xs tabular-nums">{fmtUsd(r.end)}</td>
+                          <td className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums">{fmtUsdCol(r.begin)}</td>
+                          <td className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums">{fmtUsdCol(r.interest)}</td>
+                          <td className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums">{fmtUsdCol(r.principal)}</td>
+                          <td className="py-1.5 text-right font-mono text-xs tabular-nums">{fmtUsdCol(r.end)}</td>
                         </tr>
                       ))}
                     </tbody>

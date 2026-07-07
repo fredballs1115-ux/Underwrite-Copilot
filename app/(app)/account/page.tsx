@@ -127,7 +127,7 @@ export default async function AccountPage({
       <section className="rounded-2xl border border-line bg-surface p-6 shadow-card">
         <h2 className="text-sm font-semibold tracking-tight">Change password</h2>
         <p className="mt-1 text-sm text-muted">
-          Use at least 6 characters. You&apos;ll stay signed in on this device.
+          Use at least 8 characters. You&apos;ll stay signed in on this device.
         </p>
         <ChangePasswordForm />
       </section>

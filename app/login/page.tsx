@@ -3,14 +3,19 @@ import Link from "next/link";
 import { LogoMark } from "@/app/logo";
 import { LoginForm } from "./login-form";
 
-export const metadata: Metadata = { title: "Sign in" };
+export const metadata: Metadata = {
+  title: "Sign in",
+  description:
+    "Sign in to Underwrite Copilot — upload an offering memorandum and get a sourced, adversarial screen of the deal in minutes.",
+  alternates: { canonical: "/login" },
+};
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string; next?: string; deleted?: string }>;
+  searchParams: Promise<{ mode?: string; next?: string; deleted?: string; confirmed?: string }>;
 }) {
-  const { mode, next, deleted } = await searchParams;
+  const { mode, next, deleted, confirmed } = await searchParams;
   return (
     <div className="band-dark flex flex-1 flex-col">
       <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16">
@@ -28,6 +33,11 @@ export default async function LoginPage({
           <p className="mt-6 rounded-lg bg-surface/95 px-3 py-2 text-center text-sm text-ink shadow-card">
             Your account and all its data have been deleted. Thanks for trying
             Underwrite Copilot.
+          </p>
+        )}
+        {confirmed && (
+          <p className="mt-6 rounded-lg bg-surface/95 px-3 py-2 text-center text-sm text-ink shadow-card">
+            Email confirmed — sign in below and your pipeline is ready.
           </p>
         )}
         <div className="shadow-float mt-8 rounded-2xl border border-line bg-surface p-7">

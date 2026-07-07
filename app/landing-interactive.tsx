@@ -221,11 +221,11 @@ function DemoPanel({ tab }: { tab: Tab }) {
             src="submarket trades 5.25–5.75%; broker holds 5.25%."
           />
           <RangeRow
-            label="Market rent (1BR)"
-            low="$1,410"
-            base="$1,465"
-            high="$1,540"
-            src="rent roll actuals · OM p.34 pro forma flagged +9%."
+            label="Market rent / unit"
+            low="$2,400"
+            base="$2,480"
+            high="$2,600"
+            src="rent roll actuals · OM p.12 pro forma flagged +8%."
           />
         </div>
       );
@@ -235,19 +235,19 @@ function DemoPanel({ tab }: { tab: Tab }) {
           <Killer
             n={1}
             name="Basis"
-            read="$285k/unit is 12% above the last two comparable trades with no renovation premium to justify it."
+            read="$274k/unit is 7% above the last two comparable trades with no renovation premium to justify it."
             severity="kill"
           />
           <Killer
             n={2}
             name="Exit"
-            read="Underwriting exits 25 bps below the going-in cap after a 5-year hold — the spread does the returns' heavy lifting."
+            read="Underwriting exits 20 bps below the going-in cap after a 5-year hold — the spread does the returns' heavy lifting."
             severity="caution"
           />
           <Killer
             n={3}
             name="Debt"
-            read="65% LTV at a fixed rate with two years IO — coverage holds in the base and low cases."
+            read="60% LTV at a fixed rate with one year IO — coverage holds in the base and low cases."
             severity="pass"
           />
         </div>
@@ -256,18 +256,18 @@ function DemoPanel({ tab }: { tab: Tab }) {
       return (
         <div className="space-y-2.5">
           <CompRow
-            name="The Wells at Preston Creek"
-            meta="2019 build · 2.1 mi · traded 14 months ago"
+            name="The Brixton"
+            meta="comparable vintage · 2.1 mi · traded Q3 ’25"
             rating="support"
           />
           <CompRow
-            name="Lakeline Commons"
-            meta="1998 build, renovated · 5.8 mi · smaller units"
+            name="Parkside"
+            meta="closest comp · 1.4 mi · lands near the implied basis"
             rating="leans"
           />
           <CompRow
-            name="Axis on Fifth"
-            meta="urban core, different tenant base · 11 mi"
+            name="Vue at Legacy"
+            meta="newer, amenitized, stronger submarket · 4.0 mi"
             rating="stretched"
           />
           <p className="text-[10px] leading-relaxed text-muted">

@@ -16,7 +16,7 @@ export const PRO_PRICE_LABEL = "$29.99/mo";
 // carry a single graduated-tier item, which seat syncing still supports.
 export const TEAM_BASE_PRICE = 49.99;
 export const TEAM_MEMBER_PRICE = 9.99;
-export const TEAM_PRICE_LABEL = "$49.99 + $9.99 per added member";
+export const TEAM_PRICE_LABEL = "$49.99/mo + $9.99/mo per added member";
 
 /** Monthly team total for a given member count (owner included). */
 export function teamMonthlyTotal(seatCount: number): number {

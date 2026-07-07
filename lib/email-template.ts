@@ -41,7 +41,7 @@ export function analysisReadyEmail(input: AnalysisReadyEmailInput): {
     ``,
     `Open the full report: ${input.dealUrl}`,
     ``,
-    `You're getting this because analysis emails are on. Turn them off: ${input.settingsUrl}`,
+    `You're getting this because analysis emails are on. Turn them off on your Account page: ${input.settingsUrl}`,
   ]
     .filter((l): l is string => l !== null)
     .join("\n");
@@ -60,7 +60,7 @@ export function analysisReadyEmail(input: AnalysisReadyEmailInput): {
         <tr>
           <td style="padding:28px;">
             <p style="margin:0;font-size:13px;color:#5f6b69;">Screen complete</p>
-            <h1 style="margin:6px 0 0;font-size:20px;line-height:1.3;color:#15201e;letter-spacing:-0.01em;">${esc(input.dealName)}</h1>
+            <h1 style="margin:6px 0 0;font-size:20px;line-height:1.3;color:#18211f;letter-spacing:-0.01em;">${esc(input.dealName)}</h1>
             <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:14px;">
               <tr>
                 <td style="background-color:${esc(input.verdictColor)};border-radius:999px;padding:5px 14px;">
@@ -73,7 +73,7 @@ export function analysisReadyEmail(input: AnalysisReadyEmailInput): {
             </table>
             ${
               input.reason
-                ? `<p style="margin:16px 0 0;font-size:14px;line-height:1.55;color:#3c4644;">${esc(input.reason)}</p>`
+                ? `<p style="margin:16px 0 0;font-size:14px;line-height:1.55;color:#18211f;">${esc(input.reason)}</p>`
                 : ""
             }
             <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:22px;">
@@ -87,9 +87,9 @@ export function analysisReadyEmail(input: AnalysisReadyEmailInput): {
         </tr>
         <tr>
           <td style="padding:16px 28px;border-top:1px solid #eef1f0;">
-            <p style="margin:0;font-size:12px;line-height:1.5;color:#8a9391;">
+            <p style="margin:0;font-size:12px;line-height:1.5;color:#5f6b69;">
               You're getting this because analysis emails are on.
-              <a href="${esc(input.settingsUrl)}" style="color:#114e54;">Turn them off in Settings</a>.
+              <a href="${esc(input.settingsUrl)}" style="color:#114e54;">Turn them off on your Account page</a>.
             </p>
           </td>
         </tr>

@@ -132,7 +132,7 @@ export function deriveInternalComps(
       market: extraction?.market ?? "",
       screenedAt: row.created_at,
       call: (row.verdict as { verdict?: string } | null)?.verdict ?? null,
-      priceLabel: priceNum != null ? price!.value : null,
+      priceLabel: priceNum != null ? fmtCompact(priceNum) : null,
       capLabel: capNum != null ? cap!.value : null,
       basisLabel: deriveBasis(metrics, wanted, priceNum),
     });

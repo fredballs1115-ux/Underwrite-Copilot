@@ -17,20 +17,29 @@ export const runtime = "nodejs";
  * caller's own + shared team deals; the sample deal stays out of a real
  * meeting artifact.
  */
-export async function GET() {
+export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return new Response("Unauthorized", { status: 401 });
+  if (!user) {
+    // This link navigates the whole tab — a raw 401 body strands the user.
+    return Response.redirect(
+      new URL(`/login?next=${encodeURIComponent("/deals")}`, req.url),
+      302,
+    );
+  }
 
-  const { data, error } = await supabase
-    .from("deals")
-    .select(
-      "id, name, asset_class, created_at, verdict, extraction, user_id, team_id, stage, is_sample",
-    )
-    .order("created_at", { ascending: false });
-  if (error) return new Response("Couldn't load the pipeline", { status: 500 });
+  const [{ data, error }, team] = await Promise.all([
+    supabase
+      .from("deals")
+      .select(
+        "id, name, asset_class, created_at, verdict, extraction, user_id, team_id, stage, is_sample",
+      )
+      .order("created_at", { ascending: false }),
+    getTeam(supabase, user.id).catch(() => null),
+  ]);
+  if (error) return Response.redirect(new URL("/deals?error=exportfail", req.url), 302);
 
   type Row = {
     id: string;
@@ -46,48 +55,45 @@ export async function GET() {
   };
   const rows = ((data ?? []) as Row[]).filter((d) => !d.is_sample);
 
-  // Offers-due dates are best-effort (column arrived in migration 0013).
-  const dueById = new Map<string, string>();
-  if (rows.length) {
-    const { data: dueRows } = await supabase
-      .from("deals")
-      .select("id, offers_due")
-      .in(
-        "id",
-        rows.map((d) => d.id),
-      );
-    for (const r of (dueRows ?? []) as { id: string; offers_due: string | null }[]) {
-      if (r.offers_due) dueById.set(r.id, r.offers_due);
-    }
-  }
-
-  // Teammate names for shared deals.
-  const team = await getTeam(supabase, user.id).catch(() => null);
+  // Deadlines, teammate names, and both buy boxes are mutually independent —
+  // one parallel batch instead of four sequential round trips.
   const mateIds = Array.from(
     new Set(
       rows.filter((d) => d.team_id && d.user_id !== user.id).map((d) => d.user_id),
     ),
   );
-  const nameById = new Map<string, string>();
-  if (mateIds.length) {
-    const { data: mates } = await supabase
-      .from("profiles")
-      .select("id, email, full_name")
-      .in("id", mateIds);
-    for (const m of (mates ?? []) as {
-      id: string;
-      email: string | null;
-      full_name: string | null;
-    }[]) {
-      nameById.set(m.id, m.full_name || m.email || "Teammate");
-    }
+  const [{ data: dueRows }, { data: mates }, personalBox, teamBox] =
+    await Promise.all([
+      rows.length
+        ? supabase
+            .from("deals")
+            .select("id, offers_due")
+            .in(
+              "id",
+              rows.map((d) => d.id),
+            )
+        : Promise.resolve({ data: [] as { id: string; offers_due: string | null }[] }),
+      mateIds.length
+        ? supabase.from("profiles").select("id, email, full_name").in("id", mateIds)
+        : Promise.resolve({
+            data: [] as { id: string; email: string | null; full_name: string | null }[],
+          }),
+      getBuyBoxForDeal(user.id, null).catch(() => null),
+      team ? getBuyBoxForDeal("", team.id).catch(() => null) : Promise.resolve(null),
+    ]);
+  // Offers-due dates are best-effort (column arrived in migration 0013).
+  const dueById = new Map<string, string>();
+  for (const r of (dueRows ?? []) as { id: string; offers_due: string | null }[]) {
+    if (r.offers_due) dueById.set(r.id, r.offers_due);
   }
-
-  // Buy-box fit, same engine as the pipeline page.
-  const [personalBox, teamBox] = await Promise.all([
-    getBuyBoxForDeal(user.id, null).catch(() => null),
-    team ? getBuyBoxForDeal("", team.id).catch(() => null) : Promise.resolve(null),
-  ]);
+  const nameById = new Map<string, string>();
+  for (const m of (mates ?? []) as {
+    id: string;
+    email: string | null;
+    full_name: string | null;
+  }[]) {
+    nameById.set(m.id, m.full_name || m.email || "Teammate");
+  }
 
   const exportRows: PipelineExportRow[] = rows.map((d) => {
     const extraction = d.extraction as ExtractionResult | null;
