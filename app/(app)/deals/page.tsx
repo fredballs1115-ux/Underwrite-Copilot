@@ -22,16 +22,24 @@ const ERRORS: Record<string, string> = {
     "Your team's 3 trial deals and your personal free deals are used up. Start the Team plan for unlimited shared deals, or upgrade to Pro.",
 };
 
-// Up to two headline figures to show on each pipeline row.
-function pickStats(metrics: ExtractedMetric[]): { label: string; value: string }[] {
-  const priority = [/going[- ]?in cap/i, /\bprice\b/i, /\bnoi\b/i, /\birr\b/i];
-  const chosen: ExtractedMetric[] = [];
-  for (const re of priority) {
-    const m = metrics.find((x) => re.test(x.label) && !chosen.includes(x));
-    if (m) chosen.push(m);
-    if (chosen.length >= 2) break;
-  }
-  return chosen.slice(0, 2).map((m) => ({ label: m.label, value: m.value }));
+// Fixed metric slots for the pipeline table — every row fills the SAME three
+// columns (or shows —), so one header labels them all and values align into
+// scannable columns instead of repeating micro-labels in every row.
+function pickSlots(metrics: ExtractedMetric[]): {
+  cap: string | null;
+  price: string | null;
+  noi: string | null;
+} {
+  const find = (inc: RegExp, exc?: RegExp) =>
+    metrics.find((m) => inc.test(m.label) && !(exc && exc.test(m.label)))
+      ?.value ?? null;
+  return {
+    cap:
+      find(/going[- ]?in cap/i) ??
+      find(/\bcap rate\b/i, /exit|terminal|reversion|pro ?forma/i),
+    price: find(/purchase price|asking price|\bprice\b/i, /unit|\/sf|per sf|per unit|psf/i),
+    noi: find(/\bnoi\b/i, /stabilized|pro ?forma/i) ?? find(/\bnoi\b/i),
+  };
 }
 
 export default async function DealsPage({
@@ -155,7 +163,9 @@ export default async function DealsPage({
           ? (nameById.get(d.user_id) ?? "Teammate")
           : null,
       market: extraction?.market ?? "",
-      stats: extraction ? pickStats(extraction.metrics) : [],
+      slots: extraction
+        ? pickSlots(extraction.metrics)
+        : { cap: null, price: null, noi: null },
       jobStatus:
         job === "queued" || job === "running"
           ? ("running" as const)

@@ -336,13 +336,14 @@ export function DealView({
         </div>
       )}
 
-      {/* Tab bar */}
-      <div className="overflow-x-auto">
+      {/* Tab bar — on mobile the strip scrolls; the right-edge fade plus
+          trailing padding signal there's more without hiding the last tab. */}
+      <div className="overflow-x-auto max-md:[mask-image:linear-gradient(90deg,#000_calc(100%-1.75rem),transparent)]">
         <div
           role="tablist"
           aria-label="Deal analysis sections"
           onKeyDown={onTabKeyDown}
-          className="flex min-w-max gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm"
+          className="flex min-w-max gap-1 rounded-xl border border-line bg-surface p-1 shadow-sm max-md:mr-8"
         >
           {TABS.map((t) => {
             const state = tabState(t);

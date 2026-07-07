@@ -22,10 +22,18 @@ export type DealCard = {
   /** deterministic buy-box check found at least one hard miss */
   outsideBuyBox?: boolean;
   market: string;
-  stats: { label: string; value: string }[];
+  /** fixed table columns — null renders as an em-dash placeholder */
+  slots: { cap: string | null; price: string | null; noi: string | null };
   /** latest analysis-job state, for deals still screening */
   jobStatus?: "running" | "failed" | null;
 };
+
+/** The pipeline table's column set — one header row labels every deal row. */
+const SLOT_COLUMNS: { key: keyof DealCard["slots"]; label: string }[] = [
+  { key: "cap", label: "Going-in cap" },
+  { key: "price", label: "Asking price" },
+  { key: "noi", label: "NOI" },
+];
 
 export const STAGE_LABEL: Record<Stage, string> = {
   screening: "Screening",
@@ -247,7 +255,9 @@ export function Pipeline({
         STAGE_LABEL[d.stage],
         d.outsideBuyBox ? "Outside" : "",
         d.addedBy ?? "You",
-        d.stats.map((s) => `${s.label}: ${s.value}`).join(" · "),
+        SLOT_COLUMNS.filter((c) => d.slots[c.key])
+          .map((c) => `${c.label}: ${d.slots[c.key]}`)
+          .join(" · "),
       ]
         .map(esc)
         .join(","),
@@ -596,7 +606,26 @@ export function Pipeline({
               </button>
             </p>
           )}
-          <ul className="stagger divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+          <div>
+            {/* One header row labels the fixed stat columns for every deal —
+                the rows below carry values only. Mirrors DealRow's layout. */}
+            <div
+              aria-hidden
+              className="hidden items-center gap-4 px-5 pb-1.5 md:flex"
+            >
+              {compareMode && <span className="w-4.5 shrink-0" />}
+              <span className="min-w-0 flex-1" />
+              <div className="grid w-[19rem] shrink-0 grid-cols-3 gap-3 text-right text-[10px] font-medium uppercase tracking-wide text-muted">
+                {SLOT_COLUMNS.map((c) => (
+                  <span key={c.key}>{c.label}</span>
+                ))}
+              </div>
+              <span className="flex w-24 shrink-0 justify-end text-[10px] font-medium uppercase tracking-wide text-muted">
+                Verdict
+              </span>
+              {!compareMode && <span className="h-4 w-4 shrink-0" />}
+            </div>
+            <ul className="stagger divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
             {filtered.map((d, idx) => (
               <DealRow
                 key={d.id}
@@ -607,7 +636,8 @@ export function Pipeline({
                 onToggle={() => toggleSelected(d.id)}
               />
             ))}
-          </ul>
+            </ul>
+          </div>
         </>
       )}
     </div>
@@ -719,23 +749,26 @@ function DealRow({
               <span className="font-medium text-kill">outside buy box</span>
             </>
           )}
+          {/* Mobile keeps one headline figure — the stat grid is md+ only. */}
+          {d.slots.cap && (
+            <span className="md:hidden">
+              {" · "}
+              <span className="font-mono tabular-nums">{d.slots.cap}</span> cap
+            </span>
+          )}
         </p>
       </div>
-      {/* Fixed three-slot grid, right-anchored, so numbers align into
-          scannable columns across rows even when a deal is missing a stat. */}
+      {/* Fixed three-slot grid, right-anchored, labeled ONCE by the header
+          row above the list — rows carry values only. */}
       <div className="hidden w-[19rem] shrink-0 grid-cols-3 gap-3 md:grid">
-        {Array.from({ length: 3 }).map((_, idx) => {
-          const s = d.stats[idx];
+        {SLOT_COLUMNS.map((c) => {
+          const v = d.slots[c.key];
+          const hasAny = SLOT_COLUMNS.some((x) => d.slots[x.key]);
           return (
-            <div key={idx} className="text-right">
-              {s ? (
-                <>
-                  <p className="truncate text-[10px] uppercase tracking-wide text-muted">
-                    {s.label}
-                  </p>
-                  <p className="font-mono text-sm tabular-nums">{s.value}</p>
-                </>
-              ) : d.stats.length > 0 ? (
+            <div key={c.key} className="text-right">
+              {v ? (
+                <p className="font-mono text-sm tabular-nums">{v}</p>
+              ) : hasAny ? (
                 <p className="font-mono text-sm text-line">—</p>
               ) : null}
             </div>
