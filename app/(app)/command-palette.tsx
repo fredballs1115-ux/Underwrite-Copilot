@@ -7,6 +7,8 @@ type PaletteDeal = {
   id: string;
   name: string;
   market: string;
+  address: string;
+  docs: string;
   call: string | null;
   stage: string;
 };
@@ -19,6 +21,8 @@ type Item = {
   dot?: string;
   icon?: React.ReactNode;
   group: "deals" | "actions";
+  /** extra matchable text (address, document filenames) beyond label+hint */
+  search?: string;
 };
 
 function ActionIcon({ children }: { children: React.ReactNode }) {
@@ -185,15 +189,16 @@ export function CommandPalette({
     const dealItems: Item[] = (deals ?? []).map((d) => ({
       key: d.id,
       label: d.name,
-      hint: d.market || d.stage,
+      hint: d.market || d.address || d.stage,
       href: `/deals/${d.id}`,
       dot: d.call ? (CALL_DOT[d.call] ?? "bg-line") : "bg-line",
       group: "deals" as const,
+      search: `${d.name} ${d.market} ${d.address} ${d.docs}`,
     }));
     const all = [...dealItems, ...ACTIONS];
     if (!q) return all;
     return all.filter((i) =>
-      `${i.label} ${i.hint}`.toLowerCase().includes(q),
+      (i.search ?? `${i.label} ${i.hint}`).toLowerCase().includes(q),
     );
   }, [deals, query]);
 
@@ -283,7 +288,7 @@ export function CommandPalette({
               setActive(0);
             }}
             onKeyDown={onInputKey}
-            placeholder="Jump to a deal or action…"
+            placeholder="Search deals, addresses, documents…"
             aria-label="Search deals and actions"
             role="combobox"
             aria-expanded="true"
@@ -337,7 +342,7 @@ export function CommandPalette({
                           />
                         ))}
                       <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                      <span className="shrink-0 text-xs text-muted">
+                      <span className="max-w-[11rem] shrink-0 truncate text-xs text-muted">
                         {item.hint}
                       </span>
                     </button>

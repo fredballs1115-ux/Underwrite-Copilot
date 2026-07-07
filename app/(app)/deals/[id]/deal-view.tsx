@@ -246,6 +246,26 @@ export function DealView({
           } else {
             toast(completionMessage(endedStep), "success");
           }
+          // The analyst usually tabs away during the minute-long screen — a
+          // browser notification (opt-in, granted via the offer below) brings
+          // them back. In-tab, the toast already covers it.
+          if (
+            document.hidden &&
+            typeof Notification !== "undefined" &&
+            Notification.permission === "granted"
+          ) {
+            try {
+              new Notification("Underwrite Copilot", {
+                body:
+                  data.status === "error"
+                    ? "The screen hit a snag — open the deal for details."
+                    : completionMessage(endedStep),
+              });
+            } catch {
+              // notification construction can throw on some platforms — the
+              // toast already told the story in-tab.
+            }
+          }
         }
 
         if (stepChanged || data.status === "done" || data.status === "error") {
@@ -399,7 +419,12 @@ export function DealView({
 
   return (
     <div className="flex flex-col gap-5">
-      {active && <ProgressRail job={job!} />}
+      {active && (
+        <div className="flex flex-col gap-2">
+          <ProgressRail job={job!} />
+          <NotifyOffer />
+        </div>
+      )}
 
       {job?.status === "error" && (
         <div className="rounded-xl border border-kill/30 bg-kill/5 p-4">
@@ -1030,6 +1055,50 @@ function useElapsed(): string {
   const m = Math.floor(secs / 60);
   const sec = String(secs % 60).padStart(2, "0");
   return `${m}:${sec}`;
+}
+
+/** Opt-in browser notification for the minute-long screen. Renders only
+ *  while a run is active: an offer when permission hasn't been asked, a
+ *  quiet reassurance once granted, nothing when denied or unsupported. */
+function NotifyOffer() {
+  const [perm, setPerm] = useState<NotificationPermission | "unsupported">(
+    "unsupported",
+  );
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      setPerm(
+        typeof Notification === "undefined"
+          ? "unsupported"
+          : Notification.permission,
+      );
+    });
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  if (perm === "granted") {
+    return (
+      <p className="text-xs text-muted">
+        Feel free to switch tabs — you&apos;ll get a browser notification when
+        the screen finishes.
+      </p>
+    );
+  }
+  if (perm !== "default") return null;
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          setPerm(await Notification.requestPermission());
+        } catch {
+          setPerm("denied");
+        }
+      }}
+      className="w-fit text-xs font-medium text-brand transition-colors hover:text-brand-strong"
+    >
+      Notify me when it&apos;s done — this takes about a minute
+    </button>
+  );
 }
 
 function ProgressRail({ job }: { job: NonNullable<Job> }) {
