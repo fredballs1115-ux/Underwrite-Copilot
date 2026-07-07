@@ -49,16 +49,17 @@ export default async function DealsPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const billing = user
-    ? await getBilling(supabase, user.id)
-    : null;
 
-  const { data, error } = await supabase
-    .from("deals")
-    .select(
-      "id, name, asset_class, created_at, verdict, extraction, user_id, team_id, stage",
-    )
-    .order("created_at", { ascending: false });
+  // Billing state and the deal list are independent — fetch them together.
+  const [billing, { data, error }] = await Promise.all([
+    user ? getBilling(supabase, user.id) : Promise.resolve(null),
+    supabase
+      .from("deals")
+      .select(
+        "id, name, asset_class, created_at, verdict, extraction, user_id, team_id, stage",
+      )
+      .order("created_at", { ascending: false }),
+  ]);
 
   // Latest job per deal so the list can show "Screening…" vs "Analysis failed"
   // instead of an inert label.

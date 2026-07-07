@@ -31,7 +31,7 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "Retention and deletion",
     body: [
-      "Deleting a deal deletes its documents and analyses. To delete your whole account and everything in it, email support@underwritecopilot.com from your account address and we'll remove it within 30 days, except where the law requires retention (for example, billing records).",
+      "Deleting a deal deletes its documents and analyses. To delete your whole account and everything in it, email underwritecopilot.support@gmail.com from your account address and we'll remove it within 30 days, except where the law requires retention (for example, billing records).",
     ],
   },
   {
@@ -61,7 +61,7 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "Contact",
     body: [
-      "Privacy questions or deletion requests: support@underwritecopilot.com.",
+      "Privacy questions or deletion requests: underwritecopilot.support@gmail.com.",
     ],
   },
 ];

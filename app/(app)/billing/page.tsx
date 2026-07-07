@@ -6,12 +6,13 @@ import {
   PRO_PRICE_LABEL,
 } from "@/lib/billing";
 import { startCheckout, openPortal } from "./actions";
+import { PendingButton } from "../pending-button";
 
 export const metadata: Metadata = { title: "Billing" };
 
 // Benefit-framed: what the feature does for you, not what it's called.
 const FREE_FEATURES = [
-  "3 deals with the full six-step screen on each",
+  "3 deals with the full six-stage screen on each",
   "Sourced ranges + the three deal-killers, stressed first",
   "Side-by-side deal comparison",
   "Reconcile the screen against your own model",
@@ -99,12 +100,12 @@ export default async function BillingPage({
                 : "Subscription active."}
             </p>
             <form action={openPortal} className="mt-4">
-              <button
-                type="submit"
+              <PendingButton
+                pendingLabel="Opening Stripe…"
                 className="rounded-lg border border-line px-4 py-2 text-sm font-medium transition-colors hover:bg-faint"
               >
                 Manage subscription
-              </button>
+              </PendingButton>
             </form>
           </>
         ) : (
@@ -195,12 +196,12 @@ export default async function BillingPage({
           </ul>
           {!isPro && (
             <form action={startCheckout} className="mt-6">
-              <button
-                type="submit"
+              <PendingButton
+                pendingLabel="Opening secure checkout…"
                 className="shadow-card hover-lift w-full rounded-lg bg-brand px-5 py-2.5 text-sm font-medium text-white"
               >
                 Upgrade to Pro — {PRO_PRICE_LABEL}
-              </button>
+              </PendingButton>
             </form>
           )}
         </section>

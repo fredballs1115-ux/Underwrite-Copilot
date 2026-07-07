@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getTeam } from "@/lib/teams";
 import { joinTeam } from "../../actions";
+import { PendingButton } from "../../../pending-button";
 
 export const metadata: Metadata = { title: "Join team" };
 
@@ -81,12 +82,12 @@ export default async function JoinTeamPage({
             </p>
             <form action={joinTeam} className="mt-5">
               <input type="hidden" name="token" value={token} />
-              <button
-                type="submit"
+              <PendingButton
+                pendingLabel="Joining…"
                 className="shadow-card hover-lift rounded-lg bg-brand px-6 py-2.5 text-sm font-medium text-white"
               >
                 Join the team
-              </button>
+              </PendingButton>
             </form>
             <p className="mt-3 text-xs text-muted">
               Your existing personal deals stay personal.

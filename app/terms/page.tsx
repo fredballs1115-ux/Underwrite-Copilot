@@ -68,7 +68,7 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "Contact",
     body: [
-      "Questions about these terms: support@underwritecopilot.com.",
+      "Questions about these terms: underwritecopilot.support@gmail.com.",
     ],
   },
 ];

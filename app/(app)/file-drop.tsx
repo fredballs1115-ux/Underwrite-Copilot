@@ -24,10 +24,13 @@ export function FileDrop({
   name,
   accept,
   hint,
+  maxBytes,
 }: {
   name: string;
   accept?: string;
   hint?: string;
+  /** reject oversized files before wasting an upload */
+  maxBytes?: number;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   // dragenter/dragleave fire for every child the cursor crosses — count the
@@ -43,6 +46,12 @@ export function FileDrop({
     if (!matchesAccept(file, accept)) {
       setTypeError(
         `"${file.name}" isn't a supported file type${hint ? ` — ${hint.toLowerCase()}` : "."}`,
+      );
+      return;
+    }
+    if (maxBytes && file.size > maxBytes) {
+      setTypeError(
+        `"${file.name}" is ${(file.size / 1048576).toFixed(0)} MB — the limit is ${Math.round(maxBytes / 1048576)} MB. Try compressing the PDF or splitting it.`,
       );
       return;
     }
@@ -104,8 +113,17 @@ export function FileDrop({
           accept={accept}
           className="hidden"
           onChange={(e) => {
+            const f = e.target.files?.[0] ?? null;
+            if (f && maxBytes && f.size > maxBytes) {
+              setTypeError(
+                `"${f.name}" is ${(f.size / 1048576).toFixed(0)} MB — the limit is ${Math.round(maxBytes / 1048576)} MB. Try compressing the PDF or splitting it.`,
+              );
+              e.target.value = "";
+              setFileName(null);
+              return;
+            }
             setTypeError(null);
-            setFileName(e.target.files?.[0]?.name ?? null);
+            setFileName(f?.name ?? null);
           }}
         />
         <svg

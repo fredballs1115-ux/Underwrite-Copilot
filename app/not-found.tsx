@@ -1,12 +1,11 @@
 import Link from "next/link";
+import { LogoMark } from "@/app/logo";
 
 // Global 404 — branded to match the marketing pages.
 export default function NotFound() {
   return (
     <div className="flex min-h-screen flex-1 flex-col items-center justify-center px-6 text-center">
-      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand text-sm font-semibold text-white">
-        UC
-      </div>
+      <LogoMark className="h-10 w-10" />
       <p className="mt-6 font-mono text-xs uppercase tracking-widest text-muted">
         404
       </p>

@@ -8,9 +8,9 @@ export const metadata: Metadata = { title: "Sign in" };
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string; next?: string }>;
+  searchParams: Promise<{ mode?: string; next?: string; deleted?: string }>;
 }) {
-  const { mode, next } = await searchParams;
+  const { mode, next, deleted } = await searchParams;
   return (
     <div className="band-dark flex flex-1 flex-col">
       <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16">
@@ -21,6 +21,12 @@ export default async function LoginPage({
           </span>
         </Link>
 
+        {deleted && (
+          <p className="mt-6 rounded-lg bg-surface/95 px-3 py-2 text-center text-sm text-ink shadow-card">
+            Your account and all its data have been deleted. Thanks for trying
+            Underwrite Copilot.
+          </p>
+        )}
         <div className="shadow-float mt-8 rounded-2xl border border-line bg-surface p-7">
           <h1 className="text-xl font-semibold tracking-tight">Welcome</h1>
           <p className="mt-2 text-sm leading-relaxed text-muted">

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -14,6 +14,11 @@ const APP_URL =
 
 // This `metadata` export is how Next.js sets the <title> and <meta> tags —
 // it's what shows in the browser tab, in Google results, and in link previews.
+// Colors the browser chrome (mobile address bar) to match the brand.
+export const viewport: Viewport = {
+  themeColor: "#0c3338",
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: {

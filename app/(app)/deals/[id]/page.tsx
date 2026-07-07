@@ -65,13 +65,28 @@ export default async function DealPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const pro = user ? await isPro(supabase, user.id) : false;
 
-  const { data, error } = await supabase
-    .from("deals")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+  // These four don't depend on each other — fetch them in one round trip's
+  // worth of wall clock instead of four.
+  const [pro, { data, error }, { data: docsData }, { data: jobData }] =
+    await Promise.all([
+      user ? isPro(supabase, user.id) : Promise.resolve(false),
+      supabase.from("deals").select("*").eq("id", id).maybeSingle(),
+      supabase
+        .from("deal_documents")
+        .select(
+          "id, deal_id, kind, filename, storage_path, content_type, created_at",
+        )
+        .eq("deal_id", id)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("analysis_jobs")
+        .select("status, step, progress, error")
+        .eq("deal_id", id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
   if (error || !data) {
     notFound();
@@ -95,20 +110,8 @@ export default async function DealPage({
     ? (deal.comp_search as CompSearchResult)
     : null;
 
-  const { data: docsData } = await supabase
-    .from("deal_documents")
-    .select("id, deal_id, kind, filename, storage_path, content_type, created_at")
-    .eq("deal_id", id)
-    .order("created_at", { ascending: true });
   const documents = (docsData ?? []) as DealDocument[];
 
-  const { data: jobData } = await supabase
-    .from("analysis_jobs")
-    .select("status, step, progress, error")
-    .eq("deal_id", id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
   const job = jobData as {
     status: string;
     step: string | null;
@@ -125,6 +128,10 @@ export default async function DealPage({
     files?: { id: string; name: string; path: string; createdAt: string }[];
   };
   const rawSupp = (deal.supplements as Record<string, RawSupp> | null) ?? {};
+  // Signed link so the user can re-open the OM they uploaded (1-hour expiry).
+  const omUrlPromise = deal.om_storage_path
+    ? signedSupplementUrl(deal.om_storage_path)
+    : Promise.resolve(null);
   const supplements: Record<
     string,
     {
@@ -132,17 +139,20 @@ export default async function DealPage({
       files: { id: string; name: string; createdAt: string; url: string | null }[];
     }
   > = {};
-  for (const [tabKey, s] of Object.entries(rawSupp)) {
-    const files = await Promise.all(
-      (s.files ?? []).map(async (f) => ({
-        id: f.id,
-        name: f.name,
-        createdAt: f.createdAt,
-        url: await signedSupplementUrl(f.path),
-      })),
-    );
-    supplements[tabKey] = { notes: s.notes ?? [], files };
-  }
+  const [omUrl] = await Promise.all([
+    omUrlPromise,
+    ...Object.entries(rawSupp).map(async ([tabKey, s]) => {
+      const files = await Promise.all(
+        (s.files ?? []).map(async (f) => ({
+          id: f.id,
+          name: f.name,
+          createdAt: f.createdAt,
+          url: await signedSupplementUrl(f.path),
+        })),
+      );
+      supplements[tabKey] = { notes: s.notes ?? [], files };
+    }),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -179,6 +189,31 @@ export default async function DealPage({
               >
                 {pill.label}
               </span>
+            )}
+            {omUrl && (
+              <a
+                href={omUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open the offering memorandum you uploaded (link valid for 1 hour)"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-3.5 w-3.5"
+                  aria-hidden
+                >
+                  <path d="M14 3h7v7" />
+                  <path d="M10 14 21 3" />
+                  <path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" />
+                </svg>
+                View OM
+              </a>
             )}
             {verdict &&
               (pro ? (
