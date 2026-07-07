@@ -1039,6 +1039,11 @@ export default function Home() {
                 </Link>
               </li>
               <li>
+                <Link href="/security" className="text-muted transition-colors hover:text-ink">
+                  Security
+                </Link>
+              </li>
+              <li>
                 <a
                   href="mailto:underwritecopilot.support@gmail.com"
                   className="text-muted transition-colors hover:text-ink"

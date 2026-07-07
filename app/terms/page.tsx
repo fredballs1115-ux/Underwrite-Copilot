@@ -131,6 +131,9 @@ export default function TermsPage() {
             <Link href="/privacy" className="transition-colors hover:text-ink">
               Privacy
             </Link>
+            <Link href="/security" className="transition-colors hover:text-ink">
+              Security
+            </Link>
             <Link href="/" className="transition-colors hover:text-ink">
               Home
             </Link>
