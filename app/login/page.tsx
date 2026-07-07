@@ -3,7 +3,11 @@ import Link from "next/link";
 import { LogoMark } from "@/app/logo";
 import { LoginForm } from "./login-form";
 
-export const metadata: Metadata = { title: "Sign in" };
+export const metadata: Metadata = {
+  title: "Sign in",
+  description:
+    "Sign in to Underwrite Copilot — upload an offering memorandum and get a sourced, adversarial screen of the deal in minutes.",
+};
 
 export default async function LoginPage({
   searchParams,
