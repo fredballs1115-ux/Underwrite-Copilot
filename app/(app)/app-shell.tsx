@@ -48,6 +48,13 @@ const IconUser = (p: { className?: string }) => (
     <circle cx="12" cy="7" r="4" />
   </NavIcon>
 );
+const IconTarget = (p: { className?: string }) => (
+  <NavIcon className={p.className}>
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="4.5" />
+    <circle cx="12" cy="12" r="0.8" fill="currentColor" />
+  </NavIcon>
+);
 const IconUsers = (p: { className?: string }) => (
   <NavIcon className={p.className}>
     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -67,6 +74,7 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const inPipeline = pathname.startsWith("/deals");
+  const inCriteria = pathname.startsWith("/criteria");
   const inTeam = pathname.startsWith("/team");
   const inBilling = pathname.startsWith("/billing");
   const inAccount = pathname.startsWith("/account");
@@ -93,6 +101,7 @@ export function AppShell({
           {(
             [
               ["/deals", "Pipeline", inPipeline, IconLayers],
+              ["/criteria", "Buy box", inCriteria, IconTarget],
               ["/team", "Team", inTeam, IconUsers],
               ["/billing", "Billing", inBilling, IconCard],
               ["/account", "Account", inAccount, IconUser],
@@ -164,9 +173,10 @@ export function AppShell({
             </form>
           </div>
           {/* Mobile nav — the sidebar is desktop-only, so these live here. */}
-          <nav className="flex gap-1 border-t border-white/10 px-3 py-2">
+          <nav className="flex gap-1 overflow-x-auto border-t border-white/10 px-3 py-2">
             {[
               { href: "/deals", label: "Pipeline", active: inPipeline },
+              { href: "/criteria", label: "Buy box", active: inCriteria },
               { href: "/team", label: "Team", active: inTeam },
               { href: "/billing", label: "Billing", active: inBilling },
               { href: "/account", label: "Account", active: inAccount },
@@ -175,7 +185,7 @@ export function AppShell({
                 key={n.href}
                 href={n.href}
                 aria-current={n.active ? "page" : undefined}
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                   n.active
                     ? "bg-white/12 text-white"
                     : "text-white/65 hover:bg-white/5 hover:text-white"

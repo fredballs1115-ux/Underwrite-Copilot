@@ -19,6 +19,8 @@ export type DealCard = {
   stage: Stage;
   /** teammate who added this team deal (null when it's yours) */
   addedBy: string | null;
+  /** deterministic buy-box check found at least one hard miss */
+  outsideBuyBox?: boolean;
   market: string;
   stats: { label: string; value: string }[];
   /** latest analysis-job state, for deals still screening */
@@ -662,6 +664,12 @@ function DealRow({
             </>
           )}
           {d.addedBy && <> · added by {d.addedBy}</>}
+          {d.outsideBuyBox && (
+            <>
+              {" · "}
+              <span className="font-medium text-kill">outside buy box</span>
+            </>
+          )}
         </p>
       </div>
       {/* Fixed three-slot grid, right-anchored, so numbers align into

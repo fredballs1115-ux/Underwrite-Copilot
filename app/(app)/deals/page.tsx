@@ -4,6 +4,8 @@ import { getBilling } from "@/lib/billing";
 import { type DealRow } from "@/lib/deals";
 import type { ExtractionResult, ExtractedMetric } from "@/lib/anthropic/types";
 import { Pipeline, type DealCard } from "./pipeline";
+import { getBuyBoxForDeal } from "@/lib/criteria-server";
+import { evaluateBuyBox } from "@/lib/criteria";
 
 export const metadata: Metadata = { title: "Pipeline" };
 
@@ -50,8 +52,9 @@ export default async function DealsPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Billing state and the deal list are independent — fetch them together.
-  const [billing, { data, error }] = await Promise.all([
+  // Billing state, the deal list, and the personal buy box are independent —
+  // fetch them together.
+  const [billing, { data, error }, personalBox] = await Promise.all([
     user ? getBilling(supabase, user.id) : Promise.resolve(null),
     supabase
       .from("deals")
@@ -59,7 +62,11 @@ export default async function DealsPage({
         "id, name, asset_class, created_at, verdict, extraction, user_id, team_id, stage",
       )
       .order("created_at", { ascending: false }),
+    user ? getBuyBoxForDeal(user.id, null).catch(() => null) : Promise.resolve(null),
   ]);
+  const teamBox = billing?.team
+    ? await getBuyBoxForDeal("", billing.team.id).catch(() => null)
+    : null;
 
   // Latest job per deal so the list can show "Screening…" vs "Analysis failed"
   // instead of an inert label.
@@ -126,6 +133,13 @@ export default async function DealsPage({
       createdAt: d.created_at,
       verdict: verdict?.verdict ?? null,
       stage: (d.stage as DealCard["stage"]) ?? "screening",
+      outsideBuyBox: (() => {
+        const box = d.team_id ? teamBox : personalBox;
+        if (!box || !extraction) return false;
+        return evaluateBuyBox(d.asset_class, extraction, box).some(
+          (c) => c.status === "fail",
+        );
+      })(),
       addedBy:
         d.team_id && d.user_id !== user?.id
           ? (nameById.get(d.user_id) ?? "Teammate")

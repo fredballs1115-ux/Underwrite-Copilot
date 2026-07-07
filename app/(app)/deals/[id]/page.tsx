@@ -19,6 +19,8 @@ import {
 import { DealView } from "./deal-view";
 import { DealActions } from "./deal-actions";
 import { StageSelect } from "./stage-select";
+import { getBuyBoxForDeal } from "@/lib/criteria-server";
+import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
 
 const VERDICT_PILL = {
   pass: { label: "Go", cls: "bg-pass/15 text-pass" },
@@ -139,8 +141,13 @@ export default async function DealPage({
       files: { id: string; name: string; createdAt: string; url: string | null }[];
     }
   > = {};
-  const [omUrl] = await Promise.all([
+  const ownership = deal as unknown as {
+    user_id: string;
+    team_id: string | null;
+  };
+  const [omUrl, buyBox] = await Promise.all([
     omUrlPromise,
+    getBuyBoxForDeal(ownership.user_id, ownership.team_id).catch(() => null),
     ...Object.entries(rawSupp).map(async ([tabKey, s]) => {
       const files = await Promise.all(
         (s.files ?? []).map(async (f) => ({
@@ -153,6 +160,10 @@ export default async function DealPage({
       supplements[tabKey] = { notes: s.notes ?? [], files };
     }),
   ]);
+
+  const buyBoxChecks: BuyBoxCheck[] = buyBox
+    ? evaluateBuyBox(deal.asset_class, extraction, buyBox)
+    : [];
 
   return (
     <div className="flex flex-col gap-6">
@@ -267,6 +278,82 @@ export default async function DealPage({
           </div>
         )}
       </header>
+
+      {/* The buy box — this deal against YOUR standing criteria. */}
+      {buyBoxChecks.length > 0 ? (
+        <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold tracking-tight">
+                Your buy box
+              </h2>
+              <span className="rounded-full bg-faint px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
+                {ownership.team_id ? "Team" : "Personal"}
+              </span>
+            </div>
+            <Link
+              href="/criteria"
+              className="text-xs font-medium text-brand transition-colors hover:text-brand-strong"
+            >
+              Edit criteria →
+            </Link>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {buyBoxChecks.map((c) => (
+              <div
+                key={c.label}
+                className={`rounded-lg border p-2.5 ${
+                  c.status === "fail"
+                    ? "border-kill/25 bg-kill/[0.04]"
+                    : c.status === "pass"
+                      ? "border-line bg-surface"
+                      : "border-line bg-faint"
+                }`}
+              >
+                <p className="flex items-center gap-1.5 text-xs font-medium">
+                  <span
+                    aria-hidden
+                    className={
+                      c.status === "fail"
+                        ? "text-kill"
+                        : c.status === "pass"
+                          ? "text-pass"
+                          : "text-muted"
+                    }
+                  >
+                    {c.status === "fail" ? "✕" : c.status === "pass" ? "✓" : "—"}
+                  </span>
+                  {c.label}
+                  <span className="sr-only">
+                    {c.status === "fail"
+                      ? "outside your criteria"
+                      : c.status === "pass"
+                        ? "within your criteria"
+                        : "not determinable yet"}
+                  </span>
+                </p>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted">
+                  {c.detail}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : (
+        !buyBox && (
+          <p className="text-xs text-muted">
+            Tip: set your{" "}
+            <Link
+              href="/criteria"
+              className="font-medium text-brand hover:text-brand-strong"
+            >
+              buy box
+            </Link>{" "}
+            and every screen gets checked against your own criteria
+            automatically.
+          </p>
+        )
+      )}
 
       <DealView
         dealId={id}

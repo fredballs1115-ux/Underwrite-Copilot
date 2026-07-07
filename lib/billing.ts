@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 
 export type Plan = "free" | "pro";
@@ -70,8 +71,11 @@ export async function getBilling(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<Billing> {
+  // Billing columns are hidden from user-context reads (migration 0008
+  // column grants) — this server-only helper reads them with the service role.
+  const admin = createSupabaseAdminClient();
   const [{ data: profile }, countRes, team] = await Promise.all([
-    supabase
+    admin
       .from("profiles")
       .select("plan, subscription_status, stripe_customer_id, current_period_end")
       .eq("id", userId)
@@ -128,7 +132,7 @@ export async function isPro(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<boolean> {
-  const { data } = await supabase
+  const { data } = await createSupabaseAdminClient()
     .from("profiles")
     .select("plan")
     .eq("id", userId)

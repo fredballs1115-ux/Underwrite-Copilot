@@ -8,6 +8,8 @@ import { reconcileModel } from "./reconcile";
 import { checkMarket } from "./market";
 import { synthesizeVerdict } from "./verdict";
 import { parseModelFile } from "@/lib/model-parse";
+import { getBuyBoxForDeal } from "@/lib/criteria-server";
+import { buyBoxLines } from "@/lib/criteria";
 import type {
   AssetClass,
   ExtractionResult,
@@ -43,9 +45,23 @@ async function regenerateVerdict(
 ): Promise<void> {
   const { data } = await admin
     .from("deals")
-    .select("extraction, challenges, comps, reconciliation, market")
+    .select("extraction, challenges, comps, reconciliation, market, user_id, team_id")
     .eq("id", dealId)
     .single();
+
+  // Fetch the buyer's standing criteria so the verdict judges fit against
+  // THEIR box. Best-effort: a missing box (or pre-0008 schema) just means no
+  // buy-box section in the brief.
+  let buyBox: string[] | null = null;
+  try {
+    const box = await getBuyBoxForDeal(
+      (data?.user_id as string) ?? "",
+      (data?.team_id as string) ?? null,
+    );
+    buyBox = box ? buyBoxLines(box) : null;
+  } catch {
+    buyBox = null;
+  }
 
   const verdict = await synthesizeVerdict({
     extraction: (data?.extraction as ExtractionResult) ?? null,
@@ -53,6 +69,7 @@ async function regenerateVerdict(
     comps: (data?.comps as BrokerCompsResult) ?? null,
     reconciliation: (data?.reconciliation as ReconciliationResult) ?? null,
     market: (data?.market as MarketResult) ?? null,
+    buyBox,
   });
 
   await admin

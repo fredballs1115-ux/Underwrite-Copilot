@@ -53,6 +53,8 @@ export interface VerdictInputs {
   comps: BrokerCompsResult | null;
   reconciliation: ReconciliationResult | null;
   market: MarketResult | null;
+  /** the buyer's standing criteria, pre-formatted one per line (optional) */
+  buyBox?: string[] | null;
 }
 
 /** Roll the gathered analysis up into one readable brief for the synthesizer. */
@@ -73,6 +75,18 @@ function buildBrief(input: VerdictInputs): string {
           .join("\n")
       : "Not available.",
   );
+
+  // The buyer's standing criteria — the verdict must judge fit against THEIR
+  // box, not a generic investor's.
+  if (input.buyBox && input.buyBox.length) {
+    sections.push(
+      "## The buyer's standing buy box",
+      [
+        ...input.buyBox.map((l) => `- ${l}`),
+        "Judge this deal's fit against these criteria explicitly: reference clear misses in the reason and topRisks, and if the deal fails the box on price/basis, say what entry price WOULD fit in nextSteps. A deal can be well-underwritten and still be outside the box — say so plainly.",
+      ].join("\n"),
+    );
+  }
 
   const cite = (page?: string) => (page ? ` [${page}]` : "");
   const basisTag = (b?: string) =>
