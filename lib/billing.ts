@@ -6,8 +6,27 @@ import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 export type Plan = "free" | "pro";
 
 export const FREE_DEAL_LIMIT = 3;
-export const PRO_PRICE_LABEL = "$39/mo";
-export const TEAM_PRICE_LABEL = "$29/seat/mo";
+export const PRO_PRICE_LABEL = "$29.99/mo";
+// Team pricing: the account owner's seat at $29.99, each ADDED member at
+// $20.99. In Stripe this is ONE subscription item with a graduated tiered
+// price (first unit $29.99, units 2+ $20.99) and quantity = member count —
+// so seat syncing stays a single quantity update and can never drift.
+export const TEAM_OWNER_PRICE = 29.99;
+export const TEAM_MEMBER_PRICE = 20.99;
+export const TEAM_PRICE_LABEL = "$29.99 + $20.99 per added member";
+
+/** Monthly team total for a given member count (owner included). */
+export function teamMonthlyTotal(seatCount: number): number {
+  if (seatCount <= 0) return 0;
+  return TEAM_OWNER_PRICE + (seatCount - 1) * TEAM_MEMBER_PRICE;
+}
+
+export const fmtUsd = (n: number) =>
+  n.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+  });
 
 /** Paid features (everything else is available on Free). Unlocked by a
  *  personal Pro subscription OR an active Team plan. */

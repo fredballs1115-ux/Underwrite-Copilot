@@ -142,7 +142,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Can my team share one pipeline?",
-    a: "Yes. Create a team, send teammates an invite link, and every deal anyone uploads lands in one shared pipeline — same screens, verdicts, models, and memos for everyone. The Team plan is $29 per seat per month, billed only for the seats you have, and it adjusts automatically as people join or leave.",
+    a: "Yes. Create a team, send teammates an invite link, and every deal anyone uploads lands in one shared pipeline — same screens, verdicts, models, and memos for everyone. The Team plan is $29.99 per month for the account owner plus $20.99 per month for each added member, on one subscription that adjusts automatically as people join or leave.",
   },
   {
     q: "Can I cancel anytime?",
@@ -163,11 +163,11 @@ const JSON_LD = {
         "CRE deal screening that runs every offering memorandum through the same disciplined screen: sourced ranges, the three deal-killers, and a Go / No-Go that shows its work before you open a model.",
       offers: [
         { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD" },
-        { "@type": "Offer", name: "Pro", price: "39", priceCurrency: "USD" },
+        { "@type": "Offer", name: "Pro", price: "29.99", priceCurrency: "USD" },
         {
           "@type": "Offer",
-          name: "Team (per seat)",
-          price: "29",
+          name: "Team (owner seat; each added member $20.99)",
+          price: "29.99",
           priceCurrency: "USD",
         },
       ],
@@ -684,7 +684,8 @@ export default function Home() {
                   <h3 className="text-sm font-semibold">One team, one pipeline</h3>
                   <p className="mt-1 text-xs leading-relaxed text-muted">
                     Invite your team with a link — everyone screens into the
-                    same pipeline, with the same verdicts. $29/seat.
+                    same pipeline, with the same verdicts. $20.99 per added
+                    member.
                   </p>
                   <div className="mt-auto flex items-center gap-3 pt-4">
                     <div className="flex -space-x-2">
@@ -845,7 +846,7 @@ export default function Home() {
                 </span>
                 <p className="text-sm font-semibold">Pro</p>
                 <p className="mt-2 flex items-baseline gap-1">
-                  <span className="text-4xl font-semibold tracking-tight">$39</span>
+                  <span className="text-4xl font-semibold tracking-tight">$29.99</span>
                   <span className="text-sm text-muted">/month</span>
                 </p>
                 <p className="mt-1 text-sm text-muted">
@@ -876,11 +877,12 @@ export default function Home() {
               <div className="shadow-card flex flex-col rounded-2xl border border-line bg-surface p-6">
                 <p className="text-sm font-semibold">Team</p>
                 <p className="mt-2 flex items-baseline gap-1">
-                  <span className="text-4xl font-semibold tracking-tight">$29</span>
-                  <span className="text-sm text-muted">/seat/month</span>
+                  <span className="text-4xl font-semibold tracking-tight">$29.99</span>
+                  <span className="text-sm text-muted">/month</span>
                 </p>
                 <p className="mt-1 text-sm text-muted">
-                  One shared pipeline for the whole shop.
+                  + $20.99/month per added member. One shared pipeline for the
+                  whole shop.
                 </p>
                 <ul className="mt-5 flex-1 space-y-2.5">
                   {[

@@ -1,11 +1,18 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   getBilling,
   FREE_DEAL_LIMIT,
   PRO_PRICE_LABEL,
+  TEAM_OWNER_PRICE,
+  TEAM_MEMBER_PRICE,
+  teamMonthlyTotal,
+  fmtUsd,
 } from "@/lib/billing";
+import { getTeam, TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { startCheckout, openPortal } from "./actions";
+import { removeMember, openTeamPortal } from "../team/actions";
 import { PendingButton } from "../pending-button";
 
 export const metadata: Metadata = { title: "Billing" };
@@ -40,6 +47,8 @@ export default async function BillingPage({
   const isPro = billing?.isPro ?? false;
   const dealCount = billing?.dealCount ?? 0;
   const atLimit = !isPro && dealCount >= FREE_DEAL_LIMIT;
+  // Full team detail (roster, seat count, renewal) for the Team section.
+  const team = user && billing?.team ? await getTeam(supabase, user.id) : null;
 
   const banner =
     status === "success"
@@ -178,7 +187,7 @@ export default async function BillingPage({
             )}
           </div>
           <p className="mt-2 flex items-baseline gap-1">
-            <span className="text-3xl font-semibold tracking-tight">$39</span>
+            <span className="text-3xl font-semibold tracking-tight">$29.99</span>
             <span className="text-sm text-muted">/month</span>
           </p>
           <p className="mt-1 text-sm text-muted">
@@ -207,14 +216,138 @@ export default async function BillingPage({
         </section>
       </div>
 
+      {/* Team billing — plan, roster, per-member price, next invoice. */}
+      {team ? (
+        <section className="shadow-card rounded-2xl border border-line bg-surface p-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wider text-muted">
+                Team plan
+              </p>
+              <p className="mt-1 text-xl font-semibold">{team.name}</p>
+            </div>
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                team.planActive
+                  ? "bg-pass/15 text-pass"
+                  : "bg-faint text-muted"
+              }`}
+            >
+              {team.planActive ? "Active" : "Trial"}
+            </span>
+          </div>
+
+          {/* The invoice math, spelled out. */}
+          <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+            <div className="flex items-center justify-between rounded-lg border border-line bg-faint px-3 py-2">
+              <dt className="text-muted">Owner seat</dt>
+              <dd className="font-mono tabular-nums">{fmtUsd(TEAM_OWNER_PRICE)}/mo</dd>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border border-line bg-faint px-3 py-2">
+              <dt className="text-muted">
+                Added members ({Math.max(0, team.seatCount - 1)} ×{" "}
+                {fmtUsd(TEAM_MEMBER_PRICE)})
+              </dt>
+              <dd className="font-mono tabular-nums">
+                {fmtUsd(Math.max(0, team.seatCount - 1) * TEAM_MEMBER_PRICE)}/mo
+              </dd>
+            </div>
+          </dl>
+          <div className="mt-2 flex items-center justify-between rounded-lg border border-brand/25 bg-brand/[0.04] px-3 py-2 text-sm">
+            <span className="font-medium">
+              {team.planActive ? "Next invoice" : "Once the plan starts"}
+            </span>
+            <span className="font-mono font-semibold tabular-nums">
+              {fmtUsd(teamMonthlyTotal(team.seatCount))}/mo
+            </span>
+          </div>
+          <p className="mt-2 text-xs text-muted">
+            {team.planActive
+              ? `One subscription, ${team.seatCount} ${team.seatCount === 1 ? "seat" : "seats"} — adding or removing a member updates the seat count immediately and Stripe prorates the difference automatically.${
+                  team.currentPeriodEnd
+                    ? ` Renews ${new Date(team.currentPeriodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`
+                    : ""
+                }`
+              : `Trial: ${Math.min(team.dealCount, TEAM_TRIAL_DEALS)} of ${TEAM_TRIAL_DEALS} shared deals used. Start the plan from the Team page when you're ready.`}
+          </p>
+
+          {/* Roster — the people the invoice is billing for. */}
+          <div className="mt-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-medium uppercase tracking-wider text-muted">
+                Members ({team.seatCount})
+              </h3>
+              {team.role === "owner" && (
+                <Link
+                  href="/team"
+                  className="text-xs font-medium text-brand transition-colors hover:text-brand-strong"
+                >
+                  Invite a member →
+                </Link>
+              )}
+            </div>
+            <ul className="mt-2 divide-y divide-line rounded-lg border border-line">
+              {team.members.map((m) => (
+                <li
+                  key={m.userId}
+                  className="flex items-center gap-3 px-3 py-2 text-sm"
+                >
+                  <span className="min-w-0 flex-1 truncate">
+                    {m.fullName || m.email || "Teammate"}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted">
+                    {m.role === "owner"
+                      ? `owner · ${fmtUsd(TEAM_OWNER_PRICE)}/mo`
+                      : fmtUsd(TEAM_MEMBER_PRICE) + "/mo"}
+                  </span>
+                  {team.role === "owner" && m.role !== "owner" && (
+                    <form action={removeMember}>
+                      <input type="hidden" name="memberId" value={m.userId} />
+                      <button
+                        type="submit"
+                        className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-kill transition-colors hover:bg-kill/5"
+                      >
+                        Remove
+                      </button>
+                    </form>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {team.role === "owner" && team.planActive && (
+              <p className="mt-2 text-xs text-muted">
+                Removing a member drops the seat count — and the invoice — in
+                the same action.
+              </p>
+            )}
+          </div>
+
+          {team.role === "owner" && team.planActive && (
+            <form action={openTeamPortal} className="mt-4">
+              <PendingButton
+                pendingLabel="Opening Stripe…"
+                className="rounded-lg border border-line px-4 py-2 text-sm font-medium transition-colors hover:bg-faint"
+              >
+                Manage team subscription
+              </PendingButton>
+            </form>
+          )}
+        </section>
+      ) : (
+        <p className="text-xs text-muted">
+          Working as a group? The{" "}
+          <a href="/team" className="font-medium text-brand hover:text-brand-strong">
+            Team plan
+          </a>{" "}
+          is {fmtUsd(TEAM_OWNER_PRICE)}/mo for the owner plus{" "}
+          {fmtUsd(TEAM_MEMBER_PRICE)}/mo per added member — one shared
+          pipeline, one subscription.
+        </p>
+      )}
+
       <p className="text-xs text-muted">
         Cancel anytime · billed monthly through Stripe · your deals and
-        documents are never deleted when you downgrade. Working as a group?
-        The{" "}
-        <a href="/team" className="font-medium text-brand hover:text-brand-strong">
-          Team plan
-        </a>{" "}
-        is $29/seat with one shared pipeline.
+        documents are never deleted when you downgrade.
       </p>
     </div>
   );
