@@ -7,7 +7,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { uploadOmPdf, removeStorageFiles } from "@/lib/storage";
 import { getBilling } from "@/lib/billing";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
-import { jobInFlight } from "@/lib/jobs";
+import { jobInFlight, claimJob, releaseClaim } from "@/lib/jobs";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 
@@ -264,30 +264,22 @@ export async function rerunAnalysis(formData: FormData) {
     .maybeSingle();
   if (!deal?.om_storage_path) redirect(`/deals/${dealId}`);
 
-  // Refuse to stack a second pipeline on a live job (double-click guard).
-  if (await jobInFlight(supabase, dealId)) {
+  // Atomic claim — a double-click or a concurrent teammate trigger gets
+  // "busy" instead of a second pipeline interleaving with this one.
+  const claim = await claimJob(supabase, dealId, "signal");
+  if (claim.outcome === "busy") {
     redirect(`/deals/${dealId}?error=busy`);
   }
-
-  const { data: existing } = await supabase
-    .from("analysis_jobs")
-    .select("id")
-    .eq("deal_id", dealId)
-    .limit(1)
-    .maybeSingle();
-
-  if (existing) {
-    await supabase
-      .from("analysis_jobs")
-      .update({ status: "queued", step: "signal", progress: 0, error: null })
-      .eq("deal_id", dealId);
-  } else {
-    await supabase
+  if (claim.outcome === "none") {
+    const { error: insErr } = await supabase
       .from("analysis_jobs")
       .insert({ deal_id: dealId, status: "queued", step: "signal", progress: 0 });
+    if (insErr) redirect(`/deals/${dealId}?error=busy`);
   }
 
-  after(() => runAnalysis(dealId));
+  // Snapshot for the retrade diff only when the stored results are a
+  // coherent, completed generation — never after a failed/partial run.
+  after(() => runAnalysis(dealId, { snapshotPrior: claim.priorStatus === "done" }));
   redirect(`/deals/${dealId}`);
 }
 
@@ -310,13 +302,28 @@ export async function replaceOm(formData: FormData) {
   // RLS scopes this read — a deal the caller can't see comes back null.
   const { data: deal } = await supabase
     .from("deals")
-    .select("id, om_storage_path")
+    .select("id, om_storage_path, user_id, team_id, is_sample")
     .eq("id", dealId)
     .maybeSingle();
   if (!deal) redirect("/deals");
+  // The sample deal is cap-exempt demo data — attaching a real OM to it would
+  // mint a free extra screening slot.
+  if (deal.is_sample) redirect(`/deals/${dealId}`);
 
-  if (await jobInFlight(supabase, dealId)) {
-    redirect(`/deals/${dealId}?error=busy`);
+  // Replacing the OM destroys the original upload (same path, no history) —
+  // gate it like deletion: the deal's creator, or the team owner. A teammate
+  // who can't delete the deal shouldn't be able to vaporize its source doc.
+  if (deal.user_id !== user.id) {
+    const { data: team } = deal.team_id
+      ? await supabase
+          .from("teams")
+          .select("owner_id")
+          .eq("id", deal.team_id)
+          .maybeSingle()
+      : { data: null };
+    if (!team || team.owner_id !== user.id) {
+      redirect(`/deals/${dealId}?error=ompermission`);
+    }
   }
 
   const file = formData.get("om");
@@ -330,6 +337,20 @@ export async function replaceOm(formData: FormData) {
     redirect(`/deals/${dealId}?error=omsize`);
   }
 
+  // Claim the run BEFORE the multi-second upload — the claim is a single
+  // conditional UPDATE, so a concurrent replace/re-run on the same deal gets
+  // "busy" instead of a second pipeline interleaving writes with this one.
+  const claim = await claimJob(supabase, dealId, "signal");
+  if (claim.outcome === "busy") {
+    redirect(`/deals/${dealId}?error=busy`);
+  }
+  if (claim.outcome === "none") {
+    const { error: insErr } = await supabase
+      .from("analysis_jobs")
+      .insert({ deal_id: dealId, status: "queued", step: "signal", progress: 0 });
+    if (insErr) redirect(`/deals/${dealId}?error=busy`);
+  }
+
   // Keep the same storage path (upsert) so every reference — signed URLs,
   // the pipeline download, deletion cleanup — stays valid.
   const path = (deal.om_storage_path as string) ?? `${user.id}/${dealId}.pdf`;
@@ -337,30 +358,21 @@ export async function replaceOm(formData: FormData) {
     const buffer = Buffer.from(await file.arrayBuffer());
     await uploadOmPdf(path, buffer);
   } catch {
+    // Release the claim or the deal reads "queued" with no runner.
+    await releaseClaim(
+      supabase,
+      dealId,
+      "The replacement upload didn't complete — the stored OM is unchanged.",
+    );
     redirect(`/deals/${dealId}?error=omupload`);
   }
   if (!deal.om_storage_path) {
     await supabase.from("deals").update({ om_storage_path: path }).eq("id", dealId);
   }
 
-  const { data: existing } = await supabase
-    .from("analysis_jobs")
-    .select("id")
-    .eq("deal_id", dealId)
-    .limit(1)
-    .maybeSingle();
-  if (existing) {
-    await supabase
-      .from("analysis_jobs")
-      .update({ status: "queued", step: "signal", progress: 0, error: null })
-      .eq("deal_id", dealId);
-  } else {
-    await supabase
-      .from("analysis_jobs")
-      .insert({ deal_id: dealId, status: "queued", step: "signal", progress: 0 });
-  }
-
-  after(() => runAnalysis(dealId));
+  // Only diff against results from a COMPLETED previous run — snapshotting
+  // after a failed run would pair a half-new extraction with an old verdict.
+  after(() => runAnalysis(dealId, { snapshotPrior: claim.priorStatus === "done" }));
   redirect(`/deals/${dealId}`);
 }
 

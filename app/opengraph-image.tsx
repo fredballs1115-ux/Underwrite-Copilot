@@ -132,7 +132,8 @@ export default function Image() {
               }}
             >
               Every CRE deal through the same disciplined screen — sourced
-              ranges, the three deal-killers first, a reproducible Go / No-Go.
+              ranges, the three deal-killers first, a Go / No-Go that shows
+              its work.
             </div>
           </div>
 

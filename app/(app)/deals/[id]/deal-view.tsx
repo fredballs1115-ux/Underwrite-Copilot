@@ -79,9 +79,9 @@ const TABS: {
 const PIPELINE = ["signal", "extract", "challenge", "comps", "market", "verdict"];
 
 const STEP_LABELS: Record<string, string> = {
-  signal: "First pass — pulling the headline read in seconds…",
+  signal: "First pass — the headline read lands in about half a minute…",
   extract: "Reading the OM and extracting the key terms…",
-  challenge: "Red-teaming the assumptions like an investment committee…",
+  challenge: "Grilling the assumptions the way an investment committee would…",
   comps: "Scrutinizing the broker’s comps for cherry-picking…",
   market: "Sanity-checking the assumptions against market norms…",
   reconcile: "Reconciling your model against the OM…",
@@ -99,6 +99,8 @@ const MODEL_ERRORS: Record<string, string> = {
   omsize: "That PDF is larger than 22 MB — please try a smaller file.",
   omupload:
     "The upload didn’t complete — the stored OM is unchanged. Please try again.",
+  ompermission:
+    "Only the deal’s creator or the team owner can replace its OM.",
   busy: "An analysis is already running on this deal — let it finish first.",
   memoempty: "Run the analysis first — the memo needs a verdict to export.",
   delete: "Couldn’t delete the deal — please try again.",
@@ -312,8 +314,24 @@ export function DealView({
 
       {job?.status === "error" && (
         <div className="rounded-xl border border-kill/30 bg-kill/5 p-4">
-          <p className="text-sm font-medium text-kill">Analysis failed</p>
-          {job.error && <p className="mt-1 text-sm text-muted">{job.error}</p>}
+          <p className="text-sm font-medium text-kill">
+            The screen hit a snag and stopped
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            Nothing was lost — try again below. If it fails twice, email{" "}
+            <a
+              className="font-medium text-brand hover:text-brand-strong"
+              href="mailto:underwritecopilot.support@gmail.com"
+            >
+              underwritecopilot.support@gmail.com
+            </a>{" "}
+            and we&apos;ll dig in.
+          </p>
+          {job.error && (
+            <p className="mt-2 break-words font-mono text-[11px] text-muted/80">
+              {job.error}
+            </p>
+          )}
           <RetryForm dealId={dealId} label="Try again" />
         </div>
       )}

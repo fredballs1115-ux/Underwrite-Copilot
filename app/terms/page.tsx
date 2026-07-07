@@ -12,7 +12,7 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "What the service is",
     body: [
-      "Underwrite Copilot is a first-pass screening tool for commercial real estate deals. You upload deal documents (offering memoranda, rent rolls, and similar), and the service runs an AI-assisted analysis that produces ranges, flagged assumptions, and a Go / No-Go screening verdict.",
+      "Underwrite Copilot is a first-pass screening tool for commercial real estate deals. You upload deal documents (offering memoranda, rent rolls, and similar), and the service runs an AI-assisted analysis that produces ranges, flagged assumptions, and a Go / Caution / No-Go screening verdict.",
       "It is a screen, not an underwriter of record. Outputs can be wrong, incomplete, or out of date — always verify flagged figures against the source documents before acting.",
     ],
   },

@@ -1330,6 +1330,8 @@ const VERDICT = {
     sub: "Worth deeper work",
     tint: "from-pass/10",
     iconBg: "bg-pass/15 text-pass",
+    wordCls: "text-pass",
+    rail: "border-l-pass",
     Icon: IconCheck,
   },
   caution: {
@@ -1337,6 +1339,8 @@ const VERDICT = {
     sub: "Proceed only with named conditions",
     tint: "from-caution/10",
     iconBg: "bg-caution/15 text-caution",
+    wordCls: "text-caution",
+    rail: "border-l-caution",
     Icon: IconAlert,
   },
   pass_on: {
@@ -1344,6 +1348,8 @@ const VERDICT = {
     sub: "Recommend passing",
     tint: "from-kill/10",
     iconBg: "bg-kill/15 text-kill",
+    wordCls: "text-kill",
+    rail: "border-l-kill",
     Icon: IconX,
   },
 } as const;
@@ -1426,7 +1432,9 @@ function VerdictHero({
 }) {
   const v = VERDICT[result.verdict] ?? VERDICT.caution;
   return (
-    <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
+    <section
+      className={`overflow-hidden rounded-2xl border border-line border-l-4 bg-surface shadow-sm ${v.rail}`}
+    >
       <div className={`bg-gradient-to-b ${v.tint} to-transparent p-6`}>
         <span className="text-xs font-medium uppercase tracking-wider text-muted">
           Verdict
@@ -1438,7 +1446,9 @@ function VerdictHero({
             <v.Icon className="h-5 w-5" />
           </span>
           <div>
-            <p className="text-3xl font-semibold leading-none tracking-tight">
+            <p
+              className={`text-3xl font-semibold leading-none tracking-tight ${v.wordCls}`}
+            >
               {v.word}
             </p>
             {v.sub && <p className="mt-1 text-sm text-muted">{v.sub}</p>}

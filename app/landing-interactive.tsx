@@ -319,7 +319,7 @@ function DemoPanel({ tab }: { tab: Tab }) {
             <div>
               <p className="text-xs font-medium">Screening verdict</p>
               <p className="mt-0.5 text-[10px] text-muted">
-                reproducible — same OM, same answer
+                one rubric — the work shown on every call
               </p>
             </div>
             <span className="rounded-full bg-caution/10 px-3 py-1 text-xs font-semibold text-caution">
@@ -394,7 +394,9 @@ export function DemoTabs() {
           Sample data
         </span>
       </div>
-      <div role="tabpanel" className="animate-fade p-4" key={tab}>
+      {/* min-h pinned to the tallest panel so switching tabs never reflows
+          the section — clicking around must feel solid, not jumpy. */}
+      <div role="tabpanel" className="animate-fade min-h-[21rem] p-4" key={tab}>
         <DemoPanel tab={tab} />
       </div>
     </div>

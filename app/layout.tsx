@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     template: "%s · Underwrite Copilot",
   },
   description:
-    "Run every commercial real estate deal through the same disciplined screen: rent, expenses, and cap as sourced ranges; the three deal-killers stressed first; a reproducible Go / No-Go before you open a model. Same deal in, same answer out.",
+    "Run every commercial real estate deal through the same disciplined screen: rent, expenses, and cap as sourced ranges; the three deal-killers stressed first; a Go / No-Go that shows its work before you open a model. One method, every deal.",
   keywords: [
     "CRE underwriting",
     "commercial real estate underwriting software",
@@ -44,13 +44,13 @@ export const metadata: Metadata = {
     siteName: "Underwrite Copilot",
     title: "Stop underwriting like a coin flip.",
     description:
-      "Same deal, same afternoon, 800 bps apart — that's a coin flip with a spreadsheet attached. Underwrite Copilot gives every deal the same rigor: sourced ranges, the three deal-killers first, a reproducible verdict.",
+      "Same deal, same afternoon, 800 bps apart — that's a coin flip with a spreadsheet attached. Underwrite Copilot gives every deal the same rigor: sourced ranges, the three deal-killers first, a verdict that shows its work.",
   },
   twitter: {
     card: "summary_large_image",
     title: "Stop underwriting like a coin flip.",
     description:
-      "Every CRE deal through the same disciplined screen — sourced ranges, deal-killers first, a reproducible Go / No-Go. Same deal in, same answer out.",
+      "Every CRE deal through the same disciplined screen — sourced ranges, deal-killers first, a Go / No-Go that shows its work. One method, every deal.",
   },
   robots: { index: true, follow: true },
 };

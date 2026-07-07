@@ -75,6 +75,9 @@ export async function extractTerms(
     dealName: out.dealName.trim() ? out.dealName.trim() : null,
     assetClass: out.assetClass,
     market: out.market,
+    // The buy-box market check matches against market AND address — dropping
+    // this field made "Dallas" fail on a deal whose street address is Dallas.
+    address: out.address,
     metrics: out.metrics,
   };
 }
