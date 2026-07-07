@@ -61,8 +61,22 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      // The inline script below adds a `js` class before hydration; suppress
+      // the resulting className diff warning (the standard theme-script pattern).
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full`}
     >
+      <head>
+        {/* Cut the mustard: mark the document as JS-capable before first
+            paint, so scroll-reveal sections only start hidden when JS can
+            reveal them. Without JS (or if it fails) the content stays
+            visible instead of blanking forever. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: "document.documentElement.classList.add('js')",
+          }}
+        />
+      </head>
       <body className="flex min-h-full flex-col font-sans antialiased">
         {children}
       </body>

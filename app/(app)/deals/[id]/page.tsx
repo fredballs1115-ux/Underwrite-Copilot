@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { signedSupplementUrl } from "@/lib/storage";
 import { isPro } from "@/lib/billing";
 import { type DealRow } from "@/lib/deals";
@@ -54,9 +54,8 @@ export default async function DealPage({
   const { error: errorCode, tab, a: analysisParam } = await searchParams;
 
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Request-cached: shares the layout's auth call instead of a second hop.
+  const user = await getCurrentUser();
 
   // These four don't depend on each other — fetch them in one round trip's
   // worth of wall clock instead of four.

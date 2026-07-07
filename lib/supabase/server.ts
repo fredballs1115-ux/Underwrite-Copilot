@@ -1,6 +1,8 @@
 import "server-only";
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import type { User } from "@supabase/supabase-js";
 
 /**
  * Supabase client for server code (Server Components and Route Handlers).
@@ -34,3 +36,18 @@ export async function createSupabaseServerClient() {
     },
   );
 }
+
+/**
+ * The authenticated user for this request, deduped with React `cache()` so the
+ * layout, page, and any helper that needs the user share ONE call to Supabase
+ * Auth per render instead of each making its own network round-trip. Use this
+ * in Server Components for reads; mutations that need a guaranteed-fresh check
+ * can still call getUser() directly.
+ */
+export const getCurrentUser = cache(async (): Promise<User | null> => {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user;
+});
