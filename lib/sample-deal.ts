@@ -98,6 +98,109 @@ const modelMetrics: ReconciledMetric[] = [
     confidence: "high",
     isConflict: false,
   },
+  {
+    key: "units",
+    label: "Units",
+    chosenValue: "248",
+    unit: "",
+    sources: [
+      { doc: "Rent roll", value: "248", locator: "sheet", basis: "actual" },
+      { doc: "OM", value: "248", locator: "p.3", basis: "stated" },
+    ],
+    authority: "Rent roll",
+    rationale: "Rent roll and OM agree.",
+    confidence: "high",
+    isConflict: false,
+  },
+  {
+    key: "avgRent",
+    label: "Avg monthly rent",
+    chosenValue: "$1,420/unit",
+    unit: "$",
+    sources: [
+      { doc: "OM", value: "$1,600/unit", locator: "p.12", basis: "pro forma" },
+      { doc: "Rent roll", value: "$1,420/unit", locator: "sheet", basis: "actual" },
+    ],
+    authority: "Rent roll",
+    rationale:
+      "In-place rents, not the broker's post-renovation target — the $180 gap IS the business plan, not the starting point.",
+    confidence: "high",
+    isConflict: true,
+  },
+  {
+    key: "rentGrowth",
+    label: "Rent growth",
+    chosenValue: "3.0%/yr",
+    unit: "%",
+    sources: [
+      { doc: "OM", value: "4.0%/yr", locator: "p.40", basis: "pro forma" },
+      { doc: "Market", value: "3.0%/yr", locator: "", basis: "market norm" },
+    ],
+    authority: "Market",
+    rationale:
+      "The submarket has averaged ~3% over the long run; 4% assumes the top of the band every year.",
+    confidence: "medium",
+    isConflict: true,
+  },
+  {
+    key: "expenseGrowth",
+    label: "Expense growth",
+    chosenValue: "3.0%/yr",
+    unit: "%",
+    sources: [{ doc: "Market", value: "3.0%/yr", locator: "", basis: "market norm" }],
+    authority: "Market",
+    rationale: "Held at inflation — taxes and insurance argue against less.",
+    confidence: "medium",
+    isConflict: false,
+  },
+  {
+    key: "otherIncome",
+    label: "Other income",
+    chosenValue: "$300,000/yr",
+    unit: "$",
+    sources: [{ doc: "T-12", value: "$300,000", locator: "trailing", basis: "actual" }],
+    authority: "T-12",
+    rationale: "Parking, fees, and laundry as actually collected.",
+    confidence: "high",
+    isConflict: false,
+  },
+  {
+    key: "capexReserve",
+    label: "Capital reserve",
+    chosenValue: "$300/unit/yr",
+    unit: "$",
+    sources: [
+      { doc: "OM", value: "$250/unit/yr", locator: "p.9", basis: "pro forma" },
+      { doc: "Market", value: "$300/unit/yr", locator: "", basis: "lender norm" },
+    ],
+    authority: "Market",
+    rationale:
+      "1990s vintage with original roofs and chillers — $250 underfunds what a lender will escrow anyway.",
+    confidence: "medium",
+    isConflict: true,
+  },
+  {
+    key: "rate",
+    label: "Interest rate",
+    chosenValue: "6.00%",
+    unit: "%",
+    sources: [{ doc: "Loan terms", value: "6.00%", locator: "term sheet", basis: "term sheet" }],
+    authority: "Loan terms",
+    rationale: "Quoted fixed rate, 30-yr amortization after one IO year.",
+    confidence: "high",
+    isConflict: false,
+  },
+  {
+    key: "sellingCost",
+    label: "Selling costs at exit",
+    chosenValue: "2.0%",
+    unit: "%",
+    sources: [{ doc: "Market", value: "2.0%", locator: "", basis: "market norm" }],
+    authority: "Market",
+    rationale: "Broker and transfer costs on disposition.",
+    confidence: "medium",
+    isConflict: false,
+  },
 ];
 
 const model: UnderwritingModel = {
@@ -113,10 +216,10 @@ const model: UnderwritingModel = {
   cashFlow,
   returns,
   summary:
-    "Reconciled across the OM, rent roll, and T-12. Actuals set the in-place income and expense load; the exit holds flat to going-in with no compression assumed.",
+    "Reconciled across the OM, rent roll, and T-12. Actuals set the in-place income and expense load, rent growth is haircut to the market norm, the capital reserve is funded at the lender's $300/unit, and the exit holds flat to going-in with no compression assumed.",
   caveats: [
     "Single-tranche debt and straight-line growth — a screening model, not a full build.",
-    "Capital reserve is a flat annual figure; confirm against a real capital plan.",
+    "Capital reserve is a flat annual figure; confirm against a real engineering budget.",
   ],
 };
 

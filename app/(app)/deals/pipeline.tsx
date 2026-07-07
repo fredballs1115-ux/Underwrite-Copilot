@@ -718,6 +718,13 @@ export function Pipeline({
           >
             Export CSV
           </button>
+          <a
+            href="/api/pipeline/export"
+            title="The whole pipeline as a formatted Excel workbook — stage-grouped with verdict and buy-box markers, plus a summary sheet. Built for pipeline meetings."
+            className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-faint"
+          >
+            Meeting workbook
+          </a>
         </div>
       )}
 

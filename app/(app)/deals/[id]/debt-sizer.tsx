@@ -6,16 +6,19 @@ import type { UnderwritingModel } from "@/lib/model/types";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
 /**
- * Deterministic debt sizer — pure lender math, no AI. Max loan is the most
- * restrictive of the three standard constraints:
+ * Debt & financing — every loan number a screen needs, all deterministic
+ * client math (no AI):
  *
- *   LTV        loan ≤ price × max LTV
- *   DSCR       loan ≤ (NOI / min DSCR) / mortgage constant
- *   Debt yield loan ≤ NOI / min debt yield
+ *   · loan terms the OM itself states, with page references
+ *   · the debt sizer: max loan under the most restrictive of LTV / DSCR /
+ *     debt yield, binding constraint flagged, implied equity
+ *   · payment breakdown at that loan (monthly, annual, year-1 I/P split)
+ *   · rate sensitivity: sizing and coverage at −50 / +50 / +100 bps
+ *   · breakeven occupancy vs the underwritten economics (model required)
+ *   · an amortization preview across the hold
  *
- * Seeded from the generated model when one exists (its loan terms + year-1
- * NOI), else from the OM extraction, else sensible screening defaults —
- * every figure stays editable.
+ * Seeded from the generated model when one exists, else the OM extraction,
+ * else sensible screening defaults — every figure stays editable.
  */
 
 const fmtUsd = (n: number) =>
@@ -35,6 +38,83 @@ function mortgageConstant(ratePct: number, amortYears: number, io: boolean): num
   if (n <= 0) return NaN;
   if (r === 0) return 12 / n;
   return (12 * r) / (1 - Math.pow(1 + r, -n));
+}
+
+/** Exact first-year interest/principal split at a given loan. */
+function paymentBreakdown(
+  loan: number,
+  ratePct: number,
+  amortYears: number,
+  io: boolean,
+): { monthly: number; annual: number; interest1: number; principal1: number } {
+  if (io) {
+    const annual = loan * (ratePct / 100);
+    return { monthly: annual / 12, annual, interest1: annual, principal1: 0 };
+  }
+  const r = ratePct / 100 / 12;
+  const n = Math.round(amortYears * 12);
+  const monthly = r === 0 ? loan / n : (loan * r) / (1 - Math.pow(1 + r, -n));
+  let bal = loan;
+  let interest1 = 0;
+  let principal1 = 0;
+  for (let m = 0; m < 12; m++) {
+    const i = bal * r;
+    const p = monthly - i;
+    interest1 += i;
+    principal1 += p;
+    bal -= p;
+  }
+  return { monthly, annual: monthly * 12, interest1, principal1 };
+}
+
+/** Year-by-year balances at a given loan (interest-only stays flat). */
+function amortPreview(
+  loan: number,
+  ratePct: number,
+  amortYears: number,
+  io: boolean,
+  years: number,
+): { year: number; begin: number; interest: number; principal: number; end: number }[] {
+  const rows = [];
+  const r = ratePct / 100 / 12;
+  const n = Math.round(amortYears * 12);
+  const monthly = io
+    ? (loan * (ratePct / 100)) / 12
+    : r === 0
+      ? loan / n
+      : (loan * r) / (1 - Math.pow(1 + r, -n));
+  let bal = loan;
+  for (let y = 1; y <= years; y++) {
+    const begin = bal;
+    let interest = 0;
+    let principal = 0;
+    for (let m = 0; m < 12; m++) {
+      const i = io ? monthly : bal * r;
+      const p = io ? 0 : monthly - i;
+      interest += i;
+      principal += p;
+      bal -= p;
+    }
+    rows.push({ year: y, begin, interest, principal, end: bal });
+  }
+  return rows;
+}
+
+/** Loan terms the OM itself states — shown with their page references. */
+function omLoanTerms(extraction: ExtractionResult | null) {
+  const metrics = extraction?.metrics ?? [];
+  const picks: { label: string; value: string; page?: string }[] = [];
+  const take = (label: string, inc: RegExp, exc?: RegExp) => {
+    const m = findMetric(metrics, inc, exc);
+    if (m) picks.push({ label, value: m.value, page: (m as { page?: string }).page });
+  };
+  take("Loan amount", /loan amount|existing (debt|loan)|assumable (debt|loan)|first mortgage/i, /rate|ltv/i);
+  take("LTV", /loan[- ]to[- ]value|\bltv\b/i);
+  take("Rate", /interest rate|\bloan rate\b|\bcoupon\b/i, /cap ?rate|growth|tax|vacancy/i);
+  take("Amortization", /amortiz/i);
+  take("Interest-only", /interest[- ]only|\bi\/?o\b period/i);
+  take("Maturity", /maturity|loan term/i, /amortiz/i);
+  return picks;
 }
 
 interface Seed {
@@ -76,6 +156,14 @@ function deriveSeed(
   };
 }
 
+function SubHead({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="mt-6 text-[10px] font-semibold uppercase tracking-wider text-muted">
+      {children}
+    </h3>
+  );
+}
+
 export function DebtSizer({
   model,
   extraction,
@@ -84,6 +172,7 @@ export function DebtSizer({
   extraction: ExtractionResult | null;
 }) {
   const seed = useMemo(() => deriveSeed(model, extraction), [model, extraction]);
+  const omTerms = useMemo(() => omLoanTerms(extraction), [extraction]);
 
   // Money fields stay strings so "68m", "68,000,000" and "$68M" all work.
   const [priceRaw, setPriceRaw] = useState(seed.price != null ? fmtInput(seed.price) : "");
@@ -97,6 +186,18 @@ export function DebtSizer({
 
   const price = parseMoney(priceRaw) ?? null;
   const noi = parseMoney(noiRaw) ?? null;
+
+  /** Max loan under the three constraints at a given rate. */
+  function sizeAt(rate: number): number | null {
+    const k = mortgageConstant(rate, amortYears, io);
+    const cands: number[] = [];
+    if (price != null && price > 0 && maxLtvPct > 0) cands.push(price * (maxLtvPct / 100));
+    if (noi != null && noi > 0 && minDscr > 0 && isFinite(k) && k > 0)
+      cands.push(noi / minDscr / k);
+    if (noi != null && noi > 0 && minDebtYieldPct > 0)
+      cands.push(noi / (minDebtYieldPct / 100));
+    return cands.length ? Math.min(...cands) : null;
+  }
 
   const sized = useMemo(() => {
     const k = mortgageConstant(ratePct, amortYears, io);
@@ -138,6 +239,7 @@ export function DebtSizer({
     if (!candidates.length) return { rows, maxLoan: null, binding: null, k };
     const binding = candidates.reduce((a, b) => (a.loan! <= b.loan! ? a : b));
     return { rows, maxLoan: binding.loan!, binding: binding.key, k };
+     
   }, [price, noi, ratePct, amortYears, io, maxLtvPct, minDscr, minDebtYieldPct]);
 
   const { rows, maxLoan, binding, k } = sized;
@@ -149,6 +251,48 @@ export function DebtSizer({
       : null;
   const effDy = maxLoan != null && noi != null && noi > 0 ? (noi / maxLoan) * 100 : null;
 
+  const pay = maxLoan != null ? paymentBreakdown(maxLoan, ratePct, amortYears, io) : null;
+
+  // Rate strip: re-size at each rate AND hold today's sizing to watch DSCR.
+  const rateStrip = useMemo(() => {
+    if (maxLoan == null) return [];
+    const steps = [-0.5, 0, 0.5, 1.0];
+    return steps
+      .map((d) => {
+        const rate = Math.round((ratePct + d) * 100) / 100;
+        if (rate <= 0) return null;
+        const sizedLoan = sizeAt(rate);
+        const kAt = mortgageConstant(rate, amortYears, io);
+        const dscrHeld =
+          noi != null && noi > 0 && isFinite(kAt) && kAt > 0
+            ? noi / (maxLoan * kAt)
+            : null;
+        return { d, rate, sizedLoan, dscrHeld };
+      })
+      .filter(Boolean) as { d: number; rate: number; sizedLoan: number | null; dscrHeld: number | null }[];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [maxLoan, ratePct, amortYears, io, noi, price, maxLtvPct, minDscr, minDebtYieldPct]);
+
+  // Breakeven occupancy needs the underwritten income structure — model only.
+  const breakeven = useMemo(() => {
+    const inp = model?.inputs;
+    if (!inp || maxLoan == null || !inp.year1Gpr) return null;
+    const ds = maxLoan * (isFinite(k) && k > 0 ? k : 0);
+    if (!ds) return null;
+    const needed =
+      inp.year1Opex + (inp.capexReserveAnnual ?? 0) + ds - (inp.otherIncomeAnnual ?? 0);
+    const occ = (needed / inp.year1Gpr) * 100;
+    return {
+      occ,
+      underwritten: 100 - (inp.vacancyPct ?? 0),
+    };
+     
+  }, [model, maxLoan, k]);
+
+  const holdYears = model?.holdYears ?? 5;
+  const amortRows =
+    maxLoan != null ? amortPreview(maxLoan, ratePct, amortYears, io, Math.min(Math.max(holdYears, 3), 10)) : [];
+
   const numCls =
     "w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 font-mono text-sm tabular-nums outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40";
 
@@ -159,15 +303,15 @@ export function DebtSizer({
     >
       <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold tracking-tight [&::-webkit-details-marker]:hidden">
         <span className="flex items-center justify-between gap-2">
-          Debt sizer
+          Debt &amp; financing
           <span className="text-xs font-normal text-muted">
-            what lender math supports — LTV, DSCR, debt yield
+            sizing, payments, rate sensitivity — deterministic
           </span>
         </span>
       </summary>
       <div className="border-t border-line p-5">
         <p className="text-sm text-muted">
-          Deterministic — pure math on the figures below, no AI.{" "}
+          Pure math on the figures below, no AI.{" "}
           {seed.seededFrom === "model"
             ? "Seeded from your generated model."
             : seed.seededFrom === "extraction"
@@ -175,7 +319,26 @@ export function DebtSizer({
               : "Enter the deal's figures."}
         </p>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {omTerms.length > 0 && (
+          <>
+            <SubHead>Financing stated in the OM</SubHead>
+            <ul className="mt-2 flex flex-wrap gap-1.5">
+              {omTerms.map((t) => (
+                <li
+                  key={t.label}
+                  className="rounded-full border border-line bg-paper px-2.5 py-1 text-xs"
+                >
+                  <span className="text-muted">{t.label}:</span>{" "}
+                  <span className="font-mono font-medium tabular-nums">{t.value}</span>
+                  {t.page && <span className="text-muted"> · {t.page}</span>}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
+        <SubHead>Debt sizer</SubHead>
+        <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <label className="block">
             <span className="text-[10px] font-medium uppercase tracking-wide text-muted">Price</span>
             <input value={priceRaw} onChange={(e) => setPriceRaw(e.target.value)} placeholder="$68M" inputMode="decimal" aria-label="Purchase price" className={numCls} />
@@ -242,25 +405,138 @@ export function DebtSizer({
           ))}
         </ul>
 
-        {maxLoan != null ? (
-          <div className="mt-4 rounded-xl bg-faint p-4">
-            <p className="text-sm">
-              <span className="font-semibold">Max loan {fmtUsd(maxLoan)}</span>
-              {equity != null && equity >= 0 && (
-                <span className="text-muted"> · implied equity {fmtUsd(equity)}</span>
-              )}
-            </p>
-            <p className="mt-1 font-mono text-xs tabular-nums text-muted">
-              At that loan:{" "}
-              {[
-                effLtv != null ? `${effLtv.toFixed(1)}% LTV` : null,
-                effDscr != null ? `${effDscr.toFixed(2)}x DSCR` : null,
-                effDy != null ? `${effDy.toFixed(1)}% debt yield` : null,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
-          </div>
+        {maxLoan != null && pay != null ? (
+          <>
+            <div className="mt-4 rounded-xl bg-faint p-4">
+              <p className="text-sm">
+                <span className="font-semibold">Max loan {fmtUsd(maxLoan)}</span>
+                {equity != null && equity >= 0 && (
+                  <span className="text-muted"> · implied equity {fmtUsd(equity)}</span>
+                )}
+              </p>
+              <p className="mt-1 font-mono text-xs tabular-nums text-muted">
+                At that loan:{" "}
+                {[
+                  effLtv != null ? `${effLtv.toFixed(1)}% LTV` : null,
+                  effDscr != null ? `${effDscr.toFixed(2)}x DSCR` : null,
+                  effDy != null ? `${effDy.toFixed(1)}% debt yield` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            </div>
+
+            <SubHead>Debt service at that loan</SubHead>
+            <dl className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {(
+                [
+                  ["Monthly payment", fmtUsd(pay.monthly)],
+                  ["Annual debt service", fmtUsd(pay.annual)],
+                  ["Year-1 interest", fmtUsd(pay.interest1)],
+                  [
+                    "Year-1 principal",
+                    io ? "$0 (interest-only)" : fmtUsd(pay.principal1),
+                  ],
+                ] as const
+              ).map(([label, value]) => (
+                <div key={label} className="rounded-lg border border-line px-3 py-2">
+                  <dt className="text-[10px] uppercase tracking-wide text-muted">{label}</dt>
+                  <dd className="mt-0.5 font-mono text-sm font-semibold tabular-nums">{value}</dd>
+                </div>
+              ))}
+            </dl>
+
+            {rateStrip.length > 0 && (
+              <>
+                <SubHead>If rates move</SubHead>
+                <div className="mt-2 overflow-x-auto">
+                  <table className="w-full min-w-105 text-sm">
+                    <thead>
+                      <tr className="text-left text-[10px] font-medium uppercase tracking-wide text-muted">
+                        <th className="py-1.5 pr-3 font-medium">Rate</th>
+                        <th className="py-1.5 pr-3 text-right font-medium">Max loan re-sized</th>
+                        <th className="py-1.5 pr-3 text-right font-medium">Δ vs today</th>
+                        <th className="py-1.5 text-right font-medium">DSCR holding today&rsquo;s loan</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line">
+                      {rateStrip.map((s) => (
+                        <tr key={s.rate} className={s.d === 0 ? "bg-faint/60" : undefined}>
+                          <td className="whitespace-nowrap py-1.5 pr-3 font-mono text-xs tabular-nums">
+                            {s.rate.toFixed(2)}%{s.d === 0 ? " (today)" : ""}
+                          </td>
+                          <td className="whitespace-nowrap py-1.5 pr-3 text-right font-mono text-xs tabular-nums">
+                            {s.sizedLoan != null ? fmtUsd(s.sizedLoan) : "—"}
+                          </td>
+                          <td className={`whitespace-nowrap py-1.5 pr-3 text-right font-mono text-xs tabular-nums ${s.sizedLoan != null && s.sizedLoan < maxLoan ? "text-kill" : "text-muted"}`}>
+                            {s.sizedLoan != null
+                              ? `${s.sizedLoan >= maxLoan ? "+" : "−"}${fmtUsd(Math.abs(s.sizedLoan - maxLoan))}`
+                              : "—"}
+                          </td>
+                          <td className={`whitespace-nowrap py-1.5 text-right font-mono text-xs tabular-nums ${s.dscrHeld != null && s.dscrHeld < minDscr ? "font-semibold text-kill" : ""}`}>
+                            {s.dscrHeld != null ? `${s.dscrHeld.toFixed(2)}x` : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+
+            {breakeven && (
+              <>
+                <SubHead>Breakeven occupancy</SubHead>
+                <p className="mt-2 text-sm">
+                  <span className="font-mono font-semibold tabular-nums">
+                    {breakeven.occ.toFixed(1)}%
+                  </span>{" "}
+                  <span className="text-muted">
+                    occupancy covers expenses, reserves, and this debt service —
+                    the model underwrites {breakeven.underwritten.toFixed(0)}%.
+                  </span>
+                  {breakeven.occ >= breakeven.underwritten && (
+                    <span className="font-medium text-kill">
+                      {" "}
+                      No cushion at this sizing.
+                    </span>
+                  )}
+                </p>
+              </>
+            )}
+
+            {amortRows.length > 0 && !io && (
+              <details className="mt-5">
+                <summary className="cursor-pointer text-sm font-medium text-brand transition-colors hover:text-brand-strong [&::-webkit-details-marker]:hidden">
+                  Amortization preview ({amortRows.length} years) →
+                </summary>
+                <div className="mt-2 overflow-x-auto">
+                  <table className="w-full min-w-105 text-sm">
+                    <thead>
+                      <tr className="text-left text-[10px] font-medium uppercase tracking-wide text-muted">
+                        <th className="py-1.5 pr-3 font-medium">Year</th>
+                        <th className="py-1.5 pr-3 text-right font-medium">Opening balance</th>
+                        <th className="py-1.5 pr-3 text-right font-medium">Interest</th>
+                        <th className="py-1.5 pr-3 text-right font-medium">Principal</th>
+                        <th className="py-1.5 text-right font-medium">Closing balance</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line">
+                      {amortRows.map((r) => (
+                        <tr key={r.year}>
+                          <td className="py-1.5 pr-3 font-mono text-xs tabular-nums">{r.year}</td>
+                          <td className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums">{fmtUsd(r.begin)}</td>
+                          <td className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums">{fmtUsd(r.interest)}</td>
+                          <td className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums">{fmtUsd(r.principal)}</td>
+                          <td className="py-1.5 text-right font-mono text-xs tabular-nums">{fmtUsd(r.end)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            )}
+          </>
         ) : (
           <p className="mt-4 text-sm text-muted">
             Add a price or a year-1 NOI above and the sizing appears here.
