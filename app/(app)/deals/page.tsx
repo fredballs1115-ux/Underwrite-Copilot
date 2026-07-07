@@ -37,9 +37,14 @@ function pickStats(metrics: ExtractedMetric[]): { label: string; value: string }
 export default async function DealsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; deleted?: string; joined?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    deleted?: string;
+    joined?: string;
+    new?: string;
+  }>;
 }) {
-  const { error: errorCode, deleted, joined } = await searchParams;
+  const { error: errorCode, deleted, joined, new: newParam } = await searchParams;
   const errorMessage = errorCode ? (ERRORS[errorCode] ?? null) : null;
   const notice = deleted
     ? "Deal deleted."
@@ -59,7 +64,7 @@ export default async function DealsPage({
     supabase
       .from("deals")
       .select(
-        "id, name, asset_class, created_at, verdict, extraction, user_id, team_id, stage",
+        "id, name, asset_class, created_at, verdict, extraction, user_id, team_id, stage, is_sample",
       )
       .order("created_at", { ascending: false }),
     user ? getBuyBoxForDeal(user.id, null).catch(() => null) : Promise.resolve(null),
@@ -99,7 +104,12 @@ export default async function DealsPage({
   type Row = Pick<
     DealRow,
     "id" | "name" | "asset_class" | "created_at" | "verdict" | "extraction"
-  > & { user_id: string; team_id: string | null; stage: string | null };
+  > & {
+    user_id: string;
+    team_id: string | null;
+    stage: string | null;
+    is_sample: boolean | null;
+  };
 
   // Who added each team deal — teammate profiles are readable under RLS.
   const rows = (data ?? []) as Row[];
@@ -155,11 +165,20 @@ export default async function DealsPage({
     };
   });
 
+  // Getting-started state — all real, computed from the account's actual data.
+  const onboarding = {
+    hasBuyBox: !!(personalBox || teamBox),
+    sampleId: rows.find((d) => d.is_sample)?.id ?? null,
+    hasRealDeal: rows.some((d) => !d.is_sample),
+  };
+
   return (
     <Pipeline
       deals={deals}
       errorMessage={errorMessage}
       notice={notice}
+      openNew={!!newParam}
+      onboarding={onboarding}
       billing={
         billing
           ? {

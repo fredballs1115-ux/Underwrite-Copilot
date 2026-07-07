@@ -106,6 +106,32 @@ export async function runAnalysis(dealId: string): Promise<void> {
     const assetClass = (deal.asset_class as AssetClass) ?? "auto";
     const pdf = await downloadOmPdf(deal.om_storage_path as string);
 
+    // Retrade watch: on a RE-screen, snapshot the previous run's results
+    // before they're overwritten, so the deal page can show what moved
+    // (price cuts, cap drift, verdict flips). Best-effort — a pre-0010
+    // schema without the column must never sink the run.
+    try {
+      const { data: prev } = await admin
+        .from("deals")
+        .select("extraction, verdict")
+        .eq("id", dealId)
+        .single();
+      if (prev?.extraction) {
+        await admin
+          .from("deals")
+          .update({
+            prior_screen: {
+              at: new Date().toISOString(),
+              extraction: prev.extraction,
+              verdict: prev.verdict ?? null,
+            },
+          })
+          .eq("id", dealId);
+      }
+    } catch {
+      // No snapshot — the screen itself proceeds regardless.
+    }
+
     // Step 0 — first signal: the fast headline read, stored the moment it
     // lands so the deal page shows what the deal IS while the deep pass runs.
     // Best-effort: a failure here (or a pre-0009 schema without the column)

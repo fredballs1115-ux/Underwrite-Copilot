@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { signOut } from "@/app/login/actions";
 import { LogoMark } from "@/app/logo";
 import { ToastProvider } from "./toaster";
+import { CommandPalette } from "./command-palette";
 
 function NavIcon({
   className,
@@ -78,9 +79,11 @@ export function AppShell({
   const inTeam = pathname.startsWith("/team");
   const inBilling = pathname.startsWith("/billing");
   const inAccount = pathname.startsWith("/account");
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   return (
     <ToastProvider>
+    <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     <a
       href="#main"
       className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-brand focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
@@ -97,7 +100,33 @@ export function AppShell({
           </span>
         </Link>
 
-        <nav className="mt-2 flex-1 space-y-1 px-3">
+        <div className="px-3 pb-1">
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            className="flex w-full items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/55 transition-colors hover:bg-white/10 hover:text-white/80"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-3.5 w-3.5"
+              aria-hidden
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+            Jump to…
+            <kbd className="ml-auto rounded border border-white/15 px-1.5 py-0.5 text-[10px] text-white/45">
+              ⌘K
+            </kbd>
+          </button>
+        </div>
+
+        <nav className="mt-1 flex-1 space-y-1 px-3">
           {(
             [
               ["/deals", "Pipeline", inPipeline, IconLayers],
@@ -163,14 +192,36 @@ export function AppShell({
                 Underwrite Copilot
               </span>
             </Link>
-            <form action={signOut}>
+            <div className="flex items-center gap-1">
               <button
-                type="submit"
-                className="rounded-lg px-3 py-2 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+                type="button"
+                onClick={() => setPaletteOpen(true)}
+                aria-label="Search deals and actions"
+                className="rounded-lg p-2 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
               >
-                Sign out
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4.5 w-4.5"
+                  aria-hidden
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
               </button>
-            </form>
+              <form action={signOut}>
+                <button
+                  type="submit"
+                  className="rounded-lg px-3 py-2 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  Sign out
+                </button>
+              </form>
+            </div>
           </div>
           {/* Mobile nav — the sidebar is desktop-only, so these live here. */}
           <nav className="flex gap-1 overflow-x-auto border-t border-white/10 px-3 py-2">

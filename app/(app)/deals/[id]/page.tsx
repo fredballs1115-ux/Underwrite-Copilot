@@ -19,7 +19,10 @@ import {
 } from "@/lib/anthropic/types";
 import { DealView } from "./deal-view";
 import { FirstReadCard } from "./first-read";
+import { SinceLastScreen } from "./since-last-screen";
+import { ReplaceOm } from "./replace-om";
 import { DealActions } from "./deal-actions";
+import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import { StageSelect } from "./stage-select";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
@@ -129,6 +132,16 @@ export default async function DealPage({
   const keyStats = extraction ? pickKeyStats(extraction.metrics) : [];
   const pill = verdict ? VERDICT_PILL[verdict.verdict] : null;
 
+  // Retrade watch: once a RE-screen finishes, diff it against the snapshot the
+  // pipeline took of the previous run. Hidden while a job is in flight (the
+  // stored results are mid-overwrite and would diff against themselves).
+  const jobActive = job?.status === "queued" || job?.status === "running";
+  const priorScreen = (deal.prior_screen as PriorScreen | undefined) ?? null;
+  const screenDiff =
+    !jobActive && priorScreen && extraction
+      ? computeScreenDiff(priorScreen, extraction, verdict)
+      : null;
+
   // User-added supplements, with short-lived signed URLs minted for any files.
   type RawSupp = {
     notes?: { id: string; text: string; createdAt: string }[];
@@ -232,6 +245,9 @@ export default async function DealPage({
                 {pill.label}
               </span>
             )}
+            {deal.om_storage_path && (
+              <ReplaceOm dealId={id} disabled={jobActive} />
+            )}
             {omUrl && (
               <a
                 href={omUrl}
@@ -312,6 +328,9 @@ export default async function DealPage({
 
       {/* First read — the instant signal, until the full extraction lands. */}
       {!extraction && firstSignal && <FirstReadCard signal={firstSignal} />}
+
+      {/* Retrade watch — what moved since the previous screen of this deal. */}
+      {screenDiff && <SinceLastScreen diff={screenDiff} />}
 
       {/* The buy box — this deal against YOUR standing criteria. */}
       {buyBoxChecks.length > 0 ? (
