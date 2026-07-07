@@ -320,6 +320,30 @@ export default async function DealPage({
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            {verdict && (
+              <a
+                href={`/api/deals/${id}/memo`}
+                title="One-page IC screening memo — verdict, buy-box fit, flags, next steps"
+                className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-3.5 w-3.5 text-muted"
+                  aria-hidden
+                >
+                  <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                  <path d="M15 2v5h5" />
+                  <path d="M10 12h4" />
+                  <path d="M10 16h4" />
+                </svg>
+                IC memo
+              </a>
+            )}
             <OffersDueControl
               key={`due-${offersDue ?? "unset"}`}
               dealId={id}

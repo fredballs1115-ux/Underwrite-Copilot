@@ -64,6 +64,7 @@ export function AddressAutocomplete({
   className = "",
   onSelect,
   clearOnSelect = false,
+  onDraft,
 }: {
   /** hidden input carrying the structured JSON (only set after a pick) */
   name: string;
@@ -75,6 +76,8 @@ export function AddressAutocomplete({
   /** chip-picker mode: get the pick via callback instead of/in addition to the form */
   onSelect?: (a: StructuredAddress) => void;
   clearOnSelect?: boolean;
+  /** fires on every text edit AND every pick — for draft persistence */
+  onDraft?: (text: string, picked: StructuredAddress | null) => void;
 }) {
   const [text, setText] = useState(defaultValue?.label ?? "");
   const [picked, setPicked] = useState<StructuredAddress | null>(defaultValue);
@@ -146,6 +149,7 @@ export function AddressAutocomplete({
     setOptions([]);
     setOpen(false);
     onSelect?.(a);
+    onDraft?.(clearOnSelect ? "" : a.label, a);
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -186,6 +190,7 @@ export function AddressAutocomplete({
           setText(e.target.value);
           // Hand-edited text is no longer the picked address.
           setPicked(null);
+          onDraft?.(e.target.value, null);
           lookup(e.target.value);
         }}
         onKeyDown={onKeyDown}
