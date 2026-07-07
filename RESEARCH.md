@@ -60,11 +60,11 @@ Existing-feature upgrades outrank net-new. ✅ = shipped in this run.
 |---|------|-------|--------|--------|
 | 1 | Buy-box row in side-by-side compare (mandate fit + why, per deal) | 4 | 1 | ✅ upgrade of existing compare |
 | 2 | Security page + full subprocessor disclosure (incl. Photon) | 4 | 1 | ✅ net-new trust surface |
-| 3 | Interactive sensitivity panel — exit cap × rent growth grid + adjustable hold/rate on the generated model, recomputed instantly client-side | 5 | 3 | queued (this run) |
-| 4 | Public demo deal — the full sample analysis, logged out, labeled | 5 | 2 | queued (this run) |
-| 5 | Broker-trick red flags added to the challenger's checklist (tax reset, OpEx ratio, LTL burn-off, stale insurance) | 5 | 1 | queued (this run) — analysis-logic change, will be logged |
-| 6 | Global search: ⌘K palette also matches address and document filenames | 3 | 1 | queued (this run) |
-| 7 | Browser notification (opt-in) when a screen finishes and the tab is hidden | 3 | 1 | queued (this run) |
+| 3 | Interactive sensitivity panel — exit cap × rent growth grid + adjustable hold/rate on the generated model, recomputed instantly client-side | 5 | 3 | ✅ upgrade (model existed, static grids only) |
+| 4 | Public demo deal — the full sample analysis, logged out, labeled | 5 | 2 | ✅ net-new activation/proof-of-work |
+| 5 | Broker-trick red flags added to the challenger's checklist (tax reset, OpEx ratio, LTL burn-off, stale insurance) | 5 | 1 | ✅ prompt enrichment — logged analysis-logic change |
+| 6 | Global search: ⌘K palette also matches address and document filenames | 3 | 1 | ✅ upgrade of existing palette |
+| 7 | Browser notification (opt-in) when a screen finishes and the tab is hidden | 3 | 1 | ✅ complements the existing toast |
 | 8 | Call-for-offers deadline on deals + urgency in pipeline | 4 | 3 | not built — needs a migration (user-run step); recommended next |
 | 9 | Email "analysis ready" + weekly pipeline digest | 4 | 3 | not built — requires an email provider key (flagged; won't add a dependency silently) |
 | 10 | Batch triage: upload several OMs, ranked buy-box list | 4 | 4 | not built — large; pipeline + fit column covers the read half |
