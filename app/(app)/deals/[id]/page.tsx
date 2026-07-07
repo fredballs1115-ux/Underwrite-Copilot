@@ -213,13 +213,20 @@ export default async function DealPage({
   const summaryPrice =
     findValue(metrics, /purchase price|asking price|\bprice\b/i, /unit|\/sf|per sf|per unit|psf/i) ??
     (firstSignal?.askPrice.trim() || null);
+  const sizeSf = findValue(
+    metrics,
+    /\b(total sf|square (foot|feet|footage)|sq\.? ?ft|rentable|nra|gla|building size|\bsf\b)/i,
+    /price|\$|per|\/|psf/i,
+  );
+  const sizeUnits = findValue(metrics, /\bunits?\b|unit count/i, /price|\$|per|\//i);
+  // A bare unit count ("248") reads wrong in a Size slot — say what it counts.
   const summarySize =
-    findValue(
-      metrics,
-      /\b(total sf|square (foot|feet|footage)|sq\.? ?ft|rentable|nra|gla|building size|\bsf\b)/i,
-      /price|\$|per|\/|psf/i,
-    ) ??
-    findValue(metrics, /\bunits?\b|unit count/i, /price|\$|per|\//i) ??
+    sizeSf ??
+    (sizeUnits
+      ? /^[\d,]+$/.test(sizeUnits.trim())
+        ? `${sizeUnits.trim()} units`
+        : sizeUnits
+      : null) ??
     (firstSignal?.size.trim() || null);
   const summaryCap =
     findValue(metrics, /going[- ]?in cap/i) ??

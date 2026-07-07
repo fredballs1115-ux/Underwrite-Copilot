@@ -204,6 +204,7 @@ export default function Home() {
           <nav className="hidden items-center gap-1 md:flex">
             {[
               ["#screen", "How it works"],
+              ["/demo", "Sample screen"],
               ["#pricing", "Pricing"],
               ["#faq", "FAQ"],
             ].map(([href, label]) => (
@@ -252,6 +253,7 @@ export default function Home() {
               <nav className="shadow-float absolute right-0 top-11 z-20 w-48 rounded-xl border border-white/10 bg-sidebar p-1.5">
                 {[
                   ["#screen", "How it works"],
+                  ["/demo", "Sample screen"],
                   ["#pricing", "Pricing"],
                   ["#faq", "FAQ"],
                 ].map(([href, label]) => (
@@ -344,7 +346,13 @@ export default function Home() {
               <div>
                 <DealPreview />
                 <p className="mt-4 text-center text-[11px] text-white/40">
-                  Illustrative sample deal — not a real listing.
+                  Illustrative sample deal — not a real listing.{" "}
+                  <Link
+                    href="/demo"
+                    className="font-medium text-white/70 underline-offset-2 hover:text-white hover:underline"
+                  >
+                    Browse the full sample screen →
+                  </Link>
                 </p>
               </div>
             </div>
@@ -1005,6 +1013,11 @@ export default function Home() {
                 <a href="#screen" className="text-muted transition-colors hover:text-ink">
                   How it works
                 </a>
+              </li>
+              <li>
+                <Link href="/demo" className="text-muted transition-colors hover:text-ink">
+                  Sample screen
+                </Link>
               </li>
               <li>
                 <a href="#pricing" className="text-muted transition-colors hover:text-ink">
