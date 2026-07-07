@@ -17,16 +17,110 @@ type Item = {
   hint: string;
   href: string;
   dot?: string;
+  icon?: React.ReactNode;
   group: "deals" | "actions";
 };
 
+function ActionIcon({ children }: { children: React.ReactNode }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-3.5 w-3.5 shrink-0 text-muted"
+      aria-hidden
+    >
+      {children}
+    </svg>
+  );
+}
+
 const ACTIONS: Item[] = [
-  { key: "a-new", label: "New deal…", hint: "upload an OM", href: "/deals?new=1", group: "actions" },
-  { key: "a-pipeline", label: "Pipeline", hint: "all deals", href: "/deals", group: "actions" },
-  { key: "a-criteria", label: "Buy box", hint: "your criteria", href: "/criteria", group: "actions" },
-  { key: "a-team", label: "Team", hint: "shared pipeline", href: "/team", group: "actions" },
-  { key: "a-billing", label: "Billing", hint: "plan & invoices", href: "/billing", group: "actions" },
-  { key: "a-account", label: "Account", hint: "profile & data", href: "/account", group: "actions" },
+  {
+    key: "a-new",
+    label: "New deal…",
+    hint: "upload an OM",
+    href: "/deals?new=1",
+    group: "actions",
+    icon: (
+      <ActionIcon>
+        <path d="M12 5v14" />
+        <path d="M5 12h14" />
+      </ActionIcon>
+    ),
+  },
+  {
+    key: "a-pipeline",
+    label: "Pipeline",
+    hint: "all deals",
+    href: "/deals",
+    group: "actions",
+    icon: (
+      <ActionIcon>
+        <path d="m12 2 9 5-9 5-9-5 9-5Z" />
+        <path d="m3 12 9 5 9-5" />
+        <path d="m3 17 9 5 9-5" />
+      </ActionIcon>
+    ),
+  },
+  {
+    key: "a-criteria",
+    label: "Buy box",
+    hint: "your criteria",
+    href: "/criteria",
+    group: "actions",
+    icon: (
+      <ActionIcon>
+        <circle cx="12" cy="12" r="9" />
+        <circle cx="12" cy="12" r="4.5" />
+        <circle cx="12" cy="12" r="0.8" fill="currentColor" />
+      </ActionIcon>
+    ),
+  },
+  {
+    key: "a-team",
+    label: "Team",
+    hint: "shared pipeline",
+    href: "/team",
+    group: "actions",
+    icon: (
+      <ActionIcon>
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </ActionIcon>
+    ),
+  },
+  {
+    key: "a-billing",
+    label: "Billing",
+    hint: "plan & invoices",
+    href: "/billing",
+    group: "actions",
+    icon: (
+      <ActionIcon>
+        <rect x="2" y="5" width="20" height="14" rx="2" />
+        <path d="M2 10h20" />
+      </ActionIcon>
+    ),
+  },
+  {
+    key: "a-account",
+    label: "Account",
+    hint: "profile & data",
+    href: "/account",
+    group: "actions",
+    icon: (
+      <ActionIcon>
+        <path d="M20 21a8 8 0 0 0-16 0" />
+        <circle cx="12" cy="7" r="4" />
+      </ActionIcon>
+    ),
+  },
 ];
 
 const CALL_DOT: Record<string, string> = {
@@ -235,12 +329,13 @@ export function CommandPalette({
                         index === activeIdx ? "bg-brand/10 text-ink" : "text-ink"
                       }`}
                     >
-                      {item.dot && (
-                        <span
-                          aria-hidden
-                          className={`h-1.5 w-1.5 shrink-0 rounded-full ${item.dot}`}
-                        />
-                      )}
+                      {item.icon ??
+                        (item.dot && (
+                          <span
+                            aria-hidden
+                            className={`h-1.5 w-1.5 shrink-0 rounded-full ${item.dot}`}
+                          />
+                        ))}
                       <span className="min-w-0 flex-1 truncate">{item.label}</span>
                       <span className="shrink-0 text-xs text-muted">
                         {item.hint}
