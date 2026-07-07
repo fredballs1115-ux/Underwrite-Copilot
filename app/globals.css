@@ -3,25 +3,25 @@
 /*
   Design tokens for Underwrite Copilot.
 
-  ONE palette: dark navy primary, one accent (steel blue, dark surfaces
-  only), cool neutrals — plus the three verdict/status colors, which are
+  ONE palette: deep teal primary, one accent (light aqua, dark surfaces
+  only), warm neutrals — plus the three verdict/status colors, which are
   data, not decoration. Tailwind v4 reads this @theme block and generates
   utilities for every token (`--color-brand` → bg-brand, text-brand, …).
 */
 @theme {
-  --color-paper: #fafbfc; /* marketing pages — cool off-white */
-  --color-canvas: #eef0f3; /* the app work surface — cards lift off it */
-  --color-faint: #f2f4f7; /* tinted band background */
+  --color-paper: #fbfbf9; /* marketing pages — warm off-white */
+  --color-canvas: #eceeec; /* the app work surface — cards lift off it */
+  --color-faint: #f3f5f4; /* tinted band background */
   --color-surface: #ffffff; /* cards and panels */
-  --color-ink: #16202e; /* primary text — navy-black */
-  --color-muted: #5a6472; /* secondary text */
-  --color-line: #e3e7ed; /* borders and dividers */
+  --color-ink: #18211f; /* primary text — near-black with a faint warmth */
+  --color-muted: #5f6b69; /* secondary text */
+  --color-line: #e7e4dd; /* borders and dividers */
 
-  --color-brand: #24406e; /* navy — the primary */
-  --color-brand-strong: #1a3054;
-  --color-sidebar: #101c33; /* darkest navy — app chrome & dark bands */
-  --color-sidebar-line: #24344f;
-  --color-accent: #8ab4f8; /* THE accent — steel blue, dark surfaces only */
+  --color-brand: #114e54; /* deep teal — the primary */
+  --color-brand-strong: #0c383d;
+  --color-sidebar: #0c3338; /* deep teal — app chrome & dark bands */
+  --color-sidebar-line: #1d4a4f;
+  --color-accent: #7fd6cc; /* THE accent — light aqua, dark surfaces only */
 
   /* Verdict / status colors — functional data colors, kept muted so they
      read as calls, not decoration. (Mirrored in the PDF memo and Excel.) */
@@ -54,7 +54,7 @@ body {
 
 /* Keyboard-visible focus everywhere. Elements that opt into Tailwind ring
    utilities set `outline-none`, so this is the baseline, not a double ring.
-   The sidebar is dark navy, so its focus ring flips to white. */
+   The sidebar is deep teal, so its focus ring flips to white. */
 :focus-visible {
   outline: 2px solid var(--color-brand);
   outline-offset: 2px;
@@ -66,13 +66,13 @@ body {
 /* Elevation — soft, layered shadows so cards sit *on* the canvas. */
 .shadow-card {
   box-shadow:
-    0 1px 2px rgba(16, 24, 40, 0.04),
-    0 1px 3px rgba(16, 24, 40, 0.06);
+    0 1px 2px rgba(17, 33, 31, 0.04),
+    0 1px 3px rgba(17, 33, 31, 0.06);
 }
 .shadow-float {
   box-shadow:
-    0 6px 16px -4px rgba(16, 24, 40, 0.1),
-    0 2px 6px -2px rgba(16, 24, 40, 0.06);
+    0 6px 16px -4px rgba(17, 33, 31, 0.1),
+    0 2px 6px -2px rgba(17, 33, 31, 0.06);
 }
 .hover-lift {
   transition:
@@ -82,8 +82,8 @@ body {
 .hover-lift:hover {
   transform: translateY(-1px);
   box-shadow:
-    0 8px 20px -6px rgba(16, 24, 40, 0.12),
-    0 3px 8px -3px rgba(16, 24, 40, 0.07);
+    0 8px 20px -6px rgba(17, 33, 31, 0.12),
+    0 3px 8px -3px rgba(17, 33, 31, 0.07);
 }
 
 /* Staggered entrance for lists/grids (set --i on each child). */
@@ -147,7 +147,7 @@ body {
   }
 }
 
-/* Dark navy band — flat. The identity is the navy, the type, and the
+/* Dark teal band — flat. The identity is the teal, the type, and the
    numbers; no textures, no glows. */
 .band-dark {
   background-color: var(--color-sidebar);

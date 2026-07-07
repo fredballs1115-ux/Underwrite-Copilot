@@ -16,7 +16,7 @@ const APP_URL =
 // it's what shows in the browser tab, in Google results, and in link previews.
 // Colors the browser chrome (mobile address bar) to match the brand.
 export const viewport: Viewport = {
-  themeColor: "#101c33",
+  themeColor: "#0c3338",
 };
 
 export const metadata: Metadata = {

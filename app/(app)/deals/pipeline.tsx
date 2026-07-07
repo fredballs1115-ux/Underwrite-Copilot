@@ -656,22 +656,22 @@ function EmptyArt() {
           width="70"
           height="92"
           rx="8"
-          fill="#f2f4f7"
-          stroke="#e3e7ed"
+          fill="#f3f5f4"
+          stroke="#e7e4dd"
         />
       </g>
-      <rect x="58" y="8" width="74" height="96" rx="8" fill="#fff" stroke="#e3e7ed" />
-      <rect x="68" y="20" width="36" height="5" rx="2.5" fill="#e3e7ed" />
-      <rect x="68" y="32" width="54" height="4" rx="2" fill="#eef0f3" />
-      <rect x="68" y="40" width="46" height="4" rx="2" fill="#eef0f3" />
-      <rect x="70" y="72" width="7" height="16" rx="3" fill="#24406e" opacity="0.35" />
-      <rect x="82" y="60" width="7" height="28" rx="3" fill="#24406e" />
-      <rect x="94" y="66" width="7" height="22" rx="3" fill="#24406e" opacity="0.55" />
-      <line x1="68" y1="94" x2="122" y2="94" stroke="#e3e7ed" />
-      <circle cx="132" cy="98" r="15" fill="#24406e" />
+      <rect x="58" y="8" width="74" height="96" rx="8" fill="#fff" stroke="#e7e4dd" />
+      <rect x="68" y="20" width="36" height="5" rx="2.5" fill="#e7e4dd" />
+      <rect x="68" y="32" width="54" height="4" rx="2" fill="#f0efe9" />
+      <rect x="68" y="40" width="46" height="4" rx="2" fill="#f0efe9" />
+      <rect x="70" y="72" width="7" height="16" rx="3" fill="#114e54" opacity="0.35" />
+      <rect x="82" y="60" width="7" height="28" rx="3" fill="#114e54" />
+      <rect x="94" y="66" width="7" height="22" rx="3" fill="#114e54" opacity="0.55" />
+      <line x1="68" y1="94" x2="122" y2="94" stroke="#e7e4dd" />
+      <circle cx="132" cy="98" r="15" fill="#114e54" />
       <path
         d="M125 98l5 5 9-10"
-        stroke="#8ab4f8"
+        stroke="#7fd6cc"
         strokeWidth="2.6"
         fill="none"
         strokeLinecap="round"
