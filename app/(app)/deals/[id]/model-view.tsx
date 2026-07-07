@@ -55,6 +55,7 @@ export function ModelView({
           <Sensitivity model={model} />
           <Conflicts conflicts={model.conflicts} />
           <Assumptions metrics={model.metrics} />
+          <CapexPanel model={model} />
           <CashFlow cashFlow={model.cashFlow} />
           <SummaryCaveats summary={model.summary} caveats={model.caveats} />
           {isPro ? (
@@ -632,6 +633,55 @@ export function Assumptions({ metrics }: { metrics: ReconciledMetric[] }) {
           {open ? "Show fewer" : `Show all ${metrics.length} assumptions`}
         </button>
       )}
+    </section>
+  );
+}
+
+/** Capital plan — every figure derived from the model itself (reserve input,
+ *  units, cash-flow rows), never invented: annual reserve, per-unit funding,
+ *  the total set aside across the hold, and the bite out of year-1 NOI. */
+export function CapexPanel({ model }: { model: UnderwritingModel }) {
+  const annual = model.inputs?.capexReserveAnnual ?? 0;
+  if (!annual || annual <= 0) return null;
+  const units = model.inputs?.units ?? 0;
+  const totalOverHold = model.cashFlow.reduce(
+    (sum, y) => sum + (y.capexReserve ?? 0),
+    0,
+  );
+  const noi1 = model.cashFlow[0]?.noi ?? 0;
+  const stats: [string, string][] = [
+    ["Annual reserve", compactUsd(annual)],
+    ...(units > 0
+      ? ([["Per unit / yr", `$${Math.round(annual / units).toLocaleString("en-US")}`]] as [string, string][])
+      : []),
+    [`Funded over ${model.holdYears}-yr hold`, compactUsd(totalOverHold)],
+    ...(noi1 > 0
+      ? ([["Share of year-1 NOI", `${((annual / noi1) * 100).toFixed(1)}%`]] as [string, string][])
+      : []),
+  ];
+  return (
+    <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+      <h2 className="text-sm font-semibold tracking-tight">
+        Capital plan{" "}
+        <span className="font-normal text-muted">· reserved below NOI</span>
+      </h2>
+      <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {stats.map(([label, value]) => (
+          <div key={label} className="rounded-lg border border-line px-3 py-2">
+            <dt className="text-[10px] uppercase tracking-wide text-muted">
+              {label}
+            </dt>
+            <dd className="mt-0.5 font-mono text-sm font-semibold tabular-nums">
+              {value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 text-xs leading-relaxed text-muted">
+        The reserve is deducted below NOI in every cash-flow year, so returns
+        already carry it. A screening reserve, not an engineering budget —
+        replace it with the real capital plan when you have one.
+      </p>
     </section>
   );
 }

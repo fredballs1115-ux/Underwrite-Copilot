@@ -7,6 +7,7 @@ import {
   Assumptions,
   Conflicts,
   CashFlow,
+  CapexPanel,
 } from "../(app)/deals/[id]/model-view";
 import type { UnderwritingModel } from "@/lib/model/types";
 
@@ -41,6 +42,13 @@ export function ModelSlideshow({ model }: { model: UnderwritingModel }) {
         blurb:
           "Exit cap × purchase price grid — see where the return thesis breaks before you're in it.",
         node: <Sensitivity model={model} />,
+      },
+      {
+        key: "capex",
+        label: "CapEx",
+        blurb:
+          "The capital plan, reserved below NOI in every year — per-unit funding, the total across the hold, and what it costs year-1 NOI.",
+        node: <CapexPanel model={model} />,
       },
       {
         key: "assumptions",
