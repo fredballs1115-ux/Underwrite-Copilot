@@ -78,7 +78,7 @@ type AnalysisKey = "verdict" | "challenger" | "comps" | "market" | "reconciler";
 const SECTIONS: { key: SectionKey; label: string }[] = [
   { key: "overview", label: "Overview" },
   { key: "financials", label: "Financials" },
-  { key: "buybox", label: "Buy Box Screen" },
+  { key: "buybox", label: "Buy box" },
   { key: "analyses", label: "Analyses" },
   { key: "documents", label: "Documents" },
 ];
@@ -227,6 +227,10 @@ export function DealView({
   const lastStep = useRef<string | null>(initialJob?.step ?? null);
   // Fire the "complete" toast once per run.
   const notified = useRef(false);
+  // A run whose job row hasn't advanced in STALL_MS almost certainly lost its
+  // background process (a deploy/restart). Computed in the poll (where reading
+  // the clock is a side effect, not render), it flips the rail to a restart.
+  const [stalled, setStalled] = useState(false);
 
   const active = isActive(job?.status);
 
@@ -249,6 +253,14 @@ export function DealView({
         const endedStep = data.step ?? lastStep.current;
         lastStep.current = data.step;
         setJob(data);
+        // Detect a stalled run: still active but its row hasn't been written in
+        // the stale window (the background process likely died).
+        const isRunning = data.status === "running" || data.status === "queued";
+        setStalled(
+          isRunning &&
+            !!data.updated_at &&
+            Date.now() - Date.parse(data.updated_at) > STALL_MS,
+        );
 
         if (data.status === "running" || data.status === "queued") {
           notified.current = false;
@@ -442,14 +454,6 @@ export function DealView({
     MODEL_ERRORS[modelErrorCode]
       ? MODEL_ERRORS[modelErrorCode]
       : null;
-
-  // A run whose job row hasn't advanced in STALL_MS almost certainly lost its
-  // background process (Render restart/deploy). Offer a restart rather than
-  // spinning forever — the server's claimJob reclaims a stale row.
-  const stalled =
-    active &&
-    !!job?.updated_at &&
-    Date.now() - Date.parse(job.updated_at) > STALL_MS;
 
   return (
     <div className="flex flex-col gap-5">
@@ -773,7 +777,7 @@ function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
               </span>
               {c.label}
               {c.status === "near" && (
-                <span className="rounded-full bg-caution/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-caution">
+                <span className="rounded-full bg-caution/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-caution">
                   Near-miss
                 </span>
               )}
@@ -1188,7 +1192,7 @@ function NotifyOffer() {
       }}
       className="w-fit text-xs font-medium text-brand transition-colors hover:text-brand-strong"
     >
-      Notify me when it&apos;s done — this takes about a minute
+      Notify me when it&apos;s done — it&apos;ll be a few minutes
     </button>
   );
 }

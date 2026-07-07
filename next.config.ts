@@ -6,11 +6,18 @@ import type { NextConfig } from "next";
 // conservative CSP. The CSP is deliberately permissive on style/img because
 // Tailwind emits inline styles and the app uses inline SVG + data: images; it
 // still blocks framing, plugins, and unknown script origins.
+// React's dev server (Fast Refresh) needs eval(); production never does, so
+// 'unsafe-eval' is included only in development and the prod CSP stays strict.
+const scriptSrc =
+  process.env.NODE_ENV === "development"
+    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+    : "script-src 'self' 'unsafe-inline'";
+
 const CSP = [
   "default-src 'self'",
   // Next.js injects small inline bootstrap scripts; 'unsafe-inline' is required
   // until a nonce-based CSP is wired through the framework.
-  "script-src 'self' 'unsafe-inline'",
+  scriptSrc,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",

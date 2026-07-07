@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     template: "%s · Underwrite Copilot",
   },
   description:
-    "Run every commercial real estate deal through the same disciplined screen: rent, expenses, and cap as sourced ranges; the three deal-killers stressed first; a Go / No-Go that shows its work before you open a model. One method, every deal.",
+    "Run every commercial real estate deal through the same disciplined screen: rent, expenses, and cap as sourced ranges; the three deal-killers stressed first; a Go / No-go that shows its work before you open a model. One method, every deal.",
   keywords: [
     "CRE underwriting",
     "commercial real estate underwriting software",
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Stop underwriting like a coin flip.",
     description:
-      "Every CRE deal through the same disciplined screen — sourced ranges, deal-killers first, a Go / No-Go that shows its work. One method, every deal.",
+      "Every CRE deal through the same disciplined screen — sourced ranges, deal-killers first, a Go / No-go that shows its work. One method, every deal.",
   },
   robots: { index: true, follow: true },
 };

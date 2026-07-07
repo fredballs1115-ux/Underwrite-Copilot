@@ -47,15 +47,22 @@ export async function createDeal(formData: FormData) {
   if (!(file instanceof File) || file.size === 0) {
     redirect("/deals?error=file");
   }
-  if (file.type !== "application/pdf") {
+  // Accept when the browser says PDF, says nothing (some drag sources report an
+  // empty type for a real PDF), or the name ends in .pdf — then let the magic
+  // bytes below be the real gate.
+  const looksPdf =
+    file.type === "application/pdf" ||
+    file.type === "" ||
+    /\.pdf$/i.test(file.name);
+  if (!looksPdf) {
     redirect("/deals?error=pdf");
   }
   if (file.size > MAX_BYTES) {
     redirect("/deals?error=size");
   }
-  // Trust the bytes, not the browser-declared MIME: a renamed non-PDF passes
-  // the type check above but wastes an upload + a full Claude run failing at
-  // extraction. Reject anything without the %PDF- signature up front.
+  // Trust the bytes, not the browser-declared MIME: a renamed non-PDF wastes
+  // an upload + a full Claude run failing at extraction. Reject anything
+  // without the %PDF- signature up front.
   const buffer = Buffer.from(await file.arrayBuffer());
   if (!buffer.subarray(0, 5).toString("latin1").startsWith("%PDF-")) {
     redirect("/deals?error=pdf");
@@ -370,7 +377,11 @@ export async function replaceOm(formData: FormData) {
   if (!(file instanceof File) || file.size === 0) {
     redirect(`/deals/${dealId}?error=omfile`);
   }
-  if (file.type !== "application/pdf") {
+  const looksPdf =
+    file.type === "application/pdf" ||
+    file.type === "" ||
+    /\.pdf$/i.test(file.name);
+  if (!looksPdf) {
     redirect(`/deals/${dealId}?error=ompdf`);
   }
   if (file.size > MAX_BYTES) {

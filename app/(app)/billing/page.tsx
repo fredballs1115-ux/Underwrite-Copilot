@@ -61,7 +61,11 @@ export default async function BillingPage({
             ? { cls: "bg-faint text-muted", text: "No subscription on file yet — start with Upgrade to Pro below." }
             : error === "save"
               ? { cls: "bg-kill/10 text-kill", text: "Couldn't save your billing profile — please try again." }
-              : null;
+              : error === "exists"
+                ? { cls: "bg-faint text-muted", text: "You already have an active subscription — if it still shows Free, activation can take a moment; refresh shortly." }
+                : error === "checkout"
+                  ? { cls: "bg-kill/10 text-kill", text: "Couldn't start checkout — please try again in a moment." }
+                  : null;
 
   return (
     <div className="space-y-6">
@@ -334,7 +338,7 @@ export default async function BillingPage({
           )}
         </section>
       ) : (
-        <p className="text-xs text-muted">
+        <p className="text-sm text-muted">
           Working as a group? The{" "}
           <a href="/team" className="font-medium text-brand hover:text-brand-strong">
             Team plan

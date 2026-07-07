@@ -753,12 +753,15 @@ export function BrokerComps({
   compSearch,
   active,
   isPro,
+  publicDemo = false,
 }: {
   result: BrokerCompsResult;
   dealId: string;
   compSearch: CompSearchResult | null;
   active: boolean;
   isPro: boolean;
+  /** rendered on the public /demo page — Pro gates point to signup, not billing */
+  publicDemo?: boolean;
 }) {
   const hasComps = result.saleComps.length > 0 || result.leaseComps.length > 0;
   return (
@@ -809,6 +812,7 @@ export function BrokerComps({
         active={active}
         hasOmComps={hasComps}
         isPro={isPro}
+        publicDemo={publicDemo}
       />
     </section>
   );
@@ -820,12 +824,14 @@ function PublicWebComps({
   active,
   hasOmComps,
   isPro,
+  publicDemo = false,
 }: {
   dealId: string;
   compSearch: CompSearchResult | null;
   active: boolean;
   hasOmComps: boolean;
   isPro: boolean;
+  publicDemo?: boolean;
 }) {
   return (
     <div className="rounded-xl border border-dashed border-line p-4">
@@ -842,7 +848,16 @@ function PublicWebComps({
             from CoStar or any licensed source.
           </p>
         </div>
-        {isPro ? (
+        {publicDemo ? (
+          // On the public demo the visitor has no account yet — route the
+          // gate to signup, not the billing page's sign-in wall.
+          <Link
+            href="/login?mode=signup"
+            className="shrink-0 rounded-lg border border-brand/30 bg-brand/5 px-3 py-1.5 text-sm font-medium text-brand transition-colors hover:bg-brand/10"
+          >
+            Sign up to search
+          </Link>
+        ) : isPro ? (
           <form action={searchPublicComps}>
             <input type="hidden" name="dealId" value={dealId} />
             <button
