@@ -5,7 +5,8 @@ import { LogoMark } from "@/app/logo";
 export const metadata: Metadata = {
   title: "Security",
   description:
-    "How Underwrite Copilot protects uploaded offering memorandums: private storage, database-level isolation, server-side keys, and no model training on your documents.",
+    "How Underwrite Copilot protects uploaded offering memoranda: private storage, database-level isolation, server-side keys, and no model training on your documents.",
+  alternates: { canonical: "/security" },
 };
 
 // Every claim on this page is verifiable in the codebase or in a vendor's

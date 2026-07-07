@@ -25,6 +25,13 @@ function PickButton({ disabled }: { disabled: boolean }) {
         onChange={(e) => {
           const f = e.currentTarget.files?.[0];
           if (!f) return;
+          if (f.size > 22 * 1024 * 1024) {
+            // Past 22 MB the request would blow the server-action body cap
+            // and die as a raw 500 — reject before the confirm dialog.
+            alert(`"${f.name}" is ${(f.size / 1048576).toFixed(0)} MB — the limit is 22 MB. Try compressing or splitting it.`);
+            e.currentTarget.value = "";
+            return;
+          }
           const ok = window.confirm(
             `Replace the stored OM with "${f.name}" and re-screen?\n\nThe full analysis runs again on the new document, and the deal page will show exactly what moved since this screen.`,
           );

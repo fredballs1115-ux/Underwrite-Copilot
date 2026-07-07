@@ -21,7 +21,7 @@ async function requireDeal(dealId: string) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!user) redirect("/login");
   const { data } = await supabase
     .from("deals")
     .select("id")

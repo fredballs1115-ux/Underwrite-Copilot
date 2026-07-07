@@ -23,6 +23,9 @@ export function getStripe(): Stripe {
       // change webhook/API payload shapes under us. This matches the version
       // the installed SDK (stripe@22) is generated against.
       apiVersion: "2026-06-24.dahlia",
+      // A Stripe outage should surface as a clean "try again" in seconds,
+      // not an 80s spinner into an error boundary.
+      timeout: 15_000,
       ...(base
         ? {
             host: base.hostname,

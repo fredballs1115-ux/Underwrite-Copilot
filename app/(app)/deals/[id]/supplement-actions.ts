@@ -27,7 +27,7 @@ async function loadDeal(dealId: string) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!user) redirect("/login");
   // RLS scopes this to the caller's own deal.
   const { data } = await supabase
     .from("deals")

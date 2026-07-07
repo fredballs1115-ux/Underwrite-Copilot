@@ -37,7 +37,6 @@ export const metadata: Metadata = {
     "real estate acquisitions",
   ],
   applicationName: "Underwrite Copilot",
-  alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     url: APP_URL,

@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -260,14 +261,19 @@ export async function startTeamCheckout() {
   let customerId = (trow?.stripe_customer_id as string) ?? null;
   if (!customerId) {
     // Idempotency key prevents two-tab races from minting duplicate customers.
-    const customer = await stripe.customers.create(
-      {
-        email: user.email ?? undefined,
-        name: team.name,
-        metadata: { team_id: team.id },
-      },
-      { idempotencyKey: `uc-team-customer-${team.id}` },
-    );
+    let customer;
+    try {
+      customer = await stripe.customers.create(
+        {
+          email: user.email ?? undefined,
+          name: team.name,
+          metadata: { team_id: team.id },
+        },
+        { idempotencyKey: `uc-team-customer-${team.id}` },
+      );
+    } catch {
+      redirect("/team?error=checkout");
+    }
     customerId = customer.id;
     // Billing columns on teams are service-role-only — persist via admin, and
     // fail loudly so we never mint duplicate customers on retries.
@@ -279,30 +285,37 @@ export async function startTeamCheckout() {
   }
 
   // A live subscription already on file means the webhook just hasn't landed
-  // yet (or the owner double-clicked) — never sell a second one.
-  const existing = await stripe.subscriptions.list({
-    customer: customerId,
-    status: "all",
-    limit: 10,
-  });
-  if (
-    existing.data.some((sub) =>
-      ["active", "trialing", "past_due", "incomplete"].includes(sub.status),
-    )
-  ) {
-    redirect("/team?error=exists");
-  }
+  // yet (or the owner double-clicked) — never sell a second one. A Stripe
+  // outage lands on the mapped "try again" copy, not the error boundary.
+  let session;
+  try {
+    const existing = await stripe.subscriptions.list({
+      customer: customerId,
+      status: "all",
+      limit: 10,
+    });
+    if (
+      existing.data.some((sub) =>
+        ["active", "trialing", "past_due", "incomplete"].includes(sub.status),
+      )
+    ) {
+      redirect("/team?error=exists");
+    }
 
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    customer: customerId,
-    line_items: teamCheckoutLineItems(basePriceId, seatPriceId, team.seatCount),
-    success_url: `${appUrl()}/team?status=success`,
-    cancel_url: `${appUrl()}/team?status=cancelled`,
-    metadata: { team_id: team.id },
-    subscription_data: { metadata: { team_id: team.id } },
-    allow_promotion_codes: true,
-  });
+    session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      customer: customerId,
+      line_items: teamCheckoutLineItems(basePriceId, seatPriceId, team.seatCount),
+      success_url: `${appUrl()}/team?status=success`,
+      cancel_url: `${appUrl()}/team?status=cancelled`,
+      metadata: { team_id: team.id },
+      subscription_data: { metadata: { team_id: team.id } },
+      allow_promotion_codes: true,
+    });
+  } catch (err) {
+    if (isRedirectError(err)) throw err;
+    redirect("/team?error=checkout");
+  }
 
   if (session.url) redirect(session.url);
   redirect("/team?error=checkout");
@@ -412,9 +425,14 @@ export async function openTeamPortal() {
   if (!customerId) redirect("/team?error=nocustomer");
 
   const stripe = getStripe();
-  const session = await stripe.billingPortal.sessions.create({
-    customer: customerId,
-    return_url: `${appUrl()}/team`,
-  });
+  let session;
+  try {
+    session = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: `${appUrl()}/team`,
+    });
+  } catch {
+    redirect("/team?error=checkout");
+  }
   redirect(session.url);
 }

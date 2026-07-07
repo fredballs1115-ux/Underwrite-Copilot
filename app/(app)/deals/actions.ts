@@ -177,7 +177,11 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
 export async function createDeal(formData: FormData) {
   const result = await createDealCore(formData);
   if (result.ok) redirect(`/deals/${result.dealId}`);
-  if (result.error === "auth") redirect("/login");
+  if (result.error === "auth") {
+    // Round-trip through login BACK to an error state — landing without an
+    // error would read as success and clear the localStorage draft.
+    redirect(`/login?next=${encodeURIComponent("/deals?error=auth")}`);
+  }
   redirect(`/deals?error=${result.error}`);
 }
 

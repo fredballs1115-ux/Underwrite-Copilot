@@ -115,15 +115,15 @@ const modelMetrics: ReconciledMetric[] = [
   {
     key: "avgRent",
     label: "Avg monthly rent",
-    chosenValue: "$1,420/unit",
+    chosenValue: "$2,400/unit",
     unit: "$",
     sources: [
-      { doc: "OM", value: "$1,600/unit", locator: "p.12", basis: "pro forma" },
-      { doc: "Rent roll", value: "$1,420/unit", locator: "sheet", basis: "actual" },
+      { doc: "OM", value: "$2,600/unit", locator: "p.12", basis: "pro forma" },
+      { doc: "Rent roll", value: "$2,400/unit", locator: "sheet", basis: "actual" },
     ],
     authority: "Rent roll",
     rationale:
-      "In-place rents, not the broker's post-renovation target — the $180 gap IS the business plan, not the starting point.",
+      "In-place rents, not the broker's post-renovation target — the $200 gap IS the business plan, not the starting point.",
     confidence: "high",
     isConflict: true,
   },
@@ -230,12 +230,12 @@ const extraction: ExtractionResult = {
   metrics: [
     { label: "Asking price", value: "$68,000,000", flagged: false, page: "p. 3" },
     { label: "Going-in cap", value: "5.45%", flagged: false, page: "p. 8" },
-    { label: "Pro forma cap", value: "6.75%", flagged: true, page: "p. 8" },
+    { label: "Pro forma cap", value: "5.7%", flagged: true, page: "p. 8" },
     { label: "Exit cap", value: "5.25%", flagged: true, page: "p. 41" },
     { label: "Year-1 NOI", value: "$3,706,500", flagged: false, page: "p. 8" },
     { label: "Units", value: "248", flagged: false, page: "p. 3" },
-    { label: "Avg in-place rent", value: "$1,420/mo", flagged: false, page: "p. 12" },
-    { label: "Pro forma rent", value: "$1,600/mo", flagged: true, page: "p. 12" },
+    { label: "Avg in-place rent", value: "$2,400/mo", flagged: false, page: "p. 12" },
+    { label: "Pro forma rent", value: "$2,600/mo", flagged: true, page: "p. 12" },
     { label: "Rent growth", value: "4.0%/yr", flagged: true, page: "p. 40" },
     { label: "Vacancy (pro forma)", value: "6.0%", flagged: true, page: "p. 8" },
     { label: "Loan-to-value", value: "60%", flagged: false, page: "p. 44" },
@@ -248,7 +248,7 @@ const challenges: ChallengerResult = {
       assumption: "Exit cap compression to 5.25%",
       severity: "high",
       challenge:
-        "The model exits 25 bps tighter than going-in with no stated thesis for compression in a flat-to-rising-rate environment.",
+        "The model exits 20 bps tighter than going-in with no stated thesis for compression in a flat-to-rising-rate environment.",
       question:
         "What supports a 5.25% exit in year five when the submarket trades at 5.25–5.75% today?",
     },
@@ -294,9 +294,9 @@ const comps: BrokerCompsResult = {
   leaseComps: [
     {
       name: "The Brixton (renovated)",
-      detail: "$1,540/mo · 2BR",
+      detail: "$2,520/mo · 2BR",
       support: "favorable",
-      note: "Renovated units clear $1,540 — below the $1,600 pro forma.",
+      note: "Renovated units clear $2,520 — below the $2,600 pro forma.",
     },
   ],
   redFlags: [
@@ -368,8 +368,8 @@ const verdict: VerdictResult = {
   reason:
     "The going-in basis is rich and the returns lean on an aggressive exit and rent ramp. Worth a closer look only if the seller moves on price or the ramp is de-risked.",
   topRisks: [
-    "Exit cap of 5.25% is inside today's submarket trades with no catalyst.",
-    "Pro forma rents assume a $180/mo premium the comps don't support.",
+    "Exit cap of 5.25% sits at the tight end of today's submarket trades with no catalyst.",
+    "Pro forma rents assume a $200/mo premium the comps don't support.",
     "Stabilized vacancy of 6% ignores the 9% in-place reality.",
   ],
   nextSteps: [
@@ -380,9 +380,9 @@ const verdict: VerdictResult = {
     ranges: [
       {
         label: "Market rent / unit / mo",
-        low: "$1,420",
-        base: "$1,495",
-        high: "$1,600",
+        low: "$2,400",
+        base: "$2,480",
+        high: "$2,600",
         source: "Public listings + 3 comp leases within 1 mi",
         basis: "Low = in-place renewals; high = the broker's renovated pro forma.",
         confidence: "medium",

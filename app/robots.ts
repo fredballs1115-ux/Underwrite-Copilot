@@ -19,6 +19,7 @@ export default function robots(): MetadataRoute.Robots {
         "/account",
         "/team",
         "/criteria",
+        "/preview-shell",
       ],
     },
     sitemap: `${APP_URL}/sitemap.xml`,

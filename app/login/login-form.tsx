@@ -162,7 +162,7 @@ export function LoginForm({
                 name="password"
                 type={showPw ? "text" : "password"}
                 required
-                minLength={6}
+                minLength={8}
                 autoComplete={
                   mode === "signup" ? "new-password" : "current-password"
                 }
@@ -216,18 +216,18 @@ export function LoginForm({
           </button>
 
           {mode === "signup" && (
-            <p className="text-center text-xs leading-relaxed text-white/55">
+            <p className="text-center text-xs leading-relaxed text-muted">
               By creating an account you agree to our{" "}
               <a
                 href="/terms"
-                className="font-medium text-white/80 underline-offset-2 hover:underline"
+                className="font-medium text-brand underline-offset-2 hover:underline"
               >
                 Terms
               </a>{" "}
               and{" "}
               <a
                 href="/privacy"
-                className="font-medium text-white/80 underline-offset-2 hover:underline"
+                className="font-medium text-brand underline-offset-2 hover:underline"
               >
                 Privacy Policy
               </a>

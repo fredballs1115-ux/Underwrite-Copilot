@@ -91,7 +91,12 @@ export default async function DealPage({
         .limit(40),
     ]);
 
-  if (error || !data) {
+  if (error) {
+    // A transient DB failure must not read as "this deal was removed" — let
+    // the error boundary offer a retry instead.
+    throw new Error(`Couldn't load the deal: ${error.message}`);
+  }
+  if (!data) {
     notFound();
   }
 

@@ -3,11 +3,19 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 // Returns the current analysis-job state for a deal. RLS makes sure a user can
 // only ever read jobs for their own deals.
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+  // A malformed id would fail the uuid cast as a raw 500 — answer with the
+  // same "nothing here" shape a foreign id gets.
+  if (!UUID_RE.test(id)) {
+    return Response.json({ status: "none" });
+  }
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },

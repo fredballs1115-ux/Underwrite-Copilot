@@ -87,11 +87,13 @@ body {
     0 3px 8px -3px rgba(17, 33, 31, 0.07);
 }
 
-/* Staggered entrance for lists/grids (set --i on each child). */
+/* Staggered entrance for lists/grids (set --i on each child). The delay is
+   hard-capped so row N of a long pipeline is never invisible for N×40ms —
+   everything past the tenth row rises together. */
 @media (prefers-reduced-motion: no-preference) {
   .stagger > * {
     animation: uc-rise 0.32s ease-out both;
-    animation-delay: calc(var(--i, 0) * 40ms);
+    animation-delay: min(calc(var(--i, 0) * 40ms), 400ms);
   }
 }
 
@@ -156,26 +158,53 @@ body {
 
 /* Scroll-reveal: elements fade/rise in the first time they enter the
    viewport (driven by the Reveal client component). The hidden start state
-   is scoped to `.js` so that without JavaScript (or before hydration on a
-   slow connection) the server-rendered content stays visible instead of
-   blanking out. Static under prefers-reduced-motion. */
-.js .reveal {
-  opacity: 0;
-  transform: translateY(14px);
+   is scoped to `.js` so that without JavaScript the server-rendered content
+   stays visible. The `.js` class lands at script-PARSE time, though — well
+   before hydration on a slow connection — so a pure-CSS failsafe reveals
+   everything at 4s regardless: if the observer never arrives (slow 3G,
+   hydration error), the page still reads. Static under reduced motion. */
+@keyframes uc-reveal-fallback {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.reveal {
   transition:
     opacity 0.55s ease,
     transform 0.55s ease;
+}
+/* Hidden state scoped to :not(.reveal-in) so the shown state always wins —
+   a bare `.js .reveal` (0,2,0) would out-rank `.reveal-in` (0,1,0) and keep
+   revealed content at opacity 0 forever. */
+.js .reveal:not(.reveal-in) {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: uc-reveal-fallback 0.6s ease 4s forwards;
 }
 .reveal-in {
   opacity: 1;
   transform: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .js .reveal {
+  .js .reveal:not(.reveal-in) {
     opacity: 1;
     transform: none;
     transition: none;
   }
+}
+
+/* Horizontal-scroll affordance for wide tables: classic scrolling shadows —
+   a soft inner shadow appears at whichever edge has more content, and
+   disappears when there's nothing to scroll. Needs a solid background. */
+.scroll-shadows-x {
+  background:
+    linear-gradient(to right, var(--color-surface) 30%, transparent) left/40px 100%,
+    linear-gradient(to left, var(--color-surface) 30%, transparent) right/40px 100%,
+    radial-gradient(farthest-side at 0 50%, rgba(17, 33, 31, 0.14), transparent) left/14px 100%,
+    radial-gradient(farthest-side at 100% 50%, rgba(17, 33, 31, 0.14), transparent) right/14px 100%;
+  background-repeat: no-repeat;
+  background-attachment: local, local, scroll, scroll;
 }
 
 /* A shimmering placeholder block. Size/radius come from utility classes. */

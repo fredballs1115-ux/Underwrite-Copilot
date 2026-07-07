@@ -82,6 +82,25 @@ export default async function BillingPage({
         </p>
       )}
 
+      {/* Dunning: the plan stays active while Stripe retries the card, but
+          the user needs to hear about it before the subscription cancels. */}
+      {billing?.status === "past_due" && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-caution/30 bg-caution/5 p-4">
+          <p className="text-sm font-medium text-caution">
+            Your last payment didn&rsquo;t go through. Your plan stays active
+            while Stripe retries, but please update your payment method.
+          </p>
+          <form action={openPortal}>
+            <PendingButton
+              pendingLabel="Opening Stripe…"
+              className="rounded-lg border border-caution/40 px-3.5 py-1.5 text-sm font-medium text-caution transition-colors hover:bg-caution/10"
+            >
+              Update payment method
+            </PendingButton>
+          </form>
+        </div>
+      )}
+
       {/* Current plan */}
       <section className="shadow-card rounded-2xl border border-line bg-surface p-6">
         <div className="flex items-center justify-between gap-3">

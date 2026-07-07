@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "Privacy policy",
   description:
     "What Underwrite Copilot collects, how deal documents are handled, and what we never do with your data.",
+  alternates: { canonical: "/privacy" },
 };
 
 const SECTIONS: { h: string; body: string[] }[] = [

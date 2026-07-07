@@ -2,6 +2,11 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { LogoMark } from "./logo";
 import { Reveal, CountUp, DemoTabs } from "./landing-interactive";
+import type { Metadata } from "next";
+
+// Title/description inherit the site defaults from the root layout;
+// the canonical is declared per page so subpages never collapse to /.
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 // Landing page — a React Server Component (zero client JS, no secrets).
 // The pitch is consistency: one method on every deal, with the work shown.
@@ -584,7 +589,7 @@ export default function Home() {
                       <span className="text-right">Effect</span>
                     </div>
                     {[
-                      ["Purchase price", "$70.7M", "IRR 8.7%"],
+                      ["Purchase price", "$68M", "IRR 8.7%"],
                       ["Exit cap", "5.50%", "IRR 8.7%"],
                       ["Exit cap (flexed)", "5.75%", "IRR 7.1%"],
                       ["Rent growth (flexed)", "3.0%", "IRR 7.6%"],
@@ -644,9 +649,9 @@ export default function Home() {
                   </p>
                   <div className="mt-auto space-y-1.5 pt-4 text-[10px]">
                     {[
-                      ["Preston Creek", "Genuine support", "text-pass bg-pass/10"],
-                      ["Lakeline Commons", "Leans favorable", "text-caution bg-caution/10"],
-                      ["Axis on Fifth", "Stretched", "text-kill bg-kill/10"],
+                      ["The Brixton", "Supports", "text-pass bg-pass/10"],
+                      ["Parkside", "Leans favorable", "text-caution bg-caution/10"],
+                      ["Vue at Legacy", "Stretched", "text-kill bg-kill/10"],
                     ].map(([n, r, c]) => (
                       <div
                         key={n}
@@ -1148,7 +1153,7 @@ function DealPreview() {
             </span>
           </div>
           <p className="mt-1.5 text-xs leading-relaxed text-muted">
-            $285k/unit is 12% above the last two comparable trades with no
+            $274k/unit is 7% above the last two comparable trades with no
             renovation premium to justify it.
           </p>
         </div>
