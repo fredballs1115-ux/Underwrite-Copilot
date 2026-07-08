@@ -87,9 +87,9 @@ export default function SecurityPage() {
         <h1 className="text-3xl font-semibold tracking-tight">Security</h1>
         <p className="mt-2 text-sm text-muted">Last updated: July 7, 2026</p>
         <p className="mt-5 text-sm leading-relaxed text-muted">
-          The question behind every upload: is it safe to put a confidential
-          OM here? This page is the answer — how documents are stored, who can
-          see them, and where they go. The{" "}
+          Every upload comes down to one thing: whether it is safe to put a
+          confidential OM here. This page is the answer — how documents are
+          stored, who can see them, and where they go. The{" "}
           <Link
             href="/privacy"
             className="font-medium text-brand hover:text-brand-strong"
