@@ -1079,9 +1079,13 @@ const DealRow = memo(function DealRow({
   ) : null;
   const fitBit =
     d.score != null && d.mandateVerdict ? (
-      <span className={`font-medium ${MANDATE_META[d.mandateVerdict].cls}`}>
-        Buy box {d.score} · {MANDATE_META[d.mandateVerdict].label}
-      </span>
+      d.fit === "outside" ? (
+        <span className="font-medium text-kill">Buy box {d.score} · Outside box</span>
+      ) : (
+        <span className={`font-medium ${MANDATE_META[d.mandateVerdict].cls}`}>
+          Buy box {d.score} · {MANDATE_META[d.mandateVerdict].label}
+        </span>
+      )
     ) : d.fit ? (
       <span className={`font-medium ${FIT_META[d.fit].cls}`}>
         {FIT_META[d.fit].label} buy box
@@ -1151,8 +1155,12 @@ const DealRow = memo(function DealRow({
       <span className="hidden w-16 shrink-0 text-right text-xs font-semibold lg:block">
         {d.score != null && d.mandateVerdict ? (
           <span
-            className={`tabular-nums ${MANDATE_META[d.mandateVerdict].cls}`}
-            title={`${d.score} / 100 · ${MANDATE_META[d.mandateVerdict].label} — mandate fit`}
+            className={`tabular-nums ${d.fit === "outside" ? "text-kill" : MANDATE_META[d.mandateVerdict].cls}`}
+            title={
+              d.fit === "outside"
+                ? `${d.score} / 100 mandate fit, but outside the box on a criterion the score doesn't weigh (e.g. price)`
+                : `${d.score} / 100 · ${MANDATE_META[d.mandateVerdict].label} — mandate fit`
+            }
           >
             {d.score}
           </span>

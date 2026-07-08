@@ -830,7 +830,14 @@ const MANDATE_META: Record<
 /** The 0–100 mandate-fit score as a headline gauge: the number, the
  *  PURSUE/WATCH/PASS call, a bar with the 50/75 verdict thresholds marked, and
  *  the honest coverage line (what was scored, what's still pending). */
-function MandateScoreHeader({ mandate }: { mandate: MandateScore }) {
+function MandateScoreHeader({
+  mandate,
+  unscored,
+}: {
+  mandate: MandateScore;
+  /** buy-box criteria that are checked (below) but not part of the fit score */
+  unscored: string[];
+}) {
   const score = mandate.score!;
   const meta = MANDATE_META[mandate.verdict!];
   const scored = mandate.dimensions.filter((d) => d.status !== "unknown").length;
@@ -871,8 +878,12 @@ function MandateScoreHeader({ mandate }: { mandate: MandateScore }) {
             A hard dealbreaker was tripped — capped at Pass regardless of the rest.{" "}
           </span>
         ) : null}
-        Scored on {scored} of {mandate.dimensions.length} criteria you set
+        Scored on {scored} of {mandate.dimensions.length} mandate dimension
+        {mandate.dimensions.length === 1 ? "" : "s"}
         {pending > 0 ? `, ${pending} pending more data` : ""}.
+        {unscored.length
+          ? ` ${unscored.join(" and ")} ${unscored.length > 1 ? "are" : "is"} checked below but not part of the fit score.`
+          : ""}
         {mandate.unresolvedDealbreakers > 0 && !mandate.dealbreakerTripped
           ? ` ${mandate.unresolvedDealbreakers} dealbreaker${mandate.unresolvedDealbreakers > 1 ? "s" : ""} couldn't be checked — verify manually.`
           : ""}
@@ -927,7 +938,13 @@ function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
         </Link>
       </div>
       {data.mandate?.score != null && data.mandate.verdict && (
-        <MandateScoreHeader mandate={data.mandate} />
+        <MandateScoreHeader
+          mandate={data.mandate}
+          // Criteria the fold checks below but the 0–100 score doesn't weigh.
+          unscored={data.checks
+            .filter((c) => c.label === "Price" || c.label === "Basis / unit")
+            .map((c) => (c.label === "Basis / unit" ? "basis / unit" : "price"))}
+        />
       )}
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {data.checks.map((c) => (

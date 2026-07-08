@@ -29,7 +29,7 @@ import { parseStageHistory } from "@/lib/stages";
 import { parseDealNotes, parseDealQa } from "@/lib/deals";
 import { deriveInternalComps } from "@/lib/internal-comps";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { evaluateBuyBox, buyBoxCheckSource, type BuyBoxCheck } from "@/lib/criteria";
+import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource, type BuyBoxCheck } from "@/lib/criteria";
 import { scoreMandateFit, type MandateScore, type MandateVerdict } from "@/lib/mandate";
 
 const VERDICT_PILL = {
@@ -285,13 +285,23 @@ export default async function DealPage({
     WATCH: "bg-caution/10 text-caution",
     PASS: "bg-kill/10 text-kill",
   };
+  // The fold covers ALL criteria (incl. the price band / per-unit cap, which
+  // the 0–100 score deliberately doesn't weigh). A deal outside the box on one
+  // of those must never show a green Pursue — so a hard "outside" fold wins the
+  // chip even when the scored dimensions look strong.
+  const buyBoxFold = buyBox ? foldBuyBoxChecks(buyBoxChecks) : null;
   const buyBoxChip = !buyBox
     ? null
     : mandate?.score != null && mandate.verdict
-      ? {
-          label: `Buy box ${mandate.score} · ${mandate.verdict === "PURSUE" ? "Pursue" : mandate.verdict === "WATCH" ? "Watch" : "Pass"}`,
-          cls: MANDATE_PILL[mandate.verdict],
-        }
+      ? buyBoxFold === "outside" && mandate.verdict !== "PASS"
+        ? {
+            label: `Buy box ${mandate.score} · Outside box`,
+            cls: "bg-kill/10 text-kill",
+          }
+        : {
+            label: `Buy box ${mandate.score} · ${mandate.verdict === "PURSUE" ? "Pursue" : mandate.verdict === "WATCH" ? "Watch" : "Pass"}`,
+            cls: MANDATE_PILL[mandate.verdict],
+          }
       : buyBoxChecks.some((c) => c.status === "miss")
         ? { label: "Outside buy box", cls: "bg-kill/10 text-kill" }
         : buyBoxChecks.some((c) => c.status === "near")

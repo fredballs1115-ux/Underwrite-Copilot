@@ -140,12 +140,15 @@ export function isEmptyBuyBox(box: BuyBox | null | undefined): boolean {
 // Multiple named buy boxes (Feature 4).
 //
 // The `criteria` JSONB column holds EITHER a bare BuyBox (the legacy shape,
-// still written when there's only one box) OR a versioned envelope carrying
-// several named boxes and which one is active. `resolveBuyBoxStore` normalizes
-// both into a canonical store; `serializeBuyBoxStore` collapses back to the
-// most backward-compatible shape. Every reader goes through these, so nothing
-// downstream has to know which shape is on disk — and a rollback to pre-F4
-// code reading a single-box account still sees a plain BuyBox.
+// still written when there's a single DEFAULT-named box) OR a versioned
+// envelope carrying several named boxes and which one is active. A single
+// CUSTOM-named box uses the envelope too, so it round-trips its name.
+// `resolveBuyBoxStore` normalizes both into a canonical store;
+// `serializeBuyBoxStore` collapses back to the most backward-compatible shape.
+// Every reader goes through these, so nothing downstream has to know which
+// shape is on disk — and for the common single-default-box account a pre-F4
+// rollback still reads a plain BuyBox (a custom-named or multi-box account
+// would read as no-criteria until re-deployed, never a crash).
 // ---------------------------------------------------------------------------
 
 export interface NamedBuyBox {

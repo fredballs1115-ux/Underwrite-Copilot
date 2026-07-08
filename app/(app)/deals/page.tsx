@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { getBilling } from "@/lib/billing";
 import { type DealRow } from "@/lib/deals";
-import type { ExtractionResult, ExtractedMetric } from "@/lib/anthropic/types";
+import type { ExtractionResult, ExtractedMetric, FirstSignal } from "@/lib/anthropic/types";
+import type { StructuredAddress } from "@/lib/address";
 import { Pipeline, type DealCard } from "./pipeline";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { evaluateBuyBox, foldBuyBoxChecks } from "@/lib/criteria";
+import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
 import { scoreMandateFit } from "@/lib/mandate";
 
 export const metadata: Metadata = { title: "Pipeline" };
@@ -74,7 +75,7 @@ export default async function DealsPage({
     supabase
       .from("deals")
       .select(
-        "id, name, asset_class, created_at, verdict, extraction, user_id, team_id, stage, is_sample",
+        "id, name, asset_class, created_at, verdict, extraction, address, first_signal, user_id, team_id, stage, is_sample",
       )
       .order("created_at", { ascending: false }),
     user ? getBuyBoxForDeal(user.id, null).catch(() => null) : Promise.resolve(null),
@@ -115,6 +116,8 @@ export default async function DealsPage({
     DealRow,
     "id" | "name" | "asset_class" | "created_at" | "verdict" | "extraction"
   > & {
+    address: unknown;
+    first_signal: unknown;
     user_id: string;
     team_id: string | null;
     stage: string | null;
@@ -173,11 +176,19 @@ export default async function DealsPage({
     const extraction = d.extraction as ExtractionResult | null;
     const verdict = d.verdict as { verdict?: string } | null;
     const job = jobByDeal.get(d.id);
-    // Same deterministic engine as the deal page, computed once for both the
-    // fold (fits/near/outside) and the 0–100 mandate-fit score.
+    // Same deterministic engine AND the same inputs as the deal page: judge
+    // against buyBoxCheckSource (extraction, else first signal, with the typed
+    // address widening geography) so a deal reads identically on both surfaces.
     const box = d.team_id ? teamBox : personalBox;
+    const checkSource = box
+      ? buyBoxCheckSource(
+          extraction,
+          (d.first_signal as FirstSignal | null) ?? null,
+          (d.address as StructuredAddress | null) ?? null,
+        )
+      : null;
     const mandate =
-      box && extraction ? scoreMandateFit(d.asset_class, extraction, box) : null;
+      box && checkSource ? scoreMandateFit(d.asset_class, checkSource, box) : null;
     return {
       id: d.id,
       name: d.name,
@@ -188,8 +199,8 @@ export default async function DealsPage({
       // Any miss → outside; else any near-miss → near; all-pass → fits.
       // Unknown-only results (nothing checkable yet) stay null and render as —.
       fit:
-        box && extraction
-          ? foldBuyBoxChecks(evaluateBuyBox(d.asset_class, extraction, box))
+        box && checkSource
+          ? foldBuyBoxChecks(evaluateBuyBox(d.asset_class, checkSource, box))
           : null,
       score: mandate?.score ?? null,
       mandateVerdict: mandate?.verdict ?? null,
