@@ -1,15 +1,66 @@
-# Background worker (Phase 2)
+# The dedicated analysis worker
 
-A 150–200 page OM plus several Claude calls can take a minute or more — too long
-for a normal web request. So the web app enqueues a job and this separate
-process does the slow work.
+A 150–200 page OM plus several Claude calls takes minutes — too long for a web
+request, and (until this service) it ran inside the web process, so **every
+deploy interrupted whatever screens were in flight**. This worker fixes that:
 
-Planned flow:
+- The web app (with `ANALYSIS_WORKER=1`) only **enqueues** a job row in
+  `analysis_jobs` and returns instantly.
+- The worker polls for the oldest `queued` job, **claims it atomically**
+  (two workers can never grab the same row), and runs the pipeline:
+  signal → extract → challenge → comps → market → verdict, or a reconcile.
+- The pipeline **checkpoints each finished step** onto the job's `payload`.
+- On a deploy, Render sends SIGTERM: the worker **re-queues the in-flight job
+  and exits within a second**. The replacement instance claims it and
+  **resumes after the last completed step** — a deploy costs seconds of delay,
+  not a restarted screen.
+- A job interrupted 3 times stops retrying and fails with an honest message.
+- While the worker is alive it heartbeats the running row and every queued
+  row, so a backlog never looks "stalled" to the deal page. If the worker
+  actually dies, the rows go stale and the existing 10-minute stall recovery
+  takes over, exactly as before.
+- A run wedged past 30 minutes is re-queued and the process exits nonzero so
+  Render restarts it clean (that also kills the wedged request).
+- Reconciles: the web app parks the uploaded model file in the private
+  Storage bucket (`…/<deal>.model-tmp`) and the worker deletes it the moment
+  the run reaches a terminal state.
 
-1. Poll `analysis_jobs` for a `queued` job.
-2. Run the pipeline: extract → challenge → comps → reconcile → market → verdict.
-3. Update `status` / `step` / `progress` as it goes (the deal page polls this).
-4. Save each step's results onto the deal.
+Everything above is exercised by a local end-to-end rig that runs this exact
+binary against fake Supabase/Anthropic/Resend servers — including the
+SIGTERM-resume and attempts-cap paths.
 
-It runs as its own Render service (see the commented `worker` block in
-`render.yaml`). Not wired up yet — `index.ts` is a placeholder.
+## Turning it on (order matters)
+
+1. **Run migration `supabase/migrations/0016_worker_jobs.sql`** (Supabase →
+   SQL Editor). Without it the worker idles with a loud log line instead of
+   processing.
+2. **Create the worker service** — Render dashboard → New → **Background
+   Worker** → this repo, branch `main`:
+   - Build command: `npm install && npm run build:worker`
+   - Start command: `npm run start:worker`
+   - Environment: `ANTHROPIC_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`,
+     `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL` (same values as the
+     web service), plus `RESEND_API_KEY` / `RESEND_FROM` if analysis emails
+     are on — the worker is what sends them now.
+   - One instance is the supported shape (claims are atomic, so a second
+     instance is safe, just unnecessary).
+3. Watch its logs until you see `schema OK — processing jobs`.
+4. **Flip the web service**: add `ANALYSIS_WORKER=1` to the WEB service's
+   environment (it redeploys). From then on screens run here.
+
+**Rollback** is one step: remove `ANALYSIS_WORKER` from the web service.
+Screens run in-process again immediately; the worker just goes idle and can
+be suspended or deleted.
+
+> Do not set `ANALYSIS_WORKER=1` before the worker is live — jobs would sit
+> queued with nobody to run them (the deal page would show them stalled after
+> 10 minutes).
+
+## Tuning (env, all optional)
+
+| Var | Default | Meaning |
+| --- | --- | --- |
+| `WORKER_POLL_MS` | 5000 | queue poll interval |
+| `WORKER_HEARTBEAT_MS` | 45000 | running/queued row keep-alive |
+| `WORKER_MAX_ATTEMPTS` | 3 | interruptions before a job stops retrying |
+| `WORKER_JOB_TIMEOUT_MS` | 1800000 | wedged-run cutoff (re-queue + restart) |

@@ -130,6 +130,8 @@ const MODEL_ERRORS: Record<string, string> = {
   modelfile: "Please choose your model file to upload.",
   modeltype: "Please upload your model as .xlsx, .csv, or PDF.",
   modelsize: "That file is larger than 22 MB — please try a smaller export.",
+  modelupload:
+    "Your model didn’t finish uploading — nothing was changed. Please try again.",
   omfile: "Choose the reissued OM (PDF) to upload.",
   ompdf: "The replacement OM must be a PDF.",
   omsize: "That PDF is larger than 22 MB — please try a smaller file.",
@@ -1356,7 +1358,9 @@ function ProgressRail({ job }: { job: NonNullable<Job> }) {
         <div className="flex items-center gap-3">
           <Spinner />
           <span className="text-sm">
-            {STEP_LABELS[job.step] ?? "Working…"}
+            {job.status === "queued"
+              ? "Queued — this starts in a moment…"
+              : (STEP_LABELS[job.step] ?? "Working…")}
           </span>
           <span className="ml-auto font-mono text-xs tabular-nums text-muted">
             {elapsed}
@@ -1385,7 +1389,9 @@ function ProgressRail({ job }: { job: NonNullable<Job> }) {
       <div className="flex items-center gap-3">
         <Spinner />
         <span className="text-sm">
-          {STEP_LABELS[job.step ?? ""] ?? "Analyzing…"}
+          {job.status === "queued"
+            ? "Queued — your screen starts in a moment…"
+            : (STEP_LABELS[job.step ?? ""] ?? "Analyzing…")}
         </span>
         <span className="ml-auto font-mono text-xs tabular-nums text-muted">
           {cur >= 0 ? `Step ${cur + 1} of ${steps.length} · ` : ""}

@@ -6,6 +6,26 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 const STALE_MS = 10 * 60 * 1000;
 
 /**
+ * ANALYSIS_WORKER=1 hands the pipeline to the dedicated worker service: the
+ * web app only enqueues jobs (with a payload describing the run) and the
+ * worker claims and executes them. Requires migration 0016 and a running
+ * worker — see worker/README.md. Unset, the web app runs analyses in-process
+ * via after(), exactly as before.
+ */
+export function analysisWorkerEnabled(): boolean {
+  return process.env.ANALYSIS_WORKER === "1";
+}
+
+/** What an enqueued job tells the worker to run. `snapshotPrior` and
+ *  `completed` (the resume checkpoint) are managed by the enqueue/claim
+ *  helpers and the pipeline respectively. */
+export interface WorkerPayload {
+  kind: "screen" | "reconcile";
+  /** reconcile only — the model file parked in Storage for the worker */
+  model?: { name: string; path: string };
+}
+
+/**
  * True when the deal already has a live (non-stale) analysis job. Trigger
  * actions check this before starting a pipeline so a double-click or an
  * overlapping trigger can't run two pipelines that clobber the same job row.
@@ -42,11 +62,24 @@ export interface JobClaim {
  * pipelines can never interleave writes on the same deal.
  *
  * Stale jobs (crashed runs that stopped heartbeating) are reclaimable.
+ *
+ * `workerPayload` (worker mode only) is written onto the row alongside the
+ * claim, with `snapshotPrior` derived here — only a COMPLETED prior
+ * generation is safe to diff against — and `attempts` reset for the new run.
+ * Requires migration 0016; without worker mode, pass nothing and the update
+ * touches no new columns.
+ *
+ * `claimTo` is the status the row lands in. "queued" (default) makes it
+ * immediately claimable by the worker; replace-OM claims straight to
+ * "running" so the worker can't pick the job up mid-upload and screen the
+ * OLD bytes — the caller flips it to "queued" once the new OM is in place.
  */
 export async function claimJob(
   supabase: SupabaseClient,
   dealId: string,
   step: string,
+  workerPayload?: WorkerPayload,
+  claimTo: "queued" | "running" = "queued",
 ): Promise<JobClaim> {
   const { data: existing } = await supabase
     .from("analysis_jobs")
@@ -69,11 +102,21 @@ export async function claimJob(
   let query = supabase
     .from("analysis_jobs")
     .update({
-      status: "queued",
+      status: claimTo,
       step,
       progress: 0,
       error: null,
       updated_at: new Date().toISOString(),
+      ...(workerPayload
+        ? {
+            payload: {
+              ...workerPayload,
+              snapshotPrior: priorStatus === "done",
+              completed: [],
+            },
+            attempts: 0,
+          }
+        : {}),
     })
     .eq("id", existing.id);
   if (live && stale) {
@@ -90,7 +133,8 @@ export async function claimJob(
 
 /** Release a claim taken by claimJob when the run is aborted before it
  *  starts (e.g. the upload failed) — otherwise the deal reads "queued"
- *  with no runner until the stale timeout. */
+ *  with no runner until the stale timeout. Covers "running" too, for claims
+ *  held in that state through an upload (see claimTo). */
 export async function releaseClaim(
   supabase: SupabaseClient,
   dealId: string,
@@ -104,5 +148,5 @@ export async function releaseClaim(
       updated_at: new Date().toISOString(),
     })
     .eq("deal_id", dealId)
-    .eq("status", "queued");
+    .in("status", ["queued", "running"]);
 }
