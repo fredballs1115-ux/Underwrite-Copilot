@@ -181,6 +181,12 @@ const MODEL_ERRORS: Record<string, string> = {
   reportempty: "Run the screen first — the full report needs a verdict to export.",
   reportfail:
     "Couldn’t build the full report just now — please try again in a moment.",
+  underwritepro:
+    "The Excel underwriting model is part of Pro — upgrade on the Billing page to download it.",
+  underwriteempty:
+    "Run the screen first — the model builds from the OM’s extracted terms.",
+  underwritefail:
+    "Couldn’t build the Excel model just now — please try again in a moment.",
   shareempty: "Run the screen first — a share link leads with the verdict.",
   deadline: "Couldn’t save the offers-due date — please try again.",
 };
