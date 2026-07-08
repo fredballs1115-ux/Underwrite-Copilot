@@ -290,7 +290,7 @@ export function deriveRisks(results: Results): RiskItem[] {
   for (const f of results.comps?.redFlags ?? []) {
     risks.push({
       severity: "medium",
-      title: "Comp cherry-picking / omission",
+      title: "Comp selection / omission",
       detail: f,
       source: "Comps",
       tab: "comps",
@@ -774,7 +774,7 @@ export function BrokerComps({
           <div className="flex items-center gap-2 text-kill">
             <IconFlag className="h-4 w-4" />
             <p className="text-sm font-medium text-ink">
-              Cherry-picking &amp; omissions
+              Selection &amp; omissions
             </p>
           </div>
           <ul className="mt-2.5 space-y-1.5">

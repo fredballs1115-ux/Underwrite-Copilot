@@ -163,7 +163,7 @@ export function computeModel(inp: ModelInputs): {
 } {
   const loanAmount = inp.purchasePrice * (inp.loan.ltvPct / 100);
   // Day-0 equity carries the real check size: price + closing costs + loan
-  // fees - loan proceeds. Omitting costs is how brokers flatter an IRR.
+  // fees - loan proceeds. Omitting costs is the classic way an IRR gets flattered.
   const closingCosts = inp.purchasePrice * ((inp.closingCostPct ?? 0) / 100);
   const loanFees = loanAmount * ((inp.loanFeePct ?? 0) / 100);
   const equity = inp.purchasePrice + closingCosts + loanFees - loanAmount;

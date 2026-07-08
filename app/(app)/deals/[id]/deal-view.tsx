@@ -118,7 +118,7 @@ const STEP_LABELS: Record<string, string> = {
   signal: "First pass — the headline read lands in about half a minute…",
   extract: "Reading the OM and extracting the key terms…",
   challenge: "Grilling the assumptions the way an investment committee would…",
-  comps: "Scrutinizing the broker’s comps for cherry-picking…",
+  comps: "Weighing the OM’s comps — sell-side sets tend to lean favorable…",
   market: "Sanity-checking the assumptions against market norms…",
   reconcile: "Reconciling your model against the OM…",
   verdict: "Writing the one-screen verdict…",
@@ -142,6 +142,12 @@ const MODEL_ERRORS: Record<string, string> = {
   busy: "A screen is already running on this deal — let it finish first.",
   memoempty: "Run the analysis first — the memo needs a verdict to export.",
   memofail: "Couldn’t build the memo just now — please try again in a moment.",
+  memopro:
+    "The one-page IC memo is part of Pro — upgrade on the Billing page and it exports instantly.",
+  modelpro:
+    "The Excel model export is part of Pro — upgrade on the Billing page to download it.",
+  modelempty:
+    "There’s no generated model on this deal yet — build one from the Financials section first.",
   modelfail: "Couldn’t build the Excel just now — please try again in a moment.",
   docfile: "Please choose a file to add.",
   docsize: "That file is larger than 22 MB — please try a smaller one.",

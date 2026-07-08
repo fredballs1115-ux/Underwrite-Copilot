@@ -399,7 +399,7 @@ export function evaluateBuyBox(
         status: near ? "near" : "miss",
         detail: near
           ? `Mandate targets ≥${box.minIrrPct}% IRR — the OM projects ${pct.toFixed(1)}%, ${(box.minIrrPct - pct).toFixed(1)}pt shy. Within reach if the assumptions hold up.`
-          : `Mandate targets ≥${box.minIrrPct}% IRR — the OM projects ${pct.toFixed(1)}%. Short of the mandate even on the broker's own numbers.`,
+          : `Mandate targets ≥${box.minIrrPct}% IRR — the OM projects ${pct.toFixed(1)}%. Short of the mandate even on the OM's own numbers.`,
       });
     }
   }

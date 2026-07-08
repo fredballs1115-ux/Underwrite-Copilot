@@ -88,7 +88,7 @@ export interface BrokerComp {
   /** price/unit or rent/unit, cap rate, date, size — as available in the OM */
   detail: string;
   support: CompSupport;
-  /** how it compares to the subject deal, and whether it's cherry-picked */
+  /** how it compares to the subject deal, and how hard it supports it */
   note: string;
   /** OM page the comp appears on ("" if unknown). Optional pre-cites. */
   page?: string;
@@ -96,7 +96,7 @@ export interface BrokerComp {
 export interface BrokerCompsResult {
   saleComps: BrokerComp[];
   leaseComps: BrokerComp[];
-  /** cherry-picking and conspicuous-omission concerns */
+  /** selection-bias and conspicuous-omission concerns */
   redFlags: string[];
   summary: string;
 }

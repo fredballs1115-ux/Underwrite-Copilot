@@ -123,7 +123,7 @@ const modelMetrics: ReconciledMetric[] = [
     ],
     authority: "Rent roll",
     rationale:
-      "In-place rents, not the broker's post-renovation target — the $200 gap IS the business plan, not the starting point.",
+      "In-place rents, not the OM's post-renovation target — the $200 gap IS the business plan, not the starting point.",
     confidence: "high",
     isConflict: true,
   },
@@ -304,7 +304,7 @@ const comps: BrokerCompsResult = {
     "A weaker $238k/unit trade 0.8 mi away was omitted from the set.",
   ],
   summary:
-    "The broker's set leans on the strongest trades and omits a nearby weaker sale. On clean comps, the basis looks 8–12% rich.",
+    "The comp set leans on the strongest trades and omits a nearby weaker sale — sell-side selections usually do. On clean comps, the basis looks 8–12% rich.",
 };
 
 const reconciliation: ReconciliationResult = {
@@ -384,7 +384,7 @@ const verdict: VerdictResult = {
         base: "$2,480",
         high: "$2,600",
         source: "Public listings + 3 comp leases within 1 mi",
-        basis: "Low = in-place renewals; high = the broker's renovated pro forma.",
+        basis: "Low = in-place renewals; high = the OM's renovated pro forma.",
         confidence: "medium",
       },
       {
