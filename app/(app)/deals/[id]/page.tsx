@@ -28,6 +28,7 @@ import { ShareControl, type ShareRow } from "./share-control";
 import { parseStageHistory } from "@/lib/stages";
 import { parseDealNotes, parseDealQa } from "@/lib/deals";
 import { deriveInternalComps } from "@/lib/internal-comps";
+import { buildComps, marketMemoryFor } from "@/lib/market-memory";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource, type BuyBoxCheck } from "@/lib/criteria";
 import { scoreMandateFit, type MandateScore, type MandateVerdict } from "@/lib/mandate";
@@ -96,7 +97,7 @@ export default async function DealPage({
       // own + shared team deals). Derivation filters to this asset class.
       supabase
         .from("deals")
-        .select("id, name, asset_class, created_at, is_sample, verdict, extraction")
+        .select("id, name, asset_class, created_at, is_sample, verdict, extraction, user_id")
         .neq("id", id)
         .not("extraction", "is", null)
         .order("created_at", { ascending: false })
@@ -165,6 +166,25 @@ export default async function DealPage({
     extraction,
     (siblings.data ?? []) as Parameters<typeof deriveInternalComps>[3],
   );
+
+  // Deal memory (Feature 6): the account's OWN prior screens of this exact
+  // market + asset class, aggregated. Own-account only — filter the siblings
+  // (which RLS may include team deals in) to this user's deals.
+  const ownSiblings = ((siblings.data ?? []) as Array<{ user_id?: string }>).filter(
+    (s) => s.user_id === user?.id,
+  );
+  const currentClass =
+    deal.asset_class && deal.asset_class !== "auto"
+      ? (deal.asset_class as string)
+      : (extraction?.assetClass ?? "");
+  const marketMemory = extraction?.market
+    ? marketMemoryFor(
+        buildComps(ownSiblings as Parameters<typeof buildComps>[0]),
+        deal.id,
+        currentClass,
+        extraction.market,
+      )
+    : null;
 
   const documents = (docsData ?? []) as DealDocument[];
 
@@ -536,6 +556,7 @@ export default async function DealPage({
         userId={user?.id ?? null}
         qa={parseDealQa((deal as { qa?: unknown }).qa)}
         isSample={!!(deal as { is_sample?: boolean }).is_sample}
+        marketMemory={marketMemory}
       />
     </div>
   );

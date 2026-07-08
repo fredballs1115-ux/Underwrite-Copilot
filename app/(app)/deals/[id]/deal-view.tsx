@@ -13,6 +13,11 @@ import type {
 } from "@/lib/anthropic/types";
 import type { BuyBoxCheck } from "@/lib/criteria";
 import type { MandateScore, MandateVerdict } from "@/lib/mandate";
+import {
+  fmtCapRange,
+  fmtBasisRange,
+  type MarketGroup,
+} from "@/lib/market-memory";
 import { type StageChange } from "@/lib/stages";
 import type { InternalComp } from "@/lib/internal-comps";
 import { DebtSizer } from "./debt-sizer";
@@ -279,6 +284,7 @@ export function DealView({
   qa = [],
   isSample = false,
   userId = null,
+  marketMemory = null,
 }: {
   dealId: string;
   dealName: string;
@@ -305,6 +311,7 @@ export function DealView({
   qa?: AskEntry[];
   isSample?: boolean;
   userId?: string | null;
+  marketMemory?: MarketGroup | null;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -656,6 +663,7 @@ export function DealView({
             {discrepancies && discrepancies.discrepancies.length > 0 && (
               <ReconciliationPanel dealId={dealId} result={discrepancies} />
             )}
+            {marketMemory && <MarketMemoryStrip group={marketMemory} />}
             <OverviewView
               results={results}
               active={active}
@@ -889,6 +897,45 @@ function MandateScoreHeader({
           : ""}
       </p>
     </div>
+  );
+}
+
+/** Deal memory (Feature 6): what this account's OWN past screens of the same
+ *  market + asset class looked like — a one-line read at the point of decision,
+ *  linking to the full Market data page. Never a teammate's or another
+ *  account's deals. */
+function MarketMemoryStrip({ group }: { group: MarketGroup }) {
+  const bits: string[] = [];
+  if (group.cap) bits.push(`going-in cap ${fmtCapRange(group.cap)}`);
+  if (group.perUnit) bits.push(`basis ${fmtBasisRange(group.perUnit)}`);
+  return (
+    <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold tracking-tight">
+          From your past screens
+        </h2>
+        <Link
+          href="/market"
+          className="text-xs font-medium text-brand transition-colors hover:text-brand-strong"
+        >
+          Your market data →
+        </Link>
+      </div>
+      <p className="mt-1 text-sm leading-relaxed text-muted">
+        You&apos;ve screened{" "}
+        <span className="font-medium text-ink">{group.count}</span> other{" "}
+        {group.market} <span className="capitalize">{group.assetClass}</span>{" "}
+        deal{group.count === 1 ? "" : "s"}
+        {bits.length ? (
+          <>
+            : <span className="text-ink">{bits.join(" · ")}</span>
+          </>
+        ) : (
+          ""
+        )}
+        .
+      </p>
+    </section>
   );
 }
 
