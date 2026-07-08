@@ -4,10 +4,21 @@ import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { uploadOmPdf, removeStorageFiles } from "@/lib/storage";
+import {
+  uploadOmPdf,
+  removeStorageFiles,
+  uploadSupplement,
+  modelTmpPath,
+} from "@/lib/storage";
 import { getBilling } from "@/lib/billing";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
-import { claimJob, releaseClaim } from "@/lib/jobs";
+import {
+  claimJob,
+  releaseClaim,
+  analysisWorkerEnabled,
+  workerSchemaReady,
+  newJobRow,
+} from "@/lib/jobs";
 import { parseStructuredAddress } from "@/lib/address";
 import {
   STAGES,
@@ -147,6 +158,13 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
     }
   }
 
+  // Worker handoff only when the flag is on AND migration 0016 is actually
+  // live — otherwise fall back to the in-process path (the probe logs). A
+  // failed payload insert here would be destructive: the catch below deletes
+  // the deal and its uploaded OM.
+  const workerMode =
+    analysisWorkerEnabled() && (await workerSchemaReady(supabase));
+
   // If the upload or the follow-up writes fail, remove the half-created deal —
   // otherwise the user is stranded with a ghost row that eats a free slot.
   try {
@@ -158,9 +176,17 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
       .eq("id", dealId);
     if (pathErr) throw new Error(pathErr.message);
 
-    const { error: jobErr } = await supabase
-      .from("analysis_jobs")
-      .insert({ deal_id: dealId, status: "queued", step: "signal", progress: 0 });
+    // In worker mode the queued row IS the handoff — the worker service
+    // claims it and runs the pipeline.
+    const { error: jobErr } = await supabase.from("analysis_jobs").insert(
+      newJobRow(
+        dealId,
+        "signal",
+        workerMode
+          ? { workerPayload: { kind: "screen" }, snapshotPrior: true }
+          : undefined,
+      ),
+    );
     if (jobErr) throw new Error(jobErr.message);
   } catch {
     await supabase.from("deals").delete().eq("id", dealId);
@@ -168,7 +194,7 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
     return { ok: false, error: "upload" };
   }
 
-  after(() => runAnalysis(dealId));
+  if (!workerMode) after(() => runAnalysis(dealId));
 
   return { ok: true, dealId };
 }
@@ -367,7 +393,12 @@ export async function deleteDeal(formData: FormData) {
 
   // Collect every storage path this deal owns.
   const paths: string[] = [];
-  if (deal.om_storage_path) paths.push(deal.om_storage_path as string);
+  if (deal.om_storage_path) {
+    paths.push(deal.om_storage_path as string);
+    // A worker-mode reconcile may have parked a model file here; removing a
+    // path that doesn't exist is a no-op, so always sweep it.
+    paths.push(modelTmpPath(deal.om_storage_path as string));
+  }
   const supp = (deal.supplements as Record<
     string,
     { files?: { path: string }[] }
@@ -413,21 +444,36 @@ export async function rerunAnalysis(formData: FormData) {
   if (!deal?.om_storage_path) redirect(`/deals/${dealId}`);
 
   // Atomic claim — a double-click or a concurrent teammate trigger gets
-  // "busy" instead of a second pipeline interleaving with this one.
-  const claim = await claimJob(supabase, dealId, "signal");
+  // "busy" instead of a second pipeline interleaving with this one. In worker
+  // mode the claim also writes the run payload; the worker takes it from here.
+  const workerMode =
+    analysisWorkerEnabled() && (await workerSchemaReady(supabase));
+  const claim = await claimJob(
+    supabase,
+    dealId,
+    "signal",
+    workerMode ? { kind: "screen" } : undefined,
+  );
   if (claim.outcome === "busy") {
     redirect(`/deals/${dealId}?error=busy`);
   }
   if (claim.outcome === "none") {
-    const { error: insErr } = await supabase
-      .from("analysis_jobs")
-      .insert({ deal_id: dealId, status: "queued", step: "signal", progress: 0 });
+    // No prior job row means no completed prior generation to diff against.
+    const { error: insErr } = await supabase.from("analysis_jobs").insert(
+      newJobRow(
+        dealId,
+        "signal",
+        workerMode ? { workerPayload: { kind: "screen" } } : undefined,
+      ),
+    );
     if (insErr) redirect(`/deals/${dealId}?error=busy`);
   }
 
   // Snapshot for the retrade diff only when the stored results are a
   // coherent, completed generation — never after a failed/partial run.
-  after(() => runAnalysis(dealId, { snapshotPrior: claim.priorStatus === "done" }));
+  if (!workerMode) {
+    after(() => runAnalysis(dealId, { snapshotPrior: claim.priorStatus === "done" }));
+  }
   redirect(`/deals/${dealId}`);
 }
 
@@ -497,14 +543,33 @@ export async function replaceOm(formData: FormData) {
   // Claim the run BEFORE the multi-second upload — the claim is a single
   // conditional UPDATE, so a concurrent replace/re-run on the same deal gets
   // "busy" instead of a second pipeline interleaving writes with this one.
-  const claim = await claimJob(supabase, dealId, "signal");
+  // In worker mode the claim lands directly in "running": a "queued" row is
+  // claimable the instant it exists, and the worker must never pick this job
+  // up mid-upload and screen the OLD bytes. It flips to "queued" (claimable)
+  // only once the new OM is in place; if this web process dies mid-upload,
+  // the held row goes stale and is reclaimable like any crashed run.
+  const workerMode =
+    analysisWorkerEnabled() && (await workerSchemaReady(supabase));
+  const claim = await claimJob(
+    supabase,
+    dealId,
+    "signal",
+    workerMode ? { kind: "screen" } : undefined,
+    workerMode ? "running" : "queued",
+  );
   if (claim.outcome === "busy") {
     redirect(`/deals/${dealId}?error=busy`);
   }
   if (claim.outcome === "none") {
-    const { error: insErr } = await supabase
-      .from("analysis_jobs")
-      .insert({ deal_id: dealId, status: "queued", step: "signal", progress: 0 });
+    const { error: insErr } = await supabase.from("analysis_jobs").insert(
+      newJobRow(
+        dealId,
+        "signal",
+        workerMode
+          ? { status: "running", workerPayload: { kind: "screen" } }
+          : undefined,
+      ),
+    );
     if (insErr) redirect(`/deals/${dealId}?error=busy`);
   }
 
@@ -528,7 +593,18 @@ export async function replaceOm(formData: FormData) {
 
   // Only diff against results from a COMPLETED previous run — snapshotting
   // after a failed run would pair a half-new extraction with an old verdict.
-  after(() => runAnalysis(dealId, { snapshotPrior: claim.priorStatus === "done" }));
+  if (workerMode) {
+    // New bytes are in place — hand the held row to the worker.
+    await supabase
+      .from("analysis_jobs")
+      .update({ status: "queued", updated_at: new Date().toISOString() })
+      .eq("deal_id", dealId)
+      .eq("status", "running")
+      .eq("step", "signal")
+      .eq("progress", 0);
+  } else {
+    after(() => runAnalysis(dealId, { snapshotPrior: claim.priorStatus === "done" }));
+  }
   redirect(`/deals/${dealId}`);
 }
 
@@ -571,21 +647,46 @@ export async function reconcileWithModel(formData: FormData) {
   const buffer = Buffer.from(await file.arrayBuffer());
   const name = file.name;
 
+  // Worker mode: the worker can't be handed an in-memory Buffer, so the model
+  // is parked in the private Storage bucket (creator's folder, fixed name per
+  // deal) and referenced from the job payload. The worker deletes it the
+  // moment the run reaches a terminal state; in-process runs never store it.
+  const workerMode =
+    analysisWorkerEnabled() && (await workerSchemaReady(supabase));
+  const tmpPath = workerMode
+    ? modelTmpPath(deal.om_storage_path as string)
+    : null;
+
   // Atomic claim (not a check-then-act read): two concurrent triggers on the
-  // same deal can't both win, so two pipelines never interleave writes.
-  const claim = await claimJob(supabase, dealId, "reconcile");
+  // same deal can't both win, so two pipelines never interleave writes. The
+  // claim comes BEFORE the upload, holds the row at "running" (un-claimable),
+  // and already carries the parked-file path — the fixed per-deal path may
+  // only ever be written by the claim owner. A losing concurrent submit gets
+  // "busy" WITHOUT having overwritten (or cleaned up) the winner's file, and
+  // the worker can't pick the job up until the bytes are actually in place.
+  const claim = await claimJob(
+    supabase,
+    dealId,
+    "reconcile",
+    workerMode && tmpPath
+      ? { kind: "reconcile", model: { name, path: tmpPath } }
+      : undefined,
+    workerMode ? "running" : "queued",
+  );
   if (claim.outcome === "busy") {
     redirect(`/deals/${dealId}?error=busy`);
   }
   if (claim.outcome === "none") {
-    const { error: insErr } = await supabase.from("analysis_jobs").insert({
-      deal_id: dealId,
-      status: "running",
-      step: "reconcile",
-      progress: 10,
-    });
+    const { error: insErr } = await supabase.from("analysis_jobs").insert(
+      workerMode && tmpPath
+        ? newJobRow(dealId, "reconcile", {
+            status: "running",
+            workerPayload: { kind: "reconcile", model: { name, path: tmpPath } },
+          })
+        : newJobRow(dealId, "reconcile", { status: "running", progress: 10 }),
+    );
     if (insErr) redirect(`/deals/${dealId}?error=busy`);
-  } else {
+  } else if (!workerMode) {
     // We own the row now — surface the reconcile step immediately.
     await supabase
       .from("analysis_jobs")
@@ -593,6 +694,28 @@ export async function reconcileWithModel(formData: FormData) {
       .eq("deal_id", dealId);
   }
 
-  after(() => runReconciliation(dealId, { name, buffer }));
+  if (workerMode && tmpPath) {
+    try {
+      await uploadSupplement(tmpPath, buffer, "application/octet-stream");
+    } catch {
+      // We own the claim — release it or the deal reads busy with no runner.
+      await releaseClaim(
+        supabase,
+        dealId,
+        "Your model didn't finish uploading — nothing was changed.",
+      );
+      redirect(`/deals/${dealId}?error=modelupload`);
+    }
+    // Bytes are in place — hand the held row to the worker.
+    await supabase
+      .from("analysis_jobs")
+      .update({ status: "queued", updated_at: new Date().toISOString() })
+      .eq("deal_id", dealId)
+      .eq("status", "running")
+      .eq("step", "reconcile")
+      .eq("progress", 0);
+  }
+
+  if (!workerMode) after(() => runReconciliation(dealId, { name, buffer }));
   redirect(`/deals/${dealId}`);
 }

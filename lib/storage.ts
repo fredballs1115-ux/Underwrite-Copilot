@@ -92,6 +92,14 @@ export async function removeSupplementFile(path: string): Promise<void> {
   await admin.storage.from(BUCKET).remove([path]);
 }
 
+/** Where a worker-mode reconcile parks the buyer's model file: next to the
+ *  OM, fixed name per deal. ONE definition on purpose — the enqueue path,
+ *  the worker's cleanup, and the deal/account deletion sweeps must all agree
+ *  or deleted deals would leak parked models. */
+export function modelTmpPath(omStoragePath: string): string {
+  return omStoragePath.replace(/\.pdf$/i, "") + ".model-tmp";
+}
+
 /** Remove several files at once (best-effort — used when deleting a deal). */
 export async function removeStorageFiles(paths: string[]): Promise<void> {
   const clean = paths.filter(Boolean);

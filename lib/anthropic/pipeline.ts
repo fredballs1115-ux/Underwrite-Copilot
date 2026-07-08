@@ -96,9 +96,14 @@ export async function runAnalysis(
     /** snapshot the previous results for the retrade diff — pass false when
      *  the last run failed, so a half-written generation is never diffed */
     snapshotPrior?: boolean;
+    /** worker mode: read the job's per-step checkpoints and skip whatever a
+     *  previous interrupted attempt already finished, recording new steps as
+     *  they land (migration 0016). In-process runs never pass this. */
+    resume?: boolean;
   },
 ): Promise<void> {
   const snapshotPrior = opts?.snapshotPrior ?? true;
+  const resume = opts?.resume ?? false;
   try {
     const admin = createSupabaseAdminClient();
     const { data: deal, error } = await admin
@@ -113,13 +118,65 @@ export async function runAnalysis(
     }
 
     const assetClass = (deal.asset_class as AssetClass) ?? "auto";
-    const pdf = await downloadOmPdf(deal.om_storage_path as string);
+
+    // Per-step checkpoints: a deploy that restarts the worker mid-screen
+    // re-queues the job, and the next attempt picks up after the last
+    // completed step instead of re-paying for the whole pipeline. Each step
+    // is written to the deal as it finishes (that already happened before
+    // this change), so "skip" just means trusting those writes. Checkpoint
+    // bookkeeping is best-effort — it must never sink a run.
+    let payload: Record<string, unknown> = {};
+    const completed = new Set<string>();
+    if (resume) {
+      try {
+        const { data: jobRow } = await admin
+          .from("analysis_jobs")
+          .select("payload")
+          .eq("deal_id", dealId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        payload = (jobRow?.payload as Record<string, unknown>) ?? {};
+        for (const s of (payload.completed as string[]) ?? []) completed.add(s);
+      } catch {
+        // no checkpoints — run everything
+      }
+    }
+    const markDone = async (step: string) => {
+      if (!resume) return;
+      completed.add(step);
+      try {
+        await admin
+          .from("analysis_jobs")
+          .update({ payload: { ...payload, completed: [...completed] } })
+          .eq("deal_id", dealId);
+      } catch {
+        // checkpointing is an optimization, never a failure
+      }
+    };
+
+    // The OM is only needed by the document-reading steps. A run resumed at
+    // the verdict (everything else checkpointed) skips the whole download —
+    // re-paying a 20MB Storage read just to ignore it would defeat the
+    // point of the checkpoints.
+    const pdfSteps = ["signal", "extract", "challenge", "comps", "market"];
+    const pdf = pdfSteps.some((s) => !completed.has(s))
+      ? await downloadOmPdf(deal.om_storage_path as string)
+      : null;
+    // Every use sits inside a `!completed.has(<pdf step>)` guard, so the
+    // download above must have run; this just makes that invariant loud.
+    const om = (): Buffer => {
+      if (!pdf) throw new Error("OM was not loaded for a document step.");
+      return pdf;
+    };
 
     // Retrade watch: on a RE-screen, snapshot the previous run's results
     // before they're overwritten, so the deal page can show what moved
     // (price cuts, cap drift, verdict flips). Best-effort — a pre-0010
-    // schema without the column must never sink the run.
-    if (snapshotPrior) try {
+    // schema without the column must never sink the run. On a RESUMED
+    // attempt the snapshot already happened (and the columns now hold a
+    // half-new generation), so never re-snapshot.
+    if (snapshotPrior && completed.size === 0) try {
       const { data: prev } = await admin
         .from("deals")
         .select("extraction, verdict")
@@ -146,61 +203,76 @@ export async function runAnalysis(
     // Best-effort: a failure here (or a pre-0009 schema without the column)
     // must never sink the real screen. This call also warms the prompt cache
     // for the OM, so extraction and the later steps read it cheaply.
-    await patchJob(dealId, {
-      status: "running",
-      step: "signal",
-      progress: 4,
-      error: null,
-    });
-    try {
-      // Clear the previous run's signal first so a re-run never shows a stale
-      // headline next to fresh results if the read below fails.
-      await admin.from("deals").update({ first_signal: null }).eq("id", dealId);
-      const firstSignal = await readFirstSignal(pdf, assetClass);
-      await admin
-        .from("deals")
-        .update({ first_signal: firstSignal, updated_at: new Date().toISOString() })
-        .eq("id", dealId);
-    } catch {
-      // No signal — the pipeline continues to the full extraction regardless.
+    if (!completed.has("signal")) {
+      await patchJob(dealId, {
+        status: "running",
+        step: "signal",
+        progress: 4,
+        error: null,
+      });
+      try {
+        // Clear the previous run's signal first so a re-run never shows a stale
+        // headline next to fresh results if the read below fails.
+        await admin.from("deals").update({ first_signal: null }).eq("id", dealId);
+        const firstSignal = await readFirstSignal(om(), assetClass);
+        await admin
+          .from("deals")
+          .update({ first_signal: firstSignal, updated_at: new Date().toISOString() })
+          .eq("id", dealId);
+      } catch {
+        // No signal — the pipeline continues to the full extraction regardless.
+      }
+      await markDone("signal");
     }
 
     // Step 1 — extraction
-    await patchJob(dealId, {
-      status: "running",
-      step: "extract",
-      progress: 10,
-      error: null,
-    });
-    const extraction = await extractTerms(pdf, assetClass);
-    await admin
-      .from("deals")
-      .update({ extraction, updated_at: new Date().toISOString() })
-      .eq("id", dealId);
+    if (!completed.has("extract")) {
+      await patchJob(dealId, {
+        status: "running",
+        step: "extract",
+        progress: 10,
+        error: null,
+      });
+      const extraction = await extractTerms(om(), assetClass);
+      await admin
+        .from("deals")
+        .update({ extraction, updated_at: new Date().toISOString() })
+        .eq("id", dealId);
+      await markDone("extract");
+    }
 
     // Step 2 — assumption challenger
-    await patchJob(dealId, { status: "running", step: "challenge", progress: 30 });
-    const challenges = await challengeAssumptions(pdf, assetClass);
-    await admin
-      .from("deals")
-      .update({ challenges, updated_at: new Date().toISOString() })
-      .eq("id", dealId);
+    if (!completed.has("challenge")) {
+      await patchJob(dealId, { status: "running", step: "challenge", progress: 30 });
+      const challenges = await challengeAssumptions(om(), assetClass);
+      await admin
+        .from("deals")
+        .update({ challenges, updated_at: new Date().toISOString() })
+        .eq("id", dealId);
+      await markDone("challenge");
+    }
 
     // Step 3 — broker-comp scrutiny (reads the comps out of the OM itself)
-    await patchJob(dealId, { status: "running", step: "comps", progress: 50 });
-    const comps = await scrutinizeComps(pdf);
-    await admin
-      .from("deals")
-      .update({ comps, updated_at: new Date().toISOString() })
-      .eq("id", dealId);
+    if (!completed.has("comps")) {
+      await patchJob(dealId, { status: "running", step: "comps", progress: 50 });
+      const comps = await scrutinizeComps(om());
+      await admin
+        .from("deals")
+        .update({ comps, updated_at: new Date().toISOString() })
+        .eq("id", dealId);
+      await markDone("comps");
+    }
 
     // Step 4 — market plausibility check (rules-of-thumb, no live comps feed)
-    await patchJob(dealId, { status: "running", step: "market", progress: 70 });
-    const market = await checkMarket(pdf, assetClass);
-    await admin
-      .from("deals")
-      .update({ market, updated_at: new Date().toISOString() })
-      .eq("id", dealId);
+    if (!completed.has("market")) {
+      await patchJob(dealId, { status: "running", step: "market", progress: 70 });
+      const market = await checkMarket(om(), assetClass);
+      await admin
+        .from("deals")
+        .update({ market, updated_at: new Date().toISOString() })
+        .eq("id", dealId);
+      await markDone("market");
+    }
 
     // Step 5 — verdict (synthesizes everything gathered above)
     await patchJob(dealId, { status: "running", step: "verdict", progress: 90 });

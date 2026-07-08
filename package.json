@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "build:worker": "node scripts/build-worker.mjs",
+    "start:worker": "node --enable-source-maps dist/worker/index.mjs",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
@@ -27,6 +29,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.28.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
