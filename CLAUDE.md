@@ -14,10 +14,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   `lib/anthropic/client.ts` imports `server-only` so it can never leak into the
   browser bundle.
 - **Long analyses run in a background worker** (`worker/`), not in a web request,
-  because a 150–200pp OM plus several Claude calls takes a minute+. The web app
-  enqueues a job in `analysis_jobs`; the worker runs the pipeline and updates progress.
+  because a 150–200pp OM plus several Claude calls takes a minute+. With
+  `ANALYSIS_WORKER=1` the web app only enqueues a job in `analysis_jobs`; the
+  worker claims it, runs the pipeline with per-step checkpoints (resumes after
+  deploys), and updates progress. Unset, analyses run in-process via `after()`
+  as a fallback. See `worker/README.md`.
 - **Supabase** = Postgres + Auth + Storage (the OM PDFs). Per-user isolation via RLS.
-- **Render** hosts the web service and (Phase 2) the worker.
+- **Render** hosts the web service and the worker (`render.yaml`).
 
 ## Where things live
 

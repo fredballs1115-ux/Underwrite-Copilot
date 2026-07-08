@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { removeStorageFiles } from "@/lib/storage";
+import { removeStorageFiles, modelTmpPath } from "@/lib/storage";
 import { getTeam } from "@/lib/teams";
 import { getStripe } from "@/lib/stripe/client";
 import { syncTeamSeats } from "@/lib/stripe/seats";
@@ -140,7 +140,12 @@ export async function deleteAccount(formData: FormData) {
     om_storage_path: string | null;
     supplements: Record<string, { files?: { path: string }[] }> | null;
   }[]) {
-    if (d.om_storage_path) paths.push(d.om_storage_path);
+    if (d.om_storage_path) {
+      paths.push(d.om_storage_path);
+      // Worker-mode reconciles park a model file next to the OM — sweep it
+      // too (removing a nonexistent path is a no-op).
+      paths.push(modelTmpPath(d.om_storage_path));
+    }
     for (const tab of Object.values(d.supplements ?? {}))
       for (const f of tab.files ?? []) if (f.path) paths.push(f.path);
   }

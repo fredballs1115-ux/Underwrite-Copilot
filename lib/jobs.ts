@@ -6,6 +6,92 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 const STALE_MS = 10 * 60 * 1000;
 
 /**
+ * ANALYSIS_WORKER=1 hands the pipeline to the dedicated worker service: the
+ * web app only enqueues jobs (with a payload describing the run) and the
+ * worker claims and executes them. Requires migration 0016 and a running
+ * worker — see worker/README.md. Unset, the web app runs analyses in-process
+ * via after(), exactly as before.
+ */
+export function analysisWorkerEnabled(): boolean {
+  return process.env.ANALYSIS_WORKER === "1";
+}
+
+// Cached result of the 0016 schema probe. `true` is cached for the process
+// lifetime (schemas don't unmigrate); `false` re-probes after a minute so
+// running the migration heals the app without a redeploy.
+let schemaProbe: { ok: boolean; at: number } | null = null;
+
+/**
+ * True when analysis_jobs has the 0016 columns the worker handoff writes.
+ * The enqueue paths gate on analysisWorkerEnabled() AND this, so flipping
+ * the env flag before running the migration degrades to the in-process
+ * path (with a loud log) instead of failing every deal creation — the
+ * failure there was destructive: the catch deletes the deal and its OM.
+ */
+export async function workerSchemaReady(
+  supabase: SupabaseClient,
+): Promise<boolean> {
+  if (schemaProbe && (schemaProbe.ok || Date.now() - schemaProbe.at < 60_000)) {
+    return schemaProbe.ok;
+  }
+  const { error } = await supabase
+    .from("analysis_jobs")
+    .select("payload, attempts")
+    .limit(1);
+  const ok = !error;
+  if (!ok) {
+    console.error(
+      "[jobs] ANALYSIS_WORKER=1 but analysis_jobs is missing the 0016 columns " +
+        "(run supabase/migrations/0016_worker_jobs.sql) — running analyses " +
+        `in-process until it lands. Probe error: ${error?.message}`,
+    );
+  }
+  schemaProbe = { ok, at: Date.now() };
+  return ok;
+}
+
+/** What an enqueued job tells the worker to run. `snapshotPrior` and
+ *  `completed` (the resume checkpoint) are managed by the enqueue/claim
+ *  helpers and the pipeline respectively. */
+export interface WorkerPayload {
+  kind: "screen" | "reconcile";
+  /** reconcile only — the model file parked in Storage for the worker */
+  model?: { name: string; path: string };
+}
+
+/** Build an analysis_jobs insert row. ONE place composes the worker payload
+ *  (typed — a payload typo would otherwise surface only as the worker
+ *  mis-running a job). Omit `workerPayload` for in-process rows: the insert
+ *  then touches no 0016 columns and stays safe on a pre-0016 schema. */
+export function newJobRow(
+  dealId: string,
+  step: string,
+  opts?: {
+    status?: "queued" | "running";
+    progress?: number;
+    workerPayload?: WorkerPayload;
+    /** only meaningful with workerPayload; defaults to false — inserts have
+     *  no known-complete prior generation to diff against */
+    snapshotPrior?: boolean;
+  },
+): Record<string, unknown> {
+  const row: Record<string, unknown> = {
+    deal_id: dealId,
+    status: opts?.status ?? "queued",
+    step,
+    progress: opts?.progress ?? 0,
+  };
+  if (opts?.workerPayload) {
+    row.payload = {
+      ...opts.workerPayload,
+      snapshotPrior: opts.snapshotPrior ?? false,
+      completed: [],
+    };
+  }
+  return row;
+}
+
+/**
  * True when the deal already has a live (non-stale) analysis job. Trigger
  * actions check this before starting a pipeline so a double-click or an
  * overlapping trigger can't run two pipelines that clobber the same job row.
@@ -42,11 +128,27 @@ export interface JobClaim {
  * pipelines can never interleave writes on the same deal.
  *
  * Stale jobs (crashed runs that stopped heartbeating) are reclaimable.
+ *
+ * `workerPayload` (worker mode only) is written onto the row alongside the
+ * claim, with `snapshotPrior` derived here — only a COMPLETED prior
+ * generation is safe to diff against — and `attempts` reset for the new run.
+ * Pass `null` to CLEAR the payload instead: in-process job types (comp
+ * search, model generation) claim with null in worker mode so the row never
+ * carries a stale payload the worker could mistake for a handoff. Omit it
+ * entirely (undefined) outside worker mode and the update touches no 0016
+ * columns.
+ *
+ * `claimTo` is the status the row lands in. "queued" (default) makes it
+ * immediately claimable by the worker; work that must NOT be picked up —
+ * replace-OM during its upload, and every in-process job type — claims
+ * straight to "running" so the worker never sees a claimable row.
  */
 export async function claimJob(
   supabase: SupabaseClient,
   dealId: string,
   step: string,
+  workerPayload?: WorkerPayload | null,
+  claimTo: "queued" | "running" = "queued",
 ): Promise<JobClaim> {
   const { data: existing } = await supabase
     .from("analysis_jobs")
@@ -69,11 +171,23 @@ export async function claimJob(
   let query = supabase
     .from("analysis_jobs")
     .update({
-      status: "queued",
+      status: claimTo,
       step,
       progress: 0,
       error: null,
       updated_at: new Date().toISOString(),
+      ...(workerPayload !== undefined
+        ? {
+            payload: workerPayload
+              ? {
+                  ...workerPayload,
+                  snapshotPrior: priorStatus === "done",
+                  completed: [],
+                }
+              : null,
+            attempts: 0,
+          }
+        : {}),
     })
     .eq("id", existing.id);
   if (live && stale) {
@@ -82,7 +196,13 @@ export async function claimJob(
   } else {
     query = query.in("status", ["done", "error"]);
   }
-  const { data: claimed } = await query.select("id");
+  const { data: claimed, error: claimErr } = await query.select("id");
+  if (claimErr) {
+    // Never silent: an errored claim reads as "busy" to the caller, and a
+    // schema-shaped failure (missing 0016 columns) would otherwise look like
+    // permanent contention with no trace anywhere.
+    console.error(`[jobs] claim update failed for deal ${dealId}: ${claimErr.message}`);
+  }
   return claimed && claimed.length > 0
     ? { outcome: "claimed", priorStatus }
     : { outcome: "busy", priorStatus };
@@ -90,7 +210,8 @@ export async function claimJob(
 
 /** Release a claim taken by claimJob when the run is aborted before it
  *  starts (e.g. the upload failed) — otherwise the deal reads "queued"
- *  with no runner until the stale timeout. */
+ *  with no runner until the stale timeout. Covers "running" too, for claims
+ *  held in that state through an upload (see claimTo). */
 export async function releaseClaim(
   supabase: SupabaseClient,
   dealId: string,
@@ -104,5 +225,5 @@ export async function releaseClaim(
       updated_at: new Date().toISOString(),
     })
     .eq("deal_id", dealId)
-    .eq("status", "queued");
+    .in("status", ["queued", "running"]);
 }

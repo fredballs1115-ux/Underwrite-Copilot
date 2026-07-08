@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
-import { claimJob } from "@/lib/jobs";
+import { claimJob, analysisWorkerEnabled, workerSchemaReady } from "@/lib/jobs";
 import { runCompSearch } from "@/lib/anthropic/comps-search";
 
 /** Kick off a public-web comp search in the background, reusing the job row. */
@@ -29,8 +29,16 @@ export async function searchPublicComps(formData: FormData) {
   if (!(await isPro(supabase, user.id))) return;
 
   // Atomic claim (not a check-then-act read) so overlapping triggers can't
-  // both schedule a run on the same deal.
-  const claim = await claimJob(supabase, dealId, "comps_search");
+  // both schedule a run on the same deal. This job type always runs
+  // IN-PROCESS — in worker mode, claim straight to "running" (a "queued" row
+  // is claimable the instant it exists) and clear any stale worker payload
+  // left by the last screen, so the worker never mistakes this row for a
+  // handoff and runs a phantom pipeline alongside the comp search.
+  const workerOn =
+    analysisWorkerEnabled() && (await workerSchemaReady(supabase));
+  const claim = workerOn
+    ? await claimJob(supabase, dealId, "comps_search", null, "running")
+    : await claimJob(supabase, dealId, "comps_search");
   if (claim.outcome === "busy") return;
   if (claim.outcome === "none") {
     await supabase.from("analysis_jobs").insert({

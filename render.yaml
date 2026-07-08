@@ -40,26 +40,40 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
+      # Hand analyses to the dedicated worker below. ONLY set this to "1"
+      # after (a) migration 0016 has been run and (b) the worker service is
+      # live — with the flag on and no worker, screens would queue forever.
+      # Unset/empty = analyses run in-process exactly as before.
+      # - key: ANALYSIS_WORKER
+      #   value: "1"
 
-  # ── Phase 2: the background worker that runs the long OM analysis ──────────
-  # Uncomment when we build the pipeline. It shares this repo and the same env
-  # vars (repeat the keys above, or move them into a Render "env group").
-  #
-  # - type: worker
-  #   name: underwrite-copilot-worker
-  #   runtime: node
-  #   plan: starter
-  #   branch: main
-  #   buildCommand: npm install && npm run build:worker
-  #   startCommand: npm run start:worker
-  #   envVars:
-  #     - key: NODE_VERSION
-  #       value: "22"
-  #     - key: ANTHROPIC_API_KEY
-  #       sync: false
-  #     - key: NEXT_PUBLIC_SUPABASE_URL
-  #       sync: false
-  #     - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
-  #       sync: false
-  #     - key: SUPABASE_SERVICE_ROLE_KEY
-  #       sync: false
+  # ── The dedicated analysis worker (Phase 2 — built) ────────────────────────
+  # Runs the OM screens so web deploys never interrupt them: the web app
+  # enqueues, this service claims + runs + checkpoints each step, and a deploy
+  # just re-queues the in-flight job for the replacement instance to RESUME.
+  # Same repo, same commit as the web app. Full setup: worker/README.md.
+  - type: worker
+    name: underwrite-copilot-worker
+    runtime: node
+    plan: starter
+    branch: main
+    autoDeploy: true
+    buildCommand: npm install && npm run build:worker
+    startCommand: npm run start:worker
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      # Emails link back to the app — keep identical to the web service.
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false
+      # Optional: analysis-ready emails (same values as the web service).
+      # - key: RESEND_API_KEY
+      #   sync: false
+      # - key: RESEND_FROM
+      #   sync: false
