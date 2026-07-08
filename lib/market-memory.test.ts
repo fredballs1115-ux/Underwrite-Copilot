@@ -123,9 +123,54 @@ describe("marketMemoryFor — the deal-page strip", () => {
     expect(marketMemoryFor(comps, "d3", "office", "Austin, TX")).toBeNull();
     expect(marketMemoryFor(comps, "d1", "multifamily", "Phoenix, AZ")).toBeNull();
   });
-  it("normalizes the market key (case / whitespace)", () => {
-    expect(normalizeMarketKey("  North  Dallas, TX ")).toBe("north dallas, tx");
+  it("normalizes the market key (case / whitespace / punctuation)", () => {
+    expect(normalizeMarketKey("  North  Dallas, TX ")).toBe("north dallas tx");
     expect(marketMemoryFor(comps, "d1", "MULTIFAMILY", "dallas,  tx")).not.toBeNull();
+  });
+});
+
+describe("basis is consistent within an asset class (no mixed unit/SF range)", () => {
+  it("non-multifamily always uses $/SF, even with a stray per-unit metric", () => {
+    const comps = buildComps([
+      deal("o1", {
+        assetClass: "office",
+        market: "Phoenix, AZ",
+        metrics: [["Price per unit", "$45,000"], ["Purchase price", "$18,000,000"], ["Total SF", "90,000 SF"]],
+      }),
+      deal("o2", {
+        assetClass: "office",
+        market: "Phoenix, AZ",
+        metrics: [["Purchase price", "$20,000,000"], ["Total SF", "100,000 SF"]],
+      }),
+    ]);
+    expect(comps.every((c) => c.perUnitBasis === "sf")).toBe(true);
+    const g = summarizeMarkets(comps)[0];
+    // Both $18M/90k and $20M/100k = $200/SF — one clean unit, never mixed.
+    expect(g.perUnit).toEqual({ min: 200, median: 200, max: 200, basis: "sf" });
+  });
+});
+
+describe("market grouping across punctuation variants", () => {
+  it("merges 'Dallas, TX' and 'Dallas TX' into one group", () => {
+    const comps = buildComps([
+      deal("a", { market: "Dallas, TX", metrics: [["Going-in cap rate", "5.0%"], ["Purchase price", "$50,000,000"], ["Units", "200"]] }),
+      deal("b", { market: "Dallas TX", metrics: [["Going-in cap rate", "5.2%"], ["Purchase price", "$52,000,000"], ["Units", "200"]] }),
+    ]);
+    expect(summarizeMarkets(comps)).toHaveLength(1);
+  });
+});
+
+describe("implausible extracted figures don't pollute the ranges", () => {
+  it("drops a garbage cap but keeps the deal when it has a basis", () => {
+    const comps = buildComps([
+      deal("g", { market: "Reno, NV", metrics: [["Going-in cap rate", "-5.0%"], ["Purchase price", "$10,000,000"], ["Units", "50"]] }),
+      deal("h", { market: "Reno, NV", metrics: [["Going-in cap rate", "300%"], ["Purchase price", "$12,000,000"], ["Units", "50"]] }),
+    ]);
+    expect(comps).toHaveLength(2); // kept — both have a basis
+    expect(comps.every((c) => c.capPct === null)).toBe(true); // garbage caps dropped
+    const g = summarizeMarkets(comps)[0];
+    expect(g.cap).toBeNull();
+    expect(g.perUnit?.basis).toBe("unit");
   });
 });
 

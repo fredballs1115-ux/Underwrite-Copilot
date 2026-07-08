@@ -68,33 +68,43 @@ function effectiveClass(
   return (extraction?.assetClass ?? "").toLowerCase();
 }
 
-/** Normalize a market string for grouping — trims, lowercases, collapses
- *  whitespace. Deliberately literal (no metro guessing): "North Dallas, TX"
- *  and "Dallas, TX" stay distinct rather than inventing a shared metro. */
+/** Normalize a market string for grouping — lowercases, drops punctuation, and
+ *  collapses whitespace, so "Dallas, TX" and "Dallas TX" group together.
+ *  Deliberately literal beyond that (no metro guessing): "North Dallas TX" and
+ *  "Dallas TX" stay distinct rather than inventing a shared metro. */
 export function normalizeMarketKey(market: string): string {
-  return market.trim().toLowerCase().replace(/\s+/g, " ");
+  return market
+    .toLowerCase()
+    .replace(/[.,;/]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-/** Numeric $/unit or $/SF for one deal, mirroring lib/internal-comps: a direct
- *  per-unit metric wins; else derive from price ÷ units (multifamily) or
- *  price ÷ SF (other). Returns null when nothing parses. */
+/** Numeric basis for one deal, in ONE unit PER ASSET CLASS so a group's range
+ *  is never a mix of $/unit and $/SF: multifamily is $/unit (a direct per-unit
+ *  metric, else price ÷ units); every other class is $/SF (price ÷ SF). Returns
+ *  null when nothing parses. Class-consistent by construction — the branch on
+ *  asset class comes FIRST, so a stray "per unit" metric on an office deal
+ *  can't flip it to a unit basis. */
 function deriveBasis(
   metrics: MetricLike[],
   assetClass: string,
   price: number | null,
 ): { value: number; basis: "unit" | "sf" } | null {
-  const direct = findMetric(metrics, METRIC_FIND.perUnit.inc);
-  if (direct) {
-    const n = parseMoney(direct.value);
-    if (n != null && n > 0) return { value: n, basis: "unit" };
-  }
-  if (price == null) return null;
   if (assetClass === "multifamily") {
+    const direct = findMetric(metrics, METRIC_FIND.perUnit.inc);
+    if (direct) {
+      const n = parseMoney(direct.value);
+      if (n != null && n > 0) return { value: n, basis: "unit" };
+    }
+    if (price == null) return null;
     const units = findMetric(metrics, /^units?\b|number of units|unit count/i, /per|\/|price|\$/i);
     const n = units ? Number(units.value.replace(/[,\s]/g, "")) : NaN;
     if (Number.isFinite(n) && n > 0) return { value: price / n, basis: "unit" };
     return null;
   }
+  // Office / industrial / retail are priced per SF — never per unit.
+  if (price == null) return null;
   const sf = findMetric(metrics, METRIC_FIND.sf.inc, METRIC_FIND.sf.exc);
   const n = sf ? parseMoney(sf.value) : null;
   if (n != null && n > 0) return { value: price / n, basis: "sf" };
@@ -121,7 +131,10 @@ export function buildComps(rows: DealRowLike[]): MarketComp[] {
     const cap =
       findMetric(metrics, METRIC_FIND.goingInCap.inc) ??
       findMetric(metrics, METRIC_FIND.capRate.inc, METRIC_FIND.capRate.exc);
-    const capPct = cap ? parsePct(cap.value) : null;
+    const rawCap = cap ? parsePct(cap.value) : null;
+    // Drop physically implausible caps (a mis-extraction like -5% or 300%) —
+    // not fabrication, just refusing to average garbage into the market read.
+    const capPct = rawCap != null && rawCap > 0 && rawCap <= 25 ? rawCap : null;
 
     const priceMetric = findMetric(metrics, METRIC_FIND.price.inc, METRIC_FIND.price.exc);
     const price = priceMetric ? parseMoney(priceMetric.value) : null;

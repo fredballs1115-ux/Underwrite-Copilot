@@ -55,6 +55,11 @@ export default async function MarketDataPage() {
         <p className="rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution">
           Screen a deal or two and your market history builds up here.
         </p>
+      ) : error ? (
+        <p className="rounded-lg bg-kill/10 px-3 py-2 text-sm text-kill">
+          Couldn&apos;t load your market data just now — please refresh in a
+          moment.
+        </p>
       ) : groups.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-line bg-surface px-6 py-12 text-center">
           <p className="text-sm font-medium">No market data yet</p>
