@@ -9,6 +9,8 @@ import { reconcileModel } from "./reconcile";
 import { checkMarket } from "./market";
 import { synthesizeVerdict } from "./verdict";
 import { parseModelFile } from "@/lib/model-parse";
+import { countPdfPages } from "@/lib/pdf";
+import { buildDealFacts, toFactRows } from "@/lib/facts";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxLines } from "@/lib/criteria";
 import { notifyAnalysisReady } from "@/lib/email";
@@ -243,6 +245,21 @@ export async function runAnalysis(
         .from("deals")
         .update({ extraction, updated_at: new Date().toISOString() })
         .eq("id", dealId);
+
+      // Citation-level provenance (migration 0018): store one deal_facts row
+      // per extracted figure, with its page VALIDATED against the OM's real
+      // length (a page beyond the document is recorded "source not located",
+      // never shown). Best-effort — a pre-0018 schema or a write failure must
+      // never sink the screen.
+      try {
+        const facts = buildDealFacts(extraction.metrics, countPdfPages(om()));
+        await admin.from("deal_facts").delete().eq("deal_id", dealId);
+        const rows = toFactRows(dealId, facts);
+        if (rows.length) await admin.from("deal_facts").insert(rows);
+      } catch {
+        // no facts table yet, or a transient write error — carry on.
+      }
+
       await markDone("extract");
     }
 

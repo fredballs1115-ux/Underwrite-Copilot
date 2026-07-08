@@ -21,6 +21,9 @@ const ExtractionSchema = z.object({
       flagged: z.boolean(),
       page: z.string(),
       basis: z.enum(["in_place", "pro_forma", "na"]),
+      // ≤10-word verbatim quote of the surrounding text, for the source-chip
+      // hover. Empty when the model can't quote it — never invented.
+      locatorSnippet: z.string(),
     }),
   ),
 });
@@ -78,6 +81,10 @@ export async function extractTerms(
     // The buy-box market check matches against market AND address — dropping
     // this field made "Dallas" fail on a deal whose street address is Dallas.
     address: out.address,
-    metrics: out.metrics,
+    metrics: out.metrics.map((m) => ({
+      ...m,
+      // Guard the ≤10-word cap even if the model over-quotes.
+      locatorSnippet: m.locatorSnippet?.split(/\s+/).slice(0, 10).join(" ") ?? "",
+    })),
   };
 }

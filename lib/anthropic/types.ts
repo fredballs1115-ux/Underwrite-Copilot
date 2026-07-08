@@ -54,6 +54,9 @@ export interface ExtractedMetric {
   /** in-place reality vs. the sponsor's forward story. Optional for results
    *  saved before this field existed. */
   basis?: "in_place" | "pro_forma" | "na";
+  /** ≤10-word verbatim quote of the surrounding OM text, for the source-chip
+   *  hover. Optional for extractions saved before citations existed. */
+  locatorSnippet?: string;
 }
 export interface ExtractionResult {
   dealName: string | null;

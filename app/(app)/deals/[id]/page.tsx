@@ -18,6 +18,7 @@ import {
   type FirstSignal,
 } from "@/lib/anthropic/types";
 import { DealView } from "./deal-view";
+import { parseFactRow, type DealFact } from "@/lib/facts";
 import { DealActions } from "./deal-actions";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import { StageSelect } from "./stage-select";
@@ -71,6 +72,7 @@ export default async function DealPage({
     { data: jobData },
     siblings,
     sharesRes,
+    factsRes,
   ] = await Promise.all([
       user ? isPro(supabase, user.id) : Promise.resolve(false),
       supabase.from("deals").select("*").eq("id", id).maybeSingle(),
@@ -107,6 +109,12 @@ export default async function DealPage({
         .gt("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false })
         .limit(5),
+      // Citation facts (pre-0018 schema: query errors, data reads null — the
+      // deal simply shows no source chips rather than faking them).
+      supabase
+        .from("deal_facts")
+        .select("id, field, value, unit, doc_label, page_number, located, locator_snippet, confidence, provenance")
+        .eq("deal_id", id),
     ]);
 
   if (error) {
@@ -228,6 +236,14 @@ export default async function DealPage({
   // The three summary-bar figures — a 5-second read, nothing more. The full
   // metric set lives one click away in Financials.
   const metrics = extraction?.metrics ?? [];
+
+  // Citation facts, keyed by field label for the source chips (Feature 2).
+  // Empty for deals screened before migration 0018 — no chips, never faked.
+  const factsByField: Record<string, DealFact> = {};
+  for (const row of (factsRes.data ?? []) as Record<string, unknown>[]) {
+    const f = parseFactRow(row);
+    if (!(f.field in factsByField)) factsByField[f.field] = f;
+  }
   const summaryPrice =
     findValue(metrics, /purchase price|asking price|\bprice\b/i, /unit|\/sf|per sf|per unit|psf/i) ??
     (firstSignal?.askPrice.trim() || null);
@@ -479,6 +495,7 @@ export default async function DealPage({
         stageHistory={stageHistory}
         internalComps={internalComps}
         omUrl={omUrl}
+        facts={factsByField}
         notes={parseDealNotes((deal as { notes?: unknown }).notes)}
         userEmail={user?.email ?? null}
         userId={user?.id ?? null}

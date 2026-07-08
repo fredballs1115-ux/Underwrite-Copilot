@@ -10,6 +10,8 @@ import {
   removeSupplement,
 } from "./supplement-actions";
 import { searchPublicComps } from "./comps-actions";
+import { SourceChip } from "./source-chip";
+import type { DealFact } from "@/lib/facts";
 import { FileDrop } from "../../file-drop";
 import { FileField } from "../../file-field";
 import { useToast } from "../../toaster";
@@ -479,7 +481,15 @@ function RiskRow({
 /* 1 — Extracted terms (key first, rest on demand)                     */
 /* ================================================================== */
 
-export function TermsView({ result }: { result: ExtractionResult }) {
+export function TermsView({
+  result,
+  facts = {},
+  omUrl = null,
+}: {
+  result: ExtractionResult;
+  facts?: Record<string, DealFact>;
+  omUrl?: string | null;
+}) {
   // Surface flagged + first figures; collapse the long tail.
   const ordered = [
     ...result.metrics.filter((m) => m.flagged),
@@ -501,7 +511,15 @@ export function TermsView({ result }: { result: ExtractionResult }) {
       <p className="mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums">
         {m.value}
       </p>
-      {m.page && <p className="mt-2 text-[10px] text-muted">{m.page}</p>}
+      {facts[m.label] ? (
+        <p className="mt-2 leading-none">
+          <SourceChip fact={facts[m.label]} omUrl={omUrl} />
+        </p>
+      ) : (
+        // Deals screened before citations (migration 0018) keep their plain
+        // page text — real, from the extraction, just not a validated chip.
+        m.page && <p className="mt-2 text-[10px] text-muted">{m.page}</p>
+      )}
     </div>
   ));
 

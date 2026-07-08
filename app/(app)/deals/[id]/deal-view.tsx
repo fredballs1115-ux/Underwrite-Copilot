@@ -19,6 +19,7 @@ import { DecisionLog } from "./decision-log";
 import { AskPanel } from "./ask-panel";
 import { LoiPanel } from "./loi-panel";
 import type { DealNote, AskEntry } from "@/lib/deals";
+import type { DealFact } from "@/lib/facts";
 import { parseUsd } from "@/lib/money";
 import type { ScreenDiff } from "@/lib/screen-diff";
 import {
@@ -266,6 +267,7 @@ export function DealView({
   stageHistory,
   internalComps = [],
   omUrl,
+  facts = {},
   notes = [],
   userEmail = null,
   qa = [],
@@ -290,6 +292,7 @@ export function DealView({
   stageHistory: StageChange[];
   internalComps?: InternalComp[];
   omUrl: string | null;
+  facts?: Record<string, DealFact>;
   notes?: DealNote[];
   userEmail?: string | null;
   qa?: AskEntry[];
@@ -676,6 +679,8 @@ export function DealView({
             documents={documents}
             isPro={isPro}
             supplement={supplements["terms"]}
+            facts={facts}
+            omUrl={omUrl}
           />
         )}
 
@@ -742,6 +747,8 @@ function FinancialsPanel({
   documents,
   isPro,
   supplement,
+  facts = {},
+  omUrl = null,
 }: {
   results: Results;
   active: boolean;
@@ -752,11 +759,13 @@ function FinancialsPanel({
   documents: DealDocument[];
   isPro: boolean;
   supplement: TabSupplement | undefined;
+  facts?: Record<string, DealFact>;
+  omUrl?: string | null;
 }) {
   return (
     <div className="flex flex-col gap-6">
       {results.extraction ? (
-        <TermsView result={results.extraction} />
+        <TermsView result={results.extraction} facts={facts} omUrl={omUrl} />
       ) : active && (step === "extract" || step === "signal") ? (
         <StatGridSkeleton />
       ) : hasOm ? (
