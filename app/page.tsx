@@ -27,7 +27,7 @@ const SCREEN = [
   },
   {
     n: 3,
-    title: "Scrutinize the broker's comps",
+    title: "Scrutinize the comps",
     body: "Every comp in the deck ranked for how hard it actually supports the price — stretched, leaning, or genuine support.",
   },
   {
@@ -315,14 +315,14 @@ export default function Home() {
                 </h1>
                 <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/70 max-sm:hidden">
                   Two analysts can take the same deal on the same afternoon and
-                  land 800 bps apart — different rents, different exit caps,
+                  land 200 bps apart — different rents, different exit caps,
                   different expense loads, all called &ldquo;judgment.&rdquo;
                   Underwrite Copilot runs every deal through the same
                   disciplined screen, so the answer depends on the deal — not
                   on who opened the model.
                 </p>
                 <p className="mt-6 text-lg leading-relaxed text-white/70 sm:hidden">
-                  Two analysts, same OM, 800 bps apart. Copilot runs every deal
+                  Two analysts, same OM, 200 bps apart. Copilot runs every deal
                   through the same six-stage screen — so the answer depends on
                   the deal, not the analyst.
                 </p>
@@ -403,14 +403,14 @@ export default function Home() {
               <div className="flex items-end justify-between gap-4">
                 <div>
                   <p className="font-mono text-2xl font-semibold tabular-nums sm:text-3xl">
-                    6%
+                    12%
                   </p>
                   <p className="mt-0.5 text-xs text-muted">
                     Analyst B · IRR · &ldquo;pass&rdquo;
                   </p>
                 </div>
                 <span className="mb-1 hidden rounded-full bg-caution/10 px-3 py-1 text-xs font-semibold text-caution sm:block">
-                  800 bps apart
+                  200 bps apart
                 </span>
                 <div className="text-right">
                   <p className="font-mono text-2xl font-semibold tabular-nums sm:text-3xl">

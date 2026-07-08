@@ -64,8 +64,18 @@ export type MemoData = {
   sinceLast: string | null;
 };
 
-const clamp = (s: string, n: number) =>
-  s.length > n ? s.slice(0, n - 1).trimEnd() + "\u2026" : s;
+/** Analysis output and user-shaped rows can carry surprises — numbers where
+ *  strings are expected, nulls inside arrays. Every rendered value passes
+ *  through here so no conceivable data shape can throw mid-render. */
+const str = (v: unknown): string =>
+  typeof v === "string" ? v : v == null ? "" : String(v);
+
+const clamp = (v: unknown, n: number) => {
+  const s = str(v);
+  return s.length > n ? s.slice(0, n - 1).trimEnd() + "\u2026" : s;
+};
+
+const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
 // The PDF's standard Helvetica only carries WinAnsi glyphs \u2014 swap the web
 // UI's arrows/minus signs for safe equivalents or they silently drop.
@@ -98,31 +108,34 @@ export function buildMemoData(
       )[verdict.verdict]
     : null;
 
-  const metrics = extraction?.metrics ?? [];
+  const metrics = list(extraction?.metrics) as ExtractionResult["metrics"];
   const ordered = [
-    ...metrics.filter((m) => m.flagged),
-    ...metrics.filter((m) => !m.flagged),
+    ...metrics.filter((m) => m?.flagged),
+    ...metrics.filter((m) => !m?.flagged),
   ];
-  const keyTerms = ordered
-    .slice(0, 8)
-    .map((m) => ({ label: m.label, value: m.value, flagged: m.flagged }));
+  const keyTerms = ordered.slice(0, 8).map((m) => ({
+    label: str(m?.label),
+    value: str(m?.value),
+    flagged: !!m?.flagged,
+  }));
 
-  const ch = [...(challenges?.challenges ?? [])]
-    .sort((a, b) => (SEV_RANK[a.severity] ?? 1) - (SEV_RANK[b.severity] ?? 1))
+  const ch = (list(challenges?.challenges) as ChallengerResult["challenges"])
+    .slice()
+    .sort((a, b) => (SEV_RANK[a?.severity] ?? 1) - (SEV_RANK[b?.severity] ?? 1))
     .slice(0, 3)
     .map((c) => ({
-      severity: c.severity,
-      assumption: c.assumption,
-      challenge: c.challenge,
+      severity: str(c?.severity),
+      assumption: str(c?.assumption),
+      challenge: str(c?.challenge),
     }));
 
   const flags: { label: string; text: string }[] = [];
-  for (const f of comps?.redFlags ?? []) flags.push({ label: "Comps", text: f });
-  for (const c of market?.checks ?? []) {
-    if (c.assessment === "aggressive") {
+  for (const f of list(comps?.redFlags)) flags.push({ label: "Comps", text: str(f) });
+  for (const c of list(market?.checks) as MarketResult["checks"]) {
+    if (c?.assessment === "aggressive") {
       flags.push({
         label: "Market",
-        text: `${c.assumption}: OM ${c.omSays} vs. typical ${c.typicalRange}`,
+        text: `${str(c.assumption)}: OM ${str(c.omSays)} vs. typical ${str(c.typicalRange)}`,
       });
     }
   }
@@ -144,22 +157,30 @@ export function buildMemoData(
     caution: "Caution",
     pass_on: "No-go",
   };
-  const ranges = (screen?.ranges ?? []).slice(0, 4).map((r) => ({
-    label: clamp(r.label, 28),
-    low: r.low,
-    base: r.base,
-    high: r.high,
-    source: clamp(r.source, 62),
-  }));
-  const dealKillers = (screen?.dealKillers ?? []).slice(0, 3).map((k) => ({
-    label: LEVER_LABEL[k.lever] ?? k.lever,
-    read: clamp(k.read, 72),
-    risk: clamp(k.risk ?? "", 72),
-  }));
-  const sensitivity = (screen?.sensitivity ?? []).map((sc) => ({
-    scenario: SCENARIO_LABEL[sc.scenario] ?? sc.scenario,
-    call: CALL_LABEL[sc.call] ?? sc.call,
-    note: clamp(sc.note ?? "", 90),
+  const ranges = (list(screen?.ranges) as NonNullable<typeof screen>["ranges"])
+    .slice(0, 4)
+    .map((r) => ({
+      label: clamp(r?.label, 28),
+      low: str(r?.low),
+      base: str(r?.base),
+      high: str(r?.high),
+      source: clamp(r?.source, 62),
+    }));
+  const dealKillers = (
+    list(screen?.dealKillers) as NonNullable<typeof screen>["dealKillers"]
+  )
+    .slice(0, 3)
+    .map((k) => ({
+      label: LEVER_LABEL[k?.lever] ?? str(k?.lever),
+      read: clamp(k?.read, 72),
+      risk: clamp(k?.risk ?? "", 72),
+    }));
+  const sensitivity = (
+    list(screen?.sensitivity) as NonNullable<typeof screen>["sensitivity"]
+  ).map((sc) => ({
+    scenario: SCENARIO_LABEL[sc?.scenario] ?? str(sc?.scenario),
+    call: CALL_LABEL[sc?.call] ?? str(sc?.call),
+    note: clamp(sc?.note ?? "", 90),
   }));
 
   // When the screen is present it earns the page space — tighten the older
@@ -198,16 +219,16 @@ export function buildMemoData(
   }
 
   return {
-    name: deal.name,
-    market: extraction?.market ?? "",
-    assetClass: deal.asset_class,
+    name: str(deal.name) || "Deal",
+    market: str(extraction?.market),
+    assetClass: str(deal.asset_class),
     dateStr,
     verdictWord: vmeta?.word ?? null,
     verdictColor: vmeta?.color ?? C.muted,
     verdictSub: vmeta?.sub ?? "",
     verdictReason: clamp(verdict?.reason ?? "", 280),
     keyTerms: hasScreen ? keyTerms.slice(0, 4) : keyTerms,
-    topRisks: (verdict?.topRisks ?? []).slice(0, hasScreen ? 2 : 4),
+    topRisks: list(verdict?.topRisks).map(str).slice(0, hasScreen ? 2 : 4),
     // With the screen present, the deal-killers + top risks already carry the
     // critique and the ranges carry the comp/market story — drop the two
     // overlapping sections so the memo stays one page.
@@ -216,7 +237,7 @@ export function buildMemoData(
     ranges,
     dealKillers,
     sensitivity,
-    nextSteps: (verdict?.nextSteps ?? []).slice(0, hasScreen ? 2 : 4),
+    nextSteps: list(verdict?.nextSteps).map(str).slice(0, hasScreen ? 2 : 4),
     buyBox: (buyBoxChecks ?? []).map((c) => ({
       label: clamp(c.label, 20),
       status: c.status,

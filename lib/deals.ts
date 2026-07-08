@@ -37,7 +37,7 @@ export interface DealRow {
 export const DEAL_STEPS = [
   { key: "extraction", label: "Extract & flag" },
   { key: "challenges", label: "Challenge the assumptions" },
-  { key: "comps", label: "Scrutinize the broker comps" },
+  { key: "comps", label: "Scrutinize the comps" },
   { key: "reconciliation", label: "Reconcile your model" },
   { key: "market", label: "Market check" },
   { key: "verdict", label: "Verdict" },

@@ -32,9 +32,23 @@ export async function GET(
     );
   }
 
-  // The PDF memo is a Pro feature.
-  if (!(await isPro(supabase, user.id))) {
-    return Response.redirect(new URL("/billing", req.url), 302);
+  // The PDF memo is a Pro feature. Explain the bounce on the deal page —
+  // the memo button is shown to everyone, so a silent redirect to /billing
+  // read as a mystery error to non-Pro users (that WAS the "memo is broken"
+  // bug: nothing was broken, the gate was invisible).
+  let pro = false;
+  try {
+    pro = await isPro(supabase, user.id);
+  } catch (err) {
+    // Never let the plan lookup 500 the export into a raw error page.
+    console.error(`memo isPro check failed for deal ${id}:`, err);
+    return Response.redirect(
+      new URL(`/deals/${id}?error=exportfail`, req.url),
+      302,
+    );
+  }
+  if (!pro) {
+    return Response.redirect(new URL(`/deals/${id}?error=memopro`, req.url), 302);
   }
 
   const { data, error } = await supabase

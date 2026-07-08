@@ -328,7 +328,11 @@ export default async function DealPage({
             {verdict && (
               <a
                 href={`/api/deals/${id}/memo`}
-                title="One-page IC screening memo — verdict, buy-box fit, flags, next steps"
+                title={
+                  pro
+                    ? "One-page IC screening memo — verdict, buy-box fit, flags, next steps"
+                    : "One-page IC screening memo — part of Pro"
+                }
                 className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
               >
                 <svg
@@ -347,6 +351,11 @@ export default async function DealPage({
                   <path d="M10 16h4" />
                 </svg>
                 IC memo
+                {!pro && (
+                  <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
+                    Pro
+                  </span>
+                )}
               </a>
             )}
             <OffersDueControl

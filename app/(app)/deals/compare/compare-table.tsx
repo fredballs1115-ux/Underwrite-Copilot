@@ -40,7 +40,7 @@ const FIT_LABEL: Record<NonNullable<Col["fit"]>, { text: string; cls: string }> 
 
 export function CompareTable({ cols }: { cols: Col[] }) {
   // Never crown a hero number on a deal the screen rejected — that's the
-  // exact broker-math trap the product exists to counter.
+  // exact pro-forma trap the product exists to counter.
   const eligible = cols.filter((c) => c.verdict !== "pass_on");
   const bestIrr = Math.max(...eligible.map((c) => c.irr ?? -Infinity));
   const bestEm = Math.max(...eligible.map((c) => c.em ?? -Infinity));

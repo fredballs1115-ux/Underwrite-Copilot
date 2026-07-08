@@ -22,9 +22,9 @@ const BrokerCompsSchema = z.object({
 });
 
 /**
- * Scrutinize the sale & lease comps the broker put INSIDE the OM — no external
- * comps feed (deliberate: avoids data-licensing constraints). Rates how well
- * each comp actually supports the subject deal and flags the cherry-picking.
+ * Scrutinize the sale & lease comps INSIDE the OM — no external comps feed
+ * (deliberate: avoids data-licensing constraints). Rates how well each comp
+ * actually supports the subject deal and flags selection bias.
  * Uses the reasoning model (Opus) since this is judgment, not transcription.
  */
 export async function scrutinizeComps(pdf: Buffer): Promise<BrokerCompsResult> {

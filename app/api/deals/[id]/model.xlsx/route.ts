@@ -24,9 +24,24 @@ export async function GET(
     );
   }
 
-  // The Excel model is a Pro deliverable — mirror the memo route's gate.
-  if (!(await isPro(supabase, user.id))) {
-    return Response.redirect(new URL("/billing", req.url), 302);
+  // The Excel model is a Pro deliverable — mirror the memo route's gate,
+  // and explain the bounce on the deal page (a silent /billing redirect
+  // reads as a mystery error).
+  let pro = false;
+  try {
+    pro = await isPro(supabase, user.id);
+  } catch (err) {
+    console.error(`model.xlsx isPro check failed for deal ${id}:`, err);
+    return Response.redirect(
+      new URL(`/deals/${id}?error=exportfail`, req.url),
+      302,
+    );
+  }
+  if (!pro) {
+    return Response.redirect(
+      new URL(`/deals/${id}?error=modelpro`, req.url),
+      302,
+    );
   }
 
   const { data, error } = await supabase
@@ -39,7 +54,14 @@ export async function GET(
 
   const deal = data as DealRow;
   const model = deal.model as UnderwritingModel | null;
-  if (!model) return new Response("No model generated yet", { status: 404 });
+  // Only reachable by direct URL (the download button renders with a model
+  // present) — bounce home with context instead of a bare-text 404.
+  if (!model) {
+    return Response.redirect(
+      new URL(`/deals/${id}?error=modelempty`, req.url),
+      302,
+    );
+  }
 
   // The document kinds the deal has, to drive the "inputs needed" sheet.
   const { data: docs } = await supabase

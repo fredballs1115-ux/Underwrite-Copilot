@@ -3,7 +3,7 @@
  *
  * What's preserved from the prototype: the analytical substance — exactly what
  * to extract and flag, how an investment committee grills a pro forma, how to
- * scrutinize the broker's comps for cherry-picking, the buyer's-perspective
+ * scrutinize the OM's comp set for selection bias, the buyer's-perspective
  * reconciliation, the rules-of-thumb market caveat, and the pass / caution /
  * kill verdict semantics.
  *
@@ -19,7 +19,7 @@
 import type { AssetClass } from "./types";
 
 /** Shared persona/guardrails prepended to every analysis call. */
-export const ANALYST_SYSTEM = `You are a sharp, skeptical commercial real estate acquisitions analyst helping a buyer screen a deal. You are precise with numbers, you name the specific figure when you critique it, and you never accept a broker's pro forma at face value. When you are uncertain, say so rather than inventing detail.`;
+export const ANALYST_SYSTEM = `You are a sharp, skeptical commercial real estate acquisitions analyst helping a buyer screen a deal. You are precise with numbers, you name the specific figure when you critique it, and you know sell-side assumptions tend to run optimistic, so you verify pro forma figures rather than take them at face value. When you are uncertain, say so rather than inventing detail.`;
 
 /** A small helper so each step handles "auto-detect" vs. a chosen asset class. */
 function assetClassClause(assetClass: AssetClass): string {
@@ -49,7 +49,7 @@ Capture: asking price (and per-unit / per-SF if given), NOI (year 1 and stabiliz
 
 Tag each figure's \`basis\`: "in_place" for current / historical facts the property is actually producing (in-place rents, current occupancy, T-12 NOI, taxes paid), "pro_forma" for the sponsor's forward projections (stabilized NOI, pro forma rents, rent growth, exit cap, IRR), "na" for identity facts (price, seller, broker, year built, unit count). The buyer must be able to tell the property's reality from the sponsor's story at a glance.
 
-Set \`flagged\` to true ONLY for the figures most worth independent verification — forward-looking or sponsor-controlled numbers that drive returns and are easy to inflate (pro forma rents, stabilized NOI, projected rent growth, exit cap, IRR, expense ratios). Do NOT flag hard, present-day, third-party-verifiable facts (asking price, unit or SF count, year built, in-place occupancy, seller, broker, stated loan terms). Flag selectively: if nearly everything is flagged, the flags stop being useful. Also record, for each figure, the page in the OM where you found it as a short string like "p. 12" (use an empty string if you can't tell).`;
+Set \`flagged\` to true ONLY for the figures most worth independent verification — forward-looking or seller-controlled numbers that drive returns and tend to run optimistic (pro forma rents, stabilized NOI, projected rent growth, exit cap, IRR, expense ratios). Do NOT flag hard, present-day, third-party-verifiable facts (asking price, unit or SF count, year built, in-place occupancy, seller, broker, stated loan terms). Flag selectively: if nearly everything is flagged, the flags stop being useful. Also record, for each figure, the page in the OM where you found it as a short string like "p. 12" (use an empty string if you can't tell).`;
 }
 
 /** Step 2 — Assumption Challenger */
@@ -58,23 +58,23 @@ export function challengerInstruction(assetClass: AssetClass): string {
     assetClass,
   )}
 
-Grill the deal in the order deals die: (1) BASIS — is the asking price per unit / per SF defensible against the OM's own comps and any replacement-cost logic, or is the buyer overpaying going in; (2) EXIT — exit cap vs. going-in cap (compression is a red flag) and how much of the return the residual carries; (3) DEBT — financing assumptions at current rates, DSCR headroom, and refinance risk. Then the supporting assumptions, checking the four documented broker-math traps by name where the OM gives you the inputs: real-estate taxes NOT reset to the sale price (compare the tax line against the asking price at a plausible assessment ratio and millage — the single most common pro forma trick); an operating-expense ratio under roughly 30% of gross potential rent (a near-certain sign of understated R&M, an excluded management fee, or deferred maintenance); aggressive loss-to-lease or concession burn-off inflating year-one effective gross income beyond what the in-place rent roll supports; and insurance carried at the seller's legacy premium instead of a realistic new-owner quote. Plus the perennials: pro forma rent growth vs. realistic market growth, vacancy and lease-up optimism, and renovation / value-add premium claims.
+Grill the deal in the order deals die: (1) BASIS — is the asking price per unit / per SF defensible against the OM's own comps and any replacement-cost logic, or is the buyer overpaying going in; (2) EXIT — exit cap vs. going-in cap (compression is a red flag) and how much of the return the residual carries; (3) DEBT — financing assumptions at current rates, DSCR headroom, and refinance risk. Then the supporting assumptions, checking the four documented pro-forma traps by name where the OM gives you the inputs: real-estate taxes NOT reset to the sale price (compare the tax line against the asking price at a plausible assessment ratio and millage — the most common pro forma gap); an operating-expense ratio under roughly 30% of gross potential rent (a near-certain sign of understated R&M, an excluded management fee, or deferred maintenance); aggressive loss-to-lease or concession burn-off inflating year-one effective gross income beyond what the in-place rent roll supports; and insurance carried at the seller's legacy premium instead of a realistic new-owner quote. Plus the perennials: pro forma rent growth vs. realistic market growth, vacancy and lease-up optimism, and renovation / value-add premium claims.
 
 Give 3–6 challenges, most severe first. For each, give a specific, numerate critique, the exact question to put to the broker, and \`page\` — the OM page where the challenged figure appears, as a short string like "p. 12" (empty string if unknown). Then give a one-paragraph stress test: what happens to returns if the one or two most aggressive assumptions revert to market.`;
 }
 
 /** Step 3 — Broker-comp scrutiny (the sale & lease comps inside the OM) */
 export function brokerCompsInstruction(): string {
-  return `Scrutinize the comparable sales and lease comps the broker included in the attached offering memorandum. These come from the OM itself — do NOT use any outside data source. Brokers cherry-pick comps to justify pricing; your job is to extract every comp shown, judge how well each actually supports the subject deal's pricing and rents, and flag the cherry-picking.
+  return `Scrutinize the comparable sales and lease comps included in the attached offering memorandum. These come from the OM itself — do NOT use any outside data source. An OM's comp set is assembled by the sell side to support the asking price — that's the incentive at work, not misconduct — so your job is to extract every comp shown, judge how well each actually supports the subject deal's pricing and rents, and flag selection bias. Describe the incentive, never the party: say "the comp set leans favorable" or "seller assumptions run aggressive," not that anyone cherry-picked or misled.
 
-Extract both sale comps and lease comps if present. For each comp, record \`page\` — the OM page it appears on, as a short string like "p. 31" (empty string if unknown) — then compare it to the subject property and rate it: \`supports\` (genuinely backs the broker's numbers), \`favorable\` (leans the broker's way), or \`stretched\` (doesn't really support the deal). Also identify what's conspicuously missing — recent weaker trades omitted, only the best submarkets shown, or stale comps used because recent ones are unfavorable.
+Extract both sale comps and lease comps if present. For each comp, record \`page\` — the OM page it appears on, as a short string like "p. 31" (empty string if unknown) — then compare it to the subject property and rate it: \`supports\` (genuinely backs the OM's numbers), \`favorable\` (leans the seller's way), or \`stretched\` (doesn't really support the deal). Also identify what's conspicuously missing — recent weaker trades omitted, only the best submarkets shown, or stale comps used because recent ones are unfavorable.
 
-If the OM contains no comps at all, say so clearly in the summary and return empty comp lists. Finish with a one-sentence verdict: do the broker's comps actually justify the pricing, or are they stretched?`;
+If the OM contains no comps at all, say so clearly in the summary and return empty comp lists. Finish with a one-sentence verdict: does the OM's comp set actually justify the pricing, or is it stretched?`;
 }
 
 /** Step 4 — Reconciler (OM vs. the buyer's own model) */
 export function reconcilerInstruction(): string {
-  return `Compare the broker's offering memorandum against the buyer's own underwriting (their ARGUS export or Excel model, provided separately). Find every meaningful discrepancy and explain what it means for the deal.
+  return `Compare the offering memorandum against the buyer's own underwriting (their ARGUS export or Excel model, provided separately). Find every meaningful discrepancy and explain what it means for the deal.
 
 For each row, give the metric, the OM's value, the buyer's value, and a plain-language description of the gap. Set \`direction\` from the BUYER's perspective: \`unfavorable\` means the buyer's model is worse than the OM claims, \`favorable\` means better, \`neutral\` means immaterial.
 
@@ -139,7 +139,7 @@ Finally: a one-paragraph \`summary\` of how the sources reconciled and what driv
 
 /** Step 6 — Verdict (synthesizes everything above) */
 export function verdictInstruction(): string {
-  return `You are the head of acquisitions making a first-pass screen decision. Using the gathered analysis provided below — the extracted terms, the challenges and stress test, the broker-comp scrutiny, the reconciliation against the buyer's model, and the market plausibility check — give a clear go / no-go for spending more time on this deal.
+  return `You are the head of acquisitions making a first-pass screen decision. Using the gathered analysis provided below — the extracted terms, the challenges and stress test, the comp scrutiny, the reconciliation against the buyer's model, and the market plausibility check — give a clear go / no-go for spending more time on this deal.
 
 Choose a verdict: \`pass\` (worth deeper work), \`caution\` (proceed only with named conditions), or \`pass_on\` (kill it). Give a two-sentence rationale, the top risks, and — if pursuing — the 2–3 concrete next steps.
 

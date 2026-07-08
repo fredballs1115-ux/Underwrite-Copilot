@@ -26,7 +26,7 @@ export function ModelSlideshow({ model }: { model: UnderwritingModel }) {
         key: "returns",
         label: "Returns",
         blurb:
-          "Levered IRR, equity multiple, and year-one cash-on-cash — computed from the reconciled inputs, not the broker's pro forma.",
+          "Levered IRR, equity multiple, and year-one cash-on-cash — computed from the reconciled inputs, not the OM's pro forma.",
         node: <ReturnsHeadline model={model} />,
       },
       {
