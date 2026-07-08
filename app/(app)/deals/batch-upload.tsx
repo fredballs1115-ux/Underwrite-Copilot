@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   createDealFromBatch,
@@ -48,6 +48,14 @@ interface Item {
   status: ItemStatus;
 }
 
+/** Buy-box triage chip states worth showing (anything else stays hidden).
+ *  Keys are the pipeline table's fit vocabulary — one vocabulary everywhere. */
+const TRIAGE_CHIP: Record<string, { label: string; cls: string }> = {
+  fits: { label: "Fits box", cls: "bg-pass/15 text-pass" },
+  near: { label: "Near box", cls: "bg-caution/15 text-caution" },
+  outside: { label: "Outside box", cls: "bg-kill/15 text-kill" },
+};
+
 /**
  * Batch OM triage: pick several OM PDFs (a call-for-offers day), queue them
  * all for screening in one pass. Files upload one at a time so each request
@@ -69,6 +77,11 @@ export function BatchUpload({
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
   const [pickError, setPickError] = useState<string | null>(null);
+  // Buy-box triage per queued deal — filled in by polling as first signals
+  // land (~30s into each screen), so the day's stack self-sorts up front.
+  const [triage, setTriage] = useState<
+    Record<string, { fit: string; provisional: boolean }>
+  >({});
 
   function addFiles(list: FileList | null) {
     if (!list || !list.length) return;
@@ -148,6 +161,70 @@ export function BatchUpload({
     // The new rows (with live "Screening…" status) appear behind the panel.
     router.refresh();
   }
+
+  // Poll /triage for queued deals until each resolves (or ~2 min passes).
+  // In the QA harness the fake deal ids fail the endpoint's UUID check and
+  // stay "pending" forever — the chip simply never shows, which is correct.
+  useEffect(() => {
+    // Poll until each verdict is FINAL (non-pending AND non-provisional) or
+    // the ~2-minute budget runs out. A provisional chip (from the ~30s first
+    // signal) renders immediately but keeps refining until the extraction
+    // lands. A transient fetch blip never downgrades a resolved chip.
+    const ids = items
+      .filter((it) => it.status.kind === "queued")
+      .map((it) => (it.status as { dealId: string }).dealId)
+      .filter((id) => {
+        const t = triage[id];
+        return !t || t.fit === "pending" || t.provisional;
+      });
+    if (ids.length === 0) return;
+    let cancelled = false;
+    let polls = 0;
+    const tick = async () => {
+      polls += 1;
+      const results = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const res = await fetch(`/api/deals/${id}/triage`, { cache: "no-store" });
+            if (!res.ok) return null;
+            const body = (await res.json()) as {
+              fit?: string;
+              provisional?: boolean;
+            };
+            return {
+              id,
+              fit: body.fit ?? "pending",
+              provisional: body.provisional ?? true,
+            };
+          } catch {
+            return null;
+          }
+        }),
+      );
+      if (cancelled) return;
+      setTriage((prev) => {
+        const next = { ...prev };
+        for (const r of results) {
+          if (!r) continue;
+          // Never overwrite a resolved verdict with a transient "pending".
+          if (r.fit === "pending" && next[r.id] && next[r.id].fit !== "pending")
+            continue;
+          next[r.id] = { fit: r.fit, provisional: r.provisional };
+        }
+        return next;
+      });
+      const unresolved = results.some(
+        (r) => !r || r.fit === "pending" || r.provisional,
+      );
+      if (unresolved && polls < 30) timer = setTimeout(tick, 4000);
+    };
+    let timer = setTimeout(tick, 4000);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
 
   const queued = items.filter((it) => it.status.kind === "queued").length;
   const failed = items.filter(
@@ -250,12 +327,27 @@ export function BatchUpload({
                   </span>
                 )}
                 {item.status.kind === "queued" && (
-                  <a
-                    href={`/deals/${item.status.dealId}`}
-                    className="shrink-0 text-xs font-medium text-pass hover:underline"
-                  >
-                    {item.status.deduped ? "Already queued — open →" : "Queued ✓ Open →"}
-                  </a>
+                  <span className="flex shrink-0 items-center gap-2">
+                    {TRIAGE_CHIP[triage[item.status.dealId]?.fit ?? ""] && (
+                      <span
+                        title={
+                          triage[item.status.dealId].provisional
+                            ? "Provisional — from the first-pass read; the full screen refines it"
+                            : "From the completed extraction"
+                        }
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${TRIAGE_CHIP[triage[item.status.dealId].fit].cls}`}
+                      >
+                        {TRIAGE_CHIP[triage[item.status.dealId].fit].label}
+                        {triage[item.status.dealId].provisional ? " ~" : ""}
+                      </span>
+                    )}
+                    <a
+                      href={`/deals/${item.status.dealId}`}
+                      className="text-xs font-medium text-pass hover:underline"
+                    >
+                      {item.status.deduped ? "Already queued — open →" : "Queued ✓ Open →"}
+                    </a>
+                  </span>
                 )}
                 {(item.status.kind === "error" || item.status.kind === "skipped") && (
                   <span className="shrink-0 text-xs font-medium text-kill">

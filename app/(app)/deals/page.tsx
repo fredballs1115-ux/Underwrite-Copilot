@@ -5,7 +5,7 @@ import { type DealRow } from "@/lib/deals";
 import type { ExtractionResult, ExtractedMetric } from "@/lib/anthropic/types";
 import { Pipeline, type DealCard } from "./pipeline";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { evaluateBuyBox } from "@/lib/criteria";
+import { evaluateBuyBox, foldBuyBoxChecks } from "@/lib/criteria";
 
 export const metadata: Metadata = { title: "Pipeline" };
 
@@ -185,11 +185,7 @@ export default async function DealsPage({
       fit: (() => {
         const box = d.team_id ? teamBox : personalBox;
         if (!box || !extraction) return null;
-        const checks = evaluateBuyBox(d.asset_class, extraction, box);
-        if (checks.some((c) => c.status === "miss")) return "outside" as const;
-        if (checks.some((c) => c.status === "near")) return "near" as const;
-        if (checks.some((c) => c.status === "pass")) return "fits" as const;
-        return null;
+        return foldBuyBoxChecks(evaluateBuyBox(d.asset_class, extraction, box));
       })(),
       addedBy:
         d.team_id && d.user_id !== user?.id

@@ -33,6 +33,64 @@ export interface DealRow {
   updated_at: string;
 }
 
+/** One entry in deals.notes — the analyst's decision log (migration 0017). */
+export interface DealNote {
+  /** ISO timestamp — with the author, the note's identity for deletes */
+  at: string;
+  /** author's email at write time (teams see who said what) */
+  by: string;
+  /** author's user id — the stable delete identity (emails change) */
+  byId?: string;
+  text: string;
+}
+
+export function parseDealNotes(raw: unknown): DealNote[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (n): n is DealNote =>
+      !!n &&
+      typeof n === "object" &&
+      typeof (n as { at?: unknown }).at === "string" &&
+      typeof (n as { by?: unknown }).by === "string" &&
+      typeof (n as { text?: unknown }).text === "string",
+  );
+}
+
+/** One entry in deals.qa — ask-the-deal Q&A grounded in the OM (0017). */
+export interface AskEntry {
+  at: string;
+  q: string;
+  answer: string;
+  cites: { page: string; note: string }[];
+}
+
+export function parseDealQa(raw: unknown): AskEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(
+      (e): e is AskEntry =>
+        !!e &&
+        typeof e === "object" &&
+        typeof (e as { at?: unknown }).at === "string" &&
+        typeof (e as { q?: unknown }).q === "string" &&
+        typeof (e as { answer?: unknown }).answer === "string",
+    )
+    .map((e) => ({
+      ...e,
+      cites: Array.isArray(e.cites)
+        ? e.cites
+            .filter(
+              (c): c is { page: string; note: string } =>
+                !!c &&
+                typeof c === "object" &&
+                typeof (c as { page?: unknown }).page === "string" &&
+                typeof (c as { note?: unknown }).note === "string",
+            )
+            .slice(0, 6)
+        : [],
+    }));
+}
+
 /** The six analysis steps, in order, keyed to the columns on `deals`. */
 export const DEAL_STEPS = [
   { key: "extraction", label: "Extract & flag" },

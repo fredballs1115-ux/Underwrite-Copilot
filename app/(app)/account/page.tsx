@@ -36,18 +36,33 @@ export default async function AccountPage({
   const billing = user ? await getBilling(supabase, user.id) : null;
   const isPro = billing?.isPro ?? false;
 
-  // Analysis-email preference — ON by default; a pre-0014 schema (column
-  // missing) reads as ON too, matching what the sender assumes.
+  // Email preferences — ON by default; pre-0014/0017 schemas (columns
+  // missing) read as ON too, matching what the senders assume. Queried one
+  // column at a time so a half-migrated schema degrades per-toggle.
   let emailOnAnalysis = true;
+  let emailWeeklyDigest = true;
   if (user) {
+    const admin = createSupabaseAdminClient();
     try {
-      const { data: prefs, error: prefErr } = await createSupabaseAdminClient()
+      const { data: prefs, error: prefErr } = await admin
         .from("profiles")
         .select("email_on_analysis")
         .eq("id", user.id)
         .maybeSingle();
       if (!prefErr && prefs && prefs.email_on_analysis === false) {
         emailOnAnalysis = false;
+      }
+    } catch {
+      // default stands
+    }
+    try {
+      const { data: prefs, error: prefErr } = await admin
+        .from("profiles")
+        .select("email_weekly_digest")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (!prefErr && prefs && prefs.email_weekly_digest === false) {
+        emailWeeklyDigest = false;
       }
     } catch {
       // default stands
@@ -119,7 +134,30 @@ export default async function AccountPage({
               )}
             </p>
           </div>
-          <EmailToggle enabled={emailOnAnalysis} />
+          <EmailToggle
+            enabled={emailOnAnalysis}
+            field="analysis"
+            label="Email me when an analysis finishes"
+          />
+        </div>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-5">
+          <div>
+            <h2 className="text-sm font-semibold tracking-tight">
+              Weekly pipeline digest
+            </h2>
+            <p className="mt-1 max-w-md text-sm text-muted">
+              Monday morning: your deals by stage, offers due this week, and
+              the verdicts that landed since last week.
+              {!emailEnabled() && (
+                <> Sending is currently paused while email is being configured.</>
+              )}
+            </p>
+          </div>
+          <EmailToggle
+            enabled={emailWeeklyDigest}
+            field="digest"
+            label="Email me the weekly pipeline digest"
+          />
         </div>
       </section>
 

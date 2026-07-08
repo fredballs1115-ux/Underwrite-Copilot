@@ -72,7 +72,8 @@ services:
       # Emails link back to the app — keep identical to the web service.
       - key: NEXT_PUBLIC_APP_URL
         sync: false
-      # Optional: analysis-ready emails (same values as the web service).
+      # Optional: analysis-ready + weekly digest emails BOTH send from the
+      # worker (same values as the web service).
       # - key: RESEND_API_KEY
       #   sync: false
       # - key: RESEND_FROM

@@ -22,10 +22,12 @@ import { DealActions } from "./deal-actions";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import { StageSelect } from "./stage-select";
 import { OffersDueControl } from "../offers-due";
+import { ShareControl, type ShareRow } from "./share-control";
 import { parseStageHistory } from "@/lib/stages";
+import { parseDealNotes, parseDealQa } from "@/lib/deals";
 import { deriveInternalComps } from "@/lib/internal-comps";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
+import { evaluateBuyBox, buyBoxCheckSource, type BuyBoxCheck } from "@/lib/criteria";
 
 const VERDICT_PILL = {
   pass: { label: "Go", cls: "bg-pass/15 text-pass" },
@@ -62,8 +64,14 @@ export default async function DealPage({
 
   // These five don't depend on each other — fetch them in one round trip's
   // worth of wall clock instead of five.
-  const [pro, { data, error }, { data: docsData }, { data: jobData }, siblings] =
-    await Promise.all([
+  const [
+    pro,
+    { data, error },
+    { data: docsData },
+    { data: jobData },
+    siblings,
+    sharesRes,
+  ] = await Promise.all([
       user ? isPro(supabase, user.id) : Promise.resolve(false),
       supabase.from("deals").select("*").eq("id", id).maybeSingle(),
       supabase
@@ -89,6 +97,16 @@ export default async function DealPage({
         .not("extraction", "is", null)
         .order("created_at", { ascending: false })
         .limit(40),
+      // Live share links (pre-0017 schema: the query errors and data reads
+      // null — the Share button simply shows an empty list).
+      supabase
+        .from("deal_shares")
+        .select("id, created_at, expires_at")
+        .eq("deal_id", id)
+        .eq("revoked", false)
+        .gt("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false })
+        .limit(5),
     ]);
 
   if (error) {
@@ -202,39 +220,7 @@ export default async function DealPage({
   const dealAddress =
     (deal.address as import("@/lib/address").StructuredAddress | undefined) ??
     null;
-  const addressHaystack = [
-    extraction?.address,
-    dealAddress?.label,
-    dealAddress?.county,
-    dealAddress?.state,
-  ]
-    .filter(Boolean)
-    .join(" ");
-  const signalMetrics = firstSignal
-    ? [
-        { label: "Asking price", value: firstSignal.askPrice },
-        { label: "Going-in cap rate", value: firstSignal.goingInCap },
-        {
-          // Broad per-area test: "sf", "psf", "sq ft", "square foot", "/ft"
-          // must all count — a per-SF figure misread as per-unit would give
-          // the buy-box check a confidently wrong basis.
-          label: /sf|sq|square|psf|\/\s?ft/i.test(firstSignal.perUnit)
-            ? "Price per SF"
-            : "Price per unit",
-          value: firstSignal.perUnit,
-        },
-      ].filter((m) => m.value.trim())
-    : [];
-  const checkSource =
-    extraction || firstSignal || dealAddress
-      ? {
-          assetClass:
-            extraction?.assetClass ?? firstSignal?.assetClass ?? "",
-          market: extraction?.market ?? firstSignal?.market ?? "",
-          address: addressHaystack,
-          metrics: extraction?.metrics ?? signalMetrics,
-        }
-      : null;
+  const checkSource = buyBoxCheckSource(extraction, firstSignal, dealAddress);
   const buyBoxChecks: BuyBoxCheck[] = buyBox
     ? evaluateBuyBox(deal.asset_class, checkSource, buyBox)
     : [];
@@ -325,6 +311,16 @@ export default async function DealPage({
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            {verdict && !(deal as { is_sample?: boolean }).is_sample && (
+              <ShareControl
+                dealId={id}
+                shares={((sharesRes.data ?? []) as ShareRow[])}
+                appUrl={
+                  process.env.NEXT_PUBLIC_APP_URL ??
+                  "https://underwrite-copilot.onrender.com"
+                }
+              />
+            )}
             {verdict && (
               <a
                 href={`/api/deals/${id}/memo`}
@@ -351,6 +347,36 @@ export default async function DealPage({
                   <path d="M10 16h4" />
                 </svg>
                 IC memo
+                {!pro && (
+                  <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
+                    Pro
+                  </span>
+                )}
+              </a>
+            )}
+            {verdict && (
+              <a
+                href={`/api/deals/${id}/report`}
+                title={
+                  pro
+                    ? "The full screening report — memo plus every term, challenge, comp, and market check"
+                    : "The full screening report — part of Pro"
+                }
+                className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-3.5 w-3.5 text-muted"
+                  aria-hidden
+                >
+                  <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
+                </svg>
+                Full report
                 {!pro && (
                   <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
                     Pro
@@ -422,6 +448,11 @@ export default async function DealPage({
         stageHistory={stageHistory}
         internalComps={internalComps}
         omUrl={omUrl}
+        notes={parseDealNotes((deal as { notes?: unknown }).notes)}
+        userEmail={user?.email ?? null}
+        userId={user?.id ?? null}
+        qa={parseDealQa((deal as { qa?: unknown }).qa)}
+        isSample={!!(deal as { is_sample?: boolean }).is_sample}
       />
     </div>
   );

@@ -68,6 +68,15 @@ you can suspend or delete it whenever convenient.
 > queued with nobody to run them (the deal page would show them stalled after
 > 10 minutes).
 
+## The weekly digest
+
+The Monday pipeline digest email sends FROM THIS SERVICE (the web app only
+renders the Account toggle). It needs `RESEND_API_KEY` (+ `RESEND_FROM`) on
+the WORKER's environment — set the same values as the web service. Sends at
+13:00 UTC Mondays by default; if the worker was down for that hour it
+catches up later the same day, and a per-user claim makes overlapping
+workers and retries duplicate-safe.
+
 ## Tuning (env, all optional)
 
 | Var | Default | Meaning |
@@ -77,3 +86,6 @@ you can suspend or delete it whenever convenient.
 | `WORKER_MAX_ATTEMPTS` | 3 | interruptions before a job stops retrying |
 | `WORKER_JOB_TIMEOUT_MS` | 1800000 | wedged-run cutoff (re-queue + restart) |
 | `WORKER_KEEPALIVE_AGE_MS` | 240000 | re-touch queued rows only past this age |
+| `WORKER_DIGEST_DOW` | 1 | digest day (UTC, 0 = Sunday) |
+| `WORKER_DIGEST_HOUR_UTC` | 13 | digest send hour (UTC) |
+| `WORKER_DIGEST_CHECK_MS` | 900000 | how often the clock gate is checked |

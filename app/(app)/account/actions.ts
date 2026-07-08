@@ -11,10 +11,14 @@ import { syncTeamSeats } from "@/lib/stripe/seats";
 
 export type PwState = { error?: string; ok?: boolean } | null;
 
-/** Flip the analysis-ready email preference (migration 0014). The column is
- *  service-role-written like the billing fields, so authenticate first. */
+/** Flip an email preference — the analysis-ready note (0014) or the weekly
+ *  digest (0017). The columns are service-role-written like the billing
+ *  fields, so authenticate first. */
 export async function setEmailPrefs(formData: FormData) {
   const value = String(formData.get("value") ?? "") === "on";
+  const field = String(formData.get("field") ?? "analysis");
+  const column =
+    field === "digest" ? "email_weekly_digest" : "email_on_analysis";
 
   const supabase = await createSupabaseServerClient();
   const {
@@ -24,7 +28,7 @@ export async function setEmailPrefs(formData: FormData) {
 
   const { error } = await createSupabaseAdminClient()
     .from("profiles")
-    .update({ email_on_analysis: value })
+    .update({ [column]: value })
     .eq("id", user.id);
   if (error) redirect("/account?error=emailpref");
 

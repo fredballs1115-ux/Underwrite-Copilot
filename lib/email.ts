@@ -30,9 +30,14 @@ function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? "https://underwrite-copilot.onrender.com";
 }
 
-async function sendEmail(to: string, subject: string, html: string, text: string) {
+export async function sendEmail(
+  to: string,
+  subject: string,
+  html: string,
+  text: string,
+): Promise<boolean> {
   const key = process.env.RESEND_API_KEY;
-  if (!key) return;
+  if (!key) return false;
   const base = process.env.RESEND_BASE_URL ?? "https://api.resend.com";
   const from =
     process.env.RESEND_FROM ?? "Underwrite Copilot <onboarding@resend.dev>";
@@ -51,6 +56,13 @@ async function sendEmail(to: string, subject: string, html: string, text: string
     if (!res.ok) {
       console.error(`[email] resend responded ${res.status} for "${subject}"`);
     }
+    return res.ok;
+  } catch (err) {
+    console.error(
+      `[email] send failed for "${subject}":`,
+      err instanceof Error ? err.message : err,
+    );
+    return false;
   } finally {
     clearTimeout(timer);
   }

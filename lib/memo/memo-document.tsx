@@ -79,7 +79,8 @@ const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
 // The PDF's standard Helvetica only carries WinAnsi glyphs \u2014 swap the web
 // UI's arrows/minus signs for safe equivalents or they silently drop.
-const pdfSafe = (s: string) =>
+// Exported for the full report, which prints far more raw model text.
+export const pdfSafe = (s: string) =>
   s.replace(/\u2192/g, "\u203a").replace(/[\u2212\u2013]/g, "-");
 
 /** Shape the stored analysis into the flat data the one-page memo renders. */
@@ -459,13 +460,21 @@ function Section({
 }
 
 export function MemoDocument({ data }: { data: MemoData }) {
-  const subParts = [data.market, cap(data.assetClass)].filter(Boolean);
   return (
     <Document
       title={`${data.name} — Screening Memo`}
       author="Underwrite Copilot"
     >
-      <Page size="LETTER" style={s.page}>
+      <MemoPage data={data} />
+    </Document>
+  );
+}
+
+/** The memo's single page, exported so the full report can lead with it. */
+export function MemoPage({ data }: { data: MemoData }) {
+  const subParts = [data.market, cap(data.assetClass)].filter(Boolean);
+  return (
+    <Page size="LETTER" style={s.page}>
         <View style={s.header}>
           <View style={s.brandRow}>
             <Text style={s.badge}>UC</Text>
@@ -671,7 +680,6 @@ export function MemoDocument({ data }: { data: MemoData }) {
           <Text style={s.footerText}>Underwrite Copilot</Text>
         </View>
       </Page>
-    </Document>
   );
 }
 

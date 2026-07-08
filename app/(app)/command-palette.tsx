@@ -85,6 +85,21 @@ const ACTIONS: Item[] = [
     ),
   },
   {
+    key: "a-analytics",
+    label: "Analytics",
+    hint: "portfolio trends",
+    href: "/analytics",
+    group: "actions",
+    icon: (
+      <ActionIcon>
+        <path d="M3 3v18h18" />
+        <path d="M8 17v-3" />
+        <path d="M13 17V7" />
+        <path d="M18 17v-6" />
+      </ActionIcon>
+    ),
+  },
+  {
     key: "a-team",
     label: "Team",
     hint: "shared pipeline",

@@ -76,7 +76,12 @@ async function regenerateVerdict(
 
   await admin
     .from("deals")
-    .update({ verdict, updated_at: new Date().toISOString() })
+    .update({
+      // generatedAt lets consumers (the weekly digest) know when THIS verdict
+      // landed — deals.updated_at bumps on any edit and can't be trusted.
+      verdict: { ...verdict, generatedAt: new Date().toISOString() },
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", dealId);
 }
 

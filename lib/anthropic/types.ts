@@ -174,6 +174,8 @@ export interface ScreenResult {
 
 /** Step 6 — Verdict (synthesizes all of the above) */
 export interface VerdictResult {
+  /** ISO timestamp stamped when this verdict generation landed */
+  generatedAt?: string;
   verdict: VerdictCall;
   reason: string;
   topRisks: string[];
