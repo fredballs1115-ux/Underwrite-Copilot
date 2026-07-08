@@ -4,7 +4,7 @@ import { HyperFormula } from "hyperformula";
 import { buildUnderwriteWorkbook } from "./workbook";
 import { deriveUnderwriteInputs } from "./inputs";
 import { computeUnderwrite } from "./engine";
-import { buildSensitivityGrids, formatSensCell } from "./sensitivity";
+import { buildSensitivityGrids } from "./sensitivity";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
 /**
@@ -171,20 +171,39 @@ describe("generated workbook — degenerate inputs still error-free (div guards)
   });
 });
 
-describe("generated workbook — static sensitivity grids come from the engine", () => {
-  it("every grid cell string appears verbatim on the Deal Summary sheet", async () => {
-    const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load((await buildUnderwriteWorkbook(model)) as unknown as ArrayBuffer);
-    const ds = wb.getWorksheet("Deal Summary")!;
-    const strings: string[] = [];
-    ds.eachRow((row) => row.eachCell((c) => { if (typeof c.value === "string") strings.push(c.value); }));
+describe("generated workbook — LIVE sensitivity grids match the engine", () => {
+  // The hidden "Sensitivity Engine" tab holds one live block per scenario, in
+  // grid iteration order starting at column C: scenario index = gi*25 + ri*5 +
+  // ci, column = 3 + index, IRR on row 23, EM on row 24. We read those NUMBERS
+  // (not the display string, whose TEXT("%") HyperFormula renders unlike Excel)
+  // and compare to the unit-tested engine.
+  it("every live scenario block computes the engine's IRR/EM within rounding", async () => {
+    const { hf } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    const engId = hf.getSheetId("Sensitivity Engine")!;
     const grids = buildSensitivityGrids(model.inputs);
-    for (const g of grids) {
-      for (const rowCells of g.cells) {
-        for (const cell of rowCells) {
-          expect(strings).toContain(formatSensCell(cell));
+    for (let gi = 0; gi < grids.length; gi++) {
+      for (let ri = 0; ri < 5; ri++) {
+        for (let ci = 0; ci < 5; ci++) {
+          const eng = grids[gi].cells[ri][ci];
+          if (eng.irrPct == null || eng.emx == null) continue;
+          const col = 2 + gi * 25 + ri * 5 + ci; // 0-based; C = 2
+          const irr = hf.getCellValue({ sheet: engId, row: 22, col }) as number; // row 23
+          const em = hf.getCellValue({ sheet: engId, row: 23, col }) as number; // row 24
+          expect(Math.abs(Number(irr) - eng.irrPct), `grid ${gi} [${ri}][${ci}] irr`).toBeLessThan(0.0015);
+          expect(Math.abs(Number(em) - eng.emx), `grid ${gi} [${ri}][${ci}] em`).toBeLessThan(0.02);
         }
       }
+    }
+  });
+
+  it("each grid's center scenario equals the base case", async () => {
+    const { hf } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    const engId = hf.getSheetId("Sensitivity Engine")!;
+    const base = computeUnderwrite(model.inputs).returns;
+    for (let gi = 0; gi < 3; gi++) {
+      const col = 2 + gi * 25 + 2 * 5 + 2; // center cell [2][2]
+      expect(hf.getCellValue({ sheet: engId, row: 22, col }) as number).toBeCloseTo(base.leveredIrrPct!, 3);
+      expect(hf.getCellValue({ sheet: engId, row: 23, col }) as number).toBeCloseTo(base.leveredEquityMultiple!, 2);
     }
   });
 });

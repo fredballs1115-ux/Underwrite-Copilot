@@ -2,7 +2,7 @@ import "server-only";
 import ExcelJS from "exceljs";
 import type { UnderwriteInputs } from "./engine";
 import { computeUnderwrite } from "./engine";
-import { buildSensitivityGrids, formatSensCell, type SensGrid } from "./sensitivity";
+import { defaultIncrements } from "./sensitivity";
 import type { DerivedModel, InputSource } from "./inputs";
 
 /**
@@ -108,10 +108,13 @@ export async function buildUnderwriteWorkbook(model: DerivedModel): Promise<Buff
   const wsCf = wb.addWorksheet("Cash Flow", {
     views: [{ state: "frozen", xSplit: 1, ySplit: 2, showGridLines: false }],
   });
+  // Hidden tab holding one live cash-flow block per sensitivity scenario.
+  const wsEng = wb.addWorksheet("Sensitivity Engine", { state: "veryHidden" });
 
   buildAssumptions(wsAssum, inputs, model.sources);
   const cf = buildCashFlow(wsCf, inputs, holdYears);
-  buildDealSummary(wsSummary, model, cf, holdYears);
+  const sensAnchor = buildDealSummary(wsSummary, model, cf, holdYears);
+  buildSensitivityEngine(wsSummary, wsEng, inputs, sensAnchor);
 
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
@@ -328,7 +331,7 @@ function buildCashFlow(ws: ExcelJS.Worksheet, inp: UnderwriteInputs, holdYears: 
 }
 
 // ── DEAL SUMMARY ────────────────────────────────────────────────────────────
-function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap, holdYears: number) {
+function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap, holdYears: number): number {
   const { meta, inputs } = model;
   ws.getColumn(1).width = 30;
   ws.getColumn(2).width = 18;
@@ -454,48 +457,163 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   ret("Unlevered Equity Multiple", `IF((PurchasePrice+ClosingCostsTotal+AcqFee)=0,"n/a",(SUM(${unlevOps}))/(PurchasePrice+ClosingCostsTotal+AcqFee))`, FMT.mult);
   ret("Levered Equity Multiple", `IF(Equity=0,"n/a",(SUM(${levcfRange})+NetSaleProceeds)/Equity)`, FMT.mult, "LeveredEM");
   r = Math.max(r, rr) + 2;
-
-  // ── SENSITIVITY (computed at export; labelled static) ──
-  buildSensitivityStatic(ws, r, inputs);
+  void inputs;
   void holdYears;
+  // The sensitivity display grids are written by buildSensitivityEngine, which
+  // also lays the live per-scenario cash-flow blocks on the hidden tab.
+  return r;
 }
 
 /**
- * Sensitivity grids computed at export from the (unit-tested) engine and
- * written as labelled static "IRR / EM" strings. NOT live formulas — see the
- * feature note on the fully-live-engine tradeoff. The center cell of each grid
- * equals the base case by construction (same engine).
+ * LIVE sensitivity: a hidden tab holds one compact cash-flow block per scenario
+ * cell (3 grids × 5×5 = 75), and the Deal Summary grids read their IRR/EM. Edit
+ * any assumption and the grids recompute with the rest of the model.
+ *
+ * The de-fragiliser: the sensitivity axes (exit cap, hold, price, LTC, rate)
+ * never touch NOI, so NOI-per-year and capex-per-year are IDENTICAL across all
+ * scenarios — computed once in shared columns and referenced by every block.
+ * Each scenario column is then just its overrides + loan/equity/debt/sale +
+ * a levered cash-flow vector. A scenario's hold sets which year the sale lands;
+ * years beyond it are 0, and trailing zeros don't change IRR — so a single
+ * fixed-height block (tall enough for the longest hold) serves every scenario.
  */
-function buildSensitivityStatic(ws: ExcelJS.Worksheet, startRow: number, inp: UnderwriteInputs) {
-  const grids = buildSensitivityGrids(inp);
-  let r = startRow;
-  sectionHeader(ws, r, "Sensitivity — Levered IRR / Equity Multiple", 1, 6); r++;
-  label(ws.getCell(r, 1), "Computed at export from the assumptions above — re-export after changing them.", { color: MUTED, size: 9 });
-  r++;
+function buildSensitivityEngine(
+  wsSum: ExcelJS.Worksheet,
+  eng: ExcelJS.Worksheet,
+  inp: UnderwriteInputs,
+  startRow: number,
+) {
+  const inc = defaultIncrements(inp);
+  const steps = [-2, -1, 0, 1, 2];
+  const capVals = steps.map((k) => Math.max(0.0025, inp.exitCapPct + k * inc.capStep));
+  const holdVals = steps.map((k) => Math.max(12, inp.holdMonths + k * inc.monthsStep));
+  const priceVals = steps.map((k) => Math.max(0, inp.purchasePrice + k * inc.priceStep));
+  const ltcVals = steps.map((k) => Math.max(0, inp.ltc + k * inc.ltcStep));
+  const rateVals = steps.map((k) => Math.max(0.0025, inp.allInRatePct + k * inc.rateStep));
+  const maxHoldM = Math.max(...holdVals, inp.holdMonths);
+  const maxYears = Math.max(1, Math.ceil(maxHoldM / 12));
 
+  // ── shared rows on the engine tab (column B), referenced by every scenario ──
+  // NOI at yearsElapsed e (0..maxYears): operating year y uses e=y-1; the
+  // forward exit NOI at hold h uses e=h.
+  eng.getColumn(1).width = 22;
+  let sr = 1;
+  eng.getCell(sr, 1).value = "shared: NOI by years-elapsed"; sr++;
+  const noiRow: number[] = []; // noiRow[e] = sheet row of NOI at years-elapsed e
+  for (let e = 0; e <= maxYears; e++) {
+    const rent = `(InPlaceRent*(1+RentGrowth)^${e})`;
+    const rec = `(Recoveries*(1+ExpGrowth)^${e})`;
+    const oth = `(OtherRev*(1+RentGrowth)^${e})`;
+    const egr = `((${rent}+${rec}+${oth})*(1-VacancyPct))`;
+    const opex = `(TotalBaseOpex*(1+ExpGrowth)^${e}+${egr}*MgmtFeePct)`;
+    eng.getCell(sr, 1).value = `NOI e=${e}`;
+    eng.getCell(sr, 2).value = { formula: `${egr}-${opex}` } as ExcelJS.CellFormulaValue;
+    noiRow[e] = sr;
+    sr++;
+  }
+  const capexRow: number[] = []; // capexRow[y] = sheet row of total capex for op year y
+  for (let y = 1; y <= maxYears; y++) {
+    const rent = `(InPlaceRent*(1+RentGrowth)^${y - 1})`;
+    eng.getCell(sr, 1).value = `capex y=${y}`;
+    eng.getCell(sr, 2).value = {
+      formula: `TIPSF*RSF+LCPct*${rent}+ReservesPSF*RSF*(1+ExpGrowth)^${y - 1}+IF(${y}=1,CapImprovements,0)`,
+    } as ExcelJS.CellFormulaValue;
+    capexRow[y] = sr;
+    sr++;
+  }
+  const B = (row: number) => `B${row}`;
+
+  // ── one scenario column; returns its IRR / EM cell addresses ──
+  let col = 3; // scenarios start at column C
+  const scenario = (o: {
+    price?: number; ltc?: number; rate?: number; cap?: number; holdM?: number;
+  }): { irr: string; em: string } => {
+    const c = col++;
+    const A1 = (row: number) => `${eng.getCell(row, c).address}`;
+    let row = 1;
+    const put = (formula: string): string => {
+      eng.getCell(row, c).value = { formula } as ExcelJS.CellFormulaValue;
+      const a = A1(row);
+      row++;
+      return a;
+    };
+    const putN = (n: number): string => {
+      eng.getCell(row, c).value = n;
+      const a = A1(row);
+      row++;
+      return a;
+    };
+    // overrides (a literal when perturbed, else the global named range)
+    const price = o.price != null ? putN(o.price) : put("PurchasePrice");
+    const ltc = o.ltc != null ? putN(o.ltc) : put("LTC");
+    const rate = o.rate != null ? putN(o.rate) : put("AllInRate");
+    const cap = o.cap != null ? putN(o.cap) : put("ExitCap");
+    const holdM = o.holdM != null ? putN(o.holdM) : put("HoldMonths");
+    // derived
+    const loanBasis = put(`${price}+ClosingCostsTotal+MIN(AcqFeePct*${price},AcqFeeCap)`);
+    const loan = put(`${ltc}*${loanBasis}`);
+    const equity = put(`${loanBasis}+FinCostPct*${loan}-${loan}`);
+    const mpmt = put(`IF(${rate}=0,${loan}/AmortMonths,${loan}*(${rate}/12)/(1-(1+${rate}/12)^(-AmortMonths)))`);
+    const holdY = put(`ROUND(${holdM}/12,0)`);
+    // forward NOI at exit = NOI at years-elapsed = holdY → INDEX the shared col
+    const fwd = put(`INDEX($B$${noiRow[0]}:$B$${noiRow[maxYears]},${holdY}+1)`);
+    const gross = put(`IF(${cap}=0,0,${fwd}/${cap})`);
+    const exitDebt = put(
+      `IF(${holdM}<=IOMonths,${loan},IF(${rate}=0,MAX(0,${loan}-${mpmt}*(${holdM}-IOMonths)),${loan}*(1+${rate}/12)^(${holdM}-IOMonths)-${mpmt}*(((1+${rate}/12)^(${holdM}-IOMonths)-1)/(${rate}/12))))`,
+    );
+    const netSale = put(`${gross}-${gross}*SaleCostPct-${exitDebt}`);
+    // levered cash-flow vector: year 0 = -equity; years 1..maxYears
+    const y0 = put(`-${equity}`);
+    const yCells: string[] = [y0];
+    for (let y = 1; y <= maxYears; y++) {
+      // Interest-only while within the IO PERIOD (IOMonths), not the hold —
+      // mirrors engine.annualDebtService (y*12 <= ioMonths).
+      const ds = `IF(${y}<=IOMonths/12,${loan}*${rate},${mpmt}*12)`;
+      const opCf = `${B(noiRow[y - 1])}-${B(capexRow[y])}-${equity}*AMFeePctEquity-(${ds})`;
+      const sale = `IF(${y}=${holdY},${netSale},0)`;
+      yCells.push(put(`IF(${y}>${holdY},0,(${opCf})+${sale})`));
+    }
+    const irr = put(`IFERROR(IRR(${yCells[0]}:${yCells[yCells.length - 1]}),"")`);
+    const em = put(`IFERROR(SUM(${yCells[1]}:${yCells[yCells.length - 1]})/${equity},"")`);
+    return { irr: `'Sensitivity Engine'!${irr}`, em: `'Sensitivity Engine'!${em}` };
+  };
+
+  // ── the three display grids on Deal Summary ──
+  interface GridDef { title: string; rowVals: number[]; colVals: number[]; override: (rv: number, cv: number) => Parameters<typeof scenario>[0]; }
+  const grids: GridDef[] = [
+    { title: "Exit Cap × Hold Period", rowVals: holdVals, colVals: capVals, override: (h, cp) => ({ holdM: h, cap: cp }) },
+    { title: "Exit Cap × Purchase Price", rowVals: priceVals, colVals: capVals, override: (p, cp) => ({ price: p, cap: cp }) },
+    { title: "Leverage × Rate", rowVals: rateVals, colVals: ltcVals, override: (rt, lt) => ({ rate: rt, ltc: lt }) },
+  ];
   const axisFmt = (vals: number[]) => (vals.every((v) => v < 1) ? FMT.pct2 : vals.every((v) => v < 1000) ? FMT.int : FMT.usd);
-  for (const g of grids as SensGrid[]) {
-    label(ws.getCell(r, 1), g.title, { bold: true, color: BRAND }); r++;
-    // column header row
-    g.colAxis.values.forEach((cv, ci) => {
-      const c = ws.getCell(r, 2 + ci);
-      c.value = cv;
-      c.numFmt = axisFmt(g.colAxis.values);
-      c.alignment = { horizontal: "center" };
-      c.font = { name: ARIAL, size: 9, bold: ci === g.colAxis.baseIndex, color: MUTED };
+
+  let r = startRow;
+  sectionHeader(wsSum, r, "Sensitivity — Levered IRR / Equity Multiple (live)", 1, 6); r++;
+  label(wsSum.getCell(r, 1), "Recomputes with the model — change any assumption above and these update.", { color: MUTED, size: 9 });
+  r++;
+  for (const g of grids) {
+    label(wsSum.getCell(r, 1), g.title, { bold: true, color: BRAND }); r++;
+    g.colVals.forEach((cv, ci) => {
+      const cell = wsSum.getCell(r, 2 + ci);
+      cell.value = cv;
+      cell.numFmt = axisFmt(g.colVals);
+      cell.alignment = { horizontal: "center" };
+      cell.font = { name: ARIAL, size: 9, bold: ci === 2, color: MUTED };
     });
     r++;
-    g.rowAxis.values.forEach((rv, ri) => {
-      const rl = ws.getCell(r, 1);
+    g.rowVals.forEach((rv, ri) => {
+      const rl = wsSum.getCell(r, 1);
       rl.value = rv;
-      rl.numFmt = axisFmt(g.rowAxis.values);
-      rl.font = { name: ARIAL, size: 9, bold: ri === g.rowAxis.baseIndex, color: MUTED };
-      g.colAxis.values.forEach((_cv, ci) => {
-        const c = ws.getCell(r, 2 + ci);
-        c.value = formatSensCell(g.cells[ri][ci]);
-        c.alignment = { horizontal: "center" };
-        const isCenter = ri === g.rowAxis.baseIndex && ci === g.colAxis.baseIndex;
-        c.font = { name: ARIAL, size: 9, bold: isCenter, color: INK };
+      rl.numFmt = axisFmt(g.rowVals);
+      rl.font = { name: ARIAL, size: 9, bold: ri === 2, color: MUTED };
+      g.colVals.forEach((cv, ci) => {
+        const { irr, em } = scenario(g.override(rv, cv));
+        const cell = wsSum.getCell(r, 2 + ci);
+        cell.value = {
+          formula: `IF(${irr}="","n/a",TEXT(${irr},"0.0%")&" / "&TEXT(${em},"0.0x"))`,
+        } as ExcelJS.CellFormulaValue;
+        cell.alignment = { horizontal: "center" };
+        cell.font = { name: ARIAL, size: 9, bold: ri === 2 && ci === 2, color: INK };
       });
       r++;
     });
