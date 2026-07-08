@@ -61,6 +61,25 @@ describe("irr (bisection)", () => {
   it("returns null when there is no sign change", () => {
     expect(irr([100, 6, 6])).toBeNull();
   });
+  it("returns null for a degenerate all-zero vector (not the scan floor)", () => {
+    expect(irr([0, 0, 0, 0])).toBeNull();
+  });
+});
+
+describe("capex / TI / LC are operating, not capitalized (no double-count)", () => {
+  it("a capital-improvements budget does not change the loan or equity", () => {
+    const withCapex = computeUnderwrite(baseInputs({ ltc: 0.6, capitalImprovementsYr1: 1_000_000 }));
+    const noCapex = computeUnderwrite(baseInputs({ ltc: 0.6 }));
+    expect(withCapex.sourcesUses.loanAmount).toBeCloseTo(noCapex.sourcesUses.loanAmount, 3);
+    expect(withCapex.sourcesUses.equity).toBeCloseTo(noCapex.sourcesUses.equity, 3);
+  });
+  it("it is counted exactly once — as a year-1 operating outflow", () => {
+    const withCapex = computeUnderwrite(baseInputs({ ltc: 0.6, capitalImprovementsYr1: 1_000_000 }));
+    const noCapex = computeUnderwrite(baseInputs({ ltc: 0.6 }));
+    const delta =
+      noCapex.cashFlow[0].leveredCashFlow - withCapex.cashFlow[0].leveredCashFlow;
+    expect(delta).toBeCloseTo(1_000_000, 3);
+  });
 });
 
 describe("base fixture — par bond, no debt", () => {

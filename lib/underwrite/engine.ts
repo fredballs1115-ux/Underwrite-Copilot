@@ -170,6 +170,9 @@ const grow = (base: number, pct: number, yearsElapsed: number): number =>
  *  enough that recalc'd workbook values match within rounding. */
 export function irr(cashflows: number[]): number | null {
   if (cashflows.length < 2) return null;
+  // A degenerate all-zero stream has no meaningful rate — don't report the
+  // scan floor (-90%) as if it were one.
+  if (cashflows.every((c) => c === 0)) return null;
   const npv = (rate: number) =>
     cashflows.reduce((acc, cf, t) => acc + cf / Math.pow(1 + rate, t), 0);
 
@@ -269,14 +272,12 @@ export function computeSourcesUses(inp: UnderwriteInputs): SourcesUses {
   const capitalImprovements = inp.capitalImprovementsYr1;
   const tenantImprovements = inp.tiPsf * inp.rsf;
   const leasingCommissions = inp.lcPct * inp.inPlaceRentAnnual;
-  // Loan sizes off cost EXCLUDING financing fees → no circular reference.
-  const loanBasis =
-    inp.purchasePrice +
-    closingCosts +
-    acqFee +
-    capitalImprovements +
-    tenantImprovements +
-    leasingCommissions;
+  // Loan sizes off acquisition cost EXCLUDING financing fees → no circular
+  // reference. Capital improvements / TI / LC are treated as OPERATING
+  // outflows (below NOI, in the cash-flow ladder), NOT capitalized into the
+  // basis — matching the house model (lib/model/compute.ts). Capitalizing them
+  // here AND subtracting them in the ladder would double-count them.
+  const loanBasis = inp.purchasePrice + closingCosts + acqFee;
   const loanAmount = inp.ltc * loanBasis;
   const financingCosts = inp.financingCostPct * loanAmount;
   const totalUses = loanBasis + financingCosts;

@@ -153,7 +153,12 @@ function buildAssumptions(ws: ExcelJS.Worksheet, inp: UnderwriteInputs, sources:
 
   header("Deal");
   input("Purchase Price", inp.purchasePrice, "PurchasePrice", FMT.usd, "purchasePrice", true);
-  input("Hold Period (months)", inp.holdMonths, "HoldMonths", FMT.int, "holdMonths", true);
+  // Hold is STRUCTURAL: it sets the number of cash-flow years and the sale
+  // year, which are baked at export. Not a flex input — editing it in the file
+  // would only partially recalc (a longer-hold IRR would be wrong). Re-export
+  // to change it. Mirrors the sister model.xlsx convention.
+  input("Hold Period (months) — fixed; re-export to change", inp.holdMonths, "HoldMonths", FMT.int, "holdMonths", false);
+  ws.getCell(r - 1, 2).font = { name: ARIAL, size: 10, color: INK }; // black (formula-like), not blue input
   input("Acquisition Fee %", inp.acqFeePct, "AcqFeePct", FMT.pct2, "acqFeePct");
   input("Acquisition Fee Cap", inp.acqFeeCap, "AcqFeeCap", FMT.usd);
 
@@ -366,13 +371,13 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     if (name) c.name = name;
     styleFormula(c, FMT.usd, INK, bold);
   };
+  // Uses = acquisition cost + financing. Capital improvements / TI / LC are
+  // OPERATING outflows in the Cash Flow ladder, not capitalized here — folding
+  // them into uses AND the ladder would double-count them.
   usesRow(r, "Purchase Price", "PurchasePrice"); r++;
   usesRow(r, "DD / Closing Costs", "ClosingCostsTotal"); r++;
   usesRow(r, "Acquisition Fee", "MIN(AcqFeePct*PurchasePrice,AcqFeeCap)", "AcqFee"); r++;
-  usesRow(r, "Capital Improvements", "CapImprovements"); r++;
-  usesRow(r, "Tenant Improvements", "TIPSF*RSF"); r++;
-  usesRow(r, "Leasing Commissions", "LCPct*InPlaceRent"); r++;
-  usesRow(r, "Loan Basis (cost ex-financing)", `SUM(${cellA1(rowStart, 5)}:${cellA1(r - 1, 5)})`, "LoanBasis"); r++;
+  usesRow(r, "Loan Basis (acquisition cost)", `SUM(${cellA1(rowStart, 5)}:${cellA1(r - 1, 5)})`, "LoanBasis"); r++;
   usesRow(r, "Financing Costs", "FinCostPct*LoanAmount", "FinancingCosts"); r++;
   usesRow(r, "TOTAL USES", "LoanBasis+FinancingCosts", "TotalUses", true);
   r++;
@@ -426,9 +431,11 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   };
   resRow("Residual NOI (forward)", noiFwd, FMT.usd, undefined, true);
   resRow("Exit Cap", "ExitCap", FMT.pct2, undefined, true);
-  resRow("Gross Sale Proceeds", `${noiFwd}/ExitCap`, FMT.usd, "GrossSale");
+  resRow("Gross Sale Proceeds", `IF(ExitCap=0,0,${noiFwd}/ExitCap)`, FMT.usd, "GrossSale");
   resRow("Sale Costs", "GrossSale*SaleCostPct", FMT.usd, "SaleCosts");
-  resRow("Outstanding Debt", "IF(HoldMonths<=IOMonths,LoanAmount,LoanAmount*(1+AllInRate/12)^(HoldMonths-IOMonths)-MonthlyPmt*(((1+AllInRate/12)^(HoldMonths-IOMonths)-1)/(AllInRate/12)))", FMT.usd, "OutstandingDebt");
+  // Guard rate=0 (interest-free) so the amortization closed form never divides
+  // by zero — mirrors engine.loanBalanceAtExit's r===0 branch.
+  resRow("Outstanding Debt", "IF(HoldMonths<=IOMonths,LoanAmount,IF(AllInRate=0,MAX(0,LoanAmount-MonthlyPmt*(HoldMonths-IOMonths)),LoanAmount*(1+AllInRate/12)^(HoldMonths-IOMonths)-MonthlyPmt*(((1+AllInRate/12)^(HoldMonths-IOMonths)-1)/(AllInRate/12))))", FMT.usd, "OutstandingDebt");
   resRow("Net Sale Proceeds", "GrossSale-SaleCosts-OutstandingDebt", FMT.usd, "NetSaleProceeds", false, true);
 
   let rr = resTop;
@@ -440,12 +447,12 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     styleFormula(c, fmt);
     rr++;
   };
-  ret("Going-In Cap", `${noiY1}/PurchasePrice`, FMT.pct2);
-  ret("Stabilized Yield (on cost)", `${noiY1}/TotalUses`, FMT.pct2);
+  ret("Going-In Cap", `IF(PurchasePrice=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
+  ret("Stabilized Yield (on cost)", `IF(TotalUses=0,"n/a",${noiY1}/TotalUses)`, FMT.pct2);
   ret("Unlevered IRR", `IFERROR(IRR(${unlevRange}),"check inputs")`, FMT.pct1);
   ret("Levered IRR", `IFERROR(IRR(${levRange}),"check inputs")`, FMT.pct1, "LeveredIRR");
-  ret("Unlevered Equity Multiple", `(SUM(${unlevOps}))/(PurchasePrice+ClosingCostsTotal+AcqFee)`, FMT.mult);
-  ret("Levered Equity Multiple", `(SUM(${levcfRange})+NetSaleProceeds)/Equity`, FMT.mult, "LeveredEM");
+  ret("Unlevered Equity Multiple", `IF((PurchasePrice+ClosingCostsTotal+AcqFee)=0,"n/a",(SUM(${unlevOps}))/(PurchasePrice+ClosingCostsTotal+AcqFee))`, FMT.mult);
+  ret("Levered Equity Multiple", `IF(Equity=0,"n/a",(SUM(${levcfRange})+NetSaleProceeds)/Equity)`, FMT.mult, "LeveredEM");
   r = Math.max(r, rr) + 2;
 
   // ── SENSITIVITY (computed at export; labelled static) ──

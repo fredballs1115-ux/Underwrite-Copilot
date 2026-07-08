@@ -4,6 +4,7 @@ import { HyperFormula } from "hyperformula";
 import { buildUnderwriteWorkbook } from "./workbook";
 import { deriveUnderwriteInputs } from "./inputs";
 import { computeUnderwrite } from "./engine";
+import { buildSensitivityGrids, formatSensCell } from "./sensitivity";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
 /**
@@ -146,5 +147,44 @@ describe("generated workbook — IO=999 full-term interest-only", () => {
     const debt = Number(named(hf, "OutstandingDebt"));
     const loan = Number(named(hf, "LoanAmount"));
     expect(debt).toBeCloseTo(loan, 0);
+  });
+});
+
+describe("generated workbook — degenerate inputs still error-free (div guards)", () => {
+  it("an interest-free (rate 0), amortizing loan produces no formula errors", async () => {
+    const z = deriveUnderwriteInputs(extraction, "fallback");
+    z.inputs.allInRatePct = 0;
+    z.inputs.ioMonths = 0; // amortizing → exercises the r=0 balance branch
+    const { hf } = await loadIntoHf(await buildUnderwriteWorkbook(z));
+    const errors: string[] = [];
+    for (const name of hf.getSheetNames()) {
+      (hf.getSheetValues(hf.getSheetId(name)!) as unknown[][]).forEach((row) =>
+        row.forEach((v) => {
+          if (v && typeof v === "object" && "type" in (v as object) && "value" in (v as object))
+            errors.push(name);
+        }),
+      );
+    }
+    expect(errors).toEqual([]);
+    // Outstanding debt should be the loan minus straight-line principal, finite.
+    expect(Number.isFinite(Number(named(hf, "OutstandingDebt")))).toBe(true);
+  });
+});
+
+describe("generated workbook — static sensitivity grids come from the engine", () => {
+  it("every grid cell string appears verbatim on the Deal Summary sheet", async () => {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await buildUnderwriteWorkbook(model)) as unknown as ArrayBuffer);
+    const ds = wb.getWorksheet("Deal Summary")!;
+    const strings: string[] = [];
+    ds.eachRow((row) => row.eachCell((c) => { if (typeof c.value === "string") strings.push(c.value); }));
+    const grids = buildSensitivityGrids(model.inputs);
+    for (const g of grids) {
+      for (const rowCells of g.cells) {
+        for (const cell of rowCells) {
+          expect(strings).toContain(formatSensCell(cell));
+        }
+      }
+    }
   });
 });
