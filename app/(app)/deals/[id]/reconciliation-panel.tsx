@@ -2,10 +2,9 @@
 
 import { useState, useTransition } from "react";
 import {
-  recomputeDiscrepancy,
+  applyOverride,
   severityLabel,
   formatDelta,
-  type Discrepancy,
   type ReconcileResult,
   type Severity,
 } from "@/lib/reconcile";
@@ -20,10 +19,11 @@ const SEV_PILL: Record<Severity, string> = {
 
 /**
  * The discrepancies card (Feature 3): every figure the deal's documents
- * disagree on, ranked by severity, with which source feeds the model and a
- * per-line toggle to switch it. Sits above the analysis so the conflicts are
- * seen before the verdict. Toggling recomputes the row instantly and persists
- * the choice for the next model generation.
+ * disagree on, ranked by severity, with which source is treated as
+ * authoritative and a per-line toggle to switch it. Sits above the analysis so
+ * the conflicts are seen before the verdict. Toggling re-bases and re-ranks the
+ * list instantly and persists the choice, which the challenger uses on the next
+ * screen.
  */
 export function ReconciliationPanel({
   dealId,
@@ -32,19 +32,21 @@ export function ReconciliationPanel({
   dealId: string;
   result: ReconcileResult;
 }) {
-  const [rows, setRows] = useState<Discrepancy[]>(result.discrepancies);
+  const [res, setRes] = useState<ReconcileResult>(result);
   const [, startTransition] = useTransition();
+  const rows = res.discrepancies;
 
   if (!rows.length) return null;
 
   const docLabel = (k: string) => DOC_KIND_LABEL[k] ?? k;
 
-  const choose = (idx: number, docKind: string) => {
-    setRows((prev) =>
-      prev.map((d, i) => (i === idx ? recomputeDiscrepancy(d, docKind) : d)),
-    );
+  // Re-base the whole result on the client (re-sorts + re-counts, exactly like
+  // the server) so the row jumps to its new severity immediately, and persist
+  // the choice so a reload matches.
+  const choose = (key: string, docKind: string) => {
+    setRes((prev) => applyOverride(prev, key, docKind));
     startTransition(() => {
-      void setReconOverride(dealId, rows[idx].key, docKind);
+      void setReconOverride(dealId, key, docKind);
     });
   };
 
@@ -71,12 +73,14 @@ export function ReconciliationPanel({
         </p>
       </div>
       <p className="mt-0.5 text-xs leading-relaxed text-muted">
-        Where the OM, rent roll, and T-12 disagree. The source in use feeds the
-        model — switch it per line if you trust a different document.
+        Where the OM, rent roll, and T-12 disagree. The source in use is the one
+        treated as authoritative here — switch it per line if you trust a
+        different document, and the challenger uses your choice on the next
+        screen.
       </p>
 
       <div className="mt-4 flex flex-col gap-3">
-        {rows.map((d, idx) => (
+        {rows.map((d) => (
           <div key={d.key} className="rounded-xl border border-line/70 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-medium">{d.label}</span>
@@ -98,7 +102,7 @@ export function ReconciliationPanel({
                   <button
                     key={v.docKind}
                     type="button"
-                    onClick={() => choose(idx, v.docKind)}
+                    onClick={() => choose(d.key, v.docKind)}
                     aria-pressed={inUse}
                     title={`Use the ${docLabel(v.docKind)} value for the model`}
                     className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 text-left text-xs transition-colors ${

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   computeDiscrepancies,
+  applyOverride,
   categorize,
   precedenceOrder,
   severityFor,
@@ -31,7 +32,10 @@ describe("classification & precedence", () => {
     expect(precedenceOrder("rents")[0]).toBe("rent_roll");
     expect(precedenceOrder("expenses")[0]).toBe("t12");
     expect(precedenceOrder("income")[0]).toBe("t12");
-    expect(precedenceOrder("other")[0]).toBe("om");
+    // A loan term sheet outranks the OM for debt/off-category facts; the OM
+    // still wins when no loan_terms doc is present.
+    expect(precedenceOrder("other")[0]).toBe("loan_terms");
+    expect(precedenceOrder("other")).toContain("om");
   });
   it("buckets severity by the 2% / 5% thresholds", () => {
     expect(severityFor(0.015)).toBe("minor");
@@ -100,6 +104,72 @@ describe("only overlapping facts reconcile", () => {
       doc("t12", "T-12", [fact("total_opex", "Opex", 500_000, "$500,000", "$")]),
     ];
     expect(computeDiscrepancies(docs).discrepancies).toHaveLength(0);
+  });
+});
+
+describe("unit mismatch never fabricates a discrepancy", () => {
+  it("a $/unit/mo rent is not differenced against an annual $ figure", () => {
+    // Same key, genuinely different units (monthly-per-unit vs annual). These
+    // are the SAME rent expressed two ways — not a conflict.
+    const docs = [
+      doc("om", "OM", [fact("in_place_rent", "In-Place Rent", 1500, "$1,500", "$/unit/mo")]),
+      doc("rent_roll", "Rent Roll", [fact("in_place_rent", "In-Place Rent", 18000, "$18,000", "$")]),
+    ];
+    expect(computeDiscrepancies(docs).discrepancies).toHaveLength(0);
+  });
+
+  it("reconciles within the largest same-unit bucket, dropping the odd unit", () => {
+    const docs = [
+      doc("om", "OM", [fact("in_place_rent", "In-Place Rent", 1500, "$1,500", "$/unit/mo")]),
+      doc("rent_roll", "Rent Roll", [fact("in_place_rent", "In-Place Rent", 1500, "$1,500", "$/unit/mo")]),
+      doc("t12", "T-12", [fact("in_place_rent", "In-Place Rent", 20000, "$20,000", "$")]),
+    ];
+    const r = computeDiscrepancies(docs);
+    expect(r.discrepancies).toHaveLength(1);
+    // Only the two $/unit/mo values are compared — they agree → minor, 0%.
+    expect(r.discrepancies[0].values).toHaveLength(2);
+    expect(r.discrepancies[0].deltaPct).toBe(0);
+  });
+
+  it("still compares when units differ only in formatting", () => {
+    const docs = [
+      doc("om", "OM", [fact("occupancy", "Occupancy", 0.95, "95%", "%")]),
+      doc("rent_roll", "Rent Roll", [fact("occupancy", "Occupancy", 0.92, "92%", "percent")]),
+    ];
+    // "%" and "percent" normalize to the same unit → still reconciled.
+    expect(computeDiscrepancies(docs).discrepancies).toHaveLength(1);
+  });
+});
+
+describe("loan term sheet outranks the OM for debt terms", () => {
+  it("bases an interest-rate conflict on the loan_terms doc", () => {
+    const docs = [
+      doc("om", "OM", [fact("interest_rate", "Interest Rate", 0.055, "5.5%", "%")]),
+      doc("loan_terms", "Term Sheet", [fact("interest_rate", "Interest Rate", 0.06, "6.0%", "%")]),
+    ];
+    const r = computeDiscrepancies(docs);
+    expect(r.discrepancies).toHaveLength(1);
+    expect(r.discrepancies[0].inUse).toBe("loan_terms");
+  });
+});
+
+describe("applyOverride re-bases a stored result", () => {
+  it("flips inUse + delta identically to a fresh compute with the override", () => {
+    const docs = [
+      doc("om", "OM", [fact("occupancy", "Occupancy", 0.95, "95%", "%")]),
+      doc("rent_roll", "Rent Roll", [fact("occupancy", "Occupancy", 0.92, "92%", "%")]),
+    ];
+    const stored = computeDiscrepancies(docs); // base = rent_roll
+    const flipped = applyOverride(stored, "occupancy", "om");
+    expect(flipped.discrepancies[0].inUse).toBe("om");
+    // …and matches recomputing from scratch with that override (the invariant
+    // that makes the toggle sticky across a reload).
+    const fresh = computeDiscrepancies(docs, { occupancy: "om" });
+    expect(flipped.discrepancies[0].deltaPct).toBeCloseTo(
+      fresh.discrepancies[0].deltaPct,
+      6,
+    );
+    expect(flipped.summary).toBe(fresh.summary);
   });
 });
 

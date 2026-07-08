@@ -8,7 +8,9 @@ import type { DocFacts } from "@/lib/model/types";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 
-const EXTRA_KINDS = new Set(["rent_roll", "t12", "financials"]);
+// Any of these alongside the OM is worth a reconciliation pass — including a
+// loan term sheet (authoritative over an OM summary for debt terms).
+const EXTRA_KINDS = new Set(["rent_roll", "t12", "financials", "loan_terms"]);
 
 /**
  * Multi-document reconciliation (Feature 3). Extracts per-document facts from
