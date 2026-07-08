@@ -35,6 +35,7 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 import { downloadDealFile, removeSupplementFile } from "@/lib/storage";
+import { runWeeklyDigests } from "@/lib/digest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Tunables — env-overridable so the test rig can run the real binary fast.
@@ -52,6 +53,12 @@ const PROBE_MS = int(process.env.WORKER_PROBE_MS, 60_000);
 // fires at 10 min, so 4 min keeps a wide margin while writing each waiting
 // row ~once per interval instead of on every tick).
 const KEEPALIVE_AGE_MS = int(process.env.WORKER_KEEPALIVE_AGE_MS, 4 * 60_000);
+// Weekly digest: UTC day-of-week (1 = Monday) and hour to send. Per-user
+// last_digest_at makes double-fires harmless. WORKER_DIGEST_FORCE=1 sends on
+// the next check regardless of clock (the test rig uses it).
+const DIGEST_DOW = int0(process.env.WORKER_DIGEST_DOW, 1);
+const DIGEST_HOUR_UTC = int0(process.env.WORKER_DIGEST_HOUR_UTC, 13);
+const DIGEST_CHECK_MS = int(process.env.WORKER_DIGEST_CHECK_MS, 15 * 60_000);
 
 const INTERRUPTED_MSG =
   "The screen was interrupted repeatedly (worker restarts) and stopped retrying — hit “Try again” to run it fresh.";
@@ -59,6 +66,12 @@ const INTERRUPTED_MSG =
 function int(v: string | undefined, fallback: number): number {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+}
+
+/** Like int(), but 0 is in-domain (day-of-week Sunday, hour midnight). */
+function int0(v: string | undefined, fallback: number): number {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : fallback;
 }
 
 function log(msg: string): void {
@@ -115,6 +128,35 @@ async function heartbeat(): Promise<void> {
       .lt("updated_at", new Date(Date.now() - KEEPALIVE_AGE_MS).toISOString());
   } catch {
     // A missed heartbeat is survivable; the next tick tries again.
+  }
+}
+
+/** Monday-morning pipeline digests. The clock gate picks the window; the
+ *  per-user last_digest_at guard (in runWeeklyDigests) makes overlapping
+ *  fires and worker restarts idempotent. Never blocks job processing — it
+ *  runs on its own timer, and every failure is caught and logged. */
+let digestRunning = false;
+async function digestTick(): Promise<void> {
+  // Reentrancy guard: a run that outlives the check interval must not
+  // overlap itself — the per-user last_digest_at stamp only lands at the
+  // END of each user's send, so two concurrent runs would double-send.
+  if (digestRunning) return;
+  digestRunning = true;
+  try {
+    const now = new Date();
+    // ">= hour", not "== hour": a worker that was down for the exact send
+    // hour still catches up later the same day — the per-user claim in
+    // runWeeklyDigests keeps the wider window duplicate-safe.
+    const inWindow =
+      process.env.WORKER_DIGEST_FORCE === "1" ||
+      (now.getUTCDay() === DIGEST_DOW && now.getUTCHours() >= DIGEST_HOUR_UTC);
+    if (!inWindow) return;
+    const sent = await runWeeklyDigests(admin);
+    if (sent > 0) log(`weekly digest sent to ${sent} user${sent === 1 ? "" : "s"}`);
+  } catch (err) {
+    log(`digest tick failed: ${err instanceof Error ? err.message : err}`);
+  } finally {
+    digestRunning = false;
   }
 }
 
@@ -317,6 +359,9 @@ async function main(): Promise<void> {
 
   const ticker = setInterval(() => void heartbeat(), HEARTBEAT_MS);
   ticker.unref?.();
+  void digestTick();
+  const digestTicker = setInterval(() => void digestTick(), DIGEST_CHECK_MS);
+  digestTicker.unref?.();
 
   while (!shuttingDown) {
     let job: ClaimedJob | null = null;

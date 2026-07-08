@@ -27,6 +27,7 @@ import {
   type Stage,
 } from "@/lib/stages";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
+import { parseDealNotes } from "@/lib/deals";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 
 // Keep PDFs comfortably under Claude's ~32MB per-request limit (base64 inflates
@@ -717,5 +718,95 @@ export async function reconcileWithModel(formData: FormData) {
   }
 
   if (!workerMode) after(() => runReconciliation(dealId, { name, buffer }));
+  redirect(`/deals/${dealId}`);
+}
+
+/**
+ * Decision log — append a note to the deal. Notes live as a jsonb array on
+ * the deal row (migration 0017); RLS scopes the write to deals the caller
+ * can see, and the author's email is stamped so teams see who said what.
+ */
+export async function addDealNote(formData: FormData) {
+  const dealId = String(formData.get("dealId") ?? "");
+  // Array.from splits by code point, so the cap can't shear an emoji in half.
+  const text = Array.from(String(formData.get("text") ?? "").trim())
+    .slice(0, 500)
+    .join("");
+  if (!dealId) redirect("/deals");
+  if (!text) redirect(`/deals/${dealId}?error=noteempty`);
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const note = {
+    at: new Date().toISOString(),
+    by: user.email ?? "unknown",
+    // Stable identity for deletes — emails change, ids don't.
+    byId: user.id,
+    text,
+  };
+
+  // Atomic jsonb append (RPC from 0017) so two teammates writing at once
+  // never lose each other's notes. Falls back to read-modify-write when the
+  // function hasn't been migrated yet.
+  const { error: rpcErr } = await supabase.rpc("append_deal_note", {
+    p_deal: dealId,
+    p_note: note,
+  });
+  if (rpcErr) {
+    const { data: deal, error: readErr } = await supabase
+      .from("deals")
+      .select("id, notes")
+      .eq("id", dealId)
+      .maybeSingle();
+    if (readErr) redirect(`/deals/${dealId}?error=note`);
+    if (!deal) redirect("/deals");
+    const notes = parseDealNotes(deal.notes);
+    notes.push(note);
+    const { error } = await supabase
+      .from("deals")
+      .update({ notes, updated_at: new Date().toISOString() })
+      .eq("id", dealId);
+    if (error) redirect(`/deals/${dealId}?error=note`);
+  }
+
+  revalidatePath(`/deals/${dealId}`);
+  redirect(`/deals/${dealId}`);
+}
+
+/** Remove one of the caller's OWN notes (identified by its timestamp). */
+export async function deleteDealNote(formData: FormData) {
+  const dealId = String(formData.get("dealId") ?? "");
+  const at = String(formData.get("at") ?? "");
+  if (!dealId || !at) redirect("/deals");
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: deal } = await supabase
+    .from("deals")
+    .select("id, notes")
+    .eq("id", dealId)
+    .maybeSingle();
+  if (!deal) redirect("/deals");
+
+  // Identity: the stamped user id when present (survives email changes),
+  // else the write-time email for notes from before byId existed.
+  const notes = parseDealNotes(deal.notes).filter(
+    (n) => !(n.at === at && (n.byId ? n.byId === user.id : n.by === (user.email ?? "unknown"))),
+  );
+  const { error } = await supabase
+    .from("deals")
+    .update({ notes, updated_at: new Date().toISOString() })
+    .eq("id", dealId);
+  if (error) redirect(`/deals/${dealId}?error=notedelete`);
+
+  revalidatePath(`/deals/${dealId}`);
   redirect(`/deals/${dealId}`);
 }

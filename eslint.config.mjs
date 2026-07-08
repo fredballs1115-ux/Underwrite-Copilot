@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Bundled output (worker build + local test bundles) — generated, not source.
+    "dist/**",
   ]),
 ]);
 

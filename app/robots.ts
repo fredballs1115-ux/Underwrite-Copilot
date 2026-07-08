@@ -10,7 +10,8 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      // Everything behind auth stays out of the index.
+      // Everything behind auth stays out of the index — and shared screens
+      // are for the people holding the link, not crawlers.
       disallow: [
         "/api/",
         "/deals",
@@ -19,6 +20,8 @@ export default function robots(): MetadataRoute.Robots {
         "/account",
         "/team",
         "/criteria",
+        "/analytics",
+        "/share/",
         "/preview-shell",
       ],
     },

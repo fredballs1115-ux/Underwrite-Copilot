@@ -159,6 +159,78 @@ export function geoTargets(box: BuyBox): GeoTarget[] {
  * produce rows; anything the screen hasn't yielded parseable data for is
  * reported "unknown", never silently passed.
  */
+/** Fields of FirstSignal / StructuredAddress the check source consumes —
+ *  structural so this stays importable everywhere without heavy types. */
+interface SignalLike {
+  assetClass: string;
+  market: string;
+  askPrice: string;
+  goingInCap: string;
+  perUnit: string;
+}
+interface AddressLike {
+  label?: string;
+  county?: string;
+  state?: string;
+}
+
+/**
+ * Build the pseudo-extraction the buy box is judged against: the full
+ * extraction when it's in, else the ~30s first signal standing in, with the
+ * user-entered address widening the location haystack either way. ONE
+ * implementation — the deal page, the triage endpoint, and anything else
+ * must agree on what "fits the box" means mid-screen.
+ */
+export function buyBoxCheckSource(
+  extraction: ExtractionLike | null,
+  firstSignal: SignalLike | null,
+  dealAddress: AddressLike | null,
+): ExtractionLike | null {
+  const addressHaystack = [
+    extraction?.address,
+    dealAddress?.label,
+    dealAddress?.county,
+    dealAddress?.state,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const signalMetrics = firstSignal
+    ? [
+        { label: "Asking price", value: firstSignal.askPrice },
+        { label: "Going-in cap rate", value: firstSignal.goingInCap },
+        {
+          // Broad per-area test: "sf", "psf", "sq ft", "square foot", "/ft"
+          // must all count — a per-SF figure misread as per-unit would give
+          // the buy-box check a confidently wrong basis.
+          label: /sf|sq|square|psf|\/\s?ft/i.test(firstSignal.perUnit)
+            ? "Price per SF"
+            : "Price per unit",
+          value: firstSignal.perUnit,
+        },
+      ].filter((m) => m.value.trim())
+    : [];
+  if (!extraction && !firstSignal && !dealAddress) return null;
+  return {
+    assetClass: extraction?.assetClass ?? firstSignal?.assetClass ?? "",
+    market: extraction?.market ?? firstSignal?.market ?? "",
+    address: addressHaystack,
+    metrics: extraction?.metrics ?? signalMetrics,
+  };
+}
+
+/** Fold a check list to one call, matching the pipeline table's semantics:
+ *  any miss → outside; else any near → near; else any pass → fits; nothing
+ *  checkable → null. ONE fold — every surface must agree on what a deal's
+ *  fit is, or adjacent chips contradict each other. */
+export function foldBuyBoxChecks(
+  checks: BuyBoxCheck[],
+): "fits" | "near" | "outside" | null {
+  if (checks.some((c) => c.status === "miss")) return "outside";
+  if (checks.some((c) => c.status === "near")) return "near";
+  if (checks.some((c) => c.status === "pass")) return "fits";
+  return null;
+}
+
 export function evaluateBuyBox(
   dealAssetClass: string,
   extraction: ExtractionLike | null,

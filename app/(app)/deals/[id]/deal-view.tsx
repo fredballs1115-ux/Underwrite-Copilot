@@ -12,9 +12,14 @@ import type {
   VerdictResult,
 } from "@/lib/anthropic/types";
 import type { BuyBoxCheck } from "@/lib/criteria";
-import { STAGE_LABEL, type StageChange } from "@/lib/stages";
+import { type StageChange } from "@/lib/stages";
 import type { InternalComp } from "@/lib/internal-comps";
 import { DebtSizer } from "./debt-sizer";
+import { DecisionLog } from "./decision-log";
+import { AskPanel } from "./ask-panel";
+import { LoiPanel } from "./loi-panel";
+import type { DealNote, AskEntry } from "@/lib/deals";
+import { parseUsd } from "@/lib/money";
 import type { ScreenDiff } from "@/lib/screen-diff";
 import {
   OverviewView,
@@ -158,12 +163,49 @@ const MODEL_ERRORS: Record<string, string> = {
   supp: "Couldn’t save your change — please try again.",
   delete: "Couldn’t delete the deal — please try again.",
   stage: "Couldn’t save the stage — please try again.",
+  note: "Couldn’t save your note — please try again.",
+  noteempty: "Write something in the note first — whitespace doesn’t count.",
+  notedelete: "Couldn’t remove that note — please try again.",
+  share: "Couldn’t manage that share link — please try again.",
+  loipro:
+    "The LOI draft is part of Pro — upgrade on the Billing page to generate it.",
+  loiprice:
+    "Couldn’t read the LOI’s price or deposit as dollar amounts — check the two figures.",
+  loideposit:
+    "The LOI’s deposit is larger than its offer price — double-check the two figures.",
+  loisample:
+    "The sample deal is a walkthrough — LOI drafts generate on your own deals.",
+  loifail: "Couldn’t build the LOI just now — please try again in a moment.",
+  reportpro:
+    "The full report is part of Pro — upgrade on the Billing page to export it.",
+  reportempty: "Run the screen first — the full report needs a verdict to export.",
+  reportfail:
+    "Couldn’t build the full report just now — please try again in a moment.",
+  shareempty: "Run the screen first — a share link leads with the verdict.",
   deadline: "Couldn’t save the offers-due date — please try again.",
 };
 
 // Errors from the Reconciler tab's own upload are shown inline there; every
 // other code lands the user on Overview, so it needs a top-level banner.
 const RECONCILE_ERROR_CODES = new Set(["modelfile", "modeltype", "modelsize"]);
+
+/** The extraction's asking-price string, for the LOI prefill ("" unknown). */
+function askingPriceValue(extraction: ExtractionResult | null): string {
+  // Extractions routinely carry "Asking price / unit", "Purchase price per
+  // SF", and "Asking cap rate" alongside the whole-asset figure — labels the
+  // bare /asking/ test also matches. Exclude them, then prefer the first
+  // candidate that parses as a plausible whole-asset price so one odd label
+  // can't blank (or worse, shrink) the prefill.
+  const exclude = /unit|\/ ?sf\b|per sf|psf|\bcap\b|rate|%/i;
+  const candidates = (extraction?.metrics ?? []).filter(
+    (x) =>
+      /asking|purchase\s+price|^price$/i.test(x.label) &&
+      !exclude.test(x.label) &&
+      x.value.trim(),
+  );
+  const parsed = candidates.find((x) => parseUsd(x.value) !== null);
+  return (parsed ?? candidates[0])?.value ?? "";
+}
 
 function isActive(status: string | undefined): boolean {
   return status === "queued" || status === "running";
@@ -218,6 +260,11 @@ export function DealView({
   stageHistory,
   internalComps = [],
   omUrl,
+  notes = [],
+  userEmail = null,
+  qa = [],
+  isSample = false,
+  userId = null,
 }: {
   dealId: string;
   dealName: string;
@@ -237,6 +284,11 @@ export function DealView({
   stageHistory: StageChange[];
   internalComps?: InternalComp[];
   omUrl: string | null;
+  notes?: DealNote[];
+  userEmail?: string | null;
+  qa?: AskEntry[];
+  isSample?: boolean;
+  userId?: string | null;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -590,7 +642,20 @@ export function DealView({
               active={active}
               onNavigate={navigateLegacy}
             />
-            {stageHistory.length > 0 && <StageHistory entries={stageHistory} />}
+            <AskPanel
+              dealId={dealId}
+              qa={qa}
+              hasOm={hasOm}
+              isSample={isSample}
+              isPro={isPro}
+            />
+            <DecisionLog
+              dealId={dealId}
+              notes={notes}
+              stageHistory={stageHistory}
+              userEmail={userEmail}
+              userId={userId}
+            />
           </div>
         )}
 
@@ -630,16 +695,25 @@ export function DealView({
         )}
 
         {section === "documents" && (
-          <DocumentsPanel
-            dealId={dealId}
-            hasOm={hasOm}
-            omUrl={omUrl}
-            canMemo={isPro && !!results.verdict}
-            hasVerdict={!!results.verdict}
-            documents={documents}
-            supplements={supplements}
-            active={active}
-          />
+          <div className="flex flex-col gap-6">
+            <DocumentsPanel
+              dealId={dealId}
+              hasOm={hasOm}
+              omUrl={omUrl}
+              canMemo={isPro && !!results.verdict}
+              hasVerdict={!!results.verdict}
+              documents={documents}
+              supplements={supplements}
+              active={active}
+            />
+            {!isSample && (
+              <LoiPanel
+                dealId={dealId}
+                askingPrice={askingPriceValue(results.extraction)}
+                isPro={isPro}
+              />
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -1153,32 +1227,6 @@ function useElapsed(): string {
 
 /** Where the deal has been: every stage change with its date, newest first.
  *  Simple by design — a paper trail, not a timeline visualization. */
-function StageHistory({ entries }: { entries: StageChange[] }) {
-  const ordered = [...entries].reverse();
-  return (
-    <section className="rounded-2xl border border-line bg-surface p-5 shadow-card">
-      <h2 className="text-sm font-semibold tracking-tight">Stage history</h2>
-      <ul className="mt-3 space-y-1.5">
-        {ordered.map((e, i) => (
-          <li key={`${e.at}-${i}`} className="flex items-baseline gap-3 text-sm">
-            <span className="w-24 shrink-0 font-mono text-xs tabular-nums text-muted">
-              {new Date(e.at).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-                timeZone: "UTC",
-              })}
-            </span>
-            <span>
-              Moved to{" "}
-              <span className="font-medium">{STAGE_LABEL[e.stage]}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
 
 const COMP_CALL: Record<string, { label: string; cls: string }> = {
   pass: { label: "Go", cls: "bg-pass/15 text-pass" },

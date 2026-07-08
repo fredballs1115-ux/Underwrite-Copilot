@@ -64,6 +64,14 @@ const IconUsers = (p: { className?: string }) => (
     <path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </NavIcon>
 );
+const IconChart = (p: { className?: string }) => (
+  <NavIcon className={p.className}>
+    <path d="M3 3v18h18" />
+    <path d="M8 17v-3" />
+    <path d="M13 17V7" />
+    <path d="M18 17v-6" />
+  </NavIcon>
+);
 
 /** The signed-in app chrome: a dark navy sidebar on desktop, a top bar on mobile. */
 export function AppShell({
@@ -76,6 +84,7 @@ export function AppShell({
   const pathname = usePathname();
   const inPipeline = pathname.startsWith("/deals");
   const inCriteria = pathname.startsWith("/criteria");
+  const inAnalytics = pathname.startsWith("/analytics");
   const inTeam = pathname.startsWith("/team");
   const inBilling = pathname.startsWith("/billing");
   const inAccount = pathname.startsWith("/account");
@@ -131,6 +140,7 @@ export function AppShell({
             [
               ["/deals", "Pipeline", inPipeline, IconLayers],
               ["/criteria", "Buy box", inCriteria, IconTarget],
+              ["/analytics", "Analytics", inAnalytics, IconChart],
               ["/team", "Team", inTeam, IconUsers],
               ["/billing", "Billing", inBilling, IconCard],
               ["/account", "Account", inAccount, IconUser],
@@ -228,6 +238,7 @@ export function AppShell({
             {[
               { href: "/deals", label: "Pipeline", active: inPipeline },
               { href: "/criteria", label: "Buy box", active: inCriteria },
+              { href: "/analytics", label: "Analytics", active: inAnalytics },
               { href: "/team", label: "Team", active: inTeam },
               { href: "/billing", label: "Billing", active: inBilling },
               { href: "/account", label: "Account", active: inAccount },
