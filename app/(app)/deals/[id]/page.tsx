@@ -30,6 +30,7 @@ import { parseDealNotes, parseDealQa } from "@/lib/deals";
 import { deriveInternalComps } from "@/lib/internal-comps";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, buyBoxCheckSource, type BuyBoxCheck } from "@/lib/criteria";
+import { scoreMandateFit, type MandateScore, type MandateVerdict } from "@/lib/mandate";
 
 const VERDICT_PILL = {
   pass: { label: "Go", cls: "bg-pass/15 text-pass" },
@@ -234,6 +235,13 @@ export default async function DealPage({
   const buyBoxChecks: BuyBoxCheck[] = buyBox
     ? evaluateBuyBox(deal.asset_class, checkSource, buyBox)
     : [];
+  // The single 0–100 mandate-fit read (Feature 4) — same evidence as the
+  // per-criterion checks above, rolled into one number and a PURSUE/WATCH/PASS
+  // call. Null until there's a box AND something checkable against it.
+  const mandate: MandateScore | null =
+    buyBox && checkSource
+      ? scoreMandateFit(deal.asset_class, checkSource, buyBox)
+      : null;
 
   // The three summary-bar figures — a 5-second read, nothing more. The full
   // metric set lives one click away in Financials.
@@ -269,18 +277,29 @@ export default async function DealPage({
     findValue(metrics, /\bcap rate\b/i, /exit|terminal|reversion/i) ??
     (firstSignal?.goingInCap.trim() || null);
 
-  // The buy-box verdict as one chip: any hard miss → Outside; else near
-  // misses → Near; else all pass → Fits; else unverified.
+  // The buy-box call as one chip. When there's a numeric mandate-fit score,
+  // it leads — "Buy box 82 · Pursue", coloured by the PURSUE/WATCH/PASS call.
+  // Otherwise the older fold (Outside / Near / Fits) stands in.
+  const MANDATE_PILL: Record<MandateVerdict, string> = {
+    PURSUE: "bg-pass/10 text-pass",
+    WATCH: "bg-caution/10 text-caution",
+    PASS: "bg-kill/10 text-kill",
+  };
   const buyBoxChip = !buyBox
     ? null
-    : buyBoxChecks.some((c) => c.status === "miss")
-      ? { label: "Outside buy box", cls: "bg-kill/10 text-kill" }
-      : buyBoxChecks.some((c) => c.status === "near")
-        ? { label: "Near buy box", cls: "bg-caution/10 text-caution" }
-        : buyBoxChecks.length > 0 &&
-            buyBoxChecks.every((c) => c.status === "pass")
-          ? { label: "Fits buy box", cls: "bg-pass/10 text-pass" }
-          : { label: "Buy box unverified", cls: "bg-faint text-muted" };
+    : mandate?.score != null && mandate.verdict
+      ? {
+          label: `Buy box ${mandate.score} · ${mandate.verdict === "PURSUE" ? "Pursue" : mandate.verdict === "WATCH" ? "Watch" : "Pass"}`,
+          cls: MANDATE_PILL[mandate.verdict],
+        }
+      : buyBoxChecks.some((c) => c.status === "miss")
+        ? { label: "Outside buy box", cls: "bg-kill/10 text-kill" }
+        : buyBoxChecks.some((c) => c.status === "near")
+          ? { label: "Near buy box", cls: "bg-caution/10 text-caution" }
+          : buyBoxChecks.length > 0 &&
+              buyBoxChecks.every((c) => c.status === "pass")
+            ? { label: "Fits buy box", cls: "bg-pass/10 text-pass" }
+            : { label: "Buy box unverified", cls: "bg-faint text-muted" };
 
   const addressLine =
     extraction?.address ||
@@ -489,6 +508,7 @@ export default async function DealPage({
         isPro={pro}
         buyBox={{
           checks: buyBoxChecks,
+          mandate,
           scope: ownership.team_id ? "team" : "personal",
           provisional: !extraction && !!firstSignal,
           hasBox: !!buyBox,

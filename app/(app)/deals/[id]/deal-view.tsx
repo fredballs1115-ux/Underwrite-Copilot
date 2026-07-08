@@ -12,6 +12,7 @@ import type {
   VerdictResult,
 } from "@/lib/anthropic/types";
 import type { BuyBoxCheck } from "@/lib/criteria";
+import type { MandateScore, MandateVerdict } from "@/lib/mandate";
 import { type StageChange } from "@/lib/stages";
 import type { InternalComp } from "@/lib/internal-comps";
 import { DebtSizer } from "./debt-sizer";
@@ -244,6 +245,8 @@ const SECTION_STEPS: Record<SectionKey, string[]> = {
 
 export interface BuyBoxPanelData {
   checks: BuyBoxCheck[];
+  /** the single 0–100 mandate-fit score + PURSUE/WATCH/PASS (null pre-screen) */
+  mandate: MandateScore | null;
   scope: "team" | "personal";
   /** the checks came from the first signal, not the full extraction yet */
   provisional: boolean;
@@ -815,6 +818,69 @@ function FinancialsPanel({
   );
 }
 
+const MANDATE_META: Record<
+  MandateVerdict,
+  { label: string; text: string; bar: string; chip: string }
+> = {
+  PURSUE: { label: "Pursue", text: "text-pass", bar: "bg-pass", chip: "bg-pass/15 text-pass" },
+  WATCH: { label: "Watch", text: "text-caution", bar: "bg-caution", chip: "bg-caution/15 text-caution" },
+  PASS: { label: "Pass", text: "text-kill", bar: "bg-kill", chip: "bg-kill/15 text-kill" },
+};
+
+/** The 0–100 mandate-fit score as a headline gauge: the number, the
+ *  PURSUE/WATCH/PASS call, a bar with the 50/75 verdict thresholds marked, and
+ *  the honest coverage line (what was scored, what's still pending). */
+function MandateScoreHeader({ mandate }: { mandate: MandateScore }) {
+  const score = mandate.score!;
+  const meta = MANDATE_META[mandate.verdict!];
+  const scored = mandate.dimensions.filter((d) => d.status !== "unknown").length;
+  const pending = mandate.dimensions.length - scored;
+
+  return (
+    <div className="mt-3 rounded-xl border border-line bg-faint/60 p-4">
+      <div className="flex items-center gap-4">
+        <div className="flex items-baseline gap-1">
+          <span className={`text-4xl font-semibold tabular-nums tracking-tight ${meta.text}`}>
+            {score}
+          </span>
+          <span className="text-sm text-muted">/ 100</span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span
+              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${meta.chip}`}
+            >
+              {meta.label}
+            </span>
+            <span className="text-xs text-muted">mandate fit</span>
+          </div>
+          {/* The bar, with the WATCH (50) and PURSUE (75) thresholds ticked. */}
+          <div className="relative mt-2 h-2 w-full overflow-hidden rounded-full bg-line">
+            <div
+              className={`h-full rounded-full ${meta.bar}`}
+              style={{ width: `${score}%` }}
+            />
+            <span className="absolute inset-y-0 left-[50%] w-px bg-surface/70" aria-hidden />
+            <span className="absolute inset-y-0 left-[75%] w-px bg-surface/70" aria-hidden />
+          </div>
+        </div>
+      </div>
+      <p className="mt-2.5 text-xs leading-relaxed text-muted">
+        {mandate.dealbreakerTripped ? (
+          <span className="font-medium text-kill">
+            A hard dealbreaker was tripped — capped at Pass regardless of the rest.{" "}
+          </span>
+        ) : null}
+        Scored on {scored} of {mandate.dimensions.length} criteria you set
+        {pending > 0 ? `, ${pending} pending more data` : ""}.
+        {mandate.unresolvedDealbreakers > 0 && !mandate.dealbreakerTripped
+          ? ` ${mandate.unresolvedDealbreakers} dealbreaker${mandate.unresolvedDealbreakers > 1 ? "s" : ""} couldn't be checked — verify manually.`
+          : ""}
+      </p>
+    </div>
+  );
+}
+
 /** The mandate check, full detail — the bar carries only the chip. */
 function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
   if (!data.hasBox) {
@@ -860,6 +926,9 @@ function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
           Edit criteria →
         </Link>
       </div>
+      {data.mandate?.score != null && data.mandate.verdict && (
+        <MandateScoreHeader mandate={data.mandate} />
+      )}
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {data.checks.map((c) => (
           <div

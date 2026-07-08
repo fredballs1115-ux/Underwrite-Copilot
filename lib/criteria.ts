@@ -32,10 +32,45 @@ export interface BuyBox {
   maxPerUnitK?: number;
   /** minimum going-in cap rate, % */
   minCapPct?: number;
+  /** minimum year-one cash-on-cash, % */
+  minCoCPct?: number;
   /** target base-case return (IRR), % */
   minIrrPct?: number;
+  /** hard disqualifiers — any one tripped forces a PASS verdict regardless of
+   *  the rest of the score (see lib/mandate.ts). All optional/off by default. */
+  dealbreakers?: Dealbreakers;
   /** free-text priorities, fed to the verdict synthesizer verbatim */
   notes?: string;
+}
+
+/**
+ * Absolute red lines. Distinct from the scored bands above: a scored miss
+ * costs points, a tripped dealbreaker caps the verdict at PASS. Every field is
+ * checked deterministically against the same extraction the score reads.
+ */
+export interface Dealbreakers {
+  /** an asset class outside the mandate list is an automatic PASS */
+  requireAssetClass?: boolean;
+  /** a location outside the target geographies is an automatic PASS */
+  requireGeography?: boolean;
+  /** hard purchase-price ceiling, $ millions */
+  maxPriceM?: number;
+  /** hard going-in cap floor, % */
+  minCapPct?: number;
+  /** hard basis ceiling, $ thousands per unit */
+  maxPerUnitK?: number;
+}
+
+/** True when the dealbreakers object carries no active red line. */
+export function hasNoDealbreakers(d: Dealbreakers | null | undefined): boolean {
+  if (!d) return true;
+  return (
+    !d.requireAssetClass &&
+    !d.requireGeography &&
+    d.maxPriceM == null &&
+    d.minCapPct == null &&
+    d.maxPerUnitK == null
+  );
 }
 
 /** near = a miss inside the tolerance band — worth a look, not a kill. */
@@ -48,10 +83,38 @@ export interface BuyBoxCheck {
   detail: string;
 }
 
-// Near-miss tolerances, per criterion kind.
-const NEAR_REL = 0.1; // price / SF / per-unit: within 10% beyond the bound
-const NEAR_CAP_PT = 0.25; // going-in cap: within 25bps of the floor
-const NEAR_IRR_PT = 1.0; // IRR: within 1pt of the target
+// Near-miss tolerances, per criterion kind. Exported because the mandate-fit
+// SCORE (lib/mandate.ts) awards proportional partial credit across exactly
+// these bands — so "near" on a chip and "partial credit" in the score always
+// mean the same distance from the bound.
+export const NEAR_REL = 0.1; // price / SF / per-unit: within 10% beyond the bound
+export const NEAR_CAP_PT = 0.25; // going-in cap: within 25bps of the floor
+export const NEAR_IRR_PT = 1.0; // IRR / CoC: within 1pt of the target
+
+/**
+ * The metric-label patterns the screen figures are pulled out with. Shared by
+ * the buy-box fit check (evaluateBuyBox, below) and the mandate-fit score
+ * (lib/mandate.ts) so both read the SAME figure out of an extraction — a regex
+ * that drifts in one place would silently score a deal on a different number
+ * than the chip says it checked. One definition, both consumers.
+ */
+export const METRIC_FIND = {
+  sf: {
+    inc: /\b(total sf|square (foot|feet|footage)|sq\.? ?ft|rentable|nra|gla|building size|\bsf\b)/i,
+    exc: /price|\$|per|\/|psf/i,
+  },
+  price: {
+    inc: /purchase price|asking price|\bprice\b/i,
+    exc: /unit|\/sf|per sf|per unit|psf/i,
+  },
+  perUnit: { inc: /per unit|\/unit|price\/unit|unit price/i },
+  goingInCap: { inc: /going[- ]?in cap/i },
+  capRate: { inc: /\bcap rate\b/i, exc: /exit|terminal|reversion/i },
+  irr: { inc: /\birr\b/i },
+  // Cash-on-cash isn't a required extraction field, so it's often absent —
+  // when it is, the score reports the CoC dimension "unknown", never a pass.
+  coc: { inc: /cash[- ]?on[- ]?cash|cash[- ]?on[- ]?equity|cash yield|\bcoc\b/i },
+} as const;
 
 export function isEmptyBuyBox(box: BuyBox | null | undefined): boolean {
   if (!box) return true;
@@ -66,9 +129,95 @@ export function isEmptyBuyBox(box: BuyBox | null | undefined): boolean {
     box.maxPriceM == null &&
     box.maxPerUnitK == null &&
     box.minCapPct == null &&
+    box.minCoCPct == null &&
     box.minIrrPct == null &&
+    hasNoDealbreakers(box.dealbreakers) &&
     !box.notes?.trim()
   );
+}
+
+// ---------------------------------------------------------------------------
+// Multiple named buy boxes (Feature 4).
+//
+// The `criteria` JSONB column holds EITHER a bare BuyBox (the legacy shape,
+// still written when there's only one box) OR a versioned envelope carrying
+// several named boxes and which one is active. `resolveBuyBoxStore` normalizes
+// both into a canonical store; `serializeBuyBoxStore` collapses back to the
+// most backward-compatible shape. Every reader goes through these, so nothing
+// downstream has to know which shape is on disk — and a rollback to pre-F4
+// code reading a single-box account still sees a plain BuyBox.
+// ---------------------------------------------------------------------------
+
+export interface NamedBuyBox {
+  id: string;
+  name: string;
+  box: BuyBox;
+}
+export interface BuyBoxStore {
+  boxes: NamedBuyBox[];
+  /** id of the box every screen is judged against */
+  activeId: string;
+}
+
+/** Normalize the stored `criteria` value (legacy bare box OR v2 envelope). */
+export function resolveBuyBoxStore(raw: unknown): BuyBoxStore {
+  if (!raw || typeof raw !== "object") return { boxes: [], activeId: "" };
+  const obj = raw as Record<string, unknown>;
+
+  // v2 envelope: a list of named boxes plus the active id.
+  if (Array.isArray(obj.boxes)) {
+    const boxes: NamedBuyBox[] = [];
+    obj.boxes.forEach((item, i) => {
+      if (!item || typeof item !== "object") return;
+      const it = item as Record<string, unknown>;
+      boxes.push({
+        id: typeof it.id === "string" && it.id ? it.id : `box-${i}`,
+        name: typeof it.name === "string" && it.name.trim() ? it.name.trim() : `Mandate ${i + 1}`,
+        box: (it.box && typeof it.box === "object" ? it.box : {}) as BuyBox,
+      });
+    });
+    if (!boxes.length) return { boxes: [], activeId: "" };
+    const activeId =
+      typeof obj.activeId === "string" && boxes.some((b) => b.id === obj.activeId)
+        ? obj.activeId
+        : boxes[0].id;
+    return { boxes, activeId };
+  }
+
+  // Legacy bare BuyBox.
+  const box = obj as BuyBox;
+  if (isEmptyBuyBox(box)) return { boxes: [], activeId: "" };
+  return { boxes: [{ id: "default", name: "Mandate", box }], activeId: "default" };
+}
+
+/** The active box out of a store — or null when it's unset/empty. */
+export function activeBox(store: BuyBoxStore): BuyBox | null {
+  const found =
+    store.boxes.find((b) => b.id === store.activeId) ?? store.boxes[0] ?? null;
+  return found && !isEmptyBuyBox(found.box) ? found.box : null;
+}
+
+/** Collapse a store back to what goes in `criteria`: null when empty, a bare
+ *  box for the single-box case (backward-compatible), else the v2 envelope. */
+export function serializeBuyBoxStore(store: BuyBoxStore): BuyBox | Record<string, unknown> | null {
+  const boxes = store.boxes;
+  if (boxes.length === 0) return null;
+  if (boxes.length === 1) {
+    const only = boxes[0];
+    if (isEmptyBuyBox(only.box)) return null;
+    // A single default-named box stores as a bare BuyBox (backward-compatible);
+    // a custom name is only preserved by keeping the envelope.
+    if (!only.name || only.name === "Mandate") return only.box;
+    return { v: 2, activeId: only.id, boxes: [{ id: only.id, name: only.name, box: only.box }] };
+  }
+  const activeId = boxes.some((b) => b.id === store.activeId)
+    ? store.activeId
+    : boxes[0].id;
+  return {
+    v: 2,
+    activeId,
+    boxes: boxes.map((b) => ({ id: b.id, name: b.name, box: b.box })),
+  };
 }
 
 /** "$70.7M" / "$70,700,000" / "285k" / "1.2 mm" → dollars (or plain number), or null. */
@@ -300,11 +449,7 @@ export function evaluateBuyBox(
 
   // ---- Size (SF) ---------------------------------------------------------
   if (box.sfMin != null || box.sfMax != null) {
-    const metric = findMetric(
-      metrics,
-      /\b(total sf|square (foot|feet|footage)|sq\.? ?ft|rentable|nra|gla|building size|\bsf\b)/i,
-      /price|\$|per|\/|psf/i,
-    );
+    const metric = findMetric(metrics, METRIC_FIND.sf.inc, METRIC_FIND.sf.exc);
     const sf = metric ? parseMoney(metric.value) : null;
     const bandText = [
       box.sfMin != null ? `${fmtSf(box.sfMin)} min` : null,
@@ -347,8 +492,8 @@ export function evaluateBuyBox(
   if (band.min != null || band.max != null) {
     const metric = findMetric(
       metrics,
-      /purchase price|asking price|\bprice\b/i,
-      /unit|\/sf|per sf|per unit|psf/i,
+      METRIC_FIND.price.inc,
+      METRIC_FIND.price.exc,
     );
     const dollars = metric ? parseMoney(metric.value) : null;
     const bandText = [
@@ -389,7 +534,7 @@ export function evaluateBuyBox(
 
   // ---- Price per unit ----------------------------------------------------
   if (box.maxPerUnitK != null) {
-    const metric = findMetric(metrics, /per unit|\/unit|price\/unit|unit price/i);
+    const metric = findMetric(metrics, METRIC_FIND.perUnit.inc);
     const dollars = metric ? parseMoney(metric.value) : null;
     const max = box.maxPerUnitK * 1e3;
     if (dollars == null) {
@@ -420,8 +565,8 @@ export function evaluateBuyBox(
   // ---- Going-in cap ------------------------------------------------------
   if (box.minCapPct != null) {
     const metric =
-      findMetric(metrics, /going[- ]?in cap/i) ??
-      findMetric(metrics, /\bcap rate\b/i, /exit|terminal|reversion/i);
+      findMetric(metrics, METRIC_FIND.goingInCap.inc) ??
+      findMetric(metrics, METRIC_FIND.capRate.inc, METRIC_FIND.capRate.exc);
     const pct = metric ? parsePct(metric.value) : null;
     if (pct == null) {
       checks.push({
@@ -450,7 +595,7 @@ export function evaluateBuyBox(
 
   // ---- Target return (IRR) ----------------------------------------------
   if (box.minIrrPct != null) {
-    const metric = findMetric(metrics, /\birr\b/i);
+    const metric = findMetric(metrics, METRIC_FIND.irr.inc);
     const pct = metric ? parsePct(metric.value) : null;
     if (pct == null) {
       checks.push({
@@ -503,8 +648,20 @@ export function buyBoxLines(box: BuyBox): string[] {
   if (box.maxPerUnitK != null)
     lines.push(`Max basis per unit: $${box.maxPerUnitK}k`);
   if (box.minCapPct != null) lines.push(`Min going-in cap: ${box.minCapPct}%`);
+  if (box.minCoCPct != null)
+    lines.push(`Min year-one cash-on-cash: ${box.minCoCPct}%`);
   if (box.minIrrPct != null)
     lines.push(`Target base-case IRR: ${box.minIrrPct}%+`);
+  const db = box.dealbreakers;
+  if (!hasNoDealbreakers(db)) {
+    const parts: string[] = [];
+    if (db!.requireAssetClass) parts.push("asset class must be in the mandate");
+    if (db!.requireGeography) parts.push("must sit in a target market");
+    if (db!.maxPriceM != null) parts.push(`price ≤ $${db!.maxPriceM}M`);
+    if (db!.minCapPct != null) parts.push(`going-in cap ≥ ${db!.minCapPct}%`);
+    if (db!.maxPerUnitK != null) parts.push(`basis ≤ $${db!.maxPerUnitK}k/unit`);
+    if (parts.length) lines.push(`Dealbreakers: ${parts.join("; ")}`);
+  }
   if (box.notes?.trim()) lines.push(`Priorities: ${box.notes.trim()}`);
   return lines;
 }

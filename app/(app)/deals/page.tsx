@@ -6,6 +6,7 @@ import type { ExtractionResult, ExtractedMetric } from "@/lib/anthropic/types";
 import { Pipeline, type DealCard } from "./pipeline";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, foldBuyBoxChecks } from "@/lib/criteria";
+import { scoreMandateFit } from "@/lib/mandate";
 
 export const metadata: Metadata = { title: "Pipeline" };
 
@@ -172,6 +173,11 @@ export default async function DealsPage({
     const extraction = d.extraction as ExtractionResult | null;
     const verdict = d.verdict as { verdict?: string } | null;
     const job = jobByDeal.get(d.id);
+    // Same deterministic engine as the deal page, computed once for both the
+    // fold (fits/near/outside) and the 0–100 mandate-fit score.
+    const box = d.team_id ? teamBox : personalBox;
+    const mandate =
+      box && extraction ? scoreMandateFit(d.asset_class, extraction, box) : null;
     return {
       id: d.id,
       name: d.name,
@@ -179,14 +185,14 @@ export default async function DealsPage({
       createdAt: d.created_at,
       verdict: verdict?.verdict ?? null,
       stage: (d.stage as DealCard["stage"]) ?? "screening",
-      // Deterministic mandate check, same engine as the deal page: any miss
-      // → outside; else any near-miss → near; all-pass → fits. Unknown-only
-      // results (nothing checkable yet) stay null and render as —.
-      fit: (() => {
-        const box = d.team_id ? teamBox : personalBox;
-        if (!box || !extraction) return null;
-        return foldBuyBoxChecks(evaluateBuyBox(d.asset_class, extraction, box));
-      })(),
+      // Any miss → outside; else any near-miss → near; all-pass → fits.
+      // Unknown-only results (nothing checkable yet) stay null and render as —.
+      fit:
+        box && extraction
+          ? foldBuyBoxChecks(evaluateBuyBox(d.asset_class, extraction, box))
+          : null,
+      score: mandate?.score ?? null,
+      mandateVerdict: mandate?.verdict ?? null,
       addedBy:
         d.team_id && d.user_id !== user?.id
           ? (nameById.get(d.user_id) ?? "Teammate")
