@@ -1020,6 +1020,11 @@ export default function Home() {
                 </a>
               </li>
               <li>
+                <Link href="/why" className="text-muted transition-colors hover:text-ink">
+                  Why Underwrite Copilot
+                </Link>
+              </li>
+              <li>
                 <Link href="/demo" className="text-muted transition-colors hover:text-ink">
                   Sample screen
                 </Link>

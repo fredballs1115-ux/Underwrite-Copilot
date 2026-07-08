@@ -117,6 +117,9 @@ export default function SecurityPage() {
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-6 py-6 text-xs text-muted">
           <span>Underwrite Copilot</span>
           <span className="flex gap-4">
+            <Link href="/why" className="transition-colors hover:text-ink">
+              Why
+            </Link>
             <Link href="/terms" className="transition-colors hover:text-ink">
               Terms
             </Link>
