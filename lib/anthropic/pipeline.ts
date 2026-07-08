@@ -11,6 +11,7 @@ import { synthesizeVerdict } from "./verdict";
 import { parseModelFile } from "@/lib/model-parse";
 import { countPdfPages } from "@/lib/pdf";
 import { buildDealFacts, toFactRows } from "@/lib/facts";
+import { runDocReconciliation } from "./reconcile-facts";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxLines } from "@/lib/criteria";
 import { notifyAnalysisReady } from "@/lib/email";
@@ -270,10 +271,55 @@ export async function runAnalysis(
       await markDone("extract");
     }
 
+    // Step 1b — multi-document reconciliation (best-effort). Compares the OM
+    // against any rent roll / T-12 / financials and stores the deal's
+    // discrepancies for the panel. Runs before the challenger so the skeptic
+    // can reference red flags; a no-op (and never a failure) when the deal has
+    // only the OM or the reconciliation table isn't there yet.
+    if (!completed.has("reconcile_docs")) {
+      try {
+        await runDocReconciliation(admin, dealId);
+      } catch {
+        // reconciliation is additive — never let it sink the screen
+      }
+      await markDone("reconcile_docs");
+    }
+
     // Step 2 — assumption challenger
     if (!completed.has("challenge")) {
       await patchJob(dealId, { status: "running", step: "challenge", progress: 30 });
-      const challenges = await challengeAssumptions(om(), assetClass);
+      // Feed the reconciliation red flags to the skeptic so it puts concrete
+      // OM-vs-rent-roll / OM-vs-T-12 discrepancies to the broker.
+      let reconNote: string | undefined;
+      try {
+        const { data: dr } = await admin
+          .from("deals")
+          .select("discrepancies")
+          .eq("id", dealId)
+          .single();
+        const disc = (dr?.discrepancies as {
+          discrepancies?: {
+            label: string;
+            severity: string;
+            values: { docLabel: string; value: string }[];
+          }[];
+        } | null)?.discrepancies ?? [];
+        const flagged = disc.filter((d) => d.severity !== "minor").slice(0, 6);
+        if (flagged.length) {
+          reconNote =
+            "Cross-document reconciliation flagged these conflicts: " +
+            flagged
+              .map(
+                (f) =>
+                  `${f.label} (${f.values.map((v) => `${v.docLabel}: ${v.value}`).join(" vs ")})`,
+              )
+              .join("; ") +
+            ".";
+        }
+      } catch {
+        // no discrepancies stored — the challenger runs on the OM alone
+      }
+      const challenges = await challengeAssumptions(om(), assetClass, reconNote);
       await admin
         .from("deals")
         .update({ challenges, updated_at: new Date().toISOString() })

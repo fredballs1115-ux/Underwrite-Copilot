@@ -165,6 +165,24 @@ export function computeDiscrepancies(
   return { discrepancies, counts, summary };
 }
 
+/**
+ * Recompute one discrepancy row when the user switches which source feeds the
+ * model (the per-line toggle). Pure, so the panel can update instantly on the
+ * client while the override is persisted server-side. `docKind` must be one of
+ * the row's present sources; the gap re-bases on it.
+ */
+export function recomputeDiscrepancy(d: Discrepancy, docKind: DocKind): Discrepancy {
+  const base = d.values.find((v) => v.docKind === docKind);
+  if (!base) return d;
+  const deltaPct =
+    base.numeric === 0
+      ? d.values.some((v) => v.numeric !== 0)
+        ? Infinity
+        : 0
+      : Math.max(...d.values.map((v) => Math.abs(v.numeric - base.numeric) / Math.abs(base.numeric)));
+  return { ...d, inUse: docKind, deltaPct, severity: severityFor(deltaPct) };
+}
+
 const SEV_LABEL: Record<Severity, string> = {
   minor: "Minor",
   material: "Material",

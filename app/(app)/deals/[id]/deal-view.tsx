@@ -17,6 +17,8 @@ import type { InternalComp } from "@/lib/internal-comps";
 import { DebtSizer } from "./debt-sizer";
 import { DecisionLog } from "./decision-log";
 import { AskPanel } from "./ask-panel";
+import { ReconciliationPanel } from "./reconciliation-panel";
+import type { ReconcileResult } from "@/lib/reconcile";
 import { LoiPanel } from "./loi-panel";
 import type { DealNote, AskEntry } from "@/lib/deals";
 import type { DealFact } from "@/lib/facts";
@@ -268,6 +270,7 @@ export function DealView({
   internalComps = [],
   omUrl,
   facts = {},
+  discrepancies = null,
   notes = [],
   userEmail = null,
   qa = [],
@@ -293,6 +296,7 @@ export function DealView({
   internalComps?: InternalComp[];
   omUrl: string | null;
   facts?: Record<string, DealFact>;
+  discrepancies?: ReconcileResult | null;
   notes?: DealNote[];
   userEmail?: string | null;
   qa?: AskEntry[];
@@ -646,6 +650,9 @@ export function DealView({
         {section === "overview" && (
           <div className="flex flex-col gap-6">
             {screenDiff && <SinceLastScreen diff={screenDiff} />}
+            {discrepancies && discrepancies.discrepancies.length > 0 && (
+              <ReconciliationPanel dealId={dealId} result={discrepancies} />
+            )}
             <OverviewView
               results={results}
               active={active}

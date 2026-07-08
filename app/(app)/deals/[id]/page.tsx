@@ -19,6 +19,7 @@ import {
 } from "@/lib/anthropic/types";
 import { DealView } from "./deal-view";
 import { parseFactRow, type DealFact } from "@/lib/facts";
+import type { ReconcileResult } from "@/lib/reconcile";
 import { DealActions } from "./deal-actions";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import { StageSelect } from "./stage-select";
@@ -497,6 +498,9 @@ export default async function DealPage({
         internalComps={internalComps}
         omUrl={omUrl}
         facts={factsByField}
+        discrepancies={
+          ((deal as { discrepancies?: ReconcileResult | null }).discrepancies) ?? null
+        }
         notes={parseDealNotes((deal as { notes?: unknown }).notes)}
         userEmail={user?.email ?? null}
         userId={user?.id ?? null}

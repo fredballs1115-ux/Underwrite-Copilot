@@ -27,9 +27,16 @@ const ChallengerSchema = z.object({
 export async function challengeAssumptions(
   pdf: Buffer,
   assetClass: AssetClass,
+  /** cross-document reconciliation red flags for the skeptic to reference */
+  reconNote?: string,
 ): Promise<ChallengerResult> {
   const client = getAnthropic();
   const data = pdf.toString("base64");
+  const instruction =
+    challengerInstruction(assetClass) +
+    (reconNote?.trim()
+      ? `\n\n${reconNote.trim()} Where a figure the OM relies on is contradicted by the rent roll or T-12, treat that as a first-order challenge and put the exact discrepancy to the broker.`
+      : "");
 
   const response = await client.messages.parse({
     model: MODELS.reasoning,
@@ -45,7 +52,7 @@ export async function challengeAssumptions(
             // Reads the OM from the prompt cache the extraction step wrote.
             cache_control: { type: "ephemeral" },
           },
-          { type: "text", text: challengerInstruction(assetClass) },
+          { type: "text", text: instruction },
         ],
       },
     ],
