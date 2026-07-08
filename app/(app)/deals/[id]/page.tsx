@@ -114,7 +114,8 @@ export default async function DealPage({
       supabase
         .from("deal_facts")
         .select("id, field, value, unit, doc_label, page_number, located, locator_snippet, confidence, provenance")
-        .eq("deal_id", id),
+        .eq("deal_id", id)
+        .order("id", { ascending: true }),
     ]);
 
   if (error) {

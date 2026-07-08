@@ -67,6 +67,9 @@ export interface ExtractionResult {
   /** Full street address ("" if the OM never states it). Optional for
    *  backward-compatibility. The screen anchors on the address. */
   address?: string;
+  /** The OM's total page count as the model read it, used to validate cited
+   *  pages. 0 / absent when unknown or for pre-citation extractions. */
+  totalPages?: number;
   metrics: ExtractedMetric[];
 }
 

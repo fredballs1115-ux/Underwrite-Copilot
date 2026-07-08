@@ -14,6 +14,10 @@ const ExtractionSchema = z.object({
   assetClass: z.string(),
   market: z.string(),
   address: z.string(),
+  // The OM's total page count, as the model sees the native PDF. Used to
+  // VALIDATE cited pages (a byte-level counter mis-reads object-stream and
+  // bookmarked PDFs); 0 if the model can't tell.
+  totalPages: z.number(),
   metrics: z.array(
     z.object({
       label: z.string(),
@@ -81,6 +85,7 @@ export async function extractTerms(
     // The buy-box market check matches against market AND address — dropping
     // this field made "Dallas" fail on a deal whose street address is Dallas.
     address: out.address,
+    totalPages: Number.isFinite(out.totalPages) && out.totalPages > 0 ? Math.round(out.totalPages) : 0,
     metrics: out.metrics.map((m) => ({
       ...m,
       // Guard the ≤10-word cap even if the model over-quotes.

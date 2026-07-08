@@ -51,6 +51,8 @@ Tag each figure's \`basis\`: "in_place" for current / historical facts the prope
 
 Set \`flagged\` to true ONLY for the figures most worth independent verification — forward-looking or seller-controlled numbers that drive returns and tend to run optimistic (pro forma rents, stabilized NOI, projected rent growth, exit cap, IRR, expense ratios). Do NOT flag hard, present-day, third-party-verifiable facts (asking price, unit or SF count, year built, in-place occupancy, seller, broker, stated loan terms). Flag selectively: if nearly everything is flagged, the flags stop being useful. Also record, for each figure, the page in the OM where you found it as a short string like "p. 12" (use an empty string if you can't tell).
 
+Set \`totalPages\` to the offering memorandum's total number of pages (your best count of the PDF you were given; 0 only if you truly can't tell). This is used to sanity-check the page citations, so count carefully.
+
 For \`locatorSnippet\`, give up to ten words of the actual surrounding text from that page — a short verbatim phrase a reader could search for to confirm the figure, e.g. "Going-In Cap Rate: 6.0%" or "Total Rentable Area: 300,142 SF". Use an empty string if you can't quote it. Never invent a snippet.`;
 }
 

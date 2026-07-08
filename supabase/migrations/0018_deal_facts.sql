@@ -27,7 +27,9 @@ create table if not exists public.deal_facts (
   doc_label text not null default 'OM',
   doc_id uuid references public.deal_documents (id) on delete set null,
   page_number int,
-  located boolean not null default true,
+  -- Fail CLOSED: a fact is "located" only when a writer explicitly validated
+  -- its page. A row that omits the flag must never surface an unvalidated page.
+  located boolean not null default false,
   locator_snippet text,
   confidence text not null default 'medium'
     check (confidence in ('high', 'medium', 'low')),

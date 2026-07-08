@@ -35,10 +35,11 @@ export interface FactMetric {
   locatorSnippet?: string;
 }
 
-/** "p. 12" / "Page 12" / "pp. 3-4" / "12" → 12 (first page); else null. */
+/** "p. 12" / "Page 12" / "pp. 3-4" / "1,024" → first page number; else null. */
 export function parsePageNumber(raw: string | undefined | null): number | null {
   if (!raw) return null;
-  const m = raw.match(/\d+/);
+  // Strip thousands separators so "p. 1,024" reads 1024, not 1.
+  const m = raw.replace(/,/g, "").match(/\d+/);
   if (!m) return null;
   const n = Number(m[0]);
   return Number.isFinite(n) && n > 0 ? n : null;

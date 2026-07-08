@@ -86,8 +86,8 @@ describe("buildDealFacts — the absolute source-validation rule", () => {
   });
 });
 
-describe("countPdfPages", () => {
-  it("reads the page-tree /Count", () => {
+describe("countPdfPages (fail-safe leaf counter)", () => {
+  it("counts /Type /Page leaves (not the /Pages tree node)", () => {
     const pdf = Buffer.from(
       "%PDF-1.4\n1 0 obj<</Type /Catalog /Pages 2 0 R>>endobj\n" +
         "2 0 obj<</Type /Pages /Kids[3 0 R 4 0 R 5 0 R] /Count 3>>endobj\n" +
@@ -96,14 +96,29 @@ describe("countPdfPages", () => {
     );
     expect(countPdfPages(pdf)).toBe(3);
   });
-  it("falls back to counting /Type /Page leaves", () => {
+  it("does NOT overcount from a bookmark/outline /Count (the fabrication risk)", () => {
+    // A 3-page doc whose Outlines dict carries /Count 500 must still read 3 —
+    // never 500, which would validate nonexistent cited pages.
     const pdf = Buffer.from(
-      "%PDF-1.4\n3 0 obj<</Type /Page>>endobj 4 0 obj<</Type /Page>>endobj\n%%EOF",
+      "%PDF-1.5\n1 0 obj<</Type /Catalog /Pages 2 0 R /Outlines 9 0 R>>endobj\n" +
+        "2 0 obj<</Type /Pages /Kids[3 0 R 4 0 R 5 0 R] /Count 3>>endobj\n" +
+        "3 0 obj<</Type /Page>>endobj 4 0 obj<</Type /Page>>endobj 5 0 obj<</Type /Page>>endobj\n" +
+        "9 0 obj<</Type /Outlines /Count 500>>endobj\n%%EOF",
       "latin1",
     );
-    expect(countPdfPages(pdf)).toBe(2);
+    expect(countPdfPages(pdf)).toBe(3);
   });
-  it("returns null for a non-PDF buffer", () => {
+  it("returns null when no page leaves are visible (e.g. object streams) — fails safe", () => {
     expect(countPdfPages(Buffer.from("not a pdf at all"))).toBeNull();
+    // An object-stream PDF hides page objects in a compressed /ObjStm; the
+    // counter finds none and returns null → citations mark 'source not
+    // located' rather than validating against a wrong number.
+    expect(countPdfPages(Buffer.from("%PDF-1.6\n1 0 obj<</Type /ObjStm>>stream ...", "latin1"))).toBeNull();
+  });
+});
+
+describe("parsePageNumber handles thousands separators", () => {
+  it("reads 'p. 1,024' as 1024, not 1", () => {
+    expect(parsePageNumber("p. 1,024")).toBe(1024);
   });
 });

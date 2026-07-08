@@ -252,7 +252,14 @@ export async function runAnalysis(
       // never shown). Best-effort — a pre-0018 schema or a write failure must
       // never sink the screen.
       try {
-        const facts = buildDealFacts(extraction.metrics, countPdfPages(om()));
+        // Prefer the model's own page count (it read the native PDF — robust
+        // to object-stream / bookmarked PDFs the byte counter mis-reads); fall
+        // back to the fail-safe byte counter only when the model didn't report.
+        const pageCount =
+          extraction.totalPages && extraction.totalPages > 0
+            ? extraction.totalPages
+            : countPdfPages(om());
+        const facts = buildDealFacts(extraction.metrics, pageCount);
         await admin.from("deal_facts").delete().eq("deal_id", dealId);
         const rows = toFactRows(dealId, facts);
         if (rows.length) await admin.from("deal_facts").insert(rows);
