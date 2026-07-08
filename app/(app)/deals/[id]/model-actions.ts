@@ -11,7 +11,7 @@ import {
 } from "@/lib/storage";
 import { DOC_KIND_KEYS } from "@/lib/documents";
 import { isPro } from "@/lib/billing";
-import { claimJob } from "@/lib/jobs";
+import { claimJob, analysisWorkerEnabled, workerSchemaReady } from "@/lib/jobs";
 import { runModelGeneration } from "@/lib/model/build-model";
 
 const MAX_FILE = 22 * 1024 * 1024;
@@ -108,8 +108,15 @@ export async function generateModel(formData: FormData) {
   if (!user || !(await isPro(supabase, user.id))) return;
 
   // Atomic claim (not a check-then-act read) so two overlapping triggers on
-  // the same deal can't both schedule a run.
-  const claim = await claimJob(supabase, dealId, "model");
+  // the same deal can't both schedule a run. This job type always runs
+  // IN-PROCESS — in worker mode, claim straight to "running" (a "queued" row
+  // is claimable the instant it exists) and clear any stale worker payload,
+  // so the worker never mistakes this row for a handoff.
+  const workerOn =
+    analysisWorkerEnabled() && (await workerSchemaReady(supabase));
+  const claim = workerOn
+    ? await claimJob(supabase, dealId, "model", null, "running")
+    : await claimJob(supabase, dealId, "model");
   if (claim.outcome === "busy") return;
   if (claim.outcome === "none") {
     await supabase.from("analysis_jobs").insert({

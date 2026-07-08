@@ -1359,7 +1359,7 @@ function ProgressRail({ job }: { job: NonNullable<Job> }) {
           <Spinner />
           <span className="text-sm">
             {job.status === "queued"
-              ? "Queued — this starts in a moment…"
+              ? "Queued — waiting for an open analyst slot…"
               : (STEP_LABELS[job.step] ?? "Working…")}
           </span>
           <span className="ml-auto font-mono text-xs tabular-nums text-muted">
@@ -1390,7 +1390,7 @@ function ProgressRail({ job }: { job: NonNullable<Job> }) {
         <Spinner />
         <span className="text-sm">
           {job.status === "queued"
-            ? "Queued — your screen starts in a moment…"
+            ? "Queued — waiting for an open analyst slot…"
             : (STEP_LABELS[job.step ?? ""] ?? "Analyzing…")}
         </span>
         <span className="ml-auto font-mono text-xs tabular-nums text-muted">

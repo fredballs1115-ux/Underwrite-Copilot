@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "build:worker": "node scripts/build-worker.mjs",
-    "start:worker": "node dist/worker/index.mjs",
+    "start:worker": "node --enable-source-maps dist/worker/index.mjs",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },

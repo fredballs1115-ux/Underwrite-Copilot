@@ -21,9 +21,12 @@
  *   - A job interrupted WORKER_MAX_ATTEMPTS times stops retrying and fails
  *     with an honest message instead of looping forever.
  *   - While the worker lives, it heartbeats the running row AND every queued
- *     row, so a backlogged job never reads as "stalled" to the deal page; if
- *     the worker actually dies, the rows go stale and the existing stall
- *     recovery (10 min) takes over exactly as before.
+ *     WORKER job (rows carrying a payload — the ownership marker), so a
+ *     backlogged job never reads as "stalled" to the deal page; if the
+ *     worker actually dies, the rows go stale and the existing stall
+ *     recovery (10 min) takes over exactly as before. Payload-less rows are
+ *     never claimed or touched: those belong to in-process runs, so a
+ *     deployed worker is harmless while the web flag is off.
  *
  * Requires migration 0016 (payload + attempts on analysis_jobs). Without it,
  * the worker idles with a loud log line instead of processing — and without
@@ -45,6 +48,10 @@ const MAX_ATTEMPTS = int(process.env.WORKER_MAX_ATTEMPTS, 3);
 const JOB_TIMEOUT_MS = int(process.env.WORKER_JOB_TIMEOUT_MS, 30 * 60_000);
 // How often to re-probe for migration 0016 when it's missing.
 const PROBE_MS = int(process.env.WORKER_PROBE_MS, 60_000);
+// Queued rows are re-touched only once they age past this (stall detection
+// fires at 10 min, so 4 min keeps a wide margin while writing each waiting
+// row ~once per interval instead of on every tick).
+const KEEPALIVE_AGE_MS = int(process.env.WORKER_KEEPALIVE_AGE_MS, 4 * 60_000);
 
 const INTERRUPTED_MSG =
   "The screen was interrupted repeatedly (worker restarts) and stopped retrying — hit “Try again” to run it fresh.";
@@ -85,7 +92,11 @@ async function schemaReady(): Promise<boolean> {
 }
 
 /** Touch the rows this worker is responsible for so nothing it will get to
- *  reads as stale: the job it's running, and every job waiting behind it. */
+ *  reads as stale: the job it's running, and every WORKER job (payload is
+ *  the ownership marker) waiting behind it. Payload-less queued rows belong
+ *  to in-process runs — touching those would mask THEIR crashes from the
+ *  existing stall recovery. Waiting rows are re-touched only once they age
+ *  past KEEPALIVE_AGE_MS, not rewritten on every tick. */
 async function heartbeat(): Promise<void> {
   const now = new Date().toISOString();
   try {
@@ -99,10 +110,33 @@ async function heartbeat(): Promise<void> {
     await admin
       .from("analysis_jobs")
       .update({ updated_at: now })
-      .eq("status", "queued");
+      .eq("status", "queued")
+      .not("payload", "is", null)
+      .lt("updated_at", new Date(Date.now() - KEEPALIVE_AGE_MS).toISOString());
   } catch {
     // A missed heartbeat is survivable; the next tick tries again.
   }
+}
+
+/** Mark a job failed with an honest message (idempotent, guarded). */
+async function failJob(
+  jobId: string,
+  message: string,
+  guard?: { status?: string; attempts?: number },
+): Promise<boolean> {
+  let query = admin
+    .from("analysis_jobs")
+    .update({
+      status: "error",
+      error: message,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", jobId);
+  if (guard?.status) query = query.eq("status", guard.status);
+  if (guard?.attempts !== undefined) query = query.eq("attempts", guard.attempts);
+  const { data, error } = await query.select("id");
+  if (error) log(`failed to mark job ${jobId} errored: ${error.message}`);
+  return !!data && data.length > 0;
 }
 
 /**
@@ -111,38 +145,39 @@ async function heartbeat(): Promise<void> {
  * Also enforces the attempts cap here, where the retry count is in hand.
  */
 async function claimNext(): Promise<ClaimedJob | null> {
-  const { data: next } = await admin
+  // ONLY rows carrying a worker payload are this service's to run — that is
+  // the handoff marker the web writes in worker mode. Payload-less queued
+  // rows are in-process runs mid-startup (or a flag-off web service); a
+  // worker that grabbed those would double-run the same screen.
+  const { data: next, error: nextErr } = await admin
     .from("analysis_jobs")
     .select("id, deal_id, payload, attempts")
     .eq("status", "queued")
+    .not("payload", "is", null)
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
+  if (nextErr && nextErr.code !== "PGRST116") {
+    log(`queue poll failed: ${nextErr.message}`);
+  }
   if (!next) return null;
 
   const attempts = (next.attempts as number) ?? 0;
   const payload = (next.payload as ClaimedJob["payload"]) ?? {};
 
   if (attempts >= MAX_ATTEMPTS) {
-    const { data: killed } = await admin
-      .from("analysis_jobs")
-      .update({
-        status: "error",
-        error: INTERRUPTED_MSG,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", next.id)
-      .eq("status", "queued")
-      .eq("attempts", attempts)
-      .select("id");
-    if (killed && killed.length > 0) {
+    const killed = await failJob(next.id as string, INTERRUPTED_MSG, {
+      status: "queued",
+      attempts,
+    });
+    if (killed) {
       log(`job ${next.id} exceeded ${MAX_ATTEMPTS} attempts — marked error`);
       if (payload.model?.path) await removeSupplementFile(payload.model.path);
     }
     return null;
   }
 
-  const { data: claimed } = await admin
+  const { data: claimed, error: claimErr } = await admin
     .from("analysis_jobs")
     .update({
       status: "running",
@@ -153,6 +188,7 @@ async function claimNext(): Promise<ClaimedJob | null> {
     .eq("status", "queued")
     .eq("attempts", attempts)
     .select("id");
+  if (claimErr) log(`claim failed for job ${next.id}: ${claimErr.message}`);
   if (!claimed || claimed.length === 0) return null; // raced — re-poll
 
   return {
@@ -168,11 +204,20 @@ async function claimNext(): Promise<ClaimedJob | null> {
 async function requeueCurrent(reason: string): Promise<void> {
   if (!current) return;
   try {
-    await admin
-      .from("analysis_jobs")
-      .update({ status: "queued", updated_at: new Date().toISOString() })
-      .eq("id", current.id)
-      .eq("status", "running");
+    const requeue = () =>
+      admin
+        .from("analysis_jobs")
+        .update({ status: "queued", updated_at: new Date().toISOString() })
+        .eq("id", current!.id)
+        .eq("status", "running");
+    // Twice, a beat apart: the pipeline's own patchJob writes are keyed by
+    // deal_id with no fence, so one already in flight at shutdown can land
+    // AFTER the first requeue and flip the row back to "running" — which the
+    // replacement worker would never claim. The second pass mops that up;
+    // anything slower degrades to the pre-existing 10-min stall recovery.
+    await requeue();
+    await sleep(250);
+    await requeue();
     log(`job ${current.id} re-queued (${reason})`);
   } catch {
     // If this write is lost the row goes stale and the existing stall
@@ -187,14 +232,7 @@ async function runJob(job: ClaimedJob): Promise<void> {
   if (job.payload.kind === "reconcile") {
     const model = job.payload.model;
     if (!model?.path || !model.name) {
-      await admin
-        .from("analysis_jobs")
-        .update({
-          status: "error",
-          error: "This reconcile job lost its model file — upload it again.",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", job.id);
+      await failJob(job.id, "This reconcile job lost its model file — upload it again.");
       return;
     }
     let buffer: Buffer;
@@ -203,15 +241,10 @@ async function runJob(job: ClaimedJob): Promise<void> {
     } catch {
       // The parked file couldn't be read — a terminal, honest failure (the
       // user re-uploads; retrying without the bytes can't succeed).
-      await admin
-        .from("analysis_jobs")
-        .update({
-          status: "error",
-          error:
-            "Your model file couldn't be read back for the run — please upload it again.",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", job.id);
+      await failJob(
+        job.id,
+        "Your model file couldn't be read back for the run — please upload it again.",
+      );
       await removeSupplementFile(model.path);
       return;
     }
@@ -227,10 +260,21 @@ async function runJob(job: ClaimedJob): Promise<void> {
     return;
   }
 
-  // Default: the full screen. resume=true reads the payload's per-step
-  // checkpoints (empty on a first attempt → full run).
+  if (job.payload.kind !== "screen") {
+    // An unrecognized handoff is a contract violation, not a screen — running
+    // a full six-step pipeline on a guess would overwrite every stored
+    // result. Fail it loudly instead.
+    log(`job ${job.id} has unknown payload.kind ${JSON.stringify(job.payload.kind)}`);
+    await failJob(job.id, "This job had an unrecognized type — please try again.");
+    return;
+  }
+
+  // The full screen. resume=true reads the payload's per-step checkpoints
+  // (empty on a first attempt → full run). snapshotPrior must be an explicit
+  // true from the enqueue path — only a COMPLETED prior generation is safe
+  // to diff against, so absence means no.
   await runAnalysis(job.dealId, {
-    snapshotPrior: job.payload.snapshotPrior !== false,
+    snapshotPrior: job.payload.snapshotPrior === true,
     resume: true,
   });
 }
@@ -315,19 +359,11 @@ async function main(): Promise<void> {
       // runJob handles its own failures; reaching here is unexpected. Mark
       // the job errored so the deal never wedges on "running".
       log(`job ${job.id} threw unexpectedly: ${err instanceof Error ? err.message : err}`);
-      try {
-        await admin
-          .from("analysis_jobs")
-          .update({
-            status: "error",
-            error: "The analysis hit an unexpected worker error — please try again.",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", job.id)
-          .eq("status", "running");
-      } catch {
-        // stall recovery will reclaim it
-      }
+      await failJob(
+        job.id,
+        "The analysis hit an unexpected worker error — please try again.",
+        { status: "running" },
+      );
     } finally {
       clearTimeout(timer);
       current = null;

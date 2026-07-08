@@ -118,7 +118,6 @@ export async function runAnalysis(
     }
 
     const assetClass = (deal.asset_class as AssetClass) ?? "auto";
-    const pdf = await downloadOmPdf(deal.om_storage_path as string);
 
     // Per-step checkpoints: a deploy that restarts the worker mid-screen
     // re-queues the job, and the next attempt picks up after the last
@@ -154,6 +153,21 @@ export async function runAnalysis(
       } catch {
         // checkpointing is an optimization, never a failure
       }
+    };
+
+    // The OM is only needed by the document-reading steps. A run resumed at
+    // the verdict (everything else checkpointed) skips the whole download —
+    // re-paying a 20MB Storage read just to ignore it would defeat the
+    // point of the checkpoints.
+    const pdfSteps = ["signal", "extract", "challenge", "comps", "market"];
+    const pdf = pdfSteps.some((s) => !completed.has(s))
+      ? await downloadOmPdf(deal.om_storage_path as string)
+      : null;
+    // Every use sits inside a `!completed.has(<pdf step>)` guard, so the
+    // download above must have run; this just makes that invariant loud.
+    const om = (): Buffer => {
+      if (!pdf) throw new Error("OM was not loaded for a document step.");
+      return pdf;
     };
 
     // Retrade watch: on a RE-screen, snapshot the previous run's results
@@ -200,7 +214,7 @@ export async function runAnalysis(
         // Clear the previous run's signal first so a re-run never shows a stale
         // headline next to fresh results if the read below fails.
         await admin.from("deals").update({ first_signal: null }).eq("id", dealId);
-        const firstSignal = await readFirstSignal(pdf, assetClass);
+        const firstSignal = await readFirstSignal(om(), assetClass);
         await admin
           .from("deals")
           .update({ first_signal: firstSignal, updated_at: new Date().toISOString() })
@@ -219,7 +233,7 @@ export async function runAnalysis(
         progress: 10,
         error: null,
       });
-      const extraction = await extractTerms(pdf, assetClass);
+      const extraction = await extractTerms(om(), assetClass);
       await admin
         .from("deals")
         .update({ extraction, updated_at: new Date().toISOString() })
@@ -230,7 +244,7 @@ export async function runAnalysis(
     // Step 2 — assumption challenger
     if (!completed.has("challenge")) {
       await patchJob(dealId, { status: "running", step: "challenge", progress: 30 });
-      const challenges = await challengeAssumptions(pdf, assetClass);
+      const challenges = await challengeAssumptions(om(), assetClass);
       await admin
         .from("deals")
         .update({ challenges, updated_at: new Date().toISOString() })
@@ -241,7 +255,7 @@ export async function runAnalysis(
     // Step 3 — broker-comp scrutiny (reads the comps out of the OM itself)
     if (!completed.has("comps")) {
       await patchJob(dealId, { status: "running", step: "comps", progress: 50 });
-      const comps = await scrutinizeComps(pdf);
+      const comps = await scrutinizeComps(om());
       await admin
         .from("deals")
         .update({ comps, updated_at: new Date().toISOString() })
@@ -252,7 +266,7 @@ export async function runAnalysis(
     // Step 4 — market plausibility check (rules-of-thumb, no live comps feed)
     if (!completed.has("market")) {
       await patchJob(dealId, { status: "running", step: "market", progress: 70 });
-      const market = await checkMarket(pdf, assetClass);
+      const market = await checkMarket(om(), assetClass);
       await admin
         .from("deals")
         .update({ market, updated_at: new Date().toISOString() })

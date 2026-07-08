@@ -16,9 +16,16 @@ deploy interrupted whatever screens were in flight**. This worker fixes that:
   not a restarted screen.
 - A job interrupted 3 times stops retrying and fails with an honest message.
 - While the worker is alive it heartbeats the running row and every queued
-  row, so a backlog never looks "stalled" to the deal page. If the worker
-  actually dies, the rows go stale and the existing 10-minute stall recovery
-  takes over, exactly as before.
+  worker job, so a backlog never looks "stalled" to the deal page. If the
+  worker actually dies, the rows go stale and the existing 10-minute stall
+  recovery takes over, exactly as before.
+- The worker only ever claims jobs carrying a worker payload — the handoff
+  marker the web app writes in worker mode. Jobs from a flag-off web service
+  (or in-process job types like comp search and model generation) are never
+  touched, so a deployed worker is harmless in every mixed state.
+- Jobs run ONE at a time, in order. A batch of four OMs completes serially
+  (each screen a few minutes); the ones waiting show an honest "waiting for
+  an open analyst slot" state rather than a fake progress bar.
 - A run wedged past 30 minutes is re-queued and the process exits nonzero so
   Render restarts it clean (that also kills the wedged request).
 - Reconciles: the web app parks the uploaded model file in the private
@@ -48,9 +55,14 @@ SIGTERM-resume and attempts-cap paths.
 4. **Flip the web service**: add `ANALYSIS_WORKER=1` to the WEB service's
    environment (it redeploys). From then on screens run here.
 
+If the flag is ever set without the migration, nothing breaks: the web app
+probes for the 0016 columns, logs loudly, and keeps running screens
+in-process until the migration lands.
+
 **Rollback** is one step: remove `ANALYSIS_WORKER` from the web service.
-Screens run in-process again immediately; the worker just goes idle and can
-be suspended or deleted.
+Screens run in-process again immediately. The worker keeps polling but only
+claims worker-payload jobs — new in-process screens are invisible to it — so
+you can suspend or delete it whenever convenient.
 
 > Do not set `ANALYSIS_WORKER=1` before the worker is live — jobs would sit
 > queued with nobody to run them (the deal page would show them stalled after
@@ -64,3 +76,4 @@ be suspended or deleted.
 | `WORKER_HEARTBEAT_MS` | 45000 | running/queued row keep-alive |
 | `WORKER_MAX_ATTEMPTS` | 3 | interruptions before a job stops retrying |
 | `WORKER_JOB_TIMEOUT_MS` | 1800000 | wedged-run cutoff (re-queue + restart) |
+| `WORKER_KEEPALIVE_AGE_MS` | 240000 | re-touch queued rows only past this age |
