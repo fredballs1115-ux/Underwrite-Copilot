@@ -20,7 +20,15 @@ export async function startCheckout() {
   const priceId = process.env.STRIPE_PRICE_ID;
   if (!priceId) redirect("/billing?error=config");
 
-  const stripe = getStripe();
+  // A missing STRIPE_SECRET_KEY must read as "not set up" (email us), never a
+  // raw error page — getStripe() throws when the key is absent.
+  let stripe: ReturnType<typeof getStripe>;
+  try {
+    stripe = getStripe();
+  } catch (err) {
+    console.error("checkout: Stripe client init failed (STRIPE_SECRET_KEY set?):", err);
+    redirect("/billing?error=config");
+  }
 
   // Reuse or create the Stripe customer for this user. Billing columns are
   // service-role-only reads (migration 0008).
@@ -44,7 +52,10 @@ export async function startCheckout() {
         },
         { idempotencyKey: `uc-customer-${user.id}` },
       );
-    } catch {
+    } catch (err) {
+      // Log the real Stripe error (invalid key, etc.) so the failure is
+      // diagnosable in the server logs, not just a generic "try again".
+      console.error(`checkout: stripe.customers.create failed for ${user.id}:`, err);
       redirect("/billing?error=checkout");
     }
     customerId = customer.id;
@@ -89,6 +100,8 @@ export async function startCheckout() {
     });
   } catch (err) {
     if (isRedirectError(err)) throw err;
+    // Surface the real reason (invalid price ID, bad key, outage) in the logs.
+    console.error(`checkout: create session failed for ${user.id} (price ${priceId}):`, err);
     redirect("/billing?error=checkout");
   }
 
@@ -122,7 +135,8 @@ export async function openPortal() {
       customer: customerId,
       return_url: `${appUrl()}/billing`,
     });
-  } catch {
+  } catch (err) {
+    console.error(`portal: create session failed for ${user.id}:`, err);
     redirect("/billing?error=checkout");
   }
   redirect(session.url);

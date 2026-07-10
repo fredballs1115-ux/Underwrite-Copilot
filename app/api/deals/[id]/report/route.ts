@@ -44,7 +44,7 @@ export async function GET(
   }
   if (!pro) {
     return Response.redirect(
-      new URL(`/deals/${id}?error=reportpro`, req.url),
+      new URL(`/billing?upsell=report`, req.url),
       302,
     );
   }

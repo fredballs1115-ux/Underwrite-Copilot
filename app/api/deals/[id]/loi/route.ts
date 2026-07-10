@@ -50,7 +50,7 @@ export async function GET(
     );
   }
   if (!pro) {
-    return Response.redirect(new URL(`/deals/${id}?error=loipro`, req.url), 302);
+    return Response.redirect(new URL(`/billing?upsell=loi`, req.url), 302);
   }
 
   const { data, error } = await supabase

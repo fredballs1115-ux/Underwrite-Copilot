@@ -39,7 +39,7 @@ export async function GET(
   }
   if (!pro) {
     return Response.redirect(
-      new URL(`/deals/${id}?error=modelpro`, req.url),
+      new URL(`/billing?upsell=model`, req.url),
       302,
     );
   }

@@ -38,7 +38,7 @@ export async function GET(
     return Response.redirect(new URL(`/deals/${id}?error=exportfail`, req.url), 302);
   }
   if (!pro) {
-    return Response.redirect(new URL(`/deals/${id}?error=underwritepro`, req.url), 302);
+    return Response.redirect(new URL(`/billing?upsell=underwrite`, req.url), 302);
   }
 
   const { data, error } = await supabase.from("deals").select("*").eq("id", id).maybeSingle();

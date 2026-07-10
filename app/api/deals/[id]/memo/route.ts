@@ -32,10 +32,9 @@ export async function GET(
     );
   }
 
-  // The PDF memo is a Pro feature. Explain the bounce on the deal page —
-  // the memo button is shown to everyone, so a silent redirect to /billing
-  // read as a mystery error to non-Pro users (that WAS the "memo is broken"
-  // bug: nothing was broken, the gate was invisible).
+  // The PDF memo is a Pro feature. On Free, send the user straight to the
+  // upgrade path with an ?upsell tag so the billing page explains why they
+  // landed there (never a raw error page, never a silent/mystery redirect).
   let pro = false;
   try {
     pro = await isPro(supabase, user.id);
@@ -48,7 +47,7 @@ export async function GET(
     );
   }
   if (!pro) {
-    return Response.redirect(new URL(`/deals/${id}?error=memopro`, req.url), 302);
+    return Response.redirect(new URL(`/billing?upsell=memo`, req.url), 302);
   }
 
   const { data, error } = await supabase

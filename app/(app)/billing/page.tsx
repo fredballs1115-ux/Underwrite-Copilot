@@ -36,9 +36,17 @@ const PRO_FEATURES = [
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; error?: string }>;
+  searchParams: Promise<{ status?: string; error?: string; upsell?: string }>;
 }) {
-  const { status, error } = await searchParams;
+  const { status, error, upsell } = await searchParams;
+  // Which Pro export bounced the user here, for a contextual upsell line.
+  const UPSELL_LABELS: Record<string, string> = {
+    memo: "the one-page IC memo",
+    report: "the full multi-page report",
+    model: "the Excel model",
+    underwrite: "the institutional underwriting model",
+    loi: "the LOI draft",
+  };
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -55,6 +63,11 @@ export default async function BillingPage({
       ? { cls: "bg-pass/10 text-pass", text: "You're on Pro — everything's unlocked. Thank you!" }
       : status === "cancelled"
         ? { cls: "bg-faint text-muted", text: "Checkout cancelled — no charge was made." }
+        : upsell
+          ? {
+              cls: "bg-brand/5 text-brand",
+              text: `Upgrade to Pro to export ${UPSELL_LABELS[upsell] ?? "that"} — choose a plan below.`,
+            }
         : error === "config"
           ? { cls: "bg-kill/10 text-kill", text: "Checkout isn't available right now — email underwritecopilot.support@gmail.com and we'll get you upgraded." }
           : error === "nocustomer"
