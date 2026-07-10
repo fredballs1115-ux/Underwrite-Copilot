@@ -12,6 +12,7 @@ import { parseModelFile } from "@/lib/model-parse";
 import { countPdfPages } from "@/lib/pdf";
 import { buildDealFacts, toFactRows } from "@/lib/facts";
 import { runDocReconciliation } from "./reconcile-facts";
+import { runActualsIngestion } from "./actuals-ingest";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxLines } from "@/lib/criteria";
 import { notifyAnalysisReady } from "@/lib/email";
@@ -283,6 +284,18 @@ export async function runAnalysis(
         // reconciliation is additive — never let it sink the screen
       }
       await markDone("reconcile_docs");
+    }
+
+    // Property actuals (Feature 1): structured rent-roll / T-12 ingestion,
+    // stored for the PROPERTY ACTUALS card and the model. Additive and
+    // best-effort — a bad statement never sinks the screen.
+    if (!completed.has("ingest_actuals")) {
+      try {
+        await runActualsIngestion(admin, dealId);
+      } catch {
+        // never let actuals ingestion sink the screen
+      }
+      await markDone("ingest_actuals");
     }
 
     // Step 2 — assumption challenger

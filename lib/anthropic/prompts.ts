@@ -122,6 +122,47 @@ For each fact, give:
 Capture BOTH actuals and pro forma figures when the document shows both (e.g. a statement with actual and projected columns). Getting \`basis\` right is essential: the model uses it to decide which source wins when documents disagree.`;
 }
 
+/** Structured rent-roll extraction (Feature 1). Emit RAW rows only — the
+ *  consolidation (unit mix, WALT, expiry buckets, weighted rent) is computed
+ *  downstream in code, never by the model. */
+export function rentRollExtractionInstruction(cap: number): string {
+  return `Extract the rent roll from the attached document. Return one object per unit / tenant ROW exactly as the roll lists it. Do NOT consolidate, summarize, average, or total anything — that is done downstream in code.
+
+For each row give:
+- \`tenant\`: the tenant name, or the unit label for a multifamily roll ("" if blank).
+- \`suiteUnit\`: the suite or unit number/identifier ("" if none).
+- \`sf\`: rentable square feet as a plain number, or null if the roll doesn't show it.
+- \`leaseExpiry\`: lease expiration as ISO yyyy-mm-dd. Use "" for a vacant/down unit or when no date is shown. Convert any date format to ISO; never guess a date.
+- \`inPlaceRentMonthly\`: the unit's total in-place rent PER MONTH in dollars (plain number). null if vacant or not shown. If the roll shows annual rent, divide by 12; if it shows $/SF, leave this null and fill \`rentPsf\`.
+- \`rentPsf\`: annual rent per square foot ONLY if the roll states it, else null. Do not compute it.
+- \`occupied\`: true if the unit is leased, false for a vacant / down / model unit.
+- \`freeRentMonths\`, \`tiPsf\`: concessions (free-rent months; tenant-improvement $/SF) if shown, else null.
+- \`page\`: the page this row is on, like "p. 4" ("" if unknown).
+
+Also return \`asOfDate\` (the roll's "as of" date as ISO yyyy-mm-dd, "" if not shown) and \`page\` (the page the roll starts on).
+
+Capture up to ${cap} rows. If the roll has more than ${cap} units, capture the first ${cap} and set \`truncated\` to true; otherwise \`truncated\` is false. If the document contains NO rent roll, return an empty \`rows\` array. Never invent a tenant, unit, square footage, rent, or date — use null / "" for anything not clearly shown.`;
+}
+
+/** Structured T-12 operating-statement extraction (Feature 1). Emit the stated
+ *  actuals; EGI/NOI subtotals are reconstructed downstream in code when absent. */
+export function t12ExtractionInstruction(): string {
+  return `Extract the trailing-twelve-month (T-12) operating statement from the attached document. Return the ACTUAL figures exactly as stated. Do NOT compute any subtotal the statement doesn't itself show — EGI and NOI are reconstructed downstream in code.
+
+Give:
+- \`periodEndDate\`: the trailing-12 period end as ISO yyyy-mm-dd, "" if not shown.
+- \`collectedRent\`: total collected / gross rental income (plain number), null if not shown.
+- \`vacancyLoss\`: vacancy + credit loss as a POSITIVE dollar number, null if not shown.
+- \`otherIncome\`: other income (plain number), null if not shown.
+- \`egi\`: effective gross income ONLY if the statement states it, else null. Do not compute it.
+- \`opex\`: one object per operating-expense LINE ITEM, each with \`key\` (snake_case like taxes, insurance, utilities, repairs, management, payroll, admin, cam, marketing, reserves), \`label\` (as written), \`amount\` (annual dollars, plain number), and \`page\`. Exclude debt service, depreciation, capital items, and any total row.
+- \`totalOpex\`: total operating expenses ONLY if stated, else null.
+- \`noi\`: net operating income ONLY if stated, else null. Do not compute it.
+- \`page\`: the page the statement is on.
+
+All dollar amounts are annual (trailing-12) totals. If the document has NO operating statement, return null figures and an empty \`opex\` array. Never invent a line item or amount — use null for anything not clearly shown.`;
+}
+
 /** Model generator — pass 2: reconcile across sources and produce model inputs. */
 export function reconciliationInstruction(): string {
   return `You are building a FIRST-DRAFT underwriting model for a BUYER by reconciling facts extracted from several source documents (provided below as JSON). These documents frequently DISAGREE — the OM's pro forma will not match the rent roll's in-place figures or the T-12's actuals. Reconcile every disagreement transparently. NEVER silently merge conflicting numbers.

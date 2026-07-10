@@ -30,8 +30,11 @@ import { parseDealNotes, parseDealQa } from "@/lib/deals";
 import { deriveInternalComps } from "@/lib/internal-comps";
 import { buildComps, marketMemoryFor } from "@/lib/market-memory";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource, type BuyBoxCheck } from "@/lib/criteria";
+import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource, parseMoney, type BuyBoxCheck } from "@/lib/criteria";
 import { scoreMandateFit, type MandateScore, type MandateVerdict } from "@/lib/mandate";
+import { compareNoi } from "@/lib/actuals/analyze";
+import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
+import type { ActualsData } from "./property-actuals";
 
 const VERDICT_PILL = {
   pass: { label: "Go", cls: "bg-pass/15 text-pass" },
@@ -266,6 +269,54 @@ export default async function DealPage({
   // The three summary-bar figures — a 5-second read, nothing more. The full
   // metric set lives one click away in Financials.
   const metrics = extraction?.metrics ?? [];
+
+  // Property actuals (Feature 1): the consolidated rent roll + T-12, if either
+  // was uploaded. Best-effort — the tables arrived in migration 0020; on an
+  // older schema the queries error and read null (the card simply doesn't
+  // render). Any per-number reference dates come from the stored extraction.
+  const [rrRes, t12Res] = await Promise.all([
+    supabase
+      .from("deal_rent_rolls")
+      .select("as_of_date, summary")
+      .eq("deal_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("deal_t12_statements")
+      .select("period_end_date, summary")
+      .eq("deal_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  const t12Summary = (t12Res.data?.summary as T12Summary | undefined) ?? null;
+  // OM assumed NOI (prefer a stabilized / pro-forma figure) vs the T-12 actual.
+  const omNoiMetric =
+    metrics.find(
+      (m) =>
+        /noi|net operating income/i.test(m.label) &&
+        /stab|pro ?forma|forward/i.test(m.label),
+    ) ?? metrics.find((m) => /noi|net operating income/i.test(m.label));
+  const omNoi = omNoiMetric ? parseMoney(omNoiMetric.value) : null;
+  const actuals: ActualsData = {
+    rentRoll: rrRes.data?.summary
+      ? {
+          asOf: (rrRes.data.as_of_date as string | null) ?? null,
+          summary: rrRes.data.summary as RentRollSummary,
+        }
+      : null,
+    t12: t12Summary
+      ? {
+          periodEnd: (t12Res.data?.period_end_date as string | null) ?? null,
+          summary: t12Summary,
+        }
+      : null,
+    noiComparison:
+      omNoi != null && t12Summary?.noi != null
+        ? compareNoi(omNoi, t12Summary.noi)
+        : null,
+  };
 
   // Citation facts, keyed by field label for the source chips (Feature 2).
   // Empty for deals screened before migration 0018 — no chips, never faked.
@@ -557,6 +608,7 @@ export default async function DealPage({
         qa={parseDealQa((deal as { qa?: unknown }).qa)}
         isSample={!!(deal as { is_sample?: boolean }).is_sample}
         marketMemory={marketMemory}
+        actuals={actuals}
       />
     </div>
   );

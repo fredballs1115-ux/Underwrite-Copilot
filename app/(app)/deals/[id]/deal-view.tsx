@@ -18,6 +18,7 @@ import {
   fmtBasisRange,
   type MarketGroup,
 } from "@/lib/market-memory";
+import { PropertyActuals, type ActualsData } from "./property-actuals";
 import { type StageChange } from "@/lib/stages";
 import type { InternalComp } from "@/lib/internal-comps";
 import { DebtSizer } from "./debt-sizer";
@@ -285,6 +286,7 @@ export function DealView({
   isSample = false,
   userId = null,
   marketMemory = null,
+  actuals = { rentRoll: null, t12: null, noiComparison: null },
 }: {
   dealId: string;
   dealName: string;
@@ -312,6 +314,7 @@ export function DealView({
   isSample?: boolean;
   userId?: string | null;
   marketMemory?: MarketGroup | null;
+  actuals?: ActualsData;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -664,6 +667,7 @@ export function DealView({
               <ReconciliationPanel dealId={dealId} result={discrepancies} />
             )}
             {marketMemory && <MarketMemoryStrip group={marketMemory} />}
+            <PropertyActuals data={actuals} />
             <OverviewView
               results={results}
               active={active}
