@@ -317,11 +317,14 @@ export function DebtSizer({
         : uw && uw.rsf > 0 && uw.reservesPsf > 0
           ? uw.reservesPsf * uw.rsf
           : null;
+    // Derive the /SF from the SAME annual figure the tile shows — mixing the
+    // model's annual with the screen's default reservesPsf could print a
+    // pair that doesn't divide ($100k/yr · $0.25/SF on 220k SF).
     const reservePsf =
-      uw && uw.reservesPsf > 0
-        ? uw.reservesPsf
-        : reserveAnnual != null && uw && uw.rsf > 0
-          ? reserveAnnual / uw.rsf
+      reserveAnnual != null && uw && uw.rsf > 0
+        ? reserveAnnual / uw.rsf
+        : uw && uw.reservesPsf > 0
+          ? uw.reservesPsf
           : null;
     return {
       reserveAnnual,

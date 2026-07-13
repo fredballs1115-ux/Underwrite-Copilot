@@ -238,7 +238,10 @@ const extraction: ExtractionResult = {
     { label: "Going-in cap", value: "5.45%", flagged: false, page: "p. 8" },
     { label: "Pro forma cap", value: "5.7%", flagged: true, page: "p. 8" },
     { label: "Exit cap", value: "5.25%", flagged: true, page: "p. 41" },
-    { label: "Year-1 NOI", value: "$3,706,500", flagged: false, page: "p. 8" },
+    // The OM's own p.8 figure — the pro forma the reconciliation (below) and
+    // the T-12 actual ($3,706,500) both push back on. Storing the OM's stated
+    // number here keeps the OM-vs-T-12 note honest: +4.7%, not a self-compare.
+    { label: "NOI (pro forma)", value: "$3,880,000", flagged: true, page: "p. 8" },
     { label: "Units", value: "248", flagged: false, page: "p. 3" },
     { label: "Avg in-place rent", value: "$2,400/mo", flagged: false, page: "p. 12" },
     { label: "Pro forma rent", value: "$2,600/mo", flagged: true, page: "p. 12" },

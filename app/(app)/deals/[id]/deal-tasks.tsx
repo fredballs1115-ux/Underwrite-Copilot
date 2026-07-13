@@ -9,6 +9,7 @@ import {
   formatDueDate,
   unimportedVerdictSteps,
   TASK_TITLE_MAX,
+  VERDICT_IMPORT_MAX,
   type DealTask,
   type TaskAssignee,
 } from "@/lib/deal-tasks";
@@ -134,7 +135,12 @@ export function DealTasks({
           <ImportButton
             label={
               anyImported
-                ? `Add the verdict’s ${freshSteps.length} new next step${freshSteps.length === 1 ? "" : "s"}`
+                ? // The action imports at most VERDICT_IMPORT_MAX per click —
+                  // never promise more than one click delivers.
+                  (() => {
+                    const n = Math.min(freshSteps.length, VERDICT_IMPORT_MAX);
+                    return `Add the verdict’s ${n} new next step${n === 1 ? "" : "s"}`;
+                  })()
                 : "Add the verdict’s next steps"
             }
           />

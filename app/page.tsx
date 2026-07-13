@@ -120,7 +120,7 @@ const PRO_FEATURES = [
   "Unlimited deals",
   "Excel models — first-draft + institutional underwrite.xlsx",
   "IC memo, full PDF report, and LOI draft",
-  "Your firm's name and logo on every export",
+  "Your firm's name and logo on memo & report exports",
   "Public-web comp search",
   "Everything in Free",
 ];

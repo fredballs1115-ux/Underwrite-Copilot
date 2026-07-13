@@ -74,10 +74,11 @@ export type MemoData = {
 };
 
 /** Analysis output and user-shaped rows can carry surprises — numbers where
- *  strings are expected, nulls inside arrays. Every rendered value passes
- *  through here so no conceivable data shape can throw mid-render. */
+ *  strings are expected, nulls inside arrays, glyphs standard Helvetica can't
+ *  encode. Every rendered value passes through here (incl. pdfSafe, same as
+ *  the report's str) so no data shape can throw or mis-render mid-render. */
 const str = (v: unknown): string =>
-  typeof v === "string" ? v : v == null ? "" : String(v);
+  pdfSafe(typeof v === "string" ? v : v == null ? "" : String(v));
 
 const clamp = (v: unknown, n: number) => {
   const s = str(v);
