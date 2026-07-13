@@ -7,6 +7,9 @@ import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
+import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { buildCapGrowthGrid, type CapGrowthGrid } from "@/lib/underwrite/report-grid";
+import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 
 export const runtime = "nodejs";
 
@@ -94,8 +97,53 @@ export async function GET(
     buyBoxChecks = [];
   }
 
+  // Sensitivity heatmap (Feature 5): the same derived screening model as the
+  // workbook/playground — actuals folded in — swept over exit cap × rent
+  // growth. Best-effort: any failure (pre-0020 schema, degenerate extraction)
+  // just omits the section, never sinks the report.
+  let grid: CapGrowthGrid | null = null;
   try {
-    const input = buildReportData(deal, dateStr, buyBoxChecks);
+    const extraction = (deal.extraction as ExtractionResult | null) ?? null;
+    if (extraction) {
+      const [rrRes, t12Res] = await Promise.all([
+        supabase
+          .from("deal_rent_rolls")
+          .select("as_of_date, summary")
+          .eq("deal_id", id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("deal_t12_statements")
+          .select("period_end_date, summary")
+          .eq("deal_id", id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      const derived = deriveUnderwriteInputs(extraction, deal.name, {
+        rentRoll: rrRes.data?.summary
+          ? {
+              summary: rrRes.data.summary as RentRollSummary,
+              asOf: (rrRes.data.as_of_date as string | null) ?? null,
+            }
+          : null,
+        t12: t12Res.data?.summary
+          ? {
+              summary: t12Res.data.summary as T12Summary,
+              periodEnd: (t12Res.data.period_end_date as string | null) ?? null,
+            }
+          : null,
+      });
+      grid = buildCapGrowthGrid(derived.inputs);
+    }
+  } catch (err) {
+    console.error(`report heatmap build failed for ${id}:`, err);
+    grid = null;
+  }
+
+  try {
+    const input = buildReportData(deal, dateStr, buyBoxChecks, grid);
     const element = React.createElement(ReportDocument, {
       input,
     }) as unknown as Parameters<typeof renderToBuffer>[0];

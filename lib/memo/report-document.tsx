@@ -10,6 +10,13 @@ import type {
   MarketResult,
 } from "@/lib/anthropic/types";
 import { buildMemoData, MemoPage, pdfSafe, type MemoData } from "./memo-document";
+import {
+  heatBucket,
+  heatCellText,
+  HEAT_BG,
+  HEAT_LEGEND,
+  type CapGrowthGrid,
+} from "@/lib/underwrite/report-grid";
 
 const C = {
   brand: "#114e54",
@@ -170,6 +177,9 @@ function PageChrome({
 export interface ReportInput {
   deal: DealRow;
   memo: MemoData;
+  /** the exit-cap × rent-growth heatmap (Feature 5); null when the deal has
+   *  no extraction to derive a model from */
+  grid?: CapGrowthGrid | null;
 }
 
 /** Everything the deal screen produced, shaped for the multi-page report. */
@@ -177,8 +187,9 @@ export function buildReportData(
   deal: DealRow,
   dateStr: string,
   buyBoxChecks?: BuyBoxCheck[] | null,
+  grid?: CapGrowthGrid | null,
 ): ReportInput {
-  return { deal, memo: buildMemoData(deal, dateStr, buyBoxChecks) };
+  return { deal, memo: buildMemoData(deal, dateStr, buyBoxChecks), grid: grid ?? null };
 }
 
 /**
@@ -189,7 +200,7 @@ export function buildReportData(
  * memo?"
  */
 export function ReportDocument({ input }: { input: ReportInput }) {
-  const { deal, memo } = input;
+  const { deal, memo, grid } = input;
   const dealName = memo.name;
   const extraction = deal.extraction as ExtractionResult | null;
   const challenges = deal.challenges as ChallengerResult | null;
@@ -228,6 +239,86 @@ export function ReportDocument({ input }: { input: ReportInput }) {
     >
       {/* Page 1: the one-page memo, unchanged — the executive read. */}
       <MemoPage data={memo} />
+
+      {/* Sensitivity heatmap (Feature 5): where the deal thrives, where it
+          breaks — levered IRR / EM over exit cap × rent growth, computed by
+          the same engine as the workbook and the on-screen playground. */}
+      {grid && (
+        <PageChrome title="Sensitivity analysis" dealName={dealName}>
+          <Text style={s.sub}>
+            Levered IRR and equity multiple recomputed across the two levers
+            that move screening returns most. The bordered cell is the base
+            case.
+          </Text>
+          {/* Header row: rent growth across the columns. */}
+          <View style={[s.tableHead, { marginTop: 6 }]}>
+            <Text style={[s.headText, { width: "15%" }]}>Exit cap ↓</Text>
+            {grid.growthCols.map((g, i) => (
+              <Text key={i} style={[s.headText, { width: "17%", textAlign: "center" }]}>
+                {`${(g * 100).toFixed(1)}% growth`}
+              </Text>
+            ))}
+          </View>
+          {grid.cells.map((row, r) => (
+            <View key={r} style={{ flexDirection: "row" }} wrap={false}>
+              <Text
+                style={{
+                  width: "15%",
+                  fontSize: 8,
+                  fontFamily: "Helvetica-Bold",
+                  paddingVertical: 5,
+                  paddingRight: 4,
+                }}
+              >
+                {`${(grid.capRows[r] * 100).toFixed(2)}%`}
+              </Text>
+              {row.map((cell, c) => {
+                const isBase = r === grid.baseRow && c === grid.baseCol;
+                return (
+                  <Text
+                    key={c}
+                    style={{
+                      width: "17%",
+                      fontSize: 7.5,
+                      textAlign: "center",
+                      paddingVertical: 5,
+                      backgroundColor: HEAT_BG[heatBucket(cell.irrPct)],
+                      borderWidth: isBase ? 1.4 : 0.4,
+                      borderColor: isBase ? C.ink : "#ffffff",
+                      fontFamily: isBase ? "Helvetica-Bold" : "Helvetica",
+                    }}
+                  >
+                    {heatCellText(cell)}
+                  </Text>
+                );
+              })}
+            </View>
+          ))}
+          {/* Legend */}
+          <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
+            {HEAT_LEGEND.map((l) => (
+              <View key={l.bucket} style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                <View
+                  style={{
+                    width: 8,
+                    height: 8,
+                    backgroundColor: HEAT_BG[l.bucket],
+                    borderWidth: 0.4,
+                    borderColor: C.line,
+                  }}
+                />
+                <Text style={{ fontSize: 7.5, color: C.muted }}>{l.label}</Text>
+              </View>
+            ))}
+          </View>
+          <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 6 }}>
+            Levered IRR and Equity Multiple across exit cap (rows) and rent
+            growth (columns). Green highlights scenarios meeting the 15% IRR
+            threshold. Computed from the deal&apos;s derived screening model —
+            re-export after changing assumptions.
+          </Text>
+        </PageChrome>
+      )}
 
       {metrics.length > 0 && (
         <PageChrome title="Extracted terms" dealName={dealName}>
