@@ -13,6 +13,8 @@ import { countPdfPages } from "@/lib/pdf";
 import { buildDealFacts, toFactRows } from "@/lib/facts";
 import { runDocReconciliation } from "./reconcile-facts";
 import { runActualsIngestion } from "./actuals-ingest";
+import { compareNoi } from "@/lib/actuals/analyze";
+import { parseMoney } from "@/lib/criteria";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxLines } from "@/lib/criteria";
 import { notifyAnalysisReady } from "@/lib/email";
@@ -307,7 +309,7 @@ export async function runAnalysis(
       try {
         const { data: dr } = await admin
           .from("deals")
-          .select("discrepancies")
+          .select("discrepancies, extraction")
           .eq("id", dealId)
           .single();
         const disc = (dr?.discrepancies as {
@@ -318,17 +320,55 @@ export async function runAnalysis(
           }[];
         } | null)?.discrepancies ?? [];
         const flagged = disc.filter((d) => d.severity !== "minor").slice(0, 6);
-        if (flagged.length) {
-          reconNote =
-            "Cross-document reconciliation flagged these conflicts: " +
-            flagged
-              .map(
-                (f) =>
-                  `${f.label} (${f.values.map((v) => `${v.docLabel}: ${v.value}`).join(" vs ")})`,
-              )
-              .join("; ") +
-            ".";
+        const notes: string[] = [];
+
+        // Feature 1: the OM-assumed vs T-12-actual NOI gap is the skeptic's
+        // first-order fact — a material (>5%) or red-flag (>10%) delta means
+        // the deck's income story isn't what the property produced.
+        try {
+          const { data: t12Row } = await admin
+            .from("deal_t12_statements")
+            .select("summary")
+            .eq("deal_id", dealId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          const t12Noi = (t12Row?.summary as { noi?: number | null } | null)?.noi;
+          const exMetrics =
+            (dr?.extraction as { metrics?: { label: string; value: string }[] } | null)
+              ?.metrics ?? [];
+          const omNoiMetric =
+            exMetrics.find(
+              (m) =>
+                /noi|net operating income/i.test(m.label) &&
+                /stab|pro ?forma|forward/i.test(m.label),
+            ) ?? exMetrics.find((m) => /noi|net operating income/i.test(m.label));
+          const omNoi = omNoiMetric ? parseMoney(omNoiMetric.value) : null;
+          if (omNoi != null && t12Noi != null && Number.isFinite(t12Noi) && t12Noi !== 0) {
+            const cmp = compareNoi(omNoi, t12Noi);
+            if (cmp.severity !== "in_line") {
+              notes.push(
+                `The OM's assumed NOI ($${Math.round(omNoi).toLocaleString("en-US")}) runs ${(Math.abs(cmp.deltaPct) * 100).toFixed(1)}% ${cmp.direction} the T-12 actual ($${Math.round(t12Noi).toLocaleString("en-US")}) — a ${cmp.severity === "red_flag" ? "red-flag" : "material"} gap between the deck's story and what the property produced.`,
+              );
+            }
+          }
+        } catch {
+          // no T-12 stored (or pre-0020 schema) — skip the comparison
         }
+
+        if (flagged.length) {
+          notes.push(
+            "Cross-document reconciliation flagged these conflicts: " +
+              flagged
+                .map(
+                  (f) =>
+                    `${f.label} (${f.values.map((v) => `${v.docLabel}: ${v.value}`).join(" vs ")})`,
+                )
+                .join("; ") +
+              ".",
+          );
+        }
+        if (notes.length) reconNote = notes.join(" ");
       } catch {
         // no discrepancies stored — the challenger runs on the OM alone
       }

@@ -1,9 +1,10 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
-import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { deriveUnderwriteInputs, type ActualsForModel } from "@/lib/underwrite/inputs";
 import { buildUnderwriteWorkbook } from "@/lib/underwrite/workbook";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 
 export const runtime = "nodejs";
 
@@ -53,8 +54,42 @@ export async function GET(
     return Response.redirect(new URL(`/deals/${id}?error=underwriteempty`, req.url), 302);
   }
 
+  // Property actuals (Feature 1): when a rent roll / T-12 was ingested, its
+  // occupancy, SF, NOI, and expense load re-base the workbook. Best-effort —
+  // on a pre-0020 schema the queries error and both read null (OM-only model).
+  const [rrRes, t12Res] = await Promise.all([
+    supabase
+      .from("deal_rent_rolls")
+      .select("as_of_date, summary")
+      .eq("deal_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("deal_t12_statements")
+      .select("period_end_date, summary")
+      .eq("deal_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  const actuals: ActualsForModel = {
+    rentRoll: rrRes.data?.summary
+      ? {
+          summary: rrRes.data.summary as RentRollSummary,
+          asOf: (rrRes.data.as_of_date as string | null) ?? null,
+        }
+      : null,
+    t12: t12Res.data?.summary
+      ? {
+          summary: t12Res.data.summary as T12Summary,
+          periodEnd: (t12Res.data.period_end_date as string | null) ?? null,
+        }
+      : null,
+  };
+
   try {
-    const model = deriveUnderwriteInputs(extraction, deal.name);
+    const model = deriveUnderwriteInputs(extraction, deal.name, actuals);
     const buffer = await buildUnderwriteWorkbook(model);
     const safe =
       (deal.name || "deal").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() ||

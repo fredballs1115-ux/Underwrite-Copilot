@@ -15,7 +15,16 @@
  */
 import { findMetric, parseMoney, parsePct } from "@/lib/criteria";
 import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { UnderwriteInputs } from "./engine";
+
+/** Property actuals fed into the model (Feature 1): when present, the rent
+ *  roll's occupancy/SF and the T-12's NOI/expense ratio replace the OM
+ *  narrative and the class defaults — that's what moves the verdict. */
+export interface ActualsForModel {
+  rentRoll?: { summary: RentRollSummary; asOf?: string | null } | null;
+  t12?: { summary: T12Summary; periodEnd?: string | null } | null;
+}
 
 export type Provenance = "extracted" | "derived" | "assumption";
 export interface InputSource {
@@ -69,11 +78,38 @@ const SF_EXCLUDE = /per|\/|psf|land|acre|unit/i;
 export function deriveUnderwriteInputs(
   extraction: ExtractionResult | null,
   fallbackName: string,
+  actuals?: ActualsForModel,
 ): DerivedModel {
   const metrics = extraction?.metrics ?? [];
   const assetClass = normalizeClass(extraction?.assetClass ?? "auto");
   const cd = CLASS_DEFAULTS[assetClass];
   const sources: DerivedModel["sources"] = {};
+
+  // ── Property actuals (guarded) ──────────────────────────────────────────
+  // Only physically-plausible figures override the OM/defaults; anything
+  // degenerate (zero SF, occupancy ≤5%, expense ratio ≥90%, non-positive NOI)
+  // falls back rather than poisoning the reconstruction below.
+  const rr = actuals?.rentRoll?.summary ?? null;
+  const rrAsOf = actuals?.rentRoll?.asOf ?? null;
+  const t12 = actuals?.t12?.summary ?? null;
+  const t12End = actuals?.t12?.periodEnd ?? null;
+  const t12Noi =
+    t12?.noi != null && Number.isFinite(t12.noi) && t12.noi > 0 ? t12.noi : null;
+  const t12Er =
+    t12?.totalOpex != null &&
+    t12.egi != null &&
+    t12.egi > 0 &&
+    t12.totalOpex > 0 &&
+    t12.totalOpex / t12.egi < 0.9
+      ? t12.totalOpex / t12.egi
+      : null;
+  const rrOcc =
+    rr?.sfWeightedOccupancy != null &&
+    rr.sfWeightedOccupancy > 0.05 &&
+    rr.sfWeightedOccupancy <= 1
+      ? rr.sfWeightedOccupancy
+      : null;
+  const rrSf = rr && rr.totalSf > 100 ? Math.round(rr.totalSf) : null;
 
   const mark = (
     key: keyof UnderwriteInputs,
@@ -109,8 +145,19 @@ export function deriveUnderwriteInputs(
   }
 
   // ── NOI (the anchor) ───────────────────────────────────────────────────
+  // T-12 actual NOI outranks the OM narrative when a statement was uploaded —
+  // this is the Feature-1 point: the model runs on what the property actually
+  // produced, not the deck's story.
+  const ttmNote = t12End ? ` (TTM to ${t12End})` : "";
   let noi: number;
-  if (extractedNoi != null) {
+  if (t12Noi != null) {
+    noi = t12Noi;
+    mark(
+      "inPlaceRentAnnual",
+      "derived",
+      `Grossed up from the T-12 actual NOI${ttmNote} at ${t12Er != null ? "the T-12 actual" : "an assumed"} expense ratio`,
+    );
+  } else if (extractedNoi != null) {
     noi = extractedNoi;
     mark("inPlaceRentAnnual", "derived", "Grossed up from OM NOI at an assumed expense ratio", pageOf(noiMetric));
   } else if (capPct) {
@@ -122,16 +169,26 @@ export function deriveUnderwriteInputs(
   }
 
   // ── RSF ────────────────────────────────────────────────────────────────
+  // The rent roll's summed SF outranks the OM's stated building size.
   const sfMetric = findMetric(metrics, SF_INCLUDE, SF_EXCLUDE);
   const sfParsed = sfMetric ? parseMoney(sfMetric.value) : null; // parseMoney reads plain numbers too
-  const rsf = sfParsed && sfParsed > 100 ? Math.round(sfParsed) : 100_000;
-  mark("rsf", sfParsed && sfParsed > 100 ? "extracted" : "assumption",
-    sfParsed && sfParsed > 100 ? "OM building size" : "Enter rentable SF", pageOf(sfMetric));
+  const rsf = rrSf ?? (sfParsed && sfParsed > 100 ? Math.round(sfParsed) : 100_000);
+  if (rrSf != null) {
+    mark("rsf", "extracted", `Rent roll total SF${rrAsOf ? ` (as of ${rrAsOf})` : ""}`);
+  } else {
+    mark("rsf", sfParsed && sfParsed > 100 ? "extracted" : "assumption",
+      sfParsed && sfParsed > 100 ? "OM building size" : "Enter rentable SF", pageOf(sfMetric));
+  }
 
   // ── NOI-anchored income reconstruction ──────────────────────────────────
   // EGR(1−expenseRatio) = NOI ; PGR(1−vacancy) = EGR ; rent = PGR.
-  const egr = noi / (1 - cd.expenseRatio);
-  const pgr = egr / (1 - cd.vacancy);
+  // The ratios come from the actuals when available: the T-12's expense load
+  // and the rent roll's vacancy replace the class defaults, so the whole
+  // income statement re-bases on the documents.
+  const expenseRatio = t12Er ?? cd.expenseRatio;
+  const vacancy = rrOcc != null ? 1 - rrOcc : cd.vacancy;
+  const egr = noi / (1 - expenseRatio);
+  const pgr = egr / (1 - vacancy);
   const inPlaceRentAnnual = pgr;
   const operatingExpenses = egr - noi; // = expenseRatio × EGR
 
@@ -156,7 +213,7 @@ export function deriveUnderwriteInputs(
     inPlaceRentAnnual,
     expenseRecoveriesAnnual: 0,
     otherRevenueAnnual: 0,
-    vacancyPct: cd.vacancy,
+    vacancyPct: vacancy,
     rentGrowthPct: 0.03,
 
     expenseLines: [{ label: "Operating expenses", annual: operatingExpenses }],
@@ -183,13 +240,26 @@ export function deriveUnderwriteInputs(
 
   // Remaining provenance notes.
   mark("holdMonths", "assumption", "Underwrite Copilot default — 5-year hold");
-  mark("vacancyPct", "assumption", `${assetClass} default (${Math.round(cd.vacancy * 100)}%)`);
+  if (rrOcc != null) {
+    mark(
+      "vacancyPct",
+      "extracted",
+      `Rent roll actual — ${(rrOcc * 100).toFixed(1)}% SF-weighted occupancy${rrAsOf ? ` as of ${rrAsOf}` : ""}`,
+    );
+  } else {
+    mark("vacancyPct", "assumption", `${assetClass} default (${Math.round(cd.vacancy * 100)}%)`);
+  }
   mark("rentGrowthPct", "assumption", "Default 3.0%/yr — set your view");
   mark("expenseGrowthPct", "assumption", "Default 3.0%/yr — set your view");
-  sources.expenseLines = {
-    provenance: extractedNoi != null ? "derived" : "assumption",
-    note: `Total opex to tie NOI (${Math.round(cd.expenseRatio * 100)}% of EGI ${assetClass} default) — break out from a T-12`,
-  };
+  sources.expenseLines = t12Er != null
+    ? {
+        provenance: "extracted",
+        note: `T-12 actual expense load${ttmNote} — ${Math.round(t12Er * 100)}% of EGI`,
+      }
+    : {
+        provenance: extractedNoi != null ? "derived" : "assumption",
+        note: `Total opex to tie NOI (${Math.round(cd.expenseRatio * 100)}% of EGI ${assetClass} default) — break out from a T-12`,
+      };
   mark("mgmtFeePct", "assumption", "Folded into operating expenses — split out if you track it");
   mark("reservesPsf", "assumption", `${assetClass} default $${cd.reservesPsf.toFixed(2)}/SF/yr`);
   mark("amFeePctEquity", "assumption", "Default 0.5% of equity/yr");
@@ -212,7 +282,8 @@ export function deriveUnderwriteInputs(
       address: extraction?.address ?? "",
       market: extraction?.market ?? "",
       assetClass,
-      occupancyPct: occPct != null ? occPct / 100 : null,
+      // Rent-roll actual occupancy outranks the OM's stated figure.
+      occupancyPct: rrOcc ?? (occPct != null ? occPct / 100 : null),
       rsf,
     },
   };

@@ -19,6 +19,7 @@ import {
   type MarketGroup,
 } from "@/lib/market-memory";
 import { PropertyActuals, type ActualsData } from "./property-actuals";
+import { ActualsPrompt, type ActualsSlotState } from "./actuals-prompt";
 import { type StageChange } from "@/lib/stages";
 import type { InternalComp } from "@/lib/internal-comps";
 import { DebtSizer } from "./debt-sizer";
@@ -668,6 +669,26 @@ export function DealView({
             )}
             {marketMemory && <MarketMemoryStrip group={marketMemory} />}
             <PropertyActuals data={actuals} />
+            {/* Feature 1: prompt for the actuals docs. Hidden while a screen
+                runs, on the sample, and once both docs are folded in. */}
+            {(() => {
+              if (active || isSample || !hasOm) return null;
+              const slot = (
+                kind: "rent_roll" | "t12",
+                stored: boolean,
+              ): ActualsSlotState =>
+                stored
+                  ? "done"
+                  : documents.some((d) => d.kind === kind)
+                    ? "uploaded"
+                    : "missing";
+              const rrState = slot("rent_roll", !!actuals.rentRoll);
+              const t12State = slot("t12", !!actuals.t12);
+              if (rrState === "done" && t12State === "done") return null;
+              return (
+                <ActualsPrompt dealId={dealId} rentRoll={rrState} t12={t12State} />
+              );
+            })()}
             <OverviewView
               results={results}
               active={active}
