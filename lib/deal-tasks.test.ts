@@ -4,6 +4,9 @@ import {
   isTaskOverdue,
   taskProgress,
   formatDueDate,
+  normalizeTaskTitle,
+  unimportedVerdictSteps,
+  TASK_TITLE_MAX,
   type DealTask,
 } from "./deal-tasks";
 
@@ -67,6 +70,30 @@ describe("taskProgress", () => {
       total: 3,
     });
     expect(taskProgress([])).toEqual({ done: 0, total: 0 });
+  });
+});
+
+describe("unimportedVerdictSteps", () => {
+  it("drops already-imported titles, junk entries, and in-batch duplicates", () => {
+    const tasks = [T({ title: "Walk the comps" })];
+    expect(
+      unimportedVerdictSteps(
+        ["Walk the comps", "  Get the T-12  ", "Get the T-12", 42, "", null],
+        tasks,
+      ),
+    ).toEqual(["Get the T-12"]);
+  });
+
+  it("dedupe survives truncation — a long step matches its stored 200-cp form", () => {
+    const long = "x".repeat(250);
+    const stored = normalizeTaskTitle(long);
+    expect(stored).toHaveLength(TASK_TITLE_MAX);
+    expect(unimportedVerdictSteps([long], [T({ title: stored })])).toEqual([]);
+  });
+
+  it("non-array input reads as no steps", () => {
+    expect(unimportedVerdictSteps(undefined, [])).toEqual([]);
+    expect(unimportedVerdictSteps("next steps", [])).toEqual([]);
   });
 });
 

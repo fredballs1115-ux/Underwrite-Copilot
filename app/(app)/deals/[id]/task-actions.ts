@@ -3,7 +3,11 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { TASK_TITLE_MAX, VERDICT_IMPORT_MAX } from "@/lib/deal-tasks";
+import {
+  VERDICT_IMPORT_MAX,
+  normalizeTaskTitle,
+  unimportedVerdictSteps,
+} from "@/lib/deal-tasks";
 import type { VerdictResult } from "@/lib/anthropic/types";
 
 // All writes go through the USER client — RLS from 0022 (can_access_deal in
@@ -40,10 +44,8 @@ async function resolveAssignee(
 
 export async function addDealTask(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
-  // Code-point slice so the cap can't shear an emoji in half (same as notes).
-  const title = Array.from(String(formData.get("title") ?? "").trim())
-    .slice(0, TASK_TITLE_MAX)
-    .join("");
+  // Trim + code-point cap (can't shear an emoji in half; same as notes).
+  const title = normalizeTaskTitle(String(formData.get("title") ?? ""));
   const assigneeRaw = String(formData.get("assignee") ?? "").trim();
   const dueRaw = String(formData.get("dueDate") ?? "").trim();
 
@@ -138,32 +140,32 @@ export async function importVerdictTasks(formData: FormData) {
   if (!deal) redirect("/deals");
 
   const verdict = deal.verdict as VerdictResult | null;
-  const steps = (Array.isArray(verdict?.nextSteps) ? verdict.nextSteps : [])
-    .filter((s): s is string => typeof s === "string" && !!s.trim())
-    .map((s) => Array.from(s.trim()).slice(0, TASK_TITLE_MAX).join(""))
-    .slice(0, VERDICT_IMPORT_MAX);
-  if (steps.length === 0) redirect(`/deals/${dealId}?error=tasknosteps`);
 
-  const { data: existing } = await supabase
+  // A failed read here must ABORT: with the dedupe base missing, importing
+  // would blindly duplicate every step.
+  const { data: existing, error: existErr } = await supabase
     .from("deal_tasks")
     .select("title")
     .eq("deal_id", dealId);
-  const seen = new Set(
-    ((existing ?? []) as { title: string }[]).map((t) => t.title),
-  );
-  const fresh = steps.filter((s) => !seen.has(s));
+  if (existErr) redirect(`/deals/${dealId}?error=task`);
 
-  if (fresh.length > 0) {
-    const { error } = await supabase.from("deal_tasks").insert(
-      fresh.map((title) => ({
-        deal_id: dealId,
-        created_by: user.id,
-        title,
-        source: "verdict" as const,
-      })),
-    );
-    if (error) redirect(`/deals/${dealId}?error=task`);
-  }
+  // Normalize + in-batch dedupe + drop already-imported titles, THEN cap —
+  // so a later re-import can still bring in steps past the first batch.
+  const fresh = unimportedVerdictSteps(
+    verdict?.nextSteps,
+    ((existing ?? []) as { title: string }[]),
+  ).slice(0, VERDICT_IMPORT_MAX);
+  if (fresh.length === 0) redirect(`/deals/${dealId}?error=tasknosteps`);
+
+  const { error } = await supabase.from("deal_tasks").insert(
+    fresh.map((title) => ({
+      deal_id: dealId,
+      created_by: user.id,
+      title,
+      source: "verdict" as const,
+    })),
+  );
+  if (error) redirect(`/deals/${dealId}?error=task`);
 
   revalidatePath(`/deals/${dealId}`);
 }

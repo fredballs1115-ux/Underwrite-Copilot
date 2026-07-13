@@ -66,6 +66,32 @@ export function taskProgress(tasks: Pick<DealTask, "done">[]): {
   };
 }
 
+/** Trim + code-point cap — the ONE normalization every writer applies, so
+ *  the import dedupe (title equality) can't be defeated by truncation. */
+export function normalizeTaskTitle(raw: string): string {
+  return Array.from(raw.trim()).slice(0, TASK_TITLE_MAX).join("");
+}
+
+/** The verdict's next steps that aren't tasks yet (normalized, in-batch
+ *  deduped). Drives both the import action and the button's visibility, so
+ *  the UI can never hide steps the action would import. */
+export function unimportedVerdictSteps(
+  nextSteps: unknown,
+  tasks: Pick<DealTask, "title">[],
+): string[] {
+  const existing = new Set(tasks.map((t) => t.title));
+  const out: string[] = [];
+  for (const s of Array.isArray(nextSteps) ? nextSteps : []) {
+    if (typeof s !== "string" || !s.trim()) continue;
+    const title = normalizeTaskTitle(s);
+    if (!existing.has(title)) {
+      existing.add(title); // also dedupes within the batch
+      out.push(title);
+    }
+  }
+  return out;
+}
+
 /** "Jul 20" / "Jul 20, 2027" — UTC-pinned so the server and browser render
  *  the SAME string (a bare yyyy-mm-dd parses as UTC midnight). Year shown
  *  only when it isn't the current one. */

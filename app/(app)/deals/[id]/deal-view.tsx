@@ -719,10 +719,7 @@ export function DealView({
                 tasks={tasks}
                 assignees={taskAssignees}
                 todayIso={todayIso}
-                hasVerdictSteps={
-                  Array.isArray(results.verdict?.nextSteps) &&
-                  results.verdict.nextSteps.length > 0
-                }
+                verdictSteps={results.verdict?.nextSteps}
               />
             )}
             <AskPanel

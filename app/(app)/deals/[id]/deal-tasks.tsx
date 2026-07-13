@@ -7,6 +7,7 @@ import {
   isTaskOverdue,
   taskProgress,
   formatDueDate,
+  unimportedVerdictSteps,
   TASK_TITLE_MAX,
   type DealTask,
   type TaskAssignee,
@@ -31,7 +32,7 @@ function AddButton() {
   );
 }
 
-function ImportButton() {
+function ImportButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
     <button
@@ -39,7 +40,7 @@ function ImportButton() {
       disabled={pending}
       className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint disabled:opacity-60"
     >
-      {pending ? "Adding…" : "Add the verdict’s next steps"}
+      {pending ? "Adding…" : label}
     </button>
   );
 }
@@ -84,7 +85,7 @@ export function DealTasks({
   tasks,
   assignees,
   todayIso,
-  hasVerdictSteps,
+  verdictSteps,
 }: {
   dealId: string;
   tasks: DealTask[];
@@ -92,14 +93,19 @@ export function DealTasks({
   /** yyyy-mm-dd (UTC), computed on the server once — keeps "overdue" and
    *  date labels identical between server and client render. */
   todayIso: string;
-  hasVerdictSteps: boolean;
+  /** the verdict's raw nextSteps (unknown shape — normalized here) */
+  verdictSteps?: unknown;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const sorted = sortDealTasks(tasks);
   const { done, total } = taskProgress(tasks);
   const labelFor = (id: string | null) =>
     id ? (assignees.find((a) => a.userId === id)?.label ?? "teammate") : null;
+  // Steps not yet imported — the SAME normalization/dedupe the action runs,
+  // so the button shows exactly when a click would add something (including
+  // NEW steps after a re-screen; it never vanishes forever after one import).
   const anyImported = tasks.some((t) => t.source === "verdict");
+  const freshSteps = unimportedVerdictSteps(verdictSteps, tasks);
 
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
@@ -122,10 +128,16 @@ export function DealTasks({
         )}
       </div>
 
-      {hasVerdictSteps && !anyImported && (
+      {freshSteps.length > 0 && (
         <form action={importVerdictTasks} className="mt-3">
           <input type="hidden" name="dealId" value={dealId} />
-          <ImportButton />
+          <ImportButton
+            label={
+              anyImported
+                ? `Add the verdict’s ${freshSteps.length} new next step${freshSteps.length === 1 ? "" : "s"}`
+                : "Add the verdict’s next steps"
+            }
+          />
         </form>
       )}
 

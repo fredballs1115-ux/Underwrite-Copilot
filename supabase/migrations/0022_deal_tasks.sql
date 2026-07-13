@@ -52,3 +52,26 @@ create policy "update deal tasks" on public.deal_tasks
 
 create policy "delete deal tasks" on public.deal_tasks
   for delete using (public.can_access_deal(deal_id));
+
+-- Updates may edit the WORK (title, assignee, due date, done state) but
+-- never the record's identity — a task can't be repointed to another deal,
+-- re-attributed to another creator, or re-badged as verdict-sourced through
+-- raw PostgREST (same guard pattern as deal_shares in 0017).
+create or replace function public.deal_tasks_guard()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.deal_id is distinct from old.deal_id
+     or new.created_by is distinct from old.created_by
+     or new.created_at is distinct from old.created_at
+     or new.source is distinct from old.source then
+    raise exception 'task identity fields cannot be changed';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists deal_tasks_guard on public.deal_tasks;
+create trigger deal_tasks_guard before update on public.deal_tasks
+  for each row execute function public.deal_tasks_guard();
