@@ -1006,7 +1006,9 @@ function MarketMemoryStrip({ group }: { group: MarketGroup }) {
 }
 
 /** The mandate check, full detail — the bar carries only the chip. */
-function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
+// Exported so the public sample screen (/demo) can render the SAME panel a
+// logged-in user gets, driven by a fixture box.
+export function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
   if (!data.hasBox) {
     return (
       <EmptyState
@@ -1374,7 +1376,7 @@ function DocumentsPanel({
                 href={`/api/deals/${dealId}/memo`}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
               >
-                Download the one-page memo (PDF)
+                Download the IC memo (PDF)
               </a>
             ) : (
               <Link

@@ -1293,20 +1293,16 @@ function GettingStarted({
       key: "sample",
       label: "Explore the sample deal — every tab, no upload needed",
       done: !!state.sampleId,
-      action: state.sampleId ? (
-        <Link
-          href={`/deals/${state.sampleId}`}
-          className="text-xs font-medium text-brand hover:text-brand-strong"
-        >
-          Open it →
-        </Link>
-      ) : (
+      // Both states route through the ACTION (it redirects into an existing
+      // sample after topping up anything the fixture gained since — a plain
+      // link would bypass that self-heal).
+      action: (
         <form action={createSampleDeal}>
           <PendingButton
-            pendingLabel="Adding…"
+            pendingLabel={state.sampleId ? "Opening…" : "Adding…"}
             className="text-xs font-medium text-brand hover:text-brand-strong"
           >
-            Add it →
+            {state.sampleId ? "Open it →" : "Add it →"}
           </PendingButton>
         </form>
       ),

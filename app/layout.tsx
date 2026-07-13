@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { SPREAD_BPS } from "@/lib/marketing-constants";
 import "./globals.css";
 
 // next/font downloads and self-hosts the fonts at build time (no extra network
@@ -42,8 +43,7 @@ export const metadata: Metadata = {
     url: APP_URL,
     siteName: "Underwrite Copilot",
     title: "Stop underwriting like a coin flip.",
-    description:
-      "Same deal, same afternoon, 200 bps apart — that's a coin flip with a spreadsheet attached. Underwrite Copilot gives every deal the same rigor: sourced ranges, the three deal-killers first, a verdict that shows its work.",
+    description: `Same deal, same afternoon, ${SPREAD_BPS} bps apart — that's a coin flip with a spreadsheet attached. Underwrite Copilot gives every deal the same rigor: sourced ranges, the three deal-killers first, a verdict that shows its work.`,
   },
   twitter: {
     card: "summary_large_image",

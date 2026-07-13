@@ -12,9 +12,11 @@ export interface ExportBranding {
 
 // & is the header/footer control character — double it so user text can't
 // smuggle in format codes; cap length so a 200-char footer can't blow the
-// print chrome.
+// print chrome. Slice BEFORE escaping: slicing after could cut an "&&" pair
+// in half, and the surviving lone "&" would swallow the following "&R"
+// section marker.
 const HF_MAX = 90;
-const hf = (s: string) => s.replace(/&/g, "&&").slice(0, HF_MAX);
+const hf = (s: string) => s.slice(0, HF_MAX).replace(/&/g, "&&");
 
 /** Stamp the firm identity onto a workbook: creator/company properties and a
  *  print header (firm · deal) + footer (custom line · page numbers) on the

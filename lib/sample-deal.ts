@@ -18,6 +18,18 @@ import type {
   T12Extraction,
   T12Summary,
 } from "@/lib/actuals/types";
+import type { BuyBox } from "@/lib/criteria";
+
+/** The hypothetical mandate the PUBLIC sample screen judges the deal
+ *  against — chosen so the fit lands WATCH beside the Caution verdict (a
+ *  consistent story: in scope, but short of the return floors). Logged-in
+ *  users see their OWN box here instead. */
+export const SAMPLE_DEMO_BOX: BuyBox = {
+  assetClasses: ["multifamily"],
+  minCapPct: 5.75,
+  minIrrPct: 13,
+  minCoCPct: 5,
+};
 
 export const SAMPLE_DEAL_NAME = "Sample — The Maddox at Highland Park";
 
