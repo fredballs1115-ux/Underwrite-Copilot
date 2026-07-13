@@ -2,12 +2,14 @@ import { describe, it, expect } from "vitest";
 import { computeUnderwrite, type UnderwriteInputs } from "./engine";
 import {
   leverValues,
+  sliderValues,
   runScenario,
   scenarioMetrics,
   fmtBpsDelta,
   fmtPtDelta,
   LEVER_STEPS,
 } from "./playground";
+import { scoreMandateFit } from "../mandate";
 
 /** A realistic levered base case (60% LTC, 6% cap, growth, vacancy). */
 function baseInputs(over: Partial<UnderwriteInputs> = {}): UnderwriteInputs {
@@ -151,6 +153,75 @@ describe("leverValues — slider stops", () => {
     const high = leverValues("exitCapPct", 0.35);
     expect(high[2]).toBe(LEVER_STEPS.exitCapPct.max);
     for (let i = 1; i < high.length; i++) expect(high[i]).toBeGreaterThanOrEqual(high[i - 1]);
+  });
+});
+
+describe("sliderValues — the Bug-9 wide slider range", () => {
+  it("exit cap sweeps ±400bps in 25bps steps around a mid-range base", () => {
+    const { values, baseIdx } = sliderValues("exitCapPct", 0.06);
+    expect(values).toHaveLength(33); // ±16 steps + base
+    expect(values[baseIdx]).toBe(0.06);
+    expect(values[0]).toBeCloseTo(0.02, 10); // −400bps
+    expect(values[values.length - 1]).toBeCloseTo(0.1, 10); // +400bps
+    // Strictly increasing — no dead zones on the slider.
+    for (let i = 1; i < values.length; i++)
+      expect(values[i]).toBeGreaterThan(values[i - 1]);
+  });
+
+  it("rent growth ±150bps, vacancy ±3pt (the spec's example ranges)", () => {
+    const g = sliderValues("rentGrowthPct", 0.025);
+    expect(g.values[0]).toBeCloseTo(0.01, 10);
+    expect(g.values[g.values.length - 1]).toBeCloseTo(0.04, 10);
+    const v = sliderValues("vacancyPct", 0.05);
+    expect(v.values[0]).toBeCloseTo(0.02, 10);
+    expect(v.values[v.values.length - 1]).toBeCloseTo(0.08, 10);
+  });
+
+  it("collapses clamped duplicates at a bound and keeps baseIdx honest", () => {
+    // Base at the vacancy floor: all 3 down-steps clamp onto the base.
+    const { values, baseIdx } = sliderValues("vacancyPct", 0);
+    expect(baseIdx).toBe(0);
+    expect(values[0]).toBe(0);
+    expect(values).toHaveLength(4); // base + 3 up-steps, duplicates dropped
+    for (let i = 1; i < values.length; i++)
+      expect(values[i]).toBeGreaterThan(values[i - 1]);
+  });
+
+  it("a garbled out-of-range base clamps first (monotonic, never ≤0 cap)", () => {
+    const { values, baseIdx } = sliderValues("exitCapPct", 0);
+    expect(values[baseIdx]).toBe(LEVER_STEPS.exitCapPct.min);
+    expect(baseIdx).toBe(0);
+    expect(Math.min(...values)).toBeGreaterThan(0);
+  });
+
+  it("±400bps of exit cap actually flips the mandate verdict (Bug 9)", () => {
+    // A deal that clears a 12% IRR floor at its 6% base exit cap…
+    const base = baseInputs();
+    const box = { minIrrPct: 12 };
+    const verdictAt = (capPct: number) => {
+      const m = runScenario(base, { exitCapPct: capPct });
+      return scoreMandateFit(
+        "multifamily",
+        {
+          assetClass: "multifamily",
+          metrics: [
+            { label: "IRR", value: `${((m.leveredIrrPct ?? 0) * 100).toFixed(1)}%` },
+          ],
+        },
+        box,
+      ).verdict;
+    };
+    const { values, baseIdx } = sliderValues("exitCapPct", base.exitCapPct);
+    expect(verdictAt(values[baseIdx])).toBe("PURSUE");
+    // …and reads PASS at the +400bps end of the slider — the verdict swings
+    // across its whole range as the slider moves.
+    expect(verdictAt(values[values.length - 1])).toBe("PASS");
+    // The swing is dramatic, not marginal: ≥8pt of IRR across the range.
+    const irrAt = (capPct: number) =>
+      runScenario(base, { exitCapPct: capPct }).leveredIrrPct!;
+    expect(
+      irrAt(values[baseIdx]) - irrAt(values[values.length - 1]),
+    ).toBeGreaterThan(0.08);
   });
 });
 

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import {
-  leverValues,
+  sliderValues,
   runScenario,
   fmtPct,
   fmtX,
@@ -67,28 +67,43 @@ function withScenarioReturns(
  */
 export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   const { inputs, dealAssetClass, checkSource, box } = data;
-  // Slider stops are fixed by the base model; index 2 is the base itself.
-  const caps = useMemo(() => leverValues("exitCapPct", inputs.exitCapPct), [inputs]);
+  // Slider stops are fixed by the base model; each lever carries its own
+  // base index (range ends can collapse when the base sits near a bound).
+  const caps = useMemo(() => sliderValues("exitCapPct", inputs.exitCapPct), [inputs]);
   const growths = useMemo(
-    () => leverValues("rentGrowthPct", inputs.rentGrowthPct),
+    () => sliderValues("rentGrowthPct", inputs.rentGrowthPct),
     [inputs],
   );
-  const vacs = useMemo(() => leverValues("vacancyPct", inputs.vacancyPct), [inputs]);
+  const vacs = useMemo(() => sliderValues("vacancyPct", inputs.vacancyPct), [inputs]);
 
-  const [capIdx, setCapIdx] = useState(2);
-  const [growthIdx, setGrowthIdx] = useState(2);
-  const [vacIdx, setVacIdx] = useState(2);
-  const dirty = capIdx !== 2 || growthIdx !== 2 || vacIdx !== 2;
+  const [capIdx, setCapIdx] = useState(caps.baseIdx);
+  const [growthIdx, setGrowthIdx] = useState(growths.baseIdx);
+  const [vacIdx, setVacIdx] = useState(vacs.baseIdx);
+  // If the underlying model changes (re-screen, actuals fold-in), the stop
+  // lists are rebuilt — snap back to the NEW base during render (the React
+  // "adjust state when props change" idiom); a stale index may not even
+  // exist in the new list.
+  const [prevStops, setPrevStops] = useState(caps);
+  if (prevStops !== caps) {
+    setPrevStops(caps);
+    setCapIdx(caps.baseIdx);
+    setGrowthIdx(growths.baseIdx);
+    setVacIdx(vacs.baseIdx);
+  }
+  const dirty =
+    capIdx !== caps.baseIdx ||
+    growthIdx !== growths.baseIdx ||
+    vacIdx !== vacs.baseIdx;
 
-  // The EFFECTIVE base is the sliders' center stops (clamped into physical
+  // The EFFECTIVE base is the sliders' base stops (clamped into physical
   // range), so a degenerate derived input can't make the resting metrics
   // disagree with what the levers say they're at.
   const base = useMemo(
     () =>
       runScenario(inputs, {
-        exitCapPct: caps[2],
-        rentGrowthPct: growths[2],
-        vacancyPct: vacs[2],
+        exitCapPct: caps.values[caps.baseIdx],
+        rentGrowthPct: growths.values[growths.baseIdx],
+        vacancyPct: vacs.values[vacs.baseIdx],
       }),
     [inputs, caps, growths, vacs],
   );
@@ -96,9 +111,9 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
     () =>
       dirty
         ? runScenario(inputs, {
-            exitCapPct: caps[capIdx],
-            rentGrowthPct: growths[growthIdx],
-            vacancyPct: vacs[vacIdx],
+            exitCapPct: caps.values[capIdx],
+            rentGrowthPct: growths.values[growthIdx],
+            vacancyPct: vacs.values[vacIdx],
           })
         : base,
     [inputs, caps, growths, vacs, capIdx, growthIdx, vacIdx, dirty, base],
@@ -125,9 +140,9 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   }, [box, checkSource, dealAssetClass, base, current, dirty]);
 
   const reset = () => {
-    setCapIdx(2);
-    setGrowthIdx(2);
-    setVacIdx(2);
+    setCapIdx(caps.baseIdx);
+    setGrowthIdx(growths.baseIdx);
+    setVacIdx(vacs.baseIdx);
   };
 
   return (
@@ -144,7 +159,8 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Lever
           label="Exit cap"
-          values={caps}
+          values={caps.values}
+          baseIdx={caps.baseIdx}
           idx={capIdx}
           onChange={setCapIdx}
           display={(v) => fmtPct(v, 2)}
@@ -152,7 +168,8 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         />
         <Lever
           label="Rent growth"
-          values={growths}
+          values={growths.values}
+          baseIdx={growths.baseIdx}
           idx={growthIdx}
           onChange={setGrowthIdx}
           display={(v) => fmtPct(v, 1)}
@@ -160,7 +177,8 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         />
         <Lever
           label="Vacancy"
-          values={vacs}
+          values={vacs.values}
+          baseIdx={vacs.baseIdx}
           idx={vacIdx}
           onChange={setVacIdx}
           display={(v) => fmtPct(v, 1)}
@@ -187,6 +205,15 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
               <span>
                 base {score.base.score}/100 — fit moves through IRR and
                 cash-on-cash only
+              </span>
+            )}
+            {dirty && score.base.score === score.current.score && (
+              // The score is recomputed on every drag; when it legitimately
+              // doesn't move (returns stay on the same side of every mandate
+              // threshold), say so — a static chip must never read as broken.
+              <span>
+                fit unchanged — these returns don&apos;t cross a mandate
+                threshold
               </span>
             )}
             {!dirty && <span>mandate fit at the model&apos;s base case</span>}
@@ -219,6 +246,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
 function Lever({
   label,
   values,
+  baseIdx,
   idx,
   onChange,
   display,
@@ -226,6 +254,7 @@ function Lever({
 }: {
   label: string;
   values: number[];
+  baseIdx: number;
   idx: number;
   onChange: (i: number) => void;
   display: (v: number) => string;
@@ -234,9 +263,9 @@ function Lever({
   const v = values[idx];
   // "Base" is decided by INDEX, not value equality — a clamped stop that
   // happens to duplicate the base must not claim to be it.
-  const atBase = idx === 2;
-  const base = display(values[2]);
-  const d = atBase ? "base" : deltaOf(v, values[2]);
+  const atBase = idx === baseIdx;
+  const base = display(values[baseIdx]);
+  const d = atBase ? "base" : deltaOf(v, values[baseIdx]);
   return (
     <div className="rounded-xl border border-line/70 p-3">
       <div className="flex items-baseline justify-between gap-2">

@@ -23,36 +23,68 @@ export interface ScenarioMetrics {
   dscrYr1: number | null;
 }
 
-/** Slider geometry per lever: ±`span` steps of `step` around the base. */
+/** Lever geometry: `span` steps each way builds the compact ±2-step grid
+ *  (PDF heatmap); `sliderSpan` steps each way builds the on-screen slider's
+ *  range — deliberately much wider (Bug 9: ±50bps couldn't flip a verdict on
+ *  most deals; the exit-cap slider now sweeps ±400bps at 25bps resolution). */
 export const LEVER_STEPS: Record<
   keyof PlaygroundLevers,
-  { step: number; span: number; min: number; max: number }
+  { step: number; span: number; sliderSpan: number; min: number; max: number }
 > = {
-  exitCapPct: { step: 0.0025, span: 2, min: 0.0025, max: 0.25 }, // 25bps steps
-  rentGrowthPct: { step: 0.005, span: 2, min: -0.05, max: 0.15 }, // 50bps steps
-  vacancyPct: { step: 0.01, span: 2, min: 0, max: 0.95 }, // 1.0% steps
+  // 25bps steps; slider ±16 steps = ±400bps
+  exitCapPct: { step: 0.0025, span: 2, sliderSpan: 16, min: 0.0025, max: 0.25 },
+  // 50bps steps; slider ±3 steps = ±150bps (the spec's 1.0–4.0% example)
+  rentGrowthPct: { step: 0.005, span: 2, sliderSpan: 3, min: -0.05, max: 0.15 },
+  // 1.0pt steps; slider ±3 steps = ±3pt (the spec's 2–8% example)
+  vacancyPct: { step: 0.01, span: 2, sliderSpan: 3, min: 0, max: 0.95 },
 };
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
-/**
- * The slider's stop values for one lever: `span` steps either side of the
- * base, clamped to the lever's physical range. The base itself is clamped
- * FIRST — a degenerate derived input (e.g. a 0% cap read off a garbled
- * extraction) must not produce non-monotonic stops where dragging left raises
- * the value. Index `span` is the (clamped) base, so "reset" is exact.
- */
-export function leverValues(
+/** Stops `span` steps either side of the base, clamped to the lever's
+ *  physical range. The base itself is clamped FIRST — a degenerate derived
+ *  input (e.g. a 0% cap read off a garbled extraction) must not produce
+ *  non-monotonic stops where dragging left raises the value. */
+function stops(
   lever: keyof PlaygroundLevers,
   base: number,
+  span: number,
 ): number[] {
-  const { step, span, min, max } = LEVER_STEPS[lever];
+  const { step, min, max } = LEVER_STEPS[lever];
   const b = clamp(Number.isFinite(base) ? base : min, min, max);
   const out: number[] = [];
   for (let i = -span; i <= span; i++) {
     out.push(i === 0 ? b : clamp(b + i * step, min, max));
   }
   return out;
+}
+
+/** The compact ±2-step stop list (PDF heatmap grid). Index `span` (2) is the
+ *  (clamped) base. */
+export function leverValues(
+  lever: keyof PlaygroundLevers,
+  base: number,
+): number[] {
+  return stops(lever, base, LEVER_STEPS[lever].span);
+}
+
+/**
+ * The SLIDER's stop list (Bug 9 range): `sliderSpan` steps each way, with
+ * clamped duplicates at the range ends collapsed so the slider has no dead
+ * zones. `baseIdx` locates the (clamped) base — "reset" and the "base" label
+ * key off the index, never value equality.
+ */
+export function sliderValues(
+  lever: keyof PlaygroundLevers,
+  base: number,
+): { values: number[]; baseIdx: number } {
+  const raw = stops(lever, base, LEVER_STEPS[lever].sliderSpan);
+  const values = raw.filter((v, i) => i === 0 || v !== raw[i - 1]);
+  // The base was pushed unclamped-duplicates-first, so the first occurrence
+  // of its value IS the base stop.
+  const { min, max } = LEVER_STEPS[lever];
+  const b = clamp(Number.isFinite(base) ? base : min, min, max);
+  return { values, baseIdx: values.indexOf(b) };
 }
 
 /** The four headline metrics of one computed scenario. */
