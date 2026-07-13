@@ -12,6 +12,12 @@ import type {
   VerdictResult,
 } from "@/lib/anthropic/types";
 import type { UnderwritingModel, ReconciledMetric } from "@/lib/model/types";
+import type {
+  RentRollExtraction,
+  RentRollSummary,
+  T12Extraction,
+  T12Summary,
+} from "@/lib/actuals/types";
 
 export const SAMPLE_DEAL_NAME = "Sample — The Maddox at Highland Park";
 
@@ -448,6 +454,72 @@ const verdict: VerdictResult = {
   },
 };
 
+// ---- Property actuals (Feature 1 on the sample) ----------------------------
+// Consistent by construction with the reconciliation above: the T-12's NOI is
+// the $3,706,500 the reconciler chose over the OM's $3,880,000 pro forma, and
+// the rent roll's 9.1% in-place vacancy is the figure that beat the OM's 6%.
+
+const rentRollExtraction: RentRollExtraction = {
+  asOfDate: "2026-05-31",
+  // Representative rows only — the summary below reflects the full 248-unit
+  // roll (truncated: true says "not every row is reproduced here").
+  rows: [
+    { tenant: "Unit 101", suiteUnit: "101", sf: 745, leaseExpiry: "2026-11-30", inPlaceRentMonthly: 1795, rentPsf: null, occupied: true, freeRentMonths: null, tiPsf: null, page: "roll p.1" },
+    { tenant: "Unit 108", suiteUnit: "108", sf: 745, leaseExpiry: "", inPlaceRentMonthly: null, rentPsf: null, occupied: false, freeRentMonths: null, tiPsf: null, page: "roll p.1" },
+    { tenant: "Unit 214", suiteUnit: "214", sf: 890, leaseExpiry: "2027-02-28", inPlaceRentMonthly: 2140, rentPsf: null, occupied: true, freeRentMonths: 1, tiPsf: null, page: "roll p.2" },
+    { tenant: "Unit 220", suiteUnit: "220", sf: 890, leaseExpiry: "2026-08-31", inPlaceRentMonthly: 2085, rentPsf: null, occupied: true, freeRentMonths: null, tiPsf: null, page: "roll p.2" },
+    { tenant: "Unit 305", suiteUnit: "305", sf: 1080, leaseExpiry: "2026-09-30", inPlaceRentMonthly: 2560, rentPsf: null, occupied: true, freeRentMonths: null, tiPsf: null, page: "roll p.3" },
+    { tenant: "Unit 312", suiteUnit: "312", sf: 1080, leaseExpiry: "", inPlaceRentMonthly: null, rentPsf: null, occupied: false, freeRentMonths: null, tiPsf: null, page: "roll p.3" },
+  ],
+  truncated: true,
+  page: "roll p.1–6",
+};
+
+const rentRollSummary: RentRollSummary = {
+  unitCount: 248,
+  occupiedUnits: 225,
+  totalSf: 220_720,
+  occupiedSf: 200_635,
+  sfWeightedOccupancy: 0.909,
+  waltYears: 0.6,
+  weightedAvgRentPsf: 32.4,
+  expiryBuckets: { next12mo: 0.78, y1to3: 0.22, y3to5: 0, y5plus: 0 },
+  expiryCoveredSf: 196_400,
+  truncated: false,
+  asOfUsed: "2026-05-31",
+};
+
+const t12Extraction: T12Extraction = {
+  periodEndDate: "2026-05-31",
+  collectedRent: 6_499_500,
+  vacancyLoss: 650_500,
+  otherIncome: 292_000,
+  egi: 6_791_500,
+  opex: [
+    { key: "taxes", label: "Real estate taxes", amount: 1_140_000, page: "T-12 p.1" },
+    { key: "insurance", label: "Insurance", amount: 385_000, page: "T-12 p.1" },
+    { key: "utilities", label: "Utilities", amount: 460_000, page: "T-12 p.1" },
+    { key: "rm", label: "Repairs & maintenance", amount: 420_000, page: "T-12 p.1" },
+    { key: "payroll", label: "Payroll", amount: 415_000, page: "T-12 p.2" },
+    { key: "mgmt", label: "Management fee", amount: 205_000, page: "T-12 p.2" },
+    { key: "admin", label: "Marketing & admin", amount: 60_000, page: "T-12 p.2" },
+  ],
+  totalOpex: 3_085_000,
+  noi: 3_706_500,
+  page: "T-12 p.1–2",
+};
+
+const t12Summary: T12Summary = {
+  collectedRent: 6_499_500,
+  vacancyLoss: 650_500,
+  otherIncome: 292_000,
+  egi: 6_791_500,
+  opex: t12Extraction.opex,
+  totalOpex: 3_085_000,
+  noi: 3_706_500,
+  noiDerived: false,
+};
+
 /** The full seed payload for a sample deal row. */
 export const SAMPLE_DEAL = {
   name: SAMPLE_DEAL_NAME,
@@ -459,4 +531,15 @@ export const SAMPLE_DEAL = {
   market,
   verdict,
   model,
+  /** deal_rent_rolls / deal_t12_statements seed rows (best-effort insert) */
+  rentRoll: {
+    as_of_date: "2026-05-31",
+    extraction: rentRollExtraction,
+    summary: rentRollSummary,
+  },
+  t12: {
+    period_end_date: "2026-05-31",
+    extraction: t12Extraction,
+    summary: t12Summary,
+  },
 } as const;

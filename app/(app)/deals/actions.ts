@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   uploadOmPdf,
   removeStorageFiles,
@@ -265,6 +266,28 @@ export async function createSampleDeal() {
     .select("id")
     .single();
   if (error || !deal) redirect("/deals?error=save");
+
+  // Property actuals (Feature 1) on the sample, so the PROPERTY ACTUALS card,
+  // the OM-vs-T-12 note, and the actuals-anchored playground all demo without
+  // an upload. Service-role writes (0020's tables are user-read-only);
+  // best-effort — a pre-0020 schema just leaves the sample without actuals.
+  try {
+    const admin = createSupabaseAdminClient();
+    await admin.from("deal_rent_rolls").insert({
+      deal_id: deal.id,
+      as_of_date: SAMPLE_DEAL.rentRoll.as_of_date,
+      extraction: SAMPLE_DEAL.rentRoll.extraction,
+      summary: SAMPLE_DEAL.rentRoll.summary,
+    });
+    await admin.from("deal_t12_statements").insert({
+      deal_id: deal.id,
+      period_end_date: SAMPLE_DEAL.t12.period_end_date,
+      extraction: SAMPLE_DEAL.t12.extraction,
+      summary: SAMPLE_DEAL.t12.summary,
+    });
+  } catch {
+    // sample still works OM-only
+  }
 
   revalidatePath("/deals");
   redirect(`/deals/${deal.id}`);

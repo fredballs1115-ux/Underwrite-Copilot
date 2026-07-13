@@ -118,8 +118,9 @@ const FREE_FEATURES = [
 
 const PRO_FEATURES = [
   "Unlimited deals",
-  "First-draft Excel model with IRR sensitivity",
-  "One-page PDF screening memo",
+  "Excel models — first-draft + institutional underwrite.xlsx",
+  "IC memo, full PDF report, and LOI draft",
+  "Your firm's name and logo on every export",
   "Public-web comp search",
   "Everything in Free",
 ];
@@ -315,11 +316,12 @@ export default function Home() {
                 </h1>
                 <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/70 max-sm:hidden">
                   Two analysts can take the same deal on the same afternoon and
-                  land 200 bps apart — different rents, different exit caps,
-                  different expense loads, all called &ldquo;judgment.&rdquo;
+                  land 200 bps apart — all called &ldquo;judgment.&rdquo;
                   Underwrite Copilot runs every deal through the same
-                  disciplined screen, so the answer depends on the deal — not
-                  on who opened the model.
+                  disciplined screen: it extracts the OM, reconciles it against
+                  the rent roll and T-12, scrutinizes the comps, and hands back
+                  a verdict with a 0–100 fit score against your buy box — so
+                  the answer depends on the deal, not on who opened the model.
                 </p>
                 <p className="mt-6 text-lg leading-relaxed text-white/70 sm:hidden">
                   Two analysts, same OM, 200 bps apart. Copilot runs every deal
@@ -550,6 +552,73 @@ export default function Home() {
                 Screen a deal free →
               </p>
             </Link>
+          </div>
+        </section>
+
+        {/* The toolkit — concrete feature callouts, all shipping today. */}
+        <section id="toolkit" className="scroll-mt-16">
+          <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
+            <Reveal>
+              <p className="text-xs font-medium uppercase tracking-wider text-muted">
+                The toolkit
+              </p>
+              <h2 className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">
+                Built around the numbers that decide deals.
+              </h2>
+            </Reveal>
+            <Reveal delay={80}>
+              <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {(
+                  [
+                    [
+                      "OM + rent roll + T-12, one model",
+                      "Upload the actuals and the screen re-anchors itself — in-place occupancy, WALT, actual NOI — and flags where the OM's pro forma drifts from the trailing twelve.",
+                    ],
+                    [
+                      "Drag the levers, watch it break",
+                      "Exit cap across ±400bps, rent growth, vacancy — IRR, equity multiple, DSCR, and your mandate fit recompute on every tick of the slider. No re-screen, no waiting.",
+                    ],
+                    [
+                      "Your buy box, scored 0–100",
+                      "Every deal reads PURSUE / WATCH / PASS against your mandate — cap floor, return targets, geographies, hard dealbreakers — from the first signal onward.",
+                    ],
+                    [
+                      "Comps on a map, not a list",
+                      "OM and public-web comps pinned around the subject with distance and basis. Sourced from public reporting — never MLS, CoStar, or a licensed feed.",
+                    ],
+                    [
+                      "Financing & capital, sized",
+                      "Max loan under LTV / DSCR / debt-yield with the binding constraint flagged — plus payments, rate moves, breakeven occupancy, and the capital plan.",
+                    ],
+                    [
+                      "From verdict to to-do list",
+                      "One click turns the verdict's next steps into assigned tasks with due dates — then the memo exports under your own firm's name and logo (Pro).",
+                    ],
+                  ] as const
+                ).map(([title, body]) => (
+                  <div
+                    key={title}
+                    className="hover-lift rounded-xl border border-line bg-surface p-5 shadow-card hover:border-brand/30"
+                  >
+                    <h3 className="border-b border-brand/10 pb-2.5 font-medium">
+                      {title}
+                    </h3>
+                    <p className="mt-2.5 text-sm leading-relaxed text-muted">
+                      {body}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </Reveal>
+            <p className="mt-4 text-center text-xs text-muted">
+              Every tile above is live in the product today —{" "}
+              <Link
+                href="/demo"
+                className="font-medium text-brand underline-offset-2 hover:underline"
+              >
+                see them on the sample screen →
+              </Link>
+            </p>
           </div>
         </section>
 

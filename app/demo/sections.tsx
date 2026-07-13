@@ -10,6 +10,10 @@ import {
   VerdictView,
 } from "../(app)/deals/[id]/deal-sections";
 import { ReturnsHeadline, StressPanel } from "../(app)/deals/[id]/model-view";
+import {
+  PropertyActuals,
+  type ActualsData,
+} from "../(app)/deals/[id]/property-actuals";
 import type {
   ExtractionResult,
   ChallengerResult,
@@ -28,6 +32,8 @@ export interface DemoData {
   market: MarketResult;
   verdict: VerdictResult;
   model: UnderwritingModel;
+  /** rent roll + T-12 consolidation (Feature 1), same card as the app */
+  actuals?: ActualsData | null;
 }
 
 const TABS = [
@@ -111,6 +117,7 @@ export function DemoSections({ data }: { data: DemoData }) {
         {tab === "financials" && (
           <div className="flex flex-col gap-6">
             <TermsView result={data.extraction} />
+            {data.actuals && <PropertyActuals data={data.actuals} />}
             <ReturnsHeadline model={data.model} />
             <StressPanel model={data.model} />
           </div>

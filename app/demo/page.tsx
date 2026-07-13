@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
+import { compareNoi } from "@/lib/actuals/analyze";
 import type { ExtractedMetric } from "@/lib/anthropic/types";
 import { DemoSections, type DemoData } from "./sections";
 import { ModelSlideshow } from "./model-slideshow";
@@ -50,6 +51,19 @@ export default function DemoPage() {
     market: SAMPLE_DEAL.market,
     verdict: SAMPLE_DEAL.verdict,
     model: SAMPLE_DEAL.model,
+    actuals: {
+      rentRoll: {
+        asOf: SAMPLE_DEAL.rentRoll.as_of_date,
+        summary: SAMPLE_DEAL.rentRoll.summary,
+      },
+      t12: {
+        periodEnd: SAMPLE_DEAL.t12.period_end_date,
+        summary: SAMPLE_DEAL.t12.summary,
+      },
+      // OM pro forma $3.88M vs the T-12 actual — computed by the same pure
+      // comparator the app uses (+4.7%, in line).
+      noiComparison: compareNoi(3_880_000, SAMPLE_DEAL.t12.summary.noi!),
+    },
   };
   const metrics = data.extraction.metrics;
   const price = findValue(

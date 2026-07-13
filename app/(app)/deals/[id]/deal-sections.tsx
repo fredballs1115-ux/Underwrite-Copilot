@@ -911,8 +911,10 @@ function PublicWebComps({
             )}
           </p>
           <p className="mt-0.5 text-xs leading-relaxed text-muted">
-            Best-effort search of publicly-reported sales — unverified, and never
-            from CoStar or any licensed source.
+            Comparable sales from public sources — news, press releases, county
+            records, brokerage pages, trade publications. Never MLS, CoStar, or
+            any licensed feed; accuracy depends on public reporting and may lag
+            the market. Verify before relying on a figure.
           </p>
         </div>
         {publicDemo ? (

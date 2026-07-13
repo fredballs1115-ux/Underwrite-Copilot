@@ -26,6 +26,7 @@ import type { InternalComp } from "@/lib/internal-comps";
 import { DebtSizer } from "./debt-sizer";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import { DecisionLog } from "./decision-log";
+import { SampleGuide } from "./sample-guide";
 import { DealTasks } from "./deal-tasks";
 import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
 import { AskPanel } from "./ask-panel";
@@ -682,6 +683,7 @@ export function DealView({
       >
         {section === "overview" && (
           <div className="flex flex-col gap-6">
+            {isSample && <SampleGuide />}
             {screenDiff && <SinceLastScreen diff={screenDiff} />}
             {discrepancies && discrepancies.discrepancies.length > 0 && (
               <ReconciliationPanel dealId={dealId} result={discrepancies} />
