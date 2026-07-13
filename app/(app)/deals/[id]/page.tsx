@@ -33,6 +33,7 @@ import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource, type BuyBoxCheck } from "@/lib/criteria";
 import { scoreMandateFit, type MandateScore, type MandateVerdict } from "@/lib/mandate";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
+import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { ActualsData } from "./property-actuals";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
@@ -338,6 +339,66 @@ export default async function DealPage({
       }
     : null;
 
+  // Deal tasks (Feature 7): assignable to-dos with owners and due dates.
+  // Best-effort — pre-0022 schemas error and the card doesn't render.
+  const tasksRes = await supabase
+    .from("deal_tasks")
+    .select(
+      "id, title, assignee_user_id, due_date, done, completed_at, source, created_by, created_at",
+    )
+    .eq("deal_id", id)
+    .order("created_at", { ascending: true });
+  const dealTasks: DealTask[] | null = tasksRes.error
+    ? null
+    : ((tasksRes.data ?? []) as Record<string, unknown>[]).map((r) => ({
+        id: String(r.id),
+        title: String(r.title ?? ""),
+        assigneeUserId: (r.assignee_user_id as string | null) ?? null,
+        dueDate: (r.due_date as string | null) ?? null,
+        done: !!r.done,
+        completedAt: (r.completed_at as string | null) ?? null,
+        source: r.source === "verdict" ? "verdict" : "manual",
+        createdBy: (r.created_by as string | null) ?? null,
+        createdAt: String(r.created_at ?? ""),
+      }));
+
+  // Who a task can be assigned to: the viewer, plus (team deals) the roster.
+  // Teammate emails read under the "teammates read profiles" policy (0007).
+  const taskAssignees: TaskAssignee[] = [];
+  if (user) {
+    taskAssignees.push({
+      userId: user.id,
+      label: user.email ? `${user.email.split("@")[0]} (you)` : "You",
+    });
+    if (ownership.team_id) {
+      const { data: memberRows } = await supabase
+        .from("team_members")
+        .select("user_id")
+        .eq("team_id", ownership.team_id);
+      const otherIds = ((memberRows ?? []) as { user_id: string }[])
+        .map((m) => m.user_id)
+        .filter((uid) => uid !== user.id);
+      if (otherIds.length) {
+        const { data: profileRows } = await supabase
+          .from("profiles")
+          .select("id, email, full_name")
+          .in("id", otherIds);
+        for (const p of (profileRows ?? []) as {
+          id: string;
+          email: string | null;
+          full_name: string | null;
+        }[]) {
+          taskAssignees.push({
+            userId: p.id,
+            label:
+              (p.full_name ?? "").trim() ||
+              (p.email ? p.email.split("@")[0] : "teammate"),
+          });
+        }
+      }
+    }
+  }
+
   // Citation facts, keyed by field label for the source chips (Feature 2).
   // Empty for deals screened before migration 0018 — no chips, never faked.
   const factsByField: Record<string, DealFact> = {};
@@ -630,6 +691,9 @@ export default async function DealPage({
         marketMemory={marketMemory}
         actuals={actuals}
         playground={playground}
+        tasks={dealTasks}
+        taskAssignees={taskAssignees}
+        todayIso={new Date().toISOString().slice(0, 10)}
       />
     </div>
   );

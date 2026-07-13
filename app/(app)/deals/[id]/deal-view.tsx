@@ -25,6 +25,8 @@ import { type StageChange } from "@/lib/stages";
 import type { InternalComp } from "@/lib/internal-comps";
 import { DebtSizer } from "./debt-sizer";
 import { DecisionLog } from "./decision-log";
+import { DealTasks } from "./deal-tasks";
+import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
 import { AskPanel } from "./ask-panel";
 import { ReconciliationPanel } from "./reconciliation-panel";
 import type { ReconcileResult } from "@/lib/reconcile";
@@ -178,6 +180,11 @@ const MODEL_ERRORS: Record<string, string> = {
   note: "Couldn’t save your note — please try again.",
   noteempty: "Write something in the note first — whitespace doesn’t count.",
   notedelete: "Couldn’t remove that note — please try again.",
+  task: "Couldn’t save that task — please try again.",
+  taskempty: "Give the task a short title first.",
+  taskassignee: "That assignee isn’t on this deal’s team anymore — pick again.",
+  taskdelete: "Couldn’t remove that task — please try again.",
+  tasknosteps: "This verdict has no next steps to import.",
   share: "Couldn’t manage that share link — please try again.",
   loipro:
     "The LOI draft is part of Pro — upgrade on the Billing page to generate it.",
@@ -290,6 +297,9 @@ export function DealView({
   marketMemory = null,
   actuals = { rentRoll: null, t12: null, noiComparison: null },
   playground = null,
+  tasks = null,
+  taskAssignees = [],
+  todayIso = "",
 }: {
   dealId: string;
   dealName: string;
@@ -319,6 +329,11 @@ export function DealView({
   marketMemory?: MarketGroup | null;
   actuals?: ActualsData;
   playground?: PlaygroundData | null;
+  /** null = deal_tasks table not migrated yet (card hidden) */
+  tasks?: DealTask[] | null;
+  taskAssignees?: TaskAssignee[];
+  /** yyyy-mm-dd (UTC) from the server, for stable overdue/date rendering */
+  todayIso?: string;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -698,6 +713,18 @@ export function DealView({
               onNavigate={navigateLegacy}
             />
             {playground && <SensitivityPlayground data={playground} />}
+            {tasks !== null && (
+              <DealTasks
+                dealId={dealId}
+                tasks={tasks}
+                assignees={taskAssignees}
+                todayIso={todayIso}
+                hasVerdictSteps={
+                  Array.isArray(results.verdict?.nextSteps) &&
+                  results.verdict.nextSteps.length > 0
+                }
+              />
+            )}
             <AskPanel
               dealId={dealId}
               qa={qa}
