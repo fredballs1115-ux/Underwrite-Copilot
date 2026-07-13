@@ -4,10 +4,19 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { removeStorageFiles, modelTmpPath } from "@/lib/storage";
+import {
+  removeStorageFiles,
+  modelTmpPath,
+  uploadSupplement,
+  removeSupplementFile,
+  signatureMismatch,
+} from "@/lib/storage";
 import { getTeam } from "@/lib/teams";
 import { getStripe } from "@/lib/stripe/client";
 import { syncTeamSeats } from "@/lib/stripe/seats";
+import { isPro } from "@/lib/billing";
+import { getActiveBranding, saveBrandingValue } from "@/lib/branding-server";
+import { sanitizeBranding, LOGO_MAX_BYTES } from "@/lib/branding";
 
 export type PwState = { error?: string; ok?: boolean } | null;
 
@@ -34,6 +43,93 @@ export async function setEmailPrefs(formData: FormData) {
 
   revalidatePath("/account");
   redirect("/account");
+}
+
+/**
+ * Save custom report branding (Feature 6, Pro/Team). One form carries the
+ * firm name, footer text, an optional logo file, and an optional remove-logo
+ * flag. The replaced/removed logo file is swept only AFTER the row save
+ * commits, so a failed save never orphans the branding's live logo.
+ */
+export async function saveBranding(formData: FormData) {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  let pro = false;
+  try {
+    pro = await isPro(supabase, user.id);
+  } catch {
+    pro = false;
+  }
+  if (!pro) redirect("/billing?upsell=branding");
+
+  const active = await getActiveBranding(supabase, user.id);
+  if (active.scope === "team" && !active.editable) {
+    redirect("/account?error=brandowner");
+  }
+
+  const firmName = String(formData.get("firmName") ?? "");
+  const footerText = String(formData.get("footerText") ?? "");
+  const removeLogo = String(formData.get("removeLogo") ?? "") === "1";
+  const logo = formData.get("logo");
+
+  const oldLogoPath = active.branding?.logoPath ?? null;
+  let logoPath: string | undefined = oldLogoPath ?? undefined;
+
+  if (removeLogo) {
+    logoPath = undefined;
+  } else if (logo instanceof File && logo.size > 0) {
+    if (logo.size > LOGO_MAX_BYTES) redirect("/account?error=brandlogosize");
+    const name = logo.name.toLowerCase();
+    const ext = name.endsWith(".png")
+      ? "png"
+      : name.endsWith(".jpg") || name.endsWith(".jpeg")
+        ? "jpg"
+        : null;
+    if (!ext) redirect("/account?error=brandlogotype");
+    const buf = Buffer.from(await logo.arrayBuffer());
+    // Magic-byte check: the file must BE the format its name claims.
+    if (signatureMismatch(`logo.${ext}`, buf)) {
+      redirect("/account?error=brandlogotype");
+    }
+    // Team branding stores under the team id, personal under the user id —
+    // a random suffix per upload so a stale export URL never shows a logo
+    // that was later replaced.
+    const scopeId = active.teamId ?? user.id;
+    const newPath = `${scopeId}/branding-logo-${Date.now().toString(36)}.${ext}`;
+    let uploadFailed = false;
+    try {
+      await uploadSupplement(
+        newPath,
+        buf,
+        ext === "png" ? "image/png" : "image/jpeg",
+      );
+    } catch {
+      uploadFailed = true;
+    }
+    if (uploadFailed) redirect("/account?error=brandsave");
+    logoPath = newPath;
+  }
+
+  const branding = sanitizeBranding({ firmName, footerText, logoPath });
+  const res = await saveBrandingValue(supabase, user.id, branding);
+  if (!res.ok) {
+    redirect(
+      `/account?error=${res.error === "owner" ? "brandowner" : "brandsave"}`,
+    );
+  }
+
+  // Save committed — now sweep the file the branding no longer points at.
+  const keptPath = branding?.logoPath ?? null;
+  if (oldLogoPath && oldLogoPath !== keptPath) {
+    await removeSupplementFile(oldLogoPath);
+  }
+
+  revalidatePath("/account");
+  redirect("/account?branding=saved");
 }
 
 /** Change the signed-in user's password. Returns a state for useActionState. */
@@ -160,6 +256,19 @@ export async function deleteAccount(formData: FormData) {
       .in("deal_id", dealIds);
     for (const doc of (docs ?? []) as { storage_path: string }[])
       if (doc.storage_path) paths.push(doc.storage_path);
+  }
+  // Personal branding logo (0021) — pre-migration schemas just return an
+  // error object, which reads as "no branding".
+  try {
+    const { data: bp } = await admin
+      .from("profiles")
+      .select("branding")
+      .eq("id", user.id)
+      .maybeSingle();
+    const logoPath = (bp?.branding as { logoPath?: string } | null)?.logoPath;
+    if (logoPath) paths.push(logoPath);
+  } catch {
+    // sweep is best-effort
   }
 
   // 5. Delete the auth user (cascades profiles, deals, jobs, documents),

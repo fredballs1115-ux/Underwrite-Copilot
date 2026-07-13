@@ -6,6 +6,7 @@ import { signOut } from "@/app/login/actions";
 import { ChangePasswordForm } from "./change-password-form";
 import { DeleteAccountForm } from "./delete-account-form";
 import { EmailToggle } from "./email-toggle";
+import { BrandingSection } from "./branding-section";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { emailEnabled } from "@/lib/email";
 
@@ -20,14 +21,20 @@ const DELETE_ERRORS: Record<string, string> = {
   cancelsub:
     "We couldn't cancel your subscription automatically — nothing was deleted. Cancel it from the Billing page first, then try again.",
   delete: "Deletion failed — nothing was removed. Please try again, or email underwritecopilot.support@gmail.com.",
+  // Report branding (Feature 6)
+  brandowner:
+    "Team branding is managed by the team owner — ask them to update it.",
+  brandsave: "Couldn't save your branding just now — please try again.",
+  brandlogosize: "That logo is over 1MB — please resize it and try again.",
+  brandlogotype: "Logos must be a PNG or JPG file.",
 };
 
 export default async function AccountPage({
   searchParams,
 }: {
-  searchParams: Promise<{ reset?: string; error?: string }>;
+  searchParams: Promise<{ reset?: string; error?: string; branding?: string }>;
 }) {
-  const { reset, error } = await searchParams;
+  const { reset, error, branding: brandingParam } = await searchParams;
   const deleteError = error ? (DELETE_ERRORS[error] ?? null) : null;
   const supabase = await createSupabaseServerClient();
   const {
@@ -84,6 +91,11 @@ export default async function AccountPage({
       {deleteError && (
         <p className="rounded-lg bg-kill/10 px-3 py-2 text-sm text-kill">
           {deleteError}
+        </p>
+      )}
+      {brandingParam === "saved" && (
+        <p className="rounded-lg bg-pass/10 px-3 py-2 text-sm text-pass">
+          Branding saved — your next memo or report export will carry it.
         </p>
       )}
 
@@ -160,6 +172,9 @@ export default async function AccountPage({
           />
         </div>
       </section>
+
+      {/* Report branding (Feature 6, Pro/Team) */}
+      {user && <BrandingSection userId={user.id} pro={isPro} />}
 
       {/* Security */}
       <section className="rounded-2xl border border-line bg-surface p-6 shadow-card">

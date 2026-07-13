@@ -3,7 +3,9 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
 import { buildReportData, ReportDocument } from "@/lib/memo/report-document";
+import type { MemoData } from "@/lib/memo/memo-document";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
+import { getBrandingForDeal, brandingLogoDataUri } from "@/lib/branding-server";
 import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
@@ -142,8 +144,27 @@ export async function GET(
     grid = null;
   }
 
+  // Custom firm branding (Feature 6) — best-effort, mirrors the memo route.
+  let branding: MemoData["branding"] = null;
   try {
-    const input = buildReportData(deal, dateStr, buyBoxChecks, grid);
+    const ownership = deal as unknown as {
+      user_id: string;
+      team_id: string | null;
+    };
+    const b = await getBrandingForDeal(ownership.user_id, ownership.team_id);
+    if (b) {
+      branding = {
+        firmName: b.firmName ?? null,
+        logoDataUri: await brandingLogoDataUri(b),
+        footerText: b.footerText ?? null,
+      };
+    }
+  } catch {
+    branding = null;
+  }
+
+  try {
+    const input = buildReportData(deal, dateStr, buyBoxChecks, grid, branding);
     const element = React.createElement(ReportDocument, {
       input,
     }) as unknown as Parameters<typeof renderToBuffer>[0];

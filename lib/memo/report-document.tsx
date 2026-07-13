@@ -1,5 +1,5 @@
 import "server-only";
-import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer";
+import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import type { DealRow } from "@/lib/deals";
 import type { BuyBoxCheck } from "@/lib/criteria";
 import type {
@@ -78,6 +78,8 @@ const s = StyleSheet.create({
   },
   pageHeadBrand: { fontSize: 9, fontFamily: "Helvetica-Bold", color: C.brand },
   pageHeadMeta: { fontSize: 8, color: C.muted },
+  pageHeadRow: { flexDirection: "row", alignItems: "center" },
+  pageHeadLogo: { height: 12, maxWidth: 80, objectFit: "contain", marginRight: 5 },
   h2: {
     fontSize: 13,
     fontFamily: "Helvetica-Bold",
@@ -141,35 +143,72 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
   },
   footerText: { fontSize: 7.5, color: C.muted },
+  footerLeft: { flex: 1, paddingRight: 12 },
+  poweredBy: {
+    position: "absolute",
+    bottom: 11,
+    left: 44,
+    right: 44,
+    fontSize: 8,
+    color: "#8f9995",
+    textAlign: "center",
+  },
 });
 
 function PageChrome({
   title,
   dealName,
+  branding,
   children,
 }: {
   title: string;
   dealName: string;
+  branding?: MemoData["branding"];
   children: React.ReactNode;
 }) {
+  const branded = !!(
+    branding &&
+    (branding.firmName || branding.logoDataUri || branding.footerText)
+  );
   return (
     <Page size="LETTER" style={s.page}>
       <View style={s.pageHead} fixed>
-        <Text style={s.pageHeadBrand}>Underwrite Copilot</Text>
+        <View style={s.pageHeadRow}>
+          {branding?.logoDataUri ? (
+            // react-pdf's Image has no alt concept (print canvas, not DOM)
+            // eslint-disable-next-line jsx-a11y/alt-text
+            <Image src={branding.logoDataUri} style={s.pageHeadLogo} />
+          ) : null}
+          {branding?.firmName ? (
+            <Text style={s.pageHeadBrand}>{pdfSafe(branding.firmName)}</Text>
+          ) : !branding?.logoDataUri ? (
+            <Text style={s.pageHeadBrand}>Underwrite Copilot</Text>
+          ) : null}
+        </View>
         <Text style={s.pageHeadMeta}>{dealName} — full screening report</Text>
       </View>
       <Text style={s.h2}>{title}</Text>
       {children}
       <View style={s.footer} fixed>
-        <Text style={s.footerText}>
-          First-pass screen, not investment advice. Verify flagged figures
-          against source documents.
-        </Text>
+        <View style={s.footerLeft}>
+          {branding?.footerText ? (
+            <Text style={s.footerText}>{pdfSafe(branding.footerText)}</Text>
+          ) : null}
+          <Text style={s.footerText}>
+            First-pass screen, not investment advice. Verify flagged figures
+            against source documents.
+          </Text>
+        </View>
         <Text
           style={s.footerText}
           render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
         />
       </View>
+      {branded ? (
+        <Text style={s.poweredBy} fixed>
+          Powered by Underwrite Copilot
+        </Text>
+      ) : null}
     </Page>
   );
 }
@@ -188,8 +227,13 @@ export function buildReportData(
   dateStr: string,
   buyBoxChecks?: BuyBoxCheck[] | null,
   grid?: CapGrowthGrid | null,
+  branding?: MemoData["branding"],
 ): ReportInput {
-  return { deal, memo: buildMemoData(deal, dateStr, buyBoxChecks), grid: grid ?? null };
+  return {
+    deal,
+    memo: buildMemoData(deal, dateStr, buyBoxChecks, branding),
+    grid: grid ?? null,
+  };
 }
 
 /**
@@ -235,7 +279,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   return (
     <Document
       title={`${dealName} — Full Screening Report`}
-      author="Underwrite Copilot"
+      author={memo.branding?.firmName ?? "Underwrite Copilot"}
     >
       {/* Page 1: the one-page memo, unchanged — the executive read. */}
       <MemoPage data={memo} />
@@ -244,7 +288,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           breaks — levered IRR / EM over exit cap × rent growth, computed by
           the same engine as the workbook and the on-screen playground. */}
       {grid && (
-        <PageChrome title="Sensitivity analysis" dealName={dealName}>
+        <PageChrome title="Sensitivity analysis" dealName={dealName} branding={memo.branding}>
           <Text style={s.sub}>
             Levered IRR and equity multiple recomputed across the two levers
             that move screening returns most. The bordered cell is the base
@@ -321,7 +365,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
       )}
 
       {metrics.length > 0 && (
-        <PageChrome title="Extracted terms" dealName={dealName}>
+        <PageChrome title="Extracted terms" dealName={dealName} branding={memo.branding}>
           <Text style={s.sub}>
             Every figure the screen pulled from the OM, with its basis and
             source page. Flagged rows deserve independent verification.
@@ -362,7 +406,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
       )}
 
       {chList.length > 0 && (
-        <PageChrome title="Assumption challenges" dealName={dealName}>
+        <PageChrome title="Assumption challenges" dealName={dealName} branding={memo.branding}>
           <Text style={s.sub}>
             The pro forma grilled in the order deals die — basis, exit, debt —
             each with the exact question to put to the broker.
@@ -393,7 +437,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
       )}
 
       {(saleComps.length > 0 || leaseComps.length > 0 || redFlags.length > 0) && (
-        <PageChrome title="Comp scrutiny" dealName={dealName}>
+        <PageChrome title="Comp scrutiny" dealName={dealName} branding={memo.branding}>
           <Text style={s.sub}>
             Every comp the OM presented, rated for how hard it actually
             supports the deal — sell-side sets tend to lean favorable.
@@ -457,7 +501,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
       )}
 
       {checks.length > 0 && (
-        <PageChrome title="Market plausibility" dealName={dealName}>
+        <PageChrome title="Market plausibility" dealName={dealName} branding={memo.branding}>
           <Text style={s.sub}>
             The OM&rsquo;s key assumptions against typical ranges for the asset
             class — rules of thumb, not a live comps feed.
@@ -506,7 +550,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
       )}
 
       {rows.length > 0 && (
-        <PageChrome title="Reconciliation vs. your model" dealName={dealName}>
+        <PageChrome title="Reconciliation vs. your model" dealName={dealName} branding={memo.branding}>
           <Text style={s.sub}>
             Where the OM and your own underwriting disagree, framed from your
             side of the table.
