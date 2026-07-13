@@ -7,13 +7,17 @@ import type { DealRow } from "@/lib/deals";
 
 export const runtime = "nodejs";
 
-/**
- * The sample deal's IC memo as a PUBLIC download — a prospect sees the actual
- * deliverable before creating an account. Pure fixture data (no user rows,
- * no auth), rendered by the same document code the product ships, judged
- * against the same hypothetical mandate the /demo buy-box tab shows.
- */
-export async function GET() {
+// The memo prints today's date but is otherwise pure fixture, so render it
+// once per day per process and serve the same bytes: this is a public
+// unauthenticated route, and Render doesn't edge-cache dynamic responses, so
+// without this every request would pay a full @react-pdf render. The promise
+// (not the buffer) is cached so concurrent first hits share one render; a
+// failed render clears the slot to allow retry.
+let cachedRender: { dateStr: string; pdf: Promise<Buffer> } | null = null;
+
+function getSampleMemo(dateStr: string): Promise<Buffer> {
+  if (cachedRender && cachedRender.dateStr === dateStr) return cachedRender.pdf;
+
   const deal = {
     name: SAMPLE_DEAL.name,
     asset_class: SAMPLE_DEAL.asset_class,
@@ -35,6 +39,29 @@ export async function GET() {
     SAMPLE_DEMO_BOX,
   );
 
+  const memo = buildMemoData(deal, dateStr, checks);
+  const element = React.createElement(MemoDocument, {
+    data: memo,
+  }) as unknown as Parameters<typeof renderToBuffer>[0];
+  const next = {
+    dateStr,
+    pdf: renderToBuffer(element).catch((err) => {
+      // Only clear our own entry — a newer day's render may have replaced it.
+      if (cachedRender === next) cachedRender = null;
+      throw err;
+    }),
+  };
+  cachedRender = next;
+  return next.pdf;
+}
+
+/**
+ * The sample deal's IC memo as a PUBLIC download — a prospect sees the actual
+ * deliverable before creating an account. Pure fixture data (no user rows,
+ * no auth), rendered by the same document code the product ships, judged
+ * against the same hypothetical mandate the /demo buy-box tab shows.
+ */
+export async function GET() {
   const dateStr = new Date().toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
@@ -42,11 +69,7 @@ export async function GET() {
   });
 
   try {
-    const memo = buildMemoData(deal, dateStr, checks);
-    const element = React.createElement(MemoDocument, {
-      data: memo,
-    }) as unknown as Parameters<typeof renderToBuffer>[0];
-    const buffer = await renderToBuffer(element);
+    const buffer = await getSampleMemo(dateStr);
     return new Response(new Uint8Array(buffer), {
       headers: {
         "Content-Type": "application/pdf",
