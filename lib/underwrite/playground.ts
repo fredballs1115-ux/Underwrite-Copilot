@@ -37,17 +37,20 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 
 /**
  * The slider's stop values for one lever: `span` steps either side of the
- * base, clamped to the lever's physical range. Index `span` is always the
- * base itself, so "reset" is exact, not rounded.
+ * base, clamped to the lever's physical range. The base itself is clamped
+ * FIRST — a degenerate derived input (e.g. a 0% cap read off a garbled
+ * extraction) must not produce non-monotonic stops where dragging left raises
+ * the value. Index `span` is the (clamped) base, so "reset" is exact.
  */
 export function leverValues(
   lever: keyof PlaygroundLevers,
   base: number,
 ): number[] {
   const { step, span, min, max } = LEVER_STEPS[lever];
+  const b = clamp(Number.isFinite(base) ? base : min, min, max);
   const out: number[] = [];
   for (let i = -span; i <= span; i++) {
-    out.push(i === 0 ? base : clamp(base + i * step, min, max));
+    out.push(i === 0 ? b : clamp(b + i * step, min, max));
   }
   return out;
 }

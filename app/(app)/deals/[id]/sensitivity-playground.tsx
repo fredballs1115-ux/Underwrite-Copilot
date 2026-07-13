@@ -5,7 +5,6 @@ import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import {
   leverValues,
   runScenario,
-  scenarioMetrics,
   fmtPct,
   fmtX,
   fmtBpsDelta,
@@ -81,7 +80,18 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   const [vacIdx, setVacIdx] = useState(2);
   const dirty = capIdx !== 2 || growthIdx !== 2 || vacIdx !== 2;
 
-  const base = useMemo(() => scenarioMetrics(inputs), [inputs]);
+  // The EFFECTIVE base is the sliders' center stops (clamped into physical
+  // range), so a degenerate derived input can't make the resting metrics
+  // disagree with what the levers say they're at.
+  const base = useMemo(
+    () =>
+      runScenario(inputs, {
+        exitCapPct: caps[2],
+        rentGrowthPct: growths[2],
+        vacancyPct: vacs[2],
+      }),
+    [inputs, caps, growths, vacs],
+  );
   const current = useMemo(
     () =>
       dirty
@@ -138,8 +148,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
           idx={capIdx}
           onChange={setCapIdx}
           display={(v) => fmtPct(v, 2)}
-          delta={(v) => fmtBpsDelta(v, inputs.exitCapPct)}
-          base={fmtPct(inputs.exitCapPct, 2)}
+          deltaOf={fmtBpsDelta}
         />
         <Lever
           label="Rent growth"
@@ -147,8 +156,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
           idx={growthIdx}
           onChange={setGrowthIdx}
           display={(v) => fmtPct(v, 1)}
-          delta={(v) => fmtBpsDelta(v, inputs.rentGrowthPct)}
-          base={fmtPct(inputs.rentGrowthPct, 1)}
+          deltaOf={fmtBpsDelta}
         />
         <Lever
           label="Vacancy"
@@ -156,8 +164,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
           idx={vacIdx}
           onChange={setVacIdx}
           display={(v) => fmtPct(v, 1)}
-          delta={(v) => fmtPtDelta(v, inputs.vacancyPct)}
-          base={fmtPct(inputs.vacancyPct, 1)}
+          deltaOf={fmtPtDelta}
         />
       </div>
 
@@ -184,6 +191,12 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
             )}
             {!dirty && <span>mandate fit at the model&apos;s base case</span>}
           </p>
+        ) : box && checkSource ? (
+          // A box IS set but no configured dimension is computable for this
+          // deal/scenario — say that, never "no buy box".
+          <span className="text-xs text-muted">
+            Mandate fit can&apos;t be computed for this deal&apos;s scenario yet.
+          </span>
         ) : (
           <span className="text-xs text-muted">
             Set a buy box to see the fit score move with the sliders.
@@ -209,27 +222,31 @@ function Lever({
   idx,
   onChange,
   display,
-  delta,
-  base,
+  deltaOf,
 }: {
   label: string;
   values: number[];
   idx: number;
   onChange: (i: number) => void;
   display: (v: number) => string;
-  delta: (v: number) => string;
-  base: string;
+  deltaOf: (v: number, base: number) => string;
 }) {
   const v = values[idx];
-  const d = delta(v);
+  // "Base" is decided by INDEX, not value equality — a clamped stop that
+  // happens to duplicate the base must not claim to be it.
+  const atBase = idx === 2;
+  const base = display(values[2]);
+  const d = atBase ? "base" : deltaOf(v, values[2]);
   return (
     <div className="rounded-xl border border-line/70 p-3">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-xs font-medium">{label}</span>
         <span className="font-mono text-sm font-semibold tabular-nums">
           {display(v)}
-          <span className={`ml-1.5 text-[11px] font-normal ${d === "base" ? "text-muted" : "text-brand"}`}>
-            {d === "base" ? `base ${base}` : `(base ${base}, ${d})`}
+          <span className={`ml-1.5 text-[11px] font-normal ${atBase ? "text-muted" : "text-brand"}`}>
+            {atBase
+              ? `base ${base}`
+              : `(base ${base}, ${d === "base" ? "no change" : d})`}
           </span>
         </span>
       </div>

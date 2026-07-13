@@ -142,6 +142,16 @@ describe("leverValues — slider stops", () => {
     const v = leverValues("exitCapPct", LEVER_STEPS.exitCapPct.min);
     expect(Math.min(...v)).toBeGreaterThan(0);
   });
+  it("an out-of-range base is clamped first — stops stay monotonic", () => {
+    // A garbled 0% cap must not produce stops where dragging left RAISES it.
+    const zero = leverValues("exitCapPct", 0);
+    for (let i = 1; i < zero.length; i++) expect(zero[i]).toBeGreaterThanOrEqual(zero[i - 1]);
+    expect(Math.min(...zero)).toBeGreaterThan(0);
+    // …and a 35% "cap" clamps to the ceiling.
+    const high = leverValues("exitCapPct", 0.35);
+    expect(high[2]).toBe(LEVER_STEPS.exitCapPct.max);
+    for (let i = 1; i < high.length; i++) expect(high[i]).toBeGreaterThanOrEqual(high[i - 1]);
+  });
 });
 
 describe("delta formatting", () => {

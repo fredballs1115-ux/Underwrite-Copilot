@@ -131,11 +131,22 @@ export function deriveUnderwriteInputs(
     /asking price|purchase price|guidance|^price\b|offering price/i,
     /unit|\bsf\b|\bper\b|\/|psf/i,
   );
-  const capMetric = findMetric(metrics, /going[- ]?in cap|^cap rate|\bcap\b/i, /exit|reversion|terminal/i);
+  const capMetric = findMetric(
+    metrics,
+    /going[- ]?in cap|^cap rate|\bcap\b/i,
+    // "expense cap" / "rate cap" / "capex" are not cap RATES.
+    /exit|reversion|terminal|expense|capex|capital|rate cap/i,
+  );
   const noiMetric = findMetric(metrics, /net operating income|\bnoi\b/i, /\bper\b|\/|psf|unit/i);
 
   const capDecimal = capMetric ? (parsePct(capMetric.value) ?? null) : null;
-  const capPct = capDecimal != null ? capDecimal / 100 : null;
+  // Plausibility band: a parsed 0% (garbled extraction) or a 35% "cap" (an
+  // expense-cap style figure that slipped the excludes) must never anchor
+  // pricing or the exit assumption — treat as absent.
+  const capPct =
+    capDecimal != null && capDecimal / 100 > 0.005 && capDecimal / 100 <= 0.25
+      ? capDecimal / 100
+      : null;
   const extractedNoi = noiMetric ? parseMoney(noiMetric.value) : null;
   let price = priceMetric ? parseMoney(priceMetric.value) : null;
 

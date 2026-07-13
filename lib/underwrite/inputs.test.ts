@@ -156,6 +156,27 @@ describe("deriveUnderwriteInputs — degenerate actuals are ignored", () => {
   });
 });
 
+describe("deriveUnderwriteInputs — implausible cap rates never anchor", () => {
+  it("a parsed 0% cap falls back to the 6% exit default", () => {
+    const ex: ExtractionResult = {
+      dealName: "Zero Cap",
+      assetClass: "industrial",
+      metrics: [{ label: "Cap Rate", value: "0%", flagged: false, page: "" }],
+    };
+    const { inputs } = deriveUnderwriteInputs(ex, "fallback");
+    expect(inputs.exitCapPct).toBe(0.06);
+  });
+  it("an 'Expense Cap: 35%' label is never read as the cap rate", () => {
+    const ex: ExtractionResult = {
+      dealName: "Expense Cap",
+      assetClass: "industrial",
+      metrics: [{ label: "Expense Cap", value: "35%", flagged: false, page: "" }],
+    };
+    const { inputs } = deriveUnderwriteInputs(ex, "fallback");
+    expect(inputs.exitCapPct).toBe(0.06);
+  });
+});
+
 describe("deriveUnderwriteInputs — a spelled-out NOI label anchors", () => {
   it("'Net operating income' is not disqualified by the 'per' in 'operating'", () => {
     const ex: ExtractionResult = {
