@@ -13,6 +13,7 @@ import {
 } from "@/lib/underwrite/playground";
 import { METRIC_FIND, type BuyBox } from "@/lib/criteria";
 import { scoreMandateFit, type MandateVerdict } from "@/lib/mandate";
+import { solveMaxBid, type BidFloors, type MaxBidSolution } from "@/lib/underwrite/solver";
 
 /** Everything the playground needs, computed server-side once. */
 export interface PlaygroundData {
@@ -139,6 +140,25 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
     return { current: c, base: b };
   }, [box, checkSource, dealAssetClass, base, current, dirty]);
 
+  // Max bid: the highest price that still clears the box's return floors,
+  // solved under the CURRENT slider scenario — drag exit cap out 50bps and
+  // watch your number drop. Pure engine (grid + bisection), ~2ms per solve.
+  const bid = useMemo(() => {
+    if (!box) return null;
+    const floors: BidFloors = {
+      ...(box.minIrrPct != null ? { minIrr: box.minIrrPct / 100 } : {}),
+      ...(box.minCoCPct != null ? { minCoc: box.minCoCPct / 100 } : {}),
+      ...(box.minCapPct != null ? { minCap: box.minCapPct / 100 } : {}),
+    };
+    if (floors.minIrr == null && floors.minCoc == null && floors.minCap == null)
+      return null;
+    return solveMaxBid(inputs, floors, {
+      exitCapPct: caps.values[capIdx],
+      rentGrowthPct: growths.values[growthIdx],
+      vacancyPct: vacs.values[vacIdx],
+    });
+  }, [box, inputs, caps, growths, vacs, capIdx, growthIdx, vacIdx]);
+
   const reset = () => {
     setCapIdx(caps.baseIdx);
     setGrowthIdx(growths.baseIdx);
@@ -193,6 +213,21 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         <Metric label="Year-1 DSCR" value={fmtX(current.dscrYr1)} cur={current.dscrYr1} was={base.dscrYr1} baseText={fmtX(base.dscrYr1)} dirty={dirty} />
       </div>
 
+      {bid && (
+        <MaxBidCard
+          bid={bid}
+          box={box!}
+          modeledPrice={inputs.purchasePrice}
+          dirty={dirty}
+        />
+      )}
+      {box && !bid && (
+        <p className="mt-3 text-xs text-muted">
+          Add an IRR, cash-on-cash, or cap-rate floor to your buy box and this
+          panel will solve for your max bid.
+        </p>
+      )}
+
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         {score ? (
           <p className="flex items-center gap-2 text-xs text-muted">
@@ -240,6 +275,89 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         )}
       </div>
     </section>
+  );
+}
+
+/** Rounded DOWN at display precision so the printed bid still clears the
+ *  floors — "$9.74M" must never stand for a solved $9,738,000. */
+function fmtBid(n: number): string {
+  if (n >= 1e9) return `$${(Math.floor(n / 1e7) / 100).toFixed(2)}B`;
+  if (n >= 1e6) return `$${(Math.floor(n / 1e4) / 100).toFixed(2)}M`;
+  return `$${Math.floor(n / 1e3).toLocaleString("en-US")}k`;
+}
+
+function bindingLabel(key: NonNullable<MaxBidSolution["binding"]>, box: BuyBox): string {
+  switch (key) {
+    case "minIrr":
+      return `your ${box.minIrrPct}% IRR floor binds`;
+    case "minCoc":
+      return `your ${box.minCoCPct}% cash-on-cash floor binds`;
+    case "minCap":
+      return `your ${box.minCapPct}% going-in cap floor binds`;
+  }
+}
+
+function MaxBidCard({
+  bid,
+  box,
+  modeledPrice,
+  dirty,
+}: {
+  bid: MaxBidSolution;
+  box: BuyBox;
+  modeledPrice: number;
+  dirty: boolean;
+}) {
+  return (
+    <div className="mt-3 rounded-xl border border-brand/25 bg-brand/[0.04] p-3.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className="text-xs font-semibold tracking-tight">Max bid</span>
+        <span className="text-[11px] text-muted">
+          highest price that still clears your box
+          {dirty ? " — under the current slider scenario" : ""}
+        </span>
+      </div>
+      {bid.price == null ? (
+        <p className="mt-1.5 text-sm leading-relaxed text-muted">
+          No price in range clears your floors under this scenario — the deal
+          economics, not the price, are the blocker.
+        </p>
+      ) : bid.unbounded ? (
+        <p className="mt-1.5 text-sm leading-relaxed text-muted">
+          Your floors hold even at twice the modeled price — the buy box
+          isn&apos;t the constraint on this deal.
+        </p>
+      ) : (
+        <>
+          <p className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="font-mono text-lg font-semibold tabular-nums">
+              {fmtBid(bid.price)}
+            </span>
+            {bid.deltaPct != null && modeledPrice > 0 && (
+              <span
+                className={`text-xs font-medium tabular-nums ${
+                  bid.deltaPct < 0 ? "text-caution" : "text-pass"
+                }`}
+              >
+                {bid.deltaPct >= 0 ? "+" : "−"}
+                {Math.abs(bid.deltaPct * 100).toFixed(1)}% vs the modeled price
+              </span>
+            )}
+            {bid.binding && (
+              <span className="text-xs text-muted">
+                {bindingLabel(bid.binding, box)}
+              </span>
+            )}
+          </p>
+          {bid.at && (
+            <p className="mt-1 text-[11px] tabular-nums text-muted">
+              at that price: IRR {fmtPct(bid.at.irr)} · year-1 CoC{" "}
+              {fmtPct(bid.at.coc)} · going-in cap {fmtPct(bid.at.cap, 2)}
+            </p>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 

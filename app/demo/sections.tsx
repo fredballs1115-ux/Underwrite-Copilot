@@ -125,9 +125,9 @@ export function DemoSections({ data }: { data: DemoData }) {
           <div className="flex flex-col gap-3">
             <SensitivityPlayground data={data.playground} />
             <p className="text-xs leading-relaxed text-muted">
-              Live — drag the sliders. Returns and the mandate fit recompute
-              in your browser from the same engine that builds the Excel
-              model.
+              Live — drag the sliders. Returns, the mandate fit, and the max
+              bid recompute in your browser from the same engine that builds
+              the Excel model.
             </p>
           </div>
         )}
