@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
+import { FREE_DEALS } from "@/lib/marketing-constants";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = {
@@ -43,8 +44,9 @@ export default async function LoginPage({
         <div className="shadow-float mt-8 rounded-2xl border border-line bg-surface p-7">
           <h1 className="text-xl font-semibold tracking-tight">Welcome</h1>
           <p className="mt-2 text-sm leading-relaxed text-muted">
-            Screen your first deal in minutes. Your first 3 deals are free — no
-            card required, and a fully-worked sample deal is waiting inside.
+            Screen your first deal in minutes. Your first {FREE_DEALS} deals
+            are free — no card required, and a fully-worked sample deal is
+            waiting inside.
           </p>
           <LoginForm
             initialMode={mode === "signup" ? "signup" : "signin"}

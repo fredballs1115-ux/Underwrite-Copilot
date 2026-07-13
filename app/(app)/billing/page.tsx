@@ -11,6 +11,7 @@ import {
   fmtUsd,
 } from "@/lib/billing";
 import { getTeam, TEAM_TRIAL_DEALS } from "@/lib/teams";
+import { PRICE_PRO_MONTHLY } from "@/lib/marketing-constants";
 import { startCheckout, openPortal } from "./actions";
 import { removeMember, openTeamPortal } from "../team/actions";
 import { PendingButton } from "../pending-button";
@@ -19,7 +20,7 @@ export const metadata: Metadata = { title: "Billing" };
 
 // Benefit-framed: what the feature does for you, not what it's called.
 const FREE_FEATURES = [
-  "3 deals with the full six-stage screen on each",
+  `${FREE_DEAL_LIMIT} deals with the full six-stage screen on each`,
   "Sourced ranges + the three deal-killers, stressed first",
   "Side-by-side deal comparison",
   "Reconcile the screen against your own model",
@@ -224,7 +225,7 @@ export default async function BillingPage({
             )}
           </div>
           <p className="mt-2 flex items-baseline gap-1">
-            <span className="text-3xl font-semibold tracking-tight">$29.99</span>
+            <span className="text-3xl font-semibold tracking-tight">{PRICE_PRO_MONTHLY}</span>
             <span className="text-sm text-muted">/month</span>
           </p>
           <p className="mt-1 text-sm text-muted">

@@ -2,21 +2,32 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
+import {
+  FREE_DEALS,
+  PRICE_PRO_MONTHLY,
+  PRICE_TEAM_BASE_MONTHLY,
+  PRICE_TEAM_BASE_MONTHLY_USD,
+  PRICE_TEAM_MEMBER_MONTHLY,
+  PRICE_TEAM_MEMBER_MONTHLY_USD,
+} from "@/lib/marketing-constants";
 
 export type Plan = "free" | "pro";
 
-export const FREE_DEAL_LIMIT = 3;
-export const PRO_PRICE_LABEL = "$29.99/mo";
-// Team pricing: a $49.99 base that INCLUDES the account owner, each ADDED
-// member at $9.99. In Stripe this is ONE subscription with TWO items — the
+// Canonical numbers live in lib/marketing-constants (importable from client
+// components, unlike this server-only module) — everything here derives, so
+// the billing page and the homepage can never quote different prices.
+export const FREE_DEAL_LIMIT = FREE_DEALS;
+export const PRO_PRICE_LABEL = `${PRICE_PRO_MONTHLY}/mo`;
+// Team pricing: a base that INCLUDES the account owner, each ADDED member at
+// the per-seat price. In Stripe this is ONE subscription with TWO items — the
 // base (STRIPE_TEAM_PRICE_ID, quantity 1) plus the per-seat price
 // (STRIPE_TEAM_SEAT_PRICE_ID, quantity = added members). Transitions update
 // the existing subscription in place so billing history stays continuous;
 // see lib/stripe/team-billing.ts. Teams subscribed before this structure
 // carry a single graduated-tier item, which seat syncing still supports.
-export const TEAM_BASE_PRICE = 49.99;
-export const TEAM_MEMBER_PRICE = 9.99;
-export const TEAM_PRICE_LABEL = "$49.99/mo + $9.99/mo per added member";
+export const TEAM_BASE_PRICE = PRICE_TEAM_BASE_MONTHLY_USD;
+export const TEAM_MEMBER_PRICE = PRICE_TEAM_MEMBER_MONTHLY_USD;
+export const TEAM_PRICE_LABEL = `${PRICE_TEAM_BASE_MONTHLY}/mo + ${PRICE_TEAM_MEMBER_MONTHLY}/mo per added member`;
 
 /** Monthly team total for a given member count (owner included). */
 export function teamMonthlyTotal(seatCount: number): number {

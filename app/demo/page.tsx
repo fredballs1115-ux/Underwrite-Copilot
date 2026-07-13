@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
+import { FREE_DEALS } from "@/lib/marketing-constants";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { evaluateBuyBox } from "@/lib/criteria";
@@ -265,7 +266,7 @@ export default function DemoPage() {
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-white/70">
             Upload an offering memorandum and get the same six-stage read —
             sourced ranges, challenged assumptions, and a verdict that shows
-            its work. First 3 deals free, no card.
+            its work. First {FREE_DEALS} deals free, no card.
           </p>
           <Link
             href="/login?mode=signup"

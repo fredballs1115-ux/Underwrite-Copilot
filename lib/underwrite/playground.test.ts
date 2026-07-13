@@ -168,6 +168,18 @@ describe("sliderValues — the Bug-9 wide slider range", () => {
       expect(values[i]).toBeGreaterThan(values[i - 1]);
   });
 
+  it("matches the sweep the homepage advertises (SLIDER_SWEEP_BPS)", async () => {
+    // The marketing claim is pinned to the engine: if the slider range ever
+    // changes, this fails until lib/marketing-constants.ts is updated too.
+    const { SLIDER_SWEEP_BPS } = await import("../marketing-constants");
+    const { values, baseIdx } = sliderValues("exitCapPct", 0.06);
+    expect((values[baseIdx] - values[0]) * 10_000).toBeCloseTo(SLIDER_SWEEP_BPS, 6);
+    expect((values[values.length - 1] - values[baseIdx]) * 10_000).toBeCloseTo(
+      SLIDER_SWEEP_BPS,
+      6,
+    );
+  });
+
   it("rent growth ±150bps, vacancy ±3pt (the spec's example ranges)", () => {
     const g = sliderValues("rentGrowthPct", 0.025);
     expect(g.values[0]).toBeCloseTo(0.01, 10);

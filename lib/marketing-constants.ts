@@ -37,11 +37,17 @@ export const MEMO_PAGES = 1;
 // (lib/underwrite/playground.ts LEVER_STEPS: 16 × 25bps).
 export const SLIDER_SWEEP_BPS = 400;
 
-// ── Pricing (display copy) ──────────────────────────────────────────────────
-// Must match the live Stripe prices; FREE_DEAL_LIMIT mirrors lib/billing.
-export const PRICE_PRO_MONTHLY = "$29.99";
-export const PRICE_TEAM_BASE_MONTHLY = "$49.99";
-export const PRICE_TEAM_MEMBER_MONTHLY = "$9.99";
+// ── Pricing ─────────────────────────────────────────────────────────────────
+// THE canonical price + free-tier numbers. lib/billing (server-only) derives
+// its labels and arithmetic from these — that direction, because this module
+// must stay importable from client components and billing can't. Must match
+// the live Stripe prices the user configures.
+export const PRICE_PRO_MONTHLY_USD = 29.99;
+export const PRICE_TEAM_BASE_MONTHLY_USD = 49.99;
+export const PRICE_TEAM_MEMBER_MONTHLY_USD = 9.99;
+export const PRICE_PRO_MONTHLY = `$${PRICE_PRO_MONTHLY_USD.toFixed(2)}`;
+export const PRICE_TEAM_BASE_MONTHLY = `$${PRICE_TEAM_BASE_MONTHLY_USD.toFixed(2)}`;
+export const PRICE_TEAM_MEMBER_MONTHLY = `$${PRICE_TEAM_MEMBER_MONTHLY_USD.toFixed(2)}`;
 export const FREE_DEALS = 3;
 
 // ── Sample-deal narrative figures (fixture-sourced) ─────────────────────────
