@@ -238,7 +238,9 @@ export async function createSampleDeal() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // Already have one? Open it instead of inserting a duplicate.
+  // Already have one? Open it instead of inserting a duplicate — after
+  // topping up anything the fixture gained since it was created (a sample
+  // made before the actuals existed self-heals on the next open).
   const { data: existing } = await supabase
     .from("deals")
     .select("id")
@@ -246,7 +248,10 @@ export async function createSampleDeal() {
     .eq("is_sample", true)
     .limit(1)
     .maybeSingle();
-  if (existing) redirect(`/deals/${existing.id}`);
+  if (existing) {
+    await seedSampleActuals(existing.id as string);
+    redirect(`/deals/${existing.id}`);
+  }
 
   const { data: deal, error } = await supabase
     .from("deals")
@@ -267,30 +272,54 @@ export async function createSampleDeal() {
     .single();
   if (error || !deal) redirect("/deals?error=save");
 
-  // Property actuals (Feature 1) on the sample, so the PROPERTY ACTUALS card,
-  // the OM-vs-T-12 note, and the actuals-anchored playground all demo without
-  // an upload. Service-role writes (0020's tables are user-read-only);
-  // best-effort — a pre-0020 schema just leaves the sample without actuals.
-  try {
-    const admin = createSupabaseAdminClient();
-    await admin.from("deal_rent_rolls").insert({
-      deal_id: deal.id,
-      as_of_date: SAMPLE_DEAL.rentRoll.as_of_date,
-      extraction: SAMPLE_DEAL.rentRoll.extraction,
-      summary: SAMPLE_DEAL.rentRoll.summary,
-    });
-    await admin.from("deal_t12_statements").insert({
-      deal_id: deal.id,
-      period_end_date: SAMPLE_DEAL.t12.period_end_date,
-      extraction: SAMPLE_DEAL.t12.extraction,
-      summary: SAMPLE_DEAL.t12.summary,
-    });
-  } catch {
-    // sample still works OM-only
-  }
+  await seedSampleActuals(deal.id as string);
 
   revalidatePath("/deals");
   redirect(`/deals/${deal.id}`);
+}
+
+/**
+ * Property actuals (Feature 1) on the sample, so the PROPERTY ACTUALS card,
+ * the OM-vs-T-12 note, and the actuals-anchored playground all demo without
+ * an upload. Idempotent (skips rows that already exist) so it can run on
+ * every open of an existing sample. Service-role writes (0020's tables are
+ * user-read-only); best-effort — a pre-0020 schema just leaves the sample
+ * OM-only.
+ */
+async function seedSampleActuals(dealId: string): Promise<void> {
+  try {
+    const admin = createSupabaseAdminClient();
+    const [rr, t12] = await Promise.all([
+      admin
+        .from("deal_rent_rolls")
+        .select("id", { count: "exact", head: true })
+        .eq("deal_id", dealId),
+      admin
+        .from("deal_t12_statements")
+        .select("id", { count: "exact", head: true })
+        .eq("deal_id", dealId),
+    ]);
+    // A count query against a missing table returns an error — treat any
+    // uncertainty as "don't touch".
+    if (!rr.error && (rr.count ?? 0) === 0) {
+      await admin.from("deal_rent_rolls").insert({
+        deal_id: dealId,
+        as_of_date: SAMPLE_DEAL.rentRoll.as_of_date,
+        extraction: SAMPLE_DEAL.rentRoll.extraction,
+        summary: SAMPLE_DEAL.rentRoll.summary,
+      });
+    }
+    if (!t12.error && (t12.count ?? 0) === 0) {
+      await admin.from("deal_t12_statements").insert({
+        deal_id: dealId,
+        period_end_date: SAMPLE_DEAL.t12.period_end_date,
+        extraction: SAMPLE_DEAL.t12.extraction,
+        summary: SAMPLE_DEAL.t12.summary,
+      });
+    }
+  } catch {
+    // sample still works OM-only
+  }
 }
 
 /** Track where a deal sits in YOUR process — independent of the verdict.

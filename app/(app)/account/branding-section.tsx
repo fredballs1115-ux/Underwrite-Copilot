@@ -76,11 +76,12 @@ export async function BrandingSection({
     <section className="rounded-2xl border border-line bg-surface p-6 shadow-card">
       <h2 className="text-sm font-semibold tracking-tight">Report branding</h2>
       <p className="mt-1 max-w-lg text-sm text-muted">
-        Shown on every exported memo and report{" "}
-        {scope === "team" ? "for your whole team" : "you download"} — firm
-        name and logo in the header, your footer text on each page. A small
-        &ldquo;Powered by Underwrite Copilot&rdquo; line stays at the very
-        bottom.
+        Shown on every export{" "}
+        {scope === "team" ? "for your whole team" : "you download"} — name and
+        logo on the memo and report, your name in the Excel workbooks&apos;
+        file properties and print header, and a letterhead on the LOI. Footer
+        text prints on each PDF page. A small &ldquo;Powered by Underwrite
+        Copilot&rdquo; line stays at the very bottom of the PDFs.
       </p>
 
       {readOnly ? (

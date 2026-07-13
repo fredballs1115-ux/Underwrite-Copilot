@@ -1,6 +1,8 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
 import { buildModelWorkbook } from "@/lib/model/excel-build";
+import { getBrandingForDeal } from "@/lib/branding-server";
+import type { ExportBranding } from "@/lib/excel-branding";
 import type { DealRow } from "@/lib/deals";
 import type { UnderwritingModel } from "@/lib/model/types";
 
@@ -70,10 +72,22 @@ export async function GET(
     .eq("deal_id", id);
   const kinds = ((docs ?? []) as { kind: string }[]).map((d) => d.kind);
 
+  // Firm branding (Feature 6) — best-effort, same shape as the PDF routes.
+  let branding: ExportBranding | null = null;
+  try {
+    const ownership = deal as unknown as {
+      user_id: string;
+      team_id: string | null;
+    };
+    branding = await getBrandingForDeal(ownership.user_id, ownership.team_id);
+  } catch {
+    branding = null;
+  }
+
   // Opened via a plain <a> — catch a build failure and bounce to the deal with
   // a friendly error rather than surfacing a raw 500 body in the browser.
   try {
-    const buffer = await buildModelWorkbook(model, deal.name, kinds);
+    const buffer = await buildModelWorkbook(model, deal.name, kinds, branding);
     const safe =
       (deal.name || "deal")
         .replace(/[^a-z0-9]+/gi, "-")

@@ -1,5 +1,6 @@
 import "server-only";
 import ExcelJS from "exceljs";
+import { applyWorkbookBranding, type ExportBranding } from "@/lib/excel-branding";
 import type { UnderwritingModel } from "./types";
 import { computeModel, type ModelInputs } from "./compute";
 import {
@@ -834,6 +835,7 @@ export async function buildModelWorkbook(
   model: UnderwritingModel,
   dealName: string,
   providedKinds: string[],
+  branding?: ExportBranding | null,
 ): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = "Underwrite Copilot";
@@ -853,6 +855,10 @@ export async function buildModelWorkbook(
   buildCashFlow(wb.addWorksheet("Cash Flow"), model);
   buildAssumptions(wb.addWorksheet("Assumptions"), model);
   buildConflicts(wb.addWorksheet("Conflicts"), model);
+
+  // Firm branding (Feature 6): file properties + print header/footer only —
+  // never a cell, so the template layout can't shift.
+  applyWorkbookBranding(wb, wb.worksheets, dealName, branding);
 
   const out = await wb.xlsx.writeBuffer();
   return Buffer.from(out);

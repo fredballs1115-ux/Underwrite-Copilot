@@ -2,6 +2,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
 import { deriveUnderwriteInputs, type ActualsForModel } from "@/lib/underwrite/inputs";
 import { buildUnderwriteWorkbook } from "@/lib/underwrite/workbook";
+import { getBrandingForDeal } from "@/lib/branding-server";
+import type { ExportBranding } from "@/lib/excel-branding";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
@@ -88,9 +90,21 @@ export async function GET(
       : null,
   };
 
+  // Firm branding (Feature 6) — best-effort, same shape as the PDF routes.
+  let branding: ExportBranding | null = null;
+  try {
+    const ownership = deal as unknown as {
+      user_id: string;
+      team_id: string | null;
+    };
+    branding = await getBrandingForDeal(ownership.user_id, ownership.team_id);
+  } catch {
+    branding = null;
+  }
+
   try {
     const model = deriveUnderwriteInputs(extraction, deal.name, actuals);
-    const buffer = await buildUnderwriteWorkbook(model);
+    const buffer = await buildUnderwriteWorkbook(model, branding);
     const safe =
       (deal.name || "deal").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() ||
       "deal";

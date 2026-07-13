@@ -4,6 +4,7 @@ import type { UnderwriteInputs } from "./engine";
 import { computeUnderwrite } from "./engine";
 import { defaultIncrements } from "./sensitivity";
 import type { DerivedModel, InputSource } from "./inputs";
+import { applyWorkbookBranding, type ExportBranding } from "@/lib/excel-branding";
 
 /**
  * The institutional acquisition-template workbook (Feature 1). Visible tabs:
@@ -94,7 +95,10 @@ function cellA1(row: number, col: number): string {
   return `${s}${row}`;
 }
 
-export async function buildUnderwriteWorkbook(model: DerivedModel): Promise<Buffer> {
+export async function buildUnderwriteWorkbook(
+  model: DerivedModel,
+  branding?: ExportBranding | null,
+): Promise<Buffer> {
   const { inputs } = model;
   const result = computeUnderwrite(inputs);
   const holdYears = result.holdYears;
@@ -115,6 +119,18 @@ export async function buildUnderwriteWorkbook(model: DerivedModel): Promise<Buff
   const cf = buildCashFlow(wsCf, inputs, holdYears);
   const sensAnchor = buildDealSummary(wsSummary, model, cf, holdYears);
   buildSensitivityEngine(wsSummary, wsEng, inputs, sensAnchor);
+
+  // Firm branding (Feature 6): file properties + print chrome, plus one
+  // visible "Prepared by" in the title row's empty right side — additive
+  // only, so no formula anchor can shift.
+  applyWorkbookBranding(wb, [wsSummary, wsAssum, wsCf], model.meta.dealName, branding);
+  const firm = branding?.firmName?.trim();
+  if (firm) {
+    const c = wsSummary.getCell(1, 5);
+    c.value = `Prepared by ${firm}`;
+    c.font = { name: ARIAL, size: 9, color: MUTED };
+    c.alignment = { horizontal: "right", vertical: "middle" };
+  }
 
   return Buffer.from(await wb.xlsx.writeBuffer());
 }

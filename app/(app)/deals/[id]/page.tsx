@@ -273,11 +273,11 @@ export default async function DealPage({
   // metric set lives one click away in Financials.
   const metrics = extraction?.metrics ?? [];
 
-  // Property actuals (Feature 1): the consolidated rent roll + T-12, if either
-  // was uploaded. Best-effort — the tables arrived in migration 0020; on an
-  // older schema the queries error and read null (the card simply doesn't
-  // render). Any per-number reference dates come from the stored extraction.
-  const [rrRes, t12Res] = await Promise.all([
+  // Property actuals (Feature 1), deal tasks (Feature 7), and the team
+  // roster — four independent reads, one round-trip. All best-effort: the
+  // actuals/tasks tables arrived in 0020/0022, and on an older schema the
+  // queries error and read null (the cards simply don't render).
+  const [rrRes, t12Res, tasksRes, memberRes] = await Promise.all([
     supabase
       .from("deal_rent_rolls")
       .select("as_of_date, summary")
@@ -292,6 +292,19 @@ export default async function DealPage({
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from("deal_tasks")
+      .select(
+        "id, title, assignee_user_id, due_date, done, completed_at, source, created_by, created_at",
+      )
+      .eq("deal_id", id)
+      .order("created_at", { ascending: true }),
+    ownership.team_id
+      ? supabase
+          .from("team_members")
+          .select("user_id")
+          .eq("team_id", ownership.team_id)
+      : Promise.resolve({ data: null }),
   ]);
   const t12Summary = (t12Res.data?.summary as T12Summary | undefined) ?? null;
   // OM assumed NOI vs the T-12 actual — the shared picker (word-bounded,
@@ -341,13 +354,6 @@ export default async function DealPage({
 
   // Deal tasks (Feature 7): assignable to-dos with owners and due dates.
   // Best-effort — pre-0022 schemas error and the card doesn't render.
-  const tasksRes = await supabase
-    .from("deal_tasks")
-    .select(
-      "id, title, assignee_user_id, due_date, done, completed_at, source, created_by, created_at",
-    )
-    .eq("deal_id", id)
-    .order("created_at", { ascending: true });
   const dealTasks: DealTask[] | null = tasksRes.error
     ? null
     : ((tasksRes.data ?? []) as Record<string, unknown>[]).map((r) => ({
@@ -371,11 +377,7 @@ export default async function DealPage({
       label: user.email ? `${user.email.split("@")[0]} (you)` : "You",
     });
     if (ownership.team_id) {
-      const { data: memberRows } = await supabase
-        .from("team_members")
-        .select("user_id")
-        .eq("team_id", ownership.team_id);
-      const otherIds = ((memberRows ?? []) as { user_id: string }[])
+      const otherIds = ((memberRes.data ?? []) as { user_id: string }[])
         .map((m) => m.user_id)
         .filter((uid) => uid !== user.id);
       if (otherIds.length) {

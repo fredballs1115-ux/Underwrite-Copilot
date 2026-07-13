@@ -22,6 +22,10 @@ export interface LoiParams {
   /** how many days the offer stays open */
   openDays: number;
   dateStr: string;
+  /** firm letterhead line (Feature 6 branding) — null renders no letterhead.
+   *  Deliberately name-only: the report footerText is written for internal
+   *  IC pages and doesn't belong on an outbound letter. */
+  firmName?: string | null;
 }
 
 const BRAND = "114e54";
@@ -71,6 +75,7 @@ export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
     price: clean(p.price),
     deposit: clean(p.deposit),
     dateStr: clean(p.dateStr),
+    firmName: p.firmName ? clean(p.firmName).trim() : null,
   };
 
   const financing =
@@ -79,6 +84,26 @@ export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
       : `This offer is not contingent on financing.`;
 
   const children: Paragraph[] = [
+    // Firm letterhead (Feature 6 branding) — above the title, small caps
+    // tracking, only when the account set a firm name.
+    ...(p.firmName
+      ? [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 120 },
+            children: [
+              new TextRun({
+                text: p.firmName.toUpperCase(),
+                bold: true,
+                size: 20,
+                color: INK,
+                font: "Calibri",
+                characterSpacing: 20,
+              }),
+            ],
+          }),
+        ]
+      : []),
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: 60 },
