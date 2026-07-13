@@ -24,6 +24,7 @@ import { SensitivityPlayground, type PlaygroundData } from "./sensitivity-playgr
 import { type StageChange } from "@/lib/stages";
 import type { InternalComp } from "@/lib/internal-comps";
 import { DebtSizer } from "./debt-sizer";
+import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import { DecisionLog } from "./decision-log";
 import { DealTasks } from "./deal-tasks";
 import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
@@ -752,6 +753,7 @@ export function DealView({
             supplement={supplements["terms"]}
             facts={facts}
             omUrl={omUrl}
+            underwrite={playground?.inputs ?? null}
           />
         )}
 
@@ -821,6 +823,7 @@ function FinancialsPanel({
   supplement,
   facts = {},
   omUrl = null,
+  underwrite = null,
 }: {
   results: Results;
   active: boolean;
@@ -833,6 +836,7 @@ function FinancialsPanel({
   supplement: TabSupplement | undefined;
   facts?: Record<string, DealFact>;
   omUrl?: string | null;
+  underwrite?: UnderwriteInputs | null;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -848,6 +852,14 @@ function FinancialsPanel({
       ) : (
         <EmptyState title="No OM uploaded for this deal." />
       )}
+
+      {/* FINANCING & CAPITAL directly after the terms (Bug 11) — the debt
+          story is a first-read, not an appendix behind the Excel block. */}
+      <DebtSizer
+        model={model}
+        extraction={results.extraction}
+        underwrite={underwrite}
+      />
 
       <details
         className="rounded-2xl border border-line bg-surface shadow-card"
@@ -871,8 +883,6 @@ function FinancialsPanel({
           />
         </div>
       </details>
-
-      <DebtSizer model={model} extraction={results.extraction} />
 
       {supplement && <Supplements dealId={dealId} tab="terms" data={supplement} />}
       <AddData dealId={dealId} tab="terms" />

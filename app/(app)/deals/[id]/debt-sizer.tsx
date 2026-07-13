@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { findMetric, parseMoney } from "@/lib/criteria";
 import type { UnderwritingModel } from "@/lib/model/types";
+import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
 /**
@@ -174,9 +175,13 @@ function SubHead({ children }: { children: React.ReactNode }) {
 export function DebtSizer({
   model,
   extraction,
+  underwrite = null,
 }: {
   model: UnderwritingModel | null;
   extraction: ExtractionResult | null;
+  /** the derived screening model — carries the capital plan (reserves, TI,
+   *  LC, year-1 capex) that rounds out the FINANCING & CAPITAL card */
+  underwrite?: UnderwriteInputs | null;
 }) {
   const seed = useMemo(() => deriveSeed(model, extraction), [model, extraction]);
   const omTerms = useMemo(() => omLoanTerms(extraction), [extraction]);
@@ -300,19 +305,62 @@ export function DebtSizer({
   const amortRows =
     maxLoan != null ? amortPreview(maxLoan, ratePct, amortYears, io, Math.min(Math.max(holdYears, 3), 10)) : [];
 
+  // The capital plan (Bug 11): reserves / TI / LC / year-1 capex from the
+  // derived screening model, preferring the generated model's own reserve
+  // line when one exists. Pure display of already-computed inputs.
+  const capex = useMemo(() => {
+    const uw = underwrite;
+    const modelReserve = model?.inputs?.capexReserveAnnual;
+    const reserveAnnual =
+      modelReserve != null && modelReserve > 0
+        ? modelReserve
+        : uw && uw.rsf > 0 && uw.reservesPsf > 0
+          ? uw.reservesPsf * uw.rsf
+          : null;
+    const reservePsf =
+      uw && uw.reservesPsf > 0
+        ? uw.reservesPsf
+        : reserveAnnual != null && uw && uw.rsf > 0
+          ? reserveAnnual / uw.rsf
+          : null;
+    return {
+      reserveAnnual,
+      reservePsf,
+      capYr1: uw ? uw.capitalImprovementsYr1 : null,
+      tiPsf: uw && uw.tiPsf > 0 ? uw.tiPsf : null,
+      lcPct: uw && uw.lcPct > 0 ? uw.lcPct : null,
+      source:
+        modelReserve != null && modelReserve > 0
+          ? ("model" as const)
+          : uw
+            ? ("screen" as const)
+            : null,
+    };
+  }, [model, underwrite]);
+
   const numCls =
     "w-full rounded-lg border border-line bg-paper px-2.5 py-1.5 font-mono text-sm tabular-nums outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40";
 
   return (
     <details
-      className="rounded-2xl border border-line bg-surface shadow-card"
+      // OPEN by default and second in the tab (Bug 11): the debt story is a
+      // first-class read, not an appendix — still collapsible for focus.
+      open
+      className="rounded-2xl border border-line border-l-4 border-l-brand bg-surface shadow-card"
       data-qa="debt-sizer"
     >
-      <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold tracking-tight [&::-webkit-details-marker]:hidden">
-        <span className="flex items-center justify-between gap-2">
-          Debt &amp; financing
+      <summary className="cursor-pointer list-none px-5 py-4 [&::-webkit-details-marker]:hidden">
+        <span className="flex flex-wrap items-baseline justify-between gap-2">
+          <span>
+            <span className="block text-xs font-medium uppercase tracking-wider text-muted">
+              Financing &amp; capital
+            </span>
+            <span className="text-sm font-semibold tracking-tight">
+              Debt, coverage, and the capital plan
+            </span>
+          </span>
           <span className="text-xs font-normal text-muted">
-            sizing, payments, rate sensitivity — deterministic
+            sizing, payments, rate sensitivity, capex — deterministic
           </span>
         </span>
       </summary>
@@ -547,6 +595,61 @@ export function DebtSizer({
         ) : (
           <p className="mt-4 text-sm text-muted">
             Add a price or a year-1 NOI above and the sizing appears here.
+          </p>
+        )}
+
+        <SubHead>Capital expenditures</SubHead>
+        {capex.source ? (
+          <>
+            <dl className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {(
+                [
+                  [
+                    "Capital reserves",
+                    capex.reserveAnnual != null
+                      ? `${fmtUsd(capex.reserveAnnual)}/yr${
+                          capex.reservePsf != null
+                            ? ` · $${capex.reservePsf.toFixed(2)}/SF`
+                            : ""
+                        }`
+                      : "—",
+                  ],
+                  [
+                    "Year-1 capital plan",
+                    capex.capYr1 != null
+                      ? capex.capYr1 > 0
+                        ? fmtUsd(capex.capYr1)
+                        : "$0 underwritten"
+                      : "—",
+                  ],
+                  [
+                    "Tenant improvements",
+                    capex.tiPsf != null ? `$${capex.tiPsf.toFixed(2)}/SF/yr` : "—",
+                  ],
+                  [
+                    "Leasing commissions",
+                    capex.lcPct != null
+                      ? `${(capex.lcPct * 100).toFixed(1)}% of rent`
+                      : "—",
+                  ],
+                ] as const
+              ).map(([label, value]) => (
+                <div key={label} className="rounded-lg border border-line px-3 py-2">
+                  <dt className="text-[10px] uppercase tracking-wide text-muted">{label}</dt>
+                  <dd className="mt-0.5 font-mono text-sm font-semibold tabular-nums">{value}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="mt-2 text-xs text-muted">
+              {capex.source === "model"
+                ? "Reserves from your generated model; TI / LC from the derived screening model. Reserves are deducted below NOI."
+                : "From the derived screening model — reserves are deducted below NOI."}
+            </p>
+          </>
+        ) : (
+          <p className="mt-2 text-sm text-muted">
+            No capital figures yet — run the screen (or generate the model) and
+            the reserve, TI / LC, and year-1 plan appear here.
           </p>
         )}
       </div>
