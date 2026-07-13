@@ -61,6 +61,10 @@ export interface RentRollSummary {
   /** occupied SF that actually carried an expiry date (the buckets' basis) */
   expiryCoveredSf: number;
   truncated: boolean;
+  /** the reference date WALT/expiry were measured from — the roll's stated
+   *  as-of when present, else the screen date (set at ingest, shown in the UI
+   *  so the basis is never invisible) */
+  asOfUsed?: string;
 }
 
 // ---- T-12 operating statement ---------------------------------------------

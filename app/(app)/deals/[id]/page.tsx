@@ -30,9 +30,9 @@ import { parseDealNotes, parseDealQa } from "@/lib/deals";
 import { deriveInternalComps } from "@/lib/internal-comps";
 import { buildComps, marketMemoryFor } from "@/lib/market-memory";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource, parseMoney, type BuyBoxCheck } from "@/lib/criteria";
+import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource, type BuyBoxCheck } from "@/lib/criteria";
 import { scoreMandateFit, type MandateScore, type MandateVerdict } from "@/lib/mandate";
-import { compareNoi } from "@/lib/actuals/analyze";
+import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { ActualsData } from "./property-actuals";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
@@ -293,14 +293,10 @@ export default async function DealPage({
       .maybeSingle(),
   ]);
   const t12Summary = (t12Res.data?.summary as T12Summary | undefined) ?? null;
-  // OM assumed NOI (prefer a stabilized / pro-forma figure) vs the T-12 actual.
-  const omNoiMetric =
-    metrics.find(
-      (m) =>
-        /noi|net operating income/i.test(m.label) &&
-        /stab|pro ?forma|forward/i.test(m.label),
-    ) ?? metrics.find((m) => /noi|net operating income/i.test(m.label));
-  const omNoi = omNoiMetric ? parseMoney(omNoiMetric.value) : null;
+  // OM assumed NOI vs the T-12 actual — the shared picker (word-bounded,
+  // per-unit-safe, same one the challenger note uses). Degenerate actual NOI
+  // (0 / non-finite) renders no comparison rather than an infinite delta.
+  const omNoi = pickOmNoi(metrics)?.noi ?? null;
   const actuals: ActualsData = {
     rentRoll: rrRes.data?.summary
       ? {
@@ -315,7 +311,10 @@ export default async function DealPage({
         }
       : null,
     noiComparison:
-      omNoi != null && t12Summary?.noi != null
+      omNoi != null &&
+      t12Summary?.noi != null &&
+      Number.isFinite(t12Summary.noi) &&
+      t12Summary.noi !== 0
         ? compareNoi(omNoi, t12Summary.noi)
         : null,
   };

@@ -109,7 +109,10 @@ export function deriveUnderwriteInputs(
     rr.sfWeightedOccupancy <= 1
       ? rr.sfWeightedOccupancy
       : null;
-  const rrSf = rr && rr.totalSf > 100 ? Math.round(rr.totalSf) : null;
+  // A truncated roll's SF sum covers only the captured rows — systematically
+  // understated, so it never replaces the OM's building size. (Ratios like
+  // occupancy remain valid sample estimates and still apply.)
+  const rrSf = rr && !rr.truncated && rr.totalSf > 100 ? Math.round(rr.totalSf) : null;
 
   const mark = (
     key: keyof UnderwriteInputs,
@@ -121,13 +124,15 @@ export function deriveUnderwriteInputs(
   };
 
   // ── Purchase price ─────────────────────────────────────────────────────
+  // Excludes are word-bounded: a bare /per/ would match the "per" inside
+  // "oPERating" and silently disqualify "Net operating income" itself.
   const priceMetric = findMetric(
     metrics,
     /asking price|purchase price|guidance|^price\b|offering price/i,
-    /unit|\bsf\b|per|\/|psf/i,
+    /unit|\bsf\b|\bper\b|\/|psf/i,
   );
   const capMetric = findMetric(metrics, /going[- ]?in cap|^cap rate|\bcap\b/i, /exit|reversion|terminal/i);
-  const noiMetric = findMetric(metrics, /net operating income|\bnoi\b/i, /per|\/|psf/i);
+  const noiMetric = findMetric(metrics, /net operating income|\bnoi\b/i, /\bper\b|\/|psf|unit/i);
 
   const capDecimal = capMetric ? (parsePct(capMetric.value) ?? null) : null;
   const capPct = capDecimal != null ? capDecimal / 100 : null;

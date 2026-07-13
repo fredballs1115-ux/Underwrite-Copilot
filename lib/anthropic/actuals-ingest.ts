@@ -16,17 +16,13 @@ type Admin = ReturnType<typeof createSupabaseAdminClient>;
  * screen, and each document is isolated so one bad file doesn't stop the other.
  */
 export async function runActualsIngestion(admin: Admin, dealId: string): Promise<void> {
-  const { data: deal } = await admin
-    .from("deals")
-    .select("created_at")
-    .eq("id", dealId)
-    .single();
-
+  // NEWEST document of each kind wins — a corrected roll uploaded later must
+  // replace the original, not be ignored.
   const { data: docsData } = await admin
     .from("deal_documents")
     .select("id, kind, filename, storage_path")
     .eq("deal_id", dealId)
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: false });
   const docs = (docsData ?? []) as {
     id: string;
     kind: string;
@@ -37,21 +33,22 @@ export async function runActualsIngestion(admin: Admin, dealId: string): Promise
   const rentRollDoc = docs.find((d) => d.kind === "rent_roll");
   const t12Doc = docs.find((d) => d.kind === "t12");
 
-  // Idempotent on re-screen: clear any prior actuals, then re-ingest fresh.
-  await admin.from("deal_rent_rolls").delete().eq("deal_id", dealId);
-  await admin.from("deal_t12_statements").delete().eq("deal_id", dealId);
+  // WALT/expiry need a reference date when the roll doesn't state one — the
+  // actual ingest (screen) date, stored on the summary so the basis is visible.
+  const screenDate = new Date().toISOString().slice(0, 10);
 
   if (rentRollDoc) {
     try {
       const buf = await downloadDealFile(rentRollDoc.storage_path);
       const parsed = await parseModelFile(rentRollDoc.filename, buf);
       const extraction = await extractRentRoll(parsed);
-      // The roll's own as-of date wins; else fall back to the screen date so
-      // WALT/expiry still compute (the stored asOfDate makes the basis clear).
-      const summary = consolidateRentRoll(
-        extraction,
-        (deal?.created_at as string) ?? undefined,
-      );
+      const summary = {
+        ...consolidateRentRoll(extraction, screenDate),
+        asOfUsed: extraction.asOfDate || screenDate,
+      };
+      // Replace-on-success: the delete happens only once a fresh extraction is
+      // in hand, so a transient failure never wipes previously-good actuals.
+      await admin.from("deal_rent_rolls").delete().eq("deal_id", dealId);
       await admin.from("deal_rent_rolls").insert({
         deal_id: dealId,
         source_document_id: rentRollDoc.id,
@@ -62,6 +59,9 @@ export async function runActualsIngestion(admin: Admin, dealId: string): Promise
     } catch (err) {
       console.error(`actuals: rent roll ingest failed for ${dealId}:`, err);
     }
+  } else {
+    // No rent roll on the deal (e.g. the document was removed) — clear.
+    await admin.from("deal_rent_rolls").delete().eq("deal_id", dealId);
   }
 
   if (t12Doc) {
@@ -70,6 +70,7 @@ export async function runActualsIngestion(admin: Admin, dealId: string): Promise
       const parsed = await parseModelFile(t12Doc.filename, buf);
       const extraction = await extractT12(parsed);
       const summary = summarizeT12(extraction);
+      await admin.from("deal_t12_statements").delete().eq("deal_id", dealId);
       await admin.from("deal_t12_statements").insert({
         deal_id: dealId,
         source_document_id: t12Doc.id,
@@ -80,5 +81,7 @@ export async function runActualsIngestion(admin: Admin, dealId: string): Promise
     } catch (err) {
       console.error(`actuals: t12 ingest failed for ${dealId}:`, err);
     }
+  } else {
+    await admin.from("deal_t12_statements").delete().eq("deal_id", dealId);
   }
 }

@@ -142,4 +142,35 @@ describe("deriveUnderwriteInputs — degenerate actuals are ignored", () => {
     const b = deriveUnderwriteInputs(extraction, "fallback", {});
     expect(b).toEqual(a);
   });
+
+  it("a TRUNCATED roll's partial SF sum never replaces the OM building size", () => {
+    const { inputs } = deriveUnderwriteInputs(extraction, "fallback", {
+      rentRoll: {
+        summary: { ...RENT_ROLL.summary, truncated: true, totalSf: 160_000 },
+        asOf: "2026-05-01",
+      },
+    });
+    expect(inputs.rsf).toBe(250_000); // the OM figure stands
+    // …while the ratio-based occupancy still applies (a valid sample estimate).
+    expect(inputs.vacancyPct).toBeCloseTo(0.1, 6);
+  });
+});
+
+describe("deriveUnderwriteInputs — a spelled-out NOI label anchors", () => {
+  it("'Net operating income' is not disqualified by the 'per' in 'operating'", () => {
+    const ex: ExtractionResult = {
+      dealName: "Spelled Out",
+      assetClass: "industrial",
+      metrics: [
+        { label: "Asking price", value: "$50,000,000", flagged: false, page: "" },
+        { label: "Going-in cap rate", value: "6.0%", flagged: false, page: "" },
+        // Deliberately different from price × cap ($3.0M) so a fallback there
+        // can't mask a failure to read this metric.
+        { label: "Net operating income", value: "$2,600,000", flagged: false, page: "" },
+      ],
+    };
+    const { inputs } = deriveUnderwriteInputs(ex, "fallback");
+    const r = computeUnderwrite(inputs);
+    expect(r.cashFlow[0].noi).toBeCloseTo(2_600_000, 0);
+  });
 });

@@ -8,10 +8,11 @@ const SEV: Record<NoiComparison["severity"], { label: string; cls: string }> = {
 
 const usd = (n: number | null | undefined): string => {
   if (n == null || !Number.isFinite(n)) return "—";
+  const sign = n < 0 ? "−" : "";
   const a = Math.abs(n);
-  if (a >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-  if (a >= 1e3) return `$${Math.round(n / 1e3)}k`;
-  return `$${Math.round(n)}`;
+  if (a >= 1e6) return `${sign}$${(a / 1e6).toFixed(2)}M`;
+  if (a >= 1e3) return `${sign}$${Math.round(a / 1e3)}k`;
+  return `${sign}$${Math.round(a)}`;
 };
 const pct = (dec: number | null | undefined): string =>
   dec == null || !Number.isFinite(dec) ? "—" : `${(dec * 100).toFixed(1)}%`;
@@ -78,9 +79,15 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
                 Rent roll
               </h3>
-              {rentRoll?.asOf && (
+              {rentRoll?.asOf ? (
                 <span className="text-[11px] text-muted">as of {rentRoll.asOf}</span>
-              )}
+              ) : rr.asOfUsed ? (
+                // The roll stated no as-of date — WALT/expiry were measured
+                // from the screen date, and that basis must be visible.
+                <span className="text-[11px] text-muted">
+                  no stated as-of — measured at screen date {rr.asOfUsed}
+                </span>
+              ) : null}
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
               <Stat k="Occupancy" v={pct(rr.sfWeightedOccupancy)} />

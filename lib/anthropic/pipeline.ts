@@ -13,8 +13,7 @@ import { countPdfPages } from "@/lib/pdf";
 import { buildDealFacts, toFactRows } from "@/lib/facts";
 import { runDocReconciliation } from "./reconcile-facts";
 import { runActualsIngestion } from "./actuals-ingest";
-import { compareNoi } from "@/lib/actuals/analyze";
-import { parseMoney } from "@/lib/criteria";
+import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxLines } from "@/lib/criteria";
 import { notifyAnalysisReady } from "@/lib/email";
@@ -337,13 +336,9 @@ export async function runAnalysis(
           const exMetrics =
             (dr?.extraction as { metrics?: { label: string; value: string }[] } | null)
               ?.metrics ?? [];
-          const omNoiMetric =
-            exMetrics.find(
-              (m) =>
-                /noi|net operating income/i.test(m.label) &&
-                /stab|pro ?forma|forward/i.test(m.label),
-            ) ?? exMetrics.find((m) => /noi|net operating income/i.test(m.label));
-          const omNoi = omNoiMetric ? parseMoney(omNoiMetric.value) : null;
+          // Same shared picker as the actuals card — the note and the card
+          // must reference the same OM figure.
+          const omNoi = pickOmNoi(exMetrics)?.noi ?? null;
           if (omNoi != null && t12Noi != null && Number.isFinite(t12Noi) && t12Noi !== 0) {
             const cmp = compareNoi(omNoi, t12Noi);
             if (cmp.severity !== "in_line") {

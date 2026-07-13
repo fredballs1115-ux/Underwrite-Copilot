@@ -5,6 +5,7 @@
 // code and unit-tested against known-answer fixtures. Given the same
 // extraction it always returns the same summary.
 
+import { parseMoney } from "@/lib/criteria";
 import type {
   RentRollExtraction,
   RentRollSummary,
@@ -23,6 +24,16 @@ function yearsBetween(fromISO: string, toISO: string): number | null {
   const b = Date.parse(toISO);
   if (Number.isNaN(a) || Number.isNaN(b)) return null;
   return (b - a) / MS_PER_YEAR;
+}
+
+/** The calendar anniversary `n` years after an ISO date, as epoch ms (UTC) —
+ *  so an "expires in exactly 3 years" lease buckets the same way whether or
+ *  not the window spans a leap day. Null when the date is unparseable. */
+function anniversaryMs(iso: string, n: number): number | null {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  const d = new Date(t);
+  return Date.UTC(d.getUTCFullYear() + n, d.getUTCMonth(), d.getUTCDate());
 }
 
 const sfOf = (sf: number | null): number =>
@@ -48,22 +59,29 @@ export function consolidateRentRoll(
 
   // WALT + expiry buckets over occupied units carrying BOTH SF and a parseable
   // expiry date. Time-to-expiry is floored at 0 (a lapsed lease is "now").
+  // Buckets use CALENDAR anniversaries (≤1y / ≤3y / ≤5y from the as-of date),
+  // so a same-day-anniversary lease lands in the same bucket whether or not
+  // the window spans a leap day; WALT keeps mean-year arithmetic (an average).
   let waltNum = 0;
   let waltDen = 0;
   let expiryCoveredSf = 0;
   const bkt = { next12mo: 0, y1to3: 0, y3to5: 0, y5plus: 0 };
+  const ann1 = asOf ? anniversaryMs(asOf, 1) : null;
+  const ann3 = asOf ? anniversaryMs(asOf, 3) : null;
+  const ann5 = asOf ? anniversaryMs(asOf, 5) : null;
   for (const r of occupied) {
     const sf = sfOf(r.sf);
     if (sf <= 0) continue;
     const raw = asOf ? yearsBetween(asOf, r.leaseExpiry) : null;
-    if (raw == null) continue;
+    if (raw == null || ann1 == null || ann3 == null || ann5 == null) continue;
     const y = Math.max(0, raw);
     waltNum += sf * y;
     waltDen += sf;
     expiryCoveredSf += sf;
-    if (y < 1) bkt.next12mo += sf;
-    else if (y < 3) bkt.y1to3 += sf;
-    else if (y < 5) bkt.y3to5 += sf;
+    const exp = Date.parse(r.leaseExpiry);
+    if (exp <= ann1) bkt.next12mo += sf;
+    else if (exp <= ann3) bkt.y1to3 += sf;
+    else if (exp <= ann5) bkt.y3to5 += sf;
     else bkt.y5plus += sf;
   }
   const waltYears = waltDen > 0 ? waltNum / waltDen : null;
@@ -147,6 +165,27 @@ export function summarizeT12(x: T12Extraction): T12Summary {
     noi,
     noiDerived,
   };
+}
+
+/**
+ * Pick the OM's assumed-NOI metric out of an extraction — ONE implementation
+ * shared by the deal page's actuals card and the pipeline's challenger note,
+ * so the two can never disagree. Word-bounded and per-unit-safe: "NOI per
+ * unit" and "$/SF" figures are excluded, and \bnoi\b can't match inside
+ * "Illinois". Prefers the stabilized / pro-forma figure (the sponsor's story)
+ * over an in-place NOI; returns the parsed dollars alongside the metric.
+ */
+export function pickOmNoi(
+  metrics: { label: string; value: string }[],
+): { label: string; value: string; noi: number } | null {
+  const INC = /net operating income|\bnoi\b/i;
+  const EXC = /\bper\b|\/|psf|unit/i;
+  const eligible = metrics.filter((m) => INC.test(m.label) && !EXC.test(m.label));
+  const m =
+    eligible.find((x) => /stab|pro ?forma|forward/i.test(x.label)) ?? eligible[0];
+  if (!m) return null;
+  const noi = parseMoney(m.value);
+  return noi != null && Number.isFinite(noi) ? { ...m, noi } : null;
 }
 
 export function severityForNoiDelta(deltaPct: number): ActualsSeverity {

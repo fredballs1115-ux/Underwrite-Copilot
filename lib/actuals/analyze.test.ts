@@ -4,6 +4,7 @@ import {
   summarizeT12,
   compareNoi,
   severityForNoiDelta,
+  pickOmNoi,
 } from "./analyze";
 import type { RentRollRow, RentRollExtraction, T12Extraction } from "./types";
 
@@ -118,6 +119,55 @@ describe("summarizeT12", () => {
     expect(s.totalOpex).toBe(400_000); // 250k + 150k
     expect(s.noi).toBe(650_000); // 1.05M − 400k
     expect(s.noiDerived).toBe(true);
+  });
+});
+
+describe("expiry buckets — calendar anniversaries, leap-day safe", () => {
+  it("a lease expiring exactly on the 1-year anniversary is next-12-months, leap year or not", () => {
+    // 2027→2028 spans Feb 29 2028 (366 days) — must bucket identically to a
+    // 365-day year.
+    const normal = consolidateRentRoll(
+      roll([row({ sf: 1_000, leaseExpiry: "2027-06-01" })], "2026-06-01"),
+    );
+    const leap = consolidateRentRoll(
+      roll([row({ sf: 1_000, leaseExpiry: "2028-06-01" })], "2027-06-01"),
+    );
+    expect(normal.expiryBuckets!.next12mo).toBe(1);
+    expect(leap.expiryBuckets!.next12mo).toBe(1);
+  });
+  it("exactly 3 years lands in 1–3yr regardless of leap days in the window", () => {
+    const a = consolidateRentRoll(
+      roll([row({ sf: 1_000, leaseExpiry: "2027-06-01" })], "2024-06-01"), // 1 leap day
+    );
+    const b = consolidateRentRoll(
+      roll([row({ sf: 1_000, leaseExpiry: "2029-06-01" })], "2026-06-01"), // 1 leap day, different span
+    );
+    expect(a.expiryBuckets!.y1to3).toBe(1);
+    expect(b.expiryBuckets!.y1to3).toBe(1);
+  });
+});
+
+describe("pickOmNoi — the shared OM-NOI selector", () => {
+  it("skips per-unit / per-SF NOI figures", () => {
+    const m = pickOmNoi([
+      { label: "NOI per unit", value: "$11,500" },
+      { label: "Net operating income", value: "$2,875,000" },
+    ]);
+    expect(m?.noi).toBe(2_875_000);
+  });
+  it("never matches inside another word (Illinois ≠ NOI)", () => {
+    expect(pickOmNoi([{ label: "Illinois portfolio allocation", value: "40%" }])).toBeNull();
+  });
+  it("prefers the stabilized / pro-forma figure over in-place", () => {
+    const m = pickOmNoi([
+      { label: "In-place NOI", value: "$2,000,000" },
+      { label: "Stabilized NOI", value: "$2,400,000" },
+    ]);
+    expect(m?.noi).toBe(2_400_000);
+  });
+  it("word-bounded excludes don't disqualify 'Net operating income' itself", () => {
+    const m = pickOmNoi([{ label: "Net operating income", value: "$3,000,000" }]);
+    expect(m?.noi).toBe(3_000_000);
   });
 });
 
