@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type * as Leaflet from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { haversineKm, fmtMiles, MAX_PLAUSIBLE_KM, type LatLng } from "@/lib/geo";
+import { safeHttpUrl } from "@/lib/safe-url";
 
 /** One pin/row on the comps map — OM broker comps and public-web comps carry
  *  the same shape with a different `kind` (and marker color). */
@@ -47,7 +48,9 @@ function writeGeoCache(cache: Record<string, LatLng | null>) {
 async function geocode(q: string): Promise<LatLng | null> {
   const res = await fetch(
     `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`,
-    { headers: { Accept: "application/json" } },
+    // A hung endpoint must fail fast into the table-only fallback, not leave
+    // the card stuck on "Placing comps…" forever.
+    { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(8_000) },
   );
   if (!res.ok) return null;
   const json = (await res.json()) as {
@@ -173,6 +176,10 @@ export function CompsMap({
       for (const c of placed) {
         if (!c.pos) continue;
         const color = c.kind === "om" ? "#114e54" : "#a05a1c";
+        // Comp names/details/links are LLM output over hostile documents:
+        // Leaflet innerHTMLs tooltip AND popup strings, so EVERYTHING is
+        // escaped, and hrefs pass the http(s) allowlist or don't render.
+        const href = safeHttpUrl(c.sourceHref);
         const m = L.circleMarker(c.pos, {
           radius: 8,
           color,
@@ -181,12 +188,12 @@ export function CompsMap({
           fillOpacity: 0.35,
         })
           .addTo(map)
-          .bindTooltip(c.name)
+          .bindTooltip(escapeHtml(c.name))
           .bindPopup(
             `<div style="max-width:230px"><strong>${escapeHtml(c.name)}</strong>` +
               `<div style="margin-top:2px">${escapeHtml(c.detail)}</div>` +
-              (c.sourceHref
-                ? `<a href="${escapeAttr(c.sourceHref)}" target="_blank" rel="noopener noreferrer">${escapeHtml(c.sourceLabel)}</a>`
+              (href
+                ? `<a href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(c.sourceLabel)}</a>`
                 : `<span>${escapeHtml(c.sourceLabel)}</span>`) +
               `</div>`,
           );
@@ -208,7 +215,11 @@ export function CompsMap({
   }, [phase, placed, subjectPos]);
 
   const rows = useMemo(() => {
-    const list = [...(placed ?? [])];
+    // The comps are already in hand — list them immediately; distances fill
+    // in when geocoding completes (never gate the data behind the network).
+    const list: Placed[] = placed
+      ? [...placed]
+      : comps.map((c) => ({ ...c, pos: null, distanceKm: null }));
     list.sort((a, b) => {
       if (sortKey === "name") return a.name.localeCompare(b.name);
       if (sortKey === "kind") return a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name);
@@ -218,7 +229,7 @@ export function CompsMap({
       return da - db || a.name.localeCompare(b.name);
     });
     return list;
-  }, [placed, sortKey]);
+  }, [placed, comps, sortKey]);
 
   const zoomTo = (c: Placed) => {
     const m = c.id ? markersRef.current.get(c.id) : null;
@@ -292,19 +303,22 @@ export function CompsMap({
                 </td>
                 <td className="max-w-72 truncate py-2 pr-3 text-muted">{c.detail}</td>
                 <td className="whitespace-nowrap py-2 text-xs">
-                  {c.sourceHref ? (
-                    <a
-                      href={c.sourceHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="font-medium text-brand hover:text-brand-strong"
-                    >
-                      {c.sourceLabel}
-                    </a>
-                  ) : (
-                    <span className="text-muted">{c.sourceLabel}</span>
-                  )}
+                  {(() => {
+                    const href = safeHttpUrl(c.sourceHref);
+                    return href ? (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="font-medium text-brand hover:text-brand-strong"
+                      >
+                        {c.sourceLabel}
+                      </a>
+                    ) : (
+                      <span className="text-muted">{c.sourceLabel}</span>
+                    );
+                  })()}
                 </td>
               </tr>
             ))}

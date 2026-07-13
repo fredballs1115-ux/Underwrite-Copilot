@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { rerunAnalysis, reconcileWithModel } from "../actions";
 import { PendingButton } from "../../pending-button";
 import {
@@ -12,6 +12,7 @@ import {
 import { searchPublicComps } from "./comps-actions";
 import { SourceChip } from "./source-chip";
 import { CompsMap, type MapComp } from "./comps-map";
+import { safeHttpUrl } from "@/lib/safe-url";
 import type { DealFact } from "@/lib/facts";
 import { FileDrop } from "../../file-drop";
 import { FileField } from "../../file-field";
@@ -790,32 +791,38 @@ export function BrokerComps({
 
   // The map plots SALE comps (the OM's) beside the public-web candidates —
   // one pin set per source, colored apart, geocoded by name + market.
-  const mapComps: MapComp[] = mapContext
-    ? [
-        ...result.saleComps.map((c, i): MapComp => {
-          const pageNum = c.page?.match(/\d+/)?.[0];
-          return {
-            id: `om-${i}`,
-            kind: "om",
-            name: c.name,
-            detail: c.detail,
-            sourceLabel: pageNum ? `OM p. ${pageNum}` : "OM",
-            sourceHref:
-              pageNum && mapContext.omUrl ? `${mapContext.omUrl}#page=${pageNum}` : null,
-            query: [c.name, mapContext.market].filter(Boolean).join(", "),
-          };
-        }),
-        ...(compSearch?.candidates ?? []).map((c, i): MapComp => ({
-          id: `web-${i}`,
-          kind: "web",
-          name: c.name,
-          detail: [c.detail, c.date].filter(Boolean).join(" · "),
-          sourceLabel: c.sourceName || "Public source",
-          sourceHref: c.sourceUrl || null,
-          query: [c.name, c.location || mapContext.market].filter(Boolean).join(", "),
-        })),
-      ]
-    : [];
+  // Memoized: a stable array identity keeps CompsMap's geocode/map effects
+  // from re-firing (and the map from rebuilding) on unrelated re-renders.
+  const mapComps: MapComp[] = useMemo(
+    () =>
+      mapContext
+        ? [
+            ...result.saleComps.map((c, i): MapComp => {
+              const pageNum = c.page?.match(/\d+/)?.[0];
+              return {
+                id: `om-${i}`,
+                kind: "om",
+                name: c.name,
+                detail: c.detail,
+                sourceLabel: pageNum ? `OM p. ${pageNum}` : "OM",
+                sourceHref:
+                  pageNum && mapContext.omUrl ? `${mapContext.omUrl}#page=${pageNum}` : null,
+                query: [c.name, mapContext.market].filter(Boolean).join(", "),
+              };
+            }),
+            ...(compSearch?.candidates ?? []).map((c, i): MapComp => ({
+              id: `web-${i}`,
+              kind: "web",
+              name: c.name,
+              detail: [c.detail, c.date].filter(Boolean).join(" · "),
+              sourceLabel: c.sourceName || "Public source",
+              sourceHref: c.sourceUrl || null,
+              query: [c.name, c.location || mapContext.market].filter(Boolean).join(", "),
+            })),
+          ]
+        : [],
+    [mapContext, result.saleComps, compSearch],
+  );
 
   return (
     <section className="space-y-4">
@@ -975,9 +982,10 @@ function PublicWebComps({
                       {c.note}
                     </p>
                   )}
-                  {c.sourceUrl && (
+                  {/* LLM-sourced URL — only http(s) ever becomes a link. */}
+                  {safeHttpUrl(c.sourceUrl) && (
                     <a
-                      href={c.sourceUrl}
+                      href={safeHttpUrl(c.sourceUrl)!}
                       target="_blank"
                       rel="noreferrer"
                       className="mt-1.5 inline-block text-xs font-medium text-brand hover:underline"
