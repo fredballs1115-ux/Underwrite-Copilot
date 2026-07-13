@@ -322,16 +322,26 @@ async function runJob(job: ClaimedJob): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const missing = [
+  // An UNCONFIGURED worker idles instead of dying. The Blueprint creates this
+  // service before its env vars are filled in, and a worker that exits marks
+  // EVERY deploy of the whole commit failed on Render — even when the web
+  // service is perfectly healthy. So: log what's missing, stay alive, and
+  // keep checking (Render restarts the process when env vars are added, and
+  // this check passes then). With ANALYSIS_WORKER unset on the web service,
+  // screens run in-process, so an idle worker changes nothing.
+  const requiredEnv = [
     "NEXT_PUBLIC_SUPABASE_URL",
     "SUPABASE_SERVICE_ROLE_KEY",
     "ANTHROPIC_API_KEY",
-  ].filter((k) => !process.env[k]);
-  if (missing.length) {
+  ];
+  for (;;) {
+    const missing = requiredEnv.filter((k) => !process.env[k]);
+    if (missing.length === 0) break;
+    if (shuttingDown) return;
     console.error(
-      `[worker] missing required env: ${missing.join(", ")} — set them on this service (see worker/README.md) and redeploy.`,
+      `[worker] missing required env: ${missing.join(", ")} — set them on this service (see worker/README.md). Idling until then; the web app keeps running screens in-process while ANALYSIS_WORKER is unset.`,
     );
-    process.exit(1);
+    await sleep(PROBE_MS);
   }
 
   admin = createSupabaseAdminClient();
