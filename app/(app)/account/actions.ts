@@ -78,6 +78,9 @@ export async function saveBranding(formData: FormData) {
 
   const oldLogoPath = active.branding?.logoPath ?? null;
   let logoPath: string | undefined = oldLogoPath ?? undefined;
+  // Tracked so a failed ROW save can sweep the file it just uploaded —
+  // neither the old live logo nor a fresh orphan may be left dangling.
+  let uploadedPath: string | null = null;
 
   if (removeLogo) {
     logoPath = undefined;
@@ -96,10 +99,11 @@ export async function saveBranding(formData: FormData) {
       redirect("/account?error=brandlogotype");
     }
     // Team branding stores under the team id, personal under the user id —
-    // a random suffix per upload so a stale export URL never shows a logo
-    // that was later replaced.
+    // a unique suffix per upload (ms timestamp + random) so a replaced logo
+    // never aliases the new one, even across simultaneous saves.
     const scopeId = active.teamId ?? user.id;
-    const newPath = `${scopeId}/branding-logo-${Date.now().toString(36)}.${ext}`;
+    const suffix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const newPath = `${scopeId}/branding-logo-${suffix}.${ext}`;
     let uploadFailed = false;
     try {
       await uploadSupplement(
@@ -112,11 +116,14 @@ export async function saveBranding(formData: FormData) {
     }
     if (uploadFailed) redirect("/account?error=brandsave");
     logoPath = newPath;
+    uploadedPath = newPath;
   }
 
   const branding = sanitizeBranding({ firmName, footerText, logoPath });
   const res = await saveBrandingValue(supabase, user.id, branding);
   if (!res.ok) {
+    // The row never pointed at the fresh upload — don't strand it.
+    if (uploadedPath) await removeSupplementFile(uploadedPath);
     redirect(
       `/account?error=${res.error === "owner" ? "brandowner" : "brandsave"}`,
     );

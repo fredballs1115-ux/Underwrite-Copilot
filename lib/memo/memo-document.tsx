@@ -9,6 +9,7 @@ import {
 } from "@react-pdf/renderer";
 import type { DealRow } from "@/lib/deals";
 import type { BuyBoxCheck } from "@/lib/criteria";
+import { pdfSafe } from "./pdf-text";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import type {
   ExtractionResult,
@@ -85,11 +86,10 @@ const clamp = (v: unknown, n: number) => {
 
 const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
-// The PDF's standard Helvetica only carries WinAnsi glyphs \u2014 swap the web
-// UI's arrows/minus signs for safe equivalents or they silently drop.
-// Exported for the full report, which prints far more raw model text.
-export const pdfSafe = (s: string) =>
-  s.replace(/\u2192/g, "\u203a").replace(/[\u2212\u2013]/g, "-");
+// WinAnsi-only text (standard Helvetica can't encode anything else) \u2014 the
+// full filter lives in pdf-text.ts (universal, unit-tested); re-exported here
+// for the full report and any other document module.
+export { pdfSafe };
 
 /** Shape the stored analysis into the flat data the one-page memo renders. */
 export function buildMemoData(
