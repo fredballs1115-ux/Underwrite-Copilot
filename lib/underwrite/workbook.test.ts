@@ -123,6 +123,29 @@ describe("generated workbook — live formulas via HyperFormula", () => {
     expect(uses).toBeCloseTo(engine.sourcesUses.totalUses, 0);
   });
 
+  it("Monthly Cash Flow tie rows all evaluate TRUE (months sum to the annual tab)", () => {
+    // The tie cells are the only booleans on the sheet — one per operating
+    // year. Any FALSE means the monthly convention drifted from the annual.
+    const id = hf.getSheetId("Monthly Cash Flow")!;
+    const vals = (hf.getSheetValues(id) as unknown[][]).flat();
+    const bools = vals.filter((v) => typeof v === "boolean");
+    expect(bools.length).toBe(engine.holdYears);
+    expect(bools.every((b) => b === true)).toBe(true);
+  });
+
+  it("Debt Schedule exit balance ties to the closed-form Outstanding Debt", () => {
+    expect(named(hf, "CheckDebtTie")).toBe(true);
+  });
+
+  it("Debt Schedule year-end balance is below the loan when amortizing", () => {
+    // Base fixture amortizes (ioMonths 0) — the iterated schedule must pay
+    // principal down, not just restate the loan.
+    const debt = Number(named(hf, "OutstandingDebt"));
+    const loan = Number(named(hf, "LoanAmount"));
+    expect(debt).toBeLessThan(loan);
+    expect(debt).toBeGreaterThan(0);
+  });
+
   it("ACCEPTANCE: flexing the ExitCap cell recalculates Levered IRR (down)", () => {
     const dn = (wb.definedNames as unknown as { model: { name: string; ranges: string[] }[] }).model
       .find((d) => d.name === "ExitCap")!;
@@ -140,13 +163,20 @@ describe("generated workbook — live formulas via HyperFormula", () => {
 });
 
 describe("generated workbook — IO=999 full-term interest-only", () => {
-  it("outstanding debt at exit equals the loan (no amortization)", async () => {
+  it("outstanding debt at exit equals the loan, and the schedule agrees", async () => {
     const io = deriveUnderwriteInputs(extraction, "fallback");
     io.inputs.ioMonths = 999;
     const { hf } = await loadIntoHf(await buildUnderwriteWorkbook(io));
     const debt = Number(named(hf, "OutstandingDebt"));
     const loan = Number(named(hf, "LoanAmount"));
     expect(debt).toBeCloseTo(loan, 0);
+    // Full-term IO: the iterated schedule never amortizes either.
+    expect(named(hf, "CheckDebtTie")).toBe(true);
+    // Monthly ties still hold under the IO convention.
+    const id = hf.getSheetId("Monthly Cash Flow")!;
+    const bools = (hf.getSheetValues(id) as unknown[][]).flat().filter((v) => typeof v === "boolean");
+    expect(bools.length).toBeGreaterThan(0);
+    expect(bools.every((b) => b === true)).toBe(true);
   });
 });
 
