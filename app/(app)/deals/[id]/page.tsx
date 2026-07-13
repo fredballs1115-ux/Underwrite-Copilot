@@ -35,6 +35,8 @@ import { scoreMandateFit, type MandateScore, type MandateVerdict } from "@/lib/m
 import { compareNoi } from "@/lib/actuals/analyze";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { ActualsData } from "./property-actuals";
+import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import type { PlaygroundData } from "./sensitivity-playground";
 
 const VERDICT_PILL = {
   pass: { label: "Go", cls: "bg-pass/15 text-pass" },
@@ -317,6 +319,25 @@ export default async function DealPage({
         ? compareNoi(omNoi, t12Summary.noi)
         : null,
   };
+
+  // Sensitivity playground (Feature 2 of the competitive spec): the deal's
+  // base underwriting model — actuals folded in — computed once server-side;
+  // the sliders recompute it in the browser via the same pure engine.
+  const playground: PlaygroundData | null = extraction
+    ? {
+        inputs: deriveUnderwriteInputs(extraction, deal.name, {
+          rentRoll: actuals.rentRoll
+            ? { summary: actuals.rentRoll.summary, asOf: actuals.rentRoll.asOf }
+            : null,
+          t12: actuals.t12
+            ? { summary: actuals.t12.summary, periodEnd: actuals.t12.periodEnd }
+            : null,
+        }).inputs,
+        dealAssetClass: deal.asset_class,
+        checkSource,
+        box: buyBox,
+      }
+    : null;
 
   // Citation facts, keyed by field label for the source chips (Feature 2).
   // Empty for deals screened before migration 0018 — no chips, never faked.
@@ -609,6 +630,7 @@ export default async function DealPage({
         isSample={!!(deal as { is_sample?: boolean }).is_sample}
         marketMemory={marketMemory}
         actuals={actuals}
+        playground={playground}
       />
     </div>
   );

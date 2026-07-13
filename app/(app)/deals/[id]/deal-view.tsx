@@ -20,6 +20,7 @@ import {
 } from "@/lib/market-memory";
 import { PropertyActuals, type ActualsData } from "./property-actuals";
 import { ActualsPrompt, type ActualsSlotState } from "./actuals-prompt";
+import { SensitivityPlayground, type PlaygroundData } from "./sensitivity-playground";
 import { type StageChange } from "@/lib/stages";
 import type { InternalComp } from "@/lib/internal-comps";
 import { DebtSizer } from "./debt-sizer";
@@ -288,6 +289,7 @@ export function DealView({
   userId = null,
   marketMemory = null,
   actuals = { rentRoll: null, t12: null, noiComparison: null },
+  playground = null,
 }: {
   dealId: string;
   dealName: string;
@@ -316,6 +318,7 @@ export function DealView({
   userId?: string | null;
   marketMemory?: MarketGroup | null;
   actuals?: ActualsData;
+  playground?: PlaygroundData | null;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -694,6 +697,7 @@ export function DealView({
               active={active}
               onNavigate={navigateLegacy}
             />
+            {playground && <SensitivityPlayground data={playground} />}
             <AskPanel
               dealId={dealId}
               qa={qa}
