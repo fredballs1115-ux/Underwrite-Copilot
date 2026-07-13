@@ -749,6 +749,7 @@ export function DealView({
             modelError={modelErrorCode ? MODEL_ERRORS[modelErrorCode] ?? null : null}
             supplements={supplements}
             internalComps={internalComps}
+            omUrl={omUrl}
           />
         )}
 
@@ -1098,6 +1099,7 @@ function AnalysesPanel({
   modelError,
   supplements,
   internalComps,
+  omUrl,
 }: {
   analysis: AnalysisKey;
   onSelect: (key: AnalysisKey) => void;
@@ -1113,6 +1115,7 @@ function AnalysesPanel({
   modelError: string | null;
   supplements: SupplementsMap;
   internalComps: InternalComp[];
+  omUrl: string | null;
 }) {
   const STEP_FOR: Record<AnalysisKey, string> = {
     verdict: "verdict",
@@ -1176,6 +1179,12 @@ function AnalysesPanel({
           compSearch={compSearch}
           active={active}
           isPro={isPro}
+          mapContext={{
+            subjectLabel:
+              results.extraction?.address || results.extraction?.market || "",
+            market: results.extraction?.market ?? "",
+            omUrl,
+          }}
         />
       ) : (
         <MarketCheck result={results.market!} />

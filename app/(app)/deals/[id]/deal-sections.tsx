@@ -11,6 +11,7 @@ import {
 } from "./supplement-actions";
 import { searchPublicComps } from "./comps-actions";
 import { SourceChip } from "./source-chip";
+import { CompsMap, type MapComp } from "./comps-map";
 import type { DealFact } from "@/lib/facts";
 import { FileDrop } from "../../file-drop";
 import { FileField } from "../../file-field";
@@ -773,6 +774,7 @@ export function BrokerComps({
   active,
   isPro,
   publicDemo = false,
+  mapContext = null,
 }: {
   result: BrokerCompsResult;
   dealId: string;
@@ -781,12 +783,51 @@ export function BrokerComps({
   isPro: boolean;
   /** rendered on the public /demo page — Pro gates point to signup, not billing */
   publicDemo?: boolean;
+  /** subject location for the comps map (Feature 4); null hides the map */
+  mapContext?: { subjectLabel: string; market: string; omUrl: string | null } | null;
 }) {
   const hasComps = result.saleComps.length > 0 || result.leaseComps.length > 0;
+
+  // The map plots SALE comps (the OM's) beside the public-web candidates —
+  // one pin set per source, colored apart, geocoded by name + market.
+  const mapComps: MapComp[] = mapContext
+    ? [
+        ...result.saleComps.map((c, i): MapComp => {
+          const pageNum = c.page?.match(/\d+/)?.[0];
+          return {
+            id: `om-${i}`,
+            kind: "om",
+            name: c.name,
+            detail: c.detail,
+            sourceLabel: pageNum ? `OM p. ${pageNum}` : "OM",
+            sourceHref:
+              pageNum && mapContext.omUrl ? `${mapContext.omUrl}#page=${pageNum}` : null,
+            query: [c.name, mapContext.market].filter(Boolean).join(", "),
+          };
+        }),
+        ...(compSearch?.candidates ?? []).map((c, i): MapComp => ({
+          id: `web-${i}`,
+          kind: "web",
+          name: c.name,
+          detail: [c.detail, c.date].filter(Boolean).join(" · "),
+          sourceLabel: c.sourceName || "Public source",
+          sourceHref: c.sourceUrl || null,
+          query: [c.name, c.location || mapContext.market].filter(Boolean).join(", "),
+        })),
+      ]
+    : [];
+
   return (
     <section className="space-y-4">
       <SectionHeader title="Broker-comp scrutiny" />
       {result.summary && <Callout icon={<IconAlert />}>{result.summary}</Callout>}
+      {mapContext && mapComps.length > 0 && (
+        <CompsMap
+          subjectLabel={mapContext.subjectLabel}
+          market={mapContext.market}
+          comps={mapComps}
+        />
+      )}
       {result.redFlags.length > 0 && (
         <div className="rounded-xl border border-line border-l-4 border-l-kill bg-surface p-4 shadow-sm">
           <div className="flex items-center gap-2 text-kill">
