@@ -83,6 +83,20 @@ describe("buildCapGrowthGrid", () => {
   it("is deterministic", () => {
     expect(buildCapGrowthGrid(inputs)).toEqual(grid);
   });
+
+  it("dedupes rows when the base cap sits at a lever bound", () => {
+    // Cap 25% is the exitCapPct lever max: the two stops above the base
+    // clamp onto it, so only 3 distinct cap rows survive — no repeated rows
+    // in the printed grid, and the base row still points at the base value.
+    const g = buildCapGrowthGrid(baseInputs({ exitCapPct: 0.25 }));
+    expect(g.capRows).toEqual([0.245, 0.2475, 0.25]);
+    expect(g.capRows[g.baseRow]).toBe(0.25);
+    expect(g.cells).toHaveLength(3);
+    expect(g.cells.every((r) => r.length === g.growthCols.length)).toBe(true);
+    // Growth 3% is mid-range — its columns stay a full 5 wide.
+    expect(g.growthCols).toHaveLength(5);
+    expect(g.growthCols[g.baseCol]).toBe(0.03);
+  });
 });
 
 describe("heatBucket — the IC color scale", () => {
@@ -90,11 +104,22 @@ describe("heatBucket — the IC color scale", () => {
     expect(heatBucket(0.151)).toBe("green");
     expect(heatBucket(0.15)).toBe("yellow"); // 10–15% band includes 15
     expect(heatBucket(0.1)).toBe("yellow");
-    expect(heatBucket(0.0999)).toBe("orange");
+    expect(heatBucket(0.0949)).toBe("orange");
     expect(heatBucket(0.05)).toBe("orange");
-    expect(heatBucket(0.0499)).toBe("red");
+    expect(heatBucket(0.0449)).toBe("red");
     expect(heatBucket(-0.02)).toBe("red");
     expect(heatBucket(null)).toBe("none");
+  });
+
+  it("agrees with the printed 1dp number at band edges", () => {
+    // 9.996% prints as "10.0%" — must color yellow, not orange.
+    expect(heatBucket(0.09996)).toBe("yellow");
+    // 4.996% prints as "5.0%" — must color orange, not red.
+    expect(heatBucket(0.04996)).toBe("orange");
+    // 14.996% prints "15.0%" — yellow band includes 15.
+    expect(heatBucket(0.14996)).toBe("yellow");
+    // 15.04% prints "15.0%" — still yellow, matching the printed number.
+    expect(heatBucket(0.1504)).toBe("yellow");
   });
 });
 
@@ -102,5 +127,10 @@ describe("heatCellText", () => {
   it("formats 'IRR / EM' compactly", () => {
     expect(heatCellText({ irrPct: 0.152, em: 1.94 })).toBe("15.2% / 1.9x");
     expect(heatCellText({ irrPct: null, em: 1.2 })).toBe("— / 1.2x");
+  });
+
+  it("never prints negative zero", () => {
+    expect(heatCellText({ irrPct: -0.0004, em: 0.99 })).toBe("0.0% / 1.0x");
+    expect(heatCellText({ irrPct: -0.031, em: 0.8 })).toBe("-3.1% / 0.8x");
   });
 });

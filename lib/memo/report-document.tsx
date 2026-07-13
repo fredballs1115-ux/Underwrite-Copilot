@@ -276,6 +276,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
     na: "—",
   };
 
+  // Heatmap columns share the 85% after the row-label column. Usually 5
+  // columns (17% each); fewer when a base at a lever bound deduped stops.
+  const gridColW = grid ? `${85 / grid.growthCols.length}%` : "17%";
+
   return (
     <Document
       title={`${dealName} — Full Screening Report`}
@@ -294,11 +298,13 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             that move screening returns most. The bordered cell is the base
             case.
           </Text>
-          {/* Header row: rent growth across the columns. */}
+          {/* Header row: rent growth across the columns. (No arrow glyph —
+              U+2193 isn't WinAnsi and standard Helvetica would print a stray
+              quote in its place.) */}
           <View style={[s.tableHead, { marginTop: 6 }]}>
-            <Text style={[s.headText, { width: "15%" }]}>Exit cap ↓</Text>
+            <Text style={[s.headText, { width: "15%" }]}>Exit cap</Text>
             {grid.growthCols.map((g, i) => (
-              <Text key={i} style={[s.headText, { width: "17%", textAlign: "center" }]}>
+              <Text key={i} style={[s.headText, { width: gridColW, textAlign: "center" }]}>
                 {`${(g * 100).toFixed(1)}% growth`}
               </Text>
             ))}
@@ -322,7 +328,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                   <Text
                     key={c}
                     style={{
-                      width: "17%",
+                      width: gridColW,
                       fontSize: 7.5,
                       textAlign: "center",
                       paddingVertical: 5,
