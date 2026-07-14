@@ -11,6 +11,7 @@ import {
   fmtUsd,
 } from "@/lib/billing";
 import { getTeam, TEAM_TRIAL_DEALS } from "@/lib/teams";
+import { PRICE_PRO_MONTHLY } from "@/lib/marketing-constants";
 import { startCheckout, openPortal } from "./actions";
 import { removeMember, openTeamPortal } from "../team/actions";
 import { PendingButton } from "../pending-button";
@@ -19,7 +20,7 @@ export const metadata: Metadata = { title: "Billing" };
 
 // Benefit-framed: what the feature does for you, not what it's called.
 const FREE_FEATURES = [
-  "3 deals with the full six-stage screen on each",
+  `${FREE_DEAL_LIMIT} deals with the full six-stage screen on each`,
   "Sourced ranges + the three deal-killers, stressed first",
   "Side-by-side deal comparison",
   "Reconcile the screen against your own model",
@@ -27,7 +28,7 @@ const FREE_FEATURES = [
 
 const PRO_FEATURES = [
   "Unlimited deals — screen every OM that hits your inbox",
-  "First-draft Excel model with live formulas and IRR sensitivity",
+  "Institutional Excel model — live formulas, monthly detail, debt schedule, sensitivity matrices",
   "One-page PDF screening memo you can hand to your IC",
   "Public-web comp search beyond the broker's comps",
   "Per-tab uploads and multi-document reconciliation",
@@ -36,9 +37,17 @@ const PRO_FEATURES = [
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; error?: string }>;
+  searchParams: Promise<{ status?: string; error?: string; upsell?: string }>;
 }) {
-  const { status, error } = await searchParams;
+  const { status, error, upsell } = await searchParams;
+  // Which Pro feature bounced the user here, for a contextual upsell line.
+  const UPSELL_LABELS: Record<string, string> = {
+    memo: "export the one-page IC memo",
+    report: "export the full multi-page report",
+    underwrite: "export the institutional Excel model",
+    loi: "export the LOI draft",
+    branding: "put your firm's name and logo on exported reports",
+  };
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -55,6 +64,11 @@ export default async function BillingPage({
       ? { cls: "bg-pass/10 text-pass", text: "You're on Pro — everything's unlocked. Thank you!" }
       : status === "cancelled"
         ? { cls: "bg-faint text-muted", text: "Checkout cancelled — no charge was made." }
+        : upsell
+          ? {
+              cls: "bg-brand/5 text-brand",
+              text: `Upgrade to Pro to ${UPSELL_LABELS[upsell] ?? "unlock that"} — choose a plan below.`,
+            }
         : error === "config"
           ? { cls: "bg-kill/10 text-kill", text: "Checkout isn't available right now — email underwritecopilot.support@gmail.com and we'll get you upgraded." }
           : error === "nocustomer"
@@ -210,7 +224,7 @@ export default async function BillingPage({
             )}
           </div>
           <p className="mt-2 flex items-baseline gap-1">
-            <span className="text-3xl font-semibold tracking-tight">$29.99</span>
+            <span className="text-3xl font-semibold tracking-tight">{PRICE_PRO_MONTHLY}</span>
             <span className="text-sm text-muted">/month</span>
           </p>
           <p className="mt-1 text-sm text-muted">

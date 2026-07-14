@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
+import { omDocument, omRequestOptions, type OmSource } from "./om-source";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, challengerInstruction } from "./prompts";
 import type { AssetClass, ChallengerResult } from "./types";
@@ -25,11 +26,17 @@ const ChallengerSchema = z.object({
  * stress test. Uses the reasoning model (Opus) since this is analytical.
  */
 export async function challengeAssumptions(
-  pdf: Buffer,
+  om: OmSource,
   assetClass: AssetClass,
+  /** cross-document reconciliation red flags for the skeptic to reference */
+  reconNote?: string,
 ): Promise<ChallengerResult> {
   const client = getAnthropic();
-  const data = pdf.toString("base64");
+  const instruction =
+    challengerInstruction(assetClass) +
+    (reconNote?.trim()
+      ? `\n\n${reconNote.trim()} Where a figure the OM relies on is contradicted by the rent roll or T-12, treat that as a first-order challenge and put the exact discrepancy to the broker.`
+      : "");
 
   const response = await client.messages.parse({
     model: MODELS.reasoning,
@@ -39,18 +46,14 @@ export async function challengeAssumptions(
       {
         role: "user",
         content: [
-          {
-            type: "document",
-            source: { type: "base64", media_type: "application/pdf", data },
-            // Reads the OM from the prompt cache the extraction step wrote.
-            cache_control: { type: "ephemeral" },
-          },
-          { type: "text", text: challengerInstruction(assetClass) },
+          // Reads the OM from the prompt cache the extraction step wrote.
+          omDocument(om),
+          { type: "text", text: instruction },
         ],
       },
     ],
     output_config: { format: zodOutputFormat(ChallengerSchema) },
-  });
+  }, omRequestOptions(om));
 
   const out = response.parsed_output;
   if (!out) {

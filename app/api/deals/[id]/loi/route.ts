@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
 import { buildLoiDocx } from "@/lib/loi";
+import { getBrandingForDeal } from "@/lib/branding-server";
 import { parseUsd } from "@/lib/money";
 import type { DealRow } from "@/lib/deals";
 import type { StructuredAddress } from "@/lib/address";
@@ -50,7 +51,7 @@ export async function GET(
     );
   }
   if (!pro) {
-    return Response.redirect(new URL(`/deals/${id}?error=loipro`, req.url), 302);
+    return Response.redirect(new URL(`/billing?upsell=loi`, req.url), 302);
   }
 
   const { data, error } = await supabase
@@ -109,9 +110,24 @@ export async function GET(
       .trim()
       .slice(0, 160);
 
+  // Firm letterhead (Feature 6) — best-effort; name only, the report footer
+  // text is internal-IC copy and doesn't belong on an outbound letter.
+  let firmName: string | null = null;
+  try {
+    const ownership = deal as unknown as {
+      user_id: string;
+      team_id: string | null;
+    };
+    const b = await getBrandingForDeal(ownership.user_id, ownership.team_id);
+    firmName = b?.firmName ?? null;
+  } catch {
+    firmName = null;
+  }
+
   try {
     const buffer = await buildLoiDocx({
       buyerName,
+      firmName,
       propertyName: deal.name,
       propertyAddress: address,
       price,

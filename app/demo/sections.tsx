@@ -10,6 +10,17 @@ import {
   VerdictView,
 } from "../(app)/deals/[id]/deal-sections";
 import { ReturnsHeadline, StressPanel } from "../(app)/deals/[id]/model-view";
+import {
+  PropertyActuals,
+  type ActualsData,
+} from "../(app)/deals/[id]/property-actuals";
+import { BuyBoxPanel, type BuyBoxPanelData } from "../(app)/deals/[id]/deal-view";
+import {
+  SensitivityPlayground,
+  type PlaygroundData,
+} from "../(app)/deals/[id]/sensitivity-playground";
+import { DebtSizer } from "../(app)/deals/[id]/debt-sizer";
+import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type {
   ExtractionResult,
   ChallengerResult,
@@ -28,10 +39,20 @@ export interface DemoData {
   market: MarketResult;
   verdict: VerdictResult;
   model: UnderwritingModel;
+  /** rent roll + T-12 consolidation (Feature 1), same card as the app */
+  actuals?: ActualsData | null;
+  /** the buy-box panel exactly as a logged-in user sees it (fixture box) */
+  buyBox?: BuyBoxPanelData | null;
+  /** the live sensitivity playground (fixture box drives the fit score) */
+  playground?: PlaygroundData | null;
+  /** the derived screening inputs — powers the FINANCING & CAPITAL card */
+  underwrite?: UnderwriteInputs | null;
 }
 
 const TABS = [
   { key: "verdict", label: "Verdict" },
+  { key: "buybox", label: "Buy box & fit" },
+  { key: "sensitivity", label: "Sensitivity" },
   { key: "challenger", label: "Challenger" },
   { key: "comps", label: "Comps" },
   { key: "market", label: "Market" },
@@ -90,6 +111,26 @@ export function DemoSections({ data }: { data: DemoData }) {
 
       <div key={tab} role="tabpanel" className="animate-fade">
         {tab === "verdict" && <VerdictView result={data.verdict} />}
+        {tab === "buybox" && data.buyBox && (
+          <div className="flex flex-col gap-3">
+            <BuyBoxPanel data={data.buyBox} />
+            <p className="text-xs leading-relaxed text-muted">
+              Judged against a hypothetical mandate (multifamily, ≥5.75%
+              going-in, ≥13% IRR, ≥5% cash-on-cash). Signed in, this panel
+              scores every deal against <em>your</em> buy box.
+            </p>
+          </div>
+        )}
+        {tab === "sensitivity" && data.playground && (
+          <div className="flex flex-col gap-3">
+            <SensitivityPlayground data={data.playground} />
+            <p className="text-xs leading-relaxed text-muted">
+              Live — drag the sliders. Returns, the mandate fit, and the max
+              bid recompute in your browser from the same engine that builds
+              the Excel model.
+            </p>
+          </div>
+        )}
         {tab === "challenger" && (
           <ChallengerView
             result={data.challenges}
@@ -111,7 +152,13 @@ export function DemoSections({ data }: { data: DemoData }) {
         {tab === "financials" && (
           <div className="flex flex-col gap-6">
             <TermsView result={data.extraction} />
+            {data.actuals && <PropertyActuals data={data.actuals} />}
             <ReturnsHeadline model={data.model} />
+            <DebtSizer
+              model={data.model}
+              extraction={data.extraction}
+              underwrite={data.underwrite ?? null}
+            />
             <StressPanel model={data.model} />
           </div>
         )}

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { rerunAnalysis, reconcileWithModel } from "../actions";
 import { PendingButton } from "../../pending-button";
 import {
@@ -10,6 +10,10 @@ import {
   removeSupplement,
 } from "./supplement-actions";
 import { searchPublicComps } from "./comps-actions";
+import { SourceChip } from "./source-chip";
+import { CompsMap, type MapComp } from "./comps-map";
+import { safeHttpUrl } from "@/lib/safe-url";
+import type { DealFact } from "@/lib/facts";
 import { FileDrop } from "../../file-drop";
 import { FileField } from "../../file-field";
 import { useToast } from "../../toaster";
@@ -479,7 +483,15 @@ function RiskRow({
 /* 1 — Extracted terms (key first, rest on demand)                     */
 /* ================================================================== */
 
-export function TermsView({ result }: { result: ExtractionResult }) {
+export function TermsView({
+  result,
+  facts = {},
+  omUrl = null,
+}: {
+  result: ExtractionResult;
+  facts?: Record<string, DealFact>;
+  omUrl?: string | null;
+}) {
   // Surface flagged + first figures; collapse the long tail.
   const ordered = [
     ...result.metrics.filter((m) => m.flagged),
@@ -501,7 +513,15 @@ export function TermsView({ result }: { result: ExtractionResult }) {
       <p className="mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums">
         {m.value}
       </p>
-      {m.page && <p className="mt-2 text-[10px] text-muted">{m.page}</p>}
+      {facts[m.label] ? (
+        <p className="mt-2 leading-none">
+          <SourceChip fact={facts[m.label]} omUrl={omUrl} />
+        </p>
+      ) : (
+        // Deals screened before citations (migration 0018) keep their plain
+        // page text — real, from the extraction, just not a validated chip.
+        m.page && <p className="mt-2 text-[10px] text-muted">{m.page}</p>
+      )}
     </div>
   ));
 
@@ -755,6 +775,7 @@ export function BrokerComps({
   active,
   isPro,
   publicDemo = false,
+  mapContext = null,
 }: {
   result: BrokerCompsResult;
   dealId: string;
@@ -763,12 +784,57 @@ export function BrokerComps({
   isPro: boolean;
   /** rendered on the public /demo page — Pro gates point to signup, not billing */
   publicDemo?: boolean;
+  /** subject location for the comps map (Feature 4); null hides the map */
+  mapContext?: { subjectLabel: string; market: string; omUrl: string | null } | null;
 }) {
   const hasComps = result.saleComps.length > 0 || result.leaseComps.length > 0;
+
+  // The map plots SALE comps (the OM's) beside the public-web candidates —
+  // one pin set per source, colored apart, geocoded by name + market.
+  // Memoized: a stable array identity keeps CompsMap's geocode/map effects
+  // from re-firing (and the map from rebuilding) on unrelated re-renders.
+  const mapComps: MapComp[] = useMemo(
+    () =>
+      mapContext
+        ? [
+            ...result.saleComps.map((c, i): MapComp => {
+              const pageNum = c.page?.match(/\d+/)?.[0];
+              return {
+                id: `om-${i}`,
+                kind: "om",
+                name: c.name,
+                detail: c.detail,
+                sourceLabel: pageNum ? `OM p. ${pageNum}` : "OM",
+                sourceHref:
+                  pageNum && mapContext.omUrl ? `${mapContext.omUrl}#page=${pageNum}` : null,
+                query: [c.name, mapContext.market].filter(Boolean).join(", "),
+              };
+            }),
+            ...(compSearch?.candidates ?? []).map((c, i): MapComp => ({
+              id: `web-${i}`,
+              kind: "web",
+              name: c.name,
+              detail: [c.detail, c.date].filter(Boolean).join(" · "),
+              sourceLabel: c.sourceName || "Public source",
+              sourceHref: c.sourceUrl || null,
+              query: [c.name, c.location || mapContext.market].filter(Boolean).join(", "),
+            })),
+          ]
+        : [],
+    [mapContext, result.saleComps, compSearch],
+  );
+
   return (
     <section className="space-y-4">
       <SectionHeader title="Broker-comp scrutiny" />
       {result.summary && <Callout icon={<IconAlert />}>{result.summary}</Callout>}
+      {mapContext && mapComps.length > 0 && (
+        <CompsMap
+          subjectLabel={mapContext.subjectLabel}
+          market={mapContext.market}
+          comps={mapComps}
+        />
+      )}
       {result.redFlags.length > 0 && (
         <div className="rounded-xl border border-line border-l-4 border-l-kill bg-surface p-4 shadow-sm">
           <div className="flex items-center gap-2 text-kill">
@@ -845,8 +911,10 @@ function PublicWebComps({
             )}
           </p>
           <p className="mt-0.5 text-xs leading-relaxed text-muted">
-            Best-effort search of publicly-reported sales — unverified, and never
-            from CoStar or any licensed source.
+            Comparable sales from public sources — news, press releases, county
+            records, brokerage pages, trade publications. Never MLS, CoStar, or
+            any licensed feed; accuracy depends on public reporting and may lag
+            the market. Verify before relying on a figure.
           </p>
         </div>
         {publicDemo ? (
@@ -916,9 +984,10 @@ function PublicWebComps({
                       {c.note}
                     </p>
                   )}
-                  {c.sourceUrl && (
+                  {/* LLM-sourced URL — only http(s) ever becomes a link. */}
+                  {safeHttpUrl(c.sourceUrl) && (
                     <a
-                      href={c.sourceUrl}
+                      href={safeHttpUrl(c.sourceUrl)!}
                       target="_blank"
                       rel="noreferrer"
                       className="mt-1.5 inline-block text-xs font-medium text-brand hover:underline"

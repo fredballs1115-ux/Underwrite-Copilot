@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, findMetric } from "@/lib/criteria";
 import { getTeam } from "@/lib/teams";
+import { getActiveBranding } from "@/lib/branding-server";
 import {
   buildPipelineWorkbook,
   type PipelineExportRow,
@@ -137,8 +138,17 @@ export async function GET(req: Request) {
     };
   });
 
+  // Firm branding (Feature 6) — the caller's own identity (this is an
+  // account-level export, not a deal-level one). Best-effort.
+  let branding = null;
+  try {
+    branding = (await getActiveBranding(supabase, user.id)).branding;
+  } catch {
+    branding = null;
+  }
+
   const now = new Date();
-  const buffer = await buildPipelineWorkbook(exportRows, now);
+  const buffer = await buildPipelineWorkbook(exportRows, now, branding);
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type":

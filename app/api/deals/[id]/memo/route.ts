@@ -2,8 +2,13 @@ import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
-import { MemoDocument, buildMemoData } from "@/lib/memo/memo-document";
+import {
+  MemoDocument,
+  buildMemoData,
+  type MemoData,
+} from "@/lib/memo/memo-document";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
+import { getBrandingForDeal, brandingLogoDataUri } from "@/lib/branding-server";
 import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
@@ -32,10 +37,9 @@ export async function GET(
     );
   }
 
-  // The PDF memo is a Pro feature. Explain the bounce on the deal page —
-  // the memo button is shown to everyone, so a silent redirect to /billing
-  // read as a mystery error to non-Pro users (that WAS the "memo is broken"
-  // bug: nothing was broken, the gate was invisible).
+  // The PDF memo is a Pro feature. On Free, send the user straight to the
+  // upgrade path with an ?upsell tag so the billing page explains why they
+  // landed there (never a raw error page, never a silent/mystery redirect).
   let pro = false;
   try {
     pro = await isPro(supabase, user.id);
@@ -48,7 +52,7 @@ export async function GET(
     );
   }
   if (!pro) {
-    return Response.redirect(new URL(`/deals/${id}?error=memopro`, req.url), 302);
+    return Response.redirect(new URL(`/billing?upsell=memo`, req.url), 302);
   }
 
   const { data, error } = await supabase
@@ -93,11 +97,31 @@ export async function GET(
     buyBoxChecks = [];
   }
 
+  // Custom firm branding (Feature 6) — best-effort; any failure (pre-0021
+  // schema, missing logo file) just renders the default identity.
+  let branding: MemoData["branding"] = null;
+  try {
+    const ownership = deal as unknown as {
+      user_id: string;
+      team_id: string | null;
+    };
+    const b = await getBrandingForDeal(ownership.user_id, ownership.team_id);
+    if (b) {
+      branding = {
+        firmName: b.firmName ?? null,
+        logoDataUri: await brandingLogoDataUri(b),
+        footerText: b.footerText ?? null,
+      };
+    }
+  } catch {
+    branding = null;
+  }
+
   // This link opens in a plain <a> navigation, so an unhandled throw would put
   // a raw "Internal Server Error" in the browser. Catch it and bounce back to
   // the deal with a friendly, mapped error instead.
   try {
-    const memo = buildMemoData(deal, dateStr, buyBoxChecks);
+    const memo = buildMemoData(deal, dateStr, buyBoxChecks, branding);
     // MemoDocument renders a <Document>; cast to the element type renderToBuffer
     // expects (it's typed for a Document element, not a wrapping component).
     const element = React.createElement(MemoDocument, {

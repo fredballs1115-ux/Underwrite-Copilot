@@ -42,6 +42,9 @@ export type DealCard = {
   addedBy: string | null;
   /** deterministic buy-box result against the user's mandate */
   fit: "fits" | "near" | "outside" | null;
+  /** 0–100 mandate-fit score + its PURSUE/WATCH/PASS call (null pre-screen) */
+  score: number | null;
+  mandateVerdict: "PURSUE" | "WATCH" | "PASS" | null;
   market: string;
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
@@ -59,6 +62,15 @@ const FIT_META: Record<NonNullable<DealCard["fit"]>, { label: string; cls: strin
   outside: { label: "Outside", cls: "text-kill", rank: 0 },
   near: { label: "Near", cls: "text-caution", rank: 1 },
   fits: { label: "Fits", cls: "text-pass", rank: 2 },
+};
+
+const MANDATE_META: Record<
+  NonNullable<DealCard["mandateVerdict"]>,
+  { label: string; cls: string }
+> = {
+  PASS: { label: "Pass", cls: "text-kill" },
+  WATCH: { label: "Watch", cls: "text-caution" },
+  PURSUE: { label: "Pursue", cls: "text-pass" },
 };
 
 function statusRank(d: DealCard): number {
@@ -79,7 +91,9 @@ function sortValue(d: DealCard, key: SortKey): string | number {
     case "cap":
       return d.slots.cap ? (parsePct(d.slots.cap) ?? -1) : -1;
     case "fit":
-      return d.fit ? FIT_META[d.fit].rank : -1;
+      // Sort by the numeric mandate score when present (the column shows it),
+      // falling back to the coarse fold rank for pre-score deals.
+      return d.score ?? (d.fit ? FIT_META[d.fit].rank : -1);
     case "status":
       return statusRank(d);
     case "added":
@@ -164,6 +178,8 @@ export function Pipeline({
   const [stage, setStage] = useState("all");
   const [asset, setAsset] = useState("all");
   const [market, setMarket] = useState("all");
+  // Mandate-fit filter (Feature 4): all / PURSUE / WATCH / PASS.
+  const [mfit, setMfit] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("added");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   // Dead deals stay out of the pipeline until asked for (or filtered to).
@@ -189,6 +205,7 @@ export function Pipeline({
             stage: string;
             asset: string;
             market: string;
+            mfit: string;
             showDead: boolean;
             collapsed: Partial<Record<Stage, boolean>>;
           }>;
@@ -196,6 +213,7 @@ export function Pipeline({
           if (typeof v.stage === "string") setStage(v.stage);
           if (typeof v.asset === "string") setAsset(v.asset);
           if (typeof v.market === "string") setMarket(v.market);
+          if (typeof v.mfit === "string") setMfit(v.mfit);
           if (typeof v.showDead === "boolean") setShowDead(v.showDead);
           if (v.collapsed && typeof v.collapsed === "object")
             setCollapsed(v.collapsed);
@@ -212,12 +230,12 @@ export function Pipeline({
     try {
       sessionStorage.setItem(
         PERSIST_KEY,
-        JSON.stringify({ verdict, stage, asset, market, showDead, collapsed }),
+        JSON.stringify({ verdict, stage, asset, market, mfit, showDead, collapsed }),
       );
     } catch {
       // storage unavailable — view state is per-visit only
     }
-  }, [verdict, stage, asset, market, showDead, collapsed]);
+  }, [verdict, stage, asset, market, mfit, showDead, collapsed]);
 
   // The ⌘K "New deal…" action lands here as ?new=1 — honor it even when the
   // pipeline is already mounted (client-side navigation keeps state). The
@@ -299,6 +317,8 @@ export function Pipeline({
     () => Array.from(new Set(deals.map((d) => d.market).filter(Boolean))).sort(),
     [deals],
   );
+  // Only surface the mandate-fit filter once at least one deal carries a score.
+  const hasScores = useMemo(() => deals.some((d) => !!d.mandateVerdict), [deals]);
 
   // Typing stays instant even with hundreds of rows: the list follows the
   // query at deferred priority.
@@ -319,6 +339,7 @@ export function Pipeline({
       if (dealStage === "dead" && !showDead && stage !== "dead") return false;
       if (asset !== "all" && d.assetClass !== asset) return false;
       if (market !== "all" && d.market !== market) return false;
+      if (mfit !== "all" && d.mandateVerdict !== mfit) return false;
       return true;
     });
     return list.sort((a, b) => {
@@ -332,7 +353,7 @@ export function Pipeline({
       const tie = sortKey === "added" ? 0 : b.createdAt.localeCompare(a.createdAt);
       return (sortDir === "asc" ? cmp : -cmp) || tie;
     });
-  }, [deals, deferredQuery, verdict, stage, asset, market, sortKey, sortDir, showDead]);
+  }, [deals, deferredQuery, verdict, stage, asset, market, mfit, sortKey, sortDir, showDead]);
 
   // The pipeline reads as one ladder: deals grouped by stage, in stage order,
   // each group internally sorted by the active column sort.
@@ -383,13 +404,15 @@ export function Pipeline({
     setStage("all");
     setAsset("all");
     setMarket("all");
+    setMfit("all");
   }
   const filtersActive =
     query.trim() !== "" ||
     verdict !== "all" ||
     stage !== "all" ||
     asset !== "all" ||
-    market !== "all";
+    market !== "all" ||
+    mfit !== "all";
   // Empty stage sections render (collapsed) on the clean view, but hide while
   // filters narrow the list — a run of "(0)" headers under a filter is noise.
   const hideEmptySections = filtersActive;
@@ -402,7 +425,7 @@ export function Pipeline({
       const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
       return `"${safe.replaceAll('"', '""')}"`;
     };
-    const header = ["Deal", "Asset class", "Market", "Price", "Cap rate", "Buy box", "Status", "Stage", "Offers due", "Added", "Added by"];
+    const header = ["Deal", "Asset class", "Market", "Price", "Cap rate", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Added", "Added by"];
     const lines = filtered.map((d) =>
       [
         d.name,
@@ -411,6 +434,8 @@ export function Pipeline({
         d.slots.price ?? "",
         d.slots.cap ?? "",
         d.fit ? FIT_META[d.fit].label : "",
+        d.score != null ? String(d.score) : "",
+        d.mandateVerdict ? MANDATE_META[d.mandateVerdict].label : "",
         d.verdict
           ? (VERDICT_META[d.verdict]?.label ?? d.verdict)
           : d.jobStatus === "running"
@@ -683,6 +708,18 @@ export function Pipeline({
               ]}
             />
           )}
+          {hasScores && (
+            <FilterSelect
+              value={mfit}
+              onChange={setMfit}
+              options={[
+                ["all", "All fit"],
+                ["PURSUE", "Pursue · 75+"],
+                ["WATCH", "Watch · 50–74"],
+                ["PASS", "Pass · <50"],
+              ]}
+            />
+          )}
           {deadCount > 0 && (
             <button
               type="button"
@@ -711,7 +748,7 @@ export function Pipeline({
               ["added:asc", "Oldest"],
               ["price:desc", "Price: high to low"],
               ["cap:desc", "Cap: high to low"],
-              ["fit:desc", "Best fit first"],
+              ["fit:desc", "Mandate fit: high to low"],
               ["status:desc", "By status"],
               ["name:asc", "Name A–Z"],
             ]}
@@ -1040,11 +1077,20 @@ const DealRow = memo(function DealRow({
       <span className="font-mono tabular-nums">{d.slots.cap}</span> cap
     </>
   ) : null;
-  const fitBit = d.fit ? (
-    <span className={`font-medium ${FIT_META[d.fit].cls}`}>
-      {FIT_META[d.fit].label} buy box
-    </span>
-  ) : null;
+  const fitBit =
+    d.score != null && d.mandateVerdict ? (
+      d.fit === "outside" ? (
+        <span className="font-medium text-kill">Buy box {d.score} · Outside box</span>
+      ) : (
+        <span className={`font-medium ${MANDATE_META[d.mandateVerdict].cls}`}>
+          Buy box {d.score} · {MANDATE_META[d.mandateVerdict].label}
+        </span>
+      )
+    ) : d.fit ? (
+      <span className={`font-medium ${FIT_META[d.fit].cls}`}>
+        {FIT_META[d.fit].label} buy box
+      </span>
+    ) : null;
   const dateBit = (
     <span className="font-mono tabular-nums">{fmtDate(d.createdAt)}</span>
   );
@@ -1107,7 +1153,18 @@ const DealRow = memo(function DealRow({
         {d.slots.cap ?? <span className="text-line">—</span>}
       </span>
       <span className="hidden w-16 shrink-0 text-right text-xs font-semibold lg:block">
-        {d.fit ? (
+        {d.score != null && d.mandateVerdict ? (
+          <span
+            className={`tabular-nums ${d.fit === "outside" ? "text-kill" : MANDATE_META[d.mandateVerdict].cls}`}
+            title={
+              d.fit === "outside"
+                ? `${d.score} / 100 mandate fit, but outside the box on a criterion the score doesn't weigh (e.g. price)`
+                : `${d.score} / 100 · ${MANDATE_META[d.mandateVerdict].label} — mandate fit`
+            }
+          >
+            {d.score}
+          </span>
+        ) : d.fit ? (
           <span className={FIT_META[d.fit].cls}>{FIT_META[d.fit].label}</span>
         ) : (
           <span className="font-normal text-line">—</span>
@@ -1236,20 +1293,16 @@ function GettingStarted({
       key: "sample",
       label: "Explore the sample deal — every tab, no upload needed",
       done: !!state.sampleId,
-      action: state.sampleId ? (
-        <Link
-          href={`/deals/${state.sampleId}`}
-          className="text-xs font-medium text-brand hover:text-brand-strong"
-        >
-          Open it →
-        </Link>
-      ) : (
+      // Both states route through the ACTION (it redirects into an existing
+      // sample after topping up anything the fixture gained since — a plain
+      // link would bypass that self-heal).
+      action: (
         <form action={createSampleDeal}>
           <PendingButton
-            pendingLabel="Adding…"
+            pendingLabel={state.sampleId ? "Opening…" : "Adding…"}
             className="text-xs font-medium text-brand hover:text-brand-strong"
           >
-            Add it →
+            {state.sampleId ? "Open it →" : "Add it →"}
           </PendingButton>
         </form>
       ),
@@ -1583,7 +1636,7 @@ function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
         <FileDrop
           name="om"
           accept="application/pdf"
-          hint="PDF offering memorandum, up to 22 MB"
+          hint="PDF offering memorandum, up to 32 MB"
           maxBytes={22 * 1024 * 1024}
         />
         <PendingButton

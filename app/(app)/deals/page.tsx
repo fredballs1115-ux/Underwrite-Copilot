@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { getBilling } from "@/lib/billing";
 import { type DealRow } from "@/lib/deals";
-import type { ExtractionResult, ExtractedMetric } from "@/lib/anthropic/types";
+import type { ExtractionResult, ExtractedMetric, FirstSignal } from "@/lib/anthropic/types";
+import type { StructuredAddress } from "@/lib/address";
 import { Pipeline, type DealCard } from "./pipeline";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { evaluateBuyBox, foldBuyBoxChecks } from "@/lib/criteria";
+import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
+import { scoreMandateFit } from "@/lib/mandate";
 
 export const metadata: Metadata = { title: "Pipeline" };
 
@@ -13,7 +15,7 @@ const ERRORS: Record<string, string> = {
   name: "Please give the deal a name.",
   file: "Please choose a PDF offering memorandum to upload.",
   pdf: "That file isn’t a PDF — please upload the OM as a PDF.",
-  size: "That PDF is larger than 22 MB — please try a smaller file for now.",
+  size: "That PDF is larger than 32 MB — please try a smaller file for now.",
   save: "Couldn’t save the deal. Please try again.",
   upload: "The upload didn’t complete — nothing was saved. Please try again.",
   limit:
@@ -73,7 +75,7 @@ export default async function DealsPage({
     supabase
       .from("deals")
       .select(
-        "id, name, asset_class, created_at, verdict, extraction, user_id, team_id, stage, is_sample",
+        "id, name, asset_class, created_at, verdict, extraction, address, first_signal, user_id, team_id, stage, is_sample",
       )
       .order("created_at", { ascending: false }),
     user ? getBuyBoxForDeal(user.id, null).catch(() => null) : Promise.resolve(null),
@@ -114,6 +116,8 @@ export default async function DealsPage({
     DealRow,
     "id" | "name" | "asset_class" | "created_at" | "verdict" | "extraction"
   > & {
+    address: unknown;
+    first_signal: unknown;
     user_id: string;
     team_id: string | null;
     stage: string | null;
@@ -172,6 +176,19 @@ export default async function DealsPage({
     const extraction = d.extraction as ExtractionResult | null;
     const verdict = d.verdict as { verdict?: string } | null;
     const job = jobByDeal.get(d.id);
+    // Same deterministic engine AND the same inputs as the deal page: judge
+    // against buyBoxCheckSource (extraction, else first signal, with the typed
+    // address widening geography) so a deal reads identically on both surfaces.
+    const box = d.team_id ? teamBox : personalBox;
+    const checkSource = box
+      ? buyBoxCheckSource(
+          extraction,
+          (d.first_signal as FirstSignal | null) ?? null,
+          (d.address as StructuredAddress | null) ?? null,
+        )
+      : null;
+    const mandate =
+      box && checkSource ? scoreMandateFit(d.asset_class, checkSource, box) : null;
     return {
       id: d.id,
       name: d.name,
@@ -179,14 +196,14 @@ export default async function DealsPage({
       createdAt: d.created_at,
       verdict: verdict?.verdict ?? null,
       stage: (d.stage as DealCard["stage"]) ?? "screening",
-      // Deterministic mandate check, same engine as the deal page: any miss
-      // → outside; else any near-miss → near; all-pass → fits. Unknown-only
-      // results (nothing checkable yet) stay null and render as —.
-      fit: (() => {
-        const box = d.team_id ? teamBox : personalBox;
-        if (!box || !extraction) return null;
-        return foldBuyBoxChecks(evaluateBuyBox(d.asset_class, extraction, box));
-      })(),
+      // Any miss → outside; else any near-miss → near; all-pass → fits.
+      // Unknown-only results (nothing checkable yet) stay null and render as —.
+      fit:
+        box && checkSource
+          ? foldBuyBoxChecks(evaluateBuyBox(d.asset_class, checkSource, box))
+          : null,
+      score: mandate?.score ?? null,
+      mandateVerdict: mandate?.verdict ?? null,
       addedBy:
         d.team_id && d.user_id !== user?.id
           ? (nameById.get(d.user_id) ?? "Teammate")

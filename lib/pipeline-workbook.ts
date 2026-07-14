@@ -1,13 +1,14 @@
 import "server-only";
 import ExcelJS from "exceljs";
+import { applyWorkbookBranding, type ExportBranding } from "@/lib/excel-branding";
 import { STAGES, STAGE_LABEL, normalizeStage, type Stage } from "@/lib/stages";
 import { parseMoney, parsePct } from "@/lib/criteria";
 
 /**
  * The whole pipeline as one meeting-ready Excel workbook: a stage-grouped
  * deal sheet with verdict/buy-box markers, plus a summary sheet with the
- * counts a pipeline meeting opens with. Same visual language as the model
- * workbook (lib/model/excel-build.ts).
+ * counts a pipeline meeting opens with. Same visual language as the
+ * underwriting workbook (lib/underwrite/workbook.ts).
  */
 
 const BRAND = "FF114E54";
@@ -53,6 +54,7 @@ const VERDICT_LABEL: Record<string, { label: string; color: string }> = {
 export async function buildPipelineWorkbook(
   rows: PipelineExportRow[],
   exportedAt: Date,
+  branding?: ExportBranding | null,
 ): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = "Underwrite Copilot";
@@ -262,6 +264,11 @@ export async function buildPipelineWorkbook(
   sum.getCell(`C${totalRow + 2}`).value = prices.reduce((a, b) => a + b, 0);
   sum.getCell(`C${totalRow + 2}`).numFmt = USD;
   sum.getCell(`C${totalRow + 2}`).font = { size: 10, bold: true, color: { argb: INK } };
+
+  // Firm branding (Feature 6): file properties + print chrome only — the
+  // meeting workbook is the artifact most likely to be projected, so it
+  // carries the same identity as every other export.
+  applyWorkbookBranding(wb, wb.worksheets, "Pipeline", branding);
 
   const out = await wb.xlsx.writeBuffer();
   return Buffer.from(out as ArrayBuffer);

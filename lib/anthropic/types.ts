@@ -54,6 +54,9 @@ export interface ExtractedMetric {
   /** in-place reality vs. the sponsor's forward story. Optional for results
    *  saved before this field existed. */
   basis?: "in_place" | "pro_forma" | "na";
+  /** ≤10-word verbatim quote of the surrounding OM text, for the source-chip
+   *  hover. Optional for extractions saved before citations existed. */
+  locatorSnippet?: string;
 }
 export interface ExtractionResult {
   dealName: string | null;
@@ -64,6 +67,9 @@ export interface ExtractionResult {
   /** Full street address ("" if the OM never states it). Optional for
    *  backward-compatibility. The screen anchors on the address. */
   address?: string;
+  /** The OM's total page count as the model read it, used to validate cited
+   *  pages. 0 / absent when unknown or for pre-citation extractions. */
+  totalPages?: number;
   metrics: ExtractedMetric[];
 }
 

@@ -18,6 +18,8 @@ import {
   type FirstSignal,
 } from "@/lib/anthropic/types";
 import { DealView } from "./deal-view";
+import { parseFactRow, type DealFact } from "@/lib/facts";
+import type { ReconcileResult } from "@/lib/reconcile";
 import { DealActions } from "./deal-actions";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import { StageSelect } from "./stage-select";
@@ -26,8 +28,16 @@ import { ShareControl, type ShareRow } from "./share-control";
 import { parseStageHistory } from "@/lib/stages";
 import { parseDealNotes, parseDealQa } from "@/lib/deals";
 import { deriveInternalComps } from "@/lib/internal-comps";
+import { buildComps, marketMemoryFor } from "@/lib/market-memory";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { evaluateBuyBox, buyBoxCheckSource, type BuyBoxCheck } from "@/lib/criteria";
+import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource, type BuyBoxCheck } from "@/lib/criteria";
+import { scoreMandateFit, type MandateScore, type MandateVerdict } from "@/lib/mandate";
+import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
+import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
+import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
+import type { ActualsData } from "./property-actuals";
+import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import type { PlaygroundData } from "./sensitivity-playground";
 
 const VERDICT_PILL = {
   pass: { label: "Go", cls: "bg-pass/15 text-pass" },
@@ -71,6 +81,7 @@ export default async function DealPage({
     { data: jobData },
     siblings,
     sharesRes,
+    factsRes,
   ] = await Promise.all([
       user ? isPro(supabase, user.id) : Promise.resolve(false),
       supabase.from("deals").select("*").eq("id", id).maybeSingle(),
@@ -92,7 +103,7 @@ export default async function DealPage({
       // own + shared team deals). Derivation filters to this asset class.
       supabase
         .from("deals")
-        .select("id, name, asset_class, created_at, is_sample, verdict, extraction")
+        .select("id, name, asset_class, created_at, is_sample, verdict, extraction, user_id")
         .neq("id", id)
         .not("extraction", "is", null)
         .order("created_at", { ascending: false })
@@ -107,6 +118,13 @@ export default async function DealPage({
         .gt("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false })
         .limit(5),
+      // Citation facts (pre-0018 schema: query errors, data reads null — the
+      // deal simply shows no source chips rather than faking them).
+      supabase
+        .from("deal_facts")
+        .select("id, field, value, unit, doc_label, page_number, located, locator_snippet, confidence, provenance")
+        .eq("deal_id", id)
+        .order("id", { ascending: true }),
     ]);
 
   if (error) {
@@ -154,6 +172,25 @@ export default async function DealPage({
     extraction,
     (siblings.data ?? []) as Parameters<typeof deriveInternalComps>[3],
   );
+
+  // Deal memory (Feature 6): the account's OWN prior screens of this exact
+  // market + asset class, aggregated. Own-account only — filter the siblings
+  // (which RLS may include team deals in) to this user's deals.
+  const ownSiblings = ((siblings.data ?? []) as Array<{ user_id?: string }>).filter(
+    (s) => s.user_id === user?.id,
+  );
+  const currentClass =
+    deal.asset_class && deal.asset_class !== "auto"
+      ? (deal.asset_class as string)
+      : (extraction?.assetClass ?? "");
+  const marketMemory = extraction?.market
+    ? marketMemoryFor(
+        buildComps(ownSiblings as Parameters<typeof buildComps>[0]),
+        deal.id,
+        currentClass,
+        extraction.market,
+      )
+    : null;
 
   const documents = (docsData ?? []) as DealDocument[];
 
@@ -224,10 +261,153 @@ export default async function DealPage({
   const buyBoxChecks: BuyBoxCheck[] = buyBox
     ? evaluateBuyBox(deal.asset_class, checkSource, buyBox)
     : [];
+  // The single 0–100 mandate-fit read (Feature 4) — same evidence as the
+  // per-criterion checks above, rolled into one number and a PURSUE/WATCH/PASS
+  // call. Null until there's a box AND something checkable against it.
+  const mandate: MandateScore | null =
+    buyBox && checkSource
+      ? scoreMandateFit(deal.asset_class, checkSource, buyBox)
+      : null;
 
   // The three summary-bar figures — a 5-second read, nothing more. The full
   // metric set lives one click away in Financials.
   const metrics = extraction?.metrics ?? [];
+
+  // Property actuals (Feature 1), deal tasks (Feature 7), and the team
+  // roster — four independent reads, one round-trip. All best-effort: the
+  // actuals/tasks tables arrived in 0020/0022, and on an older schema the
+  // queries error and read null (the cards simply don't render).
+  const [rrRes, t12Res, tasksRes, memberRes] = await Promise.all([
+    supabase
+      .from("deal_rent_rolls")
+      .select("as_of_date, summary")
+      .eq("deal_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("deal_t12_statements")
+      .select("period_end_date, summary")
+      .eq("deal_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("deal_tasks")
+      .select(
+        "id, title, assignee_user_id, due_date, done, completed_at, source, created_by, created_at",
+      )
+      .eq("deal_id", id)
+      .order("created_at", { ascending: true }),
+    ownership.team_id
+      ? supabase
+          .from("team_members")
+          .select("user_id")
+          .eq("team_id", ownership.team_id)
+      : Promise.resolve({ data: null }),
+  ]);
+  const t12Summary = (t12Res.data?.summary as T12Summary | undefined) ?? null;
+  // OM assumed NOI vs the T-12 actual — the shared picker (word-bounded,
+  // per-unit-safe, same one the challenger note uses). Degenerate actual NOI
+  // (0 / non-finite) renders no comparison rather than an infinite delta.
+  const omNoi = pickOmNoi(metrics)?.noi ?? null;
+  const actuals: ActualsData = {
+    rentRoll: rrRes.data?.summary
+      ? {
+          asOf: (rrRes.data.as_of_date as string | null) ?? null,
+          summary: rrRes.data.summary as RentRollSummary,
+        }
+      : null,
+    t12: t12Summary
+      ? {
+          periodEnd: (t12Res.data?.period_end_date as string | null) ?? null,
+          summary: t12Summary,
+        }
+      : null,
+    noiComparison:
+      omNoi != null &&
+      t12Summary?.noi != null &&
+      Number.isFinite(t12Summary.noi) &&
+      t12Summary.noi !== 0
+        ? compareNoi(omNoi, t12Summary.noi)
+        : null,
+  };
+
+  // Sensitivity playground (Feature 2 of the competitive spec): the deal's
+  // base underwriting model — actuals folded in — computed once server-side;
+  // the sliders recompute it in the browser via the same pure engine.
+  const playground: PlaygroundData | null = extraction
+    ? {
+        inputs: deriveUnderwriteInputs(extraction, deal.name, {
+          rentRoll: actuals.rentRoll
+            ? { summary: actuals.rentRoll.summary, asOf: actuals.rentRoll.asOf }
+            : null,
+          t12: actuals.t12
+            ? { summary: actuals.t12.summary, periodEnd: actuals.t12.periodEnd }
+            : null,
+        }).inputs,
+        dealAssetClass: deal.asset_class,
+        checkSource,
+        box: buyBox,
+      }
+    : null;
+
+  // Deal tasks (Feature 7): assignable to-dos with owners and due dates.
+  // Best-effort — pre-0022 schemas error and the card doesn't render.
+  const dealTasks: DealTask[] | null = tasksRes.error
+    ? null
+    : ((tasksRes.data ?? []) as Record<string, unknown>[]).map((r) => ({
+        id: String(r.id),
+        title: String(r.title ?? ""),
+        assigneeUserId: (r.assignee_user_id as string | null) ?? null,
+        dueDate: (r.due_date as string | null) ?? null,
+        done: !!r.done,
+        completedAt: (r.completed_at as string | null) ?? null,
+        source: r.source === "verdict" ? "verdict" : "manual",
+        createdBy: (r.created_by as string | null) ?? null,
+        createdAt: String(r.created_at ?? ""),
+      }));
+
+  // Who a task can be assigned to: the viewer, plus (team deals) the roster.
+  // Teammate emails read under the "teammates read profiles" policy (0007).
+  const taskAssignees: TaskAssignee[] = [];
+  if (user) {
+    taskAssignees.push({
+      userId: user.id,
+      label: user.email ? `${user.email.split("@")[0]} (you)` : "You",
+    });
+    if (ownership.team_id) {
+      const otherIds = ((memberRes.data ?? []) as { user_id: string }[])
+        .map((m) => m.user_id)
+        .filter((uid) => uid !== user.id);
+      if (otherIds.length) {
+        const { data: profileRows } = await supabase
+          .from("profiles")
+          .select("id, email, full_name")
+          .in("id", otherIds);
+        for (const p of (profileRows ?? []) as {
+          id: string;
+          email: string | null;
+          full_name: string | null;
+        }[]) {
+          taskAssignees.push({
+            userId: p.id,
+            label:
+              (p.full_name ?? "").trim() ||
+              (p.email ? p.email.split("@")[0] : "teammate"),
+          });
+        }
+      }
+    }
+  }
+
+  // Citation facts, keyed by field label for the source chips (Feature 2).
+  // Empty for deals screened before migration 0018 — no chips, never faked.
+  const factsByField: Record<string, DealFact> = {};
+  for (const row of (factsRes.data ?? []) as Record<string, unknown>[]) {
+    const f = parseFactRow(row);
+    if (!(f.field in factsByField)) factsByField[f.field] = f;
+  }
   const summaryPrice =
     findValue(metrics, /purchase price|asking price|\bprice\b/i, /unit|\/sf|per sf|per unit|psf/i) ??
     (firstSignal?.askPrice.trim() || null);
@@ -251,18 +431,39 @@ export default async function DealPage({
     findValue(metrics, /\bcap rate\b/i, /exit|terminal|reversion/i) ??
     (firstSignal?.goingInCap.trim() || null);
 
-  // The buy-box verdict as one chip: any hard miss → Outside; else near
-  // misses → Near; else all pass → Fits; else unverified.
+  // The buy-box call as one chip. When there's a numeric mandate-fit score,
+  // it leads — "Buy box 82 · Pursue", coloured by the PURSUE/WATCH/PASS call.
+  // Otherwise the older fold (Outside / Near / Fits) stands in.
+  const MANDATE_PILL: Record<MandateVerdict, string> = {
+    PURSUE: "bg-pass/10 text-pass",
+    WATCH: "bg-caution/10 text-caution",
+    PASS: "bg-kill/10 text-kill",
+  };
+  // The fold covers ALL criteria (incl. the price band / per-unit cap, which
+  // the 0–100 score deliberately doesn't weigh). A deal outside the box on one
+  // of those must never show a green Pursue — so a hard "outside" fold wins the
+  // chip even when the scored dimensions look strong.
+  const buyBoxFold = buyBox ? foldBuyBoxChecks(buyBoxChecks) : null;
   const buyBoxChip = !buyBox
     ? null
-    : buyBoxChecks.some((c) => c.status === "miss")
-      ? { label: "Outside buy box", cls: "bg-kill/10 text-kill" }
-      : buyBoxChecks.some((c) => c.status === "near")
-        ? { label: "Near buy box", cls: "bg-caution/10 text-caution" }
-        : buyBoxChecks.length > 0 &&
-            buyBoxChecks.every((c) => c.status === "pass")
-          ? { label: "Fits buy box", cls: "bg-pass/10 text-pass" }
-          : { label: "Buy box unverified", cls: "bg-faint text-muted" };
+    : mandate?.score != null && mandate.verdict
+      ? buyBoxFold === "outside" && mandate.verdict !== "PASS"
+        ? {
+            label: `Buy box ${mandate.score} · Outside box`,
+            cls: "bg-kill/10 text-kill",
+          }
+        : {
+            label: `Buy box ${mandate.score} · ${mandate.verdict === "PURSUE" ? "Pursue" : mandate.verdict === "WATCH" ? "Watch" : "Pass"}`,
+            cls: MANDATE_PILL[mandate.verdict],
+          }
+      : buyBoxChecks.some((c) => c.status === "miss")
+        ? { label: "Outside buy box", cls: "bg-kill/10 text-kill" }
+        : buyBoxChecks.some((c) => c.status === "near")
+          ? { label: "Near buy box", cls: "bg-caution/10 text-caution" }
+          : buyBoxChecks.length > 0 &&
+              buyBoxChecks.every((c) => c.status === "pass")
+            ? { label: "Fits buy box", cls: "bg-pass/10 text-pass" }
+            : { label: "Buy box unverified", cls: "bg-faint text-muted" };
 
   const addressLine =
     extraction?.address ||
@@ -384,6 +585,37 @@ export default async function DealPage({
                 )}
               </a>
             )}
+            {extraction && (
+              <a
+                href={`/api/deals/${id}/underwrite.xlsx`}
+                title={
+                  pro
+                    ? "Institutional acquisition model (Excel) — live formulas; change the exit cap and levered IRR recalculates"
+                    : "Institutional acquisition model (Excel) — part of Pro"
+                }
+                className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-3.5 w-3.5 text-muted"
+                  aria-hidden
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
+                </svg>
+                Underwrite model
+                {!pro && (
+                  <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
+                    Pro
+                  </span>
+                )}
+              </a>
+            )}
             <OffersDueControl
               key={`due-${offersDue ?? "unset"}`}
               dealId={id}
@@ -440,6 +672,7 @@ export default async function DealPage({
         isPro={pro}
         buyBox={{
           checks: buyBoxChecks,
+          mandate,
           scope: ownership.team_id ? "team" : "personal",
           provisional: !extraction && !!firstSignal,
           hasBox: !!buyBox,
@@ -448,11 +681,21 @@ export default async function DealPage({
         stageHistory={stageHistory}
         internalComps={internalComps}
         omUrl={omUrl}
+        facts={factsByField}
+        discrepancies={
+          ((deal as { discrepancies?: ReconcileResult | null }).discrepancies) ?? null
+        }
         notes={parseDealNotes((deal as { notes?: unknown }).notes)}
         userEmail={user?.email ?? null}
         userId={user?.id ?? null}
         qa={parseDealQa((deal as { qa?: unknown }).qa)}
         isSample={!!(deal as { is_sample?: boolean }).is_sample}
+        marketMemory={marketMemory}
+        actuals={actuals}
+        playground={playground}
+        tasks={dealTasks}
+        taskAssignees={taskAssignees}
+        todayIso={new Date().toISOString().slice(0, 10)}
       />
     </div>
   );

@@ -3,6 +3,29 @@ import type { ReactNode } from "react";
 import { LogoMark } from "./logo";
 import { Reveal, CountUp, DemoTabs } from "./landing-interactive";
 import type { Metadata } from "next";
+import {
+  SPREAD_LOW_IRR_PCT,
+  SPREAD_HIGH_IRR_PCT,
+  SPREAD_BPS,
+  FIRST_READ_CLAIM,
+  FULL_SCREEN_CLAIM,
+  ANALYSIS_STAGES,
+  DEAL_KILLERS,
+  MEMO_PAGES,
+  SLIDER_SWEEP_BPS,
+  PRICE_PRO_MONTHLY,
+  PRICE_TEAM_BASE_MONTHLY,
+  PRICE_TEAM_MEMBER_MONTHLY,
+  FREE_DEALS,
+  SAMPLE_RETRADE_DELTA,
+  SAMPLE_RECONCILE_ROWS,
+  SAMPLE_COMP_PREMIUM_LINE,
+} from "@/lib/marketing-constants";
+// The Excel-preview rows are COMPUTED from the live engine on the sample
+// model at render time — hardcoded copies of these figures are exactly what
+// drifted (the page said 7.1% while the engine computed 6.9%).
+import { computeModel } from "@/lib/model/compute";
+import { SAMPLE_DEAL } from "@/lib/sample-deal";
 
 // Title/description inherit the site defaults from the root layout;
 // the canonical is declared per page so subpages never collapse to /.
@@ -103,14 +126,30 @@ const PILLARS = [
 ];
 
 const STATS: { value: number; suffix: string; label: string }[] = [
-  { value: 6, suffix: "", label: "analysis stages on every OM" },
-  { value: 3, suffix: "", label: "deal-killers stressed first" },
+  { value: ANALYSIS_STAGES, suffix: "", label: "analysis stages on every OM" },
+  { value: DEAL_KILLERS, suffix: "", label: "deal-killers stressed first" },
   { value: 0, suffix: "", label: "black-box numbers — every figure carries its source" },
-  { value: 1, suffix: "", label: "page of memo for your IC" },
+  { value: MEMO_PAGES, suffix: "", label: "page of memo for your IC" },
 ];
 
+// Live-engine rows for the Excel-preview tile: the sample model recomputed
+// at render, so the page can never disagree with what the workbook computes.
+const XLSX_PREVIEW_ROWS: [string, string, string][] = (() => {
+  const inputs = SAMPLE_DEAL.model.inputs;
+  const irr = (over: Partial<typeof inputs>) => {
+    const r = computeModel({ ...inputs, ...over }).returns.leveredIrrPct;
+    return r == null ? "—" : `IRR ${r.toFixed(1)}%`;
+  };
+  return [
+    ["Purchase price", `$${(inputs.purchasePrice / 1e6).toFixed(0)}M`, irr({})],
+    ["Exit cap", `${inputs.exitCapPct.toFixed(2)}%`, irr({})],
+    ["Exit cap (flexed)", "5.75%", irr({ exitCapPct: 5.75 })],
+    ["Rent growth (flexed)", "2.5%", irr({ rentGrowthPct: 2.5 })],
+  ];
+})();
+
 const FREE_FEATURES = [
-  "3 deals, the full six-stage screen on each",
+  `${FREE_DEALS} deals, the full six-stage screen on each`,
   "Sourced ranges + the three deal-killers",
   "Risk digest and side-by-side deal comparison",
   "Reconcile your own underwriting model",
@@ -118,8 +157,9 @@ const FREE_FEATURES = [
 
 const PRO_FEATURES = [
   "Unlimited deals",
-  "First-draft Excel model with IRR sensitivity",
-  "One-page PDF screening memo",
+  "Excel models — first-draft + institutional underwrite.xlsx",
+  "IC memo, full PDF report, and LOI draft",
+  "Your firm's branding on memos, reports, workbooks & LOI",
   "Public-web comp search",
   "Everything in Free",
 ];
@@ -127,7 +167,7 @@ const PRO_FEATURES = [
 const FAQ: { q: string; a: string }[] = [
   {
     q: "What do I need to get started?",
-    a: "Just an offering memorandum as a PDF. Upload it and the screen runs on its own — a first read with the headline numbers lands in about half a minute, then extraction, assumption challenges, comp scrutiny, market check, and a verdict. Add a rent roll, T-12, or loan terms later to deepen the model. You can also explore a fully-worked sample deal before uploading anything.",
+    a: `Just an offering memorandum as a PDF. Upload it and the screen runs on its own — a first read with the headline numbers lands in ${FIRST_READ_CLAIM}, then extraction, assumption challenges, comp scrutiny, market check, and a verdict. Add a rent roll, T-12, or loan terms later to deepen the model. You can also explore a fully-worked sample deal before uploading anything.`,
   },
   {
     q: "Where do the numbers come from?",
@@ -147,7 +187,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Can my team share one pipeline?",
-    a: "Yes. Create a team, send teammates an invite link, and every deal anyone uploads lands in one shared pipeline — same screens, verdicts, models, and memos for everyone. The Team plan is $49.99 per month — which includes the account owner — plus $9.99 per month for each added member, on one subscription that adjusts automatically as people join or leave.",
+    a: `Yes. Create a team, send teammates an invite link, and every deal anyone uploads lands in one shared pipeline — same screens, verdicts, models, and memos for everyone. The Team plan is ${PRICE_TEAM_BASE_MONTHLY} per month — which includes the account owner — plus ${PRICE_TEAM_MEMBER_MONTHLY} per month for each added member, on one subscription that adjusts automatically as people join or leave.`,
   },
   {
     q: "Can I cancel anytime?",
@@ -168,11 +208,11 @@ const JSON_LD = {
         "CRE deal screening that runs every offering memorandum through the same disciplined screen: sourced ranges, the three deal-killers, and a Go / No-go that shows its work before you open a model.",
       offers: [
         { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD" },
-        { "@type": "Offer", name: "Pro", price: "29.99", priceCurrency: "USD" },
+        { "@type": "Offer", name: "Pro", price: PRICE_PRO_MONTHLY.replace("$", ""), priceCurrency: "USD" },
         {
           "@type": "Offer",
-          name: "Team (base includes the owner; each added member $9.99)",
-          price: "49.99",
+          name: `Team (base includes the owner; each added member ${PRICE_TEAM_MEMBER_MONTHLY})`,
+          price: PRICE_TEAM_BASE_MONTHLY.replace("$", ""),
           priceCurrency: "USD",
         },
       ],
@@ -315,14 +355,16 @@ export default function Home() {
                 </h1>
                 <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/70 max-sm:hidden">
                   Two analysts can take the same deal on the same afternoon and
-                  land 200 bps apart — different rents, different exit caps,
-                  different expense loads, all called &ldquo;judgment.&rdquo;
+                  land {SPREAD_BPS} bps apart — all called &ldquo;judgment.&rdquo;
                   Underwrite Copilot runs every deal through the same
-                  disciplined screen, so the answer depends on the deal — not
-                  on who opened the model.
+                  disciplined screen: it extracts the OM, reconciles it against
+                  the rent roll and T-12, scrutinizes the comps, and hands back
+                  a verdict with a 0–100 fit score against your buy box — so
+                  the answer depends on the deal, not on who opened the model.
                 </p>
                 <p className="mt-6 text-lg leading-relaxed text-white/70 sm:hidden">
-                  Two analysts, same OM, 200 bps apart. Copilot runs every deal
+                  Two analysts, same OM, {SPREAD_BPS} bps apart. Copilot runs
+                  every deal
                   through the same six-stage screen — so the answer depends on
                   the deal, not the analyst.
                 </p>
@@ -342,7 +384,7 @@ export default function Home() {
                 </div>
                 <p className="mt-5 max-w-xl text-sm leading-relaxed text-white/55">
                   Upload an OM → sourced ranges, the three deal-killers, and a
-                  Go / Caution / No-go in minutes. First 3 deals free · no
+                  Go / Caution / No-go in {FULL_SCREEN_CLAIM}. First {FREE_DEALS} deals free · no
                   card.
                 </p>
               </div>
@@ -403,18 +445,18 @@ export default function Home() {
               <div className="flex items-end justify-between gap-4">
                 <div>
                   <p className="font-mono text-2xl font-semibold tabular-nums sm:text-3xl">
-                    12%
+                    {SPREAD_LOW_IRR_PCT}%
                   </p>
                   <p className="mt-0.5 text-xs text-muted">
                     Analyst B · IRR · &ldquo;pass&rdquo;
                   </p>
                 </div>
                 <span className="mb-1 hidden rounded-full bg-caution/10 px-3 py-1 text-xs font-semibold text-caution sm:block">
-                  200 bps apart
+                  {SPREAD_BPS} bps apart
                 </span>
                 <div className="text-right">
                   <p className="font-mono text-2xl font-semibold tabular-nums sm:text-3xl">
-                    14%
+                    {SPREAD_HIGH_IRR_PCT}%
                   </p>
                   <p className="mt-0.5 text-xs text-muted">
                     Analyst A · IRR · &ldquo;buy&rdquo;
@@ -446,7 +488,7 @@ export default function Home() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Analyst B</span>
                   <span className="rounded-full bg-kill/10 px-2.5 py-1 text-xs font-medium text-kill">
-                    Pass · 6% IRR
+                    Pass · {SPREAD_LOW_IRR_PCT}% IRR
                   </span>
                 </div>
                 <p className="mt-2 text-sm leading-relaxed text-muted">
@@ -457,7 +499,7 @@ export default function Home() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Analyst A</span>
                   <span className="rounded-full bg-pass/10 px-2.5 py-1 text-xs font-medium text-pass">
-                    Buy · 14% IRR
+                    Buy · {SPREAD_HIGH_IRR_PCT}% IRR
                   </span>
                 </div>
                 <p className="mt-2 text-sm leading-relaxed text-muted">
@@ -509,7 +551,7 @@ export default function Home() {
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
               A first read — headline numbers and buy-box fit — lands in about
-              half a minute, while the six deeper stages keep working.
+              {FIRST_READ_CLAIM}, while the six deeper stages keep working.
             </p>
             <Reveal delay={60}>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -544,12 +586,137 @@ export default function Home() {
                   Watch it run on your own deal.
                 </span>{" "}
                 Upload an OM and the whole screen — ranges, deal-killers,
-                verdict — comes back in minutes.
+                verdict — comes back in {FULL_SCREEN_CLAIM}.
               </p>
               <p className="text-sm font-semibold text-accent transition-transform group-hover:translate-x-0.5">
                 Screen a deal free →
               </p>
             </Link>
+          </div>
+        </section>
+
+        {/* The toolkit — concrete feature callouts, all shipping today. */}
+        <section id="toolkit" className="scroll-mt-16">
+          <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
+            <Reveal>
+              <p className="text-xs font-medium uppercase tracking-wider text-muted">
+                The toolkit
+              </p>
+              <h2 className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">
+                Built around the numbers that decide deals.
+              </h2>
+            </Reveal>
+            <Reveal delay={80}>
+              <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {(
+                  [
+                    [
+                      "OM + rent roll + T-12, one model",
+                      "Upload the actuals and the screen re-anchors itself — in-place occupancy, WALT, actual NOI — and flags where the OM's pro forma drifts from the trailing twelve.",
+                    ],
+                    [
+                      "Drag the levers, watch it break",
+                      `Exit cap across ±${SLIDER_SWEEP_BPS}bps, rent growth, vacancy — IRR, equity multiple, DSCR, and your mandate fit recompute on every tick of the slider. No re-screen, no waiting.`,
+                    ],
+                    [
+                      "Your buy box, scored 0–100",
+                      "Every deal reads PURSUE / WATCH / PASS against your mandate — cap floor, return targets, geographies, hard dealbreakers — from the first signal onward.",
+                    ],
+                    [
+                      "Comps on a map, not a list",
+                      "OM and public-web comps pinned around the subject with distance and basis. Sourced from public reporting — never MLS, CoStar, or a licensed feed.",
+                    ],
+                    [
+                      "Financing & capital, sized",
+                      "Max loan under LTV / DSCR / debt-yield with the binding constraint flagged — plus payments, rate moves, breakeven occupancy, and the capital plan.",
+                    ],
+                    [
+                      "From verdict to to-do list",
+                      "One click turns the verdict's next steps into assigned tasks with due dates — then the memo exports under your own firm's name and logo (Pro).",
+                    ],
+                  ] as const
+                ).map(([title, body]) => (
+                  <div
+                    key={title}
+                    className="hover-lift rounded-xl border border-line bg-surface p-5 shadow-card hover:border-brand/30"
+                  >
+                    <h3 className="border-b border-brand/10 pb-2.5 font-medium">
+                      {title}
+                    </h3>
+                    <p className="mt-2.5 text-sm leading-relaxed text-muted">
+                      {body}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </Reveal>
+            {/* The workflow around the analysis — every item real and live,
+                pulled from the product audit, one line each. */}
+            <Reveal delay={120}>
+              <div className="mt-10 rounded-2xl border border-line bg-faint/60 p-6">
+                <h3 className="text-sm font-semibold tracking-tight">
+                  And the workflow around it
+                </h3>
+                <ul className="mt-4 grid gap-x-8 gap-y-2.5 text-sm leading-relaxed text-muted sm:grid-cols-2">
+                  {(
+                    [
+                      [
+                        "First signal in seconds",
+                        "headline numbers and buy-box fit land while the six deeper stages keep working",
+                      ],
+                      [
+                        "Click any number, open the page",
+                        "every extracted figure carries its OM page — click through and verify at the source",
+                      ],
+                      [
+                        "Ask the deal",
+                        "question the OM in plain English; answers cite the pages they came from",
+                      ],
+                      [
+                        "LOI draft in one click",
+                        "a conservative non-binding letter (.docx) prefilled from the screen's figures",
+                      ],
+                      [
+                        "A pipeline, not a folder",
+                        "stages, offer deadlines, search, side-by-side compare, and meeting-ready Excel/CSV exports",
+                      ],
+                      [
+                        "Your own market memory",
+                        "cap-rate and basis ranges built from your past screens — private to your account",
+                      ],
+                      [
+                        "Share a read-only link",
+                        "send a partner the screen without an account; links expire and can be revoked",
+                      ],
+                      [
+                        "Retrade watch",
+                        "broker reissues the deck? Replace the OM and see exactly what moved since last screen",
+                      ],
+                    ] as const
+                  ).map(([title, body]) => (
+                    <li key={title} className="flex gap-2.5">
+                      <span
+                        aria-hidden
+                        className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand"
+                      />
+                      <span>
+                        <span className="font-medium text-ink">{title}</span>{" "}
+                        — {body}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Reveal>
+            <p className="mt-4 text-center text-xs text-muted">
+              Every tile above is live in the product today —{" "}
+              <Link
+                href="/demo"
+                className="font-medium text-brand underline-offset-2 hover:underline"
+              >
+                see them on the sample screen →
+              </Link>
+            </p>
           </div>
         </section>
 
@@ -570,16 +737,17 @@ export default function Home() {
                 <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card lg:col-span-2">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="text-sm font-semibold">
-                      First-draft Excel model, alive
+                      The Excel model, alive
                     </h3>
                     <span className="rounded-full bg-faint px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
                       Sample
                     </span>
                   </div>
                   <p className="mt-1 max-w-md text-xs leading-relaxed text-muted">
-                    Not a static report — the workbook carries live formulas.
-                    Edit the tinted inputs and IRR, equity multiple, and the
-                    whole cash flow recalculate.
+                    Not a static report — seven tabs of live formulas: annual
+                    and monthly cash flow, a full debt schedule, and IRR
+                    sensitivity matrices. Edit the tinted inputs and the whole
+                    book recalculates.
                   </p>
                   <div className="mt-auto pt-4">
                   <div className="overflow-hidden rounded-lg border border-line font-mono text-[11px]">
@@ -588,12 +756,7 @@ export default function Home() {
                       <span className="text-right">Value</span>
                       <span className="text-right">Effect</span>
                     </div>
-                    {[
-                      ["Purchase price", "$68M", "IRR 8.7%"],
-                      ["Exit cap", "5.50%", "IRR 8.7%"],
-                      ["Exit cap (flexed)", "5.75%", "IRR 7.1%"],
-                      ["Rent growth (flexed)", "3.0%", "IRR 7.6%"],
-                    ].map(([k, v, e], i) => (
+                    {XLSX_PREVIEW_ROWS.map(([k, v, e], i) => (
                       <div
                         key={k}
                         className={`grid grid-cols-4 px-3 py-1.5 ${i >= 2 ? "bg-caution/5" : "bg-surface"}`}
@@ -676,10 +839,7 @@ export default function Home() {
                     favorable, unfavorable, or noise.
                   </p>
                   <div className="mt-auto space-y-1.5 pt-4 font-mono text-[10px]">
-                    {[
-                      ["Exit cap", "you 5.75 · OM 5.25", "+50 bps"],
-                      ["Yr-1 rents", "you $1.41k · OM $1.54k", "−8.4%"],
-                    ].map(([k, v, d]) => (
+                    {SAMPLE_RECONCILE_ROWS.map(([k, v, d]) => (
                       <div
                         key={k}
                         className="flex items-center justify-between gap-2 rounded-md border border-line px-2.5 py-1.5"
@@ -697,7 +857,7 @@ export default function Home() {
                   <h3 className="text-sm font-semibold">One team, one pipeline</h3>
                   <p className="mt-1 text-xs leading-relaxed text-muted">
                     Invite your team with a link — everyone screens into the
-                    same pipeline, with the same verdicts. $9.99 per added
+                    same pipeline, with the same verdicts. {PRICE_TEAM_MEMBER_MONTHLY} per added
                     member.
                   </p>
                   <div className="mt-auto flex items-center gap-3 pt-4">
@@ -738,7 +898,7 @@ export default function Home() {
                     </div>
                     <div className="flex items-center justify-between rounded-md border border-pass/25 bg-pass/[0.04] px-2.5 py-1.5 font-mono text-[10px]">
                       <span className="text-muted">Asking price</span>
-                      <span className="font-semibold text-pass">−$1.8M (−2.5%)</span>
+                      <span className="font-semibold text-pass">{SAMPLE_RETRADE_DELTA}</span>
                     </div>
                   </div>
                 </div>
@@ -832,7 +992,7 @@ export default function Home() {
                   <span className="text-4xl font-semibold tracking-tight">$0</span>
                 </p>
                 <p className="mt-1 text-sm text-muted">
-                  The full screen, on your next three deals.
+                  The full screen, on your next {FREE_DEALS} deals.
                 </p>
                 <ul className="mt-5 flex-1 space-y-2.5">
                   {FREE_FEATURES.map((f) => (
@@ -859,7 +1019,7 @@ export default function Home() {
                 </span>
                 <p className="text-sm font-semibold">Pro</p>
                 <p className="mt-2 flex items-baseline gap-1">
-                  <span className="text-4xl font-semibold tracking-tight">$29.99</span>
+                  <span className="text-4xl font-semibold tracking-tight">{PRICE_PRO_MONTHLY}</span>
                   <span className="text-sm text-muted">/month</span>
                 </p>
                 <p className="mt-1 text-sm text-muted">
@@ -890,11 +1050,11 @@ export default function Home() {
               <div className="shadow-card flex flex-col rounded-2xl border border-line bg-surface p-6">
                 <p className="text-sm font-semibold">Team</p>
                 <p className="mt-2 flex items-baseline gap-1">
-                  <span className="text-4xl font-semibold tracking-tight">$49.99</span>
+                  <span className="text-4xl font-semibold tracking-tight">{PRICE_TEAM_BASE_MONTHLY}</span>
                   <span className="text-sm text-muted">/month</span>
                 </p>
                 <p className="mt-1 text-sm text-muted">
-                  Includes the owner, + $9.99/month per added member. One
+                  Includes the owner, + {PRICE_TEAM_MEMBER_MONTHLY}/month per added member. One
                   shared pipeline for the whole shop.
                 </p>
                 <ul className="mt-5 flex-1 space-y-2.5">
@@ -903,7 +1063,7 @@ export default function Home() {
                     "One shared pipeline — same deals, same verdicts",
                     "Invite teammates with a link",
                     "Billing follows your seat count automatically",
-                    "3 shared deals free to try it",
+                    `${FREE_DEALS} shared deals free to try it`,
                   ].map((f) => (
                     <li key={f} className="flex items-start gap-2.5 text-sm">
                       <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[10px] font-bold text-brand">
@@ -989,7 +1149,7 @@ export default function Home() {
               </Link>
             </div>
             <p className="mt-4 text-xs text-white/50">
-              First 3 deals free · no credit card
+              First {FREE_DEALS} deals free · no credit card
             </p>
           </div>
         </section>
@@ -1018,6 +1178,11 @@ export default function Home() {
                 <a href="#screen" className="text-muted transition-colors hover:text-ink">
                   How it works
                 </a>
+              </li>
+              <li>
+                <Link href="/why" className="text-muted transition-colors hover:text-ink">
+                  Why Underwrite Copilot
+                </Link>
               </li>
               <li>
                 <Link href="/demo" className="text-muted transition-colors hover:text-ink">
@@ -1153,8 +1318,7 @@ function DealPreview() {
             </span>
           </div>
           <p className="mt-1.5 text-xs leading-relaxed text-muted">
-            $274k/unit is 7% above the last two comparable trades with no
-            renovation premium to justify it.
+            {SAMPLE_COMP_PREMIUM_LINE}
           </p>
         </div>
       </div>

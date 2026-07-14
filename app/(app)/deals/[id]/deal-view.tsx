@@ -12,13 +12,29 @@ import type {
   VerdictResult,
 } from "@/lib/anthropic/types";
 import type { BuyBoxCheck } from "@/lib/criteria";
+import type { MandateScore, MandateVerdict } from "@/lib/mandate";
+import {
+  fmtCapRange,
+  fmtBasisRange,
+  type MarketGroup,
+} from "@/lib/market-memory";
+import { PropertyActuals, type ActualsData } from "./property-actuals";
+import { ActualsPrompt, type ActualsSlotState } from "./actuals-prompt";
+import { SensitivityPlayground, type PlaygroundData } from "./sensitivity-playground";
 import { type StageChange } from "@/lib/stages";
 import type { InternalComp } from "@/lib/internal-comps";
 import { DebtSizer } from "./debt-sizer";
+import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import { DecisionLog } from "./decision-log";
+import { SampleGuide } from "./sample-guide";
+import { DealTasks } from "./deal-tasks";
+import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
 import { AskPanel } from "./ask-panel";
+import { ReconciliationPanel } from "./reconciliation-panel";
+import type { ReconcileResult } from "@/lib/reconcile";
 import { LoiPanel } from "./loi-panel";
 import type { DealNote, AskEntry } from "@/lib/deals";
+import type { DealFact } from "@/lib/facts";
 import { parseUsd } from "@/lib/money";
 import type { ScreenDiff } from "@/lib/screen-diff";
 import {
@@ -139,7 +155,7 @@ const MODEL_ERRORS: Record<string, string> = {
     "Your model didn’t finish uploading — nothing was changed. Please try again.",
   omfile: "Choose the reissued OM (PDF) to upload.",
   ompdf: "The replacement OM must be a PDF.",
-  omsize: "That PDF is larger than 22 MB — please try a smaller file.",
+  omsize: "That PDF is larger than 32 MB — please try a smaller file.",
   omupload:
     "The upload didn’t complete — the stored OM is unchanged. Please try again.",
   ompermission:
@@ -166,6 +182,11 @@ const MODEL_ERRORS: Record<string, string> = {
   note: "Couldn’t save your note — please try again.",
   noteempty: "Write something in the note first — whitespace doesn’t count.",
   notedelete: "Couldn’t remove that note — please try again.",
+  task: "Couldn’t save that task — please try again.",
+  taskempty: "Give the task a short title first.",
+  taskassignee: "That assignee isn’t on this deal’s team anymore — pick again.",
+  taskdelete: "Couldn’t remove that task — please try again.",
+  tasknosteps: "This verdict has no next steps to import.",
   share: "Couldn’t manage that share link — please try again.",
   loipro:
     "The LOI draft is part of Pro — upgrade on the Billing page to generate it.",
@@ -181,6 +202,12 @@ const MODEL_ERRORS: Record<string, string> = {
   reportempty: "Run the screen first — the full report needs a verdict to export.",
   reportfail:
     "Couldn’t build the full report just now — please try again in a moment.",
+  underwritepro:
+    "The Excel underwriting model is part of Pro — upgrade on the Billing page to download it.",
+  underwriteempty:
+    "Run the screen first — the model builds from the OM’s extracted terms.",
+  underwritefail:
+    "Couldn’t build the Excel model just now — please try again in a moment.",
   shareempty: "Run the screen first — a share link leads with the verdict.",
   deadline: "Couldn’t save the offers-due date — please try again.",
 };
@@ -235,6 +262,8 @@ const SECTION_STEPS: Record<SectionKey, string[]> = {
 
 export interface BuyBoxPanelData {
   checks: BuyBoxCheck[];
+  /** the single 0–100 mandate-fit score + PURSUE/WATCH/PASS (null pre-screen) */
+  mandate: MandateScore | null;
   scope: "team" | "personal";
   /** the checks came from the first signal, not the full extraction yet */
   provisional: boolean;
@@ -260,11 +289,19 @@ export function DealView({
   stageHistory,
   internalComps = [],
   omUrl,
+  facts = {},
+  discrepancies = null,
   notes = [],
   userEmail = null,
   qa = [],
   isSample = false,
   userId = null,
+  marketMemory = null,
+  actuals = { rentRoll: null, t12: null, noiComparison: null },
+  playground = null,
+  tasks = null,
+  taskAssignees = [],
+  todayIso = "",
 }: {
   dealId: string;
   dealName: string;
@@ -284,11 +321,21 @@ export function DealView({
   stageHistory: StageChange[];
   internalComps?: InternalComp[];
   omUrl: string | null;
+  facts?: Record<string, DealFact>;
+  discrepancies?: ReconcileResult | null;
   notes?: DealNote[];
   userEmail?: string | null;
   qa?: AskEntry[];
   isSample?: boolean;
   userId?: string | null;
+  marketMemory?: MarketGroup | null;
+  actuals?: ActualsData;
+  playground?: PlaygroundData | null;
+  /** null = deal_tasks table not migrated yet (card hidden) */
+  tasks?: DealTask[] | null;
+  taskAssignees?: TaskAssignee[];
+  /** yyyy-mm-dd (UTC) from the server, for stable overdue/date rendering */
+  todayIso?: string;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -636,12 +683,48 @@ export function DealView({
       >
         {section === "overview" && (
           <div className="flex flex-col gap-6">
+            {isSample && <SampleGuide />}
             {screenDiff && <SinceLastScreen diff={screenDiff} />}
+            {discrepancies && discrepancies.discrepancies.length > 0 && (
+              <ReconciliationPanel dealId={dealId} result={discrepancies} />
+            )}
+            {marketMemory && <MarketMemoryStrip group={marketMemory} />}
+            <PropertyActuals data={actuals} />
+            {/* Feature 1: prompt for the actuals docs. Hidden while a screen
+                runs, on the sample, and once both docs are folded in. */}
+            {(() => {
+              if (active || isSample || !hasOm) return null;
+              const slot = (
+                kind: "rent_roll" | "t12",
+                stored: boolean,
+              ): ActualsSlotState =>
+                stored
+                  ? "done"
+                  : documents.some((d) => d.kind === kind)
+                    ? "uploaded"
+                    : "missing";
+              const rrState = slot("rent_roll", !!actuals.rentRoll);
+              const t12State = slot("t12", !!actuals.t12);
+              if (rrState === "done" && t12State === "done") return null;
+              return (
+                <ActualsPrompt dealId={dealId} rentRoll={rrState} t12={t12State} />
+              );
+            })()}
             <OverviewView
               results={results}
               active={active}
               onNavigate={navigateLegacy}
             />
+            {playground && <SensitivityPlayground data={playground} />}
+            {tasks !== null && (
+              <DealTasks
+                dealId={dealId}
+                tasks={tasks}
+                assignees={taskAssignees}
+                todayIso={todayIso}
+                verdictSteps={results.verdict?.nextSteps}
+              />
+            )}
             <AskPanel
               dealId={dealId}
               qa={qa}
@@ -670,6 +753,9 @@ export function DealView({
             documents={documents}
             isPro={isPro}
             supplement={supplements["terms"]}
+            facts={facts}
+            omUrl={omUrl}
+            underwrite={playground?.inputs ?? null}
           />
         )}
 
@@ -691,6 +777,7 @@ export function DealView({
             modelError={modelErrorCode ? MODEL_ERRORS[modelErrorCode] ?? null : null}
             supplements={supplements}
             internalComps={internalComps}
+            omUrl={omUrl}
           />
         )}
 
@@ -736,6 +823,9 @@ function FinancialsPanel({
   documents,
   isPro,
   supplement,
+  facts = {},
+  omUrl = null,
+  underwrite = null,
 }: {
   results: Results;
   active: boolean;
@@ -746,11 +836,14 @@ function FinancialsPanel({
   documents: DealDocument[];
   isPro: boolean;
   supplement: TabSupplement | undefined;
+  facts?: Record<string, DealFact>;
+  omUrl?: string | null;
+  underwrite?: UnderwriteInputs | null;
 }) {
   return (
     <div className="flex flex-col gap-6">
       {results.extraction ? (
-        <TermsView result={results.extraction} />
+        <TermsView result={results.extraction} facts={facts} omUrl={omUrl} />
       ) : active && (step === "extract" || step === "signal") ? (
         <StatGridSkeleton />
       ) : hasOm ? (
@@ -761,6 +854,14 @@ function FinancialsPanel({
       ) : (
         <EmptyState title="No OM uploaded for this deal." />
       )}
+
+      {/* FINANCING & CAPITAL directly after the terms (Bug 11) — the debt
+          story is a first-read, not an appendix behind the Excel block. */}
+      <DebtSizer
+        model={model}
+        extraction={results.extraction}
+        underwrite={underwrite}
+      />
 
       <details
         className="rounded-2xl border border-line bg-surface shadow-card"
@@ -785,16 +886,129 @@ function FinancialsPanel({
         </div>
       </details>
 
-      <DebtSizer model={model} extraction={results.extraction} />
-
       {supplement && <Supplements dealId={dealId} tab="terms" data={supplement} />}
       <AddData dealId={dealId} tab="terms" />
     </div>
   );
 }
 
+const MANDATE_META: Record<
+  MandateVerdict,
+  { label: string; text: string; bar: string; chip: string }
+> = {
+  PURSUE: { label: "Pursue", text: "text-pass", bar: "bg-pass", chip: "bg-pass/15 text-pass" },
+  WATCH: { label: "Watch", text: "text-caution", bar: "bg-caution", chip: "bg-caution/15 text-caution" },
+  PASS: { label: "Pass", text: "text-kill", bar: "bg-kill", chip: "bg-kill/15 text-kill" },
+};
+
+/** The 0–100 mandate-fit score as a headline gauge: the number, the
+ *  PURSUE/WATCH/PASS call, a bar with the 50/75 verdict thresholds marked, and
+ *  the honest coverage line (what was scored, what's still pending). */
+function MandateScoreHeader({
+  mandate,
+  unscored,
+}: {
+  mandate: MandateScore;
+  /** buy-box criteria that are checked (below) but not part of the fit score */
+  unscored: string[];
+}) {
+  const score = mandate.score!;
+  const meta = MANDATE_META[mandate.verdict!];
+  const scored = mandate.dimensions.filter((d) => d.status !== "unknown").length;
+  const pending = mandate.dimensions.length - scored;
+
+  return (
+    <div className="mt-3 rounded-xl border border-line bg-faint/60 p-4">
+      <div className="flex items-center gap-4">
+        <div className="flex items-baseline gap-1">
+          <span className={`text-4xl font-semibold tabular-nums tracking-tight ${meta.text}`}>
+            {score}
+          </span>
+          <span className="text-sm text-muted">/ 100</span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span
+              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${meta.chip}`}
+            >
+              {meta.label}
+            </span>
+            <span className="text-xs text-muted">mandate fit</span>
+          </div>
+          {/* The bar, with the WATCH (50) and PURSUE (75) thresholds ticked. */}
+          <div className="relative mt-2 h-2 w-full overflow-hidden rounded-full bg-line">
+            <div
+              className={`h-full rounded-full ${meta.bar}`}
+              style={{ width: `${score}%` }}
+            />
+            <span className="absolute inset-y-0 left-[50%] w-px bg-surface/70" aria-hidden />
+            <span className="absolute inset-y-0 left-[75%] w-px bg-surface/70" aria-hidden />
+          </div>
+        </div>
+      </div>
+      <p className="mt-2.5 text-xs leading-relaxed text-muted">
+        {mandate.dealbreakerTripped ? (
+          <span className="font-medium text-kill">
+            A hard dealbreaker was tripped — capped at Pass regardless of the rest.{" "}
+          </span>
+        ) : null}
+        Scored on {scored} of {mandate.dimensions.length} mandate dimension
+        {mandate.dimensions.length === 1 ? "" : "s"}
+        {pending > 0 ? `, ${pending} pending more data` : ""}.
+        {unscored.length
+          ? ` ${unscored.join(" and ")} ${unscored.length > 1 ? "are" : "is"} checked below but not part of the fit score.`
+          : ""}
+        {mandate.unresolvedDealbreakers > 0 && !mandate.dealbreakerTripped
+          ? ` ${mandate.unresolvedDealbreakers} dealbreaker${mandate.unresolvedDealbreakers > 1 ? "s" : ""} couldn't be checked — verify manually.`
+          : ""}
+      </p>
+    </div>
+  );
+}
+
+/** Deal memory (Feature 6): what this account's OWN past screens of the same
+ *  market + asset class looked like — a one-line read at the point of decision,
+ *  linking to the full Market data page. Never a teammate's or another
+ *  account's deals. */
+function MarketMemoryStrip({ group }: { group: MarketGroup }) {
+  const bits: string[] = [];
+  if (group.cap) bits.push(`going-in cap ${fmtCapRange(group.cap)}`);
+  if (group.perUnit) bits.push(`basis ${fmtBasisRange(group.perUnit)}`);
+  return (
+    <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold tracking-tight">
+          From your past screens
+        </h2>
+        <Link
+          href="/market"
+          className="text-xs font-medium text-brand transition-colors hover:text-brand-strong"
+        >
+          Your market data →
+        </Link>
+      </div>
+      <p className="mt-1 text-sm leading-relaxed text-muted">
+        You&apos;ve screened{" "}
+        <span className="font-medium text-ink">{group.count}</span> other{" "}
+        {group.market} <span className="capitalize">{group.assetClass}</span>{" "}
+        deal{group.count === 1 ? "" : "s"}
+        {bits.length ? (
+          <>
+            : <span className="text-ink">{bits.join(" · ")}</span>
+          </>
+        ) : (
+          ""
+        )}
+        .
+      </p>
+    </section>
+  );
+}
+
 /** The mandate check, full detail — the bar carries only the chip. */
-function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
+// Exported so the public sample screen (/demo) can render the SAME panel a
+// logged-in user gets, driven by a fixture box.
+export function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
   if (!data.hasBox) {
     return (
       <EmptyState
@@ -838,6 +1052,15 @@ function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
           Edit criteria →
         </Link>
       </div>
+      {data.mandate?.score != null && data.mandate.verdict && (
+        <MandateScoreHeader
+          mandate={data.mandate}
+          // Criteria the fold checks below but the 0–100 score doesn't weigh.
+          unscored={data.checks
+            .filter((c) => c.label === "Price" || c.label === "Basis / unit")
+            .map((c) => (c.label === "Basis / unit" ? "basis / unit" : "price"))}
+        />
+      )}
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {data.checks.map((c) => (
           <div
@@ -914,6 +1137,7 @@ function AnalysesPanel({
   modelError,
   supplements,
   internalComps,
+  omUrl,
 }: {
   analysis: AnalysisKey;
   onSelect: (key: AnalysisKey) => void;
@@ -929,6 +1153,7 @@ function AnalysesPanel({
   modelError: string | null;
   supplements: SupplementsMap;
   internalComps: InternalComp[];
+  omUrl: string | null;
 }) {
   const STEP_FOR: Record<AnalysisKey, string> = {
     verdict: "verdict",
@@ -992,6 +1217,12 @@ function AnalysesPanel({
           compSearch={compSearch}
           active={active}
           isPro={isPro}
+          mapContext={{
+            subjectLabel:
+              results.extraction?.address || results.extraction?.market || "",
+            market: results.extraction?.market ?? "",
+            omUrl,
+          }}
         />
       ) : (
         <MarketCheck result={results.market!} />
@@ -1145,7 +1376,7 @@ function DocumentsPanel({
                 href={`/api/deals/${dealId}/memo`}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
               >
-                Download the one-page memo (PDF)
+                Download the IC memo (PDF)
               </a>
             ) : (
               <Link

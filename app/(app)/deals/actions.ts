@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   uploadOmPdf,
   removeStorageFiles,
@@ -30,9 +31,11 @@ import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { parseDealNotes } from "@/lib/deals";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 
-// Keep PDFs comfortably under Claude's ~32MB per-request limit (base64 inflates
-// the payload ~33%). Larger files will use the Files API in a later pass.
-const MAX_BYTES = 22 * 1024 * 1024;
+// Claude's document limit is 32MB of raw PDF. Small OMs ride inline in the
+// request; anything past the base64-inflation ceiling uploads once via the
+// Files API and is referenced by id (lib/anthropic/om-source.ts), so the full
+// 32MB — roughly 600 pages — is actually usable.
+const MAX_BYTES = 32 * 1024 * 1024;
 
 // Accepted formats for the buyer's own underwriting model (Phase 5 reconciler).
 const MODEL_EXT = /\.(xlsx|xls|csv|pdf)$/i;
@@ -237,7 +240,9 @@ export async function createSampleDeal() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // Already have one? Open it instead of inserting a duplicate.
+  // Already have one? Open it instead of inserting a duplicate — after
+  // topping up anything the fixture gained since it was created (a sample
+  // made before the actuals existed self-heals on the next open).
   const { data: existing } = await supabase
     .from("deals")
     .select("id")
@@ -245,7 +250,10 @@ export async function createSampleDeal() {
     .eq("is_sample", true)
     .limit(1)
     .maybeSingle();
-  if (existing) redirect(`/deals/${existing.id}`);
+  if (existing) {
+    await seedSampleActuals(existing.id as string);
+    redirect(`/deals/${existing.id}`);
+  }
 
   const { data: deal, error } = await supabase
     .from("deals")
@@ -266,8 +274,54 @@ export async function createSampleDeal() {
     .single();
   if (error || !deal) redirect("/deals?error=save");
 
+  await seedSampleActuals(deal.id as string);
+
   revalidatePath("/deals");
   redirect(`/deals/${deal.id}`);
+}
+
+/**
+ * Property actuals (Feature 1) on the sample, so the PROPERTY ACTUALS card,
+ * the OM-vs-T-12 note, and the actuals-anchored playground all demo without
+ * an upload. Idempotent (skips rows that already exist) so it can run on
+ * every open of an existing sample. Service-role writes (0020's tables are
+ * user-read-only); best-effort — a pre-0020 schema just leaves the sample
+ * OM-only.
+ */
+async function seedSampleActuals(dealId: string): Promise<void> {
+  try {
+    const admin = createSupabaseAdminClient();
+    const [rr, t12] = await Promise.all([
+      admin
+        .from("deal_rent_rolls")
+        .select("id", { count: "exact", head: true })
+        .eq("deal_id", dealId),
+      admin
+        .from("deal_t12_statements")
+        .select("id", { count: "exact", head: true })
+        .eq("deal_id", dealId),
+    ]);
+    // A count query against a missing table returns an error — treat any
+    // uncertainty as "don't touch".
+    if (!rr.error && (rr.count ?? 0) === 0) {
+      await admin.from("deal_rent_rolls").insert({
+        deal_id: dealId,
+        as_of_date: SAMPLE_DEAL.rentRoll.as_of_date,
+        extraction: SAMPLE_DEAL.rentRoll.extraction,
+        summary: SAMPLE_DEAL.rentRoll.summary,
+      });
+    }
+    if (!t12.error && (t12.count ?? 0) === 0) {
+      await admin.from("deal_t12_statements").insert({
+        deal_id: dealId,
+        period_end_date: SAMPLE_DEAL.t12.period_end_date,
+        extraction: SAMPLE_DEAL.t12.extraction,
+        summary: SAMPLE_DEAL.t12.summary,
+      });
+    }
+  } catch {
+    // sample still works OM-only
+  }
 }
 
 /** Track where a deal sits in YOUR process — independent of the verdict.

@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
+import { omDocument, omRequestOptions, type OmSource } from "./om-source";
 import { MODELS } from "./models";
 import { ANALYST_SYSTEM, firstSignalInstruction } from "./prompts";
 import type { AssetClass, FirstSignal } from "./types";
@@ -25,7 +26,7 @@ const FirstSignalSchema = z.object({
  * close to free, not a second full read.
  */
 export async function readFirstSignal(
-  pdf: Buffer,
+  om: OmSource,
   assetClass: AssetClass,
 ): Promise<FirstSignal> {
   const client = getAnthropic();
@@ -38,21 +39,13 @@ export async function readFirstSignal(
       {
         role: "user",
         content: [
-          {
-            type: "document",
-            source: {
-              type: "base64",
-              media_type: "application/pdf",
-              data: pdf.toString("base64"),
-            },
-            cache_control: { type: "ephemeral" },
-          },
+          omDocument(om),
           { type: "text", text: firstSignalInstruction(assetClass) },
         ],
       },
     ],
     output_config: { format: zodOutputFormat(FirstSignalSchema) },
-  });
+  }, omRequestOptions(om));
 
   const out = response.parsed_output;
   if (!out) {

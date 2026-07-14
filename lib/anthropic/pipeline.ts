@@ -2,6 +2,7 @@ import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { downloadOmPdf } from "@/lib/storage";
 import { readFirstSignal } from "./first-signal";
+import { omSourceFor, type OmSource } from "./om-source";
 import { extractTerms } from "./extract";
 import { challengeAssumptions } from "./challenge";
 import { scrutinizeComps } from "./comps";
@@ -9,6 +10,11 @@ import { reconcileModel } from "./reconcile";
 import { checkMarket } from "./market";
 import { synthesizeVerdict } from "./verdict";
 import { parseModelFile } from "@/lib/model-parse";
+import { countPdfPages } from "@/lib/pdf";
+import { buildDealFacts, toFactRows } from "@/lib/facts";
+import { runDocReconciliation } from "./reconcile-facts";
+import { runActualsIngestion } from "./actuals-ingest";
+import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxLines } from "@/lib/criteria";
 import { notifyAnalysisReady } from "@/lib/email";
@@ -168,11 +174,15 @@ export async function runAnalysis(
     const pdf = pdfSteps.some((s) => !completed.has(s))
       ? await downloadOmPdf(deal.om_storage_path as string)
       : null;
+    // Inline for anything the request cap carries; one Files-API upload for
+    // larger OMs, which every step then references by id (a resumed run
+    // re-uploads — one extra upload, never a stale reference).
+    const omSource = pdf ? await omSourceFor(pdf) : null;
     // Every use sits inside a `!completed.has(<pdf step>)` guard, so the
     // download above must have run; this just makes that invariant loud.
-    const om = (): Buffer => {
-      if (!pdf) throw new Error("OM was not loaded for a document step.");
-      return pdf;
+    const om = (): OmSource => {
+      if (!omSource) throw new Error("OM was not loaded for a document step.");
+      return omSource;
     };
 
     // Retrade watch: on a RE-screen, snapshot the previous run's results
@@ -243,13 +253,128 @@ export async function runAnalysis(
         .from("deals")
         .update({ extraction, updated_at: new Date().toISOString() })
         .eq("id", dealId);
+
+      // Citation-level provenance (migration 0018): store one deal_facts row
+      // per extracted figure, with its page VALIDATED against the OM's real
+      // length (a page beyond the document is recorded "source not located",
+      // never shown). Best-effort — a pre-0018 schema or a write failure must
+      // never sink the screen.
+      try {
+        // Prefer the model's own page count (it read the native PDF — robust
+        // to object-stream / bookmarked PDFs the byte counter mis-reads); fall
+        // back to the fail-safe byte counter only when the model didn't report.
+        const pageCount =
+          extraction.totalPages && extraction.totalPages > 0
+            ? extraction.totalPages
+            : pdf
+              ? countPdfPages(pdf)
+              : 0;
+        const facts = buildDealFacts(extraction.metrics, pageCount);
+        await admin.from("deal_facts").delete().eq("deal_id", dealId);
+        const rows = toFactRows(dealId, facts);
+        if (rows.length) await admin.from("deal_facts").insert(rows);
+      } catch {
+        // no facts table yet, or a transient write error — carry on.
+      }
+
       await markDone("extract");
+    }
+
+    // Step 1b — multi-document reconciliation (best-effort). Compares the OM
+    // against any rent roll / T-12 / financials and stores the deal's
+    // discrepancies for the panel. Runs before the challenger so the skeptic
+    // can reference red flags; a no-op (and never a failure) when the deal has
+    // only the OM or the reconciliation table isn't there yet.
+    if (!completed.has("reconcile_docs")) {
+      try {
+        await runDocReconciliation(admin, dealId);
+      } catch {
+        // reconciliation is additive — never let it sink the screen
+      }
+      await markDone("reconcile_docs");
+    }
+
+    // Property actuals (Feature 1): structured rent-roll / T-12 ingestion,
+    // stored for the PROPERTY ACTUALS card and the model. Additive and
+    // best-effort — a bad statement never sinks the screen.
+    if (!completed.has("ingest_actuals")) {
+      try {
+        await runActualsIngestion(admin, dealId);
+      } catch {
+        // never let actuals ingestion sink the screen
+      }
+      await markDone("ingest_actuals");
     }
 
     // Step 2 — assumption challenger
     if (!completed.has("challenge")) {
       await patchJob(dealId, { status: "running", step: "challenge", progress: 30 });
-      const challenges = await challengeAssumptions(om(), assetClass);
+      // Feed the reconciliation red flags to the skeptic so it puts concrete
+      // OM-vs-rent-roll / OM-vs-T-12 discrepancies to the broker.
+      let reconNote: string | undefined;
+      try {
+        const { data: dr } = await admin
+          .from("deals")
+          .select("discrepancies, extraction")
+          .eq("id", dealId)
+          .single();
+        const disc = (dr?.discrepancies as {
+          discrepancies?: {
+            label: string;
+            severity: string;
+            values: { docLabel: string; value: string }[];
+          }[];
+        } | null)?.discrepancies ?? [];
+        const flagged = disc.filter((d) => d.severity !== "minor").slice(0, 6);
+        const notes: string[] = [];
+
+        // Feature 1: the OM-assumed vs T-12-actual NOI gap is the skeptic's
+        // first-order fact — a material (>5%) or red-flag (>10%) delta means
+        // the deck's income story isn't what the property produced.
+        try {
+          const { data: t12Row } = await admin
+            .from("deal_t12_statements")
+            .select("summary")
+            .eq("deal_id", dealId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          const t12Noi = (t12Row?.summary as { noi?: number | null } | null)?.noi;
+          const exMetrics =
+            (dr?.extraction as { metrics?: { label: string; value: string }[] } | null)
+              ?.metrics ?? [];
+          // Same shared picker as the actuals card — the note and the card
+          // must reference the same OM figure.
+          const omNoi = pickOmNoi(exMetrics)?.noi ?? null;
+          if (omNoi != null && t12Noi != null && Number.isFinite(t12Noi) && t12Noi !== 0) {
+            const cmp = compareNoi(omNoi, t12Noi);
+            if (cmp.severity !== "in_line") {
+              notes.push(
+                `The OM's assumed NOI ($${Math.round(omNoi).toLocaleString("en-US")}) runs ${(Math.abs(cmp.deltaPct) * 100).toFixed(1)}% ${cmp.direction} the T-12 actual ($${Math.round(t12Noi).toLocaleString("en-US")}) — a ${cmp.severity === "red_flag" ? "red-flag" : "material"} gap between the deck's story and what the property produced.`,
+              );
+            }
+          }
+        } catch {
+          // no T-12 stored (or pre-0020 schema) — skip the comparison
+        }
+
+        if (flagged.length) {
+          notes.push(
+            "Cross-document reconciliation flagged these conflicts: " +
+              flagged
+                .map(
+                  (f) =>
+                    `${f.label} (${f.values.map((v) => `${v.docLabel}: ${v.value}`).join(" vs ")})`,
+                )
+                .join("; ") +
+              ".",
+          );
+        }
+        if (notes.length) reconNote = notes.join(" ");
+      } catch {
+        // no discrepancies stored — the challenger runs on the OM alone
+      }
+      const challenges = await challengeAssumptions(om(), assetClass, reconNote);
       await admin
         .from("deals")
         .update({ challenges, updated_at: new Date().toISOString() })
@@ -333,7 +458,7 @@ export async function runReconciliation(
 
     const omPdf = await downloadOmPdf(deal.om_storage_path as string);
     const parsed = await parseModelFile(model.name, model.buffer);
-    const reconciliation = await reconcileModel(omPdf, parsed);
+    const reconciliation = await reconcileModel(await omSourceFor(omPdf), parsed);
 
     await admin
       .from("deals")

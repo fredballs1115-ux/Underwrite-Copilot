@@ -8,7 +8,7 @@ import {
 } from "./actions";
 
 const MAX_FILES = 4;
-const MAX_BYTES = 22 * 1024 * 1024;
+const MAX_BYTES = 32 * 1024 * 1024;
 
 /** "the-maddox_OM_v2.pdf" → "The maddox OM v2" — a starting point the user
  *  can edit before the batch runs. */
@@ -30,7 +30,7 @@ const ERROR_COPY: Record<string, string> = {
   teamlimit: "Team plan limit reached — this one wasn't uploaded.",
   file: "The file didn't arrive — try again.",
   pdf: "Not a valid PDF.",
-  size: "Over the 22 MB limit.",
+  size: "Over the 32 MB limit.",
   save: "Couldn't save the deal — try again.",
   upload: "Upload failed — try again.",
 };
@@ -103,7 +103,7 @@ export function BatchUpload({
         continue;
       }
       if (file.size > MAX_BYTES) {
-        problems.push(`"${file.name}" is over 22 MB — left out.`);
+        problems.push(`"${file.name}" is over 32 MB — left out.`);
         continue;
       }
       if (next.some((it) => it.file.name === file.name && it.file.size === file.size)) {

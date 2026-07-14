@@ -46,7 +46,8 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       // OM PDFs are uploaded through a Server Action; raise the 1MB default.
-      bodySizeLimit: "32mb",
+      // 36mb = the 32MB PDF cap plus multipart/form-field overhead.
+      bodySizeLimit: "36mb",
     },
   },
   async headers() {

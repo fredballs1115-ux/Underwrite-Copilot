@@ -7,6 +7,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
+import { SAMPLE_COMP_PREMIUM_LINE } from "@/lib/marketing-constants";
 
 function prefersReducedMotion(): boolean {
   return (
@@ -235,7 +236,7 @@ function DemoPanel({ tab }: { tab: Tab }) {
           <Killer
             n={1}
             name="Basis"
-            read="$274k/unit is 7% above the last two comparable trades with no renovation premium to justify it."
+            read={SAMPLE_COMP_PREMIUM_LINE}
             severity="kill"
           />
           <Killer

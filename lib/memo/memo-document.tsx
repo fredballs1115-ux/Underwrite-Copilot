@@ -4,10 +4,12 @@ import {
   Page,
   View,
   Text,
+  Image,
   StyleSheet,
 } from "@react-pdf/renderer";
 import type { DealRow } from "@/lib/deals";
 import type { BuyBoxCheck } from "@/lib/criteria";
+import { pdfSafe } from "./pdf-text";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import type {
   ExtractionResult,
@@ -62,13 +64,21 @@ export type MemoData = {
   buyBox: { label: string; status: "pass" | "near" | "miss" | "unknown" }[];
   // One-line retrade summary ("Caution → Go · Price −$1.8M (−2.5%) · …"), or null.
   sinceLast: string | null;
+  /** Custom firm branding (Feature 6, Pro/Team) — null renders the default
+   *  Underwrite Copilot identity. */
+  branding: {
+    firmName: string | null;
+    logoDataUri: string | null;
+    footerText: string | null;
+  } | null;
 };
 
 /** Analysis output and user-shaped rows can carry surprises — numbers where
- *  strings are expected, nulls inside arrays. Every rendered value passes
- *  through here so no conceivable data shape can throw mid-render. */
+ *  strings are expected, nulls inside arrays, glyphs standard Helvetica can't
+ *  encode. Every rendered value passes through here (incl. pdfSafe, same as
+ *  the report's str) so no data shape can throw or mis-render mid-render. */
 const str = (v: unknown): string =>
-  typeof v === "string" ? v : v == null ? "" : String(v);
+  pdfSafe(typeof v === "string" ? v : v == null ? "" : String(v));
 
 const clamp = (v: unknown, n: number) => {
   const s = str(v);
@@ -77,17 +87,17 @@ const clamp = (v: unknown, n: number) => {
 
 const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
-// The PDF's standard Helvetica only carries WinAnsi glyphs \u2014 swap the web
-// UI's arrows/minus signs for safe equivalents or they silently drop.
-// Exported for the full report, which prints far more raw model text.
-export const pdfSafe = (s: string) =>
-  s.replace(/\u2192/g, "\u203a").replace(/[\u2212\u2013]/g, "-");
+// WinAnsi-only text (standard Helvetica can't encode anything else) \u2014 the
+// full filter lives in pdf-text.ts (universal, unit-tested); re-exported here
+// for the full report and any other document module.
+export { pdfSafe };
 
 /** Shape the stored analysis into the flat data the one-page memo renders. */
 export function buildMemoData(
   deal: DealRow,
   dateStr: string,
   buyBoxChecks?: BuyBoxCheck[] | null,
+  branding?: MemoData["branding"],
 ): MemoData {
   const extraction = deal.extraction as ExtractionResult | null;
   const challenges = deal.challenges as ChallengerResult | null;
@@ -244,6 +254,7 @@ export function buildMemoData(
       status: c.status,
     })),
     sinceLast,
+    branding: branding ?? null,
   };
 }
 
@@ -282,6 +293,7 @@ const s = StyleSheet.create({
     marginRight: 6,
   },
   brandText: { fontSize: 11, fontFamily: "Helvetica-Bold" },
+  brandLogo: { height: 22, maxWidth: 130, objectFit: "contain", marginRight: 6 },
   metaRight: { textAlign: "right", color: C.muted, fontSize: 9 },
   divider: { borderBottomWidth: 1, borderBottomColor: C.line, marginVertical: 10 },
   title: { fontSize: 18, fontFamily: "Helvetica-Bold" },
@@ -442,6 +454,16 @@ const s = StyleSheet.create({
     justifyContent: "space-between",
   },
   footerText: { fontSize: 7.5, color: C.muted },
+  footerLeft: { flex: 1, paddingRight: 12 },
+  poweredBy: {
+    position: "absolute",
+    bottom: 13,
+    left: 44,
+    right: 44,
+    fontSize: 8,
+    color: "#8f9995",
+    textAlign: "center",
+  },
 });
 
 function Section({
@@ -463,7 +485,7 @@ export function MemoDocument({ data }: { data: MemoData }) {
   return (
     <Document
       title={`${data.name} — Screening Memo`}
-      author="Underwrite Copilot"
+      author={data.branding?.firmName ?? "Underwrite Copilot"}
     >
       <MemoPage data={data} />
     </Document>
@@ -473,12 +495,25 @@ export function MemoDocument({ data }: { data: MemoData }) {
 /** The memo's single page, exported so the full report can lead with it. */
 export function MemoPage({ data }: { data: MemoData }) {
   const subParts = [data.market, cap(data.assetClass)].filter(Boolean);
+  const b = data.branding;
+  const branded = !!(b && (b.firmName || b.logoDataUri || b.footerText));
   return (
     <Page size="LETTER" style={s.page}>
         <View style={s.header}>
           <View style={s.brandRow}>
-            <Text style={s.badge}>UC</Text>
-            <Text style={s.brandText}>Underwrite Copilot</Text>
+            {b?.logoDataUri ? (
+              // react-pdf's Image has no alt concept (print canvas, not DOM)
+              // eslint-disable-next-line jsx-a11y/alt-text
+              <Image src={b.logoDataUri} style={s.brandLogo} />
+            ) : null}
+            {!b?.logoDataUri && !b?.firmName ? (
+              <Text style={s.badge}>UC</Text>
+            ) : null}
+            {b?.firmName ? (
+              <Text style={s.brandText}>{pdfSafe(b.firmName)}</Text>
+            ) : !b?.logoDataUri ? (
+              <Text style={s.brandText}>Underwrite Copilot</Text>
+            ) : null}
           </View>
           <View>
             <Text style={s.metaRight}>Deal Screening Memo</Text>
@@ -673,12 +708,24 @@ export function MemoPage({ data }: { data: MemoData }) {
         )}
 
         <View style={s.footer} fixed>
+          <View style={s.footerLeft}>
+            {b?.footerText ? (
+              <Text style={s.footerText}>{pdfSafe(b.footerText)}</Text>
+            ) : null}
+            <Text style={s.footerText}>
+              First-pass screen, not investment advice. Verify flagged figures
+              against source documents.
+            </Text>
+          </View>
           <Text style={s.footerText}>
-            First-pass screen, not investment advice. Verify flagged figures
-            against source documents.
+            {b?.firmName ? pdfSafe(b.firmName) : "Underwrite Copilot"}
           </Text>
-          <Text style={s.footerText}>Underwrite Copilot</Text>
         </View>
+        {branded ? (
+          <Text style={s.poweredBy} fixed>
+            Powered by Underwrite Copilot
+          </Text>
+        ) : null}
       </Page>
   );
 }

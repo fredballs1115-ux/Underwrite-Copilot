@@ -18,7 +18,9 @@ services:
     branch: main
     buildCommand: npm install && npm run build
     startCommand: npm start
-    healthCheckPath: /
+    # Dependency-free liveness route (no Supabase/middleware in its path) so
+    # a deploy can't be marked failed by a third-party blip during the check.
+    healthCheckPath: /api/health
     autoDeploy: true
     envVars:
       - key: NODE_VERSION

@@ -12,6 +12,24 @@ import type {
   VerdictResult,
 } from "@/lib/anthropic/types";
 import type { UnderwritingModel, ReconciledMetric } from "@/lib/model/types";
+import type {
+  RentRollExtraction,
+  RentRollSummary,
+  T12Extraction,
+  T12Summary,
+} from "@/lib/actuals/types";
+import type { BuyBox } from "@/lib/criteria";
+
+/** The hypothetical mandate the PUBLIC sample screen judges the deal
+ *  against — chosen so the fit lands WATCH beside the Caution verdict (a
+ *  consistent story: in scope, but short of the return floors). Logged-in
+ *  users see their OWN box here instead. */
+export const SAMPLE_DEMO_BOX: BuyBox = {
+  assetClasses: ["multifamily"],
+  minCapPct: 5.75,
+  minIrrPct: 13,
+  minCoCPct: 5,
+};
 
 export const SAMPLE_DEAL_NAME = "Sample — The Maddox at Highland Park";
 
@@ -232,7 +250,10 @@ const extraction: ExtractionResult = {
     { label: "Going-in cap", value: "5.45%", flagged: false, page: "p. 8" },
     { label: "Pro forma cap", value: "5.7%", flagged: true, page: "p. 8" },
     { label: "Exit cap", value: "5.25%", flagged: true, page: "p. 41" },
-    { label: "Year-1 NOI", value: "$3,706,500", flagged: false, page: "p. 8" },
+    // The OM's own p.8 figure — the pro forma the reconciliation (below) and
+    // the T-12 actual ($3,706,500) both push back on. Storing the OM's stated
+    // number here keeps the OM-vs-T-12 note honest: +4.7%, not a self-compare.
+    { label: "NOI (pro forma)", value: "$3,880,000", flagged: true, page: "p. 8" },
     { label: "Units", value: "248", flagged: false, page: "p. 3" },
     { label: "Avg in-place rent", value: "$2,400/mo", flagged: false, page: "p. 12" },
     { label: "Pro forma rent", value: "$2,600/mo", flagged: true, page: "p. 12" },
@@ -448,6 +469,72 @@ const verdict: VerdictResult = {
   },
 };
 
+// ---- Property actuals (Feature 1 on the sample) ----------------------------
+// Consistent by construction with the reconciliation above: the T-12's NOI is
+// the $3,706,500 the reconciler chose over the OM's $3,880,000 pro forma, and
+// the rent roll's 9.1% in-place vacancy is the figure that beat the OM's 6%.
+
+const rentRollExtraction: RentRollExtraction = {
+  asOfDate: "2026-05-31",
+  // Representative rows only — the summary below reflects the full 248-unit
+  // roll (truncated: true says "not every row is reproduced here").
+  rows: [
+    { tenant: "Unit 101", suiteUnit: "101", sf: 745, leaseExpiry: "2026-11-30", inPlaceRentMonthly: 1795, rentPsf: null, occupied: true, freeRentMonths: null, tiPsf: null, page: "roll p.1" },
+    { tenant: "Unit 108", suiteUnit: "108", sf: 745, leaseExpiry: "", inPlaceRentMonthly: null, rentPsf: null, occupied: false, freeRentMonths: null, tiPsf: null, page: "roll p.1" },
+    { tenant: "Unit 214", suiteUnit: "214", sf: 890, leaseExpiry: "2027-02-28", inPlaceRentMonthly: 2140, rentPsf: null, occupied: true, freeRentMonths: 1, tiPsf: null, page: "roll p.2" },
+    { tenant: "Unit 220", suiteUnit: "220", sf: 890, leaseExpiry: "2026-08-31", inPlaceRentMonthly: 2085, rentPsf: null, occupied: true, freeRentMonths: null, tiPsf: null, page: "roll p.2" },
+    { tenant: "Unit 305", suiteUnit: "305", sf: 1080, leaseExpiry: "2026-09-30", inPlaceRentMonthly: 2560, rentPsf: null, occupied: true, freeRentMonths: null, tiPsf: null, page: "roll p.3" },
+    { tenant: "Unit 312", suiteUnit: "312", sf: 1080, leaseExpiry: "", inPlaceRentMonthly: null, rentPsf: null, occupied: false, freeRentMonths: null, tiPsf: null, page: "roll p.3" },
+  ],
+  truncated: true,
+  page: "roll p.1–6",
+};
+
+const rentRollSummary: RentRollSummary = {
+  unitCount: 248,
+  occupiedUnits: 225,
+  totalSf: 220_720,
+  occupiedSf: 200_635,
+  sfWeightedOccupancy: 0.909,
+  waltYears: 0.6,
+  weightedAvgRentPsf: 32.4,
+  expiryBuckets: { next12mo: 0.78, y1to3: 0.22, y3to5: 0, y5plus: 0 },
+  expiryCoveredSf: 196_400,
+  truncated: false,
+  asOfUsed: "2026-05-31",
+};
+
+const t12Extraction: T12Extraction = {
+  periodEndDate: "2026-05-31",
+  collectedRent: 6_499_500,
+  vacancyLoss: 650_500,
+  otherIncome: 292_000,
+  egi: 6_791_500,
+  opex: [
+    { key: "taxes", label: "Real estate taxes", amount: 1_140_000, page: "T-12 p.1" },
+    { key: "insurance", label: "Insurance", amount: 385_000, page: "T-12 p.1" },
+    { key: "utilities", label: "Utilities", amount: 460_000, page: "T-12 p.1" },
+    { key: "rm", label: "Repairs & maintenance", amount: 420_000, page: "T-12 p.1" },
+    { key: "payroll", label: "Payroll", amount: 415_000, page: "T-12 p.2" },
+    { key: "mgmt", label: "Management fee", amount: 205_000, page: "T-12 p.2" },
+    { key: "admin", label: "Marketing & admin", amount: 60_000, page: "T-12 p.2" },
+  ],
+  totalOpex: 3_085_000,
+  noi: 3_706_500,
+  page: "T-12 p.1–2",
+};
+
+const t12Summary: T12Summary = {
+  collectedRent: 6_499_500,
+  vacancyLoss: 650_500,
+  otherIncome: 292_000,
+  egi: 6_791_500,
+  opex: t12Extraction.opex,
+  totalOpex: 3_085_000,
+  noi: 3_706_500,
+  noiDerived: false,
+};
+
 /** The full seed payload for a sample deal row. */
 export const SAMPLE_DEAL = {
   name: SAMPLE_DEAL_NAME,
@@ -459,4 +546,15 @@ export const SAMPLE_DEAL = {
   market,
   verdict,
   model,
+  /** deal_rent_rolls / deal_t12_statements seed rows (best-effort insert) */
+  rentRoll: {
+    as_of_date: "2026-05-31",
+    extraction: rentRollExtraction,
+    summary: rentRollSummary,
+  },
+  t12: {
+    period_end_date: "2026-05-31",
+    extraction: t12Extraction,
+    summary: t12Summary,
+  },
 } as const;

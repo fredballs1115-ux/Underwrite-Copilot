@@ -25,10 +25,10 @@ function PickButton({ disabled }: { disabled: boolean }) {
         onChange={(e) => {
           const f = e.currentTarget.files?.[0];
           if (!f) return;
-          if (f.size > 22 * 1024 * 1024) {
-            // Past 22 MB the request would blow the server-action body cap
+          if (f.size > 32 * 1024 * 1024) {
+            // Past 32 MB the request would blow the server-action body cap
             // and die as a raw 500 — reject before the confirm dialog.
-            alert(`"${f.name}" is ${(f.size / 1048576).toFixed(0)} MB — the limit is 22 MB. Try compressing or splitting it.`);
+            alert(`"${f.name}" is ${(f.size / 1048576).toFixed(0)} MB — the limit is 32 MB. Try compressing or splitting it.`);
             e.currentTarget.value = "";
             return;
           }

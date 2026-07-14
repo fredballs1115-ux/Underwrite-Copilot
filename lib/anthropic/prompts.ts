@@ -49,7 +49,11 @@ Capture: asking price (and per-unit / per-SF if given), NOI (year 1 and stabiliz
 
 Tag each figure's \`basis\`: "in_place" for current / historical facts the property is actually producing (in-place rents, current occupancy, T-12 NOI, taxes paid), "pro_forma" for the sponsor's forward projections (stabilized NOI, pro forma rents, rent growth, exit cap, IRR), "na" for identity facts (price, seller, broker, year built, unit count). The buyer must be able to tell the property's reality from the sponsor's story at a glance.
 
-Set \`flagged\` to true ONLY for the figures most worth independent verification — forward-looking or seller-controlled numbers that drive returns and tend to run optimistic (pro forma rents, stabilized NOI, projected rent growth, exit cap, IRR, expense ratios). Do NOT flag hard, present-day, third-party-verifiable facts (asking price, unit or SF count, year built, in-place occupancy, seller, broker, stated loan terms). Flag selectively: if nearly everything is flagged, the flags stop being useful. Also record, for each figure, the page in the OM where you found it as a short string like "p. 12" (use an empty string if you can't tell).`;
+Set \`flagged\` to true ONLY for the figures most worth independent verification — forward-looking or seller-controlled numbers that drive returns and tend to run optimistic (pro forma rents, stabilized NOI, projected rent growth, exit cap, IRR, expense ratios). Do NOT flag hard, present-day, third-party-verifiable facts (asking price, unit or SF count, year built, in-place occupancy, seller, broker, stated loan terms). Flag selectively: if nearly everything is flagged, the flags stop being useful. Also record, for each figure, the page in the OM where you found it as a short string like "p. 12" (use an empty string if you can't tell).
+
+Set \`totalPages\` to the offering memorandum's total number of pages (your best count of the PDF you were given; 0 only if you truly can't tell). This is used to sanity-check the page citations, so count carefully.
+
+For \`locatorSnippet\`, give up to ten words of the actual surrounding text from that page — a short verbatim phrase a reader could search for to confirm the figure, e.g. "Going-In Cap Rate: 6.0%" or "Total Rentable Area: 300,142 SF". Use an empty string if you can't quote it. Never invent a snippet.`;
 }
 
 /** Step 2 — Assumption Challenger */
@@ -116,6 +120,47 @@ For each fact, give:
 - \`basis\`: the single most important field. Use exactly one of: "actual" (historical / in-place — what rent rolls and T-12s report), "pro_forma" (the sponsor's forward projection — what OM pro formas report), "term_sheet" (loan terms), "appraisal", or "other".
 
 Capture BOTH actuals and pro forma figures when the document shows both (e.g. a statement with actual and projected columns). Getting \`basis\` right is essential: the model uses it to decide which source wins when documents disagree.`;
+}
+
+/** Structured rent-roll extraction (Feature 1). Emit RAW rows only — the
+ *  consolidation (unit mix, WALT, expiry buckets, weighted rent) is computed
+ *  downstream in code, never by the model. */
+export function rentRollExtractionInstruction(cap: number): string {
+  return `Extract the rent roll from the attached document. Return one object per unit / tenant ROW exactly as the roll lists it. Do NOT consolidate, summarize, average, or total anything — that is done downstream in code.
+
+For each row give:
+- \`tenant\`: the tenant name, or the unit label for a multifamily roll ("" if blank).
+- \`suiteUnit\`: the suite or unit number/identifier ("" if none).
+- \`sf\`: rentable square feet as a plain number, or null if the roll doesn't show it.
+- \`leaseExpiry\`: lease expiration as ISO yyyy-mm-dd. Use "" for a vacant/down unit or when no date is shown. Convert any date format to ISO; never guess a date.
+- \`inPlaceRentMonthly\`: the unit's total in-place rent PER MONTH in dollars (plain number). null if vacant or not shown. If the roll shows annual rent, divide by 12; if it shows $/SF, leave this null and fill \`rentPsf\`.
+- \`rentPsf\`: annual rent per square foot ONLY if the roll states it, else null. Do not compute it.
+- \`occupied\`: true if the unit is leased, false for a vacant / down / model unit.
+- \`freeRentMonths\`, \`tiPsf\`: concessions (free-rent months; tenant-improvement $/SF) if shown, else null.
+- \`page\`: the page this row is on, like "p. 4" ("" if unknown).
+
+Also return \`asOfDate\` (the roll's "as of" date as ISO yyyy-mm-dd, "" if not shown) and \`page\` (the page the roll starts on).
+
+Capture up to ${cap} rows. If the roll has more than ${cap} units, capture the first ${cap} and set \`truncated\` to true; otherwise \`truncated\` is false. If the document contains NO rent roll, return an empty \`rows\` array. Never invent a tenant, unit, square footage, rent, or date — use null / "" for anything not clearly shown.`;
+}
+
+/** Structured T-12 operating-statement extraction (Feature 1). Emit the stated
+ *  actuals; EGI/NOI subtotals are reconstructed downstream in code when absent. */
+export function t12ExtractionInstruction(): string {
+  return `Extract the trailing-twelve-month (T-12) operating statement from the attached document. Return the ACTUAL figures exactly as stated. Do NOT compute any subtotal the statement doesn't itself show — EGI and NOI are reconstructed downstream in code.
+
+Give:
+- \`periodEndDate\`: the trailing-12 period end as ISO yyyy-mm-dd, "" if not shown.
+- \`collectedRent\`: total collected / gross rental income (plain number), null if not shown.
+- \`vacancyLoss\`: vacancy + credit loss as a POSITIVE dollar number, null if not shown.
+- \`otherIncome\`: other income (plain number), null if not shown.
+- \`egi\`: effective gross income ONLY if the statement states it, else null. Do not compute it.
+- \`opex\`: one object per operating-expense LINE ITEM, each with \`key\` (snake_case like taxes, insurance, utilities, repairs, management, payroll, admin, cam, marketing, reserves), \`label\` (as written), \`amount\` (annual dollars, plain number), and \`page\`. Exclude debt service, depreciation, capital items, and any total row.
+- \`totalOpex\`: total operating expenses ONLY if stated, else null.
+- \`noi\`: net operating income ONLY if stated, else null. Do not compute it.
+- \`page\`: the page the statement is on.
+
+All dollar amounts are annual (trailing-12) totals. If the document has NO operating statement, return null figures and an empty \`opex\` array. Never invent a line item or amount — use null for anything not clearly shown.`;
 }
 
 /** Model generator — pass 2: reconcile across sources and produce model inputs. */
