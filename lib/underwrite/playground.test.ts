@@ -4,6 +4,7 @@ import {
   leverValues,
   sliderValues,
   runScenario,
+  yearOneNoi,
   scenarioMetrics,
   fmtBpsDelta,
   fmtPtDelta,
@@ -153,6 +154,42 @@ describe("leverValues — slider stops", () => {
     const high = leverValues("exitCapPct", 0.35);
     expect(high[2]).toBe(LEVER_STEPS.exitCapPct.max);
     for (let i = 1; i < high.length; i++) expect(high[i]).toBeGreaterThanOrEqual(high[i - 1]);
+  });
+});
+
+describe("runScenario — the price lever reprices the whole model", () => {
+  const base = baseInputs();
+
+  it("a price override matches an independent engine run exactly", () => {
+    const dragged = runScenario(base, { purchasePrice: 8_000_000 });
+    const independent = computeUnderwrite(baseInputs({ purchasePrice: 8_000_000 }));
+    expect(dragged.leveredIrrPct).toBe(independent.returns.leveredIrrPct);
+    expect(dragged.leveredEquityMultiple).toBe(
+      independent.returns.leveredEquityMultiple,
+    );
+    expect(dragged.dscrYr1).toBe(independent.cashFlow[0].dscrNoi);
+  });
+
+  it("paying less moves every headline metric the right way", () => {
+    const asks = runScenario(base, {});
+    const steal = runScenario(base, { purchasePrice: base.purchasePrice * 0.8 });
+    expect(steal.leveredIrrPct!).toBeGreaterThan(asks.leveredIrrPct!);
+    expect(steal.leveredEquityMultiple!).toBeGreaterThan(asks.leveredEquityMultiple!);
+    expect(steal.cocYr1Pct!).toBeGreaterThan(asks.cocYr1Pct!);
+    expect(steal.dscrYr1!).toBeGreaterThan(asks.dscrYr1!);
+  });
+
+  it("year-one NOI is price-independent, so cap ⇄ price inverts cleanly", () => {
+    const noi = yearOneNoi(base);
+    expect(noi).toBe(computeUnderwrite(base).cashFlow[0].noi);
+    expect(yearOneNoi(base, { purchasePrice: 5_000_000 })).toBe(noi);
+    // price = NOI / cap round-trips to the cap the engine reports.
+    const targetCap = 0.065;
+    const price = noi / targetCap;
+    const r = computeUnderwrite(baseInputs({ purchasePrice: price }));
+    expect(r.returns.goingInCapPct).toBeCloseTo(targetCap, 10);
+    // …but vacancy DOES move year-one NOI (the inversion pivots per scenario).
+    expect(yearOneNoi(base, { vacancyPct: 0.1 })).toBeLessThan(noi);
   });
 });
 
