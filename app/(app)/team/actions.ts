@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe/client";
-import { classifyStripeError } from "@/lib/stripe/diagnose";
+import { classifyStripeError, isStaleCustomer } from "@/lib/stripe/diagnose";
 import { getTeam } from "@/lib/teams";
 import { syncTeamSeats } from "@/lib/stripe/seats";
 import {
@@ -261,7 +261,25 @@ export async function startTeamCheckout() {
     .eq("id", team.id)
     .maybeSingle();
 
-  let customerId = (trow?.stripe_customer_id as string) ?? null;
+  let customerId: string | null = (trow?.stripe_customer_id as string | null) ?? null;
+  // Same self-heal as personal checkout: a team customer minted under TEST
+  // keys doesn't exist for the LIVE key — reset the mirror and mint fresh.
+  if (customerId) {
+    try {
+      if (await isStaleCustomer(stripe, customerId)) {
+        console.warn(`team: stale stripe customer ${customerId} for team ${team.id} — resetting billing mirror`);
+        await admin
+          .from("teams")
+          .update({ stripe_customer_id: null, stripe_subscription_id: null, subscription_status: null })
+          .eq("id", team.id);
+        customerId = null;
+      }
+    } catch (err) {
+      if (isRedirectError(err)) throw err;
+      console.error(`team: customer verification failed for team ${team.id}:`, err);
+      redirect(`/team?error=${classifyStripeError(err) ?? "checkout"}`);
+    }
+  }
   if (!customerId) {
     // Idempotency key prevents two-tab races from minting duplicate customers.
     let customer;
@@ -430,6 +448,20 @@ export async function openTeamPortal() {
   if (!customerId) redirect("/team?error=nocustomer");
 
   const stripe = getStripe();
+  try {
+    if (await isStaleCustomer(stripe, customerId)) {
+      console.warn(`team portal: stale stripe customer ${customerId} for team ${team.id} — resetting billing mirror`);
+      await createSupabaseAdminClient()
+        .from("teams")
+        .update({ stripe_customer_id: null, stripe_subscription_id: null, subscription_status: null })
+        .eq("id", team.id);
+      redirect("/team?error=nocustomer");
+    }
+  } catch (err) {
+    if (isRedirectError(err)) throw err;
+    console.error(`team portal: customer verification failed for team ${team.id}:`, err);
+    redirect(`/team?error=${classifyStripeError(err) ?? "checkout"}`);
+  }
   let session;
   try {
     session = await stripe.billingPortal.sessions.create({

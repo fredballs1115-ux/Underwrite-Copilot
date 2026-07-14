@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { getStripe } from "@/lib/stripe/client";
-import { classifyStripeError } from "@/lib/stripe/diagnose";
+import { classifyStripeError, isStaleCustomer } from "@/lib/stripe/diagnose";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function appUrl(): string {
@@ -41,7 +41,25 @@ export async function startCheckout() {
     .select("stripe_customer_id")
     .eq("id", user.id)
     .maybeSingle();
-  let customerId = (profile?.stripe_customer_id as string) ?? null;
+  let customerId: string | null = (profile?.stripe_customer_id as string | null) ?? null;
+  // A saved customer minted under TEST keys doesn't exist for the LIVE key
+  // ("No such customer") — verify and self-heal instead of failing checkout
+  // forever. The stale subscription mirror goes with it.
+  if (customerId) {
+    try {
+      if (await isStaleCustomer(stripe, customerId)) {
+        console.warn(`checkout: stale stripe customer ${customerId} for ${user.id} — resetting billing mirror`);
+        await adminReader()
+          .from("profiles")
+          .update({ stripe_customer_id: null, stripe_subscription_id: null, subscription_status: null })
+          .eq("id", user.id);
+        customerId = null;
+      }
+    } catch (err) {
+      console.error(`checkout: customer verification failed for ${user.id}:`, err);
+      redirect(`/billing?error=${classifyStripeError(err) ?? "checkout"}`);
+    }
+  }
   if (!customerId) {
     // Idempotency key prevents two-tab races from minting duplicate customers.
     let customer;
@@ -130,6 +148,20 @@ export async function openPortal() {
   if (!customerId) redirect("/billing?error=nocustomer");
 
   const stripe = getStripe();
+  try {
+    if (await isStaleCustomer(stripe, customerId)) {
+      console.warn(`portal: stale stripe customer ${customerId} for ${user.id} — resetting billing mirror`);
+      await adminReader2()
+        .from("profiles")
+        .update({ stripe_customer_id: null, stripe_subscription_id: null, subscription_status: null })
+        .eq("id", user.id);
+      redirect("/billing?error=nocustomer");
+    }
+  } catch (err) {
+    if (isRedirectError(err)) throw err;
+    console.error(`portal: customer verification failed for ${user.id}:`, err);
+    redirect(`/billing?error=${classifyStripeError(err) ?? "checkout"}`);
+  }
   let session;
   try {
     session = await stripe.billingPortal.sessions.create({
