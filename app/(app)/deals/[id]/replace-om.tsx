@@ -4,7 +4,7 @@ import { useRef } from "react";
 import { useFormStatus } from "react-dom";
 import { replaceOm } from "../actions";
 
-function PickButton({ disabled }: { disabled: boolean }) {
+function PickButton({ disabled, attach }: { disabled: boolean; attach: boolean }) {
   const { pending } = useFormStatus();
   const inputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -33,7 +33,9 @@ function PickButton({ disabled }: { disabled: boolean }) {
             return;
           }
           const ok = window.confirm(
-            `Replace the stored OM with "${f.name}" and re-screen?\n\nThe full analysis runs again on the new document, and the deal page will show exactly what moved since this screen.`,
+            attach
+              ? `Attach "${f.name}" as this deal's OM and screen it?\n\nThe full analysis runs on the document, and the deal page will show what moved versus the screen built from your typed facts.`
+              : `Replace the stored OM with "${f.name}" and re-screen?\n\nThe full analysis runs again on the new document, and the deal page will show exactly what moved since this screen.`,
           );
           if (ok) formRef.current?.requestSubmit();
           else e.currentTarget.value = "";
@@ -43,7 +45,11 @@ function PickButton({ disabled }: { disabled: boolean }) {
         type="button"
         disabled={disabled || pending}
         onClick={() => inputRef.current?.click()}
-        title="Upload a reissued OM (price cut, updated deck) and re-run the screen — the deal page will show what moved."
+        title={
+          attach
+            ? "Got the OM? Attach it and the full document screen runs — page cites, comp scrutiny, everything."
+            : "Upload a reissued OM (price cut, updated deck) and re-run the screen — the deal page will show what moved."
+        }
         className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint disabled:cursor-not-allowed disabled:opacity-50"
       >
         {pending ? (
@@ -62,28 +68,41 @@ function PickButton({ disabled }: { disabled: boolean }) {
             className="h-3.5 w-3.5"
             aria-hidden
           >
-            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-            <path d="M21 3v6h-6" />
+            {attach ? (
+              <>
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </>
+            ) : (
+              <>
+                <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                <path d="M21 3v6h-6" />
+              </>
+            )}
           </svg>
         )}
-        {pending ? "Uploading…" : "Replace OM"}
+        {pending ? "Uploading…" : attach ? "Attach OM" : "Replace OM"}
       </button>
     </>
   );
 }
 
-/** "The broker sent a new deck" — swap the OM and re-screen in one step. */
+/** "The broker sent a new deck" — swap the OM and re-screen in one step.
+ *  With `attach`, the same flow reads as adding the FIRST OM to a deal that
+ *  was typed in by hand (the action already handles the no-prior-OM case). */
 export function ReplaceOm({
   dealId,
   disabled,
+  attach = false,
 }: {
   dealId: string;
   disabled: boolean;
+  attach?: boolean;
 }) {
   return (
     <form action={replaceOm}>
       <input type="hidden" name="dealId" value={dealId} />
-      <PickButton disabled={disabled} />
+      <PickButton disabled={disabled} attach={attach} />
     </form>
   );
 }

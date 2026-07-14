@@ -15,9 +15,13 @@ import { getAnthropic } from "./client";
  */
 export type OmSource =
   | { kind: "file"; fileId: string }
-  | { kind: "buffer"; data: Buffer };
+  | { kind: "buffer"; data: Buffer }
+  /** manual deals: a typed fact sheet stands in for the OM (plain text) */
+  | { kind: "text"; text: string };
 
 export const omFromBuffer = (data: Buffer): OmSource => ({ kind: "buffer", data });
+
+export const omFromText = (text: string): OmSource => ({ kind: "text", text });
 
 /** Largest raw PDF the inline-base64 fallback can carry under the request cap. */
 export const MAX_INLINE_PDF_BYTES = 22 * 1024 * 1024;
@@ -58,14 +62,23 @@ export function omDocument(om: OmSource, cache = true): Anthropic.Messages.Conte
   const source =
     om.kind === "file"
       ? ({ type: "file", file_id: om.fileId } as const)
-      : ({
-          type: "base64",
-          media_type: "application/pdf",
-          data: om.data.toString("base64"),
-        } as const);
+      : om.kind === "text"
+        ? ({
+            type: "text",
+            media_type: "text/plain",
+            data: om.text,
+          } as const)
+        : ({
+            type: "base64",
+            media_type: "application/pdf",
+            data: om.data.toString("base64"),
+          } as const);
   return {
     type: "document" as const,
     source,
+    // The title tells every step what it's reading when there's no OM —
+    // the fact sheet's own preamble carries the detailed framing.
+    ...(om.kind === "text" ? { title: "Buyer-entered deal fact sheet" } : {}),
     ...(cache ? { cache_control: { type: "ephemeral" as const } } : {}),
   } as unknown as Anthropic.Messages.ContentBlockParam;
 }

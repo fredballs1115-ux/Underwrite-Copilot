@@ -15,6 +15,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createDeal, createSampleDeal } from "./actions";
 import { BatchUpload } from "./batch-upload";
+import { ManualDealForm } from "./manual-deal-form";
 import { FileDrop } from "../file-drop";
 import { PendingButton } from "../pending-button";
 import { AddressAutocomplete } from "../address-autocomplete";
@@ -783,8 +784,9 @@ export function Pipeline({
             Start your pipeline
           </p>
           <p className="mx-auto mt-1 max-w-md text-sm text-muted">
-            Upload an offering memorandum to screen your first deal — or explore
-            a fully-worked sample to see the whole thing first.
+            Upload an offering memorandum — or just type the deal’s facts — to
+            screen your first deal. Or explore a fully-worked sample to see the
+            whole thing first.
           </p>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
             {atLimit ? (
@@ -1475,6 +1477,10 @@ function writeDraft(d: DealDraft | null) {
 }
 
 function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
+  // Two ways in: upload the OM, or type the facts (no document needed —
+  // small-multifamily listings rarely come with one). An upload error code
+  // in the URL means the last submit was an upload — open on that mode.
+  const [mode, setMode] = useState<"upload" | "manual">("upload");
   const [name, setName] = useState("");
   const [assetClass, setAssetClass] = useState("auto");
   // The address field manages its own text; we mirror its latest value here
@@ -1533,11 +1539,48 @@ function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
 
   return (
     <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
-      <h2 className="text-sm font-semibold tracking-tight">New deal</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold tracking-tight">New deal</h2>
+        <div
+          role="tablist"
+          aria-label="How to add the deal"
+          className="flex gap-1 rounded-lg bg-faint p-1"
+        >
+          {(
+            [
+              ["upload", "Upload the OM"],
+              ["manual", "Type the facts"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={mode === key}
+              onClick={() => setMode(key)}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                mode === key
+                  ? "bg-surface text-ink shadow-sm"
+                  : "text-muted hover:text-ink"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
       <p className="mt-1 text-sm text-muted">
-        Upload the offering memorandum (PDF). We’ll extract the key terms and
-        flag what to verify against the source.
+        {mode === "upload"
+          ? "Upload the offering memorandum (PDF). We’ll extract the key terms and flag what to verify against the source."
+          : "No OM? Type what you know — from the listing, a broker call, your notes. The screen runs on your numbers, and you can attach the OM later."}
       </p>
+      {mode === "manual" && (
+        <div className="mt-4">
+          <ManualDealForm mode="create" />
+        </div>
+      )}
+      {mode === "upload" && (
+        <>
       {errorMessage && (
         <p className="mt-3 rounded-lg bg-kill/10 px-3 py-2 text-sm text-kill">
           {errorMessage}
@@ -1647,6 +1690,8 @@ function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
         </PendingButton>
       </form>
       <BatchUpload />
+        </>
+      )}
       <form action={createSampleDeal} className="mt-3 border-t border-line pt-3">
         <PendingButton
           pendingLabel="Setting up your sample deal…"

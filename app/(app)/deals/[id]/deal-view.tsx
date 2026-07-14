@@ -55,6 +55,8 @@ import {
 import { ModelView } from "./model-view";
 import { SinceLastScreen } from "./since-last-screen";
 import { ReplaceOm } from "./replace-om";
+import { ManualDealForm } from "../manual-deal-form";
+import { factsFromExtraction, type ManualDealFacts } from "@/lib/manual-deal";
 import { useToast } from "../../toaster";
 import type { UnderwritingModel } from "@/lib/model/types";
 import type { DealDocument } from "@/lib/documents";
@@ -792,6 +794,13 @@ export function DealView({
               documents={documents}
               supplements={supplements}
               active={active}
+              manualFacts={
+                // Typed-facts deal = no OM, not the sample. Samples have no
+                // OM either but are static demo data — never editable.
+                !hasOm && !isSample && results.extraction
+                  ? factsFromExtraction(results.extraction, dealName)
+                  : null
+              }
             />
             {!isSample && (
               <LoiPanel
@@ -1291,7 +1300,9 @@ function AnalysesPanel({
 }
 
 /** Documents: the OM itself, the memo export, uploaded documents, and every
- *  note/file added along the way — one home for all of it. */
+ *  note/file added along the way — one home for all of it. For a manual deal
+ *  the typed facts ARE the source document, so this is also where they're
+ *  edited (and where the real OM gets attached later). */
 function DocumentsPanel({
   dealId,
   hasOm,
@@ -1301,6 +1312,7 @@ function DocumentsPanel({
   documents,
   supplements,
   active,
+  manualFacts,
 }: {
   dealId: string;
   hasOm: boolean;
@@ -1310,6 +1322,9 @@ function DocumentsPanel({
   documents: DealDocument[];
   supplements: SupplementsMap;
   active: boolean;
+  /** set only for a typed-facts deal (no OM, not the sample) — enables the
+   *  attach-OM button and the edit-facts panel */
+  manualFacts: ManualDealFacts | null;
 }) {
   const KIND_LABEL: Record<string, string> = {
     om: "Offering memorandum",
@@ -1353,10 +1368,25 @@ function DocumentsPanel({
               </a>
             )}
             {hasOm && <ReplaceOm dealId={dealId} disabled={active} />}
-            {!hasOm && (
+            {!hasOm && manualFacts && (
+              // A manual deal — the OM can arrive later and upgrades the
+              // screen to the full document analysis.
+              <ReplaceOm dealId={dealId} disabled={active} attach />
+            )}
+            {!hasOm && !manualFacts && (
               <span className="text-xs text-muted">none uploaded</span>
             )}
           </li>
+          {manualFacts && (
+            <li className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm">
+              <span className="min-w-0 flex-1 truncate font-medium">
+                Typed deal facts
+              </span>
+              <span className="text-xs text-muted">
+                entered by hand — the screen runs on these
+              </span>
+            </li>
+          )}
           {documents.map((d) => (
             <li
               key={d.id}
@@ -1387,6 +1417,24 @@ function DocumentsPanel({
               </Link>
             )}
           </div>
+        )}
+        {manualFacts && (
+          <details className="group mt-3 rounded-lg border border-line">
+            <summary className="cursor-pointer select-none px-3 py-2.5 text-sm font-medium transition-colors hover:bg-faint">
+              Edit the facts &amp; re-screen
+              <span className="ml-2 text-xs font-normal text-muted">
+                fix a number, add what you’ve learned — the whole screen
+                re-runs on the new facts
+              </span>
+            </summary>
+            <div className="border-t border-line p-4">
+              <ManualDealForm
+                mode="edit"
+                dealId={dealId}
+                initial={manualFacts}
+              />
+            </div>
+          </details>
         )}
       </section>
 
