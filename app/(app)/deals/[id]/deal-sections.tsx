@@ -1056,20 +1056,20 @@ function CompTable({ title, comps }: { title: string; comps: BrokerComp[] }) {
                   key={i}
                   className="border-b border-line align-top transition-colors last:border-0 hover:bg-faint/60"
                 >
-                  <td className="px-4 py-3">
-                    <p className="font-medium">{c.name}</p>
+                  <td className="min-w-[14rem] px-4 py-3">
+                    <p className="break-words font-medium">{c.name}</p>
                     {c.note && (
                       <p className="mt-0.5 text-xs leading-relaxed text-muted">
                         {c.note}
                       </p>
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 font-mono text-xs tabular-nums text-muted">
+                  <td className="min-w-[9rem] max-w-[16rem] break-words px-4 py-3 font-mono text-xs leading-relaxed tabular-nums text-muted">
                     {c.detail}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${r.badge}`}
+                      className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${r.badge}`}
                     >
                       {r.label}
                     </span>
