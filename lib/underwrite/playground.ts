@@ -6,11 +6,15 @@
 
 import { computeUnderwrite, type UnderwriteInputs } from "./engine";
 
-/** The three levers the playground exposes. All decimals (0.045 = 4.5%). */
+/** The levers the playground exposes. Percents are decimals (0.045 = 4.5%);
+ *  purchasePrice is dollars. Price is the deep lever: the engine re-sizes the
+ *  loan basis, debt, financing costs, fees, and equity from it, so a price
+ *  change moves every downstream metric — not just the cap-rate division. */
 export interface PlaygroundLevers {
   exitCapPct: number;
   rentGrowthPct: number;
   vacancyPct: number;
+  purchasePrice: number;
 }
 
 export interface ScenarioMetrics {
@@ -27,8 +31,11 @@ export interface ScenarioMetrics {
  *  (PDF heatmap); `sliderSpan` steps each way builds the on-screen slider's
  *  range — deliberately much wider (Bug 9: ±50bps couldn't flip a verdict on
  *  most deals; the exit-cap slider now sweeps ±400bps at 25bps resolution). */
+/** The stepped percent levers — price is a free input, not a slider. */
+export type PercentLever = "exitCapPct" | "rentGrowthPct" | "vacancyPct";
+
 export const LEVER_STEPS: Record<
-  keyof PlaygroundLevers,
+  PercentLever,
   { step: number; span: number; sliderSpan: number; min: number; max: number }
 > = {
   // 25bps steps; slider ±16 steps = ±400bps
@@ -46,7 +53,7 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
  *  input (e.g. a 0% cap read off a garbled extraction) must not produce
  *  non-monotonic stops where dragging left raises the value. */
 function stops(
-  lever: keyof PlaygroundLevers,
+  lever: PercentLever,
   base: number,
   span: number,
 ): number[] {
@@ -62,7 +69,7 @@ function stops(
 /** The compact ±2-step stop list (PDF heatmap grid). Index `span` (2) is the
  *  (clamped) base. */
 export function leverValues(
-  lever: keyof PlaygroundLevers,
+  lever: PercentLever,
   base: number,
 ): number[] {
   return stops(lever, base, LEVER_STEPS[lever].span);
@@ -75,7 +82,7 @@ export function leverValues(
  * key off the index, never value equality.
  */
 export function sliderValues(
-  lever: keyof PlaygroundLevers,
+  lever: PercentLever,
   base: number,
 ): { values: number[]; baseIdx: number } {
   const raw = stops(lever, base, LEVER_STEPS[lever].sliderSpan);
@@ -101,23 +108,48 @@ export function scenarioMetrics(inputs: UnderwriteInputs): ScenarioMetrics {
 }
 
 /**
- * Recompute the model with the playground's levers applied. Only the three
- * levers are touched; everything else — price, debt, expenses, capex — is the
- * base model verbatim, so the comparison against base is apples-to-apples.
+ * Recompute the model with the playground's levers applied. Only the levers
+ * are touched; everything else — debt terms, expenses, capex — is the base
+ * model verbatim, so the comparison against base is apples-to-apples. (When
+ * the price lever is set, debt/equity/fees re-derive from it, because that's
+ * what a price change means.)
  */
 export function runScenario(
   base: UnderwriteInputs,
   levers: Partial<PlaygroundLevers>,
 ): ScenarioMetrics {
-  const inputs: UnderwriteInputs = {
+  return scenarioMetrics(scenarioInputs(base, levers));
+}
+
+/** The base inputs with the playground's levers applied — shared by the
+ *  metric runs and the year-one NOI read so they can never disagree. */
+function scenarioInputs(
+  base: UnderwriteInputs,
+  levers: Partial<PlaygroundLevers>,
+): UnderwriteInputs {
+  return {
     ...base,
     // never share the array reference with the base inputs
     expenseLines: base.expenseLines.map((l) => ({ ...l })),
     ...(levers.exitCapPct != null ? { exitCapPct: levers.exitCapPct } : {}),
     ...(levers.rentGrowthPct != null ? { rentGrowthPct: levers.rentGrowthPct } : {}),
     ...(levers.vacancyPct != null ? { vacancyPct: levers.vacancyPct } : {}),
+    ...(levers.purchasePrice != null && levers.purchasePrice > 0
+      ? { purchasePrice: levers.purchasePrice }
+      : {}),
   };
-  return scenarioMetrics(inputs);
+}
+
+/**
+ * Year-one NOI under the given levers. Price never enters NOI (income and
+ * expenses are property facts), which is exactly why price ⇄ going-in cap is
+ * a clean inversion: cap = yearOneNoi / price, price = yearOneNoi / cap.
+ */
+export function yearOneNoi(
+  base: UnderwriteInputs,
+  levers: Partial<PlaygroundLevers> = {},
+): number {
+  return computeUnderwrite(scenarioInputs(base, levers)).cashFlow[0]?.noi ?? 0;
 }
 
 // ---- Display helpers (pure formatting, shared with tests) -----------------

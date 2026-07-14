@@ -5,6 +5,7 @@ import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import {
   sliderValues,
   runScenario,
+  yearOneNoi,
   fmtPct,
   fmtX,
   fmtBpsDelta,
@@ -80,6 +81,10 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   const [capIdx, setCapIdx] = useState(caps.baseIdx);
   const [growthIdx, setGrowthIdx] = useState(growths.baseIdx);
   const [vacIdx, setVacIdx] = useState(vacs.baseIdx);
+  // Your price: null = the modeled price. Typing a price (or a going-in cap,
+  // its mirror) reprices the WHOLE model — debt, equity, fees, and every
+  // metric below recompute, exactly like re-running the screen at that basis.
+  const [priceOverride, setPriceOverride] = useState<number | null>(null);
   // If the underlying model changes (re-screen, actuals fold-in), the stop
   // lists are rebuilt — snap back to the NEW base during render (the React
   // "adjust state when props change" idiom); a stale index may not even
@@ -90,11 +95,13 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
     setCapIdx(caps.baseIdx);
     setGrowthIdx(growths.baseIdx);
     setVacIdx(vacs.baseIdx);
+    setPriceOverride(null);
   }
   const dirty =
     capIdx !== caps.baseIdx ||
     growthIdx !== growths.baseIdx ||
-    vacIdx !== vacs.baseIdx;
+    vacIdx !== vacs.baseIdx ||
+    priceOverride != null;
 
   // The EFFECTIVE base is the sliders' base stops (clamped into physical
   // range), so a degenerate derived input can't make the resting metrics
@@ -115,9 +122,17 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
             exitCapPct: caps.values[capIdx],
             rentGrowthPct: growths.values[growthIdx],
             vacancyPct: vacs.values[vacIdx],
+            ...(priceOverride != null ? { purchasePrice: priceOverride } : {}),
           })
         : base,
-    [inputs, caps, growths, vacs, capIdx, growthIdx, vacIdx, dirty, base],
+    [inputs, caps, growths, vacs, capIdx, growthIdx, vacIdx, priceOverride, dirty, base],
+  );
+
+  // Year-one NOI at the current vacancy lever — the price <-> going-in-cap
+  // inversion pivots on it (price never enters NOI).
+  const noiY1 = useMemo(
+    () => yearOneNoi(inputs, { vacancyPct: vacs.values[vacIdx] }),
+    [inputs, vacs, vacIdx],
   );
 
   // Live mandate fit on the SAME scorer, with the model's IRR/CoC swapped in.
@@ -163,6 +178,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
     setCapIdx(caps.baseIdx);
     setGrowthIdx(growths.baseIdx);
     setVacIdx(vacs.baseIdx);
+    setPriceOverride(null);
   };
 
   return (
@@ -172,9 +188,17 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
           Sensitivity playground
         </h2>
         <p className="text-xs text-muted">
-          Recomputed from the underwriting model as you drag — no re-screen.
+          Recomputed from the underwriting model as you type or drag — no
+          re-screen.
         </p>
       </div>
+
+      <PriceCapControls
+        basePrice={inputs.purchasePrice}
+        noiY1={noiY1}
+        value={priceOverride}
+        onChange={setPriceOverride}
+      />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Lever
@@ -275,6 +299,134 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         )}
       </div>
     </section>
+  );
+}
+
+/** Parse "$2,000,000", "2000000", "2m", "2.5 MM", "750k" → dollars. */
+function parsePriceText(s: string): number | null {
+  const m = s.trim().toLowerCase().match(/^\$?\s*([\d,]*\.?\d+)\s*(mm?|k)?$/);
+  if (!m) return null;
+  const n = parseFloat(m[1].replace(/,/g, ""));
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const mult = m[2]?.startsWith("m") ? 1e6 : m[2] === "k" ? 1e3 : 1;
+  return n * mult;
+}
+
+const fmtUsd0 = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+
+/**
+ * Price ⇄ going-in cap, as one linked control. Typing either reprices the
+ * whole model: price is a real engine input (debt, fees, and equity re-size
+ * from it), and cap is its mirror through year-one NOI (cap = NOI ÷ price),
+ * so the two fields can never disagree.
+ */
+function PriceCapControls({
+  basePrice,
+  noiY1,
+  value,
+  onChange,
+}: {
+  basePrice: number;
+  noiY1: number;
+  value: number | null;
+  onChange: (v: number | null) => void;
+}) {
+  const [editing, setEditing] = useState<"price" | "cap" | null>(null);
+  const [draft, setDraft] = useState("");
+  const price = value ?? basePrice;
+  const capPct = price > 0 && noiY1 > 0 ? (noiY1 / price) * 100 : null;
+  const atBase = value == null;
+  const deltaPct = basePrice > 0 ? ((price - basePrice) / basePrice) * 100 : 0;
+
+  // Snapping back to (nearly) the modeled price clears the override entirely,
+  // so "base" stays an exact state, never a float hair away from it.
+  const commit = (n: number | null) => {
+    if (n == null) return;
+    // Ignore keystroke fragments ("5" on the way to "55000000"): only prices
+    // within 1%–100x of the modeled price commit; anything else waits for
+    // more typing. Snapping (nearly) back to base clears the override.
+    if (n < basePrice * 0.01 || n > basePrice * 100) return;
+    onChange(Math.abs(n - basePrice) < 0.5 ? null : n);
+  };
+  const commitPrice = (s: string) => {
+    setDraft(s);
+    commit(parsePriceText(s));
+  };
+  const commitCap = (s: string) => {
+    setDraft(s);
+    const c = parseFloat(s.replace(/[%\s]/g, ""));
+    if (Number.isFinite(c) && c > 0.1 && c < 50 && noiY1 > 0) {
+      commit(noiY1 / (c / 100));
+    }
+  };
+  const inputCls =
+    "mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 font-mono text-sm font-semibold tabular-nums outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40";
+
+  return (
+    <div className="mt-4 rounded-xl border border-brand/25 bg-brand/[0.04] p-3.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className="text-xs font-semibold tracking-tight">Your price</span>
+        <span className="text-[11px] text-muted">
+          type a price or a going-in cap — the whole model reprices
+        </span>
+      </div>
+      <div className="mt-2 grid gap-3 sm:grid-cols-3">
+        <label className="block">
+          <span className="text-[11px] uppercase tracking-wide text-muted">
+            Purchase price
+          </span>
+          <input
+            inputMode="decimal"
+            value={editing === "price" ? draft : fmtUsd0(price)}
+            onFocus={(e) => {
+              setEditing("price");
+              setDraft(e.currentTarget.value);
+            }}
+            onChange={(e) => commitPrice(e.currentTarget.value)}
+            onBlur={() => setEditing(null)}
+            aria-label="Purchase price scenario"
+            className={inputCls}
+          />
+        </label>
+        <label className="block">
+          <span className="text-[11px] uppercase tracking-wide text-muted">
+            Going-in cap
+          </span>
+          <input
+            inputMode="decimal"
+            value={
+              editing === "cap"
+                ? draft
+                : capPct != null
+                  ? `${capPct.toFixed(2)}%`
+                  : "—"
+            }
+            onFocus={(e) => {
+              setEditing("cap");
+              setDraft(e.currentTarget.value);
+            }}
+            onChange={(e) => commitCap(e.currentTarget.value)}
+            onBlur={() => setEditing(null)}
+            aria-label="Going-in cap scenario"
+            className={inputCls}
+          />
+        </label>
+        <div className="flex items-end pb-2.5">
+          {atBase ? (
+            <span className="text-xs text-muted">at the modeled price</span>
+          ) : (
+            <span
+              className={`text-xs font-medium tabular-nums ${
+                deltaPct < 0 ? "text-pass" : "text-caution"
+              }`}
+            >
+              {deltaPct >= 0 ? "+" : "−"}
+              {Math.abs(deltaPct).toFixed(1)}% vs modeled ({fmtUsd0(basePrice)})
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
