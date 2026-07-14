@@ -39,9 +39,14 @@ export interface ManualDealFacts {
   yearBuilt: number | null;
   /** average in-place rent per unit per month */
   avgRentMo: number | null;
-  /** free-text context — condition, tenancy, the story */
+  /** free-text context — condition, tenancy, the story (≤ NOTES_MAX chars) */
   notes: string;
 }
+
+/** How much "anything else" the buyer can type. Roomy on purpose — the
+ *  challenger and market check read every word, and a page of context is
+ *  ~1k tokens, trivial next to the analysis itself. */
+export const NOTES_MAX = 4_000;
 
 /** "1,250,000" / "$1.25m" / "950k" → dollars; null when unparseable. */
 export function moneyFrom(raw: string): number | null {
@@ -91,7 +96,7 @@ export function factsFromForm(form: {
     occupancyPct: pctFrom(s("occupancy", 40)),
     yearBuilt: countFrom(s("yearBuilt", 40)),
     avgRentMo: moneyFrom(s("avgRent", 40)),
-    notes: s("notes", 600),
+    notes: s("notes", NOTES_MAX),
   };
 }
 
@@ -150,7 +155,6 @@ export function buildManualExtraction(facts: ManualDealFacts): ExtractionResult 
   if (facts.occupancyPct != null)
     add("Occupancy", pct(Math.min(100, facts.occupancyPct), 1), "in_place");
   if (facts.yearBuilt != null) add("Year built", String(facts.yearBuilt));
-  if (facts.notes) add("Context from the buyer", facts.notes);
 
   return {
     dealName: facts.name,
@@ -158,6 +162,10 @@ export function buildManualExtraction(facts: ManualDealFacts): ExtractionResult 
     market: facts.market,
     address: facts.address,
     totalPages: 0,
+    // Notes travel as their own field, never a metric — a paragraph in a
+    // KPI card renders badly, and keeping prose out of the metrics array
+    // keeps the label matchers' surface purely figures.
+    ...(facts.notes ? { buyerNotes: facts.notes } : {}),
     metrics,
   };
 }
@@ -183,7 +191,9 @@ export function factsFromExtraction(
     occupancyPct: pctFrom(find(/^occupancy$/i)),
     yearBuilt: countFrom(find(/^year built$/i)),
     avgRentMo: moneyFrom(find(/^average in-place rent$/i)),
-    notes: find(/^context from the buyer$/i),
+    // The dedicated field; the metric fallback reads deals created in the
+    // brief window when notes shipped as a "Context from the buyer" metric.
+    notes: extraction.buyerNotes ?? find(/^context from the buyer$/i),
   };
 }
 
@@ -244,6 +254,9 @@ export function manualFactSheet(
     "",
     "FACTS AS ENTERED",
     ...(lines.length ? lines : ["- (none beyond the header above)"]),
+    ...(extraction.buyerNotes
+      ? ["", "CONTEXT FROM THE BUYER (verbatim)", extraction.buyerNotes]
+      : []),
   ].join("\n");
 }
 

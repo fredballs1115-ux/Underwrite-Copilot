@@ -550,6 +550,19 @@ export function TermsView({
           />
         </button>
       )}
+      {/* Manual deals: the buyer's free-text context, as prose — a paragraph
+          has no business inside a KPI card. Whitespace is preserved so a
+          pasted notes file keeps its line breaks. */}
+      {result.buyerNotes && (
+        <div className="mt-3 rounded-xl border border-line bg-surface p-4 shadow-sm">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+            Context from the buyer
+          </p>
+          <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-relaxed">
+            {result.buyerNotes}
+          </p>
+        </div>
+      )}
     </section>
   );
 }

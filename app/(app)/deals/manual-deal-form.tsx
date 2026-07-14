@@ -9,7 +9,7 @@ import {
 } from "./actions";
 import { AddressAutocomplete } from "../address-autocomplete";
 import type { StructuredAddress } from "@/lib/address";
-import type { ManualDealFacts } from "@/lib/manual-deal";
+import { NOTES_MAX, type ManualDealFacts } from "@/lib/manual-deal";
 
 /**
  * Type a deal in — no OM. One component serves both flows: creating a deal
@@ -205,16 +205,27 @@ export function ManualDealForm({
         </Labeled>
       </div>
 
-      <textarea
-        name="notes"
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        rows={2}
-        maxLength={600}
-        aria-label="Anything else about the deal"
-        placeholder="Anything else — condition, tenancy, the story. e.g. original 1968 interiors, all four units month-to-month, roof replaced 2019"
-        className={field}
-      />
+      <div>
+        <textarea
+          name="notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={5}
+          maxLength={NOTES_MAX}
+          aria-label="Anything else about the deal"
+          placeholder="Anything else — condition, tenancy, the story, your reno plan. e.g. original 1968 interiors, all four units month-to-month at $1,250–1,400, roof replaced 2019, seller retiring, plan is $20k/unit interior refresh then re-lease at market. The challenger and market check read every word of this."
+          className={`${field} resize-y`}
+        />
+        <p className="mt-1 flex justify-between text-xs text-muted">
+          <span>
+            The more context you give, the sharper the challenge — paste your
+            whole notes file if you like.
+          </span>
+          <span className="shrink-0 pl-3 font-mono tabular-nums">
+            {notes.length.toLocaleString("en-US")}/{NOTES_MAX.toLocaleString("en-US")}
+          </span>
+        </p>
+      </div>
 
       <p className="text-xs leading-relaxed text-muted">
         *Enough to screen = the asking price — or NOI + cap rate, and the price

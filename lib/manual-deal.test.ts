@@ -10,6 +10,7 @@ import {
   firstSignalFromExtraction,
   manualFactSheet,
   manualCompsStub,
+  NOTES_MAX,
   type ManualDealFacts,
 } from "./manual-deal";
 import { evaluateBuyBox, findMetric, METRIC_FIND } from "./criteria";
@@ -74,6 +75,13 @@ describe("parsers", () => {
     expect(facts.units).toBe(4);
     expect(facts.noiAnnual).toBeNull();
     expect(facts.notes).toBe("MTM tenants");
+  });
+
+  it("notes accept a full page of context, capped at NOTES_MAX", () => {
+    const long = "x".repeat(NOTES_MAX + 500);
+    const facts = factsFromForm(new Map([["name", "N"], ["notes", long]]));
+    expect(facts.notes.length).toBe(NOTES_MAX);
+    expect(NOTES_MAX).toBeGreaterThanOrEqual(4_000);
   });
 });
 
@@ -140,19 +148,19 @@ describe("buildManualExtraction", () => {
     ).toBe("3,600 SF");
   });
 
-  it("the buyer-notes metric never collides with a figure matcher", () => {
-    const { metrics } = buildManualExtraction({
+  it("notes ride as buyerNotes prose, never a metric — no matcher surface", () => {
+    const ex = buildManualExtraction({
       ...QUAD,
       notes: "price per sf cap rate noi square feet units", // worst-case text
     });
-    const notes = metrics.find((m) => m.label === "Context from the buyer");
-    expect(notes).toBeTruthy();
-    // Matchers test LABELS, so the price/cap/sf reads stay on the real figures.
+    expect(ex.buyerNotes).toBe("price per sf cap rate noi square feet units");
+    expect(ex.metrics.some((m) => /context/i.test(m.label))).toBe(false);
+    // Figures stay exactly where the matchers expect them.
     expect(
-      findMetric(metrics, METRIC_FIND.price.inc, METRIC_FIND.price.exc)?.value,
+      findMetric(ex.metrics, METRIC_FIND.price.inc, METRIC_FIND.price.exc)?.value,
     ).toBe("$1,250,000");
     expect(
-      findMetric(metrics, METRIC_FIND.sf.inc, METRIC_FIND.sf.exc)?.value,
+      findMetric(ex.metrics, METRIC_FIND.sf.inc, METRIC_FIND.sf.exc)?.value,
     ).toBe("3,600 SF");
   });
 
@@ -204,6 +212,18 @@ describe("buildManualExtraction", () => {
     expect(back.yearBuilt).toBe(1968);
     expect(back.avgRentMo).toBe(1_450);
     expect(back.notes).toBe(QUAD.notes);
+  });
+
+  it("still reads notes off a legacy extraction that stored them as a metric", () => {
+    const legacy = buildManualExtraction({ ...QUAD, notes: "" });
+    legacy.metrics.push({
+      label: "Context from the buyer",
+      value: "roof 2019, tenants MTM",
+      flagged: false,
+      page: "",
+      basis: "na",
+    });
+    expect(factsFromExtraction(legacy, "x").notes).toBe("roof 2019, tenants MTM");
   });
 });
 
