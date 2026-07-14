@@ -10,7 +10,7 @@ import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
-import { buildCapGrowthGrid, type CapGrowthGrid } from "@/lib/underwrite/report-grid";
+import { buildSensitivityData, type SensitivityData } from "@/lib/underwrite/report-grid";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 
 export const runtime = "nodejs";
@@ -82,6 +82,9 @@ export async function GET(
   });
 
   let buyBoxChecks: BuyBoxCheck[] = [];
+  // The buy-box target IRR anchors the sensitivity page's color scale, so
+  // the grids grade against THIS buyer's hurdle, not a generic threshold.
+  let hurdlePct: number | null = null;
   try {
     const ownership = deal as unknown as {
       user_id: string;
@@ -94,16 +97,17 @@ export async function GET(
         (deal.extraction as ExtractionResult) ?? null,
         box,
       );
+      hurdlePct = box.minIrrPct ?? null;
     }
   } catch {
     buyBoxChecks = [];
   }
 
-  // Sensitivity heatmap (Feature 5): the same derived screening model as the
+  // Sensitivity page (Feature 5): the same derived screening model as the
   // workbook/playground — actuals folded in — swept over exit cap × rent
-  // growth. Best-effort: any failure (pre-0020 schema, degenerate extraction)
-  // just omits the section, never sinks the report.
-  let grid: CapGrowthGrid | null = null;
+  // growth and price × exit cap. Best-effort: any failure (pre-0020 schema,
+  // degenerate extraction) just omits the section, never sinks the report.
+  let sensitivity: SensitivityData | null = null;
   try {
     const extraction = (deal.extraction as ExtractionResult | null) ?? null;
     if (extraction) {
@@ -137,11 +141,11 @@ export async function GET(
             }
           : null,
       });
-      grid = buildCapGrowthGrid(derived.inputs);
+      sensitivity = buildSensitivityData(derived.inputs, hurdlePct);
     }
   } catch (err) {
     console.error(`report heatmap build failed for ${id}:`, err);
-    grid = null;
+    sensitivity = null;
   }
 
   // Custom firm branding (Feature 6) — best-effort, mirrors the memo route.
@@ -164,7 +168,7 @@ export async function GET(
   }
 
   try {
-    const input = buildReportData(deal, dateStr, buyBoxChecks, grid, branding);
+    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding);
     const element = React.createElement(ReportDocument, {
       input,
     }) as unknown as Parameters<typeof renderToBuffer>[0];

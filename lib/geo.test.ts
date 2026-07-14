@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { haversineKm, kmToMiles, fmtMiles } from "./geo";
+import { haversineKm, kmToMiles, fmtMiles, geocodeCandidates } from "./geo";
 
 // Known city pairs (great-circle, city-center coordinates).
 const NYC = { lat: 40.7128, lng: -74.006 };
@@ -31,5 +31,30 @@ describe("distance display", () => {
   it("one decimal under 10 miles, whole numbers above", () => {
     expect(fmtMiles(1)).toBe("0.6 mi");
     expect(fmtMiles(50)).toBe("31 mi");
+  });
+});
+
+describe("geocodeCandidates — the address-first query ladder", () => {
+  it("finds a street address hiding in the detail text", () => {
+    const q = geocodeCandidates(
+      "Trech Support Solutions HQ — Building C, 4801 Innovation Corridor Parkway",
+      "$28.50/SF NNN · 12,400 SF · 5-yr term",
+      "North Dallas, TX",
+    );
+    expect(q[0]).toBe("4801 Innovation Corridor Parkway, North Dallas, TX");
+    // Cleaned name (annotation stripped) comes next, raw name last.
+    expect(q).toContain("Trech Support Solutions HQ, North Dallas, TX");
+    expect(q[q.length - 1]).toMatch(/^Trech Support Solutions HQ — Building C/);
+  });
+
+  it("falls back to the cleaned then raw name when no address exists", () => {
+    const q = geocodeCandidates("The Berkley at Legacy (Phase II)", "$68.4M · 4.7% cap", "Plano, TX");
+    expect(q[0]).toBe("The Berkley at Legacy, Plano, TX");
+    expect(q).toContain("The Berkley at Legacy (Phase II), Plano, TX");
+  });
+
+  it("collapses duplicates and skips empty locales", () => {
+    const q = geocodeCandidates("Crestwood Flats", "", "");
+    expect(q).toEqual(["Crestwood Flats"]);
   });
 });

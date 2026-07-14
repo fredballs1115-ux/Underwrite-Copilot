@@ -19,7 +19,9 @@ const CSP = [
   // until a nonce-based CSP is wired through the framework.
   scriptSrc,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  // OpenStreetMap raster tiles power the comps map — without these hosts the
+  // map renders as a blank gray canvas (tiles are <img> loads, so img-src).
+  "img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.org",
   "font-src 'self' data:",
   // Supabase (auth/storage/signed URLs) + Photon geocoder are the only
   // cross-origin fetch targets from the browser.

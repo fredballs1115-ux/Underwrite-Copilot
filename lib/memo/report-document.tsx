@@ -12,10 +12,12 @@ import type {
 import { buildMemoData, MemoPage, pdfSafe, type MemoData } from "./memo-document";
 import {
   heatBucket,
-  heatCellText,
+  heatCellIrr,
+  heatCellEm,
+  heatLegend,
   HEAT_BG,
-  HEAT_LEGEND,
-  type CapGrowthGrid,
+  type SensitivityData,
+  type HeatCell,
 } from "@/lib/underwrite/report-grid";
 
 const C = {
@@ -216,9 +218,10 @@ function PageChrome({
 export interface ReportInput {
   deal: DealRow;
   memo: MemoData;
-  /** the exit-cap × rent-growth heatmap (Feature 5); null when the deal has
-   *  no extraction to derive a model from */
-  grid?: CapGrowthGrid | null;
+  /** the sensitivity page's data (Feature 5): both grids, the buyer-hurdle
+   *  color scale, the takeaway, and the max bid; null when the deal has no
+   *  extraction to derive a model from */
+  sensitivity?: SensitivityData | null;
 }
 
 /** Everything the deal screen produced, shaped for the multi-page report. */
@@ -226,13 +229,13 @@ export function buildReportData(
   deal: DealRow,
   dateStr: string,
   buyBoxChecks?: BuyBoxCheck[] | null,
-  grid?: CapGrowthGrid | null,
+  sensitivity?: SensitivityData | null,
   branding?: MemoData["branding"],
 ): ReportInput {
   return {
     deal,
     memo: buildMemoData(deal, dateStr, buyBoxChecks, branding),
-    grid: grid ?? null,
+    sensitivity: sensitivity ?? null,
   };
 }
 
@@ -243,8 +246,146 @@ export function buildReportData(
  * reconciliation when one ran. For the people who ask "what's behind the
  * memo?"
  */
+const fmtHurdle = (pct: number): string => `${Number(pct.toFixed(1))}%`;
+
+const fmtCompactUsd = (n: number): string =>
+  n >= 1e6
+    ? `$${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2).replace(/\.?0+$/, "")}M`
+    : `$${Math.round(n / 1e3)}k`;
+
+/**
+ * One sensitivity grid: a spanning axis title over the column values, a
+ * left axis label over bold row labels, and two-line cells (IRR bold, EM
+ * muted) colored by distance from the buyer's hurdle. The base cell wears
+ * an ink border. Shared by the cap × growth grid and the retrade grid so
+ * they can never drift apart visually.
+ */
+function HeatGrid({
+  axisLabel,
+  spanLabel,
+  colLabels,
+  rowLabels,
+  cells,
+  baseRow,
+  baseCol,
+  hurdlePct,
+  rowLabelWidth = "13%",
+}: {
+  axisLabel: string;
+  spanLabel: string;
+  colLabels: string[];
+  rowLabels: string[];
+  cells: HeatCell[][];
+  baseRow: number;
+  baseCol: number;
+  hurdlePct: number;
+  rowLabelWidth?: string;
+}) {
+  const colW = `${(100 - parseFloat(rowLabelWidth)) / colLabels.length}%`;
+  return (
+    <View style={{ marginTop: 6 }}>
+      {/* Spanning axis title over the value columns. */}
+      <View style={{ flexDirection: "row" }}>
+        <Text style={{ width: rowLabelWidth }} />
+        <Text
+          style={{
+            width: `${100 - parseFloat(rowLabelWidth)}%`,
+            fontSize: 6.5,
+            letterSpacing: 0.6,
+            color: C.muted,
+            textAlign: "center",
+            paddingBottom: 2,
+          }}
+        >
+          {spanLabel}
+        </Text>
+      </View>
+      {/* Column value row + left axis label in the corner. */}
+      <View
+        style={{
+          flexDirection: "row",
+          borderBottomWidth: 0.7,
+          borderBottomColor: C.line,
+          paddingBottom: 2.5,
+          marginBottom: 1,
+        }}
+      >
+        <Text
+          style={{
+            width: rowLabelWidth,
+            fontSize: 6.5,
+            letterSpacing: 0.6,
+            color: C.muted,
+            paddingRight: 4,
+          }}
+        >
+          {axisLabel}
+        </Text>
+        {colLabels.map((label, i) => (
+          <Text
+            key={i}
+            style={{
+              width: colW,
+              fontSize: 8,
+              fontFamily: i === baseCol ? "Helvetica-Bold" : "Helvetica",
+              color: C.ink,
+              textAlign: "center",
+            }}
+          >
+            {label}
+          </Text>
+        ))}
+      </View>
+      {cells.map((row, r) => (
+        <View key={r} style={{ flexDirection: "row", alignItems: "stretch" }} wrap={false}>
+          <View style={{ width: rowLabelWidth, justifyContent: "center", paddingRight: 4 }}>
+            <Text
+              style={{
+                fontSize: 8,
+                fontFamily: r === baseRow ? "Helvetica-Bold" : "Helvetica",
+                color: C.ink,
+              }}
+            >
+              {rowLabels[r]}
+            </Text>
+          </View>
+          {row.map((cell, c) => {
+            const isBase = r === baseRow && c === baseCol;
+            return (
+              <View
+                key={c}
+                style={{
+                  width: colW,
+                  paddingVertical: 4,
+                  backgroundColor: HEAT_BG[heatBucket(cell.irrPct, hurdlePct)],
+                  borderWidth: isBase ? 1.6 : 1,
+                  borderColor: isBase ? C.ink : "#ffffff",
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 8.5,
+                    fontFamily: "Helvetica-Bold",
+                    color: C.ink,
+                  }}
+                >
+                  {heatCellIrr(cell)}
+                </Text>
+                <Text style={{ fontSize: 6.5, color: C.muted, marginTop: 1 }}>
+                  {heatCellEm(cell)}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export function ReportDocument({ input }: { input: ReportInput }) {
-  const { deal, memo, grid } = input;
+  const { deal, memo, sensitivity } = input;
   const dealName = memo.name;
   const extraction = deal.extraction as ExtractionResult | null;
   const challenges = deal.challenges as ChallengerResult | null;
@@ -276,10 +417,6 @@ export function ReportDocument({ input }: { input: ReportInput }) {
     na: "—",
   };
 
-  // Heatmap columns share the 85% after the row-label column. Usually 5
-  // columns (17% each); fewer when a base at a lever bound deduped stops.
-  const gridColW = grid ? `${85 / grid.growthCols.length}%` : "17%";
-
   return (
     <Document
       title={`${dealName} — Full Screening Report`}
@@ -288,72 +425,44 @@ export function ReportDocument({ input }: { input: ReportInput }) {
       {/* Page 1: the one-page memo, unchanged — the executive read. */}
       <MemoPage data={memo} />
 
-      {/* Sensitivity heatmap (Feature 5): where the deal thrives, where it
-          breaks — levered IRR / EM over exit cap × rent growth, computed by
-          the same engine as the workbook and the on-screen playground. */}
-      {grid && (
+      {/* Sensitivity page (Feature 5): where the deal thrives, where it
+          breaks — two grids from the same engine as the workbook and the
+          on-screen playground, colored against the BUYER'S hurdle. */}
+      {sensitivity && (
         <PageChrome title="Sensitivity analysis" dealName={dealName} branding={memo.branding}>
           <Text style={s.sub}>
-            Levered IRR and equity multiple recomputed across the two levers
-            that move screening returns most. The bordered cell is the base
-            case.
+            {`Levered IRR (bold) and equity multiple, recomputed cell by cell. Color marks distance from the ${
+              sensitivity.hurdleSource === "buybox"
+                ? `${fmtHurdle(sensitivity.hurdlePct)} IRR target in your buy box`
+                : `${fmtHurdle(sensitivity.hurdlePct)} screening hurdle`
+            } — deeper green clears it by more, deeper red misses by more. The ink-bordered cell is the modeled base case.`}
           </Text>
-          {/* Header row: rent growth across the columns. (No arrow glyph —
-              U+2193 isn't WinAnsi and standard Helvetica would print a stray
-              quote in its place.) */}
-          <View style={[s.tableHead, { marginTop: 6 }]}>
-            <Text style={[s.headText, { width: "15%" }]}>Exit cap</Text>
-            {grid.growthCols.map((g, i) => (
-              <Text key={i} style={[s.headText, { width: gridColW, textAlign: "center" }]}>
-                {`${(g * 100).toFixed(1)}% growth`}
-              </Text>
-            ))}
-          </View>
-          {grid.cells.map((row, r) => (
-            <View key={r} style={{ flexDirection: "row" }} wrap={false}>
-              <Text
-                style={{
-                  width: "15%",
-                  fontSize: 8,
-                  fontFamily: "Helvetica-Bold",
-                  paddingVertical: 5,
-                  paddingRight: 4,
-                }}
-              >
-                {`${(grid.capRows[r] * 100).toFixed(2)}%`}
-              </Text>
-              {row.map((cell, c) => {
-                const isBase = r === grid.baseRow && c === grid.baseCol;
-                return (
-                  <Text
-                    key={c}
-                    style={{
-                      width: gridColW,
-                      fontSize: 7.5,
-                      textAlign: "center",
-                      paddingVertical: 5,
-                      backgroundColor: HEAT_BG[heatBucket(cell.irrPct)],
-                      borderWidth: isBase ? 1.4 : 0.4,
-                      borderColor: isBase ? C.ink : "#ffffff",
-                      fontFamily: isBase ? "Helvetica-Bold" : "Helvetica",
-                    }}
-                  >
-                    {heatCellText(cell)}
-                  </Text>
-                );
-              })}
-            </View>
-          ))}
-          {/* Legend */}
-          <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
-            {HEAT_LEGEND.map((l) => (
-              <View key={l.bucket} style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+
+          <HeatGrid
+            axisLabel="EXIT CAP"
+            spanLabel="RENT GROWTH (ANNUAL)"
+            colLabels={sensitivity.grid.growthCols.map((g) => `${(g * 100).toFixed(1)}%`)}
+            rowLabels={sensitivity.grid.capRows.map((cap) => `${(cap * 100).toFixed(2)}%`)}
+            cells={sensitivity.grid.cells}
+            baseRow={sensitivity.grid.baseRow}
+            baseCol={sensitivity.grid.baseCol}
+            hurdlePct={sensitivity.hurdlePct}
+          />
+          <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
+            {sensitivity.takeaway}
+          </Text>
+
+          {/* Legend — shared by both grids. */}
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 9 }}>
+            {heatLegend(sensitivity.hurdlePct).map((l) => (
+              <View key={l.bucket} style={{ flexDirection: "row", alignItems: "center", gap: 3.5 }}>
                 <View
                   style={{
-                    width: 8,
-                    height: 8,
+                    width: 10,
+                    height: 10,
+                    borderRadius: 2,
                     backgroundColor: HEAT_BG[l.bucket],
-                    borderWidth: 0.4,
+                    borderWidth: 0.5,
                     borderColor: C.line,
                   }}
                 />
@@ -361,11 +470,43 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               </View>
             ))}
           </View>
-          <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 6 }}>
-            Levered IRR and Equity Multiple across exit cap (rows) and rent
-            growth (columns). Green highlights scenarios meeting the 15% IRR
-            threshold. Computed from the deal&apos;s derived screening model —
-            re-export after changing assumptions.
+
+          <Text style={[s.h2, { marginTop: 16 }]}>The retrade grid</Text>
+          <Text style={s.sub}>
+            The same model repriced: what paying less (or more) does to
+            returns at each exit cap. Rows re-size the loan, fees, and equity
+            from the new price.
+          </Text>
+          <HeatGrid
+            axisLabel="PRICE"
+            spanLabel="EXIT CAP"
+            colLabels={sensitivity.priceGrid.capCols.map((cap) => `${(cap * 100).toFixed(2)}%`)}
+            rowLabels={sensitivity.priceGrid.priceRows.map(
+              (p) =>
+                `${fmtCompactUsd(p.price)}  ${
+                  p.deltaPct === 0 ? "(ask)" : `(${p.deltaPct > 0 ? "+" : ""}${Math.round(p.deltaPct * 100)}%)`
+                }`,
+            )}
+            cells={sensitivity.priceGrid.cells}
+            baseRow={sensitivity.priceGrid.baseRow}
+            baseCol={sensitivity.priceGrid.baseCol}
+            hurdlePct={sensitivity.hurdlePct}
+            rowLabelWidth="19%"
+          />
+          <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
+            {sensitivity.maxBid
+              ? sensitivity.maxBid.unbounded
+                ? `Max bid holding ${fmtHurdle(sensitivity.hurdlePct)} IRR: clears at every tested price — the constraint never binds inside the search range.`
+                : `Max bid holding ${fmtHurdle(sensitivity.hurdlePct)} IRR: ${fmtCompactUsd(sensitivity.maxBid.price)} (${
+                    sensitivity.maxBid.deltaPct > 0 ? "+" : ""
+                  }${(sensitivity.maxBid.deltaPct * 100).toFixed(1)}% vs the modeled price).`
+              : `No price inside the tested range holds ${fmtHurdle(sensitivity.hurdlePct)} IRR under these assumptions.`}
+          </Text>
+
+          <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 10 }}>
+            Computed from the deal&apos;s derived screening model — the same
+            engine behind the Excel workbook and the on-screen playground.
+            Re-export after changing assumptions.
           </Text>
         </PageChrome>
       )}
