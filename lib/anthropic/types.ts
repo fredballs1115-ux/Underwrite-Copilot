@@ -70,6 +70,10 @@ export interface ExtractionResult {
   /** The OM's total page count as the model read it, used to validate cited
    *  pages. 0 / absent when unknown or for pre-citation extractions. */
   totalPages?: number;
+  /** Free-text context typed by the buyer on MANUAL (no-OM) deals — condition,
+   *  tenancy, the story. Never set by the OM extraction; rendered as prose,
+   *  not a metric, and fed verbatim to the analysis fact sheet. */
+  buyerNotes?: string;
   metrics: ExtractedMetric[];
 }
 
