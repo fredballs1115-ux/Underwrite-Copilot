@@ -3,6 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
+import { omDocument, omRequestOptions, omSourceFor, type OmSource } from "./om-source";
 import { MODELS, MAX_TOKENS } from "./models";
 import {
   ANALYST_SYSTEM,
@@ -54,19 +55,19 @@ const T12Schema = z.object({
   page: z.string(),
 });
 
-/** The document content block — native PDF, else flattened text. */
-function docBlock(parsed: ParsedModel): Anthropic.ContentBlockParam {
+/** The document content block — native PDF (inline under the request-cap
+ *  ceiling, Files API above it), else flattened text. */
+async function docParts(
+  parsed: ParsedModel,
+): Promise<{ block: Anthropic.ContentBlockParam; om: OmSource | null }> {
   if (parsed.kind === "pdf") {
-    return {
-      type: "document",
-      source: {
-        type: "base64",
-        media_type: "application/pdf",
-        data: parsed.data.toString("base64"),
-      },
-    };
+    const om = await omSourceFor(parsed.data, "document.pdf");
+    return { block: omDocument(om, false), om };
   }
-  return { type: "text", text: `Document contents (extracted text):\n\n${parsed.text}` };
+  return {
+    block: { type: "text", text: `Document contents (extracted text):\n\n${parsed.text}` },
+    om: null,
+  };
 }
 
 /**
@@ -77,6 +78,7 @@ function docBlock(parsed: ParsedModel): Anthropic.ContentBlockParam {
  */
 export async function extractRentRoll(parsed: ParsedModel): Promise<RentRollExtraction> {
   const client = getAnthropic();
+  const doc = await docParts(parsed);
   const response = await client.messages.parse({
     model: MODELS.reasoning,
     max_tokens: MAX_TOKENS.analysis,
@@ -84,11 +86,11 @@ export async function extractRentRoll(parsed: ParsedModel): Promise<RentRollExtr
     messages: [
       {
         role: "user",
-        content: [docBlock(parsed), { type: "text", text: rentRollExtractionInstruction(RENT_ROLL_ROW_CAP) }],
+        content: [doc.block, { type: "text", text: rentRollExtractionInstruction(RENT_ROLL_ROW_CAP) }],
       },
     ],
     output_config: { format: zodOutputFormat(RentRollSchema) },
-  });
+  }, doc.om ? omRequestOptions(doc.om) : {});
   const out = response.parsed_output;
   if (!out) throw new Error("Could not extract the rent roll.");
   // Hard cap defensively even if the model over-returns.
@@ -102,6 +104,7 @@ export async function extractRentRoll(parsed: ParsedModel): Promise<RentRollExtr
  */
 export async function extractT12(parsed: ParsedModel): Promise<T12Extraction> {
   const client = getAnthropic();
+  const doc = await docParts(parsed);
   const response = await client.messages.parse({
     model: MODELS.reasoning,
     max_tokens: MAX_TOKENS.analysis,
@@ -109,11 +112,11 @@ export async function extractT12(parsed: ParsedModel): Promise<T12Extraction> {
     messages: [
       {
         role: "user",
-        content: [docBlock(parsed), { type: "text", text: t12ExtractionInstruction() }],
+        content: [doc.block, { type: "text", text: t12ExtractionInstruction() }],
       },
     ],
     output_config: { format: zodOutputFormat(T12Schema) },
-  });
+  }, doc.om ? omRequestOptions(doc.om) : {});
   const out = response.parsed_output;
   if (!out) throw new Error("Could not extract the T-12 statement.");
   return out;

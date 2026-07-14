@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe/client";
+import { classifyStripeError } from "@/lib/stripe/diagnose";
 import { getTeam } from "@/lib/teams";
 import { syncTeamSeats } from "@/lib/stripe/seats";
 import {
@@ -222,8 +223,10 @@ export async function startTeamCheckout() {
           metadata: { team_id: team.id, user_id: "" },
           proration_behavior: "create_prorations",
         });
-      } catch {
-        redirect("/team?error=upgrade");
+      } catch (err) {
+        if (isRedirectError(err)) throw err;
+        console.error(`team: pro->team subscription update failed for team ${team.id}:`, err);
+        redirect(`/team?error=${classifyStripeError(err) ?? "upgrade"}`);
       }
 
       // Mirror the handover locally so no window shows both plans active;
@@ -271,8 +274,9 @@ export async function startTeamCheckout() {
         },
         { idempotencyKey: `uc-team-customer-${team.id}` },
       );
-    } catch {
-      redirect("/team?error=checkout");
+    } catch (err) {
+      console.error(`team: stripe.customers.create failed for team ${team.id}:`, err);
+      redirect(`/team?error=${classifyStripeError(err) ?? "checkout"}`);
     }
     customerId = customer.id;
     // Billing columns on teams are service-role-only — persist via admin, and
@@ -314,7 +318,8 @@ export async function startTeamCheckout() {
     });
   } catch (err) {
     if (isRedirectError(err)) throw err;
-    redirect("/team?error=checkout");
+    console.error(`team: create checkout session failed for team ${team.id} (base ${basePriceId}, seat ${seatPriceId}):`, err);
+    redirect(`/team?error=${classifyStripeError(err) ?? "checkout"}`);
   }
 
   if (session.url) redirect(session.url);
@@ -431,8 +436,9 @@ export async function openTeamPortal() {
       customer: customerId,
       return_url: `${appUrl()}/team`,
     });
-  } catch {
-    redirect("/team?error=checkout");
+  } catch (err) {
+    console.error(`team: portal session failed for team ${team.id}:`, err);
+    redirect(`/team?error=${classifyStripeError(err) ?? "checkout"}`);
   }
   redirect(session.url);
 }

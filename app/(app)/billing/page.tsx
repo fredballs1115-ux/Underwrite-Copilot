@@ -34,6 +34,22 @@ const PRO_FEATURES = [
   "Per-tab uploads and multi-document reconciliation",
 ];
 
+// Billing failures name their actual cause. The four config codes come from
+// lib/stripe/diagnose.ts — they only occur when the site's Stripe setup is
+// wrong, so the copy speaks to the operator; transient failures keep the
+// generic retry line.
+const BILLING_ERRORS: Record<string, { cls: string; text: string }> = {
+  config: { cls: "bg-kill/10 text-kill", text: "Checkout isn't available right now — email underwritecopilot.support@gmail.com and we'll get you upgraded." },
+  nocustomer: { cls: "bg-faint text-muted", text: "No subscription on file yet — start with Upgrade to Pro below." },
+  save: { cls: "bg-kill/10 text-kill", text: "Couldn't save your billing profile — please try again." },
+  exists: { cls: "bg-faint text-muted", text: "You already have an active subscription — if it still shows Free, activation can take a moment; refresh shortly." },
+  checkout: { cls: "bg-kill/10 text-kill", text: "Couldn't start checkout — please try again in a moment." },
+  stripekey: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: Stripe rejected the API key. Site owner — STRIPE_SECRET_KEY is missing, truncated, or from the wrong account; paste the full live secret key and save." },
+  price: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: Stripe couldn't find the configured price. Site owner — this is almost always a Test-mode price ID used with a Live key; copy the price_… ID from Live mode into STRIPE_PRICE_ID." },
+  pricetype: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: the configured Stripe price is one-time, but subscriptions need Recurring · Monthly. Site owner — recreate the price as recurring and update the ID." },
+  appurl: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: the app's public URL is misconfigured. Site owner — set NEXT_PUBLIC_APP_URL to the full https:// address of this site." },
+};
+
 export default async function BillingPage({
   searchParams,
 }: {
@@ -69,17 +85,9 @@ export default async function BillingPage({
               cls: "bg-brand/5 text-brand",
               text: `Upgrade to Pro to ${UPSELL_LABELS[upsell] ?? "unlock that"} — choose a plan below.`,
             }
-        : error === "config"
-          ? { cls: "bg-kill/10 text-kill", text: "Checkout isn't available right now — email underwritecopilot.support@gmail.com and we'll get you upgraded." }
-          : error === "nocustomer"
-            ? { cls: "bg-faint text-muted", text: "No subscription on file yet — start with Upgrade to Pro below." }
-            : error === "save"
-              ? { cls: "bg-kill/10 text-kill", text: "Couldn't save your billing profile — please try again." }
-              : error === "exists"
-                ? { cls: "bg-faint text-muted", text: "You already have an active subscription — if it still shows Free, activation can take a moment; refresh shortly." }
-                : error === "checkout"
-                  ? { cls: "bg-kill/10 text-kill", text: "Couldn't start checkout — please try again in a moment." }
-                  : null;
+        : error
+          ? (BILLING_ERRORS[error] ?? null)
+          : null;
 
   return (
     <div className="space-y-6">

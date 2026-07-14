@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 /**
  * A styled stand-in for a bare `<input type="file">` inside compact forms:
  * button trigger + chosen-file readout, identical form semantics (the named
- * input still submits with the form). Rejects files over the 22 MB action
+ * input still submits with the form). Rejects files over the 32 MB action
  * cap before submit — past it the request dies as a raw 500.
  */
 export function FileField({
@@ -30,9 +30,9 @@ export function FileField({
         className="sr-only"
         onChange={(e) => {
           const f = e.currentTarget.files?.[0] ?? null;
-          if (f && f.size > 22 * 1024 * 1024) {
+          if (f && f.size > 32 * 1024 * 1024) {
             alert(
-              `"${f.name}" is ${(f.size / 1048576).toFixed(0)} MB — the limit is 22 MB. Try compressing or splitting it.`,
+              `"${f.name}" is ${(f.size / 1048576).toFixed(0)} MB — the limit is 32 MB. Try compressing or splitting it.`,
             );
             e.currentTarget.value = "";
             setFileName(null);

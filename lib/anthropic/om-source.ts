@@ -80,3 +80,13 @@ export function omRequestOptions(om: OmSource): { headers?: Record<string, strin
     ? { headers: { "anthropic-beta": "files-api-2025-04-14" } }
     : {};
 }
+
+/** Request options when a message may reference SEVERAL documents — the beta
+ *  header is needed if ANY of them rides as a Files-API reference. */
+export function anyOmRequestOptions(
+  ...sources: (OmSource | null | undefined)[]
+): { headers?: Record<string, string> } {
+  return sources.some((s) => s?.kind === "file")
+    ? { headers: { "anthropic-beta": "files-api-2025-04-14" } }
+    : {};
+}

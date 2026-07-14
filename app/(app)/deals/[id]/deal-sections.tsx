@@ -1217,7 +1217,7 @@ export function ReconcileSection({
           name="model"
           accept=".xlsx,.xls,.csv,application/pdf"
           hint="Excel (.xlsx), CSV, or a PDF / Argus export"
-          maxBytes={22 * 1024 * 1024}
+          maxBytes={32 * 1024 * 1024}
         />
         <PendingButton
           disabled={disabled}
@@ -1969,7 +1969,7 @@ export function AddData({ dealId, tab }: { dealId: string; tab: string }) {
             </form>
             <p className="mt-1.5 text-[11px] text-muted">
               Rent roll, T-12, comp sheet, anything — PDF, Excel, CSV, or image
-              (up to 22 MB).
+              (up to 32 MB).
             </p>
           </div>
         </div>

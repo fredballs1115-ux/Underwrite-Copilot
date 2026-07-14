@@ -511,7 +511,10 @@ export default async function DealPage({
               <span className="capitalize">{deal.asset_class}</span>
             </p>
           </div>
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          {/* min-w-0 (not shrink-0): the cluster must be allowed to shrink
+              below its one-row width or its internal flex-wrap never engages
+              and the tail controls overflow the card on phones. */}
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
             {verdict && !(deal as { is_sample?: boolean }).is_sample && (
               <ShareControl
                 dealId={id}
