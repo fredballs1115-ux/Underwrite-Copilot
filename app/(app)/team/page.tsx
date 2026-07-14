@@ -41,6 +41,11 @@ const MESSAGES: Record<string, { cls: string; text: string }> = {
   confirmdelete: { cls: "bg-kill/10 text-kill", text: "Type DELETE (all caps) in the box to confirm deleting the team." },
   deletesub: { cls: "bg-kill/10 text-kill", text: "We couldn't convert the team's subscription, so nothing was deleted. Try again, or email underwritecopilot.support@gmail.com." },
   delete: { cls: "bg-kill/10 text-kill", text: "Couldn't delete the team — nothing was removed. Please try again." },
+  // Config-specific causes from lib/stripe/diagnose.ts — operator-fixable.
+  stripekey: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: Stripe rejected the API key. Site owner — STRIPE_SECRET_KEY is missing, truncated, or from the wrong account; paste the full live secret key and save." },
+  price: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: Stripe couldn't find a configured team price. Site owner — this is almost always a Test-mode price ID used with a Live key; copy the live price_… IDs into STRIPE_TEAM_PRICE_ID and STRIPE_TEAM_SEAT_PRICE_ID." },
+  pricetype: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: a configured Stripe price is one-time, but subscriptions need Recurring · Monthly. Site owner — recreate the price as recurring and update the ID." },
+  appurl: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: the app's public URL is misconfigured. Site owner — set NEXT_PUBLIC_APP_URL to the full https:// address of this site." },
 };
 
 export default async function TeamPage({

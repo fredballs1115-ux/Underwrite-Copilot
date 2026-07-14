@@ -11,7 +11,7 @@ type Supp = {
 };
 type SuppMap = Record<string, Supp>;
 
-const MAX_FILE = 22 * 1024 * 1024;
+const MAX_FILE = 32 * 1024 * 1024;
 const VALID_TABS = new Set([
   "terms",
   "challenger",

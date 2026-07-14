@@ -1637,7 +1637,7 @@ function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
           name="om"
           accept="application/pdf"
           hint="PDF offering memorandum, up to 32 MB"
-          maxBytes={22 * 1024 * 1024}
+          maxBytes={32 * 1024 * 1024}
         />
         <PendingButton
           pendingLabel="Uploading your OM — hang tight…"

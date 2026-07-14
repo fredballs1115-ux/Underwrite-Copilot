@@ -14,7 +14,7 @@ import { isPro } from "@/lib/billing";
 import { claimJob, analysisWorkerEnabled, workerSchemaReady } from "@/lib/jobs";
 import { runModelGeneration } from "@/lib/model/build-model";
 
-const MAX_FILE = 22 * 1024 * 1024;
+const MAX_FILE = 32 * 1024 * 1024;
 
 async function requireDeal(dealId: string) {
   const supabase = await createSupabaseServerClient();

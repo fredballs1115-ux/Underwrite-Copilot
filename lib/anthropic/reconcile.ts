@@ -3,7 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
-import { omDocument, omRequestOptions, type OmSource } from "./om-source";
+import { anyOmRequestOptions, omDocument, omSourceFor, type OmSource } from "./om-source";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, reconcilerInstruction } from "./prompts";
 import type { ReconciliationResult } from "./types";
@@ -46,16 +46,11 @@ export async function reconcileModel(
     },
   ];
 
+  let modelOm: OmSource | null = null;
   if (model.kind === "pdf") {
     content.push({ type: "text", text: "The buyer's own underwriting model:" });
-    content.push({
-      type: "document",
-      source: {
-        type: "base64",
-        media_type: "application/pdf",
-        data: model.data.toString("base64"),
-      },
-    });
+    modelOm = await omSourceFor(model.data, "buyer-model.pdf");
+    content.push(omDocument(modelOm, false));
   } else {
     content.push({
       type: "text",
@@ -73,7 +68,7 @@ export async function reconcileModel(
     system: ANALYST_SYSTEM,
     messages,
     output_config: { format: zodOutputFormat(ReconciliationSchema) },
-  }, omRequestOptions(om));
+  }, anyOmRequestOptions(om, modelOm));
 
   const out = response.parsed_output;
   if (!out) {

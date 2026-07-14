@@ -3,6 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
+import { omDocument, omRequestOptions, omSourceFor, type OmSource } from "./om-source";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, docExtractionInstruction } from "./prompts";
 import type { ParsedModel } from "@/lib/model-parse";
@@ -35,15 +36,10 @@ export async function extractDocFacts(doc: {
   const client = getAnthropic();
 
   const content: Anthropic.ContentBlockParam[] = [];
+  let om: OmSource | null = null;
   if (doc.parsed.kind === "pdf") {
-    content.push({
-      type: "document",
-      source: {
-        type: "base64",
-        media_type: "application/pdf",
-        data: doc.parsed.data.toString("base64"),
-      },
-    });
+    om = await omSourceFor(doc.parsed.data, doc.name || "document.pdf");
+    content.push(omDocument(om, false));
   } else {
     content.push({
       type: "text",
@@ -61,7 +57,7 @@ export async function extractDocFacts(doc: {
     system: ANALYST_SYSTEM,
     messages: [{ role: "user", content }],
     output_config: { format: zodOutputFormat(FactsSchema) },
-  });
+  }, om ? omRequestOptions(om) : {});
 
   const out = response.parsed_output;
   if (!out) {

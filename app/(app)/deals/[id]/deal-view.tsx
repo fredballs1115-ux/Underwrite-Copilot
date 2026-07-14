@@ -150,7 +150,7 @@ const STEP_LABELS: Record<string, string> = {
 const MODEL_ERRORS: Record<string, string> = {
   modelfile: "Please choose your model file to upload.",
   modeltype: "Please upload your model as .xlsx, .csv, or PDF.",
-  modelsize: "That file is larger than 22 MB — please try a smaller export.",
+  modelsize: "That file is larger than 32 MB — please try a smaller export.",
   modelupload:
     "Your model didn’t finish uploading — nothing was changed. Please try again.",
   omfile: "Choose the reissued OM (PDF) to upload.",
@@ -171,7 +171,7 @@ const MODEL_ERRORS: Record<string, string> = {
     "There’s no generated model on this deal yet — build one from the Financials section first.",
   modelfail: "Couldn’t build the Excel just now — please try again in a moment.",
   docfile: "Please choose a file to add.",
-  docsize: "That file is larger than 22 MB — please try a smaller one.",
+  docsize: "That file is larger than 32 MB — please try a smaller one.",
   exportfail:
     "Couldn’t build that export just now — please try again in a moment.",
   docformat:
