@@ -1,4 +1,5 @@
 import "server-only";
+import type Stripe from "stripe";
 
 /**
  * Turn a raw Stripe SDK error into an actionable config-error code, so the
@@ -11,6 +12,27 @@ import "server-only";
  * issues) — callers fall back to their generic retry copy for those.
  */
 export type StripeConfigErrorCode = "stripekey" | "price" | "pricetype" | "appurl";
+
+/**
+ * True when a SAVED Stripe customer id no longer exists under the current
+ * key — the classic case is an id minted in TEST mode surviving in the
+ * database after the switch to LIVE keys ("No such customer"). Callers
+ * self-heal by clearing the mirror and minting a fresh customer, instead of
+ * failing checkout forever. Deleted customers count as stale too. Errors
+ * other than resource_missing propagate to normal handling.
+ */
+export async function isStaleCustomer(
+  stripe: Stripe,
+  customerId: string,
+): Promise<boolean> {
+  try {
+    const customer = await stripe.customers.retrieve(customerId);
+    return (customer as { deleted?: boolean }).deleted === true;
+  } catch (err) {
+    if ((err as { code?: string })?.code === "resource_missing") return true;
+    throw err;
+  }
+}
 
 export function classifyStripeError(err: unknown): StripeConfigErrorCode | null {
   const e = err as {

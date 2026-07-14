@@ -49,6 +49,11 @@ const nextConfig: NextConfig = {
       // 36mb = the 32MB PDF cap plus multipart/form-field overhead.
       bodySizeLimit: "36mb",
     },
+    // Next 16 separately caps bodies on routes that pass through the proxy
+    // (middleware) at 10MB — our session proxy runs on /deals, so without
+    // this, uploads over 10MB truncate mid-stream ("Unexpected end of form")
+    // no matter what bodySizeLimit says. Keep in lockstep with it.
+    proxyClientMaxBodySize: "36mb",
   },
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
