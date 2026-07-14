@@ -12,6 +12,7 @@ import {
 import { searchPublicComps } from "./comps-actions";
 import { SourceChip } from "./source-chip";
 import { CompsMap, type MapComp } from "./comps-map";
+import { geocodeCandidates } from "@/lib/geo";
 import { safeHttpUrl } from "@/lib/safe-url";
 import type { DealFact } from "@/lib/facts";
 import { FileDrop } from "../../file-drop";
@@ -803,9 +804,11 @@ export function BrokerComps({
   const hasComps = result.saleComps.length > 0 || result.leaseComps.length > 0;
 
   // The map plots SALE comps (the OM's) beside the public-web candidates —
-  // one pin set per source, colored apart, geocoded by name + market.
-  // Memoized: a stable array identity keeps CompsMap's geocode/map effects
-  // from re-firing (and the map from rebuilding) on unrelated re-renders.
+  // one pin set per source, colored apart. Each comp carries a geocode query
+  // LADDER (address-in-text first, cleaned name, raw name — lib/geo), because
+  // bare property names rarely exist in OpenStreetMap and used to leave most
+  // pins unplaced. Memoized: a stable array identity keeps CompsMap's
+  // geocode/map effects from re-firing on unrelated re-renders.
   const mapComps: MapComp[] = useMemo(
     () =>
       mapContext
@@ -820,7 +823,7 @@ export function BrokerComps({
                 sourceLabel: pageNum ? `OM p. ${pageNum}` : "OM",
                 sourceHref:
                   pageNum && mapContext.omUrl ? `${mapContext.omUrl}#page=${pageNum}` : null,
-                query: [c.name, mapContext.market].filter(Boolean).join(", "),
+                queries: geocodeCandidates(c.name, c.detail, mapContext.market),
               };
             }),
             ...(compSearch?.candidates ?? []).map((c, i): MapComp => ({
@@ -830,7 +833,11 @@ export function BrokerComps({
               detail: [c.detail, c.date].filter(Boolean).join(" · "),
               sourceLabel: c.sourceName || "Public source",
               sourceHref: c.sourceUrl || null,
-              query: [c.name, c.location || mapContext.market].filter(Boolean).join(", "),
+              queries: geocodeCandidates(
+                c.name,
+                c.detail ?? "",
+                c.location || mapContext.market,
+              ),
             })),
           ]
         : [],
