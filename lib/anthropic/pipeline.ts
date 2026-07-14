@@ -2,7 +2,12 @@ import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { downloadOmPdf } from "@/lib/storage";
 import { readFirstSignal } from "./first-signal";
-import { omSourceFor, type OmSource } from "./om-source";
+import { omSourceFor, omFromText, type OmSource } from "./om-source";
+import {
+  manualFactSheet,
+  firstSignalFromExtraction,
+  manualCompsStub,
+} from "@/lib/manual-deal";
 import { extractTerms } from "./extract";
 import { challengeAssumptions } from "./challenge";
 import { scrutinizeComps } from "./comps";
@@ -119,13 +124,22 @@ export async function runAnalysis(
     const admin = createSupabaseAdminClient();
     const { data: deal, error } = await admin
       .from("deals")
-      .select("id, asset_class, om_storage_path")
+      .select("id, name, asset_class, om_storage_path, extraction")
       .eq("id", dealId)
       .single();
 
     if (error || !deal) throw new Error("Deal not found.");
-    if (!deal.om_storage_path) {
-      throw new Error("No OM file is attached to this deal.");
+    // Manual deals have no OM — the stored extraction (the buyer's typed
+    // facts) is the source, and a synthesized fact sheet stands in for the
+    // document. No extraction either means there's nothing to screen.
+    const manualExtraction = !deal.om_storage_path
+      ? ((deal.extraction as ExtractionResult | null) ?? null)
+      : null;
+    const manual = manualExtraction != null;
+    if (!deal.om_storage_path && !manual) {
+      throw new Error(
+        "No OM file is attached to this deal — upload one, or enter the deal's facts by hand.",
+      );
     }
 
     const assetClass = (deal.asset_class as AssetClass) ?? "auto";
@@ -169,17 +183,26 @@ export async function runAnalysis(
     // The OM is only needed by the document-reading steps. A run resumed at
     // the verdict (everything else checkpointed) skips the whole download —
     // re-paying a 20MB Storage read just to ignore it would defeat the
-    // point of the checkpoints.
+    // point of the checkpoints. Manual deals never download: their document
+    // is the fact sheet synthesized from the typed facts.
     const pdfSteps = ["signal", "extract", "challenge", "comps", "market"];
-    const pdf = pdfSteps.some((s) => !completed.has(s))
-      ? await downloadOmPdf(deal.om_storage_path as string)
-      : null;
+    const needsDoc = pdfSteps.some((s) => !completed.has(s));
+    const pdf =
+      needsDoc && !manual
+        ? await downloadOmPdf(deal.om_storage_path as string)
+        : null;
     // Inline for anything the request cap carries; one Files-API upload for
     // larger OMs, which every step then references by id (a resumed run
     // re-uploads — one extra upload, never a stale reference).
-    const omSource = pdf ? await omSourceFor(pdf) : null;
+    const omSource = manualExtraction
+      ? needsDoc
+        ? omFromText(manualFactSheet(manualExtraction, (deal.name as string) ?? "Deal"))
+        : null
+      : pdf
+        ? await omSourceFor(pdf)
+        : null;
     // Every use sits inside a `!completed.has(<pdf step>)` guard, so the
-    // download above must have run; this just makes that invariant loud.
+    // source above must have been built; this just makes that invariant loud.
     const om = (): OmSource => {
       if (!omSource) throw new Error("OM was not loaded for a document step.");
       return omSource;
@@ -190,8 +213,12 @@ export async function runAnalysis(
     // (price cuts, cap drift, verdict flips). Best-effort — a pre-0010
     // schema without the column must never sink the run. On a RESUMED
     // attempt the snapshot already happened (and the columns now hold a
-    // half-new generation), so never re-snapshot.
-    if (snapshotPrior && completed.size === 0) try {
+    // half-new generation), so never re-snapshot. Manual deals skip this:
+    // their extraction exists BEFORE any screen (it's the typed facts, and
+    // this run never rewrites it), so a run-time snapshot would just diff
+    // the deal against itself — the edit-facts action snapshots the OLD
+    // facts instead, where a real before/after exists.
+    if (snapshotPrior && completed.size === 0 && !manual) try {
       const { data: prev } = await admin
         .from("deals")
         .select("extraction, verdict")
@@ -217,7 +244,8 @@ export async function runAnalysis(
     // lands so the deal page shows what the deal IS while the deep pass runs.
     // Best-effort: a failure here (or a pre-0009 schema without the column)
     // must never sink the real screen. This call also warms the prompt cache
-    // for the OM, so extraction and the later steps read it cheaply.
+    // for the OM, so extraction and the later steps read it cheaply. Manual
+    // deals derive the signal from the typed facts — no model call.
     if (!completed.has("signal")) {
       await patchJob(dealId, {
         status: "running",
@@ -229,7 +257,9 @@ export async function runAnalysis(
         // Clear the previous run's signal first so a re-run never shows a stale
         // headline next to fresh results if the read below fails.
         await admin.from("deals").update({ first_signal: null }).eq("id", dealId);
-        const firstSignal = await readFirstSignal(om(), assetClass);
+        const firstSignal = manualExtraction
+          ? firstSignalFromExtraction(manualExtraction)
+          : await readFirstSignal(om(), assetClass);
         await admin
           .from("deals")
           .update({ first_signal: firstSignal, updated_at: new Date().toISOString() })
@@ -240,8 +270,9 @@ export async function runAnalysis(
       await markDone("signal");
     }
 
-    // Step 1 — extraction
-    if (!completed.has("extract")) {
+    // Step 1 — extraction. A manual deal's extraction IS the typed facts,
+    // already stored at create/edit time — nothing to extract from.
+    if (!completed.has("extract") && !manual) {
       await patchJob(dealId, {
         status: "running",
         step: "extract",
@@ -279,6 +310,7 @@ export async function runAnalysis(
 
       await markDone("extract");
     }
+    if (manual) await markDone("extract");
 
     // Step 1b — multi-document reconciliation (best-effort). Compares the OM
     // against any rent roll / T-12 / financials and stores the deal's
@@ -382,10 +414,12 @@ export async function runAnalysis(
       await markDone("challenge");
     }
 
-    // Step 3 — broker-comp scrutiny (reads the comps out of the OM itself)
+    // Step 3 — broker-comp scrutiny (reads the comps out of the OM itself).
+    // A manual deal has no OM comp set — store the explanatory stub so the
+    // comps tab hands over to own-comps / public-web search instead.
     if (!completed.has("comps")) {
       await patchJob(dealId, { status: "running", step: "comps", progress: 50 });
-      const comps = await scrutinizeComps(om());
+      const comps = manual ? manualCompsStub() : await scrutinizeComps(om());
       await admin
         .from("deals")
         .update({ comps, updated_at: new Date().toISOString() })

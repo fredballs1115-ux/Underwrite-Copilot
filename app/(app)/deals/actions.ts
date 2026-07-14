@@ -29,6 +29,12 @@ import {
 } from "@/lib/stages";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { parseDealNotes } from "@/lib/deals";
+import {
+  factsFromForm,
+  manualFactsProblem,
+  buildManualExtraction,
+  firstSignalFromExtraction,
+} from "@/lib/manual-deal";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 
 // Claude's document limit is 32MB of raw PDF. Small OMs ride inline in the
@@ -225,6 +231,260 @@ export async function createDealFromBatch(
   formData: FormData,
 ): Promise<CreateDealResult> {
   return createDealCore(formData);
+}
+
+/** Inline state for the manual-entry forms (useActionState) — errors render
+ *  next to the fields instead of bouncing through a redirect, so nothing the
+ *  user typed is ever lost. */
+export type ManualDealState = { error: string } | null;
+
+/**
+ * Create a deal from TYPED facts — no OM. The facts become a normal
+ * ExtractionResult (plus an instant first signal), so the buy box, mandate
+ * score, playground, and workbook all light up; the analysis pipeline then
+ * runs its manual branch (challenger + market check against a synthesized
+ * fact sheet, comps handed to the user's own tools). Same caps, idempotency,
+ * and team routing as the upload path.
+ */
+export async function createManualDeal(
+  _prev: ManualDealState,
+  formData: FormData,
+): Promise<ManualDealState> {
+  const facts = factsFromForm(formData);
+  const problem = manualFactsProblem(facts);
+  if (problem) return { error: problem };
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    redirect(`/login?next=${encodeURIComponent("/deals")}`);
+  }
+
+  const billing = await getBilling(supabase, user.id);
+  if (!billing.canCreateDeal) {
+    return {
+      error: billing.team
+        ? "Your team’s trial deals and your personal free deals are used up — start the Team plan or upgrade to Pro."
+        : "You’ve reached the free-plan deal limit. Upgrade to Pro for unlimited deals.",
+    };
+  }
+
+  // Same 15s idempotency window as the upload path — a double-click can't
+  // mint twin deals and twin Claude runs.
+  const { data: recent } = await supabase
+    .from("deals")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("name", facts.name)
+    .gte("created_at", new Date(Date.now() - 15_000).toISOString())
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (recent?.id) redirect(`/deals/${recent.id}`);
+
+  // A structured autocomplete pick fills the market for the pipeline table
+  // and geography checks; a bare typed address stays a label.
+  const structured = parseStructuredAddress(formData.get("address"));
+  if (!facts.market && structured) {
+    facts.market = [structured.city, structured.state].filter(Boolean).join(", ");
+  }
+  const address =
+    structured ??
+    (facts.address
+      ? { label: facts.address, street: "", city: "", state: "", zip: "", county: "", submarket: "" }
+      : null);
+
+  const extraction = buildManualExtraction(facts);
+  const firstSignal = firstSignalFromExtraction(extraction);
+
+  const teamAllowed =
+    !!billing.team &&
+    (billing.team.active || billing.team.dealCount < TEAM_TRIAL_DEALS);
+  const { data: deal, error: insertErr } = await supabase
+    .from("deals")
+    .insert({
+      name: facts.name,
+      asset_class: facts.assetClass,
+      user_id: user.id,
+      team_id: teamAllowed ? billing.team!.id : null,
+      extraction,
+      first_signal: firstSignal,
+    })
+    .select("id")
+    .single();
+  if (insertErr || !deal) {
+    return { error: "Couldn’t save the deal. Please try again." };
+  }
+  const dealId = deal.id as string;
+
+  // Best-effort separate update so a pre-0011 schema can't sink the create.
+  if (address) {
+    try {
+      await supabase.from("deals").update({ address }).eq("id", dealId);
+    } catch {
+      // the deal still works without the address column
+    }
+  }
+
+  const workerMode =
+    analysisWorkerEnabled() && (await workerSchemaReady(supabase));
+  const { error: jobErr } = await supabase.from("analysis_jobs").insert(
+    newJobRow(
+      dealId,
+      "signal",
+      workerMode ? { workerPayload: { kind: "screen" } } : undefined,
+    ),
+  );
+  if (jobErr) {
+    // No storage to sweep — just remove the half-created row.
+    await supabase.from("deals").delete().eq("id", dealId);
+    return { error: "Couldn’t start the screen. Please try again." };
+  }
+
+  if (!workerMode) after(() => runAnalysis(dealId));
+  redirect(`/deals/${dealId}`);
+}
+
+/**
+ * Edit a manual deal's typed facts and re-screen. Only for deals with no OM
+ * (an uploaded OM is the source of truth — facts come from extraction there).
+ * Snapshots the OLD facts + verdict first so the deal page shows exactly what
+ * moved, then rebuilds the extraction and runs the pipeline's manual branch.
+ */
+export async function updateManualFacts(
+  _prev: ManualDealState,
+  formData: FormData,
+): Promise<ManualDealState> {
+  const dealId = String(formData.get("dealId") ?? "");
+  if (!dealId) return { error: "Something went wrong — reload and try again." };
+
+  const facts = factsFromForm(formData);
+  const problem = manualFactsProblem(facts);
+  if (problem) return { error: problem };
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: deal } = await supabase
+    .from("deals")
+    .select("id, om_storage_path, is_sample, extraction, verdict")
+    .eq("id", dealId)
+    .maybeSingle();
+  if (!deal) return { error: "This deal is no longer available." };
+  if (deal.is_sample || deal.om_storage_path) {
+    return {
+      error:
+        "This deal has an OM behind it — its facts come from the document, so re-screen from the OM instead.",
+    };
+  }
+
+  // Claim the run BEFORE writing anything, held at "running" so the worker
+  // can't pick the job up while the extraction is mid-rewrite (same pattern
+  // as replace-OM). A losing concurrent trigger gets "busy".
+  const workerMode =
+    analysisWorkerEnabled() && (await workerSchemaReady(supabase));
+  const claim = await claimJob(
+    supabase,
+    dealId,
+    "signal",
+    workerMode ? { kind: "screen" } : undefined,
+    workerMode ? "running" : "queued",
+  );
+  if (claim.outcome === "busy") {
+    return { error: "A screen is already running on this deal — give it a minute to finish." };
+  }
+  if (claim.outcome === "none") {
+    const { error: insErr } = await supabase.from("analysis_jobs").insert(
+      newJobRow(
+        dealId,
+        "signal",
+        workerMode
+          ? { status: "running", workerPayload: { kind: "screen" } }
+          : undefined,
+      ),
+    );
+    if (insErr) {
+      return { error: "Couldn’t start the re-screen. Please try again." };
+    }
+  }
+
+  // Retrade watch for typed facts: the pipeline's manual branch never
+  // snapshots (the extraction it sees is already the NEW facts), so the
+  // before/after is captured here — only against a COMPLETED generation.
+  if (deal.extraction && deal.verdict) {
+    try {
+      await supabase
+        .from("deals")
+        .update({
+          prior_screen: {
+            at: new Date().toISOString(),
+            extraction: deal.extraction,
+            verdict: deal.verdict,
+          },
+        })
+        .eq("id", dealId);
+    } catch {
+      // pre-0010 schema — the re-screen proceeds without the diff
+    }
+  }
+
+  const structured = parseStructuredAddress(formData.get("address"));
+  if (!facts.market && structured) {
+    facts.market = [structured.city, structured.state].filter(Boolean).join(", ");
+  }
+  const extraction = buildManualExtraction(facts);
+  const firstSignal = firstSignalFromExtraction(extraction);
+
+  const { error: updateErr } = await supabase
+    .from("deals")
+    .update({
+      name: facts.name,
+      asset_class: facts.assetClass,
+      extraction,
+      first_signal: firstSignal,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", dealId);
+  if (updateErr) {
+    await releaseClaim(
+      supabase,
+      dealId,
+      "The fact update didn’t save — the stored facts are unchanged.",
+    );
+    return { error: "Couldn’t save the changes. Please try again." };
+  }
+  const structuredUpdate = structured
+    ? { address: structured }
+    : facts.address
+      ? { address: { label: facts.address, street: "", city: "", state: "", zip: "", county: "", submarket: "" } }
+      : null;
+  if (structuredUpdate) {
+    try {
+      await supabase.from("deals").update(structuredUpdate).eq("id", dealId);
+    } catch {
+      // pre-0011 schema — carry on
+    }
+  }
+
+  if (workerMode) {
+    // New facts are in place — hand the held row to the worker.
+    await supabase
+      .from("analysis_jobs")
+      .update({ status: "queued", updated_at: new Date().toISOString() })
+      .eq("deal_id", dealId)
+      .eq("status", "running")
+      .eq("step", "signal")
+      .eq("progress", 0);
+  } else {
+    after(() => runAnalysis(dealId, { snapshotPrior: false }));
+  }
+  revalidatePath(`/deals/${dealId}`);
+  redirect(`/deals/${dealId}`);
 }
 
 /**
@@ -480,7 +740,8 @@ export async function deleteDeal(formData: FormData) {
   redirect("/deals?deleted=1");
 }
 
-/** Re-run (or first-run) the analysis for an existing deal that has an OM. */
+/** Re-run (or first-run) the analysis for an existing deal that has an OM —
+ *  or a manual deal's typed facts (its stored extraction is the source). */
 export async function rerunAnalysis(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
   if (!dealId) redirect("/deals");
@@ -493,10 +754,14 @@ export async function rerunAnalysis(formData: FormData) {
 
   const { data: deal } = await supabase
     .from("deals")
-    .select("id, om_storage_path")
+    .select("id, om_storage_path, extraction, is_sample")
     .eq("id", dealId)
     .maybeSingle();
-  if (!deal?.om_storage_path) redirect(`/deals/${dealId}`);
+  // Screenable = has an OM, or has typed facts (manual). The sample deal is
+  // static demo data — nothing to run.
+  if (!deal || deal.is_sample || (!deal.om_storage_path && !deal.extraction)) {
+    redirect(`/deals/${dealId}`);
+  }
 
   // Atomic claim — a double-click or a concurrent teammate trigger gets
   // "busy" instead of a second pipeline interleaving with this one. In worker
