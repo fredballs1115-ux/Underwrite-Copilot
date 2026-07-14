@@ -28,7 +28,7 @@ const FREE_FEATURES = [
 
 const PRO_FEATURES = [
   "Unlimited deals — screen every OM that hits your inbox",
-  "First-draft Excel model with live formulas and IRR sensitivity",
+  "Institutional Excel model — live formulas, monthly detail, debt schedule, sensitivity matrices",
   "One-page PDF screening memo you can hand to your IC",
   "Public-web comp search beyond the broker's comps",
   "Per-tab uploads and multi-document reconciliation",
@@ -44,8 +44,7 @@ export default async function BillingPage({
   const UPSELL_LABELS: Record<string, string> = {
     memo: "export the one-page IC memo",
     report: "export the full multi-page report",
-    model: "export the Excel model",
-    underwrite: "export the institutional underwriting model",
+    underwrite: "export the institutional Excel model",
     loi: "export the LOI draft",
     branding: "put your firm's name and logo on exported reports",
   };

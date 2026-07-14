@@ -311,7 +311,7 @@ function buildAssumptions(ws: ExcelJS.Worksheet, inp: UnderwriteInputs, sources:
   // Hold is STRUCTURAL: it sets the number of cash-flow years and the sale
   // year, which are baked at export. Not a flex input — editing it in the file
   // would only partially recalc (a longer-hold IRR would be wrong). Re-export
-  // to change it. Mirrors the sister model.xlsx convention.
+  // to change it.
   input("Hold Period (months) — fixed; re-export to change", inp.holdMonths, "HoldMonths", FMT.int, "holdMonths", false);
   ws.getCell(r - 1, 2).font = { name: ARIAL, size: 10, color: INK }; // black (formula-like), not blue input
   input("Acquisition Fee %", inp.acqFeePct, "AcqFeePct", FMT.pct2, "acqFeePct");

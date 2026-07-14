@@ -65,7 +65,7 @@ export function ModelView({
             <DownloadRow dealId={dealId} />
           ) : (
             <Link
-              href="/billing"
+              href="/billing?upsell=underwrite"
               className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-caution/30 bg-caution/5 px-4 py-2.5 text-sm font-medium text-caution transition-colors hover:bg-caution/10"
             >
               Upgrade to Pro to download the Excel model
@@ -808,7 +808,7 @@ function SummaryCaveats({
 function DownloadRow({ dealId }: { dealId: string }) {
   return (
     <a
-      href={`/api/deals/${dealId}/model.xlsx`}
+      href={`/api/deals/${dealId}/underwrite.xlsx`}
       className="inline-flex w-fit items-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
     >
       <svg

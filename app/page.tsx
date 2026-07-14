@@ -737,16 +737,17 @@ export default function Home() {
                 <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card lg:col-span-2">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="text-sm font-semibold">
-                      First-draft Excel model, alive
+                      The Excel model, alive
                     </h3>
                     <span className="rounded-full bg-faint px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
                       Sample
                     </span>
                   </div>
                   <p className="mt-1 max-w-md text-xs leading-relaxed text-muted">
-                    Not a static report — the workbook carries live formulas.
-                    Edit the tinted inputs and IRR, equity multiple, and the
-                    whole cash flow recalculate.
+                    Not a static report — seven tabs of live formulas: annual
+                    and monthly cash flow, a full debt schedule, and IRR
+                    sensitivity matrices. Edit the tinted inputs and the whole
+                    book recalculates.
                   </p>
                   <div className="mt-auto pt-4">
                   <div className="overflow-hidden rounded-lg border border-line font-mono text-[11px]">

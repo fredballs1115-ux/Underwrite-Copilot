@@ -7,8 +7,8 @@ import { parseMoney, parsePct } from "@/lib/criteria";
 /**
  * The whole pipeline as one meeting-ready Excel workbook: a stage-grouped
  * deal sheet with verdict/buy-box markers, plus a summary sheet with the
- * counts a pipeline meeting opens with. Same visual language as the model
- * workbook (lib/model/excel-build.ts).
+ * counts a pipeline meeting opens with. Same visual language as the
+ * underwriting workbook (lib/underwrite/workbook.ts).
  */
 
 const BRAND = "FF114E54";
