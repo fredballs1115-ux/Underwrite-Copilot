@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
+import { omDocument, omRequestOptions, omSourceFor } from "./om-source";
 import { MODELS } from "./models";
 import { ANALYST_SYSTEM } from "./prompts";
 
@@ -34,6 +35,9 @@ export async function askDealQuestion(
   question: string,
 ): Promise<AskResult> {
   const client = getAnthropic();
+  // Oversized OMs ride as a Files-API reference (same prefix the pipeline
+  // caches); everything else keeps the inline path.
+  const om = await omSourceFor(pdf);
 
   const response = await client.messages.parse({
     model: MODELS.reasoning,
@@ -43,15 +47,7 @@ export async function askDealQuestion(
       {
         role: "user",
         content: [
-          {
-            type: "document",
-            source: {
-              type: "base64",
-              media_type: "application/pdf",
-              data: pdf.toString("base64"),
-            },
-            cache_control: { type: "ephemeral" },
-          },
+          omDocument(om),
           {
             type: "text",
             text: `Answer the buyer's question using ONLY the attached offering memorandum. Be specific and numerate; quote the OM's own figures where they exist; keep the answer under roughly 250 words. If the OM does not state the answer, say so plainly rather than inferring — "the OM doesn't state this" is a valuable answer. For every factual claim, cite the OM page it comes from in \`cites\` (short refs like "p. 41"; empty list only when the OM is silent).
@@ -66,7 +62,7 @@ ${question}
       },
     ],
     output_config: { format: zodOutputFormat(AskSchema) },
-  });
+  }, omRequestOptions(om));
 
   const out = response.parsed_output;
   if (!out) throw new Error("The answer did not come back structured.");

@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
+import { omDocument, omRequestOptions, type OmSource } from "./om-source";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, brokerCompsInstruction } from "./prompts";
 import type { BrokerCompsResult } from "./types";
@@ -27,9 +28,8 @@ const BrokerCompsSchema = z.object({
  * actually supports the subject deal and flags selection bias.
  * Uses the reasoning model (Opus) since this is judgment, not transcription.
  */
-export async function scrutinizeComps(pdf: Buffer): Promise<BrokerCompsResult> {
+export async function scrutinizeComps(om: OmSource): Promise<BrokerCompsResult> {
   const client = getAnthropic();
-  const data = pdf.toString("base64");
 
   const response = await client.messages.parse({
     model: MODELS.reasoning,
@@ -39,18 +39,14 @@ export async function scrutinizeComps(pdf: Buffer): Promise<BrokerCompsResult> {
       {
         role: "user",
         content: [
-          {
-            type: "document",
-            source: { type: "base64", media_type: "application/pdf", data },
-            // Reads the OM from the prompt cache the extraction step wrote.
-            cache_control: { type: "ephemeral" },
-          },
+          // Reads the OM from the prompt cache the extraction step wrote.
+          omDocument(om),
           { type: "text", text: brokerCompsInstruction() },
         ],
       },
     ],
     output_config: { format: zodOutputFormat(BrokerCompsSchema) },
-  });
+  }, omRequestOptions(om));
 
   const out = response.parsed_output;
   if (!out) {

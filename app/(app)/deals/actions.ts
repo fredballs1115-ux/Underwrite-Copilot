@@ -31,9 +31,11 @@ import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { parseDealNotes } from "@/lib/deals";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 
-// Keep PDFs comfortably under Claude's ~32MB per-request limit (base64 inflates
-// the payload ~33%). Larger files will use the Files API in a later pass.
-const MAX_BYTES = 22 * 1024 * 1024;
+// Claude's document limit is 32MB of raw PDF. Small OMs ride inline in the
+// request; anything past the base64-inflation ceiling uploads once via the
+// Files API and is referenced by id (lib/anthropic/om-source.ts), so the full
+// 32MB — roughly 600 pages — is actually usable.
+const MAX_BYTES = 32 * 1024 * 1024;
 
 // Accepted formats for the buyer's own underwriting model (Phase 5 reconciler).
 const MODEL_EXT = /\.(xlsx|xls|csv|pdf)$/i;

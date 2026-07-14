@@ -155,7 +155,7 @@ const MODEL_ERRORS: Record<string, string> = {
     "Your model didn’t finish uploading — nothing was changed. Please try again.",
   omfile: "Choose the reissued OM (PDF) to upload.",
   ompdf: "The replacement OM must be a PDF.",
-  omsize: "That PDF is larger than 22 MB — please try a smaller file.",
+  omsize: "That PDF is larger than 32 MB — please try a smaller file.",
   omupload:
     "The upload didn’t complete — the stored OM is unchanged. Please try again.",
   ompermission:

@@ -15,7 +15,7 @@ const ERRORS: Record<string, string> = {
   name: "Please give the deal a name.",
   file: "Please choose a PDF offering memorandum to upload.",
   pdf: "That file isn’t a PDF — please upload the OM as a PDF.",
-  size: "That PDF is larger than 22 MB — please try a smaller file for now.",
+  size: "That PDF is larger than 32 MB — please try a smaller file for now.",
   save: "Couldn’t save the deal. Please try again.",
   upload: "The upload didn’t complete — nothing was saved. Please try again.",
   limit:

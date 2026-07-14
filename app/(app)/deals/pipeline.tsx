@@ -1636,7 +1636,7 @@ function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
         <FileDrop
           name="om"
           accept="application/pdf"
-          hint="PDF offering memorandum, up to 22 MB"
+          hint="PDF offering memorandum, up to 32 MB"
           maxBytes={22 * 1024 * 1024}
         />
         <PendingButton

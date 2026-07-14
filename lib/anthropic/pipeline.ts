@@ -2,6 +2,7 @@ import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { downloadOmPdf } from "@/lib/storage";
 import { readFirstSignal } from "./first-signal";
+import { omSourceFor, type OmSource } from "./om-source";
 import { extractTerms } from "./extract";
 import { challengeAssumptions } from "./challenge";
 import { scrutinizeComps } from "./comps";
@@ -173,11 +174,15 @@ export async function runAnalysis(
     const pdf = pdfSteps.some((s) => !completed.has(s))
       ? await downloadOmPdf(deal.om_storage_path as string)
       : null;
+    // Inline for anything the request cap carries; one Files-API upload for
+    // larger OMs, which every step then references by id (a resumed run
+    // re-uploads — one extra upload, never a stale reference).
+    const omSource = pdf ? await omSourceFor(pdf) : null;
     // Every use sits inside a `!completed.has(<pdf step>)` guard, so the
     // download above must have run; this just makes that invariant loud.
-    const om = (): Buffer => {
-      if (!pdf) throw new Error("OM was not loaded for a document step.");
-      return pdf;
+    const om = (): OmSource => {
+      if (!omSource) throw new Error("OM was not loaded for a document step.");
+      return omSource;
     };
 
     // Retrade watch: on a RE-screen, snapshot the previous run's results
@@ -261,7 +266,9 @@ export async function runAnalysis(
         const pageCount =
           extraction.totalPages && extraction.totalPages > 0
             ? extraction.totalPages
-            : countPdfPages(om());
+            : pdf
+              ? countPdfPages(pdf)
+              : 0;
         const facts = buildDealFacts(extraction.metrics, pageCount);
         await admin.from("deal_facts").delete().eq("deal_id", dealId);
         const rows = toFactRows(dealId, facts);
@@ -451,7 +458,7 @@ export async function runReconciliation(
 
     const omPdf = await downloadOmPdf(deal.om_storage_path as string);
     const parsed = await parseModelFile(model.name, model.buffer);
-    const reconciliation = await reconcileModel(omPdf, parsed);
+    const reconciliation = await reconcileModel(await omSourceFor(omPdf), parsed);
 
     await admin
       .from("deals")

@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
+import { omDocument, omRequestOptions, type OmSource } from "./om-source";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, marketCheckInstruction } from "./prompts";
 import type { AssetClass, MarketResult } from "./types";
@@ -27,11 +28,10 @@ const MarketSchema = z.object({
  * model.
  */
 export async function checkMarket(
-  pdf: Buffer,
+  om: OmSource,
   assetClass: AssetClass,
 ): Promise<MarketResult> {
   const client = getAnthropic();
-  const data = pdf.toString("base64");
 
   const response = await client.messages.parse({
     model: MODELS.reasoning,
@@ -41,18 +41,14 @@ export async function checkMarket(
       {
         role: "user",
         content: [
-          {
-            type: "document",
-            source: { type: "base64", media_type: "application/pdf", data },
-            // Reads the OM from the prompt cache the extraction step wrote.
-            cache_control: { type: "ephemeral" },
-          },
+          // Reads the OM from the prompt cache the extraction step wrote.
+          omDocument(om),
           { type: "text", text: marketCheckInstruction(assetClass) },
         ],
       },
     ],
     output_config: { format: zodOutputFormat(MarketSchema) },
-  });
+  }, omRequestOptions(om));
 
   const out = response.parsed_output;
   if (!out) {

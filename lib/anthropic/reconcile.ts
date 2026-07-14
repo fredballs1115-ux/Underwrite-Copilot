@@ -3,6 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
+import { omDocument, omRequestOptions, type OmSource } from "./om-source";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, reconcilerInstruction } from "./prompts";
 import type { ReconciliationResult } from "./types";
@@ -28,7 +29,7 @@ const ReconciliationSchema = z.object({
  * printed) or text we flattened out of their spreadsheet. Reasoning model.
  */
 export async function reconcileModel(
-  omPdf: Buffer,
+  om: OmSource,
   model: ParsedModel,
 ): Promise<ReconciliationResult> {
   const client = getAnthropic();
@@ -38,15 +39,7 @@ export async function reconcileModel(
   // the prompt cache (and re-warms it) instead of paying a full re-read of a
   // 150-200pp PDF. The label text moves after the document for that reason.
   const content: Anthropic.ContentBlockParam[] = [
-    {
-      type: "document",
-      source: {
-        type: "base64",
-        media_type: "application/pdf",
-        data: omPdf.toString("base64"),
-      },
-      cache_control: { type: "ephemeral" },
-    },
+    omDocument(om),
     {
       type: "text",
       text: "The document above is the broker's offering memorandum (OM).",
@@ -80,7 +73,7 @@ export async function reconcileModel(
     system: ANALYST_SYSTEM,
     messages,
     output_config: { format: zodOutputFormat(ReconciliationSchema) },
-  });
+  }, omRequestOptions(om));
 
   const out = response.parsed_output;
   if (!out) {
