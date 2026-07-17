@@ -206,7 +206,7 @@ def shorten_note(text):
     for pattern, label in NOTE_FLAGS:
         if re.search(pattern, low) and label not in flags:
             flags.append(label)
-        if len(flags) == 3:
+        if len(flags) == 2:
             break
     if flags:
         return "; ".join(flags)
