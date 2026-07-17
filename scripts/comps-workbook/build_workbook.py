@@ -139,6 +139,117 @@ HEADER_FILL = PatternFill("solid", fgColor="1F3864")
 HEADER_FONT = Font(color="FFFFFF", bold=True, size=10)
 BODY_FONT = Font(size=10)
 
+BROKER_NAMES = [
+    ("cushman", "Cushman & Wakefield"), ("c&w", "Cushman & Wakefield"),
+    ("newmark", "Newmark"), ("nmrk", "Newmark"), ("jll", "JLL"),
+    ("jones lang", "JLL"), ("cbre", "CBRE"), ("berkadia", "Berkadia"),
+    ("transwestern", "Transwestern"), ("klnb", "KLNB"),
+    ("nai michael", "NAI Michael"), ("jm zell", "JM Zell"),
+    ("kbc", "KBC Advisors"), ("lincoln", "Lincoln Property Company"),
+]
+
+
+def broker_short(value):
+    """Reduce a broker credit line to just the company name."""
+    if not value:
+        return None
+    low = str(value).lower()
+    for needle, name in BROKER_NAMES:
+        if needle in low:
+            return name
+    return str(value).split("(")[0].split(",")[0].split("|")[0].strip()
+
+
+# (pattern in note text, terse label) — order matters, first match groups first.
+NOTE_FLAGS = [
+    (r"subject propert|subject portfolio", "Subject property"),
+    (r"under contract|\bu/c\b", "Under contract"),
+    (r"\bpending\b", "Pending"),
+    (r"not an executed|not executed|asking rate|availabilit|marketing", "Asking, not executed"),
+    (r"pipeline|target rent", "Pipeline target rent"),
+    (r"discrepancy", "Source discrepancy"),
+    (r"converted from monthly", "Converted from monthly"),
+    (r"sale.?leaseback", "Sale-leaseback"),
+    (r"\breo\b|deed.in.lieu|note sale", "Distressed/note sale"),
+    (r"vacant", "Vacant at sale"),
+    (r"owner.user|user buyer|user purchase", "Owner-user sale"),
+    (r"portfolio", "Portfolio deal"),
+    (r"renewal", "Renewal"),
+    (r"new lease", "New lease"),
+    (r"expansion", "Expansion"),
+    (r"land value|razed|redevelop", "Land-value trade"),
+    (r"forward take|takeout|earn.out", "Forward/earn-out"),
+    (r"stabilized", "Stabilized cap"),
+    (r"\broc\b|return on cost", "RoC, not cap"),
+    (r"20(21|22|23)", "Pre-2024 vintage"),
+]
+
+
+def shorten_note(text):
+    """Compress a long note into a few flag words for the workbook.
+    Full detail stays in the extraction JSONs."""
+    if not text:
+        return None
+    low = str(text).lower()
+    flags = []
+    for pattern, label in NOTE_FLAGS:
+        if re.search(pattern, low) and label not in flags:
+            flags.append(label)
+        if len(flags) == 3:
+            break
+    if flags:
+        return "; ".join(flags)
+    first = re.split(r"[;.]", str(text))[0].strip()
+    return (first[:57] + "...") if len(first) > 60 else (first or None)
+
+
+WARNING_KEEP = [
+    (r"truncat|missing from this file|ends at", "File truncated — section(s) missing"),
+    (r"qc pass corrected|transcription error", "QC corrected values vs source"),
+    (r"2022", "2022 vintage"),
+    (r"2025-vintage|months of 2025|2025 comp", "2025 vintage"),
+    (r"duplicate", "Duplicate upload"),
+    (r"under contract|pending", "Some rows pending/U-C"),
+    (r"asking|availabilit|pipeline|not executed", "Some rows asking, not executed"),
+    (r"misprint", "Source misprint (value nulled)"),
+    (r"lab/life science|residential|office", "Non-industrial rows removed"),
+]
+
+
+def shorten_basis(value):
+    """Compress verbose rate-basis strings to a terse label."""
+    if not value:
+        return None
+    low = str(value).lower()
+    if "nnn" in low:
+        return "$/SF NNN"
+    if "/mo" in low or "per month" in low or ("monthly" in low and "annual" not in low):
+        return "$/SF/mo"
+    if "gross" in low or re.search(r"\bfs\b", low):
+        return "Gross/FS"
+    if "$/sf" in low or "psf" in low or "per sf" in low:
+        return "$/SF"
+    if "not stated" in low or "not printed" in low:
+        return "Not stated"
+    return str(value)[:20]
+
+
+ROW_LEVEL_WARNINGS = {"Some rows pending/U-C", "Some rows asking, not executed",
+                      "QC corrected values vs source", "Non-industrial rows removed"}
+
+
+def shorten_warnings(warnings, has_comps=True):
+    """Keep only genuinely notable warnings, as short phrases.
+    Row-level flags are meaningless for packages that contributed no comps."""
+    out = []
+    low_all = " ".join(str(w).lower() for w in warnings or [])
+    for pattern, label in WARNING_KEEP:
+        if label in ROW_LEVEL_WARNINGS and not has_comps:
+            continue
+        if re.search(pattern, low_all) and label not in out:
+            out.append(label)
+    return "; ".join(out)
+
 
 def norm_state(value):
     if not value:
@@ -280,7 +391,11 @@ def write_sheet(wb, title, columns, rows):
         row = dict(row)
         row["source"] = "; ".join(dict.fromkeys(s for s, _, _ in sources))
         row["page_ref"] = "; ".join(p for _, p, _ in sources if p)
-        row["broker"] = "; ".join(dict.fromkeys(b for _, _, b in sources if b))
+        row["broker"] = "; ".join(dict.fromkeys(broker_short(b) for _, _, b in sources if b))
+        row["notes"] = shorten_note(row.get("notes"))
+        row["rate_basis"] = shorten_basis(row.get("rate_basis"))
+        if not row.get("property"):
+            row["property"] = row.get("address")
         for col_idx, (field, _) in enumerate(columns, start=1):
             value = row.get(field)
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
@@ -288,7 +403,7 @@ def write_sheet(wb, title, columns, rows):
             if field in NUMBER_FORMATS and isinstance(value, (int, float)):
                 cell.number_format = NUMBER_FORMATS[field]
             if value is not None:
-                widths[col_idx - 1] = max(widths[col_idx - 1], min(len(str(value)), 45))
+                widths[col_idx - 1] = max(widths[col_idx - 1], min(len(str(value)), 32))
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = w + 3
     ws.freeze_panes = "A2"
@@ -298,32 +413,33 @@ def write_sheet(wb, title, columns, rows):
 
 
 def write_sources_sheet(wb, packages, collected):
-    columns = ["Package File", "Offering", "Address", "City", "State", "Type",
+    columns = ["Offering", "Address", "City", "State", "Type",
                "Broker", "Pages", "Lease Comps", "Sale Comps", "Land Comps",
-               "Comp Sections Found", "Warnings"]
+               "Comps Found", "Warnings"]
     ws = wb.create_sheet("Sources")
     for i, header in enumerate(columns, start=1):
         cell = ws.cell(row=1, column=i, value=header)
         cell.fill = HEADER_FILL
         cell.font = HEADER_FONT
+    packages = sorted(packages, key=lambda pkg: str(pkg["package"].get("city") or "~"))
     for r, pkg in enumerate(packages, start=2):
         p = pkg["package"]
+        n_comps = sum(len(pkg.get(ct) or []) for ct, _, _ in COMP_TYPES + EXTRA_TYPES)
         values = [
-            p.get("file"), p.get("offering_name"), p.get("property_address"),
-            p.get("city"), norm_state(p.get("state")), p.get("property_type"),
-            p.get("broker"), p.get("pages"),
+            p.get("offering_name") or p.get("file"), p.get("property_address"),
+            p.get("city"), norm_state(p.get("state")), "Industrial",
+            broker_short(p.get("broker")), p.get("pages"),
             len(pkg.get("lease_comps") or []),
             len(pkg.get("sale_comps") or []),
             len(pkg.get("land_sale_comps") or []),
-            "; ".join(pkg.get("sections_found") or []),
-            "; ".join(pkg.get("warnings") or []),
+            "Yes" if n_comps else "No",
+            shorten_warnings(pkg.get("warnings"), has_comps=n_comps > 0),
         ]
         for c, v in enumerate(values, start=1):
             ws.cell(row=r, column=c, value=v).font = BODY_FONT
-    # Note comps whose state fell outside the requested tabs.
     ws.freeze_panes = "A2"
     for i in range(1, len(columns) + 1):
-        ws.column_dimensions[get_column_letter(i)].width = 18
+        ws.column_dimensions[get_column_letter(i)].width = 20
     return ws
 
 
@@ -347,7 +463,7 @@ def main():
     for state in args.states:
         for ct, label, columns in COMP_TYPES:
             rows = [c for c in collected[ct].values() if c.get("state") == state]
-            rows.sort(key=lambda c: str(c.get("sale_date") or c.get("lease_date") or ""))
+            rows.sort(key=lambda c: (str(c.get("city") or "~").lower(), str(c.get("property") or c.get("address") or "").lower()))
             name = f"{state} {label}"
             write_sheet(wb, name, columns, rows)
             tab_counts[name] = len(rows)
@@ -358,13 +474,14 @@ def main():
     if leftovers:
         for label, rows in leftovers.items():
             columns = next(cols for _, l, cols in COMP_TYPES if l == label)
+            rows.sort(key=lambda c: (str(c.get("city") or "~").lower(), str(c.get("property") or c.get("address") or "").lower()))
             name = f"Other States {label}"[:31]
             write_sheet(wb, name, columns, rows)
             tab_counts[name] = len(rows)
     for ct, label, columns in EXTRA_TYPES:
         rows = list(collected[ct].values())
         if rows:
-            rows.sort(key=lambda c: str(c.get("sale_date") or c.get("lease_date") or ""))
+            rows.sort(key=lambda c: (str(c.get("city") or "~").lower(), str(c.get("property") or c.get("address") or "").lower()))
             write_sheet(wb, label[:31], columns, rows)
             tab_counts[label] = len(rows)
     write_sources_sheet(wb, packages, collected)
