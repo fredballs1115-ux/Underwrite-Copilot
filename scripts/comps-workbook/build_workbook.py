@@ -434,12 +434,15 @@ def write_sheet(wb, title, columns, rows):
             row["property"] = row.get("address")
         for col_idx, (field, _) in enumerate(columns, start=1):
             value = row.get(field)
+            # No blank cells: an unknown value reads as "N/A" so a gap is never
+            # ambiguous between "not applicable" and "missed in extraction".
+            if value is None or (isinstance(value, str) and not value.strip()):
+                value = "N/A"
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
             cell.font = BODY_FONT
             if field in NUMBER_FORMATS and isinstance(value, (int, float)):
                 cell.number_format = NUMBER_FORMATS[field]
-            if value is not None:
-                widths[col_idx - 1] = max(widths[col_idx - 1], min(len(str(value)), 32))
+            widths[col_idx - 1] = max(widths[col_idx - 1], min(len(str(value)), 32))
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = w + 3
     ws.freeze_panes = "A2"
@@ -472,6 +475,8 @@ def write_sources_sheet(wb, packages, collected):
             shorten_warnings(pkg.get("warnings"), has_comps=n_comps > 0),
         ]
         for c, v in enumerate(values, start=1):
+            if v is None or (isinstance(v, str) and not v.strip()):
+                v = "N/A"
             ws.cell(row=r, column=c, value=v).font = BODY_FONT
     ws.freeze_panes = "A2"
     for i in range(1, len(columns) + 1):
