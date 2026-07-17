@@ -378,6 +378,22 @@ def collect(packages):
     return collected
 
 
+def sort_rows(rows):
+    """Most recent deals first (lease date for leases, sale date for sales);
+    rows with no parseable date sink to the bottom, city A-Z as tiebreak."""
+    rows.sort(key=lambda c: (norm_month(c.get("sale_date") or c.get("lease_date")) is None,
+                             c_neg(norm_month(c.get("sale_date") or c.get("lease_date"))),
+                             str(c.get("city") or "~").lower()))
+    return rows
+
+
+def c_neg(month):
+    """Invert a 'YYYY-MM' string so ascending sort yields newest-first."""
+    if month is None:
+        return ""
+    return "".join(chr(255 - ord(ch)) for ch in month)
+
+
 def write_sheet(wb, title, columns, rows):
     ws = wb.create_sheet(title)
     for col_idx, (_, header) in enumerate(columns, start=1):
@@ -463,7 +479,7 @@ def main():
     for state in args.states:
         for ct, label, columns in COMP_TYPES:
             rows = [c for c in collected[ct].values() if c.get("state") == state]
-            rows.sort(key=lambda c: (str(c.get("city") or "~").lower(), str(c.get("property") or c.get("address") or "").lower()))
+            sort_rows(rows)
             name = f"{state} {label}"
             write_sheet(wb, name, columns, rows)
             tab_counts[name] = len(rows)
@@ -474,14 +490,14 @@ def main():
     if leftovers:
         for label, rows in leftovers.items():
             columns = next(cols for _, l, cols in COMP_TYPES if l == label)
-            rows.sort(key=lambda c: (str(c.get("city") or "~").lower(), str(c.get("property") or c.get("address") or "").lower()))
+            sort_rows(rows)
             name = f"Other States {label}"[:31]
             write_sheet(wb, name, columns, rows)
             tab_counts[name] = len(rows)
     for ct, label, columns in EXTRA_TYPES:
         rows = list(collected[ct].values())
         if rows:
-            rows.sort(key=lambda c: (str(c.get("city") or "~").lower(), str(c.get("property") or c.get("address") or "").lower()))
+            sort_rows(rows)
             write_sheet(wb, label[:31], columns, rows)
             tab_counts[label] = len(rows)
     write_sources_sheet(wb, packages, collected)
