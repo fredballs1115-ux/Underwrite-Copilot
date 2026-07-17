@@ -45,6 +45,7 @@ LEASE_COLUMNS = [
     ("term", "Term"),
     ("lease_date", "Lease Date"),
     ("notes", "Notes"),
+    ("broker", "Broker"),
     ("source", "Source Package(s)"),
     ("page_ref", "PDF Page(s)"),
 ]
@@ -64,6 +65,7 @@ SALE_COLUMNS = [
     ("seller", "Seller"),
     ("sale_date", "Sale Date"),
     ("notes", "Notes"),
+    ("broker", "Broker"),
     ("source", "Source Package(s)"),
     ("page_ref", "PDF Page(s)"),
 ]
@@ -82,6 +84,7 @@ LAND_COLUMNS = [
     ("seller", "Seller"),
     ("sale_date", "Sale Date"),
     ("notes", "Notes"),
+    ("broker", "Broker"),
     ("source", "Source Package(s)"),
     ("page_ref", "PDF Page(s)"),
 ]
@@ -167,6 +170,7 @@ def collect(packages):
     counter = 0
     for pkg in packages:
         source = pkg["package"].get("offering_name") or pkg["package"]["file"]
+        broker = pkg["package"].get("broker")
         for ct, _, _ in COMP_TYPES:
             for comp in pkg.get(ct) or []:
                 counter += 1
@@ -179,9 +183,9 @@ def collect(packages):
                 if key in bucket:
                     row = bucket[key]
                     merge_comps(row, comp, source)
-                    row["_sources"].append((source, page_str))
+                    row["_sources"].append((source, page_str, broker))
                 else:
-                    comp["_sources"] = [(source, page_str)]
+                    comp["_sources"] = [(source, page_str, broker)]
                     bucket[key] = comp
     return collected
 
@@ -197,8 +201,9 @@ def write_sheet(wb, title, columns, rows):
     for row_idx, row in enumerate(rows, start=2):
         sources = row.get("_sources", [])
         row = dict(row)
-        row["source"] = "; ".join(dict.fromkeys(s for s, _ in sources))
-        row["page_ref"] = "; ".join(p for _, p in sources if p)
+        row["source"] = "; ".join(dict.fromkeys(s for s, _, _ in sources))
+        row["page_ref"] = "; ".join(p for _, p, _ in sources if p)
+        row["broker"] = "; ".join(dict.fromkeys(b for _, _, b in sources if b))
         for col_idx, (field, _) in enumerate(columns, start=1):
             value = row.get(field)
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
