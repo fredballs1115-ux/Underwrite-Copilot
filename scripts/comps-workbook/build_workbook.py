@@ -497,16 +497,6 @@ def main():
         raise SystemExit(f"No extraction JSON files found in {args.input_dir}")
     collected = collect(packages)
 
-    # A lease row with no quoted rate is leasing-activity, not a priced comp:
-    # route it to its own tab so the state Lease Comps tabs stay rate-bearing.
-    def is_activity(comp):
-        rate = comp.get("rate")
-        return rate is None or (isinstance(rate, str) and not rate.strip())
-
-    activity = [c for c in collected["lease_comps"].values() if is_activity(c)]
-    collected["lease_comps"] = {k: c for k, c in collected["lease_comps"].items()
-                                if not is_activity(c)}
-
     wb = Workbook()
     wb.remove(wb.active)
     tab_counts = {}
@@ -535,10 +525,6 @@ def main():
             sort_rows(rows)
             write_sheet(wb, label[:31], columns, rows)
             tab_counts[label] = len(rows)
-    if activity:
-        sort_rows(activity)
-        write_sheet(wb, "Leasing Activity (No Rate)", LEASE_COLUMNS, activity)
-        tab_counts["Leasing Activity (No Rate)"] = len(activity)
     write_sources_sheet(wb, packages, collected)
 
     wb.save(args.output)
