@@ -160,6 +160,17 @@ def broker_short(value):
     return str(value).split("(")[0].split(",")[0].split("|")[0].strip()
 
 
+def source_short(name):
+    """Trim an offering name to a compact source label for the workbook —
+    drop OM boilerplate and file-type parentheticals."""
+    if not name:
+        return None
+    s = re.sub(r"\s*\((?:xlsx|exhibit|pasted image[^)]*|[^)]*exhibit[^)]*)\)\s*", "", str(name), flags=re.I)
+    s = re.sub(r"\b(Offering Memorandum|OM)\b", "", s, flags=re.I)
+    s = re.sub(r"\s{2,}", " ", s).strip(" -–—")
+    return s[:40].strip() or str(name)[:40]
+
+
 # (pattern in note text, terse label) — order matters, first match groups first.
 NOTE_FLAGS = [
     (r"subject propert|subject portfolio", "Subject property"),
@@ -199,8 +210,17 @@ def shorten_note(text):
             break
     if flags:
         return "; ".join(flags)
+    # No known flag: take the first clause, trimmed to a clean word boundary
+    # (never an ellipsis — a note should read as a complete short phrase).
     first = re.split(r"[;.]", str(text))[0].strip()
-    return (first[:57] + "...") if len(first) > 60 else (first or None)
+    if len(first) <= 45:
+        return first or None
+    words, out = first.split(), []
+    for w in words:
+        if len(" ".join(out + [w])) > 45:
+            break
+        out.append(w)
+    return " ".join(out) or None
 
 
 WARNING_KEEP = [
@@ -405,7 +425,7 @@ def write_sheet(wb, title, columns, rows):
     for row_idx, row in enumerate(rows, start=2):
         sources = row.get("_sources", [])
         row = dict(row)
-        row["source"] = "; ".join(dict.fromkeys(s for s, _, _ in sources))
+        row["source"] = "; ".join(dict.fromkeys(source_short(s) for s, _, _ in sources))
         row["page_ref"] = "; ".join(p for _, p, _ in sources if p)
         row["broker"] = "; ".join(dict.fromkeys(broker_short(b) for _, _, b in sources if b))
         row["notes"] = shorten_note(row.get("notes"))
