@@ -149,13 +149,65 @@ def norm_state(value):
     return STATE_NAMES.get(s.lower(), s.upper())
 
 
-def dedupe_key(comp):
-    """Identity of a comp across packages: address (or property name) + city + state."""
+MONTH_ABBR = {m.lower(): i for i, m in enumerate(
+    ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], 1)}
+MONTH_FULL = {m.lower(): i for i, m in enumerate(
+    ["January", "February", "March", "April", "May", "June", "July", "August",
+     "September", "October", "November", "December"], 1)}
+
+
+def norm_month(value):
+    """Normalize a printed date to 'YYYY-MM' when parseable, else None."""
+    if not value:
+        return None
+    s = str(value).strip().lower()
+    m = re.match(r"([a-z]+)[\s\-/]+(\d{2,4})", s)
+    if m and (m.group(1) in MONTH_ABBR or m.group(1) in MONTH_FULL):
+        month = MONTH_ABBR.get(m.group(1)) or MONTH_FULL.get(m.group(1))
+        yr = int(m.group(2))
+        return f"{yr if yr > 99 else 2000 + yr}-{month:02d}"
+    m = re.match(r"(\d{4})-(\d{2})", s)
+    if m:
+        return f"{m.group(1)}-{m.group(2)}"
+    m = re.match(r"(\d{1,2})/\d{1,2}/(\d{4})", s)
+    if m:
+        return f"{m.group(2)}-{int(m.group(1)):02d}"
+    return None
+
+
+def dedupe_key(comp, comp_type):
+    """Identity of a comp across packages.
+
+    Address alone is not identity: two tenants can lease the same building and
+    a building can trade twice, so leases key on tenant as well and sales on
+    the transaction month. A same-key value conflict is split later by the
+    guard in collect().
+    """
     base = comp.get("address") or comp.get("property") or ""
     city = comp.get("city") or ""
     state = norm_state(comp.get("state")) or ""
-    key = re.sub(r"[^a-z0-9]", "", f"{base}{city}{state}".lower())
+    parts = [base, city, state]
+    if comp_type in ("lease_comps", "land_lease_comps"):
+        parts.append(comp.get("tenant") or "")
+    else:
+        parts.append(norm_month(comp.get("sale_date")) or "")
+    key = re.sub(r"[^a-z0-9]", "", "".join(str(p) for p in parts).lower())
     return key or None
+
+
+def guard_conflict(existing, incoming, comp_type):
+    """True when two same-key comps are actually distinct transactions:
+    their headline numbers differ by more than tolerance."""
+    if comp_type in ("lease_comps", "land_lease_comps"):
+        checks = [("leased_sf", 0.02), ("rate", 0.05), ("rate_mo_acre", 0.05)]
+    else:
+        checks = [("sale_price", 0.05)]
+    for field, tol in checks:
+        a, b = existing.get(field), incoming.get(field)
+        if isinstance(a, (int, float)) and isinstance(b, (int, float)) and a and b:
+            if abs(a - b) / max(abs(a), abs(b)) > tol:
+                return True
+    return False
 
 
 def merge_comps(existing, incoming, source):
@@ -201,8 +253,10 @@ def collect(packages):
                 comp["state"] = norm_state(comp.get("state"))
                 pages = comp.pop("pages", None) or []
                 page_str = ", ".join(f"p.{p}" for p in pages)
-                key = dedupe_key(comp) or f"__uniq{counter}"
+                key = dedupe_key(comp, ct) or f"__uniq{counter}"
                 bucket = collected[ct]
+                while key in bucket and guard_conflict(bucket[key], comp, ct):
+                    key += "~"  # same key but conflicting numbers: a distinct transaction
                 if key in bucket:
                     row = bucket[key]
                     merge_comps(row, comp, source)
