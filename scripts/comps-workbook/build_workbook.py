@@ -95,6 +95,29 @@ COMP_TYPES = [
     ("land_sale_comps", "Land Sale Comps", LAND_COLUMNS),
 ]
 
+LAND_LEASE_COLUMNS = [
+    ("property", "Property / Location"),
+    ("address", "Address"),
+    ("city", "City"),
+    ("state", "State"),
+    ("tenant", "Tenant"),
+    ("landlord", "Landlord / Owner"),
+    ("acres", "Acres"),
+    ("rate_mo_acre", "Rate $/Mo/Acre"),
+    ("term", "Term"),
+    ("lease_date", "Lease Date"),
+    ("notes", "Notes"),
+    ("broker", "Broker"),
+    ("source", "Source Package(s)"),
+    ("page_ref", "PDF Page(s)"),
+]
+
+# Comp categories outside the per-state tab set; each gets one combined tab.
+EXTRA_TYPES = [
+    ("office_sale_comps", "DMV Office Sale Comps", SALE_COLUMNS),
+    ("land_lease_comps", "Land Lease Comps (IOS)", LAND_LEASE_COLUMNS),
+]
+
 NUMBER_FORMATS = {
     "leased_sf": "#,##0",
     "building_sf": "#,##0",
@@ -166,12 +189,12 @@ def load_packages(input_dir):
 
 def collect(packages):
     """Return {comp_type: {key or unique id: row}} with sources merged."""
-    collected = {ct: {} for ct, _, _ in COMP_TYPES}
+    collected = {ct: {} for ct, _, _ in COMP_TYPES + EXTRA_TYPES}
     counter = 0
     for pkg in packages:
         source = pkg["package"].get("offering_name") or pkg["package"]["file"]
         broker = pkg["package"].get("broker")
-        for ct, _, _ in COMP_TYPES:
+        for ct, _, _ in COMP_TYPES + EXTRA_TYPES:
             for comp in pkg.get(ct) or []:
                 counter += 1
                 comp = dict(comp)
@@ -284,6 +307,12 @@ def main():
             name = f"Other States {label}"[:31]
             write_sheet(wb, name, columns, rows)
             tab_counts[name] = len(rows)
+    for ct, label, columns in EXTRA_TYPES:
+        rows = list(collected[ct].values())
+        if rows:
+            rows.sort(key=lambda c: str(c.get("sale_date") or c.get("lease_date") or ""))
+            write_sheet(wb, label[:31], columns, rows)
+            tab_counts[label] = len(rows)
     write_sources_sheet(wb, packages, collected)
 
     wb.save(args.output)
