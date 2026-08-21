@@ -36,26 +36,39 @@
       "jurisdiction_state": "DC",
       "jurisdiction_local": "Washington",
       "rule_type": "topa",
-      "applies_if": { "transaction": "sale_of_rental_housing_accommodation" },
+      "applies_if": { "transaction": "sale_of_rental_housing_accommodation", "units_gte": 5 },
       "exempt_if": null,
-      "effect": "Before selling a DC housing accommodation (or issuing a demolition/discontinuance notice to vacate), the owner must give tenants an opportunity to purchase at a bona fide offer (D.C. Code § 42-3404.02(a)). Entity-interest transfers count: selling the LLC/corporation/trust whose principal asset is the building is a 'sale' (§ 42-3404.02(c)(1)(B)(i)) — TOPA cannot be structured around. 5+ unit offers without a third-party contract trigger the tenant-organization appraisal regime (§ 42-3404.02(a-1)). Process tiers/timelines for single-family vs 2-4 unit vs 5+ live in §§ 42-3404.09-.11.",
+      "effect": "For COVERED accommodations (5+ units; and 2-4 unit buildings majority-owned by a business corporation — see dc-topa-2-4-unit-exemption), sale requires a tenant opportunity to purchase at a bona fide offer (D.C. Code § 42-3404.02(a), as reorganized by D.C. Law 26-80 eff. 2025-12-31). Entity-interest transfers count as a 'sale' (§ 42-3404.02(c)(1)(B)(i) pre-amendment text) — TOPA cannot be structured around for covered buildings. 5+ unit offers without a third-party contract trigger the tenant-organization appraisal regime (§ 42-3404.02(a-1)).",
       "source": "https://code.dccouncil.gov/us/dc/council/code/sections/42-3404.02",
-      "as_of": "2026-07-16",
+      "as_of": "2026-08-21",
       "status": "sourced",
-      "verification": "Verbatim quotes pulled from fetched code text; adversarial panel cut by usage limit (1 of 3 votes completed, affirmative)"
+      "verification": "Pre-amendment text quotes from July fetch of code; Law 26-80 reorganization applied per snippet-confirmed law page + firm alerts; post-amendment section text not yet directly fetched"
     },
     {
-      "id": "dc-rental-act-2025-topa-changes",
+      "id": "dc-rental-act-law-26-80",
       "jurisdiction_state": "DC",
       "jurisdiction_local": "Washington",
       "rule_type": "topa",
       "applies_if": { "transaction": "sale_of_rental_housing_accommodation" },
       "exempt_if": null,
-      "effect": "The 2025 RENTAL Act was reported passed by the DC Council with changes to TOPA exemptions for smaller/newer buildings. PENDING CONFIRMATION of enacted text, law number, effective date, and exactly which building sizes gained exemptions — do not rely on this row until status upgrades.",
-      "source": "https://wtop.com/dc/2025/07/dc-council-passes-rental-act-heres-what-it-means-for-affordable-housing-in-the-district/",
-      "as_of": "2026-07-15",
-      "status": "unverified_not_found",
-      "verification": "Trade-press report only; enacted-text fetch in progress"
+      "effect": "ENACTED: RENTAL Amendment Act of 2025 = D.C. Law 26-80 (Bill B26-0164 -> Act 26-199 signed Nov 13, 2025 -> effective Dec 31, 2025 after congressional review). Amends the Rental Housing Act (expedited eviction review, reduced pre-filing notice periods) and TOPA: exempts SINGLE-FAMILY accommodations (incl. house + one ADU, and a single unit in a condo/co-op/HOA) from TOPA; clarifies 2-4 unit TOPA rules do not apply to 2-unit single-family accommodations; adds a NEW-CONSTRUCTION exemption (sale within 15 years of permanent C of O, applied retroactively to the effective date); preserves the elderly/disabled single-family tenant carve-out (rental agreement signed by 2018-03-31, occupancy by 2018-04-15). A later Council item 'tightens language on prior RENTAL Act passage' — possible follow-up amendment, unreviewed.",
+      "source": "https://code.dccouncil.gov/us/dc/council/laws/26-80",
+      "as_of": "2026-08-21",
+      "status": "sourced",
+      "verification": "Law number, short title, and effective date snippet-confirmed on code.dccouncil.gov page titles; substance via lims.dccouncil.gov engrossment + Ballard Spahr Jan 2026 alert; enacted section text not directly fetchable from this environment — reconfirm before closing on a TOPA-sensitive deal"
+    },
+    {
+      "id": "dc-topa-2-4-unit-exemption",
+      "jurisdiction_state": "DC",
+      "jurisdiction_local": "Washington",
+      "rule_type": "topa_exemption",
+      "applies_if": { "transaction": "sale_of_rental_housing_accommodation", "units_lte": 4 },
+      "exempt_if": { "owner_form_any_of": ["natural_person", "living_trust_of_natural_person", "llc", "partnership", "trust"] },
+      "effect": "Under D.C. Law 26-80 (eff. 2025-12-31), 2-4 unit accommodations are EXEMPT from TOPA unless the accommodation is majority-owned by a business CORPORATION ('majority ownership interests' = majority of the value of capital, profits, and losses). Per practitioner analysis, LLC/partnership/trust ownership retains the exemption — only corporate majority ownership re-triggers TOPA. This materially de-risks DC 2-4 unit purchases vs the pre-2026 regime. CAUTION: statutory text not directly fetched; practitioner reading (Federal Title) is the source for the corporation-only nuance — verify the enacted definition before relying on entity structure.",
+      "source": "https://code.dccouncil.gov/us/dc/council/laws/26-80",
+      "as_of": "2026-08-21",
+      "status": "sourced",
+      "verification": "Law existence + long-title TOPA amendments snippet-confirmed on official pages; corporation-ownership nuance from federaltitle.com practitioner alert; single-family definition snippet-confirmed"
     },
     {
       "id": "dc-vacant-property-tax",
@@ -103,11 +116,11 @@
       "rule_type": "rent_control",
       "applies_if": { "units_gte": 1, "property_type": "rental_housing" },
       "exempt_if": { "see_rule": "md-pg-prsa-small-landlord-exemption" },
-      "effect": "Permanent Rent Stabilization and Protection Act (CB-55-2024, enacted June 18 2024, effective Sept 15 2024; codified around County Code § 13-147): annual rent increases for covered units capped at the LESSER of 6.0% or CPI-U + 3% (age-restricted senior facilities: lesser of 4.5% or CPI-U). Annual allowance updates each July 1.",
+      "effect": "Permanent Rent Stabilization and Protection Act (CB-055-2024, amending County Code § 13-147; lineage CB-007-2023 temporary cap -> CB-008-2024 -> CB-055-2024 permanent — NOTE: 'CB-007-2025' is an unrelated employee-benefits bill): annual rent increases for covered units capped at the LESSER of 6.0% or CPI-U + 3% (age-restricted senior facilities: lesser of 4.5% or CPI-U). Annual allowance updates each July 1. Enactment/effective dates CONFLICT across sources (enacted 2024-06-18 / effective 2024-09-15 per county FAQ; passed 2024-07-16, signed 2024-08-01, effective 2024-10-17 per others) — dates unverified pending a direct Legistar pull; the cap itself is consistently stated.",
       "source": "https://www.princegeorgescountymd.gov/departments-offices/permitting-inspections-and-enforcement/about-dpie/code-enforcement/permanent-rent-stabilization-and-protection-act-prsa",
-      "as_of": "2026-07-16",
+      "as_of": "2026-08-21",
       "status": "sourced",
-      "verification": "County DPIE pages; second primary (county code text) fetch in progress"
+      "verification": "County DPIE pages + CB-55 FAQ PDF (Rev. 5-14-25) concur on the cap formula; effective-date conflict flagged"
     },
     {
       "id": "md-pg-prsa-small-landlord-exemption",
@@ -116,11 +129,11 @@
       "rule_type": "rent_control_exemption",
       "applies_if": { "property_type": "rental_housing" },
       "exempt_if": { "owner_total_rental_units_in_county_lte": 5, "owner_form_any_of": ["natural_person", "living_trust_of_natural_person", "estate_or_trust_of_decedent"] },
-      "effect": "A rental unit is EXEMPT from the PRSA if the landlord owns 5 or fewer rental units in the county AND is a natural person (or a natural person's living trust, or a decedent's trust/estate). DOMICILE FINDING: the county's FAQ attaches a domicile-in-county condition ONLY to the separate CONDOMINIUM exemption ('a condominium unit owned by one or more persons domiciled in the County'); the 5-or-fewer natural-person exemption carries NO domicile condition in the FAQ text — a Virginia-resident natural person qualifies. No affirmative exemption application is required while qualifying conditions hold; exemption lapses when conditions cease. Pending: confirmation against the county code text itself (fetch in progress) before relying on this for a domicile-sensitive purchase.",
+      "effect": "A rental unit is EXEMPT from the PRSA if the landlord owns 'five (5) or fewer rental units within the County' AND is '(1) a natural person or a living trust of a natural person, or (2) the trust or estate of a decedent' (exact-phrase confirmed). County FAQ states plainly: 'If you own the property through an LLC or corporate entity, the PRSA applies.' DOMICILE FINDING — SETTLED: the domicile-in-county condition attaches ONLY to the separate CONDOMINIUM exemption ('owned by one or more individuals domiciled in the County', expressly tied to § 13-147) and to the owner-occupied original-2-unit exemption; the 5-or-fewer natural-person exemption carries NO domicile condition — a Virginia-resident natural person qualifies. Other § 13-147 exemptions: religious facilities, regulated-affordable units, cooperatives, dormitories, 501(c)(3) temporary-shelter facilities. No exemption application needed while conditions hold ('not considered to be regulated rental units'); exemption lapses when conditions cease.",
       "source": "https://www.princegeorgescountymd.gov/departments-offices/faq/permanent-rent-stabilization-law-housing-community-development/what-full-list-residence-and-building-types-are-exempt-law",
-      "as_of": "2026-07-16",
+      "as_of": "2026-08-21",
       "status": "sourced",
-      "verification": "County FAQ pages via independent searches; CB-55 FAQ PDF (Rev. 5-14-25) + § 13-147 code text fetch in progress to upgrade to verified"
+      "verification": "Exact-phrase snippet confirmation ('five (5) or fewer rental units' + 'natural person') matched both the county HTML FAQ and the CB-55 FAQ PDF (Rev. 5-14-25), plus 3 independently-labeled queries; both documents are DPIE-authored, so a direct § 13-147 code-text pull is still queued before the 'verified' label"
     },
     {
       "id": "md-baltimore-rental-license",
@@ -142,11 +155,11 @@
       "rule_type": "rent_control_absence",
       "applies_if": { "property_type": "rental_housing" },
       "exempt_if": null,
-      "effect": "Virginia localities have no enabling authority to impose rent control (Dillon Rule state; no statute grants rent-regulation power). No Virginia locality operates rent control as of July 2026. Statewide VRLTA (Title 55.1, Ch. 12) governs landlord-tenant terms: security deposit capped at 2 months' rent (§ 55.1-1226), notice and disclosure duties apply. Exact statutory anchor for the preemption point being confirmed via live fetch (user-supplied cite § 55.1-1243 is being checked against the actual section text - preliminary reading: that section covers a different subject).",
-      "source": "https://law.lis.virginia.gov/vacode/title55.1/chapter12/",
-      "as_of": "2026-07-16",
+      "effect": "No Virginia locality may impose rent control — but the mechanism is Dillon Rule ABSENCE OF GRANT, not an express statutory ban: no Code section grants (or expressly prohibits) locality rent regulation, and localities hold only powers expressly granted or necessarily implied. Enabling bills keep failing (SB 366 defeated in committee; HB 721 continued; HB 278/SB 355 sent to a Virginia Housing Commission 'Local Rent Regulation Authority Bill Study', June 2026, carried toward 2027) — WATCH ITEM: passage of an enabling act would change this row. CITE CORRECTION: § 55.1-1243 (sometimes cited for 'no rent control') is REPEALED (Acts 2021 Sp. Sess. I cc. 403-404, eff. 2021-07-01) and covered tenant ouster remedies, now § 55.1-1243.1 — it was never a rent-control provision. VRLTA statewide terms: security deposit capped — 'No landlord may demand or receive a security deposit, however denominated, in an amount or value in excess of two months' periodic rent' (§ 55.1-1226, exact-phrase confirmed); deposit itemization within 45 days of termination/vacancy; § 55.1-1204 governs rental-agreement terms (an amended version takes effect 2027-07-01 — review before then).",
+      "source": "https://law.lis.virginia.gov/vacode/title55.1/chapter12/section55.1-1226/",
+      "as_of": "2026-08-21",
       "status": "sourced",
-      "verification": "law.lis.virginia.gov fetched cleanly in July 15-16 subagent passes; precise section-level cite fetch in progress"
+      "verification": "Absence-of-grant confirmed by domain-restricted searches of law.lis.virginia.gov (no rent-control section exists in the Code); § 55.1-1226 cap sentence exact-phrase confirmed; failed-bill history via Virginia Mercury + vhc.virginia.gov study PDF"
     },
     {
       "id": "pa-philadelphia-eviction-diversion",
@@ -203,8 +216,9 @@
     }
   ],
   "gaps": [
-    "DC RENTAL Act 2025: enacted law number, effective date, final TOPA small-building exemption text (fetch in progress)",
-    "PG County § 13-147 code text to double-source the FAQ exemption reading (fetch in progress)",
+    "D.C. Law 26-80 enacted SECTION TEXT (esp. the 2-4 unit TOPA exemption's 'business corporation' definition) — currently on practitioner-alert authority; also the follow-up Council item 'tightening language' on the RENTAL Act",
+    "PG County § 13-147 code text direct pull (both current confirmations are DPIE-authored documents) + resolve the conflicting PRSA enactment/effective dates via Legistar",
+    "Virginia enabling-bill WATCH: HB 278/SB 355 study outcome (Housing Commission, June 2026) — rent-control authority could be granted in a future session",
     "MoCo exemption list verbatim (23-year rolling window phrasing + full exemption enumeration)",
     "Takoma Park vacancy control confirmation (does the cap bind between tenancies?)",
     "NJ: per-municipality ordinance screen for the top NJ metros (Newark, Jersey City, Paterson, Elizabeth, Edison, etc.)",

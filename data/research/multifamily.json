@@ -54,6 +54,18 @@
       "value": "Zillow category page 'Prince William County VA Duplex & Triplex Homes For Sale - 0 Homes' (July 2026); zero on-market 2-4 unit inventory in the county at snippet date.",
       "status": "sourced",
       "sources": ["exact-phrase snippet confirmation across independent queries, July 2026"]
+    },
+    "rents_fy2026_hud_fmr_dc_area": {
+      "value": { "0br": 1953, "1br": 2015, "2br": 2246, "3br": 2835, "4br": null },
+      "unit": "usd_month",
+      "yoy_2br": "-2.9% (FY2025 metro 2BR was $2,314)",
+      "status": "sourced",
+      "sources": [
+        "https://usrentprices.com/rent-prices/washington-dc (FY2026 HUD FMR republisher)",
+        "https://plainrent.com/states/district-of-columbia (FY2026 HUD FMR republisher)",
+        "https://www.federalregister.gov/documents/2025/08/22/2025-16060/ (FY2026 FMR publication notice)"
+      ],
+      "note": "Snippet-confirmed on two independent republisher domains; labeled 'Washington, DC' not the metro name, and the DC metro is a mandatory SAFMR zone so these may be ZIP-SAFMR averages — verify against huduser.gov FY2026_FMR_Schedule.pdf (blocked from this environment) before underwriting. 4BR FY2026 not found (FY2025 was $3,413 — prior vintage, do not substitute). DCHA payment standard set at 187% of FMR (Resolution 25-31, 2025-10-08) — material Section 8 upside in DC proper."
     }
   },
   "debt_terms": {
