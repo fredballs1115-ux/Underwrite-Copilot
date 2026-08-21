@@ -80,3 +80,46 @@ services:
       #   sync: false
       # - key: RESEND_FROM
       #   sync: false
+
+  # ── Daily market intel (research build) ────────────────────────────────────
+  # Weekday news sweep for the jurisdictions + sectors on file: Google News
+  # RSS → dedupe → Claude scores relevance → digest + red-banner alerts for
+  # likely rule changes. Requires migrations 0023 + 0024.
+  - type: cron
+    name: underwrite-copilot-intel
+    runtime: node
+    plan: starter
+    branch: main
+    schedule: "0 12 * * 1-5"
+    buildCommand: npm install --omit=dev
+    startCommand: node scripts/daily-intel.mjs
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false # same value as NEXT_PUBLIC_SUPABASE_URL
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+  # ── Daily rates pull (research build) ──────────────────────────────────────
+  # FRED → rates table so screens use today's 10Y/SOFR/PMMS, not hardcoded
+  # numbers. Free key: https://fred.stlouisfed.org/docs/api/api_key.html
+  - type: cron
+    name: underwrite-copilot-rates
+    runtime: node
+    plan: starter
+    branch: main
+    schedule: "30 12 * * 1-5"
+    buildCommand: npm install --omit=dev
+    startCommand: node scripts/fetch-rates.mjs
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: FRED_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false

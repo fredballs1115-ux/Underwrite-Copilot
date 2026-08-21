@@ -8,6 +8,7 @@ import {
   fmtBasisRange,
   type MarketGroup,
 } from "@/lib/market-memory";
+import { seedBenchmarks } from "@/lib/research-data";
 
 export const metadata: Metadata = { title: "Market data" };
 
@@ -88,7 +89,150 @@ export default async function MarketDataPage() {
           </div>
         </>
       )}
+
+      <RatesStrip />
+      <IntelDigestCard />
     </div>
+  );
+}
+
+// ── Live rates (research build) ───────────────────────────────────────────────
+// Newest observation per FRED series from the rates table (daily cron);
+// falls back to the checked-in PMMS snapshot so the strip is never empty.
+async function RatesStrip() {
+  const supabase = await createSupabaseServerClient();
+  let rows: { series_id: string; obs_date: string; value: number; label: string | null }[] = [];
+  try {
+    const { data } = await supabase
+      .from("rates")
+      .select("series_id, obs_date, value, label")
+      .order("obs_date", { ascending: false })
+      .limit(40);
+    const newest = new Map<string, (typeof rows)[number]>();
+    for (const r of (data as typeof rows | null) ?? []) {
+      if (!newest.has(r.series_id)) newest.set(r.series_id, r);
+    }
+    rows = [...newest.values()];
+  } catch {
+    // 0023 not migrated — fall through to the snapshot
+  }
+  if (rows.length === 0) {
+    const pmms = seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed");
+    if (pmms?.low != null) {
+      rows = [
+        {
+          series_id: "MORTGAGE30US",
+          obs_date: pmms.as_of,
+          value: pmms.low,
+          label: "Freddie Mac PMMS 30-Year Fixed",
+        },
+      ];
+    }
+  }
+  if (rows.length === 0) return null;
+
+  return (
+    <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
+      <h2 className="text-sm font-semibold tracking-tight">Rates</h2>
+      <div className="mt-3 flex flex-wrap gap-x-8 gap-y-2">
+        {rows.map((r) => (
+          <div key={r.series_id}>
+            <p className="text-[11px] uppercase tracking-wide text-muted">
+              {r.label ?? r.series_id}
+            </p>
+            <p className="mt-0.5 font-mono text-base font-semibold tabular-nums">
+              {r.value}%{" "}
+              <span className="text-[11px] font-normal text-muted">as of {r.obs_date}</span>
+            </p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-[11px] text-muted">
+        FRED, pulled daily by the rates cron; the screen&apos;s debt assumptions
+        read these instead of hardcoded numbers.
+      </p>
+    </section>
+  );
+}
+
+// ── Daily intel digest (research build) ──────────────────────────────────────
+interface DigestHead {
+  digest_date: string;
+  item_count: number;
+}
+
+async function IntelDigestCard() {
+  const supabase = await createSupabaseServerClient();
+  let digest: DigestHead | null = null;
+  let items: {
+    url: string;
+    title: string;
+    source: string | null;
+    relevance: number | null;
+    action: string | null;
+  }[] = [];
+  try {
+    const [{ data: d }, { data: it }] = await Promise.all([
+      supabase
+        .from("market_intel_digests")
+        .select("digest_date, item_count")
+        .order("digest_date", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("market_intel_items")
+        .select("url, title, source, relevance, action")
+        .gte("relevance", 6)
+        .order("created_at", { ascending: false })
+        .limit(6),
+    ]);
+    digest = (d as DigestHead | null) ?? null;
+    items = (it as typeof items | null) ?? [];
+  } catch {
+    // 0024 not migrated — render the setup note below
+  }
+
+  return (
+    <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold tracking-tight">Daily intel</h2>
+        {digest && (
+          <span className="text-[11px] text-muted">
+            latest digest {digest.digest_date} · {digest.item_count} notable
+          </span>
+        )}
+      </div>
+      {items.length === 0 ? (
+        <p className="mt-2 text-sm text-muted">
+          The weekday intel job hasn&apos;t landed anything notable yet. It
+          watches rent-regulation news for your jurisdictions plus rates, tax,
+          and HUD policy, scores each item for your buy box, and flags likely
+          rule changes as red banners.
+        </p>
+      ) : (
+        <ul className="mt-3 space-y-2.5">
+          {items.map((it) => (
+            <li key={it.url} className="text-sm leading-snug">
+              <span className="mr-2 rounded bg-faint px-1.5 py-px font-mono text-[11px] tabular-nums text-muted">
+                {it.relevance}/10
+              </span>
+              <a
+                href={it.url}
+                target="_blank"
+                rel="noreferrer"
+                className="underline decoration-dotted underline-offset-2 hover:text-brand"
+              >
+                {it.title}
+              </a>
+              {it.source && <span className="ml-1 text-xs text-muted">({it.source})</span>}
+              {it.action && (
+                <p className="ml-12 mt-0.5 text-xs text-muted">→ {it.action}</p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
