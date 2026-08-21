@@ -105,14 +105,23 @@ const num = (s: string | null | undefined): number | undefined => {
   return m ? Number(m[0]) : undefined;
 };
 
-/** Build the evaluation subject from what the deal already knows. */
+/** Build the evaluation subject from what the deal already knows. The
+ *  sector-facts answers (permit year, RAD registration, other units) override
+ *  the defaults — an explicit answer always beats an assumption. */
 export function buildSubject(input: {
   address: { state?: string; city?: string; county?: string; submarket?: string } | null;
   sizeText?: string | null;
   yearBuilt?: number | null;
+  sectorFields?: Record<string, string | number | boolean> | null;
 }): RuleSubject {
   const units =
     input.sizeText && /\b(units?|doors)\b/i.test(input.sizeText) ? num(input.sizeText) : undefined;
+  const sf = input.sectorFields ?? {};
+  const numField = (k: string): number | undefined =>
+    typeof sf[k] === "number" ? (sf[k] as number) : undefined;
+  const boolField = (k: string): boolean | undefined =>
+    typeof sf[k] === "boolean" ? (sf[k] as boolean) : undefined;
+  const otherUnits = numField("owner_units_in_jurisdiction");
   return {
     ...BUYER_DEFAULTS,
     state: input.address?.state || undefined,
@@ -121,6 +130,14 @@ export function buildSubject(input: {
     ),
     units,
     built_year: input.yearBuilt ?? undefined,
+    building_permit_year: numField("building_permit_year"),
+    exemption_registered_with_rad: boolField("rad_exemption_registered"),
+    ...(otherUnits !== undefined
+      ? {
+          owner_other_rental_units_in_dc: otherUnits,
+          owner_total_rental_units_in_county: otherUnits + (units ?? 0),
+        }
+      : {}),
     transaction: "sale_of_rental_housing_accommodation",
   };
 }

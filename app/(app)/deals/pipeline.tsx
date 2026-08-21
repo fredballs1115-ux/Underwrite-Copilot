@@ -1644,6 +1644,11 @@ function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
             <option value="office">Office</option>
             <option value="industrial">Industrial</option>
             <option value="retail">Retail</option>
+            <option value="sfr_btr">SFR / BTR</option>
+            <option value="self_storage">Self-storage</option>
+            <option value="manufactured_housing">Manufactured housing</option>
+            <option value="hospitality_str">Hospitality / STR</option>
+            <option value="land_infill">Land / infill</option>
           </select>
         </div>
         <div>

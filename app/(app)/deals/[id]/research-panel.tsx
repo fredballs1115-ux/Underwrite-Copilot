@@ -92,10 +92,12 @@ export async function ResearchPanel({
   address,
   sizeText,
   priceText,
+  sectorFields,
 }: {
   address: StructuredAddress | null;
   sizeText?: string | null;
   priceText?: string | null;
+  sectorFields?: Record<string, string | number | boolean> | null;
 }) {
   // DB first, seeds as fallback — a missing table (migration not yet run)
   // must degrade silently to the checked-in research layer.
@@ -122,7 +124,7 @@ export async function ResearchPanel({
     // seeds already loaded
   }
 
-  const subject = buildSubject({ address, sizeText });
+  const subject = buildSubject({ address, sizeText, sectorFields });
   const evals = address?.state ? evaluateRules(rules, subject) : [];
   const shown = evals.filter((e) => e.outcome !== "not_applicable");
 

@@ -142,7 +142,14 @@ async function RatesStrip() {
             </p>
             <p className="mt-0.5 font-mono text-base font-semibold tabular-nums">
               {r.value}%{" "}
-              <span className="text-[11px] font-normal text-muted">as of {r.obs_date}</span>
+              <a
+                href={`https://fred.stlouisfed.org/series/${r.series_id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[11px] font-normal text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
+              >
+                {r.series_id} · as of {r.obs_date}
+              </a>
             </p>
           </div>
         ))}
