@@ -277,6 +277,72 @@ export default function DemoPage() {
         </div>
       </main>
 
+      {/* The research layer — real rules + real data behind the sample's
+          jurisdiction (site-polish 2). Everything here is genuine: the rule
+          is verified against the statute, the FMR is the published FY2026
+          figure, and signed-in samples pull live recorded sales. */}
+      <section className="border-t border-line">
+        <div className="mx-auto max-w-5xl px-6 py-12">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted">
+            Behind this screen
+          </p>
+          <h2 className="mt-2 text-xl font-semibold tracking-tight">
+            The sample sits in a real submarket — and the rules are real too.
+          </h2>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border border-line bg-surface p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded bg-kill/10 px-2 py-0.5 text-[11px] font-semibold text-kill">
+                  Applies
+                </span>
+                <span className="text-[11px] uppercase tracking-wide text-muted">
+                  eviction procedure · Philadelphia
+                </span>
+                <span className="rounded bg-pass/10 px-1.5 py-px text-[10px] font-medium text-pass">
+                  verified vs statute
+                </span>
+              </div>
+              <p className="mt-2 text-sm leading-relaxed">
+                Philadelphia Code § 9-811: before any eviction step, a landlord
+                must enroll in the city&apos;s Eviction Diversion Program and
+                participate in good faith for at least 30 days before filing.
+                The screen prices that turnover delay in.
+              </p>
+              <a
+                href="https://codelibrary.amlegal.com/codes/philadelphia/latest/philadelphia_pa/0-0-0-278160"
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1.5 inline-block text-[11px] text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
+              >
+                read the statute
+              </a>
+            </div>
+            <div className="rounded-xl border border-line bg-surface p-4">
+              <p className="text-[11px] uppercase tracking-wide text-muted">
+                Real benchmarks for this submarket
+              </p>
+              <p className="mt-2 text-sm leading-relaxed">
+                Philadelphia MSA FY2026 fair market rent:{" "}
+                <span className="font-mono font-semibold tabular-nums">$1,810/mo</span>{" "}
+                (2BR) · metro 2–4 unit median{" "}
+                <span className="font-mono font-semibold tabular-nums">$363,500</span>{" "}
+                (+6.9% YoY, May 2026) · recorded-sales comps pull automatically
+                from the city&apos;s own OPA records the moment a deal has an
+                address.
+              </p>
+              <p className="mt-2 text-[11px] text-muted">
+                Signed-in sample screens run the live pull — real recorded
+                sales around Brewerytown, source-linked row by row.
+              </p>
+            </div>
+          </div>
+          <p className="mt-4 text-xs text-muted">
+            The deal above is illustrative; this panel is not — the rules,
+            rents, and records are the product&apos;s actual research layer.
+          </p>
+        </div>
+      </section>
+
       <footer className="border-t border-line bg-paper">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-6 text-xs text-muted">
           <span>Underwrite Copilot · sample data is illustrative only</span>
