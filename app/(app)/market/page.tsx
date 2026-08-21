@@ -133,10 +133,23 @@ function MetroExplorer({ selected }: { selected?: string }) {
       : active.comps_provider === "discovery"
         ? "Recorded-sales comps staged in discovery mode — the health check resolves the endpoints."
         : `Recorded-sales comps LIVE via ${providers[active.comps_provider as string]?.name ?? active.comps_provider}.`;
-  const examples =
-    (multifamilySeed.top_east_coast_metros ?? []).find((m) =>
-      m.metro.toLowerCase().startsWith(active.name.split(" ")[0].toLowerCase())
-    )?.example_properties ?? [];
+  // Explicit metro-id → research-metro mapping: name-prefix matching missed
+  // the DMV entry (its metro string is "DMV core (DC / PG County MD / NoVA)")
+  // for the three DMV metros.
+  const EXAMPLE_METRO: Record<string, string> = {
+    dc: "DMV core",
+    pg_county: "DMV core",
+    montgomery_county: "DMV core",
+    nova: "DMV core",
+    philadelphia: "Philadelphia",
+    baltimore: "Baltimore",
+  };
+  const wanted = EXAMPLE_METRO[active.id];
+  const examples = wanted
+    ? ((multifamilySeed.top_east_coast_metros ?? []).find((m) =>
+        m.metro.toLowerCase().startsWith(wanted.toLowerCase())
+      )?.example_properties ?? [])
+    : [];
   const noteStatus = (active.market_notes as { status?: string } | null)?.status ?? "sourced";
   const noteMeta =
     noteStatus === "verified"

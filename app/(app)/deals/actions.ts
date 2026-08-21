@@ -473,15 +473,29 @@ export async function updateManualFacts(
       ? { address: { label: facts.address, street: "", city: "", state: "", zip: "", county: "", submarket: "" } }
       : null;
   if (structuredUpdate) {
+    // Only a CHANGED address invalidates the stored comps — a facts save
+    // that round-trips the same address must not wipe the result and re-hit
+    // the geocoder + government portal for identical inputs.
+    let priorLabel: string | null = null;
     try {
+      const { data: prior } = await supabase
+        .from("deals")
+        .select("address")
+        .eq("id", dealId)
+        .maybeSingle();
+      priorLabel =
+        ((prior?.address as { label?: string } | null)?.label ?? null);
       await supabase.from("deals").update(structuredUpdate).eq("id", dealId);
     } catch {
       // pre-0011 schema — carry on
     }
-    after(async () => {
-      // force: an edited address invalidates whatever was pulled before
-      if (await claimRecordComps(dealId, true)) await runRecordComps(dealId);
-    });
+    const newLabel = structuredUpdate.address.label;
+    if (newLabel && newLabel !== priorLabel) {
+      after(async () => {
+        // force: an edited address invalidates whatever was pulled before
+        if (await claimRecordComps(dealId, true)) await runRecordComps(dealId);
+      });
+    }
   }
 
   if (workerMode) {

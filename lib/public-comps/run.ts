@@ -54,10 +54,16 @@ export async function claimRecordComps(dealId: string, force = false): Promise<b
       Date.now() - Date.parse(existing.retrievedAt ?? "") > PENDING_STALE_MS;
     if (!stalePending) return false;
   }
-  // Conditional write: only one racer's update matches the still-unclaimed row.
+  // Conditional write: only one racer's update matches the still-unclaimed
+  // row. For the stale-pending case, match the OLD sentinel's retrievedAt —
+  // matching on status alone would also match the winner's freshly-written
+  // sentinel, letting every racer "win".
   const query = admin.from("deals").update({ public_comps: sentinel }).eq("id", dealId);
   const { data } = existing
-    ? await query.eq("public_comps->>status", "pending").select("id")
+    ? await query
+        .eq("public_comps->>status", "pending")
+        .eq("public_comps->>retrievedAt", existing.retrievedAt ?? "")
+        .select("id")
     : await query.is("public_comps", null).select("id");
   return (data?.length ?? 0) > 0;
 }
@@ -73,7 +79,12 @@ async function geocode(label: string): Promise<{ lat: number; lng: number } | nu
       features?: { geometry?: { coordinates?: [number, number] } }[];
     };
     const c = body.features?.[0]?.geometry?.coordinates;
-    return c ? { lng: c[0], lat: c[1] } : null;
+    // Finite check (same guard as the client geocoder in comps-map): a
+    // malformed feature must fail as geocode_failed, not interpolate
+    // null/NaN into provider query strings.
+    return c && Number.isFinite(c[0]) && Number.isFinite(c[1])
+      ? { lng: c[0], lat: c[1] }
+      : null;
   } catch {
     return null;
   }
@@ -154,14 +165,24 @@ export async function runRecordComps(dealId: string): Promise<void> {
     let monthsBack = MONTHS_BACK;
     let comps = await attempt(radiusKm, monthsBack);
     if (comps.length < MIN_COMPS_BEFORE_WIDENING) {
-      radiusKm = WIDE_RADIUS_KM;
-      monthsBack = WIDE_MONTHS_BACK;
-      comps = await attempt(radiusKm, monthsBack);
+      // A failed widening must fall back to the narrow results, not erase
+      // them — 3 real comps beat a provider_error.
+      try {
+        const widened = await attempt(WIDE_RADIUS_KM, WIDE_MONTHS_BACK);
+        radiusKm = WIDE_RADIUS_KM;
+        monthsBack = WIDE_MONTHS_BACK;
+        comps = widened;
+      } catch {
+        if (comps.length === 0) throw new Error(`${provider.id}: widened query failed with no narrow results to fall back on`);
+      }
     }
 
+    // Stats over EXACTLY the stored list — a headline count that disagrees
+    // with the payload is two truths in one panel.
+    const stored = comps.slice(0, 40);
     await store({
       ...base,
-      status: comps.length ? "ok" : "no_sales",
+      status: stored.length ? "ok" : "no_sales",
       providerId: provider.id,
       providerName: provider.name,
       datasetUrl: provider.datasetUrl,
@@ -171,8 +192,8 @@ export async function runRecordComps(dealId: string): Promise<void> {
         monthsBack,
         classFilter: assetClass.includes("multifamily") ? "multifamily/mixed" : "all sales",
       },
-      comps: comps.slice(0, 40),
-      stats: compStats(comps),
+      comps: stored,
+      stats: compStats(stored),
     });
   } catch (err) {
     await store({
