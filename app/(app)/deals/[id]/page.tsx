@@ -4,6 +4,7 @@ import { ResearchPanel } from "./research-panel";
 import { SectorFieldsForm } from "./sector-fields-form";
 import type { SectorFieldValues } from "@/lib/sector-fields";
 import { PublicCompsPanel } from "./public-comps-panel";
+import { BuildingPhoto } from "./building-photo";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
 import { parseMoney } from "@/lib/criteria";
@@ -723,6 +724,9 @@ export default async function DealPage({
       />
 
       <div className="mt-6 space-y-4">
+        {dealAddress?.label && (
+          <BuildingPhoto dealId={id} alt={`Street view of ${dealAddress.label}`} />
+        )}
         <PublicCompsPanel
           dealId={id}
           result={publicComps}

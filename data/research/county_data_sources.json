@@ -1,0 +1,104 @@
+{
+  "$schema_note": "Where each Mid-Atlantic jurisdiction's property/sales records actually live, with URL patterns and machine-access status. wired = live comps provider; discovery = provider staged, endpoint resolving via /api/comps/health; manual = human-usable portal, no clean API found; unassessed = not yet investigated.",
+  "as_of": "2026-08-21",
+  "sources": [
+    {
+      "jurisdiction": "Washington DC",
+      "system": "OTR ITS Public Extract + property sales (Open Data DC, ArcGIS)",
+      "url_pattern": "https://opendata.dc.gov/datasets/integrated-tax-system-public-extract-property-sales — ArcGIS FeatureServer query; per-parcel human lookup at https://mytax.dc.gov (Real Property search by SSL)",
+      "access": "wired (dc_its; field names pending health check)",
+      "notes": "CAMA Residential/Commercial/Condo datasets carry building characteristics; daily updates."
+    },
+    {
+      "jurisdiction": "Maryland — statewide (all 23 counties + Baltimore City)",
+      "system": "SDAT Real Property via Maryland Open Data (Socrata ed4q-f8tm)",
+      "url_pattern": "https://opendata.maryland.gov/resource/ed4q-f8tm.json?$where=... — SoQL incl. within_circle; per-parcel human lookup at https://sdat.dat.maryland.gov/RealProperty/",
+      "access": "wired (md_sdat; column names pending health check)",
+      "notes": "One feed covers PG, Montgomery, Baltimore City/County, and every other MD county."
+    },
+    {
+      "jurisdiction": "Philadelphia PA",
+      "system": "OPA properties + assessment history (Carto SQL API)",
+      "url_pattern": "https://phl.carto.com/api/v2/sql?q=SELECT ... FROM opa_properties_public — PostGIS SQL; per-parcel human lookup at https://property.phila.gov/?p=<parcel_number>",
+      "access": "wired (philly_opa; reference-verified)",
+      "notes": "RTT transfer records also exposed (rtt_summary table) for deed-level history."
+    },
+    {
+      "jurisdiction": "New Jersey — statewide",
+      "system": "NJGIN Parcels + MOD-IV composite (ArcGIS)",
+      "url_pattern": "https://services2.arcgis.com/XVOqAjTOJ5P6ngMu/arcgis/rest/services/Parcels_Composite_NJ_WM/FeatureServer/0/query — current service (pre-2026-03-11 URL retired); county tax-board SR1A sales files supplement",
+      "access": "wired (nj_modiv; MOD-IV column names pending health check)",
+      "notes": "MOD-IV = the assessor tax roll joined to parcels; NJ municipal rent-control screen is the separate regulatory gap."
+    },
+    {
+      "jurisdiction": "Fairfax County VA",
+      "system": "Tax Administration Real Estate — sales + parcels (ArcGIS hub)",
+      "url_pattern": "https://data-fairfaxcountygis.opendata.arcgis.com/datasets/Fairfaxcountygis::tax-administrations-real-estate-sales-data/about — sales is a coordinate-less TABLE with one-to-many join to parcels; per-parcel human lookup at https://icare.fairfaxcounty.gov/",
+      "access": "discovery (va_fairfax)",
+      "notes": "Wiring needs the backing FeatureServer URL from the hub v3 probe + a two-stage parcel join."
+    },
+    {
+      "jurisdiction": "Arlington County VA",
+      "system": "Arlington GIS Open Data (ArcGIS)",
+      "url_pattern": "https://gisdata-arlgis.opendata.arcgis.com/ — property polygons w/ assessment attributes; per-parcel human lookup at https://propertysearch.arlingtonva.us/",
+      "access": "discovery (va_arlington)",
+      "notes": "Server root probe (gis.arlingtonva.us) lists services; sales attribute names unknown."
+    },
+    {
+      "jurisdiction": "Prince William County VA",
+      "system": "County assessment/GIS portals",
+      "url_pattern": "https://www.pwcva.gov/department/real-estate-assessments — human search; GIS at https://gisweb.pwcgov.org; no documented open sales API found",
+      "access": "manual",
+      "notes": "Portal 403-blocks automated fetch (confirmed July 2026); the county TAX-DELINQUENCY list (verified pipeline, July pass) is the off-market flow source."
+    },
+    {
+      "jurisdiction": "Loudoun County VA",
+      "system": "County parcel/assessment portal + open-data site",
+      "url_pattern": "https://logis.loudoun.gov / https://geohub-loudoungis.opendata.arcgis.com",
+      "access": "unassessed",
+      "notes": "Data-center-alley land intel overlaps here."
+    },
+    {
+      "jurisdiction": "Richmond VA (city)",
+      "system": "City assessor + open-data portal",
+      "url_pattern": "https://www.rva.gov/assessor-real-estate / https://data.richmondgov.com (Socrata)",
+      "access": "unassessed",
+      "notes": "Socrata portal historically carries property + transfer datasets — likely wireable; next candidate after the VA discovery pair."
+    },
+    {
+      "jurisdiction": "Norfolk / Virginia Beach VA",
+      "system": "City open-data portals + assessor search",
+      "url_pattern": "https://data.norfolk.gov (Socrata) / https://data.vbgov.com — assessor human search per city",
+      "access": "unassessed",
+      "notes": "Both cities run Socrata portals; sales datasets unconfirmed."
+    },
+    {
+      "jurisdiction": "Baltimore City MD",
+      "system": "Covered by statewide SDAT feed; city open data supplements",
+      "url_pattern": "https://data.baltimorecity.gov — vacants, permits, citations (useful for the license/violation screen)",
+      "access": "wired via md_sdat",
+      "notes": "City code-violation data pairs with the rent-freeze-while-unabated rule."
+    },
+    {
+      "jurisdiction": "Allegheny County PA (Pittsburgh)",
+      "system": "WPRDC property sales + assessments (CKAN)",
+      "url_pattern": "https://data.wprdc.org/api/3/action/datastore_search_sql?sql=SELECT ... FROM \"5bbe6c55-bce6-4edb-9d04-68edeb6bf7b1\" — sales lack coordinates; join to parcel centroids resource or tools.wprdc.org/property-api",
+      "access": "discovery (pa_allegheny)",
+      "notes": "Best-documented civic data portal in PA; monthly refresh."
+    },
+    {
+      "jurisdiction": "Philadelphia suburbs PA (Montgomery/Bucks/Chester/Delaware counties)",
+      "system": "County GIS/assessment portals",
+      "url_pattern": "varies; e.g. https://www.montgomerycountypa.gov (GIS hub), Bucks/Chester ArcGIS hubs",
+      "access": "unassessed",
+      "notes": "Queue after the discovery four."
+    },
+    {
+      "jurisdiction": "New Castle County DE",
+      "system": "County parcel search + GIS hub",
+      "url_pattern": "https://www3.newcastlede.gov/parcel/search/ (human) / https://apps-nccde.hub.arcgis.com (hub); REST root probe at gis.nccde.org",
+      "access": "discovery (de_new_castle)",
+      "notes": "Kent/Sussex counties: no open feeds found — Delaware outside NCC is a manual-lookup state."
+    }
+  ]
+}

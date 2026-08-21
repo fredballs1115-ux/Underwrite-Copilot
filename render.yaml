@@ -42,6 +42,10 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
+      # Street View building photos (optional): metadata-checked, key stays
+      # server-side behind /api/deals/[id]/photo. No key = clean no-photo cards.
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
       # Hand analyses to the dedicated worker below. ONLY set this to "1"
       # after (a) migration 0016 has been run and (b) the worker service is
       # live — with the flag on and no worker, screens would queue forever.
