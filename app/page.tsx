@@ -13,6 +13,7 @@ import {
   DEAL_KILLERS,
   MEMO_PAGES,
   SLIDER_SWEEP_BPS,
+  COMPS_JURISDICTIONS,
   PRICE_PRO_MONTHLY,
   PRICE_TEAM_BASE_MONTHLY,
   PRICE_TEAM_MEMBER_MONTHLY,
@@ -151,6 +152,7 @@ const XLSX_PREVIEW_ROWS: [string, string, string][] = (() => {
 const FREE_FEATURES = [
   `${FREE_DEALS} deals, the full six-stage screen on each`,
   "Sourced ranges + the three deal-killers",
+  "Recorded-sales comps + local rent-rule check by address",
   "Risk digest and side-by-side deal comparison",
   "Reconcile your own underwriting model",
 ];
@@ -623,8 +625,8 @@ export default function Home() {
                       "Every deal reads PURSUE / WATCH / PASS against your mandate — cap floor, return targets, geographies, hard dealbreakers — from the first signal onward.",
                     ],
                     [
-                      "Comps on a map, not a list",
-                      "OM and public-web comps pinned around the subject with distance and basis. Sourced from public reporting — never MLS, CoStar, or a licensed feed.",
+                      "Comps that pull themselves",
+                      `Give a deal an address and recorded sales appear from government records — ${COMPS_JURISDICTIONS} today — with the median, the range, and where your price sits against them. Public records, never a licensed feed.`,
                     ],
                     [
                       "Financing & capital, sized",
@@ -633,6 +635,18 @@ export default function Home() {
                     [
                       "From verdict to to-do list",
                       "One click turns the verdict's next steps into assigned tasks with due dates — then the memo exports under your own firm's name and logo (Pro).",
+                    ],
+                    [
+                      "Rent control, checked at the address",
+                      "DC's exemptions, PG County's cap, Philadelphia's eviction diversion — the rules engine reads the deal's address and answers Exempt, Applies, or names the open question, statute linked.",
+                    ],
+                    [
+                      "Rates that refresh themselves",
+                      "The 10-Year, SOFR, the 30-year survey, and CRE delinquency land daily from FRED; a weekday intel sweep scores the news for your buy box and raises a red banner when a rent law moves.",
+                    ],
+                    [
+                      "Market data with receipts",
+                      "Every research-sourced figure is clickable — its source, its as-of date, and whether it's verified or merely sourced. Stale data wears a badge instead of hiding.",
                     ],
                   ] as const
                 ).map(([title, body]) => (
@@ -714,7 +728,7 @@ export default function Home() {
                 href="/demo"
                 className="font-medium text-brand underline-offset-2 hover:underline"
               >
-                see them on the sample screen →
+                see the screen itself on the sample deal →
               </Link>
             </p>
           </div>
