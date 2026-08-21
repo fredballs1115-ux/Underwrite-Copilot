@@ -28,6 +28,8 @@ import {
 import { computeModel } from "@/lib/model/compute";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { seedBenchmarks, seedRules } from "@/lib/research-data";
+import { RegulationPlayground } from "./landing-regulation";
+import { COVERAGE_LIVE, COVERAGE_DISCOVERY } from "@/lib/public-comps/core";
 
 // Title/description inherit the site defaults from the root layout;
 // the canonical is declared per page so subpages never collapse to /.
@@ -330,8 +332,25 @@ export default function Home() {
       </header>
 
       <main className="flex-1">
-        {/* Hero — flat dark navy; the product itself is the visual. */}
+        {/* Hero — dark navy with soft accent glows; the product is the visual. */}
         <section className="band-dark relative overflow-hidden text-white">
+          {/* Ambient glows: pure CSS, no layout shift, subtle by design. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -top-32 right-[-10%] h-[28rem] w-[28rem] rounded-full opacity-25 blur-3xl"
+            style={{
+              background:
+                "radial-gradient(closest-side, #7fd6cc 0%, transparent 70%)",
+            }}
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute bottom-[-8rem] left-[-6%] h-[22rem] w-[22rem] rounded-full opacity-15 blur-3xl"
+            style={{
+              background:
+                "radial-gradient(closest-side, #7fd6cc 0%, transparent 70%)",
+            }}
+          />
           <div className="relative mx-auto max-w-6xl px-6 pb-14 pt-16 sm:pt-24">
             <div className="grid items-center gap-12 lg:grid-cols-2">
               <div>
@@ -428,6 +447,7 @@ export default function Home() {
           </div>
         </section>
 
+        <ResearchTicker />
         <LiveProofStrip />
 
         {/* The problem */}
@@ -738,6 +758,52 @@ export default function Home() {
                 see the screen itself on the sample deal →
               </Link>
             </p>
+          </div>
+        </section>
+
+        {/* The rules engine, live — the differentiator, demonstrated. */}
+        <section id="rules" className="scroll-mt-16">
+          <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
+            <Reveal>
+              <p className="text-xs font-medium uppercase tracking-wider text-muted">
+                Try it right here
+              </p>
+              <h2 className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">
+                The rent-control engine, running live on this page.
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
+                Four real scenarios, one click apart. Watch how entity title
+                flips a DC rowhouse from exempt to rent-stabilized, and how the
+                engine names the exact fact that would settle an open question.
+              </p>
+            </Reveal>
+            <Reveal delay={80}>
+              <div className="mt-8">
+                <RegulationPlayground />
+              </div>
+            </Reveal>
+            <Reveal delay={120}>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs">
+                <span className="mr-1 text-muted">Recorded-sales comps:</span>
+                {COVERAGE_LIVE.map((p) => (
+                  <span
+                    key={p.id}
+                    className="rounded-full bg-brand px-2.5 py-1 font-medium text-white"
+                  >
+                    {p.regionLabel}
+                  </span>
+                ))}
+                {COVERAGE_DISCOVERY.map((p) => (
+                  <span
+                    key={p.id}
+                    className="rounded-full border border-dashed border-line px-2.5 py-1 text-muted"
+                    title="being wired — endpoint resolving"
+                  >
+                    {p.regionLabel}
+                  </span>
+                ))}
+              </div>
+            </Reveal>
           </div>
         </section>
 
@@ -1415,6 +1481,53 @@ async function LiveProofStrip() {
             {it}
           </span>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Research ticker (site-polish 2) ──────────────────────────────────────────
+// A slow marquee of REAL figures from the research layer — the same seeds the
+// market page renders with provenance. Content duplicated once for a seamless
+// CSS loop; hover pauses; reduced-motion gets a static row.
+function ResearchTicker() {
+  const bench = seedBenchmarks();
+  const pick = (metro: string, metric: string) =>
+    bench.find((b) => b.metro === metro && b.metric === metric)?.low ?? null;
+  const money = (n: number | null) =>
+    n === null ? null : n >= 10000 ? `$${Math.round(n / 1000)}k` : `$${n.toLocaleString()}`;
+  const items = [
+    ["30-yr fixed", `${pick("", "pmms_30y_fixed") ?? "—"}% · FRED`],
+    ["Philadelphia 2–4 unit median", `${money(pick("Philadelphia, PA", "median_sale_price_2_4_unit"))} · +6.9% YoY`],
+    ["Scranton", money(pick("Scranton, PA", "median_sale_price_2_4_unit"))],
+    ["Albany", money(pick("Albany, NY", "median_sale_price_2_4_unit"))],
+    ["Providence", `${money(pick("Providence, RI", "median_sale_price_2_4_unit"))} · ~150 sales/mo`],
+    ["DC FY2026 2BR FMR", `$${(pick("Washington DC area", "hud_fmr_fy2026_2br") ?? 0).toLocaleString()}/mo`],
+    ["Baltimore FY2026 2BR FMR", `$${(pick("Baltimore MD", "hud_fmr_fy2026_2br") ?? 0).toLocaleString()}/mo`],
+    ["DC ≤4-unit natural-person exemption", "verified vs statute"],
+    ["PG County cap", "lesser of 6% or CPI+3%"],
+    ["Recorded-sales comps", COMPS_JURISDICTIONS],
+  ].filter(([, v]) => v && !String(v).includes("null"));
+
+  const row = (hidden: boolean) => (
+    <div
+      aria-hidden={hidden || undefined}
+      className="flex shrink-0 items-center gap-10 pr-10"
+    >
+      {items.map(([k, v]) => (
+        <span key={String(k)} className="inline-flex items-baseline gap-2 whitespace-nowrap text-sm">
+          <span className="text-white/55">{k}</span>
+          <span className="font-mono font-semibold tabular-nums text-accent">{v}</span>
+        </span>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="band-dark overflow-hidden border-t border-white/10 py-3 text-white">
+      <div className="ticker-track flex w-max">
+        {row(false)}
+        {row(true)}
       </div>
     </div>
   );
