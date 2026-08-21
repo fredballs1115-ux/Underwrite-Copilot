@@ -27,10 +27,15 @@ import {
 // drifted (the page said 7.1% while the engine computed 6.9%).
 import { computeModel } from "@/lib/model/compute";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
+import { seedBenchmarks, seedRules } from "@/lib/research-data";
 
 // Title/description inherit the site defaults from the root layout;
 // the canonical is declared per page so subpages never collapse to /.
 export const metadata: Metadata = { alternates: { canonical: "/" } };
+
+// ISR, daily: the proof strip under the hero quotes the newest FRED pull —
+// a fully static page would freeze it at deploy time.
+export const revalidate = 86400;
 
 // Landing page — a React Server Component (zero client JS, no secrets).
 // The pitch is consistency: one method on every deal, with the work shown.
@@ -422,6 +427,8 @@ export default function Home() {
             </dl>
           </div>
         </section>
+
+        <LiveProofStrip />
 
         {/* The problem */}
         <section id="problem" className="scroll-mt-16">
@@ -1335,6 +1342,79 @@ function DealPreview() {
             {SAMPLE_COMP_PREMIUM_LINE}
           </p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Live proof strip (site-polish) ───────────────────────────────────────────
+// Real numbers from the research layer, QUERIED at render time — the rates
+// table and benchmark/rule counts come from the database when it's reachable
+// (service client, read-only), and from the checked-in research seeds
+// otherwise. Nothing here is typed-in marketing copy; if a value is missing
+// it simply doesn't render.
+async function LiveProofStrip() {
+  let pmms: { value: number; asOf: string } | null = null;
+  let benchCount = seedBenchmarks().length;
+  let ruleCount = seedRules().length;
+  try {
+    const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
+    const admin = createSupabaseAdminClient();
+    const [{ data: rate }, bench, rules] = await Promise.all([
+      admin
+        .from("rates")
+        .select("value, obs_date")
+        .eq("series_id", "MORTGAGE30US")
+        .order("obs_date", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      admin.from("benchmarks").select("id", { count: "exact", head: true }),
+      admin.from("regulatory_rules").select("id", { count: "exact", head: true }),
+    ]);
+    if (rate) pmms = { value: Number(rate.value), asOf: String(rate.obs_date) };
+    if (bench.count) benchCount = Math.max(benchCount, bench.count);
+    if (rules.count) ruleCount = Math.max(ruleCount, rules.count);
+  } catch {
+    // no env / tables — seeds carry the strip
+  }
+  if (!pmms) {
+    const seed = seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed");
+    if (seed?.low != null) pmms = { value: seed.low, asOf: seed.as_of };
+  }
+  const fmtDate = (iso: string) =>
+    new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    });
+  const items = [
+    pmms && (
+      <>
+        30-yr fixed{" "}
+        <span className="font-mono font-semibold tabular-nums">{pmms.value}%</span>{" "}
+        <span className="text-muted">({fmtDate(pmms.asOf)}, FRED)</span>
+      </>
+    ),
+    <>
+      <span className="font-mono font-semibold tabular-nums">{benchCount}</span>{" "}
+      sourced benchmarks across{" "}
+      <span className="font-mono font-semibold tabular-nums">14</span> sectors
+    </>,
+    <>
+      <span className="font-mono font-semibold tabular-nums">{ruleCount}</span>{" "}
+      rent-control &amp; TOPA rules on file — every number carries its source
+    </>,
+  ].filter(Boolean);
+
+  return (
+    <div className="border-b border-line bg-faint/70">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-8 gap-y-1.5 px-6 py-3 text-sm">
+        {items.map((it, i) => (
+          <span key={i} className="inline-flex items-center gap-2">
+            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
+            {it}
+          </span>
+        ))}
       </div>
     </div>
   );

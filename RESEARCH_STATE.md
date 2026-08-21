@@ -4,7 +4,12 @@ Resume file per project protocol: a future session starts HERE and does not
 repeat finished work. Ops/go-live steps + the ranked gap list live in
 `INTEGRATION_NOTES.md`.
 
-**Last updated:** 2026-08-21 (session 3) — BOTH PHASES COMPLETE.
+**Last updated:** 2026-08-21 (session 3, site-polish pass) — BOTH PHASES COMPLETE;
+metro layer added (metros.json: 8 Mid-Atlantic metros; county_data_sources.json:
+14 jurisdictions mapped). New sourced facts: Baltimore FY2026 2BR FMR $1,943,
+Philadelphia $1,810, Richmond institutional median $129.5k/unit (Q1 2026).
+Gaps that did NOT confirm (never guessed): Richmond + Norfolk FY2026 FMRs.
+Run migration 0027 (deals.photo) with the others.
 
 ## Done
 

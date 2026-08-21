@@ -8,8 +8,10 @@ import {
   fmtBasisRange,
   type MarketGroup,
 } from "@/lib/market-memory";
-import { mergeBenchmarks, seedBenchmarks } from "@/lib/research-data";
-import { COVERAGE_DISCOVERY, COVERAGE_SUMMARY } from "@/lib/public-comps/core";
+import { mergeBenchmarks, seedBenchmarks, seedRules } from "@/lib/research-data";
+import { COVERAGE_DISCOVERY, COVERAGE_SUMMARY, PROVIDERS } from "@/lib/public-comps/core";
+import metrosSeed from "@/data/research/metros.json";
+import multifamilySeed from "@/data/research/multifamily.json";
 
 export const metadata: Metadata = { title: "Market data" };
 
@@ -19,7 +21,12 @@ const CALL_META: Record<string, { label: string; cls: string }> = {
   pass_on: { label: "No-go", cls: "text-kill" },
 };
 
-export default async function MarketDataPage() {
+export default async function MarketDataPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ metro?: string }>;
+}) {
+  const { metro: metroParam } = (await searchParams) ?? {};
   const supabase = await createSupabaseServerClient();
   const user = await getCurrentUser();
 
@@ -91,10 +98,179 @@ export default async function MarketDataPage() {
         </>
       )}
 
+      <MetroExplorer selected={metroParam} />
       <MidAtlanticTable />
       <RatesStrip />
       <IntelDigestCard />
     </div>
+  );
+}
+
+// ── Metro explorer (site-polish) ─────────────────────────────────────────────
+// The research showroom: pick a metro, see what the research layer actually
+// holds for it — FMR benchmarks, market notes, the regulatory rules in force
+// (statute-linked, status-labeled), comps availability, and example
+// properties. Server-rendered; selection is a query param, so it's linkable.
+function MetroExplorer({ selected }: { selected?: string }) {
+  const metros = metrosSeed.metros ?? [];
+  const active =
+    metros.find((m) => m.id === selected) ?? metros[0];
+  if (!active) return null;
+  const rules = seedRules().filter((r) =>
+    (active.rule_ids as string[] | undefined)?.includes(r.id)
+  );
+  const fmr = active.fmr_fy2026 as {
+    "2br"?: number | null;
+    range?: [number, number];
+    status?: string;
+    note?: string;
+    sources?: string[];
+  } | null;
+  const providers = Object.fromEntries(PROVIDERS.map((p) => [p.id, p]));
+  const compsLine =
+    active.comps_provider === null
+      ? "No open sales feed found for this metro yet — comps here are manual-lookup (see county_data_sources.json)."
+      : active.comps_provider === "discovery"
+        ? "Recorded-sales comps staged in discovery mode — the health check resolves the endpoints."
+        : `Recorded-sales comps LIVE via ${providers[active.comps_provider as string]?.name ?? active.comps_provider}.`;
+  const examples =
+    (multifamilySeed.top_east_coast_metros ?? []).find((m) =>
+      m.metro.toLowerCase().startsWith(active.name.split(" ")[0].toLowerCase())
+    )?.example_properties ?? [];
+  const noteStatus = (active.market_notes as { status?: string } | null)?.status ?? "sourced";
+  const noteMeta =
+    noteStatus === "verified"
+      ? "bg-emerald-500/10 text-emerald-600"
+      : "bg-brand/10 text-brand";
+
+  return (
+    <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
+      <h2 className="text-sm font-semibold tracking-tight">Metro explorer</h2>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {metros.map((m) => (
+          <Link
+            key={m.id}
+            href={`/market?metro=${m.id}`}
+            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+              m.id === active.id
+                ? "border-brand bg-brand text-white"
+                : "border-line text-muted hover:border-brand hover:text-brand"
+            }`}
+          >
+            {m.name}
+          </Link>
+        ))}
+      </div>
+
+      <div className="mt-4 space-y-4">
+        <p className="text-sm leading-relaxed">
+          {(active.market_notes as { value?: string } | null)?.value}
+          <span className={`ml-2 rounded px-1.5 py-px align-middle text-[10px] font-medium ${noteMeta}`}>
+            {noteStatus}
+          </span>
+        </p>
+
+        {typeof fmr?.["2br"] === "number" ? (
+          <p className="text-sm">
+            <span className="text-[11px] uppercase tracking-wide text-muted">
+              FY2026 fair market rent
+            </span>{" "}
+            <span className="font-mono font-semibold tabular-nums">
+              ${fmr["2br"].toLocaleString()}/mo
+            </span>{" "}
+            <span className="text-muted">2BR</span>
+            {fmr.range && (
+              <span className="text-xs text-muted">
+                {" "}
+                (payment-standard range ${fmr.range[0].toLocaleString()}–$
+                {fmr.range[1].toLocaleString()})
+              </span>
+            )}
+            {fmr.sources?.[0] && (
+              <a
+                href={fmr.sources[0]}
+                target="_blank"
+                rel="noreferrer"
+                className="ml-2 text-[11px] text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
+              >
+                source
+              </a>
+            )}
+          </p>
+        ) : (
+          <p className="text-xs text-muted">
+            FY2026 FMR for this metro: not yet confirmed —{" "}
+            {fmr?.note ?? "queued in the research gaps."}
+          </p>
+        )}
+
+        <div>
+          <h3 className="text-[11px] uppercase tracking-wide text-muted">
+            Rules in force here
+          </h3>
+          {rules.length === 0 ? (
+            <p className="mt-1 text-sm text-muted">
+              No rules on file for this metro — that means unscreened, not
+              unregulated.
+            </p>
+          ) : (
+            <ul className="mt-2 space-y-2">
+              {rules.map((r) => (
+                <li key={r.id} className="text-sm leading-snug">
+                  <span
+                    className={`mr-2 rounded px-1.5 py-px text-[10px] font-medium ${
+                      r.status === "verified"
+                        ? "bg-emerald-500/10 text-emerald-600"
+                        : r.status === "sourced"
+                          ? "bg-brand/10 text-brand"
+                          : "bg-amber-500/10 text-amber-600"
+                    }`}
+                  >
+                    {r.status}
+                  </span>
+                  {r.effect.split(". ")[0]}.
+                  {r.source && (
+                    <a
+                      href={r.source}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="ml-1.5 text-[11px] text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
+                    >
+                      statute
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <p className="text-xs text-muted">{compsLine}</p>
+
+        {examples.length > 0 && (
+          <div>
+            <h3 className="text-[11px] uppercase tracking-wide text-muted">
+              Example properties from the research
+            </h3>
+            <ul className="mt-2 space-y-1.5">
+              {examples.map((e) => (
+                <li key={e.address} className="text-sm">
+                  <span className="font-medium">{e.address}</span>
+                  {typeof e.price === "number" && (
+                    <span className="ml-2 font-mono tabular-nums">
+                      ${e.price.toLocaleString()}
+                    </span>
+                  )}
+                  <span className="ml-2 text-xs text-muted">
+                    {e.metric} — {e.note}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 

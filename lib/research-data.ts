@@ -6,6 +6,7 @@
 import rulesSeed from "@/data/research/regulatory_rules.json";
 import multifamilySeed from "@/data/research/multifamily.json";
 import capitalSeed from "@/data/research/capital_markets.json";
+import metrosSeed from "@/data/research/metros.json";
 import type { Benchmark, RegulatoryRule, RuleSubject } from "@/lib/research";
 
 export function seedRules(): RegulatoryRule[] {
@@ -102,6 +103,27 @@ export function seedBenchmarks(): Benchmark[] {
       }
     }
   }
+  // Metro-level FY2026 FMRs from metros.json (DC-area rows already come from
+  // multifamily.json above — skip its metro to avoid near-duplicate rows).
+  for (const m of metrosSeed.metros ?? []) {
+    if (m.id === "dc") continue;
+    const fmr = m.fmr_fy2026 as { "2br"?: number | null; status?: string; sources?: string[]; note?: string } | undefined;
+    if (typeof fmr?.["2br"] === "number") {
+      out.push({
+        sector: "multifamily",
+        metro: m.name,
+        metric: "hud_fmr_fy2026_2br",
+        low: fmr["2br"],
+        high: fmr["2br"],
+        unit: "usd_month",
+        source: fmr.sources?.[0] ?? "",
+        as_of: "2025-10-01",
+        status: (fmr.status as Benchmark["status"]) ?? "sourced",
+        note: fmr.note ?? null,
+      });
+    }
+  }
+
   const pmms = capitalSeed.snapshot?.mortgage_30y_pmms;
   if (typeof pmms?.value === "number") {
     out.push({
