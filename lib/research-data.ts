@@ -7,6 +7,15 @@ import rulesSeed from "@/data/research/regulatory_rules.json";
 import multifamilySeed from "@/data/research/multifamily.json";
 import capitalSeed from "@/data/research/capital_markets.json";
 import metrosSeed from "@/data/research/metros.json";
+import sfrSeed from "@/data/research/sfr_btr.json";
+import officeSeed from "@/data/research/office.json";
+import industrialSeed from "@/data/research/industrial.json";
+import retailSeed from "@/data/research/retail.json";
+import hospitalitySeed from "@/data/research/hospitality_str.json";
+import storageSeed from "@/data/research/self_storage.json";
+import seniorSeed from "@/data/research/senior_housing.json";
+import mhcSeed from "@/data/research/manufactured_housing.json";
+import specialtySeed from "@/data/research/specialty.json";
 import type { Benchmark, RegulatoryRule, RuleSubject } from "@/lib/research";
 
 export function seedRules(): RegulatoryRule[] {
@@ -120,6 +129,46 @@ export function seedBenchmarks(): Benchmark[] {
         as_of: "2025-10-01",
         status: (fmr.status as Benchmark["status"]) ?? "sourced",
         note: fmr.note ?? null,
+      });
+    }
+  }
+
+  // Sector cap-rate bands from the sector research files — national tiers
+  // (metro ""), one row per tier that actually carries a number. Unverified
+  // tiers (low/high null) are deliberately NOT rows: a gap is a gap.
+  const SECTOR_FILES: { sector: string; doc: { as_of?: string; cap_rate_ranges?: unknown } }[] = [
+    { sector: "sfr_btr", doc: sfrSeed },
+    { sector: "office", doc: officeSeed },
+    { sector: "industrial", doc: industrialSeed },
+    { sector: "retail", doc: retailSeed },
+    { sector: "hospitality_str", doc: hospitalitySeed },
+    { sector: "self_storage", doc: storageSeed },
+    { sector: "senior_housing", doc: seniorSeed },
+    { sector: "manufactured_housing", doc: mhcSeed },
+    { sector: "specialty", doc: specialtySeed },
+  ];
+  for (const { sector, doc } of SECTOR_FILES) {
+    const ranges = (doc.cap_rate_ranges ?? []) as {
+      tier?: string;
+      low?: number | null;
+      high?: number | null;
+      status?: string;
+      sources?: string[];
+      note?: string;
+    }[];
+    for (const r of ranges) {
+      if (typeof r.low !== "number" || typeof r.high !== "number" || !r.tier) continue;
+      out.push({
+        sector,
+        metro: "",
+        metric: `cap_rate__${r.tier.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")}`,
+        low: Math.round(r.low * 10000) / 100, // store as percent
+        high: Math.round(r.high * 10000) / 100,
+        unit: "pct",
+        source: r.sources?.[0] ?? "",
+        as_of: doc.as_of ?? "2026-08-21",
+        status: (r.status as Benchmark["status"]) ?? "sourced",
+        note: [r.tier, r.note].filter(Boolean).join(" — "),
       });
     }
   }

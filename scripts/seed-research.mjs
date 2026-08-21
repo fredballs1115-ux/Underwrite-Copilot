@@ -46,7 +46,10 @@ const rules = rulesDoc.rules.map((r) => ({
   console.log(`regulatory_rules: upserted ${rules.length}`);
 }
 
-// Benchmarks mirror lib/research-data.ts#seedBenchmarks — keep both in sync.
+// Benchmarks here cover the CORE subset (metro medians, DC FMRs, PMMS).
+// lib/research-data.ts#seedBenchmarks is the CANONICAL, larger set (adds
+// sector cap-rate bands + metro FMRs) and the app always merges it in — DB
+// rows override per key, so this script seeding fewer rows is safe.
 const mf = await read("multifamily.json");
 const cap = await read("capital_markets.json");
 const benchmarks = [];
