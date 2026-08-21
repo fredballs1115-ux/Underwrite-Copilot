@@ -37,6 +37,14 @@ export const MEMO_PAGES = 1;
 // (lib/underwrite/playground.ts LEVER_STEPS: 16 × 25bps).
 export const SLIDER_SWEEP_BPS = 400;
 
+// ── Research-layer facts (countable in the codebase) ────────────────────────
+// Public-record comp jurisdictions = lib/public-comps/core.ts PROVIDERS
+// (Philadelphia OPA, DC ITS extract, Maryland SDAT statewide).
+export const COMPS_JURISDICTIONS = "Washington DC, Maryland, and Philadelphia";
+// The rates cron tracks 4 FRED series (scripts/fetch-rates.mjs SERIES):
+// 10Y Treasury, SOFR, 30-year mortgage survey, CRE loan delinquency.
+export const RATE_SERIES = 4;
+
 // ── Pricing ─────────────────────────────────────────────────────────────────
 // THE canonical price + free-tier numbers. lib/billing (server-only) derives
 // its labels and arithmetic from these — that direction, because this module

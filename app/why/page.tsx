@@ -42,6 +42,13 @@ const SECTIONS: { h: string; body: string[] }[] = [
     ],
   },
   {
+    h: "It knows the ground",
+    body: [
+      "Give a deal an address and the app checks the local rules: rent control coverage, small-landlord exemptions, purchase rights. It answers with the statute linked, or names the open question. Unknown jurisdictions say so — never a silent pass.",
+      "Recorded sales nearby pull automatically from government records in covered jurisdictions — Washington DC, Maryland, and Philadelphia today. Public records, clearly labeled. Not an appraisal.",
+    ],
+  },
+  {
     h: "Your data stays yours",
     body: [
       "Documents are private to your account and, if you create one, your team. The market data built from your past screens is private to you alone.",
