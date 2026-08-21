@@ -35,7 +35,10 @@ values are `null` with `unverified_not_found`.
 
 ## Ops steps to go live (in order)
 
-1. Run migrations **0023, 0024, 0025** in the Supabase SQL editor (idempotent).
+1. Run migrations **0023, 0024, 0025, 0026** in the Supabase SQL editor (idempotent).
+   (0026 adds `deals.public_comps` for auto-pulled public-record comps —
+   without it, comp pulls fail silently on write; the panel will sit in
+   "pulling…" state.)
 2. (Optional) seed the DB layer: `SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/seed-research.mjs`
    — the app already falls back to the checked-in JSONs, so this only matters
    when you want DB rows to override shipped seeds without a deploy.
@@ -49,6 +52,13 @@ values are `null` with `unverified_not_found`.
    with a DC/PG/Philadelphia address and confirm the regulation panel fires.
    (These live steps couldn't run in the build container — no secrets, and
    the egress proxy blocks FRED/census/HUD from here.)
+6. **Auto-comps check**: open (or create) a deal with a Philadelphia street
+   address — the "Recorded sales nearby" panel should fill within a minute.
+   Then hit `/api/comps/health` signed-in: Philadelphia should be `ok:true`;
+   the DC and Maryland entries ship config-first (their portals were
+   unreachable from the build environment), and this route returns the
+   upstream layer list / field errors needed to correct
+   `lib/public-comps/core.ts` in one line each.
 
 ## Verified vs sourced — the honest ledger
 

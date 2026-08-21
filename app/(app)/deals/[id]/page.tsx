@@ -3,6 +3,11 @@ import { notFound } from "next/navigation";
 import { ResearchPanel } from "./research-panel";
 import { SectorFieldsForm } from "./sector-fields-form";
 import type { SectorFieldValues } from "@/lib/sector-fields";
+import { PublicCompsPanel } from "./public-comps-panel";
+import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
+import type { RecordCompsResult } from "@/lib/public-comps/core";
+import { parseMoney } from "@/lib/criteria";
+import { after } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { signedSupplementUrl } from "@/lib/storage";
 import { isPro } from "@/lib/billing";
@@ -434,6 +439,19 @@ export default async function DealPage({
     findValue(metrics, /\bcap rate\b/i, /exit|terminal|reversion/i) ??
     (firstSignal?.goingInCap.trim() || null);
 
+  // Public-record comps (auto-comps v2): render whatever the background pull
+  // stored; when a deal has an address but nothing stored yet (pre-feature
+  // deals, or a save whose after() died in a deploy), kick the pull now —
+  // claimRecordComps's sentinel makes double-fires harmless.
+  const publicComps =
+    ((deal as { public_comps?: RecordCompsResult | null }).public_comps) ?? null;
+  const subjectPriceNumber = summaryPrice ? parseMoney(summaryPrice) : null;
+  if (dealAddress?.label && !publicComps) {
+    after(async () => {
+      if (await claimRecordComps(id)) await runRecordComps(id);
+    });
+  }
+
   // The buy-box call as one chip. When there's a numeric mandate-fit score,
   // it leads — "Buy box 82 · Pursue", coloured by the PURSUE/WATCH/PASS call.
   // Otherwise the older fold (Outside / Near / Fits) stands in.
@@ -705,6 +723,12 @@ export default async function DealPage({
       />
 
       <div className="mt-6 space-y-4">
+        <PublicCompsPanel
+          dealId={id}
+          result={publicComps}
+          hasAddress={!!dealAddress?.label}
+          subjectPrice={subjectPriceNumber}
+        />
         <SectorFieldsForm
           dealId={id}
           assetClass={(deal.asset_class as string) ?? "auto"}
