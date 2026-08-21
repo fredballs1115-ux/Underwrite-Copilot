@@ -192,14 +192,14 @@ export default function DemoPage() {
         <div className="mt-6 rounded-2xl border border-line bg-surface p-5 shadow-card">
           <div className="flex flex-wrap items-center gap-2.5">
             <h2 className="text-xl font-semibold tracking-tight">
-              The Maddox at Highland Park
+              The Maddox at Brewerytown
             </h2>
             <span className="rounded-full bg-caution/15 px-2.5 py-1 text-[11px] font-medium text-caution">
               Caution
             </span>
           </div>
           <p className="mt-1 text-sm text-muted">
-            {data.extraction.market || "North Dallas, TX"} ·{" "}
+            {data.extraction.market || "Brewerytown, Philadelphia, PA"} ·{" "}
             <span className="capitalize">multifamily</span>
           </p>
           <dl className="mt-4 grid grid-cols-1 gap-3 border-t border-line pt-4 sm:grid-cols-3">

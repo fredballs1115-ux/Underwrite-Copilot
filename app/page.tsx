@@ -1347,9 +1347,9 @@ function DealPreview() {
       <div className="shadow-float relative rounded-2xl border border-line bg-surface p-5 text-ink">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-sm font-medium">The Maddox at Highland Park</p>
+            <p className="text-sm font-medium">The Maddox at Brewerytown</p>
             <p className="text-xs text-muted">
-              Multifamily · 248 units · North Dallas
+              Multifamily · 248 units · Brewerytown, Philadelphia
             </p>
           </div>
           <span className="rounded-full bg-caution/10 px-2.5 py-1 text-xs font-medium text-caution">

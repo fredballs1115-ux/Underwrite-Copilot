@@ -524,6 +524,17 @@ export async function createSampleDeal() {
     .limit(1)
     .maybeSingle();
   if (existing) {
+    // Self-healing sample: backfill the neighborhood placement on samples
+    // created before the relocation, so their panels light up too.
+    try {
+      await supabase
+        .from("deals")
+        .update({ address: SAMPLE_DEAL.address })
+        .eq("id", existing.id)
+        .is("address", null);
+    } catch {
+      // pre-0011 schema — carry on
+    }
     await seedSampleActuals(existing.id as string);
     redirect(`/deals/${existing.id}`);
   }
@@ -546,6 +557,22 @@ export async function createSampleDeal() {
     .select("id")
     .single();
   if (error || !deal) redirect("/deals?error=save");
+
+  // Neighborhood-level address (real submarket, fictional building) so the
+  // regulation panel and the recorded-sales pull demo on REAL Philadelphia
+  // data. Best-effort like every address write; comps pull rides after().
+  try {
+    await supabase
+      .from("deals")
+      .update({ address: SAMPLE_DEAL.address })
+      .eq("id", deal.id);
+    const sampleId = deal.id as string;
+    after(async () => {
+      if (await claimRecordComps(sampleId)) await runRecordComps(sampleId);
+    });
+  } catch {
+    // pre-0011 schema — the sample still works address-less
+  }
 
   await seedSampleActuals(deal.id as string);
 
