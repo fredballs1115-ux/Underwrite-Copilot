@@ -123,10 +123,16 @@ export function PublicCompsPanel({
   }
 
   const s = result.stats;
+  // The vs-median line only makes sense when the subject and the surrounding
+  // recorded stock are the same kind of thing. A $68M asset against rowhouse
+  // sales would read "20,000% above market" — suppress outside a plausible
+  // band instead of rendering a meaningless verdict.
+  const ratio = subjectPrice && s.medianPrice > 0 ? subjectPrice / s.medianPrice : null;
   const vsMedian =
-    subjectPrice && s.medianPrice > 0
-      ? Math.round(((subjectPrice - s.medianPrice) / s.medianPrice) * 100)
+    ratio !== null && ratio >= 0.25 && ratio <= 4
+      ? Math.round((ratio - 1) * 100)
       : null;
+  const scaleMismatch = ratio !== null && vsMedian === null;
 
   return (
     <section className="rounded-xl border border-line bg-surface p-4">
@@ -156,6 +162,15 @@ export function PublicCompsPanel({
             >
               This deal is {Math.abs(vsMedian)}% {vsMedian >= 0 ? "above" : "below"} the
               recorded median.
+            </span>
+          </>
+        )}
+        {scaleMismatch && (
+          <>
+            {". "}
+            <span className="text-muted">
+              The subject&apos;s scale differs from the surrounding recorded
+              stock, so a whole-price comparison isn&apos;t meaningful here.
             </span>
           </>
         )}

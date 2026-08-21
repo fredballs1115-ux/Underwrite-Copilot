@@ -55,12 +55,21 @@ export async function GET(
         status?: string;
         location?: { lat?: number; lng?: number };
       };
-      cache = {
-        status: meta.status === "OK" ? "ok" : "none",
-        checkedAt: new Date().toISOString(),
-        panoLat: meta.location?.lat,
-        panoLng: meta.location?.lng,
-      };
+      if (meta.status === "OK") {
+        cache = {
+          status: "ok",
+          checkedAt: new Date().toISOString(),
+          panoLat: meta.location?.lat,
+          panoLng: meta.location?.lng,
+        };
+      } else if (meta.status === "ZERO_RESULTS" || meta.status === "NOT_FOUND") {
+        // Definitive "no imagery here" — safe to cache.
+        cache = { status: "none", checkedAt: new Date().toISOString() };
+      } else {
+        // OVER_QUERY_LIMIT / REQUEST_DENIED / UNKNOWN_ERROR are transient or
+        // config states — 404 this request but never poison the 30-day cache.
+        return new NextResponse(null, { status: 404 });
+      }
     } catch {
       // Transient failure: report no image THIS request, don't cache a "none".
       return new NextResponse(null, { status: 404 });

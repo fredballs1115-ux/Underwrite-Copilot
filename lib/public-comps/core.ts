@@ -217,7 +217,10 @@ const dc: ProviderConfig = {
         lng,
         saleDate: new Date(dateMs).toISOString().slice(0, 10),
         price,
-        sqft: num(a.LANDAREA),
+        // LANDAREA is LAND square feet, not building area — presenting it as
+        // $/SF would be a materially wrong pricing signal. Null until a real
+        // improvement-area field is confirmed via the health check.
+        sqft: null,
         propertyType: `usecode ${str(a.USECODE) || "?"}`,
         sourceUrl: `https://opendata.dc.gov/datasets/integrated-tax-system-public-extract-property-sales`,
       });

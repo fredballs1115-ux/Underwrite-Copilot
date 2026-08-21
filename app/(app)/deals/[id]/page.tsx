@@ -447,7 +447,11 @@ export default async function DealPage({
   const publicComps =
     ((deal as { public_comps?: RecordCompsResult | null }).public_comps) ?? null;
   const subjectPriceNumber = summaryPrice ? parseMoney(summaryPrice) : null;
-  if (dealAddress?.label && !publicComps) {
+  // Also re-kick a lingering "pending" sentinel: a deploy can kill the
+  // after() worker between claim and result, and claimRecordComps's
+  // stale-pending reclaim (10-min threshold) is only reachable if someone
+  // calls it — page refreshes are that someone.
+  if (dealAddress?.label && (!publicComps || publicComps.status === "pending")) {
     after(async () => {
       if (await claimRecordComps(id)) await runRecordComps(id);
     });

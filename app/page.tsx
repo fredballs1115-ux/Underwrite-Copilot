@@ -1496,18 +1496,27 @@ function ResearchTicker() {
     bench.find((b) => b.metro === metro && b.metric === metric)?.low ?? null;
   const money = (n: number | null) =>
     n === null ? null : n >= 10000 ? `$${Math.round(n / 1000)}k` : `$${n.toLocaleString()}`;
-  const items = [
-    ["30-yr fixed", `${pick("", "pmms_30y_fixed") ?? "—"}% · FRED`],
-    ["Philadelphia 2–4 unit median", `${money(pick("Philadelphia, PA", "median_sale_price_2_4_unit"))} · +6.9% YoY`],
-    ["Scranton", money(pick("Scranton, PA", "median_sale_price_2_4_unit"))],
-    ["Albany", money(pick("Albany, NY", "median_sale_price_2_4_unit"))],
-    ["Providence", `${money(pick("Providence, RI", "median_sale_price_2_4_unit"))} · ~150 sales/mo`],
-    ["DC FY2026 2BR FMR", `$${(pick("Washington DC area", "hud_fmr_fy2026_2br") ?? 0).toLocaleString()}/mo`],
-    ["Baltimore FY2026 2BR FMR", `$${(pick("Baltimore MD", "hud_fmr_fy2026_2br") ?? 0).toLocaleString()}/mo`],
-    ["DC ≤4-unit natural-person exemption", "verified vs statute"],
-    ["PG County cap", "lesser of 6% or CPI+3%"],
-    ["Recorded-sales comps", COMPS_JURISDICTIONS],
-  ].filter(([, v]) => v && !String(v).includes("null"));
+  // Each candidate renders only when its number actually exists — a missing
+  // seed drops the item rather than showing "—" or "$0".
+  const pmmsVal = pick("", "pmms_30y_fixed");
+  const dcFmr = pick("Washington DC area", "hud_fmr_fy2026_2br");
+  const baltFmr = pick("Baltimore MD", "hud_fmr_fy2026_2br");
+  const phillyMed = money(pick("Philadelphia, PA", "median_sale_price_2_4_unit"));
+  const provMed = money(pick("Providence, RI", "median_sale_price_2_4_unit"));
+  const items = (
+    [
+      pmmsVal !== null && ["30-yr fixed", `${pmmsVal}% · FRED`],
+      phillyMed && ["Philadelphia 2–4 unit median", `${phillyMed} · +6.9% YoY`],
+      ["Scranton", money(pick("Scranton, PA", "median_sale_price_2_4_unit"))],
+      ["Albany", money(pick("Albany, NY", "median_sale_price_2_4_unit"))],
+      provMed && ["Providence", `${provMed} · ~150 sales/mo`],
+      dcFmr !== null && ["DC FY2026 2BR FMR", `$${dcFmr.toLocaleString()}/mo`],
+      baltFmr !== null && ["Baltimore FY2026 2BR FMR", `$${baltFmr.toLocaleString()}/mo`],
+      ["DC ≤4-unit natural-person exemption", "verified vs statute"],
+      ["PG County cap", "lesser of 6% or CPI+3%"],
+      ["Recorded-sales comps", COMPS_JURISDICTIONS],
+    ] as const
+  ).filter((it): it is [string, string] => Array.isArray(it) && !!it[1]);
 
   const row = (hidden: boolean) => (
     <div
