@@ -32,24 +32,42 @@ export async function GET() {
         } catch {
           body = text.slice(0, 500);
         }
-        // ArcGIS roots: surface the layer list so a wrong index is
-        // self-correcting from this response alone.
-        const layers = (body as { layers?: { id: number; name: string }[] })?.layers?.map(
-          (l) => `${l.id}: ${l.name}`
-        );
+        // Surface exactly what the wiring step needs and nothing bulkier:
+        // ArcGIS roots list layers/services; layer + CKAN + hub responses
+        // carry field schemas; hub v3 items carry the backing server URL.
+        const b = body as {
+          layers?: { id: number; name: string }[];
+          services?: { name: string; type: string }[];
+          fields?: { name: string }[];
+          result?: { fields?: { id: string }[] };
+          data?: { attributes?: { url?: string; fields?: { name: string }[] } };
+        };
+        const layers = b?.layers?.map((l) => `${l.id}: ${l.name}`);
+        const services = b?.services?.map((s) => `${s.name} (${s.type})`);
+        const fields =
+          b?.fields?.map((f) => f.name) ??
+          b?.result?.fields?.map((f) => f.id) ??
+          b?.data?.attributes?.fields?.map((f) => f.name);
+        const backingUrl = b?.data?.attributes?.url;
+        const distilled = layers || services || fields || backingUrl;
         return {
           provider: p.id,
           name: p.name,
+          configured: p.configured,
           needsFieldVerification: p.needsFieldVerification,
           httpStatus: res.status,
           ok: res.ok,
-          layers: layers ?? undefined,
-          sample: layers ? undefined : body,
+          layers,
+          services: services?.slice(0, 40),
+          fields: fields?.slice(0, 80),
+          backingUrl,
+          sample: distilled ? undefined : body,
         };
       } catch (err) {
         return {
           provider: p.id,
           name: p.name,
+          configured: p.configured,
           needsFieldVerification: p.needsFieldVerification,
           httpStatus: null,
           ok: false,

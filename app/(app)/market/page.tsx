@@ -8,7 +8,8 @@ import {
   fmtBasisRange,
   type MarketGroup,
 } from "@/lib/market-memory";
-import { seedBenchmarks } from "@/lib/research-data";
+import { mergeBenchmarks, seedBenchmarks } from "@/lib/research-data";
+import { COVERAGE_DISCOVERY, COVERAGE_SUMMARY } from "@/lib/public-comps/core";
 
 export const metadata: Metadata = { title: "Market data" };
 
@@ -90,9 +91,109 @@ export default async function MarketDataPage() {
         </>
       )}
 
+      <MidAtlanticTable />
       <RatesStrip />
       <IntelDigestCard />
     </div>
+  );
+}
+
+// ── Mid-Atlantic market table (research build) ───────────────────────────────
+// The seeded + DB-merged benchmarks as one table: 2-4 unit medians, monthly
+// sales, and active listings per metro, plus the DC-area FY2026 FMR row —
+// visible from day one (it doesn't depend on the user's own screens), every
+// row with provenance. Recorded-sales COVERAGE for auto-comps is stated
+// from the provider registry so it can't drift.
+async function MidAtlanticTable() {
+  const supabase = await createSupabaseServerClient();
+  let benchmarks = seedBenchmarks();
+  try {
+    const { data } = await supabase.from("benchmarks").select("*");
+    if (data?.length) benchmarks = mergeBenchmarks(data as never);
+  } catch {
+    // seeds stand
+  }
+  const mf = benchmarks.filter((b) => b.sector === "multifamily" && b.metro);
+  const metros = [...new Set(mf.map((b) => b.metro))].filter(
+    (m) => m !== "Washington DC area"
+  );
+  const get = (metro: string, metric: string) =>
+    mf.find((b) => b.metro === metro && b.metric === metric);
+  const fmr = mf.filter((b) => b.metro === "Washington DC area");
+  const priceRows = metros
+    .map((m) => ({ metro: m, price: get(m, "median_sale_price_2_4_unit"), sales: get(m, "monthly_sales_2_4_unit"), listings: get(m, "active_listings_2_4_unit") }))
+    .filter((r) => r.price)
+    .sort((a, b) => (a.price!.low ?? 0) - (b.price!.low ?? 0));
+  if (priceRows.length === 0) return null;
+
+  const money = (n: number | null) => (n === null ? "—" : `$${Math.round(n / 1000)}k`);
+  const range = (b: { low: number | null; high: number | null } | undefined) =>
+    !b || b.low === null
+      ? "—"
+      : b.low === b.high
+        ? `${b.low}`
+        : `${b.low}–${b.high}`;
+
+  return (
+    <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold tracking-tight">
+          Mid-Atlantic 2–4 unit market
+        </h2>
+        <span className="text-[11px] text-muted">
+          {priceRows[0].price!.as_of} · Redfin public dataset
+        </span>
+      </div>
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full min-w-[520px] text-left text-sm">
+          <thead>
+            <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
+              <th className="py-1.5 pr-3 font-medium">Metro</th>
+              <th className="py-1.5 pr-3 font-medium">Median sale</th>
+              <th className="py-1.5 pr-3 font-medium">Sales / mo</th>
+              <th className="py-1.5 pr-3 font-medium">Active</th>
+              <th className="py-1.5 font-medium">Note</th>
+            </tr>
+          </thead>
+          <tbody>
+            {priceRows.map((r) => (
+              <tr key={r.metro} className="border-b border-line/60">
+                <td className="py-1.5 pr-3 font-medium">{r.metro}</td>
+                <td className="py-1.5 pr-3 font-mono tabular-nums">{money(r.price!.low)}</td>
+                <td className="py-1.5 pr-3 font-mono tabular-nums">{range(r.sales)}</td>
+                <td className="py-1.5 pr-3 font-mono tabular-nums">{range(r.listings)}</td>
+                <td className="py-1.5 text-xs text-muted">
+                  {(r.price!.note ?? "").split(";")[0]}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {fmr.length > 0 && (
+        <p className="mt-3 border-t border-line pt-2 text-xs text-muted">
+          DC-area FY2026 HUD fair-market rents:{" "}
+          {fmr
+            .map(
+              (b) =>
+                `${b.metric.replace("hud_fmr_fy2026_", "").toUpperCase()} $${(b.low ?? 0).toLocaleString()}`
+            )
+            .join(" · ")}{" "}
+          <span className="text-[11px]">(sourced; verify against the HUD schedule)</span>
+        </p>
+      )}
+      <p className="mt-2 text-[11px] leading-relaxed text-muted">
+        Recorded-sales comps auto-pull live in {COVERAGE_SUMMARY}
+        {COVERAGE_DISCOVERY.length > 0 && (
+          <>
+            {"; being wired: "}
+            {COVERAGE_DISCOVERY.map((p) => p.regionLabel).join(", ")}
+          </>
+        )}
+        . Every figure above carries its source and as-of date in the research
+        layer; stale rows badge themselves on deal screens.
+      </p>
+    </section>
   );
 }
 

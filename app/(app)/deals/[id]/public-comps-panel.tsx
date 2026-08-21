@@ -6,7 +6,11 @@
 // is the pricing read.
 
 import { fmtMiles, kmToMiles } from "@/lib/geo";
-import type { RecordCompsResult } from "@/lib/public-comps/core";
+import {
+  COVERAGE_DISCOVERY,
+  COVERAGE_SUMMARY,
+  type RecordCompsResult,
+} from "@/lib/public-comps/core";
 import { refreshRecordComps } from "./comps-actions";
 
 const fmtMoney = (n: number) =>
@@ -72,9 +76,15 @@ export function PublicCompsPanel({
       <section className="rounded-xl border border-line bg-surface p-4">
         {header}
         <p className="mt-2 text-sm text-muted">
-          No public-records source is wired for this jurisdiction yet — covered
-          today: Washington DC, all of Maryland, and Philadelphia. That means
-          no data on file, not that no sales happened.
+          No public-records source is wired for this jurisdiction yet — live
+          today: {COVERAGE_SUMMARY}
+          {COVERAGE_DISCOVERY.length > 0 && (
+            <>
+              {"; being wired: "}
+              {COVERAGE_DISCOVERY.map((p) => p.name.replace(/ — .*$/, "")).join(", ")}
+            </>
+          )}
+          . That means no data on file, not that no sales happened.
         </p>
       </section>
     );
