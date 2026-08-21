@@ -274,3 +274,22 @@ body {
   font-size: 9px;
   background: rgba(255, 255, 255, 0.75);
 }
+
+/* Landing research ticker (site-polish 2): seamless marquee — content is
+   rendered twice, track slides one copy's width. Motion-sensitive users get
+   a static row. */
+@keyframes ticker-slide {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.ticker-track {
+  animation: ticker-slide 55s linear infinite;
+}
+.ticker-track:hover {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track {
+    animation: none;
+  }
+}
