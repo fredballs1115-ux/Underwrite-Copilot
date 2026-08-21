@@ -13,6 +13,7 @@ import {
 } from "@/lib/storage";
 import { getBilling } from "@/lib/billing";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
+import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import {
   claimJob,
   releaseClaim,
@@ -166,6 +167,11 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
     } catch {
       // pre-0011 schema — the deal still works without the address column
     }
+    // Auto-comps: an address is all the public record needs — pull recorded
+    // sales in the background the moment a building goes in.
+    after(async () => {
+      if (await claimRecordComps(dealId)) await runRecordComps(dealId);
+    });
   }
 
   // Worker handoff only when the flag is on AND migration 0016 is actually
@@ -326,6 +332,9 @@ export async function createManualDeal(
     } catch {
       // the deal still works without the address column
     }
+    after(async () => {
+      if (await claimRecordComps(dealId)) await runRecordComps(dealId);
+    });
   }
 
   const workerMode =
@@ -469,6 +478,10 @@ export async function updateManualFacts(
     } catch {
       // pre-0011 schema — carry on
     }
+    after(async () => {
+      // force: an edited address invalidates whatever was pulled before
+      if (await claimRecordComps(dealId, true)) await runRecordComps(dealId);
+    });
   }
 
   if (workerMode) {

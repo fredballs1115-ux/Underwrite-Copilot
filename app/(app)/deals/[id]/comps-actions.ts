@@ -7,6 +7,30 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
 import { claimJob, analysisWorkerEnabled, workerSchemaReady } from "@/lib/jobs";
 import { runCompSearch } from "@/lib/anthropic/comps-search";
+import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
+
+/** Re-pull public-record comps on demand (all plans — the data is free). */
+export async function refreshRecordComps(formData: FormData) {
+  const dealId = String(formData.get("dealId") ?? "");
+  if (!dealId) return;
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+  // RLS-scoped read is the access check — no row, no refresh.
+  const { data: deal } = await supabase
+    .from("deals")
+    .select("id")
+    .eq("id", dealId)
+    .maybeSingle();
+  if (!deal) return;
+
+  await claimRecordComps(dealId, true);
+  after(() => runRecordComps(dealId));
+  revalidatePath(`/deals/${dealId}`);
+}
 
 /** Kick off a public-web comp search in the background, reusing the job row. */
 export async function searchPublicComps(formData: FormData) {
