@@ -1,0 +1,131 @@
+{
+  "sector": "multifamily",
+  "$schema_note": "Focus tiers: 2-4 unit (residential financing), 5-50 unit walk-up (commercial financing at 5+), institutional noted only for context. status labels: verified = 2+ independent primary confirmations (incl. 3-0 adversarial panels), sourced = one primary source or exact-phrase snippet confirmation across independent queries, unverified_not_found = could not confirm — never estimated. Listing-derived rows carry note 'reconfirm live before acting'.",
+  "as_of": "2026-07-16",
+  "cycle_position": {
+    "summary": "East Coast 2-4 unit values still rising into mid-2026: May 2026 Redfin medians up YoY in most candidate metros (Philadelphia +6.9%, Albany +6.2%, Hartford +12.8%, New Haven +17.9%, Bridgeport +8.1%; Scranton flat). Northern Virginia 2-4 unit supply is effectively zero on-market (Zillow category page for Prince William County read '0 Homes' for duplex/triplex, July 2026), pushing small-multifamily buyers to off-market channels. Rate environment per FY2026 debt sources still elevated vs 2021 lows.",
+    "status": "sourced",
+    "sources": [
+      "https://www.redfin.com/news/data-center/downloads/ (redfin_metro_market_tracker.tsv000.gz, updated 2026-06-02, Multi-Family 2-4 Unit property type)",
+      "https://www.zillow.com/prince-william-county-va/duplex-triplex/ (exact-phrase snippet, July 2026)"
+    ]
+  },
+  "cap_rate_ranges": [
+    {
+      "tier": "2-4 unit East Coast (all metros)",
+      "low": null,
+      "high": null,
+      "status": "unverified_not_found",
+      "sources": [],
+      "note": "No primary cap-rate series for 2-4 unit product was verifiable this pass (institutional surveys exclude the segment; portal AVM caps are not primary). Gross-yield proxies from verified price+rent pairs are provided under top_east_coast_metros instead."
+    },
+    {
+      "tier": "institutional multifamily (context only)",
+      "low": null,
+      "high": null,
+      "status": "unverified_not_found",
+      "sources": [],
+      "note": "CBRE/JLL cap-rate surveys and NCREIF data not fetched this pass — queued in RESEARCH_STATE.md."
+    }
+  ],
+  "supply_demand": {
+    "on_market_depth_may_2026": {
+      "value": {
+        "providence_ri": { "monthly_sales": "151-155 (Mar-May 2026)", "active_listings": 438, "median_sale_price": 610000 },
+        "philadelphia_pa": { "monthly_sales": 40, "active_listings": 366, "median_sale_price": 363500, "yoy": "+6.9%" },
+        "scranton_pa": { "monthly_sales": 67, "median_sale_price": 225000, "yoy": "flat" },
+        "albany_ny": { "monthly_sales": 63, "median_sale_price": 255000, "yoy": "+6.2%" },
+        "reading_pa": { "monthly_sales": 12, "median_sale_price": 279000 },
+        "hartford_ct": { "monthly_sales": 61, "median_sale_price": 426000, "yoy": "+12.8%" },
+        "new_haven_ct": { "monthly_sales": 81, "median_sale_price": 475000, "yoy": "+17.9%" },
+        "bridgeport_ct": { "monthly_sales": 42, "median_sale_price": 700000, "yoy": "+8.1%" }
+      },
+      "status": "sourced",
+      "sources": ["https://www.redfin.com/news/data-center/downloads/ — redfin_metro_market_tracker.tsv000.gz (S3, HTTP 200, updated 2026-06-02, periods through 2026-05-31, PROPERTY_TYPE='Multi-Family (2-4 Unit)')"],
+      "note": "Directly fetched public dataset (single primary source)."
+    },
+    "stock_counts_acs_b25024": {
+      "value": null,
+      "status": "unverified_not_found",
+      "sources": ["https://api.census.gov/data/2023/acs/acs5/groups/B25024.html"],
+      "note": "Method verified (B25024_004E = 2-unit structures, B25024_005E = 3-4 unit structures, place-level queries documented); api.census.gov 403-blocked from this environment in prior passes — live re-fetch in progress; per-city counts land here when it succeeds."
+    },
+    "nova_scarcity": {
+      "value": "Zillow category page 'Prince William County VA Duplex & Triplex Homes For Sale - 0 Homes' (July 2026); zero on-market 2-4 unit inventory in the county at snippet date.",
+      "status": "sourced",
+      "sources": ["exact-phrase snippet confirmation across independent queries, July 2026"]
+    }
+  },
+  "debt_terms": {
+    "conventional_investor_2_4": {
+      "value": "15-25% down investor conventional; rate premium over Freddie PMMS varies by LLPA grid. Current PMMS value pending live FRED fetch (MORTGAGE30US).",
+      "status": "unverified_not_found",
+      "sources": ["https://fred.stlouisfed.org/series/MORTGAGE30US"],
+      "note": "Parameter fetch in progress; grid specifics (LLPAs by LTV/property type) queued."
+    },
+    "fha_house_hack_3_4_unit": {
+      "value": "FHA owner-occupant on 3-4 units requires the HUD 4000.1 self-sufficiency test (net rental income from all units must cover PITI at the prescribed vacancy factor); CY2026 FHA loan limits for the DC metro by unit count reported via ML 2025-23 but dollar values did not survive verification.",
+      "status": "unverified_not_found",
+      "sources": ["https://www.hud.gov/program_offices/administration/hudclips/handbooks/hsgh (Handbook 4000.1)"],
+      "note": "Test mechanics and limit dollar values queued for the FY2026 fetch; never estimate."
+    },
+    "dscr": {
+      "value": null,
+      "status": "unverified_not_found",
+      "sources": [],
+      "note": "No primary DSCR pricing source verified this pass."
+    }
+  },
+  "top_east_coast_metros": [
+    {
+      "metro": "Philadelphia, PA",
+      "why": "Deepest accessible stock at working prices: 366 active 2-4 unit listings (Redfin, May 2026) and ~1,075 multi-family listings on Homes.com (July 2026, $70k-$6M); $363,500 May 2026 median (+6.9% YoY); rowhouse duplex/triplex vintage matches a dated-product strategy; no rent control (PA); the one verified burden is the § 9-811 eviction-diversion 30-day pre-filing requirement.",
+      "example_properties": [
+        { "address": "922 Ellsworth St, Philadelphia, PA 19147", "price": 575000, "metric": "duplex, ~1,665 sqft, Bella Vista/Italian Market, separately metered, listed ~2026-06-05", "source": "homes.com + remax.com + listing broker (snippet-confirmed x3)", "as_of": "2026-07-16", "status": "sourced", "note": "reconfirm live before acting" },
+        { "address": "2819 W Oxford St, Philadelphia, PA 19121", "price": null, "metric": "permitted 3-unit triplex, Brewerytown, all units occupied, stated unit rents ~$1,200-1,400/mo", "source": "homes.com + redfin + trulia + movoto (snippet-confirmed)", "as_of": "2026-07-16", "status": "sourced", "note": "reconfirm live before acting; list price NOT verified, unit mix inconsistent across sources" }
+      ]
+    },
+    {
+      "metro": "Albany/Troy, NY",
+      "why": "$255,000 May 2026 median (+6.2% YoY) on 63 monthly sales; ETPA structurally cannot reach 2-4 unit product and no Capital Region municipality has adopted it (as of 2026-07-16); $1-2M cash covers two buildings plus renovations.",
+      "example_properties": []
+    },
+    {
+      "metro": "Scranton, PA",
+      "why": "Cheapest liquid 2-4 unit market on the board: $225,000 median on 67 monthly sales (May 2026, flat YoY); no rent control; thin economy makes rent verification the gating diligence item.",
+      "example_properties": []
+    },
+    {
+      "metro": "Providence, RI",
+      "why": "Deepest 2-4 unit transaction market on the East Coast (~150 sales/month Mar-May 2026, 438 active) with no rent control, but $610-630k medians demand verified in-place rents before yield clears.",
+      "example_properties": []
+    },
+    {
+      "metro": "DMV core (DC / PG County MD / NoVA)",
+      "why": "Home market. DC: pre-1976 stock rent-stabilized UNLESS the verified natural-person <=4-unit exemption applies (LLC disqualifies) — post-1975 buildings exempt entirely; TOPA timeline on every purchase. PG County: PRSA cap (lesser of 6% or CPI-U+3%) with the natural-person <=5-unit exemption (no domicile condition per county FAQ). NoVA: no rent control anywhere, but near-zero on-market 2-4 inventory (Prince William read 0 listings in July 2026) — off-market sourcing (tax-delinquency pipeline verified in July 15 pass) is the entry.",
+      "example_properties": [
+        { "address": "17423 & 17419 Wilson St, Dumfries, VA 22026", "price": 589000, "metric": "renovated 2-unit, in-place $4,300/mo (~8.8% gross yield), Bright MLS #VAPW2118338, re-listed after financing fall-through", "source": "snippet-confirmed across independent queries (Bright MLS via portal snippets)", "as_of": "2026-07-15", "status": "sourced", "note": "reconfirm live before acting" }
+      ]
+    },
+    {
+      "metro": "Baltimore, MD",
+      "why": "No rent cap and cheap dated stock, but license-before-rent (no license = no right to collect) and the code-violation rent freeze invert the value-add sequence: license, cure, then reposition. Ranked below the four above for an out-of-area first buy.",
+      "example_properties": []
+    }
+  ],
+  "small_investor_verdict": {
+    "accessible": true,
+    "entry_vehicle": "Direct purchase as natural person; 2-4 units on residential financing (conventional investor or FHA house-hack on 3-4 units); hold title personally where small-landlord exemptions require it (DC: personal title mandatory for the exemption; PG: natural person or living trust).",
+    "reasoning": "The 2-4 unit tier is the one asset class where a $1-2M cash position buys controlling positions in multiple buildings with residential debt, and where the DC/PG regulatory exemptions specifically reward natural-person ownership. Verified regulation mapping (DC § 42-3502.05 3-0, Philadelphia § 9-811 3-0) plus fetched market depth (Redfin May 2026) support Philadelphia, Albany, Scranton, Providence as expansion metros and the DMV as the exemption-aware home market."
+  },
+  "gaps": [
+    "Cap-rate series for the 2-4 unit segment (no primary source verified)",
+    "ACS B25024 per-city stock counts (API 403-blocked; re-fetch in progress)",
+    "FY2026 SAFMR dollar values by ZIP (huduser.gov blocked; FY2026 system existence verified 3-0, values pending)",
+    "CY2026 FHA loan limits by unit count for DC metro (ML 2025-23 values unconfirmed)",
+    "Fannie Mae 5%-down owner-occupant 2-4 unit policy parameters (unconfirmed this pass)",
+    "5-50 unit walk-up tier: no pricing/debt data gathered yet (commercial financing tier queued)",
+    "Southern metros (Richmond, Norfolk, Carolinas, Savannah, Jacksonville): no stock/pricing data returned — unscreened, not rejected",
+    "In-place rent verification for Providence/Albany/Scranton (needed before yield ranking is final)"
+  ]
+}
