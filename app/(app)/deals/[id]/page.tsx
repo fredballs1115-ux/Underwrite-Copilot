@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ResearchPanel } from "./research-panel";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { signedSupplementUrl } from "@/lib/storage";
 import { isPro } from "@/lib/billing";
@@ -700,6 +701,14 @@ export default async function DealPage({
         taskAssignees={taskAssignees}
         todayIso={new Date().toISOString().slice(0, 10)}
       />
+
+      <div className="mt-6">
+        <ResearchPanel
+          address={dealAddress}
+          sizeText={summarySize}
+          priceText={summaryPrice}
+        />
+      </div>
     </div>
   );
 }

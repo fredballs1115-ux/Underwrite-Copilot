@@ -1,0 +1,35 @@
+{
+  "$schema_note": "Federal tax provisions that move small-CRE underwriting. status labels per project convention.",
+  "as_of": "2026-08-21",
+  "bonus_depreciation": {
+    "summary": "100% bonus depreciation is PERMANENT under the One Big Beautiful Bill Act (signed July 4, 2025) for qualified property ACQUIRED and PLACED IN SERVICE after January 19, 2025 — no phase-down schedule. Property placed in service Jan 1-19, 2025 gets 40%; transitional elections allow 40%/60% on certain post-Jan-19 property. Restores full first-year value of cost-segregation studies on short-life components of acquired buildings.",
+    "status": "verified",
+    "sources": [
+      "https://www.kbkg.com/feature/obbb-tax-bill-makes-100-bonus-depreciation-permanent-what-you-need-to-know",
+      "https://tax.thomsonreuters.com/en/glossary/bonus-depreciation",
+      "https://www.cbh.com/insights/articles/trumps-tax-bill-bonus-depreciation-cost-segregation/"
+    ],
+    "note": "Multiple independent national tax practices concur on dates and permanence; IRC section text not directly fetched from this environment."
+  },
+  "section_1031": {
+    "summary": "No change to like-kind exchanges identified in the OBBBA per reviewed practitioner coverage — real-property 1031 remains available under pre-existing law (TCJA limits: real property only).",
+    "status": "sourced",
+    "sources": ["https://anchor1031.com/resources/education/opportunity-zone-hub"],
+    "note": "Stated as absence-of-change across reviewed sources rather than an affirmative statutory confirmation."
+  },
+  "opportunity_zones_2": {
+    "summary": "OZ program made PERMANENT by OBBBA. New designations every 10 years — first round designated July 1, 2026, EFFECTIVE January 1, 2027; old zones overlap until December 31, 2028. Post-2026 investments get a rolling 5-year deferral. Rural enhancements: substantial-improvement basis requirement lowered to 50% for rural-QOZ property (determinations on/after July 4, 2025); new rural QOF investments get a 30% basis step-up.",
+    "status": "sourced",
+    "sources": [
+      "https://www.crowe.com/insights/tax-news-highlights/obbba-makes-enhanced-opportunity-zones-permanent",
+      "https://www.nahb.org/blog/2025/08/opprtunity-zones-one-big-beautiful-bill-act",
+      "https://www.hud.gov/opportunity-zones/updates"
+    ],
+    "note": "TIMING EDGE for this buyer: the 2026-07-01 designation list is now public — East Coast target ZIPs should be cross-checked against new-zone maps before the Jan 1, 2027 effective date; deals closed inside a newly designated zone can pair value-add with OZ 2.0 basis benefits."
+  },
+  "gaps": [
+    "State conformity: whether DC/MD/VA conform to federal bonus depreciation (nonconformity changes state taxable income materially)",
+    "Cross-check target ZIPs against the July 2026 OZ designation list (not fetched this pass)",
+    "Qualified Small Landlord provisions, if any, in 2025-2026 federal acts — not searched"
+  ]
+}
