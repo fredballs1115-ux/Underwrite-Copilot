@@ -38,9 +38,10 @@ export const MEMO_PAGES = 1;
 export const SLIDER_SWEEP_BPS = 400;
 
 // ── Research-layer facts (countable in the codebase) ────────────────────────
-// Public-record comp jurisdictions = lib/public-comps/core.ts PROVIDERS
-// (Philadelphia OPA, DC ITS extract, Maryland SDAT statewide).
-export const COMPS_JURISDICTIONS = "Washington DC, Maryland, and Philadelphia";
+// Public-record comp jurisdictions: RE-EXPORTED from the provider registry
+// itself (lib/public-comps/core.ts COVERAGE_SUMMARY, derived from configured
+// providers) so marketing copy can never claim coverage the code doesn't have.
+export { COVERAGE_SUMMARY as COMPS_JURISDICTIONS } from "@/lib/public-comps/core";
 // The rates cron tracks 4 FRED series (scripts/fetch-rates.mjs SERIES):
 // 10Y Treasury, SOFR, 30-year mortgage survey, CRE loan delinquency.
 export const RATE_SERIES = 4;

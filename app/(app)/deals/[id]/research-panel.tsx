@@ -19,6 +19,7 @@ import {
 } from "@/lib/research";
 import {
   buildSubject,
+  mergeBenchmarks,
   pricePerUnit,
   seedBenchmarks,
   seedRules,
@@ -115,10 +116,7 @@ export async function ResearchPanel({
       rules = [...byId.values()];
     }
     if (dbBench?.length) {
-      const key = (b: Benchmark) => `${b.sector}|${b.metro}|${b.metric}`;
-      const byKey = new Map(benchmarks.map((b) => [key(b), b]));
-      for (const b of dbBench as unknown as Benchmark[]) byKey.set(key(b), b);
-      benchmarks = [...byKey.values()];
+      benchmarks = mergeBenchmarks(dbBench as unknown as Benchmark[]);
     }
   } catch {
     // seeds already loaded

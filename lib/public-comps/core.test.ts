@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   compStats,
+  COVERAGE_DISCOVERY,
+  COVERAGE_SUMMARY,
   finalizeComps,
   PROVIDERS,
   providerFor,
@@ -9,15 +11,74 @@ import {
 const philly = PROVIDERS.find((p) => p.id === "philly_opa")!;
 const dc = PROVIDERS.find((p) => p.id === "dc_its")!;
 const md = PROVIDERS.find((p) => p.id === "md_sdat")!;
+const nj = PROVIDERS.find((p) => p.id === "nj_modiv")!;
 
 describe("providerFor — jurisdiction routing", () => {
-  it("routes Philadelphia, DC, and any Maryland county; nothing for VA yet", () => {
+  it("routes Philadelphia, DC, any Maryland county, and statewide NJ", () => {
     expect(providerFor({ state: "PA", city: "Philadelphia", county: "" })?.id).toBe("philly_opa");
     expect(providerFor({ state: "PA", city: "", county: "Philadelphia County" })?.id).toBe("philly_opa");
     expect(providerFor({ state: "PA", city: "Scranton", county: "Lackawanna" })).toBeNull();
     expect(providerFor({ state: "DC", city: "Washington", county: "" })?.id).toBe("dc_its");
     expect(providerFor({ state: "MD", city: "Hyattsville", county: "Prince George's County" })?.id).toBe("md_sdat");
+    expect(providerFor({ state: "NJ", city: "Trenton", county: "Mercer" })?.id).toBe("nj_modiv");
     expect(providerFor({ state: "VA", city: "Woodbridge", county: "Prince William" })).toBeNull();
+  });
+  it("discovery-mode providers are never routed to, even when they match", () => {
+    // Fairfax matches a Fairfax deal but is unconfigured — must fall through.
+    expect(providerFor({ state: "VA", city: "", county: "Fairfax County" })).toBeNull();
+    expect(providerFor({ state: "PA", city: "Pittsburgh", county: "Allegheny" })).toBeNull();
+    expect(providerFor({ state: "DE", city: "Wilmington", county: "New Castle" })).toBeNull();
+  });
+  it("coverage copy derives from the registry", () => {
+    expect(COVERAGE_SUMMARY).toContain("New Jersey (statewide)");
+    expect(COVERAGE_SUMMARY).toContain("Maryland (statewide)");
+    // discovery jurisdictions never appear in the LIVE summary
+    expect(COVERAGE_SUMMARY).not.toContain("Fairfax");
+    expect(COVERAGE_DISCOVERY.map((p) => p.id)).toContain("va_fairfax");
+  });
+});
+
+describe("NJ provider", () => {
+  const q = {
+    lat: 40.2206,
+    lng: -74.7597,
+    radiusKm: 1.6,
+    monthsBack: 24,
+    assetClass: "multifamily",
+    nowIso: "2026-08-21T12:00:00.000Z",
+  };
+  it("builds a centroid point-distance query", () => {
+    const url = nj.buildUrl(q);
+    expect(url).toContain("Parcels_Composite_NJ_WM/FeatureServer/0/query");
+    expect(url).toContain("returnCentroid=true");
+    expect(url).toContain("distance=1600");
+    expect(decodeURIComponent(url).replace(/\+/g, " ")).toContain(
+      "DEED_DATE >= DATE '2024-08-21'"
+    );
+  });
+  it("parses centroid features with epoch or string dates; junk dropped", () => {
+    const out = nj.parse({
+      features: [
+        {
+          attributes: {
+            PROP_LOC: "12 MAIN ST",
+            MUN_NAME: "TRENTON",
+            SALE_PRICE: 450000,
+            DEED_DATE: Date.UTC(2026, 1, 3),
+            PROP_CLASS: "2",
+          },
+          centroid: { x: -74.76, y: 40.221 },
+        },
+        { attributes: { PROP_LOC: "NO PRICE", DEED_DATE: Date.UTC(2026, 1, 3) }, centroid: { x: -74.7, y: 40.2 } },
+      ],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({
+      address: "12 MAIN ST, TRENTON",
+      price: 450000,
+      saleDate: "2026-02-03",
+      propertyType: "class 2",
+    });
   });
 });
 

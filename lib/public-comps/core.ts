@@ -87,6 +87,13 @@ export interface ProviderConfig {
   healthUrl: string;
   /** true when endpoint/fields could not be verified from the build env */
   needsFieldVerification: boolean;
+  /** short human region label ("Maryland (statewide)") — coverage copy derives from these */
+  regionLabel: string;
+  /** false = DISCOVERY MODE: the jurisdiction is claimed, the health probe
+   *  resolves the real endpoint/fields from production, but providerFor
+   *  skips it — deals there honestly read "no source wired yet" instead of
+   *  firing a query known to be wrong. Flipping to true is the wiring step. */
+  configured: boolean;
 }
 
 const monthsAgoIso = (nowIso: string, months: number): string => {
@@ -158,6 +165,8 @@ const philadelphia: ProviderConfig = {
     "https://phl.carto.com/api/v2/sql?q=" +
     encodeURIComponent("SELECT sale_date, sale_price, lat, lng FROM opa_properties_public LIMIT 1"),
   needsFieldVerification: false,
+  configured: true,
+  regionLabel: "Philadelphia",
 };
 
 // ── Washington, DC — ITS Public Extract via ArcGIS FeatureServer ────────────
@@ -217,6 +226,8 @@ const dc: ProviderConfig = {
   },
   healthUrl: `${DC_SERVICE_ROOT}?f=json`,
   needsFieldVerification: true,
+  configured: true,
+  regionLabel: "Washington DC",
 };
 
 // ── Maryland (statewide) — SDAT assessments via Socrata ─────────────────────
@@ -281,16 +292,172 @@ const md: ProviderConfig = {
       $limit: "1",
     }).toString(),
   needsFieldVerification: true,
+  configured: true,
+  regionLabel: "Maryland (statewide)",
 };
 
-export const PROVIDERS: ProviderConfig[] = [philadelphia, dc, md];
+// ── New Jersey (statewide) — Parcels + MOD-IV composite via ArcGIS ──────────
+// Current service URL confirmed via NJGIN's retired-services notice (the
+// pre-March-2026 URL was replaced): Parcels_Composite_NJ_WM. MOD-IV joins
+// tax-assessor attributes onto every parcel; the sale-related COLUMN NAMES
+// are unverified from the build env — the health probe fetches layer 0's
+// schema so the real names land in /api/comps/health. Polygon layer, so the
+// query asks for centroids.
+const NJ_LAYER =
+  "https://services2.arcgis.com/XVOqAjTOJ5P6ngMu/arcgis/rest/services/Parcels_Composite_NJ_WM/FeatureServer/0";
+const nj: ProviderConfig = {
+  id: "nj_modiv",
+  name: "New Jersey Parcels + MOD-IV (NJGIN, statewide)",
+  datasetUrl:
+    "https://njogis-newjersey.opendata.arcgis.com/datasets/newjersey::parcels-and-mod-iv-composite-of-nj-web-mercator-3857/about",
+  matches: (a) => a.state.toUpperCase() === "NJ",
+  buildUrl: (q) => {
+    const meters = Math.round(q.radiusKm * 1000);
+    const since = monthsAgoIso(q.nowIso, q.monthsBack);
+    const params = new URLSearchParams({
+      f: "json",
+      where: `SALE_PRICE > 10000 AND DEED_DATE >= DATE '${since}'`,
+      geometry: `${q.lng},${q.lat}`,
+      geometryType: "esriGeometryPoint",
+      inSR: "4326",
+      distance: String(meters),
+      units: "esriSRUnit_Meter",
+      outFields: "PROP_LOC,MUN_NAME,SALE_PRICE,DEED_DATE,PROP_CLASS,PAMS_PIN",
+      outSR: "4326",
+      resultRecordCount: "80",
+      returnGeometry: "false",
+      returnCentroid: "true",
+    });
+    return `${NJ_LAYER}/query?${params.toString()}`;
+  },
+  parse: (json) => {
+    const feats = (json as { features?: unknown[] })?.features ?? [];
+    const out: Omit<RecordComp, "distanceKm">[] = [];
+    for (const f of feats as {
+      attributes?: Record<string, unknown>;
+      centroid?: { x?: number; y?: number };
+      geometry?: { x?: number; y?: number };
+    }[]) {
+      const a = f.attributes ?? {};
+      const price = num(a.SALE_PRICE);
+      const lat = num(f.centroid?.y) ?? num(f.geometry?.y);
+      const lng = num(f.centroid?.x) ?? num(f.geometry?.x);
+      const dateMs = num(a.DEED_DATE);
+      const date =
+        dateMs !== null
+          ? new Date(dateMs).toISOString().slice(0, 10)
+          : str(a.DEED_DATE).slice(0, 10);
+      if (!price || lat === null || lng === null || !date) continue;
+      out.push({
+        address: [str(a.PROP_LOC), str(a.MUN_NAME)].filter(Boolean).join(", "),
+        lat,
+        lng,
+        saleDate: date,
+        price,
+        sqft: null,
+        propertyType: `class ${str(a.PROP_CLASS) || "?"}`,
+        sourceUrl:
+          "https://njogis-newjersey.opendata.arcgis.com/datasets/newjersey::parcels-and-mod-iv-composite-of-nj-web-mercator-3857/about",
+      });
+    }
+    return out;
+  },
+  healthUrl: `${NJ_LAYER}?f=json`,
+  needsFieldVerification: true,
+  configured: true,
+  regionLabel: "New Jersey (statewide)",
+};
+
+// ── DISCOVERY-MODE providers ────────────────────────────────────────────────
+// Jurisdictions with real open sales data whose exact REST endpoints could
+// not be resolved through this build environment's proxy. Their health probes
+// hit the portals' own metadata APIs, which return the FeatureServer URL and
+// field list — the wiring step is then mechanical: fill the query builder,
+// flip configured to true. Until then providerFor skips them and deals there
+// read "no source wired yet".
+const discovery = (
+  id: string,
+  name: string,
+  regionLabel: string,
+  datasetUrl: string,
+  matches: ProviderConfig["matches"],
+  healthUrl: string
+): ProviderConfig => ({
+  id,
+  name,
+  regionLabel,
+  datasetUrl,
+  matches,
+  buildUrl: () => {
+    throw new Error(`${id}: discovery mode — endpoint not yet configured`);
+  },
+  parse: () => [],
+  healthUrl,
+  needsFieldVerification: true,
+  configured: false,
+});
+
+const fairfax = discovery(
+  "va_fairfax",
+  "Fairfax County VA — Tax Administration sales (discovery)",
+  "Fairfax County VA",
+  "https://data-fairfaxcountygis.opendata.arcgis.com/datasets/Fairfaxcountygis::tax-administrations-real-estate-sales-data/about",
+  (a) => a.state.toUpperCase() === "VA" && /fairfax/i.test(a.county || a.city),
+  // Hub v3 dataset API returns the backing FeatureServer URL + field list.
+  "https://data-fairfaxcountygis.opendata.arcgis.com/api/v3/datasets/764b1798c0434003a862e2734ba2b705_1"
+);
+const arlington = discovery(
+  "va_arlington",
+  "Arlington County VA — property sales (discovery)",
+  "Arlington County VA",
+  "https://gisdata-arlgis.opendata.arcgis.com/",
+  (a) => a.state.toUpperCase() === "VA" && /arlington/i.test(a.county || a.city),
+  "https://gis.arlingtonva.us/arcgis/rest/services?f=json"
+);
+const allegheny = discovery(
+  "pa_allegheny",
+  "Allegheny County PA (Pittsburgh) — WPRDC sales (discovery)",
+  "Pittsburgh / Allegheny County PA",
+  "https://data.wprdc.org/dataset/real-estate-sales",
+  (a) => a.state.toUpperCase() === "PA" && /allegheny|pittsburgh/i.test(a.county || a.city),
+  // CKAN datastore_search with limit 0 returns the resource's field schema.
+  "https://data.wprdc.org/api/3/action/datastore_search?resource_id=5bbe6c55-bce6-4edb-9d04-68edeb6bf7b1&limit=1"
+);
+const newCastle = discovery(
+  "de_new_castle",
+  "New Castle County DE — parcel sales (discovery)",
+  "New Castle County DE",
+  "https://apps-nccde.hub.arcgis.com/",
+  (a) => a.state.toUpperCase() === "DE" && /new castle|wilmington|newark/i.test(a.county || a.city),
+  "https://gis.nccde.org/agsserver/rest/services?f=json"
+);
+
+export const PROVIDERS: ProviderConfig[] = [
+  philadelphia,
+  dc,
+  md,
+  nj,
+  fairfax,
+  arlington,
+  allegheny,
+  newCastle,
+];
+
+/** Human-readable coverage, derived from the configs so copy can't drift. */
+export const COVERAGE_LIVE = PROVIDERS.filter((p) => p.configured);
+export const COVERAGE_DISCOVERY = PROVIDERS.filter((p) => !p.configured);
+const liveLabels = COVERAGE_LIVE.map((p) => p.regionLabel);
+export const COVERAGE_SUMMARY =
+  liveLabels.length > 1
+    ? `${liveLabels.slice(0, -1).join(", ")}, and ${liveLabels[liveLabels.length - 1]}`
+    : (liveLabels[0] ?? "no jurisdictions yet");
 
 export function providerFor(a: {
   state: string;
   city: string;
   county: string;
 }): ProviderConfig | null {
-  return PROVIDERS.find((p) => p.matches(a)) ?? null;
+  return PROVIDERS.find((p) => p.configured && p.matches(a)) ?? null;
 }
 
 /** Attach distances, drop out-of-radius rows (providers over-fetch), dedupe

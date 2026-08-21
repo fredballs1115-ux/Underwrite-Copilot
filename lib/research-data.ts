@@ -32,19 +32,53 @@ export function seedBenchmarks(): Benchmark[] {
       new_haven_ct: "New Haven, CT",
       bridgeport_ct: "Bridgeport, CT",
     };
+    const rangeOf = (v: unknown): [number, number] | null => {
+      if (typeof v === "number") return [v, v];
+      if (typeof v === "string") {
+        const m = v.match(/(\d[\d,]*)\s*[-–]\s*(\d[\d,]*)/);
+        if (m) return [Number(m[1].replace(/,/g, "")), Number(m[2].replace(/,/g, ""))];
+        const single = v.match(/^\s*(\d[\d,]*)/);
+        if (single) return [Number(single[1].replace(/,/g, "")), Number(single[1].replace(/,/g, ""))];
+      }
+      return null;
+    };
     for (const [key, row] of Object.entries(metros)) {
+      const base = {
+        sector: "multifamily",
+        metro: label[key] ?? key,
+        source: md.sources?.[0] ?? "",
+        as_of: "2026-05-31",
+        status: (md.status as Benchmark["status"]) ?? "sourced",
+      };
       if (typeof row.median_sale_price === "number") {
         out.push({
-          sector: "multifamily",
-          metro: label[key] ?? key,
+          ...base,
           metric: "median_sale_price_2_4_unit",
           low: row.median_sale_price,
           high: row.median_sale_price,
           unit: "usd",
-          source: md.sources?.[0] ?? "",
-          as_of: "2026-05-31",
-          status: (md.status as Benchmark["status"]) ?? "sourced",
           note: row.yoy ? `YoY ${row.yoy}; single-month median, not a band` : "single-month median, not a band",
+        });
+      }
+      const sales = rangeOf((row as { monthly_sales?: unknown }).monthly_sales);
+      if (sales) {
+        out.push({
+          ...base,
+          metric: "monthly_sales_2_4_unit",
+          low: sales[0],
+          high: sales[1],
+          unit: "count",
+          note: "closed sales per month, 2-4 unit product",
+        });
+      }
+      if (typeof row.active_listings === "number") {
+        out.push({
+          ...base,
+          metric: "active_listings_2_4_unit",
+          low: row.active_listings,
+          high: row.active_listings,
+          unit: "count",
+          note: "active listings at month end",
         });
       }
     }
@@ -84,6 +118,15 @@ export function seedBenchmarks(): Benchmark[] {
     });
   }
   return out;
+}
+
+/** Merge DB benchmark rows over the checked-in seeds (DB wins per key) —
+ *  shared by the deal panel and the market page so both tell the same story. */
+export function mergeBenchmarks(dbRows: Benchmark[] | null | undefined): Benchmark[] {
+  const key = (b: Benchmark) => `${b.sector}|${b.metro}|${b.metric}`;
+  const byKey = new Map(seedBenchmarks().map((b) => [key(b), b]));
+  for (const b of dbRows ?? []) byKey.set(key(b), b);
+  return [...byKey.values()];
 }
 
 /** The buyer profile the rules evaluate against until a real setting exists.
