@@ -1,0 +1,28 @@
+{
+  "sector": "specialty",
+  "as_of": "2026-08-21",
+  "cycle_position": {
+    "summary": "Grab-bag of operating-business-flavored niches. Car wash NNN: average listed cap 6.21% (April 2026), stable; Mister Car Wash-leased assets 5.25-6.25% on 20-year terms — express-tunnel saturation risk in overbuilt corridors is the known hazard. RV parks: observed caps span 5.13-8.86% by quality/seasonality. Parking and marinas: no clean 2026 national data in snippet coverage; both are municipal-contract/operations businesses at heart. Ground leases/towers: bond-like, institutionally priced.",
+    "status": "sourced",
+    "sources": [
+      "https://tradenetlease.com/nnn-car-wash-listed-inventory-april-2026/",
+      "https://investmentgrade.com/mister-car-wash-credit-rating-nnn-cap-rate/",
+      "https://realestatesolutionist.substack.com/p/rv-listings-rundown-02262026"
+    ]
+  },
+  "cap_rate_ranges": [
+    { "tier": "car wash NNN (listed average, Apr 2026)", "low": 0.0621, "high": 0.0621, "status": "sourced", "sources": ["https://tradenetlease.com/nnn-car-wash-listed-inventory-april-2026/"] },
+    { "tier": "Mister Car Wash NNN, 20-yr terms", "low": 0.0525, "high": 0.0625, "status": "sourced", "sources": ["https://investmentgrade.com/mister-car-wash-credit-rating-nnn-cap-rate/"] },
+    { "tier": "RV parks (observed range)", "low": 0.0513, "high": 0.0886, "status": "sourced", "sources": ["https://realestatesolutionist.substack.com/p/rv-listings-rundown-02262026"], "note": "Listing-level observations, not a survey." },
+    { "tier": "parking / marinas / ground leases", "low": null, "high": null, "status": "unverified_not_found", "sources": [] }
+  ],
+  "supply_demand": { "value": "Car wash: express-tunnel overbuilding in some corridors (tenant-failure risk behind the credit). RV: demand cyclical with fuel/consumer.", "status": "sourced", "sources": [] },
+  "debt_terms": { "value": "NNN forms finance like retail NNN; RV/marina/parking are SBA-or-operations territory.", "status": "sourced", "sources": [] },
+  "top_east_coast_metros": [],
+  "small_investor_verdict": {
+    "accessible": false,
+    "entry_vehicle": "Only the NNN forms (car wash ~ $2M+ tickets overlap the top of budget) behave like real estate; the rest are operating businesses wearing a real-estate costume.",
+    "reasoning": "A car-wash NNN duplicates the retail-NNN diversification slot with worse residual risk (single-purpose building if the tenant fails in an overbuilt corridor). RV parks/marinas can yield well but demand hospitality operations. Pass at this stage; revisit if the passive-income slot ever needs filling and retail NNN pricing is worse."
+  },
+  "gaps": ["Parking/marina/ground-lease 2026 pricing", "Car-wash corridor saturation screen for any specific deal"]
+}

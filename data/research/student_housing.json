@@ -1,0 +1,27 @@
+{
+  "sector": "student_housing",
+  "as_of": "2026-08-21",
+  "cycle_position": {
+    "summary": "A more complex chapter: the approaching decline in US high-school graduates (the 'enrollment cliff'), visa processing delays hitting international enrollment, and elevated construction costs. Investor interest concentrates in supply-constrained markets with growing flagship enrollment; supply-heavy college towns face rent and lease-up pressure.",
+    "status": "sourced",
+    "sources": [
+      "https://www.walkerdunlop.com/outlooks/student-housing-outlook-2026",
+      "https://www.pwc.com/us/en/industries/financial-services/asset-wealth-management/real-estate/emerging-trends-in-real-estate-pwc-uli/property-type-outlook/student-housing.html"
+    ]
+  },
+  "cap_rate_ranges": [
+    { "tier": "purpose-built student housing", "low": null, "high": null, "status": "unverified_not_found", "sources": [], "note": "No clean 2026 band captured in snippet coverage." }
+  ],
+  "supply_demand": { "value": "Bifurcated by university: flagship/growing enrollment + limited pipeline = favored; everything else pressured.", "status": "sourced", "sources": ["https://www.walkerdunlop.com/outlooks/student-housing-outlook-2026"] },
+  "debt_terms": { "value": "By-the-bed purpose-built = agency/institutional; small near-campus rentals = ordinary investor residential debt.", "status": "sourced", "sources": [] },
+  "top_east_coast_metros": [],
+  "small_investor_verdict": {
+    "accessible": true,
+    "entry_vehicle": "Not purpose-built — near-campus 2-4 unit rentals at stable flagship universities (a flavor of the core multifamily strategy with a demand anchor), screened through the same regulatory rules engine.",
+    "reasoning": "By-the-bed product is institutional and cliff-exposed. But a duplex two blocks from a flagship with growing enrollment is the core strategy plus a structural demand floor — underwrite it as multifamily, verify the university's enrollment trend, and check the town's rental licensing (college towns license aggressively). East Coast candidates worth screening: Penn State-adjacent, VCU/Richmond, College Park (PG County rules apply!), UDel/Newark."
+  },
+  "gaps": [
+    "Enrollment trends for the specific East Coast flagships near target metros",
+    "College-town rental licensing ordinances (often stricter than city norms)"
+  ]
+}

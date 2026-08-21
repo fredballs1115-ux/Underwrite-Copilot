@@ -1,0 +1,28 @@
+{
+  "sector": "land_infill",
+  "as_of": "2026-08-21",
+  "cycle_position": {
+    "summary": "Two markets in one: LISTED small lots are abundant (Zillow: 300,000+ lots of <=5 acres listed June 2026, national median $79,000 at 0.57 acres) while ENTITLED, shovel-ready lots are tight in most metros — competition pushes entitled pricing above what pencils for production builders, and MLS-listed land is systematically overpriced by broker/investor activity. The margin lives in taking un-entitled or under-zoned infill through approvals.",
+    "status": "sourced",
+    "sources": [
+      "https://www.housingwire.com/articles/empty-lots-zillow-housing-shortage/",
+      "https://www.nahb.org/blog/2025/12/sponsored-acres-infill-sourcing-to-boost-margins",
+      "https://www.forbes.com/sites/jennifercastenson/2026/06/22/infill-housing-real-estates-diamond-in-the-rough/"
+    ]
+  },
+  "cap_rate_ranges": [
+    { "tier": "n/a (land is a residual-value asset, not a yield asset)", "low": null, "high": null, "status": "unverified_not_found", "sources": [], "note": "Underwrite as finished-value minus (build cost + entitlement cost + carry + margin)." }
+  ],
+  "supply_demand": { "value": "Listed small-lot supply deep; entitled-lot supply tight; middle-housing zoning reforms (duplex/triplex by-right) keep expanding the infill entitlement envelope city by city.", "status": "sourced", "sources": ["https://www.housingwire.com/articles/empty-lots-zillow-housing-shortage/"] },
+  "debt_terms": { "value": "Raw land = cash or seller financing (banks lend little); construction-to-perm once entitled.", "status": "sourced", "sources": [] },
+  "top_east_coast_metros": [],
+  "small_investor_verdict": {
+    "accessible": true,
+    "entry_vehicle": "Infill lots and shells in the SAME rowhouse submarkets as the core strategy (Philadelphia, Baltimore, Richmond), targeting by-right 2-4 unit builds or gut-rehab shells — plus the speculative NoVA data-center-adjacency land watch.",
+    "reasoning": "Cash buyer advantage is maximal (no financing contingency on land), and every hour spent learning a rowhouse submarket for the multifamily strategy doubles as land-sourcing intelligence. Discipline rule from the sources: never pay MLS ask for land; the deal is off-market or at the tax sale (the PWC delinquency pipeline from the July pass applies directly). Entitlement/permit timeline risk is the tax on the higher margin."
+  },
+  "gaps": [
+    "Philadelphia/Baltimore shell + lot pricing bands (portal-blocked)",
+    "Middle-housing zoning reform status per target city (DC/Arlington/Alexandria have versions; not systematized into the rules engine yet)"
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "sector": "office",
+  "as_of": "2026-08-21",
+  "cycle_position": {
+    "summary": "Deep bifurcation. CBD office took a ~50% peak-to-trough price decline vs ~19% for suburban; CBD vacancy will fall more slowly for several more quarters (bigger pipelines, more space shedding). Some CBD trades print 400+ bps above 2019 caps (San Francisco CBD example: 9.6% vs 5.4% five years earlier). Medical office is the resilient corner: 9.8% vacancy, record rents, record retention.",
+    "status": "sourced",
+    "sources": [
+      "https://www.pwc.com/us/en/industries/financial-services/asset-wealth-management/real-estate/emerging-trends-in-real-estate-pwc-uli/property-type-outlook/office.html",
+      "https://www.mmcginvest.com/post/us-medical-office-market-outlook-2026-full-waiting-rooms-empty-pipelines"
+    ]
+  },
+  "cap_rate_ranges": [
+    { "tier": "multi-tenant office (early 2025-2026)", "low": 0.08, "high": 0.10, "status": "sourced", "sources": ["https://ardorcre.com/medical-office-cap-rates/"] },
+    { "tier": "medical office, stabilized multi-tenant suburban", "low": 0.065, "high": 0.08, "status": "sourced", "sources": ["https://www.thesorso.com/answers/cap-rate-medical-office-building", "https://www.creghealthcare.com/pages/blog/medical-office-cap-rates-2026.html"], "note": "Full observed Q1 2026 range 5.5%-8.5% by quality/tenancy; MOB trades 100-300 bps inside generic office." }
+  ],
+  "supply_demand": { "value": "CBD pipelines still delivering into weak demand; MOB pipelines near empty ('full waiting rooms, empty pipelines').", "status": "sourced", "sources": ["https://www.mmcginvest.com/post/us-medical-office-market-outlook-2026-full-waiting-rooms-empty-pipelines"] },
+  "debt_terms": { "value": "Bank CRE appetite for office remains the tightest of the majors; no primary terms captured this pass.", "status": "unverified_not_found", "sources": [] },
+  "top_east_coast_metros": [],
+  "small_investor_verdict": {
+    "accessible": false,
+    "entry_vehicle": "Only the medical-office edge: a small suburban MOB or medical condo near a hospital cluster can fit $1-2M, at 6.5-8% caps with sticky tenants. Generic office — even cheap — is a leasing-capital trap at this scale.",
+    "reasoning": "TI/LC costs and re-leasing risk on small office suites consume the yield premium; the buyer's hands-on advantage doesn't transfer (tenant rep brokers gate deal flow). MOB's structural demand story is real but entry inventory at $1-2M is thin and often condo-form with association drag."
+  },
+  "gaps": [
+    "East Coast small-MOB inventory and pricing at the $1-2M ticket",
+    "Office-to-residential conversion economics for small buildings (relevant to the buyer's rowhouse markets; not researched)"
+  ]
+}

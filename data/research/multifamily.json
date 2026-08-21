@@ -21,11 +21,22 @@
     },
     {
       "tier": "institutional multifamily (context only)",
-      "low": null,
-      "high": null,
-      "status": "unverified_not_found",
-      "sources": [],
-      "note": "CBRE/JLL cap-rate surveys and NCREIF data not fetched this pass — queued in RESEARCH_STATE.md."
+      "low": 0.045,
+      "high": 0.05,
+      "status": "sourced",
+      "sources": [
+        "https://blog.firstam.com/cre-insights/multifamily-cap-rates-poised-to-slip-in-2026",
+        "https://www.cbre.com/insights/books/us-real-estate-market-outlook-2026/multifamily"
+      ],
+      "note": "National average ~5.04%, flat for several quarters (longest plateau in 25 years); stable assets 4.5-5.0%, value-add ~6.0%. Sector enters 2026 after absorbing the largest supply wave since the 1980s; vacancy 4.4% vs 5.2% 2010s average, expected to drift up near-term. As-of 2026-08-21 snippet pass."
+    },
+    {
+      "tier": "value-add multifamily (institutional)",
+      "low": 0.06,
+      "high": 0.06,
+      "status": "sourced",
+      "sources": ["https://www.pwc.com/us/en/industries/financial-services/asset-wealth-management/real-estate/emerging-trends-in-real-estate-pwc-uli/property-type-outlook/multifamily-housing.html"],
+      "note": "~6.0% per 2026 outlook coverage; single point, not a band."
     }
   ],
   "supply_demand": {

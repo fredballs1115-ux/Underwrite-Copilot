@@ -1,0 +1,30 @@
+{
+  "sector": "self_storage",
+  "as_of": "2026-08-21",
+  "cycle_position": {
+    "summary": "Stabilizing after the rate-cut era: occupancy flat at 89-92% since early 2024; REITs report improving occupancy trends and stabilizing move-in rates entering the 2026 season, while leaning on price (REIT advertised rents ~7.5% below non-REIT operators in Jan 2026). Supply relief is real: 2026 deliveries forecast at 2.4% of stock, down from 3.0% in 2025 and well under the 4.2% long-term average.",
+    "status": "sourced",
+    "sources": [
+      "https://www.yardibreeze.com/blog/2026/03/state-of-self-storage-2026/",
+      "https://crittendenreport.com/self-storage-in-2026-stability-and-optimism/",
+      "https://thestoragebrief.com/articles/self-storage-cap-rates-2026/"
+    ]
+  },
+  "cap_rate_ranges": [
+    { "tier": "Class A climate-controlled, primary", "low": 0.05, "high": 0.06, "status": "sourced", "sources": ["https://thestoragebrief.com/articles/self-storage-cap-rates-2026/"] },
+    { "tier": "Class B, secondary", "low": 0.06, "high": 0.07, "status": "sourced", "sources": ["https://thestoragebrief.com/articles/self-storage-cap-rates-2026/"] },
+    { "tier": "Class C / non-climate, tertiary", "low": 0.07, "high": 0.075, "status": "sourced", "sources": ["https://thestoragebrief.com/articles/self-storage-cap-rates-2026/"], "note": "7.5%+ observed; the small-buyer tier." }
+  ],
+  "supply_demand": { "value": "2026 new supply 2.4% of stock (falling); occupancy 89-92% flat.", "status": "sourced", "sources": ["https://www.yardibreeze.com/blog/2026/03/state-of-self-storage-2026/"] },
+  "debt_terms": { "value": "Local bank recourse + SBA 7(a)/504 for owner-operated facilities at the small ticket.", "status": "sourced", "sources": ["https://skyviewadvisors.com/q1-2026-self-storage-industry-report/"] },
+  "top_east_coast_metros": [],
+  "small_investor_verdict": {
+    "accessible": true,
+    "entry_vehicle": "A Class B/C facility (150-400 units) in a tertiary East Coast market at 7%+, run through third-party management or remote-operated tech.",
+    "reasoning": "No leases longer than a month, no residential tenant law, no rent regulation anywhere — the regulatory opposite of multifamily, at yields that clear the buyer's bar. The risks are REIT price competition bleeding into secondary markets and the operating-business reality (marketing, auctions, delinquency). A real candidate for allocation #2 or #3, and the Excel model's unit-mix/occupancy inputs map onto the app's sector-aware fields."
+  },
+  "gaps": [
+    "East Coast tertiary facility comps at the $1-2M ticket",
+    "Street-rate trend data by East Coast metro (Radius+/Yardi paywalled)"
+  ]
+}

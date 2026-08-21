@@ -1,0 +1,25 @@
+{
+  "sector": "data_centers",
+  "as_of": "2026-08-21",
+  "cycle_position": {
+    "summary": "The tightest asset class in CRE: North America primary-market vacancy 1.6%; 74.3% of capacity under construction is pre-leased; pricing at all-time highs, and large AI deployments now pay PREMIUMS for scale where they once got volume discounts. The binding constraint is power delivery, not capital, land, or demand — power gates development timelines and suppresses speculative build.",
+    "status": "sourced",
+    "sources": [
+      "https://www.datacenterfrontier.com/energy/article/55352453/cbres-2026-data-center-outlook-demand-surges-as-delivery-becomes-the-constraint",
+      "https://www.cbre.com/insights/reports/global-data-center-trends-2026",
+      "https://www.ropesgray.com/en/insights/viewpoints/102mvfl/data-center-investment-in-2026-ai-demand-power-constraints-and-private-equity"
+    ]
+  },
+  "cap_rate_ranges": [
+    { "tier": "stabilized colocation", "low": null, "high": null, "status": "unverified_not_found", "sources": [], "note": "No clean 2026 cap-rate band surfaced in snippet coverage; deals are bespoke (powered-shell vs turnkey vs hyperscale build-to-suit)." }
+  ],
+  "supply_demand": { "value": "1.6% primary vacancy; 74.3% of under-construction capacity pre-leased; power-gated pipeline.", "status": "sourced", "sources": ["https://www.cbre.com/insights/reports/global-data-center-trends-2026"] },
+  "debt_terms": { "value": "Institutional/private-credit territory; not a small-balance market.", "status": "sourced", "sources": ["https://www.ropesgray.com/en/insights/viewpoints/102mvfl/data-center-investment-in-2026-ai-demand-power-constraints-and-private-equity"] },
+  "top_east_coast_metros": [],
+  "small_investor_verdict": {
+    "accessible": false,
+    "entry_vehicle": "REIT shares (or nothing). The only physical-asset adjacency at $1-2M: land near substations/fiber in Northern Virginia's expansion corridors — a speculative land play, not a data-center play.",
+    "reasoning": "Minimum viable direct ticket is two orders of magnitude above budget. The NoVA land adjacency overlaps the buyer's home turf and is worth tracking through the intel watches (Loudoun/PW data-center-alley rezonings move dirt prices), but it belongs in the land/infill bucket."
+  },
+  "gaps": ["Stabilized colo cap-rate band", "PW County data-center overlay district changes (feeds the land thesis)"]
+}

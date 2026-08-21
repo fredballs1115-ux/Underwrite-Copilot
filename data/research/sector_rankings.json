@@ -1,0 +1,120 @@
+{
+  "$schema_note": "Every sector ranked for THIS buyer: small hands-on investor, $1-2M total cash, natural person, East Coast (DMV core, ME-FL expansion). Scores 1-5 per dimension (5 = best for this buyer). composite = weighted: entry_feasibility x2, yield x1.5, value_add_upside x1.5, regulatory_risk x1 (5 = LOW risk), liquidity x1. Rankings synthesize the per-sector files; every load-bearing number is cited there.",
+  "as_of": "2026-08-21",
+  "rankings": [
+    {
+      "rank": 1,
+      "sector": "multifamily_2_4_unit",
+      "file": "multifamily.json",
+      "scores": { "entry_feasibility": 5, "yield": 4, "value_add_upside": 5, "regulatory_risk": 4, "liquidity": 4 },
+      "one_liner": "The core: residential debt, verified natural-person exemptions (DC 3-0, PG sourced), 8-14% gross yields in the target metros, and the buyer's hands-on skill is the alpha. Regulatory risk is MANAGED, not absent — the exemptions are the strategy.",
+      "action": "Philadelphia first (depth + no rent control), Albany/Scranton for yield, DMV with the exemption playbook, Providence once rents verify."
+    },
+    {
+      "rank": 2,
+      "sector": "industrial_small_bay_ios",
+      "file": "industrial.json",
+      "scores": { "entry_feasibility": 3, "yield": 5, "value_add_upside": 4, "regulatory_risk": 5, "liquidity": 3 },
+      "one_liner": "Secondary-market IOS at 6.75-7.75% (7-10% cash-on-cash) with ZERO residential-style regulation; scarce at the $1-2M ticket but the best risk-adjusted diversifier when found.",
+      "action": "Hunt 1-5 acre by-right IOS yards along Richmond/Harrisburg/Allentown corridors via broker networks + tax-sale pipeline."
+    },
+    {
+      "rank": 3,
+      "sector": "self_storage",
+      "file": "self_storage.json",
+      "scores": { "entry_feasibility": 4, "yield": 4, "value_add_upside": 4, "regulatory_risk": 5, "liquidity": 3 },
+      "one_liner": "Class B/C tertiary at 7%+, month-to-month leases, no tenant law, supply falling to 2.4% of stock — the regulatory opposite of multifamily at similar yield.",
+      "action": "Screen tertiary East Coast facilities (150-400 units) with third-party management quotes in hand."
+    },
+    {
+      "rank": 4,
+      "sector": "manufactured_housing",
+      "file": "manufactured_housing.json",
+      "scores": { "entry_feasibility": 3, "yield": 5, "value_add_upside": 5, "regulatory_risk": 3, "liquidity": 2 },
+      "one_liner": "Value-add parks at 7-9.5% with the strongest affordability tailwind in housing; East Coast inventory scarcity, PE competition, and spreading MHC-specific tenant statutes temper it.",
+      "action": "Before any offer: screen the state's MHC statute (lot-rent notice, sale opportunity-to-purchase) — flagged as a rules-engine gap."
+    },
+    {
+      "rank": 5,
+      "sector": "retail_nnn",
+      "file": "retail.json",
+      "scores": { "entry_feasibility": 4, "yield": 3, "value_add_upside": 1, "regulatory_risk": 5, "liquidity": 4 },
+      "one_liner": "The passive slot: one credit-tenant box at 6.2-6.8%, bond-like, zero regulation — but zero use for the buyer's value-add edge.",
+      "action": "Hold as diversification option once the active portfolio is built; necessity-retail tenants only."
+    },
+    {
+      "rank": 6,
+      "sector": "sfr_btr",
+      "file": "sfr_btr.json",
+      "scores": { "entry_feasibility": 5, "yield": 4, "value_add_upside": 3, "regulatory_risk": 4, "liquidity": 5 },
+      "one_liner": "7.3% average caps and anti-institutional politics favor small buyers, but single-tenant vacancy risk and no exemption leverage keep it behind the 2-4 unit core.",
+      "action": "Opportunistic only — an SFR next to an owned 2-4 unit compounds the submarket edge."
+    },
+    {
+      "rank": 7,
+      "sector": "land_infill",
+      "file": "land_infill.json",
+      "scores": { "entry_feasibility": 4, "yield": 1, "value_add_upside": 5, "regulatory_risk": 2, "liquidity": 2 },
+      "one_liner": "Highest-margin use of cash (entitlement alpha, no financing contingency) in the same rowhouse submarkets — carried by the core strategy's market knowledge; entitlement risk is the tax.",
+      "action": "Off-market/tax-sale lots only, never MLS ask; track NoVA data-center-adjacency dirt as the speculative sleeve."
+    },
+    {
+      "rank": 8,
+      "sector": "student_housing_adjacent",
+      "file": "student_housing.json",
+      "scores": { "entry_feasibility": 4, "yield": 4, "value_add_upside": 4, "regulatory_risk": 3, "liquidity": 3 },
+      "one_liner": "Near-flagship 2-4 units = the core strategy with a demand floor; purpose-built is institutional and enrollment-cliff-exposed.",
+      "action": "Screen College Park (PG rules apply), Richmond/VCU, Newark DE as multifamily deals with an enrollment check."
+    },
+    {
+      "rank": 9,
+      "sector": "office_medical_edge",
+      "file": "office.json",
+      "scores": { "entry_feasibility": 2, "yield": 4, "value_add_upside": 2, "regulatory_risk": 5, "liquidity": 2 },
+      "one_liner": "Only the medical-office edge (6.5-8% stabilized, sticky tenants) is investable at $1-2M; generic office is a leasing-capital trap at this scale.",
+      "action": "Passive watch; consider only a hospital-adjacent small MOB with 5+ year tenancy in place."
+    },
+    {
+      "rank": 10,
+      "sector": "hospitality_str",
+      "file": "hospitality_str.json",
+      "scores": { "entry_feasibility": 3, "yield": 4, "value_add_upside": 3, "regulatory_risk": 1, "liquidity": 3 },
+      "one_liner": "Hotel fundamentals fine, STR yields real — but the regulatory ratchet in the buyer's urban markets can kill an underwrite with one council vote: the anti-thesis of exemption-anchored certainty.",
+      "action": "Avoid urban STR; only writing-verified permissive resort markets qualify, and none screened yet."
+    },
+    {
+      "rank": 11,
+      "sector": "senior_housing",
+      "file": "senior_housing.json",
+      "scores": { "entry_feasibility": 1, "yield": 3, "value_add_upside": 2, "regulatory_risk": 2, "liquidity": 2 },
+      "one_liner": "Best demographic story in CRE (occupancy records, boomers turn 80) but the product is care operations — not transferable skill. REIT exposure if any.",
+      "action": "None direct."
+    },
+    {
+      "rank": 12,
+      "sector": "data_centers",
+      "file": "data_centers.json",
+      "scores": { "entry_feasibility": 1, "yield": 2, "value_add_upside": 1, "regulatory_risk": 4, "liquidity": 1 },
+      "one_liner": "1.6% vacancy and power-gated growth — two orders of magnitude above budget. The tradeable adjacency is NoVA land (see land_infill).",
+      "action": "Intel watch on Loudoun/PW rezonings only."
+    },
+    {
+      "rank": 13,
+      "sector": "life_science",
+      "file": "life_science.json",
+      "scores": { "entry_feasibility": 1, "yield": 1, "value_add_upside": 1, "regulatory_risk": 4, "liquidity": 1 },
+      "one_liner": "23.1% vacancy, half the 2020-25 deliveries still empty; institutional distress story with no small-buyer entry.",
+      "action": "None."
+    },
+    {
+      "rank": 14,
+      "sector": "specialty",
+      "file": "specialty.json",
+      "scores": { "entry_feasibility": 2, "yield": 3, "value_add_upside": 2, "regulatory_risk": 4, "liquidity": 2 },
+      "one_liner": "Car-wash NNN duplicates the retail slot with worse residual risk; RV/marina/parking are operating businesses. Pass.",
+      "action": "None at this stage."
+    }
+  ],
+  "portfolio_shape_for_this_buyer": "With $1-2M: 60-75% into the 2-4 unit core (2-4 buildings across Philadelphia + one DMV exemption play), 15-25% into ONE diversifier when the right asset surfaces (IOS yard, storage facility, or value-add MHC), 10-15% dry powder for tax-sale/off-market land strikes. Every allocation above assumes natural-person title where exemptions demand it.",
+  "gaps": ["Rankings rest on sourced (not verified) sector data — see per-sector files; re-rank after any verified pass contradicts a band."]
+}

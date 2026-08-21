@@ -1,0 +1,31 @@
+{
+  "sector": "sfr_btr",
+  "as_of": "2026-08-21",
+  "cycle_position": {
+    "summary": "SFR cap rates rose to 7.3% in Q4 2025 (+194 bps since 2021) as rents outpaced home prices — income yields improving. BTR development still elevated (~69,000 units started in the 12 months ending Sept 2025, 7.2% of all single-family starts) but Q1 2026 starts fell back on financing costs, multifamily supply competition, and congressional legislative risk aimed at institutional SFR ownership. Occupancy near long-run averages; rent growth moderated but steady.",
+    "status": "sourced",
+    "sources": [
+      "https://www.credaily.com/briefs/single-family-rental-cap-rates-rise-nationwide/",
+      "https://eyeonhousing.org/2026/05/single-family-built-to-rent-slowed-at-start-of-2026/",
+      "https://arbor.com/blog/single-family-rental-investment-snapshot-april-2026/"
+    ]
+  },
+  "cap_rate_ranges": [
+    { "tier": "SFR national average (Q4 2025)", "low": 0.073, "high": 0.073, "status": "sourced", "sources": ["https://www.credaily.com/briefs/single-family-rental-cap-rates-rise-nationwide/"] }
+  ],
+  "supply_demand": {
+    "btr_starts_ttm_sep2025": { "value": 69000, "share_of_sf_starts": "7.2%", "status": "sourced", "sources": ["https://eyeonhousing.org/2026/05/single-family-built-to-rent-slowed-at-start-of-2026/"] },
+    "note": "Legislative risk (institutional-ownership bills in Congress) froze parts of the development market in early 2026 — a watch item that does NOT bind a natural-person buyer of scattered SFRs."
+  },
+  "debt_terms": { "value": "Same conventional investor stack as 2-4 unit multifamily (see multifamily.json); DSCR products widely offered on SFR.", "status": "sourced", "sources": [] },
+  "top_east_coast_metros": [],
+  "small_investor_verdict": {
+    "accessible": true,
+    "entry_vehicle": "Scattered-site SFRs bought individually as a natural person; BTR communities are institutional-only (LP/REIT exposure if desired).",
+    "reasoning": "7.3% average cap beats institutional multifamily by ~230 bps and the anti-institutional legislative mood is a tailwind for small buyers. But single-tenant vacancy risk (100% vacant or 100% full per house) and no small-landlord exemption leverage make it a complement to, not a substitute for, the 2-4 unit core strategy."
+  },
+  "gaps": [
+    "East Coast metro-level SFR cap rates/rent yields (national number only)",
+    "The specific congressional bills on institutional SFR ownership (names/status not captured)"
+  ]
+}

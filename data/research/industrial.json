@@ -1,0 +1,35 @@
+{
+  "sector": "industrial",
+  "as_of": "2026-08-21",
+  "cycle_position": {
+    "summary": "Bifurcated by vintage: newly-built vacancy fell 480 bps YoY (Q1 2026, Cushman) while older-product vacancy rose 70 bps yet stays tight at 5.6%. IOS (industrial outdoor storage) is the momentum niche: sector sized ~$218B (up ~9% YoY), 2025 transaction volume $14-16B (+15-20% vs 2024), early 2026 tracking ahead. Improvement costs $15-40/SF vs $80-120/SF warehouse construction keep IOS yields attractive.",
+    "status": "sourced",
+    "sources": [
+      "https://www.matthews.com/insights/ios-sector-update-2026",
+      "https://thesisdriven.com/buy-box/niche-industrial-2026",
+      "https://www.tylercauble.com/blog/industrial-real-estate"
+    ]
+  },
+  "cap_rate_ranges": [
+    { "tier": "IOS stabilized institutional, primary markets", "low": 0.06, "high": 0.0675, "status": "sourced", "sources": ["https://www.matthews.com/insights/ios-sector-update-2026"] },
+    { "tier": "IOS secondary markets", "low": 0.0675, "high": 0.0775, "status": "sourced", "sources": ["https://www.matthews.com/insights/ios-sector-update-2026"], "note": "Cash-on-cash at acquisition frequently 7-10%+." },
+    { "tier": "small-bay / shallow-bay multi-tenant", "low": null, "high": null, "status": "unverified_not_found", "sources": [], "note": "Widely reported tight but no clean 2026 cap-rate band captured this pass." }
+  ],
+  "supply_demand": {
+    "value": "Older-stock vacancy 5.6% (tight); small-bay structurally undersupplied (nobody builds it — construction costs exceed achievable rents in most metros).",
+    "status": "sourced",
+    "sources": ["https://www.tylercauble.com/blog/industrial-real-estate"]
+  },
+  "debt_terms": { "value": "Local/regional bank recourse debt dominates the sub-$5M ticket; IOS financing products emerging (dedicated lenders advertise 65-75% LTV).", "status": "sourced", "sources": ["https://clscre.com/blog/industrial-outdoor-storage-ios-financing-2026.html"] },
+  "top_east_coast_metros": [],
+  "small_investor_verdict": {
+    "accessible": true,
+    "entry_vehicle": "Small IOS yards (1-5 acres, truck/contractor/equipment tenants) and older small-bay flex in secondary East Coast metros — the one industrial corner where $1-2M still buys a whole asset.",
+    "reasoning": "Yields (6.75-7.75%+ secondary IOS; 7-10% cash-on-cash) beat everything except the buyer's core 2-4 unit strategy, with NO residential-style rent regulation anywhere on the East Coast. Zoning is the moat and the diligence item: IOS lives or dies on by-right outdoor-storage use. Institutionalization is compressing primary-market yields — secondary metros (Richmond, Harrisburg, Allentown corridors) are where the small-buyer edge survives."
+  },
+  "gaps": [
+    "East Coast IOS/small-bay comps at the $1-2M ticket (portal-blocked; needs broker OMs)",
+    "Cold storage: institutional-scale only at this budget — not researched further",
+    "Small-bay 2026 cap-rate band"
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "sector": "retail",
+  "as_of": "2026-08-21",
+  "cycle_position": {
+    "summary": "Repriced and settled: after two years of upward drift, single-tenant net lease caps have found their level (Boulder Group avg 6.80%, down 1 bp QoQ; Marcus & Millichap 2025 mean 6.5% was a 12-year high). Strong bifurcation: necessity retail (grocery, pharmacy, discount) tight; discretionary/power-center carries the risk premium. Grocery-anchored national average ~6.7%, stack ~5.5% (Publix/Trader Joe's institutional) to ~7.1% (discount-anchored); Class A primary 5.75-6.50%.",
+    "status": "sourced",
+    "sources": [
+      "https://silberproperties.com/the-net-lease-market-at-mid-year-cap-rates-hold-as-the-market-splits-in-two/",
+      "https://apers.app/learn/asset-classes/retail/grocery-anchored-below-market-anchor-inline-economics",
+      "https://investmentgrade.com/nnn-cap-rates-2026/"
+    ]
+  },
+  "cap_rate_ranges": [
+    { "tier": "single-tenant net lease, national average", "low": 0.065, "high": 0.068, "status": "sourced", "sources": ["https://silberproperties.com/the-net-lease-market-at-mid-year-cap-rates-hold-as-the-market-splits-in-two/"] },
+    { "tier": "grocery-anchored, Class A primary", "low": 0.0575, "high": 0.065, "status": "sourced", "sources": ["https://apers.app/learn/asset-classes/retail/grocery-anchored-below-market-anchor-inline-economics"] },
+    { "tier": "grocery-anchored, full stack", "low": 0.055, "high": 0.071, "status": "sourced", "sources": ["https://apers.app/learn/asset-classes/retail/grocery-anchored-below-market-anchor-inline-economics"] }
+  ],
+  "supply_demand": { "value": "Effectively no new strip/neighborhood retail supply for a decade in most East Coast metros — existing centers hold pricing power.", "status": "sourced", "sources": ["https://investingincre.com/2026/08/13/phoenix-retail-real-estate-is-a-landlords-market/"] },
+  "debt_terms": { "value": "NNN with credit tenants finances at 65-75% LTV non-recourse at the larger tickets; small single-tenant deals are local-bank recourse.", "status": "sourced", "sources": ["https://thesisdriven.com/guides/triple-net-lease"] },
+  "top_east_coast_metros": [],
+  "small_investor_verdict": {
+    "accessible": true,
+    "entry_vehicle": "One single-tenant NNN asset ($1-2M buys a QSR/auto-parts/dollar-store box at 6.2-6.8%) or a small unanchored strip in a secondary metro.",
+    "reasoning": "The passive counterweight to the hands-on multifamily core: bond-like income, zero rent regulation, minimal management. The trade-offs are flat growth (fixed bumps), binary tenant-credit risk on single-tenant boxes, and dark-box re-leasing risk. For THIS buyer it's a diversification slot, not the main event — the value-add skill set adds nothing to a 20-year Mister Car Wash lease."
+  },
+  "gaps": [
+    "East Coast strip-center comps at the $1-2M ticket",
+    "Mall tier: excluded as inaccessible/secularly challenged at this budget"
+  ]
+}

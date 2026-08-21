@@ -1,0 +1,30 @@
+{
+  "sector": "manufactured_housing",
+  "as_of": "2026-08-21",
+  "cycle_position": {
+    "summary": "Affordability-crisis beneficiary with a repricing underway: national average cap ~5.9% early 2026 (down ~40 bps from Q4 2024) even as REIT implied caps normalized hard (4.44% Q1 2025 -> 6.59% Q4 2025). Tiered market: premium 200+ lot city-utility parks 4-5%; stabilized 5-7%; value-add (below-market rents, park-owned-home cleanup, utility issues) 7-9.5%. Private equity active and consolidating.",
+    "status": "sourced",
+    "sources": [
+      "https://keelteam.com/post/mobile-home-park-cap-rates-explained/",
+      "https://requitygroup.com/insights/mobile-home-park-cap-rates-tier-2026-guide",
+      "https://www.northmarq.com/news/featured-expert/manufactured-housing-communities-poised-growth-2026-affordability-crisis"
+    ]
+  },
+  "cap_rate_ranges": [
+    { "tier": "premium (200+ lots, city utilities)", "low": 0.04, "high": 0.05, "status": "sourced", "sources": ["https://keelteam.com/post/mobile-home-park-cap-rates-explained/"] },
+    { "tier": "stabilized (90%+ occupied, mid-size markets)", "low": 0.05, "high": 0.07, "status": "sourced", "sources": ["https://keelteam.com/post/mobile-home-park-cap-rates-explained/"] },
+    { "tier": "value-add (below-market rents, deferred maintenance)", "low": 0.07, "high": 0.095, "status": "sourced", "sources": ["https://requitygroup.com/insights/mobile-home-park-cap-rates-tier-2026-guide"] }
+  ],
+  "supply_demand": { "value": "Essentially zero new community supply (zoning hostility) against a deepening affordability crisis — the structural long.", "status": "sourced", "sources": ["https://www.northmarq.com/news/featured-expert/manufactured-housing-communities-poised-growth-2026-affordability-crisis"] },
+  "debt_terms": { "value": "Agency (Fannie/Freddie MHC programs) at 50+ lots with standards; small parks = local bank/seller financing.", "status": "sourced", "sources": [] },
+  "top_east_coast_metros": [],
+  "small_investor_verdict": {
+    "accessible": true,
+    "entry_vehicle": "A 30-80 lot value-add park in a secondary/tertiary East Coast market (PA/upstate NY/Southside VA/Carolinas), tenant-owned homes preferred, at the 7-9.5% tier.",
+    "reasoning": "The value-add math rhymes with the buyer's core skill (fix infrastructure, raise below-market lot rents toward market, convert park-owned homes to tenant-owned) at yields the 2-4 unit market can't reach. Watch-outs: East Coast park inventory is scarcer than the Midwest/Southeast, PE competition is real at the quality tiers, several states are adding MHC-specific tenant protections (rent-increase notice, opportunity-to-purchase on park sales) — screen each state's MHC statute before offering; not yet in the rules engine."
+  },
+  "gaps": [
+    "MD/VA/PA/NC MHC-specific statutes (lot-rent notice, park-sale opportunity-to-purchase) — add to regulatory_rules",
+    "East Coast park listings at the $1-2M ticket (broker-network market, portal-invisible)"
+  ]
+}
