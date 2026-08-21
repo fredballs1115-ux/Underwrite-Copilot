@@ -1,0 +1,29 @@
+{
+  "sector": "hospitality_str",
+  "as_of": "2026-08-21",
+  "cycle_position": {
+    "summary": "Hotels: RevPAR accelerating (Q2 2026 +5.7% as ADR +4.4%; HVS raised its 2026 forecast to +3.0%), convention demand rebounding. Cap rates: ~8.5% overall average, Q1 2026 transactions 8.6%, Q2 print 7.7% on an upscale mix shift (T12 through June 8.2%). STRs: the regulatory ratchet keeps tightening — registration caps, licensing limits, zoning restrictions spreading; platform data-sharing mandates (e.g. SB 346 eff. Jan 1, 2026) end under-the-radar operation; NYC allows sub-30-day stays only with the host on site (max 2 guests); San Francisco requires permanent residency and caps unhosted nights.",
+    "status": "sourced",
+    "sources": [
+      "https://www.hospitalitynet.org/report/4132704/hvs-us-market-pulse-may-2026",
+      "https://www.baystreethospitality.com/post/us-hotel-revpar-diverges-2150bps-gateway-cap-rates-lag-2026",
+      "https://deckard.com/resources/2026-str-regulations",
+      "https://www.minut.com/blog/short-term-rental-laws-us"
+    ]
+  },
+  "cap_rate_ranges": [
+    { "tier": "US hotels, all (T12 through June 2026)", "low": 0.082, "high": 0.086, "status": "sourced", "sources": ["https://www.hotelnewsresource.com/article142335.html"] }
+  ],
+  "supply_demand": { "value": "Hotel demand growth outpacing supply in 2026; STR supply growth constrained by regulation in exactly the urban East Coast markets this buyer works.", "status": "sourced", "sources": ["https://www.hospitalitynet.org/report/4132704/hvs-us-market-pulse-may-2026"] },
+  "debt_terms": { "value": "Hotel debt = SBA 504/7(a) for small flagged/independent assets; STR financed as investor residential (DSCR lenders underwrite STR income with haircuts).", "status": "sourced", "sources": [] },
+  "top_east_coast_metros": [],
+  "small_investor_verdict": {
+    "accessible": false,
+    "entry_vehicle": "Only defensible form at $1-2M: an STR-zoned property in a resort/leisure market with EXPLICITLY permissive local rules verified in writing. Urban East Coast STR is a compliance trap; small hotels are operating businesses, not real estate plays.",
+    "reasoning": "The regulatory direction is uniformly hostile in the buyer's core markets (DC/MD/VA and the I-95 cities), platform data-sharing removes the gray zone, and an STR-dependent underwrite can be destroyed by one council vote — the exact opposite of the exemption-anchored certainty the core strategy is built on."
+  },
+  "gaps": [
+    "Jurisdiction-by-jurisdiction STR rules for DC/MD/VA beach + mountain markets (the one viable niche) — not yet screened",
+    "Small-hotel (sub-50-key) East Coast pricing"
+  ]
+}

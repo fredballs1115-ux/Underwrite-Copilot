@@ -1,0 +1,52 @@
+{
+  "$schema_note": "Rates snapshot + the FRED series contract the live rates service (scripts/fetch-rates.mjs) pulls daily. Snapshot values here are seed/fallback only — the app prefers the rates table. status labels per project convention.",
+  "as_of": "2026-08-21",
+  "fred_series": [
+    { "series_id": "DGS10", "label": "10-Year Treasury Constant Maturity", "unit": "pct", "cadence": "daily" },
+    { "series_id": "SOFR", "label": "Secured Overnight Financing Rate", "unit": "pct", "cadence": "daily" },
+    { "series_id": "MORTGAGE30US", "label": "Freddie Mac PMMS 30-Year Fixed", "unit": "pct", "cadence": "weekly" },
+    { "series_id": "DRCRELEXFACBS", "label": "CRE Loan Delinquency Rate, All Commercial Banks", "unit": "pct", "cadence": "quarterly" }
+  ],
+  "snapshot": {
+    "mortgage_30y_pmms": {
+      "value": 6.65,
+      "unit": "pct",
+      "as_of": "2026-08-20",
+      "status": "verified",
+      "sources": [
+        "https://freddiemac.gcs-web.com/news-releases/ (Freddie Mac PMMS weekly release)",
+        "https://www.globenewswire.com/news-release/2026/08/20/3348688/0/en/mortgage-rates-decline-for-second-consecutive-week.html"
+      ],
+      "note": "Second consecutive weekly decline: 6.69 (Aug 6) -> 6.67 (Aug 13) -> 6.65 (Aug 20)."
+    },
+    "treasury_10y": {
+      "value": null,
+      "unit": "pct",
+      "as_of": null,
+      "status": "unverified_not_found",
+      "sources": ["https://fred.stlouisfed.org/series/DGS10"],
+      "note": "FRED blocked from the build environment; populated by the live rates service in production."
+    },
+    "sofr": {
+      "value": null,
+      "unit": "pct",
+      "as_of": null,
+      "status": "unverified_not_found",
+      "sources": ["https://fred.stlouisfed.org/series/SOFR"],
+      "note": "Populated by the live rates service in production."
+    },
+    "cre_delinquency": {
+      "value": null,
+      "unit": "pct",
+      "as_of": null,
+      "status": "unverified_not_found",
+      "sources": ["https://fred.stlouisfed.org/series/DRCRELEXFACBS"],
+      "note": "Populated by the live rates service in production."
+    }
+  },
+  "gaps": [
+    "FHFA HPI by metro (fhfa.gov blocked from build environment)",
+    "FDIC/Fed bank CRE concentration + SLOOS lending standards (not fetched this pass)",
+    "HMDA multifamily lending volumes by county (not fetched this pass)"
+  ]
+}

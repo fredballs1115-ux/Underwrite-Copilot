@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { AppShell } from "./app-shell";
+import { RegulatoryAlertBanner } from "./regulatory-alert-banner";
 
 // Wraps every signed-in screen: real auth check (proxy.ts is the fast gate)
 // plus the app chrome (deep-teal sidebar / mobile top bar). getCurrentUser is
@@ -17,5 +18,10 @@ export default async function AppLayout({
     redirect("/login");
   }
 
-  return <AppShell userEmail={user.email ?? ""}>{children}</AppShell>;
+  return (
+    <AppShell userEmail={user.email ?? ""}>
+      <RegulatoryAlertBanner />
+      {children}
+    </AppShell>
+  );
 }

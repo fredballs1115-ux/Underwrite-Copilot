@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ResearchPanel } from "./research-panel";
+import { SectorFieldsForm } from "./sector-fields-form";
+import type { SectorFieldValues } from "@/lib/sector-fields";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { signedSupplementUrl } from "@/lib/storage";
 import { isPro } from "@/lib/billing";
@@ -700,6 +703,24 @@ export default async function DealPage({
         taskAssignees={taskAssignees}
         todayIso={new Date().toISOString().slice(0, 10)}
       />
+
+      <div className="mt-6 space-y-4">
+        <SectorFieldsForm
+          dealId={id}
+          assetClass={(deal.asset_class as string) ?? "auto"}
+          values={
+            ((deal as { sector_fields?: SectorFieldValues | null }).sector_fields) ?? null
+          }
+        />
+        <ResearchPanel
+          address={dealAddress}
+          sizeText={summarySize}
+          priceText={summaryPrice}
+          sectorFields={
+            ((deal as { sector_fields?: SectorFieldValues | null }).sector_fields) ?? null
+          }
+        />
+      </div>
     </div>
   );
 }

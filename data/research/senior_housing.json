@@ -1,0 +1,25 @@
+{
+  "sector": "senior_housing",
+  "as_of": "2026-08-21",
+  "cycle_position": {
+    "summary": "Demand inflection: occupancy 89.9% in Q2 2026 (+0.4pp, record occupied units); NIC expects >90% in 2026 — a 20-year high — as the oldest boomers turn 80 this year and new supply stays scarce. Cap rates compressed to a 6.2% average through year-end 2025 (210 bps over the 10Y vs a 416 bps long-term average) and 85% of surveyed investors expect further compression.",
+    "status": "sourced",
+    "sources": [
+      "https://www.nic.org/blog/senior-housing-occupancy-climbs-in-second-quarter-2026/",
+      "https://www.mmcginvest.com/post/u-s-senior-housing-market-report-2026-outlook-occupancy-cap-rates-and-forecasts-through-2031",
+      "https://www.jll.com/en-us/insights/market-perspectives/seniors-housing-care-investor-survey-and-trend-outlook"
+    ]
+  },
+  "cap_rate_ranges": [
+    { "tier": "sector average (YE2025)", "low": 0.062, "high": 0.062, "status": "sourced", "sources": ["https://www.mmcginvest.com/post/u-s-senior-housing-market-report-2026-outlook-occupancy-cap-rates-and-forecasts-through-2031"] }
+  ],
+  "supply_demand": { "value": "Occupancy 89.9% and climbing; construction starts scarce; boomer-turning-80 demand wave begins 2026.", "status": "sourced", "sources": ["https://www.nic.org/blog/senior-housing-occupancy-climbs-in-second-quarter-2026/"] },
+  "debt_terms": { "value": "HUD 232 / agency seniors programs at institutional scale; small residential-assisted-living homes finance as residential + SBA.", "status": "sourced", "sources": [] },
+  "top_east_coast_metros": [],
+  "small_investor_verdict": {
+    "accessible": false,
+    "entry_vehicle": "Direct = an operating healthcare business (staffing, licensure, liability) — not this buyer's game. The only $1-2M door: a residential assisted-living house (8-16 beds) WITH an experienced operator partner, or REIT/fund exposure to ride the demographic wave passively.",
+    "reasoning": "The best demand story in real estate for the next decade, but the real product is care operations; real estate is the container. A hands-on value-add landlord skill set does not transfer to census management and state licensure."
+  },
+  "gaps": ["DC/MD/VA residential assisted living licensure regimes (needed before any RAL-house consideration)"]
+}

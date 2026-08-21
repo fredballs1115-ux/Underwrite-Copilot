@@ -1,0 +1,25 @@
+{
+  "sector": "life_science",
+  "as_of": "2026-08-21",
+  "cycle_position": {
+    "summary": "Post-boom hangover: vacancy 23.1% nationally after ~60M SF delivered 2020-2025 in the 11 tracked hubs (more than half still vacant), rents deflating. The bleeding has likely peaked — construction pipeline down to 4% of inventory (lowest since 2017), funding stabilizing, clinical-trial activity strengthening — but recovery is a multi-year absorption story.",
+    "status": "sourced",
+    "sources": [
+      "https://www.cushmanwakefield.com/en/insights/life-science-report",
+      "https://www.commercialsearch.com/news/life-science-sector-faces-excess-vacancy-after-construction-boom/",
+      "https://www.cnbc.com/2026/04/22/life-sciences-lab-real-estate-rebound.html"
+    ]
+  },
+  "cap_rate_ranges": [
+    { "tier": "stabilized lab", "low": null, "high": null, "status": "unverified_not_found", "sources": [], "note": "Trades are distress-driven and bespoke; no meaningful 2026 band." }
+  ],
+  "supply_demand": { "value": "23.1% vacancy; pipeline 4% of inventory and shrinking.", "status": "sourced", "sources": ["https://www.cushmanwakefield.com/en/insights/life-science-report"] },
+  "debt_terms": { "value": "Institutional; lenders largely closed to new lab exposure.", "status": "sourced", "sources": [] },
+  "top_east_coast_metros": [],
+  "small_investor_verdict": {
+    "accessible": false,
+    "entry_vehicle": "None at $1-2M. Watch from a distance; the eventual distressed-conversion trade belongs to institutions.",
+    "reasoning": "Specialized systems (HVAC, vibration, chemical), institutional tenancy, and a 23% vacancy overhang — nothing here fits a small hands-on buyer."
+  },
+  "gaps": []
+}
