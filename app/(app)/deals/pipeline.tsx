@@ -1626,7 +1626,7 @@ function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
               persist({ name: e.target.value });
             }}
             aria-label="Deal name"
-            placeholder="Deal name — e.g. The Maddox at Highland Park"
+            placeholder="Deal name — e.g. The Maddox at Brewerytown"
             className="flex-1 rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
           />
           <select

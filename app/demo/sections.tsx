@@ -134,7 +134,7 @@ export function DemoSections({ data }: { data: DemoData }) {
         {tab === "challenger" && (
           <ChallengerView
             result={data.challenges}
-            dealName="The Maddox at Highland Park"
+            dealName="The Maddox at Brewerytown"
           />
         )}
         {tab === "comps" && (

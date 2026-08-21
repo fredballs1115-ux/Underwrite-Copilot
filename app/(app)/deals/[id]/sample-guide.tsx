@@ -28,7 +28,10 @@ export function SampleGuide() {
         </li>
       </ol>
       <p className="mt-3 border-t border-brand/10 pt-2.5 text-xs text-muted">
-        This deal is illustrative — no real property or firm. Drag the
+        This deal is illustrative — no real property or firm. It&apos;s placed
+        at neighborhood level in a real submarket (Brewerytown, Philadelphia),
+        so the regulation check and the recorded-sales panel below run on real
+        Philadelphia rules and real public records. Drag the
         sensitivity sliders below: returns and mandate fit recompute live, and
         the PROPERTY ACTUALS card shows the rent roll and T-12 the screen
         reconciled against the OM.

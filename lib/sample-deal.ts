@@ -31,7 +31,7 @@ export const SAMPLE_DEMO_BOX: BuyBox = {
   minCoCPct: 5,
 };
 
-export const SAMPLE_DEAL_NAME = "Sample — The Maddox at Highland Park";
+export const SAMPLE_DEAL_NAME = "Sample — The Maddox at Brewerytown";
 
 const inputs: ModelInputs = {
   units: 248,
@@ -244,7 +244,7 @@ const model: UnderwritingModel = {
 const extraction: ExtractionResult = {
   dealName: SAMPLE_DEAL_NAME,
   assetClass: "multifamily",
-  market: "North Dallas, TX",
+  market: "Brewerytown, Philadelphia, PA",
   metrics: [
     { label: "Asking price", value: "$68,000,000", flagged: false, page: "p. 3" },
     { label: "Going-in cap", value: "5.45%", flagged: false, page: "p. 8" },
@@ -300,7 +300,7 @@ const comps: BrokerCompsResult = {
       note: "Comparable vintage and submarket; supports a sub-$260k basis.",
     },
     {
-      name: "Vue at Legacy — 4.0 mi",
+      name: "Vue at Girard — 4.0 mi",
       detail: "$298k/unit · 4.9% cap · Q1'25",
       support: "stretched",
       note: "Newer, amenitized asset in a stronger submarket — not a clean comp.",
@@ -539,6 +539,20 @@ const t12Summary: T12Summary = {
 export const SAMPLE_DEAL = {
   name: SAMPLE_DEAL_NAME,
   asset_class: "multifamily",
+  /** Neighborhood-level placement — deliberately NOT a street address. The
+   *  building is fictional; the submarket is real, so the jurisdiction-level
+   *  features (regulation check, recorded-sales pull around the neighborhood
+   *  centroid) run on real Philadelphia data while the deal stays labeled
+   *  illustrative. Never sharpen this to a street address. */
+  address: {
+    label: "Brewerytown, Philadelphia, PA",
+    street: "",
+    city: "Philadelphia",
+    state: "PA",
+    zip: "",
+    county: "Philadelphia County",
+    submarket: "Brewerytown",
+  },
   extraction,
   challenges,
   comps,
