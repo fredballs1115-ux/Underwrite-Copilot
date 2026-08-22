@@ -26,6 +26,13 @@ jobs:
           grep -c "ticker-track" body.html && echo "TICKER: present" || echo "TICKER: missing"
           echo "== FIRST 1200 CHARS OF BODY =="
           head -c 1200 body.html
+      - name: Public pages spot-check
+        run: |
+          for path in demo why; do
+            curl -sS -o "p_$path.html" --max-time 60 "https://underwrite-copilot.onrender.com/$path" || true
+          done
+          grep -q "Behind this screen" p_demo.html && echo "/demo: research layer present" || echo "/demo: MISSING research section"
+          grep -q "It knows the ground" p_why.html && echo "/why: current copy present" || echo "/why: OLD copy"
       - name: Verdict
         run: |
           if grep -q "The OM lands Thursday" body.html; then
