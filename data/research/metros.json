@@ -32,7 +32,8 @@
    "gaps": [
     "Class 1 tax-rate row not yet a benchmark",
     "ACS 2-4 unit stock count (API blocked)"
-   ]
+   ],
+   "region": "DMV core"
   },
   {
    "id": "pg_county",
@@ -55,7 +56,8 @@
    "gaps": [
     "FY2026 SAFMRs by PG ZIP",
     "county tax-rate + municipal add-on benchmark rows"
-   ]
+   ],
+   "region": "DMV core"
   },
   {
    "id": "montgomery_county",
@@ -78,7 +80,8 @@
    "gaps": [
     "MoCo exemption list verbatim",
     "Takoma Park vacancy-control confirmation"
-   ]
+   ],
+   "region": "DMV core"
   },
   {
    "id": "nova",
@@ -100,7 +103,8 @@
    "gaps": [
     "Fairfax/Arlington provider wiring (needs /api/comps/health output)",
     "PW County assessment URL pattern documented in county_data_sources.json"
-   ]
+   ],
+   "region": "DMV core"
   },
   {
    "id": "baltimore",
@@ -130,7 +134,8 @@
    "comps_provider": "md_sdat",
    "gaps": [
     "City 2-4 unit median (metro Redfin series not broken out for Baltimore in the May pull)"
-   ]
+   ],
+   "region": "Mid-Atlantic"
   },
   {
    "id": "richmond",
@@ -158,7 +163,8 @@
     "FY2026 FMR",
     "2-4 unit price series",
     "Richmond city assessor open-data provider"
-   ]
+   ],
+   "region": "Mid-Atlantic"
   },
   {
    "id": "norfolk_hampton_roads",
@@ -183,7 +189,8 @@
     "FY2026 FMR",
     "stock counts",
     "city assessor feeds (Norfolk/VB open-data portals exist — unassessed)"
-   ]
+   ],
+   "region": "Mid-Atlantic"
   },
   {
    "id": "philadelphia",
@@ -207,7 +214,8 @@
    "gaps": [
     "City permits pipeline (BPS blocked)"
    ],
-   "ingest_market": "philadelphia"
+   "ingest_market": "philadelphia",
+   "region": "Mid-Atlantic"
   },
   {
    "id": "nyc",
@@ -234,7 +242,8 @@
     "PLUTO+Rolling Sales ingest wiring (BBL join)",
     "borough-level 2-4 unit medians"
    ],
-   "ingest_market": "nyc"
+   "ingest_market": "nyc",
+   "region": "Northeast"
   },
   {
    "id": "chicago",
@@ -258,7 +267,8 @@
     "Cook County Socrata dataset ids (resolve at wiring)",
     "FY2026 FMR"
    ],
-   "ingest_market": "cook_county"
+   "ingest_market": "cook_county",
+   "region": "Midwest"
   },
   {
    "id": "boston",
@@ -280,7 +290,8 @@
    "gaps": [
     "assessment-roll ingest wiring",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Northeast"
   },
   {
    "id": "atlanta",
@@ -302,7 +313,8 @@
    "gaps": [
     "Fulton bulk endpoint",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Southeast"
   },
   {
    "id": "miami",
@@ -324,7 +336,8 @@
    "gaps": [
     "statute text pull to upgrade FL rule",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Southeast"
   },
   {
    "id": "dallas",
@@ -346,7 +359,8 @@
    "gaps": [
     "DCAD roll ingest wiring",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Texas & Plains"
   },
   {
    "id": "houston",
@@ -368,7 +382,8 @@
    "gaps": [
     "HCAD roll ingest wiring",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Texas & Plains"
   },
   {
    "id": "los_angeles",
@@ -392,7 +407,8 @@
     "current RSO cap % (single-source)",
     "assessor-roll ingest",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "West Coast"
   },
   {
    "id": "san_francisco",
@@ -414,7 +430,8 @@
    "comps_provider": null,
    "gaps": [
     "FY2026 FMR"
-   ]
+   ],
+   "region": "West Coast"
   },
   {
    "id": "seattle",
@@ -436,7 +453,8 @@
    "gaps": [
     "King County sales-file ingest wiring",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "West Coast"
   },
   {
    "id": "denver",
@@ -458,7 +476,8 @@
    "gaps": [
     "opendata.denvergov.org ingest wiring",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Mountain West"
   },
   {
    "id": "phoenix",
@@ -480,7 +499,8 @@
    "gaps": [
     "Maricopa bulk endpoint",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Mountain West"
   },
   {
    "id": "newark_jc",
@@ -504,7 +524,8 @@
    "gaps": [
     "per-ordinance screen for other NJ municipalities",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Northeast"
   },
   {
    "id": "twin_cities",
@@ -527,7 +548,8 @@
    "gaps": [
     "Hennepin/Ramsey bulk endpoints",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Midwest"
   },
   {
    "id": "nashville",
@@ -549,7 +571,8 @@
    "gaps": [
     "Davidson bulk endpoint",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Southeast"
   },
   {
    "id": "charlotte",
@@ -571,7 +594,8 @@
    "gaps": [
     "POLARIS/Wake bulk endpoints",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Southeast"
   },
   {
    "id": "providence",
@@ -593,7 +617,8 @@
    "gaps": [
     "Providence assessor bulk endpoint",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Northeast"
   },
   {
    "id": "hartford_newhaven",
@@ -615,7 +640,8 @@
    "gaps": [
     "CT municipal open-data endpoints",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Northeast"
   },
   {
    "id": "albany",
@@ -638,7 +664,8 @@
    "gaps": [
     "Albany County bulk endpoint",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Northeast"
   },
   {
    "id": "scranton_reading",
@@ -659,7 +686,8 @@
     "city-level ordinance screen",
     "county bulk endpoints",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Northeast"
   },
   {
    "id": "portland_me",
@@ -681,7 +709,8 @@
    "gaps": [
     "Cumberland County bulk endpoint",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Northeast"
   },
   {
    "id": "columbus",
@@ -703,7 +732,8 @@
    "gaps": [
     "county auditor bulk endpoints",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Midwest"
   },
   {
    "id": "detroit",
@@ -725,7 +755,8 @@
    "gaps": [
     "Detroit open-data parcel endpoint",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Midwest"
   },
   {
    "id": "milwaukee",
@@ -747,7 +778,8 @@
    "gaps": [
     "MPROP ingest wiring",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Midwest"
   },
   {
    "id": "indianapolis",
@@ -769,7 +801,8 @@
    "gaps": [
     "IndyGIS bulk endpoint",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Midwest"
   },
   {
    "id": "kc_stl",
@@ -791,7 +824,8 @@
    "gaps": [
     "assessor bulk endpoints",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Midwest"
   },
   {
    "id": "las_vegas",
@@ -814,7 +848,8 @@
     "NV preemption statute cite",
     "Clark County bulk endpoint",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Mountain West"
   },
   {
    "id": "salt_lake",
@@ -837,7 +872,8 @@
     "UT preemption statute cite",
     "county bulk endpoint",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Mountain West"
   },
   {
    "id": "new_orleans",
@@ -860,7 +896,8 @@
     "LA statute cite",
     "Orleans Parish bulk endpoint",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Southeast"
   },
   {
    "id": "louisville",
@@ -883,7 +920,8 @@
     "KY statute cite",
     "PVA bulk endpoint",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Southeast"
   },
   {
    "id": "charleston",
@@ -906,7 +944,8 @@
     "SC section number",
     "county bulk endpoints",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Southeast"
   },
   {
    "id": "okc_tulsa",
@@ -929,7 +968,8 @@
     "OK statute cite",
     "county bulk endpoints",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Texas & Plains"
   },
   {
    "id": "birmingham",
@@ -952,7 +992,8 @@
     "statute text pull",
     "county bulk endpoint",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Southeast"
   },
   {
    "id": "burlington_vt",
@@ -974,7 +1015,8 @@
    "gaps": [
     "Burlington charter watch",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Northeast"
   },
   {
    "id": "wilmington_de",
@@ -996,7 +1038,8 @@
    "gaps": [
     "NCC endpoint resolution via /api/comps/health",
     "FY2026 FMR"
-   ]
+   ],
+   "region": "Mid-Atlantic"
   }
  ]
 }

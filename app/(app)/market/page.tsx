@@ -213,6 +213,21 @@ async function MidAtlanticTable() {
 // holds for it — FMR benchmarks, market notes, the regulatory rules in force
 // (statute-linked, status-labeled), comps availability, and example
 // properties. Server-rendered; selection is a query param, so it's linkable.
+// The buyer's geography first, then outward: each region is its own distinct
+// block so 43 metros never blur into one pill cloud. Metros missing a region
+// stamp fall into "More markets" instead of vanishing.
+const REGION_ORDER = [
+  "DMV core",
+  "Mid-Atlantic",
+  "Northeast",
+  "Southeast",
+  "Midwest",
+  "Texas & Plains",
+  "Mountain West",
+  "West Coast",
+  "More markets",
+] as const;
+
 async function MetroExplorer({ selected }: { selected?: string }) {
   const metros = metrosSeed.metros ?? [];
   const active =
@@ -286,23 +301,52 @@ async function MetroExplorer({ selected }: { selected?: string }) {
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
       <h2 className="text-sm font-semibold tracking-tight">Metro explorer</h2>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {metros.map((m) => (
-          <Link
-            key={m.id}
-            href={`/market?metro=${m.id}`}
-            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-              m.id === active.id
-                ? "border-brand bg-brand text-white"
-                : "border-line text-muted hover:border-brand hover:text-brand"
-            }`}
-          >
-            {m.name}
-          </Link>
-        ))}
+      <p className="mt-1 text-xs text-muted">
+        {metros.length} metros across {REGION_ORDER.length} regions — every
+        area in its own place; pick a metro for its rules, rents, and data
+        coverage.
+      </p>
+      <div className="mt-3 space-y-3">
+        {REGION_ORDER.map((region) => {
+          const group = metros.filter(
+            (m) => ((m as { region?: string }).region ?? "More markets") === region
+          );
+          if (group.length === 0) return null;
+          return (
+            <div key={region}>
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                {region}
+                <span className="ml-1.5 font-normal normal-case tracking-normal">
+                  · {group.length} metro{group.length === 1 ? "" : "s"}
+                </span>
+              </h3>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {group.map((m) => (
+                  <Link
+                    key={m.id}
+                    href={`/market?metro=${m.id}`}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                      m.id === active.id
+                        ? "border-brand bg-brand text-white"
+                        : "border-line text-muted hover:border-brand hover:text-brand"
+                    }`}
+                  >
+                    {m.name}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <div className="mt-4 space-y-4">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-brand">
+          {(active as { region?: string }).region ?? "More markets"} ·{" "}
+          <span className="font-normal normal-case tracking-normal text-muted">
+            {active.name}
+          </span>
+        </p>
         <p className="text-sm leading-relaxed">
           {(active.market_notes as { value?: string } | null)?.value}
           <span className={`ml-2 rounded px-1.5 py-px align-middle text-[10px] font-medium ${noteMeta}`}>
