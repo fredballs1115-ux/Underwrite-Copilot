@@ -15,7 +15,31 @@ since you pointed the web service at `main`). What gates the new features is
 Everything ships dark-safe: nothing breaks while those are pending, pages
 say exactly what's missing and why.
 
-## What changed in this pass (national expansion)
+## The overnight run (Aug 22) — what changed while you slept
+
+Every row below is merged AND probe-verified on the live site
+(live-verify run #42 against the final merge). Standing rules held all
+night: the homepage matches the real site, and coverage stops at the 15
+markets.
+
+| Change | Where to click |
+|---|---|
+| **Deals find their metro's benchmarks** — a Brooklyn deal now shows the NYC FMR row, Wilmington shows the Philadelphia-market FMR (matching runs on the covered-market name, not just the city string); DMV suburbs deliberately do NOT inherit DC-proper FMR (unverified for the counties) | any deal → Regulation & benchmarks → "vs. market" |
+| **Brooklyn finally counts as NYC** — boroughs (and their county names) now match New York City's rules; before, a Brooklyn deal silently saw NO rent-stabilization read | screen anything in Brooklyn/Queens/Bronx |
+| **The rules' open questions became answerable** — "Year built" and "You'll live in one unit" joined Deal facts; year built also auto-fills from the OM/manual entry; MoCo's rolling under-23-years exemption now computes; each open question links "Answer in Deal facts ↑" | any deal → Deal facts panel + Regulation panel |
+| **Buy box: one-tap territories** — every covered market is a quick-add chip whose match keywords are the SAME ones the market matcher uses (Dallas–Fort Worth chip hits Fort Worth and Plano deals); alias matching is state-gated so a Seattle chip can never hit "King St, Washington DC" (caught in the formal review pass) | Buy box → Geography |
+| **Pull Comps ↔ deal ↔ market triangle closed** — comps results carry the covered-market chip; deal pages link the market brief; metro briefs link screen-a-deal | Pull comps → search any covered address |
+| **Homepage playground demonstrates the new engine** — "Brooklyn 8-unit · built 1930" (two regimes split on one building) and "Silver Spring fourplex · built 2019" (rolling-age exemption) | homepage → the live rules widget |
+| **Honest empty states** — "Screened: N rules on file, none triggered" is no longer misreported as "unscreened" (the sample deal hit exactly this); onboarding + empty pipeline point at the market briefs | sample deal → Regulation panel |
+| **Error boundaries on the Next 16 convention** — a page error now keeps the shell and nav, says your data is fine, and offers a real retry (`unstable_retry` re-fetches; the old global boundary only re-rendered) | (hopefully never) |
+| **/why keeps pace** — the ground section says the engine names the exact open question and takes your answer on the deal | /why |
+
+PRs #74–#82, each gated on tsc + eslint + 349 tests + build, merged one
+at a time, live-verified in batches. One defect found by the formal
+review pass mid-run (the state-gating above) — fixed and pinned before
+it could ever mislead a mandate check.
+
+## What changed in the pass before (national expansion)
 
 | Change | Where to click |
 |---|---|
