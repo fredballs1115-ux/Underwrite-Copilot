@@ -957,6 +957,230 @@
    "as_of": "2026-08-22",
    "status": "sourced",
    "verification": "DE-specific guide + 50-state trackers concur"
+  },
+  {
+   "id": "ia-rent-control-preemption",
+   "jurisdiction_state": "IA",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Iowa bars cities and towns from creating rent control - Des Moines included. No rent regulation anywhere in Iowa.",
+   "quote": null,
+   "source": "https://ipropertymanagement.com/laws/rent-control",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "cross-stated by multiple 50-state guides; statute cite pull queued"
+  },
+  {
+   "id": "ks-rent-control-preemption",
+   "jurisdiction_state": "KS",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Kansas preempts local rent control - Wichita and Kansas City KS included. No rent regulation anywhere in Kansas.",
+   "quote": null,
+   "source": "https://ipropertymanagement.com/laws/rent-control",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "cross-stated by multiple 50-state guides; statute cite pull queued"
+  },
+  {
+   "id": "id-rent-control-preemption",
+   "jurisdiction_state": "ID",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Idaho preempts all forms of rent control - no city or county may enact it. Boise: no caps.",
+   "quote": null,
+   "source": "https://ipropertymanagement.com/laws/rent-control",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "cross-stated by multiple 50-state guides; statute cite pull queued"
+  },
+  {
+   "id": "sd-rent-control-preemption",
+   "jurisdiction_state": "SD",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "South Dakota preempts local rent control. No rent regulation anywhere in South Dakota.",
+   "quote": null,
+   "source": "https://ipropertymanagement.com/laws/rent-control",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "cross-stated by multiple 50-state guides; statute cite pull queued"
+  },
+  {
+   "id": "nd-rent-control-preemption",
+   "jurisdiction_state": "ND",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "North Dakota bans cities and towns from enacting rent control. No rent regulation anywhere in North Dakota.",
+   "quote": null,
+   "source": "https://ipropertymanagement.com/laws/rent-control",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "cross-stated by multiple 50-state guides; statute cite pull queued"
+  },
+  {
+   "id": "mt-rent-control-preemption",
+   "jurisdiction_state": "MT",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Montana preempts local rent regulation. No rent caps anywhere in Montana.",
+   "quote": null,
+   "source": "https://www.supportdemocracy.org/equitablehousing",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "listed among preemption states by the equitable-housing preemption tracker + 50-state guides; cite pull queued"
+  },
+  {
+   "id": "nm-rent-control-preemption",
+   "jurisdiction_state": "NM",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "New Mexico preempts local rent regulation - Albuquerque: no caps. Statehouse repeal attempts recur; none has passed.",
+   "quote": null,
+   "source": "https://www.supportdemocracy.org/equitablehousing",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "listed among preemption states by the equitable-housing preemption tracker + 50-state guides; cite pull queued"
+  },
+  {
+   "id": "ne-no-rent-control",
+   "jurisdiction_state": "NE",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Nebraska has no rent control at any level; no explicit preemption statute surfaced - encoded as no-cap with the preemption question left open. Omaha/Lincoln: no caps.",
+   "quote": null,
+   "source": "https://ipropertymanagement.com/laws/rent-control",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "cross-stated by multiple 50-state guides; statute cite pull queued"
+  },
+  {
+   "id": "ar-no-rent-control",
+   "jurisdiction_state": "AR",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Arkansas has no rent control at any level; no explicit preemption statute surfaced. Little Rock: no caps. (Arkansas is also the one state without an implied warranty of habitability - a different diligence axis, noted for the later tenant-law pass.)",
+   "quote": null,
+   "source": "https://ipropertymanagement.com/laws/rent-control",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "cross-stated by multiple 50-state guides; statute cite pull queued"
+  },
+  {
+   "id": "ms-no-rent-control",
+   "jurisdiction_state": "MS",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Mississippi has no rent control at the state or local level. Jackson: no caps.",
+   "quote": null,
+   "source": "https://ipropertymanagement.com/laws/rent-control",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "cross-stated by multiple 50-state guides; statute cite pull queued"
+  },
+  {
+   "id": "wv-no-rent-control-latent-authority",
+   "jurisdiction_state": "WV",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "West Virginia has no rent control AND no preemption statute - like Rhode Island, municipalities hold latent authority no one has used. A different posture from the preemption states; watch, not worry.",
+   "quote": null,
+   "source": "https://ipropertymanagement.com/laws/rent-control",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "cross-stated by multiple 50-state guides; statute cite pull queued"
+  },
+  {
+   "id": "wy-no-rent-control",
+   "jurisdiction_state": "WY",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Wyoming has no rent control anywhere; the 50-state trackers CONFLICT on whether a preemption statute exists (one says cities may enact, another says state law effectively prevents it) - encoded as no-cap with the conflict named and a statute pull queued.",
+   "quote": null,
+   "source": "https://ipropertymanagement.com/laws/rent-control",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "cross-stated by multiple 50-state guides; statute cite pull queued"
+  },
+  {
+   "id": "ak-no-rent-control",
+   "jurisdiction_state": "AK",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Alaska has no statewide rent control; preemption status unconfirmed from the trackers. Anchorage: no caps.",
+   "quote": null,
+   "source": "https://ipropertymanagement.com/laws/rent-control",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "cross-stated by multiple 50-state guides; statute cite pull queued"
+  },
+  {
+   "id": "hi-no-statewide-rent-control",
+   "jurisdiction_state": "HI",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Hawaii has no STATEWIDE rent control - but county-level rent measures exist (Maui County has enacted rent-related restrictions), so a Hawaii deal needs its county screened. County-by-county pass queued; until then this row says check, not clear.",
+   "quote": null,
+   "source": "https://ipropertymanagement.com/laws/rent-control",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "cross-stated by multiple 50-state guides; statute cite pull queued"
   }
  ],
  "gaps": [
@@ -976,6 +1200,7 @@
   "Minneapolis charter-amendment text direct pull (rent regulation authorized 2021, no ordinance enacted)",
   "NV / UT preemption statute citations (rows encoded as sourced pending the cite)",
   "MI MCL 123.411 direct legislature.mi.gov text pull",
-  "KY/SC/AL/LA/OK statute citations + NH HB 60 bill-text pull (rows encoded as sourced)"
+  "KY/SC/AL/LA/OK statute citations + NH HB 60 bill-text pull (rows encoded as sourced)",
+  "50-state close-out cites: IA/KS/ID/SD/ND/MT/NM statute numbers; NE/AR/WY/AK preemption question; HI county-level screen (Maui)"
  ]
 }

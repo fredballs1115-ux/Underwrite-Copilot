@@ -358,7 +358,7 @@ export default function Home() {
           {/* Ambient glows: pure CSS, no layout shift, subtle by design. */}
           <div
             aria-hidden
-            className="pointer-events-none absolute -top-32 right-[-10%] h-[28rem] w-[28rem] rounded-full opacity-25 blur-3xl"
+            className="glow-drift pointer-events-none absolute -top-32 right-[-10%] h-[28rem] w-[28rem] rounded-full opacity-25 blur-3xl"
             style={{
               background:
                 "radial-gradient(closest-side, #7fd6cc 0%, transparent 70%)",
@@ -366,7 +366,7 @@ export default function Home() {
           />
           <div
             aria-hidden
-            className="pointer-events-none absolute bottom-[-8rem] left-[-6%] h-[22rem] w-[22rem] rounded-full opacity-15 blur-3xl"
+            className="glow-drift-2 pointer-events-none absolute bottom-[-8rem] left-[-6%] h-[22rem] w-[22rem] rounded-full opacity-15 blur-3xl"
             style={{
               background:
                 "radial-gradient(closest-side, #7fd6cc 0%, transparent 70%)",
@@ -417,7 +417,7 @@ export default function Home() {
                 <div className="mt-8 flex flex-wrap items-center gap-3">
                   <Link
                     href="/login?mode=signup"
-                    className="rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-brand-strong transition-colors hover:bg-accent"
+                    className="cta-breathe rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-brand-strong transition-colors hover:bg-accent"
                   >
                     Get started free
                   </Link>
@@ -522,11 +522,11 @@ export default function Home() {
                   aria-hidden
                 />
                 <span
-                  className="absolute left-[10%] top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-surface bg-ink/80 shadow"
+                  className="spread-dot-l absolute left-[10%] top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-surface bg-ink/80 shadow"
                   aria-hidden
                 />
                 <span
-                  className="absolute left-[90%] top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-surface bg-ink/80 shadow"
+                  className="spread-dot-r absolute left-[90%] top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-surface bg-ink/80 shadow"
                   aria-hidden
                 />
               </div>
@@ -633,7 +633,8 @@ export default function Home() {
               {SCREEN.map((s) => (
                 <div
                   key={s.n}
-                  className="hover-lift relative overflow-hidden rounded-xl border border-line bg-surface p-5 shadow-card hover:border-brand/30"
+                  style={{ "--i": s.n - 1 } as React.CSSProperties}
+                  className="hover-lift stage-cycle relative overflow-hidden rounded-xl border border-line bg-surface p-5 shadow-card hover:border-brand/30"
                 >
                   <span
                     aria-hidden
@@ -1291,7 +1292,7 @@ export default function Home() {
             <div className="mt-8 flex justify-center">
               <Link
                 href="/login?mode=signup"
-                className="rounded-lg bg-white px-6 py-3 text-sm font-semibold text-brand-strong transition-colors hover:bg-accent"
+                className="cta-breathe rounded-lg bg-white px-6 py-3 text-sm font-semibold text-brand-strong transition-colors hover:bg-accent"
               >
                 Screen your first deal free
               </Link>
@@ -1561,7 +1562,7 @@ async function LiveProofStrip() {
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-8 gap-y-1.5 px-6 py-3 text-sm">
         {items.map((it, i) => (
           <span key={i} className="inline-flex items-center gap-2">
-            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
+            <span aria-hidden className="beacon scale-75" />
             {it}
           </span>
         ))}
@@ -1699,11 +1700,14 @@ async function GroundLayerSection() {
                 Pull comps on any address
               </p>
               {salesCount > 0 ? (
-                <p className="mt-2 font-mono text-2xl font-semibold tabular-nums">
-                  {num(salesCount)}
-                  <span className="ml-2 text-sm font-normal text-muted">
-                    deed-recorded sales ingested
-                    {propCount > 0 && ` · ${num(propCount)} parcels`}
+                <p className="mt-2 flex items-center gap-2.5 font-mono text-2xl font-semibold tabular-nums">
+                  <span className="beacon shrink-0" aria-hidden />
+                  <span>
+                    {num(salesCount)}
+                    <span className="ml-2 font-sans text-sm font-normal text-muted">
+                      deed-recorded sales ingested — live
+                      {propCount > 0 && ` · ${num(propCount)} parcels`}
+                    </span>
                   </span>
                 </p>
               ) : (
@@ -1781,13 +1785,16 @@ async function GroundLayerSection() {
                 A steward that never sleeps
               </p>
               {stewardAt ? (
-                <p className="mt-2 text-sm leading-relaxed">
-                  <span className="font-semibold">
-                    Data last verified {fmtD(stewardAt)}
-                  </span>{" "}
-                  <span className="text-muted">
-                    {correctionCount > 0 &&
-                      `· ${num(correctionCount)} corrections logged in the open`}
+                <p className="mt-2 flex items-center gap-2 text-sm leading-relaxed">
+                  <span className="beacon shrink-0" aria-hidden />
+                  <span>
+                    <span className="font-semibold">
+                      Data last verified {fmtD(stewardAt)}
+                    </span>{" "}
+                    <span className="text-muted">
+                      {correctionCount > 0 &&
+                        `· ${num(correctionCount)} corrections logged in the open`}
+                    </span>
                   </span>
                 </p>
               ) : (

@@ -161,14 +161,20 @@ export function RegulationPlayground() {
       </div>
       <p className="mt-3 text-sm text-muted">{active.blurb}</p>
 
-      <ul className="mt-4 space-y-3">
-        {evals.map((e) => {
+      {/* key on the scenario: switching chips remounts the list so the
+          stagger animation replays — the engine visibly re-runs. */}
+      <ul key={active.id} className="stagger mt-4 space-y-3">
+        {evals.map((e, i) => {
           const meta = OUTCOME_META[e.outcome];
           const open = [...new Set(e.unknowns.map((u) => UNKNOWN_LABELS[u] ?? null))].filter(
             Boolean
           );
           return (
-            <li key={e.rule.id} className="rounded-xl border border-line/70 p-3.5">
+            <li
+              key={e.rule.id}
+              style={{ "--i": i } as React.CSSProperties}
+              className="rounded-xl border border-line/70 p-3.5"
+            >
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${meta.cls}`}>
                   {meta.label}
