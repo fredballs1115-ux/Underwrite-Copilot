@@ -48,7 +48,7 @@ export const SECTOR_FIELDS: Record<string, SectorFieldDef[]> = {
       key: "owner_units_in_jurisdiction",
       label: "Your other rental units in this jurisdiction",
       type: "number",
-      help: "DC exemption: 0 others required. PG County: ≤5 total in the county.",
+      help: "DC exemption: 0 others required. PG County: ≤5 total in the county. NY Good Cause: ≤10 statewide.",
     },
   ],
   retail: [
