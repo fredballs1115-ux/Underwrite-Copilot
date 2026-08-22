@@ -21,6 +21,10 @@ const BASE: Partial<RuleSubject> = {
   transaction: "sale_of_rental_housing_accommodation",
 };
 
+// Module scope, so the rolling-age scenario evaluates against the visitor's
+// actual year — its verdict is stable for decades either way (2019 + 23 > 2042).
+const CURRENT_YEAR = new Date().getFullYear();
+
 const SCENARIOS: Scenario[] = [
   {
     id: "dc-personal",
@@ -66,6 +70,20 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: "moco-newbuild",
+    label: "Silver Spring fourplex · built 2019",
+    blurb:
+      "Montgomery County's cap carries a rolling under-23-years exemption — a 2019 build sits inside it.",
+    subject: {
+      ...BASE,
+      state: "MD",
+      locality: ["Silver Spring", "Montgomery County"],
+      units: 4,
+      built_year: 2019,
+      current_year: CURRENT_YEAR,
+    },
+  },
+  {
     id: "philly-triplex",
     label: "Philadelphia triplex · tenanted",
     blurb: "An occupied Brewerytown triplex you'd reposition after closing.",
@@ -88,6 +106,20 @@ const SCENARIOS: Scenario[] = [
       locality: ["Jersey City"],
       units: 4,
       built_year: 1961,
+    },
+  },
+  {
+    id: "bk-eight",
+    label: "Brooklyn 8-unit · built 1930",
+    blurb:
+      "A Bed-Stuy eight-unit, 8 units statewide total — the boroughs answer to New York City's rules, and two regimes split here.",
+    subject: {
+      ...BASE,
+      state: "NY",
+      locality: ["Brooklyn", "Kings County"],
+      units: 8,
+      built_year: 1930,
+      owner_total_rental_units_in_state: 8,
     },
   },
   {
