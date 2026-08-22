@@ -1,0 +1,30 @@
+name: steward
+# Actions fallback for the nightly verification steward (the Render cron in
+# render.yaml is the primary). Runs the same script from GitHub's network:
+# link health, freshness, consistency, and re-verification of the oldest
+# 'sourced' claims. No-ops with instructions until the Supabase Actions
+# secrets exist; the Anthropic secret is optional (re-verification skips
+# without it and the run notes say so).
+on:
+  schedule:
+    - cron: "30 6 * * *"
+  workflow_dispatch:
+jobs:
+  steward:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --omit=dev
+      - name: Run steward
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "Supabase Actions secrets not set (repo Settings → Secrets → Actions: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY). Skipping."
+            exit 0
+          fi
+          node scripts/steward.mjs
