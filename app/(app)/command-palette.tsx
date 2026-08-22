@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import metrosSeed from "@/data/research/metros.json";
 
 type PaletteDeal = {
   id: string;
@@ -112,6 +113,21 @@ const ACTIONS: Item[] = [
       </ActionIcon>
     ),
   },
+  // One entry per covered market, derived from the same metros data the
+  // market page renders — type a city, land on its brief.
+  ...(metrosSeed.metros ?? []).map((m) => ({
+    key: `mkt-${m.id}`,
+    label: `Market brief: ${m.name}`,
+    hint: (m as { region?: string }).region ?? "covered market",
+    href: `/market?metro=${m.id}`,
+    group: "actions" as const,
+    icon: (
+      <ActionIcon>
+        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+        <circle cx="12" cy="10" r="3" />
+      </ActionIcon>
+    ),
+  })),
   {
     key: "a-news",
     label: "News",
