@@ -4,6 +4,20 @@ Resume file per project protocol: a future session starts HERE and does not
 repeat finished work. Ops/go-live steps + the ranked gap list live in
 `INTEGRATION_NOTES.md`.
 
+**2026-08-22 (session 4d, third sweep — Midwest/Mountain/NE corridor)** —
+9 rules (46 total) + 12 metros (36): OH HB 430 preemption (eff. 2022-09-22,
+4 sources); **Portland ME rent control** (70% of Boston CPI, 2.2% for 2026,
+sitting tenants AND between tenancies, owner-occupied 2-4 unit EXEMPT —
+verified vs city ordinance PDF + FAQ; the one rent-controlled city in the
+ME→FL corridor north of NJ); MI MCL 123.411 + WI §66.1015 (legislature
+primary) + IN §32-31-1-20 + MO §441.043 (revisor.mo.gov primary)
+preemptions; NV/UT preemptions sourced (statute cites queued); **RI = no
+rent control AND no preemption — latent municipal authority**, watch
+Providence. NE-corridor metros (Providence, Hartford/New Haven, Albany,
+Scranton/Reading) finally in metros.json, tied to the existing CT fair-rent
++ NY ETPA rules and the Redfin medians already in the benchmark tables.
+Homepage/why scale counts are DERIVED so they updated automatically.
+
 **2026-08-22 (session 4c, second sweep)** — 5 more rules (37 total) + 3
 metros (24): SF Rent Ordinance (pre-June-13-1979 caps + just-cause; post-1979
 exempt from caps but just-cause-covered since the 2024 ordinance — verified
