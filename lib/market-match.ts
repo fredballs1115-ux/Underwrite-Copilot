@@ -72,3 +72,29 @@ export function metroForAddress(addr: {
 export function coveredState(state?: string | null): boolean {
   return COVERED_STATES.has(abbrevState(state ?? "").toUpperCase());
 }
+
+export interface MarketNavEntry {
+  id: string;
+  name: string;
+  region: string;
+  /** alias text for palette search: "brooklyn" or "fort worth" must land */
+  search: string;
+}
+
+/** Slim covered-market list for client navigation (⌘K). Built SERVER-side
+ *  and passed as a prop — the full metros.json (notes, sources, gaps) must
+ *  never ride into a client bundle. */
+export function coveredMarketNav(): MarketNavEntry[] {
+  const aliasesById = new Map<string, string[]>();
+  for (const m of MATCHERS) {
+    const list = aliasesById.get(m.id) ?? [];
+    list.push(...m.keywords);
+    aliasesById.set(m.id, list);
+  }
+  return (metrosSeed.metros ?? []).map((m) => ({
+    id: m.id,
+    name: m.name as string,
+    region: ((m as { region?: string }).region ?? "covered market") as string,
+    search: [m.name, ...(aliasesById.get(m.id) ?? [])].join(" "),
+  }));
+}

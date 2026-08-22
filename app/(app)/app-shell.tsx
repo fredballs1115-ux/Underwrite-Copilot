@@ -7,6 +7,7 @@ import { signOut } from "@/app/login/actions";
 import { LogoMark } from "@/app/logo";
 import { ToastProvider } from "./toaster";
 import { CommandPalette } from "./command-palette";
+import type { MarketNavEntry } from "@/lib/market-match";
 
 function NavIcon({
   className,
@@ -98,9 +99,12 @@ const IconNews = (p: { className?: string }) => (
 /** The signed-in app chrome: a dark navy sidebar on desktop, a top bar on mobile. */
 export function AppShell({
   userEmail,
+  markets = [],
   children,
 }: {
   userEmail: string;
+  /** slim covered-market list for the ⌘K palette (built server-side) */
+  markets?: MarketNavEntry[];
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -117,7 +121,7 @@ export function AppShell({
 
   return (
     <ToastProvider>
-    <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+    <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} markets={markets} />
     <a
       href="#main"
       className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-brand focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"

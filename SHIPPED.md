@@ -44,6 +44,7 @@ section links the demo's recorded-sales read).
 | 0001–0026 | applied |
 | 0027_photos.sql | apply if you haven't (photo metadata caching) |
 | **0028_property_database.sql** | **NEW — required for everything above** (its `journal_entries` table ended up unused after the Journal became the News feed — harmless, ignore it) |
+| **0029_rules_scope.sql** | **NEW — run it if you EVER seeded the rules table**: deletes the rules for jurisdictions outside the 15 covered markets from the database (the seeder only upserts, so a pre-cut database keeps showing them otherwise) |
 
 ## YOUR TASKS — things I could not possibly do
 
