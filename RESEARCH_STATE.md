@@ -4,6 +4,15 @@ Resume file per project protocol: a future session starts HERE and does not
 repeat finished work. Ops/go-live steps + the ranked gap list live in
 `INTEGRATION_NOTES.md`.
 
+**2026-08-22 (session 4f, 50-state close-out)** — 14 rules (68 total,
+ALL 50 STATES + DC): IA/KS/ID/SD/ND/MT/NM preemptions (sourced, cites
+queued); NE/AR/MS no-rent-control-at-any-level; **WV joins RI in the
+no-preemption latent-authority class**; WY encoded with its tracker
+CONFLICT named; AK preemption unconfirmed; **HI flagged check-not-clear**
+(Maui county-level measures — county screen queued). AR's missing implied
+warranty of habitability noted for the future tenant-law axis. Homepage
+scale stats now honestly read every-state coverage, derived.
+
 **2026-08-22 (session 4e, fourth sweep — the South + New England close-out)**
 — 8 rules (54 total, spanning 36 states + DC) + 7 metros (43): KY/SC/AL/LA/OK
 preemptions (SC statute language quoted verbatim; AL cite §11-80-8.1; all
