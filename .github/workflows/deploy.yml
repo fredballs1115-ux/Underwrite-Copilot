@@ -1,0 +1,43 @@
+name: deploy-to-render
+# GitHub-driven deploys: Render's auto-deploy is confirmed not firing
+# (live-verify run #1 proved the live site serves a pre-session build), so
+# this workflow POSTs Render's Deploy Hook on every push to main instead.
+#
+# ACTIVATION (one step, ~2 min): Render dashboard → underwrite-copilot-web →
+# Settings → Deploy Hook → copy the URL → GitHub repo → Settings → Secrets
+# and variables → Actions → New repository secret →
+#   name: RENDER_DEPLOY_HOOK   value: <the URL>
+# Until the secret exists this job no-ops with a reminder instead of failing.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "RENDER_DEPLOY_HOOK secret not set — skipping. Add it (Render → Settings → Deploy Hook) to enable GitHub-driven deploys."
+            exit 0
+          fi
+          code=$(curl -sS -o /dev/null -w "%{http_code}" -X POST "$HOOK")
+          echo "Render deploy hook responded HTTP $code"
+          [ "$code" -ge 200 ] && [ "$code" -lt 300 ]
+      - name: Wait, then verify the live site picked it up
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then exit 0; fi
+          echo "Waiting 6 minutes for the build..."
+          sleep 360
+          curl -sS -o body.html --max-time 60 https://underwrite-copilot.onrender.com/ || true
+          if grep -q "The OM lands Thursday" body.html; then
+            echo "LIVE SITE NOW CURRENT ✔"
+          else
+            echo "Live site still old after deploy trigger — open Render → Events and read the build log (build may be failing)."
+            exit 1
+          fi
