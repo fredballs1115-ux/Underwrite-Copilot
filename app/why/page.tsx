@@ -59,7 +59,7 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "It knows the ground",
     body: [
-      `Give a deal an address and the app checks the local rules: rent control coverage, small-landlord exemptions, purchase rights — ${RULE_COUNT} machine-evaluable rules focused on the Mid-Atlantic and the ${MAJOR_MARKET_COUNT} biggest US markets, DC to Jersey City to LA to Chicago. It answers with the statute linked, or names the open question. Unknown jurisdictions say so — never a silent pass.`,
+      `Give a deal an address and the app checks the local rules: rent control coverage, small-landlord exemptions, purchase rights — ${RULE_COUNT} machine-evaluable rules focused on the Mid-Atlantic and the ${MAJOR_MARKET_COUNT} biggest US markets, DC to Brooklyn to LA to Chicago. It answers with the statute linked, or names the exact open question — year built, whether you'll live in a unit — and takes your answer right on the deal. Unknown jurisdictions say so — never a silent pass.`,
       `Recorded sales nearby pull automatically from government records — live county APIs in ${COVERAGE_SUMMARY} today, plus a bulk property database of government deed records with ${WIRED_MARKETS.join(", ")} pipelines wired. Public records, clearly labeled. Not an appraisal.`,
     ],
   },
