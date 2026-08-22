@@ -4,7 +4,7 @@ import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/serve
 import { getBilling } from "@/lib/billing";
 import { type DealRow } from "@/lib/deals";
 import type { ExtractionResult, ExtractedMetric, FirstSignal } from "@/lib/anthropic/types";
-import type { StructuredAddress } from "@/lib/address";
+import { parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { Pipeline, type DealCard } from "./pipeline";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
@@ -55,9 +55,13 @@ export default async function DealsPage({
     deleted?: string;
     joined?: string;
     new?: string;
+    addr?: string;
   }>;
 }) {
-  const { error: errorCode, deleted, joined, new: newParam } = await searchParams;
+  const { error: errorCode, deleted, joined, new: newParam, addr } = await searchParams;
+  // Pull Comps hand-off: a structured address arrives as ?addr=<json> and
+  // opens the new-deal form on the manual tab with the address pre-picked.
+  const prefillAddress = parseStructuredAddress(addr ?? "");
   const errorMessage = errorCode ? (ERRORS[errorCode] ?? null) : null;
   const notice = deleted
     ? "Deal deleted."
@@ -236,7 +240,8 @@ export default async function DealsPage({
         deals={deals}
         errorMessage={errorMessage}
         notice={notice}
-        openNew={newParam}
+        openNew={newParam ?? (prefillAddress ? "prefill" : undefined)}
+        prefillAddress={prefillAddress}
         onboarding={onboarding}
         billing={
           billing

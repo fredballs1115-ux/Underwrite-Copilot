@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { parseStructuredAddress } from "@/lib/address";
@@ -87,9 +88,31 @@ export default async function PullCompsPage({
 
       {result ? (
         <section className="rounded-xl border border-line bg-surface p-4">
-          <h2 className="text-sm font-semibold">
-            Recorded sales near <span className="font-mono font-normal">{q}</span>
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold">
+              Recorded sales near <span className="font-mono font-normal">{q}</span>
+            </h2>
+            {/* The hand-off: this pull becomes a screened deal in one click —
+                the new-deal form opens on the manual tab, address picked. */}
+            <Link
+              href={`/deals?addr=${encodeURIComponent(
+                JSON.stringify(
+                  picked ?? {
+                    label: q,
+                    street: "",
+                    city: "",
+                    state: "",
+                    zip: "",
+                    county: "",
+                    submarket: "",
+                  }
+                )
+              )}`}
+              className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              Screen this address as a deal →
+            </Link>
+          </div>
           <CompsResultView result={result} subjectPrice={null} />
         </section>
       ) : (
