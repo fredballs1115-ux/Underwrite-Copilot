@@ -11,7 +11,7 @@ on:
         required: true
         default: philadelphia
         type: choice
-        options: [philadelphia]
+        options: [philadelphia, nyc, cook_county]
       max_rows:
         description: "Row cap (smoke-test with 5000 first)"
         required: false
