@@ -1,33 +1,47 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/server";
+import { parseStructuredAddress } from "@/lib/address";
 import { COVERAGE_SUMMARY } from "@/lib/public-comps/core";
 import { computeRecordComps } from "@/lib/public-comps/run";
+import { AddressAutocomplete } from "../address-autocomplete";
 import { CompsResultView } from "./result-view";
 
 export const metadata: Metadata = { title: "Pull comps" };
-// Every render with ?q= hits the geocoder + the property DB / live records
-// API — never cache a comps pull.
+// Every render with an address hits the geocoder + the property DB / live
+// records API — never cache a comps pull.
 export const dynamic = "force-dynamic";
 
 /**
- * Standalone Pull Comps tool: type any address, get recorded sales around it
- * from the same engine the deal screener runs automatically — ingested deed
- * records first (any market the property database covers), live county/city
- * records APIs second. No deal required.
+ * Standalone Pull Comps tool: the SAME search-as-you-type address box the
+ * deal forms use (Photon suggestions while typing; a pick carries the full
+ * structured address), feeding the same engine the screener runs
+ * automatically — ingested deed records first, live county/city records
+ * APIs second. No deal required.
  */
 export default async function PullCompsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; cls?: string }>;
+  searchParams: Promise<{ q?: string; addr?: string; cls?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/comps");
 
   const params = await searchParams;
-  const q = (params.q ?? "").trim().slice(0, 160);
+  // Structured pick first (routes to the right county source); raw text is
+  // the degraded fallback when the geocoder was unreachable while typing.
+  const picked = parseStructuredAddress(params.addr ?? "");
+  const q = picked?.label ?? (params.q ?? "").trim().slice(0, 160);
   const cls = params.cls === "multifamily" ? "multifamily" : "";
-  const result = q ? await computeRecordComps({ label: q, assetClass: cls }) : null;
+  const result = q
+    ? await computeRecordComps({
+        label: q,
+        state: picked?.state,
+        city: picked?.city,
+        county: picked?.county,
+        assetClass: cls,
+      })
+    : null;
 
   return (
     <div className="space-y-5">
@@ -44,13 +58,11 @@ export default async function PullCompsPage({
       <form method="get" className="flex flex-wrap items-end gap-2">
         <label className="min-w-0 grow basis-72">
           <span className="mb-1 block text-xs font-medium text-muted">Address</span>
-          <input
-            type="text"
-            name="q"
-            defaultValue={q}
-            required
-            maxLength={160}
-            placeholder="e.g. 1300 W Girard Ave, Philadelphia, PA"
+          <AddressAutocomplete
+            name="addr"
+            textName="q"
+            defaultValue={picked}
+            placeholder="Start typing — pick the address from the suggestions"
             className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-brand"
           />
         </label>
@@ -82,10 +94,11 @@ export default async function PullCompsPage({
         </section>
       ) : (
         <section className="rounded-xl border border-dashed border-line p-4 text-sm text-muted">
-          Type an address above. Results come from county deed records and the
-          ingested property database — with a source link on every row, and an
-          honest sentence (never a blank) when a jurisdiction isn&apos;t
-          covered yet.
+          Start typing an address above and pick it from the suggestions —
+          picking (rather than free-typing) is what tells the engine the
+          county, so it can route to the right public-records source. Results
+          carry a source link on every row, and an honest sentence (never a
+          blank) when a jurisdiction isn&apos;t covered yet.
         </section>
       )}
     </div>

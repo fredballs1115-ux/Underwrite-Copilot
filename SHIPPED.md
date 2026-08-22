@@ -23,12 +23,14 @@ say exactly what's missing and why.
 | **Philadelphia bulk ingest pipeline** — OPA parcels + last sales via Carto SQL, idempotent upserts, `MAX_ROWS` smoke-testing | GitHub → Actions → "ingest" |
 | **Comps engine, DB-first**: any address near ingested deed records gets comps from the property DB (works in ANY ingested market); live county APIs remain the fallback | every deal's "Recorded sales nearby" panel |
 | **Pull Comps tool** — type any address, no deal required; same engine, honest statuses | app → **Pull comps** (nav + ⌘K) |
-| **The Daily Journal** — weekday CRE entry written from that morning's sourced sweep (Markets / Deals / Policy & Rates / My Markets), every claim linked, failed days visibly marked | app → **Journal** (after crons run) |
-| **Laws** promoted to top-level: browse every rule by state, applies/exempt conditions in plain English, statutory quotes, provenance, recent change flags | app → **Laws** |
+| **News** — the stories feed: every headline the weekday sweep gathers, scored 0–10 for YOUR buy box, each linking to its source; law/rule changes get the top strip; a compact "News for your markets" card sits under the pipeline (per feedback: links to the news itself, no written journal) | app → **News** + pipeline card (after crons run) |
+| **Laws stay on the building** (per feedback: no standalone section) — every deal's address gets its rules evaluated automatically in the Regulation panel; big law changes land in News + the red banner | any deal → Regulation & benchmarks |
 | **Verification steward** — nightly: link health, feed freshness, consistency (incl. SFR-leakage), re-verification of the oldest singly-sourced claims via web search; corrections land in an open changelog, never silently | app → Account → **Data health**; site footer "data last verified" |
-| **Homepage: "The ground layer" section** — live DB stats for all four (comps DB count, rules count, latest journal headline, steward heartbeat), honest not-yet states before data lands | homepage, after the rules playground |
-| Proof strip + footer now carry recorded-sales count, journal headline, and the steward marker (only when real) | homepage |
-| Nav: Pull comps / Journal / Laws added (sidebar, mobile, ⌘K palette) | app shell |
+| **Homepage: "The ground layer" section** — live DB stats for all four (comps DB count, rules count, top scored story, steward heartbeat), honest not-yet states before data lands | homepage, after the rules playground |
+| Proof strip + footer now carry recorded-sales count, the top story, and the steward marker (only when real) | homepage |
+| **Pull Comps types like the deal forms** (per feedback): search-as-you-type suggestions; picking an address hands the engine the county so it routes to the right records source | app → **Pull comps** |
+| Homepage hero restored to "Stop underwriting like a coin flip." (per feedback); the rest of the revamp stays | homepage |
+| Nav: Pull comps / News added (sidebar, mobile, ⌘K palette) | app shell |
 | `data/research/ingestion_sources.md` — every bulk dataset per market (Mid-Atlantic → Tier-1 → Tier-2), access method, status, standing rules | repo |
 
 Per the standing rule: each distinctive feature got top-level nav, a
@@ -41,7 +43,7 @@ section links the demo's recorded-sales read).
 |---|---|
 | 0001–0026 | applied |
 | 0027_photos.sql | apply if you haven't (photo metadata caching) |
-| **0028_property_database.sql** | **NEW — required for everything above** |
+| **0028_property_database.sql** | **NEW — required for everything above** (its `journal_entries` table ended up unused after the Journal became the News feed — harmless, ignore it) |
 
 ## YOUR TASKS — things I could not possibly do
 
