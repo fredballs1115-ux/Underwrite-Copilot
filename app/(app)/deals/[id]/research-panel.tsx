@@ -18,6 +18,7 @@ import {
   type RuleEvaluation,
 } from "@/lib/research";
 import {
+  benchmarksForDeal,
   buildSubject,
   mergeBenchmarks,
   pricePerUnit,
@@ -152,12 +153,11 @@ export async function ResearchPanel({
   const subject = buildSubject({ address, sizeText, sectorFields });
   const evals = address?.state ? evaluateRules(rules, subject) : [];
   const shown = evals.filter((e) => e.outcome !== "not_applicable");
+  const metro = address ? metroForAddress(address) : null;
 
-  // vs-market: match the deal's metro benchmarks by city name.
-  const city = (address?.city ?? "").toLowerCase();
-  const metroBench = benchmarks.filter(
-    (b) => b.metro && city && b.metro.toLowerCase().startsWith(city)
-  );
+  // vs-market: covered-market name first (a Brooklyn deal must find the
+  // "New York City" FMR row), raw city as the fallback.
+  const metroBench = benchmarksForDeal(benchmarks, address?.city, metro?.name);
   const ppu = pricePerUnit(priceText, sizeText);
 
   const hasRegulation = shown.length > 0;
@@ -173,8 +173,6 @@ export async function ResearchPanel({
       </section>
     );
   }
-
-  const metro = metroForAddress(address);
 
   return (
     <section className="rounded-xl border border-line bg-surface p-4">
