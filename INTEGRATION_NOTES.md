@@ -79,32 +79,38 @@ OZ 2.0 timing, address-level listing examples (all marked "reconfirm live").
 
 ## Top 10 gaps, ranked by how much they'd change your underwriting
 
+(Re-ranked 2026-08-22 after the two big-city sweeps — items the sweeps
+closed are gone: NJ's two biggest cities are screened, the LA cap is
+verified, SF/Twin Cities/TN/NC are encoded.)
+
 1. **D.C. Law 26-80 enacted section text** — the 2–4 unit TOPA exemption's
-   "business corporation" definition is on practitioner authority; if it
-   reads broader (any entity), DC 2–4s get even cleaner. Verify before any
-   TOPA-sensitive close; also the Council's follow-up "tightening" item.
+   "business corporation" definition; still on practitioner-alert authority.
 2. **PG County § 13-147 code text + effective dates** — both current
-   confirmations are county-FAQ documents; the enactment/effective dates
-   conflict across sources. One Legistar pull settles both.
-3. **FY2026 SAFMR dollar values by target ZIP** (22191/93, 20109-11, DC ZIPs)
-   — Section 8 rents at 187% of FMR (DCHA) may be your best DC exit rents;
-   the FY2026_FMR_Schedule.pdf needs an unblocked network.
-4. **ACS B25024 2-4 unit stock counts per metro** — the method is proven,
-   the API was blocked; these counts decide where dated stock actually is.
-5. **NJ municipal rent-control screen** — ~100 ordinances unscreened; NJ
-   deals are un-underwritable until the target town's ordinance is read.
+   confirmations are secondary.
+3. **FY2026 big-metro FMR primary pulls (huduser)** — ten metros' 2BR FMRs
+   failed the 2-source bar (Chicago/LA/SF/Seattle/Boston/Dallas/Miami/
+   Atlanta/Denver/Phoenix + Twin Cities/Nashville/Charlotte); NYC $2,910
+   made it as sourced. Also FY2026 SAFMRs by target ZIP.
+4. **ACS B25024 2-4 unit stock counts per metro** — partially superseded:
+   wired metros (Philly/NYC/Cook) now count REAL parcels from the property
+   DB; ACS still decides where dated stock is in unwired metros.
+5. **First ingest runs + remaining pipelines** — Philadelphia/NYC/Cook are
+   wired but need their Actions runs (user task); Boston CKAN, King County
+   sales file, Hennepin/Ramsey, POLARIS/Wake, TX CADs documented next.
 6. **CY2026 FHA loan limits (DC metro) + the 4000.1 self-sufficiency test
    parameters** — gates the house-hack financing path on 3-4 units.
-7. **In-place rents for Providence/Albany/Scranton** — the yield ranking of
-   the top expansion metros rests on price data alone so far.
-8. **Virginia enabling-bill watch (HB 278/SB 355 study)** — passage would
-   end the no-rent-control baseline; the intel watch covers it, but check
-   each GA session.
+7. **NJ beyond Newark/Jersey City** — ~98 municipal ordinances unscreened;
+   the statewide catch-all rule says so on every other NJ deal.
+8. **Watch items with teeth**: Virginia enabling-bill study (2027 session),
+   MA rent-control revival (SJC blocked the 2026 ballot, pressure ongoing),
+   Minneapolis charter authorization (no ordinance yet), St. Paul rollback
+   churn, rolling exemption windows (CA 15yr / WA 12yr / OR 15yr) advancing
+   each Jan 1 — the steward re-verifies these nightly.
 9. **MHC-specific tenant statutes (MD/VA/PA/NC)** — needed before the
    rank-4 diversifier is actionable; not yet in the rules engine.
-10. **Cap-rate series for the 2-4 unit segment specifically** — institutional
-    surveys exclude it; gross-yield proxies from verified price+rent pairs
-    are the current stand-in.
+10. **Cap-rate series for the 2-4 unit segment specifically** — becomes
+    COMPUTABLE per-metro once ingested sales accumulate alongside rent
+    data; gross-yield proxies are the stand-in.
 
 ## Environment caveat for future build sessions
 
