@@ -231,13 +231,27 @@ export async function ResearchPanel({
         </p>
       )}
 
-      {!hasRegulation && (
-        <p className="mt-2 text-sm text-muted">
-          No rules on file for {address.city || address.county || address.state}
-          {" — "}this means the research layer hasn&apos;t screened this
-          jurisdiction yet, not that it&apos;s unregulated.
-        </p>
-      )}
+      {!hasRegulation &&
+        (evals.length > 0 ? (
+          // Rules exist for this jurisdiction — they evaluated and none bite
+          // this deal. Saying "not screened" here would be false: the sample
+          // deal's Philadelphia sits exactly in this state (its eviction-
+          // diversion mandate keys off a filing, not a purchase).
+          <p className="mt-2 text-sm text-muted">
+            Screened: {evals.length} rule{evals.length === 1 ? "" : "s"} on
+            file for {address.city || address.county || address.state} — none
+            triggered by this deal&apos;s facts. Rules that key off events (an
+            eviction filing, a vacancy registration) stay dormant until those
+            events.
+          </p>
+        ) : (
+          <p className="mt-2 text-sm text-muted">
+            No rules on file for{" "}
+            {address.city || address.county || address.state}
+            {" — "}this means the research layer hasn&apos;t screened this
+            jurisdiction yet, not that it&apos;s unregulated.
+          </p>
+        ))}
 
       {hasRegulation && (
         <ul className="mt-3 space-y-3">
