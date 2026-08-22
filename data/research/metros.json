@@ -206,7 +206,8 @@
    "comps_provider": "philly_opa",
    "gaps": [
     "City permits pipeline (BPS blocked)"
-   ]
+   ],
+   "ingest_market": "philadelphia"
   },
   {
    "id": "nyc",
@@ -232,7 +233,8 @@
    "gaps": [
     "PLUTO+Rolling Sales ingest wiring (BBL join)",
     "borough-level 2-4 unit medians"
-   ]
+   ],
+   "ingest_market": "nyc"
   },
   {
    "id": "chicago",
@@ -255,7 +257,8 @@
    "gaps": [
     "Cook County Socrata dataset ids (resolve at wiring)",
     "FY2026 FMR"
-   ]
+   ],
+   "ingest_market": "cook_county"
   },
   {
    "id": "boston",

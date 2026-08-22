@@ -213,7 +213,7 @@ async function MidAtlanticTable() {
 // holds for it — FMR benchmarks, market notes, the regulatory rules in force
 // (statute-linked, status-labeled), comps availability, and example
 // properties. Server-rendered; selection is a query param, so it's linkable.
-function MetroExplorer({ selected }: { selected?: string }) {
+async function MetroExplorer({ selected }: { selected?: string }) {
   const metros = metrosSeed.metros ?? [];
   const active =
     metros.find((m) => m.id === selected) ?? metros[0];
@@ -221,6 +221,31 @@ function MetroExplorer({ selected }: { selected?: string }) {
   const rules = seedRules().filter((r) =>
     (active.rule_ids as string[] | undefined)?.includes(r.id)
   );
+  // Live property-DB stock counts for metros whose bulk pipeline is wired —
+  // real rows replace hand-entered stats; zero rows renders nothing rather
+  // than a hollow "0".
+  const ingestMarket = (active as { ingest_market?: string }).ingest_market;
+  let stock: { parcels: number; sales: number } | null = null;
+  if (ingestMarket) {
+    try {
+      const supabase = await createSupabaseServerClient();
+      const [p, s] = await Promise.all([
+        supabase
+          .from("properties")
+          .select("id", { count: "exact", head: true })
+          .eq("market", ingestMarket),
+        supabase
+          .from("recorded_sales")
+          .select("id", { count: "exact", head: true })
+          .eq("market", ingestMarket),
+      ]);
+      if ((p.count ?? 0) > 0 || (s.count ?? 0) > 0) {
+        stock = { parcels: p.count ?? 0, sales: s.count ?? 0 };
+      }
+    } catch {
+      // migration 0028 not run — no line
+    }
+  }
   const fmr = active.fmr_fy2026 as {
     "2br"?: number | null;
     range?: [number, number];
@@ -359,6 +384,26 @@ function MetroExplorer({ selected }: { selected?: string }) {
             </ul>
           )}
         </div>
+
+        {stock && (
+          <p className="text-sm">
+            <span className="text-[11px] uppercase tracking-wide text-muted">
+              Property database
+            </span>{" "}
+            <span className="font-mono font-semibold tabular-nums">
+              {stock.parcels.toLocaleString()}
+            </span>{" "}
+            investable parcels ·{" "}
+            <span className="font-mono font-semibold tabular-nums">
+              {stock.sales.toLocaleString()}
+            </span>{" "}
+            deed-recorded sales
+            <span className="ml-1.5 text-[11px] text-muted">
+              — live counts from ingested government records; single-family
+              excluded at ingestion
+            </span>
+          </p>
+        )}
 
         <p className="text-xs text-muted">{compsLine}</p>
 
