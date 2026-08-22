@@ -1,0 +1,5 @@
+{
+  "$schema_note": "Written by scripts/audit-source-links.mjs (needs network egress — run locally or as a Render job). lib/link-audit.ts consults this before rendering any provenance link as clickable: ok:false renders as plain text. Empty results = nothing audited yet; links render normally until then.",
+  "audited_at": null,
+  "results": {}
+}

@@ -9,6 +9,7 @@ import {
   type MarketGroup,
 } from "@/lib/market-memory";
 import { mergeBenchmarks, seedBenchmarks, seedRules } from "@/lib/research-data";
+import { linkOk } from "@/lib/link-audit";
 import { COVERAGE_DISCOVERY, COVERAGE_SUMMARY, PROVIDERS } from "@/lib/public-comps/core";
 import metrosSeed from "@/data/research/metros.json";
 import multifamilySeed from "@/data/research/multifamily.json";
@@ -100,9 +101,112 @@ export default async function MarketDataPage({
 
       <MetroExplorer selected={metroParam} />
       <MidAtlanticTable />
+      <SectorRanges />
       <RatesStrip />
       <IntelDigestCard />
     </div>
+  );
+}
+
+// ── Sector cap-rate ranges (ship-it pass) ───────────────────────────────────
+// Investable asset classes priced the way each class actually prices: cap-
+// rate RANGES per researched tier, never a single blended number, provenance
+// per row. Single-family residential is excluded from every market surface
+// by policy — filtered here at the data level, not just hidden.
+async function SectorRanges() {
+  const supabase = await createSupabaseServerClient();
+  let benchmarks = seedBenchmarks();
+  try {
+    const { data } = await supabase.from("benchmarks").select("*");
+    if (data?.length) benchmarks = mergeBenchmarks(data as never);
+  } catch {
+    // seeds stand
+  }
+  const rows = benchmarks
+    .filter(
+      (b) =>
+        b.metric.startsWith("cap_rate__") &&
+        b.sector !== "sfr_btr" // investable classes only — no single-family on market surfaces
+    )
+    .sort((a, b) => a.sector.localeCompare(b.sector) || (a.low ?? 0) - (b.low ?? 0));
+  if (rows.length === 0) return null;
+
+  const sectorLabel: Record<string, string> = {
+    office: "Office / medical",
+    industrial: "Industrial / IOS",
+    retail: "Retail / NNN",
+    hospitality_str: "Hospitality",
+    self_storage: "Self-storage",
+    senior_housing: "Senior housing",
+    manufactured_housing: "Manufactured housing",
+    specialty: "Specialty",
+    multifamily: "Multifamily",
+  };
+
+  return (
+    <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold tracking-tight">
+          Sector cap-rate ranges
+        </h2>
+        <span className="text-[11px] text-muted">
+          national tiers · ranges, never single numbers · investable classes only
+        </span>
+      </div>
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full min-w-[560px] text-left text-sm">
+          <thead>
+            <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
+              <th className="py-1.5 pr-3 font-medium">Sector</th>
+              <th className="py-1.5 pr-3 font-medium">Tier</th>
+              <th className="py-1.5 pr-3 font-medium">Cap-rate range</th>
+              <th className="py-1.5 font-medium">Provenance</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((b) => (
+              <tr key={`${b.sector}|${b.metric}`} className="border-b border-line/60">
+                <td className="py-1.5 pr-3 font-medium">
+                  {sectorLabel[b.sector] ?? b.sector}
+                </td>
+                <td className="py-1.5 pr-3 text-xs text-muted">
+                  {(b.note ?? "").split(" — ")[0]}
+                </td>
+                <td className="py-1.5 pr-3 font-mono tabular-nums">
+                  {b.low === b.high ? `${b.low}%` : `${b.low}%–${b.high}%`}
+                </td>
+                <td className="py-1.5 text-[11px] text-muted">
+                  {b.status}
+                  {" · "}
+                  {b.as_of}
+                  {b.source && linkOk(b.source) !== false && (
+                    <>
+                      {" · "}
+                      <a
+                        href={b.source}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline decoration-dotted underline-offset-2 hover:text-ink"
+                      >
+                        source
+                      </a>
+                    </>
+                  )}
+                  {b.source && linkOk(b.source) === false && (
+                    <> · source on file — link unavailable</>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-[11px] text-muted">
+        Tiers without a confirmable range are gaps in the research files, not
+        rows here. Deal-level pricing uses the recorded-sales comps panel, not
+        these national bands.
+      </p>
+    </section>
   );
 }
 
@@ -338,7 +442,7 @@ async function MidAtlanticTable() {
           <thead>
             <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
               <th className="py-1.5 pr-3 font-medium">Metro</th>
-              <th className="py-1.5 pr-3 font-medium">Median sale</th>
+              <th className="py-1.5 pr-3 font-medium">Median sale (2–4 unit)</th>
               <th className="py-1.5 pr-3 font-medium">Sales / mo</th>
               <th className="py-1.5 pr-3 font-medium">Active</th>
               <th className="py-1.5 font-medium">Note</th>

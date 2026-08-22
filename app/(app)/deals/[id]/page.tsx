@@ -728,7 +728,10 @@ export default async function DealPage({
       />
 
       <div className="mt-6 space-y-4">
-        {dealAddress?.label && (
+        {/* Street-level imagery requires a street-level address: a
+            neighborhood-only placement (like the sample) would render some
+            random block — wrong in context. */}
+        {dealAddress?.label && dealAddress.street && (
           <BuildingPhoto dealId={id} alt={`Street view of ${dealAddress.label}`} />
         )}
         <PublicCompsPanel
