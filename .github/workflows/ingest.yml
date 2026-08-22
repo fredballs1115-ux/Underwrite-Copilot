@@ -1,0 +1,37 @@
+name: ingest
+# Bulk property-data ingestion, run from GitHub's network (the dev container
+# has none). Pick a market; the pipeline upserts idempotently, so re-runs are
+# safe and MAX_ROWS lets you smoke-test small first. Requires the two
+# Supabase Actions secrets; no-ops with instructions until they exist.
+on:
+  workflow_dispatch:
+    inputs:
+      market:
+        description: "Market pipeline to run"
+        required: true
+        default: philadelphia
+        type: choice
+        options: [philadelphia]
+      max_rows:
+        description: "Row cap (smoke-test with 5000 first)"
+        required: false
+        default: "400000"
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install
+      - name: Run pipeline
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MAX_ROWS: ${{ inputs.max_rows }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "Supabase Actions secrets not set (repo Settings → Secrets → Actions: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY). Skipping."
+            exit 0
+          fi
+          npx tsx "scripts/ingest/${{ inputs.market }}.ts"
