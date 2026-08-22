@@ -250,16 +250,13 @@ export function buildSubject(input: {
     built_year: input.yearBuilt ?? undefined,
     building_permit_year: numField("building_permit_year"),
     exemption_registered_with_rad: boolField("rad_exemption_registered"),
-    ...(otherUnits !== undefined
-      ? {
-          owner_other_rental_units_in_dc: otherUnits,
-          owner_total_rental_units_in_county: otherUnits + (units ?? 0),
-          // Conservative floor: the stated in-jurisdiction holdings plus this
-          // deal. The panel's caveat line declares the no-other-units
-          // assumption this rides on.
-          owner_total_rental_units_in_state: otherUnits + (units ?? 0),
-        }
-      : {}),
+    // Portfolio totals ALWAYS include this deal's own units — the ≤N-unit
+    // small-landlord tests (PG ≤5, NY Good Cause ≤10) must fail on an
+    // acquisition that alone exceeds the cap, even with the default
+    // "no other units" assumption the panel declares.
+    owner_total_rental_units_in_county: (otherUnits ?? 0) + (units ?? 0),
+    owner_total_rental_units_in_state: (otherUnits ?? 0) + (units ?? 0),
+    ...(otherUnits !== undefined ? { owner_other_rental_units_in_dc: otherUnits } : {}),
     transaction: "sale_of_rental_housing_accommodation",
   };
 }

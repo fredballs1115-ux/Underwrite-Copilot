@@ -77,6 +77,8 @@ export default async function NewsPage({
       supabase
         .from("regulatory_alerts")
         .select("id, rule_id, headline, url, detail, detected_at")
+        // A dismissed banner must stay dismissed here too.
+        .is("dismissed_at", null)
         .order("detected_at", { ascending: false })
         .limit(5),
     ]);

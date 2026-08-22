@@ -16,6 +16,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { normalizeCookClass, numOrNull } from "../../lib/ingest/normalize";
+import { pin14, resolveFields, soda, soqlLit, str } from "../../lib/ingest/socrata";
 
 const MARKET = "cook_county";
 const UNIVERSE = "https://datacatalog.cookcountyil.gov/resource/nj4t-kc8j.json";
@@ -28,6 +29,9 @@ const PAGE = 5000;
 const MAX_ROWS = Number(process.env.MAX_ROWS ?? 400000);
 const SALES_MAX = Math.max(2000, Math.floor(MAX_ROWS / 2));
 const SINCE = process.env.SINCE ?? "2024-01-01";
+// Resume point for the universe phase: a capped run prints the offset to
+// pass on the next run — offsets are NOT persisted anywhere else.
+const OFFSET = Number(process.env.OFFSET ?? 0);
 
 const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -36,37 +40,6 @@ if (!url || !key) {
   process.exit(1);
 }
 const supabase = createClient(url, key, { auth: { persistSession: false } });
-
-async function soda(base: string, params: Record<string, string>): Promise<Record<string, unknown>[]> {
-  const qs = new URLSearchParams(params).toString();
-  const res = await fetch(`${base}?${qs}`, {
-    headers: { accept: "application/json", "user-agent": "underwrite-copilot-ingest/1.0" },
-    signal: AbortSignal.timeout(90000),
-  });
-  if (!res.ok) throw new Error(`SODA HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  return (await res.json()) as Record<string, unknown>[];
-}
-
-function resolveFields(sample: Record<string, unknown>, wanted: Record<string, string[]>) {
-  const keys = Object.keys(sample);
-  const out: Record<string, string> = {};
-  const missing: string[] = [];
-  for (const [name, candidates] of Object.entries(wanted)) {
-    const hit = candidates.find((c) => keys.includes(c));
-    if (hit) out[name] = hit;
-    else missing.push(`${name} (tried ${candidates.join("/")})`);
-  }
-  if (missing.length) {
-    throw new Error(`dataset fields not found: ${missing.join("; ")} — available: ${keys.join(", ")}`);
-  }
-  return out;
-}
-
-const str = (v: unknown) => (v === null || v === undefined ? null : String(v));
-const pin14 = (v: unknown) => {
-  const digits = (str(v) ?? "").replace(/\D/g, "");
-  return digits ? digits.padStart(14, "0") : null;
-};
 
 // ── Phase A: parcel universe (latest year), pin→coords map ─────────────────
 const coordsByPin = new Map<string, { lat: number; lng: number }>();
@@ -95,13 +68,14 @@ let uniDropped = 0;
   if (!maxYear) throw new Error("could not determine latest universe year");
   console.log(`latest universe year: ${maxYear}`);
 
-  let offset = 0;
+  let offset = OFFSET;
   for (;;) {
     const rows = await soda(UNIVERSE, {
       $select: [f.pin, f.cls, f.lat, f.lng, addrField, cityField].filter(Boolean).join(","),
-      // Latest year only, and skip the single-family ocean server-side
+      // Latest year only (soqlLit: quoting a NUMBER column raises a SODA
+      // type-mismatch), and skip the single-family ocean server-side
       // (211/212 kept) — the normalizer still gates the rest.
-      $where: `${f.year} = '${maxYear}' and (not starts_with(${f.cls}, '2') or ${f.cls} in ('211','212'))`,
+      $where: `${f.year} = ${soqlLit(maxYear)} and (not starts_with(${f.cls}, '2') or ${f.cls} in ('211','212'))`,
       $order: f.pin,
       $limit: String(PAGE),
       $offset: String(offset),
@@ -152,7 +126,10 @@ let uniDropped = 0;
     }
     console.log(`universe → seen ${uniSeen} · kept ${uniKept} · dropped ${uniDropped}`);
     if (uniSeen >= MAX_ROWS) {
-      console.log(`MAX_ROWS ${MAX_ROWS} reached on the universe — stopping phase A (idempotent re-runs continue).`);
+      console.log(
+        `MAX_ROWS ${MAX_ROWS} reached on the universe — phase A stopped at offset ${offset}. ` +
+          `Re-running repeats THIS window; to continue where this run stopped, re-run with OFFSET=${offset}.`
+      );
       break;
     }
   }
@@ -181,7 +158,9 @@ let salesDropped = 0;
   for (;;) {
     const rows = await soda(SALES, {
       $where: `${f.date} >= '${SINCE}T00:00:00.000'`,
-      $order: `${f.date} DESC`,
+      // Tie-break on pin: same-date rows run deep, and offset paging over a
+      // non-unique order silently skips rows.
+      $order: `${f.date} DESC, ${f.pin}`,
       $limit: String(PAGE),
       $offset: String(offset),
     });
@@ -222,7 +201,9 @@ let salesDropped = 0;
     if (deeds.length) {
       const { error } = await supabase
         .from("recorded_sales")
-        .upsert(deeds, { onConflict: "market,parcel_id,sale_date,price", ignoreDuplicates: true });
+        // DO UPDATE (not ignoreDuplicates): a fuller universe window on a
+        // later run must be able to backfill coordinates on existing rows.
+        .upsert(deeds, { onConflict: "market,parcel_id,sale_date,price" });
       if (error) throw new Error(`recorded_sales upsert: ${error.message}`);
       salesKept += deeds.length;
     }

@@ -119,7 +119,7 @@ describe("statewide caps and preemptions", () => {
   });
 });
 
-describe("buildSubject statewide totals", () => {
+describe("buildSubject portfolio totals", () => {
   it("propagates the in-jurisdiction answer to the statewide floor", () => {
     const s = buildSubject({
       address: { state: "NY", city: "New York" },
@@ -128,8 +128,19 @@ describe("buildSubject statewide totals", () => {
     });
     expect(s.owner_total_rental_units_in_state).toBe(6);
   });
-  it("defaults the statewide portfolio to zero, matching the panel's stated assumption", () => {
-    const s = buildSubject({ address: { state: "NY", city: "New York" }, sizeText: "4 units" });
-    expect(s.owner_total_rental_units_in_state).toBe(0);
+  it("ALWAYS counts the deal's own units — a 15-unit acquisition can't ride the small-landlord exemption via the default", () => {
+    const s = buildSubject({ address: { state: "NY", city: "New York" }, sizeText: "15 units" });
+    expect(s.owner_total_rental_units_in_state).toBe(15);
+    const o = outcomes({
+      ...BASE,
+      state: "NY",
+      locality: ["New York"],
+      units: 15,
+      built_year: 1985,
+      owner_total_rental_units_in_state: 15,
+    });
+    // Not exempt; owner-occupancy is the one path left open, so it reads as
+    // an open question rather than a silent pass either way.
+    expect(o["ny-good-cause-eviction"]).toBe("possibly_applies");
   });
 });

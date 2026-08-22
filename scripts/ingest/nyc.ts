@@ -23,6 +23,7 @@ import {
   normalizeNycCategory,
   numOrNull,
 } from "../../lib/ingest/normalize";
+import { resolveFields, soda, str } from "../../lib/ingest/socrata";
 
 const MARKET = "nyc";
 const PLUTO = "https://data.cityofnewyork.us/resource/64uk-42ks.json";
@@ -35,6 +36,9 @@ const PAGE = 5000;
 const MAX_ROWS = Number(process.env.MAX_ROWS ?? 400000);
 const SALES_MAX = Math.max(2000, Math.floor(MAX_ROWS / 2));
 const SINCE = process.env.SINCE ?? "2024-01-01";
+// Resume point for the PLUTO phase: a capped run prints the offset to pass
+// on the next run — offsets are NOT persisted anywhere else.
+const OFFSET = Number(process.env.OFFSET ?? 0);
 
 const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -44,35 +48,6 @@ if (!url || !key) {
 }
 const supabase = createClient(url, key, { auth: { persistSession: false } });
 
-async function soda(base: string, params: Record<string, string>): Promise<Record<string, unknown>[]> {
-  const qs = new URLSearchParams(params).toString();
-  const res = await fetch(`${base}?${qs}`, {
-    headers: { accept: "application/json", "user-agent": "underwrite-copilot-ingest/1.0" },
-    signal: AbortSignal.timeout(90000),
-  });
-  if (!res.ok) throw new Error(`SODA HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  return (await res.json()) as Record<string, unknown>[];
-}
-
-/** Field-name resolver: Socrata slugs occasionally shift — detect from a
- *  sample row and fail LOUDLY (listing what exists) rather than ingesting
- *  nulls. */
-function resolveFields(sample: Record<string, unknown>, wanted: Record<string, string[]>) {
-  const keys = Object.keys(sample);
-  const out: Record<string, string> = {};
-  const missing: string[] = [];
-  for (const [name, candidates] of Object.entries(wanted)) {
-    const hit = candidates.find((c) => keys.includes(c));
-    if (hit) out[name] = hit;
-    else missing.push(`${name} (tried ${candidates.join("/")})`);
-  }
-  if (missing.length) {
-    throw new Error(`dataset fields not found: ${missing.join("; ")} — available: ${keys.join(", ")}`);
-  }
-  return out;
-}
-
-const str = (v: unknown) => (v === null || v === undefined ? null : String(v));
 
 // ── Phase A: PLUTO parcels (kept classes only) + bbl→coords map ────────────
 const coordsByBbl = new Map<string, { lat: number; lng: number }>();
@@ -96,7 +71,7 @@ let plutoDropped = 0;
   });
   console.log(`PLUTO fields resolved: ${JSON.stringify(f)}`);
 
-  let offset = 0;
+  let offset = OFFSET;
   for (;;) {
     const rows = await soda(PLUTO, {
       $select: Object.values(f).join(","),
@@ -150,7 +125,10 @@ let plutoDropped = 0;
     }
     console.log(`PLUTO → seen ${plutoSeen} · kept ${plutoKept} · dropped ${plutoDropped}`);
     if (plutoSeen >= MAX_ROWS) {
-      console.log(`MAX_ROWS ${MAX_ROWS} reached on PLUTO — stopping phase A (re-run to continue; upserts idempotent).`);
+      console.log(
+        `MAX_ROWS ${MAX_ROWS} reached on PLUTO — phase A stopped at offset ${offset}. ` +
+          `Re-running repeats THIS window; to continue where this run stopped, re-run with OFFSET=${offset}.`
+      );
       break;
     }
   }
@@ -185,7 +163,9 @@ let salesDropped = 0;
   let offset = 0;
   for (;;) {
     const rows = await soda(SALES, {
-      $order: `${f.date} DESC`,
+      // Tie-break on block/lot: same-date rows run thousands deep, and
+      // offset paging over a non-unique order silently skips rows.
+      $order: `${f.date} DESC, ${f.block}, ${f.lot}`,
       $limit: String(PAGE),
       $offset: String(offset),
     });
@@ -230,7 +210,9 @@ let salesDropped = 0;
     if (deeds.length) {
       const { error } = await supabase
         .from("recorded_sales")
-        .upsert(deeds, { onConflict: "market,parcel_id,sale_date,price", ignoreDuplicates: true });
+        // DO UPDATE (not ignoreDuplicates): a fuller PLUTO window on a later
+        // run must be able to backfill coordinates on existing sales rows.
+        .upsert(deeds, { onConflict: "market,parcel_id,sale_date,price" });
       if (error) throw new Error(`recorded_sales upsert: ${error.message}`);
       salesKept += deeds.length;
     }
@@ -245,5 +227,5 @@ let salesDropped = 0;
 console.log(
   `nyc ingest complete: ${plutoKept} parcels (${plutoDropped} dropped at the gate), ` +
     `${salesKept} sales since ${SINCE} (${salesNoCoords} without coords — outside the fetched PLUTO window; ` +
-    `re-run with a bigger MAX_ROWS to fill).`
+    `a later run with a bigger MAX_ROWS/OFFSET backfills them).`
 );
