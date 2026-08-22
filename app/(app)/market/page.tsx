@@ -231,7 +231,7 @@ function MetroExplorer({ selected }: { selected?: string }) {
   const providers = Object.fromEntries(PROVIDERS.map((p) => [p.id, p]));
   const compsLine =
     active.comps_provider === null
-      ? "No open sales feed found for this metro yet — comps here are manual-lookup (see county_data_sources.json)."
+      ? "No live sales feed wired for this metro yet — its bulk public-record sources are documented in ingestion_sources.md and load through the property database."
       : active.comps_provider === "discovery"
         ? "Recorded-sales comps staged in discovery mode — the health check resolves the endpoints."
         : `Recorded-sales comps LIVE via ${providers[active.comps_provider as string]?.name ?? active.comps_provider}.`;

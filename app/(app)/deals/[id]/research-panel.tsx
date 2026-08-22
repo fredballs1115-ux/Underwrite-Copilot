@@ -69,6 +69,8 @@ const UNKNOWN_LABELS: Record<string, string> = {
   municipality_adopted_etpa: "whether the municipality adopted ETPA",
   municipality_population_gte: "municipality population",
   occupancy: "owner-occupancy status",
+  owner_occupied_with_units_lte: "owner-occupancy status and unit count",
+  owner_total_rental_units_in_state_lte: "total rental units you own in this state",
 };
 
 function SourceLink({

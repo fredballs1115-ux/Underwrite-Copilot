@@ -56,6 +56,8 @@ export interface RuleSubject {
   owner_natural_persons?: number;
   owner_other_rental_units_in_dc?: number;
   owner_total_rental_units_in_county?: number;
+  /** statewide portfolio (NY Good Cause small-landlord test, etc.) */
+  owner_total_rental_units_in_state?: number;
   owner_form?: string;
   owner_domiciled_in_county?: boolean;
   exemption_registered_with_rad?: boolean;
@@ -140,6 +142,19 @@ function evalCondition(key: string, want: unknown, s: RuleSubject): Tri {
     return y < w ? "yes" : "no";
   }
 
+  // Dedicated composite handlers MUST run before the generic comparator
+  // sweep: "owner_occupied_with_units_lte" ends in _lte but its base is not a
+  // subject field, so the generic block would swallow it as forever-unknown.
+  if (key === "owner_form_any_of" && Array.isArray(want)) {
+    if (s.owner_form === undefined) return "unknown";
+    return want.includes(s.owner_form) ? "yes" : "no";
+  }
+  if (key === "owner_occupied_with_units_lte") {
+    const w = typeof want === "number" ? want : Number(want);
+    if (s.occupancy === undefined || s.units === undefined) return "unknown";
+    return s.occupancy === "owner_occupied" && s.units <= w ? "yes" : "no";
+  }
+
   // comparator suffixes over numeric subject fields
   const cmp = key.match(/^(.*)_(lte|gte|lt|gt)$/);
   if (cmp) {
@@ -153,16 +168,6 @@ function evalCondition(key: string, want: unknown, s: RuleSubject): Tri {
       case "lt": return val < w ? "yes" : "no";
       case "gt": return val > w ? "yes" : "no";
     }
-  }
-
-  if (key === "owner_form_any_of" && Array.isArray(want)) {
-    if (s.owner_form === undefined) return "unknown";
-    return want.includes(s.owner_form) ? "yes" : "no";
-  }
-  if (key === "owner_occupied_with_units_lte") {
-    const w = typeof want === "number" ? want : Number(want);
-    if (s.occupancy === undefined || s.units === undefined) return "unknown";
-    return s.occupancy === "owner_occupied" && s.units <= w ? "yes" : "no";
   }
 
   // plain equality against a same-named subject field

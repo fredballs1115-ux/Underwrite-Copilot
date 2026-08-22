@@ -1,230 +1,617 @@
 {
-  "$schema_note": "Seed file for the regulatory_rules table. status: 'verified' = 2+ independent primary confirmations (incl. 3-0 adversarial verification panels run against primary text in the July 2026 research sessions); 'sourced' = one primary source or exact-phrase snippet confirmation across independent queries; 'unverified_not_found' = rule believed to exist but parameter/text not confirmable — never estimated. applies_if / exempt_if are machine-evaluable conditions over deal inputs: jurisdiction fields, units, building_permit_year, owner_is_natural_person, owner_entity_type, owner_other_units_in_jurisdiction, owner_domiciled_in_county, occupancy.",
-  "as_of": "2026-07-16",
-  "research_provenance": "Two deep-research passes (DMV-wide + East Coast ME-FL) with adversarial verification panels, July 15-16, 2026. Verification panels were partially cut by usage limits; statuses reflect what actually survived. Claims whose panels died retain 'sourced' with their citation.",
-  "rules": [
-    {
-      "id": "dc-rent-stab-coverage",
-      "jurisdiction_state": "DC",
-      "jurisdiction_local": "Washington",
-      "rule_type": "rent_control_coverage",
-      "applies_if": { "units_gte": 1, "building_permit_issued_on_or_before": "1975-12-31", "property_type": "rental_housing" },
-      "exempt_if": { "building_permit_issued_after": "1975-12-31" },
-      "effect": "Rental units in buildings whose building permit issued after Dec 31, 1975 are EXEMPT from DC rent stabilization (D.C. Code § 42-3502.05(a)(2)); pre-1976 stock is presumptively covered unless another exemption applies. Newly created units in existing structures with a C of O after Jan 1, 1980 are also exempt.",
-      "quote": "Any rental unit in any newly constructed housing accommodation for which the building permit was issued after December 31, 1975 ... shall be exempt",
-      "source": "https://code.dccouncil.gov/us/dc/council/code/sections/42-3502.05",
-      "as_of": "2026-07-16",
-      "status": "verified",
-      "verification": "3-0 adversarial panel against fetched code text"
-    },
-    {
-      "id": "dc-rent-stab-small-landlord-exemption",
-      "jurisdiction_state": "DC",
-      "jurisdiction_local": "Washington",
-      "rule_type": "rent_control_exemption",
-      "applies_if": { "building_permit_issued_on_or_before": "1975-12-31" },
-      "exempt_if": { "units_lte": 4, "owner_is_natural_person": true, "owner_natural_persons_lte": 4, "owner_other_rental_units_in_dc": 0, "exemption_registered_with_rad": true },
-      "effect": "Pre-1976 building escapes rent stabilization ONLY via the small-landlord exemption: housing accommodation of 4 or fewer rental units (aggregated across structures), owned by not more than 4 natural persons, none holding any direct or indirect interest in any other DC rental unit. An LLC or corporate owner does NOT qualify; owning any other DC rental disqualifies. Claim of exemption must be registered (RAD registration/BBL still required).",
-      "quote": "(3) ... any rental unit in any housing accommodation of 4 or fewer rental units, including any aggregate of 4 rental units whether within the same structure or not, provided: (A) The housing accommodation is owned by not more than 4 natural persons; (B) None of the housing providers has an interest, either directly or indirectly, in any other rental unit in the District of Columbia",
-      "source": "https://code.dccouncil.gov/us/dc/council/code/sections/42-3502.05",
-      "as_of": "2026-07-16",
-      "status": "verified",
-      "verification": "3-0 adversarial panel against fetched code text"
-    },
-    {
-      "id": "dc-topa-sale-trigger",
-      "jurisdiction_state": "DC",
-      "jurisdiction_local": "Washington",
-      "rule_type": "topa",
-      "applies_if": { "transaction": "sale_of_rental_housing_accommodation", "units_gte": 5 },
-      "exempt_if": null,
-      "effect": "For COVERED accommodations (5+ units; and 2-4 unit buildings majority-owned by a business corporation — see dc-topa-2-4-unit-exemption), sale requires a tenant opportunity to purchase at a bona fide offer (D.C. Code § 42-3404.02(a), as reorganized by D.C. Law 26-80 eff. 2025-12-31). Entity-interest transfers count as a 'sale' (§ 42-3404.02(c)(1)(B)(i) pre-amendment text) — TOPA cannot be structured around for covered buildings. 5+ unit offers without a third-party contract trigger the tenant-organization appraisal regime (§ 42-3404.02(a-1)).",
-      "source": "https://code.dccouncil.gov/us/dc/council/code/sections/42-3404.02",
-      "as_of": "2026-08-21",
-      "status": "sourced",
-      "verification": "Pre-amendment text quotes from July fetch of code; Law 26-80 reorganization applied per snippet-confirmed law page + firm alerts; post-amendment section text not yet directly fetched"
-    },
-    {
-      "id": "dc-rental-act-law-26-80",
-      "jurisdiction_state": "DC",
-      "jurisdiction_local": "Washington",
-      "rule_type": "topa",
-      "applies_if": { "transaction": "sale_of_rental_housing_accommodation" },
-      "exempt_if": null,
-      "effect": "ENACTED: RENTAL Amendment Act of 2025 = D.C. Law 26-80 (Bill B26-0164 -> Act 26-199 signed Nov 13, 2025 -> effective Dec 31, 2025 after congressional review). Amends the Rental Housing Act (expedited eviction review, reduced pre-filing notice periods) and TOPA: exempts SINGLE-FAMILY accommodations (incl. house + one ADU, and a single unit in a condo/co-op/HOA) from TOPA; clarifies 2-4 unit TOPA rules do not apply to 2-unit single-family accommodations; adds a NEW-CONSTRUCTION exemption (sale within 15 years of permanent C of O, applied retroactively to the effective date); preserves the elderly/disabled single-family tenant carve-out (rental agreement signed by 2018-03-31, occupancy by 2018-04-15). A later Council item 'tightens language on prior RENTAL Act passage' — possible follow-up amendment, unreviewed.",
-      "source": "https://code.dccouncil.gov/us/dc/council/laws/26-80",
-      "as_of": "2026-08-21",
-      "status": "sourced",
-      "verification": "Law number, short title, and effective date snippet-confirmed on code.dccouncil.gov page titles; substance via lims.dccouncil.gov engrossment + Ballard Spahr Jan 2026 alert; enacted section text not directly fetchable from this environment — reconfirm before closing on a TOPA-sensitive deal"
-    },
-    {
-      "id": "dc-topa-2-4-unit-exemption",
-      "jurisdiction_state": "DC",
-      "jurisdiction_local": "Washington",
-      "rule_type": "topa_exemption",
-      "applies_if": { "transaction": "sale_of_rental_housing_accommodation", "units_lte": 4 },
-      "exempt_if": { "owner_form_any_of": ["natural_person", "living_trust_of_natural_person", "llc", "partnership", "trust"] },
-      "effect": "Under D.C. Law 26-80 (eff. 2025-12-31), 2-4 unit accommodations are EXEMPT from TOPA unless the accommodation is majority-owned by a business CORPORATION ('majority ownership interests' = majority of the value of capital, profits, and losses). Per practitioner analysis, LLC/partnership/trust ownership retains the exemption — only corporate majority ownership re-triggers TOPA. This materially de-risks DC 2-4 unit purchases vs the pre-2026 regime. CAUTION: statutory text not directly fetched; practitioner reading (Federal Title) is the source for the corporation-only nuance — verify the enacted definition before relying on entity structure.",
-      "source": "https://code.dccouncil.gov/us/dc/council/laws/26-80",
-      "as_of": "2026-08-21",
-      "status": "sourced",
-      "verification": "Law existence + long-title TOPA amendments snippet-confirmed on official pages; corporation-ownership nuance from federaltitle.com practitioner alert; single-family definition snippet-confirmed"
-    },
-    {
-      "id": "dc-vacant-property-tax",
-      "jurisdiction_state": "DC",
-      "jurisdiction_local": "Washington",
-      "rule_type": "tax_penalty",
-      "applies_if": { "occupancy": "vacant_registered" },
-      "exempt_if": null,
-      "effect": "Vacant property is taxed at Class 3 ($5.00 per $100 assessed) and blighted at Class 4 ($10.00 per $100) vs Class 1 residential $0.85 per $100 — a 6-12x carrying-cost penalty during long renovations unless a vacancy exemption is obtained.",
-      "source": "https://otr.cfo.dc.gov/page/real-property-tax-rates",
-      "as_of": "2026-07-15",
-      "status": "sourced",
-      "verification": "OTR rate table, single primary source"
-    },
-    {
-      "id": "md-moco-rent-stabilization",
-      "jurisdiction_state": "MD",
-      "jurisdiction_local": "Montgomery County",
-      "rule_type": "rent_control",
-      "applies_if": { "units_gte": 1, "property_type": "rental_housing" },
-      "exempt_if": { "any_of": [ { "building_age_years_lt": 23 }, { "owner_occupied_with_units_lte": 2 } ] },
-      "effect": "Montgomery County rent stabilization (Bill 15-23, effective 2024) caps annual increases at CPI-U + 3%, maximum 6%. Key exemptions include buildings first occupied fewer than 23 years ago (rolling window) and small owner-occupied configurations; exact exemption list in county code — verify per deal.",
-      "source": "https://www.montgomerycountymd.gov/DHCA/housing/landlordtenant/rent-stabilization.html",
-      "as_of": "2026-07-15",
-      "status": "sourced",
-      "verification": "Cap formula verified in July 15 pass (CPI+3% capped at 6%); exemption details sourced, panel cut"
-    },
-    {
-      "id": "md-takoma-park-rent-stabilization",
-      "jurisdiction_state": "MD",
-      "jurisdiction_local": "Takoma Park",
-      "rule_type": "rent_control",
-      "applies_if": { "units_gte": 2, "property_type": "rental_housing" },
-      "exempt_if": null,
-      "effect": "Takoma Park runs its OWN rent stabilization (City Code Ch. 6.20) on top of being inside Montgomery County: covers all rental properties of 2+ units (and individually rented condos), with NO small-building or natural-person exemption comparable to DC/PG. Allowance = 100% of CPI change; July 1, 2026 - June 30, 2027 allowance published at 3.0% (corrected from an initially published 3.3%). Vacancy control reported (cap persists between tenancies) - pending confirmation.",
-      "source": "https://takomaparkmd.gov/m/newsflash/home/detail/381",
-      "as_of": "2026-07-16",
-      "status": "sourced",
-      "verification": "City newsflash + code chapter snippet-confirmed; panels cut by usage limit"
-    },
-    {
-      "id": "md-pg-prsa-cap",
-      "jurisdiction_state": "MD",
-      "jurisdiction_local": "Prince George's County",
-      "rule_type": "rent_control",
-      "applies_if": { "units_gte": 1, "property_type": "rental_housing" },
-      "exempt_if": { "see_rule": "md-pg-prsa-small-landlord-exemption" },
-      "effect": "Permanent Rent Stabilization and Protection Act (CB-055-2024, amending County Code § 13-147; lineage CB-007-2023 temporary cap -> CB-008-2024 -> CB-055-2024 permanent — NOTE: 'CB-007-2025' is an unrelated employee-benefits bill): annual rent increases for covered units capped at the LESSER of 6.0% or CPI-U + 3% (age-restricted senior facilities: lesser of 4.5% or CPI-U). Annual allowance updates each July 1. Enactment/effective dates CONFLICT across sources (enacted 2024-06-18 / effective 2024-09-15 per county FAQ; passed 2024-07-16, signed 2024-08-01, effective 2024-10-17 per others) — dates unverified pending a direct Legistar pull; the cap itself is consistently stated.",
-      "source": "https://www.princegeorgescountymd.gov/departments-offices/permitting-inspections-and-enforcement/about-dpie/code-enforcement/permanent-rent-stabilization-and-protection-act-prsa",
-      "as_of": "2026-08-21",
-      "status": "sourced",
-      "verification": "County DPIE pages + CB-55 FAQ PDF (Rev. 5-14-25) concur on the cap formula; effective-date conflict flagged"
-    },
-    {
-      "id": "md-pg-prsa-small-landlord-exemption",
-      "jurisdiction_state": "MD",
-      "jurisdiction_local": "Prince George's County",
-      "rule_type": "rent_control_exemption",
-      "applies_if": { "property_type": "rental_housing" },
-      "exempt_if": { "owner_total_rental_units_in_county_lte": 5, "owner_form_any_of": ["natural_person", "living_trust_of_natural_person", "estate_or_trust_of_decedent"] },
-      "effect": "A rental unit is EXEMPT from the PRSA if the landlord owns 'five (5) or fewer rental units within the County' AND is '(1) a natural person or a living trust of a natural person, or (2) the trust or estate of a decedent' (exact-phrase confirmed). County FAQ states plainly: 'If you own the property through an LLC or corporate entity, the PRSA applies.' DOMICILE FINDING — SETTLED: the domicile-in-county condition attaches ONLY to the separate CONDOMINIUM exemption ('owned by one or more individuals domiciled in the County', expressly tied to § 13-147) and to the owner-occupied original-2-unit exemption; the 5-or-fewer natural-person exemption carries NO domicile condition — a Virginia-resident natural person qualifies. Other § 13-147 exemptions: religious facilities, regulated-affordable units, cooperatives, dormitories, 501(c)(3) temporary-shelter facilities. No exemption application needed while conditions hold ('not considered to be regulated rental units'); exemption lapses when conditions cease.",
-      "source": "https://www.princegeorgescountymd.gov/departments-offices/faq/permanent-rent-stabilization-law-housing-community-development/what-full-list-residence-and-building-types-are-exempt-law",
-      "as_of": "2026-08-21",
-      "status": "sourced",
-      "verification": "Exact-phrase snippet confirmation ('five (5) or fewer rental units' + 'natural person') matched both the county HTML FAQ and the CB-55 FAQ PDF (Rev. 5-14-25), plus 3 independently-labeled queries; both documents are DPIE-authored, so a direct § 13-147 code-text pull is still queued before the 'verified' label"
-    },
-    {
-      "id": "md-baltimore-rental-license",
-      "jurisdiction_state": "MD",
-      "jurisdiction_local": "Baltimore City",
-      "rule_type": "licensing",
-      "applies_if": { "occupancy": "non_owner_occupied_rental", "units_gte": 1 },
-      "exempt_if": null,
-      "effect": "Rental dwelling license required for non-owner-occupied rentals including 1-2 family homes (expanded 2018; Baltimore City Code Art. 13). Since Jan 1, 2019 an unlicensed landlord has NO legal right to collect rent. No rent-increase percentage cap exists, but increases are barred while housing-code violation notices citing serious defects remain unabated — directly binding on dated value-add stock; sequence is license, cure violations, then reposition.",
-      "source": "https://www.peoples-law.org/baltimore-city-rental-and-housing-laws",
-      "as_of": "2026-07-16",
-      "status": "sourced",
-      "verification": "Maryland People's Law Library (Maryland State Law Library); snippet-confirmed across independent queries; city code text not directly fetched"
-    },
-    {
-      "id": "va-no-local-rent-control",
-      "jurisdiction_state": "VA",
-      "jurisdiction_local": null,
-      "rule_type": "rent_control_absence",
-      "applies_if": { "property_type": "rental_housing" },
-      "exempt_if": null,
-      "effect": "No Virginia locality may impose rent control — but the mechanism is Dillon Rule ABSENCE OF GRANT, not an express statutory ban: no Code section grants (or expressly prohibits) locality rent regulation, and localities hold only powers expressly granted or necessarily implied. Enabling bills keep failing (SB 366 defeated in committee; HB 721 continued; HB 278/SB 355 sent to a Virginia Housing Commission 'Local Rent Regulation Authority Bill Study', June 2026, carried toward 2027) — WATCH ITEM: passage of an enabling act would change this row. CITE CORRECTION: § 55.1-1243 (sometimes cited for 'no rent control') is REPEALED (Acts 2021 Sp. Sess. I cc. 403-404, eff. 2021-07-01) and covered tenant ouster remedies, now § 55.1-1243.1 — it was never a rent-control provision. VRLTA statewide terms: security deposit capped — 'No landlord may demand or receive a security deposit, however denominated, in an amount or value in excess of two months' periodic rent' (§ 55.1-1226, exact-phrase confirmed); deposit itemization within 45 days of termination/vacancy; § 55.1-1204 governs rental-agreement terms (an amended version takes effect 2027-07-01 — review before then).",
-      "source": "https://law.lis.virginia.gov/vacode/title55.1/chapter12/section55.1-1226/",
-      "as_of": "2026-08-21",
-      "status": "sourced",
-      "verification": "Absence-of-grant confirmed by domain-restricted searches of law.lis.virginia.gov (no rent-control section exists in the Code); § 55.1-1226 cap sentence exact-phrase confirmed; failed-bill history via Virginia Mercury + vhc.virginia.gov study PDF"
-    },
-    {
-      "id": "pa-philadelphia-eviction-diversion",
-      "jurisdiction_state": "PA",
-      "jurisdiction_local": "Philadelphia",
-      "rule_type": "eviction_procedure",
-      "applies_if": { "action": "eviction", "property_type": "residential_rental" },
-      "exempt_if": null,
-      "effect": "Philadelphia Code § 9-811: before taking steps to evict, a landlord must enroll in the city's Eviction Diversion Program, give the tenant notice of diversion rights, and participate in reasonable good faith for at least 30 days before filing in Municipal Court. Adds a mandatory pre-filing delay to turnover of occupied units. No unit-count carve-out found in operative text (small landlords covered). Pennsylvania has no state or local rent control.",
-      "quote": "the landlord participates in the eviction diversion program in reasonable good faith, as defined by the City, for no less than thirty (30) days",
-      "source": "https://codelibrary.amlegal.com/codes/philadelphia/latest/philadelphia_pa/0-0-0-278160",
-      "as_of": "2026-07-16",
-      "status": "verified",
-      "verification": "3-0 adversarial panel; statute text snippet-confirmed via independent exact-phrase searches"
-    },
-    {
-      "id": "ct-fair-rent-commissions",
-      "jurisdiction_state": "CT",
-      "jurisdiction_local": null,
-      "rule_type": "rent_adjudication",
-      "applies_if": { "municipality_population_gte": 25000, "property_type": "rental_housing" },
-      "exempt_if": null,
-      "effect": "PA 22-30 (2022) made fair rent commissions MANDATORY in every CT municipality of 25,000+ (ordinance deadline July 1, 2023) — New Haven, Hartford, Bridgeport all covered. Under CGS § 7-148b commissions hold adjudicative power: investigate complaints, subpoena, hold hearings, and ORDER rent reductions for rents found harsh and unconscionable. Case-by-case rent regulation risk on post-renovation repositioning. Separately, PA 24-143 §§ 16-17 (eff. Oct 1, 2024) requires 45 days' advance written notice statewide for any rent increase; tenant non-response is not agreement.",
-      "source": "https://cga.ct.gov/2024/rpt/pdf/2024-R-0143.pdf",
-      "as_of": "2026-07-16",
-      "status": "sourced",
-      "verification": "OLR report language snippet-confirmed across independent queries; PDF 403-blocked to fetchers; panels cut"
-    },
-    {
-      "id": "ny-etpa-product-class-carveout",
-      "jurisdiction_state": "NY",
-      "jurisdiction_local": null,
-      "rule_type": "rent_control_coverage",
-      "applies_if": { "units_gte": 6, "built_before": "1974-01-01", "municipality_adopted_etpa": true },
-      "exempt_if": { "units_lte": 5 },
-      "effect": "ETPA rent stabilization's qualifying vacancy analysis is restricted to buildings of 6+ units built before Jan 1, 1974 — 2-4 unit product sits OUTSIDE ETPA even in municipalities that opt in. Post-2019 HSTPA any NY municipality may opt in on a sub-5% vacancy finding (latent adoption risk), but as of July 16, 2026 HCR lists adoptions only in Nassau, Rockland, Westchester, and Ulster counties — no Capital Region (Albany/Troy) adoption.",
-      "source": "https://hcr.ny.gov/rent-stabilization-and-emergency-tenant-protection-act",
-      "as_of": "2026-07-16",
-      "status": "sourced",
-      "verification": "HCR page sentences verbatim-confirmed via independent domain-restricted search snippets; panels cut"
-    },
-    {
-      "id": "nj-municipal-rent-control",
-      "jurisdiction_state": "NJ",
-      "jurisdiction_local": null,
-      "rule_type": "rent_control",
-      "applies_if": { "property_type": "rental_housing" },
-      "exempt_if": null,
-      "effect": "New Jersey rent control is MUNICIPAL — roughly 100 local ordinances with widely varying caps, coverage, and small-owner exemptions. NOT YET SCREENED ordinance-by-ordinance in this research. Underwriting rule until seeded: treat every NJ deal as 'rules unknown — check the municipality's ordinance before offer.'",
-      "source": null,
-      "as_of": "2026-07-16",
-      "status": "unverified_not_found",
-      "verification": "Per-municipality screen not yet run; the ~100 count itself is unconfirmed"
-    }
-  ],
-  "gaps": [
-    "D.C. Law 26-80 enacted SECTION TEXT (esp. the 2-4 unit TOPA exemption's 'business corporation' definition) — currently on practitioner-alert authority; also the follow-up Council item 'tightening language' on the RENTAL Act",
-    "PG County § 13-147 code text direct pull (both current confirmations are DPIE-authored documents) + resolve the conflicting PRSA enactment/effective dates via Legistar",
-    "Virginia enabling-bill WATCH: HB 278/SB 355 study outcome (Housing Commission, June 2026) — rent-control authority could be granted in a future session",
-    "MoCo exemption list verbatim (23-year rolling window phrasing + full exemption enumeration)",
-    "Takoma Park vacancy control confirmation (does the cap bind between tenancies?)",
-    "NJ: per-municipality ordinance screen for the top NJ metros (Newark, Jersey City, Paterson, Elizabeth, Edison, etc.)",
-    "NY: Albany/Troy good-cause eviction law status (2024 statewide law municipal opt-ins) — not yet screened",
-    "Carolinas/GA/FL landlord-tenant regimes + preemption statutes — not yet screened (preemption widely reported but not primary-confirmed this pass)",
-    "Baltimore City Code Art. 13 licensing text direct fetch (currently on People's Law Library authority)",
-    "DC TOPA single-family and 2-4 unit tier timelines verbatim (§§ 42-3404.09-.11)"
-  ]
+ "$schema_note": "Seed file for the regulatory_rules table. status: 'verified' = 2+ independent primary confirmations (incl. 3-0 adversarial verification panels run against primary text in the July 2026 research sessions); 'sourced' = one primary source or exact-phrase snippet confirmation across independent queries; 'unverified_not_found' = rule believed to exist but parameter/text not confirmable — never estimated. applies_if / exempt_if are machine-evaluable conditions over deal inputs: jurisdiction fields, units, building_permit_year, owner_is_natural_person, owner_entity_type, owner_other_units_in_jurisdiction, owner_domiciled_in_county, occupancy.",
+ "as_of": "2026-08-22",
+ "research_provenance": "Two deep-research passes (DMV-wide + East Coast ME-FL) with adversarial verification panels, July 15-16, 2026. Verification panels were partially cut by usage limits; statuses reflect what actually survived. Claims whose panels died retain 'sourced' with their citation. | 2026-08-22 big-city sweep: 15 rules added for NY/CA/WA/OR/IL/MA/TX/GA/FL/AZ/CO/NJ via snippet-confirmation",
+ "rules": [
+  {
+   "id": "dc-rent-stab-coverage",
+   "jurisdiction_state": "DC",
+   "jurisdiction_local": "Washington",
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "units_gte": 1,
+    "building_permit_issued_on_or_before": "1975-12-31",
+    "property_type": "rental_housing"
+   },
+   "exempt_if": {
+    "building_permit_issued_after": "1975-12-31"
+   },
+   "effect": "Rental units in buildings whose building permit issued after Dec 31, 1975 are EXEMPT from DC rent stabilization (D.C. Code § 42-3502.05(a)(2)); pre-1976 stock is presumptively covered unless another exemption applies. Newly created units in existing structures with a C of O after Jan 1, 1980 are also exempt.",
+   "quote": "Any rental unit in any newly constructed housing accommodation for which the building permit was issued after December 31, 1975 ... shall be exempt",
+   "source": "https://code.dccouncil.gov/us/dc/council/code/sections/42-3502.05",
+   "as_of": "2026-07-16",
+   "status": "verified",
+   "verification": "3-0 adversarial panel against fetched code text"
+  },
+  {
+   "id": "dc-rent-stab-small-landlord-exemption",
+   "jurisdiction_state": "DC",
+   "jurisdiction_local": "Washington",
+   "rule_type": "rent_control_exemption",
+   "applies_if": {
+    "building_permit_issued_on_or_before": "1975-12-31"
+   },
+   "exempt_if": {
+    "units_lte": 4,
+    "owner_is_natural_person": true,
+    "owner_natural_persons_lte": 4,
+    "owner_other_rental_units_in_dc": 0,
+    "exemption_registered_with_rad": true
+   },
+   "effect": "Pre-1976 building escapes rent stabilization ONLY via the small-landlord exemption: housing accommodation of 4 or fewer rental units (aggregated across structures), owned by not more than 4 natural persons, none holding any direct or indirect interest in any other DC rental unit. An LLC or corporate owner does NOT qualify; owning any other DC rental disqualifies. Claim of exemption must be registered (RAD registration/BBL still required).",
+   "quote": "(3) ... any rental unit in any housing accommodation of 4 or fewer rental units, including any aggregate of 4 rental units whether within the same structure or not, provided: (A) The housing accommodation is owned by not more than 4 natural persons; (B) None of the housing providers has an interest, either directly or indirectly, in any other rental unit in the District of Columbia",
+   "source": "https://code.dccouncil.gov/us/dc/council/code/sections/42-3502.05",
+   "as_of": "2026-07-16",
+   "status": "verified",
+   "verification": "3-0 adversarial panel against fetched code text"
+  },
+  {
+   "id": "dc-topa-sale-trigger",
+   "jurisdiction_state": "DC",
+   "jurisdiction_local": "Washington",
+   "rule_type": "topa",
+   "applies_if": {
+    "transaction": "sale_of_rental_housing_accommodation",
+    "units_gte": 5
+   },
+   "exempt_if": null,
+   "effect": "For COVERED accommodations (5+ units; and 2-4 unit buildings majority-owned by a business corporation — see dc-topa-2-4-unit-exemption), sale requires a tenant opportunity to purchase at a bona fide offer (D.C. Code § 42-3404.02(a), as reorganized by D.C. Law 26-80 eff. 2025-12-31). Entity-interest transfers count as a 'sale' (§ 42-3404.02(c)(1)(B)(i) pre-amendment text) — TOPA cannot be structured around for covered buildings. 5+ unit offers without a third-party contract trigger the tenant-organization appraisal regime (§ 42-3404.02(a-1)).",
+   "source": "https://code.dccouncil.gov/us/dc/council/code/sections/42-3404.02",
+   "as_of": "2026-08-21",
+   "status": "sourced",
+   "verification": "Pre-amendment text quotes from July fetch of code; Law 26-80 reorganization applied per snippet-confirmed law page + firm alerts; post-amendment section text not yet directly fetched"
+  },
+  {
+   "id": "dc-rental-act-law-26-80",
+   "jurisdiction_state": "DC",
+   "jurisdiction_local": "Washington",
+   "rule_type": "topa",
+   "applies_if": {
+    "transaction": "sale_of_rental_housing_accommodation"
+   },
+   "exempt_if": null,
+   "effect": "ENACTED: RENTAL Amendment Act of 2025 = D.C. Law 26-80 (Bill B26-0164 -> Act 26-199 signed Nov 13, 2025 -> effective Dec 31, 2025 after congressional review). Amends the Rental Housing Act (expedited eviction review, reduced pre-filing notice periods) and TOPA: exempts SINGLE-FAMILY accommodations (incl. house + one ADU, and a single unit in a condo/co-op/HOA) from TOPA; clarifies 2-4 unit TOPA rules do not apply to 2-unit single-family accommodations; adds a NEW-CONSTRUCTION exemption (sale within 15 years of permanent C of O, applied retroactively to the effective date); preserves the elderly/disabled single-family tenant carve-out (rental agreement signed by 2018-03-31, occupancy by 2018-04-15). A later Council item 'tightens language on prior RENTAL Act passage' — possible follow-up amendment, unreviewed.",
+   "source": "https://code.dccouncil.gov/us/dc/council/laws/26-80",
+   "as_of": "2026-08-21",
+   "status": "sourced",
+   "verification": "Law number, short title, and effective date snippet-confirmed on code.dccouncil.gov page titles; substance via lims.dccouncil.gov engrossment + Ballard Spahr Jan 2026 alert; enacted section text not directly fetchable from this environment — reconfirm before closing on a TOPA-sensitive deal"
+  },
+  {
+   "id": "dc-topa-2-4-unit-exemption",
+   "jurisdiction_state": "DC",
+   "jurisdiction_local": "Washington",
+   "rule_type": "topa_exemption",
+   "applies_if": {
+    "transaction": "sale_of_rental_housing_accommodation",
+    "units_lte": 4
+   },
+   "exempt_if": {
+    "owner_form_any_of": [
+     "natural_person",
+     "living_trust_of_natural_person",
+     "llc",
+     "partnership",
+     "trust"
+    ]
+   },
+   "effect": "Under D.C. Law 26-80 (eff. 2025-12-31), 2-4 unit accommodations are EXEMPT from TOPA unless the accommodation is majority-owned by a business CORPORATION ('majority ownership interests' = majority of the value of capital, profits, and losses). Per practitioner analysis, LLC/partnership/trust ownership retains the exemption — only corporate majority ownership re-triggers TOPA. This materially de-risks DC 2-4 unit purchases vs the pre-2026 regime. CAUTION: statutory text not directly fetched; practitioner reading (Federal Title) is the source for the corporation-only nuance — verify the enacted definition before relying on entity structure.",
+   "source": "https://code.dccouncil.gov/us/dc/council/laws/26-80",
+   "as_of": "2026-08-21",
+   "status": "sourced",
+   "verification": "Law existence + long-title TOPA amendments snippet-confirmed on official pages; corporation-ownership nuance from federaltitle.com practitioner alert; single-family definition snippet-confirmed"
+  },
+  {
+   "id": "dc-vacant-property-tax",
+   "jurisdiction_state": "DC",
+   "jurisdiction_local": "Washington",
+   "rule_type": "tax_penalty",
+   "applies_if": {
+    "occupancy": "vacant_registered"
+   },
+   "exempt_if": null,
+   "effect": "Vacant property is taxed at Class 3 ($5.00 per $100 assessed) and blighted at Class 4 ($10.00 per $100) vs Class 1 residential $0.85 per $100 — a 6-12x carrying-cost penalty during long renovations unless a vacancy exemption is obtained.",
+   "source": "https://otr.cfo.dc.gov/page/real-property-tax-rates",
+   "as_of": "2026-07-15",
+   "status": "sourced",
+   "verification": "OTR rate table, single primary source"
+  },
+  {
+   "id": "md-moco-rent-stabilization",
+   "jurisdiction_state": "MD",
+   "jurisdiction_local": "Montgomery County",
+   "rule_type": "rent_control",
+   "applies_if": {
+    "units_gte": 1,
+    "property_type": "rental_housing"
+   },
+   "exempt_if": {
+    "any_of": [
+     {
+      "building_age_years_lt": 23
+     },
+     {
+      "owner_occupied_with_units_lte": 2
+     }
+    ]
+   },
+   "effect": "Montgomery County rent stabilization (Bill 15-23, effective 2024) caps annual increases at CPI-U + 3%, maximum 6%. Key exemptions include buildings first occupied fewer than 23 years ago (rolling window) and small owner-occupied configurations; exact exemption list in county code — verify per deal.",
+   "source": "https://www.montgomerycountymd.gov/DHCA/housing/landlordtenant/rent-stabilization.html",
+   "as_of": "2026-07-15",
+   "status": "sourced",
+   "verification": "Cap formula verified in July 15 pass (CPI+3% capped at 6%); exemption details sourced, panel cut"
+  },
+  {
+   "id": "md-takoma-park-rent-stabilization",
+   "jurisdiction_state": "MD",
+   "jurisdiction_local": "Takoma Park",
+   "rule_type": "rent_control",
+   "applies_if": {
+    "units_gte": 2,
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Takoma Park runs its OWN rent stabilization (City Code Ch. 6.20) on top of being inside Montgomery County: covers all rental properties of 2+ units (and individually rented condos), with NO small-building or natural-person exemption comparable to DC/PG. Allowance = 100% of CPI change; July 1, 2026 - June 30, 2027 allowance published at 3.0% (corrected from an initially published 3.3%). Vacancy control reported (cap persists between tenancies) - pending confirmation.",
+   "source": "https://takomaparkmd.gov/m/newsflash/home/detail/381",
+   "as_of": "2026-07-16",
+   "status": "sourced",
+   "verification": "City newsflash + code chapter snippet-confirmed; panels cut by usage limit"
+  },
+  {
+   "id": "md-pg-prsa-cap",
+   "jurisdiction_state": "MD",
+   "jurisdiction_local": "Prince George's County",
+   "rule_type": "rent_control",
+   "applies_if": {
+    "units_gte": 1,
+    "property_type": "rental_housing"
+   },
+   "exempt_if": {
+    "see_rule": "md-pg-prsa-small-landlord-exemption"
+   },
+   "effect": "Permanent Rent Stabilization and Protection Act (CB-055-2024, amending County Code § 13-147; lineage CB-007-2023 temporary cap -> CB-008-2024 -> CB-055-2024 permanent — NOTE: 'CB-007-2025' is an unrelated employee-benefits bill): annual rent increases for covered units capped at the LESSER of 6.0% or CPI-U + 3% (age-restricted senior facilities: lesser of 4.5% or CPI-U). Annual allowance updates each July 1. Enactment/effective dates CONFLICT across sources (enacted 2024-06-18 / effective 2024-09-15 per county FAQ; passed 2024-07-16, signed 2024-08-01, effective 2024-10-17 per others) — dates unverified pending a direct Legistar pull; the cap itself is consistently stated.",
+   "source": "https://www.princegeorgescountymd.gov/departments-offices/permitting-inspections-and-enforcement/about-dpie/code-enforcement/permanent-rent-stabilization-and-protection-act-prsa",
+   "as_of": "2026-08-21",
+   "status": "sourced",
+   "verification": "County DPIE pages + CB-55 FAQ PDF (Rev. 5-14-25) concur on the cap formula; effective-date conflict flagged"
+  },
+  {
+   "id": "md-pg-prsa-small-landlord-exemption",
+   "jurisdiction_state": "MD",
+   "jurisdiction_local": "Prince George's County",
+   "rule_type": "rent_control_exemption",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": {
+    "owner_total_rental_units_in_county_lte": 5,
+    "owner_form_any_of": [
+     "natural_person",
+     "living_trust_of_natural_person",
+     "estate_or_trust_of_decedent"
+    ]
+   },
+   "effect": "A rental unit is EXEMPT from the PRSA if the landlord owns 'five (5) or fewer rental units within the County' AND is '(1) a natural person or a living trust of a natural person, or (2) the trust or estate of a decedent' (exact-phrase confirmed). County FAQ states plainly: 'If you own the property through an LLC or corporate entity, the PRSA applies.' DOMICILE FINDING — SETTLED: the domicile-in-county condition attaches ONLY to the separate CONDOMINIUM exemption ('owned by one or more individuals domiciled in the County', expressly tied to § 13-147) and to the owner-occupied original-2-unit exemption; the 5-or-fewer natural-person exemption carries NO domicile condition — a Virginia-resident natural person qualifies. Other § 13-147 exemptions: religious facilities, regulated-affordable units, cooperatives, dormitories, 501(c)(3) temporary-shelter facilities. No exemption application needed while conditions hold ('not considered to be regulated rental units'); exemption lapses when conditions cease.",
+   "source": "https://www.princegeorgescountymd.gov/departments-offices/faq/permanent-rent-stabilization-law-housing-community-development/what-full-list-residence-and-building-types-are-exempt-law",
+   "as_of": "2026-08-21",
+   "status": "sourced",
+   "verification": "Exact-phrase snippet confirmation ('five (5) or fewer rental units' + 'natural person') matched both the county HTML FAQ and the CB-55 FAQ PDF (Rev. 5-14-25), plus 3 independently-labeled queries; both documents are DPIE-authored, so a direct § 13-147 code-text pull is still queued before the 'verified' label"
+  },
+  {
+   "id": "md-baltimore-rental-license",
+   "jurisdiction_state": "MD",
+   "jurisdiction_local": "Baltimore City",
+   "rule_type": "licensing",
+   "applies_if": {
+    "occupancy": "non_owner_occupied_rental",
+    "units_gte": 1
+   },
+   "exempt_if": null,
+   "effect": "Rental dwelling license required for non-owner-occupied rentals including 1-2 family homes (expanded 2018; Baltimore City Code Art. 13). Since Jan 1, 2019 an unlicensed landlord has NO legal right to collect rent. No rent-increase percentage cap exists, but increases are barred while housing-code violation notices citing serious defects remain unabated — directly binding on dated value-add stock; sequence is license, cure violations, then reposition.",
+   "source": "https://www.peoples-law.org/baltimore-city-rental-and-housing-laws",
+   "as_of": "2026-07-16",
+   "status": "sourced",
+   "verification": "Maryland People's Law Library (Maryland State Law Library); snippet-confirmed across independent queries; city code text not directly fetched"
+  },
+  {
+   "id": "va-no-local-rent-control",
+   "jurisdiction_state": "VA",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_absence",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "No Virginia locality may impose rent control — but the mechanism is Dillon Rule ABSENCE OF GRANT, not an express statutory ban: no Code section grants (or expressly prohibits) locality rent regulation, and localities hold only powers expressly granted or necessarily implied. Enabling bills keep failing (SB 366 defeated in committee; HB 721 continued; HB 278/SB 355 sent to a Virginia Housing Commission 'Local Rent Regulation Authority Bill Study', June 2026, carried toward 2027) — WATCH ITEM: passage of an enabling act would change this row. CITE CORRECTION: § 55.1-1243 (sometimes cited for 'no rent control') is REPEALED (Acts 2021 Sp. Sess. I cc. 403-404, eff. 2021-07-01) and covered tenant ouster remedies, now § 55.1-1243.1 — it was never a rent-control provision. VRLTA statewide terms: security deposit capped — 'No landlord may demand or receive a security deposit, however denominated, in an amount or value in excess of two months' periodic rent' (§ 55.1-1226, exact-phrase confirmed); deposit itemization within 45 days of termination/vacancy; § 55.1-1204 governs rental-agreement terms (an amended version takes effect 2027-07-01 — review before then).",
+   "source": "https://law.lis.virginia.gov/vacode/title55.1/chapter12/section55.1-1226/",
+   "as_of": "2026-08-21",
+   "status": "sourced",
+   "verification": "Absence-of-grant confirmed by domain-restricted searches of law.lis.virginia.gov (no rent-control section exists in the Code); § 55.1-1226 cap sentence exact-phrase confirmed; failed-bill history via Virginia Mercury + vhc.virginia.gov study PDF"
+  },
+  {
+   "id": "pa-philadelphia-eviction-diversion",
+   "jurisdiction_state": "PA",
+   "jurisdiction_local": "Philadelphia",
+   "rule_type": "eviction_procedure",
+   "applies_if": {
+    "action": "eviction",
+    "property_type": "residential_rental"
+   },
+   "exempt_if": null,
+   "effect": "Philadelphia Code § 9-811: before taking steps to evict, a landlord must enroll in the city's Eviction Diversion Program, give the tenant notice of diversion rights, and participate in reasonable good faith for at least 30 days before filing in Municipal Court. Adds a mandatory pre-filing delay to turnover of occupied units. No unit-count carve-out found in operative text (small landlords covered). Pennsylvania has no state or local rent control.",
+   "quote": "the landlord participates in the eviction diversion program in reasonable good faith, as defined by the City, for no less than thirty (30) days",
+   "source": "https://codelibrary.amlegal.com/codes/philadelphia/latest/philadelphia_pa/0-0-0-278160",
+   "as_of": "2026-07-16",
+   "status": "verified",
+   "verification": "3-0 adversarial panel; statute text snippet-confirmed via independent exact-phrase searches"
+  },
+  {
+   "id": "ct-fair-rent-commissions",
+   "jurisdiction_state": "CT",
+   "jurisdiction_local": null,
+   "rule_type": "rent_adjudication",
+   "applies_if": {
+    "municipality_population_gte": 25000,
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "PA 22-30 (2022) made fair rent commissions MANDATORY in every CT municipality of 25,000+ (ordinance deadline July 1, 2023) — New Haven, Hartford, Bridgeport all covered. Under CGS § 7-148b commissions hold adjudicative power: investigate complaints, subpoena, hold hearings, and ORDER rent reductions for rents found harsh and unconscionable. Case-by-case rent regulation risk on post-renovation repositioning. Separately, PA 24-143 §§ 16-17 (eff. Oct 1, 2024) requires 45 days' advance written notice statewide for any rent increase; tenant non-response is not agreement.",
+   "source": "https://cga.ct.gov/2024/rpt/pdf/2024-R-0143.pdf",
+   "as_of": "2026-07-16",
+   "status": "sourced",
+   "verification": "OLR report language snippet-confirmed across independent queries; PDF 403-blocked to fetchers; panels cut"
+  },
+  {
+   "id": "ny-etpa-product-class-carveout",
+   "jurisdiction_state": "NY",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "units_gte": 6,
+    "built_before": "1974-01-01",
+    "municipality_adopted_etpa": true
+   },
+   "exempt_if": {
+    "units_lte": 5
+   },
+   "effect": "ETPA rent stabilization's qualifying vacancy analysis is restricted to buildings of 6+ units built before Jan 1, 1974 — 2-4 unit product sits OUTSIDE ETPA even in municipalities that opt in. Post-2019 HSTPA any NY municipality may opt in on a sub-5% vacancy finding (latent adoption risk), but as of July 16, 2026 HCR lists adoptions only in Nassau, Rockland, Westchester, and Ulster counties — no Capital Region (Albany/Troy) adoption.",
+   "source": "https://hcr.ny.gov/rent-stabilization-and-emergency-tenant-protection-act",
+   "as_of": "2026-07-16",
+   "status": "sourced",
+   "verification": "HCR page sentences verbatim-confirmed via independent domain-restricted search snippets; panels cut"
+  },
+  {
+   "id": "nj-municipal-rent-control",
+   "jurisdiction_state": "NJ",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "New Jersey rent control is MUNICIPAL - roughly 100 local ordinances with widely varying caps, coverage, and small-owner exemptions. Newark and Jersey City are now screened as their own rules (nj-newark-rent-control, nj-jersey-city-rent-control); every OTHER NJ municipality remains unscreened - treat as 'rules unknown, check the ordinance before offer.'",
+   "source": null,
+   "as_of": "2026-07-16",
+   "status": "unverified_not_found",
+   "verification": "Per-municipality screen not yet run; the ~100 count itself is unconfirmed"
+  },
+  {
+   "id": "ny-nyc-rent-stabilization-coverage",
+   "jurisdiction_state": "NY",
+   "jurisdiction_local": "New York",
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "units_gte": 1,
+    "built_before": "1974-01-01",
+    "property_type": "rental_housing"
+   },
+   "exempt_if": {
+    "units_lte": 5
+   },
+   "effect": "NYC rent stabilization covers buildings of SIX OR MORE units built before Jan 1, 1974 (core class Feb 1947-Jan 1974; pre-1947 buildings with tenancies begun after June 30, 1971 also covered). Buildings under 6 units are NOT stabilized absent a tax-benefit program (421-a/J-51 style participation adds coverage regardless of size/age). 2-4 unit product sits outside stabilization - the small-building path through NYC.",
+   "quote": "rent stabilized apartments are those apartments in buildings containing six or more units built between February 1, 1947 and January 1, 1974",
+   "source": "https://rentguidelinesboard.cityofnewyork.us/resources/faqs/rent-control/",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "snippet-confirmed across NYC Rent Guidelines Board, nyc.gov, NYS HCR, NYU Furman Center (4 independent, 3 primary)"
+  },
+  {
+   "id": "ny-good-cause-eviction",
+   "jurisdiction_state": "NY",
+   "jurisdiction_local": "New York",
+   "rule_type": "eviction_protection",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": {
+    "any_of": [
+     {
+      "owner_total_rental_units_in_state_lte": 10
+     },
+     {
+      "owner_occupied_with_units_lte": 10
+     }
+    ]
+   },
+   "effect": "NY Good Cause Eviction (eff. Apr 20, 2024; automatic in NYC, other municipalities may opt in) requires good cause to evict or non-renew and makes rent increases above the local standard presumptively unreasonable. SMALL-LANDLORD EXEMPT: owners of 10 or fewer units statewide (for entities, EACH beneficial owner must hold <=10 units in NYS), owner-occupied buildings of <=10 units, and units renting above 245% of HUD FMR (DHCR publishes the thresholds by county each Aug 1). Landlords must state coverage/exemption in lease notices since Aug 2024.",
+   "quote": "exempts premises owned by a 'small landlord,' ... any owner of no more than 10 units in the state",
+   "source": "https://hcr.ny.gov/system/files/documents/2026/07/gce-fact-sheet-05.04.26-update.pdf",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "snippet-confirmed across NYS DHCR fact sheet, NY RPP 231-c (nysenate.gov), nyc.gov HPD, Legal Services NYC (4 independent, 3 primary)"
+  },
+  {
+   "id": "ca-ab1482-rent-cap",
+   "jurisdiction_state": "CA",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": {
+    "any_of": [
+     {
+      "building_permit_issued_after": "2011-01-01"
+     },
+     {
+      "owner_occupied_with_units_lte": 2
+     }
+    ]
+   },
+   "effect": "California AB 1482 (Tenant Protection Act) caps annual rent increases statewide at 5% + regional CPI, max 10%, and requires just cause after 12 months. EXEMPT: housing issued a certificate of occupancy within the last 15 YEARS (rolling - the 2011 date encoded here is the 2026 snapshot and moves forward each year), and an owner-occupied DUPLEX where the owner lives in the other unit for the whole tenancy. Separately-owned SFR/condos have their own exemption unless held by a corporation/REIT. City ordinances (LA RSO, SF) override where stricter.",
+   "quote": "A duplex in which the owner occupies one of the units as the owner's principal place of residence for the duration of the tenancy is exempt",
+   "source": "https://caanet.org/topics/ab-1482/",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "snippet-confirmed across California Apartment Association, Fresno Housing Authority Q&A PDF, and three practitioner guides; 15-year rolling window cross-confirmed (2026: C of O after Jan 1, 2011)"
+  },
+  {
+   "id": "ca-la-rso-coverage",
+   "jurisdiction_state": "CA",
+   "jurisdiction_local": "Los Angeles",
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "units_gte": 2,
+    "built_before": "1979-01-01",
+    "property_type": "rental_housing"
+   },
+   "exempt_if": {
+    "building_permit_issued_after": "1978-10-01"
+   },
+   "effect": "City of Los Angeles RSO covers properties of 2+ units first built ON OR BEFORE Oct 1, 1978 (~624,000 units in ~118,000 properties): capped annual increases (2025 ordinance capped hikes at 4% - single-source, verify current cap at housing.lacity.gov before underwriting), just-cause eviction, relocation fees. Applies inside LA city limits only; LA County unincorporated areas have their own RSO, and AB 1482 covers the rest. NOTE: the year-level check here approximates the Oct 1, 1978 cutoff.",
+   "quote": "The RSO applies to properties in the city of Los Angeles with two or more units built before October 1, 1978",
+   "source": "https://housing.lacity.gov/residents/what-is-covered-under-the-rso",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "snippet-confirmed across three LAHD (housing.lacity.gov) pages + practitioner guides; 4% 2025 cap is single-source (NBC LA) and flagged as such"
+  },
+  {
+   "id": "wa-rent-cap-hb1217",
+   "jurisdiction_state": "WA",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": {
+    "any_of": [
+     {
+      "building_permit_issued_after": "2014-01-01"
+     },
+     {
+      "owner_occupied_with_units_lte": 2
+     }
+    ]
+   },
+   "effect": "Washington HB 1217 (signed May 2025, effective immediately) caps annual rent increases statewide at the lesser of 7% + CPI or 10% - 10% for 2025, 9.683% for increases taking effect in 2026 - with NO increase allowed in a tenancy's first 12 months. EXEMPT from the cap: buildings within 12 YEARS of first certificate of occupancy (rolling - 2014 here is the 2026 snapshot) and owner-occupied single-family homes renting out no more than 2 units/bedrooms (incl. ADU). Exempt properties still owe the notice/parity requirements (RCW 59.18.710).",
+   "quote": "up to 7% plus the Consumer Price Index, or 10 percent, whichever is less",
+   "source": "https://www.commerce.wa.gov/housing-policy/hb1217-landlord-resource-center/",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "snippet-confirmed across WA Dept of Commerce, WA Realtors, Stoel Rives, Multifamily NW (4 independent, 1 primary); 2026 cap 9.683% cross-confirmed"
+  },
+  {
+   "id": "or-rent-cap-sb611",
+   "jurisdiction_state": "OR",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": {
+    "building_permit_issued_after": "2011-01-01"
+   },
+   "effect": "Oregon's statewide rent cap (SB 608 of 2019, tightened by SB 611 of 2023) limits annual increases to the LESSER of 10% or 7% + CPI-U West - 10% for 2025, 9.5% for 2026. EXEMPT: units within 15 YEARS of first certificate of occupancy (rolling - 2011 here is the 2026 snapshot). Just-cause eviction applies after the first year. Portland layers its own relocation-assistance ordinance on top.",
+   "quote": "the lesser of 10% or 7% plus the 12-month change in the Consumer Price Index for All Urban Consumers in the West Region",
+   "source": "https://rentalhousingjournal.com/local-exceptions-complicate-oregons-post-sb-611-rent-regulations/",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "formula + 15-year exemption snippet-confirmed across 4 independent guides; 2026 cap 9.5% confirmed by 2 (sourced-grade for the number)"
+  },
+  {
+   "id": "il-rent-control-preemption",
+   "jurisdiction_state": "IL",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Illinois' Rent Control Preemption Act (50 ILCS 825, eff. Aug 1, 1997) bars every unit of local government - Chicago included - from controlling residential or commercial rents. Repeal bills appear most sessions in Springfield; none has passed as of mid-2026. No rent caps anywhere in Illinois.",
+   "quote": "A unit of local government shall not enact, maintain, or enforce an ordinance or resolution that would have the effect of controlling the amount of rent",
+   "source": "https://www.ilga.gov/Documents/legislation/ilcs/documents/005008250K5.htm",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "statute text on ilga.gov + Justia mirror + 2 practitioner guides"
+  },
+  {
+   "id": "il-chicago-rlto-owner-occupied-exemption",
+   "jurisdiction_state": "IL",
+   "jurisdiction_local": "Chicago",
+   "rule_type": "licensing_and_tenant_law",
+   "applies_if": {
+    "units_gte": 1,
+    "property_type": "rental_housing"
+   },
+   "exempt_if": {
+    "owner_occupied_with_units_lte": 6
+   },
+   "effect": "Chicago's RLTO (security-deposit interest + strict penalties, disclosure duties, tenant remedies) governs most Chicago rentals - but OWNER-OCCUPIED buildings of 6 units or fewer are exempt (Muni. Code 5-12-020), except the non-renewal notice rule (5-12-130) and the lockout ban (5-12-160) which apply regardless. The exemption dies the day the owner moves out. Illinois' Security Deposit Return Act and the Cook County RTLO can still reach exempt buildings.",
+   "quote": "The most common exemption ... is owner-occupied buildings of six apartments or less",
+   "source": "https://www.chicago.gov/city/en/depts/doh/provdrs/landlords/svcs/residential-landlord-and-tenant-ordinance.html",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "snippet-confirmed across chicago.gov, Metropolitan Tenants Organization, Domu, depositlaw 5-12-020 text (4 independent, 1 primary)"
+  },
+  {
+   "id": "ma-rent-control-ban",
+   "jurisdiction_state": "MA",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Massachusetts voters banned rent control statewide in 1994 (Question 9, passed 51-49), nullifying Boston/Brookline/Cambridge programs; the prohibition still stands. WATCH: a 2026 revival initiative was blocked from the November ballot by the SJC, but organized pressure to restore rent control continues - passage of any future measure would flip this row.",
+   "quote": "repealed existing rent control laws and prohibited any future rent control laws",
+   "source": "https://ballotpedia.org/Massachusetts_Question_9,_Prohibition_of_Rent_Control_Initiative_(1994)",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "Ballotpedia + electionstats.state.ma.us official results + CBS Boston (2026 SJC ruling) - 3 independent, 1 primary"
+  },
+  {
+   "id": "tx-rent-control-preemption",
+   "jurisdiction_state": "TX",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Texas allows municipal rent control ONLY during a declared housing disaster AND with the governor's approval (Local Gov't Code 214.902) - conditions never met in modern practice. No Texas city (Dallas, Houston, Austin, San Antonio included) operates rent control. Rent increases are uncapped statewide.",
+   "quote": "may establish rent control if the governing body finds that a housing emergency exists due to a disaster ... and the governor approves the ordinance",
+   "source": "https://texas.public.law/statutes/tex._local_gov't_code_section_214.902",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "statute text via texas.public.law + FindLaw + Justia mirrors + Texas State Law Library guide"
+  },
+  {
+   "id": "ga-rent-control-preemption",
+   "jurisdiction_state": "GA",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Georgia has prohibited local rent regulation since 1984: O.C.G.A. 44-7-19 bars any county or municipality (Atlanta included) from regulating rent on private single-family or multiunit residential property. No rent caps anywhere in Georgia.",
+   "quote": "no county or municipal corporation may enact, maintain, or enforce any ordinance or resolution which would regulate in any way the amount of rent",
+   "source": "https://law.justia.com/codes/georgia/title-44/chapter-7/article-1/section-44-7-19/",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "statute text (Justia 2025 code) + 3 practitioner guides"
+  },
+  {
+   "id": "fl-rent-control-preemption",
+   "jurisdiction_state": "FL",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Florida preempts local rent control (Fla. Stat. 166.043) - no Florida municipality (Miami included) has modern rent control, and landlords set market rates without caps.",
+   "quote": null,
+   "source": "https://barneswalker.com/legal-glossary/r/rent-control-prohibition-florida/",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "one practitioner source names the statute directly; statute-text pull queued to upgrade"
+  },
+  {
+   "id": "az-rent-control-preemption",
+   "jurisdiction_state": "AZ",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Arizona bars cities, towns, and counties from regulating residential rents (A.R.S. 33-1329). Phoenix and every other Arizona municipality: no rent caps, fully in effect as of 2026.",
+   "quote": null,
+   "source": "https://www.azleg.gov/ars/33/01329.htm",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "statute on azleg.gov (primary) + 2 practitioner guides"
+  },
+  {
+   "id": "co-rent-control-prohibition",
+   "jurisdiction_state": "CO",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Colorado prohibits county/municipal rent control on private residential property (C.R.S. 38-12-301), with a carve-out for voluntary affordable-housing agreements. Denver cannot cap rents; the statute remains active as of 2026.",
+   "quote": null,
+   "source": "https://law.justia.com/codes/colorado/title-38/tenants-and-landlords/article-12/part-3/section-38-12-301/",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "statute text via Justia (2024 CRS) + colorado.public.law mirror + FindLaw"
+  },
+  {
+   "id": "nj-newark-rent-control",
+   "jurisdiction_state": "NJ",
+   "jurisdiction_local": "Newark",
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "units_gte": 1,
+    "property_type": "rental_housing"
+   },
+   "exempt_if": {
+    "owner_occupied_with_units_lte": 4
+   },
+   "effect": "Newark's rent control ordinance (Title XIX) caps annual increases on covered housing - but OWNER-OCCUPIED 1-4 family properties are exempt. Non-owner-occupied small buildings remain covered: the exemption requires living there.",
+   "quote": "exempts owner-occupied one (1), two (2), three (3) or four (4) family housing space units",
+   "source": "https://ecode360.com/36623772",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "Newark code (ecode360) + archived Title XIX ordinance PDF + RentCheckMe guide"
+  },
+  {
+   "id": "nj-jersey-city-rent-control",
+   "jurisdiction_state": "NJ",
+   "jurisdiction_local": "Jersey City",
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "units_gte": 1,
+    "built_before": "1987-01-01",
+    "property_type": "rental_housing"
+   },
+   "exempt_if": {
+    "units_lte": 4
+   },
+   "effect": "Jersey City rent control reaches buildings of 5+ units built before 1987. Every 1-4 UNIT property is exempt REGARDLESS of owner-occupancy - broader than Newark's owner-occupied-only exemption, and exactly the 2-4 unit product this buyer underwrites.",
+   "quote": "exempts all dwellings with four or fewer units regardless of owner occupancy",
+   "source": "https://www.jerseycitynj.gov/cityhall/HousingAndDevelopment/housingpreservation/landlordtenantrelations",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "Jersey City official page + Ord. 20-036 (civicweb) + 2 practitioner guides"
+  }
+ ],
+ "gaps": [
+  "D.C. Law 26-80 enacted SECTION TEXT (esp. the 2-4 unit TOPA exemption's 'business corporation' definition) — currently on practitioner-alert authority; also the follow-up Council item 'tightening language' on the RENTAL Act",
+  "PG County § 13-147 code text direct pull (both current confirmations are DPIE-authored documents) + resolve the conflicting PRSA enactment/effective dates via Legistar",
+  "Virginia enabling-bill WATCH: HB 278/SB 355 study outcome (Housing Commission, June 2026) — rent-control authority could be granted in a future session",
+  "MoCo exemption list verbatim (23-year rolling window phrasing + full exemption enumeration)",
+  "Takoma Park vacancy control confirmation (does the cap bind between tenancies?)",
+  "NJ: per-municipality ordinance screen for the top NJ metros (Newark, Jersey City, Paterson, Elizabeth, Edison, etc.)",
+  "NY: Albany/Troy good-cause eviction law status (2024 statewide law municipal opt-ins) — not yet screened",
+  "Carolinas/GA/FL landlord-tenant regimes + preemption statutes — not yet screened (preemption widely reported but not primary-confirmed this pass)",
+  "Baltimore City Code Art. 13 licensing text direct fetch (currently on People's Law Library authority)",
+  "DC TOPA single-family and 2-4 unit tier timelines verbatim (§§ 42-3404.09-.11)",
+  "FY2026 2BR FMRs for Chicago/LA/SF/Seattle/Boston/Dallas metro areas - aggregator figures conflicted, did not meet the 2-source bar (huduser pull queued); NYC $2,910 confirmed by two independent republishers",
+  "LA RSO current annual cap percentage (2025 '4%' amendment is single-source NBC LA - confirm at housing.lacity.gov)",
+  "FL 166.043 statute text direct pull (currently one practitioner source)",
+  "Rolling exemption windows (CA 15yr / WA 12yr / OR 15yr) encoded as 2026-snapshot dates - steward re-verification advances them annually"
+ ]
 }
