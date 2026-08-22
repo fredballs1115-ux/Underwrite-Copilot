@@ -197,7 +197,8 @@ export async function ResearchPanel({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold">Regulation &amp; benchmarks</h2>
         <span className="text-[11px] text-muted">
-          assumes natural-person buyer with no other units in this jurisdiction
+          assumes a natural-person buyer with no other units here unless your
+          Deal facts say otherwise
         </span>
       </div>
 
