@@ -252,6 +252,8 @@ export function buildSubject(input: {
   sizeText?: string | null;
   yearBuilt?: number | null;
   sectorFields?: Record<string, string | number | boolean> | null;
+  /** injected for deterministic tests; defaults to the wall-clock year */
+  currentYear?: number;
 }): RuleSubject {
   const units =
     input.sizeText && /\b(units?|doors)\b/i.test(input.sizeText) ? num(input.sizeText) : undefined;
@@ -261,6 +263,7 @@ export function buildSubject(input: {
   const boolField = (k: string): boolean | undefined =>
     typeof sf[k] === "boolean" ? (sf[k] as boolean) : undefined;
   const otherUnits = numField("owner_units_in_jurisdiction");
+  const willOccupy = boolField("will_owner_occupy");
   return {
     ...BUYER_DEFAULTS,
     state: input.address?.state || undefined,
@@ -268,7 +271,13 @@ export function buildSubject(input: {
       (s): s is string => !!s
     ),
     units,
-    built_year: input.yearBuilt ?? undefined,
+    // The deal-facts answer beats the OM/manual claim — the buyer may be
+    // correcting a wrong listing figure.
+    built_year: numField("year_built") ?? input.yearBuilt ?? undefined,
+    current_year: input.currentYear ?? new Date().getFullYear(),
+    // Post-close intent only — the occupancy STRING (current status) stays
+    // unknown, so vacant-tax and rental-license questions stay honestly open.
+    ...(willOccupy !== undefined ? { owner_occupied: willOccupy } : {}),
     building_permit_year: numField("building_permit_year"),
     exemption_registered_with_rad: boolField("rad_exemption_registered"),
     // Portfolio totals ALWAYS include this deal's own units — the ≤N-unit

@@ -129,6 +129,68 @@ describe("statewide caps and preemptions", () => {
   });
 });
 
+describe("boroughs are New York City (jurisdiction aliases)", () => {
+  it("a Brooklyn deal sees the NYC rent-stabilization rule", () => {
+    const o = outcomes({
+      ...BASE, state: "NY", locality: ["Brooklyn", "Kings County"], units: 8, built_year: 1930,
+    });
+    expect(o["ny-nyc-rent-stabilization-coverage"]).toBe("applies");
+  });
+  it("Richmond VA never aliases into NYC — the alias table is state-guarded", () => {
+    const o = outcomes({ ...BASE, state: "VA", locality: ["Richmond"], units: 4 });
+    expect(o["ny-nyc-rent-stabilization-coverage"]).toBeUndefined();
+    expect(o["va-no-local-rent-control"]).toBe("applies");
+  });
+});
+
+describe("deal-facts answers: rolling age + owner-occupancy intent", () => {
+  const moco = { ...BASE, state: "MD", locality: ["Montgomery County"] };
+  it("MoCo: a 2010-build sits inside the under-23-years exemption in 2026", () => {
+    const o = outcomes({ ...moco, units: 4, built_year: 2010, current_year: 2026 });
+    expect(o["md-moco-rent-stabilization"]).toBe("exempt");
+  });
+  it("MoCo: a 1990 absentee triplex is capped; owner-occupying a duplex escapes", () => {
+    const capped = outcomes({
+      ...moco, units: 3, built_year: 1990, current_year: 2026, owner_occupied: false,
+    });
+    expect(capped["md-moco-rent-stabilization"]).toBe("applies");
+    const duplex = outcomes({
+      ...moco, units: 2, built_year: 1990, current_year: 2026, owner_occupied: true,
+    });
+    expect(duplex["md-moco-rent-stabilization"]).toBe("exempt");
+  });
+  it("without a current_year the rolling-age test stays an open question", () => {
+    const o = outcomes({ ...moco, units: 4, built_year: 2010, owner_occupied: false });
+    expect(o["md-moco-rent-stabilization"]).toBe("possibly_applies");
+  });
+  it("the owner_occupied boolean answers Chicago and Newark without an occupancy string", () => {
+    const chi = outcomes({ ...BASE, state: "IL", locality: ["Chicago"], units: 3, owner_occupied: true });
+    expect(chi["il-chicago-rlto-owner-occupied-exemption"]).toBe("exempt");
+    const nwk = outcomes({ ...BASE, state: "NJ", locality: ["Newark"], units: 4, owner_occupied: false });
+    expect(nwk["nj-newark-rent-control"]).toBe("applies");
+  });
+});
+
+describe("buildSubject deal-facts wiring", () => {
+  it("year_built + will_owner_occupy flow through; the deal-facts year beats the OM claim", () => {
+    const s = buildSubject({
+      address: { state: "NY", city: "Brooklyn" },
+      sizeText: "8 units",
+      yearBuilt: 1999, // the OM's (wrong) claim
+      sectorFields: { year_built: 1930, will_owner_occupy: false },
+      currentYear: 2026,
+    });
+    expect(s.built_year).toBe(1930);
+    expect(s.owner_occupied).toBe(false);
+    expect(s.current_year).toBe(2026);
+    expect(outcomes(s)["ny-nyc-rent-stabilization-coverage"]).toBe("applies");
+  });
+  it("no answer means intent stays unknown — never a silent false", () => {
+    const s = buildSubject({ address: { state: "IL", city: "Chicago" }, sizeText: "3 units" });
+    expect(s.owner_occupied).toBeUndefined();
+  });
+});
+
 describe("buildSubject portfolio totals", () => {
   it("propagates the in-jurisdiction answer to the statewide floor", () => {
     const s = buildSubject({

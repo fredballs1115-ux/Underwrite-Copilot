@@ -21,6 +21,18 @@ export interface SectorFieldDef {
 export const SECTOR_FIELDS: Record<string, SectorFieldDef[]> = {
   multifamily: [
     {
+      key: "year_built",
+      label: "Year built",
+      type: "number",
+      help: "Settles age-based coverage: NYC pre-1974, Jersey City pre-1987, LA pre-1979, Montgomery County's under-23-years exemption. Only needed if the screen below still asks.",
+    },
+    {
+      key: "will_owner_occupy",
+      label: "You'll live in one unit",
+      type: "boolean",
+      help: "Owner-occupied small buildings duck the caps in Chicago, Newark, and MoCo — and the CA, WA, and NY statewide regimes.",
+    },
+    {
       key: "building_permit_year",
       label: "Building permit year",
       type: "number",
