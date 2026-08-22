@@ -1,65 +1,68 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect } from "react";
+import Link from "next/link";
 
-// Error boundary for the signed-in app. A thrown error renders this instead of
-// white-screening; `reset()` re-renders the segment to retry.
+// Boundary for the signed-in pages: an error in one page keeps the shell —
+// nav, palette, the rest of the product — and offers a real retry.
+// `unstable_retry` re-fetches the segment (Next 16.2 convention).
 export default function AppError({
   error,
+  unstable_retry,
   reset,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  unstable_retry?: () => void;
+  reset?: () => void;
 }) {
   useEffect(() => {
-    // Surface it in the server/client logs for debugging.
     console.error(error);
   }, [error]);
+  const retry = unstable_retry ?? reset;
 
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
-      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-kill/10 text-kill">
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-5 w-5"
-          aria-hidden
-        >
-          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-          <path d="M12 9v4" />
-          <path d="M12 17h.01" />
-        </svg>
+    <div className="rounded-2xl border border-line bg-surface p-10 text-center shadow-card">
+      <div
+        aria-hidden
+        className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-kill/10 text-xl font-bold text-kill"
+      >
+        !
       </div>
-      <h1 className="mt-5 text-xl font-semibold tracking-tight">
-        Something went wrong.
-      </h1>
-      <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted">
-        This screen hit an unexpected error. Try again — if it keeps happening,
-        head back to your pipeline.
+      <p className="mt-5 text-base font-semibold tracking-tight">
+        This page hit an unexpected error.
       </p>
-      {error.digest && (
-        <p className="mt-2 font-mono text-xs text-muted/70">
-          Error ID: {error.digest}
-        </p>
-      )}
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-        <button
-          type="button"
-          onClick={reset}
-          className="rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+      <p className="mx-auto mt-1 max-w-md text-sm text-muted">
+        Your deals and data are fine — this is a rendering hiccup, not a data
+        loss. Try again, or jump back to the pipeline. Persisting? Email{" "}
+        <a
+          href="mailto:underwritecopilot.support@gmail.com"
+          className="underline decoration-dotted underline-offset-2 hover:text-ink"
         >
-          Try again
-        </button>
+          underwritecopilot.support@gmail.com
+        </a>
+        {error.digest ? (
+          <>
+            {" "}
+            with error ID <span className="font-mono text-xs">{error.digest}</span>
+          </>
+        ) : null}
+        .
+      </p>
+      <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
+        {retry && (
+          <button
+            type="button"
+            onClick={() => retry()}
+            className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+          >
+            Try again
+          </button>
+        )}
         <Link
           href="/deals"
-          className="rounded-lg border border-line bg-surface px-4 py-2.5 text-sm font-medium transition-colors hover:bg-faint"
+          className="rounded-lg border border-line px-4 py-2 text-sm font-medium transition-colors hover:bg-faint"
         >
-          Back to pipeline
+          Back to the pipeline
         </Link>
       </div>
     </div>

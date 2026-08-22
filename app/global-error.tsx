@@ -8,14 +8,18 @@ import { useEffect } from "react";
 // on globals.css having loaded — styles are inlined against the teal palette.
 export default function GlobalError({
   error,
+  unstable_retry,
   reset,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  /** Next 16.2 convention: re-fetches and re-renders; reset only re-renders */
+  unstable_retry?: () => void;
+  reset?: () => void;
 }) {
   useEffect(() => {
     console.error(error);
   }, [error]);
+  const retry = unstable_retry ?? reset;
 
   return (
     <html lang="en">
@@ -97,7 +101,7 @@ export default function GlobalError({
           >
             <button
               type="button"
-              onClick={reset}
+              onClick={() => retry?.()}
               style={{
                 borderRadius: "0.5rem",
                 background: "#114e54",
