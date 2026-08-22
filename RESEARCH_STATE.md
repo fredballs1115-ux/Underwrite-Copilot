@@ -4,7 +4,24 @@ Resume file per project protocol: a future session starts HERE and does not
 repeat finished work. Ops/go-live steps + the ranked gap list live in
 `INTEGRATION_NOTES.md`.
 
-**Last updated:** 2026-08-21 (session 3, site-polish pass) — BOTH PHASES COMPLETE;
+**Last updated:** 2026-08-22 (session 4, national expansion) — property
+database layer built: migration 0028 (properties + recorded_sales w/ PostGIS
+`nearby_sales` RPC + journal_entries + data_issues/changelog/steward_runs),
+`lib/ingest/normalize` (SFR dropped at the gate, tested), Philadelphia bulk
+pipeline (`scripts/ingest/philadelphia.ts`, Carto SQL, idempotent) + ingest
+GitHub workflow; comps engine refactored DB-first (`computeRecordComps`
+shared by deals + the new /comps Pull Comps tool); /journal (daily entry
+written by extended daily-intel.mjs, honest fetch_failed rows), /laws
+(full rule reference + alerts), nightly steward (`scripts/steward.mjs`:
+link health, freshness per cadence, SFR-leakage invariant, N=5 oldest
+sourced claims re-verified via web search, corrections via open changelog)
++ /data-health + footer "data last verified". Homepage "ground layer"
+section with live DB stats. Bulk source map: `data/research/
+ingestion_sources.md`. Gated on user: migration 0028, Actions secrets,
+first ingest run, steward cron, Supabase plan decision ($25/mo Pro when
+market #2 lands).
+
+Previous (2026-08-21, session 3, site-polish): BOTH PHASES COMPLETE;
 metro layer added (metros.json: 8 Mid-Atlantic metros; county_data_sources.json:
 14 jurisdictions mapped). New sourced facts: Baltimore FY2026 2BR FMR $1,943,
 Philadelphia $1,810, Richmond institutional median $129.5k/unit (Q1 2026).

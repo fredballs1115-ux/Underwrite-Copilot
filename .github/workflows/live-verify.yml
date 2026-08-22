@@ -24,6 +24,8 @@ jobs:
           grep -c "Stop underwriting like a" body.html && echo "OLD HERO STILL PRESENT" || true
           grep -o "page rendered[^<]*" body.html || echo "no render stamp found"
           grep -c "ticker-track" body.html && echo "TICKER: present" || echo "TICKER: missing"
+          grep -c "The ground layer" body.html && echo "GROUND LAYER (national expansion): present" || echo "GROUND LAYER: missing"
+          grep -o "data last verified[^<]*" body.html && echo "STEWARD MARKER: present" || echo "STEWARD MARKER: absent (no steward run yet — expected until the nightly cron lands)"
           echo "== FIRST 1200 CHARS OF BODY =="
           head -c 1200 body.html
       - name: Public pages spot-check
