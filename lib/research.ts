@@ -47,8 +47,16 @@ export interface RuleSubject {
   units?: number;
   building_permit_year?: number;
   built_year?: number;
+  /** "now" for rolling-age tests (MoCo's under-23-years exemption) — injected
+   *  so evaluation stays deterministic and testable */
+  current_year?: number;
   municipality_population?: number;
+  /** CURRENT status ("vacant_registered", "non_owner_occupied_rental", …) —
+   *  distinct from owner_occupied, which is the buyer's post-close intent */
   occupancy?: string;
+  /** will the buyer live in the building? Feeds the owner-occupancy
+   *  exemptions without asserting anything about current occupancy */
+  owner_occupied?: boolean;
   property_type?: string;
   transaction?: string;
   action?: string;
@@ -92,16 +100,38 @@ const norm = (s: string) =>
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 
+/** Places whose everyday name differs from the jurisdiction their rules are
+ *  filed under — the five boroughs (and their county names) ARE New York
+ *  City. State-guarded: "richmond" only aliases inside NY (Richmond County =
+ *  Staten Island), never Richmond VA. */
+const LOCALITY_ALIASES: Record<string, Record<string, string>> = {
+  NY: {
+    brooklyn: "new york",
+    kings: "new york",
+    bronx: "new york",
+    queens: "new york",
+    manhattan: "new york",
+    "staten island": "new york",
+    richmond: "new york",
+    nyc: "new york",
+  },
+};
+
 /** DC's dual identity: the address layer yields state "DC" and city names like
  *  "Washington" / "District of Columbia"; rules store state "DC", local "Washington". */
 export function jurisdictionMatches(rule: RegulatoryRule, subject: RuleSubject): boolean {
   if (!subject.state) return false;
-  if (abbrevState(subject.state).toUpperCase() !== rule.jurisdiction_state.toUpperCase()) {
+  const state = abbrevState(subject.state).toUpperCase();
+  if (state !== rule.jurisdiction_state.toUpperCase()) {
     return false;
   }
   if (!rule.jurisdiction_local) return true; // statewide rule
   const want = norm(rule.jurisdiction_local);
-  const have = (subject.locality ?? []).map(norm).filter(Boolean);
+  const aliases = LOCALITY_ALIASES[state] ?? {};
+  const have = (subject.locality ?? [])
+    .map(norm)
+    .filter(Boolean)
+    .flatMap((h) => (aliases[h] ? [h, aliases[h]] : [h]));
   if (rule.jurisdiction_state.toUpperCase() === "DC") return true; // one jurisdiction
   return have.some((h) => h === want || h.includes(want) || want.includes(h));
 }
@@ -151,8 +181,23 @@ function evalCondition(key: string, want: unknown, s: RuleSubject): Tri {
   }
   if (key === "owner_occupied_with_units_lte") {
     const w = typeof want === "number" ? want : Number(want);
-    if (s.occupancy === undefined || s.units === undefined) return "unknown";
-    return s.occupancy === "owner_occupied" && s.units <= w ? "yes" : "no";
+    // The buyer's stated intent (deal-facts boolean) answers this; the
+    // occupancy STRING is the fallback for subjects that carry one (tests,
+    // the homepage playground).
+    const occ =
+      s.owner_occupied ?? (s.occupancy === undefined ? undefined : s.occupancy === "owner_occupied");
+    if (occ === undefined || s.units === undefined) return "unknown";
+    return occ && s.units <= w ? "yes" : "no";
+  }
+  // Rolling-age tests (MoCo's under-23-years exemption). The base
+  // "building_age_years" is derived, not a subject field — without this the
+  // generic sweep below would read undefined and stay unknown forever.
+  if (key === "building_age_years_lt") {
+    const w = typeof want === "number" ? want : Number(want);
+    if (s.built_year === undefined || s.current_year === undefined || !Number.isFinite(w)) {
+      return "unknown";
+    }
+    return s.current_year - s.built_year < w ? "yes" : "no";
   }
 
   // comparator suffixes over numeric subject fields

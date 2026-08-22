@@ -66,15 +66,30 @@ const UNKNOWN_LABELS: Record<string, string> = {
   building_permit_issued_on_or_before: "building permit year",
   building_permit_issued_after: "building permit year",
   built_before: "year built",
+  building_age_years_lt: "year built",
   exemption_registered_with_rad: "RAD exemption registration",
   units_gte: "unit count",
   units_lte: "unit count",
   municipality_adopted_etpa: "whether the municipality adopted ETPA",
   municipality_population_gte: "municipality population",
-  occupancy: "owner-occupancy status",
-  owner_occupied_with_units_lte: "owner-occupancy status and unit count",
+  occupancy: "current occupancy status",
+  owner_occupied_with_units_lte: "whether you'll owner-occupy (and unit count)",
   owner_total_rental_units_in_state_lte: "total rental units you own in this state",
 };
+
+/** Condition keys the Deal-facts panel can actually answer — only these earn
+ *  the "answer in Deal facts" pointer (units come from the deal itself, and
+ *  current-occupancy has no form field on purpose). */
+const ANSWERABLE_IN_DEAL_FACTS = new Set([
+  "built_before",
+  "building_age_years_lt",
+  "building_permit_issued_after",
+  "building_permit_issued_on_or_before",
+  "exemption_registered_with_rad",
+  "owner_occupied_with_units_lte",
+  "owner_total_rental_units_in_county_lte",
+  "owner_total_rental_units_in_state_lte",
+]);
 
 function SourceLink({
   source,
@@ -121,11 +136,14 @@ export async function ResearchPanel({
   address,
   sizeText,
   priceText,
+  yearBuilt,
   sectorFields,
 }: {
   address: StructuredAddress | null;
   sizeText?: string | null;
   priceText?: string | null;
+  /** parsed from the deal's extraction metrics (manual entry or OM) */
+  yearBuilt?: number | null;
   sectorFields?: Record<string, string | number | boolean> | null;
 }) {
   // DB first, seeds as fallback — a missing table (migration not yet run)
@@ -150,7 +168,7 @@ export async function ResearchPanel({
     // seeds already loaded
   }
 
-  const subject = buildSubject({ address, sizeText, sectorFields });
+  const subject = buildSubject({ address, sizeText, yearBuilt, sectorFields });
   const evals = address?.state ? evaluateRules(rules, subject) : [];
   const shown = evals.filter((e) => e.outcome !== "not_applicable");
   const metro = address ? metroForAddress(address) : null;
@@ -226,6 +244,7 @@ export async function ResearchPanel({
           {shown.map((e) => {
             const meta = OUTCOME_META[e.outcome];
             const open = [...new Set(e.unknowns.map((u) => UNKNOWN_LABELS[u] ?? u))];
+            const answerable = e.unknowns.some((u) => ANSWERABLE_IN_DEAL_FACTS.has(u));
             return (
               <li key={e.rule.id} className="rounded-lg border border-line/70 p-3">
                 <div className="flex flex-wrap items-center gap-2">
@@ -240,7 +259,15 @@ export async function ResearchPanel({
                 <p className="mt-1.5 text-sm leading-relaxed">{e.rule.effect}</p>
                 {open.length > 0 && (
                   <p className="mt-1 text-[12px] text-amber-600">
-                    To settle this: provide {open.join(", ")}.
+                    To settle this: provide {open.join(", ")}.{" "}
+                    {answerable && (
+                      <a
+                        href="#deal-facts"
+                        className="font-medium underline decoration-dotted underline-offset-2 hover:text-amber-700"
+                      >
+                        Answer in Deal facts ↑
+                      </a>
+                    )}
                   </p>
                 )}
                 <div className="mt-1.5">

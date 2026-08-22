@@ -439,6 +439,13 @@ export default async function DealPage({
     findValue(metrics, /going[- ]?in cap/i) ??
     findValue(metrics, /\bcap rate\b/i, /exit|terminal|reversion/i) ??
     (firstSignal?.goingInCap.trim() || null);
+  // Year built feeds the rules engine's age-based coverage tests (NYC
+  // pre-1974, JC pre-1987, LA pre-1979, MoCo's rolling-age exemption). The
+  // plausibility window guards against a mis-matched metric value.
+  const yearBuiltRaw = findValue(metrics, /\byear built\b/i)?.match(/\d{4}/)?.[0];
+  const yearBuiltNum = yearBuiltRaw ? Number(yearBuiltRaw) : null;
+  const summaryYearBuilt =
+    yearBuiltNum != null && yearBuiltNum >= 1700 && yearBuiltNum <= 2100 ? yearBuiltNum : null;
 
   // Public-record comps (auto-comps v2): render whatever the background pull
   // stored; when a deal has an address but nothing stored yet (pre-feature
@@ -740,17 +747,22 @@ export default async function DealPage({
           hasAddress={!!dealAddress?.label}
           subjectPrice={subjectPriceNumber}
         />
-        <SectorFieldsForm
-          dealId={id}
-          assetClass={(deal.asset_class as string) ?? "auto"}
-          values={
-            ((deal as { sector_fields?: SectorFieldValues | null }).sector_fields) ?? null
-          }
-        />
+        {/* Anchor target for the Regulation panel's "answer in Deal facts"
+            links; scroll-mt keeps the jump clear of the sticky header. */}
+        <div id="deal-facts" className="scroll-mt-24">
+          <SectorFieldsForm
+            dealId={id}
+            assetClass={(deal.asset_class as string) ?? "auto"}
+            values={
+              ((deal as { sector_fields?: SectorFieldValues | null }).sector_fields) ?? null
+            }
+          />
+        </div>
         <ResearchPanel
           address={dealAddress}
           sizeText={summarySize}
           priceText={summaryPrice}
+          yearBuilt={summaryYearBuilt}
           sectorFields={
             ((deal as { sector_fields?: SectorFieldValues | null }).sector_fields) ?? null
           }
