@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { absenteeFlag, normalizePhillyCategory, numOrNull } from "./normalize";
+import {
+  absenteeFlag,
+  normalizeCookClass,
+  normalizeNycBuildingClass,
+  normalizeNycCategory,
+  normalizePhillyCategory,
+  numOrNull,
+} from "./normalize";
 
 describe("normalizePhillyCategory", () => {
   it("drops single-family and single condo units — the SFR gate", () => {
@@ -18,6 +25,46 @@ describe("normalizePhillyCategory", () => {
     const r = normalizePhillyCategory("WEIRD NEW CODE");
     expect(r.assetClass).toBe("other");
     expect(r.note).toContain("WEIRD NEW CODE");
+  });
+});
+
+describe("normalizeNycCategory", () => {
+  it("drops one-family, condo units, and co-op units", () => {
+    expect(normalizeNycCategory("01 ONE FAMILY DWELLINGS").assetClass).toBeNull();
+    expect(normalizeNycCategory("12 CONDOS - WALKUP APARTMENTS").assetClass).toBeNull();
+    expect(normalizeNycCategory("09 COOPS - WALKUP APARTMENTS").assetClass).toBeNull();
+  });
+  it("keeps the investable classes", () => {
+    expect(normalizeNycCategory("02 TWO FAMILY DWELLINGS").assetClass).toBe("multifamily");
+    expect(normalizeNycCategory("07 RENTALS - WALKUP APARTMENTS").assetClass).toBe("multifamily");
+    expect(normalizeNycCategory("21 OFFICE BUILDINGS").assetClass).toBe("office");
+    expect(normalizeNycCategory("30 WAREHOUSES").assetClass).toBe("industrial");
+    expect(normalizeNycCategory("31 COMMERCIAL VACANT LAND").assetClass).toBe("land");
+  });
+});
+
+describe("normalizeNycBuildingClass", () => {
+  it("A (one-family) and R (condo unit) drop; B/C/D are multifamily; S is mixed", () => {
+    expect(normalizeNycBuildingClass("A4").assetClass).toBeNull();
+    expect(normalizeNycBuildingClass("R4").assetClass).toBeNull();
+    expect(normalizeNycBuildingClass("B1").assetClass).toBe("multifamily");
+    expect(normalizeNycBuildingClass("C3").assetClass).toBe("multifamily");
+    expect(normalizeNycBuildingClass("D7").assetClass).toBe("multifamily");
+    expect(normalizeNycBuildingClass("S3").assetClass).toBe("mixed_use");
+    expect(normalizeNycBuildingClass("V1").assetClass).toBe("land");
+  });
+});
+
+describe("normalizeCookClass", () => {
+  it("211/212 (2-6 unit) survive the residential drop; other 2xx fall", () => {
+    expect(normalizeCookClass("211").assetClass).toBe("multifamily");
+    expect(normalizeCookClass("212").assetClass).toBe("multifamily");
+    expect(normalizeCookClass("203").assetClass).toBeNull();
+    expect(normalizeCookClass("299").assetClass).toBeNull();
+  });
+  it("3xx multifamily and 5xx commercial are kept", () => {
+    expect(normalizeCookClass("315").assetClass).toBe("multifamily");
+    expect(normalizeCookClass("517").assetClass).toBe("commercial_retail");
   });
 });
 

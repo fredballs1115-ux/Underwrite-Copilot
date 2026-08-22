@@ -27,8 +27,8 @@ from here says so.
 
 | Market | Dataset | Notes |
 |---|---|---|
-| NYC | PLUTO (parcels, citywide), DOF Rolling Sales (12-mo sales, no coords — join to PLUTO by BBL), ACRIS (deeds) | best-documented big-city stack; rolling sales lack lat/lng → BBL join required |
-| Chicago / Cook County | Cook County Data Portal (Socrata): Assessor parcel universe + "Parcel Sales" datasets | dataset ids unconfirmed from here — resolve on first wiring |
+| NYC | PLUTO `64uk-42ks` + DOF Rolling Sales `usep-8jbt` (no coords — BBL join to PLUTO, implemented); ACRIS deeper deed history documented | **wired** (`nyc.ts`); one-family (A*) + condo units (R*) drop at the gate |
+| Chicago / Cook County | Parcel Universe `nj4t-kc8j` (latest year, centroid coords) + Parcel Sales `wvhk-k5uv`, PIN join | **wired** (`cook_county.ts`); CCAO 211/212 (2-6 unit) kept, rest of 2xx drops |
 | Boston | Property Assessment (data.boston.gov, CKAN) | yearly roll CSV |
 | Atlanta / Fulton | Fulton assessor GIS hub | portal |
 | Miami-Dade | Open data hub parcels + sales | portal |
