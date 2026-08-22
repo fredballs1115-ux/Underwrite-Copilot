@@ -404,15 +404,15 @@
     "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
    },
    "market_notes": {
-    "value": "SF's own rent ordinance layers over AB 1482 (city rules screened at rule level in a later pass - treat pre-1979 SF multifamily as rent-controlled until then). Secured assessor roll on data.sfgov.org (Socrata).",
-    "status": "sourced"
+    "value": "Two regimes stack: the SF Rent Ordinance (essentially all residential built before June 13, 1979 - Rent Board caps + just-cause; post-1979 stock exempt from the caps but, since 2024, covered by just-cause anyway) and AB 1482 statewide for the rest. Pre-1979 SF multifamily is regulated stock - underwrite the allowed increase, not pro-forma rents. Secured assessor roll on data.sfgov.org (Socrata).",
+    "status": "verified"
    },
    "rule_ids": [
+    "ca-sf-rent-ordinance",
     "ca-ab1482-rent-cap"
    ],
    "comps_provider": null,
    "gaps": [
-    "SF rent ordinance rule encoding",
     "FY2026 FMR"
    ]
   },
@@ -503,6 +503,73 @@
    "comps_provider": "nj_modiv",
    "gaps": [
     "per-ordinance screen for other NJ municipalities",
+    "FY2026 FMR"
+   ]
+  },
+  {
+   "id": "twin_cities",
+   "name": "Minneapolis / St. Paul",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers; huduser direct pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "The Midwest's rent-control exception: St. Paul caps increases at 3% (2021 ballot) with a ROLLING 20-year new-construction exemption and 2025 rollback churn still in motion; Minneapolis authorized rent regulation by charter in 2021 but has enacted nothing - a watch item, not a rule. Hennepin County parcel data documented for bulk ingest.",
+    "status": "verified"
+   },
+   "rule_ids": [
+    "mn-stpaul-rent-stabilization",
+    "mn-minneapolis-authorized-not-enacted"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "Hennepin/Ramsey bulk endpoints",
+    "FY2026 FMR"
+   ]
+  },
+  {
+   "id": "nashville",
+   "name": "Nashville",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers; huduser direct pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "Tennessee prohibits local rent control (Tenn. Code 66-35-102) - no caps in Nashville or Memphis. Davidson County assessor portal documented.",
+    "status": "verified"
+   },
+   "rule_ids": [
+    "tn-rent-control-preemption"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "Davidson bulk endpoint",
+    "FY2026 FMR"
+   ]
+  },
+  {
+   "id": "charlotte",
+   "name": "Charlotte / Raleigh",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers; huduser direct pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "North Carolina preempts local rent regulation (G.S. 42-14.1) - no caps in Charlotte or Raleigh. POLARIS (Mecklenburg) and Wake County portals documented for bulk parcels.",
+    "status": "verified"
+   },
+   "rule_ids": [
+    "nc-rent-control-preemption"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "POLARIS/Wake bulk endpoints",
     "FY2026 FMR"
    ]
   }

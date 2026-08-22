@@ -99,6 +99,29 @@ describe("Chicago", () => {
   });
 });
 
+describe("San Francisco", () => {
+  it("a 1925 six-unit is Rent Ordinance stock; a 1995 building escapes the caps", () => {
+    const old = outcomes({ ...BASE, state: "CA", locality: ["San Francisco"], units: 6, built_year: 1925 });
+    expect(old["ca-sf-rent-ordinance"]).toBe("applies");
+    const newer = outcomes({ ...BASE, state: "CA", locality: ["San Francisco"], units: 6, built_year: 1995 });
+    expect(newer["ca-sf-rent-ordinance"]).toBe("exempt");
+  });
+});
+
+describe("Twin Cities", () => {
+  it("St. Paul's 3% cap catches pre-2005 stock and exempts the 20-year window", () => {
+    const older = outcomes({ ...BASE, state: "MN", locality: ["Saint Paul"], units: 4, built_year: 1960 });
+    expect(older["mn-stpaul-rent-stabilization"]).toBe("applies");
+    const newer = outcomes({ ...BASE, state: "MN", locality: ["Saint Paul"], units: 4, built_year: 2015 });
+    expect(newer["mn-stpaul-rent-stabilization"]).toBe("exempt");
+  });
+  it("Minneapolis reads as authorized-but-not-enacted, not as a cap", () => {
+    const o = outcomes({ ...BASE, state: "MN", locality: ["Minneapolis"], units: 4 });
+    expect(o["mn-minneapolis-authorized-not-enacted"]).toBe("applies");
+    expect(o["mn-stpaul-rent-stabilization"]).toBeUndefined(); // St. Paul rule stays out of Minneapolis
+  });
+});
+
 describe("statewide caps and preemptions", () => {
   it("WA HB 1217 catches a tenant-occupied 1980 triplex (no exemption path holds)", () => {
     const o = outcomes({
@@ -112,6 +135,8 @@ describe("statewide caps and preemptions", () => {
       ["GA", "Atlanta", "ga-rent-control-preemption"],
       ["AZ", "Phoenix", "az-rent-control-preemption"],
       ["CO", "Denver", "co-rent-control-prohibition"],
+      ["TN", "Nashville", "tn-rent-control-preemption"],
+      ["NC", "Charlotte", "nc-rent-control-preemption"],
     ] as const) {
       const o = outcomes({ ...BASE, state, locality: [city], units: 4 });
       expect(o[id]).toBe("applies");
