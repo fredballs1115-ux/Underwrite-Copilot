@@ -108,40 +108,6 @@ describe("San Francisco", () => {
   });
 });
 
-describe("Twin Cities", () => {
-  it("St. Paul's 3% cap catches pre-2005 stock and exempts the 20-year window", () => {
-    const older = outcomes({ ...BASE, state: "MN", locality: ["Saint Paul"], units: 4, built_year: 1960 });
-    expect(older["mn-stpaul-rent-stabilization"]).toBe("applies");
-    const newer = outcomes({ ...BASE, state: "MN", locality: ["Saint Paul"], units: 4, built_year: 2015 });
-    expect(newer["mn-stpaul-rent-stabilization"]).toBe("exempt");
-  });
-  it("Minneapolis reads as authorized-but-not-enacted, not as a cap", () => {
-    const o = outcomes({ ...BASE, state: "MN", locality: ["Minneapolis"], units: 4 });
-    expect(o["mn-minneapolis-authorized-not-enacted"]).toBe("applies");
-    expect(o["mn-stpaul-rent-stabilization"]).toBeUndefined(); // St. Paul rule stays out of Minneapolis
-  });
-});
-
-describe("Portland, Maine", () => {
-  it("the corridor's one rent-controlled city exempts the owner-occupied 2-4 unit house-hack", () => {
-    const hack = outcomes({
-      ...BASE, state: "ME", locality: ["Portland"], units: 3, occupancy: "owner_occupied",
-    });
-    expect(hack["me-portland-rent-control"]).toBe("exempt");
-    const absentee = outcomes({
-      ...BASE, state: "ME", locality: ["Portland"], units: 4, occupancy: "tenant_occupied",
-    });
-    expect(absentee["me-portland-rent-control"]).toBe("applies");
-  });
-});
-
-describe("Rhode Island's latent authority", () => {
-  it("Providence reads as no-cap-but-watch, not as preempted", () => {
-    const o = outcomes({ ...BASE, state: "RI", locality: ["Providence"], units: 4 });
-    expect(o["ri-no-rent-control-latent-authority"]).toBe("applies");
-  });
-});
-
 describe("statewide caps and preemptions", () => {
   it("WA HB 1217 catches a tenant-occupied 1980 triplex (no exemption path holds)", () => {
     const o = outcomes({
@@ -149,26 +115,12 @@ describe("statewide caps and preemptions", () => {
     });
     expect(o["wa-rent-cap-hb1217"]).toBe("applies");
   });
-  it("Texas / Georgia / Arizona / Colorado preemption rules surface for their states", () => {
+  it("covered no-cap jurisdictions surface for their markets", () => {
+    // Covered-market jurisdictions only (per the 15-market scope).
     for (const [state, city, id] of [
       ["TX", "Dallas", "tx-rent-control-preemption"],
       ["GA", "Atlanta", "ga-rent-control-preemption"],
-      ["AZ", "Phoenix", "az-rent-control-preemption"],
-      ["CO", "Denver", "co-rent-control-prohibition"],
-      ["TN", "Nashville", "tn-rent-control-preemption"],
-      ["NC", "Charlotte", "nc-rent-control-preemption"],
-      ["OH", "Columbus", "oh-rent-control-preemption"],
-      ["MI", "Detroit", "mi-rent-control-preemption"],
-      ["WI", "Milwaukee", "wi-rent-control-preemption"],
-      ["IN", "Indianapolis", "in-rent-control-preemption"],
-      ["MO", "Kansas City", "mo-rent-control-preemption"],
-      ["KY", "Louisville", "ky-rent-control-preemption"],
-      ["SC", "Charleston", "sc-rent-control-preemption"],
-      ["AL", "Birmingham", "al-rent-control-preemption"],
-      ["LA", "New Orleans", "la-rent-control-preemption"],
-      ["OK", "Oklahoma City", "ok-rent-control-preemption"],
-      ["VT", "Burlington", "vt-no-rent-control"],
-      ["NH", "Manchester", "nh-no-rent-control"],
+      ["FL", "Miami", "fl-rent-control-preemption"],
       ["DE", "Wilmington", "de-no-rent-control"],
     ] as const) {
       const o = outcomes({ ...BASE, state, locality: [city], units: 4 });

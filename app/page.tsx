@@ -40,14 +40,20 @@ const RULE_COUNT = seedRules().length;
 const WIRED_MARKETS = (metrosSeed.metros ?? [])
   .filter((m) => (m as { ingest_market?: string }).ingest_market)
   .map((m) => m.name);
-// Deliberately FOCUSED coverage (per direction): the Mid-Atlantic home
-// region + the biggest US markets — never a 50-state sprawl. The engine
-// still evaluates any US address; these are the markets the product leads
-// with.
+// Deliberately FOCUSED coverage (per direction): FIFTEEN markets, full stop
+// — the DMV core (one market, four jurisdiction entries) + the rest of the
+// Mid-Atlantic + the biggest US markets. Research and website coverage stop
+// at this list; outside it the screener says "unscreened", never guesses.
 const MAJOR_MARKETS = (metrosSeed.metros ?? []).filter(
   (m) => (m as { region?: string }).region === "Major US markets"
 );
 const MAJOR_MARKET_COUNT = MAJOR_MARKETS.length;
+// DMV core's four jurisdiction entries are ONE market to a human.
+const MARKET_COUNT =
+  1 +
+  (metrosSeed.metros ?? []).filter((m) => (m as { region?: string }).region === "Mid-Atlantic")
+    .length +
+  MAJOR_MARKET_COUNT;
 
 // Title/description inherit the site defaults from the root layout;
 // the canonical is declared per page so subpages never collapse to /.
@@ -155,9 +161,9 @@ const STATS: { value: number; suffix: string; label: string }[] = [
   { value: ANALYSIS_STAGES, suffix: "", label: "analysis stages on every OM" },
   { value: DEAL_KILLERS, suffix: "", label: "deal-killers stressed first" },
   {
-    value: MAJOR_MARKET_COUNT,
+    value: MARKET_COUNT,
     suffix: "",
-    label: "major US markets + the whole Mid-Atlantic, screened building-by-building",
+    label: "covered markets — the Mid-Atlantic + the biggest US metros, building-by-building",
   },
   { value: 0, suffix: "", label: "black-box numbers — every figure carries its source" },
 ];
@@ -206,7 +212,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Which markets does it cover?",
-    a: `Coverage is deliberately focused: the whole Mid-Atlantic — DC, the Maryland counties, Northern Virginia, Baltimore, Richmond, Hampton Roads, Philadelphia, Wilmington, Newark/Jersey City — plus the ${MAJOR_MARKET_COUNT} biggest US markets (${MAJOR_MARKETS.map((m) => m.name).join(", ")}). Each gets its rent rules, market notes, and data coverage tracked with sources. Underneath, a ${RULE_COUNT}-rule law engine still evaluates any US address and says so honestly when a jurisdiction is outside the focus list — never a silent pass. Live recorded-sales comps run via county APIs in ${COMPS_JURISDICTIONS}, with a bulk property database (${WIRED_MARKETS.join(", ")} wired) extending them.`,
+    a: `${MARKET_COUNT} markets, deliberately: the DMV core (DC, Prince George's, Montgomery County, Northern Virginia), Baltimore, Richmond, Hampton Roads, Philadelphia (incl. Wilmington), Newark/Jersey City — and the ${MAJOR_MARKET_COUNT} biggest US metros: ${MAJOR_MARKETS.map((m) => m.name).join(", ")}. Each carries its rent rules (${RULE_COUNT} statute-linked, machine-evaluated at every address), market notes, and data coverage with sources. Outside those markets the screener says "unscreened — not unregulated" and stops; it never guesses. Recorded-sales comps run via county APIs in ${COMPS_JURISDICTIONS}, extended by the bulk property database (${WIRED_MARKETS.join(", ")} wired).`,
   },
   {
     q: "Are my documents private?",
@@ -861,11 +867,12 @@ export default function Home() {
             </Reveal>
             <Reveal delay={140}>
               <p className="mt-3 text-center text-xs text-muted">
-                Coverage is deliberately focused: the whole Mid-Atlantic plus
-                the {MAJOR_MARKET_COUNT} biggest US markets, backed by the
-                property database ({WIRED_MARKETS.join(", ")} pipelines wired)
-                — and the {RULE_COUNT}-rule law engine still knows the posture
-                wherever else a deal lands.
+                Coverage is deliberately focused: {MARKET_COUNT} markets — the
+                whole Mid-Atlantic plus the {MAJOR_MARKET_COUNT} biggest US
+                metros — with {RULE_COUNT} statute-linked rules and the
+                property database ({WIRED_MARKETS.join(", ")} pipelines
+                wired). Outside those markets the screener says
+                &ldquo;unscreened&rdquo; — it never guesses.
               </p>
             </Reveal>
           </div>

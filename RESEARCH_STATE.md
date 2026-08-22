@@ -4,6 +4,19 @@ Resume file per project protocol: a future session starts HERE and does not
 repeat finished work. Ops/go-live steps + the ranked gap list live in
 `INTEGRATION_NOTES.md`.
 
+**2026-08-22 (session 4h, HARD 15-market cut per direction)** — "DO NOT do
+all 50 states. Top 15 markets only." Executed literally: metros = 15 markets
+(DMV core [1 market, 4 jurisdiction entries] + Baltimore, Richmond, Hampton
+Roads, Philadelphia [Wilmington folded in], Newark/Jersey City + 9 majors:
+NYC, Boston, Chicago, LA, SF, Seattle, Miami, Atlanta, Dallas). Houston/
+Denver/Phoenix dropped. RULES CUT 68 → 29 across exactly the 14 covered
+jurisdictions (DC MD VA PA DE NJ NY MA IL CA WA FL GA TX); every other
+state's rules REMOVED from the product (git history holds them). Off-list
+benchmark medians (Providence/Hartford/Albany/Scranton/Reading/New Haven/
+Bridgeport) no longer display. Outside the covered set the screener says
+"unscreened — not unregulated" and stops. STANDING SCOPE RULE: research and
+website coverage stop at these 15 markets.
+
 **2026-08-22 (session 4g, FOCUS scoping per direction)** — presentation
 scoped to the Mid-Atlantic home region (10 metros incl. Newark/Jersey City)
 + the 12 biggest US markets (NYC, Boston, Chicago, LA, SF, Seattle, Miami,
