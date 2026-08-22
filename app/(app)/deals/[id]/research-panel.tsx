@@ -25,6 +25,8 @@ import {
   seedRules,
 } from "@/lib/research-data";
 import { linkOk } from "@/lib/link-audit";
+import { coveredState, metroForAddress } from "@/lib/market-match";
+import Link from "next/link";
 import type { StructuredAddress } from "@/lib/address";
 
 const OUTCOME_META: Record<
@@ -172,6 +174,8 @@ export async function ResearchPanel({
     );
   }
 
+  const metro = metroForAddress(address);
+
   return (
     <section className="rounded-xl border border-line bg-surface p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -180,6 +184,32 @@ export async function ResearchPanel({
           assumes natural-person buyer with no other units in this jurisdiction
         </span>
       </div>
+
+      {/* Covered-market chip: one click from the deal to its market brief —
+          rules, rents, and data coverage in one place. Outside the covered
+          list the honest sentence renders instead. */}
+      {metro ? (
+        <Link
+          href={`/market?metro=${metro.id}`}
+          className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/5 px-2.5 py-1 text-[11px] font-medium text-brand transition-colors hover:bg-brand/10"
+        >
+          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
+          Covered market: {metro.name} — open the market brief →
+        </Link>
+      ) : (
+        !coveredState(address.state) && (
+          <p className="mt-2 text-[11px] text-muted">
+            Outside the covered market list — rules here are unscreened, not
+            unregulated.{" "}
+            <Link
+              href="/market"
+              className="underline decoration-dotted underline-offset-2 hover:text-brand"
+            >
+              See covered markets
+            </Link>
+          </p>
+        )
+      )}
 
       {!hasRegulation && (
         <p className="mt-2 text-sm text-muted">
