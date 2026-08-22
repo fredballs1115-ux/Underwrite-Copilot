@@ -5,6 +5,7 @@
 
 import metrosSeed from "@/data/research/metros.json";
 import { abbrevState } from "@/lib/address";
+import type { GeoTarget } from "@/lib/criteria";
 
 export interface CoveredMetro {
   id: string;
@@ -79,6 +80,24 @@ export interface MarketNavEntry {
   region: string;
   /** alias text for palette search: "brooklyn" or "fort worth" must land */
   search: string;
+}
+
+/** One suggested buy-box territory per covered market. The SAME keyword set
+ *  that maps deals to markets becomes the chip's match needles, so "in this
+ *  market" means the same thing to the mandate check and the market matcher.
+ *  Built SERVER-side and passed as a prop (bundle rule, as below). */
+export function coveredMarketGeoTargets(): GeoTarget[] {
+  const aliasesById = new Map<string, string[]>();
+  const stateById = new Map<string, string>();
+  for (const m of MATCHERS) {
+    aliasesById.set(m.id, [...(aliasesById.get(m.id) ?? []), ...m.keywords]);
+    if (!stateById.has(m.id)) stateById.set(m.id, m.state);
+  }
+  return (metrosSeed.metros ?? []).map((m) => ({
+    label: m.name as string,
+    state: stateById.get(m.id),
+    aliases: [...new Set(aliasesById.get(m.id) ?? [])],
+  }));
 }
 
 /** Slim covered-market list for client navigation (⌘K). Built SERVER-side

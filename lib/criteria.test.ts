@@ -194,3 +194,15 @@ describe("shared parsers", () => {
     expect(parsePct("5.25%")).toBe(5.25);
   });
 });
+
+describe("geography — market-level territory chips", () => {
+  it("an aliased chip matches every city in its market, and only those", () => {
+    const box: BuyBox = {
+      geos: [{ label: "Dallas-Fort Worth", state: "TX", aliases: ["dallas", "fort worth"] }],
+    };
+    const hit = evaluateBuyBox("auto", ex([], { market: "Fort Worth, TX" }), box);
+    expect(check(hit, "Geography")?.status).toBe("pass");
+    const miss = evaluateBuyBox("auto", ex([], { market: "Houston, TX" }), box);
+    expect(check(miss, "Geography")?.status).toBe("miss");
+  });
+});

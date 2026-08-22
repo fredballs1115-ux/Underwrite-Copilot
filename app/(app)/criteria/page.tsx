@@ -11,6 +11,7 @@ import {
 } from "./actions";
 import { PendingButton } from "../pending-button";
 import { GeoPicker } from "./geo-picker";
+import { coveredMarketGeoTargets } from "@/lib/market-match";
 
 export const metadata: Metadata = { title: "Buy box" };
 
@@ -245,7 +246,7 @@ export default async function CriteriaPage({
                     market, address, and county.
                   </p>
                   <div className="mt-2">
-                    <GeoPicker initial={geoTargets(box)} />
+                    <GeoPicker initial={geoTargets(box)} suggestions={coveredMarketGeoTargets()} />
                   </div>
                 </div>
               </div>

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { coveredState, metroForAddress } from "@/lib/market-match";
+import {
+  coveredMarketGeoTargets,
+  coveredState,
+  metroForAddress,
+} from "@/lib/market-match";
 
 describe("metroForAddress", () => {
   it("maps the buyer's home turf", () => {
@@ -27,5 +31,18 @@ describe("metroForAddress", () => {
     // covered STATE but un-matched city: null metro, state still covered
     expect(metroForAddress({ city: "Pittsburgh", state: "PA" })).toBeNull();
     expect(coveredState("PA")).toBe(true);
+  });
+});
+
+describe("coveredMarketGeoTargets", () => {
+  it("every covered market becomes a one-tap territory carrying its match needles", () => {
+    const targets = coveredMarketGeoTargets();
+    expect(targets.every((t) => !!t.label && (t.aliases?.length ?? 0) > 0)).toBe(true);
+    const dfw = targets.find((t) => t.label === "Dallas-Fort Worth");
+    expect(dfw?.state).toBe("TX");
+    expect(dfw?.aliases).toContain("fort worth");
+    // Wilmington folds into the Philadelphia market — its needle rides along.
+    const philly = targets.find((t) => t.label === "Philadelphia PA");
+    expect(philly?.aliases).toContain("wilmington");
   });
 });
