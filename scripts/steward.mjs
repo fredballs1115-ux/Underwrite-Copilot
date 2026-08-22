@@ -6,14 +6,13 @@
 //      research layer, HEAD/GET-checked; dead → data_issues, revived →
 //      resolved. (The weekly link-audit workflow covers the JSON layer.)
 //   2. FRESHNESS — every feed has a cadence: rates (weekdays), intel digest +
-//      journal (weekdays), benchmarks (180-day research rule), each wired
-//      ingest market (monthly re-runs). Overdue → data_issues; back on
+//      news stories (weekdays), benchmarks (180-day research rule), each
+//      wired ingest market (monthly re-runs). Overdue → data_issues; back on
 //      schedule → resolved. A cron that silently stopped becomes a visible
 //      issue the next night.
 //   3. CONSISTENCY — invariants that must hold: no single-family leakage into
-//      the property DB (the normalizer's one job), journal failure rows
-//      visible. Checks that need external keys are SKIPPED WITH A NOTE, not
-//      quietly dropped.
+//      the property DB (the normalizer's one job). Checks that need external
+//      keys are SKIPPED WITH A NOTE, not quietly dropped.
 //   4. RE-VERIFICATION — the N oldest 'sourced' claims get re-checked against
 //      the live web via Claude + web search. Confirmed → as_of bumps to
 //      today. A changed benchmark number is corrected IN THE OPEN: the row
@@ -191,7 +190,7 @@ async function freshness(table, dateCol, staleDays, subject, hint) {
 
 await freshness("rates", "obs_date", 5, "rates", "is the weekday FRED cron running?");
 await freshness("market_intel_digests", "digest_date", 4, "market_intel_digests", "is the weekday intel cron running?");
-await freshness("journal_entries", "entry_date", 4, "journal_entries", "is the weekday intel cron running?");
+await freshness("market_intel_items", "created_at", 4, "news_stories", "is the weekday intel cron running?");
 
 // Benchmarks: the 180-day research rule — count, don't just check the newest.
 try {

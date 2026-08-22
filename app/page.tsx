@@ -360,9 +360,9 @@ export default function Home() {
                   AI deal screening for CRE acquisitions
                 </span>
                 <h1 className="mt-6 text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.4rem]">
-                  The OM lands Thursday.{" "}
+                  Stop underwriting like a{" "}
                   <span className="relative inline-block whitespace-nowrap">
-                    Offers are due Monday.
+                    coin flip.
                     <svg
                       viewBox="0 0 220 12"
                       preserveAspectRatio="none"
@@ -834,7 +834,7 @@ export default function Home() {
         </section>
 
         {/* The ground layer — the data floor under every screen: property DB,
-            laws, the daily journal, and the steward that polices it all. */}
+            laws-on-the-building, scored news, and the steward policing it. */}
         <GroundLayerSection />
 
         {/* The artifacts — a bento of what you actually walk away with. */}
@@ -1451,11 +1451,11 @@ async function LiveProofStrip() {
   let benchCount = seedBenchmarks().length;
   let ruleCount = seedRules().length;
   let salesCount = 0;
-  let journalTitle: string | null = null;
+  let storyTitle: string | null = null;
   try {
     const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
     const admin = createSupabaseAdminClient();
-    const [{ data: rate }, bench, rules, sales, { data: j }] = await Promise.all([
+    const [{ data: rate }, bench, rules, sales, { data: s }] = await Promise.all([
       admin
         .from("rates")
         .select("value, obs_date")
@@ -1467,10 +1467,10 @@ async function LiveProofStrip() {
       admin.from("regulatory_rules").select("id", { count: "exact", head: true }),
       admin.from("recorded_sales").select("id", { count: "exact", head: true }),
       admin
-        .from("journal_entries")
-        .select("title, status")
-        .eq("status", "ok")
-        .order("entry_date", { ascending: false })
+        .from("market_intel_items")
+        .select("title")
+        .gte("relevance", 6)
+        .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
     ]);
@@ -1478,7 +1478,7 @@ async function LiveProofStrip() {
     if (bench.count) benchCount = Math.max(benchCount, bench.count);
     if (rules.count) ruleCount = Math.max(ruleCount, rules.count);
     salesCount = sales.count ?? 0;
-    journalTitle = (j?.title as string | null) ?? null;
+    storyTitle = (s?.title as string | null) ?? null;
   } catch {
     // no env / tables — seeds carry the strip
   }
@@ -1517,9 +1517,10 @@ async function LiveProofStrip() {
         deed-recorded sales in the comps database
       </>
     ),
-    journalTitle && (
+    storyTitle && (
       <>
-        today&apos;s journal: <span className="font-semibold">“{journalTitle}”</span>
+        top story for this buy box:{" "}
+        <span className="font-semibold">“{storyTitle}”</span>
       </>
     ),
   ].filter(Boolean);
@@ -1581,48 +1582,54 @@ async function FooterTrustLine() {
 
 // ── The ground layer (national expansion) ────────────────────────────────────
 // Four live-stat cards for the data floor: the ingested property database +
-// Pull Comps, the laws reference, the Daily Journal, and the nightly steward.
+// Pull Comps, laws attached to the building, the scored news feed, and the
+// nightly steward.
 // Every number is a live DB count or a code-derived fact; anything the DB
 // can't attest yet renders an honest not-yet state instead of a placeholder.
-interface JournalHead {
-  entry_date: string;
+interface StoryHead {
   title: string;
-  status: string;
+  source: string | null;
+  relevance: number | null;
 }
 
 async function GroundLayerSection() {
   let salesCount = 0;
   let propCount = 0;
   let ruleCount = seedRules().length;
-  let journal: JournalHead | null = null;
+  let storyCount = 0;
+  let topStory: StoryHead | null = null;
   let stewardAt: string | null = null;
   let correctionCount = 0;
   try {
     const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
     const admin = createSupabaseAdminClient();
-    const [sales, props, rules, { data: j }, { data: run }, changes] = await Promise.all([
-      admin.from("recorded_sales").select("id", { count: "exact", head: true }),
-      admin.from("properties").select("id", { count: "exact", head: true }),
-      admin.from("regulatory_rules").select("id", { count: "exact", head: true }),
-      admin
-        .from("journal_entries")
-        .select("entry_date, title, status")
-        .order("entry_date", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      admin
-        .from("steward_runs")
-        .select("finished_at, started_at")
-        .not("finished_at", "is", null)
-        .order("started_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      admin.from("data_changelog").select("id", { count: "exact", head: true }),
-    ]);
+    const [sales, props, rules, stories, { data: s }, { data: run }, changes] =
+      await Promise.all([
+        admin.from("recorded_sales").select("id", { count: "exact", head: true }),
+        admin.from("properties").select("id", { count: "exact", head: true }),
+        admin.from("regulatory_rules").select("id", { count: "exact", head: true }),
+        admin.from("market_intel_items").select("url", { count: "exact", head: true }),
+        admin
+          .from("market_intel_items")
+          .select("title, source, relevance")
+          .gte("relevance", 6)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        admin
+          .from("steward_runs")
+          .select("finished_at, started_at")
+          .not("finished_at", "is", null)
+          .order("started_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        admin.from("data_changelog").select("id", { count: "exact", head: true }),
+      ]);
     salesCount = sales.count ?? 0;
     propCount = props.count ?? 0;
     if (rules.count) ruleCount = Math.max(ruleCount, rules.count);
-    journal = (j as JournalHead | null) ?? null;
+    storyCount = stories.count ?? 0;
+    topStory = (s as StoryHead | null) ?? null;
     stewardAt = (run?.finished_at as string | null) ?? null;
     correctionCount = changes.count ?? 0;
   } catch {
@@ -1649,9 +1656,9 @@ async function GroundLayerSection() {
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
             Under every screen sits a data floor the broker didn&apos;t write:
-            government parcel and deed records, landlord law encoded as logic,
-            a daily sourced journal — and a nightly steward that re-verifies
-            all of it while you sleep.
+            government parcel and deed records, landlord law encoded as logic
+            on each building, the news scored for your buy box — and a
+            nightly steward that re-verifies all of it while you sleep.
           </p>
         </Reveal>
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -1700,36 +1707,39 @@ async function GroundLayerSection() {
               <p className="mt-2 text-sm leading-relaxed text-muted">
                 Rent control, TOPA, licensing, deposits, eviction — encoded as
                 conditions with their exemption paths, statutory quotes, and
-                sources. Browsable as a full reference in the app, evaluated
-                automatically against every deal&apos;s address, and
-                red-bannered the day a rule looks like it changed.
+                sources, attached to the building: every deal&apos;s address
+                gets the rules that touch it evaluated automatically. A rule
+                that looks like it changed hits the news feed and a red
+                banner the same morning.
               </p>
             </div>
           </Reveal>
           <Reveal delay={80}>
             <div className="shadow-card h-full rounded-2xl border border-line bg-surface p-5">
               <p className="text-xs font-medium uppercase tracking-wider text-muted">
-                The Daily Journal
+                The news, scored for you
               </p>
-              {journal && journal.status === "ok" ? (
+              {topStory ? (
                 <p className="mt-2 text-sm leading-relaxed">
-                  <span className="font-semibold">“{journal.title}”</span>{" "}
+                  <span className="font-semibold">“{topStory.title}”</span>{" "}
                   <span className="text-muted">
-                    — {fmtD(journal.entry_date)}&apos;s entry, in the app.
+                    — {topStory.relevance}/10 for this buy box
+                    {topStory.source ? ` (${topStory.source})` : ""}
+                    {storyCount > 0 && ` · ${num(storyCount)} stories tracked`}
                   </span>
                 </p>
               ) : (
                 <p className="mt-2 text-sm leading-relaxed">
                   <span className="font-semibold">
-                    A dated CRE brief, written every weekday morning.
+                    Every weekday&apos;s stories, scored 0–10 for your buy box.
                   </span>
                 </p>
               )}
               <p className="mt-2 text-sm leading-relaxed text-muted">
-                Markets, deal flow, policy &amp; rates, then your markets —
-                written from that morning&apos;s sourced sweep. Every claim
-                carries its link, and a day the pipeline failed says so
-                instead of pretending it was quiet.
+                A morning sweep gathers the news that touches your markets,
+                rates, tax, and regulation, scores each story for how much it
+                matters to you, and links every headline straight to its
+                source — with law changes red-bannered the same day.
               </p>
             </div>
           </Reveal>

@@ -113,31 +113,17 @@ const ACTIONS: Item[] = [
     ),
   },
   {
-    key: "a-journal",
-    label: "Journal",
-    hint: "daily CRE brief",
-    href: "/journal",
+    key: "a-news",
+    label: "News",
+    hint: "scored stories, linked to the source",
+    href: "/news",
     group: "actions",
     icon: (
       <ActionIcon>
-        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" />
-      </ActionIcon>
-    ),
-  },
-  {
-    key: "a-laws",
-    label: "Laws",
-    hint: "landlord rules by jurisdiction",
-    href: "/laws",
-    group: "actions",
-    icon: (
-      <ActionIcon>
-        <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
-        <path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
-        <path d="M7 21h10" />
-        <path d="M12 3v18" />
-        <path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2" />
+        <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2" />
+        <path d="M18 14h-8" />
+        <path d="M15 18h-5" />
+        <path d="M10 6h8v4h-8V6Z" />
       </ActionIcon>
     ),
   },

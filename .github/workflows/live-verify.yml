@@ -20,8 +20,8 @@ jobs:
       - name: Check for current-build markers
         run: |
           echo "== MARKER CHECKS =="
-          grep -c "The OM lands Thursday" body.html && echo "HERO: NEW (current build)" || echo "HERO: OLD OR MISSING"
-          grep -c "Stop underwriting like a" body.html && echo "OLD HERO STILL PRESENT" || true
+          grep -c "Stop underwriting like a" body.html && echo "HERO: CURRENT (coin-flip headline restored per request)" || echo "HERO: OLD OR MISSING"
+          grep -c "The OM lands Thursday" body.html && echo "SUPERSEDED HERO STILL PRESENT" || true
           grep -o "page rendered[^<]*" body.html || echo "no render stamp found"
           grep -c "ticker-track" body.html && echo "TICKER: present" || echo "TICKER: missing"
           grep -c "The ground layer" body.html && echo "GROUND LAYER (national expansion): present" || echo "GROUND LAYER: missing"
@@ -37,7 +37,7 @@ jobs:
           grep -q "It knows the ground" p_why.html && echo "/why: current copy present" || echo "/why: OLD copy"
       - name: Verdict
         run: |
-          if grep -q "The OM lands Thursday" body.html; then
+          if grep -q "Stop underwriting like a" body.html && grep -q "The ground layer" body.html; then
             echo "VERDICT: LIVE SITE IS CURRENT — any 'unchanged' sighting is client-side cache."
           else
             echo "VERDICT: LIVE SITE IS SERVING AN OLD BUILD — Render is not deploying main. Check dashboard.render.com → underwrite-copilot-web → Events for failed deploys (likely build OOM on the starter instance) or auto-deploy toggled off."

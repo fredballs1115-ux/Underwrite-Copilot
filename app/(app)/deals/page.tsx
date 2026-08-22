@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { getBilling } from "@/lib/billing";
 import { type DealRow } from "@/lib/deals";
@@ -230,22 +231,84 @@ export default async function DealsPage({
   };
 
   return (
-    <Pipeline
-      deals={deals}
-      errorMessage={errorMessage}
-      notice={notice}
-      openNew={newParam}
-      onboarding={onboarding}
-      billing={
-        billing
-          ? {
-              isPro: billing.isPro,
-              canCreateDeal: billing.canCreateDeal,
-              dealCount: billing.dealCount,
-              dealLimit: billing.dealLimit,
-            }
-          : null
-      }
-    />
+    <>
+      <Pipeline
+        deals={deals}
+        errorMessage={errorMessage}
+        notice={notice}
+        openNew={newParam}
+        onboarding={onboarding}
+        billing={
+          billing
+            ? {
+                isPro: billing.isPro,
+                canCreateDeal: billing.canCreateDeal,
+                dealCount: billing.dealCount,
+                dealLimit: billing.dealLimit,
+              }
+            : null
+        }
+      />
+      <TodaysNews />
+    </>
+  );
+}
+
+/** Compact stories strip under the pipeline: the highest-scored recent
+ *  headlines from the weekday sweep, each linking to its source. Renders
+ *  nothing at all until the intel cron has stories — no filler card. */
+async function TodaysNews() {
+  let items: {
+    url: string;
+    title: string;
+    source: string | null;
+    relevance: number | null;
+  }[] = [];
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data } = await supabase
+      .from("market_intel_items")
+      .select("url, title, source, relevance")
+      .gte("relevance", 5)
+      .order("created_at", { ascending: false })
+      .limit(4);
+    items = (data as typeof items | null) ?? [];
+  } catch {
+    // table absent — no card
+  }
+  if (items.length === 0) return null;
+
+  return (
+    <section className="mt-6 rounded-xl border border-line bg-surface p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold">News for your markets</h2>
+        <Link
+          href="/news"
+          className="text-xs font-medium text-brand underline decoration-dotted underline-offset-2"
+        >
+          All stories →
+        </Link>
+      </div>
+      <ul className="mt-2 space-y-1.5">
+        {items.map((it) => (
+          <li key={it.url} className="text-sm leading-snug">
+            {it.relevance !== null && (
+              <span className="mr-2 rounded bg-faint px-1.5 py-px font-mono text-[11px] tabular-nums text-muted">
+                {it.relevance}/10
+              </span>
+            )}
+            <a
+              href={it.url}
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-dotted underline-offset-2 hover:text-brand"
+            >
+              {it.title}
+            </a>
+            {it.source && <span className="ml-1.5 text-[11px] text-muted">{it.source}</span>}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
