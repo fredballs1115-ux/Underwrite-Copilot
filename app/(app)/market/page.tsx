@@ -459,6 +459,13 @@ async function MetroExplorer({ selected }: { selected?: string }) {
 
         <p className="text-xs text-muted">{compsLine}</p>
 
+        <Link
+          href="/deals?new=metro"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-brand/40"
+        >
+          Screen a deal in {active.name} →
+        </Link>
+
         {examples.length > 0 && (
           <div>
             <h3 className="text-[11px] uppercase tracking-wide text-muted">
