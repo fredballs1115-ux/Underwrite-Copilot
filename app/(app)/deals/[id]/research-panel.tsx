@@ -197,18 +197,22 @@ export async function ResearchPanel({
           Covered market: {metro.name} — open the market brief →
         </Link>
       ) : (
-        !coveredState(address.state) && (
-          <p className="mt-2 text-[11px] text-muted">
-            Outside the covered market list — rules here are unscreened, not
-            unregulated.{" "}
-            <Link
-              href="/market"
-              className="underline decoration-dotted underline-offset-2 hover:text-brand"
-            >
-              See covered markets
-            </Link>
-          </p>
-        )
+        // Keyed off the MARKET match, not the state: a Pittsburgh or Roanoke
+        // deal sits in a covered STATE but outside every covered market, and
+        // must say so — statewide rules below still evaluate.
+        <p className="mt-2 text-[11px] text-muted">
+          Not in a covered market — market-level coverage here is unscreened,
+          not unregulated
+          {coveredState(address.state)
+            ? "; statewide rules still evaluate below."
+            : "."}{" "}
+          <Link
+            href="/market"
+            className="underline decoration-dotted underline-offset-2 hover:text-brand"
+          >
+            See covered markets
+          </Link>
+        </p>
       )}
 
       {!hasRegulation && (

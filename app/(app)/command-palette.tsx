@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import metrosSeed from "@/data/research/metros.json";
+import type { MarketNavEntry } from "@/lib/market-match";
 
 type PaletteDeal = {
   id: string;
@@ -113,21 +113,6 @@ const ACTIONS: Item[] = [
       </ActionIcon>
     ),
   },
-  // One entry per covered market, derived from the same metros data the
-  // market page renders — type a city, land on its brief.
-  ...(metrosSeed.metros ?? []).map((m) => ({
-    key: `mkt-${m.id}`,
-    label: `Market brief: ${m.name}`,
-    hint: (m as { region?: string }).region ?? "covered market",
-    href: `/market?metro=${m.id}`,
-    group: "actions" as const,
-    icon: (
-      <ActionIcon>
-        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-        <circle cx="12" cy="10" r="3" />
-      </ActionIcon>
-    ),
-  })),
   {
     key: "a-news",
     label: "News",
@@ -226,9 +211,12 @@ const CALL_DOT: Record<string, string> = {
 export function CommandPalette({
   open,
   onOpenChange,
+  markets = [],
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** slim covered-market list, built server-side (lib/market-match) */
+  markets?: MarketNavEntry[];
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -292,12 +280,29 @@ export function CommandPalette({
       group: "deals" as const,
       search: `${d.name} ${d.market} ${d.address} ${d.docs}`,
     }));
-    const all = [...dealItems, ...ACTIONS];
+    // Market briefs come LAST so core actions stay above the fold on an
+    // empty query; their alias search text makes "brooklyn" or "fort worth"
+    // land on the right brief.
+    const marketItems: Item[] = markets.map((m) => ({
+      key: `mkt-${m.id}`,
+      label: `Market brief: ${m.name}`,
+      hint: m.region,
+      href: `/market?metro=${m.id}`,
+      group: "actions" as const,
+      search: `market brief ${m.search}`,
+      icon: (
+        <ActionIcon>
+          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+          <circle cx="12" cy="10" r="3" />
+        </ActionIcon>
+      ),
+    }));
+    const all = [...dealItems, ...ACTIONS, ...marketItems];
     if (!q) return all;
     return all.filter((i) =>
       (i.search ?? `${i.label} ${i.hint}`).toLowerCase().includes(q),
     );
-  }, [deals, query]);
+  }, [deals, markets, query]);
 
   // Clamp instead of a state-syncing effect: as the filter narrows, the
   // highlighted row is derived from the raw index, never reset via setState.

@@ -48,12 +48,14 @@ const MAJOR_MARKETS = (metrosSeed.metros ?? []).filter(
   (m) => (m as { region?: string }).region === "Major US markets"
 );
 const MAJOR_MARKET_COUNT = MAJOR_MARKETS.length;
-// DMV core's four jurisdiction entries are ONE market to a human.
-const MARKET_COUNT =
-  1 +
-  (metrosSeed.metros ?? []).filter((m) => (m as { region?: string }).region === "Mid-Atlantic")
-    .length +
-  MAJOR_MARKET_COUNT;
+// DMV core's four jurisdiction entries are ONE market to a human; every
+// other entry counts as itself, whatever its region stamp — an unstamped
+// future metro must move this number, not silently vanish from it.
+const MARKET_COUNT = new Set(
+  (metrosSeed.metros ?? []).map((m) =>
+    (m as { region?: string }).region === "DMV core" ? "DMV core" : m.id
+  )
+).size;
 
 // Title/description inherit the site defaults from the root layout;
 // the canonical is declared per page so subpages never collapse to /.
@@ -1494,13 +1496,13 @@ function DealPreview() {
 async function LiveProofStrip() {
   let pmms: { value: number; asOf: string } | null = null;
   let benchCount = seedBenchmarks().length;
-  let ruleCount = seedRules().length;
+  const ruleCount = seedRules().length;
   let salesCount = 0;
   let storyTitle: string | null = null;
   try {
     const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
     const admin = createSupabaseAdminClient();
-    const [{ data: rate }, bench, rules, sales, { data: s }] = await Promise.all([
+    const [{ data: rate }, bench, sales, { data: s }] = await Promise.all([
       admin
         .from("rates")
         .select("value, obs_date")
@@ -1509,7 +1511,6 @@ async function LiveProofStrip() {
         .limit(1)
         .maybeSingle(),
       admin.from("benchmarks").select("id", { count: "exact", head: true }),
-      admin.from("regulatory_rules").select("id", { count: "exact", head: true }),
       admin.from("recorded_sales").select("id", { count: "exact", head: true }),
       admin
         .from("market_intel_items")
@@ -1521,7 +1522,7 @@ async function LiveProofStrip() {
     ]);
     if (rate) pmms = { value: Number(rate.value), asOf: String(rate.obs_date) };
     if (bench.count) benchCount = Math.max(benchCount, bench.count);
-    if (rules.count) ruleCount = Math.max(ruleCount, rules.count);
+    // ruleCount stays the checked-in seed truth (see GroundLayerSection).
     salesCount = sales.count ?? 0;
     storyTitle = (s?.title as string | null) ?? null;
   } catch {
@@ -1640,7 +1641,7 @@ interface StoryHead {
 async function GroundLayerSection() {
   let salesCount = 0;
   let propCount = 0;
-  let ruleCount = seedRules().length;
+  const ruleCount = seedRules().length;
   let storyCount = 0;
   let topStory: StoryHead | null = null;
   let stewardAt: string | null = null;
@@ -1648,11 +1649,10 @@ async function GroundLayerSection() {
   try {
     const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
     const admin = createSupabaseAdminClient();
-    const [sales, props, rules, stories, { data: s }, { data: run }, changes] =
+    const [sales, props, stories, { data: s }, { data: run }, changes] =
       await Promise.all([
         admin.from("recorded_sales").select("id", { count: "exact", head: true }),
         admin.from("properties").select("id", { count: "exact", head: true }),
-        admin.from("regulatory_rules").select("id", { count: "exact", head: true }),
         admin.from("market_intel_items").select("url", { count: "exact", head: true }),
         admin
           .from("market_intel_items")
@@ -1672,7 +1672,8 @@ async function GroundLayerSection() {
       ]);
     salesCount = sales.count ?? 0;
     propCount = props.count ?? 0;
-    if (rules.count) ruleCount = Math.max(ruleCount, rules.count);
+    // ruleCount stays the checked-in seed truth: a database seeded before
+    // the 15-market cut (0029 not yet run) must not resurrect the old count.
     storyCount = stories.count ?? 0;
     topStory = (s as StoryHead | null) ?? null;
     stewardAt = (run?.finished_at as string | null) ?? null;

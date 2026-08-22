@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { AppShell } from "./app-shell";
+import { coveredMarketNav } from "@/lib/market-match";
 import { RegulatoryAlertBanner } from "./regulatory-alert-banner";
 
 // Wraps every signed-in screen: real auth check (proxy.ts is the fast gate)
@@ -19,7 +20,7 @@ export default async function AppLayout({
   }
 
   return (
-    <AppShell userEmail={user.email ?? ""}>
+    <AppShell userEmail={user.email ?? ""} markets={coveredMarketNav()}>
       <RegulatoryAlertBanner />
       {children}
     </AppShell>
