@@ -829,6 +829,134 @@
    "as_of": "2026-08-22",
    "status": "sourced",
    "verification": "no-preemption + no-local-adoption cross-stated by three 50-state guides"
+  },
+  {
+   "id": "ky-rent-control-preemption",
+   "jurisdiction_state": "KY",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Kentucky preempts local rent control - Louisville and Lexington cannot cap rents. No rent regulation anywhere in Kentucky.",
+   "quote": null,
+   "source": "https://ipropertymanagement.com/laws/rent-control",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "cross-stated by multiple 50-state guides; statute cite pull queued"
+  },
+  {
+   "id": "sc-rent-control-preemption",
+   "jurisdiction_state": "SC",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "South Carolina preempts local rent regulation: no county or municipal corporation may regulate the amount of rent on private residential or commercial rental property - Charleston and Columbia included.",
+   "quote": "No county or municipal corporation may enact, maintain, or enforce any ordinance or resolution which would regulate in any way the amount of rent",
+   "source": "https://commoner-law.com/rights/housing-rights/rent-control",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "statute language quoted verbatim by tracker; section-number pull queued"
+  },
+  {
+   "id": "al-rent-control-preemption",
+   "jurisdiction_state": "AL",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Alabama preempts local rent regulation (Ala. Code 11-80-8.1) - Birmingham cannot cap rents. No rent regulation anywhere in Alabama.",
+   "quote": null,
+   "source": "https://commoner-law.com/rights/housing-rights/rent-control",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "cite named by tracker + concurring 50-state guides; statute text pull queued"
+  },
+  {
+   "id": "la-rent-control-preemption",
+   "jurisdiction_state": "LA",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Louisiana prohibits cities and towns from creating rent control - New Orleans and Baton Rouge: no caps. No rent regulation anywhere in Louisiana.",
+   "quote": null,
+   "source": "https://ipropertymanagement.com/laws/rent-control",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "cross-stated by multiple 50-state guides; statute cite pull queued"
+  },
+  {
+   "id": "ok-rent-control-preemption",
+   "jurisdiction_state": "OK",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Oklahoma bans cities and towns from enacting rent control - Oklahoma City and Tulsa: no caps. No rent regulation anywhere in Oklahoma.",
+   "quote": null,
+   "source": "https://ipropertymanagement.com/laws/rent-control",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "cross-stated by multiple 50-state guides; statute cite pull queued"
+  },
+  {
+   "id": "vt-no-rent-control",
+   "jurisdiction_state": "VT",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Vermont has no statewide rent control and no local ordinance in effect in any municipality (Burlington's tenant-protection charter politics recur - watch, not law). Pending statehouse bills have not carried rent caps.",
+   "quote": null,
+   "source": "https://northeastpcg.com/rent-regulation-in-new-england-a-2026-field-guide/",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "New England field guide + 50-state trackers concur"
+  },
+  {
+   "id": "nh-no-rent-control",
+   "jurisdiction_state": "NH",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "New Hampshire has no rent control at any level - and moved landlord-favorable in 2025: HB 60 (signed Aug 1, 2025) makes expiration of a 12+ month lease good cause for eviction with 60-day notice, reversing the 2005 case law that had blocked non-renewal at term.",
+   "quote": null,
+   "source": "https://northeastpcg.com/rent-regulation-in-new-england-a-2026-field-guide/",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "field guide (HB 60 detail single-source, labeled) + 50-state trackers concur on no-rent-control"
+  },
+  {
+   "id": "de-no-rent-control",
+   "jurisdiction_state": "DE",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Delaware has no rent control at state or local level and no statewide just-cause requirement (manufactured-home lots have their own rent-justification regime - separate rule when the MHC sector activates). Wilmington: no caps.",
+   "quote": null,
+   "source": "https://evictionriskmap.com/rent-control-guide/delaware/",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "DE-specific guide + 50-state trackers concur"
   }
  ],
  "gaps": [
@@ -847,6 +975,7 @@
   "Rolling exemption windows (CA 15yr / WA 12yr / OR 15yr) encoded as 2026-snapshot dates - steward re-verification advances them annually",
   "Minneapolis charter-amendment text direct pull (rent regulation authorized 2021, no ordinance enacted)",
   "NV / UT preemption statute citations (rows encoded as sourced pending the cite)",
-  "MI MCL 123.411 direct legislature.mi.gov text pull"
+  "MI MCL 123.411 direct legislature.mi.gov text pull",
+  "KY/SC/AL/LA/OK statute citations + NH HB 60 bill-text pull (rows encoded as sourced)"
  ]
 }

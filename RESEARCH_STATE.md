@@ -4,6 +4,16 @@ Resume file per project protocol: a future session starts HERE and does not
 repeat finished work. Ops/go-live steps + the ranked gap list live in
 `INTEGRATION_NOTES.md`.
 
+**2026-08-22 (session 4e, fourth sweep — the South + New England close-out)**
+— 8 rules (54 total, spanning 36 states + DC) + 7 metros (43): KY/SC/AL/LA/OK
+preemptions (SC statute language quoted verbatim; AL cite §11-80-8.1; all
+sourced with cite pulls queued); VT no-rent-control (Burlington charter
+politics = watch), NH no-rent-control + landlord-favorable HB 60 (2025:
+lease expiry = good cause, single-source labeled), DE no rent control at any
+level (MHC rent-justification regime noted for the sector's later
+activation). The ME→FL corridor is now covered state-by-state end to end.
+Homepage derived counts updated automatically (37 jurisdictions).
+
 **2026-08-22 (session 4d, third sweep — Midwest/Mountain/NE corridor)** —
 9 rules (46 total) + 12 metros (36): OH HB 430 preemption (eff. 2022-09-22,
 4 sources); **Portland ME rent control** (70% of Boston CPI, 2.2% for 2026,

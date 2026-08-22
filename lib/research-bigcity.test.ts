@@ -162,6 +162,14 @@ describe("statewide caps and preemptions", () => {
       ["WI", "Milwaukee", "wi-rent-control-preemption"],
       ["IN", "Indianapolis", "in-rent-control-preemption"],
       ["MO", "Kansas City", "mo-rent-control-preemption"],
+      ["KY", "Louisville", "ky-rent-control-preemption"],
+      ["SC", "Charleston", "sc-rent-control-preemption"],
+      ["AL", "Birmingham", "al-rent-control-preemption"],
+      ["LA", "New Orleans", "la-rent-control-preemption"],
+      ["OK", "Oklahoma City", "ok-rent-control-preemption"],
+      ["VT", "Burlington", "vt-no-rent-control"],
+      ["NH", "Manchester", "nh-no-rent-control"],
+      ["DE", "Wilmington", "de-no-rent-control"],
     ] as const) {
       const o = outcomes({ ...BASE, state, locality: [city], units: 4 });
       expect(o[id]).toBe("applies");
