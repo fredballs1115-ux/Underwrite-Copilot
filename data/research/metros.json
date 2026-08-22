@@ -838,6 +838,165 @@
     "county bulk endpoint",
     "FY2026 FMR"
    ]
+  },
+  {
+   "id": "new_orleans",
+   "name": "New Orleans LA",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "Louisiana bars local rent control - no caps in New Orleans. Orleans Parish assessor rolls documented; insurance cost, not regulation, is the underwriting story here.",
+    "status": "sourced"
+   },
+   "rule_ids": [
+    "la-rent-control-preemption"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "LA statute cite",
+    "Orleans Parish bulk endpoint",
+    "FY2026 FMR"
+   ]
+  },
+  {
+   "id": "louisville",
+   "name": "Louisville / Lexington KY",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "Kentucky preempts local rent control - no caps in Louisville or Lexington. Jefferson County PVA data documented.",
+    "status": "sourced"
+   },
+   "rule_ids": [
+    "ky-rent-control-preemption"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "KY statute cite",
+    "PVA bulk endpoint",
+    "FY2026 FMR"
+   ]
+  },
+  {
+   "id": "charleston",
+   "name": "Charleston / Columbia SC",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "South Carolina preempts local rent regulation (statute language on file) - no caps in Charleston or Columbia. County assessor portals documented; flood/insurance load is the real underwriting variable.",
+    "status": "sourced"
+   },
+   "rule_ids": [
+    "sc-rent-control-preemption"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "SC section number",
+    "county bulk endpoints",
+    "FY2026 FMR"
+   ]
+  },
+  {
+   "id": "okc_tulsa",
+   "name": "Oklahoma City / Tulsa OK",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "Oklahoma bans local rent control - no caps in OKC or Tulsa. County assessor portals documented.",
+    "status": "sourced"
+   },
+   "rule_ids": [
+    "ok-rent-control-preemption"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "OK statute cite",
+    "county bulk endpoints",
+    "FY2026 FMR"
+   ]
+  },
+  {
+   "id": "birmingham",
+   "name": "Birmingham AL",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "Alabama preempts local rent regulation (Ala. Code 11-80-8.1) - no caps in Birmingham. Jefferson County AL parcel data documented.",
+    "status": "sourced"
+   },
+   "rule_ids": [
+    "al-rent-control-preemption"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "statute text pull",
+    "county bulk endpoint",
+    "FY2026 FMR"
+   ]
+  },
+  {
+   "id": "burlington_vt",
+   "name": "Burlington VT",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "No rent control anywhere in Vermont - but Burlington's tenant-protection charter politics recur, so the corridor's smallest metro stays a watch, not a free pass.",
+    "status": "sourced"
+   },
+   "rule_ids": [
+    "vt-no-rent-control"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "Burlington charter watch",
+    "FY2026 FMR"
+   ]
+  },
+  {
+   "id": "wilmington_de",
+   "name": "Wilmington DE",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "No rent control at any level in Delaware and no statewide just-cause - the corridor's quietest regulatory ground. New Castle County parcels staged in comps discovery mode already.",
+    "status": "sourced"
+   },
+   "rule_ids": [
+    "de-no-rent-control"
+   ],
+   "comps_provider": "discovery",
+   "gaps": [
+    "NCC endpoint resolution via /api/comps/health",
+    "FY2026 FMR"
+   ]
   }
  ]
 }
