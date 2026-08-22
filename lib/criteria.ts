@@ -11,6 +11,10 @@ export interface GeoTarget {
   city?: string;
   state?: string;
   county?: string;
+  /** extra match needles for market-level territories (a "Dallas-Fort Worth"
+   *  chip must hit Fort Worth and Plano deals too). Same substring semantics
+   *  as city/county/label. */
+  aliases?: string[];
 }
 
 export interface BuyBox {
@@ -435,7 +439,7 @@ export function evaluateBuyBox(
       });
     } else {
       const hit = targets.find((t) => {
-        const needles = [t.city, t.county, t.label]
+        const needles = [t.city, t.county, t.label, ...(t.aliases ?? [])]
           .filter((s): s is string => !!s && s.trim().length > 1)
           .map((s) => s.toLowerCase());
         return needles.some((n) => haystack.includes(n));
