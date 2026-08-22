@@ -10,6 +10,7 @@ import {
 } from "@/lib/market-memory";
 import { mergeBenchmarks, seedBenchmarks, seedRules } from "@/lib/research-data";
 import { linkOk } from "@/lib/link-audit";
+import { looseValue, SECTORS } from "@/lib/research-sectors";
 import { COVERAGE_DISCOVERY, COVERAGE_SUMMARY, PROVIDERS } from "@/lib/public-comps/core";
 import metrosSeed from "@/data/research/metros.json";
 import multifamilySeed from "@/data/research/multifamily.json";
@@ -25,9 +26,9 @@ const CALL_META: Record<string, { label: string; cls: string }> = {
 export default async function MarketDataPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ metro?: string }>;
+  searchParams?: Promise<{ metro?: string; sector?: string }>;
 }) {
-  const { metro: metroParam } = (await searchParams) ?? {};
+  const { metro: metroParam, sector: sectorParam } = (await searchParams) ?? {};
   const supabase = await createSupabaseServerClient();
   const user = await getCurrentUser();
 
@@ -101,19 +102,20 @@ export default async function MarketDataPage({
 
       <MetroExplorer selected={metroParam} />
       <MidAtlanticTable />
-      <SectorRanges />
+      <SectorExplorer selected={sectorParam} />
       <RatesStrip />
       <IntelDigestCard />
     </div>
   );
 }
 
-// ── Sector cap-rate ranges (ship-it pass) ───────────────────────────────────
-// Investable asset classes priced the way each class actually prices: cap-
-// rate RANGES per researched tier, never a single blended number, provenance
-// per row. Single-family residential is excluded from every market surface
-// by policy — filtered here at the data level, not just hidden.
-async function SectorRanges() {
+// ── Mid-Atlantic market table (research build) ───────────────────────────────
+// The seeded + DB-merged benchmarks as one table: 2-4 unit medians, monthly
+// sales, and active listings per metro, plus the DC-area FY2026 FMR row —
+// visible from day one (it doesn't depend on the user's own screens), every
+// row with provenance. Recorded-sales COVERAGE for auto-comps is stated
+// from the provider registry so it can't drift.
+async function MidAtlanticTable() {
   const supabase = await createSupabaseServerClient();
   let benchmarks = seedBenchmarks();
   try {
@@ -122,89 +124,85 @@ async function SectorRanges() {
   } catch {
     // seeds stand
   }
-  const rows = benchmarks
-    .filter(
-      (b) =>
-        b.metric.startsWith("cap_rate__") &&
-        b.sector !== "sfr_btr" // investable classes only — no single-family on market surfaces
-    )
-    .sort((a, b) => a.sector.localeCompare(b.sector) || (a.low ?? 0) - (b.low ?? 0));
-  if (rows.length === 0) return null;
+  const mf = benchmarks.filter((b) => b.sector === "multifamily" && b.metro);
+  const metros = [...new Set(mf.map((b) => b.metro))].filter(
+    (m) => m !== "Washington DC area"
+  );
+  const get = (metro: string, metric: string) =>
+    mf.find((b) => b.metro === metro && b.metric === metric);
+  const fmr = mf.filter((b) => b.metro === "Washington DC area");
+  const priceRows = metros
+    .map((m) => ({ metro: m, price: get(m, "median_sale_price_2_4_unit"), sales: get(m, "monthly_sales_2_4_unit"), listings: get(m, "active_listings_2_4_unit") }))
+    .filter((r) => r.price)
+    .sort((a, b) => (a.price!.low ?? 0) - (b.price!.low ?? 0));
+  if (priceRows.length === 0) return null;
 
-  const sectorLabel: Record<string, string> = {
-    office: "Office / medical",
-    industrial: "Industrial / IOS",
-    retail: "Retail / NNN",
-    hospitality_str: "Hospitality",
-    self_storage: "Self-storage",
-    senior_housing: "Senior housing",
-    manufactured_housing: "Manufactured housing",
-    specialty: "Specialty",
-    multifamily: "Multifamily",
-  };
+  const money = (n: number | null) => (n === null ? "—" : `$${Math.round(n / 1000)}k`);
+  const range = (b: { low: number | null; high: number | null } | undefined) =>
+    !b || b.low === null
+      ? "—"
+      : b.low === b.high
+        ? `${b.low}`
+        : `${b.low}–${b.high}`;
 
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold tracking-tight">
-          Sector cap-rate ranges
+          Mid-Atlantic 2–4 unit market
         </h2>
         <span className="text-[11px] text-muted">
-          national tiers · ranges, never single numbers · investable classes only
+          {priceRows[0].price!.as_of} · Redfin public dataset
         </span>
       </div>
       <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[560px] text-left text-sm">
+        <table className="w-full min-w-[520px] text-left text-sm">
           <thead>
             <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
-              <th className="py-1.5 pr-3 font-medium">Sector</th>
-              <th className="py-1.5 pr-3 font-medium">Tier</th>
-              <th className="py-1.5 pr-3 font-medium">Cap-rate range</th>
-              <th className="py-1.5 font-medium">Provenance</th>
+              <th className="py-1.5 pr-3 font-medium">Metro</th>
+              <th className="py-1.5 pr-3 font-medium">Median sale (2–4 unit)</th>
+              <th className="py-1.5 pr-3 font-medium">Sales / mo</th>
+              <th className="py-1.5 pr-3 font-medium">Active</th>
+              <th className="py-1.5 font-medium">Note</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((b) => (
-              <tr key={`${b.sector}|${b.metric}`} className="border-b border-line/60">
-                <td className="py-1.5 pr-3 font-medium">
-                  {sectorLabel[b.sector] ?? b.sector}
-                </td>
-                <td className="py-1.5 pr-3 text-xs text-muted">
-                  {(b.note ?? "").split(" — ")[0]}
-                </td>
-                <td className="py-1.5 pr-3 font-mono tabular-nums">
-                  {b.low === b.high ? `${b.low}%` : `${b.low}%–${b.high}%`}
-                </td>
-                <td className="py-1.5 text-[11px] text-muted">
-                  {b.status}
-                  {" · "}
-                  {b.as_of}
-                  {b.source && linkOk(b.source) !== false && (
-                    <>
-                      {" · "}
-                      <a
-                        href={b.source}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline decoration-dotted underline-offset-2 hover:text-ink"
-                      >
-                        source
-                      </a>
-                    </>
-                  )}
-                  {b.source && linkOk(b.source) === false && (
-                    <> · source on file — link unavailable</>
-                  )}
+            {priceRows.map((r) => (
+              <tr key={r.metro} className="border-b border-line/60">
+                <td className="py-1.5 pr-3 font-medium">{r.metro}</td>
+                <td className="py-1.5 pr-3 font-mono tabular-nums">{money(r.price!.low)}</td>
+                <td className="py-1.5 pr-3 font-mono tabular-nums">{range(r.sales)}</td>
+                <td className="py-1.5 pr-3 font-mono tabular-nums">{range(r.listings)}</td>
+                <td className="py-1.5 text-xs text-muted">
+                  {(r.price!.note ?? "").split(";")[0]}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-[11px] text-muted">
-        Tiers without a confirmable range are gaps in the research files, not
-        rows here. Deal-level pricing uses the recorded-sales comps panel, not
-        these national bands.
+      {fmr.length > 0 && (
+        <p className="mt-3 border-t border-line pt-2 text-xs text-muted">
+          DC-area FY2026 HUD fair-market rents:{" "}
+          {fmr
+            .map(
+              (b) =>
+                `${b.metric.replace("hud_fmr_fy2026_", "").toUpperCase()} $${(b.low ?? 0).toLocaleString()}`
+            )
+            .join(" · ")}{" "}
+          <span className="text-[11px]">(sourced; verify against the HUD schedule)</span>
+        </p>
+      )}
+      <p className="mt-2 text-[11px] leading-relaxed text-muted">
+        Recorded-sales comps auto-pull live in {COVERAGE_SUMMARY}
+        {COVERAGE_DISCOVERY.length > 0 && (
+          <>
+            {"; being wired: "}
+            {COVERAGE_DISCOVERY.map((p) => p.regionLabel).join(", ")}
+          </>
+        )}
+        . Every figure above carries its source and as-of date in the research
+        layer; stale rows badge themselves on deal screens.
       </p>
     </section>
   );
@@ -391,101 +389,184 @@ function MetroExplorer({ selected }: { selected?: string }) {
   );
 }
 
-// ── Mid-Atlantic market table (research build) ───────────────────────────────
-// The seeded + DB-merged benchmarks as one table: 2-4 unit medians, monthly
-// sales, and active listings per metro, plus the DC-area FY2026 FMR row —
-// visible from day one (it doesn't depend on the user's own screens), every
-// row with provenance. Recorded-sales COVERAGE for auto-comps is stated
-// from the provider registry so it can't drift.
-async function MidAtlanticTable() {
-  const supabase = await createSupabaseServerClient();
-  let benchmarks = seedBenchmarks();
-  try {
-    const { data } = await supabase.from("benchmarks").select("*");
-    if (data?.length) benchmarks = mergeBenchmarks(data as never);
-  } catch {
-    // seeds stand
-  }
-  const mf = benchmarks.filter((b) => b.sector === "multifamily" && b.metro);
-  const metros = [...new Set(mf.map((b) => b.metro))].filter(
-    (m) => m !== "Washington DC area"
+// ── Sector explorer (every asset type) ──────────────────────────────────────
+// The full research file for EVERY asset class, rendered: cycle position,
+// cap-rate ranges (ranges, never single numbers), supply/demand, debt terms,
+// the small-investor verdict, and the named gaps — provenance throughout.
+// SFR appears as an asset-class OVERVIEW here while staying excluded from
+// multifamily sales aggregates (an overview is not a row in 2-4 unit math).
+function SectorExplorer({ selected }: { selected?: string }) {
+  const active = SECTORS.find((x) => x.id === selected) ?? SECTORS[0];
+  const doc = active.doc;
+  const ranges = (doc.cap_rate_ranges ?? []).filter(
+    (r) => typeof r.low === "number" && typeof r.high === "number"
   );
-  const get = (metro: string, metric: string) =>
-    mf.find((b) => b.metro === metro && b.metric === metric);
-  const fmr = mf.filter((b) => b.metro === "Washington DC area");
-  const priceRows = metros
-    .map((m) => ({ metro: m, price: get(m, "median_sale_price_2_4_unit"), sales: get(m, "monthly_sales_2_4_unit"), listings: get(m, "active_listings_2_4_unit") }))
-    .filter((r) => r.price)
-    .sort((a, b) => (a.price!.low ?? 0) - (b.price!.low ?? 0));
-  if (priceRows.length === 0) return null;
-
-  const money = (n: number | null) => (n === null ? "—" : `$${Math.round(n / 1000)}k`);
-  const range = (b: { low: number | null; high: number | null } | undefined) =>
-    !b || b.low === null
-      ? "—"
-      : b.low === b.high
-        ? `${b.low}`
-        : `${b.low}–${b.high}`;
+  const unpriced = (doc.cap_rate_ranges ?? []).filter(
+    (r) => typeof r.low !== "number" || typeof r.high !== "number"
+  );
+  const supply = looseValue(doc.supply_demand) ??
+    looseValue((doc.supply_demand as Record<string, unknown> | undefined)?.nova_scarcity) ??
+    null;
+  const debt = looseValue(doc.debt_terms) ??
+    looseValue((doc.debt_terms as Record<string, unknown> | undefined)?.conventional_investor_2_4) ??
+    null;
+  const verdict = doc.small_investor_verdict;
+  const cycleStatus = doc.cycle_position?.status ?? "sourced";
+  const statusCls = (st: string | undefined) =>
+    st === "verified"
+      ? "bg-pass/10 text-pass"
+      : st === "unverified_not_found"
+        ? "bg-caution/10 text-caution"
+        : "bg-brand/10 text-brand";
 
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold tracking-tight">
-          Mid-Atlantic 2–4 unit market
+          Every asset class, researched
         </h2>
         <span className="text-[11px] text-muted">
-          {priceRows[0].price!.as_of} · Redfin public dataset
+          as of {doc.as_of ?? "2026-08-21"} · ranges, never single numbers
         </span>
       </div>
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[520px] text-left text-sm">
-          <thead>
-            <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
-              <th className="py-1.5 pr-3 font-medium">Metro</th>
-              <th className="py-1.5 pr-3 font-medium">Median sale (2–4 unit)</th>
-              <th className="py-1.5 pr-3 font-medium">Sales / mo</th>
-              <th className="py-1.5 pr-3 font-medium">Active</th>
-              <th className="py-1.5 font-medium">Note</th>
-            </tr>
-          </thead>
-          <tbody>
-            {priceRows.map((r) => (
-              <tr key={r.metro} className="border-b border-line/60">
-                <td className="py-1.5 pr-3 font-medium">{r.metro}</td>
-                <td className="py-1.5 pr-3 font-mono tabular-nums">{money(r.price!.low)}</td>
-                <td className="py-1.5 pr-3 font-mono tabular-nums">{range(r.sales)}</td>
-                <td className="py-1.5 pr-3 font-mono tabular-nums">{range(r.listings)}</td>
-                <td className="py-1.5 text-xs text-muted">
-                  {(r.price!.note ?? "").split(";")[0]}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {SECTORS.map((x) => (
+          <Link
+            key={x.id}
+            href={`/market?sector=${x.id}`}
+            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+              x.id === active.id
+                ? "border-brand bg-brand text-white"
+                : "border-line text-muted hover:border-brand hover:text-brand"
+            }`}
+          >
+            {x.label}
+          </Link>
+        ))}
       </div>
-      {fmr.length > 0 && (
-        <p className="mt-3 border-t border-line pt-2 text-xs text-muted">
-          DC-area FY2026 HUD fair-market rents:{" "}
-          {fmr
-            .map(
-              (b) =>
-                `${b.metric.replace("hud_fmr_fy2026_", "").toUpperCase()} $${(b.low ?? 0).toLocaleString()}`
-            )
-            .join(" · ")}{" "}
-          <span className="text-[11px]">(sourced; verify against the HUD schedule)</span>
-        </p>
-      )}
-      <p className="mt-2 text-[11px] leading-relaxed text-muted">
-        Recorded-sales comps auto-pull live in {COVERAGE_SUMMARY}
-        {COVERAGE_DISCOVERY.length > 0 && (
-          <>
-            {"; being wired: "}
-            {COVERAGE_DISCOVERY.map((p) => p.regionLabel).join(", ")}
-          </>
+
+      <div className="mt-4 space-y-4">
+        {doc.cycle_position?.summary && (
+          <p className="text-sm leading-relaxed">
+            {doc.cycle_position.summary}
+            <span
+              className={`ml-2 rounded px-1.5 py-px align-middle text-[10px] font-medium ${statusCls(cycleStatus)}`}
+            >
+              {cycleStatus}
+            </span>
+            {doc.cycle_position.sources?.[0] &&
+              linkOk(doc.cycle_position.sources[0]) !== false && (
+                <a
+                  href={doc.cycle_position.sources[0]}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="ml-1.5 text-[11px] text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
+                >
+                  source
+                </a>
+              )}
+          </p>
         )}
-        . Every figure above carries its source and as-of date in the research
-        layer; stale rows badge themselves on deal screens.
-      </p>
+
+        {ranges.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[480px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
+                  <th className="py-1.5 pr-3 font-medium">Tier</th>
+                  <th className="py-1.5 pr-3 font-medium">Cap-rate range</th>
+                  <th className="py-1.5 font-medium">Provenance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ranges.map((r) => (
+                  <tr key={r.tier} className="border-b border-line/60">
+                    <td className="py-1.5 pr-3 text-xs">{r.tier}</td>
+                    <td className="py-1.5 pr-3 font-mono tabular-nums">
+                      {r.low === r.high
+                        ? `${((r.low ?? 0) * 100).toFixed(2).replace(/\.?0+$/, "")}%`
+                        : `${((r.low ?? 0) * 100).toFixed(2).replace(/\.?0+$/, "")}%–${((r.high ?? 0) * 100).toFixed(2).replace(/\.?0+$/, "")}%`}
+                    </td>
+                    <td className="py-1.5 text-[11px] text-muted">
+                      {r.status ?? "sourced"}
+                      {r.sources?.[0] && linkOk(r.sources[0]) !== false && (
+                        <>
+                          {" · "}
+                          <a
+                            href={r.sources[0]}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline decoration-dotted underline-offset-2 hover:text-ink"
+                          >
+                            source
+                          </a>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {unpriced.length > 0 && (
+          <p className="text-[11px] text-muted">
+            {unpriced.length} tier{unpriced.length === 1 ? "" : "s"} without a
+            confirmable range — shown as gaps, never estimated:{" "}
+            {unpriced.map((r) => r.tier).filter(Boolean).join("; ")}.
+          </p>
+        )}
+
+        {(supply || debt) && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {supply && (
+              <div className="rounded-lg border border-line/70 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted">
+                  Supply &amp; demand
+                </p>
+                <p className="mt-1 text-sm leading-relaxed">{supply}</p>
+              </div>
+            )}
+            {debt && (
+              <div className="rounded-lg border border-line/70 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted">
+                  Debt terms
+                </p>
+                <p className="mt-1 text-sm leading-relaxed">{debt}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {verdict && (
+          <div className="rounded-xl border border-brand/25 bg-brand/[0.04] p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`rounded px-2 py-0.5 text-[11px] font-semibold ${
+                  verdict.accessible ? "bg-pass/10 text-pass" : "bg-kill/10 text-kill"
+                }`}
+              >
+                {verdict.accessible ? "Accessible at $1–2M" : "Not accessible direct"}
+              </span>
+              <span className="text-[11px] uppercase tracking-wide text-muted">
+                small-investor verdict
+              </span>
+            </div>
+            {verdict.entry_vehicle && (
+              <p className="mt-1.5 text-sm font-medium">{verdict.entry_vehicle}</p>
+            )}
+            {verdict.reasoning && (
+              <p className="mt-1 text-sm leading-relaxed text-muted">{verdict.reasoning}</p>
+            )}
+          </div>
+        )}
+
+        {(doc.gaps?.length ?? 0) > 0 && (
+          <p className="text-[11px] leading-relaxed text-muted">
+            Named gaps: {doc.gaps!.join(" · ")}
+          </p>
+        )}
+      </div>
     </section>
   );
 }

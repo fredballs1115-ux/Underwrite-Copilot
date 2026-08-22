@@ -35,9 +35,9 @@ import { COVERAGE_LIVE, COVERAGE_DISCOVERY } from "@/lib/public-comps/core";
 // the canonical is declared per page so subpages never collapse to /.
 export const metadata: Metadata = { alternates: { canonical: "/" } };
 
-// ISR, daily: the proof strip under the hero quotes the newest FRED pull —
-// a fully static page would freeze it at deploy time.
-export const revalidate = 86400;
+// ISR, hourly: the proof strip quotes the newest FRED pull, and a shorter
+// window keeps "the site didn't change" cache confusion to at most an hour.
+export const revalidate = 3600;
 
 // Landing page — a React Server Component (zero client JS, no secrets).
 // The pitch is consistency: one method on every deal, with the work shown.
@@ -359,9 +359,9 @@ export default function Home() {
                   AI deal screening for CRE acquisitions
                 </span>
                 <h1 className="mt-6 text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.4rem]">
-                  Stop underwriting like a{" "}
+                  The OM lands Thursday.{" "}
                   <span className="relative inline-block whitespace-nowrap">
-                    coin flip.
+                    Offers are due Monday.
                     <svg
                       viewBox="0 0 220 12"
                       preserveAspectRatio="none"
@@ -380,19 +380,18 @@ export default function Home() {
                   </span>
                 </h1>
                 <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/70 max-sm:hidden">
-                  Two analysts can take the same deal on the same afternoon and
-                  land {SPREAD_BPS} bps apart — all called &ldquo;judgment.&rdquo;
-                  Underwrite Copilot runs every deal through the same
-                  disciplined screen: it extracts the OM, reconciles it against
-                  the rent roll and T-12, scrutinizes the comps, and hands back
-                  a verdict with a 0–100 fit score against your buy box — so
-                  the answer depends on the deal, not on who opened the model.
+                  Small shops see 10–15 OMs a week, spend 20–45 minutes on each
+                  manual screen, and fully model one in ten. Copilot screens
+                  the deal tonight: every figure extracted with its page cite,
+                  broker comps stress-ranked, recorded sales pulled from the
+                  county record, the rent-control call made at the address —
+                  and a verdict scored 0–100 against your buy box before the
+                  weekend starts.
                 </p>
                 <p className="mt-6 text-lg leading-relaxed text-white/70 sm:hidden">
-                  Two analysts, same OM, {SPREAD_BPS} bps apart. Copilot runs
-                  every deal
-                  through the same six-stage screen — so the answer depends on
-                  the deal, not the analyst.
+                  10–15 OMs a week, 20–45 minutes each, one in ten modeled.
+                  Copilot screens tonight: page-cited extraction, recorded
+                  county sales, the rent-control call, a scored verdict.
                 </p>
                 <div className="mt-8 flex flex-wrap items-center gap-3">
                   <Link
@@ -412,6 +411,10 @@ export default function Home() {
                   Upload an OM → sourced ranges, the three deal-killers, and a
                   Go / Caution / No-go in {FULL_SCREEN_CLAIM}. First {FREE_DEALS} deals free · no
                   card.
+                </p>
+                <p className="mt-4 max-w-xl font-mono text-[11px] uppercase tracking-wider text-white/40">
+                  price/door · going-in cap (T-12) · untrended YoC · DSCR ·
+                  debt yield · loss-to-lease
                 </p>
               </div>
 
@@ -512,6 +515,28 @@ export default function Home() {
             </div>
 
             </Reveal>
+            <Reveal delay={60}>
+              <div className="mt-4 rounded-2xl border border-line bg-surface p-5 shadow-card">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted">
+                  Four instant disqualifiers the screen stresses first
+                </p>
+                <ul className="mt-3 grid gap-x-8 gap-y-2 text-sm leading-relaxed text-muted sm:grid-cols-2">
+                  {(
+                    [
+                      "Property taxes not reset to the sale price",
+                      "OpEx ratio under ~30% of gross potential rent",
+                      "Aggressive loss-to-lease and concession burn-off",
+                      "Insurance still at the seller\u2019s legacy premium",
+                    ] as const
+                  ).map((d) => (
+                    <li key={d} className="flex gap-2.5">
+                      <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-kill/70" />
+                      <span>{d}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Reveal>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div className="rounded-xl border border-line bg-surface p-5 shadow-card">
                 <div className="flex items-center justify-between">
@@ -576,7 +601,7 @@ export default function Home() {
               The six-stage screen
             </p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
-              What happens to every OM you upload.
+              Our proof is public: a fully worked screen.
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
               A first read — headline numbers and buy-box fit — lands in about
@@ -1326,7 +1351,8 @@ export default function Home() {
         </div>
         <div className="border-t border-line">
           <p className="mx-auto max-w-6xl px-6 py-4 text-xs text-muted">
-            © 2026 Underwrite Copilot. A first-pass screen, not investment
+            © 2026 Underwrite Copilot · page rendered{" "}
+            {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}. A first-pass screen, not investment
             advice.
           </p>
         </div>
