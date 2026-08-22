@@ -6,10 +6,13 @@ import { seedRules } from "@/lib/research-data";
 import metrosSeed from "@/data/research/metros.json";
 
 // Coverage figures DERIVED from the same seeds the app evaluates — this page
-// can never claim ground the rules engine doesn't cover.
+// can never claim ground the rules engine doesn't cover. Coverage is
+// deliberately focused: the Mid-Atlantic home region + the biggest US
+// markets (per direction), with the law engine as depth everywhere else.
 const RULE_COUNT = seedRules().length;
-const RULE_STATE_COUNT = new Set(seedRules().map((r) => r.jurisdiction_state.toUpperCase()))
-  .size;
+const MAJOR_MARKET_COUNT = (metrosSeed.metros ?? []).filter(
+  (m) => (m as { region?: string }).region === "Major US markets"
+).length;
 const WIRED_MARKETS = (metrosSeed.metros ?? [])
   .filter((m) => (m as { ingest_market?: string }).ingest_market)
   .map((m) => m.name);
@@ -56,7 +59,7 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "It knows the ground",
     body: [
-      `Give a deal an address and the app checks the local rules: rent control coverage, small-landlord exemptions, purchase rights — ${RULE_COUNT} machine-evaluable rules across ${RULE_STATE_COUNT} states, DC to Jersey City to LA to Chicago. It answers with the statute linked, or names the open question. Unknown jurisdictions say so — never a silent pass.`,
+      `Give a deal an address and the app checks the local rules: rent control coverage, small-landlord exemptions, purchase rights — ${RULE_COUNT} machine-evaluable rules focused on the Mid-Atlantic and the ${MAJOR_MARKET_COUNT} biggest US markets, DC to Jersey City to LA to Chicago. It answers with the statute linked, or names the open question. Unknown jurisdictions say so — never a silent pass.`,
       `Recorded sales nearby pull automatically from government records — live county APIs in ${COVERAGE_SUMMARY} today, plus a bulk property database of government deed records with ${WIRED_MARKETS.join(", ")} pipelines wired. Public records, clearly labeled. Not an appraisal.`,
     ],
   },

@@ -213,18 +213,16 @@ async function MidAtlanticTable() {
 // holds for it — FMR benchmarks, market notes, the regulatory rules in force
 // (statute-linked, status-labeled), comps availability, and example
 // properties. Server-rendered; selection is a query param, so it's linkable.
-// The buyer's geography first, then outward: each region is its own distinct
-// block so 43 metros never blur into one pill cloud. Metros missing a region
-// stamp fall into "More markets" instead of vanishing.
+// The buyer's geography first, then the biggest markets — a deliberately
+// FOCUSED list (per direction: the Mid-Atlantic home region + the 12 major
+// US markets, never a 50-state sprawl). Each area is its own distinct block;
+// metros missing a region stamp fall into "More markets" instead of
+// vanishing. The rules engine still evaluates ANY US address — focus is
+// about presentation, not blind spots.
 const REGION_ORDER = [
   "DMV core",
   "Mid-Atlantic",
-  "Northeast",
-  "Southeast",
-  "Midwest",
-  "Texas & Plains",
-  "Mountain West",
-  "West Coast",
+  "Major US markets",
   "More markets",
 ] as const;
 
@@ -302,9 +300,10 @@ async function MetroExplorer({ selected }: { selected?: string }) {
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
       <h2 className="text-sm font-semibold tracking-tight">Metro explorer</h2>
       <p className="mt-1 text-xs text-muted">
-        {metros.length} metros across {REGION_ORDER.length} regions — every
-        area in its own place; pick a metro for its rules, rents, and data
-        coverage.
+        Your home region plus the{" "}
+        {metros.filter((m) => (m as { region?: string }).region === "Major US markets").length}{" "}
+        biggest US markets — a deliberately focused list, each area in its own
+        place. Pick a metro for its rules, rents, and data coverage.
       </p>
       <div className="mt-3 space-y-3">
         {REGION_ORDER.map((region) => {

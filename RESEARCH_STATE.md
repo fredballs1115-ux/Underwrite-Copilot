@@ -4,6 +4,15 @@ Resume file per project protocol: a future session starts HERE and does not
 repeat finished work. Ops/go-live steps + the ranked gap list live in
 `INTEGRATION_NOTES.md`.
 
+**2026-08-22 (session 4g, FOCUS scoping per direction)** — presentation
+scoped to the Mid-Atlantic home region (10 metros incl. Newark/Jersey City)
++ the 12 biggest US markets (NYC, Boston, Chicago, LA, SF, Seattle, Miami,
+Atlanta, Dallas, Houston, Denver, Phoenix) = 22 metro entries, three market
+sections. The 68-rule / 51-jurisdiction engine is RETAINED as depth (any
+address still evaluates; unscreened-focus jurisdictions say so) but the
+marketing now leads with the focused list, not every-state scale. Removed
+metro entries live in git history if re-expanded.
+
 **2026-08-22 (session 4f, 50-state close-out)** — 14 rules (68 total,
 ALL 50 STATES + DC): IA/KS/ID/SD/ND/MT/NM preemptions (sourced, cites
 queued); NE/AR/MS no-rent-control-at-any-level; **WV joins RI in the
