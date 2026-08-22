@@ -832,12 +832,12 @@ export default function Home() {
                 The rent-control engine, running live on this page.
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
-                {SCENARIO_COUNT} real scenarios, one click apart — DC to Jersey
-                City to LA to Chicago. Watch entity title flip a DC rowhouse
-                from exempt to rent-stabilized, Jersey City exempt every
-                fourplex outright, and two regimes stack on one 1965 LA
-                building — with the engine naming the exact fact that would
-                settle each open question.
+                {SCENARIO_COUNT} real scenarios, one click apart — DC to
+                Brooklyn to LA to Chicago. Watch entity title flip a DC
+                rowhouse from exempt to rent-stabilized, two regimes split on
+                one 1930 Brooklyn eight-unit, and Montgomery County&apos;s
+                rolling age exemption clear a 2019 build — with the engine
+                naming the exact fact that would settle each open question.
               </p>
             </Reveal>
             <Reveal delay={80}>
