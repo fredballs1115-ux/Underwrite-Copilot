@@ -298,6 +298,39 @@ export function priceBand(box: BuyBox): { min?: number; max?: number } {
   };
 }
 
+/** Parse + sanitize the geography-chips JSON the picker submits. Pure and
+ *  shared with the save action so what the picker can build, the save can
+ *  keep — dropping a field here (aliases, once) silently neutered the
+ *  one-tap market territories after reload. Caps mirror the picker's 24. */
+export function sanitizeGeoTargets(raw: unknown): GeoTarget[] | undefined {
+  if (typeof raw !== "string" || !raw.trim()) return undefined;
+  try {
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return undefined;
+    const out: GeoTarget[] = [];
+    for (const item of arr.slice(0, 24)) {
+      const label = String(item?.label ?? "").slice(0, 80).trim();
+      if (!label) continue;
+      const aliases = Array.isArray(item?.aliases)
+        ? item.aliases
+            .map((a: unknown) => String(a).toLowerCase().trim().slice(0, 40))
+            .filter((a: string) => a.length > 1)
+            .slice(0, 16)
+        : [];
+      out.push({
+        label,
+        city: item?.city ? String(item.city).slice(0, 60) : undefined,
+        state: item?.state ? String(item.state).slice(0, 30) : undefined,
+        county: item?.county ? String(item.county).slice(0, 60) : undefined,
+        ...(aliases.length ? { aliases } : {}),
+      });
+    }
+    return out.length ? out : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** All geography targets, folding the legacy comma-string in as bare labels. */
 export function geoTargets(box: BuyBox): GeoTarget[] {
   const chips = [...(box.geos ?? [])];

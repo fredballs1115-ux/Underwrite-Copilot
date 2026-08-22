@@ -7,6 +7,7 @@ import {
   parseMoney,
   parsePct,
   resolveBuyBoxStore,
+  sanitizeGeoTargets,
   serializeBuyBoxStore,
   activeBox,
   type BuyBox,
@@ -192,6 +193,28 @@ describe("shared parsers", () => {
   });
   it("parsePct pulls a percentage", () => {
     expect(parsePct("5.25%")).toBe(5.25);
+  });
+});
+
+describe("sanitizeGeoTargets — the save keeps what the picker builds", () => {
+  it("aliases survive the round-trip, sanitized and capped", () => {
+    const raw = JSON.stringify([
+      { label: "Dallas-Fort Worth", state: "TX", aliases: ["Dallas", " FORT WORTH ", "x", 7] },
+    ]);
+    const out = sanitizeGeoTargets(raw);
+    // lowercased + trimmed; one-char entries ("x", 7→"7") are dropped
+    expect(out?.[0].aliases).toEqual(["dallas", "fort worth"]);
+  });
+  it("accepts up to 24 chips — the picker's cap, not the old 12", () => {
+    const raw = JSON.stringify(
+      Array.from({ length: 30 }, (_, i) => ({ label: `Market ${i}` })),
+    );
+    expect(sanitizeGeoTargets(raw)).toHaveLength(24);
+  });
+  it("junk never throws and never yields empty chips", () => {
+    expect(sanitizeGeoTargets("not json")).toBeUndefined();
+    expect(sanitizeGeoTargets(JSON.stringify([{ city: "no label" }]))).toBeUndefined();
+    expect(sanitizeGeoTargets(JSON.stringify({ label: "not an array" }))).toBeUndefined();
   });
 });
 

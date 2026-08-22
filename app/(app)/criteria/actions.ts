@@ -6,10 +6,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getActiveBuyBox, saveBuyBoxStore } from "@/lib/criteria-server";
 import {
   hasNoDealbreakers,
+  sanitizeGeoTargets,
   type BuyBox,
   type BuyBoxStore,
   type Dealbreakers,
-  type GeoTarget,
 } from "@/lib/criteria";
 
 const ASSET_CLASSES = ["multifamily", "office", "industrial", "retail"];
@@ -21,28 +21,8 @@ function num(formData: FormData, key: string): number | undefined {
   return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
-/** Parse + sanitize the geography chips JSON from the picker. */
-function parseGeos(raw: unknown): GeoTarget[] | undefined {
-  if (typeof raw !== "string" || !raw.trim()) return undefined;
-  try {
-    const arr = JSON.parse(raw);
-    if (!Array.isArray(arr)) return undefined;
-    const out: GeoTarget[] = [];
-    for (const item of arr.slice(0, 12)) {
-      const label = String(item?.label ?? "").slice(0, 80).trim();
-      if (!label) continue;
-      out.push({
-        label,
-        city: item?.city ? String(item.city).slice(0, 60) : undefined,
-        state: item?.state ? String(item.state).slice(0, 30) : undefined,
-        county: item?.county ? String(item.county).slice(0, 60) : undefined,
-      });
-    }
-    return out.length ? out : undefined;
-  } catch {
-    return undefined;
-  }
-}
+// Geography-chips sanitization lives in lib/criteria (sanitizeGeoTargets) —
+// pure and tested, so what the picker can build, the save keeps.
 
 /** A min–max pair, swapped if entered backwards. */
 function range(
@@ -79,7 +59,7 @@ function buildBox(formData: FormData): BuyBox {
 
   return {
     assetClasses: assetClasses.length ? assetClasses : undefined,
-    geos: parseGeos(formData.get("geos")),
+    geos: sanitizeGeoTargets(formData.get("geos")),
     sfMin: sfMinK != null ? sfMinK * 1e3 : undefined,
     sfMax: sfMaxK != null ? sfMaxK * 1e3 : undefined,
     priceMinM,
