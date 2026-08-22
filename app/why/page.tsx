@@ -2,6 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
 import { COVERAGE_SUMMARY } from "@/lib/public-comps/core";
+import { seedRules } from "@/lib/research-data";
+import metrosSeed from "@/data/research/metros.json";
+
+// Coverage figures DERIVED from the same seeds the app evaluates — this page
+// can never claim ground the rules engine doesn't cover.
+const RULE_COUNT = seedRules().length;
+const RULE_STATE_COUNT = new Set(seedRules().map((r) => r.jurisdiction_state.toUpperCase()))
+  .size;
+const WIRED_MARKETS = (metrosSeed.metros ?? [])
+  .filter((m) => (m as { ingest_market?: string }).ingest_market)
+  .map((m) => m.name);
 
 export const metadata: Metadata = {
   title: "Why Underwrite Copilot",
@@ -45,8 +56,8 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "It knows the ground",
     body: [
-      "Give a deal an address and the app checks the local rules: rent control coverage, small-landlord exemptions, purchase rights. It answers with the statute linked, or names the open question. Unknown jurisdictions say so — never a silent pass.",
-      `Recorded sales nearby pull automatically from government records in covered jurisdictions — ${COVERAGE_SUMMARY} today. Public records, clearly labeled. Not an appraisal.`,
+      `Give a deal an address and the app checks the local rules: rent control coverage, small-landlord exemptions, purchase rights — ${RULE_COUNT} machine-evaluable rules across ${RULE_STATE_COUNT} states, DC to Jersey City to LA to Chicago. It answers with the statute linked, or names the open question. Unknown jurisdictions say so — never a silent pass.`,
+      `Recorded sales nearby pull automatically from government records — live county APIs in ${COVERAGE_SUMMARY} today, plus a bulk property database of government deed records with ${WIRED_MARKETS.join(", ")} pipelines wired. Public records, clearly labeled. Not an appraisal.`,
     ],
   },
   {
