@@ -78,6 +78,43 @@ const SCENARIOS: Scenario[] = [
       action: "eviction",
     },
   },
+  {
+    id: "jc-fourplex",
+    label: "Jersey City fourplex · any owner",
+    blurb: "A 1961 four-unit near Journal Square — no owner-occupancy required.",
+    subject: {
+      ...BASE,
+      state: "NJ",
+      locality: ["Jersey City"],
+      units: 4,
+      built_year: 1961,
+    },
+  },
+  {
+    id: "la-fourplex",
+    label: "LA fourplex · built 1965",
+    blurb: "A Mid-City fourplex in your own name — two regimes stack here.",
+    subject: {
+      ...BASE,
+      state: "CA",
+      locality: ["Los Angeles"],
+      units: 4,
+      built_year: 1965,
+      owner_is_natural_person: true,
+    },
+  },
+  {
+    id: "chi-housshack",
+    label: "Chicago three-flat · you live in unit 1",
+    blurb: "An owner-occupied Logan Square three-flat — the house-hack case.",
+    subject: {
+      ...BASE,
+      state: "IL",
+      locality: ["Chicago"],
+      units: 3,
+      occupancy: "owner_occupied",
+    },
+  },
 ];
 
 const OUTCOME_META: Record<string, { label: string; cls: string }> = {
@@ -90,6 +127,8 @@ const UNKNOWN_LABELS: Record<string, string> = {
   exemption_registered_with_rad: "register the exemption with RAD",
   building_permit_issued_on_or_before: "confirm the permit year",
   building_permit_issued_after: "confirm the permit year",
+  owner_occupied_with_units_lte: "confirm owner-occupancy",
+  owner_total_rental_units_in_state_lte: "confirm your statewide unit count",
 };
 
 export function RegulationPlayground() {

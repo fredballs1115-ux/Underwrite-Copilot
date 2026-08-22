@@ -213,6 +213,7 @@ export const BUYER_DEFAULTS: Partial<RuleSubject> = {
   owner_form: "natural_person",
   owner_other_rental_units_in_dc: 0,
   owner_total_rental_units_in_county: 0,
+  owner_total_rental_units_in_state: 0,
   property_type: "rental_housing",
 };
 
@@ -253,6 +254,10 @@ export function buildSubject(input: {
       ? {
           owner_other_rental_units_in_dc: otherUnits,
           owner_total_rental_units_in_county: otherUnits + (units ?? 0),
+          // Conservative floor: the stated in-jurisdiction holdings plus this
+          // deal. The panel's caveat line declares the no-other-units
+          // assumption this rides on.
+          owner_total_rental_units_in_state: otherUnits + (units ?? 0),
         }
       : {}),
     transaction: "sale_of_rental_housing_accommodation",

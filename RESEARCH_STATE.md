@@ -4,6 +4,31 @@ Resume file per project protocol: a future session starts HERE and does not
 repeat finished work. Ops/go-live steps + the ranked gap list live in
 `INTEGRATION_NOTES.md`.
 
+**2026-08-22 (session 4b, big-city sweep)** — 16 rules added (32 total) via
+snippet-confirmation, primary statute text wherever it surfaced: NYC rent
+stabilization (6+ units pre-1974 — 2-4 unit product OUTSIDE it, verified) +
+Good Cause Eviction (≤10-unit statewide small-landlord + owner-occupied ≤10
++ 245%-of-FMR exemptions, verified vs DHCR fact sheet); CA AB 1482 (5%+CPI
+max 10%; owner-occupied duplex + 15-yr rolling C-of-O exemptions) + LA RSO
+(2+ units on/before Oct 1 1978; 2025 4% cap single-source — confirm); WA HB
+1217 (lesser of 7%+CPI or 10%; 2026 = 9.683%; 12-yr new-construction +
+owner-occupied-SFR≤2 exemptions); OR SB 608/611 (lesser of 10% or 7%+CPI-U
+West; 2026 = 9.5% sourced; 15-yr exemption); IL Preemption Act 1997 +
+Chicago RLTO owner-occupied ≤6 exemption; MA 1994 ban (2026 revival BLOCKED
+from ballot by SJC — watch); TX §214.902 / GA §44-7-19 / AZ §33-1329 / CO
+§38-12-301 preemptions (all verified vs statute text); FL §166.043 (sourced,
+statute pull queued); Newark owner-occupied-1-4 exemption vs Jersey City ALL
+1-4-unit exemption (both verified — JC is the standout for this buy box).
+13 metros added to metros.json with regulation-forward market_notes.
+FMR FY2026: NYC 2BR $2,910 (sourced, 2 republishers); Chicago/LA/SF/Seattle/
+Boston/Dallas/Miami/Atlanta/Denver/Phoenix/Houston DID NOT CONFIRM from
+independent sources (aggregator figures conflicted) — recorded as gaps,
+never estimated. Evaluator bug found+fixed while testing: the generic _lte
+comparator swallowed owner_occupied_with_units_lte before its dedicated
+handler (was forever-unknown); 13 new tests pin the big-city outcomes.
+Rolling exemption windows (CA 15yr/WA 12yr/OR 15yr) encoded as 2026-snapshot
+dates — steward re-verification advances them.
+
 **Last updated:** 2026-08-22 (session 4, national expansion) — property
 database layer built: migration 0028 (properties + recorded_sales w/ PostGIS
 `nearby_sales` RPC + journal_entries + data_issues/changelog/steward_runs),

@@ -1,212 +1,507 @@
 {
-  "$schema_note": "Metro-level research for the Mid-Atlantic market explorer. Two-tier status labels per project convention; comps_provider references lib/public-comps/core.ts provider ids ('discovery' = staged, null = no open feed known). rule_ids reference regulatory_rules.json.",
-  "as_of": "2026-08-21",
-  "metros": [
-    {
-      "id": "dc",
-      "name": "Washington DC",
-      "fmr_fy2026": {
-        "2br": 2246,
-        "0br": 1953,
-        "1br": 2015,
-        "3br": 2835,
-        "status": "sourced",
-        "sources": [
-          "https://usrentprices.com/rent-prices/washington-dc",
-          "https://plainrent.com/states/district-of-columbia"
-        ],
-        "note": "Republisher-labeled 'Washington DC'; mandatory SAFMR zone so these may be ZIP averages — verify vs FY2026_FMR_Schedule.pdf. DCHA payment standard 187% of FMR (Res. 25-31)."
-      },
-      "market_notes": {
-        "value": "Pre-1976 rowhouse-flat stock rent-stabilized unless natural-person exemption applies; post-1975 buildings exempt; TOPA largely gone for 2-4s under Law 26-80.",
-        "status": "sourced"
-      },
-      "rule_ids": [
-        "dc-rent-stab-coverage",
-        "dc-rent-stab-small-landlord-exemption",
-        "dc-topa-2-4-unit-exemption",
-        "dc-rental-act-law-26-80",
-        "dc-vacant-property-tax"
-      ],
-      "comps_provider": "dc_its",
-      "gaps": [
-        "Class 1 tax-rate row not yet a benchmark",
-        "ACS 2-4 unit stock count (API blocked)"
-      ]
-    },
-    {
-      "id": "pg_county",
-      "name": "Prince George's County MD",
-      "fmr_fy2026": {
-        "2br": null,
-        "status": "unverified_not_found",
-        "sources": [],
-        "note": "Inside the Washington metro SAFMR zone — ZIP-level SAFMRs apply (22193-style bedroom values confirmed for FY2024/25 vintage only); FY2026 per-ZIP values pending huduser pull."
-      },
-      "market_notes": {
-        "value": "Inside-Beltway towns (Mount Rainier, Hyattsville, Brentwood, Capitol Heights) hold the county's 2-4 unit stock; PRSA caps increases at lesser of 6% or CPI-U+3% with the natural-person ≤5-unit exemption (no domicile condition per county FAQ).",
-        "status": "sourced"
-      },
-      "rule_ids": [
-        "md-pg-prsa-cap",
-        "md-pg-prsa-small-landlord-exemption"
-      ],
-      "comps_provider": "md_sdat",
-      "gaps": [
-        "FY2026 SAFMRs by PG ZIP",
-        "county tax-rate + municipal add-on benchmark rows"
-      ]
-    },
-    {
-      "id": "montgomery_county",
-      "name": "Montgomery County MD",
-      "fmr_fy2026": {
-        "2br": null,
-        "status": "unverified_not_found",
-        "sources": [],
-        "note": "Washington-metro SAFMR zone; per-ZIP values pending."
-      },
-      "market_notes": {
-        "value": "County rent stabilization (CPI+3% capped 6%) with building-age and small-owner exemptions; Takoma Park layers its OWN stricter regime (all 2+ unit rentals, no small-owner exemption, FY2027 allowance 3.0%).",
-        "status": "sourced"
-      },
-      "rule_ids": [
-        "md-moco-rent-stabilization",
-        "md-takoma-park-rent-stabilization"
-      ],
-      "comps_provider": "md_sdat",
-      "gaps": [
-        "MoCo exemption list verbatim",
-        "Takoma Park vacancy-control confirmation"
-      ]
-    },
-    {
-      "id": "nova",
-      "name": "Northern Virginia",
-      "fmr_fy2026": {
-        "2br": null,
-        "status": "unverified_not_found",
-        "sources": [],
-        "note": "Washington-metro SAFMR zone (Prince William confirmed a SAFMR jurisdiction, 3-0); per-ZIP values pending."
-      },
-      "market_notes": {
-        "value": "No rent control anywhere in Virginia (Dillon-Rule absence of grant; enabling bills keep failing). Near-zero on-market 2-4 unit inventory — Prince William read '0 Homes' for duplex/triplex in July 2026; off-market sourcing (tax-delinquency pipeline) is the entry. Fairfax/Arlington comps staged in discovery mode.",
-        "status": "sourced"
-      },
-      "rule_ids": [
-        "va-no-local-rent-control"
-      ],
-      "comps_provider": "discovery",
-      "gaps": [
-        "Fairfax/Arlington provider wiring (needs /api/comps/health output)",
-        "PW County assessment URL pattern documented in county_data_sources.json"
-      ]
-    },
-    {
-      "id": "baltimore",
-      "name": "Baltimore MD",
-      "fmr_fy2026": {
-        "2br": 1943,
-        "range": [
-          1749,
-          2137
-        ],
-        "status": "sourced",
-        "sources": [
-          "https://hellosection8.com/fair_market_rents/hud-metro12580m12580.html"
-        ],
-        "note": "Baltimore-Columbia-Towson MSA; range brackets are the 90/110% payment-standard structure."
-      },
-      "market_notes": {
-        "value": "Q1 2026 metro multifamily volume +53.1% YoY to $367M — strongest quarter since 2022. No rent cap in the city, but license-before-rent (unlicensed = no right to collect) and the code-violation rent freeze invert the value-add sequence: license, cure, then reposition.",
-        "status": "sourced",
-        "sources": [
-          "https://harborstoneadvisors.com/baltimore-metro-q1-2026-multifamily-market-report/"
-        ]
-      },
-      "rule_ids": [
-        "md-baltimore-rental-license"
-      ],
-      "comps_provider": "md_sdat",
-      "gaps": [
-        "City 2-4 unit median (metro Redfin series not broken out for Baltimore in the May pull)"
-      ]
-    },
-    {
-      "id": "richmond",
-      "name": "Richmond VA",
-      "fmr_fy2026": {
-        "2br": null,
-        "status": "unverified_not_found",
-        "sources": [
-          "https://plainrent.com/states/virginia"
-        ],
-        "note": "Richmond MSA FY2026 FMR not snippet-confirmed this pass. Context: VA statewide FY2026 2BR average $1,369 (plainrent.com republisher, sourced) — metro-specific value still unconfirmed; a Richmond 3BR ~$2,072 appeared single-source only."
-      },
-      "market_notes": {
-        "value": "Institutional multifamily YTD median $129,500/unit (Q1 2026, skewed by one high-vacancy trade; $180,700/unit excluding it) amid elevated supply with steady vacancy. No rent control (VA). City open-data comp feed queued in county_data_sources.json.",
-        "status": "sourced",
-        "sources": [
-          "https://www.northmarq.com/insights/insights/richmonds-multifamily-vacancy-holds-steady-amid-elevated-supply-q1-2026"
-        ]
-      },
-      "rule_ids": [
-        "va-no-local-rent-control"
-      ],
-      "comps_provider": null,
-      "gaps": [
-        "FY2026 FMR",
-        "2-4 unit price series",
-        "Richmond city assessor open-data provider"
-      ]
-    },
-    {
-      "id": "norfolk_hampton_roads",
-      "name": "Norfolk / Hampton Roads VA",
-      "fmr_fy2026": {
-        "2br": null,
-        "status": "unverified_not_found",
-        "sources": [
-          "https://plainrent.com/states/virginia"
-        ],
-        "note": "Virginia Beach-Norfolk-Newport News MSA FY2026 FMR not snippet-confirmed this pass. Context: VA statewide FY2026 2BR average $1,369 (plainrent.com republisher, sourced) — metro-specific value still unconfirmed; a Richmond 3BR ~$2,072 appeared single-source only."
-      },
-      "market_notes": {
-        "value": "No rent control (VA). Military-demand rental base; screened for stock/pricing in a future pass — currently the thinnest data of the eight metros.",
-        "status": "sourced"
-      },
-      "rule_ids": [
-        "va-no-local-rent-control"
-      ],
-      "comps_provider": null,
-      "gaps": [
-        "FY2026 FMR",
-        "stock counts",
-        "city assessor feeds (Norfolk/VB open-data portals exist — unassessed)"
-      ]
-    },
-    {
-      "id": "philadelphia",
-      "name": "Philadelphia PA",
-      "fmr_fy2026": {
-        "2br": 1810,
-        "status": "sourced",
-        "sources": [
-          "https://voucherready.com/articles/rent-and-payment-standards/hud-fair-market-rents-2026-news"
-        ],
-        "note": "Philadelphia-Camden-Wilmington MSA, effective 2025-10-01 through 2026-09-30."
-      },
-      "market_notes": {
-        "value": "The deepest accessible 2-4 unit market on the coast: $363,500 May 2026 median (+6.9% YoY), 366 active listings (Redfin), ~1,075 multi-family listings on Homes.com (July 2026). No rent control (PA); § 9-811 eviction diversion adds a verified 30-day pre-filing step. Auto-comps live via OPA.",
-        "status": "sourced"
-      },
-      "rule_ids": [
-        "pa-philadelphia-eviction-diversion"
-      ],
-      "comps_provider": "philly_opa",
-      "gaps": [
-        "City permits pipeline (BPS blocked)"
-      ]
-    }
-  ]
+ "$schema_note": "Metro-level research for the Mid-Atlantic market explorer. Two-tier status labels per project convention; comps_provider references lib/public-comps/core.ts provider ids ('discovery' = staged, null = no open feed known). rule_ids reference regulatory_rules.json.",
+ "as_of": "2026-08-22",
+ "metros": [
+  {
+   "id": "dc",
+   "name": "Washington DC",
+   "fmr_fy2026": {
+    "2br": 2246,
+    "0br": 1953,
+    "1br": 2015,
+    "3br": 2835,
+    "status": "sourced",
+    "sources": [
+     "https://usrentprices.com/rent-prices/washington-dc",
+     "https://plainrent.com/states/district-of-columbia"
+    ],
+    "note": "Republisher-labeled 'Washington DC'; mandatory SAFMR zone so these may be ZIP averages — verify vs FY2026_FMR_Schedule.pdf. DCHA payment standard 187% of FMR (Res. 25-31)."
+   },
+   "market_notes": {
+    "value": "Pre-1976 rowhouse-flat stock rent-stabilized unless natural-person exemption applies; post-1975 buildings exempt; TOPA largely gone for 2-4s under Law 26-80.",
+    "status": "sourced"
+   },
+   "rule_ids": [
+    "dc-rent-stab-coverage",
+    "dc-rent-stab-small-landlord-exemption",
+    "dc-topa-2-4-unit-exemption",
+    "dc-rental-act-law-26-80",
+    "dc-vacant-property-tax"
+   ],
+   "comps_provider": "dc_its",
+   "gaps": [
+    "Class 1 tax-rate row not yet a benchmark",
+    "ACS 2-4 unit stock count (API blocked)"
+   ]
+  },
+  {
+   "id": "pg_county",
+   "name": "Prince George's County MD",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "Inside the Washington metro SAFMR zone — ZIP-level SAFMRs apply (22193-style bedroom values confirmed for FY2024/25 vintage only); FY2026 per-ZIP values pending huduser pull."
+   },
+   "market_notes": {
+    "value": "Inside-Beltway towns (Mount Rainier, Hyattsville, Brentwood, Capitol Heights) hold the county's 2-4 unit stock; PRSA caps increases at lesser of 6% or CPI-U+3% with the natural-person ≤5-unit exemption (no domicile condition per county FAQ).",
+    "status": "sourced"
+   },
+   "rule_ids": [
+    "md-pg-prsa-cap",
+    "md-pg-prsa-small-landlord-exemption"
+   ],
+   "comps_provider": "md_sdat",
+   "gaps": [
+    "FY2026 SAFMRs by PG ZIP",
+    "county tax-rate + municipal add-on benchmark rows"
+   ]
+  },
+  {
+   "id": "montgomery_county",
+   "name": "Montgomery County MD",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "Washington-metro SAFMR zone; per-ZIP values pending."
+   },
+   "market_notes": {
+    "value": "County rent stabilization (CPI+3% capped 6%) with building-age and small-owner exemptions; Takoma Park layers its OWN stricter regime (all 2+ unit rentals, no small-owner exemption, FY2027 allowance 3.0%).",
+    "status": "sourced"
+   },
+   "rule_ids": [
+    "md-moco-rent-stabilization",
+    "md-takoma-park-rent-stabilization"
+   ],
+   "comps_provider": "md_sdat",
+   "gaps": [
+    "MoCo exemption list verbatim",
+    "Takoma Park vacancy-control confirmation"
+   ]
+  },
+  {
+   "id": "nova",
+   "name": "Northern Virginia",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "Washington-metro SAFMR zone (Prince William confirmed a SAFMR jurisdiction, 3-0); per-ZIP values pending."
+   },
+   "market_notes": {
+    "value": "No rent control anywhere in Virginia (Dillon-Rule absence of grant; enabling bills keep failing). Near-zero on-market 2-4 unit inventory — Prince William read '0 Homes' for duplex/triplex in July 2026; off-market sourcing (tax-delinquency pipeline) is the entry. Fairfax/Arlington comps staged in discovery mode.",
+    "status": "sourced"
+   },
+   "rule_ids": [
+    "va-no-local-rent-control"
+   ],
+   "comps_provider": "discovery",
+   "gaps": [
+    "Fairfax/Arlington provider wiring (needs /api/comps/health output)",
+    "PW County assessment URL pattern documented in county_data_sources.json"
+   ]
+  },
+  {
+   "id": "baltimore",
+   "name": "Baltimore MD",
+   "fmr_fy2026": {
+    "2br": 1943,
+    "range": [
+     1749,
+     2137
+    ],
+    "status": "sourced",
+    "sources": [
+     "https://hellosection8.com/fair_market_rents/hud-metro12580m12580.html"
+    ],
+    "note": "Baltimore-Columbia-Towson MSA; range brackets are the 90/110% payment-standard structure."
+   },
+   "market_notes": {
+    "value": "Q1 2026 metro multifamily volume +53.1% YoY to $367M — strongest quarter since 2022. No rent cap in the city, but license-before-rent (unlicensed = no right to collect) and the code-violation rent freeze invert the value-add sequence: license, cure, then reposition.",
+    "status": "sourced",
+    "sources": [
+     "https://harborstoneadvisors.com/baltimore-metro-q1-2026-multifamily-market-report/"
+    ]
+   },
+   "rule_ids": [
+    "md-baltimore-rental-license"
+   ],
+   "comps_provider": "md_sdat",
+   "gaps": [
+    "City 2-4 unit median (metro Redfin series not broken out for Baltimore in the May pull)"
+   ]
+  },
+  {
+   "id": "richmond",
+   "name": "Richmond VA",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [
+     "https://plainrent.com/states/virginia"
+    ],
+    "note": "Richmond MSA FY2026 FMR not snippet-confirmed this pass. Context: VA statewide FY2026 2BR average $1,369 (plainrent.com republisher, sourced) — metro-specific value still unconfirmed; a Richmond 3BR ~$2,072 appeared single-source only."
+   },
+   "market_notes": {
+    "value": "Institutional multifamily YTD median $129,500/unit (Q1 2026, skewed by one high-vacancy trade; $180,700/unit excluding it) amid elevated supply with steady vacancy. No rent control (VA). City open-data comp feed queued in county_data_sources.json.",
+    "status": "sourced",
+    "sources": [
+     "https://www.northmarq.com/insights/insights/richmonds-multifamily-vacancy-holds-steady-amid-elevated-supply-q1-2026"
+    ]
+   },
+   "rule_ids": [
+    "va-no-local-rent-control"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "FY2026 FMR",
+    "2-4 unit price series",
+    "Richmond city assessor open-data provider"
+   ]
+  },
+  {
+   "id": "norfolk_hampton_roads",
+   "name": "Norfolk / Hampton Roads VA",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [
+     "https://plainrent.com/states/virginia"
+    ],
+    "note": "Virginia Beach-Norfolk-Newport News MSA FY2026 FMR not snippet-confirmed this pass. Context: VA statewide FY2026 2BR average $1,369 (plainrent.com republisher, sourced) — metro-specific value still unconfirmed; a Richmond 3BR ~$2,072 appeared single-source only."
+   },
+   "market_notes": {
+    "value": "No rent control (VA). Military-demand rental base; screened for stock/pricing in a future pass — currently the thinnest data of the eight metros.",
+    "status": "sourced"
+   },
+   "rule_ids": [
+    "va-no-local-rent-control"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "FY2026 FMR",
+    "stock counts",
+    "city assessor feeds (Norfolk/VB open-data portals exist — unassessed)"
+   ]
+  },
+  {
+   "id": "philadelphia",
+   "name": "Philadelphia PA",
+   "fmr_fy2026": {
+    "2br": 1810,
+    "status": "sourced",
+    "sources": [
+     "https://voucherready.com/articles/rent-and-payment-standards/hud-fair-market-rents-2026-news"
+    ],
+    "note": "Philadelphia-Camden-Wilmington MSA, effective 2025-10-01 through 2026-09-30."
+   },
+   "market_notes": {
+    "value": "The deepest accessible 2-4 unit market on the coast: $363,500 May 2026 median (+6.9% YoY), 366 active listings (Redfin), ~1,075 multi-family listings on Homes.com (July 2026). No rent control (PA); § 9-811 eviction diversion adds a verified 30-day pre-filing step. Auto-comps live via OPA.",
+    "status": "sourced"
+   },
+   "rule_ids": [
+    "pa-philadelphia-eviction-diversion"
+   ],
+   "comps_provider": "philly_opa",
+   "gaps": [
+    "City permits pipeline (BPS blocked)"
+   ]
+  },
+  {
+   "id": "nyc",
+   "name": "New York City",
+   "fmr_fy2026": {
+    "2br": 2910,
+    "status": "sourced",
+    "sources": [
+     "https://tenanture.com/fair-market-rent/ny",
+     "https://usrentprices.com/rent-prices/new-york-ny"
+    ],
+    "note": "Confirmed by two independent republishers; huduser primary pull queued to upgrade to verified."
+   },
+   "market_notes": {
+    "value": "The small-building path through NYC: rent stabilization requires 6+ units built pre-1974, so 2-4 unit product trades UNregulated on rent - but Good Cause Eviction (2024) applies citywide unless the owner holds <=10 units statewide or owner-occupies a <=10-unit building. Deed history via ACRIS; DOF Rolling Sales lacks coordinates (BBL join to PLUTO documented in ingestion_sources.md).",
+    "status": "verified"
+   },
+   "rule_ids": [
+    "ny-nyc-rent-stabilization-coverage",
+    "ny-good-cause-eviction"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "PLUTO+Rolling Sales ingest wiring (BBL join)",
+    "borough-level 2-4 unit medians"
+   ]
+  },
+  {
+   "id": "chicago",
+   "name": "Chicago",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "No rent control anywhere in Illinois (Preemption Act 1997, repeal attempts keep failing). Chicago's RLTO is the real compliance load - and owner-occupied buildings of <=6 units are exempt from most of it, which fits a house-hacked 2-4 unit purchase exactly. Cook County parcel + sales data on Socrata (documented).",
+    "status": "verified"
+   },
+   "rule_ids": [
+    "il-rent-control-preemption",
+    "il-chicago-rlto-owner-occupied-exemption"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "Cook County Socrata dataset ids (resolve at wiring)",
+    "FY2026 FMR"
+   ]
+  },
+  {
+   "id": "boston",
+   "name": "Boston",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "Rent control banned statewide since 1994 (Question 9); a 2026 ballot revival was blocked by the SJC but the pressure campaign continues - a genuine watch item. Property Assessment roll published yearly on data.boston.gov (CKAN).",
+    "status": "verified"
+   },
+   "rule_ids": [
+    "ma-rent-control-ban"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "assessment-roll ingest wiring",
+    "FY2026 FMR"
+   ]
+  },
+  {
+   "id": "atlanta",
+   "name": "Atlanta",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "Georgia has barred local rent regulation since 1984 (O.C.G.A. 44-7-19) - no caps in Atlanta or anywhere in the state. Fulton County assessor GIS hub documented for bulk parcels.",
+    "status": "verified"
+   },
+   "rule_ids": [
+    "ga-rent-control-preemption"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "Fulton bulk endpoint",
+    "FY2026 FMR"
+   ]
+  },
+  {
+   "id": "miami",
+   "name": "Miami",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "Florida preempts local rent control (Fla. Stat. 166.043) - market-rate increases statewide. Miami-Dade open data hub carries parcels + sales (documented).",
+    "status": "sourced"
+   },
+   "rule_ids": [
+    "fl-rent-control-preemption"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "statute text pull to upgrade FL rule",
+    "FY2026 FMR"
+   ]
+  },
+  {
+   "id": "dallas",
+   "name": "Dallas-Fort Worth",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "Texas permits rent control only under a governor-approved disaster declaration (Local Gov't Code 214.902) - never invoked in modern practice; increases uncapped. DCAD publishes full certified rolls as downloads.",
+    "status": "verified"
+   },
+   "rule_ids": [
+    "tx-rent-control-preemption"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "DCAD roll ingest wiring",
+    "FY2026 FMR"
+   ]
+  },
+  {
+   "id": "houston",
+   "name": "Houston",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "Same Texas preemption as Dallas (214.902): no rent caps. HCAD publishes the full appraisal roll for download - the easiest big-Texas bulk source.",
+    "status": "verified"
+   },
+   "rule_ids": [
+    "tx-rent-control-preemption"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "HCAD roll ingest wiring",
+    "FY2026 FMR"
+   ]
+  },
+  {
+   "id": "los_angeles",
+   "name": "Los Angeles",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "Two regimes stack: the city RSO (2+ units built on/before Oct 1, 1978 - caps, just-cause, relocation fees) and AB 1482 statewide for everything the RSO misses (5%+CPI max 10%, 15-year new-construction exemption, owner-occupied duplex exemption). A pre-1979 fourplex here is regulated stock - underwrite the cap, not pro-forma rents. County assessor roll ~2.4M parcels (plan-size driver).",
+    "status": "verified"
+   },
+   "rule_ids": [
+    "ca-la-rso-coverage",
+    "ca-ab1482-rent-cap"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "current RSO cap % (single-source)",
+    "assessor-roll ingest",
+    "FY2026 FMR"
+   ]
+  },
+  {
+   "id": "san_francisco",
+   "name": "San Francisco",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "SF's own rent ordinance layers over AB 1482 (city rules screened at rule level in a later pass - treat pre-1979 SF multifamily as rent-controlled until then). Secured assessor roll on data.sfgov.org (Socrata).",
+    "status": "sourced"
+   },
+   "rule_ids": [
+    "ca-ab1482-rent-cap"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "SF rent ordinance rule encoding",
+    "FY2026 FMR"
+   ]
+  },
+  {
+   "id": "seattle",
+   "name": "Seattle",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated. (FY2024 2BR was $2,645 per rentdata.org - kept OUT of the data as stale vintage)"
+   },
+   "market_notes": {
+    "value": "Washington's 2025 HB 1217 now caps increases statewide (lesser of 7%+CPI or 10%; 9.683% for 2026) with a 12-year new-construction exemption - Seattle adds landlord regulations (JumpStart-era rules) but no separate city rent cap. King County publishes a dedicated real-property SALES file: the easiest comps win in the West.",
+    "status": "verified"
+   },
+   "rule_ids": [
+    "wa-rent-cap-hb1217"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "King County sales-file ingest wiring",
+    "FY2026 FMR"
+   ]
+  },
+  {
+   "id": "denver",
+   "name": "Denver",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "Colorado prohibits local rent control (C.R.S. 38-12-301, voluntary affordable-housing agreements excepted) - no caps in Denver. City open-data portal carries parcels + sales (documented).",
+    "status": "verified"
+   },
+   "rule_ids": [
+    "co-rent-control-prohibition"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "opendata.denvergov.org ingest wiring",
+    "FY2026 FMR"
+   ]
+  },
+  {
+   "id": "phoenix",
+   "name": "Phoenix",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "Arizona bars municipal rent regulation (A.R.S. 33-1329) - no caps in Phoenix. Maricopa assessor publishes bulk data (documented).",
+    "status": "verified"
+   },
+   "rule_ids": [
+    "az-rent-control-preemption"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "Maricopa bulk endpoint",
+    "FY2026 FMR"
+   ]
+  },
+  {
+   "id": "newark_jc",
+   "name": "Newark / Jersey City",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "The two big screened NJ rent-control cities split exactly on the small-building question: Jersey City exempts EVERY 1-4 unit property regardless of occupancy (5+ built pre-1987 is controlled); Newark exempts 1-4 family ONLY when owner-occupied. Statewide, ~100 other NJ ordinances remain unscreened - check before offer. NJ MOD-IV property rolls are statewide (provider wired for parcels).",
+    "status": "verified"
+   },
+   "rule_ids": [
+    "nj-jersey-city-rent-control",
+    "nj-newark-rent-control",
+    "nj-municipal-rent-control"
+   ],
+   "comps_provider": "nj_modiv",
+   "gaps": [
+    "per-ordinance screen for other NJ municipalities",
+    "FY2026 FMR"
+   ]
+  }
+ ]
 }

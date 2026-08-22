@@ -1808,6 +1808,7 @@ function ResearchTicker() {
   const pmmsVal = pick("", "pmms_30y_fixed");
   const dcFmr = pick("Washington DC area", "hud_fmr_fy2026_2br");
   const baltFmr = pick("Baltimore MD", "hud_fmr_fy2026_2br");
+  const nycFmr = pick("New York City", "hud_fmr_fy2026_2br");
   const phillyMed = money(pick("Philadelphia, PA", "median_sale_price_2_4_unit"));
   const provMed = money(pick("Providence, RI", "median_sale_price_2_4_unit"));
   const items = (
@@ -1819,8 +1820,12 @@ function ResearchTicker() {
       provMed && ["Providence", `${provMed} · ~150 sales/mo`],
       dcFmr !== null && ["DC FY2026 2BR FMR", `$${dcFmr.toLocaleString()}/mo`],
       baltFmr !== null && ["Baltimore FY2026 2BR FMR", `$${baltFmr.toLocaleString()}/mo`],
+      nycFmr !== null && ["NYC FY2026 2BR FMR", `$${nycFmr.toLocaleString()}/mo`],
       ["DC ≤4-unit natural-person exemption", "verified vs statute"],
       ["PG County cap", "lesser of 6% or CPI+3%"],
+      ["Jersey City 1–4 unit stock", "rent-control exempt, any owner"],
+      ["NYC 2–4 unit product", "outside rent stabilization"],
+      ["WA statewide cap 2026", "9.683% (HB 1217)"],
       ["Recorded-sales comps", COMPS_JURISDICTIONS],
     ] as const
   ).filter((it): it is [string, string] => Array.isArray(it) && !!it[1]);
