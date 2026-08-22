@@ -377,12 +377,12 @@
    "exempt_if": {
     "building_permit_issued_after": "1978-10-01"
    },
-   "effect": "City of Los Angeles RSO covers properties of 2+ units first built ON OR BEFORE Oct 1, 1978 (~624,000 units in ~118,000 properties): capped annual increases (2025 ordinance capped hikes at 4% - single-source, verify current cap at housing.lacity.gov before underwriting), just-cause eviction, relocation fees. Applies inside LA city limits only; LA County unincorporated areas have their own RSO, and AB 1482 covers the rest. NOTE: the year-level check here approximates the Oct 1, 1978 cutoff.",
+   "effect": "City of Los Angeles RSO covers properties of 2+ units first built ON OR BEFORE Oct 1, 1978 (~624,000 units): capped annual increases, just-cause eviction, relocation fees. CURRENT CAP: 3% for increases effective July 1, 2025 - June 30, 2026; utility add-on percentages end Feb 2, 2026; and from July 1, 2026 the amended formula (ordinance eff. Jan 24, 2026) sets increases at 90% of average CPI with a 1% floor and 4% ceiling (was 3%-8%). Applies inside LA city limits only; LA County unincorporated areas have their own RSO, and AB 1482 covers the rest. NOTE: the year-level check here approximates the Oct 1, 1978 cutoff.",
    "quote": "The RSO applies to properties in the city of Los Angeles with two or more units built before October 1, 1978",
    "source": "https://housing.lacity.gov/residents/what-is-covered-under-the-rso",
    "as_of": "2026-08-22",
    "status": "verified",
-   "verification": "snippet-confirmed across three LAHD (housing.lacity.gov) pages + practitioner guides; 4% 2025 cap is single-source (NBC LA) and flagged as such"
+   "verification": "coverage snippet-confirmed across three LAHD (housing.lacity.gov) pages; cap/formula cross-confirmed 2026-08-22 via the LAHD rent-increase calculator page, AAGLA, and two practitioner analyses (upgraded from single-source)"
   },
   {
    "id": "wa-rent-cap-hb1217",
@@ -596,6 +596,92 @@
    "as_of": "2026-08-22",
    "status": "verified",
    "verification": "Jersey City official page + Ord. 20-036 (civicweb) + 2 practitioner guides"
+  },
+  {
+   "id": "ca-sf-rent-ordinance",
+   "jurisdiction_state": "CA",
+   "jurisdiction_local": "San Francisco",
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "units_gte": 1,
+    "property_type": "rental_housing"
+   },
+   "exempt_if": {
+    "building_permit_issued_after": "1979-06-13"
+   },
+   "effect": "The San Francisco Rent Ordinance covers essentially all residential units first built BEFORE June 13, 1979: Rent Board-set annual increase caps plus just-cause eviction. Units with a first C of O after June 13, 1979 are exempt from the RENT CAPS - but since the 2024 ordinance, post-1979 units are covered by the JUST-CAUSE eviction provisions anyway (and AB 1482's statewide cap catches most of them). NOTE: the year-level check here approximates the June 13, 1979 cutoff - a 1979-vintage building needs its exact C-of-O date pulled.",
+   "quote": "residential units first constructed after June 13, 1979 ... are exempt from the rent increase limitations (but not the just cause eviction provisions)",
+   "source": "https://www.sf.gov/information--partial-exemption-newly-constructed-rental-units",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "snippet-confirmed across two sf.gov pages (primary), SF Tenants Union, and the 2024 eviction-expansion ordinance coverage (Wallace Richardson)"
+  },
+  {
+   "id": "mn-stpaul-rent-stabilization",
+   "jurisdiction_state": "MN",
+   "jurisdiction_local": "Saint Paul",
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "units_gte": 1,
+    "property_type": "rental_housing"
+   },
+   "exempt_if": {
+    "building_permit_issued_after": "2004-12-31"
+   },
+   "effect": "St. Paul is the only Minnesota city with active rent stabilization: a 3% annual cap (2021 ballot measure) with landlord exception requests, and a ROLLING 20-year new-construction exemption (as amended 2022: first C of O after Dec 31, 2004 - the date advances each year). WATCH: the council voted further rollbacks in May 2025 and more changes keep surfacing - re-verify the current text before underwriting a covered St. Paul deal.",
+   "quote": "exempted new construction for 20 years, which also applied retroactively",
+   "source": "https://www.stpaul.gov/departments/safety-inspections/rent-buy-sell-property/rent-stabilization",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "stpaul.gov (primary) + Minnesota Reformer + FOX9/KSTP rollback coverage - cap + 20-year exemption cross-confirmed; 2025 rollback churn flagged as watch"
+  },
+  {
+   "id": "mn-minneapolis-authorized-not-enacted",
+   "jurisdiction_state": "MN",
+   "jurisdiction_local": "Minneapolis",
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Minneapolis voters authorized rent regulation by charter amendment in 2021, but the City Council has NOT enacted an ordinance as of early 2026 - no rent cap is in force. Latent adoption risk: an enacted ordinance would flip this row, so it stays a watch item rather than a free pass.",
+   "quote": null,
+   "source": "https://minnesotareformer.com/2025/05/08/st-paul-walks-back-rent-control/",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "cross-referenced in Twin Cities rent-control coverage; direct city-charter pull queued"
+  },
+  {
+   "id": "tn-rent-control-preemption",
+   "jurisdiction_state": "TN",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Tennessee prohibits local rent control (Tenn. Code 66-35-102) - Nashville and Memphis cannot cap rents. No rent regulation anywhere in Tennessee.",
+   "quote": null,
+   "source": "https://law.justia.com/codes/tennessee/title-66/chapter-35/section-66-35-102/",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "statute text via Justia (multiple code-year editions) + LawServer mirror"
+  },
+  {
+   "id": "nc-rent-control-preemption",
+   "jurisdiction_state": "NC",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "North Carolina preempts local rent regulation (G.S. 42-14.1): no county or city may regulate the rent charged for private residential or commercial rental property - Charlotte and Raleigh included. No rent caps anywhere in North Carolina.",
+   "quote": "no county or city ... which regulates the amount of rent to be charged for privately owned, single-family or multiple unit residential or commercial rental property",
+   "source": "https://www.ncleg.gov/enactedlegislation/statutes/pdf/bysection/chapter_42/gs_42-14.1.pdf",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "statute PDF on ncleg.gov (primary) + secondary guides"
   }
  ],
  "gaps": [
@@ -610,8 +696,8 @@
   "Baltimore City Code Art. 13 licensing text direct fetch (currently on People's Law Library authority)",
   "DC TOPA single-family and 2-4 unit tier timelines verbatim (§§ 42-3404.09-.11)",
   "FY2026 2BR FMRs for Chicago/LA/SF/Seattle/Boston/Dallas metro areas - aggregator figures conflicted, did not meet the 2-source bar (huduser pull queued); NYC $2,910 confirmed by two independent republishers",
-  "LA RSO current annual cap percentage (2025 '4%' amendment is single-source NBC LA - confirm at housing.lacity.gov)",
   "FL 166.043 statute text direct pull (currently one practitioner source)",
-  "Rolling exemption windows (CA 15yr / WA 12yr / OR 15yr) encoded as 2026-snapshot dates - steward re-verification advances them annually"
+  "Rolling exemption windows (CA 15yr / WA 12yr / OR 15yr) encoded as 2026-snapshot dates - steward re-verification advances them annually",
+  "Minneapolis charter-amendment text direct pull (rent regulation authorized 2021, no ordinance enacted)"
  ]
 }

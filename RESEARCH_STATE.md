@@ -4,6 +4,21 @@ Resume file per project protocol: a future session starts HERE and does not
 repeat finished work. Ops/go-live steps + the ranked gap list live in
 `INTEGRATION_NOTES.md`.
 
+**2026-08-22 (session 4c, second sweep)** — 5 more rules (37 total) + 3
+metros (24): SF Rent Ordinance (pre-June-13-1979 caps + just-cause; post-1979
+exempt from caps but just-cause-covered since the 2024 ordinance — verified
+vs sf.gov ×2); St. Paul rent stabilization (3% cap, ROLLING 20-yr
+new-construction exemption, May-2025 rollback churn = watch — verified vs
+stpaul.gov) + Minneapolis authorized-not-enacted (sourced); TN §66-35-102 and
+NC §42-14.1 preemptions (verified vs statute text, ncleg.gov primary). LA RSO
+cap UPGRADED single-source→verified: 3% through 2026-06-30, utility adders
+end 2026-02-02, then 90%-of-CPI formula floor 1% / ceiling 4% from
+2026-07-01 (LAHD calculator page + AAGLA + 2 analyses). NYC+Cook ingest
+pipelines wired (PLUTO/RollingSales BBL join; universe/sales PIN join, CCAO
+211/212 kept); review pass fixed 7 findings incl. portfolio-floor and
+coord-backfill bugs. Market page shows live property-DB stock counts for
+wired metros.
+
 **2026-08-22 (session 4b, big-city sweep)** — 16 rules added (32 total) via
 snippet-confirmation, primary statute text wherever it surfaced: NYC rent
 stabilization (6+ units pre-1974 — 2-4 unit product OUTSIDE it, verified) +
