@@ -117,6 +117,10 @@ const SCENARIOS: Scenario[] = [
   },
 ];
 
+/** Scenario count, exported so the section copy can never drift from the
+ *  chips actually rendered. */
+export const SCENARIO_COUNT = SCENARIOS.length;
+
 const OUTCOME_META: Record<string, { label: string; cls: string }> = {
   exempt: { label: "Exempt", cls: "bg-pass/10 text-pass" },
   applies: { label: "Applies", cls: "bg-kill/10 text-kill" },

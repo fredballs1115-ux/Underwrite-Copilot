@@ -11,7 +11,6 @@ import {
   FULL_SCREEN_CLAIM,
   ANALYSIS_STAGES,
   DEAL_KILLERS,
-  MEMO_PAGES,
   SLIDER_SWEEP_BPS,
   COMPS_JURISDICTIONS,
   PRICE_PRO_MONTHLY,
@@ -29,8 +28,21 @@ import { computeModel } from "@/lib/model/compute";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { seedBenchmarks, seedRules } from "@/lib/research-data";
 import { hoursSince } from "@/lib/research";
-import { RegulationPlayground } from "./landing-regulation";
+import { RegulationPlayground, SCENARIO_COUNT } from "./landing-regulation";
 import { COVERAGE_LIVE, COVERAGE_DISCOVERY } from "@/lib/public-comps/core";
+import metrosSeed from "@/data/research/metros.json";
+
+// The research layer's scale, DERIVED from the same seeds the app evaluates
+// — the homepage can never claim coverage the rules engine doesn't have.
+// (Server component only: these pull the research JSONs, which must not ride
+// into client bundles via marketing-constants.)
+const RULE_COUNT = seedRules().length;
+const RULE_STATE_COUNT = new Set(seedRules().map((r) => r.jurisdiction_state.toUpperCase()))
+  .size;
+const METRO_COUNT = (metrosSeed.metros ?? []).length;
+const WIRED_MARKETS = (metrosSeed.metros ?? [])
+  .filter((m) => (m as { ingest_market?: string }).ingest_market)
+  .map((m) => m.name);
 
 // Title/description inherit the site defaults from the root layout;
 // the canonical is declared per page so subpages never collapse to /.
@@ -137,8 +149,12 @@ const PILLARS = [
 const STATS: { value: number; suffix: string; label: string }[] = [
   { value: ANALYSIS_STAGES, suffix: "", label: "analysis stages on every OM" },
   { value: DEAL_KILLERS, suffix: "", label: "deal-killers stressed first" },
+  {
+    value: RULE_COUNT,
+    suffix: "",
+    label: `landlord-law rules across ${RULE_STATE_COUNT} states, checked at every address`,
+  },
   { value: 0, suffix: "", label: "black-box numbers — every figure carries its source" },
-  { value: MEMO_PAGES, suffix: "", label: "page of memo for your IC" },
 ];
 
 // Live-engine rows for the Excel-preview tile: the sample model recomputed
@@ -182,6 +198,10 @@ const FAQ: { q: string; a: string }[] = [
   {
     q: "Where do the numbers come from?",
     a: "Every figure traces to a named source — an OM page, your rent roll, a market norm — and conflicting sources are reconciled openly (actuals beat pro forma), never silently merged. The return math is deterministic code, not a language model guessing at arithmetic.",
+  },
+  {
+    q: "Which markets does it cover?",
+    a: `The screen itself runs on any US offering memorandum. The ground layer underneath is broader every month: ${RULE_COUNT} landlord-law rules across ${RULE_STATE_COUNT} states (rent control, TOPA, licensing, deposits — DC, Maryland, NYC, Jersey City, LA, San Francisco, Chicago, Seattle, the Twin Cities, and the no-cap states among them), ${METRO_COUNT} tracked metros, live recorded-sales comps via county APIs in ${COMPS_JURISDICTIONS}, and a bulk property database with ${WIRED_MARKETS.join(", ")} pipelines wired. A jurisdiction we haven't screened says so on the deal — never a silent pass.`,
   },
   {
     q: "Are my documents private?",
@@ -798,9 +818,12 @@ export default function Home() {
                 The rent-control engine, running live on this page.
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
-                Four real scenarios, one click apart. Watch how entity title
-                flips a DC rowhouse from exempt to rent-stabilized, and how the
-                engine names the exact fact that would settle an open question.
+                {SCENARIO_COUNT} real scenarios, one click apart — DC to Jersey
+                City to LA to Chicago. Watch entity title flip a DC rowhouse
+                from exempt to rent-stabilized, Jersey City exempt every
+                fourplex outright, and two regimes stack on one 1965 LA
+                building — with the engine naming the exact fact that would
+                settle each open question.
               </p>
             </Reveal>
             <Reveal delay={80}>
@@ -829,6 +852,14 @@ export default function Home() {
                   </span>
                 ))}
               </div>
+            </Reveal>
+            <Reveal delay={140}>
+              <p className="mt-3 text-center text-xs text-muted">
+                Plus the property database — bulk government deed records,
+                market by market: {WIRED_MARKETS.join(", ")} pipelines wired,
+                and {RULE_COUNT} landlord-law rules across {RULE_STATE_COUNT}{" "}
+                states tracked over {METRO_COUNT} metros.
+              </p>
             </Reveal>
           </div>
         </section>
@@ -1687,7 +1718,8 @@ async function GroundLayerSection() {
                 Type an address, get the recorded sales around it — from
                 government deed records, with a source link on every row.
                 Live county APIs already cover {COMPS_JURISDICTIONS}; the
-                property database extends it nationally. Single-family is
+                property database extends it nationally, with{" "}
+                {WIRED_MARKETS.join(", ")} pipelines wired. Single-family is
                 excluded by design, and the screener runs the same pull
                 against every deal automatically.
               </p>
@@ -1701,7 +1733,7 @@ async function GroundLayerSection() {
               <p className="mt-2 font-mono text-2xl font-semibold tabular-nums">
                 {ruleCount}
                 <span className="ml-2 text-sm font-normal text-muted">
-                  machine-evaluable rules on file
+                  machine-evaluable rules across {RULE_STATE_COUNT} states
                 </span>
               </p>
               <p className="mt-2 text-sm leading-relaxed text-muted">
@@ -1826,6 +1858,9 @@ function ResearchTicker() {
       ["Jersey City 1–4 unit stock", "rent-control exempt, any owner"],
       ["NYC 2–4 unit product", "outside rent stabilization"],
       ["WA statewide cap 2026", "9.683% (HB 1217)"],
+      ["LA RSO from Jul 2026", "90% of CPI · 1–4%"],
+      ["St. Paul cap", "3% · 20-yr new-build exempt"],
+      [`${RULE_COUNT} landlord-law rules`, `${RULE_STATE_COUNT} states · statute-linked`],
       ["Recorded-sales comps", COMPS_JURISDICTIONS],
     ] as const
   ).filter((it): it is [string, string] => Array.isArray(it) && !!it[1]);
