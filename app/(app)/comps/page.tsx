@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { parseStructuredAddress } from "@/lib/address";
+import { coveredState, metroForAddress } from "@/lib/market-match";
 import { COVERAGE_SUMMARY } from "@/lib/public-comps/core";
 import { computeRecordComps } from "@/lib/public-comps/run";
 import { AddressAutocomplete } from "../address-autocomplete";
@@ -43,6 +44,9 @@ export default async function PullCompsPage({
         assetClass: cls,
       })
     : null;
+  // Same chip the deal page shows: one click from a comps pull to the
+  // address's market brief (rules, rents, data coverage).
+  const metro = picked ? metroForAddress(picked) : null;
 
   return (
     <div className="space-y-5">
@@ -113,6 +117,29 @@ export default async function PullCompsPage({
               Screen this address as a deal →
             </Link>
           </div>
+          {metro ? (
+            <Link
+              href={`/market?metro=${metro.id}`}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/5 px-2.5 py-1 text-[11px] font-medium text-brand outline-none transition-colors hover:bg-brand/10 focus-visible:ring-2 focus-visible:ring-brand/40"
+            >
+              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
+              Covered market: {metro.name} — open the market brief →
+            </Link>
+          ) : picked?.state ? (
+            <p className="mt-2 text-[11px] text-muted">
+              Not in a covered market — market-level coverage here is
+              unscreened, not unregulated
+              {coveredState(picked.state)
+                ? "; recorded sales below still pull where the records reach."
+                : "."}{" "}
+              <Link
+                href="/market"
+                className="underline decoration-dotted underline-offset-2 hover:text-brand"
+              >
+                See covered markets
+              </Link>
+            </p>
+          ) : null}
           <CompsResultView result={result} subjectPrice={null} />
         </section>
       ) : (
