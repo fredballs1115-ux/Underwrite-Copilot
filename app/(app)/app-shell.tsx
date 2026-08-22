@@ -80,6 +80,27 @@ const IconMemory = (p: { className?: string }) => (
     <path d="M8 17.5h0" />
   </NavIcon>
 );
+const IconPin = (p: { className?: string }) => (
+  <NavIcon className={p.className}>
+    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+    <circle cx="12" cy="10" r="3" />
+  </NavIcon>
+);
+const IconBook = (p: { className?: string }) => (
+  <NavIcon className={p.className}>
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" />
+  </NavIcon>
+);
+const IconScale = (p: { className?: string }) => (
+  <NavIcon className={p.className}>
+    <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
+    <path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
+    <path d="M7 21h10" />
+    <path d="M12 3v18" />
+    <path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2" />
+  </NavIcon>
+);
 
 /** The signed-in app chrome: a dark navy sidebar on desktop, a top bar on mobile. */
 export function AppShell({
@@ -92,8 +113,11 @@ export function AppShell({
   const pathname = usePathname();
   const inPipeline = pathname.startsWith("/deals");
   const inCriteria = pathname.startsWith("/criteria");
+  const inComps = pathname.startsWith("/comps");
   const inAnalytics = pathname.startsWith("/analytics");
   const inMarket = pathname.startsWith("/market");
+  const inJournal = pathname.startsWith("/journal");
+  const inLaws = pathname.startsWith("/laws");
   const inTeam = pathname.startsWith("/team");
   const inBilling = pathname.startsWith("/billing");
   const inAccount = pathname.startsWith("/account");
@@ -149,8 +173,11 @@ export function AppShell({
             [
               ["/deals", "Pipeline", inPipeline, IconLayers],
               ["/criteria", "Buy box", inCriteria, IconTarget],
-              ["/analytics", "Analytics", inAnalytics, IconChart],
+              ["/comps", "Pull comps", inComps, IconPin],
               ["/market", "Market data", inMarket, IconMemory],
+              ["/journal", "Journal", inJournal, IconBook],
+              ["/laws", "Laws", inLaws, IconScale],
+              ["/analytics", "Analytics", inAnalytics, IconChart],
               ["/team", "Team", inTeam, IconUsers],
               ["/billing", "Billing", inBilling, IconCard],
               ["/account", "Account", inAccount, IconUser],
@@ -248,8 +275,11 @@ export function AppShell({
             {[
               { href: "/deals", label: "Pipeline", active: inPipeline },
               { href: "/criteria", label: "Buy box", active: inCriteria },
-              { href: "/analytics", label: "Analytics", active: inAnalytics },
+              { href: "/comps", label: "Pull comps", active: inComps },
               { href: "/market", label: "Market data", active: inMarket },
+              { href: "/journal", label: "Journal", active: inJournal },
+              { href: "/laws", label: "Laws", active: inLaws },
+              { href: "/analytics", label: "Analytics", active: inAnalytics },
               { href: "/team", label: "Team", active: inTeam },
               { href: "/billing", label: "Billing", active: inBilling },
               { href: "/account", label: "Account", active: inAccount },
