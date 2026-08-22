@@ -191,7 +191,7 @@ export async function ResearchPanel({
       {metro ? (
         <Link
           href={`/market?metro=${metro.id}`}
-          className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/5 px-2.5 py-1 text-[11px] font-medium text-brand transition-colors hover:bg-brand/10"
+          className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/5 px-2.5 py-1 text-[11px] font-medium text-brand outline-none transition-colors hover:bg-brand/10 focus-visible:ring-2 focus-visible:ring-brand/40"
         >
           <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
           Covered market: {metro.name} — open the market brief →

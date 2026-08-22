@@ -108,7 +108,7 @@ export default async function PullCompsPage({
                   }
                 )
               )}`}
-              className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+              className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               Screen this address as a deal →
             </Link>
