@@ -1,0 +1,36 @@
+name: live-verify
+# Fetches the LIVE site from GitHub's network (the build container cannot
+# reach it) and reports exactly what it serves — the decisive evidence for
+# "did the deploy land". Run manually (Actions tab → live-verify → Run
+# workflow) or automatically on every push to main.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch live homepage
+        run: |
+          set -x
+          curl -sS -D headers.txt -o body.html --max-time 60 https://underwrite-copilot.onrender.com/ || true
+          echo "== RESPONSE HEADERS =="; cat headers.txt || true
+          echo "== BYTES =="; wc -c body.html || true
+      - name: Check for current-build markers
+        run: |
+          echo "== MARKER CHECKS =="
+          grep -c "The OM lands Thursday" body.html && echo "HERO: NEW (current build)" || echo "HERO: OLD OR MISSING"
+          grep -c "Stop underwriting like a" body.html && echo "OLD HERO STILL PRESENT" || true
+          grep -o "page rendered[^<]*" body.html || echo "no render stamp found"
+          grep -c "ticker-track" body.html && echo "TICKER: present" || echo "TICKER: missing"
+          echo "== FIRST 1200 CHARS OF BODY =="
+          head -c 1200 body.html
+      - name: Verdict
+        run: |
+          if grep -q "The OM lands Thursday" body.html; then
+            echo "VERDICT: LIVE SITE IS CURRENT — any 'unchanged' sighting is client-side cache."
+          else
+            echo "VERDICT: LIVE SITE IS SERVING AN OLD BUILD — Render is not deploying main. Check dashboard.render.com → underwrite-copilot-web → Events for failed deploys (likely build OOM on the starter instance) or auto-deploy toggled off."
+            exit 1
+          fi
