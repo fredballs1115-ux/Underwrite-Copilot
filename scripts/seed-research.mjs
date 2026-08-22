@@ -75,7 +75,8 @@ for (const [br, v] of Object.entries(fmr?.value ?? {})) {
     benchmarks.push({
       sector: "multifamily", metro: "Washington DC area", metric: `hud_fmr_fy2026_${br}`,
       low: v, high: v, unit: "usd_month", source: fmr.sources?.[0] ?? "",
-      as_of: "2025-10-01", status: fmr.status ?? "sourced", note: fmr.note ?? null,
+      as_of: "2026-08-21", status: fmr.status ?? "sourced",
+      note: ["FY2026, effective 2025-10-01 through 2026-09-30", fmr.note].filter(Boolean).join(". "),
     });
   }
 }

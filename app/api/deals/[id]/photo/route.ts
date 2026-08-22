@@ -40,8 +40,14 @@ export async function GET(
   if (!deal) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const key = process.env.GOOGLE_MAPS_API_KEY;
-  const address = (deal.address as StructuredAddress | null)?.label;
-  if (!key || !address) return new NextResponse(null, { status: 404 });
+  const structured = deal.address as StructuredAddress | null;
+  const address = structured?.label;
+  // Street-level imagery only for street-level addresses — a neighborhood
+  // placement must never show a random block's photo (defense in depth with
+  // the page-side gate; also covers stale cached 'ok' verdicts).
+  if (!key || !address || !structured?.street) {
+    return new NextResponse(null, { status: 404 });
+  }
 
   // Cached metadata verdict (fresh within 30 days) skips the round trip.
   let cache = (deal.photo as PhotoCache | null) ?? null;

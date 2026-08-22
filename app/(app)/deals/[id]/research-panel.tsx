@@ -24,6 +24,7 @@ import {
   seedBenchmarks,
   seedRules,
 } from "@/lib/research-data";
+import { linkOk } from "@/lib/link-audit";
 import type { StructuredAddress } from "@/lib/address";
 
 const OUTCOME_META: Record<
@@ -41,6 +42,21 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
   sourced: { label: "sourced", cls: "bg-brand/10 text-brand" },
   unverified_not_found: { label: "unverified", cls: "bg-amber-500/10 text-amber-600" },
 };
+
+/** Friendly names for benchmark metrics — raw keys like "hud_fmr_fy2026_0br"
+ *  read like plumbing. Unknown metrics fall back to de-underscored text. */
+function metricLabel(metric: string): string {
+  const fmr = metric.match(/^hud_fmr_fy2026_(\w+)$/);
+  if (fmr) {
+    const br = fmr[1] === "0br" ? "studio" : fmr[1].toUpperCase();
+    return `FY2026 fair market rent · ${br}`;
+  }
+  if (metric === "median_sale_price_2_4_unit") return "2–4 unit median sale";
+  if (metric === "monthly_sales_2_4_unit") return "2–4 unit sales / month";
+  if (metric === "active_listings_2_4_unit") return "2–4 unit active listings";
+  if (metric === "pmms_30y_fixed") return "30-yr fixed (PMMS)";
+  return metric.replace(/__/g, ": ").replace(/_/g, " ");
+}
 
 /** Plain-English labels for condition keys surfaced as open questions. */
 const UNKNOWN_LABELS: Record<string, string> = {
@@ -66,6 +82,10 @@ function SourceLink({
 }) {
   const meta = STATUS_META[status] ?? STATUS_META.sourced;
   const stale = isStale(asOf);
+  // Audit gate: a link the audit script has verified DEAD renders as plain
+  // text — the user never gets handed a clickable 404. Unaudited links render
+  // normally (never audited ≠ dead).
+  const audited = linkOk(source);
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
       <span className={`rounded px-1.5 py-px font-medium ${meta.cls}`}>{meta.label}</span>
@@ -75,16 +95,19 @@ function SourceLink({
         </span>
       )}
       {!stale && <span>as of {asOf}</span>}
-      {source && (
-        <a
-          href={source}
-          target="_blank"
-          rel="noreferrer"
-          className="underline decoration-dotted underline-offset-2 hover:text-ink"
-        >
-          source
-        </a>
-      )}
+      {source &&
+        (audited === false ? (
+          <span title={source}>source on file — link unavailable</span>
+        ) : (
+          <a
+            href={source}
+            target="_blank"
+            rel="noreferrer"
+            className="underline decoration-dotted underline-offset-2 hover:text-ink"
+          >
+            source
+          </a>
+        ))}
     </span>
   );
 }
@@ -212,7 +235,7 @@ export async function ResearchPanel({
                   className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
                 >
                   <span>
-                    {b.metric.replace(/_/g, " ")}
+                    {metricLabel(b.metric)}
                     {": "}
                     <span className="font-mono tabular-nums">
                       {b.low === b.high
