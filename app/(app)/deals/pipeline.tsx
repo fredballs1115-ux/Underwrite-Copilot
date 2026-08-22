@@ -161,6 +161,7 @@ export function Pipeline({
   errorMessage,
   notice,
   openNew,
+  prefillAddress,
   onboarding,
   billing,
 }: {
@@ -171,6 +172,9 @@ export function Pipeline({
    *  fresh nonce per invocation re-triggers the effect even when the form
    *  was closed and the param is still in the URL. */
   openNew?: string;
+  /** structured address handed in from Pull Comps ("screen this address") —
+   *  opens the form on the manual tab with the address pre-picked. */
+  prefillAddress?: StructuredAddress | null;
   onboarding?: OnboardingState;
   billing: BillingInfo | null;
 }) {
@@ -631,7 +635,9 @@ export function Pipeline({
         </div>
       )}
 
-      {showForm && !atLimit && <NewDealForm errorMessage={errorMessage} />}
+      {showForm && !atLimit && (
+        <NewDealForm errorMessage={errorMessage} prefill={prefillAddress ?? null} />
+      )}
       {atLimit && errorMessage && (
         <section className="rounded-xl border border-caution/30 bg-caution/5 p-5">
           <p className="text-sm font-medium text-caution">{errorMessage}</p>
@@ -1476,11 +1482,18 @@ function writeDraft(d: DealDraft | null) {
   }
 }
 
-function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
+function NewDealForm({
+  errorMessage,
+  prefill,
+}: {
+  errorMessage: string | null;
+  prefill?: StructuredAddress | null;
+}) {
   // Two ways in: upload the OM, or type the facts (no document needed —
   // small-multifamily listings rarely come with one). An upload error code
   // in the URL means the last submit was an upload — open on that mode.
-  const [mode, setMode] = useState<"upload" | "manual">("upload");
+  // A Pull Comps hand-off arrives with the address picked: open on manual.
+  const [mode, setMode] = useState<"upload" | "manual">(prefill ? "manual" : "upload");
   const [name, setName] = useState("");
   const [assetClass, setAssetClass] = useState("auto");
   // The address field manages its own text; we mirror its latest value here
@@ -1576,7 +1589,7 @@ function NewDealForm({ errorMessage }: { errorMessage: string | null }) {
       </p>
       {mode === "manual" && (
         <div className="mt-4">
-          <ManualDealForm mode="create" />
+          <ManualDealForm mode="create" initialAddress={prefill ?? null} />
         </div>
       )}
       {mode === "upload" && (
