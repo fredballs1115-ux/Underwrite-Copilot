@@ -70,12 +70,15 @@ Actions → add `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (Supabase →
 Settings → API), optionally `ANTHROPIC_API_KEY`. ~3 min. *Skip it and:* the
 ingest workflow, the steward fallback, and DB-mode link audit all no-op.
 
-**4. First Philadelphia ingest** — repo → Actions → **ingest** → Run
-workflow → market `philadelphia`, max_rows `5000` (smoke). If the log looks
-right and Supabase usage is sane, run again with max_rows `400000` (takes a
-while; it's resumable and idempotent). ~5 min of your attention. *Skip it
-and:* the comps DB stays empty — Pull Comps still works via live county
-APIs, but only in the wired jurisdictions.
+**4. First ingest runs** — repo → Actions → **ingest** → Run workflow →
+market `philadelphia`, max_rows `5000` (smoke). If the log looks right and
+Supabase usage is sane, run again with max_rows `400000`. Then repeat for
+`nyc` and `cook_county` (both smoke-test the same way; their sales rows
+gain coordinates as their parcel phases fill — later runs backfill). ~10
+min of your attention total. *Skip it and:* the comps DB stays empty —
+Pull Comps still works via live county APIs, but only in the wired
+jurisdictions. **Watch Supabase → Database usage between markets: three
+metros will likely need the $25/mo Pro plan (task 1).**
 
 **5. Render cron for the steward + existing crons' env** — easiest path:
 Render → your Blueprint → Sync (render.yaml now defines
