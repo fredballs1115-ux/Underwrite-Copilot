@@ -820,6 +820,16 @@ export function Pipeline({
               </PendingButton>
             </form>
           </div>
+          <p className="mt-3 text-xs text-muted">
+            Not sure where to hunt?{" "}
+            <Link
+              href="/market"
+              className="font-medium text-brand hover:text-brand-strong"
+            >
+              Browse the covered markets
+            </Link>{" "}
+            — rules, rents, and recorded-sales coverage per metro.
+          </p>
         </div>
       ) : filtered.length === 0 ? (
         deadCount === deals.length && !showDead && stage !== "dead" ? (
@@ -1409,6 +1419,16 @@ function GettingStarted({
           </li>
         ))}
       </ul>
+      <p className="mt-3 text-xs text-muted">
+        While you&apos;re here:{" "}
+        <Link
+          href="/market"
+          className="font-medium text-brand hover:text-brand-strong"
+        >
+          browse the covered markets
+        </Link>{" "}
+        — rules, rents, and data coverage for each metro you buy in.
+      </p>
     </section>
   );
 }
