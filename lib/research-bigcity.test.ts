@@ -122,6 +122,26 @@ describe("Twin Cities", () => {
   });
 });
 
+describe("Portland, Maine", () => {
+  it("the corridor's one rent-controlled city exempts the owner-occupied 2-4 unit house-hack", () => {
+    const hack = outcomes({
+      ...BASE, state: "ME", locality: ["Portland"], units: 3, occupancy: "owner_occupied",
+    });
+    expect(hack["me-portland-rent-control"]).toBe("exempt");
+    const absentee = outcomes({
+      ...BASE, state: "ME", locality: ["Portland"], units: 4, occupancy: "tenant_occupied",
+    });
+    expect(absentee["me-portland-rent-control"]).toBe("applies");
+  });
+});
+
+describe("Rhode Island's latent authority", () => {
+  it("Providence reads as no-cap-but-watch, not as preempted", () => {
+    const o = outcomes({ ...BASE, state: "RI", locality: ["Providence"], units: 4 });
+    expect(o["ri-no-rent-control-latent-authority"]).toBe("applies");
+  });
+});
+
 describe("statewide caps and preemptions", () => {
   it("WA HB 1217 catches a tenant-occupied 1980 triplex (no exemption path holds)", () => {
     const o = outcomes({
@@ -137,6 +157,11 @@ describe("statewide caps and preemptions", () => {
       ["CO", "Denver", "co-rent-control-prohibition"],
       ["TN", "Nashville", "tn-rent-control-preemption"],
       ["NC", "Charlotte", "nc-rent-control-preemption"],
+      ["OH", "Columbus", "oh-rent-control-preemption"],
+      ["MI", "Detroit", "mi-rent-control-preemption"],
+      ["WI", "Milwaukee", "wi-rent-control-preemption"],
+      ["IN", "Indianapolis", "in-rent-control-preemption"],
+      ["MO", "Kansas City", "mo-rent-control-preemption"],
     ] as const) {
       const o = outcomes({ ...BASE, state, locality: [city], units: 4 });
       expect(o[id]).toBe("applies");

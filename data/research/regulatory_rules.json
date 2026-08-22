@@ -682,6 +682,153 @@
    "as_of": "2026-08-22",
    "status": "verified",
    "verification": "statute PDF on ncleg.gov (primary) + secondary guides"
+  },
+  {
+   "id": "oh-rent-control-preemption",
+   "jurisdiction_state": "OH",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Ohio preempts local rent control since HB 430 (signed June 24, 2022; effective Sept 22, 2022, amending ORC Chapter 5321): political subdivisions may not impose rent control or rent stabilization in any manner - Columbus, Cleveland, and Cincinnati included. Ohio was the 31st preemption state.",
+   "quote": null,
+   "source": "https://www.vorys.com/publication-Ohio-Legislature-Preserves-Statewide-Authority-and-Acts-to-Stop-Local-Rent-Control",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "HB 430 cross-confirmed across Vorys, NAA, Columbus Apartment Association, Forbes (4 independent)"
+  },
+  {
+   "id": "me-portland-rent-control",
+   "jurisdiction_state": "ME",
+   "jurisdiction_local": "Portland",
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "units_gte": 1,
+    "property_type": "rental_housing"
+   },
+   "exempt_if": {
+    "owner_occupied_with_units_lte": 4
+   },
+   "effect": "Portland, Maine has real rent control (2020 ballot; Code ch. 6 art. XIII): annual increases capped at 70% of the Greater Boston CPI change - 2.2% for calendar 2026 - applying to sitting tenants AND between tenancies, with a rent board and registration. EXEMPT: units in an OWNER-OCCUPIED building of 2-4 units - the house-hack path through the only rent-controlled city in the buyer's Maine-to-Florida corridor north of New Jersey. Rest of Maine: no rent control.",
+   "quote": "Units in an owner-occupied building containing either 2, 3, or 4 dwelling units are exempt",
+   "source": "https://content.civicplus.com/api/assets/78f22237-21c9-4ad5-9b67-56223c0b6e6c",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "city ordinance PDF + city FAQ (both primary, civicplus-hosted) + two practitioner guides; 2026 cap 2.2% cross-confirmed"
+  },
+  {
+   "id": "mi-rent-control-preemption",
+   "jurisdiction_state": "MI",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Michigan preempts local rent control (MCL 123.411, since 1988): no city or county may adopt rent control unless authorized by state law - Detroit included. No rent caps anywhere in Michigan.",
+   "quote": null,
+   "source": "https://commoner-law.com/rights/housing-rights/rent-control/michigan",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "MCL 123.411 cross-confirmed across two legal guides + preemption trackers; direct legislature.mi.gov pull queued"
+  },
+  {
+   "id": "wi-rent-control-preemption",
+   "jurisdiction_state": "WI",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Wisconsin preempts local rent control (Wis. Stat. 66.1015): no city, village, town, or county may regulate the amount of rent charged for residential rental units - Milwaukee and Madison included.",
+   "quote": "66.1015 Municipal rent control ... prohibited",
+   "source": "https://docs.legis.wisconsin.gov/2017/statutes/statutes/66/x/1015",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "statute on docs.legis.wisconsin.gov (primary) + Justia + LawServer mirrors"
+  },
+  {
+   "id": "in-rent-control-preemption",
+   "jurisdiction_state": "IN",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Indiana preempts local regulation of rental rates (Ind. Code 32-31-1-20: 'Local Units Prohibited From Regulating Rental Rates') - Indianapolis included. No rent caps anywhere in Indiana.",
+   "quote": null,
+   "source": "https://law.justia.com/codes/indiana/title-32/article-31/chapter-1/section-32-31-1-20/",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "statute text via Justia (2024/2025 code editions) + practitioner guides"
+  },
+  {
+   "id": "mo-rent-control-preemption",
+   "jurisdiction_state": "MO",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Missouri preempts local rent control (RSMo 441.043): no county or city - charter governments included - may regulate the amount of rent on private residential or commercial rental property. Kansas City and St. Louis: no caps.",
+   "quote": "No county or city ... may enact, maintain, or enforce any ordinance or resolution which regulates the amount of rent",
+   "source": "https://revisor.mo.gov/main/OneSection.aspx?section=441.043",
+   "as_of": "2026-08-22",
+   "status": "verified",
+   "verification": "statute text on revisor.mo.gov (primary) + Justia"
+  },
+  {
+   "id": "nv-rent-control-preemption",
+   "jurisdiction_state": "NV",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Nevada has no statewide rent control, and state law bars cities and towns from enacting their own - Las Vegas and Reno: no caps. Statute citation pull queued to upgrade this row.",
+   "quote": null,
+   "source": "https://ipropertymanagement.com/laws/rent-control",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "preemption cross-stated by two 50-state guides; primary statute cite not yet surfaced - labeled accordingly"
+  },
+  {
+   "id": "ut-rent-control-preemption",
+   "jurisdiction_state": "UT",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Utah has no statewide rent control, and state law bars cities from enacting their own - Salt Lake City: no caps. Statute citation pull queued to upgrade this row.",
+   "quote": null,
+   "source": "https://ipropertymanagement.com/laws/rent-control",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "preemption cross-stated by two 50-state guides; primary statute cite not yet surfaced - labeled accordingly"
+  },
+  {
+   "id": "ri-no-rent-control-latent-authority",
+   "jurisdiction_state": "RI",
+   "jurisdiction_local": null,
+   "rule_type": "rent_control_coverage",
+   "applies_if": {
+    "property_type": "rental_housing"
+   },
+   "exempt_if": null,
+   "effect": "Rhode Island has no statewide rent control AND no preemption statute - municipalities hold latent authority to enact rent control, and as of 2026 none (Providence included) has. That makes RI different in kind from the preemption states: a Providence ordinance is legally possible and statehouse rent-cap bills recur - a genuine watch item on the highest-priced 2-4 unit metro in the expansion research.",
+   "quote": null,
+   "source": "https://commoner-law.com/rights/housing-rights/rent-control",
+   "as_of": "2026-08-22",
+   "status": "sourced",
+   "verification": "no-preemption + no-local-adoption cross-stated by three 50-state guides"
   }
  ],
  "gaps": [
@@ -698,6 +845,8 @@
   "FY2026 2BR FMRs for Chicago/LA/SF/Seattle/Boston/Dallas metro areas - aggregator figures conflicted, did not meet the 2-source bar (huduser pull queued); NYC $2,910 confirmed by two independent republishers",
   "FL 166.043 statute text direct pull (currently one practitioner source)",
   "Rolling exemption windows (CA 15yr / WA 12yr / OR 15yr) encoded as 2026-snapshot dates - steward re-verification advances them annually",
-  "Minneapolis charter-amendment text direct pull (rent regulation authorized 2021, no ordinance enacted)"
+  "Minneapolis charter-amendment text direct pull (rent regulation authorized 2021, no ordinance enacted)",
+  "NV / UT preemption statute citations (rows encoded as sourced pending the cite)",
+  "MI MCL 123.411 direct legislature.mi.gov text pull"
  ]
 }
