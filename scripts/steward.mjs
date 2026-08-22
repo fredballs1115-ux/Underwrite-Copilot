@@ -303,17 +303,22 @@ if (!anthropicKey) {
   notes.push("re-verification: skipped (no ANTHROPIC_API_KEY)");
 } else {
   try {
+    // OLDEST claims re-verify regardless of tier: 'verified' rows age too
+    // (rolling exemption windows — CA 15yr / WA 12yr / OR 15yr — advance
+    // every Jan 1, and statutes amend), and a sourced-only filter would
+    // leave them rotting forever. Sourced rows still surface first simply
+    // by being older on average.
     const [{ data: bm }, { data: rr }] = await Promise.all([
       supabase
         .from("benchmarks")
         .select("id, sector, metro, metric, low, high, unit, source, as_of, note")
-        .eq("status", "sourced")
+        .in("status", ["sourced", "verified"])
         .order("as_of", { ascending: true })
         .limit(3),
       supabase
         .from("regulatory_rules")
         .select("id, jurisdiction_state, jurisdiction_local, rule_type, effect, source, as_of")
-        .eq("status", "sourced")
+        .in("status", ["sourced", "verified"])
         .order("as_of", { ascending: true })
         .limit(RECHECK_CLAIMS - 3),
     ]);
