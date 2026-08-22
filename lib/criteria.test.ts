@@ -205,4 +205,20 @@ describe("geography — market-level territory chips", () => {
     const miss = evaluateBuyBox("auto", ex([], { market: "Houston, TX" }), box);
     expect(check(miss, "Geography")?.status).toBe("miss");
   });
+  it("alias needles are state-gated — a Seattle chip never hits King St in DC", () => {
+    const seattle: BuyBox = {
+      geos: [{ label: "Seattle", state: "WA", aliases: ["seattle", "king"] }],
+    };
+    const dc = evaluateBuyBox(
+      "auto",
+      ex([], { address: "1201 King St NW, Washington, DC 20005" }),
+      seattle,
+    );
+    expect(check(dc, "Geography")?.status).toBe("miss");
+    const wa = evaluateBuyBox("auto", ex([], { address: "410 S King St, Seattle, WA" }), seattle);
+    expect(check(wa, "Geography")?.status).toBe("pass");
+    // Without any state token the aliases stay off; the label still works.
+    const bare = evaluateBuyBox("auto", ex([], { market: "Seattle" }), seattle);
+    expect(check(bare, "Geography")?.status).toBe("pass"); // label needle, ungated
+  });
 });

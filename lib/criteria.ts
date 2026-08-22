@@ -439,9 +439,23 @@ export function evaluateBuyBox(
       });
     } else {
       const hit = targets.find((t) => {
-        const needles = [t.city, t.county, t.label, ...(t.aliases ?? [])]
+        const needles = [t.city, t.county, t.label]
           .filter((s): s is string => !!s && s.trim().length > 1)
           .map((s) => s.toLowerCase());
+        // Alias needles are market-level keywords ("king", "essex",
+        // "wilmington") that collide across states as bare substrings — a
+        // Seattle chip must not hit "King St, Washington, DC". They only
+        // count when the chip's state abbreviation appears as its own word
+        // in the haystack (US address text virtually always carries it).
+        const st = (t.state ?? "").trim().toLowerCase().replace(/[^a-z]/g, "");
+        const aliasesOk = !st || new RegExp(`\\b${st}\\b`).test(haystack);
+        if (aliasesOk) {
+          needles.push(
+            ...(t.aliases ?? [])
+              .filter((s) => s.trim().length > 1)
+              .map((s) => s.toLowerCase())
+          );
+        }
         return needles.some((n) => haystack.includes(n));
       });
       checks.push({
