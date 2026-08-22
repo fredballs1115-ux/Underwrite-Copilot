@@ -1,107 +1,103 @@
 # SHIPPED — what's live, how to see it, what only you can do
 
-## ⚠ BLOCKER FIRST (read before anything else)
+## ⚠ READ FIRST — what gates what
 
-**This build environment cannot reach the live site, Render, or Supabase**
-(network-proxied; every probe blocked). So "verified against the LIVE URL"
-is physically impossible from here — the honest version of "prove it" is:
-everything below builds clean and passes 301 tests on exactly the commit
-Render deploys, and **your 3 verification commands** replace the live checks
-I cannot run:
+The deploy pipeline itself is **proven working** (live-verify runs green
+since you pointed the web service at `main`). What gates the new features is
+**data plumbing only you can touch**:
 
-```
-# 1. New homepage actually serving (should print the hero + ticker markup):
-curl -s https://underwrite-copilot.onrender.com/ | grep -o "Stop underwriting like a"
+- **Migration 0028 not yet run** → property DB, journal, laws alerts feed,
+  steward, Data Health all render honest empty states until it is.
+- **No GitHub Actions secrets** → the ingest/steward/link-audit workflows
+  no-op with instructions instead of running.
+- **Supabase plan decision** (money — your call, task 1 below).
 
-# 2. Market page rendering research data:
-curl -s https://underwrite-copilot.onrender.com/market | head -c 200   # (redirects to login = normal; open in browser signed in)
+Everything ships dark-safe: nothing breaks while those are pending, pages
+say exactly what's missing and why.
 
-# 3. In a browser, hard-refresh (Cmd+Shift+R) — the homepage is ISR-cached
-#    daily and your browser caches it too; a stale tab is the #1 reason
-#    "nothing changed."
-```
-
-Your screenshot already proves the deploy pipeline works — the "VS. MARKET"
-block it shows has only existed since this build.
-
-## What changed in this pass (deploying on merge)
+## What changed in this pass (national expansion)
 
 | Change | Where to click |
 |---|---|
-| FY2026 FMRs no longer wear a false "stale" badge; labels read "FY2026 fair market rent · 2BR" | any deal with a DC/MD address → vs. market block |
-| Street View only renders for street-level addresses — the sample's random-block photo is gone at the root | the sample deal (clean, no photo) vs. any real street-addressed deal (photo once the key is set) |
-| Dead-link protection: audited-dead source URLs render as "source on file — link unavailable", never a clickable 404 | everywhere provenance renders (activates as the audit file fills) |
-| `scripts/audit-source-links.mjs` — audits every research/DB source URL | run it (task 3 below) |
-| Sector cap-rate ranges table — ranges only, provenance per row, **single-family excluded from all market surfaces by policy (data-level filter)** | /market, below the Mid-Atlantic table |
-| Mid-Atlantic table column renamed "Median sale (2–4 unit)" — class-scoped, never a mixed distribution | /market |
-| `DEPLOY_DIAGNOSIS.md` — the full checklist, VERIFIED vs CANNOT-VERIFY split | repo root |
+| **Property database** (migration 0028): `properties` + `recorded_sales` (PostGIS radius index), single-family dropped at ingestion by policy | run task 2, then ingest (task 4) |
+| **Philadelphia bulk ingest pipeline** — OPA parcels + last sales via Carto SQL, idempotent upserts, `MAX_ROWS` smoke-testing | GitHub → Actions → "ingest" |
+| **Comps engine, DB-first**: any address near ingested deed records gets comps from the property DB (works in ANY ingested market); live county APIs remain the fallback | every deal's "Recorded sales nearby" panel |
+| **Pull Comps tool** — type any address, no deal required; same engine, honest statuses | app → **Pull comps** (nav + ⌘K) |
+| **The Daily Journal** — weekday CRE entry written from that morning's sourced sweep (Markets / Deals / Policy & Rates / My Markets), every claim linked, failed days visibly marked | app → **Journal** (after crons run) |
+| **Laws** promoted to top-level: browse every rule by state, applies/exempt conditions in plain English, statutory quotes, provenance, recent change flags | app → **Laws** |
+| **Verification steward** — nightly: link health, feed freshness, consistency (incl. SFR-leakage), re-verification of the oldest singly-sourced claims via web search; corrections land in an open changelog, never silently | app → Account → **Data health**; site footer "data last verified" |
+| **Homepage: "The ground layer" section** — live DB stats for all four (comps DB count, rules count, latest journal headline, steward heartbeat), honest not-yet states before data lands | homepage, after the rules playground |
+| Proof strip + footer now carry recorded-sales count, journal headline, and the steward marker (only when real) | homepage |
+| Nav: Pull comps / Journal / Laws added (sidebar, mobile, ⌘K palette) | app shell |
+| `data/research/ingestion_sources.md` — every bulk dataset per market (Mid-Atlantic → Tier-1 → Tier-2), access method, status, standing rules | repo |
 
-**On "median price" generally:** the market page's medians were already
-class-scoped (Redfin's 2–4 unit series — no warehouses in the distribution);
-the fix was labeling. The per-class metrics your spec lists ($/unit, $/SF,
-$/key, $/pad, GRM, 25th–75th percentiles with n) require transaction-level
-data the wired feeds don't publish (Redfin gives one median, no distribution;
-$/unit needs unit counts per sale). Deriving them anyway would mean invented
-denominators — refused. They become computable per-metro once the comps
-providers accumulate recorded sales; that path is noted in WILL_TODO.md.
-
-**On the homepage "full revamp":** the homepage was rebuilt twice in the
-last day (ticker, hero glows, live rules engine running in-browser, coverage
-board, DB-queried proof strip, interactive sample tabs) and every element of
-your requirements list is present — value-prop line, single CTA, live proof
-strip, an interactive click-through demo (DemoTabs + the rules playground —
-real engine code, not a screenshot), ≤4 supporting sections, zero filler.
-Rebuilding it a third time in 24 hours would be churn, not progress; what it
-needs now is your eyes on the LIVE page post-hard-refresh. If specific
-elements still miss for you, name them and they get changed same-day.
+Per the standing rule: each distinctive feature got top-level nav, a
+homepage live-stat slot, and a sample-screen mention (the ground-layer
+section links the demo's recorded-sales read).
 
 ## Migrations — production status
 
 | Migration | Status |
 |---|---|
-| 0001–0022 | applied (pre-existing app works) |
-| 0023–0026 | applied per your "did all 26" message |
-| **0027_photos.sql** | **presumed UNAPPLIED — newer than your run; task 1** |
+| 0001–0026 | applied |
+| 0027_photos.sql | apply if you haven't (photo metadata caching) |
+| **0028_property_database.sql** | **NEW — required for everything above** |
 
 ## YOUR TASKS — things I could not possibly do
 
-Ordered by impact. Every one requires your logins; none can be done from
-this environment (its network is sealed).
+Ordered by impact. Every one needs your logins/money; none can be done from
+this sealed environment.
 
-**1. Apply migration 0027** — Supabase dashboard → SQL Editor → paste
-`supabase/migrations/0027_photos.sql` → Run. ~1 min. *Skip it and:* photo
-metadata can't cache; every photo view re-asks Google (slower, eats quota).
+**1. Supabase plan decision — $25/month or stay free.** Free tier = 500 MB
+database. Philadelphia alone (~250–400k non-SFR parcels + sales) will use a
+large share of it; a second metro will not fit. **Pro is $25/mo for 8 GB**
+(fits all Mid-Atlantic parcels + national sales-only). My recommendation:
+run the Philadelphia smoke test first (task 4), watch Database → Usage, and
+upgrade when you add market #2. ~2 min to decide. *Skip it and:* ingestion
+halts mid-market when the disk fills — the steward will flag it, nothing
+corrupts, but comps coverage stops growing. **I will never purchase anything
+without you saying so — this is the one dollar decision on the table.**
 
-**2. Confirm Render deployed `main` @ `13fd589`+** — dashboard.render.com →
-underwrite-copilot-web → Events. If the last deploy predates today or auto-
-deploy is off, click "Manual Deploy → latest commit". ~2 min. *Skip it and:*
-the live site really does lag the repo — the one failure mode I can't see.
+**2. Run migration 0028** — Supabase → SQL Editor → paste
+`supabase/migrations/0028_property_database.sql` → Run (safe to re-run; run
+0027 first if you never did). ~2 min. *Skip it and:* property DB, journal,
+Data Health, steward all stay at their empty states.
 
-**3. Run the link audit** — locally: `git pull && node
-scripts/audit-source-links.mjs` (add `SUPABASE_URL` + service key env to
-include DB rows), then `git add data/research/link_audit.json && git commit
--m "link audit" && git push origin main`. ~5 min. *Skip it and:* provenance
-links stay unaudited — any dead republisher URL stays clickable.
+**3. GitHub Actions secrets** — repo → Settings → Secrets and variables →
+Actions → add `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (Supabase →
+Settings → API), optionally `ANTHROPIC_API_KEY`. ~3 min. *Skip it and:* the
+ingest workflow, the steward fallback, and DB-mode link audit all no-op.
 
-**4. `/api/comps/health` → paste me the JSON** — open it signed-in on the
-live site. ~1 min. *Skip it and:* Fairfax, Arlington, Pittsburgh, New Castle
-comps stay off, and DC/MD/NJ field names stay unconfirmed guesses.
+**4. First Philadelphia ingest** — repo → Actions → **ingest** → Run
+workflow → market `philadelphia`, max_rows `5000` (smoke). If the log looks
+right and Supabase usage is sane, run again with max_rows `400000` (takes a
+while; it's resumable and idempotent). ~5 min of your attention. *Skip it
+and:* the comps DB stays empty — Pull Comps still works via live county
+APIs, but only in the wired jurisdictions.
 
-**5. `GOOGLE_MAPS_API_KEY`** — console.cloud.google.com → enable "Street
-View Static API" → create key → Render web service env. Free tier covers
-thousands/month. ~10 min. *Skip it and:* no building photos (clean cards,
-nothing broken).
+**5. Render cron for the steward + existing crons' env** — easiest path:
+Render → your Blueprint → Sync (render.yaml now defines
+`underwrite-copilot-steward`, nightly 06:00 UTC). If you created services
+manually instead, add a Cron Job: command `node scripts/steward.mjs`,
+schedule `0 6 * * *`, env `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` +
+`ANTHROPIC_API_KEY`. While there, confirm the intel + rates crons have
+their env vars and Trigger Run each once. ~10 min. *Skip it and:* no
+journal entries, no daily rates, no steward heartbeat — the footer will
+simply never say "data last verified" (and Data health explains why).
+(The steward also has a GitHub Actions fallback at 06:30 UTC once task 3
+is done — belt and suspenders.)
 
-**6. Cron env vars** (if not done) — the two cron services need
-`ANTHROPIC_API_KEY` / `FRED_API_KEY` + Supabase URL + service key; Trigger
-Run once each. ~5 min. *Skip it and:* no daily rates, no intel digest, no
-rule-change banners.
+**6. `/api/comps/health` → paste me the JSON** — open it signed-in on the
+live site. ~1 min. *Skip it and:* Fairfax, Arlington, Pittsburgh, New
+Castle stay off; DC/MD/NJ field names stay unconfirmed.
 
-**7. The two human verifications** (judgment calls deliberately yours):
-PG County DPIE FAQ current revision (recommendation: also email DPIE for a
-written domicile answer) and D.C. Law 26-80's enacted "business corporation"
-TOPA definition on code.dccouncil.gov (recommendation: confirm before any
-TOPA-sensitive close). ~30 min. *Skip them and:* two load-bearing rules stay
-"sourced" instead of "verified" — fine for screening, not for closing.
+**7. `GOOGLE_MAPS_API_KEY`** — console.cloud.google.com → enable "Street
+View Static API" → key → Render web env. ~10 min. *Skip it and:* no
+building photos (clean cards, nothing broken).
+
+**8. Two human legal verifications** — PG County DPIE domicile answer in
+writing; D.C. Law 26-80's enacted TOPA "business corporation" text on
+code.dccouncil.gov. ~30 min. *Skip them and:* two load-bearing rules stay
+"sourced" not "verified" — fine for screening, not for closing.
 
 Nothing else requires you.

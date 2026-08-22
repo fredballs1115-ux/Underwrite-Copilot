@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Daily market intel (Render cron, weekdays 12:00 UTC).
+// Daily market intel + Daily Journal (Render cron, weekdays 12:00 UTC).
 //
 //   1. Google News RSS per watch query (jurisdictions + sectors from Phase 1)
 //   2. dedupe on url vs market_intel_items
@@ -7,6 +7,11 @@
 //      flags likely LAW/REGULATION CHANGES against the regulatory_rules ids
 //   4. digest markdown + action items → market_intel_digests
 //   5. flagged rule changes → regulatory_alerts (red banner until dismissed)
+//   6. a second Claude call writes the day's JOURNAL entry (300-600 words,
+//      Markets / Deals / Policy & Rates / My Markets, every claim linked to
+//      one of the day's gathered items) → journal_entries. If the fetch or
+//      the write fails, an honest fetch_failed row is stored — the /journal
+//      page never fakes a quiet day.
 //
 //   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... ANTHROPIC_API_KEY=... \
 //     node scripts/daily-intel.mjs
@@ -18,7 +23,9 @@ import { createClient } from "@supabase/supabase-js";
 
 // One watch query per jurisdiction rule-set + per sector the buyer tracks.
 // Keep queries SPECIFIC — Google News RSS returns ~100 items per query and
-// relevance scoring costs tokens.
+// relevance scoring costs tokens. The journal-tagged watches broaden the net
+// to national markets / deal flow so the Journal has more than regulation to
+// write about.
 const WATCHES = [
   { sector: "regulation-dc", q: '"rent control" OR "rent stabilization" OR TOPA Washington DC council' },
   { sector: "regulation-md", q: '"rent stabilization" Maryland "Prince George" OR Montgomery OR "Takoma Park"' },
@@ -28,6 +35,9 @@ const WATCHES = [
   { sector: "capital-markets", q: 'mortgage rates multifamily "cap rates" commercial real estate lending' },
   { sector: "tax", q: '"bonus depreciation" OR "opportunity zone" OR "1031 exchange" real estate investor' },
   { sector: "housing-policy", q: 'HUD "fair market rent" OR "FHA loan limit" OR "Section 8" payment standard' },
+  { sector: "national-markets", q: 'commercial real estate office OR industrial OR retail vacancy "cap rate" OR CMBS' },
+  { sector: "deal-flow", q: 'multifamily OR industrial OR "shopping center" portfolio acquisition OR sale price' },
+  { sector: "construction-supply", q: 'multifamily construction starts OR completions OR permits apartments' },
 ];
 
 const MAX_NEW_ITEMS = 40; // per run, across all watches
@@ -103,9 +113,13 @@ for (let i = 0; i < candidates.length; i += 100) {
   for (const row of data ?? []) seen.add(row.url);
 }
 const fresh = candidates.filter((c) => !seen.has(c.url)).slice(0, MAX_NEW_ITEMS);
+const today = new Date().toISOString().slice(0, 10);
 console.log(`gathered ${gathered.length}, unique ${candidates.length}, new ${fresh.length}`);
 if (fresh.length === 0) {
   console.log("nothing new — no digest today");
+  // The journal still writes: repeat coverage is normal in news; a quiet
+  // dedupe log is not a quiet news day.
+  await writeJournal(candidates);
   process.exit(0);
 }
 
@@ -193,7 +207,6 @@ const notable = rows
   .filter((r) => (r.relevance ?? 0) >= DIGEST_THRESHOLD)
   .sort((a, b) => (b.relevance ?? 0) - (a.relevance ?? 0));
 
-const today = new Date().toISOString().slice(0, 10);
 const md = [
   `# Market intel — ${today}`,
   "",
@@ -237,4 +250,105 @@ for (const { c, s } of changes) {
   if (error) console.error(`alert insert: ${error.message}`);
   else console.log(`ALERT${rule_id ? ` [${rule_id}]` : ""}: ${c.title}`);
 }
+
+// ── 6: the Daily Journal entry ──────────────────────────────────────────────
+// Prefer today's scored fresh items; fold in the wider gathered pool when
+// fresh is thin so the entry has enough to cite. The model may ONLY cite the
+// links it is handed — a claim without one of these links is a rule breach it
+// is told to avoid, and the sources column records exactly what it saw.
+async function writeJournal(pool) {
+  const upsertEntry = async (row) => {
+    const { error } = await supabase
+      .from("journal_entries")
+      .upsert([row], { onConflict: "entry_date" });
+    if (error) console.error(`journal upsert: ${error.message}`);
+    else console.log(`journal ${row.entry_date}: ${row.status} — ${row.title}`);
+  };
+
+  const items = pool.slice(0, 45);
+  if (items.length === 0) {
+    await upsertEntry({
+      entry_date: today,
+      title: "No entry — news fetch failed",
+      markdown:
+        "No journal entry today: every news fetch failed, so there is nothing sourced to write from. This row exists so a silent gap is visible.",
+      topics: [],
+      markets: [],
+      sources: [],
+      status: "fetch_failed",
+    });
+    return;
+  }
+
+  const journalPrompt = `You write a private daily CRE journal for one reader:
+a small hands-on investor, $1-2M total cash, buying 2-4 unit multifamily as a
+natural person on the East Coast (DC/MD/VA core, expanding Maine-Florida,
+watching Philadelphia and Baltimore), strategy built on small-landlord
+exemptions from rent regulation and dated-stock value-add.
+
+Write TODAY'S entry (${today}) from ONLY the numbered items below.
+
+Hard rules:
+- 300-600 words of GitHub markdown with EXACTLY these four sections:
+  "## Markets", "## Deals", "## Policy & Rates", "## My Markets".
+- EVERY factual claim carries an inline markdown link to one of the item
+  URLs below. No link, no claim. NEVER invent a fact, number, or URL.
+- Headlines are all you have — do not embellish beyond what a headline says.
+  Attribute plainly ("Bisnow reports...", "per the Washington Post...").
+- A section with no supporting items gets one honest line, e.g. "Nothing in
+  today's sweep." — never filler.
+- Terse, first-person-adjacent analyst voice. No greeting, no sign-off.
+
+Items:
+${items.map((c, i) => `${i}. [${c.sector}] ${c.title} (${c.source ?? "?"}) — ${c.url}`).join("\n")}
+
+Output format — EXACTLY:
+TITLE: <a specific 4-10 word headline for today's entry>
+TAGS: <comma list from: markets, deals, policy, rates, regulation, my-markets>
+MARKETS: <comma list of place slugs actually discussed (e.g. dc, maryland, virginia, philadelphia, baltimore, national) or none>
+
+<the markdown entry>`;
+
+  try {
+    const raw = await callClaude(journalPrompt);
+    const title = raw.match(/^TITLE:\s*(.+)$/m)?.[1]?.trim();
+    const tags = raw.match(/^TAGS:\s*(.+)$/m)?.[1] ?? "";
+    const markets = raw.match(/^MARKETS:\s*(.+)$/m)?.[1] ?? "";
+    const bodyStart = raw.indexOf("\n\n");
+    const body = bodyStart >= 0 ? raw.slice(bodyStart).trim() : "";
+    if (!title || !body.includes("## Markets")) {
+      throw new Error("journal output missing TITLE or sections");
+    }
+    const slugList = (s) =>
+      s
+        .split(",")
+        .map((t) => t.trim().toLowerCase())
+        .filter((t) => t && t !== "none")
+        .slice(0, 8);
+    await upsertEntry({
+      entry_date: today,
+      title: title.slice(0, 120),
+      markdown: body.slice(0, 12000),
+      topics: slugList(tags),
+      markets: slugList(markets),
+      sources: items.map((c) => ({ title: c.title, url: c.url, source: c.source ?? null })),
+      status: "ok",
+    });
+  } catch (err) {
+    console.error(`journal failed: ${String(err)}`);
+    await upsertEntry({
+      entry_date: today,
+      title: "No entry — journal write failed",
+      markdown: `No journal entry today: the writing step failed (${String(err).slice(0, 200)}). This row exists so a silent gap is visible.`,
+      topics: [],
+      markets: [],
+      sources: items.map((c) => ({ title: c.title, url: c.url, source: c.source ?? null })),
+      status: "fetch_failed",
+    });
+  }
+}
+
+// rows carry sector/title/source/url (built from fresh above) — past the
+// early exit they are never empty.
+await writeJournal(rows);
 console.log("intel run complete");

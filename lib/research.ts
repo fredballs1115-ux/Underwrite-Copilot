@@ -218,6 +218,13 @@ export function evaluateRules(rules: RegulatoryRule[], subject: RuleSubject): Ru
   return out;
 }
 
+/** Hours since an ISO timestamp — Infinity when unparseable. (Components
+ *  call this instead of Date.now() so render stays lint-pure.) */
+export function hoursSince(iso: string, now = new Date()): number {
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? (now.getTime() - t) / 3_600_000 : Infinity;
+}
+
 /** >180 days old = stale, per the build spec. */
 export function isStale(asOf: string, today = new Date()): boolean {
   const t = Date.parse(asOf);

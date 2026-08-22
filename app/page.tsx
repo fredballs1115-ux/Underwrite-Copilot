@@ -28,6 +28,7 @@ import {
 import { computeModel } from "@/lib/model/compute";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { seedBenchmarks, seedRules } from "@/lib/research-data";
+import { hoursSince } from "@/lib/research";
 import { RegulationPlayground } from "./landing-regulation";
 import { COVERAGE_LIVE, COVERAGE_DISCOVERY } from "@/lib/public-comps/core";
 
@@ -832,6 +833,10 @@ export default function Home() {
           </div>
         </section>
 
+        {/* The ground layer — the data floor under every screen: property DB,
+            laws, the daily journal, and the steward that polices it all. */}
+        <GroundLayerSection />
+
         {/* The artifacts — a bento of what you actually walk away with. */}
         <section className="border-y border-line bg-faint">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
@@ -1350,11 +1355,7 @@ export default function Home() {
           </nav>
         </div>
         <div className="border-t border-line">
-          <p className="mx-auto max-w-6xl px-6 py-4 text-xs text-muted">
-            © 2026 Underwrite Copilot · page rendered{" "}
-            {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}. A first-pass screen, not investment
-            advice.
-          </p>
+          <FooterTrustLine />
         </div>
       </footer>
     </div>
@@ -1449,10 +1450,12 @@ async function LiveProofStrip() {
   let pmms: { value: number; asOf: string } | null = null;
   let benchCount = seedBenchmarks().length;
   let ruleCount = seedRules().length;
+  let salesCount = 0;
+  let journalTitle: string | null = null;
   try {
     const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
     const admin = createSupabaseAdminClient();
-    const [{ data: rate }, bench, rules] = await Promise.all([
+    const [{ data: rate }, bench, rules, sales, { data: j }] = await Promise.all([
       admin
         .from("rates")
         .select("value, obs_date")
@@ -1462,10 +1465,20 @@ async function LiveProofStrip() {
         .maybeSingle(),
       admin.from("benchmarks").select("id", { count: "exact", head: true }),
       admin.from("regulatory_rules").select("id", { count: "exact", head: true }),
+      admin.from("recorded_sales").select("id", { count: "exact", head: true }),
+      admin
+        .from("journal_entries")
+        .select("title, status")
+        .eq("status", "ok")
+        .order("entry_date", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
     if (rate) pmms = { value: Number(rate.value), asOf: String(rate.obs_date) };
     if (bench.count) benchCount = Math.max(benchCount, bench.count);
     if (rules.count) ruleCount = Math.max(ruleCount, rules.count);
+    salesCount = sales.count ?? 0;
+    journalTitle = (j?.title as string | null) ?? null;
   } catch {
     // no env / tables — seeds carry the strip
   }
@@ -1496,6 +1509,19 @@ async function LiveProofStrip() {
       <span className="font-mono font-semibold tabular-nums">{ruleCount}</span>{" "}
       rent-control &amp; TOPA rules on file — every number carries its source
     </>,
+    salesCount > 0 && (
+      <>
+        <span className="font-mono font-semibold tabular-nums">
+          {salesCount.toLocaleString("en-US")}
+        </span>{" "}
+        deed-recorded sales in the comps database
+      </>
+    ),
+    journalTitle && (
+      <>
+        today&apos;s journal: <span className="font-semibold">“{journalTitle}”</span>
+      </>
+    ),
   ].filter(Boolean);
 
   return (
@@ -1509,6 +1535,251 @@ async function LiveProofStrip() {
         ))}
       </div>
     </div>
+  );
+}
+
+// ── Footer trust line ────────────────────────────────────────────────────────
+// "page rendered" catches stale deploys; "data last verified" is the nightly
+// steward's public heartbeat. No steward run yet → the claim simply doesn't
+// render (we never assert a verification that hasn't happened), and a run
+// older than 48h renders as a visible warning, not a quiet omission.
+async function FooterTrustLine() {
+  let verifiedAt: string | null = null;
+  try {
+    const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
+    const admin = createSupabaseAdminClient();
+    const { data } = await admin
+      .from("steward_runs")
+      .select("finished_at")
+      .not("finished_at", "is", null)
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    verifiedAt = (data?.finished_at as string | null) ?? null;
+  } catch {
+    // table absent — render without the marker
+  }
+  const overdue = verifiedAt !== null && hoursSince(verifiedAt) > 48;
+  const fmt = (t: string | Date) =>
+    new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return (
+    <p className="mx-auto max-w-6xl px-6 py-4 text-xs text-muted">
+      © 2026 Underwrite Copilot · page rendered {fmt(new Date())}
+      {verifiedAt && !overdue && <> · data last verified {fmt(verifiedAt)} by the nightly steward</>}
+      {verifiedAt && overdue && (
+        <>
+          {" · "}
+          <span className="text-caution">
+            data verification overdue (last ran {fmt(verifiedAt)})
+          </span>
+        </>
+      )}
+      . A first-pass screen, not investment advice.
+    </p>
+  );
+}
+
+// ── The ground layer (national expansion) ────────────────────────────────────
+// Four live-stat cards for the data floor: the ingested property database +
+// Pull Comps, the laws reference, the Daily Journal, and the nightly steward.
+// Every number is a live DB count or a code-derived fact; anything the DB
+// can't attest yet renders an honest not-yet state instead of a placeholder.
+interface JournalHead {
+  entry_date: string;
+  title: string;
+  status: string;
+}
+
+async function GroundLayerSection() {
+  let salesCount = 0;
+  let propCount = 0;
+  let ruleCount = seedRules().length;
+  let journal: JournalHead | null = null;
+  let stewardAt: string | null = null;
+  let correctionCount = 0;
+  try {
+    const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
+    const admin = createSupabaseAdminClient();
+    const [sales, props, rules, { data: j }, { data: run }, changes] = await Promise.all([
+      admin.from("recorded_sales").select("id", { count: "exact", head: true }),
+      admin.from("properties").select("id", { count: "exact", head: true }),
+      admin.from("regulatory_rules").select("id", { count: "exact", head: true }),
+      admin
+        .from("journal_entries")
+        .select("entry_date, title, status")
+        .order("entry_date", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      admin
+        .from("steward_runs")
+        .select("finished_at, started_at")
+        .not("finished_at", "is", null)
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      admin.from("data_changelog").select("id", { count: "exact", head: true }),
+    ]);
+    salesCount = sales.count ?? 0;
+    propCount = props.count ?? 0;
+    if (rules.count) ruleCount = Math.max(ruleCount, rules.count);
+    journal = (j as JournalHead | null) ?? null;
+    stewardAt = (run?.finished_at as string | null) ?? null;
+    correctionCount = changes.count ?? 0;
+  } catch {
+    // no env / tables — the not-yet states below stay honest
+  }
+  const num = (n: number) => n.toLocaleString("en-US");
+  const fmtD = (iso: string) =>
+    new Date(iso).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    });
+
+  return (
+    <section id="ground" className="scroll-mt-16 border-y border-line bg-faint">
+      <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
+        <Reveal>
+          <p className="text-xs font-medium uppercase tracking-wider text-muted">
+            The ground layer
+          </p>
+          <h2 className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">
+            It doesn&apos;t just read the broker&apos;s numbers. It stands on
+            its own.
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
+            Under every screen sits a data floor the broker didn&apos;t write:
+            government parcel and deed records, landlord law encoded as logic,
+            a daily sourced journal — and a nightly steward that re-verifies
+            all of it while you sleep.
+          </p>
+        </Reveal>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          <Reveal>
+            <div className="shadow-card h-full rounded-2xl border border-line bg-surface p-5">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted">
+                Pull comps on any address
+              </p>
+              {salesCount > 0 ? (
+                <p className="mt-2 font-mono text-2xl font-semibold tabular-nums">
+                  {num(salesCount)}
+                  <span className="ml-2 text-sm font-normal text-muted">
+                    deed-recorded sales ingested
+                    {propCount > 0 && ` · ${num(propCount)} parcels`}
+                  </span>
+                </p>
+              ) : (
+                <p className="mt-2 text-sm leading-relaxed">
+                  <span className="font-semibold">
+                    Bulk county deed records, loading market by market
+                  </span>{" "}
+                  <span className="text-muted">— Philadelphia is wired first.</span>
+                </p>
+              )}
+              <p className="mt-2 text-sm leading-relaxed text-muted">
+                Type an address, get the recorded sales around it — from
+                government deed records, with a source link on every row.
+                Live county APIs already cover {COMPS_JURISDICTIONS}; the
+                property database extends it nationally. Single-family is
+                excluded by design, and the screener runs the same pull
+                against every deal automatically.
+              </p>
+            </div>
+          </Reveal>
+          <Reveal delay={40}>
+            <div className="shadow-card h-full rounded-2xl border border-line bg-surface p-5">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted">
+                The laws, as logic
+              </p>
+              <p className="mt-2 font-mono text-2xl font-semibold tabular-nums">
+                {ruleCount}
+                <span className="ml-2 text-sm font-normal text-muted">
+                  machine-evaluable rules on file
+                </span>
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-muted">
+                Rent control, TOPA, licensing, deposits, eviction — encoded as
+                conditions with their exemption paths, statutory quotes, and
+                sources. Browsable as a full reference in the app, evaluated
+                automatically against every deal&apos;s address, and
+                red-bannered the day a rule looks like it changed.
+              </p>
+            </div>
+          </Reveal>
+          <Reveal delay={80}>
+            <div className="shadow-card h-full rounded-2xl border border-line bg-surface p-5">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted">
+                The Daily Journal
+              </p>
+              {journal && journal.status === "ok" ? (
+                <p className="mt-2 text-sm leading-relaxed">
+                  <span className="font-semibold">“{journal.title}”</span>{" "}
+                  <span className="text-muted">
+                    — {fmtD(journal.entry_date)}&apos;s entry, in the app.
+                  </span>
+                </p>
+              ) : (
+                <p className="mt-2 text-sm leading-relaxed">
+                  <span className="font-semibold">
+                    A dated CRE brief, written every weekday morning.
+                  </span>
+                </p>
+              )}
+              <p className="mt-2 text-sm leading-relaxed text-muted">
+                Markets, deal flow, policy &amp; rates, then your markets —
+                written from that morning&apos;s sourced sweep. Every claim
+                carries its link, and a day the pipeline failed says so
+                instead of pretending it was quiet.
+              </p>
+            </div>
+          </Reveal>
+          <Reveal delay={120}>
+            <div className="shadow-card h-full rounded-2xl border border-line bg-surface p-5">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted">
+                A steward that never sleeps
+              </p>
+              {stewardAt ? (
+                <p className="mt-2 text-sm leading-relaxed">
+                  <span className="font-semibold">
+                    Data last verified {fmtD(stewardAt)}
+                  </span>{" "}
+                  <span className="text-muted">
+                    {correctionCount > 0 &&
+                      `· ${num(correctionCount)} corrections logged in the open`}
+                  </span>
+                </p>
+              ) : (
+                <p className="mt-2 text-sm leading-relaxed">
+                  <span className="font-semibold">
+                    Nightly re-verification, with a public changelog.
+                  </span>
+                </p>
+              )}
+              <p className="mt-2 text-sm leading-relaxed text-muted">
+                Every night it re-checks source links, feed freshness, and the
+                oldest singly-sourced claims against the live web. A number
+                that changed at the source gets corrected in the open —
+                old, new, reason, evidence — never silently. If the steward
+                itself stops, the site says so within 48 hours.
+              </p>
+            </div>
+          </Reveal>
+        </div>
+        <Reveal delay={140}>
+          <p className="mt-6 text-center text-sm text-muted">
+            All of it is already wired into the{" "}
+            <Link
+              href="/demo"
+              className="font-medium text-brand underline decoration-dotted underline-offset-2"
+            >
+              fully worked sample screen
+            </Link>
+            {" — "}including the recorded-sales read on the sample&apos;s own
+            submarket.
+          </p>
+        </Reveal>
+      </div>
+    </section>
   );
 }
 

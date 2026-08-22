@@ -85,6 +85,75 @@ const ACTIONS: Item[] = [
     ),
   },
   {
+    key: "a-comps",
+    label: "Pull comps",
+    hint: "recorded sales near any address",
+    href: "/comps",
+    group: "actions",
+    icon: (
+      <ActionIcon>
+        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+        <circle cx="12" cy="10" r="3" />
+      </ActionIcon>
+    ),
+  },
+  {
+    key: "a-market",
+    label: "Market data",
+    hint: "benchmarks & rates",
+    href: "/market",
+    group: "actions",
+    icon: (
+      <ActionIcon>
+        <path d="M4 4h16v5H4z" />
+        <path d="M4 15h16v5H4z" />
+        <path d="M8 6.5h0" />
+        <path d="M8 17.5h0" />
+      </ActionIcon>
+    ),
+  },
+  {
+    key: "a-journal",
+    label: "Journal",
+    hint: "daily CRE brief",
+    href: "/journal",
+    group: "actions",
+    icon: (
+      <ActionIcon>
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" />
+      </ActionIcon>
+    ),
+  },
+  {
+    key: "a-laws",
+    label: "Laws",
+    hint: "landlord rules by jurisdiction",
+    href: "/laws",
+    group: "actions",
+    icon: (
+      <ActionIcon>
+        <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
+        <path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" />
+        <path d="M7 21h10" />
+        <path d="M12 3v18" />
+        <path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2" />
+      </ActionIcon>
+    ),
+  },
+  {
+    key: "a-data-health",
+    label: "Data health",
+    hint: "steward runs, issues, changelog",
+    href: "/data-health",
+    group: "actions",
+    icon: (
+      <ActionIcon>
+        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+      </ActionIcon>
+    ),
+  },
+  {
     key: "a-analytics",
     label: "Analytics",
     hint: "portfolio trends",

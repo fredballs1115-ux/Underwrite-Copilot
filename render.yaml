@@ -127,3 +127,26 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+
+  # ── Nightly verification steward (national expansion) ─────────────────────
+  # Link health + freshness + consistency checks + re-verification of the
+  # oldest 'sourced' claims via web search. Writes data_issues/data_changelog/
+  # steward_runs (migration 0028); the site footer's "data last verified"
+  # marker reads the latest run, so a dead cron becomes visible within 48h.
+  - type: cron
+    name: underwrite-copilot-steward
+    runtime: node
+    plan: starter
+    branch: main
+    schedule: "0 6 * * *"
+    buildCommand: npm install --omit=dev
+    startCommand: node scripts/steward.mjs
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false

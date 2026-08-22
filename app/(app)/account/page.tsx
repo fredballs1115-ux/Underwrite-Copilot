@@ -200,6 +200,24 @@ export default async function AccountPage({
       <section className="rounded-2xl border border-line bg-surface p-6 shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
+            <h2 className="text-sm font-semibold tracking-tight">Data health</h2>
+            <p className="mt-1 text-sm text-muted">
+              The nightly verification steward&apos;s ledger: runs, open
+              issues, and every correction made in the open.
+            </p>
+          </div>
+          <Link
+            href="/data-health"
+            className="rounded-lg border border-line px-4 py-2 text-sm font-medium transition-colors hover:bg-faint"
+          >
+            View ledger
+          </Link>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-line bg-surface p-6 shadow-card">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
             <h2 className="text-sm font-semibold tracking-tight">Sign out</h2>
             <p className="mt-1 text-sm text-muted">
               End your session on this device.
