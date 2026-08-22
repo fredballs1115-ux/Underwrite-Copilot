@@ -168,7 +168,7 @@ export function AppShell({
           </button>
         </div>
 
-        <nav className="mt-1 flex-1 space-y-1 px-3">
+        <nav className="mt-1 flex-1 space-y-1 overflow-y-auto px-3">
           {(
             [
               ["/deals", "Pipeline", inPipeline, IconLayers],

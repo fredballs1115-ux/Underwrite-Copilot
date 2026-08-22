@@ -76,6 +76,9 @@ export default async function JournalPage({
       .eq("entry_date", selectedDate)
       .maybeSingle();
     entry = (data as Entry | null) ?? null;
+    // jsonb defense: only our cron writes sources, but a malformed row must
+    // degrade to "no sources listed", not crash the page.
+    if (entry && !Array.isArray(entry.sources)) entry = { ...entry, sources: [] };
   }
 
   const allTopics = [...new Set(heads.flatMap((h) => h.topics))].sort();
