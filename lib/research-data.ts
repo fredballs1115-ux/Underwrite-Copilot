@@ -203,6 +203,27 @@ export function mergeBenchmarks(dbRows: Benchmark[] | null | undefined): Benchma
   return [...byKey.values()];
 }
 
+/** Benchmarks relevant to one deal. Matched by covered-market NAME first —
+ *  a Brooklyn deal must find the "New York City" FMR row — with the raw city
+ *  string as the fallback for labels the market matcher doesn't know. Prefix
+ *  match on purpose: seed labels carry suffixes ("Baltimore MD",
+ *  "Washington DC area"). DMV suburbs are deliberately NOT mapped onto the
+ *  "Washington DC area" rows — that figure is labeled for DC proper and
+ *  unverified for the surrounding counties. */
+export function benchmarksForDeal(
+  benchmarks: Benchmark[],
+  city?: string | null,
+  metroName?: string | null
+): Benchmark[] {
+  const c = (city ?? "").trim().toLowerCase();
+  const m = (metroName ?? "").trim().toLowerCase();
+  return benchmarks.filter((b) => {
+    if (!b.metro) return false;
+    const label = b.metro.toLowerCase();
+    return (!!c && label.startsWith(c)) || (!!m && label.startsWith(m));
+  });
+}
+
 /** The buyer profile the rules evaluate against until a real setting exists.
  *  These mirror the operator's stated profile; anything NOT safely assumable
  *  (RAD registration, permit year) stays undefined so the tri-state engine
