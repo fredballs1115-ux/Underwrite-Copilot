@@ -125,8 +125,15 @@ async function MidAtlanticTable() {
     // seeds stand
   }
   const mf = benchmarks.filter((b) => b.sector === "multifamily" && b.metro);
+  // Covered markets ONLY (per the 15-market scope): benchmark rows for
+  // metros outside the covered list exist in the research seeds but are not
+  // displayed — the website covers the list, full stop.
+  const covered = new Set(
+    (metrosSeed.metros ?? []).map((m) => m.name.split(/[ ,/]/)[0].toLowerCase())
+  );
   const metros = [...new Set(mf.map((b) => b.metro))].filter(
-    (m) => m !== "Washington DC area"
+    (m) =>
+      m !== "Washington DC area" && covered.has(m.split(/[ ,/]/)[0].toLowerCase())
   );
   const get = (metro: string, metric: string) =>
     mf.find((b) => b.metro === metro && b.metric === metric);

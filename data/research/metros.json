@@ -1,5 +1,5 @@
 {
- "$schema_note": "Metro-level research for the Mid-Atlantic market explorer. Two-tier status labels per project convention; comps_provider references lib/public-comps/core.ts provider ids ('discovery' = staged, null = no open feed known). rule_ids reference regulatory_rules.json. SCOPE (2026-08-22, per direction): the product presents the Mid-Atlantic home region + the 12 biggest US markets only. The 68-rule engine still evaluates ANY US address; metros removed from this list keep their rules and live in git history if re-expanded.",
+ "$schema_note": "SCOPE (final, per direction 2026-08-22): FIFTEEN markets total - the DMV core (one market, four jurisdiction entries) + Baltimore, Richmond, Hampton Roads, Philadelphia (incl. Wilmington), Newark/Jersey City + nine majors (NYC, Boston, Chicago, LA, SF, Seattle, Miami, Atlanta, Dallas). Research and website coverage stop at this list; nothing else is screened or claimed.",
  "as_of": "2026-08-22",
  "metros": [
   {
@@ -204,7 +204,7 @@
     "note": "Philadelphia-Camden-Wilmington MSA, effective 2025-10-01 through 2026-09-30."
    },
    "market_notes": {
-    "value": "The deepest accessible 2-4 unit market on the coast: $363,500 May 2026 median (+6.9% YoY), 366 active listings (Redfin), ~1,075 multi-family listings on Homes.com (July 2026). No rent control (PA); § 9-811 eviction diversion adds a verified 30-day pre-filing step. Auto-comps live via OPA.",
+    "value": "The deepest accessible 2-4 unit market on the coast: $363,500 May 2026 median (+6.9% YoY), 366 active listings (Redfin), ~1,075 multi-family listings on Homes.com (July 2026). No rent control (PA); § 9-811 eviction diversion adds a verified 30-day pre-filing step. Auto-comps live via OPA. Wilmington DE sits inside the Philadelphia orbit: no rent control at any level in Delaware (New Castle comps staged in discovery).",
     "status": "sourced"
    },
    "rule_ids": [
@@ -215,29 +215,6 @@
     "City permits pipeline (BPS blocked)"
    ],
    "ingest_market": "philadelphia",
-   "region": "Mid-Atlantic"
-  },
-  {
-   "id": "wilmington_de",
-   "name": "Wilmington DE",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "No rent control at any level in Delaware and no statewide just-cause - the corridor's quietest regulatory ground. New Castle County parcels staged in comps discovery mode already.",
-    "status": "sourced"
-   },
-   "rule_ids": [
-    "de-no-rent-control"
-   ],
-   "comps_provider": "discovery",
-   "gaps": [
-    "NCC endpoint resolution via /api/comps/health",
-    "FY2026 FMR"
-   ],
    "region": "Mid-Atlantic"
   },
   {
@@ -477,75 +454,6 @@
    "comps_provider": null,
    "gaps": [
     "DCAD roll ingest wiring",
-    "FY2026 FMR"
-   ],
-   "region": "Major US markets"
-  },
-  {
-   "id": "houston",
-   "name": "Houston",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "Same Texas preemption as Dallas (214.902): no rent caps. HCAD publishes the full appraisal roll for download - the easiest big-Texas bulk source.",
-    "status": "verified"
-   },
-   "rule_ids": [
-    "tx-rent-control-preemption"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "HCAD roll ingest wiring",
-    "FY2026 FMR"
-   ],
-   "region": "Major US markets"
-  },
-  {
-   "id": "denver",
-   "name": "Denver",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "Colorado prohibits local rent control (C.R.S. 38-12-301, voluntary affordable-housing agreements excepted) - no caps in Denver. City open-data portal carries parcels + sales (documented).",
-    "status": "verified"
-   },
-   "rule_ids": [
-    "co-rent-control-prohibition"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "opendata.denvergov.org ingest wiring",
-    "FY2026 FMR"
-   ],
-   "region": "Major US markets"
-  },
-  {
-   "id": "phoenix",
-   "name": "Phoenix",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "Arizona bars municipal rent regulation (A.R.S. 33-1329) - no caps in Phoenix. Maricopa assessor publishes bulk data (documented).",
-    "status": "verified"
-   },
-   "rule_ids": [
-    "az-rent-control-preemption"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "Maricopa bulk endpoint",
     "FY2026 FMR"
    ],
    "region": "Major US markets"
