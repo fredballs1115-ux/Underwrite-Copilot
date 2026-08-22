@@ -1,5 +1,5 @@
 {
- "$schema_note": "Metro-level research for the Mid-Atlantic market explorer. Two-tier status labels per project convention; comps_provider references lib/public-comps/core.ts provider ids ('discovery' = staged, null = no open feed known). rule_ids reference regulatory_rules.json.",
+ "$schema_note": "Metro-level research for the Mid-Atlantic market explorer. Two-tier status labels per project convention; comps_provider references lib/public-comps/core.ts provider ids ('discovery' = staged, null = no open feed known). rule_ids reference regulatory_rules.json. SCOPE (2026-08-22, per direction): the product presents the Mid-Atlantic home region + the 12 biggest US markets only. The 68-rule engine still evaluates ANY US address; metros removed from this list keep their rules and live in git history if re-expanded.",
  "as_of": "2026-08-22",
  "metros": [
   {
@@ -218,6 +218,54 @@
    "region": "Mid-Atlantic"
   },
   {
+   "id": "wilmington_de",
+   "name": "Wilmington DE",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "No rent control at any level in Delaware and no statewide just-cause - the corridor's quietest regulatory ground. New Castle County parcels staged in comps discovery mode already.",
+    "status": "sourced"
+   },
+   "rule_ids": [
+    "de-no-rent-control"
+   ],
+   "comps_provider": "discovery",
+   "gaps": [
+    "NCC endpoint resolution via /api/comps/health",
+    "FY2026 FMR"
+   ],
+   "region": "Mid-Atlantic"
+  },
+  {
+   "id": "newark_jc",
+   "name": "Newark / Jersey City",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "The two big screened NJ rent-control cities split exactly on the small-building question: Jersey City exempts EVERY 1-4 unit property regardless of occupancy (5+ built pre-1987 is controlled); Newark exempts 1-4 family ONLY when owner-occupied. Statewide, ~100 other NJ ordinances remain unscreened - check before offer. NJ MOD-IV property rolls are statewide (provider wired for parcels).",
+    "status": "verified"
+   },
+   "rule_ids": [
+    "nj-jersey-city-rent-control",
+    "nj-newark-rent-control",
+    "nj-municipal-rent-control"
+   ],
+   "comps_provider": "nj_modiv",
+   "gaps": [
+    "per-ordinance screen for other NJ municipalities",
+    "FY2026 FMR"
+   ],
+   "region": "Mid-Atlantic"
+  },
+  {
    "id": "nyc",
    "name": "New York City",
    "fmr_fy2026": {
@@ -243,7 +291,30 @@
     "borough-level 2-4 unit medians"
    ],
    "ingest_market": "nyc",
-   "region": "Northeast"
+   "region": "Major US markets"
+  },
+  {
+   "id": "boston",
+   "name": "Boston",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "Rent control banned statewide since 1994 (Question 9); a 2026 ballot revival was blocked by the SJC but the pressure campaign continues - a genuine watch item. Property Assessment roll published yearly on data.boston.gov (CKAN).",
+    "status": "verified"
+   },
+   "rule_ids": [
+    "ma-rent-control-ban"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "assessment-roll ingest wiring",
+    "FY2026 FMR"
+   ],
+   "region": "Major US markets"
   },
   {
    "id": "chicago",
@@ -268,122 +339,7 @@
     "FY2026 FMR"
    ],
    "ingest_market": "cook_county",
-   "region": "Midwest"
-  },
-  {
-   "id": "boston",
-   "name": "Boston",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "Rent control banned statewide since 1994 (Question 9); a 2026 ballot revival was blocked by the SJC but the pressure campaign continues - a genuine watch item. Property Assessment roll published yearly on data.boston.gov (CKAN).",
-    "status": "verified"
-   },
-   "rule_ids": [
-    "ma-rent-control-ban"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "assessment-roll ingest wiring",
-    "FY2026 FMR"
-   ],
-   "region": "Northeast"
-  },
-  {
-   "id": "atlanta",
-   "name": "Atlanta",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "Georgia has barred local rent regulation since 1984 (O.C.G.A. 44-7-19) - no caps in Atlanta or anywhere in the state. Fulton County assessor GIS hub documented for bulk parcels.",
-    "status": "verified"
-   },
-   "rule_ids": [
-    "ga-rent-control-preemption"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "Fulton bulk endpoint",
-    "FY2026 FMR"
-   ],
-   "region": "Southeast"
-  },
-  {
-   "id": "miami",
-   "name": "Miami",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "Florida preempts local rent control (Fla. Stat. 166.043) - market-rate increases statewide. Miami-Dade open data hub carries parcels + sales (documented).",
-    "status": "sourced"
-   },
-   "rule_ids": [
-    "fl-rent-control-preemption"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "statute text pull to upgrade FL rule",
-    "FY2026 FMR"
-   ],
-   "region": "Southeast"
-  },
-  {
-   "id": "dallas",
-   "name": "Dallas-Fort Worth",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "Texas permits rent control only under a governor-approved disaster declaration (Local Gov't Code 214.902) - never invoked in modern practice; increases uncapped. DCAD publishes full certified rolls as downloads.",
-    "status": "verified"
-   },
-   "rule_ids": [
-    "tx-rent-control-preemption"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "DCAD roll ingest wiring",
-    "FY2026 FMR"
-   ],
-   "region": "Texas & Plains"
-  },
-  {
-   "id": "houston",
-   "name": "Houston",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "Same Texas preemption as Dallas (214.902): no rent caps. HCAD publishes the full appraisal roll for download - the easiest big-Texas bulk source.",
-    "status": "verified"
-   },
-   "rule_ids": [
-    "tx-rent-control-preemption"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "HCAD roll ingest wiring",
-    "FY2026 FMR"
-   ],
-   "region": "Texas & Plains"
+   "region": "Major US markets"
   },
   {
    "id": "los_angeles",
@@ -408,7 +364,7 @@
     "assessor-roll ingest",
     "FY2026 FMR"
    ],
-   "region": "West Coast"
+   "region": "Major US markets"
   },
   {
    "id": "san_francisco",
@@ -431,7 +387,7 @@
    "gaps": [
     "FY2026 FMR"
    ],
-   "region": "West Coast"
+   "region": "Major US markets"
   },
   {
    "id": "seattle",
@@ -454,7 +410,99 @@
     "King County sales-file ingest wiring",
     "FY2026 FMR"
    ],
-   "region": "West Coast"
+   "region": "Major US markets"
+  },
+  {
+   "id": "miami",
+   "name": "Miami",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "Florida preempts local rent control (Fla. Stat. 166.043) - market-rate increases statewide. Miami-Dade open data hub carries parcels + sales (documented).",
+    "status": "sourced"
+   },
+   "rule_ids": [
+    "fl-rent-control-preemption"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "statute text pull to upgrade FL rule",
+    "FY2026 FMR"
+   ],
+   "region": "Major US markets"
+  },
+  {
+   "id": "atlanta",
+   "name": "Atlanta",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "Georgia has barred local rent regulation since 1984 (O.C.G.A. 44-7-19) - no caps in Atlanta or anywhere in the state. Fulton County assessor GIS hub documented for bulk parcels.",
+    "status": "verified"
+   },
+   "rule_ids": [
+    "ga-rent-control-preemption"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "Fulton bulk endpoint",
+    "FY2026 FMR"
+   ],
+   "region": "Major US markets"
+  },
+  {
+   "id": "dallas",
+   "name": "Dallas-Fort Worth",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "Texas permits rent control only under a governor-approved disaster declaration (Local Gov't Code 214.902) - never invoked in modern practice; increases uncapped. DCAD publishes full certified rolls as downloads.",
+    "status": "verified"
+   },
+   "rule_ids": [
+    "tx-rent-control-preemption"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "DCAD roll ingest wiring",
+    "FY2026 FMR"
+   ],
+   "region": "Major US markets"
+  },
+  {
+   "id": "houston",
+   "name": "Houston",
+   "fmr_fy2026": {
+    "2br": null,
+    "status": "unverified_not_found",
+    "sources": [],
+    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
+   },
+   "market_notes": {
+    "value": "Same Texas preemption as Dallas (214.902): no rent caps. HCAD publishes the full appraisal roll for download - the easiest big-Texas bulk source.",
+    "status": "verified"
+   },
+   "rule_ids": [
+    "tx-rent-control-preemption"
+   ],
+   "comps_provider": null,
+   "gaps": [
+    "HCAD roll ingest wiring",
+    "FY2026 FMR"
+   ],
+   "region": "Major US markets"
   },
   {
    "id": "denver",
@@ -477,7 +525,7 @@
     "opendata.denvergov.org ingest wiring",
     "FY2026 FMR"
    ],
-   "region": "Mountain West"
+   "region": "Major US markets"
   },
   {
    "id": "phoenix",
@@ -500,546 +548,7 @@
     "Maricopa bulk endpoint",
     "FY2026 FMR"
    ],
-   "region": "Mountain West"
-  },
-  {
-   "id": "newark_jc",
-   "name": "Newark / Jersey City",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers (aggregator figures conflicted); huduser direct pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "The two big screened NJ rent-control cities split exactly on the small-building question: Jersey City exempts EVERY 1-4 unit property regardless of occupancy (5+ built pre-1987 is controlled); Newark exempts 1-4 family ONLY when owner-occupied. Statewide, ~100 other NJ ordinances remain unscreened - check before offer. NJ MOD-IV property rolls are statewide (provider wired for parcels).",
-    "status": "verified"
-   },
-   "rule_ids": [
-    "nj-jersey-city-rent-control",
-    "nj-newark-rent-control",
-    "nj-municipal-rent-control"
-   ],
-   "comps_provider": "nj_modiv",
-   "gaps": [
-    "per-ordinance screen for other NJ municipalities",
-    "FY2026 FMR"
-   ],
-   "region": "Northeast"
-  },
-  {
-   "id": "twin_cities",
-   "name": "Minneapolis / St. Paul",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers; huduser direct pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "The Midwest's rent-control exception: St. Paul caps increases at 3% (2021 ballot) with a ROLLING 20-year new-construction exemption and 2025 rollback churn still in motion; Minneapolis authorized rent regulation by charter in 2021 but has enacted nothing - a watch item, not a rule. Hennepin County parcel data documented for bulk ingest.",
-    "status": "verified"
-   },
-   "rule_ids": [
-    "mn-stpaul-rent-stabilization",
-    "mn-minneapolis-authorized-not-enacted"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "Hennepin/Ramsey bulk endpoints",
-    "FY2026 FMR"
-   ],
-   "region": "Midwest"
-  },
-  {
-   "id": "nashville",
-   "name": "Nashville",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers; huduser direct pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "Tennessee prohibits local rent control (Tenn. Code 66-35-102) - no caps in Nashville or Memphis. Davidson County assessor portal documented.",
-    "status": "verified"
-   },
-   "rule_ids": [
-    "tn-rent-control-preemption"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "Davidson bulk endpoint",
-    "FY2026 FMR"
-   ],
-   "region": "Southeast"
-  },
-  {
-   "id": "charlotte",
-   "name": "Charlotte / Raleigh",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar from republishers; huduser direct pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "North Carolina preempts local rent regulation (G.S. 42-14.1) - no caps in Charlotte or Raleigh. POLARIS (Mecklenburg) and Wake County portals documented for bulk parcels.",
-    "status": "verified"
-   },
-   "rule_ids": [
-    "nc-rent-control-preemption"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "POLARIS/Wake bulk endpoints",
-    "FY2026 FMR"
-   ],
-   "region": "Southeast"
-  },
-  {
-   "id": "providence",
-   "name": "Providence RI",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "The priciest 2-4 unit metro in the expansion research (see the Mid-Atlantic table medians) and the one with the most unusual legal posture: Rhode Island has NO rent control and NO preemption - municipalities hold latent authority no one has used. Watch Providence's council and the statehouse.",
-    "status": "sourced"
-   },
-   "rule_ids": [
-    "ri-no-rent-control-latent-authority"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "Providence assessor bulk endpoint",
-    "FY2026 FMR"
-   ],
-   "region": "Northeast"
-  },
-  {
-   "id": "hartford_newhaven",
-   "name": "Hartford / New Haven CT",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "Connecticut has no rent caps, but its FAIR RENT COMMISSIONS are mandatory in towns over 25,000 - a tenant can haul any increase before a board that may roll it back. Not rent control, but a real check on aggressive repositioning. Medians for both metros sit in the Mid-Atlantic table.",
-    "status": "sourced"
-   },
-   "rule_ids": [
-    "ct-fair-rent-commissions"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "CT municipal open-data endpoints",
-    "FY2026 FMR"
-   ],
-   "region": "Northeast"
-  },
-  {
-   "id": "albany",
-   "name": "Albany NY",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "Capital Region 2-4 unit stock trades cheap (see the Mid-Atlantic table) and OUTSIDE ETPA rent stabilization - the ETPA vacancy test only reaches 6+ unit pre-1974 buildings, and no Capital Region municipality has opted in (HCR lists adoptions only in Nassau/Rockland/Westchester/Ulster). Statewide Good Cause opt-in is the latent risk to watch.",
-    "status": "sourced"
-   },
-   "rule_ids": [
-    "ny-etpa-product-class-carveout",
-    "ny-good-cause-eviction"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "Albany County bulk endpoint",
-    "FY2026 FMR"
-   ],
-   "region": "Northeast"
-  },
-  {
-   "id": "scranton_reading",
-   "name": "Scranton / Reading PA",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "The cheapest dated-stock metros in the research (Mid-Atlantic table medians) - classic value-add hunting ground. No Pennsylvania rent control; city-level rules are unscreened outside Philadelphia, so the screener says so rather than passing silently.",
-    "status": "sourced"
-   },
-   "rule_ids": [],
-   "comps_provider": null,
-   "gaps": [
-    "city-level ordinance screen",
-    "county bulk endpoints",
-    "FY2026 FMR"
-   ],
-   "region": "Northeast"
-  },
-  {
-   "id": "portland_me",
-   "name": "Portland ME",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "The one rent-controlled city in the Maine-to-Florida corridor north of New Jersey: increases capped at 70% of Boston-area CPI (2.2% for 2026), sitting tenants AND between tenancies - but OWNER-OCCUPIED 2-4 unit buildings are exempt, which is exactly the house-hack entry. Rest of Maine: no rent control.",
-    "status": "verified"
-   },
-   "rule_ids": [
-    "me-portland-rent-control"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "Cumberland County bulk endpoint",
-    "FY2026 FMR"
-   ],
-   "region": "Northeast"
-  },
-  {
-   "id": "columbus",
-   "name": "Columbus / Cleveland / Cincinnati OH",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "Ohio preempts rent control statewide since HB 430 (2022) - no caps in any of the three Cs. Franklin/Cuyahoga/Hamilton county auditors publish parcel data (documented).",
-    "status": "verified"
-   },
-   "rule_ids": [
-    "oh-rent-control-preemption"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "county auditor bulk endpoints",
-    "FY2026 FMR"
-   ],
-   "region": "Midwest"
-  },
-  {
-   "id": "detroit",
-   "name": "Detroit MI",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "Michigan preempts rent control (MCL 123.411, since 1988) - no caps in Detroit. Wayne County/city open-data parcels documented.",
-    "status": "verified"
-   },
-   "rule_ids": [
-    "mi-rent-control-preemption"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "Detroit open-data parcel endpoint",
-    "FY2026 FMR"
-   ],
-   "region": "Midwest"
-  },
-  {
-   "id": "milwaukee",
-   "name": "Milwaukee WI",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "Wisconsin preempts rent control (Wis. Stat. 66.1015) - no caps in Milwaukee or Madison. Milwaukee's MPROP master property file is a clean bulk source (documented).",
-    "status": "verified"
-   },
-   "rule_ids": [
-    "wi-rent-control-preemption"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "MPROP ingest wiring",
-    "FY2026 FMR"
-   ],
-   "region": "Midwest"
-  },
-  {
-   "id": "indianapolis",
-   "name": "Indianapolis IN",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "Indiana preempts local rental-rate regulation (Ind. Code 32-31-1-20) - no caps in Indianapolis. Marion County parcels via IndyGIS (documented).",
-    "status": "verified"
-   },
-   "rule_ids": [
-    "in-rent-control-preemption"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "IndyGIS bulk endpoint",
-    "FY2026 FMR"
-   ],
-   "region": "Midwest"
-  },
-  {
-   "id": "kc_stl",
-   "name": "Kansas City / St. Louis MO",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "Missouri preempts local rent control (RSMo 441.043, charter cities included) - no caps in KC or St. Louis. Jackson County and St. Louis city/county assessor portals documented.",
-    "status": "verified"
-   },
-   "rule_ids": [
-    "mo-rent-control-preemption"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "assessor bulk endpoints",
-    "FY2026 FMR"
-   ],
-   "region": "Midwest"
-  },
-  {
-   "id": "las_vegas",
-   "name": "Las Vegas NV",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "No statewide rent control, and cities are barred from enacting their own (statute cite pull queued) - no caps in Las Vegas or Reno. Clark County assessor bulk data documented.",
-    "status": "sourced"
-   },
-   "rule_ids": [
-    "nv-rent-control-preemption"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "NV preemption statute cite",
-    "Clark County bulk endpoint",
-    "FY2026 FMR"
-   ],
-   "region": "Mountain West"
-  },
-  {
-   "id": "salt_lake",
-   "name": "Salt Lake City UT",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "No statewide rent control, and cities are barred from enacting their own (statute cite pull queued) - no caps in Salt Lake. County assessor bulk data documented.",
-    "status": "sourced"
-   },
-   "rule_ids": [
-    "ut-rent-control-preemption"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "UT preemption statute cite",
-    "county bulk endpoint",
-    "FY2026 FMR"
-   ],
-   "region": "Mountain West"
-  },
-  {
-   "id": "new_orleans",
-   "name": "New Orleans LA",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "Louisiana bars local rent control - no caps in New Orleans. Orleans Parish assessor rolls documented; insurance cost, not regulation, is the underwriting story here.",
-    "status": "sourced"
-   },
-   "rule_ids": [
-    "la-rent-control-preemption"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "LA statute cite",
-    "Orleans Parish bulk endpoint",
-    "FY2026 FMR"
-   ],
-   "region": "Southeast"
-  },
-  {
-   "id": "louisville",
-   "name": "Louisville / Lexington KY",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "Kentucky preempts local rent control - no caps in Louisville or Lexington. Jefferson County PVA data documented.",
-    "status": "sourced"
-   },
-   "rule_ids": [
-    "ky-rent-control-preemption"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "KY statute cite",
-    "PVA bulk endpoint",
-    "FY2026 FMR"
-   ],
-   "region": "Southeast"
-  },
-  {
-   "id": "charleston",
-   "name": "Charleston / Columbia SC",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "South Carolina preempts local rent regulation (statute language on file) - no caps in Charleston or Columbia. County assessor portals documented; flood/insurance load is the real underwriting variable.",
-    "status": "sourced"
-   },
-   "rule_ids": [
-    "sc-rent-control-preemption"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "SC section number",
-    "county bulk endpoints",
-    "FY2026 FMR"
-   ],
-   "region": "Southeast"
-  },
-  {
-   "id": "okc_tulsa",
-   "name": "Oklahoma City / Tulsa OK",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "Oklahoma bans local rent control - no caps in OKC or Tulsa. County assessor portals documented.",
-    "status": "sourced"
-   },
-   "rule_ids": [
-    "ok-rent-control-preemption"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "OK statute cite",
-    "county bulk endpoints",
-    "FY2026 FMR"
-   ],
-   "region": "Texas & Plains"
-  },
-  {
-   "id": "birmingham",
-   "name": "Birmingham AL",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "Alabama preempts local rent regulation (Ala. Code 11-80-8.1) - no caps in Birmingham. Jefferson County AL parcel data documented.",
-    "status": "sourced"
-   },
-   "rule_ids": [
-    "al-rent-control-preemption"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "statute text pull",
-    "county bulk endpoint",
-    "FY2026 FMR"
-   ],
-   "region": "Southeast"
-  },
-  {
-   "id": "burlington_vt",
-   "name": "Burlington VT",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "No rent control anywhere in Vermont - but Burlington's tenant-protection charter politics recur, so the corridor's smallest metro stays a watch, not a free pass.",
-    "status": "sourced"
-   },
-   "rule_ids": [
-    "vt-no-rent-control"
-   ],
-   "comps_provider": null,
-   "gaps": [
-    "Burlington charter watch",
-    "FY2026 FMR"
-   ],
-   "region": "Northeast"
-  },
-  {
-   "id": "wilmington_de",
-   "name": "Wilmington DE",
-   "fmr_fy2026": {
-    "2br": null,
-    "status": "unverified_not_found",
-    "sources": [],
-    "note": "FY2026 2BR FMR did not meet the 2-independent-source bar; huduser pull queued - never estimated."
-   },
-   "market_notes": {
-    "value": "No rent control at any level in Delaware and no statewide just-cause - the corridor's quietest regulatory ground. New Castle County parcels staged in comps discovery mode already.",
-    "status": "sourced"
-   },
-   "rule_ids": [
-    "de-no-rent-control"
-   ],
-   "comps_provider": "discovery",
-   "gaps": [
-    "NCC endpoint resolution via /api/comps/health",
-    "FY2026 FMR"
-   ],
-   "region": "Mid-Atlantic"
+   "region": "Major US markets"
   }
  ]
 }

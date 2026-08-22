@@ -37,12 +37,17 @@ import metrosSeed from "@/data/research/metros.json";
 // (Server component only: these pull the research JSONs, which must not ride
 // into client bundles via marketing-constants.)
 const RULE_COUNT = seedRules().length;
-const RULE_STATE_COUNT = new Set(seedRules().map((r) => r.jurisdiction_state.toUpperCase()))
-  .size;
-const METRO_COUNT = (metrosSeed.metros ?? []).length;
 const WIRED_MARKETS = (metrosSeed.metros ?? [])
   .filter((m) => (m as { ingest_market?: string }).ingest_market)
   .map((m) => m.name);
+// Deliberately FOCUSED coverage (per direction): the Mid-Atlantic home
+// region + the biggest US markets — never a 50-state sprawl. The engine
+// still evaluates any US address; these are the markets the product leads
+// with.
+const MAJOR_MARKETS = (metrosSeed.metros ?? []).filter(
+  (m) => (m as { region?: string }).region === "Major US markets"
+);
+const MAJOR_MARKET_COUNT = MAJOR_MARKETS.length;
 
 // Title/description inherit the site defaults from the root layout;
 // the canonical is declared per page so subpages never collapse to /.
@@ -150,9 +155,9 @@ const STATS: { value: number; suffix: string; label: string }[] = [
   { value: ANALYSIS_STAGES, suffix: "", label: "analysis stages on every OM" },
   { value: DEAL_KILLERS, suffix: "", label: "deal-killers stressed first" },
   {
-    value: RULE_COUNT,
+    value: MAJOR_MARKET_COUNT,
     suffix: "",
-    label: `landlord-law rules across ${RULE_STATE_COUNT} states, checked at every address`,
+    label: "major US markets + the whole Mid-Atlantic, screened building-by-building",
   },
   { value: 0, suffix: "", label: "black-box numbers — every figure carries its source" },
 ];
@@ -201,7 +206,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Which markets does it cover?",
-    a: `The screen itself runs on any US offering memorandum. The ground layer underneath is broader every month: ${RULE_COUNT} landlord-law rules across ${RULE_STATE_COUNT} states (rent control, TOPA, licensing, deposits — DC, Maryland, NYC, Jersey City, LA, San Francisco, Chicago, Seattle, the Twin Cities, and the no-cap states among them), ${METRO_COUNT} tracked metros, live recorded-sales comps via county APIs in ${COMPS_JURISDICTIONS}, and a bulk property database with ${WIRED_MARKETS.join(", ")} pipelines wired. A jurisdiction we haven't screened says so on the deal — never a silent pass.`,
+    a: `Coverage is deliberately focused: the whole Mid-Atlantic — DC, the Maryland counties, Northern Virginia, Baltimore, Richmond, Hampton Roads, Philadelphia, Wilmington, Newark/Jersey City — plus the ${MAJOR_MARKET_COUNT} biggest US markets (${MAJOR_MARKETS.map((m) => m.name).join(", ")}). Each gets its rent rules, market notes, and data coverage tracked with sources. Underneath, a ${RULE_COUNT}-rule law engine still evaluates any US address and says so honestly when a jurisdiction is outside the focus list — never a silent pass. Live recorded-sales comps run via county APIs in ${COMPS_JURISDICTIONS}, with a bulk property database (${WIRED_MARKETS.join(", ")} wired) extending them.`,
   },
   {
     q: "Are my documents private?",
@@ -856,10 +861,11 @@ export default function Home() {
             </Reveal>
             <Reveal delay={140}>
               <p className="mt-3 text-center text-xs text-muted">
-                Plus the property database — bulk government deed records,
-                market by market: {WIRED_MARKETS.join(", ")} pipelines wired,
-                and {RULE_COUNT} landlord-law rules across {RULE_STATE_COUNT}{" "}
-                states tracked over {METRO_COUNT} metros.
+                Coverage is deliberately focused: the whole Mid-Atlantic plus
+                the {MAJOR_MARKET_COUNT} biggest US markets, backed by the
+                property database ({WIRED_MARKETS.join(", ")} pipelines wired)
+                — and the {RULE_COUNT}-rule law engine still knows the posture
+                wherever else a deal lands.
               </p>
             </Reveal>
           </div>
@@ -1737,7 +1743,7 @@ async function GroundLayerSection() {
               <p className="mt-2 font-mono text-2xl font-semibold tabular-nums">
                 {ruleCount}
                 <span className="ml-2 text-sm font-normal text-muted">
-                  machine-evaluable rules across {RULE_STATE_COUNT} states
+                  machine-evaluable rules, focused on your markets
                 </span>
               </p>
               <p className="mt-2 text-sm leading-relaxed text-muted">
@@ -1866,8 +1872,8 @@ function ResearchTicker() {
       ["NYC 2–4 unit product", "outside rent stabilization"],
       ["WA statewide cap 2026", "9.683% (HB 1217)"],
       ["LA RSO from Jul 2026", "90% of CPI · 1–4%"],
-      ["St. Paul cap", "3% · 20-yr new-build exempt"],
-      [`${RULE_COUNT} landlord-law rules`, `${RULE_STATE_COUNT} states · statute-linked`],
+      ["SF pre-1979 stock", "Rent Board caps + just cause"],
+      [`${RULE_COUNT} landlord-law rules`, "statute-linked · your markets first"],
       ["Recorded-sales comps", COMPS_JURISDICTIONS],
     ] as const
   ).filter((it): it is [string, string] => Array.isArray(it) && !!it[1]);
