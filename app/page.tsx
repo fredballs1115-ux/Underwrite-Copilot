@@ -1915,10 +1915,10 @@ function ShippedThisWeek() {
             Built in the open — shipping daily
           </h2>
           <Link
-            href="/login?next=/whats-new"
+            href="/whats-new"
             className="text-xs font-medium text-brand hover:text-brand-strong"
           >
-            Full log in the app →
+            Full log →
           </Link>
         </div>
         <ul className="mt-3 grid gap-3 sm:grid-cols-3">
