@@ -453,6 +453,7 @@ export default function Home() {
                   price/door · going-in cap (T-12) · untrended YoC · DSCR ·
                   debt yield · loss-to-lease
                 </p>
+                <HeroNowScreening />
               </div>
 
               {/* Product preview */}
@@ -1939,6 +1940,64 @@ function ShippedThisWeek() {
  *  REAL per-market fact (sourced FY2026 2BR FMR when we have one, else the
  *  count of statute-linked rules on file). Scrolls opposite the price
  *  ticker; pauses on hover; still under prefers-reduced-motion. */
+/** Hero rotator — one covered market at a time, 4.5s each, facts from the
+ *  same seed the marquee reads. The animated stack is aria-hidden (it
+ *  repeats the marquee's content); screen readers get one static sentence.
+ *  The keyframes in globals.css assume EXACTLY 6 items — render 6 or none. */
+function HeroNowScreening() {
+  const withFacts = (metrosSeed.metros ?? [])
+    .map((m) => {
+      const entry = m as {
+        name: string;
+        rule_ids?: string[];
+        fmr_fy2026?: { "2br"?: number | null };
+      };
+      const fmr = entry.fmr_fy2026?.["2br"];
+      const rules = entry.rule_ids?.length ?? 0;
+      const fact =
+        typeof fmr === "number"
+          ? `2BR FMR $${fmr.toLocaleString()}/mo`
+          : rules > 0
+            ? `${rules} rule${rules === 1 ? "" : "s"} on file`
+            : null;
+      return fact ? ([entry.name, fact] as const) : null;
+    })
+    .filter((x): x is readonly [string, string] => x !== null);
+  // Stride across the seed's region ordering so the six picks span the
+  // coverage map instead of clustering in the DMV block at the top.
+  const step = Math.floor(withFacts.length / 6);
+  const picks =
+    step >= 1
+      ? Array.from({ length: 6 }, (_, i) => withFacts[i * step]).filter(
+          (x): x is readonly [string, string] => x !== undefined,
+        )
+      : [];
+  if (picks.length !== 6) return null;
+  return (
+    <div className="mt-3 max-w-xl font-mono text-[11px] uppercase tracking-wider">
+      <span className="sr-only">
+        Now screening the {MARKET_COUNT} covered markets, including{" "}
+        {picks.map(([name]) => name).join(", ")}.
+      </span>
+      <div aria-hidden className="flex items-baseline gap-2">
+        <span className="shrink-0 text-white/40">Now screening:</span>
+        <span className="relative block min-w-0 flex-1">
+          {picks.map(([name, fact], i) => (
+            <span
+              key={name}
+              className={`hero-rotator-item block truncate ${i === 0 ? "" : "absolute inset-0"}`}
+              style={{ animationDelay: `${i * 4.5}s` }}
+            >
+              <span className="text-accent">{name}</span>
+              <span className="text-white/55"> · {fact}</span>
+            </span>
+          ))}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function MarketsMarquee() {
   const items = (metrosSeed.metros ?? []).map((m) => {
     const entry = m as {
