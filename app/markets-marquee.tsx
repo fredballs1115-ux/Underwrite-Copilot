@@ -14,23 +14,28 @@ export const MARKET_COUNT = new Set(
   )
 ).size;
 
+/** The strongest honest fact string for a metro — the published FMR and the
+ *  rules-on-file count TOGETHER when both exist — or null when the seed
+ *  carries neither. Shared by the marquee and the hero rotator so the two
+ *  surfaces can never describe the same market differently. */
+export function metroFact(m: unknown): string | null {
+  const entry = m as {
+    rule_ids?: string[];
+    fmr_fy2026?: { "2br"?: number | null };
+  };
+  const fmr = entry.fmr_fy2026?.["2br"];
+  const rules = entry.rule_ids?.length ?? 0;
+  const parts = [
+    typeof fmr === "number" ? `2BR FMR $${fmr.toLocaleString()}/mo` : null,
+    rules > 0 ? `${rules} rule${rules === 1 ? "" : "s"} on file` : null,
+  ].filter((x): x is string => x !== null);
+  return parts.length ? parts.join(" · ") : null;
+}
+
 export function MarketsMarquee() {
   const items = (metrosSeed.metros ?? []).map((m) => {
-    const entry = m as {
-      id: string;
-      name: string;
-      region?: string;
-      rule_ids?: string[];
-      fmr_fy2026?: { "2br"?: number | null };
-    };
-    const fmr = entry.fmr_fy2026?.["2br"];
-    const rules = entry.rule_ids?.length ?? 0;
-    const fact =
-      typeof fmr === "number"
-        ? `2BR FMR $${fmr.toLocaleString()}/mo`
-        : rules > 0
-          ? `${rules} rule${rules === 1 ? "" : "s"} on file`
-          : (entry.region ?? "covered market");
+    const entry = m as { id: string; name: string; region?: string };
+    const fact = metroFact(m) ?? (entry.region ?? "covered market");
     return [entry.id, entry.name, fact] as const;
   });
   // Each item is a real link into that market's brief — the marquee is a
