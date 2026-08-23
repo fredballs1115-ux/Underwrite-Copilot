@@ -18,6 +18,8 @@ export type Col = {
   name: string;
   assetClass: string;
   market: string;
+  /** covered-market name when the address maps into the 15-market scope */
+  coveredMarket: string | null;
   verdict: string | null;
   reason: string | null;
   hasModel: boolean;
@@ -52,6 +54,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     mono?: boolean;
   }[] = [
     { label: "Market", get: (c) => c.market },
+    { label: "Covered market", get: (c) => c.coveredMarket ?? "—" },
     {
       label: "Asset class",
       get: (c) => c.assetClass.charAt(0).toUpperCase() + c.assetClass.slice(1),

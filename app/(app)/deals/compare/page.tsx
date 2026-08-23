@@ -7,6 +7,8 @@ import type { UnderwritingModel } from "@/lib/model/types";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, type BuyBox } from "@/lib/criteria";
 import { CompareTable, usd, type Col } from "./compare-table";
+import { metroForAddress } from "@/lib/market-match";
+import type { StructuredAddress } from "@/lib/address";
 
 export const metadata: Metadata = { title: "Compare deals" };
 
@@ -46,6 +48,11 @@ function toCol(deal: DealRow, box: BuyBox | null): Col {
     name: deal.name,
     assetClass: deal.asset_class,
     market: ex?.market || "—",
+    // Same matcher the pipeline and deal page use — all three surfaces agree.
+    coveredMarket:
+      metroForAddress(
+        ((deal as { address?: unknown }).address as StructuredAddress | null) ?? {},
+      )?.name ?? null,
     verdict: verdict?.verdict ?? null,
     reason: verdict?.reason ?? null,
     hasModel: model != null,

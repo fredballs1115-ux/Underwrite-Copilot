@@ -6,7 +6,9 @@ import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { FREE_DEALS } from "@/lib/marketing-constants";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
-import { evaluateBuyBox } from "@/lib/criteria";
+import { evaluateBuyBox, parsePct } from "@/lib/criteria";
+import { leverageRead } from "@/lib/leverage";
+import { seedBenchmarks } from "@/lib/research-data";
 import { scoreMandateFit } from "@/lib/mandate";
 import type { ExtractedMetric } from "@/lib/anthropic/types";
 import { DemoSections, type DemoData } from "./sections";
@@ -147,6 +149,16 @@ export default function DemoPage() {
   const cap =
     findValue(metrics, /going[- ]?in cap/i) ??
     findValue(metrics, /\bcap rate\b/i, /exit|terminal|reversion/i);
+
+  // Leverage check on the SAMPLE — the same lib/leverage code path every
+  // real deal page runs, against the same sourced PMMS snapshot, so the
+  // demo can never show a check the product doesn't do.
+  const pmmsRow = seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed");
+  const sampleCapPct = cap ? parsePct(cap) : null;
+  const sampleLeverage =
+    sampleCapPct != null && pmmsRow && typeof pmmsRow.low === "number"
+      ? leverageRead(sampleCapPct, pmmsRow.low)
+      : null;
 
   return (
     <div className="flex flex-1 flex-col bg-canvas">
@@ -346,6 +358,39 @@ export default function DemoPage() {
               </p>
             </div>
           </div>
+          {sampleLeverage && pmmsRow && sampleCapPct != null && (
+            <div className="mt-4 rounded-xl border border-line bg-surface p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] uppercase tracking-wide text-muted">
+                  Leverage check — computed, not opined
+                </p>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                    sampleLeverage.tone === "negative"
+                      ? "bg-kill/10 text-kill"
+                      : sampleLeverage.tone === "thin"
+                        ? "bg-caution/10 text-caution"
+                        : "bg-pass/10 text-pass"
+                  }`}
+                >
+                  {sampleLeverage.tone === "negative"
+                    ? "negative leverage"
+                    : sampleLeverage.tone === "thin"
+                      ? "thin spread"
+                      : "positive at benchmark"}
+                </span>
+              </div>
+              <p className="mt-2 text-sm leading-relaxed">
+                {sampleLeverage.label} — going-in cap {sampleCapPct}% vs{" "}
+                <span className="font-mono font-semibold tabular-nums">
+                  {pmmsRow.low}%
+                </span>{" "}
+                30-yr fixed (as of {pmmsRow.as_of}). Every real deal gets this
+                same arithmetic on its deal page, refreshed against the latest
+                FRED pull.
+              </p>
+            </div>
+          )}
           <p className="mt-4 text-xs text-muted">
             The deal above is illustrative; this panel is not — the rules,
             rents, and records are the product&apos;s actual research layer.
