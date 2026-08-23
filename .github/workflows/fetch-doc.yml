@@ -22,7 +22,7 @@ jobs:
     steps:
       - name: Fetch PDF and print text part
         run: |
-          sudo apt-get update -qq >/dev/null && sudo apt-get install -y -qq poppler-utils >/dev/null
+          sudo apt-get update -qq >/dev/null && sudo apt-get install -y -qq poppler-utils tesseract-ocr >/dev/null
           curl -sSL --max-time 120 -o doc.pdf "$DOC_URL"
           file doc.pdf
           pages=$(pdfinfo doc.pdf | awk '/^Pages:/ {print $2}')
@@ -31,5 +31,19 @@ jobs:
           f=$(( (PART - 1) * per + 1 ))
           l=$(( PART * per )); [ "$l" -gt "$pages" ] && l=$pages
           echo "== PART $PART: pages $f-$l =="
-          if [ "$f" -le "$pages" ]; then pdftotext -layout -f "$f" -l "$l" doc.pdf -; fi
+          if [ "$f" -le "$pages" ]; then
+            # Scanned PDFs have no text layer — pdftotext returns only
+            # form-feeds. Detect that and fall back to OCR at 300dpi.
+            chars=$(pdftotext -layout -f "$f" -l "$l" doc.pdf - | tr -d '[:space:]\f' | wc -c)
+            if [ "$chars" -lt 100 ]; then
+              echo "(no text layer: $chars chars — OCR fallback)"
+              pdftoppm -r 300 -gray -f "$f" -l "$l" doc.pdf pg
+              for p in $(ls pg-*.p*m | sort -V); do
+                echo "--- OCR $p ---"
+                tesseract "$p" stdout 2>/dev/null || true
+              done
+            else
+              pdftotext -layout -f "$f" -l "$l" doc.pdf -
+            fi
+          fi
           echo "== END PART $PART =="
