@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-23",
+      "title": "Every deal gets a leverage check against today's 30-yr rate",
+      "blurb": "The deal page now computes the spread between the going-in cap and the freshest FRED 30-yr fixed — negative leverage and thin spreads called out in plain numbers, sourced and dated. Arithmetic, not an opinion.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-08-23",
       "title": "The screen absorbs a 101-page crash post-mortem",
       "blurb": "Negative leverage named outright, stabilized occupancy above ~95% challenged, exit values checked for the 'there's always a buyer' myth and missing sale costs, and demand claims weighed against supply — disciplines drawn from the industry's most famous lessons-learned memo.",
       "href": "/deals"
@@ -66,12 +72,6 @@
       "title": "A What's-new log, everywhere you'd look",
       "blurb": "This list — on the pipeline, at /whats-new, in the ⌘K palette, and stamped on the homepage — so improvements are never invisible again.",
       "href": "/whats-new"
-    },
-    {
-      "date": "2026-08-22",
-      "title": "Site freshness capped at ~10 minutes",
-      "blurb": "Browsers could show an hours-old copy of the site while revalidating. Now capped: what you see is at most minutes behind.",
-      "href": "/"
     }
   ]
 }

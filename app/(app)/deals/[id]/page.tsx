@@ -762,6 +762,7 @@ export default async function DealPage({
           address={dealAddress}
           sizeText={summarySize}
           priceText={summaryPrice}
+          capText={summaryCap}
           yearBuilt={summaryYearBuilt}
           sectorFields={
             ((deal as { sector_fields?: SectorFieldValues | null }).sector_fields) ?? null
