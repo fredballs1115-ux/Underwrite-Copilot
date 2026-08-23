@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-23",
+      "title": "The markets band runs on Why and the demo too",
+      "blurb": "The across-the-screen covered-markets band — every market a live link to its brief — now also anchors /why and introduces the demo's research layer. One shared implementation, three pages.",
+      "href": "/why"
+    },
+    {
+      "date": "2026-08-23",
       "title": "The hero says what it's screening, one market at a time",
       "blurb": "A rotating line under the headline cycles six covered markets with a real fact each — sourced FMRs and rules on file, straight from the research layer.",
       "href": "/market"

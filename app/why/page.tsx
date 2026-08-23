@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
+import { MarketsMarquee } from "@/app/markets-marquee";
 import { COVERAGE_SUMMARY } from "@/lib/public-comps/core";
 import { seedRules } from "@/lib/research-data";
 import metrosSeed from "@/data/research/metros.json";
@@ -151,6 +152,10 @@ export default function WhyPage() {
           </div>
         </div>
       </main>
+
+      {/* Same live band as the homepage — the coverage claim, made concrete
+          on the page that argues the "why". */}
+      <MarketsMarquee />
 
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-6 py-6 text-xs text-muted">
