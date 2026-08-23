@@ -15,6 +15,25 @@ since you pointed the web service at `main`). What gates the new features is
 Everything ships dark-safe: nothing breaks while those are pending, pages
 say exactly what's missing and why.
 
+## Friday night (Aug 22–23 ET) — why you "weren't seeing updates", fixed
+
+You reported seeing none of the updates. The diagnosis, with evidence:
+the SERVER was current all along (probes confirm), but the homepage
+shipped with Next's default cache header — browsers were allowed to show
+a STALE copy for up to a year while revalidating in the background, so
+every visit showed the page from your PREVIOUS visit. Fixed, then made
+improvements impossible to miss:
+
+| Change | Where to click |
+|---|---|
+| **Staleness capped at ~10 minutes** — homepage, /why, /demo now revalidate every 5 min and caches may serve stale for at most 5 more (`expireTime`). **Hard-refresh once** to flush any copy cached before the fix | homepage |
+| **What's-new, everywhere** — "New in Underwrite Copilot" card on the pipeline; full log at /whats-new; ⌘K "What's new"; homepage proof strip says "shipped {date}: {title}" and the footer stamps the latest improvement — all from one checked-in changelog | pipeline · /whats-new · ⌘K |
+| **Probes now prove freshness** — live-verify fetches cache-busted and FAILS unless the page carries overnight-only content; deploy.yml's self-check no longer greps a superseded hero | GitHub → Actions |
+| Optional belt-and-braces: `RENDER_DEPLOY_HOOK` secret (task 9 below) | GitHub → Settings → Secrets |
+
+PRs #86–#91, all merged; #86–#89 probe-verified under the strict
+verdict (run #54), #90–#91 in the probe cycle behind them.
+
 ## The overnight run (Aug 22) — what changed while you slept
 
 Every row below is merged AND probe-verified on the live site
