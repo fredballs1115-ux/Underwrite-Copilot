@@ -12,9 +12,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Fetch live homepage
+        # Cache-busting query + no-cache request header: the verdict must
+        # reflect the ORIGIN's current build, never a stale CDN/SWR copy.
         run: |
           set -x
-          curl -sS -D headers.txt -o body.html --max-time 60 https://underwrite-copilot.onrender.com/ || true
+          curl -sS -D headers.txt -o body.html --max-time 60 \
+            -H "Cache-Control: no-cache" \
+            "https://underwrite-copilot.onrender.com/?probe=${GITHUB_RUN_ID}" || true
           echo "== RESPONSE HEADERS =="; cat headers.txt || true
           echo "== BYTES =="; wc -c body.html || true
       - name: Check for current-build markers
@@ -26,6 +30,8 @@ jobs:
           grep -c "ticker-track" body.html && echo "TICKER: present" || echo "TICKER: missing"
           grep -c "The ground layer" body.html && echo "GROUND LAYER (national expansion): present" || echo "GROUND LAYER: missing"
           grep -o "data last verified[^<]*" body.html && echo "STEWARD MARKER: present" || echo "STEWARD MARKER: absent (no steward run yet — expected until the nightly cron lands)"
+          grep -c "Silver Spring fourplex" body.html && echo "OVERNIGHT PLAYGROUND (Aug 22): present" || echo "OVERNIGHT PLAYGROUND: MISSING — serving a pre-Aug-22-overnight build"
+          grep -c "rolling age exemption" body.html && echo "OVERNIGHT COPY (Aug 22): present" || echo "OVERNIGHT COPY: MISSING"
           echo "== FIRST 1200 CHARS OF BODY =="
           head -c 1200 body.html
       - name: Public pages spot-check
@@ -35,11 +41,19 @@ jobs:
           done
           grep -q "Behind this screen" p_demo.html && echo "/demo: research layer present" || echo "/demo: MISSING research section"
           grep -q "It knows the ground" p_why.html && echo "/why: current copy present" || echo "/why: OLD copy"
+          grep -q "takes your answer right on the deal" p_why.html && echo "/why: overnight copy present" || echo "/why: overnight copy MISSING"
       - name: Verdict
+        # Three tiers: the standing markers prove the site is up and on the
+        # right lineage; the OVERNIGHT marker proves the build is from the
+        # Aug-22 overnight run or later — the standing markers alone cannot
+        # tell a fresh build from a stale one.
         run: |
-          if grep -q "Stop underwriting like a" body.html && grep -q "The ground layer" body.html; then
-            echo "VERDICT: LIVE SITE IS CURRENT — any 'unchanged' sighting is client-side cache."
-          else
+          if ! grep -q "Stop underwriting like a" body.html || ! grep -q "The ground layer" body.html; then
             echo "VERDICT: LIVE SITE IS SERVING AN OLD BUILD — Render is not deploying main. Check dashboard.render.com → underwrite-copilot-web → Events for failed deploys (likely build OOM on the starter instance) or auto-deploy toggled off."
             exit 1
           fi
+          if ! grep -q "Silver Spring fourplex" body.html; then
+            echo "VERDICT: SITE UP but serving a build OLDER than the Aug-22 overnight run — Render likely stopped picking up pushes partway through. Check Render → Events."
+            exit 1
+          fi
+          echo "VERDICT: LIVE SITE IS CURRENT (origin serves the overnight build) — any 'unchanged' sighting is client-side cache; a refresh after ~10 minutes clears it now that expireTime is capped."

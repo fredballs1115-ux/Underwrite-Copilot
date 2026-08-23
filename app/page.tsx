@@ -61,9 +61,11 @@ const MARKET_COUNT = new Set(
 // the canonical is declared per page so subpages never collapse to /.
 export const metadata: Metadata = { alternates: { canonical: "/" } };
 
-// ISR, hourly: the proof strip quotes the newest FRED pull, and a shorter
-// window keeps "the site didn't change" cache confusion to at most an hour.
-export const revalidate = 3600;
+// ISR, five-minute window: the proof strip quotes live DB stats, and paired
+// with next.config's expireTime this bounds cache staleness (browser SWR
+// included) to ~10 minutes — an hour of "the site didn't change" confusion
+// during ship loops proved too long.
+export const revalidate = 300;
 
 // Landing page — a React Server Component (zero client JS, no secrets).
 // The pitch is consistency: one method on every deal, with the work shown.

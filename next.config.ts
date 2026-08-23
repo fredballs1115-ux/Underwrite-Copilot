@@ -45,6 +45,13 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  // Cap how long caches (browsers included — Chrome honors
+  // stale-while-revalidate) may serve a STALE prerendered page while
+  // revalidating. Next's default expire is a year, which made every homepage
+  // visit show the content from the visitor's PREVIOUS visit — hours-old
+  // during rapid ship loops. With the homepage's revalidate=300 this yields
+  // "s-maxage=300, stale-while-revalidate=300": at most ~10 minutes behind.
+  expireTime: 600,
   experimental: {
     serverActions: {
       // OM PDFs are uploaded through a Server Action; raise the 1MB default.

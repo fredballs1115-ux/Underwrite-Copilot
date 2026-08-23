@@ -34,8 +34,12 @@ jobs:
           if [ -z "$HOOK" ]; then exit 0; fi
           echo "Waiting 6 minutes for the build..."
           sleep 360
-          curl -sS -o body.html --max-time 60 https://underwrite-copilot.onrender.com/ || true
-          if grep -q "The OM lands Thursday" body.html; then
+          # Cache-busted fetch; marker = the standing hero (kept per request),
+          # NOT a superseded string — the old "The OM lands Thursday" check
+          # would have failed every healthy deploy since the hero was restored.
+          curl -sS -o body.html --max-time 60 -H "Cache-Control: no-cache" \
+            "https://underwrite-copilot.onrender.com/?deploy=${GITHUB_RUN_ID}" || true
+          if grep -q "Stop underwriting like a" body.html; then
             echo "LIVE SITE NOW CURRENT ✔"
           else
             echo "Live site still old after deploy trigger — open Render → Events and read the build log (build may be failing)."
