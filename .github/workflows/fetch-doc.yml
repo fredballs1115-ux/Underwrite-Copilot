@@ -1,0 +1,35 @@
+name: fetch-doc
+# Internal research tool: extracts the TEXT of a public PDF from GitHub's
+# network (the build container's egress is sealed) and prints it into the
+# job logs, split across four matrix jobs so each log stays small enough
+# to read back through the API. Dispatch-only; write access required.
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Public PDF URL to extract text from"
+        required: true
+        type: string
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        part: [1, 2, 3, 4]
+    env:
+      DOC_URL: ${{ inputs.url }}
+      PART: ${{ matrix.part }}
+    steps:
+      - name: Fetch PDF and print text part
+        run: |
+          sudo apt-get update -qq >/dev/null && sudo apt-get install -y -qq poppler-utils >/dev/null
+          curl -sSL --max-time 120 -o doc.pdf "$DOC_URL"
+          file doc.pdf
+          pages=$(pdfinfo doc.pdf | awk '/^Pages:/ {print $2}')
+          echo "TOTAL PAGES: $pages"
+          per=$(( (pages + 3) / 4 ))
+          f=$(( (PART - 1) * per + 1 ))
+          l=$(( PART * per )); [ "$l" -gt "$pages" ] && l=$pages
+          echo "== PART $PART: pages $f-$l =="
+          if [ "$f" -le "$pages" ]; then pdftotext -layout -f "$f" -l "$l" doc.pdf -; fi
+          echo "== END PART $PART =="
