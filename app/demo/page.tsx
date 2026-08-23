@@ -11,6 +11,11 @@ import type { ExtractedMetric } from "@/lib/anthropic/types";
 import { DemoSections, type DemoData } from "./sections";
 import { ModelSlideshow } from "./model-slideshow";
 
+// ISR, five-minute window: without a revalidate this page is fully static
+// and browsers may serve a year-stale copy under stale-while-revalidate —
+// the same trap the homepage had. next.config expireTime caps the rest.
+export const revalidate = 300;
+
 export const metadata: Metadata = {
   title: "Sample screen — a complete analysis, worked end to end",
   description:
