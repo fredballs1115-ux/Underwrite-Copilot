@@ -27,6 +27,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
     },
     {
+      // The covered-market briefs — public since the marquee and coverage
+      // board link prospects straight into them.
+      url: `${APP_URL}/market`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.7,
+    },
+    {
+      url: `${APP_URL}/whats-new`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.5,
+    },
+    {
       url: `${APP_URL}/login`,
       lastModified: now,
       changeFrequency: "yearly",

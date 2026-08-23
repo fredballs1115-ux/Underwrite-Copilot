@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-23",
+      "title": "Market briefs open without an account",
+      "blurb": "Clicking a market in the homepage band used to hit a login wall. The 15 covered-market briefs — rules, rents, coverage — are now public; your own deal memory still needs a sign-in.",
+      "href": "/market"
+    },
+    {
+      "date": "2026-08-23",
       "title": "The pipeline shows which deals sit in covered markets",
       "blurb": "Each deal row now carries its covered-market name — same matcher the deal page uses — and searching the pipeline by market name finds those deals.",
       "href": "/deals"
