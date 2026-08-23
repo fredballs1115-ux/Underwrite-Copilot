@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
+import { MarketsMarquee } from "@/app/markets-marquee";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { FREE_DEALS } from "@/lib/marketing-constants";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
@@ -281,6 +282,10 @@ export default function DemoPage() {
           </Link>
         </div>
       </main>
+
+      {/* Same live band as the homepage — leads into the research-layer
+          section below: these are the markets that layer covers. */}
+      <MarketsMarquee />
 
       {/* The research layer — real rules + real data behind the sample's
           jurisdiction (site-polish 2). Everything here is genuine: the rule
