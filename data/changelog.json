@@ -2,6 +2,12 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-08-23",
+      "title": "A What's-new log, everywhere you'd look",
+      "blurb": "This list — on the pipeline, at /whats-new, in the ⌘K palette, and stamped on the homepage — so improvements are never invisible again.",
+      "href": "/whats-new"
+    },
+    {
       "date": "2026-08-22",
       "title": "Site freshness capped at ~10 minutes",
       "blurb": "Browsers could show an hours-old copy of the site while revalidating. Now capped: what you see is at most minutes behind.",

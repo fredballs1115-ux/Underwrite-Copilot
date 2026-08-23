@@ -141,6 +141,23 @@ const ACTIONS: Item[] = [
     ),
   },
   {
+    key: "a-whats-new",
+    label: "What's new",
+    hint: "every product improvement, newest first",
+    href: "/whats-new",
+    group: "actions",
+    search: "whats new changelog improvements updates shipped",
+    icon: (
+      <ActionIcon>
+        <path d="M12 2v4" />
+        <path d="m16.2 7.8 2.9-2.9" />
+        <path d="M18 12h4" />
+        <path d="M12 22a10 10 0 1 1 10-10" />
+        <path d="m9 12 2 2 4-4" />
+      </ActionIcon>
+    ),
+  },
+  {
     key: "a-analytics",
     label: "Analytics",
     hint: "portfolio trends",
