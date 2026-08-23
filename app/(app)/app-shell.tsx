@@ -201,6 +201,14 @@ export function AppShell({
         </nav>
 
         <div className="border-t border-white/10 px-3 py-4">
+          {/* Not a nav item (the list is full) — a quiet standing pointer to
+              the improvement log, same target as the ⌘K "What's new" action. */}
+          <Link
+            href="/whats-new"
+            className="mb-2 block rounded-lg px-2 py-1.5 text-sm text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            What&apos;s new
+          </Link>
           <div className="flex items-center gap-2.5 px-2">
             <span
               aria-hidden

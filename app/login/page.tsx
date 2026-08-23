@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
 import { FREE_DEALS } from "@/lib/marketing-constants";
+import { MARKET_COUNT } from "@/app/markets-marquee";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = {
@@ -54,7 +55,26 @@ export default async function LoginPage({
           />
         </div>
 
-        <p className="mt-6 text-center text-xs leading-relaxed text-white/50">
+        {/* The login wall is a doorway, not a dead end — the public research
+            surfaces stay one tap away for a prospect who isn't ready. */}
+        <p className="mt-6 text-center text-xs leading-relaxed text-white/60">
+          Not ready to sign in? Browse the{" "}
+          <Link
+            href="/market"
+            className="font-medium text-white/80 underline decoration-dotted underline-offset-2 hover:text-white"
+          >
+            {MARKET_COUNT} covered markets
+          </Link>{" "}
+          or the{" "}
+          <Link
+            href="/demo"
+            className="font-medium text-white/80 underline decoration-dotted underline-offset-2 hover:text-white"
+          >
+            fully worked sample screen
+          </Link>{" "}
+          — no account needed.
+        </p>
+        <p className="mt-3 text-center text-xs leading-relaxed text-white/50">
           First-pass screen, not investment advice.
         </p>
       </div>
