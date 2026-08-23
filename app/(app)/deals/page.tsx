@@ -5,6 +5,7 @@ import { getBilling } from "@/lib/billing";
 import { type DealRow } from "@/lib/deals";
 import type { ExtractionResult, ExtractedMetric, FirstSignal } from "@/lib/anthropic/types";
 import { parseStructuredAddress, type StructuredAddress } from "@/lib/address";
+import { WhatsNewCard } from "./whats-new";
 import { Pipeline, type DealCard } from "./pipeline";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
@@ -255,6 +256,7 @@ export default async function DealsPage({
         }
       />
       <TodaysNews />
+      <WhatsNewCard />
     </>
   );
 }
