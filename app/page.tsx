@@ -32,7 +32,7 @@ import { RegulationPlayground, SCENARIO_COUNT } from "./landing-regulation";
 import { changelogEntries, latestChange } from "@/lib/changelog";
 import { COVERAGE_LIVE, COVERAGE_DISCOVERY } from "@/lib/public-comps/core";
 import metrosSeed from "@/data/research/metros.json";
-import { MarketsMarquee, MARKET_COUNT } from "./markets-marquee";
+import { MarketsMarquee, MARKET_COUNT, metroFact } from "./markets-marquee";
 
 // The research layer's scale, DERIVED from the same seeds the app evaluates
 // — the homepage can never claim coverage the rules engine doesn't have.
@@ -1947,20 +1947,8 @@ function ShippedThisWeek() {
 function HeroNowScreening() {
   const withFacts = (metrosSeed.metros ?? [])
     .map((m) => {
-      const entry = m as {
-        name: string;
-        rule_ids?: string[];
-        fmr_fy2026?: { "2br"?: number | null };
-      };
-      const fmr = entry.fmr_fy2026?.["2br"];
-      const rules = entry.rule_ids?.length ?? 0;
-      const fact =
-        typeof fmr === "number"
-          ? `2BR FMR $${fmr.toLocaleString()}/mo`
-          : rules > 0
-            ? `${rules} rule${rules === 1 ? "" : "s"} on file`
-            : null;
-      return fact ? ([entry.name, fact] as const) : null;
+      const fact = metroFact(m);
+      return fact ? ([(m as { name: string }).name, fact] as const) : null;
     })
     .filter((x): x is readonly [string, string] => x !== null);
   // Stride across the seed's region ordering so the six picks span the
