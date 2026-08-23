@@ -15,6 +15,37 @@ since you pointed the web service at `main`). What gates the new features is
 Everything ships dark-safe: nothing breaks while those are pending, pages
 say exactly what's missing and why.
 
+## Sunday (Aug 23 ET) — stale browsers now fix THEMSELVES, and the day's build run
+
+You reported "still nothing is showing up on homescreen" mid-afternoon.
+The evidence again cleared the pipeline: probe run #82 printed
+`LIVE BUILD SHA: a8fe5ae · this run's main tip: a8fe5ae` — the origin was
+serving a merge that was minutes old. The gap is browsers that saved a
+copy **before Friday's fix**, when pages granted `stale-while-revalidate`
+for a year, plus restored mobile tabs that re-show a frozen snapshot
+without refetching. Those copies can outlive any server-side change.
+
+**The permanent cure shipped (PR #104, probe #84 verified):** every page
+now carries its build sha (`uc-build` meta) plus a tiny script that asks
+`/api/build` (uncacheable) which build is actually running — on load, on
+tab-restore, and when a tab returns to the foreground — and reloads once
+per new build on mismatch. Scoped to the public pages; loop-guarded.
+**Cross over once** (one hard refresh, or open a private window) and no
+copy of the site can ever go quietly stale on you again.
+
+The rest of the day's run — every PR merged and the batch probe-verified
+(runs #76, #82, #84 under the strict verdict):
+
+| Change | Where to look |
+|---|---|
+| Hero "Now screening" rotator — six covered markets, one at a time, real facts | homepage hero (#99) |
+| Covered-markets band now also on /why and /demo (one shared component) | /why · /demo (#100) |
+| Pipeline rows name their covered market; search matches it; CSV exports it | /deals (#101, #103) |
+| **/market opens without an account** — the homepage band used to hit a login wall (real bug, found + fixed); signed-out visitors get their own header/copy | /market in a private window (#102, #104) |
+| Dark price ticker: every figure links to its market, caption names the band | homepage (#104) |
+| /whats-new public + linked from every public footer; sitemap gains /market + /whats-new | any public page footer (#98, #103) |
+| Footer "latest improvement" links the log; 404 offers the covered markets | homepage footer · any bad URL (#105) |
+
 ## Friday night (Aug 22–23 ET) — why you "weren't seeing updates", fixed
 
 You reported seeing none of the updates. The diagnosis, with evidence:
