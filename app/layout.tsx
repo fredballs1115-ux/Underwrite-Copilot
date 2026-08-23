@@ -54,6 +54,37 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
+// Baked into every rendered page: the sha of the build that produced THIS
+// HTML. The self-heal script below compares it to /api/build (the running
+// server, no-store) and reloads once when they differ — the cure for
+// browsers still holding a copy from before the freshness fix, whose
+// stale-while-revalidate grant ran for a year, and for restored mobile
+// tabs that never refetch. Scoped to the public ISR pages (the only ones
+// whose HTML can be stale) so an app page mid-form-entry never reloads.
+const BUILD_SHA = (process.env.RENDER_GIT_COMMIT ?? "").slice(0, 7);
+
+const SELF_HEAL_SCRIPT = `(function(){
+var served=${JSON.stringify(BUILD_SHA)};
+if(!served)return;
+var PUB={"/":1,"/why":1,"/demo":1,"/whats-new":1,"/security":1,"/terms":1,"/privacy":1};
+var busy=false;
+function check(){
+if(!PUB[location.pathname]||busy)return;
+busy=true;
+fetch("/api/build",{cache:"no-store"}).then(function(r){return r.json()}).then(function(d){
+busy=false;
+if(d&&d.sha&&d.sha!==served){
+var k="uc-heal-"+d.sha;
+try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1");}catch(e){}
+location.reload();
+}}).catch(function(){busy=false;});
+}
+addEventListener("pageshow",function(e){if(e.persisted)check();});
+document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible")check();});
+if(document.readyState==="complete"){setTimeout(check,400);}
+else{addEventListener("load",function(){setTimeout(check,800);});}
+})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -75,6 +106,10 @@ export default function RootLayout({
             __html: "document.documentElement.classList.add('js')",
           }}
         />
+        {/* Machine-checkable build stamp (the footer carries the human one). */}
+        {BUILD_SHA ? <meta name="uc-build" content={BUILD_SHA} /> : null}
+        {/* Stale-copy self-heal — see SELF_HEAL_SCRIPT above. */}
+        <script dangerouslySetInnerHTML={{ __html: SELF_HEAL_SCRIPT }} />
       </head>
       <body className="flex min-h-full flex-col font-sans antialiased">
         {children}

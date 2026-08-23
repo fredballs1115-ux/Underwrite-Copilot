@@ -52,17 +52,34 @@ export default async function MarketDataPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Your market data</h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted">
-          What your own past screens say about the markets you work — going-in
-          caps and basis, grouped by market and asset class. Built only from the
-          deals you&apos;ve screened; private to your account, never shared with
-          your team.
-        </p>
-      </div>
+      {user ? (
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Your market data</h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted">
+            What your own past screens say about the markets you work — going-in
+            caps and basis, grouped by market and asset class. Built only from the
+            deals you&apos;ve screened; private to your account, never shared with
+            your team.
+          </p>
+        </div>
+      ) : (
+        // Anonymous visitors land here from the homepage/why/demo marquee —
+        // lead with the research layer itself, not "your" data they don't
+        // have yet. The signed-in memory blocks below are user-gated.
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">
+            The covered markets
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted">
+            The research layer behind every screen — rules on file, published
+            FMRs, live benchmarks, and recorded-sales coverage across the
+            covered markets. Sign in and your own screens build a private comp
+            memory on top of it.
+          </p>
+        </div>
+      )}
 
-      {error && /relation|does not exist|schema/i.test(error.message) ? (
+      {!user ? null : error && /relation|does not exist|schema/i.test(error.message) ? (
         <p className="rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution">
           Screen a deal or two and your market history builds up here.
         </p>
