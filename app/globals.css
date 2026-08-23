@@ -361,3 +361,29 @@ body {
     animation: none;
   }
 }
+
+/* Hero "Now screening" rotator: a vertical crossfade, one market at a time —
+   deliberately a different motion class from the two horizontal tickers.
+   Keyframe percentages assume EXACTLY 6 items (each visible 1/6 of the
+   cycle); the component renders 6 or nothing. 27s cycle = 4.5s per item,
+   staggered via inline animation-delay. */
+@keyframes hero-rotate-item {
+  0% { opacity: 0; transform: translateY(8px); }
+  1.5% { opacity: 1; transform: translateY(0); }
+  15.2% { opacity: 1; transform: translateY(0); }
+  16.67% { opacity: 0; transform: translateY(-6px); }
+  100% { opacity: 0; transform: translateY(-6px); }
+}
+.hero-rotator-item {
+  opacity: 0;
+  animation: hero-rotate-item 27s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-rotator-item {
+    animation: none;
+  }
+  /* The first item is the in-flow one (it sizes the row) — leave it showing. */
+  .hero-rotator-item:first-child {
+    opacity: 1;
+  }
+}

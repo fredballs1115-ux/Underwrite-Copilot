@@ -34,6 +34,7 @@ jobs:
           grep -c "rolling age exemption" body.html && echo "OVERNIGHT COPY (Aug 22): present" || echo "OVERNIGHT COPY: MISSING"
           grep -c "ticker-track-reverse" body.html && echo "MARKETS MARQUEE (Aug 23): present" || echo "MARKETS MARQUEE: not yet deployed"
           grep -c "Built in the open" body.html && echo "SHIPPED BLOCK (Aug 23): present" || echo "SHIPPED BLOCK: not yet deployed"
+          grep -c "hero-rotator-item" body.html && echo "HERO ROTATOR (Aug 23): present" || echo "HERO ROTATOR: not yet deployed"
           live=$(grep -o 'commit/[0-9a-f]\{7\}' body.html | head -1 | cut -d/ -f2)
           echo "LIVE BUILD SHA: ${live:-not stamped yet} · this run's main tip: ${GITHUB_SHA:0:7}"
           echo "== FIRST 1200 CHARS OF BODY =="
