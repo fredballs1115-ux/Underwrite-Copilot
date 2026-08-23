@@ -34,7 +34,20 @@ jobs:
           grep -c "rolling age exemption" body.html && echo "OVERNIGHT COPY (Aug 22): present" || echo "OVERNIGHT COPY: MISSING"
           echo "== FIRST 1200 CHARS OF BODY =="
           head -c 1200 body.html
-      - name: Public pages spot-check
+      - name: Alternate-host check (diagnostic, non-gating)
+        # The blueprint names the service underwrite-copilot-web, but the
+        # canonical URL is underwrite-copilot.onrender.com — if BOTH resolve,
+        # two services exist and a user bookmarking the other one sees a
+        # frozen site while every probe here passes. Report what each serves.
+        run: |
+          for host in underwrite-copilot.onrender.com underwrite-copilot-web.onrender.com; do
+            echo "== $host =="
+            code=$(curl -sS -o alt.html -w "%{http_code}" --max-time 30 -H "Cache-Control: no-cache" "https://$host/?probe=${GITHUB_RUN_ID}" || echo "FETCH-FAILED")
+            echo "HTTP $code · $(wc -c < alt.html 2>/dev/null || echo 0) bytes"
+            grep -q "Silver Spring fourplex" alt.html && echo "  serves the CURRENT build" || echo "  does NOT serve the current build"
+            grep -o "latest improvement:[^<]*" alt.html | head -1 || true
+            rm -f alt.html
+          done
         run: |
           for path in demo why; do
             curl -sS -o "p_$path.html" --max-time 60 "https://underwrite-copilot.onrender.com/$path" || true
