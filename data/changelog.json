@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-23",
+      "title": "The challenger learned the down-cycle classics",
+      "blurb": "Assumption challenges now overlay the discipline every crash re-teaches: market-driven leasing assumptions, worst-case drift, cash flow over exit hopes, and no credit for 'other buyers are circling'.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-08-23",
       "title": "Stale pages now fix themselves",
       "blurb": "If your browser is showing an older copy of the site, it now notices the newer build and reloads itself once — no hard refresh needed, ever again.",
       "href": "/whats-new"
@@ -66,12 +72,6 @@
       "title": "One-tap market territories in the buy box",
       "blurb": "Every covered market is a quick-add geography chip — a Dallas–Fort Worth chip matches Fort Worth and Plano deals too.",
       "href": "/criteria"
-    },
-    {
-      "date": "2026-08-22",
-      "title": "Deal facts answer the rules' open questions",
-      "blurb": "Year built and 'you'll live in one unit' now feed the rent-control screen — each open question links straight to where you answer it.",
-      "href": "/deals"
     }
   ]
 }
