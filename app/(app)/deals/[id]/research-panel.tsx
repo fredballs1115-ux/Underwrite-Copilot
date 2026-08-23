@@ -27,6 +27,8 @@ import {
 } from "@/lib/research-data";
 import { linkOk } from "@/lib/link-audit";
 import { coveredState, metroForAddress } from "@/lib/market-match";
+import { parsePct } from "@/lib/criteria";
+import { leverageRead } from "@/lib/leverage";
 import Link from "next/link";
 import type { StructuredAddress } from "@/lib/address";
 
@@ -136,12 +138,15 @@ export async function ResearchPanel({
   address,
   sizeText,
   priceText,
+  capText,
   yearBuilt,
   sectorFields,
 }: {
   address: StructuredAddress | null;
   sizeText?: string | null;
   priceText?: string | null;
+  /** the deal's going-in cap as displayed (e.g. "5.8%") — for the leverage check */
+  capText?: string | null;
   /** parsed from the deal's extraction metrics (manual entry or OM) */
   yearBuilt?: number | null;
   sectorFields?: Record<string, string | number | boolean> | null;
@@ -177,6 +182,46 @@ export async function ResearchPanel({
   // "New York City" FMR row), raw city as the fallback.
   const metroBench = benchmarksForDeal(benchmarks, address?.city, metro?.name);
   const ppu = pricePerUnit(priceText, sizeText);
+
+  // Leverage check (deterministic code, not a model call): the going-in cap
+  // against the freshest 30-yr fixed on hand — the rates table when the
+  // nightly FRED pull has run, else the benchmark row's sourced snapshot.
+  const capPct = capText ? parsePct(capText) : null;
+  let bench30: { value: number; asOf: string; source: string } | null = null;
+  if (capPct != null) {
+    try {
+      const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
+      const { data: rate } = await createSupabaseAdminClient()
+        .from("rates")
+        .select("value, obs_date")
+        .eq("series_id", "MORTGAGE30US")
+        .order("obs_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (rate?.value != null) {
+        bench30 = {
+          value: Number(rate.value),
+          asOf: String(rate.obs_date),
+          source: "FRED · MORTGAGE30US",
+        };
+      }
+    } catch {
+      // No admin key / table in this environment — the seeded snapshot below
+      // still serves, with its own as-of.
+    }
+    if (!bench30) {
+      const row = benchmarks.find((b) => b.metric === "pmms_30y_fixed");
+      if (row && typeof row.low === "number") {
+        bench30 = {
+          value: row.low,
+          asOf: row.as_of,
+          source: row.source || "FRED PMMS",
+        };
+      }
+    }
+  }
+  const leverage =
+    capPct != null && bench30 ? leverageRead(capPct, bench30.value) : null;
 
   const hasRegulation = shown.length > 0;
   const hasBenchmarks = metroBench.length > 0;
@@ -230,6 +275,39 @@ export async function ResearchPanel({
             See covered markets
           </Link>
         </p>
+      )}
+
+      {/* Leverage check — the 1989 lesson as arithmetic. One-sided honesty:
+          the PMMS benchmark is an owner-occupier rate, so negative here is
+          certainly negative in practice, while positive still needs a real
+          investor quote. */}
+      {leverage && bench30 && capPct != null && (
+        <div className="mt-3 rounded-lg border border-line bg-faint/60 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold">Leverage check</p>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                leverage.tone === "negative"
+                  ? "bg-red-500/10 text-red-600"
+                  : leverage.tone === "thin"
+                    ? "bg-amber-500/10 text-amber-600"
+                    : "bg-emerald-500/10 text-emerald-600"
+              }`}
+            >
+              {leverage.tone === "negative"
+                ? "negative leverage"
+                : leverage.tone === "thin"
+                  ? "thin spread"
+                  : "positive at benchmark"}
+            </span>
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-muted">
+            {leverage.label} — going-in cap {capPct}% vs {bench30.value}% (
+            {bench30.source}, as of {bench30.asOf}). The benchmark is an
+            owner-occupier rate; investor debt usually prices above it, so a
+            thin spread here is thinner in practice.
+          </p>
+        </div>
       )}
 
       {!hasRegulation &&
