@@ -439,12 +439,13 @@ export function Pipeline({
       const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
       return `"${safe.replaceAll('"', '""')}"`;
     };
-    const header = ["Deal", "Asset class", "Market", "Price", "Cap rate", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Added", "Added by"];
+    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "Cap rate", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Added", "Added by"];
     const lines = filtered.map((d) =>
       [
         d.name,
         d.assetClass,
         d.market,
+        d.coveredMarket ?? "",
         d.slots.price ?? "",
         d.slots.cap ?? "",
         d.fit ? FIT_META[d.fit].label : "",

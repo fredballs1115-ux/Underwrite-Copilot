@@ -128,6 +128,9 @@ export default function PrivacyPage() {
             <Link href="/security" className="transition-colors hover:text-ink">
               Security
             </Link>
+            <Link href="/whats-new" className="transition-colors hover:text-ink">
+              What&apos;s new
+            </Link>
             <Link href="/" className="transition-colors hover:text-ink">
               Home
             </Link>
