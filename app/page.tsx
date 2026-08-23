@@ -1648,7 +1648,14 @@ async function FooterTrustLine() {
       {latest && (
         <>
           {" "}
-          · latest improvement: {latest.title} ({fmt(`${latest.date}T00:00:00Z`)})
+          · latest improvement:{" "}
+          <Link
+            href="/whats-new"
+            className="underline decoration-dotted underline-offset-2 hover:text-ink"
+          >
+            {latest.title}
+          </Link>{" "}
+          ({fmt(`${latest.date}T00:00:00Z`)})
         </>
       )}
       {verifiedAt && !overdue && <> · data last verified {fmt(verifiedAt)} by the nightly steward</>}
