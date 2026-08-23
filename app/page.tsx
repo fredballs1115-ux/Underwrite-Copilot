@@ -29,6 +29,7 @@ import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { seedBenchmarks, seedRules } from "@/lib/research-data";
 import { hoursSince } from "@/lib/research";
 import { RegulationPlayground, SCENARIO_COUNT } from "./landing-regulation";
+import { latestChange } from "@/lib/changelog";
 import { COVERAGE_LIVE, COVERAGE_DISCOVERY } from "@/lib/public-comps/core";
 import metrosSeed from "@/data/research/metros.json";
 
@@ -1611,9 +1612,18 @@ async function FooterTrustLine() {
   const overdue = verifiedAt !== null && hoursSince(verifiedAt) > 48;
   const fmt = (t: string | Date) =>
     new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  // Same checked-in changelog the app's What's-new card renders — the
+  // homepage can never claim an improvement the app doesn't ship.
+  const latest = latestChange();
   return (
     <p className="mx-auto max-w-6xl px-6 py-4 text-xs text-muted">
       © 2026 Underwrite Copilot · page rendered {fmt(new Date())}
+      {latest && (
+        <>
+          {" "}
+          · latest improvement: {latest.title} ({fmt(`${latest.date}T00:00:00Z`)})
+        </>
+      )}
       {verifiedAt && !overdue && <> · data last verified {fmt(verifiedAt)} by the nightly steward</>}
       {verifiedAt && overdue && (
         <>

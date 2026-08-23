@@ -1,0 +1,41 @@
+{
+  "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
+  "entries": [
+    {
+      "date": "2026-08-22",
+      "title": "Site freshness capped at ~10 minutes",
+      "blurb": "Browsers could show an hours-old copy of the site while revalidating. Now capped: what you see is at most minutes behind.",
+      "href": "/"
+    },
+    {
+      "date": "2026-08-22",
+      "title": "One-tap market territories in the buy box",
+      "blurb": "Every covered market is a quick-add geography chip — a Dallas–Fort Worth chip matches Fort Worth and Plano deals too.",
+      "href": "/criteria"
+    },
+    {
+      "date": "2026-08-22",
+      "title": "Deal facts answer the rules' open questions",
+      "blurb": "Year built and 'you'll live in one unit' now feed the rent-control screen — each open question links straight to where you answer it.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-08-22",
+      "title": "Boroughs evaluate as New York City",
+      "blurb": "A Brooklyn or Queens deal now sees NYC rent stabilization and Good Cause — it silently matched nothing before.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-08-22",
+      "title": "Comps pulls link the market brief",
+      "blurb": "Pull comps on a covered address and jump to that market's rules, rents, and data coverage in one click.",
+      "href": "/comps"
+    },
+    {
+      "date": "2026-08-22",
+      "title": "Benchmarks match your metro, not just the city string",
+      "blurb": "A Brooklyn deal finds the New York City FMR row; Wilmington finds the Philadelphia-market rent benchmark.",
+      "href": "/deals"
+    }
+  ]
+}
