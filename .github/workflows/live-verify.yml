@@ -48,6 +48,7 @@ jobs:
             grep -o "latest improvement:[^<]*" alt.html | head -1 || true
             rm -f alt.html
           done
+      - name: Public pages spot-check
         run: |
           for path in demo why; do
             curl -sS -o "p_$path.html" --max-time 60 "https://underwrite-copilot.onrender.com/$path" || true
