@@ -341,8 +341,23 @@ body {
 .ticker-track:hover {
   animation-play-state: paused;
 }
+/* Second across-the-screen band (covered markets): opposite direction and a
+   slower clock so the two never read as one element. */
+@keyframes ticker-slide-reverse {
+  from { transform: translateX(-50%); }
+  to { transform: translateX(0); }
+}
+.ticker-track-reverse {
+  animation: ticker-slide-reverse 70s linear infinite;
+}
+.ticker-track-reverse:hover {
+  animation-play-state: paused;
+}
 @media (prefers-reduced-motion: reduce) {
   .ticker-track {
+    animation: none;
+  }
+  .ticker-track-reverse {
     animation: none;
   }
 }

@@ -29,7 +29,7 @@ import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { seedBenchmarks, seedRules } from "@/lib/research-data";
 import { hoursSince } from "@/lib/research";
 import { RegulationPlayground, SCENARIO_COUNT } from "./landing-regulation";
-import { latestChange } from "@/lib/changelog";
+import { changelogEntries, latestChange } from "@/lib/changelog";
 import { COVERAGE_LIVE, COVERAGE_DISCOVERY } from "@/lib/public-comps/core";
 import metrosSeed from "@/data/research/metros.json";
 
@@ -883,6 +883,10 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Second across-the-screen band: every covered market with a real
+            fact, scrolling the other way from the price ticker. */}
+        <MarketsMarquee />
+
         {/* The ground layer — the data floor under every screen: property DB,
             laws-on-the-building, scored news, and the steward policing it. */}
         <GroundLayerSection />
@@ -1404,6 +1408,7 @@ export default function Home() {
             </ul>
           </nav>
         </div>
+        <ShippedThisWeek />
         <div className="border-t border-line">
           <FooterTrustLine />
         </div>
@@ -1873,6 +1878,97 @@ async function GroundLayerSection() {
 // A slow marquee of REAL figures from the research layer — the same seeds the
 // market page renders with provenance. Content duplicated once for a seamless
 // CSS loop; hover pauses; reduced-motion gets a static row.
+/** The three newest shipped improvements, visible on the public page — the
+ *  same checked-in changelog the app renders, so the homepage's freshness
+ *  story can never outrun the product. */
+function ShippedThisWeek() {
+  const entries = changelogEntries(3);
+  if (entries.length === 0) return null;
+  const fmt = (iso: string) =>
+    new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    });
+  return (
+    <div className="border-t border-line bg-faint/60">
+      <div className="mx-auto max-w-6xl px-6 py-8">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm font-semibold tracking-tight">
+            Built in the open — shipping daily
+          </h2>
+          <Link
+            href="/login?next=/whats-new"
+            className="text-xs font-medium text-brand hover:text-brand-strong"
+          >
+            Full log in the app →
+          </Link>
+        </div>
+        <ul className="mt-3 grid gap-3 sm:grid-cols-3">
+          {entries.map((e) => (
+            <li key={`${e.date}|${e.title}`} className="rounded-xl border border-line bg-surface p-3.5">
+              <p className="text-sm font-medium leading-snug">{e.title}</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted">{e.blurb}</p>
+              <p className="mt-1.5 text-[11px] text-muted">{fmt(e.date)}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+/** The covered markets as a marquee — every entry from metros.json with a
+ *  REAL per-market fact (sourced FY2026 2BR FMR when we have one, else the
+ *  count of statute-linked rules on file). Scrolls opposite the price
+ *  ticker; pauses on hover; still under prefers-reduced-motion. */
+function MarketsMarquee() {
+  const items = (metrosSeed.metros ?? []).map((m) => {
+    const entry = m as {
+      name: string;
+      region?: string;
+      rule_ids?: string[];
+      fmr_fy2026?: { "2br"?: number | null };
+    };
+    const fmr = entry.fmr_fy2026?.["2br"];
+    const rules = entry.rule_ids?.length ?? 0;
+    const fact =
+      typeof fmr === "number"
+        ? `2BR FMR $${fmr.toLocaleString()}/mo`
+        : rules > 0
+          ? `${rules} rule${rules === 1 ? "" : "s"} on file`
+          : (entry.region ?? "covered market");
+    return [entry.name, fact] as const;
+  });
+  const row = (hidden: boolean) => (
+    <div
+      aria-hidden={hidden || undefined}
+      className="flex shrink-0 items-center gap-10 pr-10"
+    >
+      {items.map(([k, v]) => (
+        <span
+          key={k}
+          className="inline-flex items-baseline gap-2 whitespace-nowrap text-sm"
+        >
+          <span className="font-medium">{k}</span>
+          <span className="font-mono text-[13px] tabular-nums text-brand">{v}</span>
+        </span>
+      ))}
+    </div>
+  );
+  return (
+    <div className="overflow-hidden border-y border-line bg-faint/70 py-3">
+      <p className="mb-1.5 text-center text-[11px] font-medium uppercase tracking-wider text-muted">
+        The {MARKET_COUNT} covered markets — live from the research layer
+      </p>
+      <div className="ticker-track-reverse flex w-max">
+        {row(false)}
+        {row(true)}
+      </div>
+    </div>
+  );
+}
+
 function ResearchTicker() {
   const bench = seedBenchmarks();
   const pick = (metro: string, metric: string) =>
@@ -1885,15 +1981,24 @@ function ResearchTicker() {
   const dcFmr = pick("Washington DC area", "hud_fmr_fy2026_2br");
   const baltFmr = pick("Baltimore MD", "hud_fmr_fy2026_2br");
   const nycFmr = pick("New York City", "hud_fmr_fy2026_2br");
+  const phillyFmr = pick("Philadelphia PA", "hud_fmr_fy2026_2br");
   const phillyMed = money(pick("Philadelphia, PA", "median_sale_price_2_4_unit"));
-  const provMed = money(pick("Providence, RI", "median_sale_price_2_4_unit"));
+  // YoY comes from the SAME seed row as the median — never typed beside it.
+  const phillyYoY = bench
+    .find((b) => b.metro === "Philadelphia, PA" && b.metric === "median_sale_price_2_4_unit")
+    ?.note?.match(/YoY ([+\-]?[\d.]+%)/)?.[1];
   const items = (
     [
       pmmsVal !== null && ["30-yr fixed", `${pmmsVal}% · FRED`],
-      phillyMed && ["Philadelphia 2–4 unit median", `${phillyMed} · +6.9% YoY`],
-      ["Scranton", money(pick("Scranton, PA", "median_sale_price_2_4_unit"))],
-      ["Albany", money(pick("Albany, NY", "median_sale_price_2_4_unit"))],
-      provMed && ["Providence", `${provMed} · ~150 sales/mo`],
+      // In-scope items only — the 15 covered markets are the whole story.
+      phillyMed && [
+        "Philadelphia 2–4 unit median",
+        phillyYoY ? `${phillyMed} · ${phillyYoY} YoY` : phillyMed,
+      ],
+      phillyFmr !== null && ["Philadelphia FY2026 2BR FMR", `$${phillyFmr.toLocaleString()}/mo`],
+      ["MoCo rent cap", "CPI+3% · max 6%"],
+      ["Chicago owner-occupied ≤6 units", "RLTO exempt"],
+      ["NY Good Cause", "≤10-unit landlords exempt"],
       dcFmr !== null && ["DC FY2026 2BR FMR", `$${dcFmr.toLocaleString()}/mo`],
       baltFmr !== null && ["Baltimore FY2026 2BR FMR", `$${baltFmr.toLocaleString()}/mo`],
       nycFmr !== null && ["NYC FY2026 2BR FMR", `$${nycFmr.toLocaleString()}/mo`],

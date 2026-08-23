@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-23",
+      "title": "The covered markets march across the homepage",
+      "blurb": "A second across-the-screen band — all 15 markets with a real fact each (sourced FMRs, rules on file), scrolling opposite the price ticker. The ticker itself now shows covered markets only.",
+      "href": "/market"
+    },
+    {
+      "date": "2026-08-23",
       "title": "A What's-new log, everywhere you'd look",
       "blurb": "This list — on the pipeline, at /whats-new, in the ⌘K palette, and stamped on the homepage — so improvements are never invisible again.",
       "href": "/whats-new"
