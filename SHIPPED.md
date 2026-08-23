@@ -130,4 +130,17 @@ writing; D.C. Law 26-80's enacted TOPA "business corporation" text on
 code.dccouncil.gov. ~30 min. *Skip them and:* two load-bearing rules stay
 "sourced" not "verified" — fine for screening, not for closing.
 
+**9. (Optional, belt-and-braces) `RENDER_DEPLOY_HOOK` secret** — the
+deploy-to-render workflow currently no-ops in ~6 seconds because this secret
+was never added; the site deploys only via Render's own auto-deploy (which
+IS working — probes confirm). Render → underwrite-copilot-web → Settings →
+Deploy Hook → copy URL → GitHub → Settings → Secrets → Actions →
+`RENDER_DEPLOY_HOOK`. ~2 min. *Skip it and:* nothing breaks today, but if
+Render's auto-deploy ever silently stops, there's no second trigger.
+
+**If the site ever "looks unchanged":** hard-refresh once. Browsers were
+allowed to show a stale homepage copy for up to a year while revalidating
+(Next's default); that window is now capped at ~10 minutes, but a copy
+cached before the fix needs one manual refresh to flush.
+
 Nothing else requires you.
