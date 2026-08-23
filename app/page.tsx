@@ -1631,9 +1631,26 @@ async function FooterTrustLine() {
   // Same checked-in changelog the app's What's-new card renders — the
   // homepage can never claim an improvement the app doesn't ship.
   const latest = latestChange();
+  // Render exposes the deployed commit at build time — the footer names it,
+  // so "is the site actually on the latest code" is answerable by comparing
+  // this stamp to the repo's main tip. Absent locally; omitted then.
+  const buildSha = (process.env.RENDER_GIT_COMMIT ?? "").slice(0, 7);
   return (
     <p className="mx-auto max-w-6xl px-6 py-4 text-xs text-muted">
       © 2026 Underwrite Copilot · page rendered {fmt(new Date())}
+      {buildSha && (
+        <>
+          {" · build "}
+          <a
+            href={`https://github.com/fredballs1115-ux/Underwrite-Copilot/commit/${buildSha}`}
+            target="_blank"
+            rel="noreferrer"
+            className="font-mono underline decoration-dotted underline-offset-2 hover:text-ink"
+          >
+            {buildSha}
+          </a>
+        </>
+      )}
       {latest && (
         <>
           {" "}
@@ -1925,6 +1942,7 @@ function ShippedThisWeek() {
 function MarketsMarquee() {
   const items = (metrosSeed.metros ?? []).map((m) => {
     const entry = m as {
+      id: string;
       name: string;
       region?: string;
       rule_ids?: string[];
@@ -1938,21 +1956,28 @@ function MarketsMarquee() {
         : rules > 0
           ? `${rules} rule${rules === 1 ? "" : "s"} on file`
           : (entry.region ?? "covered market");
-    return [entry.name, fact] as const;
+    return [entry.id, entry.name, fact] as const;
   });
+  // Each item is a real link into that market's brief — the marquee is a
+  // navigation surface, not just decoration. Duplicate row is aria-hidden,
+  // so screen readers and tab order see each market once.
   const row = (hidden: boolean) => (
     <div
       aria-hidden={hidden || undefined}
       className="flex shrink-0 items-center gap-10 pr-10"
     >
-      {items.map(([k, v]) => (
-        <span
+      {items.map(([id, k, v]) => (
+        <Link
           key={k}
-          className="inline-flex items-baseline gap-2 whitespace-nowrap text-sm"
+          href={`/market?metro=${id}`}
+          tabIndex={hidden ? -1 : undefined}
+          className="group inline-flex items-baseline gap-2 whitespace-nowrap text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
         >
-          <span className="font-medium">{k}</span>
+          <span className="font-medium underline-offset-2 group-hover:underline">
+            {k}
+          </span>
           <span className="font-mono text-[13px] tabular-nums text-brand">{v}</span>
-        </span>
+        </Link>
       ))}
     </div>
   );

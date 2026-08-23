@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-23",
+      "title": "The site names its own build — and the marquee navigates",
+      "blurb": "The footer stamps the exact commit the live site was built from (click it to see the code on GitHub), and every market in the marquee now links to its brief.",
+      "href": "/market"
+    },
+    {
+      "date": "2026-08-23",
       "title": "The covered markets march across the homepage",
       "blurb": "A second across-the-screen band — all 15 markets with a real fact each (sourced FMRs, rules on file), scrolling opposite the price ticker. The ticker itself now shows covered markets only.",
       "href": "/market"
