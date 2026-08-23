@@ -19,7 +19,12 @@ export function WhatsNewCard({ limit = 3 }: { limit?: number }) {
         <h2 className="text-sm font-semibold tracking-tight">
           New in Underwrite Copilot
         </h2>
-        <span className="text-[11px] text-muted">shipping daily</span>
+        <Link
+          href="/whats-new"
+          className="text-[11px] font-medium text-brand hover:text-brand-strong"
+        >
+          All improvements →
+        </Link>
       </div>
       <ul className="mt-2 space-y-2">
         {entries.map((e) => (
