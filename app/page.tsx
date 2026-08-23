@@ -1572,6 +1572,17 @@ async function LiveProofStrip() {
         <span className="font-semibold">“{storyTitle}”</span>
       </>
     ),
+    // Same checked-in changelog the app's What's-new card renders — the
+    // freshest visible proof that the product ships daily.
+    (() => {
+      const latest = latestChange();
+      return latest ? (
+        <>
+          shipped {fmtDate(latest.date)}:{" "}
+          <span className="font-semibold">{latest.title}</span>
+        </>
+      ) : null;
+    })(),
   ].filter(Boolean);
 
   return (
