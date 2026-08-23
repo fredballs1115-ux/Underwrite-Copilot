@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-23",
+      "title": "The screen absorbs a 101-page crash post-mortem",
+      "blurb": "Negative leverage named outright, stabilized occupancy above ~95% challenged, exit values checked for the 'there's always a buyer' myth and missing sale costs, and demand claims weighed against supply — disciplines drawn from the industry's most famous lessons-learned memo.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-08-23",
       "title": "The challenger learned the down-cycle classics",
       "blurb": "Assumption challenges now overlay the discipline every crash re-teaches: market-driven leasing assumptions, worst-case drift, cash flow over exit hopes, and no credit for 'other buyers are circling'.",
       "href": "/deals"
@@ -66,12 +72,6 @@
       "title": "Site freshness capped at ~10 minutes",
       "blurb": "Browsers could show an hours-old copy of the site while revalidating. Now capped: what you see is at most minutes behind.",
       "href": "/"
-    },
-    {
-      "date": "2026-08-22",
-      "title": "One-tap market territories in the buy box",
-      "blurb": "Every covered market is a quick-add geography chip — a Dallas–Fort Worth chip matches Fort Worth and Plano deals too.",
-      "href": "/criteria"
     }
   ]
 }
