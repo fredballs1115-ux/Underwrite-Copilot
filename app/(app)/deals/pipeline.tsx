@@ -47,6 +47,9 @@ export type DealCard = {
   score: number | null;
   mandateVerdict: "PURSUE" | "WATCH" | "PASS" | null;
   market: string;
+  /** covered-market name when the address maps into the 15-market scope
+   *  (computed server-side via metroForAddress) — null outside it */
+  coveredMarket: string | null;
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
@@ -332,7 +335,13 @@ export function Pipeline({
     const q = deferredQuery.trim().toLowerCase();
     const list = deals.filter((d) => {
       const dealStage = normalizeStage(d.stage);
-      if (q && !`${d.name} ${d.market}`.toLowerCase().includes(q)) return false;
+      if (
+        q &&
+        !`${d.name} ${d.market} ${d.coveredMarket ?? ""}`
+          .toLowerCase()
+          .includes(q)
+      )
+        return false;
       if (verdict !== "all") {
         if (verdict === "screening") {
           if (d.verdict) return false;
@@ -1084,6 +1093,18 @@ const DealRow = memo(function DealRow({
   // stage itself lives in the group header (and the row's Stage select), so
   // it no longer repeats here.
   const marketBit = d.market || null;
+  // Non-interactive on purpose: the whole row is already one link, so this
+  // marks "the ground layer knows this address" — the deal page carries the
+  // actual link into the market brief.
+  const coveredBit = d.coveredMarket ? (
+    <span
+      className="inline-flex items-center gap-1 whitespace-nowrap text-brand"
+      title={`${d.coveredMarket} is a covered market — rules and benchmarks on file; the deal page links its brief`}
+    >
+      <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
+      {d.coveredMarket}
+    </span>
+  ) : null;
   const assetBit = d.assetClass ? (
     <span className="capitalize">{d.assetClass}</span>
   ) : null;
@@ -1145,19 +1166,19 @@ const DealRow = memo(function DealRow({
         <p className="truncate font-medium">{d.name}</p>
         <MetaLine
           className="md:hidden"
-          bits={[dueBit, marketBit, assetBit, priceBit, capBit, fitBit, dateBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, assetBit, priceBit, capBit, fitBit, dateBit, addedByBit]}
         />
         <MetaLine
           className="hidden md:block lg:hidden"
-          bits={[dueBit, marketBit, assetBit, fitBit, dateBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, assetBit, fitBit, dateBit, addedByBit]}
         />
         <MetaLine
           className="hidden lg:block xl:hidden"
-          bits={[dueBit, marketBit, dateBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, dateBit, addedByBit]}
         />
         <MetaLine
           className="hidden xl:block"
-          bits={[dueBit, marketBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, addedByBit]}
         />
       </div>
       {/* Column cells — widths, order, and gaps mirror the header row. */}

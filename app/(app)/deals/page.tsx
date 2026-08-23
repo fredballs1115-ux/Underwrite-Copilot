@@ -10,6 +10,7 @@ import { Pipeline, type DealCard } from "./pipeline";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
 import { scoreMandateFit } from "@/lib/mandate";
+import { metroForAddress } from "@/lib/market-match";
 
 export const metadata: Metadata = { title: "Pipeline" };
 
@@ -215,6 +216,11 @@ export default async function DealsPage({
           ? (nameById.get(d.user_id) ?? "Teammate")
           : null,
       market: extraction?.market ?? "",
+      // The same matcher the deal page uses — the list and the detail agree
+      // on whether an address sits inside the 15-market scope.
+      coveredMarket:
+        metroForAddress((d.address as StructuredAddress | null) ?? {})?.name ??
+        null,
       offersDue: dueById.get(d.id) ?? null,
       slots: extraction
         ? pickSlots(extraction.metrics)
