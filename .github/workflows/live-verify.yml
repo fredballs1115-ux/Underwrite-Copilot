@@ -32,6 +32,8 @@ jobs:
           grep -o "data last verified[^<]*" body.html && echo "STEWARD MARKER: present" || echo "STEWARD MARKER: absent (no steward run yet — expected until the nightly cron lands)"
           grep -c "Silver Spring fourplex" body.html && echo "OVERNIGHT PLAYGROUND (Aug 22): present" || echo "OVERNIGHT PLAYGROUND: MISSING — serving a pre-Aug-22-overnight build"
           grep -c "rolling age exemption" body.html && echo "OVERNIGHT COPY (Aug 22): present" || echo "OVERNIGHT COPY: MISSING"
+          grep -c "ticker-track-reverse" body.html && echo "MARKETS MARQUEE (Aug 23): present" || echo "MARKETS MARQUEE: not yet deployed"
+          grep -c "Built in the open" body.html && echo "SHIPPED BLOCK (Aug 23): present" || echo "SHIPPED BLOCK: not yet deployed"
           echo "== FIRST 1200 CHARS OF BODY =="
           head -c 1200 body.html
       - name: Alternate-host check (diagnostic, non-gating)
