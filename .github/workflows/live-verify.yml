@@ -35,6 +35,7 @@ jobs:
           grep -c "ticker-track-reverse" body.html && echo "MARKETS MARQUEE (Aug 23): present" || echo "MARKETS MARQUEE: not yet deployed"
           grep -c "Built in the open" body.html && echo "SHIPPED BLOCK (Aug 23): present" || echo "SHIPPED BLOCK: not yet deployed"
           grep -c "hero-rotator-item" body.html && echo "HERO ROTATOR (Aug 23): present" || echo "HERO ROTATOR: not yet deployed"
+          grep -o 'name="uc-build" content="[0-9a-f]*"' body.html | head -1 && echo "SELF-HEAL SENTINEL: armed (stale browser copies reload themselves)" || echo "SELF-HEAL SENTINEL: not yet deployed"
           live=$(grep -o 'commit/[0-9a-f]\{7\}' body.html | head -1 | cut -d/ -f2)
           echo "LIVE BUILD SHA: ${live:-not stamped yet} · this run's main tip: ${GITHUB_SHA:0:7}"
           echo "== FIRST 1200 CHARS OF BODY =="
@@ -55,12 +56,20 @@ jobs:
           done
       - name: Public pages spot-check
         run: |
-          for path in demo why; do
+          for path in demo why whats-new market; do
             curl -sS -o "p_$path.html" --max-time 60 "https://underwrite-copilot.onrender.com/$path" || true
           done
           grep -q "Behind this screen" p_demo.html && echo "/demo: research layer present" || echo "/demo: MISSING research section"
           grep -q "It knows the ground" p_why.html && echo "/why: current copy present" || echo "/why: OLD copy"
           grep -q "takes your answer right on the deal" p_why.html && echo "/why: overnight copy present" || echo "/why: overnight copy MISSING"
+          grep -q "ticker-track-reverse" p_why.html && echo "/why: markets band present" || echo "/why: markets band not yet deployed"
+          grep -q "improvement" p_whats-new.html && echo "/whats-new: public changelog serves" || echo "/whats-new: not serving (pre-#98 build or auth-walled)"
+          # /market must open for ANONYMOUS visitors (no cookies here): the
+          # signed-out chrome says "Get started"; a login redirect would 200
+          # on /login and fail the covered-market grep instead.
+          grep -q "Get started" p_market.html && grep -qi "covered market" p_market.html \
+            && echo "/market: opens signed-out with public chrome" \
+            || echo "/market: NOT public yet (pre-#102 build serves a login wall)"
       - name: Verdict
         # Three tiers: the standing markers prove the site is up and on the
         # right lineage; the OVERNIGHT marker proves the build is from the

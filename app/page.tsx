@@ -2009,49 +2009,72 @@ function ResearchTicker() {
   const phillyYoY = bench
     .find((b) => b.metro === "Philadelphia, PA" && b.metric === "median_sale_price_2_4_unit")
     ?.note?.match(/YoY ([+\-]?[\d.]+%)/)?.[1];
+  // [label, value, destination] — every item is a real link into the surface
+  // that backs the number (a metro's brief, or the market page's rates and
+  // coverage strips), mirroring the marquee: navigation, not decoration.
   const items = (
     [
-      pmmsVal !== null && ["30-yr fixed", `${pmmsVal}% · FRED`],
+      pmmsVal !== null && ["30-yr fixed", `${pmmsVal}% · FRED`, "/market"],
       // In-scope items only — the 15 covered markets are the whole story.
       phillyMed && [
         "Philadelphia 2–4 unit median",
         phillyYoY ? `${phillyMed} · ${phillyYoY} YoY` : phillyMed,
+        "/market?metro=philadelphia",
       ],
-      phillyFmr !== null && ["Philadelphia FY2026 2BR FMR", `$${phillyFmr.toLocaleString()}/mo`],
-      ["MoCo rent cap", "CPI+3% · max 6%"],
-      ["Chicago owner-occupied ≤6 units", "RLTO exempt"],
-      ["NY Good Cause", "≤10-unit landlords exempt"],
-      dcFmr !== null && ["DC FY2026 2BR FMR", `$${dcFmr.toLocaleString()}/mo`],
-      baltFmr !== null && ["Baltimore FY2026 2BR FMR", `$${baltFmr.toLocaleString()}/mo`],
-      nycFmr !== null && ["NYC FY2026 2BR FMR", `$${nycFmr.toLocaleString()}/mo`],
-      ["DC ≤4-unit natural-person exemption", "verified vs statute"],
-      ["PG County cap", "lesser of 6% or CPI+3%"],
-      ["Jersey City 1–4 unit stock", "rent-control exempt, any owner"],
-      ["NYC 2–4 unit product", "outside rent stabilization"],
-      ["WA statewide cap 2026", "9.683% (HB 1217)"],
-      ["LA RSO from Jul 2026", "90% of CPI · 1–4%"],
-      ["SF pre-1979 stock", "Rent Board caps + just cause"],
-      [`${RULE_COUNT} landlord-law rules`, "statute-linked · your markets first"],
-      ["Recorded-sales comps", COMPS_JURISDICTIONS],
+      phillyFmr !== null && [
+        "Philadelphia FY2026 2BR FMR",
+        `$${phillyFmr.toLocaleString()}/mo`,
+        "/market?metro=philadelphia",
+      ],
+      ["MoCo rent cap", "CPI+3% · max 6%", "/market?metro=montgomery_county"],
+      ["Chicago owner-occupied ≤6 units", "RLTO exempt", "/market?metro=chicago"],
+      ["NY Good Cause", "≤10-unit landlords exempt", "/market?metro=nyc"],
+      dcFmr !== null && ["DC FY2026 2BR FMR", `$${dcFmr.toLocaleString()}/mo`, "/market?metro=dc"],
+      baltFmr !== null && [
+        "Baltimore FY2026 2BR FMR",
+        `$${baltFmr.toLocaleString()}/mo`,
+        "/market?metro=baltimore",
+      ],
+      nycFmr !== null && ["NYC FY2026 2BR FMR", `$${nycFmr.toLocaleString()}/mo`, "/market?metro=nyc"],
+      ["DC ≤4-unit natural-person exemption", "verified vs statute", "/market?metro=dc"],
+      ["PG County cap", "lesser of 6% or CPI+3%", "/market?metro=pg_county"],
+      ["Jersey City 1–4 unit stock", "rent-control exempt, any owner", "/market?metro=newark_jc"],
+      ["NYC 2–4 unit product", "outside rent stabilization", "/market?metro=nyc"],
+      ["WA statewide cap 2026", "9.683% (HB 1217)", "/market?metro=seattle"],
+      ["LA RSO from Jul 2026", "90% of CPI · 1–4%", "/market?metro=los_angeles"],
+      ["SF pre-1979 stock", "Rent Board caps + just cause", "/market?metro=san_francisco"],
+      [`${RULE_COUNT} landlord-law rules`, "statute-linked · your markets first", "/market"],
+      ["Recorded-sales comps", COMPS_JURISDICTIONS, "/market"],
     ] as const
-  ).filter((it): it is [string, string] => Array.isArray(it) && !!it[1]);
+  ).filter((it): it is [string, string, string] => Array.isArray(it) && !!it[1]);
 
   const row = (hidden: boolean) => (
     <div
       aria-hidden={hidden || undefined}
       className="flex shrink-0 items-center gap-10 pr-10"
     >
-      {items.map(([k, v]) => (
-        <span key={String(k)} className="inline-flex items-baseline gap-2 whitespace-nowrap text-sm">
-          <span className="text-white/55">{k}</span>
+      {items.map(([k, v, href]) => (
+        <Link
+          key={String(k)}
+          href={href}
+          tabIndex={hidden ? -1 : undefined}
+          className="group inline-flex items-baseline gap-2 whitespace-nowrap text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+        >
+          <span className="text-white/55 underline-offset-2 group-hover:text-white/80 group-hover:underline">
+            {k}
+          </span>
           <span className="font-mono font-semibold tabular-nums text-accent">{v}</span>
-        </span>
+        </Link>
       ))}
     </div>
   );
 
   return (
     <div className="band-dark overflow-hidden border-t border-white/10 py-3 text-white">
+      <p className="mb-1.5 text-center text-[11px] font-medium uppercase tracking-wider text-white/40">
+        Live from the research layer — sourced, dated, statute-linked · tap any
+        figure for its market
+      </p>
       <div className="ticker-track flex w-max">
         {row(false)}
         {row(true)}

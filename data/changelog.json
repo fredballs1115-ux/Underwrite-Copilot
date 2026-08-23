@@ -3,6 +3,18 @@
   "entries": [
     {
       "date": "2026-08-23",
+      "title": "Stale pages now fix themselves",
+      "blurb": "If your browser is showing an older copy of the site, it now notices the newer build and reloads itself once — no hard refresh needed, ever again.",
+      "href": "/whats-new"
+    },
+    {
+      "date": "2026-08-23",
+      "title": "Every ticker figure is a door",
+      "blurb": "The dark price ticker's items — FMRs, rent caps, the 30-yr rate — now click through to the market behind them, with a caption saying what the band is.",
+      "href": "/market"
+    },
+    {
+      "date": "2026-08-23",
       "title": "Market briefs open without an account",
       "blurb": "Clicking a market in the homepage band used to hit a login wall. The 15 covered-market briefs — rules, rents, coverage — are now public; your own deal memory still needs a sign-in.",
       "href": "/market"
@@ -59,24 +71,6 @@
       "date": "2026-08-22",
       "title": "Deal facts answer the rules' open questions",
       "blurb": "Year built and 'you'll live in one unit' now feed the rent-control screen — each open question links straight to where you answer it.",
-      "href": "/deals"
-    },
-    {
-      "date": "2026-08-22",
-      "title": "Boroughs evaluate as New York City",
-      "blurb": "A Brooklyn or Queens deal now sees NYC rent stabilization and Good Cause — it silently matched nothing before.",
-      "href": "/deals"
-    },
-    {
-      "date": "2026-08-22",
-      "title": "Comps pulls link the market brief",
-      "blurb": "Pull comps on a covered address and jump to that market's rules, rents, and data coverage in one click.",
-      "href": "/comps"
-    },
-    {
-      "date": "2026-08-22",
-      "title": "Benchmarks match your metro, not just the city string",
-      "blurb": "A Brooklyn deal finds the New York City FMR row; Wilmington finds the Philadelphia-market rent benchmark.",
       "href": "/deals"
     }
   ]
