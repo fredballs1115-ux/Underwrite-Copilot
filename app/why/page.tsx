@@ -17,6 +17,11 @@ const WIRED_MARKETS = (metrosSeed.metros ?? [])
   .filter((m) => (m as { ingest_market?: string }).ingest_market)
   .map((m) => m.name);
 
+// ISR, five-minute window: without a revalidate this page is fully static
+// and browsers may serve a year-stale copy under stale-while-revalidate —
+// the same trap the homepage had. next.config expireTime caps the rest.
+export const revalidate = 300;
+
 export const metadata: Metadata = {
   title: "Why Underwrite Copilot",
   description:
