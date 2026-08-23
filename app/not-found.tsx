@@ -29,6 +29,12 @@ export default function NotFound() {
         >
           Back home
         </Link>
+        <Link
+          href="/market"
+          className="rounded-lg border border-line bg-surface px-4 py-2.5 text-sm font-medium transition-colors hover:bg-faint"
+        >
+          Browse the covered markets
+        </Link>
       </div>
     </div>
   );
