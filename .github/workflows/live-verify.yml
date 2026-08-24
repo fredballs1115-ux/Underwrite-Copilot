@@ -71,6 +71,12 @@ jobs:
           grep -q "Get started" p_market.html && grep -qi "covered market" p_market.html \
             && echo "/market: opens signed-out with public chrome" \
             || echo "/market: NOT public yet (pre-#102 build serves a login wall)"
+          # The public sample IC memo must serve real PDF bytes — the memo
+          # renderer only fails at request time, so probe the artifact itself.
+          curl -sS -o memo.pdf --max-time 60 "https://underwrite-copilot.onrender.com/api/demo/memo" || true
+          [ "$(head -c 5 memo.pdf 2>/dev/null)" = "%PDF-" ] \
+            && echo "/api/demo/memo: serves a real PDF ($(wc -c < memo.pdf) bytes)" \
+            || echo "/api/demo/memo: NOT serving PDF bytes — memo render failing"
       - name: Verdict
         # Three tiers: the standing markers prove the site is up and on the
         # right lineage; the OVERNIGHT marker proves the build is from the

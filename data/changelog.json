@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-24",
+      "title": "The IC memo and the Excel model got a design overhaul",
+      "blurb": "The one-page memo now leads with a color-coded verdict banner, chip-style buy box, zebra ranges with a highlighted base case, deal-killer cards, and a scenario trio — and a new CI test renders it to real PDF bytes on every change. The workbook's KPI tiles are outlined and its cash-flow ladder zebra-striped, with every layout-anchored test intact.",
+      "href": "/api/demo/memo"
+    },
+    {
+      "date": "2026-08-24",
       "title": "The homepage sample screen now mirrors the real deal page",
       "blurb": "The walkthrough widget uses the deal page's own five sections — Overview, Financials, Buy box, Analyses, Documents — with the real analysis names, verdict and mandate chips, and figures computed from the sample deal through the live engine. The hero card is a faithful miniature of the real summary bar, artifact buttons and all.",
       "href": "/demo"
@@ -66,12 +72,6 @@
       "title": "Stale pages now fix themselves",
       "blurb": "If your browser is showing an older copy of the site, it now notices the newer build and reloads itself once — no hard refresh needed, ever again.",
       "href": "/whats-new"
-    },
-    {
-      "date": "2026-08-23",
-      "title": "Every ticker figure is a door",
-      "blurb": "The dark price ticker's items — FMRs, rent caps, the 30-yr rate — now click through to the market behind them, with a caption saying what the band is.",
-      "href": "/market"
     }
   ]
 }
