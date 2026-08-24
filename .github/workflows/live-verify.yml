@@ -77,6 +77,10 @@ jobs:
           [ "$(head -c 5 memo.pdf 2>/dev/null)" = "%PDF-" ] \
             && echo "/api/demo/memo: serves a real PDF ($(wc -c < memo.pdf) bytes)" \
             || echo "/api/demo/memo: NOT serving PDF bytes — memo render failing"
+          curl -sS -o report.pdf --max-time 60 "https://underwrite-copilot.onrender.com/api/demo/report" || true
+          [ "$(head -c 5 report.pdf 2>/dev/null)" = "%PDF-" ] \
+            && echo "/api/demo/report: serves a real PDF ($(wc -c < report.pdf) bytes)" \
+            || echo "/api/demo/report: not serving PDF bytes (pre-#126 build, or report render failing)"
       - name: Verdict
         # Three tiers: the standing markers prove the site is up and on the
         # right lineage; the OVERNIGHT marker proves the build is from the
