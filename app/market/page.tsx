@@ -286,12 +286,21 @@ async function MetroExplorer({ selected }: { selected?: string }) {
     }
   }
   const fmr = active.fmr_fy2026 as {
+    "0br"?: number | null;
+    "1br"?: number | null;
     "2br"?: number | null;
+    "3br"?: number | null;
     range?: [number, number];
     status?: string;
     note?: string;
     sources?: string[];
   } | null;
+  // Full bedroom row where the research carries one (LA's Federal-Register
+  // revision, SF's housing-authority sheet, Newark's NJ-Treasury table) —
+  // 2BR stays the emphasized headline everywhere.
+  const fmrBeds = (["0br", "1br", "2br", "3br"] as const)
+    .map((k) => ({ label: k.toUpperCase(), value: fmr?.[k] }))
+    .filter((b): b is { label: string; value: number } => typeof b.value === "number");
   const providers = Object.fromEntries(PROVIDERS.map((p) => [p.id, p]));
   const compsLine =
     active.comps_provider === null
@@ -380,14 +389,33 @@ async function MetroExplorer({ selected }: { selected?: string }) {
         </p>
 
         {typeof fmr?.["2br"] === "number" ? (
-          <p className="text-sm">
+          <div className="text-sm">
             <span className="text-[11px] uppercase tracking-wide text-muted">
               FY2026 fair market rent
             </span>{" "}
-            <span className="font-mono font-semibold tabular-nums">
-              ${fmr["2br"].toLocaleString()}/mo
-            </span>{" "}
-            <span className="text-muted">2BR</span>
+            {fmrBeds.map((b, i) => (
+              <span key={b.label}>
+                {i > 0 && <span className="text-muted"> · </span>}
+                <span className="text-muted">{b.label}</span>{" "}
+                <span
+                  className={`font-mono tabular-nums ${
+                    b.label === "2BR" ? "font-semibold" : "text-muted"
+                  }`}
+                >
+                  ${b.value.toLocaleString()}
+                </span>
+              </span>
+            ))}
+            <span className="text-muted">/mo</span>
+            <span
+              className={`ml-2 rounded px-1.5 py-px align-middle text-[10px] font-medium ${
+                fmr.status === "verified"
+                  ? "bg-emerald-500/10 text-emerald-600"
+                  : "bg-brand/10 text-brand"
+              }`}
+            >
+              {fmr.status ?? "sourced"}
+            </span>
             {fmr.range && (
               <span className="text-xs text-muted">
                 {" "}
@@ -405,7 +433,12 @@ async function MetroExplorer({ selected }: { selected?: string }) {
                 source
               </a>
             )}
-          </p>
+            {fmr.note && (
+              <p className="mt-1 text-[11px] leading-relaxed text-muted">
+                {fmr.note}
+              </p>
+            )}
+          </div>
         ) : (
           <p className="text-xs text-muted">
             FY2026 FMR for this metro: not yet confirmed —{" "}

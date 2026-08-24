@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-24",
+      "title": "Market briefs show full bedroom rents and their provenance",
+      "blurb": "Where the research carries a full FY2026 row — LA's Federal-Register revision, San Francisco's housing-authority sheet, Newark's state-treasury table — the brief now lists 0BR through 3BR with a verified/sourced chip, and prints the provenance note under the figure: where the number came from, and what was rejected on the way.",
+      "href": "/market"
+    },
+    {
+      "date": "2026-08-24",
       "title": "Break it yourself: the return engine, live on the homepage",
       "blurb": "A new interactive band puts three levers — exit cap, rent growth, vacancy — in your hands and recomputes IRR, equity multiple, cash-on-cash, exit value and NOI on every tick, through the same deterministic engine that prices real screens. Runs entirely in your browser on the labeled sample deal; no AI in the box.",
       "href": "/#stress"
@@ -66,12 +72,6 @@
       "title": "Market briefs open without an account",
       "blurb": "Clicking a market in the homepage band used to hit a login wall. The 15 covered-market briefs — rules, rents, coverage — are now public; your own deal memory still needs a sign-in.",
       "href": "/market"
-    },
-    {
-      "date": "2026-08-23",
-      "title": "The pipeline shows which deals sit in covered markets",
-      "blurb": "Each deal row now carries its covered-market name — same matcher the deal page uses — and searching the pipeline by market name finds those deals.",
-      "href": "/deals"
     }
   ]
 }
