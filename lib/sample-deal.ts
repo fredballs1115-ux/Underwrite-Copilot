@@ -246,20 +246,23 @@ const extraction: ExtractionResult = {
   assetClass: "multifamily",
   market: "Brewerytown, Philadelphia, PA",
   metrics: [
-    { label: "Asking price", value: "$68,000,000", flagged: false, page: "p. 3" },
-    { label: "Going-in cap", value: "5.45%", flagged: false, page: "p. 8" },
-    { label: "Pro forma cap", value: "5.7%", flagged: true, page: "p. 8" },
-    { label: "Exit cap", value: "5.25%", flagged: true, page: "p. 41" },
+    // basis mirrors what each label already states — in-place figures vs the
+    // OM's projection — so the report's Basis column reads meaningfully on
+    // the sample (facts and financing terms carry "na").
+    { label: "Asking price", value: "$68,000,000", flagged: false, page: "p. 3", basis: "na" },
+    { label: "Going-in cap", value: "5.45%", flagged: false, page: "p. 8", basis: "in_place" },
+    { label: "Pro forma cap", value: "5.7%", flagged: true, page: "p. 8", basis: "pro_forma" },
+    { label: "Exit cap", value: "5.25%", flagged: true, page: "p. 41", basis: "pro_forma" },
     // The OM's own p.8 figure — the pro forma the reconciliation (below) and
     // the T-12 actual ($3,706,500) both push back on. Storing the OM's stated
     // number here keeps the OM-vs-T-12 note honest: +4.7%, not a self-compare.
-    { label: "NOI (pro forma)", value: "$3,880,000", flagged: true, page: "p. 8" },
-    { label: "Units", value: "248", flagged: false, page: "p. 3" },
-    { label: "Avg in-place rent", value: "$2,400/mo", flagged: false, page: "p. 12" },
-    { label: "Pro forma rent", value: "$2,600/mo", flagged: true, page: "p. 12" },
-    { label: "Rent growth", value: "4.0%/yr", flagged: true, page: "p. 40" },
-    { label: "Vacancy (pro forma)", value: "6.0%", flagged: true, page: "p. 8" },
-    { label: "Loan-to-value", value: "60%", flagged: false, page: "p. 44" },
+    { label: "NOI (pro forma)", value: "$3,880,000", flagged: true, page: "p. 8", basis: "pro_forma" },
+    { label: "Units", value: "248", flagged: false, page: "p. 3", basis: "na" },
+    { label: "Avg in-place rent", value: "$2,400/mo", flagged: false, page: "p. 12", basis: "in_place" },
+    { label: "Pro forma rent", value: "$2,600/mo", flagged: true, page: "p. 12", basis: "pro_forma" },
+    { label: "Rent growth", value: "4.0%/yr", flagged: true, page: "p. 40", basis: "pro_forma" },
+    { label: "Vacancy (pro forma)", value: "6.0%", flagged: true, page: "p. 8", basis: "pro_forma" },
+    { label: "Loan-to-value", value: "60%", flagged: false, page: "p. 44", basis: "na" },
   ],
 };
 

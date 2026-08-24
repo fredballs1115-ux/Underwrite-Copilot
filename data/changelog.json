@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-24",
+      "title": "The full report now matches the memo's design language",
+      "blurb": "Every page of the multi-page report picked up the redesigned memo's system: brand-ticked titles with live count pills (figures pulled, comps rated, checks aggressive), zebra-striped tables, ratings as tinted chips, and summary cards with the brand bar. The sample's extracted terms now carry their in-place / pro-forma basis, and a second CI smoke test renders the whole report to PDF bytes.",
+      "href": "/demo"
+    },
+    {
+      "date": "2026-08-24",
       "title": "The IC memo and the Excel model got a design overhaul",
       "blurb": "The one-page memo now leads with a color-coded verdict banner, chip-style buy box, zebra ranges with a highlighted base case, deal-killer cards, and a scenario trio — and a new CI test renders it to real PDF bytes on every change. The workbook's KPI tiles are outlined and its cash-flow ladder zebra-striped, with every layout-anchored test intact.",
       "href": "/api/demo/memo"
@@ -66,12 +72,6 @@
       "title": "The challenger learned the down-cycle classics",
       "blurb": "Assumption challenges now overlay the discipline every crash re-teaches: market-driven leasing assumptions, worst-case drift, cash flow over exit hopes, and no credit for 'other buyers are circling'.",
       "href": "/deals"
-    },
-    {
-      "date": "2026-08-23",
-      "title": "Stale pages now fix themselves",
-      "blurb": "If your browser is showing an older copy of the site, it now notices the newer build and reloads itself once — no hard refresh needed, ever again.",
-      "href": "/whats-new"
     }
   ]
 }
