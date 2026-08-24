@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-24",
+      "title": "The homepage got its board, its gauge, and its stamp",
+      "blurb": "Three new eye-catchers, every number real: a market pulse board — all covered metros as breathing tiles with their FY2026 rents, statuses, and rule counts, each opening its brief; an analog IRR gauge inside 'Break it yourself' whose needle swings live as you drag the levers, with the demo mandate's 13% target ticked; and the hero card's verdict chip now stamps itself on like an IC decision.",
+      "href": "/"
+    },
+    {
+      "date": "2026-08-24",
       "title": "Compare any two covered markets, side by side",
       "blurb": "A new tool on /market puts two metros next to each other on one shared dollar scale: the FY2026 bedroom rent ladders drawn as bars, the 2BR spread computed, rules on file, comps-feed status, and verified/sourced chips — every figure straight off the research layer, with a one-click jump into either brief.",
       "href": "/market"
@@ -66,12 +72,6 @@
       "title": "Compare shows each deal's leverage spread",
       "blurb": "The side-by-side view gains a 'Leverage vs 30-yr' row — the signed spread between each deal's going-in cap and the freshest 30-yr fixed, color-coded negative / thin / positive with the same arithmetic as the deal page, captioned with the benchmark and its as-of date.",
       "href": "/deals"
-    },
-    {
-      "date": "2026-08-24",
-      "title": "The price ticker carries every covered market's FY2026 rent",
-      "blurb": "All fourteen sourced FY2026 2BR fair-market rents now ride the dark ticker — derived from the research layer, each linking to its market brief, with the DC metro's shared figure riding once instead of four times. The proof strip's sector count is computed now too; the typed-in number had drifted.",
-      "href": "/market"
     }
   ]
 }
