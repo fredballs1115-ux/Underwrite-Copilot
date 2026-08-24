@@ -17,8 +17,8 @@ say exactly what's missing and why.
 
 ## Sunday night–Monday (Aug 23–24 ET) — the screen absorbs a famous post-mortem, computes leverage, and every market gets its rent number
 
-Nine more PRs merged, each probe-verified live (#107–#115; probes through
-#103 all exact sha matches). Three threads:
+Thirteen more PRs merged, each probe-verified live (#107–#119; every probe
+an exact sha match). Four threads:
 
 **1. The Trammell Crow lessons-learned memo (from Zach Wade), fully read and encoded.**
 All 101 pages OCR'd via the new `fetch-doc` Actions workflow (#109, #110 —
@@ -53,6 +53,18 @@ no FMR — a recorded gap, never an estimate. Smaller catches: "Richmond
 County VA" (rural Northern Neck) is not Richmond; Fort Worth prices
 separately from Dallas.
 
+**4. The homepage now provably matches the product — and got two new
+interactive pieces (#116–#119).** DC's $2,246 was arithmetic-confirmed
+against DCHA's own board resolution (#116). A correlation audit of the
+whole homepage found and fixed the two typed numbers that had drifted —
+the ticker now derives one FMR item per covered market and the proof
+strip computes its sector count (#117). Compare gained a color-coded
+leverage row so all three deal surfaces share the same arithmetic
+(#118). And per your ask for more effects like the bands (both kept):
+a "Break it yourself" panel now runs the REAL deterministic return
+engine in the visitor's browser — three sliders, five figures
+recomputing on every tick, sample-labeled, no AI in the box (#119).
+
 | Change | Where to look |
 |---|---|
 | Marquee + rotator facts denser (FMR + rules together) | homepage (#107) |
@@ -61,6 +73,10 @@ separately from Dallas.
 | Leverage check on every deal + the demo | deal page · /demo (#112, #113) |
 | Login page offers /market + /demo without an account; sidebar "What's new" | /login · app sidebar (#114) |
 | FY2026 FMRs for (nearly) all covered markets | homepage marquee · /market (#115) |
+| DC FMR primary-confirmed (DCHA Res. 25-31, 187% arithmetic) | /market?metro=dc (#116) |
+| Ticker derives every market's FMR; sector count computed | homepage (#117) |
+| Compare: leverage spread per deal, color-coded | /deals → Compare (#118) |
+| "Break it yourself" — live engine sliders | homepage #stress (#119) |
 
 ## Sunday (Aug 23 ET) — stale browsers now fix THEMSELVES, and the day's build run
 

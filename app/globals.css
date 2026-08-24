@@ -387,3 +387,35 @@ body {
     opacity: 1;
   }
 }
+
+/* "The screen, running" — a looping trace of the six stages on the sample
+   deal. Each line fades in at its own offset (staggered cascade, --i per
+   line), holds, then yields; the caret blinks on the closing line. Pure CSS,
+   server-rendered. Reduced-motion shows all lines statically. */
+@keyframes screenrun-in {
+  0% { opacity: 0; transform: translateY(4px); }
+  3.5% { opacity: 1; transform: none; }
+  86% { opacity: 1; }
+  93%, 100% { opacity: 0; }
+}
+.screenrun-line {
+  opacity: 0;
+  animation: screenrun-in 15s linear infinite;
+  animation-delay: calc(var(--i) * 1.6s);
+}
+@keyframes screenrun-caret {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.screenrun-caret {
+  animation: screenrun-caret 1.1s steps(1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .screenrun-line {
+    animation: none;
+    opacity: 1;
+  }
+  .screenrun-caret {
+    animation: none;
+  }
+}
