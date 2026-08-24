@@ -207,9 +207,9 @@ export function mergeBenchmarks(dbRows: Benchmark[] | null | undefined): Benchma
  *  a Brooklyn deal must find the "New York City" FMR row — with the raw city
  *  string as the fallback for labels the market matcher doesn't know. Prefix
  *  match on purpose: seed labels carry suffixes ("Baltimore MD",
- *  "Washington DC area"). DMV suburbs are deliberately NOT mapped onto the
- *  "Washington DC area" rows — that figure is labeled for DC proper and
- *  unverified for the surrounding counties. */
+ *  "Washington DC area"). DMV suburbs get their OWN rows (each entry in
+ *  metros.json carries the DC-HMFA FY2026 FMR, DCHA-confirmed metro-wide),
+ *  so they no longer need to borrow the "Washington DC area" rows. */
 export function benchmarksForDeal(
   benchmarks: Benchmark[],
   city?: string | null,
