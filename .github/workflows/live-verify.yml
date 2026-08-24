@@ -64,9 +64,12 @@ jobs:
           done
           grep -q "Behind this screen" p_demo.html && echo "/demo: research layer present" || echo "/demo: MISSING research section"
           grep -q "Eviction Diversion Program" p_demo.html && echo "/demo: legal panel present (real rule text serves)" || echo "/demo: legal panel not yet deployed"
+          grep -q "would you ask the broker" p_demo.html && echo "/demo: broker-question cards present" || echo "/demo: broker-question cards not yet deployed"
+          grep -q "copy citation" p_market.html && echo "/market: copy-citation + FMR ladder present" || echo "/market: citation tools not yet deployed"
           grep -q "It knows the ground" p_why.html && echo "/why: current copy present" || echo "/why: OLD copy"
           grep -q "takes your answer right on the deal" p_why.html && echo "/why: overnight copy present" || echo "/why: overnight copy MISSING"
           grep -q "ticker-track-reverse" p_why.html && echo "/why: markets band present" || echo "/why: markets band not yet deployed"
+          grep -q "screenrun-line" p_why.html && echo "/why: screen-run trace present" || echo "/why: screen-run trace not yet deployed"
           grep -q "improvement" p_whats-new.html && echo "/whats-new: public changelog serves" || echo "/whats-new: not serving (pre-#98 build or auth-walled)"
           # /market must open for ANONYMOUS visitors (no cookies here): the
           # signed-out chrome says "Get started"; a login redirect would 200

@@ -14,6 +14,7 @@ import { scoreMandateFit } from "@/lib/mandate";
 import type { ExtractedMetric } from "@/lib/anthropic/types";
 import { DemoSections, type DemoData } from "./sections";
 import { ModelSlideshow } from "./model-slideshow";
+import { BrokerQuestions } from "./broker-questions";
 
 // ISR, five-minute window: without a revalidate this page is fully static
 // and browsers may serve a year-stale copy under stale-while-revalidate —
@@ -327,6 +328,10 @@ export default function DemoPage() {
             sample's one rule happens to be dormant on a purchase, and the
             panel says so instead of hiding it — that honesty IS the demo. */}
         <LegalPanel />
+
+        {/* Interactive: the challenger's real broker questions, revealed on
+            click — the reader plays analyst before seeing the drafted ask. */}
+        <BrokerQuestions />
 
 
         {/* The actual deliverables — a prospect can hold the export in their

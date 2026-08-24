@@ -14,6 +14,7 @@ import { looseValue, SECTORS } from "@/lib/research-sectors";
 import { COVERAGE_DISCOVERY, COVERAGE_SUMMARY, PROVIDERS } from "@/lib/public-comps/core";
 import metrosSeed from "@/data/research/metros.json";
 import multifamilySeed from "@/data/research/multifamily.json";
+import { CopyCite } from "./copy-cite";
 
 export const metadata: Metadata = { title: "Market data" };
 
@@ -433,6 +434,37 @@ async function MetroExplorer({ selected }: { selected?: string }) {
                 source
               </a>
             )}
+            {/* Bedroom ladder, drawn — widths scale to the real dollars in
+                the row above (aria-hidden: the numbers already read as text). */}
+            {fmrBeds.length >= 2 && (
+              <div className="mt-2 max-w-md space-y-1" aria-hidden>
+                {fmrBeds.map((b) => {
+                  const max = Math.max(...fmrBeds.map((x) => x.value));
+                  const w = Math.max(8, Math.round((b.value / max) * 100));
+                  return (
+                    <div key={b.label} className="flex items-center gap-2">
+                      <span className="w-7 shrink-0 text-[10px] font-medium text-muted">
+                        {b.label}
+                      </span>
+                      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-faint">
+                        <div
+                          className={`h-full rounded-full transition-[width] duration-500 ${
+                            b.label === "2BR" ? "bg-brand" : "bg-brand/40"
+                          }`}
+                          style={{ width: `${w}%` }}
+                        />
+                      </div>
+                      <span className="w-14 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted">
+                        ${b.value.toLocaleString()}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <CopyCite
+              text={`${active.name} — FY2026 2BR fair market rent $${fmr["2br"].toLocaleString()}/mo (${fmr.status ?? "sourced"}${fmr.sources?.[0] ? `; source: ${fmr.sources[0]}` : ""}) · via Underwrite Copilot market brief`}
+            />
             {fmr.note && (
               <p className="mt-1 text-[11px] leading-relaxed text-muted">
                 {fmr.note}
