@@ -8,6 +8,8 @@ import {
   type ReactNode,
 } from "react";
 import { SAMPLE_COMP_PREMIUM_LINE } from "@/lib/marketing-constants";
+import { SAMPLE_DEAL } from "@/lib/sample-deal";
+import { computeModel } from "@/lib/model/compute";
 
 function prefersReducedMotion(): boolean {
   return (
@@ -80,12 +82,33 @@ export function CountUp({
 }
 
 /* ------------------------------------------------------------------ */
-/* Interactive demo — what the screen looks like, tab by tab.          */
-/* All data below is an ILLUSTRATIVE SAMPLE, clearly labeled in the UI. */
+/* Interactive demo — a faithful MINIATURE of the real deal page.      */
+/* The tab bar is the deal page's actual section list, the analyses    */
+/* sub-pills are its actual analysis names, and every figure derives   */
+/* from the same sample fixture + live engine the demo renders.        */
+/* All data is an ILLUSTRATIVE SAMPLE, clearly labeled in the UI.      */
 /* ------------------------------------------------------------------ */
 
-const TABS = ["Ranges", "Deal-killers", "Comps", "Verdict"] as const;
+// Derived once from the sample fixture through the SAME computeModel the
+// product ships — this widget cannot disagree with the engine or the demo.
+const INPUTS = SAMPLE_DEAL.model.inputs;
+const RETURNS = computeModel(INPUTS).returns;
+const VERDICT_WORD =
+  SAMPLE_DEAL.verdict.verdict === "pass"
+    ? "Go"
+    : SAMPLE_DEAL.verdict.verdict === "pass_on"
+      ? "No-go"
+      : "Caution";
+const pct1 = (n: number | null) =>
+  n == null || !isFinite(n) ? "—" : `${n.toFixed(1)}%`;
+
+// The REAL deal page's section list (deal-view.tsx SECTIONS) — the homepage
+// walkthrough uses the product's own information architecture, not a
+// marketing rewrite of it.
+const TABS = ["Overview", "Financials", "Buy box", "Analyses", "Documents"] as const;
 type Tab = (typeof TABS)[number];
+// The REAL analyses sub-tabs (deal-view.tsx ANALYSES), shown as pills.
+const ANALYSIS_PILLS = ["Verdict", "Challenger", "Comps", "Market", "Reconciler"] as const;
 
 function RangeRow({
   label,
@@ -209,15 +232,75 @@ function CompRow({
   );
 }
 
+/** The deal page's three-figure summary strip, in miniature. */
+function SummaryFigures() {
+  return (
+    <dl className="flex flex-wrap gap-x-8 gap-y-2 rounded-lg border border-line px-3 py-2.5">
+      {(
+        [
+          ["Price", `$${(INPUTS.purchasePrice / 1e6).toFixed(0)}M`],
+          ["Size", `${INPUTS.units} units`],
+          ["Going-in cap", `${RETURNS.goingInCapPct.toFixed(2)}%`],
+        ] as const
+      ).map(([k, v]) => (
+        <div key={k}>
+          <dt className="text-[9px] uppercase tracking-wide text-muted">{k}</dt>
+          <dd className="mt-0.5 font-mono text-sm font-semibold tabular-nums">
+            {v}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 function DemoPanel({ tab }: { tab: Tab }) {
   switch (tab) {
-    case "Ranges":
+    case "Overview":
       return (
         <div className="space-y-3">
+          <div className="flex items-center justify-between rounded-lg border border-line p-3">
+            <div>
+              <p className="text-xs font-medium">Screening verdict</p>
+              <p className="mt-0.5 text-[10px] text-muted">
+                one rubric — the work shown on every call
+              </p>
+            </div>
+            <span className="rounded-full bg-caution/10 px-3 py-1 text-xs font-semibold text-caution">
+              {VERDICT_WORD}
+            </span>
+          </div>
+          <SummaryFigures />
+          <Killer n={1} name="Basis" read={SAMPLE_COMP_PREMIUM_LINE} severity="kill" />
+          <Killer
+            n={2}
+            name="Exit"
+            read="Underwriting exits 20 bps below the going-in cap after a 5-year hold — the spread does the returns' heavy lifting."
+            severity="caution"
+          />
+        </div>
+      );
+    case "Financials":
+      return (
+        <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-line bg-line text-center">
+            {(
+              [
+                ["Levered IRR", pct1(RETURNS.leveredIrrPct)],
+                ["Equity multiple", RETURNS.equityMultiple ? `${RETURNS.equityMultiple.toFixed(2)}x` : "—"],
+                ["Cash-on-cash", pct1(RETURNS.cashOnCashPct)],
+              ] as const
+            ).map(([k, v]) => (
+              <div key={k} className="bg-surface px-2 py-2">
+                <p className="text-[9px] uppercase tracking-wide text-muted">{k}</p>
+                <p className="mt-0.5 font-mono text-xs font-semibold tabular-nums">{v}</p>
+              </div>
+            ))}
+          </div>
           <RangeRow
             label="Exit cap"
             low="5.25%"
-            base="5.50%"
+            base={`${INPUTS.exitCapPct.toFixed(2)}%`}
             high="5.75%"
             src="submarket trades 5.25–5.75%; broker holds 5.25%."
           />
@@ -230,91 +313,119 @@ function DemoPanel({ tab }: { tab: Tab }) {
           />
         </div>
       );
-    case "Deal-killers":
+    case "Buy box":
       return (
         <div className="space-y-3">
-          <Killer
-            n={1}
-            name="Basis"
-            read={SAMPLE_COMP_PREMIUM_LINE}
-            severity="kill"
-          />
-          <Killer
-            n={2}
-            name="Exit"
-            read="Underwriting exits 20 bps below the going-in cap after a 5-year hold — the spread does the returns' heavy lifting."
-            severity="caution"
-          />
-          <Killer
-            n={3}
-            name="Debt"
-            read="60% LTV at a fixed rate with one year IO — coverage holds in the base and low cases."
-            severity="pass"
-          />
-        </div>
-      );
-    case "Comps":
-      return (
-        <div className="space-y-2.5">
-          <CompRow
-            name="The Brixton"
-            meta="comparable vintage · 2.1 mi · traded Q3 ’25"
-            rating="support"
-          />
-          <CompRow
-            name="Parkside"
-            meta="closest comp · 1.4 mi · lands near the implied basis"
-            rating="leans"
-          />
-          <CompRow
-            name="Vue at Legacy"
-            meta="newer, amenitized, stronger submarket · 4.0 mi"
-            rating="stretched"
-          />
+          <div className="rounded-lg border border-line p-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium">Mandate fit</p>
+              <span className="rounded-full bg-caution/10 px-2.5 py-0.5 text-xs font-semibold text-caution">
+                WATCH
+              </span>
+            </div>
+            <p className="mt-1.5 text-xs leading-relaxed text-muted">
+              Your saved criteria, checked in code on every screen — cap floor,
+              return targets, geographies, hard dealbreakers.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-1.5 text-[10px] font-medium">
+            {(
+              [
+                ["✓", "Market", "text-pass border-line"],
+                ["✓", "Price", "text-pass border-line"],
+                ["✓", "Asset class", "text-pass border-line"],
+                ["✕", "Going-in cap", "text-kill border-kill/30 bg-kill/[0.04]"],
+              ] as const
+            ).map(([mark, label, cls]) => (
+              <span
+                key={label}
+                className={`flex items-center gap-1 rounded-md border px-2 py-1 ${cls}`}
+              >
+                <span aria-hidden>{mark}</span>
+                <span className="text-ink">{label}</span>
+              </span>
+            ))}
+          </div>
           <p className="text-[10px] leading-relaxed text-muted">
-            Every comp is pulled from the broker&apos;s own deck and ranked for
-            how hard it supports the asking price.
+            A deal can be well-underwritten and still be outside the box — it
+            says so, from the first signal onward, and the verdict judges the
+            fit out loud.
           </p>
         </div>
       );
-    case "Verdict":
+    case "Analyses":
       return (
         <div className="space-y-3">
-          <div className="flex items-center justify-between rounded-lg border border-line p-3">
-            <div>
-              <p className="text-xs font-medium">Screening verdict</p>
-              <p className="mt-0.5 text-[10px] text-muted">
-                one rubric — the work shown on every call
-              </p>
-            </div>
-            <span className="rounded-full bg-caution/10 px-3 py-1 text-xs font-semibold text-caution">
-              Caution
-            </span>
+          {/* The real analyses sub-tabs, verbatim (Verdict shown active). */}
+          <div className="flex flex-wrap gap-1" aria-hidden>
+            {ANALYSIS_PILLS.map((p, i) => (
+              <span
+                key={p}
+                className={`rounded-lg px-2.5 py-1 text-[11px] font-medium ${
+                  i === 0 ? "bg-faint text-ink shadow-sm" : "text-muted"
+                }`}
+              >
+                {p}
+              </span>
+            ))}
           </div>
           <div className="grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-line bg-line text-center">
-            {[
-              ["Conservative", "No-go", "text-kill"],
-              ["Base", "Caution", "text-caution"],
-              ["Sponsor", "Go", "text-pass"],
-            ].map(([k, v, c]) => (
+            {(
+              [
+                ["Conservative", "No-go", "text-kill"],
+                ["Base", VERDICT_WORD, "text-caution"],
+                ["Sponsor", "Go", "text-pass"],
+              ] as const
+            ).map(([k, v, c]) => (
               <div key={k} className="bg-surface px-2 py-2">
                 <p className="text-[9px] uppercase tracking-wide text-muted">{k}</p>
                 <p className={`mt-0.5 text-xs font-semibold ${c}`}>{v}</p>
               </div>
             ))}
           </div>
+          <CompRow name="The Brixton" meta="comparable vintage · 2.1 mi" rating="support" />
+          <CompRow name="Vue at Legacy" meta="newer, amenitized · 4.0 mi" rating="stretched" />
           <p className="text-[10px] leading-relaxed text-muted">
-            The verdict flips across scenarios — that spread <em>is</em> the
-            finding. This deal earns a model only at the right basis.
+            Five analyses, one rubric — the verdict flips across scenarios, and
+            that spread <em>is</em> the finding.
+          </p>
+        </div>
+      );
+    case "Documents":
+      return (
+        <div className="space-y-2.5">
+          {(
+            [
+              ["offering-memorandum.pdf", "screened — all six stages, page-cited", "bg-pass/10 text-pass", "Screened"],
+              ["rent-roll.csv", "actuals beat pro forma in every conflict", "bg-brand/10 text-brand", "Reconciled"],
+              ["t12-operating.pdf", "expense load anchored to the trailing twelve", "bg-brand/10 text-brand", "Reconciled"],
+            ] as const
+          ).map(([file, meta, cls, chip]) => (
+            <div
+              key={file}
+              className="flex items-center justify-between gap-3 rounded-lg border border-line p-3"
+            >
+              <div className="min-w-0">
+                <p className="truncate font-mono text-xs">{file}</p>
+                <p className="truncate text-[10px] text-muted">{meta}</p>
+              </div>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-medium ${cls}`}>
+                {chip}
+              </span>
+            </div>
+          ))}
+          <p className="text-[10px] leading-relaxed text-muted">
+            Add a rent roll, T-12, or loan terms any time — the screen
+            re-anchors itself and flags where the OM&apos;s pro forma drifts.
           </p>
         </div>
       );
   }
 }
 
-/** Tabbed walkthrough of the screen's output — pure sample data. */
+/** Tabbed walkthrough mirroring the real deal page's sections — sample data. */
 export function DemoTabs() {
-  const [tab, setTab] = useState<Tab>("Ranges");
+  const [tab, setTab] = useState<Tab>("Overview");
 
   function onKeys(e: KeyboardEvent<HTMLDivElement>) {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
@@ -335,7 +446,7 @@ export function DemoTabs() {
           role="tablist"
           aria-label="Screen walkthrough"
           onKeyDown={onKeys}
-          className="flex gap-1"
+          className="flex gap-1 overflow-x-auto"
         >
           {TABS.map((t) => (
             <button
@@ -345,7 +456,7 @@ export function DemoTabs() {
               aria-selected={tab === t}
               tabIndex={tab === t ? 0 : -1}
               onClick={() => setTab(t)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
                 tab === t
                   ? "bg-surface text-ink shadow-sm"
                   : "text-muted hover:text-ink"
@@ -361,7 +472,7 @@ export function DemoTabs() {
       </div>
       {/* min-h pinned to the tallest panel so switching tabs never reflows
           the section — clicking around must feel solid, not jumpy. */}
-      <div role="tabpanel" className="animate-fade min-h-[21rem] p-4" key={tab}>
+      <div role="tabpanel" className="animate-fade min-h-[24rem] p-4" key={tab}>
         <DemoPanel tab={tab} />
       </div>
     </div>

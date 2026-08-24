@@ -608,10 +608,10 @@ export default function Home() {
                 Click through what the verdict is built on.
               </h2>
               <p className="mt-3 max-w-md text-sm leading-relaxed text-muted">
-                Every tab below is a real output shape from the product —
-                ranges instead of hero numbers, the three deal-killers graded,
-                the broker&apos;s own comps ranked, and a verdict that holds
-                across scenarios. Shown here with illustrative sample data.
+                The tabs below are the deal page&apos;s own five sections —
+                Overview, Financials, Buy box, Analyses, Documents — with the
+                same chips, figures, and analysis names the product renders.
+                Shown here in miniature, on illustrative sample data.
               </p>
               <Link
                 href="/login?mode=signup"
@@ -1514,8 +1514,20 @@ function ScreenRunStrip() {
   );
 }
 
-/** A stylized preview of the product's output — pure decoration. */
+/** A faithful miniature of the REAL deal page's summary bar — name + verdict
+ *  + buy-box chips, the address line, exactly three figures, and the artifact
+ *  row (IC memo / Full report / Underwrite model), plus the top deal-killer.
+ *  Figures derive from the sample fixture through the live engine, so this
+ *  card can never drift from what the product actually renders. */
 function DealPreview() {
+  const inputs = SAMPLE_DEAL.model.inputs;
+  const r = computeModel(inputs).returns;
+  const verdictWord =
+    SAMPLE_DEAL.verdict.verdict === "pass"
+      ? "Go"
+      : SAMPLE_DEAL.verdict.verdict === "pass_on"
+        ? "No-go"
+        : "Caution";
   return (
     <div className="relative">
       {/* Glow + a second sheet behind, so the card reads as a stack. */}
@@ -1524,55 +1536,53 @@ function DealPreview() {
         aria-hidden
       />
       <div className="shadow-float relative rounded-2xl border border-line bg-surface p-5 text-ink">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-sm font-medium">The Maddox at Brewerytown</p>
-            <p className="text-xs text-muted">
-              Multifamily · 248 units · Brewerytown, Philadelphia
-            </p>
-          </div>
-          <span className="rounded-full bg-caution/10 px-2.5 py-1 text-xs font-medium text-caution">
-            Caution
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-semibold tracking-tight">
+            The Maddox at Brewerytown
+          </p>
+          <span className="rounded-full bg-caution/10 px-2.5 py-0.5 text-xs font-semibold text-caution">
+            {verdictWord}
+          </span>
+          <span className="rounded-full bg-caution/10 px-2 py-0.5 text-[10px] font-semibold text-caution">
+            WATCH
           </span>
         </div>
+        <p className="mt-0.5 text-xs text-muted">
+          Brewerytown, Philadelphia · Multifamily · {inputs.units} units
+        </p>
 
-        {/* Exit cap as a range, not a hero number */}
-        <div className="mt-4 rounded-lg border border-line p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium">Exit cap</span>
-            <span className="font-mono text-[11px] tabular-nums text-muted">
-              range
+        <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2 border-y border-line py-3">
+          {(
+            [
+              ["Price", `$${(inputs.purchasePrice / 1e6).toFixed(0)}M`],
+              ["Size", `${inputs.units} units`],
+              ["Going-in cap", `${r.goingInCapPct.toFixed(2)}%`],
+            ] as const
+          ).map(([k, v]) => (
+            <div key={k}>
+              <dt className="text-[10px] uppercase tracking-wide text-muted">
+                {k}
+              </dt>
+              <dd className="mt-0.5 font-mono text-sm font-semibold tabular-nums">
+                {v}
+              </dd>
+            </div>
+          ))}
+        </dl>
+
+        {/* The real header's artifact row, in miniature. */}
+        <div className="mt-3 flex flex-wrap gap-1.5" aria-hidden>
+          {["IC memo", "Full report", "Underwrite model"].map((a) => (
+            <span
+              key={a}
+              className="flex items-center gap-1 rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-medium shadow-sm"
+            >
+              {a}
+              <span className="rounded-full bg-brand/10 px-1.5 py-px text-[9px] font-semibold text-brand">
+                Pro
+              </span>
             </span>
-          </div>
-          <div className="mt-2 grid grid-cols-3 gap-px overflow-hidden rounded-md border border-line bg-line">
-            {[
-              { k: "Low", v: "5.25%", e: false },
-              { k: "Base", v: "5.50%", e: true },
-              { k: "High", v: "5.75%", e: false },
-            ].map((c) => (
-              <div
-                key={c.k}
-                className={`px-2.5 py-1.5 ${c.e ? "bg-brand/5" : "bg-surface"}`}
-              >
-                <p className="text-[10px] uppercase tracking-wide text-muted">
-                  {c.k}
-                </p>
-                <p
-                  className={`mt-0.5 font-mono tabular-nums ${
-                    c.e
-                      ? "text-sm font-semibold text-brand"
-                      : "text-xs text-ink"
-                  }`}
-                >
-                  {c.v}
-                </p>
-              </div>
-            ))}
-          </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-muted">
-            <span className="font-medium text-ink">Source:</span> submarket
-            trades 5.25–5.75%; broker holds 5.25%.
-          </p>
+          ))}
         </div>
 
         <div className="mt-3 rounded-lg border border-line border-l-4 border-l-kill bg-paper p-3">
