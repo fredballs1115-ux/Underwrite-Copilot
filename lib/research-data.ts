@@ -129,7 +129,7 @@ export function seedBenchmarks(): Benchmark[] {
         high: fmr["2br"],
         unit: "usd_month",
         source: fmr.sources?.[0] ?? "",
-        as_of: "2026-08-21",
+        as_of: "2026-08-24",
         status: (fmr.status as Benchmark["status"]) ?? "sourced",
         note: ["FY2026, effective 2025-10-01 through 2026-09-30", fmr.note].filter(Boolean).join(". "),
       });
