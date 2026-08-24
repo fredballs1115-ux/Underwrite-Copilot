@@ -1,5 +1,6 @@
 import Link from "next/link";
 import metrosSeed from "@/data/research/metros.json";
+import { seedBenchmarks } from "@/lib/research-data";
 
 // The pulse board — every covered market as a live tile: its FY2026 2BR
 // fair-market rent, research status, and rules on file, straight off the
@@ -32,6 +33,39 @@ const DOT: Record<string, string> = {
   sourced: "bg-accent",
   unverified_not_found: "bg-amber-400",
 };
+
+// The credibility strip is DERIVED: a curated label map of primary-document
+// hosts, shown only for hosts that actually appear in the research file's
+// source URLs right now. Aggregators never make this list; if a primary
+// source drops out of the data, its chip drops out of the strip.
+const PRIMARY_HOSTS: Record<string, string> = {
+  "huduser.gov": "HUD (huduser.gov)",
+  "govinfo.gov": "Federal Register",
+  "dchousing.org": "DC Housing Authority",
+  "sfha.org": "SF Housing Authority",
+  "nj.gov": "NJ Treasury",
+};
+const FOUND_PRIMARY: string[] = (() => {
+  const found = new Set<string>();
+  for (const m of metrosSeed.metros ?? []) {
+    const sources =
+      (m as { fmr_fy2026?: { sources?: string[] } | null }).fmr_fy2026?.sources ?? [];
+    for (const s of sources) {
+      try {
+        const host = new URL(s).hostname.replace(/^www\./, "");
+        for (const key of Object.keys(PRIMARY_HOSTS)) {
+          if (host === key || host.endsWith(`.${key}`)) found.add(key);
+        }
+      } catch {
+        // non-URL source string — skip
+      }
+    }
+  }
+  return Object.keys(PRIMARY_HOSTS).filter((k) => found.has(k));
+})();
+const HAS_FRED = seedBenchmarks().some((b) =>
+  (b.source ?? "").toLowerCase().includes("fred"),
+);
 
 export function MarketPulseBoard() {
   const priced = TILES.filter((t) => t.fmr2br != null).length;
@@ -88,6 +122,26 @@ export function MarketPulseBoard() {
             </Link>
           ))}
         </div>
+        {(FOUND_PRIMARY.length > 0 || HAS_FRED) && (
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40">
+              Primary documents on file:
+            </span>
+            {FOUND_PRIMARY.map((k) => (
+              <span
+                key={k}
+                className="rounded-full border border-white/15 bg-white/[0.03] px-2.5 py-1 text-[10px] font-medium text-white/70"
+              >
+                {PRIMARY_HOSTS[k]}
+              </span>
+            ))}
+            {HAS_FRED && (
+              <span className="rounded-full border border-white/15 bg-white/[0.03] px-2.5 py-1 text-[10px] font-medium text-white/70">
+                FRED (rates)
+              </span>
+            )}
+          </div>
+        )}
         <p className="mt-4 text-[11px] text-white/40">
           FY2026 2BR fair-market rents from HUD&apos;s schedules and the
           authorities&apos; own sheets — sourced and statused per metro, gaps
