@@ -26,6 +26,7 @@ import {
 // drifted (the page said 7.1% while the engine computed 6.9%).
 import { computeModel } from "@/lib/model/compute";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
+import { sampleLegal } from "@/lib/sample-legal";
 import { seedBenchmarks, seedRules } from "@/lib/research-data";
 import { hoursSince } from "@/lib/research";
 import { RegulationPlayground, SCENARIO_COUNT } from "./landing-regulation";
@@ -40,6 +41,9 @@ import { MarketsMarquee, MARKET_COUNT, metroFact } from "./markets-marquee";
 // (Server component only: these pull the research JSONs, which must not ride
 // into client bundles via marketing-constants.)
 const RULE_COUNT = seedRules().length;
+// The sample deal's legal read through the REAL rules engine — feeds the
+// walkthrough widget's Regulation block and the hero's baby legal note.
+const LEGAL = sampleLegal();
 const WIRED_MARKETS = (metrosSeed.metros ?? [])
   .filter((m) => (m as { ingest_market?: string }).ingest_market)
   .map((m) => m.name);
@@ -487,6 +491,24 @@ export default function Home() {
                     Excel model
                   </a>
                 </p>
+                {/* Baby legal note — the deal page's Regulation panel in one
+                    line, derived from the same rules engine. */}
+                <p className="mt-1.5 text-center text-[11px] leading-relaxed text-white/40">
+                  Legal screen: {LEGAL.screenedCount} rule
+                  {LEGAL.screenedCount === 1 ? "" : "s"} on file for{" "}
+                  {LEGAL.jurisdiction} —{" "}
+                  {LEGAL.triggeredCount === 0
+                    ? "none triggered by this deal's facts"
+                    : `${LEGAL.triggeredCount} triggered`}
+                  {LEGAL.stateFact ? <> · {LEGAL.stateFact.replace(/\.$/, "")}</> : null}
+                  {" · "}
+                  <Link
+                    href={LEGAL.metroId ? `/market?metro=${LEGAL.metroId}` : "/market"}
+                    className="text-white/60 underline-offset-2 hover:text-white hover:underline"
+                  >
+                    market brief →
+                  </Link>
+                </p>
               </div>
             </div>
 
@@ -646,7 +668,7 @@ export default function Home() {
               </Link>
             </Reveal>
             <Reveal delay={120}>
-              <DemoTabs />
+              <DemoTabs legal={LEGAL} />
             </Reveal>
           </div>
         </section>

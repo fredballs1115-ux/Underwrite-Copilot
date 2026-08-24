@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-24",
+      "title": "The legal read is on the sample screen — and the homepage",
+      "blurb": "The deal page's Regulation & benchmarks panel now shows in the homepage walkthrough and on /demo: the sample's Philadelphia jurisdiction run through the real rules engine — one verified rule on file, honestly marked dormant (it keys off an eviction filing, not a purchase), with source, as-of, and the state's no-rent-control fact extracted verbatim. A tiny legal note rides under the hero card too, and new tests lock every number to the engine.",
+      "href": "/demo"
+    },
+    {
+      "date": "2026-08-24",
       "title": "The sample artifacts are one click from the homepage",
       "blurb": "The full multi-page report joined the memo and the Excel model as a public demo download, and the homepage now hands you all three — under the hero card and on the memo tile — so the artifact buttons in the miniature summary bar have the real files behind them.",
       "href": "/demo"
@@ -65,12 +71,6 @@
       "date": "2026-08-23",
       "title": "Every deal gets a leverage check against today's 30-yr rate",
       "blurb": "The deal page now computes the spread between the going-in cap and the freshest FRED 30-yr fixed — negative leverage and thin spreads called out in plain numbers, sourced and dated. Arithmetic, not an opinion.",
-      "href": "/deals"
-    },
-    {
-      "date": "2026-08-23",
-      "title": "The screen absorbs a 101-page crash post-mortem",
-      "blurb": "Negative leverage named outright, stabilized occupancy above ~95% challenged, exit values checked for the 'there's always a buyer' myth and missing sale costs, and demand claims weighed against supply — disciplines drawn from the industry's most famous lessons-learned memo.",
       "href": "/deals"
     }
   ]
