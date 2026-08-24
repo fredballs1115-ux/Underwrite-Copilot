@@ -462,6 +462,31 @@ export default function Home() {
                     Browse the full sample screen →
                   </Link>
                 </p>
+                {/* The mini summary bar above shows the artifact buttons —
+                    these are the REAL public sample files behind them. */}
+                <p className="mt-1.5 text-center text-[11px] text-white/45">
+                  Or hold its artifacts:{" "}
+                  <a
+                    href="/api/demo/memo"
+                    className="text-white/65 underline-offset-2 hover:text-white hover:underline"
+                  >
+                    IC memo
+                  </a>
+                  {" · "}
+                  <a
+                    href="/api/demo/report"
+                    className="text-white/65 underline-offset-2 hover:text-white hover:underline"
+                  >
+                    full report
+                  </a>
+                  {" · "}
+                  <a
+                    href="/api/demo/underwrite.xlsx"
+                    className="text-white/65 underline-offset-2 hover:text-white hover:underline"
+                  >
+                    Excel model
+                  </a>
+                </p>
               </div>
             </div>
 
@@ -996,6 +1021,12 @@ export default function Home() {
                       <div className="h-8 rounded bg-faint" />
                     </div>
                   </div>
+                  <a
+                    href="/api/demo/memo"
+                    className="mt-3 inline-block text-[11px] font-medium text-brand underline-offset-2 hover:underline"
+                  >
+                    Download the sample memo (PDF) →
+                  </a>
                   </div>
                 </div>
 

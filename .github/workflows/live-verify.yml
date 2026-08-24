@@ -36,6 +36,7 @@ jobs:
           grep -c "Built in the open" body.html && echo "SHIPPED BLOCK (Aug 23): present" || echo "SHIPPED BLOCK: not yet deployed"
           grep -c "hero-rotator-item" body.html && echo "HERO ROTATOR (Aug 23): present" || echo "HERO ROTATOR: not yet deployed"
           grep -c "Break it yourself" body.html && echo "STRESS BENCH (Aug 24): present" || echo "STRESS BENCH: not yet deployed"
+          grep -c "Or hold its artifacts" body.html && echo "ARTIFACT LINKS (Aug 24): present" || echo "ARTIFACT LINKS: not yet deployed"
           grep -o 'name="uc-build" content="[0-9a-f]*"' body.html | head -1 && echo "SELF-HEAL SENTINEL: armed (stale browser copies reload themselves)" || echo "SELF-HEAL SENTINEL: not yet deployed"
           live=$(grep -o 'commit/[0-9a-f]\{7\}' body.html | head -1 | cut -d/ -f2)
           echo "LIVE BUILD SHA: ${live:-not stamped yet} · this run's main tip: ${GITHUB_SHA:0:7}"
