@@ -56,6 +56,40 @@ const DIR_COLOR: Record<string, string> = {
   neutral: C.muted,
 };
 
+// Light tints for chip backgrounds — react-pdf has no alpha compositing
+// against the page, so the tints are precomputed solids (the memo's trio,
+// keyed by the rating color they pair with).
+const TINT: Record<string, string> = {
+  [C.pass]: "#e9f4ef",
+  [C.caution]: "#f8f0e3",
+  [C.kill]: "#f9eae8",
+  [C.brand]: "#e8f1ef",
+  [C.muted]: C.faint,
+};
+
+/** A rating word as a bordered, tinted chip — the same treatment the memo
+ *  gives buy-box checks, so support/assessment reads scan identically across
+ *  both documents. Empty word renders an em dash, not an empty chip. */
+function RateChip({ word, color }: { word: string; color: string }) {
+  if (!word) return <Text style={{ fontSize: 8, color: C.muted }}>—</Text>;
+  return (
+    <View style={{ flexDirection: "row" }}>
+      <View
+        style={{
+          borderWidth: 0.75,
+          borderColor: color,
+          backgroundColor: TINT[color] ?? C.faint,
+          borderRadius: 7,
+          paddingVertical: 1,
+          paddingHorizontal: 5,
+        }}
+      >
+        <Text style={{ fontSize: 7, fontFamily: "Helvetica-Bold", color }}>{word}</Text>
+      </View>
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
   page: {
     paddingTop: 34,
@@ -82,11 +116,28 @@ const s = StyleSheet.create({
   pageHeadMeta: { fontSize: 8, color: C.muted },
   pageHeadRow: { flexDirection: "row", alignItems: "center" },
   pageHeadLogo: { height: 12, maxWidth: 80, objectFit: "contain", marginRight: 5 },
+  h2Row: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+  h2Tick: {
+    width: 4,
+    height: 13,
+    backgroundColor: C.brand,
+    borderRadius: 2,
+    marginRight: 6,
+  },
   h2: {
     fontSize: 13,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 8,
   },
+  countPill: {
+    borderWidth: 0.75,
+    borderColor: C.line,
+    backgroundColor: C.faint,
+    borderRadius: 8,
+    paddingVertical: 1.5,
+    paddingHorizontal: 7,
+    marginLeft: 8,
+  },
+  countPillText: { fontSize: 7.5, fontFamily: "Helvetica-Bold", color: C.muted },
   sub: { fontSize: 8.5, color: C.muted, marginBottom: 10 },
 
   tableHead: {
@@ -104,10 +155,13 @@ const s = StyleSheet.create({
   },
   row: {
     flexDirection: "row",
+    alignItems: "center",
     borderBottomWidth: 0.5,
     borderBottomColor: C.line,
     paddingVertical: 3.5,
+    paddingHorizontal: 2,
   },
+  rowAlt: { backgroundColor: C.faint },
 
   block: { marginBottom: 9 },
   blockTitleRow: { flexDirection: "row", alignItems: "center", marginBottom: 2 },
@@ -127,8 +181,12 @@ const s = StyleSheet.create({
 
   summaryBox: {
     marginTop: 10,
-    backgroundColor: C.faint,
-    borderRadius: 6,
+    borderWidth: 0.75,
+    borderColor: C.line,
+    borderLeftWidth: 3,
+    borderLeftColor: C.brand,
+    backgroundColor: "#fbfcfb",
+    borderRadius: 5,
     padding: 9,
   },
   summaryText: { fontSize: 9, color: C.ink },
@@ -157,13 +215,40 @@ const s = StyleSheet.create({
   },
 });
 
+/** A page (or in-page) heading with the memo's brand tick, plus an optional
+ *  count pill derived from the data on the page ("31 figures · 4 flagged") —
+ *  the reader knows the page's weight before reading a row. */
+function TitleRow({
+  title,
+  count,
+  marginTop,
+}: {
+  title: string;
+  count?: string;
+  marginTop?: number;
+}) {
+  return (
+    <View style={marginTop != null ? [s.h2Row, { marginTop }] : s.h2Row}>
+      <View style={s.h2Tick} />
+      <Text style={s.h2}>{title}</Text>
+      {count ? (
+        <View style={s.countPill}>
+          <Text style={s.countPillText}>{count}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function PageChrome({
   title,
+  count,
   dealName,
   branding,
   children,
 }: {
   title: string;
+  count?: string;
   dealName: string;
   branding?: MemoData["branding"];
   children: React.ReactNode;
@@ -189,7 +274,7 @@ function PageChrome({
         </View>
         <Text style={s.pageHeadMeta}>{dealName} — full screening report</Text>
       </View>
-      <Text style={s.h2}>{title}</Text>
+      <TitleRow title={title} count={count} />
       {children}
       <View style={s.footer} fixed>
         <View style={s.footerLeft}>
@@ -417,6 +502,18 @@ export function ReportDocument({ input }: { input: ReportInput }) {
     na: "—",
   };
 
+  // Count pills for each page title — derived from the rows on the page, so
+  // the pill can never disagree with the table under it.
+  const flaggedCount = metrics.filter((m) => m?.flagged).length;
+  const highCount = chList.filter((c) => str(c?.severity) === "high").length;
+  const compCount = saleComps.length + leaseComps.length;
+  const aggressiveCount = checks.filter(
+    (c) => str(c?.assessment) === "aggressive",
+  ).length;
+  const unfavCount = rows.filter(
+    (r) => str(r?.direction) === "unfavorable",
+  ).length;
+
   return (
     <Document
       title={`${dealName} — Full Screening Report`}
@@ -429,7 +526,12 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           breaks — two grids from the same engine as the workbook and the
           on-screen playground, colored against the BUYER'S hurdle. */}
       {sensitivity && (
-        <PageChrome title="Sensitivity analysis" dealName={dealName} branding={memo.branding}>
+        <PageChrome
+          title="Sensitivity analysis"
+          count={`graded vs ${fmtHurdle(sensitivity.hurdlePct)} IRR`}
+          dealName={dealName}
+          branding={memo.branding}
+        >
           <Text style={s.sub}>
             {`Levered IRR (bold) and equity multiple, recomputed cell by cell. Color marks distance from the ${
               sensitivity.hurdleSource === "buybox"
@@ -471,7 +573,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             ))}
           </View>
 
-          <Text style={[s.h2, { marginTop: 16 }]}>The retrade grid</Text>
+          <TitleRow title="The retrade grid" marginTop={16} />
           <Text style={s.sub}>
             The same model repriced: what paying less (or more) does to
             returns at each exit cap. Rows re-size the loan, fees, and equity
@@ -512,7 +614,12 @@ export function ReportDocument({ input }: { input: ReportInput }) {
       )}
 
       {metrics.length > 0 && (
-        <PageChrome title="Extracted terms" dealName={dealName} branding={memo.branding}>
+        <PageChrome
+          title="Extracted terms"
+          count={`${metrics.length} figures${flaggedCount ? ` \u00b7 ${flaggedCount} flagged` : ""}`}
+          dealName={dealName}
+          branding={memo.branding}
+        >
           <Text style={s.sub}>
             Every figure the screen pulled from the OM, with its basis and
             source page. Flagged rows deserve independent verification.
@@ -525,35 +632,40 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             <Text style={[s.headText, { width: "14%" }]}>Flag</Text>
           </View>
           {metrics.map((m, i) => (
-            <View key={i} style={s.row} wrap={false}>
+            <View key={i} style={i % 2 === 1 ? [s.row, s.rowAlt] : s.row} wrap={false}>
               <Text style={{ width: "34%", fontSize: 8.5 }}>{str(m?.label)}</Text>
               <Text
                 style={{ width: "24%", fontSize: 8.5, fontFamily: "Helvetica-Bold" }}
               >
                 {str(m?.value)}
               </Text>
-              <Text style={{ width: "16%", fontSize: 8, color: C.muted }}>
+              <Text
+                style={{
+                  width: "16%",
+                  fontSize: 8,
+                  color: str(m?.basis) === "pro_forma" ? C.caution : C.muted,
+                }}
+              >
                 {BASIS_LABEL[str(m?.basis)] ?? "—"}
               </Text>
               <Text style={{ width: "12%", fontSize: 8, color: C.muted }}>
                 {str(m?.page)}
               </Text>
-              <Text
-                style={{
-                  width: "14%",
-                  fontSize: 8,
-                  color: m?.flagged ? C.caution : C.muted,
-                }}
-              >
-                {m?.flagged ? "verify" : ""}
-              </Text>
+              <View style={{ width: "14%" }}>
+                {m?.flagged ? <RateChip word="verify" color={C.caution} /> : null}
+              </View>
             </View>
           ))}
         </PageChrome>
       )}
 
       {chList.length > 0 && (
-        <PageChrome title="Assumption challenges" dealName={dealName} branding={memo.branding}>
+        <PageChrome
+          title="Assumption challenges"
+          count={`${chList.length} challenges${highCount ? ` \u00b7 ${highCount} high` : ""}`}
+          dealName={dealName}
+          branding={memo.branding}
+        >
           <Text style={s.sub}>
             The pro forma grilled in the order deals die — basis, exit, debt —
             each with the exact question to put to the broker.
@@ -584,7 +696,12 @@ export function ReportDocument({ input }: { input: ReportInput }) {
       )}
 
       {(saleComps.length > 0 || leaseComps.length > 0 || redFlags.length > 0) && (
-        <PageChrome title="Comp scrutiny" dealName={dealName} branding={memo.branding}>
+        <PageChrome
+          title="Comp scrutiny"
+          count={`${compCount} comps${redFlags.length ? ` \u00b7 ${redFlags.length} flags` : ""}`}
+          dealName={dealName}
+          branding={memo.branding}
+        >
           <Text style={s.sub}>
             Every comp the OM presented, rated for how hard it actually
             supports the deal — sell-side sets tend to lean favorable.
@@ -598,7 +715,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               <View key={g.label} style={{ marginBottom: 10 }}>
                 <Text style={[s.headText, { marginBottom: 4 }]}>{g.label}</Text>
                 {g.items.map((cp, i) => (
-                  <View key={i} style={s.row} wrap={false}>
+                  <View key={i} style={i % 2 === 1 ? [s.row, s.rowAlt] : s.row} wrap={false}>
                     <Text
                       style={{ width: "26%", fontSize: 8.5, fontFamily: "Helvetica-Bold" }}
                     >
@@ -607,16 +724,12 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                     <Text style={{ width: "30%", fontSize: 8.5 }}>
                       {str(cp?.detail)}
                     </Text>
-                    <Text
-                      style={{
-                        width: "14%",
-                        fontSize: 8,
-                        fontFamily: "Helvetica-Bold",
-                        color: SUPPORT_COLOR[str(cp?.support)] ?? C.muted,
-                      }}
-                    >
-                      {str(cp?.support)}
-                    </Text>
+                    <View style={{ width: "14%", paddingRight: 3 }}>
+                      <RateChip
+                        word={str(cp?.support)}
+                        color={SUPPORT_COLOR[str(cp?.support)] ?? C.muted}
+                      />
+                    </View>
                     <Text style={{ width: "22%", fontSize: 7.5, color: C.muted }}>
                       {str(cp?.note)}
                     </Text>
@@ -648,7 +761,12 @@ export function ReportDocument({ input }: { input: ReportInput }) {
       )}
 
       {checks.length > 0 && (
-        <PageChrome title="Market plausibility" dealName={dealName} branding={memo.branding}>
+        <PageChrome
+          title="Market plausibility"
+          count={`${checks.length} checks${aggressiveCount ? ` \u00b7 ${aggressiveCount} aggressive` : ""}`}
+          dealName={dealName}
+          branding={memo.branding}
+        >
           <Text style={s.sub}>
             The OM&rsquo;s key assumptions against typical ranges for the asset
             class — rules of thumb, not a live comps feed.
@@ -661,7 +779,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             <Text style={[s.headText, { width: "24%" }]}>Note</Text>
           </View>
           {checks.map((c, i) => (
-            <View key={i} style={s.row} wrap={false}>
+            <View key={i} style={i % 2 === 1 ? [s.row, s.rowAlt] : s.row} wrap={false}>
               <Text style={{ width: "26%", fontSize: 8.5 }}>
                 {str(c?.assumption)}
               </Text>
@@ -673,16 +791,12 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               <Text style={{ width: "18%", fontSize: 8.5 }}>
                 {str(c?.typicalRange)}
               </Text>
-              <Text
-                style={{
-                  width: "14%",
-                  fontSize: 8,
-                  fontFamily: "Helvetica-Bold",
-                  color: ASSESS_COLOR[str(c?.assessment)] ?? C.muted,
-                }}
-              >
-                {str(c?.assessment)}
-              </Text>
+              <View style={{ width: "14%", paddingRight: 3 }}>
+                <RateChip
+                  word={str(c?.assessment)}
+                  color={ASSESS_COLOR[str(c?.assessment)] ?? C.muted}
+                />
+              </View>
               <Text style={{ width: "24%", fontSize: 7.5, color: C.muted }}>
                 {str(c?.note)}
               </Text>
@@ -697,7 +811,12 @@ export function ReportDocument({ input }: { input: ReportInput }) {
       )}
 
       {rows.length > 0 && (
-        <PageChrome title="Reconciliation vs. your model" dealName={dealName} branding={memo.branding}>
+        <PageChrome
+          title="Reconciliation vs. your model"
+          count={`${rows.length} metrics${unfavCount ? ` \u00b7 ${unfavCount} unfavorable` : ""}`}
+          dealName={dealName}
+          branding={memo.branding}
+        >
           <Text style={s.sub}>
             Where the OM and your own underwriting disagree, framed from your
             side of the table.
@@ -709,7 +828,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             <Text style={[s.headText, { width: "30%" }]}>Gap</Text>
           </View>
           {rows.map((r, i) => (
-            <View key={i} style={s.row} wrap={false}>
+            <View key={i} style={i % 2 === 1 ? [s.row, s.rowAlt] : s.row} wrap={false}>
               <Text style={{ width: "26%", fontSize: 8.5 }}>{str(r?.metric)}</Text>
               <Text style={{ width: "22%", fontSize: 8.5 }}>{str(r?.omValue)}</Text>
               <Text style={{ width: "22%", fontSize: 8.5 }}>{str(r?.myValue)}</Text>
@@ -717,6 +836,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                 style={{
                   width: "30%",
                   fontSize: 8.5,
+                  fontFamily:
+                    str(r?.direction) === "unfavorable"
+                      ? "Helvetica-Bold"
+                      : "Helvetica",
                   color: DIR_COLOR[str(r?.direction)] ?? C.ink,
                 }}
               >
