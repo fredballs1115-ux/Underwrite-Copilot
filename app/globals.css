@@ -419,3 +419,42 @@ body {
     animation: none;
   }
 }
+
+/* Market pulse board: each tile breathes on a staggered cycle — a faint
+   accent glow that travels across the wall. Hover/focus styles come from
+   utilities; this is only the idle life. Static under reduced motion. */
+@keyframes pulse-tile-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(127, 214, 204, 0); }
+  50% { box-shadow: 0 0 22px 1px rgba(127, 214, 204, 0.18); }
+}
+.pulse-tile {
+  animation: pulse-tile-breathe 6s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.35s);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse-tile { animation: none; }
+}
+
+/* Verdict stamp: the hero card's verdict chip slams in once on load —
+   oversized and tilted, then settling. Skipped under reduced motion. */
+@keyframes stamp-in {
+  0% { opacity: 0; transform: scale(2.4) rotate(-14deg); }
+  55% { opacity: 1; transform: scale(0.92) rotate(3deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+.stamp-in {
+  opacity: 0;
+  animation: stamp-in 0.55s cubic-bezier(0.2, 0.8, 0.3, 1.1) 0.5s both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .stamp-in { animation: none; opacity: 1; }
+}
+
+/* IRR gauge: the needle eases between positions as the stress levers move. */
+.gauge-needle {
+  transition: transform 0.35s cubic-bezier(0.34, 1.2, 0.5, 1);
+  transform-origin: 100px 92px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gauge-needle { transition: none; }
+}

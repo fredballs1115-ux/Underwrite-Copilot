@@ -10,7 +10,7 @@
 
 import { useMemo, useState } from "react";
 import { computeModel } from "@/lib/model/compute";
-import { SAMPLE_DEAL } from "@/lib/sample-deal";
+import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { SLIDER_SWEEP_BPS } from "@/lib/marketing-constants";
 
 const BASE = SAMPLE_DEAL.model.inputs;
@@ -69,6 +69,52 @@ function Lever({
         style={{ accentColor: "#7fd6cc" }}
       />
     </label>
+  );
+}
+
+// ── IRR gauge ── an analog needle over the same number the big readout
+// prints, swinging live as the levers move. Scale 0–25% IRR; the accent
+// tick marks the demo mandate's target (a real stored criterion, not an
+// invented hurdle) and the faint dot marks the broker's base case.
+// aria-hidden — the numeric IRR reads right below it.
+const GAUGE_MAX = 25;
+const GAUGE_HURDLE = SAMPLE_DEMO_BOX.minIrrPct ?? null;
+
+function gaugeAngle(pct: number | null): number {
+  if (pct == null || !isFinite(pct)) return 0;
+  return (Math.min(Math.max(pct, 0), GAUGE_MAX) / GAUGE_MAX) * 180;
+}
+function arcPoint(deg: number, radius: number): [number, number] {
+  const rad = (deg * Math.PI) / 180;
+  return [100 - radius * Math.cos(rad), 92 - radius * Math.sin(rad)];
+}
+
+function IrrGauge({ irr, baseIrr }: { irr: number | null; baseIrr: number | null }) {
+  const a = gaugeAngle(irr);
+  const hurdleA = GAUGE_HURDLE != null ? gaugeAngle(GAUGE_HURDLE) : null;
+  const [hx1, hy1] = hurdleA != null ? arcPoint(hurdleA, 70) : [0, 0];
+  const [hx2, hy2] = hurdleA != null ? arcPoint(hurdleA, 86) : [0, 0];
+  const basePt = baseIrr != null ? arcPoint(gaugeAngle(baseIrr), 78) : null;
+  return (
+    <svg viewBox="0 0 200 104" className="irr-gauge mx-auto block w-full max-w-[15rem]">
+      <path
+        d="M 22 92 A 78 78 0 0 1 178 92"
+        fill="none"
+        stroke="rgba(255,255,255,0.12)"
+        strokeWidth="8"
+        strokeLinecap="round"
+      />
+      {hurdleA != null && (
+        <line x1={hx1} y1={hy1} x2={hx2} y2={hy2} stroke="#7fd6cc" strokeWidth="2.5" opacity="0.9" />
+      )}
+      {basePt && <circle cx={basePt[0]} cy={basePt[1]} r="3" fill="rgba(255,255,255,0.45)" />}
+      <g className="gauge-needle" style={{ transform: `rotate(${a}deg)` }}>
+        <line x1="100" y1="92" x2="34" y2="92" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+      </g>
+      <circle cx="100" cy="92" r="5" fill="currentColor" />
+      <text x="18" y="102" fontSize="7" fill="rgba(255,255,255,0.4)">0%</text>
+      <text x="168" y="102" fontSize="7" fill="rgba(255,255,255,0.4)">{GAUGE_MAX}%</text>
+    </svg>
   );
 }
 
@@ -165,7 +211,16 @@ export function StressBench() {
           </div>
         </div>
 
-        <dl className="grid min-w-[15rem] grid-cols-2 content-start gap-x-10 gap-y-5">
+        <div className="min-w-[15rem]">
+          <div aria-hidden className={tone}>
+            <IrrGauge irr={r.leveredIrrPct} baseIrr={base.leveredIrrPct} />
+            <p className="mt-1 text-center text-[10px] text-white/40">
+              tick = the demo mandate&apos;s{" "}
+              {GAUGE_HURDLE != null ? `${GAUGE_HURDLE}%` : ""} IRR target · dot
+              = broker&apos;s base
+            </p>
+          </div>
+          <dl className="mt-4 grid grid-cols-2 content-start gap-x-10 gap-y-5">
           <div className="col-span-2 sm:col-span-1 lg:col-span-2">
             <dt className="text-[11px] font-medium uppercase tracking-wider text-white/45">
               Levered IRR
@@ -216,7 +271,8 @@ export function StressBench() {
               {fmtM(r.year1Noi)}
             </dd>
           </div>
-        </dl>
+          </dl>
+        </div>
       </div>
       <p className="mt-3 text-center text-[11px] leading-relaxed text-white/45">
         Illustrative sample deal ({BASE.units} units, {fmtM(BASE.purchasePrice)}

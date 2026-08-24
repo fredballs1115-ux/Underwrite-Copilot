@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { LogoMark } from "./logo";
 import { Reveal, CountUp, DemoTabs } from "./landing-interactive";
 import { ScreenRunStrip } from "./screen-run-strip";
+import { MarketPulseBoard } from "./market-pulse";
 import type { Metadata } from "next";
 import {
   SPREAD_LOW_IRR_PCT,
@@ -532,6 +533,9 @@ export default function Home() {
 
         <ResearchTicker />
         <LiveProofStrip />
+        {/* Eye-catcher: the market pulse board — the whole covered map as a
+            breathing tile wall, every figure real, every tile a door. */}
+        <MarketPulseBoard />
 
         {/* The problem */}
         <section id="problem" className="scroll-mt-16">
@@ -1522,7 +1526,7 @@ function DealPreview() {
           <p className="text-sm font-semibold tracking-tight">
             The Maddox at Brewerytown
           </p>
-          <span className="rounded-full bg-caution/10 px-2.5 py-0.5 text-xs font-semibold text-caution">
+          <span className="stamp-in rounded-full bg-caution/10 px-2.5 py-0.5 text-xs font-semibold text-caution ring-1 ring-caution/30">
             {verdictWord}
           </span>
           <span className="rounded-full bg-caution/10 px-2 py-0.5 text-[10px] font-semibold text-caution">
