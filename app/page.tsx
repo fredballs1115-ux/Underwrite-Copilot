@@ -30,6 +30,7 @@ import { seedBenchmarks, seedRules } from "@/lib/research-data";
 import { hoursSince } from "@/lib/research";
 import { RegulationPlayground, SCENARIO_COUNT } from "./landing-regulation";
 import { changelogEntries, latestChange } from "@/lib/changelog";
+import { StressBench } from "./landing-stress";
 import { COVERAGE_LIVE, COVERAGE_DISCOVERY } from "@/lib/public-comps/core";
 import metrosSeed from "@/data/research/metros.json";
 import { MarketsMarquee, MARKET_COUNT, metroFact } from "./markets-marquee";
@@ -678,6 +679,33 @@ export default function Home() {
                 Screen a deal free →
               </p>
             </Link>
+          </div>
+        </section>
+
+        {/* Break it yourself — the deterministic engine, interactive, in the
+            reader's browser. The "drag the levers, watch it break" tile as a
+            live demonstration instead of a promise. */}
+        <section id="stress" className="band-dark scroll-mt-16 text-white">
+          <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
+            <Reveal>
+              <p className="text-xs font-medium uppercase tracking-wider text-accent/90">
+                Try the engine
+              </p>
+              <h2 className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">
+                Break it yourself — the return math, live in your browser.
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/65">
+                Worst case first: drag the exit cap away from the broker&apos;s
+                base and watch the return decay. Every tick recomputes through
+                the same deterministic engine the product ships — real code,
+                no AI in this box, no server round-trip.
+              </p>
+            </Reveal>
+            <Reveal delay={80}>
+              <div className="mt-8">
+                <StressBench />
+              </div>
+            </Reveal>
           </div>
         </section>
 
