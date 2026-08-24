@@ -15,6 +15,43 @@ since you pointed the web service at `main`). What gates the new features is
 Everything ships dark-safe: nothing breaks while those are pending, pages
 say exactly what's missing and why.
 
+## Monday evening (Aug 24 ET) — your three call-outs, answered: legal on the sample, a deeper model, cool stuff everywhere
+
+Three more PRs, each probe-verified live (#128–#130), built directly
+from your evening feedback:
+
+**"Nowhere does it talk about the legal information" (#128).** The deal
+page's Regulation & benchmarks panel now shows everywhere the sample
+deal does — derived by one module through the REAL rules engine on the
+sample's Philadelphia jurisdiction. The homepage walkthrough's Overview
+panel carries the compact panel (covered-market chip, screened line,
+rule card with outcome chip and the dormancy explainer), the hero card
+has the baby legal note you asked for, and /demo carries the full panel
+with source link and verified chip. Four tests lock it all to the
+engine.
+
+**"More on the model — go more in depth" (#129).** The workbook's ninth
+tab, Operating Metrics: expense ratio, NOI margin, DSCR, debt yield,
+breakeven occupancy, and cash-on-cash by operating year, plus per-unit
+and per-SF yardsticks — every cell a live formula, five new
+HyperFormula tests tying it to the engine. When nothing states a unit
+count the per-unit block says "omitted rather than guessed."
+
+**"Cool features everywhere" (#130).** Five in one pass, all real data:
+reveal-on-click broker-question cards on /demo (the challenger's actual
+drafted asks), the FMR bedroom ladder drawn as bars on market briefs, a
+one-click copy-citation button, a compare-two-markets tool with both
+ladders on ONE shared dollar scale plus the computed 2BR spread, and
+the six-stage screen-run trace band now playing on /why.
+
+| Change | Where to look |
+|---|---|
+| Legal read on the sample screen + hero baby note | homepage · /demo (#128) |
+| Operating Metrics tab (ratio ladder, per-unit/SF) | sample .xlsx (#129) |
+| Broker-question reveal cards | /demo (#130) |
+| FMR ladders, copy-cite, compare-two-markets | /market (#130) |
+| Screen-run trace on /why | /why (#130) |
+
 ## Sunday night–Monday (Aug 23–24 ET) — the post-mortem absorbed, leverage computed, every market priced, and the deliverables redesigned
 
 Twenty more PRs merged, each probe-verified live (#107–#126; every probe
