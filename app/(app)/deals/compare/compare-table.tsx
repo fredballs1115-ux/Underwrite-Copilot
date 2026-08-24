@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { LeverageRead } from "@/lib/leverage";
 
 export const VERDICT_PILL: Record<string, { label: string; cls: string }> = {
   pass: { label: "Go", cls: "bg-pass/15 text-pass" },
@@ -30,6 +31,8 @@ export type Col = {
   em: number | null;
   coc: number | null;
   cap: number | null;
+  /** cap vs the freshest 30-yr fixed — same arithmetic as the deal page */
+  leverage: LeverageRead | null;
   price: string | null;
   noi: string | null;
 };
@@ -52,6 +55,8 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     get: (c: Col) => string | null;
     best?: (c: Col) => boolean;
     mono?: boolean;
+    /** optional per-cell tone class (e.g. the leverage row's traffic light) */
+    cls?: (c: Col) => string;
   }[] = [
     { label: "Market", get: (c) => c.market },
     { label: "Covered market", get: (c) => c.coveredMarket ?? "—" },
@@ -73,6 +78,23 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     },
     { label: "Cash-on-cash (Yr 1)", get: (c) => pct(c.coc), mono: true },
     { label: "Going-in cap", get: (c) => pct(c.cap), mono: true },
+    {
+      label: "Leverage vs 30-yr",
+      // Signed spread only — the full sentence lives on each deal's page.
+      get: (c) =>
+        c.leverage
+          ? `${c.leverage.spreadBps > 0 ? "+" : ""}${c.leverage.spreadBps} bps`
+          : null,
+      cls: (c) =>
+        c.leverage?.tone === "negative"
+          ? "text-kill"
+          : c.leverage?.tone === "thin"
+            ? "text-caution"
+            : c.leverage
+              ? "text-pass"
+              : "",
+      mono: true,
+    },
     { label: "Purchase price", get: (c) => c.price, mono: true },
     { label: "Year-1 NOI", get: (c) => c.noi, mono: true },
   ];
@@ -166,7 +188,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                     key={c.id}
                     className={`border-l border-line px-4 py-3 ${
                       mr.mono ? "font-mono tabular-nums" : ""
-                    } ${isBest ? "font-semibold text-brand" : "text-ink"}`}
+                    } ${isBest ? "font-semibold text-brand" : mr.cls?.(c) || "text-ink"}`}
                   >
                     {val ?? <span className="text-muted">—</span>}
                     {isBest && (

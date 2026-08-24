@@ -9,6 +9,8 @@ import { evaluateBuyBox, type BuyBox } from "@/lib/criteria";
 import { CompareTable, usd, type Col } from "./compare-table";
 import { metroForAddress } from "@/lib/market-match";
 import type { StructuredAddress } from "@/lib/address";
+import { leverageRead } from "@/lib/leverage";
+import { seedBenchmarks } from "@/lib/research-data";
 
 export const metadata: Metadata = { title: "Compare deals" };
 
@@ -19,7 +21,7 @@ function fromExtraction(ex: ExtractionResult | null, re: RegExp): string | null 
   return m ? m.value : null;
 }
 
-function toCol(deal: DealRow, box: BuyBox | null): Col {
+function toCol(deal: DealRow, box: BuyBox | null, bench30: number | null): Col {
   const ex = (deal.extraction as ExtractionResult | null) ?? null;
   const verdict = (deal.verdict as VerdictResult | null) ?? null;
   const model = (deal.model as UnderwritingModel | null) ?? null;
@@ -62,6 +64,12 @@ function toCol(deal: DealRow, box: BuyBox | null): Col {
     em: r?.equityMultiple ?? null,
     coc: r?.cashOnCashPct ?? null,
     cap: r?.goingInCapPct ?? null,
+    // Same arithmetic as the deal page's leverage check, run on the SAME cap
+    // this table shows one row above — never a differently-sourced number.
+    leverage:
+      r?.goingInCapPct != null && bench30 != null
+        ? leverageRead(r.goingInCapPct, bench30)
+        : null,
     price: usd(r?.purchasePrice) ?? fromExtraction(ex, /\bprice\b/i),
     noi: usd(r?.year1Noi) ?? fromExtraction(ex, /\bnoi\b/i),
   };
@@ -102,8 +110,34 @@ export default async function ComparePage({
     }),
   );
   const boxByScope = new Map(boxEntries);
+
+  // The freshest 30-yr fixed, one fetch for the whole table — same source
+  // order as the deal page: live rates table when reachable, seeded PMMS
+  // snapshot otherwise.
+  let bench30: { value: number; asOf: string } | null = null;
+  try {
+    const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
+    const admin = createSupabaseAdminClient();
+    const { data: rate } = await admin
+      .from("rates")
+      .select("value, obs_date")
+      .eq("series_id", "MORTGAGE30US")
+      .order("obs_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (rate?.value != null)
+      bench30 = { value: Number(rate.value), asOf: String(rate.obs_date) };
+  } catch {
+    // no admin env — the seeded snapshot below still serves
+  }
+  if (!bench30) {
+    const row = seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed");
+    if (row && typeof row.low === "number")
+      bench30 = { value: row.low, asOf: row.as_of };
+  }
+
   const cols = (rows as Scoped[]).map((d) =>
-    toCol(d, boxByScope.get(scopeKey(d)) ?? null),
+    toCol(d, boxByScope.get(scopeKey(d)) ?? null, bench30?.value ?? null),
   );
 
   const backLink = (
@@ -140,6 +174,15 @@ export default async function ComparePage({
       </div>
 
       <CompareTable cols={cols} />
+
+      {bench30 && cols.some((c) => c.leverage) && (
+        <p className="text-xs leading-relaxed text-muted">
+          Leverage row: each deal&apos;s going-in cap against the 30-yr fixed
+          ({bench30.value}%, {bench30.asOf}) — an owner-occupier benchmark;
+          investor debt usually prices above it, so a thin spread here is
+          thinner in practice.
+        </p>
+      )}
 
       <p className="text-xs leading-relaxed text-muted">
         First-pass screen, not investment advice. &ldquo;Best&rdquo; is only
