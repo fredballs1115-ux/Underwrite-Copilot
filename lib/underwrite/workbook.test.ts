@@ -237,3 +237,88 @@ describe("generated workbook — LIVE sensitivity grids match the engine", () =>
     }
   });
 });
+
+describe("Operating Metrics tab — the ratio ladder ties to the engine", () => {
+  let hf: ReturnType<typeof HyperFormula.buildFromSheets>;
+  let wb: ExcelJS.Workbook;
+  beforeAll(async () => {
+    const buf = await buildUnderwriteWorkbook(model);
+    ({ hf, wb } = await loadIntoHf(buf));
+  });
+
+  function opsLabelRow(book: ExcelJS.Workbook, label: string): number {
+    const ws = book.getWorksheet("Operating Metrics")!;
+    for (let r = 1; r <= ws.rowCount; r++) {
+      if (String(ws.getCell(r, 1).value ?? "") === label) return r;
+    }
+    return -1;
+  }
+  function opsValue(engine2: ReturnType<typeof HyperFormula.buildFromSheets>, row: number, col: number): unknown {
+    const id = engine2.getSheetId("Operating Metrics")!;
+    return (engine2.getSheetValues(id) as unknown[][])[row - 1]?.[col - 1];
+  }
+
+  it("exists with the full margins ladder and per-SF yardsticks", () => {
+    expect(wb.getWorksheet("Operating Metrics")).toBeTruthy();
+    for (const lab of [
+      "Expense Ratio (OpEx / EGR)",
+      "NOI Margin",
+      "DSCR (NOI)",
+      "Debt Yield",
+      "Breakeven Occupancy",
+      "Cash-on-Cash (levered)",
+      "Price / SF",
+      "Year-1 NOI / SF",
+    ]) {
+      expect(opsLabelRow(wb, lab), lab).toBeGreaterThan(0);
+    }
+  });
+
+  it("Year-1 breakeven occupancy = (OpEx + Debt Service) / PGR, per the engine", () => {
+    const y1 = engine.cashFlow[0];
+    const expected =
+      (y1.operatingExpenses + y1.debtService) / y1.potentialGrossRevenue;
+    const r = opsLabelRow(wb, "Breakeven Occupancy");
+    expect(Number(opsValue(hf, r, 2))).toBeCloseTo(expected, 6);
+  });
+
+  it("Year-1 DSCR on the ladder matches the engine", () => {
+    const y1 = engine.cashFlow[0];
+    const r = opsLabelRow(wb, "DSCR (NOI)");
+    expect(Number(opsValue(hf, r, 2))).toBeCloseTo(y1.noi / y1.debtService, 6);
+  });
+
+  it("omits per-unit yardsticks honestly when nothing states a unit count", () => {
+    // The industrial fixture states SF, not units — the tab must say so
+    // instead of guessing a denominator.
+    expect(model.meta.units).toBeNull();
+    const ws = wb.getWorksheet("Operating Metrics")!;
+    let found = false;
+    for (let r = 1; r <= ws.rowCount; r++) {
+      if (String(ws.getCell(r, 1).value ?? "").includes("per-unit yardsticks omitted")) {
+        found = true;
+      }
+    }
+    expect(found).toBe(true);
+  });
+
+  it("renders live per-unit yardsticks when the OM states units", async () => {
+    const withUnits: ExtractionResult = {
+      ...extraction,
+      metrics: [
+        ...extraction.metrics,
+        { label: "Units", value: "250", flagged: false, page: "p. 4" },
+      ],
+    };
+    const m2 = deriveUnderwriteInputs(withUnits, "fallback");
+    expect(m2.meta.units).toBe(250);
+    const buf2 = await buildUnderwriteWorkbook(m2);
+    const { hf: hf2, wb: wb2 } = await loadIntoHf(buf2);
+    const priceRow = opsLabelRow(wb2, "Price / Unit");
+    expect(priceRow).toBeGreaterThan(0);
+    expect(Number(opsValue(hf2, priceRow, 2))).toBeCloseTo(
+      m2.inputs.purchasePrice / 250,
+      0,
+    );
+  }, 30000);
+});

@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-24",
+      "title": "The Excel model goes deeper: an Operating Metrics tab",
+      "blurb": "A ninth tab carries the ratio ladder an IC actually checks year by year — expense ratio, NOI margin, DSCR, debt yield, breakeven occupancy, cash-on-cash — plus price, rent, NOI and OpEx per unit and per SF. Every cell is a live formula over the Cash Flow tab, so changing any assumption re-prices the ladder; when nothing states a unit count, the per-unit block says so instead of guessing.",
+      "href": "/api/demo/underwrite.xlsx"
+    },
+    {
+      "date": "2026-08-24",
       "title": "The legal read is on the sample screen — and the homepage",
       "blurb": "The deal page's Regulation & benchmarks panel now shows in the homepage walkthrough and on /demo: the sample's Philadelphia jurisdiction run through the real rules engine — one verified rule on file, honestly marked dormant (it keys off an eviction filing, not a purchase), with source, as-of, and the state's no-rent-control fact extracted verbatim. A tiny legal note rides under the hero card too, and new tests lock every number to the engine.",
       "href": "/demo"
@@ -66,12 +72,6 @@
       "title": "The demo shows the leverage check; Compare names covered markets",
       "blurb": "The sample screen now runs the same leverage arithmetic every real deal gets, and the side-by-side Compare view carries a covered-market row — all three deal surfaces agree on scope.",
       "href": "/demo"
-    },
-    {
-      "date": "2026-08-23",
-      "title": "Every deal gets a leverage check against today's 30-yr rate",
-      "blurb": "The deal page now computes the spread between the going-in cap and the freshest FRED 30-yr fixed — negative leverage and thin spreads called out in plain numbers, sourced and dated. Arithmetic, not an opinion.",
-      "href": "/deals"
     }
   ]
 }
