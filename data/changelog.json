@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-24",
+      "title": "Compare shows each deal's leverage spread",
+      "blurb": "The side-by-side view gains a 'Leverage vs 30-yr' row — the signed spread between each deal's going-in cap and the freshest 30-yr fixed, color-coded negative / thin / positive with the same arithmetic as the deal page, captioned with the benchmark and its as-of date.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-08-24",
       "title": "The price ticker carries every covered market's FY2026 rent",
       "blurb": "All fourteen sourced FY2026 2BR fair-market rents now ride the dark ticker — derived from the research layer, each linking to its market brief, with the DC metro's shared figure riding once instead of four times. The proof strip's sector count is computed now too; the typed-in number had drifted.",
       "href": "/market"
@@ -66,12 +72,6 @@
       "title": "The markets band runs on Why and the demo too",
       "blurb": "The across-the-screen covered-markets band — every market a live link to its brief — now also anchors /why and introduces the demo's research layer. One shared implementation, three pages.",
       "href": "/why"
-    },
-    {
-      "date": "2026-08-23",
-      "title": "The hero says what it's screening, one market at a time",
-      "blurb": "A rotating line under the headline cycles six covered markets with a real fact each — sourced FMRs and rules on file, straight from the research layer.",
-      "href": "/market"
     }
   ]
 }
