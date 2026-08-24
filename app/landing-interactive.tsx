@@ -10,6 +10,7 @@ import {
 import { SAMPLE_COMP_PREMIUM_LINE } from "@/lib/marketing-constants";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { computeModel } from "@/lib/model/compute";
+import type { SampleLegal } from "@/lib/sample-legal";
 
 function prefersReducedMotion(): boolean {
   return (
@@ -254,7 +255,63 @@ function SummaryFigures() {
   );
 }
 
-function DemoPanel({ tab }: { tab: Tab }) {
+/** The deal page's Regulation & benchmarks panel, in miniature — same
+ *  engine, same outcome chips, same dormancy explainer, fed by the derived
+ *  SampleLegal struct so this can never drift from the real screen. */
+function LegalBlock({ legal }: { legal: SampleLegal }) {
+  const rule = legal.rules[0];
+  return (
+    <div className="rounded-lg border border-line bg-paper p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+          Regulation &amp; benchmarks
+        </p>
+        {legal.metroName && (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/5 px-2 py-0.5 text-[9px] font-medium text-brand">
+            <span aria-hidden className="h-1 w-1 rounded-full bg-brand" />
+            Covered market: {legal.metroName}
+          </span>
+        )}
+      </div>
+      <p className="mt-1.5 text-[10px] leading-relaxed text-muted">
+        Screened: {legal.screenedCount} rule
+        {legal.screenedCount === 1 ? "" : "s"} on file for {legal.jurisdiction} —{" "}
+        {legal.triggeredCount === 0
+          ? "none triggered by this deal's facts"
+          : `${legal.triggeredCount} triggered`}
+        .
+      </p>
+      {rule && (
+        <div className="mt-2 rounded-md border border-line/70 p-2.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="rounded bg-line/60 px-1.5 py-px text-[9px] font-semibold text-muted">
+              {rule.outcomeLabel}
+            </span>
+            <span className="text-[9px] uppercase tracking-wide text-muted">
+              {rule.typeLabel}
+            </span>
+            <span className="ml-auto rounded bg-emerald-500/10 px-1.5 py-px text-[9px] font-medium text-emerald-600">
+              {rule.status} · {rule.asOf}
+            </span>
+          </div>
+          <p className="mt-1 text-[10px] leading-relaxed text-muted">
+            {rule.effect.length > 150
+              ? rule.effect.slice(0, 149).trimEnd() + "…"
+              : rule.effect}
+          </p>
+          {rule.dormantNote && (
+            <p className="mt-1 text-[9px] font-medium text-caution">{rule.dormantNote}</p>
+          )}
+        </div>
+      )}
+      {legal.stateFact && (
+        <p className="mt-1.5 text-[9px] text-muted">{legal.stateFact}</p>
+      )}
+    </div>
+  );
+}
+
+function DemoPanel({ tab, legal }: { tab: Tab; legal: SampleLegal }) {
   switch (tab) {
     case "Overview":
       return (
@@ -278,6 +335,7 @@ function DemoPanel({ tab }: { tab: Tab }) {
             read="Underwriting exits 20 bps below the going-in cap after a 5-year hold — the spread does the returns' heavy lifting."
             severity="caution"
           />
+          <LegalBlock legal={legal} />
         </div>
       );
     case "Financials":
@@ -424,7 +482,7 @@ function DemoPanel({ tab }: { tab: Tab }) {
 }
 
 /** Tabbed walkthrough mirroring the real deal page's sections — sample data. */
-export function DemoTabs() {
+export function DemoTabs({ legal }: { legal: SampleLegal }) {
   const [tab, setTab] = useState<Tab>("Overview");
 
   function onKeys(e: KeyboardEvent<HTMLDivElement>) {
@@ -473,7 +531,7 @@ export function DemoTabs() {
       {/* min-h pinned to the tallest panel so switching tabs never reflows
           the section — clicking around must feel solid, not jumpy. */}
       <div role="tabpanel" className="animate-fade min-h-[24rem] p-4" key={tab}>
-        <DemoPanel tab={tab} />
+        <DemoPanel tab={tab} legal={legal} />
       </div>
     </div>
   );
