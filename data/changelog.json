@@ -3,6 +3,18 @@
   "entries": [
     {
       "date": "2026-08-24",
+      "title": "Compare any two covered markets, side by side",
+      "blurb": "A new tool on /market puts two metros next to each other on one shared dollar scale: the FY2026 bedroom rent ladders drawn as bars, the 2BR spread computed, rules on file, comps-feed status, and verified/sourced chips — every figure straight off the research layer, with a one-click jump into either brief.",
+      "href": "/market"
+    },
+    {
+      "date": "2026-08-24",
+      "title": "More to play with, on every public page",
+      "blurb": "The sample screen's broker questions became reveal-on-click cards on /demo — play analyst, then see the exact question the screen drafts. Market briefs draw the bedroom rent ladder as bars scaled to the real dollars and add a one-click copy-citation button. And the six-stage screen-run trace now plays on /why too.",
+      "href": "/demo"
+    },
+    {
+      "date": "2026-08-24",
       "title": "The Excel model goes deeper: an Operating Metrics tab",
       "blurb": "A ninth tab carries the ratio ladder an IC actually checks year by year — expense ratio, NOI margin, DSCR, debt yield, breakeven occupancy, cash-on-cash — plus price, rent, NOI and OpEx per unit and per SF. Every cell is a live formula over the Cash Flow tab, so changing any assumption re-prices the ladder; when nothing states a unit count, the per-unit block says so instead of guessing.",
       "href": "/api/demo/underwrite.xlsx"
@@ -60,18 +72,6 @@
       "title": "The price ticker carries every covered market's FY2026 rent",
       "blurb": "All fourteen sourced FY2026 2BR fair-market rents now ride the dark ticker — derived from the research layer, each linking to its market brief, with the DC metro's shared figure riding once instead of four times. The proof strip's sector count is computed now too; the typed-in number had drifted.",
       "href": "/market"
-    },
-    {
-      "date": "2026-08-24",
-      "title": "Every covered market now carries its FY2026 fair-market rent",
-      "blurb": "A sourced HUD FY2026 2BR fair-market rent now backs 17 of 18 metro entries — San Francisco straight from the housing authority's own sheet, North Jersey from the state's republication of HUD's tables, LA from the April revision in the Federal Register. Seattle stays an honest gap: the widely-quoted figure turned out to be average rent, not the FMR.",
-      "href": "/market"
-    },
-    {
-      "date": "2026-08-23",
-      "title": "The demo shows the leverage check; Compare names covered markets",
-      "blurb": "The sample screen now runs the same leverage arithmetic every real deal gets, and the side-by-side Compare view carries a covered-market row — all three deal surfaces agree on scope.",
-      "href": "/demo"
     }
   ]
 }
