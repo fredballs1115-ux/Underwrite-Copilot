@@ -1497,7 +1497,14 @@ function DealPreview() {
 // it simply doesn't render.
 async function LiveProofStrip() {
   let pmms: { value: number; asOf: string } | null = null;
-  let benchCount = seedBenchmarks().length;
+  const seedBench = seedBenchmarks();
+  let benchCount = seedBench.length;
+  // Derived, never typed: the sector spread and FMR coverage move whenever
+  // the research seeds do — a hardcoded "14 sectors" drifted to fiction once.
+  const sectorCount = new Set(seedBench.map((b) => b.sector)).size;
+  const fmrMetroCount = new Set(
+    seedBench.filter((b) => b.metric === "hud_fmr_fy2026_2br").map((b) => b.metro)
+  ).size;
   const ruleCount = seedRules().length;
   let salesCount = 0;
   let storyTitle: string | null = null;
@@ -1551,8 +1558,16 @@ async function LiveProofStrip() {
     <>
       <span className="font-mono font-semibold tabular-nums">{benchCount}</span>{" "}
       sourced benchmarks across{" "}
-      <span className="font-mono font-semibold tabular-nums">14</span> sectors
+      <span className="font-mono font-semibold tabular-nums">{sectorCount}</span>{" "}
+      sectors
     </>,
+    fmrMetroCount > 0 && (
+      <>
+        FY2026 2BR fair-market rents on file for{" "}
+        <span className="font-mono font-semibold tabular-nums">{fmrMetroCount}</span>{" "}
+        covered-market entries
+      </>
+    ),
     <>
       <span className="font-mono font-semibold tabular-nums">{ruleCount}</span>{" "}
       rent-control &amp; TOPA rules on file — every number carries its source
@@ -1995,10 +2010,32 @@ function ResearchTicker() {
   // Each candidate renders only when its number actually exists — a missing
   // seed drops the item rather than showing "—" or "$0".
   const pmmsVal = pick("", "pmms_30y_fixed");
-  const dcFmr = pick("Washington DC area", "hud_fmr_fy2026_2br");
-  const baltFmr = pick("Baltimore MD", "hud_fmr_fy2026_2br");
-  const nycFmr = pick("New York City", "hud_fmr_fy2026_2br");
-  const phillyFmr = pick("Philadelphia PA", "hud_fmr_fy2026_2br");
+  // One FMR item per covered market that has a sourced FY2026 figure —
+  // derived from the SAME seed rows the market briefs and deal benchmarks
+  // render, never typed here. The DC HMFA figure backs four jurisdiction
+  // entries (DC, PG, MoCo, NoVA); it rides once, labeled for the metro,
+  // instead of four times at the same dollar. A metro without a verified
+  // figure (Seattle today) simply doesn't ride — a gap is a gap.
+  const DC_HMFA_SIBLINGS = new Set(["pg_county", "montgomery_county", "nova"]);
+  const fmrItems = (metrosSeed.metros ?? [])
+    .filter((m) => !DC_HMFA_SIBLINGS.has(m.id))
+    .map((m) => {
+      // DC's benchmark row generates from multifamily.json under the label
+      // "Washington DC area" (the metros.json generator skips id "dc") — the
+      // seed name alone would silently drop the DC item from the ticker.
+      const rowMetro =
+        m.id === "dc" ? "Washington DC area" : (m as { name: string }).name;
+      const v = pick(rowMetro, "hud_fmr_fy2026_2br");
+      if (v === null) return null;
+      const label =
+        m.id === "dc" ? "DC metro (incl. PG · MoCo · NoVA)" : (m as { name: string }).name;
+      return [
+        `${label} FY2026 2BR FMR`,
+        `$${v.toLocaleString()}/mo`,
+        `/market?metro=${m.id}`,
+      ] as readonly [string, string, string];
+    })
+    .filter((x): x is readonly [string, string, string] => x !== null);
   const phillyMed = money(pick("Philadelphia, PA", "median_sale_price_2_4_unit"));
   // YoY comes from the SAME seed row as the median — never typed beside it.
   const phillyYoY = bench
@@ -2016,21 +2053,10 @@ function ResearchTicker() {
         phillyYoY ? `${phillyMed} · ${phillyYoY} YoY` : phillyMed,
         "/market?metro=philadelphia",
       ],
-      phillyFmr !== null && [
-        "Philadelphia FY2026 2BR FMR",
-        `$${phillyFmr.toLocaleString()}/mo`,
-        "/market?metro=philadelphia",
-      ],
+      ...fmrItems,
       ["MoCo rent cap", "CPI+3% · max 6%", "/market?metro=montgomery_county"],
       ["Chicago owner-occupied ≤6 units", "RLTO exempt", "/market?metro=chicago"],
       ["NY Good Cause", "≤10-unit landlords exempt", "/market?metro=nyc"],
-      dcFmr !== null && ["DC FY2026 2BR FMR", `$${dcFmr.toLocaleString()}/mo`, "/market?metro=dc"],
-      baltFmr !== null && [
-        "Baltimore FY2026 2BR FMR",
-        `$${baltFmr.toLocaleString()}/mo`,
-        "/market?metro=baltimore",
-      ],
-      nycFmr !== null && ["NYC FY2026 2BR FMR", `$${nycFmr.toLocaleString()}/mo`, "/market?metro=nyc"],
       ["DC ≤4-unit natural-person exemption", "verified vs statute", "/market?metro=dc"],
       ["PG County cap", "lesser of 6% or CPI+3%", "/market?metro=pg_county"],
       ["Jersey City 1–4 unit stock", "rent-control exempt, any owner", "/market?metro=newark_jc"],
@@ -2070,7 +2096,12 @@ function ResearchTicker() {
         Live from the research layer — sourced, dated, statute-linked · tap any
         figure for its market
       </p>
-      <div className="ticker-track flex w-max">
+      {/* Duration scales with item count (~3s each) so adding markets never
+          speeds the scroll — the CSS class alone assumes a fixed row. */}
+      <div
+        className="ticker-track flex w-max"
+        style={{ animationDuration: `${Math.max(40, items.length * 3)}s` }}
+      >
         {row(false)}
         {row(true)}
       </div>

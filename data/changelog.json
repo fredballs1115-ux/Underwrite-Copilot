@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-24",
+      "title": "The price ticker carries every covered market's FY2026 rent",
+      "blurb": "All fourteen sourced FY2026 2BR fair-market rents now ride the dark ticker — derived from the research layer, each linking to its market brief, with the DC metro's shared figure riding once instead of four times. The proof strip's sector count is computed now too; the typed-in number had drifted.",
+      "href": "/market"
+    },
+    {
+      "date": "2026-08-24",
       "title": "Every covered market now carries its FY2026 fair-market rent",
       "blurb": "A sourced HUD FY2026 2BR fair-market rent now backs 17 of 18 metro entries — San Francisco straight from the housing authority's own sheet, North Jersey from the state's republication of HUD's tables, LA from the April revision in the Federal Register. Seattle stays an honest gap: the widely-quoted figure turned out to be average rent, not the FMR.",
       "href": "/market"
@@ -65,12 +71,6 @@
       "date": "2026-08-23",
       "title": "The hero says what it's screening, one market at a time",
       "blurb": "A rotating line under the headline cycles six covered markets with a real fact each — sourced FMRs and rules on file, straight from the research layer.",
-      "href": "/market"
-    },
-    {
-      "date": "2026-08-23",
-      "title": "The site names its own build — and the marquee navigates",
-      "blurb": "The footer stamps the exact commit the live site was built from (click it to see the code on GitHub), and every market in the marquee now links to its brief.",
       "href": "/market"
     }
   ]
