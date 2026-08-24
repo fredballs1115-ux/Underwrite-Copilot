@@ -250,8 +250,9 @@ export default function DemoPage() {
               Take the deliverables with you
             </h2>
             <p className="mt-1 max-w-md text-sm text-muted">
-              The one-page IC memo and the live-formula Excel model this
-              screen produced — the same files a signed-in analyst exports.
+              The one-page IC memo, the full multi-page report behind it, and
+              the live-formula Excel model this screen produced — the same
+              files a signed-in analyst exports.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -260,6 +261,12 @@ export default function DemoPage() {
               className="rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
             >
               Sample IC memo (PDF)
+            </a>
+            <a
+              href="/api/demo/report"
+              className="rounded-lg border border-line px-3.5 py-2 text-sm font-medium transition-colors hover:bg-faint"
+            >
+              Full report (PDF)
             </a>
             <a
               href="/api/demo/underwrite.xlsx"

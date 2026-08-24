@@ -15,10 +15,10 @@ since you pointed the web service at `main`). What gates the new features is
 Everything ships dark-safe: nothing breaks while those are pending, pages
 say exactly what's missing and why.
 
-## Sunday night–Monday (Aug 23–24 ET) — the screen absorbs a famous post-mortem, computes leverage, and every market gets its rent number
+## Sunday night–Monday (Aug 23–24 ET) — the post-mortem absorbed, leverage computed, every market priced, and the deliverables redesigned
 
-Thirteen more PRs merged, each probe-verified live (#107–#119; every probe
-an exact sha match). Four threads:
+Twenty more PRs merged, each probe-verified live (#107–#126; every probe
+an exact sha match). Five threads:
 
 **1. The Trammell Crow lessons-learned memo (from Zach Wade), fully read and encoded.**
 All 101 pages OCR'd via the new `fetch-doc` Actions workflow (#109, #110 —
@@ -65,6 +65,27 @@ a "Break it yourself" panel now runs the REAL deterministic return
 engine in the visitor's browser — three sliders, five figures
 recomputing on every tick, sample-labeled, no AI in the box (#119).
 
+**5. The deliverables got their design pass (#120–#126) — your "way
+better, cleaner" round.** The homepage gained a looping six-stage
+screen-run trace (#120) and the market briefs full 0–3BR FMR rows with
+provenance chips and notes (#121). The sample screen was rebuilt as a
+faithful miniature of the REAL deal page — its five sections, its real
+analysis names, every figure computed through the live engine (#122,
+your "nothing like the actual site" call-out). Then the artifacts: the
+one-page IC memo redesigned end to end — color-coded verdict banner,
+chip-style buy box, zebra ranges with a highlighted base case,
+deal-killer cards, scenario trio (#123); the Excel workbook's KPI tiles
+outlined and its cash-flow ladder zebra-striped with every
+layout-anchored test intact (#123); the full multi-page report brought
+into the same design language — brand-ticked titles with live count
+pills, ratings as tinted chips, summary cards, a basis column that now
+reads in-place vs pro-forma (#125); and the full report published as a
+third PUBLIC demo download beside the memo and the model, with the
+homepage handing you all three — under the hero card and on the memo
+tile (#126). Both PDFs now render to real bytes in CI on every change
+(#123, #125), and live-verify probes both public artifact routes for
+%PDF- bytes on every deploy (#124, #126).
+
 | Change | Where to look |
 |---|---|
 | Marquee + rotator facts denser (FMR + rules together) | homepage (#107) |
@@ -77,6 +98,14 @@ recomputing on every tick, sample-labeled, no AI in the box (#119).
 | Ticker derives every market's FMR; sector count computed | homepage (#117) |
 | Compare: leverage spread per deal, color-coded | /deals → Compare (#118) |
 | "Break it yourself" — live engine sliders | homepage #stress (#119) |
+| The screen, running: looping six-stage trace band | homepage (#120) |
+| Market briefs: 0–3BR FMR rows, status chip, provenance note | /market (#121) |
+| Sample screen mirrors the real deal page (five sections, real names) | homepage (#122) |
+| IC memo redesign + workbook polish, memo render test in CI | /api/demo/memo · exports (#123) |
+| live-verify probes the sample memo PDF | Actions → live-verify (#124) |
+| Full report in the memo's design language, report render test | full-report export (#125) |
+| Full report as a third public demo download | /demo (#126) |
+| Sample artifacts one click from the homepage | hero card · memo tile (#126) |
 
 ## Sunday (Aug 23 ET) — stale browsers now fix THEMSELVES, and the day's build run
 

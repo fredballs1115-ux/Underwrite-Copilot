@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-24",
+      "title": "The sample artifacts are one click from the homepage",
+      "blurb": "The full multi-page report joined the memo and the Excel model as a public demo download, and the homepage now hands you all three — under the hero card and on the memo tile — so the artifact buttons in the miniature summary bar have the real files behind them.",
+      "href": "/demo"
+    },
+    {
+      "date": "2026-08-24",
       "title": "The full report now matches the memo's design language",
       "blurb": "Every page of the multi-page report picked up the redesigned memo's system: brand-ticked titles with live count pills (figures pulled, comps rated, checks aggressive), zebra-striped tables, ratings as tinted chips, and summary cards with the brand bar. The sample's extracted terms now carry their in-place / pro-forma basis, and a second CI smoke test renders the whole report to PDF bytes.",
       "href": "/demo"
@@ -65,12 +71,6 @@
       "date": "2026-08-23",
       "title": "The screen absorbs a 101-page crash post-mortem",
       "blurb": "Negative leverage named outright, stabilized occupancy above ~95% challenged, exit values checked for the 'there's always a buyer' myth and missing sale costs, and demand claims weighed against supply — disciplines drawn from the industry's most famous lessons-learned memo.",
-      "href": "/deals"
-    },
-    {
-      "date": "2026-08-23",
-      "title": "The challenger learned the down-cycle classics",
-      "blurb": "Assumption challenges now overlay the discipline every crash re-teaches: market-driven leasing assumptions, worst-case drift, cash flow over exit hopes, and no credit for 'other buyers are circling'.",
       "href": "/deals"
     }
   ]
