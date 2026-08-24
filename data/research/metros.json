@@ -10,12 +10,12 @@
     "0br": 1953,
     "1br": 2015,
     "3br": 2835,
-    "status": "sourced",
+    "status": "verified",
     "sources": [
-     "https://usrentprices.com/rent-prices/washington-dc",
-     "https://plainrent.com/states/district-of-columbia"
+     "https://www.dchousing.org/api/files/board/610.pdf",
+     "https://usrentprices.com/rent-prices/washington-dc"
     ],
-    "note": "Republisher-labeled 'Washington DC'; mandatory SAFMR zone so these may be ZIP averages — verify vs FY2026_FMR_Schedule.pdf. DCHA payment standard 187% of FMR (Res. 25-31)."
+    "note": "Washington-Arlington-Alexandria DC-VA-MD HMFA. Primary-confirmed via DCHA Resolution 25-31 (read 2026-08-24): the Board's FY2026 payment standards are exactly 187% of FMR, and every bedroom reverses onto these values — $4,200/1.87 = $2,246 (2BR), $3,652/1.87 = $1,953, $3,768/1.87 = $2,015, $5,301/1.87 = $2,835. Mandatory SAFMR zone (ZIP-level rents govern vouchers)."
    },
    "market_notes": {
     "value": "Pre-1976 rowhouse-flat stock rent-stabilized unless natural-person exemption applies; post-1975 buildings exempt; TOPA largely gone for 2-4s under Law 26-80.",

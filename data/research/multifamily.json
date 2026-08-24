@@ -70,13 +70,13 @@
       "value": { "0br": 1953, "1br": 2015, "2br": 2246, "3br": 2835, "4br": null },
       "unit": "usd_month",
       "yoy_2br": "-2.9% (FY2025 metro 2BR was $2,314)",
-      "status": "sourced",
+      "status": "verified",
       "sources": [
+        "https://www.dchousing.org/api/files/board/610.pdf (DCHA Resolution 25-31 — FY2026 payment standards at 187% of FMR)",
         "https://usrentprices.com/rent-prices/washington-dc (FY2026 HUD FMR republisher)",
-        "https://plainrent.com/states/district-of-columbia (FY2026 HUD FMR republisher)",
-        "https://www.federalregister.gov/documents/2025/08/22/2025-16060/ (FY2026 FMR publication notice)"
+        "https://plainrent.com/states/district-of-columbia (FY2026 HUD FMR republisher)"
       ],
-      "note": "Snippet-confirmed on two independent republisher domains; labeled 'Washington, DC' not the metro name, and the DC metro is a mandatory SAFMR zone so these may be ZIP-SAFMR averages — verify against huduser.gov FY2026_FMR_Schedule.pdf (blocked from this environment) before underwriting. 4BR FY2026 not found (FY2025 was $3,413 — prior vintage, do not substitute). DCHA payment standard set at 187% of FMR (Resolution 25-31, 2025-10-08) — material Section 8 upside in DC proper."
+      "note": "PRIMARY-CONFIRMED 2026-08-24 via DCHA Resolution 25-31: the Board's FY2026 payment standards are exactly 187% of FMR and every bedroom reverses onto these values ($4,200/1.87 = $2,246 2BR; $3,652/1.87 = $1,953; $3,768/1.87 = $2,015; $5,301/1.87 = $2,835) — these are the metro-wide HMFA FMRs, not ZIP averages. Mandatory SAFMR zone (ZIP-level rents govern vouchers). 4BR FY2026 not found (FY2025 was $3,413 — prior vintage, do not substitute). DCHA payment standard at 187% of FMR — material Section 8 upside in DC proper."
     }
   },
   "debt_terms": {

@@ -15,6 +15,53 @@ since you pointed the web service at `main`). What gates the new features is
 Everything ships dark-safe: nothing breaks while those are pending, pages
 say exactly what's missing and why.
 
+## Sunday night–Monday (Aug 23–24 ET) — the screen absorbs a famous post-mortem, computes leverage, and every market gets its rent number
+
+Nine more PRs merged, each probe-verified live (#107–#115; probes through
+#103 all exact sha matches). Three threads:
+
+**1. The Trammell Crow lessons-learned memo (from Zach Wade), fully read and encoded.**
+All 101 pages OCR'd via the new `fetch-doc` Actions workflow (#109, #110 —
+a public-PDF text extractor that runs where egress is open). Its
+disciplines are now IN the analysis prompts, in our own words (#108, #111):
+negative leverage named outright, stabilized occupancy >~95% presumptively
+challenged, exit values tested against "there's always a buyer", demand
+claims weighed against supply, weak-credit rents discounted. The memo text
+itself stays out of the repo — principles only, never republication.
+
+**2. Leverage became arithmetic, not opinion (#112, #113).**
+Every deal page — and the public demo — now computes the spread between
+the going-in cap and the freshest FRED 30-yr fixed and says it plainly:
+negative leverage in red, thin (<75bps) in amber, positive in green,
+sourced and dated. Compare view names each deal's covered market.
+
+**3. Every covered market now carries its FY2026 fair-market rent (#115).**
+17 of 18 metro entries have a sourced HUD FY2026 2BR FMR (was 4). Three
+came from primary documents through the fetch arm: San Francisco $3,604
+from the SF Housing Authority's own payment-standards sheet; Newark
+$2,205 / Jersey City $2,763 from NJ Treasury's republication of HUD's
+tables; LA's revised $2,903 from the April Federal Register. DC's $2,246
+is now arithmetic-confirmed by DCHA Resolution 25-31 (payment standards
+÷ 1.87 reverse exactly onto every bedroom). The homepage marquee, hero
+rotator, market briefs and deal benchmarks all light up from one file.
+
+**Integrity note you should actually read:** the two-source bar caught two
+would-be fabrications this pass — aggregators quoted $2,850/$3,174 for SF
+(the housing authority says $3,604), and Seattle's widely-quoted "$2,501
+FMR" is actually its average market rent. Seattle therefore still shows
+no FMR — a recorded gap, never an estimate. Smaller catches: "Richmond
+County VA" (rural Northern Neck) is not Richmond; Fort Worth prices
+separately from Dallas.
+
+| Change | Where to look |
+|---|---|
+| Marquee + rotator facts denser (FMR + rules together) | homepage (#107) |
+| Down-cycle discipline overlay in challenger + market check + verdict | any screened deal (#108, #111) |
+| `fetch-doc` workflow: public-PDF text via Actions, OCR fallback | .github/workflows (#109, #110) |
+| Leverage check on every deal + the demo | deal page · /demo (#112, #113) |
+| Login page offers /market + /demo without an account; sidebar "What's new" | /login · app sidebar (#114) |
+| FY2026 FMRs for (nearly) all covered markets | homepage marquee · /market (#115) |
+
 ## Sunday (Aug 23 ET) — stale browsers now fix THEMSELVES, and the day's build run
 
 You reported "still nothing is showing up on homescreen" mid-afternoon.
