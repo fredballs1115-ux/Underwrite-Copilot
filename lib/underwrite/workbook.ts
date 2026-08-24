@@ -146,6 +146,7 @@ export async function buildUnderwriteWorkbook(
   const wsDebt = wb.addWorksheet("Debt Schedule", {
     views: [{ state: "frozen", xSplit: 0, ySplit: 3, showGridLines: false }],
   });
+  const wsOps = wb.addWorksheet("Operating Metrics", { views: [{ showGridLines: false }] });
   const wsSens = wb.addWorksheet("Sensitivity", { views: [{ showGridLines: false }] });
   // Hidden tab holding one live cash-flow block per sensitivity scenario.
   const wsEng = wb.addWorksheet("Sensitivity Engine", { state: "veryHidden" });
@@ -161,9 +162,10 @@ export async function buildUnderwriteWorkbook(
   buildDealSummary(wsSummary, model, cf, holdYears);
   buildMonthlyCashFlow(wsMonthly, cf, inputs, holdYears);
   buildDebtSchedule(wsDebt, inputs);
+  buildOperatingMetrics(wsOps, cf, model, holdYears);
   buildSensitivity(wsSens, wsEng, inputs);
 
-  const visible = [wsCover, wsSummary, wsAssum, wsCf, wsMonthly, wsDebt, wsSens];
+  const visible = [wsCover, wsSummary, wsAssum, wsCf, wsMonthly, wsDebt, wsOps, wsSens];
   visible.forEach((ws) => printSetup(ws, ws !== wsCover && ws !== wsAssum));
   // Monthly is 60+ columns — fitting it to one page width prints a smear.
   // Paginate across pages instead, repeating the line labels on each page.
@@ -887,6 +889,162 @@ function buildDebtSchedule(ws: ExcelJS.Worksheet, inp: UnderwriteInputs) {
  * scenarios start at column C in grid order (index = gi*25 + ri*5 + ci), the
  * IRR sits on sheet row 23 and the EM on row 24. Do not add rows to a block.
  */
+// ── OPERATING METRICS ── the ratio ladder an IC actually checks year by
+// year — expense ratio, NOI margin, DSCR, debt yield, breakeven occupancy,
+// cash-on-cash — plus per-unit and per-SF yardsticks. Every cell is a live
+// formula over the Cash Flow tab and the book's named cells, so changing
+// any assumption re-prices this ladder too.
+function buildOperatingMetrics(
+  ws: ExcelJS.Worksheet,
+  cf: CfMap,
+  model: DerivedModel,
+  holdYears: number,
+) {
+  ws.getColumn(1).width = 34;
+  const firstCol = 2;
+  const lastCol = firstCol + holdYears - 1;
+  for (let c = firstCol; c <= lastCol; c++) ws.getColumn(c).width = 13;
+
+  titleRow(ws, "Operating Metrics");
+  label(
+    ws.getCell(2, 1),
+    "Every ratio recomputes live off the Cash Flow tab — change an assumption and this ladder re-prices.",
+    { color: MUTED, size: 9 },
+  );
+
+  // 0-based operating-year offset → Cash Flow cell address
+  const at = (key: string, y: number) =>
+    `'Cash Flow'!${cellA1(cf.rows[key], cf.firstOpCol + y)}`;
+
+  let r = 4;
+  sectionHeader(ws, r, "Margins & risk — by operating year", 1, lastCol);
+  r++;
+  label(ws.getCell(r, 1), "OPERATING YEAR", { bold: true, color: MUTED, size: 8 });
+  for (let y = 0; y < holdYears; y++) {
+    const c = ws.getCell(r, firstCol + y);
+    c.value = y + 1;
+    c.font = { name: ARIAL, size: 9, bold: true, color: INK };
+    c.alignment = { horizontal: "right" };
+  }
+  bottomBorder(ws, r, 1, lastCol);
+  r++;
+
+  const ratioRows: [string, (y: number) => string, string][] = [
+    [
+      "Expense Ratio (OpEx / EGR)",
+      (y) => `IF(${at("egr", y)}=0,"n/a",-${at("opex", y)}/${at("egr", y)})`,
+      FMT.pct1,
+    ],
+    [
+      "NOI Margin",
+      (y) => `IF(${at("egr", y)}=0,"n/a",${at("noi", y)}/${at("egr", y)})`,
+      FMT.pct1,
+    ],
+    ["DSCR (NOI)", (y) => `${at("dscr", y)}`, FMT.ratio],
+    ["Debt Yield", (y) => `${at("debtyield", y)}`, FMT.pct1],
+    [
+      "Breakeven Occupancy",
+      (y) =>
+        `IF(${at("pgr", y)}=0,"n/a",(-${at("opex", y)}-${at("debt", y)})/${at("pgr", y)})`,
+      FMT.pct1,
+    ],
+    [
+      "Cash-on-Cash (levered)",
+      (y) => `IF(Equity=0,"n/a",${at("levcf", y)}/Equity)`,
+      FMT.pct1,
+    ],
+  ];
+  ratioRows.forEach(([lab, f, fmt], i) => {
+    if (i % 2 === 1) {
+      for (let c = 1; c <= lastCol; c++) {
+        ws.getCell(r, c).fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: BANDFILL },
+        };
+      }
+    }
+    label(ws.getCell(r, 1), lab);
+    for (let y = 0; y < holdYears; y++) {
+      const cell = ws.getCell(r, firstCol + y);
+      cell.value = { formula: f(y) } as ExcelJS.CellFormulaValue;
+      styleFormula(cell, fmt);
+      cell.alignment = { horizontal: "right" };
+    }
+    r++;
+  });
+  bottomBorder(ws, r - 1, 1, lastCol);
+  r++;
+  label(
+    ws.getCell(r, 1),
+    "Breakeven occupancy = (OpEx + Debt Service) ÷ Potential Gross Revenue — where cash flow crosses zero. Screen it against the market's actual vacancy, not the pro forma's.",
+    { color: MUTED, size: 9 },
+  );
+  r += 2;
+
+  sectionHeader(ws, r, "Per-unit & per-SF yardsticks — year 1", 1, lastCol);
+  r++;
+  const twoCol = (lab: string, formula: string, fmt: string, zebra: boolean) => {
+    if (zebra) {
+      for (let c = 1; c <= 2; c++) {
+        ws.getCell(r, c).fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: BANDFILL },
+        };
+      }
+    }
+    label(ws.getCell(r, 1), lab);
+    const cell = ws.getCell(r, 2);
+    cell.value = { formula } as ExcelJS.CellFormulaValue;
+    styleFormula(cell, fmt);
+    cell.alignment = { horizontal: "right" };
+    r++;
+  };
+
+  const units = model.meta.units;
+  let zebra = false;
+  if (units && units > 0) {
+    label(ws.getCell(r, 1), "Units");
+    const u = ws.getCell(r, 2);
+    u.value = units;
+    u.name = "UnitsCount";
+    styleLink(u, FMT.int);
+    u.alignment = { horizontal: "right" };
+    r++;
+    twoCol("Price / Unit", "PurchasePrice/UnitsCount", FMT.usd, (zebra = !zebra));
+    twoCol(
+      "Year-1 Rent / Unit / Month",
+      `${at("rent", 0)}/UnitsCount/12`,
+      FMT.usd,
+      (zebra = !zebra),
+    );
+    twoCol("Year-1 NOI / Unit", `${at("noi", 0)}/UnitsCount`, FMT.usd, (zebra = !zebra));
+    twoCol(
+      "Year-1 OpEx / Unit",
+      `-${at("opex", 0)}/UnitsCount`,
+      FMT.usd,
+      (zebra = !zebra),
+    );
+  } else {
+    label(
+      ws.getCell(r, 1),
+      "Unit count not stated in the OM or rent roll — per-unit yardsticks omitted rather than guessed.",
+      { color: MUTED, size: 9 },
+    );
+    r++;
+  }
+  twoCol("Price / SF", "PurchasePrice/RSF", FMT.psf, (zebra = !zebra));
+  twoCol("Year-1 NOI / SF", `${at("noi", 0)}/RSF`, FMT.psf, (zebra = !zebra));
+  twoCol(
+    "Year-1 Rent / SF / Year",
+    `${at("rent", 0)}/RSF`,
+    FMT.psf,
+    (zebra = !zebra),
+  );
+  bottomBorder(ws, r - 1, 1, 2);
+}
+
 function buildSensitivity(
   wsSens: ExcelJS.Worksheet,
   eng: ExcelJS.Worksheet,

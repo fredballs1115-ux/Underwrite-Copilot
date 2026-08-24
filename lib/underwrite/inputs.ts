@@ -43,6 +43,9 @@ export interface WorkbookMeta {
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
+  /** unit count for per-unit yardsticks — rent-roll actual first, then the
+   *  OM's stated figure; null when neither states one (never guessed) */
+  units: number | null;
 }
 
 export interface DerivedModel {
@@ -290,6 +293,18 @@ export function deriveUnderwriteInputs(
     capPct ? pageOf(capMetric) : undefined);
   mark("saleCostPct", "assumption", "Default 2.0% of sale price");
 
+  // Unit count, same precedence as occupancy: rent-roll actual first, then
+  // the OM's stated metric. Bounds guard against a mis-parsed dollar figure
+  // landing in a "units" label; nothing plausible → null, never a guess.
+  const unitsMetric = findMetric(metrics, /\bunits?\b|\bdoors?\b/i, /\bper\b|\/|price|rent|psf|value/i);
+  const omUnits = unitsMetric ? parseMoney(unitsMetric.value) : null;
+  const units =
+    rr?.unitCount && rr.unitCount > 0
+      ? rr.unitCount
+      : omUnits != null && omUnits >= 1 && omUnits <= 50_000
+        ? Math.round(omUnits)
+        : null;
+
   return {
     inputs,
     sources,
@@ -301,6 +316,7 @@ export function deriveUnderwriteInputs(
       // Rent-roll actual occupancy outranks the OM's stated figure.
       occupancyPct: rrOcc ?? (occPct != null ? occPct / 100 : null),
       rsf,
+      units,
     },
   };
 }
