@@ -406,6 +406,9 @@ function buildCashFlow(ws: ExcelJS.Worksheet, inp: UnderwriteInputs, holdYears: 
   }
 
   const rows: Record<string, number> = {};
+  // Body rows in order, for zebra striping after the ladder is built —
+  // readability on a 20-line ladder without touching any formula anchor.
+  const bodyRows: number[] = [];
   let r = 4;
   const at = (key: string, col: number) => cellA1(rows[key], col);
   const prev = (col: number) => cellA1(r, col - 1);
@@ -418,6 +421,7 @@ function buildCashFlow(ws: ExcelJS.Worksheet, inp: UnderwriteInputs, holdYears: 
     opts: { bold?: boolean; y0?: string; fwd?: boolean } = {},
   ) => {
     rows[key] = r;
+    bodyRows.push(r);
     label(ws.getCell(r, 1), text, { bold: opts.bold });
     if (opts.y0) {
       ws.getCell(r, y0Col).value = { formula: opts.y0 } as ExcelJS.CellFormulaValue;
@@ -480,6 +484,19 @@ function buildCashFlow(ws: ExcelJS.Worksheet, inp: UnderwriteInputs, holdYears: 
     (col, y) => (y === holdYears ? `${at("levcf", col)}+NetSaleProceeds` : `${at("levcf", col)}`),
     FMT.usd, { bold: true, y0: "-Equity" });
 
+  // Zebra: every other body row gets the light band, full ladder width.
+  // Fill only — borders, fonts, and formulas are untouched.
+  bodyRows.forEach((rowNum, i) => {
+    if (i % 2 === 0) return;
+    for (let c2 = 1; c2 <= fwdCol; c2++) {
+      ws.getCell(rowNum, c2).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: BANDFILL },
+      };
+    }
+  });
+
   return { firstOpCol, lastOpCol, fwdCol, y0Col, rows };
 }
 
@@ -516,6 +533,7 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   // Tiles live in columns 1,2,4,5 + one merged pair — keep it simple: five
   // tiles across columns 1..5 with the spacer col 3 carrying the middle tile.
   ws.getColumn(3).width = 18;
+  const tileEdge = { style: "thin" as const, color: { argb: LINE } };
   kpis.forEach(([lab, formula, fmt], i) => {
     const col = 1 + i;
     const l = ws.getCell(r, col);
@@ -523,12 +541,15 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     l.font = { name: ARIAL, size: 8, bold: true, color: MUTED };
     l.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BANDFILL } };
     l.alignment = { horizontal: "center", vertical: "middle" };
+    // Outlined as a tile pair: label carries the top edge, value the bottom.
+    l.border = { top: tileEdge, left: tileEdge, right: tileEdge };
     const v = ws.getCell(r + 1, col);
     v.value = { formula } as ExcelJS.CellFormulaValue;
     v.font = { name: ARIAL, size: 13, bold: true, color: BRAND };
     v.numFmt = fmt;
     v.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BANDFILL } };
     v.alignment = { horizontal: "center", vertical: "middle" };
+    v.border = { bottom: tileEdge, left: tileEdge, right: tileEdge };
   });
   ws.getRow(r).height = 14;
   ws.getRow(r + 1).height = 24;

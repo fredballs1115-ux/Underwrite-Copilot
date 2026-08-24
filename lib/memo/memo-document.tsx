@@ -41,6 +41,22 @@ const CALL_COLOR: Record<string, string> = {
   Caution: C.caution,
   "No-go": C.kill,
 };
+// Light tints for banner backgrounds — react-pdf has no alpha compositing
+// against the page, so the tints are precomputed solids.
+const VERDICT_TINT: Record<string, string> = {
+  Go: "#e9f4ef",
+  Caution: "#f8f0e3",
+  "No-go": "#f9eae8",
+};
+const STATUS_CHIP: Record<
+  "pass" | "near" | "miss" | "unknown",
+  { color: string; bg: string; mark: string }
+> = {
+  pass: { color: C.pass, bg: "#e9f4ef", mark: "✓" },
+  near: { color: C.caution, bg: "#f8f0e3", mark: "±" },
+  miss: { color: C.kill, bg: "#f9eae8", mark: "×" },
+  unknown: { color: C.muted, bg: C.faint, mark: "—" },
+};
 
 export type MemoData = {
   name: string;
@@ -295,9 +311,35 @@ const s = StyleSheet.create({
   brandText: { fontSize: 11, fontFamily: "Helvetica-Bold" },
   brandLogo: { height: 22, maxWidth: 130, objectFit: "contain", marginRight: 6 },
   metaRight: { textAlign: "right", color: C.muted, fontSize: 9 },
-  divider: { borderBottomWidth: 1, borderBottomColor: C.line, marginVertical: 10 },
-  title: { fontSize: 18, fontFamily: "Helvetica-Bold" },
-  sub: { fontSize: 10, color: C.muted, marginTop: 2 },
+  divider: {
+    borderBottomWidth: 2,
+    borderBottomColor: C.brand,
+    marginTop: 10,
+    marginBottom: 12,
+  },
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  title: {
+    fontSize: 19,
+    fontFamily: "Helvetica-Bold",
+    letterSpacing: -0.2,
+    lineHeight: 1.15,
+  },
+  sub: { fontSize: 10, color: C.muted, marginTop: 4 },
+  titleChipBox: {
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 11,
+    marginLeft: 10,
+  },
+  titleChipText: {
+    fontSize: 11,
+    fontFamily: "Helvetica-Bold",
+    color: "#ffffff",
+  },
 
   verdictBox: {
     marginTop: 10,
@@ -307,6 +349,11 @@ const s = StyleSheet.create({
     borderRadius: 6,
     padding: 10,
   },
+  verdictHead: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+  },
   eyebrow: {
     fontSize: 8,
     color: C.muted,
@@ -314,12 +361,12 @@ const s = StyleSheet.create({
     letterSpacing: 1,
   },
   verdictWord: {
-    fontSize: 20,
+    fontSize: 18,
     fontFamily: "Helvetica-Bold",
-    marginTop: 3,
+    marginTop: 2,
     lineHeight: 1.05,
   },
-  verdictSub: { fontSize: 10, color: C.muted, marginTop: 2 },
+  verdictSub: { fontSize: 9.5, color: C.muted },
   verdictReason: { marginTop: 6, fontSize: 10, color: C.ink },
   sinceLast: { marginTop: 6, fontSize: 8, color: C.muted },
 
@@ -337,31 +384,62 @@ const s = StyleSheet.create({
     letterSpacing: 0.5,
     marginRight: 8,
   },
-  buyBoxChip: { flexDirection: "row", marginRight: 10, marginBottom: 2 },
-  buyBoxMark: { fontSize: 8.5, fontFamily: "Helvetica-Bold", marginRight: 2.5 },
-  buyBoxLabel: { fontSize: 8.5, color: C.ink },
+  buyBoxChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 5,
+    marginBottom: 3,
+    borderWidth: 0.75,
+    borderRadius: 8,
+    paddingVertical: 1.5,
+    paddingHorizontal: 6,
+  },
+  buyBoxMark: { fontSize: 8, fontFamily: "Helvetica-Bold", marginRight: 3 },
+  buyBoxLabel: { fontSize: 8, color: C.ink },
 
   section: { marginTop: 13 },
   twoCol: { flexDirection: "row", marginTop: 13, gap: 14 },
   col: { flex: 1 },
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 7,
+  },
+  sectionTick: {
+    width: 3,
+    height: 8,
+    backgroundColor: C.brand,
+    borderRadius: 1.5,
+    marginRight: 5,
+  },
   sectionTitle: {
     fontSize: 9,
     fontFamily: "Helvetica-Bold",
     color: C.muted,
     textTransform: "uppercase",
     letterSpacing: 1,
-    marginBottom: 7,
   },
 
-  termsWrap: { flexDirection: "row", flexWrap: "wrap" },
+  termsWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    borderWidth: 0.75,
+    borderColor: C.line,
+    borderRadius: 6,
+    overflow: "hidden",
+  },
   term: {
     width: "25%",
-    paddingRight: 10,
-    marginBottom: 7,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRightWidth: 0.5,
+    borderRightColor: C.line,
+    borderBottomWidth: 0.5,
+    borderBottomColor: C.line,
   },
-  termLabel: { fontSize: 7.5, color: C.muted, textTransform: "uppercase" },
-  termValue: { fontSize: 11, fontFamily: "Helvetica-Bold", marginTop: 1 },
-  verify: { fontSize: 7, color: C.caution },
+  termLabel: { fontSize: 7, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 },
+  termValue: { fontSize: 11, fontFamily: "Helvetica-Bold", marginTop: 1.5 },
+  verify: { fontSize: 6.5, color: C.caution, marginTop: 1 },
 
   row: { flexDirection: "row", marginBottom: 5 },
   bullet: { width: 10, color: C.muted },
@@ -403,8 +481,10 @@ const s = StyleSheet.create({
     flexDirection: "row",
     borderBottomWidth: 0.5,
     borderBottomColor: C.line,
-    paddingVertical: 3,
+    paddingVertical: 3.5,
+    paddingHorizontal: 2,
   },
+  rangeRowAlt: { backgroundColor: C.faint },
   rangeLabel: { width: "26%", fontSize: 8.5, fontFamily: "Helvetica-Bold" },
   rangeCell: { width: "13%", fontSize: 8.5, textAlign: "right", paddingRight: 6 },
   rangeCellBase: {
@@ -414,6 +494,8 @@ const s = StyleSheet.create({
     paddingRight: 6,
     fontFamily: "Helvetica-Bold",
     color: C.brand,
+    backgroundColor: "#e8f1ef",
+    borderRadius: 3,
   },
   rangeSource: { width: "35%", fontSize: 7.5, color: C.muted },
   rangeHeadText: {
@@ -423,24 +505,51 @@ const s = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // The screen: deal-killers + sensitivity
-  killersRow: { flexDirection: "row", marginTop: 8 },
-  killerCol: { flex: 1, paddingRight: 10 },
+  // The screen: deal-killers as cards + the scenario trio
+  killersRow: { flexDirection: "row", marginTop: 8, gap: 6 },
+  killerCard: {
+    flex: 1,
+    borderWidth: 0.75,
+    borderColor: C.line,
+    borderLeftWidth: 3,
+    borderLeftColor: C.brand,
+    borderRadius: 5,
+    padding: 6,
+    backgroundColor: "#fbfcfb",
+  },
   killerName: { fontSize: 8.5, fontFamily: "Helvetica-Bold", color: C.brand },
-  killerRead: { fontSize: 8, color: C.muted, marginTop: 1.5 },
-  killerRisk: { fontSize: 7.5, color: C.kill, marginTop: 1.5 },
+  killerRead: { fontSize: 8, color: C.muted, marginTop: 2 },
+  killerRisk: { fontSize: 7.5, color: C.kill, marginTop: 2 },
   sensBlock: { marginTop: 8 },
   sensLabel: {
     fontSize: 7,
     color: C.muted,
     textTransform: "uppercase",
     letterSpacing: 0.5,
-    marginBottom: 2,
+    marginBottom: 3,
   },
-  sensLine: { flexDirection: "row", alignItems: "baseline", marginBottom: 1.5 },
-  sensScenario: { fontSize: 8, color: C.muted, width: 62 },
-  sensCall: { fontSize: 8.5, fontFamily: "Helvetica-Bold", width: 46 },
-  sensNote: { fontSize: 7.5, color: C.muted, flex: 1 },
+  sensRow: {
+    flexDirection: "row",
+    borderWidth: 0.75,
+    borderColor: C.line,
+    borderRadius: 5,
+    overflow: "hidden",
+  },
+  sensCell: {
+    flex: 1,
+    paddingVertical: 5,
+    paddingHorizontal: 7,
+    borderRightWidth: 0.5,
+    borderRightColor: C.line,
+  },
+  sensScenario: {
+    fontSize: 6.5,
+    color: C.muted,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  sensCall: { fontSize: 9.5, fontFamily: "Helvetica-Bold", marginTop: 1 },
+  sensNote: { fontSize: 7, color: C.muted, marginTop: 1.5 },
 
   footer: {
     position: "absolute",
@@ -475,7 +584,10 @@ function Section({
 }) {
   return (
     <View style={s.section}>
-      <Text style={s.sectionTitle}>{title}</Text>
+      <View style={s.sectionTitleRow}>
+        <View style={s.sectionTick} />
+        <Text style={s.sectionTitle}>{title}</Text>
+      </View>
       {children}
     </View>
   );
@@ -523,20 +635,40 @@ export function MemoPage({ data }: { data: MemoData }) {
 
         <View style={s.divider} />
 
-        <Text style={s.title}>{data.name}</Text>
-        {subParts.length > 0 && (
-          <Text style={s.sub}>{subParts.join("  ·  ")}</Text>
-        )}
+        <View style={s.titleRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.title}>{data.name}</Text>
+            {subParts.length > 0 && (
+              <Text style={s.sub}>{subParts.join("  ·  ")}</Text>
+            )}
+          </View>
+          {data.verdictWord ? (
+            <View
+              style={[s.titleChipBox, { backgroundColor: data.verdictColor }]}
+            >
+              <Text style={s.titleChipText}>{data.verdictWord}</Text>
+            </View>
+          ) : null}
+        </View>
 
         {data.verdictWord && (
-          <View style={[s.verdictBox, { borderLeftColor: data.verdictColor }]}>
-            <Text style={s.eyebrow}>Verdict</Text>
-            <Text style={[s.verdictWord, { color: data.verdictColor }]}>
-              {data.verdictWord}
-            </Text>
-            {data.verdictSub ? (
-              <Text style={s.verdictSub}>{data.verdictSub}</Text>
-            ) : null}
+          <View
+            style={[
+              s.verdictBox,
+              {
+                borderLeftColor: data.verdictColor,
+                backgroundColor: VERDICT_TINT[data.verdictWord] ?? C.faint,
+              },
+            ]}
+          >
+            <View style={s.verdictHead}>
+              <Text style={[s.verdictWord, { color: data.verdictColor }]}>
+                {data.verdictWord}
+              </Text>
+              {data.verdictSub ? (
+                <Text style={s.verdictSub}>{data.verdictSub}</Text>
+              ) : null}
+            </View>
             {data.verdictReason ? (
               <Text style={s.verdictReason}>{data.verdictReason}</Text>
             ) : null}
@@ -549,34 +681,23 @@ export function MemoPage({ data }: { data: MemoData }) {
         {data.buyBox.length > 0 && (
           <View style={s.buyBoxRow}>
             <Text style={s.buyBoxTitle}>Buy box</Text>
-            {data.buyBox.map((c, i) => (
-              <View key={i} style={s.buyBoxChip}>
-                <Text
+            {data.buyBox.map((c, i) => {
+              const chip = STATUS_CHIP[c.status] ?? STATUS_CHIP.unknown;
+              return (
+                <View
+                  key={i}
                   style={[
-                    s.buyBoxMark,
-                    {
-                      color:
-                        c.status === "miss"
-                          ? C.kill
-                          : c.status === "near"
-                            ? C.caution
-                            : c.status === "pass"
-                              ? C.pass
-                              : C.muted,
-                    },
+                    s.buyBoxChip,
+                    { borderColor: chip.color, backgroundColor: chip.bg },
                   ]}
                 >
-                  {c.status === "miss"
-                    ? "×"
-                    : c.status === "near"
-                      ? "±"
-                      : c.status === "pass"
-                        ? "•"
-                        : "—"}
-                </Text>
-                <Text style={s.buyBoxLabel}>{c.label}</Text>
-              </View>
-            ))}
+                  <Text style={[s.buyBoxMark, { color: chip.color }]}>
+                    {chip.mark}
+                  </Text>
+                  <Text style={s.buyBoxLabel}>{c.label}</Text>
+                </View>
+              );
+            })}
           </View>
         )}
 
@@ -590,7 +711,10 @@ export function MemoPage({ data }: { data: MemoData }) {
               <Text style={[s.rangeSource, s.rangeHeadText]}>Source</Text>
             </View>
             {data.ranges.map((r, i) => (
-              <View key={i} style={s.rangeRow}>
+              <View
+                key={i}
+                style={i % 2 === 1 ? [s.rangeRow, s.rangeRowAlt] : s.rangeRow}
+              >
                 <Text style={s.rangeLabel}>{r.label}</Text>
                 <Text style={s.rangeCell}>{r.low}</Text>
                 <Text style={s.rangeCellBase}>{r.base}</Text>
@@ -602,7 +726,7 @@ export function MemoPage({ data }: { data: MemoData }) {
             {data.dealKillers.length > 0 && (
               <View style={s.killersRow}>
                 {data.dealKillers.map((k, i) => (
-                  <View key={i} style={s.killerCol}>
+                  <View key={i} style={s.killerCard}>
                     <Text style={s.killerName}>
                       {i + 1}. {k.label}
                     </Text>
@@ -618,17 +742,22 @@ export function MemoPage({ data }: { data: MemoData }) {
             {data.sensitivity.length > 0 && (
               <View style={s.sensBlock}>
                 <Text style={s.sensLabel}>Where the call flips</Text>
-                {data.sensitivity.map((sc, i) => (
-                  <View key={i} style={s.sensLine}>
-                    <Text style={s.sensScenario}>{sc.scenario}</Text>
-                    <Text
-                      style={[s.sensCall, { color: CALL_COLOR[sc.call] ?? C.ink }]}
-                    >
-                      {sc.call}
-                    </Text>
-                    {sc.note ? <Text style={s.sensNote}>— {sc.note}</Text> : null}
-                  </View>
-                ))}
+                <View style={s.sensRow}>
+                  {data.sensitivity.map((sc, i) => (
+                    <View key={i} style={s.sensCell}>
+                      <Text style={s.sensScenario}>{sc.scenario}</Text>
+                      <Text
+                        style={[
+                          s.sensCall,
+                          { color: CALL_COLOR[sc.call] ?? C.ink },
+                        ]}
+                      >
+                        {sc.call}
+                      </Text>
+                      {sc.note ? <Text style={s.sensNote}>{sc.note}</Text> : null}
+                    </View>
+                  ))}
+                </View>
               </View>
             )}
           </Section>
