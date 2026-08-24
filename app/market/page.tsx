@@ -15,6 +15,28 @@ import { COVERAGE_DISCOVERY, COVERAGE_SUMMARY, PROVIDERS } from "@/lib/public-co
 import metrosSeed from "@/data/research/metros.json";
 import multifamilySeed from "@/data/research/multifamily.json";
 import { CopyCite } from "./copy-cite";
+import { MarketCompare, type CompareMetro } from "./market-compare";
+
+// The compare tool's compact per-metro facts, derived once from the research
+// layer — FMR row, rule count, comps-feed state. Serializable: it crosses the
+// server → client boundary as props.
+const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) => {
+  const fmr = (m as { fmr_fy2026?: CompareMetro["fmr"] | null }).fmr_fy2026 ?? {};
+  const beds: CompareMetro["fmr"] = { status: fmr.status };
+  for (const k of ["0br", "1br", "2br", "3br"] as const) {
+    const v = fmr[k];
+    if (typeof v === "number") beds[k] = v;
+  }
+  return {
+    id: m.id,
+    name: m.name,
+    region: (m as { region?: string }).region ?? "More markets",
+    fmr: beds,
+    ruleCount: ((m as { rule_ids?: string[] }).rule_ids ?? []).length,
+    compsLive:
+      typeof m.comps_provider === "string" && m.comps_provider !== "discovery",
+  };
+});
 
 export const metadata: Metadata = { title: "Market data" };
 
@@ -119,6 +141,9 @@ export default async function MarketDataPage({
       )}
 
       <MetroExplorer selected={metroParam} />
+      {/* Side-by-side: any two covered markets on one shared dollar scale,
+          straight off the research layer. */}
+      <MarketCompare metros={COMPARE_METROS} />
       <MidAtlanticTable />
       <SectorExplorer selected={sectorParam} />
       <RatesStrip />
