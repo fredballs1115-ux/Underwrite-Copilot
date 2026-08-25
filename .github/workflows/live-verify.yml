@@ -91,6 +91,7 @@ jobs:
           grep -q "takes your answer right on the deal" p_why.html && echo "/why: overnight copy present" || echo "/why: overnight copy MISSING"
           grep -q "ticker-track-reverse" p_why.html && echo "/why: markets band present" || echo "/why: markets band not yet deployed"
           grep -q "screenrun-line" p_why.html && echo "/why: screen-run trace present" || echo "/why: screen-run trace not yet deployed"
+          grep -q "multifamily, and retail vacancy" p_why.html && echo "/why: asset-type copy includes retail (Aug 25)" || echo "/why: asset-type copy still pre-retail"
           grep -q "improvement" p_whats-new.html && echo "/whats-new: public changelog serves" || echo "/whats-new: not serving (pre-#98 build or auth-walled)"
           # /market must open for ANONYMOUS visitors (no cookies here): the
           # signed-out chrome says "Get started"; a login redirect would 200
