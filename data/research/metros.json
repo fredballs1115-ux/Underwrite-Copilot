@@ -522,16 +522,17 @@
           "note": "Q1 2026 level 9.3% via NJ Business Magazine's report on the quarter's house data; Savills Q1 confirms climbing vacancy with port-centric submarkets (Linden/Elizabeth, Hudson Waterfront) off ≥16% from peak rents. Colliers Q2 shows leasing rebounding to 9.8M SF. Market-wide asking rent not pinned — gap recorded."
         },
         "multifamily": {
-          "vacancy_pct_low": 5.6,
+          "vacancy_pct_low": 3.0,
           "vacancy_pct_high": 5.6,
-          "cap_rate_low_pct": null,
-          "cap_rate_high_pct": null,
+          "cap_rate_low_pct": 5.7,
+          "cap_rate_high_pct": 5.7,
           "status": "sourced",
           "sources": [
             "https://www.marcusmillichap.com/research/market-report/northern-new-jersey/northern-new-jersey-2026-investment-forecast-multifamily-market-report",
-            "https://www.lument.com/momentum-building-in-northern-new-jersey-multifamily-market/"
+            "https://www.lument.com/momentum-building-in-northern-new-jersey-multifamily-market/",
+            "https://www.matthews.com/insights/top-10-multifamily-markets-in-2026"
           ],
-          "note": "M&M 2026 forecast: vacancy 5.6% overall but Class A at 10.7% on new-supply concentration; rents ~$2,253 (+2.0% YoY, decelerating). Jersey City has 4,000+ units slated for 2026 (The Journal towers, 505 Summit) — upward vacancy pressure in the urban core while Union/Essex/Bergen pipelines shrink. Lument: 77.9% lease-renewal rate, best of the top-20 metros (June 2025)."
+          "note": "M&M 2026 forecast: vacancy 5.6% overall but Class A at 10.7% on new-supply concentration; rents ~$2,253 (+2.0% YoY, decelerating). Jersey City has 4,000+ units slated for 2026 (The Journal towers, 505 Summit) — upward vacancy pressure in the urban core while Union/Essex/Bergen pipelines shrink. Lument: 77.9% lease-renewal rate, best of the top-20 metros (June 2025). Cap filled + vacancy banded Aug 25: Matthews (Top 10 Multifamily Markets 2026) has Northern NJ at a 5.7% cap on $1.1B volume (~$314K/unit) with vacancy driven to 3.0% by 4,329 units of absorption — vs M&M's 5.6% overall; two named houses, different bases and vintages, spread carried. Third sighting of CBRE-national class figures republished as local (Newark/JC loan-store pages) rejected on sight."
         }
       }
     },
