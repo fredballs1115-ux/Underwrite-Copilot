@@ -152,7 +152,7 @@ const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) => {
   let sectors: CompareMetro["sectors"];
   if (snap) {
     sectors = {};
-    for (const sec of ["office", "industrial", "multifamily"] as const) {
+    for (const sec of ["office", "industrial", "multifamily", "retail"] as const) {
       const blk = snap[sec] as
         | {
             vacancy_pct?: number | null;

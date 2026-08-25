@@ -83,6 +83,8 @@ before.
 | Change | Where to look |
 |---|---|
 | Sector-aware challenger + market check | upload any office/industrial/retail OM (#141) |
+| Retail — the fourth asset type, 10 of 15 markets | /market briefs (#141, #142) |
+| Baltimore's 10.0-vs-20.9 denominator lesson | /market?metro=baltimore + spread board (#142) |
 | Cap rates on the briefs, basis always named | /market, any metro (#139, #140) |
 | Sector reads on the research ticker | homepage ticker (#140) |
 | "By asset type" sector panel, all 15 markets | /market, any metro (#134, #136) |
