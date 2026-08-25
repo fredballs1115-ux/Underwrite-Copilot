@@ -109,6 +109,7 @@ written down, not papered over.
 | DC retail 6.3% historic high · Philly construct-held · MoCo $6.94/SF | /market briefs (#154) |
 | Hampton Roads retail 4.4–4.6% — the retail program closes | /market?metro=norfolk_hampton_roads (#155) |
 | Baltimore retail direction sourced, level held open honestly | /market?metro=baltimore (#156) |
+| Sector leaderboards — 15 markets ranked per asset class | /market?sector=office · industrial · multifamily · retail (#157) |
 | Sector-aware challenger + market check | upload any office/industrial/retail OM (#141) |
 | Retail — the fourth asset type, 10 of 15 markets | /market briefs (#141, #142) |
 | Baltimore's 10.0-vs-20.9 denominator lesson | /market?metro=baltimore + spread board (#142) |

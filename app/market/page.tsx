@@ -764,6 +764,163 @@ async function MetroExplorer({ selected }: { selected?: string }) {
   );
 }
 
+// ── Sector leaderboard (cross-metro) ─────────────────────────────────────────
+// The same snapshot blocks the metro tiles render, flipped the other way: one
+// asset class at a time, every covered market with a numeric read, ranked
+// tightest to loosest. Bands are sorted by midpoint but DISPLAYED as bands —
+// a spread is never averaged into a single printed number. Metros whose block
+// carries only a sourced note (direction on file, level held open) are named
+// under the table, never silently dropped. Only the four snapshot-tracked
+// classes produce rows; other sector tabs render the research doc alone.
+type LeaderRow = {
+  id: string;
+  name: string;
+  vLow: number | null;
+  vHigh: number | null;
+  rent: number | null;
+  rentBasis: string | null;
+  capLow: number | null;
+  capHigh: number | null;
+  source: string | null;
+};
+function sectorLeaderboard(sector: string): {
+  rows: LeaderRow[];
+  heldOpen: string[];
+} {
+  const rows: LeaderRow[] = [];
+  const heldOpen: string[] = [];
+  for (const m of metrosSeed.metros ?? []) {
+    const snap = (m as { sector_snapshot?: Record<string, unknown> | null })
+      .sector_snapshot;
+    const blk = snap?.[sector] as SnapBlock | undefined;
+    if (!blk || typeof blk !== "object") continue;
+    const vLow = blk.vacancy_pct ?? blk.vacancy_pct_low ?? null;
+    const vHighRaw = blk.vacancy_pct ?? blk.vacancy_pct_high ?? vLow;
+    const rent = typeof blk.asking_rent_psf === "number" ? blk.asking_rent_psf : null;
+    const capLow = typeof blk.cap_rate_low_pct === "number" ? blk.cap_rate_low_pct : null;
+    const capHigh = typeof blk.cap_rate_high_pct === "number" ? blk.cap_rate_high_pct : null;
+    if (vLow === null && rent === null && capLow === null) {
+      heldOpen.push(m.name);
+      continue;
+    }
+    rows.push({
+      id: m.id,
+      name: m.name,
+      vLow,
+      vHigh: typeof vHighRaw === "number" ? vHighRaw : null,
+      rent,
+      rentBasis: blk.rent_basis ?? null,
+      capLow,
+      capHigh,
+      source: blk.sources?.[0] ?? null,
+    });
+  }
+  rows.sort((a, b) => {
+    if (a.vLow === null && b.vLow === null) return a.name.localeCompare(b.name);
+    if (a.vLow === null) return 1;
+    if (b.vLow === null) return -1;
+    return (
+      (a.vLow + (a.vHigh ?? a.vLow)) / 2 - (b.vLow + (b.vHigh ?? b.vLow)) / 2
+    );
+  });
+  return { rows, heldOpen };
+}
+
+function SectorLeaderboard({ sector }: { sector: string }) {
+  const { rows, heldOpen } = sectorLeaderboard(sector);
+  if (rows.length === 0 && heldOpen.length === 0) return null;
+  const label = SECTOR_LABEL[sector] ?? sector;
+  const anyRent = rows.some((r) => r.rent !== null);
+  const anyCap = rows.some((r) => r.capLow !== null);
+  const band = (lo: number, hi: number | null) =>
+    hi === null || hi === lo ? `${lo}%` : `${lo}–${hi}%`;
+  return (
+    <div>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
+          {label} across the covered markets
+        </h3>
+        <span className="text-[11px] text-muted">
+          ranked tightest to loosest · vintages vary by print — each metro page
+          declares them
+        </span>
+      </div>
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full min-w-[440px] text-left text-sm">
+          <thead>
+            <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
+              <th className="py-1.5 pr-2 font-medium">#</th>
+              <th className="py-1.5 pr-3 font-medium">Market</th>
+              <th className="py-1.5 pr-3 font-medium">Vacancy</th>
+              {anyRent && <th className="py-1.5 pr-3 font-medium">Asking $/SF</th>}
+              {anyCap && <th className="py-1.5 pr-3 font-medium">Cap range</th>}
+              <th className="py-1.5 font-medium">Src</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => {
+              // Sorted with every vacancy-ranked row first, so index = rank.
+              return (
+                <tr key={r.id} className="border-b border-line/60">
+                  <td className="py-1.5 pr-2 font-mono text-[11px] tabular-nums text-muted">
+                    {r.vLow !== null ? i + 1 : "—"}
+                  </td>
+                  <td className="py-1.5 pr-3">
+                    <Link
+                      href={`/market?metro=${r.id}`}
+                      className="text-xs font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
+                    >
+                      {r.name}
+                    </Link>
+                  </td>
+                  <td className="py-1.5 pr-3 font-mono text-xs tabular-nums">
+                    {r.vLow !== null ? band(r.vLow, r.vHigh) : "level open"}
+                  </td>
+                  {anyRent && (
+                    <td
+                      className="py-1.5 pr-3 font-mono text-xs tabular-nums"
+                      title={r.rentBasis ?? undefined}
+                    >
+                      {r.rent !== null ? `$${r.rent.toFixed(2)}` : "—"}
+                    </td>
+                  )}
+                  {anyCap && (
+                    <td className="py-1.5 pr-3 font-mono text-xs tabular-nums">
+                      {r.capLow !== null && r.capHigh !== null
+                        ? band(r.capLow, r.capHigh)
+                        : "—"}
+                    </td>
+                  )}
+                  <td className="py-1.5 text-[11px] text-muted">
+                    {r.source && linkOk(r.source) !== false ? (
+                      <a
+                        href={r.source}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline decoration-dotted underline-offset-2 hover:text-ink"
+                      >
+                        source
+                      </a>
+                    ) : (
+                      "on file"
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {heldOpen.length > 0 && (
+        <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
+          Direction on file, numeric level held open: {heldOpen.join(" · ")} —
+          the metro pages carry the sourced notes.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ── Sector explorer (every asset type) ──────────────────────────────────────
 // The full research file for EVERY asset class, rendered: cycle position,
 // cap-rate ranges (ranges, never single numbers), supply/demand, debt terms,
@@ -891,6 +1048,8 @@ function SectorExplorer({ selected }: { selected?: string }) {
             {unpriced.map((r) => r.tier).filter(Boolean).join("; ")}.
           </p>
         )}
+
+        <SectorLeaderboard sector={active.id} />
 
         {(supply || debt) && (
           <div className="grid gap-3 sm:grid-cols-2">
