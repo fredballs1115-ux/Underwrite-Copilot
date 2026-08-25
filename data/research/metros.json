@@ -1059,6 +1059,18 @@
             "https://www.marcusmillichap.com/research/market-report/atlanta/atlanta-2q26-multifamily-market-report"
           ],
           "note": "Reads span Northmarq 5.6% (lowest in nearly three years, expected to reach 5.2%) to a CRE Daily brief's 7.2% declining — spread carried. M&M 2Q26: deliveries slowing 43% YoY (9,300 units, +1.6% inventory), rents ~$1,600 (+1% — among the stronger early-2026 metros). Cap reads conflict by construct (5.2% A/B average vs low-to-mid-5s deal narrative vs a 5.5-6.0 aggregator quote) — no single band carried."
+        },
+        "retail": {
+          "vacancy_pct_low": 4.6,
+          "vacancy_pct_high": 4.6,
+          "asking_rent_psf": 19.19,
+          "rent_basis": "avg asking, $/SF/yr",
+          "status": "sourced",
+          "sources": [
+            "https://partnersrealestate.com/research/atlanta-retail-q1-2026-quarterly-market-report/",
+            "https://www.colliers.com/en/research/atlanta/2026-q2-atlanta-retail-market-report"
+          ],
+          "note": "Q1 2026 vacancy 4.6% (Partners); asking $19.19/SF by Q2 (+3.3% QoQ). Rent trend splits by tracker — Colliers has +1.0% over 12 months while Partners-tracked runs -1.0% YoY — recorded, not averaged. Colliers Q2: vacancy rising in second-tier space, premier centers still favored; 180k SF under construction, the most since 2024. Inventory-constrained overall."
         }
       }
     },
