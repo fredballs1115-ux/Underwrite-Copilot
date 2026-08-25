@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { benchmarksForDeal, seedBenchmarks } from "@/lib/research-data";
 import { metroForAddress } from "@/lib/market-match";
+import metrosSeed from "@/data/research/metros.json";
 
 const seeds = seedBenchmarks();
 
@@ -97,5 +98,31 @@ describe("sector snapshot benchmark rows", () => {
       expect(r.source, `${r.metro} ${r.metric}`).toMatch(/^https?:\/\//);
       expect(r.as_of).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     }
+  });
+  it("the homepage spread board has at least three real divergences to draw", () => {
+    // The SpreadBoard derives (metro, sector) pairs where two named trackers
+    // publish different vacancy figures. Lock the derivation's ground truth:
+    // the widest spread today is LA office (17.8-25.8), and there are always
+    // at least three genuine spreads to fill the board.
+    const rows: { name: string; sector: string; low: number; high: number }[] = [];
+    for (const m of metrosSeed.metros ?? []) {
+      const snap = (m as { sector_snapshot?: Record<string, unknown> | null }).sector_snapshot;
+      if (!snap) continue;
+      for (const [sector, blk] of Object.entries(snap)) {
+        if (sector === "as_of" || typeof blk !== "object" || blk == null) continue;
+        const b = blk as { vacancy_pct?: number | null; vacancy_pct_low?: number | null; vacancy_pct_high?: number | null };
+        const low = b.vacancy_pct ?? b.vacancy_pct_low;
+        const high = b.vacancy_pct ?? b.vacancy_pct_high;
+        if (typeof low === "number" && typeof high === "number" && high > low) {
+          rows.push({ name: m.name, sector, low, high });
+        }
+      }
+    }
+    rows.sort((a, b) => b.high - b.low - (a.high - a.low));
+    expect(rows.length).toBeGreaterThanOrEqual(3);
+    expect(rows[0].name).toBe("Los Angeles");
+    expect(rows[0].sector).toBe("office");
+    expect(rows[0].low).toBeCloseTo(17.8, 3);
+    expect(rows[0].high).toBeCloseTo(25.8, 3);
   });
 });

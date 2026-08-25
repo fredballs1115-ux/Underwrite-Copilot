@@ -394,7 +394,7 @@
             "https://assets.cushmanwakefield.com/-/media/cw/marketbeat-pdfs/2026/q1/us-reports/industrial/hampton_roads_americas_alliance_marketbeat_industrial_q1_2026.pdf",
             "https://www.jll.com/en-us/insights/market-dynamics/hampton-roads-industrial"
           ],
-          "note": "Cushman MarketBeat Q1 2026: vacancy 7.8% as new deliveries outpace absorption; port-anchored demand base (Port of Virginia). Market-wide asking rent not captured this sweep — gap recorded, not estimated."
+          "note": "Cushman MarketBeat Q1 2026: vacancy 7.8% as new deliveries outpace absorption; port-anchored demand base (Port of Virginia). Asking rent stays null: the only figure surfacing ($23.33/SF, +2.3% YoY, aggregator-attributed) fails plausibility for port-market warehouse at 2-3x peer ports (Richmond $8.86, Baltimore $11.17) — likely a flex/office conflation; rejected on the record rather than carried."
         },
         "multifamily": {
           "vacancy_pct_low": 5.2,
@@ -466,7 +466,7 @@
             "https://www.northmarq.com/insights/insights/multifamily-fundamentals-philadelphia-remain-stable-despite-wave-new-supply",
             "https://www.cbre.com/insights/figures/philadelphia-multifamily-figures-report-q2-2026"
           ],
-          "note": "Vacancy 4.8% Q2 2026 (Northmarq, citing Fannie Mae; ~5.1% projected by Q4). CAP RATE deliberately null: the one aggregator carrying per-class figures (4.74/4.92/5.38% A/B/C) also states '5.6% all classes' on the same pages — internally inconsistent, templated-page smell — so no number is encoded until a brokerage survey figure is pulled. Never estimated."
+          "note": "Vacancy 4.8% Q2 2026 (Northmarq, citing Fannie Mae; ~5.1% projected by Q4). CAP RATE deliberately null: the one aggregator carrying per-class figures (4.74/4.92/5.38% A/B/C) also states '5.6% all classes' on the same pages — internally inconsistent, templated-page smell — so no number is encoded until a brokerage survey figure is pulled. Never estimated. Provenance closed Aug 25: those templated per-class figures (4.74/4.92/5.38) are CBRE's NATIONAL H1 2026 class averages — the aggregator republishes them as local numbers on its city pages, which is exactly the conflation the null guards against."
         },
         "as_of": "2026-08-25"
       }
@@ -572,7 +572,9 @@
             "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/new-york-city-area-marketbeats/manhattan-office",
             "https://www.propertyshark.com/Real-Estate-Reports/2026/07/28/nyc-office-market-report-q2-2026/"
           ],
-          "note": "Q2 2026 Manhattan: Cushman & Wakefield 19.3% (-60bps QoQ, lowest since Q3 2021; overall asking $72.83/SF, Class A $84.79); PropertyShark tracks 13.1% on its stock incl. coworking — the band is a measurement-basis spread, not an error bar. Plaza District asking crossed $100/SF."
+          "note": "Q2 2026 Manhattan: Cushman & Wakefield 19.3% (-60bps QoQ, lowest since Q3 2021; overall asking $72.83/SF, Class A $84.79); PropertyShark tracks 13.1% on its stock incl. coworking — the band is a measurement-basis spread, not an error bar. Plaza District asking crossed $100/SF. Rent gap filled Aug 25, and the houses diverge here too: Cushman $72.83 overall (Class A $84.79), Colliers $78.03, CBRE $80.17 (+3% QoQ) — Cushman carried for house-consistency with the vacancy line, the others on record. Q2 2026: rents +5.7% YoY (sharpest midyear rise since 2016) on 22.8M SF of H1 leasing, the strongest first half since 2002; Cushman vacancy tightened 60bps to 19.3%, Colliers availability 13.0%.",
+          "asking_rent_psf": 72.83,
+          "rent_basis": "avg gross asking, Manhattan overall (Cushman)"
         },
         "industrial": {
           "vacancy_pct_low": 7.7,
@@ -635,15 +637,14 @@
           "note": "Q2 2026: Cushman & Wakefield 19.0% (+30bps, smallest quarterly increase in a year); another Greater-Boston tracker prints 23.6% total vacancy — measurement-basis spread. First back-to-back occupancy gains since 2019. Class A direct asking $51.28/SF, overall $45.68."
         },
         "industrial": {
-          "vacancy_pct_low": null,
-          "vacancy_pct_high": null,
-          "asking_rent_psf": null,
-          "rent_basis": null,
-          "status": "unverified_not_found",
+          "vacancy_pct_low": 12.8,
+          "vacancy_pct_high": 12.8,
+          "status": "sourced",
           "sources": [
-            "https://www.remmesco.com/blog/posts/2026/04/17/boston-commercial-real-estate-market-2026-office-industrial-life-science-retail-outlookboston-commercial-real-estate-market-2026-office-industrial-life-science-retail-outlook/"
+            "https://www.colliers.com/en/research/boston/greater-boston-industrial-report-2026q1",
+            "https://www.colliers.com/en/research/boston/greater-boston-industrial-report-q2-2026"
           ],
-          "note": "Q2 2026 narrative only, no clean level captured this pass: vacancy at a decade high as a completion wave digests, met by a ~73% pullback in speculative groundbreakings. Numeric level + asking rent queued for the next sweep — never estimated."
+          "note": "Gap filled Aug 25 (was recorded as unverified — no level had cleared the bar). Colliers Q1 2026: overall vacancy 12.8% (+30bps, near an 11-year high; the post-Covid low was 5.6% in 3Q22), a fourth straight quarter of negative absorption (-432k SF), annual rent growth swung from +33.5% at the 2022 peak to -1.5%. Colliers Q2: absorption back positive (+440k SF, logistics-led); South submarket availability 15.6%, a 14-year high, while the West grew rents 5.7% YoY. Market-wide asking rent level still not published — held null."
         },
         "multifamily": {
           "vacancy_pct_low": 4.9,
@@ -692,9 +693,12 @@
           "status": "sourced",
           "sources": [
             "https://www.tenantbase.com/chicago/q1-2026/",
-            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats"
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats",
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats/cbd-office"
           ],
-          "note": "Vacancy 27.3% (Q1 2026 print; among the highest of the covered metros). The co-reported '$22.99/SF average asking' fails plausibility for Chicago office (CBD asking runs far higher) — likely a net or suburban figure, so no rent is encoded. Rent level queued for the next sweep."
+          "note": "Vacancy 27.3% (Q1 2026 print; among the highest of the covered metros). The co-reported '$22.99/SF average asking' fails plausibility for Chicago office (CBD asking runs far higher) — likely a net or suburban figure, so no rent is encoded. Rent level queued for the next sweep. Rent gap filled Aug 25: Cushman CBD MarketBeat Q2 2026 has average gross asking at $43.90/SF (+0.8% QoQ; Class A $54.06, Trophy $57.45, B $41.30, C $30.32) — confirming the earlier $22.99 aggregator figure was implausible and rightly rejected. Eleventh straight quarter of negative absorption (-215k SF), but H1 leasing +1.7% YoY and sublease down 24.3% YoY.",
+          "asking_rent_psf": 43.9,
+          "rent_basis": "avg gross asking, CBD (Cushman)"
         },
         "industrial": {
           "vacancy_pct_low": 4.7,
@@ -767,9 +771,12 @@
           "vacancy_pct_high": 5.0,
           "status": "sourced",
           "sources": [
-            "https://www.cbre.com/insights/figures/los-angeles-industrial-figures-q2-2026"
+            "https://www.cbre.com/insights/figures/los-angeles-industrial-figures-q2-2026",
+            "https://kidder.com/market-reports/los-angeles-industrial-market-report/"
           ],
-          "note": "CBRE Q2 2026: vacancy 5.0% (-22bps QoQ), third straight quarter of positive absorption — but asking rents still repricing: -2.5% QoQ, -7.0% YoY, -32.4% over 36 months. Rent level not published in the pieces reviewed — trajectory carried, level null."
+          "note": "CBRE Q2 2026: vacancy 5.0% (-22bps QoQ), third straight quarter of positive absorption. Rent gap filled Aug 25: Kidder Q2 has average direct asking at $1.37/SF/month NNN ($16.44/yr, a x12 annualization - arithmetic, not an estimate), down 6.16% YoY from $1.46 - consistent with CBRE's reported -7.0% YoY trajectory and the -32.4% 36-month reprice.",
+          "asking_rent_psf": 16.44,
+          "rent_basis": "NNN annualized from Kidder's $1.37/SF monthly"
         },
         "multifamily": {
           "vacancy_pct_low": 4.5,

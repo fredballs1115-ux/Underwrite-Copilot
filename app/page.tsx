@@ -5,6 +5,7 @@ import { Reveal, CountUp, DemoTabs } from "./landing-interactive";
 import { ScreenRunStrip } from "./screen-run-strip";
 import { MarketPulseBoard } from "./market-pulse";
 import { RetradeReplay } from "./retrade-replay";
+import { SpreadBoard } from "./spread-board";
 import { ScrollProgress } from "./scroll-progress";
 import type { Metadata } from "next";
 import {
@@ -653,6 +654,11 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        {/* The spread board — even the professional trackers disagree; the
+            three widest real divergences from the research file, drawn as
+            ranges. Data-derived, links into the metro briefs. */}
+        <SpreadBoard />
 
         {/* Inside the screen — interactive walkthrough on sample data */}
         <section className="border-y border-line bg-faint">

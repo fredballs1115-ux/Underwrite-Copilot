@@ -15,6 +15,49 @@ since you pointed the web service at `main`). What gates the new features is
 Everything ships dark-safe: nothing breaks while those are pending, pages
 say exactly what's missing and why.
 
+## Monday night (Aug 24–25 ET) — homescreen eye-catchers, then the big one: real data on the asset types that matter
+
+**Your call: "more than 2BR info… research on all asset types… real data on assets that matter… way more info on each metro."** Answered in two probe-verified PRs (#134, #136):
+
+**Every covered market now carries an office / industrial / multifamily read.**
+Each metro brief on /market has a "By asset type" panel: vacancy, asking
+rent, and cap-rate bands, each with a status chip, a clickable source, an
+as-of date, and a provenance note. All 18 metro entries across the 15
+markets are covered — nothing queued, nothing guessed. The same figures
+flow automatically into deal-page vs-market benchmarks (labeled "office
+vacancy," "industrial asking rent $/SF," …) and the Compare tool's data
+spine.
+
+The integrity rules did real work in the sweeps:
+- **Divergence is shown, never averaged** — LA office runs 17.8–25.8%
+  depending on the tracker and whether you count direct, total, or
+  available space; the panel says exactly that. Same for Hampton Roads
+  (7.1 vs 12.7, bases named), NYC, Miami, Atlanta, DFW.
+- **Two templated aggregator numbers caught and rejected** — one
+  boilerplate "4.6% trending to 5.1%" line that appears verbatim on
+  multiple metros' pages, and a prose summary that inverted SF
+  multifamily's trend (claimed rising when Kidder's own table shows it
+  falling). The table text is what shipped.
+- **Gaps stay gaps** — Boston industrial has a decade-high-vacancy
+  narrative but no tracker level that cleared the source bar, so the
+  panel records exactly that instead of a made-up number. Six cap bands
+  held null with the reasoning written down.
+
+**Homescreen eye-catchers rounds 2–3 (#132, #133, verified live before the
+sector work):** the market pulse board (18 breathing tiles, each a real
+metro), the live IRR gauge wired to the stress bench, the verdict stamp
+animation, the retrade replay loop (ask struck through, price drops,
+verdict flips to Go — all from the sample fixture), the reading-progress
+hairline, and the primary-sources strip derived from the research file's
+actual URL hosts.
+
+| Change | Where to look |
+|---|---|
+| "By asset type" sector panel, all 15 markets | /market, any metro (#134, #136) |
+| Sector figures in deal benchmarks + labels | any deal's vs-market panel |
+| Pulse board · IRR gauge · verdict stamp | homepage (#132) |
+| Retrade replay · scroll hairline · sources strip | homepage (#133) |
+
 ## Monday evening (Aug 24 ET) — your three call-outs, answered: legal on the sample, a deeper model, cool stuff everywhere
 
 Three more PRs, each probe-verified live (#128–#130), built directly
