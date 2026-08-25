@@ -15,7 +15,11 @@ import { COVERAGE_DISCOVERY, COVERAGE_SUMMARY, PROVIDERS } from "@/lib/public-co
 import metrosSeed from "@/data/research/metros.json";
 import multifamilySeed from "@/data/research/multifamily.json";
 import { CopyCite } from "./copy-cite";
-import { MarketCompare, type CompareMetro } from "./market-compare";
+import {
+  MarketCompare,
+  type CompareMetro,
+  type CompareSector,
+} from "./market-compare";
 
 // The compare tool's compact per-metro facts, derived once from the research
 // layer — FMR row, rule count, comps-feed state. Serializable: it crosses the
@@ -141,11 +145,49 @@ const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) => {
     const v = fmr[k];
     if (typeof v === "number") beds[k] = v;
   }
+  // Sector fundamentals for the compare table, from the same snapshot blocks
+  // the "By asset type" panel renders — nulls simply produce no entry.
+  const snap = (m as { sector_snapshot?: Record<string, unknown> | null })
+    .sector_snapshot;
+  let sectors: CompareMetro["sectors"];
+  if (snap) {
+    sectors = {};
+    for (const sec of ["office", "industrial", "multifamily"] as const) {
+      const blk = snap[sec] as
+        | {
+            vacancy_pct?: number | null;
+            vacancy_pct_low?: number | null;
+            vacancy_pct_high?: number | null;
+            asking_rent_psf?: number | null;
+            cap_rate_low_pct?: number | null;
+            cap_rate_high_pct?: number | null;
+          }
+        | undefined;
+      if (!blk) continue;
+      const s: CompareSector = {};
+      const vLow = blk.vacancy_pct ?? blk.vacancy_pct_low;
+      const vHigh = blk.vacancy_pct ?? blk.vacancy_pct_high ?? vLow;
+      if (typeof vLow === "number") {
+        s.vLow = vLow;
+        if (typeof vHigh === "number") s.vHigh = vHigh;
+      }
+      if (typeof blk.asking_rent_psf === "number") s.rent = blk.asking_rent_psf;
+      if (
+        typeof blk.cap_rate_low_pct === "number" &&
+        typeof blk.cap_rate_high_pct === "number"
+      ) {
+        s.capLow = blk.cap_rate_low_pct;
+        s.capHigh = blk.cap_rate_high_pct;
+      }
+      if (Object.keys(s).length > 0) sectors[sec] = s;
+    }
+  }
   return {
     id: m.id,
     name: m.name,
     region: (m as { region?: string }).region ?? "More markets",
     fmr: beds,
+    sectors,
     ruleCount: ((m as { rule_ids?: string[] }).rule_ids ?? []).length,
     compsLive:
       typeof m.comps_provider === "string" && m.comps_provider !== "discovery",
