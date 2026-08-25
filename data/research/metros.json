@@ -328,6 +328,13 @@
             "https://www.marcusmillichap.com/research/market-report/baltimore/baltimore-2q-2026-multifamily-market-report"
           ],
           "note": "Q2 2026 by class: Class A 5.1% (+40bps YoY), Class C 4.2% (-90bps) — the band spans the class split. Disciplined construction pipeline; positive rent appreciation. Cap rate: no two-source figure captured this pass — null, never estimated. Single-source (M&M) pending corroboration."
+        },
+        "retail": {
+          "status": "sourced",
+          "sources": [
+            "https://www.marcusmillichap.com/research/market-report/baltimore/baltimore-2026-investment-forecast-retail-market-report"
+          ],
+          "note": "NUMERIC FIELD HELD OPEN — direction sourced, level not yet. Marcus & Millichap’s 2026 Baltimore retail forecast: development at its LOWEST since at least 2007, but a contraction in gross metro product plus below-average population growth keep net absorption negative, lifting vacancy to a comparatively HIGH level among major U.S. metros — the limited pipeline insulates neighborhood centers from legacy big-box closures. A digest print of “1.04/SF NNN with BW-Corridor transport slots at 2.84” was REJECTED as industrial-shaped warehouse figures spliced under a retail heading (sixth sector-conflation catch). A dated vacancy level from a named house has not cleared the bar."
         }
       }
     },
