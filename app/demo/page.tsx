@@ -258,6 +258,9 @@ export default function DemoPage() {
       (b) => b.metric === "industrial_asking_rent_psf",
     )?.low,
     multifamily: band("multifamily_vacancy_pct"),
+    // Renders nothing today — Philadelphia retail is a recorded gap — but
+    // the line picks it up the moment a sourced figure lands in the seed.
+    retail: band("retail_vacancy_pct"),
   };
 
   return (
@@ -506,6 +509,14 @@ export default function DemoPage() {
                       {" · "}multifamily{" "}
                       <span className="font-mono tabular-nums text-ink">
                         {phillySectors.multifamily}
+                      </span>
+                    </>
+                  )}
+                  {phillySectors.retail && (
+                    <>
+                      {" · "}retail{" "}
+                      <span className="font-mono tabular-nums text-ink">
+                        {phillySectors.retail}
                       </span>
                     </>
                   )}{" "}
