@@ -128,6 +128,29 @@ services:
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
 
+  # ── Monthly HUD FMR pull (public-data registry build) ──────────────────────
+  # huduser FMR API → benchmarks table, PRIMARY source for every covered
+  # metro's fair market rents (closes the FY2026 verification gap). Monthly
+  # because FMRs change annually (Oct 1) with occasional mid-year revisions.
+  # Free token: https://www.huduser.gov/hudapi/public/register
+  - type: cron
+    name: underwrite-copilot-fmr
+    runtime: node
+    plan: starter
+    branch: main
+    schedule: "45 12 3 * *"
+    buildCommand: npm install --omit=dev
+    startCommand: node scripts/fetch-fmr.mjs
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: HUD_API_TOKEN
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
   # ── Nightly verification steward (national expansion) ─────────────────────
   # Link health + freshness + consistency checks + re-verification of the
   # oldest 'sourced' claims via web search. Writes data_issues/data_changelog/
