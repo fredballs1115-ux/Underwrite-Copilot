@@ -374,6 +374,15 @@
             "https://www.northmarq.com/insights/insights/richmonds-multifamily-vacancy-holds-steady-amid-elevated-supply-q1-2026"
           ],
           "note": "Northmarq mid-2026: vacancy 7.2%, forecast ~7.7% by year-end as ~3,300 more units deliver; rents $1,625 (+1.7% YoY). Supply-heavy but demand steady. Cap held null through the Aug 25 hunt too: the only figure surfacing is the templated loan-store '5.6% all classes' line (fourth metro caught republishing it). Northmarq's outlook instead: vacancy peaking ~7.5% then leveling in early 2026; transaction volume expected to return via value-add first, stabilized Class A after, as rent growth accelerates."
+        },
+        "retail": {
+          "vacancy_pct": 4.4,
+          "status": "sourced",
+          "sources": [
+            "https://rebusinessonline.com/richmonds-mixed-use-boom-fuels-the-citys-retail-market/",
+            "https://rebusinessonline.com/mid-atlantic-retail-market-is-experiencing-methodical-growth/"
+          ],
+          "note": "Cushman & Wakefield | Thalhimer (Jim Ashby, SVP Retail Services — the dominant local house): greater Richmond retail vacancy ~4.4% on ~81M SF of inventory, held tight by years of limited new development and zoning constraints. VINTAGE CAVEAT: the accessible articles do not print the survey quarter — treated as a recent-cycle (2025–26 era) read, not a dated quarterly print. Pipeline to watch: Diamond District, Genworth HQ, Nunnally Village add supply over the next several years. Asking-rent level not published — held null."
         }
       }
     },
@@ -1151,7 +1160,7 @@
             "https://www.northmarq.com/insights/insights/atlantas-multifamily-vacancy-shrinks-lowest-level-nearly-three-years",
             "https://www.marcusmillichap.com/research/market-report/atlanta/atlanta-2q26-multifamily-market-report"
           ],
-          "note": "Reads span Northmarq 5.6% (lowest in nearly three years, expected to reach 5.2%) to a CRE Daily brief's 7.2% declining — spread carried. M&M 2Q26: deliveries slowing 43% YoY (9,300 units, +1.6% inventory), rents ~$1,600 (+1% — among the stronger early-2026 metros). Cap reads conflict by construct (5.2% A/B average vs low-to-mid-5s deal narrative vs a 5.5-6.0 aggregator quote) — no single band carried."
+          "note": "Reads span Northmarq 5.6% (lowest in nearly three years, expected to reach 5.2%) to a CRE Daily brief's 7.2% declining — spread carried. M&M 2Q26: deliveries slowing 43% YoY (9,300 units, +1.6% inventory), rents ~$1,600 (+1% — among the stronger early-2026 metros). Cap reads conflict by construct (5.2% A/B average vs low-to-mid-5s deal narrative vs a 5.5-6.0 aggregator quote) — no single band carried. Northmarq’s 2026 deal commentary splits the tape by deal type: sub-5% in-place for value-add quality bought at a discount to replacement cost, mid-5s for stabilized assets with less upside — useful for placing YOUR deal on the conflicted tape. A templated “Q2 2026 Class A/B 5.2%” print (loan-store family, fifth sighting) rejected again."
         },
         "retail": {
           "vacancy_pct_low": 4.6,
