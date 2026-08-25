@@ -28,6 +28,35 @@ function assetClassClause(assetClass: AssetClass): string {
     : `The asset class is ${assetClass}; apply its norms.`;
 }
 
+/** Sector-specific pro-forma traps for the challenger. The base prompt's
+ *  named traps (tax reset, opex ratio vs GPR, loss-to-lease burn-off, legacy
+ *  insurance) ARE the multifamily list, so multifamily adds nothing here —
+ *  office / industrial / retail get the diligence points that die deals in
+ *  THEIR sector. "auto" carries all three, gated on what the document turns
+ *  out to be. */
+const OFFICE_TRAPS = `OFFICE-SPECIFIC TRAPS, checked by name where the OM gives the inputs: (a) ROLLOVER — weighted average lease term (WALT) shorter than the hold period means tenants roll inside the deal; name which tenants expire in which years, and treat a pro forma that renews everyone at higher rent as a story, not a plan; (b) RE-LEASING COST REALITY — tenant improvements, leasing commissions, free rent, and downtime priced at TODAY'S market packages, not the legacy deal's, and actually carried in a below-NOI reserve; (c) FACE VS EFFECTIVE — concessions and free-rent burn-off can make year-one income read far above what tenants actually pay; ask for effective rents; (d) CREDIT AND SHADOW SPACE — weak-credit or shrinking tenants, and submarket sublease availability, undercut both the rent roll and the exit story.`;
+
+const INDUSTRIAL_TRAPS = `INDUSTRIAL-SPECIFIC TRAPS, checked by name where the OM gives the inputs: (a) FUNCTIONAL FIT — clear height, dock-door count, truck-court depth, and power against what modern tenants require; a low-clear older box priced like Class A logistics is the classic trap; (b) MARK-TO-MARKET CLAIMS — "below-market rents" must be proven against actual current submarket asking, not the prior peak; several big-port submarkets have repriced double digits off peak; (c) TENANT CONCENTRATION — a single-tenant or 3PL-heavy roll carries binary renewal risk; check renewal options, termination rights, and credit; (d) EXCESS-LAND AND OUTDOOR-STORAGE STORIES — value ascribed to yard or excess land needs zoning evidence, not a site plan sketch; (e) ROOF AND SLAB — age and condition against the capital reserve.`;
+
+const RETAIL_TRAPS = `RETAIL-SPECIFIC TRAPS, checked by name where the OM gives the inputs: (a) ANCHOR DEPENDENCE — co-tenancy clauses can let inline tenants cut rent or leave if an anchor goes dark; read them before believing the rent roll; (b) OCCUPANCY-COST RATIO — inline rents are only durable if rent-to-sales stays healthy; where the OM omits tenant sales, say plainly that this check cannot be run; (c) RECOVERY AND PERCENTAGE RENT — how much income depends on reimbursements or percentage rent, and whether the recovery math survives a vacancy; (d) TENANT-MIX CLAIMS — "internet-resistant" is an assertion; judge the actual tenant list.`;
+
+function sectorTrapsClause(assetClass: AssetClass): string {
+  switch (assetClass) {
+    case "office":
+      return `\n\n${OFFICE_TRAPS}`;
+    case "industrial":
+      return `\n\n${INDUSTRIAL_TRAPS}`;
+    case "retail":
+      return `\n\n${RETAIL_TRAPS}`;
+    case "auto":
+      return `\n\nIf the document turns out to be office, industrial, or retail rather than multifamily, ALSO apply that sector's trap list. ${OFFICE_TRAPS} ${INDUSTRIAL_TRAPS} ${RETAIL_TRAPS}`;
+    case "multifamily":
+    default:
+      // The base prompt's four named traps are the multifamily list.
+      return "";
+  }
+}
+
 /** Step 0 — First signal: the 30-second headline read, before the deep pass. */
 export function firstSignalInstruction(assetClass: AssetClass): string {
   return `Give ONLY the headline read of the attached offering memorandum — the 30-second version an analyst gives when a deal first hits their desk. ${assetClassClause(
@@ -66,7 +95,9 @@ Grill the deal in the order deals die: (1) BASIS — is the asking price per uni
 
 Overlay the down-cycle discipline the industry keeps re-learning in every crash: leasing and rent assumptions must come from today's market, not from what the pro forma needs to pencil; when the market is softening, treat this quarter's worst case as a candidate for next quarter's base case; judge the deal on the cash it actually throws off, not on appraisal values or exit hopes — a return that lives mostly in the residual is a warning, not a plan; and "other buyers are circling" is never underwriting support. A stated exit value is a snapshot, not a movie: if it presumes a ready buyer at a cap rate no market evidence supports, with no allowance for selling costs, say so — when an owner most needs to sell, the bid is thinnest. Where headline rents come from weak-credit tenants, the rent roll is worth less than it reads. And where an assumption exists only to make the deal work on paper, say exactly that.
 
-Give 3–6 challenges, most severe first. For each, give a specific, numerate critique, the exact question to put to the broker, and \`page\` — the OM page where the challenged figure appears, as a short string like "p. 12" (empty string if unknown). Then give a one-paragraph stress test: what happens to returns if the one or two most aggressive assumptions revert to market.`;
+Give 3–6 challenges, most severe first. For each, give a specific, numerate critique, the exact question to put to the broker, and \`page\` — the OM page where the challenged figure appears, as a short string like "p. 12" (empty string if unknown). Then give a one-paragraph stress test: what happens to returns if the one or two most aggressive assumptions revert to market.${sectorTrapsClause(
+    assetClass,
+  )}`;
 }
 
 /** Step 3 — Broker-comp scrutiny (the sale & lease comps inside the OM) */
@@ -97,7 +128,31 @@ You do NOT have a live comps feed — reason from typical ranges and explicitly 
 
 Two demand-side traps to check by name: absorption or demand claims that never mention the SUPPLY side (competing space delivering into the same submarket), and growth stories resting on projected population or job growth rather than evidence that exists today — in-place rents, current occupancy, existing rooftops. The OM's own leasing anecdotes are the seller's narrative, not market data.
 
-Be clear throughout that these are rules-of-thumb, not pulled comps, and must be verified against real market data.`;
+Be clear throughout that these are rules-of-thumb, not pulled comps, and must be verified against real market data.${sectorNormsClause(
+    assetClass,
+  )}`;
+}
+
+/** Compact sector norms for the market check — the era-calibration each
+ *  sector needs so "typical range" means today's market, not the prior
+ *  cycle's. Multifamily is the base calibration already. */
+function sectorNormsClause(assetClass: AssetClass): string {
+  const office = `For office, weigh sublease shadow space and lease rollover against the submarket: big-downtown vacancy runs far above the pre-2020 world, so an OM benchmarked to 2019-vintage "norms" is off-market by construction.`;
+  const industrial = `For industrial, judge rent assumptions against CURRENT submarket asking — several major port submarkets have repriced double digits off their peak — and vacancy claims against the post-supply-wave reality, not 2021–22 scarcity.`;
+  const retail = `For retail, judge inline rents against occupancy-cost norms for the tenant type wherever sales figures are given.`;
+  switch (assetClass) {
+    case "office":
+      return `\n\n${office}`;
+    case "industrial":
+      return `\n\n${industrial}`;
+    case "retail":
+      return `\n\n${retail}`;
+    case "auto":
+      return `\n\nCalibrate to the sector the document turns out to be: ${office} ${industrial} ${retail}`;
+    case "multifamily":
+    default:
+      return "";
+  }
 }
 
 /** Model generator — pass 1: extract underwriting facts from ONE document. */

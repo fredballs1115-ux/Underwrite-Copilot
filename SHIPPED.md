@@ -67,8 +67,24 @@ implausible aggregator figure rejected on the record, and the
 Philadelphia cap mystery solved: the templated page's "local" caps are
 CBRE's national averages in disguise.
 
+**And the screen itself now speaks each sector's language (#141).** The
+assumption challenger keeps its shared floor (tax reset, opex ratio,
+loss-to-lease, legacy insurance — the multifamily playbook that was
+always the foundation) and adds named trap lists per asset type: office
+OMs get grilled on WALT rollover inside the hold, TI/LC at today's
+packages, face-vs-effective rent, and sublease shadow space; industrial
+on clear height and dock fit, mark-to-market proven against current
+asking, tenant concentration, and excess-land stories; retail on
+co-tenancy clauses, occupancy-cost ratios, and recovery math. The
+market check calibrates each sector past its prior cycle. Nine lock
+tests pin the contract; multifamily prompts are byte-identical to
+before.
+
 | Change | Where to look |
 |---|---|
+| Sector-aware challenger + market check | upload any office/industrial/retail OM (#141) |
+| Cap rates on the briefs, basis always named | /market, any metro (#139, #140) |
+| Sector reads on the research ticker | homepage ticker (#140) |
 | "By asset type" sector panel, all 15 markets | /market, any metro (#134, #136) |
 | Spread board — the trackers disagree | homepage (#137) |
 | Compare: sectors side by side | /market, compare card (#138) |

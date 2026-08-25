@@ -729,6 +729,16 @@
             "https://essexrealtygroup.com/chicago-multifamily-report-april-2026/"
           ],
           "note": "Band spans stabilized-asset occupancy 96.3% (=3.7% vacancy, JPMorgan) to 4.6% market vacancy (projected 5.1% by Q3 2026); rent growth ~3.8% YoY — supply discipline doing the work. Cap rate: no two-source band captured; null. Cook County landlord rules already on file for this metro. Cap filled Aug 25 with the basis named: Essex Realty (local multifamily brokerage) April 2026 rolling data — 175 transactions, $587.8M, average cap 8.3%. That average is dominated by the Class B/C neighborhood buildings that drive Chicago volume (Northmarq: B/C sales fuel the market); institutional Class A trades price far tighter (gateway core ~4-5% nationally). A transaction average for the small-building stock, not a metro-wide quoted band."
+        },
+        "retail": {
+          "vacancy_pct_low": 7.8,
+          "vacancy_pct_high": 7.8,
+          "status": "sourced",
+          "sources": [
+            "https://assets.cushmanwakefield.com/-/media/cw/marketbeat-pdfs/2026/q2/us-reports/national/q22026usretailmarketbeat.pdf",
+            "https://www.colliers.com/-/media/files/unitedstates/national/2026/colliers-us-retail-statistics-report-2026-q2.ashx"
+          ],
+          "note": "Cushman Q2 2026: retail vacancy 7.8%. Metro asking rent not surfaced this pass (US average runs $24.79/SF, +2.4% YoY per CBRE) — level held null. Chicago is among the Midwest markets carrying new retail construction."
         }
       }
     },
@@ -977,6 +987,18 @@
             "https://realcostiq.com/cap-rate/miami/"
           ],
           "note": "Measured reads span 5.4% (MMG Q2: occupancy 94.6%, rents -0.2% YoY, absorption ~= completions) to 6.6% (Miami Realtors, March 2026, best of the large South-Region metros); M&M projects ~4.9% for 2026 — a forecast, noted not banded. Miami-Dade median asking $2,660 (May 2026, +1.5% YoY); Class A occupancy 95-96%. ~13,800-unit pipeline, 30.7% of it Downtown. Cap filled Aug 25 with vintage declared: Class A stabilized core 4.75-5.0% (CBRE H2 2025 read, corroborated across three independent surveys; core Brickell/Edgewater/Wynwood 4-5, value-add South Dade 5-6.5). Q2 2026: A/B caps expanded ~5bps on softening rents, Class C stable. No fresher named-house metro average surfaced."
+        },
+        "retail": {
+          "vacancy_pct_low": 3.0,
+          "vacancy_pct_high": 3.0,
+          "asking_rent_psf": 42.5,
+          "rent_basis": "avg asking, $/SF/yr",
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/miami/1q26-miami-dade-county-retail",
+            "https://commercialobserver.com/2026/07/south-florida-miami-retail-leasing-vacancy-rent/"
+          ],
+          "note": "Retail pilot (first metro with a fourth sector): Colliers Q2 2026 has Miami-Dade retail at 3.0% vacancy with asking $42.50/SF/yr (+2.6% QoQ), net absorption +378,795 SF and 1.3M SF under construction — among the tightest retail markets in the country (South Florida runs sub-5% across all three counties). Remaining metros' retail queues for the next research batches."
         }
       }
     },
@@ -1037,6 +1059,18 @@
             "https://www.marcusmillichap.com/research/market-report/atlanta/atlanta-2q26-multifamily-market-report"
           ],
           "note": "Reads span Northmarq 5.6% (lowest in nearly three years, expected to reach 5.2%) to a CRE Daily brief's 7.2% declining — spread carried. M&M 2Q26: deliveries slowing 43% YoY (9,300 units, +1.6% inventory), rents ~$1,600 (+1% — among the stronger early-2026 metros). Cap reads conflict by construct (5.2% A/B average vs low-to-mid-5s deal narrative vs a 5.5-6.0 aggregator quote) — no single band carried."
+        },
+        "retail": {
+          "vacancy_pct_low": 4.6,
+          "vacancy_pct_high": 4.6,
+          "asking_rent_psf": 19.19,
+          "rent_basis": "avg asking, $/SF/yr",
+          "status": "sourced",
+          "sources": [
+            "https://partnersrealestate.com/research/atlanta-retail-q1-2026-quarterly-market-report/",
+            "https://www.colliers.com/en/research/atlanta/2026-q2-atlanta-retail-market-report"
+          ],
+          "note": "Q1 2026 vacancy 4.6% (Partners); asking $19.19/SF by Q2 (+3.3% QoQ). Rent trend splits by tracker — Colliers has +1.0% over 12 months while Partners-tracked runs -1.0% YoY — recorded, not averaged. Colliers Q2: vacancy rising in second-tier space, premier centers still favored; 180k SF under construction, the most since 2024. Inventory-constrained overall."
         }
       }
     },
@@ -1099,6 +1133,18 @@
             "https://www.matthews.com/insights/dallas-fort-worth-multifamily-q1-2026"
           ],
           "note": "Northmarq Q1 2026: occupancy 93.2% (+10bps) = 6.8% vacancy; absorption ~8,500 units vs ~7,500 delivered; pipeline 43% below the 2023 peak. Average metro rent $1,482 (-3.0% YoY) while Class A rose 3.2% YoY for a fifth straight quarter — the mix, not a contradiction. A templated aggregator line quoting 4.6% was rejected (same boilerplate seen on another metro's page). No. 1 metro for absolute population growth (+100k residents YoY). Cap filled Aug 25: Matthews Q1 2026 transaction average 5.8% at ~$183K/unit — expansion slowing as borrowing costs still shape underwriting."
+        },
+        "retail": {
+          "vacancy_pct_low": 5.1,
+          "vacancy_pct_high": 5.1,
+          "asking_rent_psf": 25.47,
+          "rent_basis": "avg asking, $/SF/yr",
+          "status": "sourced",
+          "sources": [
+            "https://www.matthews.com/insights/q1-2026-dallas-fort-worth-tx-retail-market-report",
+            "https://www.bisnow.com/dallas-ft-worth/news/retail/weitzman-projects-grocery-anchored-retail-will-drive-dfw-to-4th-straight-year-of-record-occupancy-in-2026-132610"
+          ],
+          "note": "Q2 2026: vacancy 5.1% on 471.9M SF with asking $25.47/SF (+2.4% YoY) — CoStar-derived tracking, anchored by Matthews' Q1 report and Weitzman's outlook (grocery-anchored demand driving a fourth straight year of record occupancy). Tight and getting tighter."
         }
       }
     }
