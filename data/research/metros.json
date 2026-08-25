@@ -250,14 +250,15 @@
       "sector_snapshot": {
         "as_of": "2026-08-25",
         "office": {
-          "vacancy_pct_low": 20.9,
+          "vacancy_pct_low": 10.0,
           "vacancy_pct_high": 20.9,
           "status": "sourced",
           "sources": [
             "https://www.cbre.com/insights/figures/baltimore-office-figures-q2-2026",
-            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/baltimore-marketbeats"
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/baltimore-marketbeats",
+            "https://klnb.com/wp-content/uploads/2026/04/NAIKLNB_MD_Office_Q1_2026.pdf"
           ],
-          "note": "Q2 2026: vacancy 20.9% (+10bps QoQ), direct asking $26.77/SF (flat QoQ, -0.5% YoY); 60k SF occupancy loss in Q2, YTD absorption -37k SF (CBRE)."
+          "note": "Q2 2026: vacancy 20.9% (+10bps QoQ), direct asking $26.77/SF (flat QoQ, -0.5% YoY); 60k SF occupancy loss in Q2, YTD absorption -37k SF (CBRE). Band widened Aug 25 into the starkest basis divergence on the board: KLNB (CoStar-sourced, Greater Baltimore all-inventory) prints 10.0% with CBD asking $26.35 while CBRE's competitive set runs 20.9% at $26.77 — same city, half the vacancy, because the denominators differ. Spread carried with both bases named; ask which inventory a broker is quoting before comparing."
         },
         "industrial": {
           "vacancy_pct_low": 8.5,

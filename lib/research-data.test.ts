@@ -128,9 +128,16 @@ describe("sector snapshot benchmark rows", () => {
     }
     rows.sort((a, b) => b.high - b.low - (a.high - a.low));
     expect(rows.length).toBeGreaterThanOrEqual(3);
-    expect(rows[0].name).toBe("Los Angeles");
+    // Baltimore office took the top slot on Aug 25 when the KLNB all-inventory
+    // read (10.0) widened the band against CBRE's competitive 20.9 — the
+    // starkest basis divergence on the board.
+    expect(rows[0].name).toBe("Baltimore MD");
     expect(rows[0].sector).toBe("office");
-    expect(rows[0].low).toBeCloseTo(17.8, 3);
-    expect(rows[0].high).toBeCloseTo(25.8, 3);
+    expect(rows[0].low).toBeCloseTo(10.0, 3);
+    expect(rows[0].high).toBeCloseTo(20.9, 3);
+    // LA office (17.8–25.8) still rides in the top three.
+    expect(
+      rows.slice(0, 3).some((r) => r.name === "Los Angeles" && r.sector === "office"),
+    ).toBe(true);
   });
 });
