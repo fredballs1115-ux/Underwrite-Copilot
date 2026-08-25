@@ -365,3 +365,27 @@ export function pricePerUnit(priceText?: string | null, sizeText?: string | null
   if (!p || !u || u < 1) return null;
   return Math.round(p / u);
 }
+
+/** Format a benchmark's low–high for display, by what the metric IS: percent
+ *  figures (vacancy, cap rates, PMMS) get %, per-square-foot rents get $/SF,
+ *  monthly-sales and listing counts are plain counts, and dollar figures
+ *  (FMRs, sale medians) keep the $ prefix. A blanket $ prefix printed
+ *  "office vacancy: $17.7" on deal pages — units follow the metric now. */
+export function fmtBenchValue(
+  metric: string,
+  low?: number | null,
+  high?: number | null,
+): string {
+  const range = (f: (n: number) => string): string => {
+    if (typeof low !== "number") return "—";
+    return typeof high !== "number" || high === low
+      ? f(low)
+      : `${f(low)}–${f(high)}`;
+  };
+  if (/_vacancy_pct$|_cap_rate_pct$/.test(metric) || metric === "pmms_30y_fixed")
+    return range((n) => `${n}%`);
+  if (/_asking_rent_psf$/.test(metric)) return range((n) => `$${n.toFixed(2)}/SF`);
+  if (metric === "monthly_sales_2_4_unit" || metric === "active_listings_2_4_unit")
+    return range((n) => n.toLocaleString());
+  return range((n) => `$${n.toLocaleString()}`);
+}

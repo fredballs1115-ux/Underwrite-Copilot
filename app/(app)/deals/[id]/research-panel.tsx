@@ -20,11 +20,13 @@ import {
 import {
   benchmarksForDeal,
   buildSubject,
+  fmtBenchValue,
   mergeBenchmarks,
   pricePerUnit,
   seedBenchmarks,
   seedRules,
 } from "@/lib/research-data";
+import { sectorLeaderboard } from "@/lib/sector-leaderboard";
 import { linkOk } from "@/lib/link-audit";
 import { coveredState, metroForAddress } from "@/lib/market-match";
 import { parsePct } from "@/lib/criteria";
@@ -73,6 +75,25 @@ function metricLabel(metric: string): string {
   if (metric === "pmms_30y_fixed") return "30-yr fixed (PMMS)";
   return metric.replace(/__/g, ": ").replace(/_/g, " ");
 }
+
+// Where each covered metro sits per sector across the covered markets
+// (tightest vacancy first) — the same shared builder behind the market
+// page's rankings, the briefs' chips, and the sample screen, so a deal's
+// vs-market row can never disagree with them.
+const SECTOR_RANKS: Record<
+  string,
+  Record<string, { rank: number; total: number }>
+> = Object.fromEntries(
+  ["office", "industrial", "multifamily", "retail"].map((sec) => {
+    const ranked = sectorLeaderboard(sec).rows.filter((r) => r.vLow !== null);
+    return [
+      sec,
+      Object.fromEntries(
+        ranked.map((r, i) => [r.id, { rank: i + 1, total: ranked.length }]),
+      ),
+    ];
+  }),
+);
 
 /** Plain-English labels for condition keys surfaced as open questions. */
 const UNKNOWN_LABELS: Record<string, string> = {
@@ -420,6 +441,11 @@ export async function ResearchPanel({
                 ppu && b.metric === "median_sale_price_2_4_unit"
                   ? vsRange(ppu, b.low, b.high)
                   : null;
+              // Vacancy rows also say where this metro sits in its sector's
+              // cross-metro ranking — same builder as the market page.
+              const vac = b.metric.match(/^(\w+?)_vacancy_pct$/);
+              const rank =
+                vac && metro ? SECTOR_RANKS[vac[1]]?.[metro.id] : undefined;
               return (
                 <li
                   key={`${b.metro}|${b.metric}`}
@@ -429,10 +455,17 @@ export async function ResearchPanel({
                     {metricLabel(b.metric)}
                     {": "}
                     <span className="font-mono tabular-nums">
-                      {b.low === b.high
-                        ? `$${(b.low ?? 0).toLocaleString()}`
-                        : `$${(b.low ?? 0).toLocaleString()}–$${(b.high ?? 0).toLocaleString()}`}
+                      {fmtBenchValue(b.metric, b.low, b.high)}
                     </span>
+                    {rank && vac && (
+                      <Link
+                        href={`/market?sector=${vac[1]}`}
+                        title="rank across covered markets, tightest first"
+                        className="ml-2 rounded-full border border-line px-1.5 py-px text-[11px] font-medium text-muted transition-colors hover:border-brand hover:text-brand"
+                      >
+                        #{rank.rank} of {rank.total}
+                      </Link>
+                    )}
                     {cmp && cmp !== "no_range" && (
                       <span
                         className={`ml-2 rounded px-1.5 py-px text-[11px] font-medium ${

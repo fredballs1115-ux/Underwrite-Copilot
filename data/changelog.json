@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-25",
+      "title": "Deal pages: benchmark units follow the metric, and vacancy rows get pack positions",
+      "blurb": "The vs-market panel on deal pages printed every benchmark with a dollar sign — including percent figures, so an office deal read 'office vacancy: $17.7–$22.3'. Units now follow the metric: vacancy, cap rates, and the 30-yr PMMS print as percents, rents as $/SF, sales and listing counts plain, medians and FMRs keep their dollars — locked in by unit tests. And each vacancy row now carries the metro's rank across the covered markets, from the same shared builder as the rankings, the briefs, and the sample screen — the deal page is the fourth surface that can never disagree.",
+      "href": "/demo"
+    },
+    {
+      "date": "2026-08-25",
       "title": "The changelog becomes a tour — every improvement links to where it landed",
       "blurb": "What's-new now shows the full log grouped by ship day with a running count (19 improvements landed on Aug 25 alone), a momentum line derived from the log itself, and a 'See it live' link on every entry — the log names where in the app each change lives, so the page doubles as a guided tour. The covered-markets band now runs here too, same as /why and /demo.",
       "href": "/whats-new"
