@@ -458,3 +458,39 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .gauge-needle { transition: none; }
 }
+
+/* The retrade, replayed — one 12s shared timeline. Base styles ARE the final
+   state (strike drawn, v2 visible, Go stamped, Caution dimmed) so reduced
+   motion and no-animation contexts read the finished story; the keyframes
+   drive the full cycle from hidden. */
+@keyframes rt-strike-x {
+  0%, 22% { transform: scaleX(0); }
+  30%, 90% { transform: scaleX(1); }
+  96%, 100% { transform: scaleX(0); }
+}
+.rt-strike {
+  transform-origin: left;
+  animation: rt-strike-x 12s linear infinite;
+}
+@keyframes rt-fade-seq {
+  0%, 30% { opacity: 0; transform: translateY(4px); }
+  37%, 90% { opacity: 1; transform: none; }
+  96%, 100% { opacity: 0; }
+}
+.rt-new { animation: rt-fade-seq 12s linear infinite; }
+@keyframes rt-stamp-seq {
+  0%, 55% { opacity: 0; transform: scale(2.2) rotate(-12deg); }
+  61%, 90% { opacity: 1; transform: scale(1) rotate(0deg); }
+  96%, 100% { opacity: 0; }
+}
+.rt-go { animation: rt-stamp-seq 12s cubic-bezier(0.2, 0.8, 0.3, 1.1) infinite; }
+@keyframes rt-dim-seq {
+  0%, 55% { opacity: 1; }
+  61%, 90% { opacity: 0.3; }
+  96%, 100% { opacity: 1; }
+}
+.rt-caution { animation: rt-dim-seq 12s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .rt-strike, .rt-new, .rt-go, .rt-caution { animation: none; }
+  .rt-caution { opacity: 0.3; }
+}

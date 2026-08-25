@@ -2,6 +2,18 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-08-25",
+      "title": "The pulse board names its primary documents",
+      "blurb": "A credibility strip under the market board lists the primary-document hosts actually present in the research file's source URLs — HUD, the Federal Register, the DC and SF housing authorities, NJ Treasury, and FRED for rates. Derived, not typed: if a primary source leaves the data, its chip leaves the strip.",
+      "href": "/"
+    },
+    {
+      "date": "2026-08-25",
+      "title": "The retrade plays itself on the homepage",
+      "blurb": "A looping story card: the sample deal's original ask gets struck through, the reissued deck lands at the canonical −$1.8M, and the verdict stamps over from Caution to Go — the product's one-click re-screen, told in twelve seconds of pure CSS. A hairline reading-progress bar now rides the top of the page too.",
+      "href": "/"
+    },
+    {
       "date": "2026-08-24",
       "title": "The homepage got its board, its gauge, and its stamp",
       "blurb": "Three new eye-catchers, every number real: a market pulse board — all covered metros as breathing tiles with their FY2026 rents, statuses, and rule counts, each opening its brief; an analog IRR gauge inside 'Break it yourself' whose needle swings live as you drag the levers, with the demo mandate's 13% target ticked; and the hero card's verdict chip now stamps itself on like an IC decision.",
@@ -60,18 +72,6 @@
       "title": "Market briefs show full bedroom rents and their provenance",
       "blurb": "Where the research carries a full FY2026 row — LA's Federal-Register revision, San Francisco's housing-authority sheet, Newark's state-treasury table — the brief now lists 0BR through 3BR with a verified/sourced chip, and prints the provenance note under the figure: where the number came from, and what was rejected on the way.",
       "href": "/market"
-    },
-    {
-      "date": "2026-08-24",
-      "title": "Break it yourself: the return engine, live on the homepage",
-      "blurb": "A new interactive band puts three levers — exit cap, rent growth, vacancy — in your hands and recomputes IRR, equity multiple, cash-on-cash, exit value and NOI on every tick, through the same deterministic engine that prices real screens. Runs entirely in your browser on the labeled sample deal; no AI in the box.",
-      "href": "/#stress"
-    },
-    {
-      "date": "2026-08-24",
-      "title": "Compare shows each deal's leverage spread",
-      "blurb": "The side-by-side view gains a 'Leverage vs 30-yr' row — the signed spread between each deal's going-in cap and the freshest 30-yr fixed, color-coded negative / thin / positive with the same arithmetic as the deal page, captioned with the benchmark and its as-of date.",
-      "href": "/deals"
     }
   ]
 }

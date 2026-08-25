@@ -4,6 +4,8 @@ import { LogoMark } from "./logo";
 import { Reveal, CountUp, DemoTabs } from "./landing-interactive";
 import { ScreenRunStrip } from "./screen-run-strip";
 import { MarketPulseBoard } from "./market-pulse";
+import { RetradeReplay } from "./retrade-replay";
+import { ScrollProgress } from "./scroll-progress";
 import type { Metadata } from "next";
 import {
   SPREAD_LOW_IRR_PCT,
@@ -281,6 +283,9 @@ export default function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
       />
+      {/* Hairline reading-progress bar over everything (accent, so it reads
+          on the dark hero and the light body alike). */}
+      <ScrollProgress />
       {/* Nav — dark, so it reads as one piece with the hero. */}
       <header className="sticky top-0 z-10 border-b border-white/10 bg-sidebar text-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-3.5">
@@ -679,6 +684,10 @@ export default function Home() {
         </section>
 
         {/* The six-stage screen */}
+        {/* Eye-catcher: the retrade story on a 12s loop — price struck,
+            deck reissued, verdict stamps over to Go. */}
+        <RetradeReplay />
+
         <section id="screen" className="scroll-mt-16">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <p className="text-xs font-medium uppercase tracking-wider text-muted">

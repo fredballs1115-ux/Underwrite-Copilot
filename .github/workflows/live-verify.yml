@@ -41,6 +41,9 @@ jobs:
           grep -c "pulse-tile" body.html && echo "MARKET PULSE BOARD (Aug 24): present" || echo "MARKET PULSE BOARD: not yet deployed"
           grep -c "irr-gauge" body.html && echo "IRR GAUGE (Aug 24): present" || echo "IRR GAUGE: not yet deployed"
           grep -c "stamp-in" body.html && echo "VERDICT STAMP (Aug 24): present" || echo "VERDICT STAMP: not yet deployed"
+          grep -c "rt-strike" body.html && echo "RETRADE REPLAY (Aug 25): present" || echo "RETRADE REPLAY: not yet deployed"
+          grep -c "scroll-progress" body.html && echo "SCROLL PROGRESS (Aug 25): present" || echo "SCROLL PROGRESS: not yet deployed"
+          grep -c "Primary documents on file" body.html && echo "PRIMARY SOURCES STRIP (Aug 25): present" || echo "PRIMARY SOURCES STRIP: not yet deployed"
           grep -o 'name="uc-build" content="[0-9a-f]*"' body.html | head -1 && echo "SELF-HEAL SENTINEL: armed (stale browser copies reload themselves)" || echo "SELF-HEAL SENTINEL: not yet deployed"
           live=$(grep -o 'commit/[0-9a-f]\{7\}' body.html | head -1 | cut -d/ -f2)
           echo "LIVE BUILD SHA: ${live:-not stamped yet} · this run's main tip: ${GITHUB_SHA:0:7}"
