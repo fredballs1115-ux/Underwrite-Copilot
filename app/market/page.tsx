@@ -14,6 +14,10 @@ import { looseValue, SECTORS } from "@/lib/research-sectors";
 import { COVERAGE_DISCOVERY, COVERAGE_SUMMARY, PROVIDERS } from "@/lib/public-comps/core";
 import metrosSeed from "@/data/research/metros.json";
 import multifamilySeed from "@/data/research/multifamily.json";
+import {
+  sectorLeaderboard,
+  type SnapBlock,
+} from "@/lib/sector-leaderboard";
 import { CopyCite } from "./copy-cite";
 import {
   MarketCompare,
@@ -29,18 +33,6 @@ import {
  *  divergence is shown, never averaged), asking rent, and cap-rate bands,
  *  each with its status chip and provenance note. Metros without a snapshot
  *  say so honestly. */
-type SnapBlock = {
-  vacancy_pct?: number | null;
-  vacancy_pct_low?: number | null;
-  vacancy_pct_high?: number | null;
-  asking_rent_psf?: number | null;
-  rent_basis?: string | null;
-  cap_rate_low_pct?: number | null;
-  cap_rate_high_pct?: number | null;
-  status?: string;
-  sources?: string[];
-  note?: string;
-};
 const SECTOR_LABEL: Record<string, string> = {
   multifamily: "Multifamily",
   office: "Office",
@@ -767,65 +759,10 @@ async function MetroExplorer({ selected }: { selected?: string }) {
 // ── Sector leaderboard (cross-metro) ─────────────────────────────────────────
 // The same snapshot blocks the metro tiles render, flipped the other way: one
 // asset class at a time, every covered market with a numeric read, ranked
-// tightest to loosest. Bands are sorted by midpoint but DISPLAYED as bands —
-// a spread is never averaged into a single printed number. Metros whose block
-// carries only a sourced note (direction on file, level held open) are named
-// under the table, never silently dropped. Only the four snapshot-tracked
-// classes produce rows; other sector tabs render the research doc alone.
-type LeaderRow = {
-  id: string;
-  name: string;
-  vLow: number | null;
-  vHigh: number | null;
-  rent: number | null;
-  rentBasis: string | null;
-  capLow: number | null;
-  capHigh: number | null;
-  source: string | null;
-};
-function sectorLeaderboard(sector: string): {
-  rows: LeaderRow[];
-  heldOpen: string[];
-} {
-  const rows: LeaderRow[] = [];
-  const heldOpen: string[] = [];
-  for (const m of metrosSeed.metros ?? []) {
-    const snap = (m as { sector_snapshot?: Record<string, unknown> | null })
-      .sector_snapshot;
-    const blk = snap?.[sector] as SnapBlock | undefined;
-    if (!blk || typeof blk !== "object") continue;
-    const vLow = blk.vacancy_pct ?? blk.vacancy_pct_low ?? null;
-    const vHighRaw = blk.vacancy_pct ?? blk.vacancy_pct_high ?? vLow;
-    const rent = typeof blk.asking_rent_psf === "number" ? blk.asking_rent_psf : null;
-    const capLow = typeof blk.cap_rate_low_pct === "number" ? blk.cap_rate_low_pct : null;
-    const capHigh = typeof blk.cap_rate_high_pct === "number" ? blk.cap_rate_high_pct : null;
-    if (vLow === null && rent === null && capLow === null) {
-      heldOpen.push(m.name);
-      continue;
-    }
-    rows.push({
-      id: m.id,
-      name: m.name,
-      vLow,
-      vHigh: typeof vHighRaw === "number" ? vHighRaw : null,
-      rent,
-      rentBasis: blk.rent_basis ?? null,
-      capLow,
-      capHigh,
-      source: blk.sources?.[0] ?? null,
-    });
-  }
-  rows.sort((a, b) => {
-    if (a.vLow === null && b.vLow === null) return a.name.localeCompare(b.name);
-    if (a.vLow === null) return 1;
-    if (b.vLow === null) return -1;
-    return (
-      (a.vLow + (a.vHigh ?? a.vLow)) / 2 - (b.vLow + (b.vHigh ?? b.vLow)) / 2
-    );
-  });
-  return { rows, heldOpen };
-}
-
+// tightest to loosest — built by the shared lib/sector-leaderboard helper
+// (the homepage sector-lens strip derives from the same function). Only the
+// four snapshot-tracked classes produce rows; other sector tabs render the
+// research doc alone.
 function SectorLeaderboard({ sector }: { sector: string }) {
   const { rows, heldOpen } = sectorLeaderboard(sector);
   if (rows.length === 0 && heldOpen.length === 0) return null;

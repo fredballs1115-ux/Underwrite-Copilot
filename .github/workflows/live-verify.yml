@@ -81,6 +81,9 @@ jobs:
           # rules count — a combination only the sector-led metroFact produces.
           grep -qE "% vac[^<]*rules? on file" body.html && echo "MARQUEE AND HERO SPEAK ASSET CLASSES (Aug 25): present" || echo "MARQUEE AND HERO SPEAK ASSET CLASSES (Aug 25): not yet deployed"
           grep -q "grid grid-cols-1 items-center gap-12" body.html && echo "MOBILE HERO GRID FIX (Aug 25): present" || echo "MOBILE HERO GRID FIX (Aug 25): not yet deployed"
+          # The board's sector-lens strip: tightest market per asset class,
+          # each chip opening the full /market?sector= ranking.
+          grep -q "tightest on file" body.html && echo "SECTOR LENS STRIP (Aug 25): present" || echo "SECTOR LENS STRIP (Aug 25): not yet deployed"
           # Full-coverage spot check: Dallas's brief must carry its encoded
           # industrial note — proves the batch-2-5 metros serve, not just batch 1.
           curl -sS -o p_market_dfw.html --max-time 60 "https://underwrite-copilot.onrender.com/market?metro=dallas" || true

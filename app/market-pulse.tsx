@@ -1,6 +1,10 @@
 import Link from "next/link";
 import metrosSeed from "@/data/research/metros.json";
 import { seedBenchmarks } from "@/lib/research-data";
+import {
+  sectorLeaderboard,
+  type SnapBlock,
+} from "@/lib/sector-leaderboard";
 
 // The pulse board — every covered market as a live tile that ROTATES through
 // its real asset-class reads: office, industrial, multifamily, and retail
@@ -23,15 +27,6 @@ const FACE_LABEL: Record<string, string> = {
   industrial: "Industrial",
   multifamily: "Multifamily",
   retail: "Retail",
-};
-
-type SnapBlock = {
-  vacancy_pct?: number | null;
-  vacancy_pct_low?: number | null;
-  vacancy_pct_high?: number | null;
-  asking_rent_psf?: number | null;
-  cap_rate_low_pct?: number | null;
-  cap_rate_high_pct?: number | null;
 };
 
 function faceValue(b: SnapBlock): string | null {
@@ -121,6 +116,28 @@ const HAS_FRED = seedBenchmarks().some((b) =>
   (b.source ?? "").toLowerCase().includes("fred"),
 );
 
+// The sector lens — the tightest market on file per asset class, derived from
+// the same shared leaderboard builder the market page ranks with. Bands stay
+// bands; the count is how many covered markets carry a numeric vacancy read
+// for that class. Each chip opens the full ranking on the market page.
+const SECTOR_LENS = (
+  ["office", "industrial", "multifamily", "retail"] as const
+).flatMap((sec) => {
+  const ranked = sectorLeaderboard(sec).rows.filter((r) => r.vLow !== null);
+  const top = ranked[0];
+  if (!top || top.vLow === null) return [];
+  const hi = top.vHigh ?? top.vLow;
+  return [
+    {
+      sec,
+      label: FACE_LABEL[sec],
+      name: top.name,
+      band: top.vLow === hi ? `${top.vLow}%` : `${top.vLow}–${hi}%`,
+      count: ranked.length,
+    },
+  ];
+});
+
 export function MarketPulseBoard() {
   return (
     <section
@@ -192,6 +209,45 @@ export function MarketPulseBoard() {
             </Link>
           ))}
         </div>
+        {SECTOR_LENS.length > 0 && (
+          <div className="mt-5">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">
+                The sector lens — tightest on file per asset class
+              </p>
+              <p className="text-[10px] text-white/35">
+                each opens the full ranking
+              </p>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {SECTOR_LENS.map((s) => (
+                <Link
+                  key={s.sec}
+                  href={`/market?sector=${s.sec}`}
+                  className="group rounded-xl border border-white/10 bg-white/[0.04] p-3 outline-none transition-colors hover:border-accent/60 hover:bg-white/[0.08] focus-visible:ring-2 focus-visible:ring-accent/60"
+                >
+                  <div className="flex items-baseline justify-between gap-1.5">
+                    <p className="text-[9px] font-semibold uppercase tracking-wider text-accent/80">
+                      {s.label}
+                    </p>
+                    <p className="text-[9px] text-white/40 group-hover:text-white/60">
+                      {s.count} ranked →
+                    </p>
+                  </div>
+                  <p className="mt-1 truncate text-[11px] font-medium text-white/75 group-hover:text-white">
+                    {s.name}
+                  </p>
+                  <p className="font-mono text-[13px] font-semibold tabular-nums text-white">
+                    {s.band}
+                    <span className="ml-1 text-[10px] font-normal text-white/45">
+                      vac
+                    </span>
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
         {(FOUND_PRIMARY.length > 0 || HAS_FRED) && (
           <div className="mt-5 flex flex-wrap items-center gap-2">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40">

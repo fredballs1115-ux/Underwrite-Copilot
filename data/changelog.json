@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-25",
+      "title": "The sector lens — the board now names the tightest market per asset class",
+      "blurb": "Under the pulse board, four chips carry the tightest covered market on file for office, industrial, multifamily, and retail — today that's four different metros (Hampton Roads office, Northern Virginia industrial, New York multifamily, Boston retail), each with its vacancy band kept as a band and a count of how many markets are ranked. Every chip opens the full cross-metro ranking, and both surfaces derive from the same shared leaderboard builder, so the homepage can never drift from the market page.",
+      "href": "/market?sector=industrial"
+    },
+    {
+      "date": "2026-08-25",
       "title": "Sector leaderboards — every covered market ranked, one asset class at a time",
       "blurb": "The market page's asset-class explorer now flips the metro tiles the other way: pick office, industrial, multifamily, or retail and see every covered market with a numeric read ranked tightest to loosest — vacancy bands kept as bands (a spread is never averaged into one printed number), asking $/SF and cap ranges where sourced, a source link on every row. Metros whose level is honestly held open are named under the table, never silently dropped.",
       "href": "/market?sector=office"
