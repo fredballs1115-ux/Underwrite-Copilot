@@ -965,14 +965,15 @@
         "multifamily": {
           "vacancy_pct_low": 5.4,
           "vacancy_pct_high": 6.6,
-          "cap_rate_low_pct": null,
-          "cap_rate_high_pct": null,
+          "cap_rate_low_pct": 4.75,
+          "cap_rate_high_pct": 5.0,
           "status": "sourced",
           "sources": [
             "https://www.miamirealtors.com/2026/04/20/broward-county-emerging-as-top-multifamily-investment-market/",
-            "https://www.marcusmillichap.com/research/market-report/miami-dade/miami-dade-2q26-multifamily-market-report"
+            "https://www.marcusmillichap.com/research/market-report/miami-dade/miami-dade-2q26-multifamily-market-report",
+            "https://realcostiq.com/cap-rate/miami/"
           ],
-          "note": "Measured reads span 5.4% (MMG Q2: occupancy 94.6%, rents -0.2% YoY, absorption ~= completions) to 6.6% (Miami Realtors, March 2026, best of the large South-Region metros); M&M projects ~4.9% for 2026 — a forecast, noted not banded. Miami-Dade median asking $2,660 (May 2026, +1.5% YoY); Class A occupancy 95-96%. ~13,800-unit pipeline, 30.7% of it Downtown. Cap band not published in the pieces reviewed — null."
+          "note": "Measured reads span 5.4% (MMG Q2: occupancy 94.6%, rents -0.2% YoY, absorption ~= completions) to 6.6% (Miami Realtors, March 2026, best of the large South-Region metros); M&M projects ~4.9% for 2026 — a forecast, noted not banded. Miami-Dade median asking $2,660 (May 2026, +1.5% YoY); Class A occupancy 95-96%. ~13,800-unit pipeline, 30.7% of it Downtown. Cap filled Aug 25 with vintage declared: Class A stabilized core 4.75-5.0% (CBRE H2 2025 read, corroborated across three independent surveys; core Brickell/Edgewater/Wynwood 4-5, value-add South Dade 5-6.5). Q2 2026: A/B caps expanded ~5bps on softening rents, Class C stable. No fresher named-house metro average surfaced."
         }
       }
     },
@@ -1087,14 +1088,14 @@
         "multifamily": {
           "vacancy_pct_low": 6.8,
           "vacancy_pct_high": 6.8,
-          "cap_rate_low_pct": null,
-          "cap_rate_high_pct": null,
+          "cap_rate_low_pct": 5.8,
+          "cap_rate_high_pct": 5.8,
           "status": "sourced",
           "sources": [
             "https://www.northmarq.com/insights/insights/dallas-fort-worth-multifamily-rents-and-occupancy-climb-open-q1-2026",
             "https://www.matthews.com/insights/dallas-fort-worth-multifamily-q1-2026"
           ],
-          "note": "Northmarq Q1 2026: occupancy 93.2% (+10bps) = 6.8% vacancy; absorption ~8,500 units vs ~7,500 delivered; pipeline 43% below the 2023 peak. Average metro rent $1,482 (-3.0% YoY) while Class A rose 3.2% YoY for a fifth straight quarter — the mix, not a contradiction. A templated aggregator line quoting 4.6% was rejected (same boilerplate seen on another metro's page). No. 1 metro for absolute population growth (+100k residents YoY)."
+          "note": "Northmarq Q1 2026: occupancy 93.2% (+10bps) = 6.8% vacancy; absorption ~8,500 units vs ~7,500 delivered; pipeline 43% below the 2023 peak. Average metro rent $1,482 (-3.0% YoY) while Class A rose 3.2% YoY for a fifth straight quarter — the mix, not a contradiction. A templated aggregator line quoting 4.6% was rejected (same boilerplate seen on another metro's page). No. 1 metro for absolute population growth (+100k residents YoY). Cap filled Aug 25: Matthews Q1 2026 transaction average 5.8% at ~$183K/unit — expansion slowing as borrowing costs still shape underwriting."
         }
       }
     }
