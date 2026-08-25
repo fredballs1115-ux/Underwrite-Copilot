@@ -805,6 +805,16 @@
             "https://www.matthews.com/insights/los-angeles-multifamily-q2-2026"
           ],
           "note": "Q2 2026: Kidder 5.5% (Q1 5.6%) vs Matthews 4.52% — spread carried. Average asking $2,310/unit (studios $1,700 to 3BR $3,230). Cap filled Aug 25: Kidder Q2 2026 average expanded to 5.8% (CoStar-sourced transaction average, not a quoted band); average sale $280,591/unit (+3.3% YoY). Earlier fuzzy-attribution cluster reads (~5.1-5.4) superseded by the named-house average; agent surveys still quote 4.5-5.5 for stabilized mid-tier."
+        },
+        "retail": {
+          "vacancy_pct_low": 5.6,
+          "vacancy_pct_high": 5.6,
+          "status": "sourced",
+          "sources": [
+            "https://kidder.com/market-reports/los-angeles-retail-market-report/",
+            "https://www.matthews.com/insights/los-angeles-ca-retail-market-report-q2-2026"
+          ],
+          "note": "Kidder Q2 2026: vacancy 5.6% (+10bps YoY from 5.5%). Asking-rent level not captured this pass — held null."
         }
       }
     },
@@ -868,6 +878,15 @@
             "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/san-francisco-multifamily-market-outlook"
           ],
           "note": "1Q26: Kidder's own table reads 4.7% (4Q25 4.8%, 1Q25 5.3% — tightening 60bps YoY); Moody's via JPMorgan has 4.4% stable with rents +7% YoY, above pre-pandemic. Kidder 1Q26: average asking $2,652/unit (-3.0% YoY — the trend now corroborated by a second independent digest, resolving the earlier summary conflict), average sale $323,825/unit (-18% YoY). A third-party prose summary had inverted Kidder's vacancy trend; the report's own table text is carried here. Cap held null: an agent-reported Q1 average of ~5.9% (in line with the past three years, well above last cycle's sub-4s) is single-source — below the bar, on record."
+        },
+        "retail": {
+          "vacancy_pct_low": 6.0,
+          "vacancy_pct_high": 6.0,
+          "status": "sourced",
+          "sources": [
+            "https://kidder.com/wp-content/uploads/market_report/retail-market-research-san-francisco-2026-1q.pdf"
+          ],
+          "note": "Kidder 1Q26, from the report's own table text: vacancy 6.0% (4Q25 6.3%, 1Q25 6.8% — tightening 80bps YoY as the city recovery broadens). Asking rent not captured — held null."
         }
       }
     },
@@ -925,6 +944,17 @@
             "https://kidder.com/market-reports/seattle-multifamily-market-report/"
           ],
           "note": "Kidder Q2 2026: vacancy 6.7%, improving from 7.0% in Q1. Asking rents by type: studio $1,544 / 1BR $1,908 / 2BR $2,285 / 3BR $2,631. The market-rate 2BR asking sits below the FY2026 FMR — see this metro's FMR note for the conflation history. Cap filled Aug 25: Kidder Q2 2026 sales average 5.7% (+10bps YoY from 5.6%) — a transaction average, not a quoted band; average sale $276,610/unit (-14.75% YoY)."
+        },
+        "retail": {
+          "vacancy_pct_low": 3.9,
+          "vacancy_pct_high": 4.0,
+          "asking_rent_psf": 23.4,
+          "rent_basis": "NNN annualized from Kidder's $1.95/SF monthly (1Q26)",
+          "status": "sourced",
+          "sources": [
+            "https://kidder.com/market-reports/seattle-retail-market-report/"
+          ],
+          "note": "Kidder: 1Q26 vacancy 4.0% (up from 3.3% a year earlier) with asking stable at $1.95/SF/month ($23.40/yr, x12 annualization named); 2Q26 prints 3.9% — the two quarters carried as the band. ~50k SF delivered in Q1; one of the tightest retail markets on the board."
         }
       }
     },
