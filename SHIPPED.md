@@ -111,6 +111,7 @@ written down, not papered over.
 | Baltimore retail direction sourced, level held open honestly | /market?metro=baltimore (#156) |
 | Sector leaderboards — 15 markets ranked per asset class | /market?sector=office · industrial · multifamily · retail (#157) |
 | The sector lens — board names the tightest market per class | homepage board strip → the rankings (#158) |
+| Rank chips — every brief's sector read says where it sits | /market?metro=nova industrial #1 of 17 (#159) |
 | Sector-aware challenger + market check | upload any office/industrial/retail OM (#141) |
 | Retail — the fourth asset type, 10 of 15 markets | /market briefs (#141, #142) |
 | Baltimore's 10.0-vs-20.9 denominator lesson | /market?metro=baltimore + spread board (#142) |

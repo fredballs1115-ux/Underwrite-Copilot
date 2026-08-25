@@ -39,10 +39,30 @@ const SECTOR_LABEL: Record<string, string> = {
   industrial: "Industrial",
   retail: "Retail",
 };
+// Where each metro sits in its sector's cross-metro ranking (tightest first),
+// keyed sector → metro id — same shared builder the leaderboard table and the
+// homepage lens render, so a brief's chip can never disagree with the table.
+// Metros without a numeric vacancy for a sector simply have no rank entry.
+const SECTOR_RANKS: Record<
+  string,
+  Record<string, { rank: number; total: number }>
+> = Object.fromEntries(
+  ["office", "industrial", "multifamily", "retail"].map((sec) => {
+    const ranked = sectorLeaderboard(sec).rows.filter((r) => r.vLow !== null);
+    return [
+      sec,
+      Object.fromEntries(
+        ranked.map((r, i) => [r.id, { rank: i + 1, total: ranked.length }]),
+      ),
+    ];
+  }),
+);
 function SectorSnapshotPanel({
   snapshot,
+  metroId,
 }: {
   snapshot: Record<string, unknown> | null;
+  metroId?: string;
 }) {
   const entries = Object.entries(snapshot ?? {}).filter(
     (e): e is [string, SnapBlock] => e[0] !== "as_of" && typeof e[1] === "object",
@@ -96,6 +116,16 @@ function SectorSnapshotPanel({
                   <span className="font-mono text-xs tabular-nums text-ink">
                     {bits.length > 0 ? bits.join(" · ") : "figures pending"}
                   </span>
+                  {metroId && SECTOR_RANKS[sector]?.[metroId] && (
+                    <Link
+                      href={`/market?sector=${sector}`}
+                      title={`rank among covered-market ${SECTOR_LABEL[sector] ?? sector} vacancy reads, tightest first`}
+                      className="rounded-full border border-line px-1.5 py-px text-[10px] font-medium text-muted transition-colors hover:border-brand hover:text-brand"
+                    >
+                      #{SECTOR_RANKS[sector][metroId].rank} of{" "}
+                      {SECTOR_RANKS[sector][metroId].total}
+                    </Link>
+                  )}
                   <span
                     className={`ml-auto rounded px-1.5 py-px text-[10px] font-medium ${
                       b.status === "verified"
@@ -568,6 +598,7 @@ async function MetroExplorer({ selected }: { selected?: string }) {
               sector_snapshot?: Record<string, unknown> | null;
             }).sector_snapshot ?? null
           }
+          metroId={active.id}
         />
 
         {typeof fmr?.["2br"] === "number" ? (

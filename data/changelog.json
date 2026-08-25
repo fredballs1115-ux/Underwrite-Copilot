@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-25",
+      "title": "Rank chips on every brief — each sector read says where it sits in the pack",
+      "blurb": "Every metro brief's asset-type rows now carry a rank chip — Northern Virginia industrial reads #1 of 17, DC office #13 of 18 — computed from the same shared leaderboard builder as the rankings table and the homepage lens, so the three surfaces can never disagree. Chips only appear where a numeric vacancy ranks; a metro whose level is held open gets no invented position. Each chip clicks through to the full cross-metro ranking.",
+      "href": "/market?metro=nova"
+    },
+    {
+      "date": "2026-08-25",
       "title": "The sector lens — the board now names the tightest market per asset class",
       "blurb": "Under the pulse board, four chips carry the tightest covered market on file for office, industrial, multifamily, and retail — today that's four different metros (Hampton Roads office, Northern Virginia industrial, New York multifamily, Boston retail), each with its vacancy band kept as a band and a count of how many markets are ranked. Every chip opens the full cross-metro ranking, and both surfaces derive from the same shared leaderboard builder, so the homepage can never drift from the market page.",
       "href": "/market?sector=industrial"
