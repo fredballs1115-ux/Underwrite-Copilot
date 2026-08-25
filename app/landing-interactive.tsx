@@ -504,7 +504,7 @@ export function DemoTabs({ legal }: { legal: SampleLegal }) {
           role="tablist"
           aria-label="Screen walkthrough"
           onKeyDown={onKeys}
-          className="flex gap-1 overflow-x-auto"
+          className="flex min-w-0 gap-1 overflow-x-auto"
         >
           {TABS.map((t) => (
             <button

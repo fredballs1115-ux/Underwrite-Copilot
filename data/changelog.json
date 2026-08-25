@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-25",
+      "title": "The homepage fits your phone again",
+      "blurb": "A mobile audit caught two layout bugs invisible on desktop: the hero and the interactive walkthrough each used a grid whose phone-width column could not shrink below its content, so on small screens the hero clipped its right edge (the headline lost words, the sample card ran off) and the walkthrough forced sideways page scroll. Both grids now declare a shrinkable column; the walkthrough’s tab strip scrolls inside its card instead of stretching the page. Verified at 390px: no horizontal scroll, nothing clipped but the decorative glow that was always meant to bleed.",
+      "href": "/"
+    },
+    {
+      "date": "2026-08-25",
       "title": "The hero and the markets band speak asset classes now too",
       "blurb": "The “Now screening” line under the hero and the covered-markets band that scrolls across the homepage, /why, and /demo used to lead every market with its 2BR fair-market rent. They now lead with the market’s real asset-class read — office, industrial, multifamily, or retail vacancy with the asking rent where sourced — varied across the strip so six hero slots show four different sectors instead of an all-office wall. The FMR ladders stay where they belong: the ticker’s dedicated items, the metro briefs, and the compare tool.",
       "href": "/"

@@ -395,7 +395,12 @@ export default function Home() {
             }}
           />
           <div className="relative mx-auto max-w-6xl px-6 pb-14 pt-16 sm:pt-24">
-            <div className="grid items-center gap-12 lg:grid-cols-2">
+            {/* grid-cols-1 matters (same as the walkthrough section): the
+                implicit mobile track is `auto` and cannot shrink below the
+                sample card's intrinsic width, which pushed the whole hero
+                wider than small phones — masked by the section's
+                overflow-hidden, so the page didn't scroll, it just clipped. */}
+            <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
               <div>
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-xs font-medium text-accent">
                   <span className="h-1.5 w-1.5 rounded-full bg-accent" />
@@ -662,7 +667,11 @@ export default function Home() {
 
         {/* Inside the screen — interactive walkthrough on sample data */}
         <section className="border-y border-line bg-faint">
-          <div className="mx-auto grid max-w-6xl items-start gap-10 px-6 py-16 sm:py-20 lg:grid-cols-2">
+          {/* grid-cols-1 matters: the implicit mobile track is `auto`, which
+              cannot shrink below the walkthrough card's intrinsic tab-strip
+              width and forces the page wider than small phones. Tailwind's
+              track values are minmax(0,1fr), so the explicit column shrinks. */}
+          <div className="mx-auto grid max-w-6xl grid-cols-1 items-start gap-10 px-6 py-16 sm:py-20 lg:grid-cols-2">
             <Reveal>
               <p className="text-xs font-medium uppercase tracking-wider text-muted">
                 Inside the screen
