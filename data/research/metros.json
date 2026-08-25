@@ -691,9 +691,12 @@
           "status": "sourced",
           "sources": [
             "https://www.tenantbase.com/chicago/q1-2026/",
-            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats"
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats",
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats/cbd-office"
           ],
-          "note": "Vacancy 27.3% (Q1 2026 print; among the highest of the covered metros). The co-reported '$22.99/SF average asking' fails plausibility for Chicago office (CBD asking runs far higher) — likely a net or suburban figure, so no rent is encoded. Rent level queued for the next sweep."
+          "note": "Vacancy 27.3% (Q1 2026 print; among the highest of the covered metros). The co-reported '$22.99/SF average asking' fails plausibility for Chicago office (CBD asking runs far higher) — likely a net or suburban figure, so no rent is encoded. Rent level queued for the next sweep. Rent gap filled Aug 25: Cushman CBD MarketBeat Q2 2026 has average gross asking at $43.90/SF (+0.8% QoQ; Class A $54.06, Trophy $57.45, B $41.30, C $30.32) — confirming the earlier $22.99 aggregator figure was implausible and rightly rejected. Eleventh straight quarter of negative absorption (-215k SF), but H1 leasing +1.7% YoY and sublease down 24.3% YoY.",
+          "asking_rent_psf": 43.9,
+          "rent_basis": "avg gross asking, CBD (Cushman)"
         },
         "industrial": {
           "vacancy_pct_low": 4.7,
