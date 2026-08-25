@@ -250,14 +250,15 @@
       "sector_snapshot": {
         "as_of": "2026-08-25",
         "office": {
-          "vacancy_pct_low": 20.9,
+          "vacancy_pct_low": 10.0,
           "vacancy_pct_high": 20.9,
           "status": "sourced",
           "sources": [
             "https://www.cbre.com/insights/figures/baltimore-office-figures-q2-2026",
-            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/baltimore-marketbeats"
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/baltimore-marketbeats",
+            "https://klnb.com/wp-content/uploads/2026/04/NAIKLNB_MD_Office_Q1_2026.pdf"
           ],
-          "note": "Q2 2026: vacancy 20.9% (+10bps QoQ), direct asking $26.77/SF (flat QoQ, -0.5% YoY); 60k SF occupancy loss in Q2, YTD absorption -37k SF (CBRE)."
+          "note": "Q2 2026: vacancy 20.9% (+10bps QoQ), direct asking $26.77/SF (flat QoQ, -0.5% YoY); 60k SF occupancy loss in Q2, YTD absorption -37k SF (CBRE). Band widened Aug 25 into the starkest basis divergence on the board: KLNB (CoStar-sourced, Greater Baltimore all-inventory) prints 10.0% with CBD asking $26.35 while CBRE's competitive set runs 20.9% at $26.77 — same city, half the vacancy, because the denominators differ. Spread carried with both bases named; ask which inventory a broker is quoting before comparing."
         },
         "industrial": {
           "vacancy_pct_low": 8.5,
@@ -534,6 +535,18 @@
             "https://www.matthews.com/insights/top-10-multifamily-markets-in-2026"
           ],
           "note": "M&M 2026 forecast: vacancy 5.6% overall but Class A at 10.7% on new-supply concentration; rents ~$2,253 (+2.0% YoY, decelerating). Jersey City has 4,000+ units slated for 2026 (The Journal towers, 505 Summit) — upward vacancy pressure in the urban core while Union/Essex/Bergen pipelines shrink. Lument: 77.9% lease-renewal rate, best of the top-20 metros (June 2025). Cap filled + vacancy banded Aug 25: Matthews (Top 10 Multifamily Markets 2026) has Northern NJ at a 5.7% cap on $1.1B volume (~$314K/unit) with vacancy driven to 3.0% by 4,329 units of absorption — vs M&M's 5.6% overall; two named houses, different bases and vintages, spread carried. Third sighting of CBRE-national class figures republished as local (Newark/JC loan-store pages) rejected on sight."
+        },
+        "retail": {
+          "vacancy_pct_low": 3.4,
+          "vacancy_pct_high": 3.4,
+          "asking_rent_psf": 17.92,
+          "rent_basis": "avg asking, $/SF/yr",
+          "status": "sourced",
+          "sources": [
+            "https://chainstoreage.com/new-jersey-retail-vacancy-rates-continue-drop",
+            "https://www.roi-nj.com/2024/08/15/real_estate_development/marcus-millichap-report-finds-record-low-vacancy-and-strong-rent-growth-in-north-jersey-retail-market/"
+          ],
+          "note": "Northern NJ retail runs a tight 3.4% — Hudson County at 1.7% is reported as the lowest of any major US submarket. Asking $17.92/SF with a +12.0% YoY growth print carried as reported (an outlier pace; flagged for re-verification next sweep). M&M has called North Jersey retail record-low vacancy with strong rent growth since 2024 — the trend, corroborated."
         }
       }
     },
@@ -601,6 +614,17 @@
             "https://arielpa.nyc/news/press-releases/second-quarter-nyc-multifamily-sales-jump-268-year-over-year-ariel-property-advisors-q2-multifamily-quarter-in-review-shows"
           ],
           "note": "Band spans Manhattan borough monthlies (~1.5-1.9% through 2026, Corcoran; 19 straight months of inventory contraction, median rent at a record ~$5,000) to M&M's 2.4% citywide 2026 projection — the nation's lowest metro vacancy. Cap rate: no clean two-source band captured; rent-stabilization exposure is the underwriting gate here (see this metro's rules). Cap held null after the Aug 25 hunt — only a single agent survey quotes a band (4.5-5.5 going-in typical, 3.5-6.5 full span), below the source bar. What IS documented (Ariel Property Advisors, H1/Q2 2026): two very different markets — Manhattan free-market strength (rents +10% YoY; H1 multifamily sales $4.95B, +21%) against a rent-stabilized valuation reset, refinancings at roughly double original rates and stabilized trading dominated by distress; the free-market-vs-stabilized cap spread runs a structural 100-300bps. Screen the regulation status before the cap."
+        },
+        "retail": {
+          "vacancy_pct_low": 3.6,
+          "vacancy_pct_high": 6.6,
+          "asking_rent_psf": 54.6,
+          "rent_basis": "Manhattan avg asking (Matthews)",
+          "status": "sourced",
+          "sources": [
+            "https://www.matthews.com/insights/new-york-retail-market-report-q2-2026"
+          ],
+          "note": "Matthews Q2 2026, carried as the borough spread: Brooklyn 3.6% (down from 3.7%, +52k SF absorbed) to Manhattan 6.6% (down from 7.0% in Q1); Manhattan asking $54.60/SF (+0.9% YoY). Metro availability ran ~4.2% in Q1, near historic lows."
         }
       }
     },
@@ -662,6 +686,18 @@
             "https://www.northmarq.com/insights/insights/boston-multifamily-transaction-activity-accelerates-q1-2026"
           ],
           "note": "Q2 2026 divergent trackers: 4.9% (-20bps QoQ, asking $3,108/mo) vs 6.1% ($2,999/unit, +1.1% YoY; ~220bps below the 8.3% national) — band is the tracker spread. Either reading is tight vs national. Cap rate: no two-source band captured; null. Cap filled Aug 25: core stabilized ~4.5-4.75% per two independent aggregator surveys agreeing (Class A 4-4.75, B value-add 4.75-5.75) — consistent with CBRE's gateway-core 4-5% national read; among the tightest ranges of any US metro. Northmarq: Q1 2026 transaction totals ran 50%+ ahead of last year."
+        },
+        "retail": {
+          "vacancy_pct_low": 2.6,
+          "vacancy_pct_high": 3.2,
+          "asking_rent_psf": 24.93,
+          "rent_basis": "avg asking (Matthews, year-end 2025 — vintage declared)",
+          "status": "sourced",
+          "sources": [
+            "https://www.matthews.com/insights/boston-retail-2025",
+            "https://abgrealty.com/boston-retail-real-estate-trends-what-tenants-and-property-owners-should-watch-in-2026/"
+          ],
+          "note": "Band spans vintages: Matthews year-end 2025 at 3.2% vs a 2026 read of 2.6% overall (availability ~3.1%) — Boston is among the tightest retail markets tracked, and led national Q2 2026 absorption on grocery/apparel expansion downtown. Asking $24.93/SF (+2.5% YoY, YE2025). Supply disciplined: 488k SF delivered, 485k SF under construction."
         }
       }
     },
@@ -805,6 +841,16 @@
             "https://www.matthews.com/insights/los-angeles-multifamily-q2-2026"
           ],
           "note": "Q2 2026: Kidder 5.5% (Q1 5.6%) vs Matthews 4.52% — spread carried. Average asking $2,310/unit (studios $1,700 to 3BR $3,230). Cap filled Aug 25: Kidder Q2 2026 average expanded to 5.8% (CoStar-sourced transaction average, not a quoted band); average sale $280,591/unit (+3.3% YoY). Earlier fuzzy-attribution cluster reads (~5.1-5.4) superseded by the named-house average; agent surveys still quote 4.5-5.5 for stabilized mid-tier."
+        },
+        "retail": {
+          "vacancy_pct_low": 5.6,
+          "vacancy_pct_high": 5.6,
+          "status": "sourced",
+          "sources": [
+            "https://kidder.com/market-reports/los-angeles-retail-market-report/",
+            "https://www.matthews.com/insights/los-angeles-ca-retail-market-report-q2-2026"
+          ],
+          "note": "Kidder Q2 2026: vacancy 5.6% (+10bps YoY from 5.5%). Asking-rent level not captured this pass — held null."
         }
       }
     },
@@ -868,6 +914,15 @@
             "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/san-francisco-multifamily-market-outlook"
           ],
           "note": "1Q26: Kidder's own table reads 4.7% (4Q25 4.8%, 1Q25 5.3% — tightening 60bps YoY); Moody's via JPMorgan has 4.4% stable with rents +7% YoY, above pre-pandemic. Kidder 1Q26: average asking $2,652/unit (-3.0% YoY — the trend now corroborated by a second independent digest, resolving the earlier summary conflict), average sale $323,825/unit (-18% YoY). A third-party prose summary had inverted Kidder's vacancy trend; the report's own table text is carried here. Cap held null: an agent-reported Q1 average of ~5.9% (in line with the past three years, well above last cycle's sub-4s) is single-source — below the bar, on record."
+        },
+        "retail": {
+          "vacancy_pct_low": 6.0,
+          "vacancy_pct_high": 6.0,
+          "status": "sourced",
+          "sources": [
+            "https://kidder.com/wp-content/uploads/market_report/retail-market-research-san-francisco-2026-1q.pdf"
+          ],
+          "note": "Kidder 1Q26, from the report's own table text: vacancy 6.0% (4Q25 6.3%, 1Q25 6.8% — tightening 80bps YoY as the city recovery broadens). Asking rent not captured — held null."
         }
       }
     },
@@ -925,6 +980,17 @@
             "https://kidder.com/market-reports/seattle-multifamily-market-report/"
           ],
           "note": "Kidder Q2 2026: vacancy 6.7%, improving from 7.0% in Q1. Asking rents by type: studio $1,544 / 1BR $1,908 / 2BR $2,285 / 3BR $2,631. The market-rate 2BR asking sits below the FY2026 FMR — see this metro's FMR note for the conflation history. Cap filled Aug 25: Kidder Q2 2026 sales average 5.7% (+10bps YoY from 5.6%) — a transaction average, not a quoted band; average sale $276,610/unit (-14.75% YoY)."
+        },
+        "retail": {
+          "vacancy_pct_low": 3.9,
+          "vacancy_pct_high": 4.0,
+          "asking_rent_psf": 23.4,
+          "rent_basis": "NNN annualized from Kidder's $1.95/SF monthly (1Q26)",
+          "status": "sourced",
+          "sources": [
+            "https://kidder.com/market-reports/seattle-retail-market-report/"
+          ],
+          "note": "Kidder: 1Q26 vacancy 4.0% (up from 3.3% a year earlier) with asking stable at $1.95/SF/month ($23.40/yr, x12 annualization named); 2Q26 prints 3.9% — the two quarters carried as the band. ~50k SF delivered in Q1; one of the tightest retail markets on the board."
         }
       }
     },

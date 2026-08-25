@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-25",
+      "title": "Retail becomes the fourth asset type on the board — and Baltimore shows why bases matter",
+      "blurb": "Nine covered markets now carry a sourced retail read alongside office, industrial, and multifamily — from Boston and Seattle at the tight end (2.6–3.2% and 3.9–4.0%) through Miami (3.0% at $42.50/SF) to Chicago (7.8%), with NYC carried as its honest borough spread (Brooklyn 3.6% to Manhattan 6.6%). And the widest divergence on the homepage spread board is now Baltimore office: one tracker's all-inventory base prints 10.0% while another's competitive set prints 20.9% — same city, half the vacancy, because the denominators differ. The brief names both bases and says the practical thing: ask which inventory a broker is quoting.",
+      "href": "/market?metro=baltimore"
+    },
+    {
+      "date": "2026-08-25",
       "title": "The screen now grills each asset type in its own language",
       "blurb": "The assumption challenger keeps its shared floor — taxes reset to sale price, expense ratios vs gross rent, loss-to-lease burn-off, legacy insurance — and now adds sector-specific trap lists: office deals get grilled on lease rollover inside the hold (WALT), re-leasing costs at today's TI/LC packages, face-vs-effective rent, and sublease shadow space; industrial on clear height and dock fit, mark-to-market claims proven against current asking, and tenant concentration; retail on co-tenancy clauses and occupancy-cost ratios. The market check calibrates each sector past its prior cycle. Multifamily deals are unchanged — that playbook was already the foundation.",
       "href": "/why"
@@ -66,12 +72,6 @@
       "title": "The Excel model goes deeper: an Operating Metrics tab",
       "blurb": "A ninth tab carries the ratio ladder an IC actually checks year by year — expense ratio, NOI margin, DSCR, debt yield, breakeven occupancy, cash-on-cash — plus price, rent, NOI and OpEx per unit and per SF. Every cell is a live formula over the Cash Flow tab, so changing any assumption re-prices the ladder; when nothing states a unit count, the per-unit block says so instead of guessing.",
       "href": "/api/demo/underwrite.xlsx"
-    },
-    {
-      "date": "2026-08-24",
-      "title": "The legal read is on the sample screen — and the homepage",
-      "blurb": "The deal page's Regulation & benchmarks panel now shows in the homepage walkthrough and on /demo: the sample's Philadelphia jurisdiction run through the real rules engine — one verified rule on file, honestly marked dormant (it keys off an eviction filing, not a purchase), with source, as-of, and the state's no-rent-control fact extracted verbatim. A tiny legal note rides under the hero card too, and new tests lock every number to the engine.",
-      "href": "/demo"
     }
   ]
 }
