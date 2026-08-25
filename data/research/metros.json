@@ -109,15 +109,16 @@
         },
         "industrial": {
           "vacancy_pct_low": 6.0,
-          "vacancy_pct_high": 6.0,
+          "vacancy_pct_high": 10.1,
           "asking_rent_psf": 12.5,
           "rent_basis": "NNN midpoint of $10-15 band",
           "status": "sourced",
           "sources": [
             "https://warespace.com/resources/market-reports/washington-dc",
-            "https://nmrk.imgix.net/uploads/fields/pdf-market-reports/1Q26-Washington-Metro-Industrial-Market-Report.pdf"
+            "https://nmrk.imgix.net/uploads/fields/pdf-market-reports/1Q26-Washington-Metro-Industrial-Market-Report.pdf",
+            "https://www.colliers.com/en/research/washington-dc/maryland-industrial-market-report-2026-q1"
           ],
-          "note": "Central PG County ~6.0% vacancy, asking ~$10-15/SF NNN — a 30-40% discount to close-in NoVA. The encoded $12.50 is the stated band's midpoint, labeled as such."
+          "note": "Two bases, recorded as the spread: the close-in Central PG corridor runs ~6.0% (Newmark 1Q26 Washington-metro survey / WareSpace small-bay), while Colliers’ Maryland report prints the WHOLE county at 10.1% for Q1 2026 (down 110bps QoQ) — outer big-box product loosens the county-wide number. Ask which submarket your deal sits in before picking a benchmark. Asking ~0-15/SF NNN; the encoded 2.50 is the band midpoint, labeled as such — a 30-40% discount to close-in NoVA."
         },
         "multifamily": {
           "vacancy_pct": 5.2,
@@ -572,7 +573,7 @@
             "https://chainstoreage.com/new-jersey-retail-vacancy-rates-continue-drop",
             "https://www.roi-nj.com/2024/08/15/real_estate_development/marcus-millichap-report-finds-record-low-vacancy-and-strong-rent-growth-in-north-jersey-retail-market/"
           ],
-          "note": "Northern NJ retail runs a tight 3.4% — Hudson County at 1.7% is reported as the lowest of any major US submarket. Asking $17.92/SF with a +12.0% YoY growth print carried as reported (an outlier pace; flagged for re-verification next sweep). M&M has called North Jersey retail record-low vacancy with strong rent growth since 2024 — the trend, corroborated."
+          "note": "VINTAGE DECLARED: the 3.4% vacancy (Hudson County 1.7%, reported lowest of any major US submarket) and $17.92/SF with +12.0% YoY are Marcus & Millichap-era prints of 2024 vintage, recycled since by trade digests. Aug 2026 re-verification found NO dated 2026 named-house NNJ retail report — and one 2026 digest attaches an 8.2% “vacancy” to the same $17.92 rent print, a probable conflation with the industrial series (8%+ vacancy at 3.5M SF of half-year leasing is an industrial-shaped number), rejected. Treat the tightness story as directional and the levels as dated until a 2026 report clears the bar."
         }
       }
     },
@@ -697,7 +698,7 @@
             "https://www.colliers.com/en/research/boston/greater-boston-industrial-report-2026q1",
             "https://www.colliers.com/en/research/boston/greater-boston-industrial-report-q2-2026"
           ],
-          "note": "Gap filled Aug 25 (was recorded as unverified — no level had cleared the bar). Colliers Q1 2026: overall vacancy 12.8% (+30bps, near an 11-year high; the post-Covid low was 5.6% in 3Q22), a fourth straight quarter of negative absorption (-432k SF), annual rent growth swung from +33.5% at the 2022 peak to -1.5%. Colliers Q2: absorption back positive (+440k SF, logistics-led); South submarket availability 15.6%, a 14-year high, while the West grew rents 5.7% YoY. Market-wide asking rent level still not published — held null."
+          "note": "Gap filled Aug 25 (was recorded as unverified — no level had cleared the bar). Colliers Q1 2026: overall vacancy 12.8% (+30bps, near an 11-year high; the post-Covid low was 5.6% in 3Q22), a fourth straight quarter of negative absorption (-432k SF), annual rent growth swung from +33.5% at the 2022 peak to -1.5%. Colliers Q2: absorption back positive (+440k SF, logistics-led); South submarket availability 15.6%, a 14-year high, while the West grew rents 5.7% YoY; total AVAILABILITY printed 13.5% (+50bps QoQ, vacant new deliveries) — availability, not vacancy, never band the two. Market-wide asking rent level still not published — held null."
         },
         "multifamily": {
           "vacancy_pct_low": 4.9,
