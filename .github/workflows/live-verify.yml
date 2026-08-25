@@ -76,6 +76,7 @@ jobs:
           grep -q "Asset-type read" p_market.html && echo "/market: compare sector table present (Aug 25)" || echo "/market: compare sector table not yet deployed"
           grep -q "The trackers disagree too" body.html && echo "SPREAD BOARD (Aug 25): present" || echo "SPREAD BOARD (Aug 25): not yet deployed"
           grep -q "DFW office vacancy" body.html && echo "TICKER SECTOR ITEMS (Aug 25): present" || echo "TICKER SECTOR ITEMS (Aug 25): not yet deployed"
+          grep -q "pulse-face" body.html && echo "PULSE TILES ROTATE ASSET CLASSES (Aug 25): present" || echo "PULSE TILES ROTATE ASSET CLASSES (Aug 25): not yet deployed"
           # Full-coverage spot check: Dallas's brief must carry its encoded
           # industrial note — proves the batch-2-5 metros serve, not just batch 1.
           curl -sS -o p_market_dfw.html --max-time 60 "https://underwrite-copilot.onrender.com/market?metro=dallas" || true

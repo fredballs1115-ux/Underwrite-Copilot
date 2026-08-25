@@ -2,27 +2,73 @@ import Link from "next/link";
 import metrosSeed from "@/data/research/metros.json";
 import { seedBenchmarks } from "@/lib/research-data";
 
-// The pulse board — every covered market as a live tile: its FY2026 2BR
-// fair-market rent, research status, and rules on file, straight off the
-// research layer (the same metros.json the market briefs render). Tiles
-// breathe on a staggered cycle (pure CSS; static under reduced motion) and
-// every tile is a real link into its market brief. Nothing typed in: a
-// metro without a confirmed FMR shows its gap honestly.
+// The pulse board — every covered market as a live tile that ROTATES through
+// its real asset-class reads: office, industrial, multifamily, and retail
+// where the research carries them (vacancy, asking rent, cap band), straight
+// off the same metros.json the market briefs render. Pure CSS crossfade,
+// staggered per tile; reduced motion pins each tile to its first face.
+// Nothing typed in: a metro shows only the sectors it actually has, and a
+// screen reader gets every face as one static sentence.
+type PulseFace = { label: string; value: string };
 type PulseTile = {
   id: string;
   name: string;
-  fmr2br: number | null;
+  faces: PulseFace[];
   status: string | null;
   ruleCount: number;
 };
 
+const FACE_LABEL: Record<string, string> = {
+  office: "Office",
+  industrial: "Industrial",
+  multifamily: "Multifamily",
+  retail: "Retail",
+};
+
+type SnapBlock = {
+  vacancy_pct?: number | null;
+  vacancy_pct_low?: number | null;
+  vacancy_pct_high?: number | null;
+  asking_rent_psf?: number | null;
+  cap_rate_low_pct?: number | null;
+  cap_rate_high_pct?: number | null;
+};
+
+function faceValue(b: SnapBlock): string | null {
+  const lo = b.vacancy_pct ?? b.vacancy_pct_low;
+  const hi = b.vacancy_pct ?? b.vacancy_pct_high ?? lo;
+  const bits: string[] = [];
+  if (typeof lo === "number")
+    bits.push(lo === hi ? `${lo}% vac` : `${lo}–${hi}% vac`);
+  if (typeof b.asking_rent_psf === "number")
+    bits.push(`$${b.asking_rent_psf.toFixed(2)}/SF`);
+  if (
+    typeof b.cap_rate_low_pct === "number" &&
+    typeof b.cap_rate_high_pct === "number"
+  )
+    bits.push(
+      b.cap_rate_low_pct === b.cap_rate_high_pct
+        ? `cap ${b.cap_rate_low_pct}%`
+        : `cap ${b.cap_rate_low_pct}–${b.cap_rate_high_pct}%`,
+    );
+  return bits.length > 0 ? bits.join(" · ") : null;
+}
+
 const TILES: PulseTile[] = (metrosSeed.metros ?? []).map((m) => {
-  const fmr = (m as { fmr_fy2026?: { "2br"?: number | null; status?: string } | null })
-    .fmr_fy2026;
+  const fmr = (m as { fmr_fy2026?: { status?: string } | null }).fmr_fy2026;
+  const snap = (m as { sector_snapshot?: Record<string, unknown> | null })
+    .sector_snapshot;
+  const faces: PulseFace[] = [];
+  for (const sector of ["office", "industrial", "multifamily", "retail"]) {
+    const blk = snap?.[sector];
+    if (typeof blk !== "object" || blk == null) continue;
+    const value = faceValue(blk as SnapBlock);
+    if (value) faces.push({ label: FACE_LABEL[sector], value });
+  }
   return {
     id: m.id,
     name: m.name,
-    fmr2br: typeof fmr?.["2br"] === "number" ? fmr["2br"] : null,
+    faces,
     status: fmr?.status ?? null,
     ruleCount: ((m as { rule_ids?: string[] }).rule_ids ?? []).length,
   };
@@ -63,10 +109,10 @@ const FOUND_PRIMARY: string[] = (() => {
   }
   return Object.keys(PRIMARY_HOSTS).filter((k) => found.has(k));
 })();
-// Sourced sector figures (office/industrial/multifamily vacancy, rents,
-// caps) flowing out of the metros' snapshot blocks — counted, not typed.
+// Sourced sector figures (office/industrial/multifamily/retail vacancy,
+// rents, caps) flowing out of the metros' snapshot blocks — counted, not typed.
 const SECTOR_FIGURES = seedBenchmarks().filter((b) =>
-  /^(office|industrial|multifamily)_(vacancy_pct|asking_rent_psf|cap_rate_pct)$/.test(
+  /^(office|industrial|multifamily|retail)_(vacancy_pct|asking_rent_psf|cap_rate_pct)$/.test(
     b.metric,
   ),
 ).length;
@@ -76,10 +122,9 @@ const HAS_FRED = seedBenchmarks().some((b) =>
 );
 
 export function MarketPulseBoard() {
-  const priced = TILES.filter((t) => t.fmr2br != null).length;
   return (
     <section
-      aria-label="Every covered market with its FY2026 fair market rent"
+      aria-label="Every covered market rotating through its asset-class reads"
       className="band-dark border-y border-white/10 text-white"
     >
       <div className="mx-auto max-w-6xl px-6 py-12">
@@ -89,10 +134,10 @@ export function MarketPulseBoard() {
             layer
           </h2>
           <p className="text-xs text-white/45">
-            {priced} priced with FY2026 HUD rents ·{" "}
+            every tile rotates its office / industrial / multifamily / retail
+            read ·{" "}
             <span className="text-white/60">{SECTOR_FIGURES}</span> sourced
-            office / industrial / multifamily figures behind the tiles · every
-            tile opens its brief
+            sector figures · every tile opens its brief
           </p>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
@@ -114,16 +159,31 @@ export function MarketPulseBoard() {
                   }`}
                 />
               </div>
-              {t.fmr2br != null ? (
-                <p className="mt-1.5 font-mono text-base font-semibold tabular-nums text-white">
-                  ${t.fmr2br.toLocaleString()}
-                  <span className="ml-1 text-[9px] font-normal text-white/40">
-                    2BR/mo
-                  </span>
-                </p>
+              {t.faces.length > 0 ? (
+                <>
+                  <div aria-hidden className="relative mt-1.5 h-[2.35rem]">
+                    {t.faces.map((f, fi) => (
+                      <div
+                        key={f.label}
+                        style={{ "--f": fi } as React.CSSProperties}
+                        className={`pulse-face pulse-face-${t.faces.length} absolute inset-x-0 top-0`}
+                      >
+                        <p className="text-[9px] font-semibold uppercase tracking-wider text-accent/80">
+                          {f.label}
+                        </p>
+                        <p className="truncate font-mono text-[13px] font-semibold tabular-nums text-white">
+                          {f.value}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="sr-only">
+                    {t.faces.map((f) => `${f.label}: ${f.value}`).join("; ")}
+                  </p>
+                </>
               ) : (
                 <p className="mt-1.5 text-[11px] font-medium text-amber-300/80">
-                  FMR gap — recorded
+                  sector reads queued
                 </p>
               )}
               <p className="mt-1 text-[10px] text-white/40">
@@ -153,10 +213,11 @@ export function MarketPulseBoard() {
           </div>
         )}
         <p className="mt-4 text-[11px] text-white/40">
-          FY2026 2BR fair-market rents from HUD&apos;s schedules and the
-          authorities&apos; own sheets — sourced and statused per metro, gaps
-          shown as gaps. Same file the market briefs and the deal benchmarks
-          read.
+          Office, industrial, multifamily, and retail reads from named research
+          houses — vacancy, asking rents, and cap bands, spreads shown when
+          trackers diverge, gaps recorded rather than guessed. Dots mark each
+          metro&apos;s FMR record: verified / sourced / open gap. Same file the
+          market briefs and the deal benchmarks read.
         </p>
       </div>
     </section>

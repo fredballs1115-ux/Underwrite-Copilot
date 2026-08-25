@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-25",
+      "title": "The pulse board now speaks asset classes — every tile rotates office, industrial, multifamily, retail",
+      "blurb": "The homepage board used to lead every metro with its 2BR fair-market rent. Real deals are screened by asset class, so now each tile rotates through the sectors its research actually carries: office, industrial, multifamily, and retail vacancy, asking rents, and cap bands — Baltimore surfaces its 10–20.9% office tracker spread, Miami shows 3.0% retail at $42.50/SF, DFW its 5.8% multifamily cap. A metro missing a sector simply skips that face; nothing is invented to fill a slot. Reduced-motion visitors get a pinned first face, and screen readers get every read as one plain sentence.",
+      "href": "/"
+    },
+    {
+      "date": "2026-08-25",
       "title": "Retail becomes the fourth asset type on the board — and Baltimore shows why bases matter",
       "blurb": "Nine covered markets now carry a sourced retail read alongside office, industrial, and multifamily — from Boston and Seattle at the tight end (2.6–3.2% and 3.9–4.0%) through Miami (3.0% at $42.50/SF) to Chicago (7.8%), with NYC carried as its honest borough spread (Brooklyn 3.6% to Manhattan 6.6%). And the widest divergence on the homepage spread board is now Baltimore office: one tracker's all-inventory base prints 10.0% while another's competitive set prints 20.9% — same city, half the vacancy, because the denominators differ. The brief names both bases and says the practical thing: ask which inventory a broker is quoting.",
       "href": "/market?metro=baltimore"

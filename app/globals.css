@@ -494,3 +494,51 @@ body {
   .rt-strike, .rt-new, .rt-go, .rt-caution { animation: none; }
   .rt-caution { opacity: 0.3; }
 }
+
+/* Pulse-board tile faces: each tile rotates through its metro's asset-class
+   reads (office / industrial / multifamily / retail). One keyframe set per
+   face count so every face gets an equal 1/N share of the cycle at ~4s per
+   face; the tile's --i stagger keeps the wall from flipping in lockstep.
+   A single-face tile just shows it. Reduced motion pins the first face. */
+@keyframes pulse-face-2 {
+  0% { opacity: 0; }
+  4% { opacity: 1; }
+  46% { opacity: 1; }
+  50% { opacity: 0; }
+  100% { opacity: 0; }
+}
+@keyframes pulse-face-3 {
+  0% { opacity: 0; }
+  3% { opacity: 1; }
+  30.3% { opacity: 1; }
+  33.3% { opacity: 0; }
+  100% { opacity: 0; }
+}
+@keyframes pulse-face-4 {
+  0% { opacity: 0; }
+  2.5% { opacity: 1; }
+  22.5% { opacity: 1; }
+  25% { opacity: 0; }
+  100% { opacity: 0; }
+}
+.pulse-face { opacity: 0; }
+.pulse-face-1 { opacity: 1; }
+/* Negative delays start every animation mid-cycle, so each tile shows a
+   face from the first paint instead of sitting dark until its slot; the
+   (--f - N) form keeps the office-first order. */
+.pulse-face-2 {
+  animation: pulse-face-2 8s linear infinite;
+  animation-delay: calc((var(--f) - 2) * 4s - var(--i) * 0.35s);
+}
+.pulse-face-3 {
+  animation: pulse-face-3 12s linear infinite;
+  animation-delay: calc((var(--f) - 3) * 4s - var(--i) * 0.35s);
+}
+.pulse-face-4 {
+  animation: pulse-face-4 16s linear infinite;
+  animation-delay: calc((var(--f) - 4) * 4s - var(--i) * 0.35s);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse-face { animation: none; opacity: 0; }
+  .pulse-face:first-child { opacity: 1; }
+}
