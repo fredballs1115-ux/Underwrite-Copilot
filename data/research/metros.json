@@ -98,6 +98,15 @@
       ],
       "region": "DMV core",
       "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct": 19.2,
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/washington-dc/suburban-maryland-office-market-report-2026-q1"
+          ],
+          "note": "Colliers Q1 2026, Suburban Maryland survey area (Montgomery + Prince George’s together — not a county split): 19.2% vacancy, down 20bps on marginal positive demand. Newmark’s prior read (Q3 2025) was 20.1%, same direction, older vintage — kept as context, not banded. Avison Young’s 21.9% is AVAILABILITY (direct) plus 1.7% sublet — a different construct than vacancy, recorded here so nobody mistakes the two."
+        },
         "industrial": {
           "vacancy_pct_low": 6.0,
           "vacancy_pct_high": 6.0,
@@ -120,8 +129,7 @@
             "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/washington-dc-multifamily-market-outlook"
           ],
           "note": "Regional vacancy 5.2% at YE2025 (+50bps YoY); Q1 2026 by class: luxury 11.9%, B/C 7.9% — the spread IS the decision datum. Cap band 4.75-5.5% vs CBRE's 4.73% US core going-in average; deal mix leaning Class B / value-add. 2026 deliveries projected under 10k units (decade low). Federal-employment uncertainty is the named headwind."
-        },
-        "as_of": "2026-08-25"
+        }
       }
     },
     {
@@ -151,6 +159,15 @@
       ],
       "region": "DMV core",
       "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct": 19.2,
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/washington-dc/suburban-maryland-office-market-report-2026-q1"
+          ],
+          "note": "Colliers Q1 2026, Suburban Maryland survey area (Montgomery + Prince George’s together — not a county split): 19.2% vacancy, down 20bps on marginal positive demand. Newmark’s prior read (Q3 2025) was 20.1%, same direction, older vintage — kept as context, not banded. Avison Young’s 21.9% is AVAILABILITY (direct) plus 1.7% sublet — a different construct than vacancy, recorded here so nobody mistakes the two."
+        },
         "multifamily": {
           "vacancy_pct": 5.2,
           "cap_rate_low_pct": 4.75,
@@ -161,8 +178,7 @@
             "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/washington-dc-multifamily-market-outlook"
           ],
           "note": "Regional vacancy 5.2% at YE2025 (+50bps YoY); Q1 2026 by class: luxury 11.9%, B/C 7.9% — the spread IS the decision datum. Cap band 4.75-5.5% vs CBRE's 4.73% US core going-in average; deal mix leaning Class B / value-add. 2026 deliveries projected under 10k units (decade low). Federal-employment uncertainty is the named headwind."
-        },
-        "as_of": "2026-08-25"
+        }
       }
     },
     {
@@ -191,6 +207,17 @@
       ],
       "region": "DMV core",
       "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 20.8,
+          "vacancy_pct_high": 21.3,
+          "status": "sourced",
+          "sources": [
+            "https://www.cbre.com/insights/figures/northern-virginia-office-figures-q2-2026",
+            "https://www.nmrk.com/insights/market-report/northern-virginia-market-reports"
+          ],
+          "note": "Two trackers, Q2 2026: Newmark prints 20.8% (down 60bps YoY), CBRE 21.3% (down 50bps, its lowest NoVA read since 2021) — recorded as the spread, not averaged. Direction agrees across both: NoVA office is tightening while the District sets record highs. Defense/GovCon demand is the usual driver cited; underwrite tenancy by agency exposure, not the metro headline."
+        },
         "industrial": {
           "vacancy_pct_low": 3.9,
           "vacancy_pct_high": 5.0,
@@ -213,8 +240,7 @@
             "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/washington-dc-multifamily-market-outlook"
           ],
           "note": "Regional vacancy 5.2% at YE2025 (+50bps YoY); Q1 2026 by class: luxury 11.9%, B/C 7.9% — the spread IS the decision datum. Cap band 4.75-5.5% vs CBRE's 4.73% US core going-in average; deal mix leaning Class B / value-add. 2026 deliveries projected under 10k units (decade low). Federal-employment uncertainty is the named headwind."
-        },
-        "as_of": "2026-08-25"
+        }
       }
     },
     {
