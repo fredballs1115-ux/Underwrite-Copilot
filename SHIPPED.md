@@ -80,8 +80,27 @@ market check calibrates each sector past its prior cycle. Nine lock
 tests pin the contract; multifamily prompts are byte-identical to
 before.
 
+**And the board itself now rotates asset classes (#144, your call).** You
+said the pulse tiles shouldn't lead with a 2BR rent — "relation to
+something with a real asset class like office industrial multi and rotate
+it." Now every tile cycles through the sectors its metro's research
+actually carries: office first, then industrial, multifamily, retail —
+vacancy (or the tracker spread), asking rent, cap band per face. A metro
+missing a sector skips that face rather than faking one; reduced-motion
+visitors get a pinned first face; screen readers get every read as one
+plain sentence. The rotation exposed the thinnest tiles, so #145 filled
+them the same hour: NoVA office lands as the honest 20.8–21.3% Newmark/
+CBRE spread (both Q2 2026, both tightening while the District sets record
+highs), and PG + Montgomery County get Colliers' 19.2% with the base
+declared — it's the Suburban-Maryland survey area, both counties
+together, not a county split. DC-district retail still has no dated 2026
+figure from a named house after three more search angles; that gap stays
+written down, not papered over.
+
 | Change | Where to look |
 |---|---|
+| Pulse tiles rotate office / industrial / MF / retail | homepage board (#144) |
+| DMV office fills — NoVA spread, Suburban MD base | /market?metro=nova (#145) |
 | Sector-aware challenger + market check | upload any office/industrial/retail OM (#141) |
 | Retail — the fourth asset type, 10 of 15 markets | /market briefs (#141, #142) |
 | Baltimore's 10.0-vs-20.9 denominator lesson | /market?metro=baltimore + spread board (#142) |
