@@ -869,7 +869,40 @@
         "King County sales-file ingest wiring",
         "FY2026 FMR"
       ],
-      "region": "Major US markets"
+      "region": "Major US markets",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 28.2,
+          "vacancy_pct_high": 28.2,
+          "status": "sourced",
+          "sources": [
+            "https://kidder.com/market-reports/seattle-office-market-report/"
+          ],
+          "note": "Kidder Q2 2026, Seattle Close-In: vacancy 28.2% (from 28.0% in Q1 — the region's highest), average asking $35.00/SF across classes (-0.5% QoQ, -6.8% YoY). Still repricing."
+        },
+        "industrial": {
+          "vacancy_pct_low": 9.5,
+          "vacancy_pct_high": 9.5,
+          "status": "sourced",
+          "sources": [
+            "https://kidder.com/market-reports/seattle-industrial-market-report/",
+            "https://warecre.com/cre-insights/market-property-insights/seattle-warehouse-market-report/"
+          ],
+          "note": "Kidder Q2 2026: vacancy 9.5%, up from 7.0% at year-end 2023 as supply outpaces demand. Asking rents quoted monthly here: roughly $0.90-1.35/SF shell, $1.50-2.00 close-in (warecre) — too wide and mixed-basis to carry as one annual figure, so the level stays null with the range on record."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 6.7,
+          "vacancy_pct_high": 6.7,
+          "cap_rate_low_pct": null,
+          "cap_rate_high_pct": null,
+          "status": "sourced",
+          "sources": [
+            "https://kidder.com/market-reports/seattle-multifamily-market-report/"
+          ],
+          "note": "Kidder Q2 2026: vacancy 6.7%, improving from 7.0% in Q1. Asking rents by type: studio $1,544 / 1BR $1,908 / 2BR $2,285 / 3BR $2,631. The market-rate 2BR asking sits below the FY2026 FMR — see this metro's FMR note for the conflation history. Cap band not published in the pieces reviewed — null."
+        }
+      }
     },
     {
       "id": "miami",
@@ -893,7 +926,44 @@
       "gaps": [
         "statute text pull to upgrade FL rule"
       ],
-      "region": "Major US markets"
+      "region": "Major US markets",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 10.8,
+          "vacancy_pct_high": 14.9,
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/miami/2q26-miami-dade-county-office",
+            "https://www.cbre.com/insights/figures/miami-office-figures-report-q2-2026"
+          ],
+          "note": "Q2 2026: Colliers 10.8% (-10bps, record asking $65.50/SF full-service, Class A $73.37) vs CBRE 14.9% ($68.60/SF) — tracker bases differ; spread carried. One of the tightest office markets covered, with premium demand setting rent records."
+        },
+        "industrial": {
+          "vacancy_pct_low": 7.7,
+          "vacancy_pct_high": 7.7,
+          "asking_rent_psf": 17.19,
+          "rent_basis": "NNN asking",
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/miami/2q26-miami-dade-county-industrial",
+            "https://www.cbre.com/insights/figures/miami-industrial-figures-q2-2026"
+          ],
+          "note": "Colliers Q2 2026: vacancy 7.7% (+60bps as 769k SF delivered), asking $17.19/SF NNN (+0.9% QoQ, +1.5% YoY). Supply wave absorbing."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 5.4,
+          "vacancy_pct_high": 6.6,
+          "cap_rate_low_pct": null,
+          "cap_rate_high_pct": null,
+          "status": "sourced",
+          "sources": [
+            "https://www.miamirealtors.com/2026/04/20/broward-county-emerging-as-top-multifamily-investment-market/",
+            "https://www.marcusmillichap.com/research/market-report/miami-dade/miami-dade-2q26-multifamily-market-report"
+          ],
+          "note": "Measured reads span 5.4% (MMG Q2: occupancy 94.6%, rents -0.2% YoY, absorption ~= completions) to 6.6% (Miami Realtors, March 2026, best of the large South-Region metros); M&M projects ~4.9% for 2026 — a forecast, noted not banded. Miami-Dade median asking $2,660 (May 2026, +1.5% YoY); Class A occupancy 95-96%. ~13,800-unit pipeline, 30.7% of it Downtown. Cap band not published in the pieces reviewed — null."
+        }
+      }
     },
     {
       "id": "atlanta",
@@ -917,7 +987,43 @@
       "gaps": [
         "Fulton bulk endpoint"
       ],
-      "region": "Major US markets"
+      "region": "Major US markets",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 18.0,
+          "vacancy_pct_high": 18.0,
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/atlanta/2026-q2-atlanta-office-market-report"
+          ],
+          "note": "Colliers Q2 2026: vacancy eased to ~18% from a 26% peak (narrative round figure — carried as stated); Class A asking $35.86/SF with >5% YoY growth for a third straight quarter; sublease availability under 5.0M SF for the first time since Q4 2021. Stabilizing on HQ demand."
+        },
+        "industrial": {
+          "vacancy_pct_low": 8.2,
+          "vacancy_pct_high": 9.0,
+          "asking_rent_psf": 7.53,
+          "rent_basis": "direct asking, all product (Cushman)",
+          "status": "sourced",
+          "sources": [
+            "https://www.cbre.com/insights/figures/atlanta-industrial-figures-report-q2-2026",
+            "https://www.jll.com/en-us/insights/market-dynamics/atlanta-industrial"
+          ],
+          "note": "Q2 2026: CBRE direct 8.2% vs JLL 9.0% (4.4M SF absorbed) — spread carried. Rents cluster tightly: Cushman $7.53 direct all-product (warehouse/distribution $7.38), JLL $7.43. Pressure concentrated in smaller-format and legacy product."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 5.6,
+          "vacancy_pct_high": 7.2,
+          "cap_rate_low_pct": null,
+          "cap_rate_high_pct": null,
+          "status": "sourced",
+          "sources": [
+            "https://www.northmarq.com/insights/insights/atlantas-multifamily-vacancy-shrinks-lowest-level-nearly-three-years",
+            "https://www.marcusmillichap.com/research/market-report/atlanta/atlanta-2q26-multifamily-market-report"
+          ],
+          "note": "Reads span Northmarq 5.6% (lowest in nearly three years, expected to reach 5.2%) to a CRE Daily brief's 7.2% declining — spread carried. M&M 2Q26: deliveries slowing 43% YoY (9,300 units, +1.6% inventory), rents ~$1,600 (+1% — among the stronger early-2026 metros). Cap reads conflict by construct (5.2% A/B average vs low-to-mid-5s deal narrative vs a 5.5-6.0 aggregator quote) — no single band carried."
+        }
+      }
     },
     {
       "id": "dallas",
@@ -943,7 +1049,43 @@
         "DCAD roll ingest wiring",
         "Fort Worth-Arlington-Grapevine HMFA FMR (separate area, not yet sourced)"
       ],
-      "region": "Major US markets"
+      "region": "Major US markets",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 19.9,
+          "vacancy_pct_high": 19.9,
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/dallas/dfw-office-market-report-2026-q2"
+          ],
+          "note": "Q2 2026: vacancy 19.9% — below 20% for the first time since Q2 2023 — on +1.4M SF net absorption; average asking $34.01/SF. Recovery led by corporate relocations."
+        },
+        "industrial": {
+          "vacancy_pct_low": 8.3,
+          "vacancy_pct_high": 9.3,
+          "asking_rent_psf": 8.99,
+          "rent_basis": "avg asking",
+          "status": "sourced",
+          "sources": [
+            "https://www.cbre.com/insights/figures/dallas-fort-worth-industrial-figures-q2-2026",
+            "https://www.jll.com/en-us/insights/market-dynamics/dallas-fort-worth-industrial"
+          ],
+          "note": "Q2 2026: CBRE 8.3% (-20bps QoQ) vs JLL 9.3% (a seventh straight quarterly decline) — spread carried. Asking $8.99/SF; 16.9M SF leased in the quarter; 31.2M SF under construction — the nation's biggest industrial build."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 6.8,
+          "vacancy_pct_high": 6.8,
+          "cap_rate_low_pct": null,
+          "cap_rate_high_pct": null,
+          "status": "sourced",
+          "sources": [
+            "https://www.northmarq.com/insights/insights/dallas-fort-worth-multifamily-rents-and-occupancy-climb-open-q1-2026",
+            "https://www.matthews.com/insights/dallas-fort-worth-multifamily-q1-2026"
+          ],
+          "note": "Northmarq Q1 2026: occupancy 93.2% (+10bps) = 6.8% vacancy; absorption ~8,500 units vs ~7,500 delivered; pipeline 43% below the 2023 peak. Average metro rent $1,482 (-3.0% YoY) while Class A rose 3.2% YoY for a fifth straight quarter — the mix, not a contradiction. A templated aggregator line quoting 4.6% was rejected (same boilerplate seen on another metro's page). No. 1 metro for absolute population growth (+100k residents YoY)."
+        }
+      }
     }
   ]
 }
