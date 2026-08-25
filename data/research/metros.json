@@ -781,14 +781,14 @@
         "multifamily": {
           "vacancy_pct_low": 4.5,
           "vacancy_pct_high": 5.6,
-          "cap_rate_low_pct": null,
-          "cap_rate_high_pct": null,
+          "cap_rate_low_pct": 5.8,
+          "cap_rate_high_pct": 5.8,
           "status": "sourced",
           "sources": [
             "https://kidder.com/market-reports/los-angeles-multifamily-market-report/",
             "https://www.matthews.com/insights/los-angeles-multifamily-q2-2026"
           ],
-          "note": "Q2 2026: Kidder 5.5% (Q1 5.6%) vs Matthews 4.52% — spread carried. Average asking $2,310/unit (studios $1,700 to 3BR $3,230). Cap reads cluster ~5.1–5.4% metro average after six quarters of expansion, with agent surveys quoting 4.5–5.5% for stabilized mid-tier — no single house band cleared the attribution bar, so null carried rather than a stitched range."
+          "note": "Q2 2026: Kidder 5.5% (Q1 5.6%) vs Matthews 4.52% — spread carried. Average asking $2,310/unit (studios $1,700 to 3BR $3,230). Cap filled Aug 25: Kidder Q2 2026 average expanded to 5.8% (CoStar-sourced transaction average, not a quoted band); average sale $280,591/unit (+3.3% YoY). Earlier fuzzy-attribution cluster reads (~5.1-5.4) superseded by the named-house average; agent surveys still quote 4.5-5.5 for stabilized mid-tier."
         }
       }
     },
@@ -902,13 +902,13 @@
         "multifamily": {
           "vacancy_pct_low": 6.7,
           "vacancy_pct_high": 6.7,
-          "cap_rate_low_pct": null,
-          "cap_rate_high_pct": null,
+          "cap_rate_low_pct": 5.7,
+          "cap_rate_high_pct": 5.7,
           "status": "sourced",
           "sources": [
             "https://kidder.com/market-reports/seattle-multifamily-market-report/"
           ],
-          "note": "Kidder Q2 2026: vacancy 6.7%, improving from 7.0% in Q1. Asking rents by type: studio $1,544 / 1BR $1,908 / 2BR $2,285 / 3BR $2,631. The market-rate 2BR asking sits below the FY2026 FMR — see this metro's FMR note for the conflation history. Cap band not published in the pieces reviewed — null."
+          "note": "Kidder Q2 2026: vacancy 6.7%, improving from 7.0% in Q1. Asking rents by type: studio $1,544 / 1BR $1,908 / 2BR $2,285 / 3BR $2,631. The market-rate 2BR asking sits below the FY2026 FMR — see this metro's FMR note for the conflation history. Cap filled Aug 25: Kidder Q2 2026 sales average 5.7% (+10bps YoY from 5.6%) — a transaction average, not a quoted band; average sale $276,610/unit (-14.75% YoY)."
         }
       }
     },
