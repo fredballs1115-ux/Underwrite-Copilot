@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-25",
+      "title": "The stubborn gaps give ground — DC retail lands, Philly and MoCo carry honest reads",
+      "blurb": "Four sweeps came back empty on DC retail; the fifth landed it: Marcus & Millichap’s institutional arm prints District retail vacancy at a historic-high 6.3% entering 2026 — record restaurant closures, federal workforce cuts — with the city’s own Streetsense retail plan corroborating, so the flagship DC tile now rotates all four asset classes. Philadelphia retail arrives as a construct lesson: Center City’s on-foot storefront survey (occupancy 84.2%, a two-year high) is a storefront COUNT, not square-footage vacancy, so the number stays out of the comparable fields and a digest’s “7.3%” was rejected after it stitched multifamily-shaped figures into the retail answer. Montgomery County industrial lands as a county-specific .94/SF print with zero construction pipeline, vintage declared.",
+      "href": "/market?metro=dc"
+    },
+    {
+      "date": "2026-08-25",
       "title": "The homepage fits your phone again",
       "blurb": "A mobile audit caught two layout bugs invisible on desktop: the hero and the interactive walkthrough each used a grid whose phone-width column could not shrink below its content, so on small screens the hero clipped its right edge (the headline lost words, the sample card ran off) and the walkthrough forced sideways page scroll. Both grids now declare a shrinkable column; the walkthrough’s tab strip scrolls inside its card instead of stretching the page. Verified at 390px: no horizontal scroll, nothing clipped but the decorative glow that was always meant to bleed.",
       "href": "/"

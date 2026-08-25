@@ -68,7 +68,16 @@
           ],
           "note": "Regional vacancy 5.2% at YE2025 (+50bps YoY); Q1 2026 by class: luxury 11.9%, B/C 7.9% — the spread IS the decision datum. Cap band 4.75-5.5% vs CBRE's 4.73% US core going-in average; deal mix leaning Class B / value-add. 2026 deliveries projected under 10k units (decade low). Federal-employment uncertainty is the named headwind."
         },
-        "as_of": "2026-08-25"
+        "as_of": "2026-08-25",
+        "retail": {
+          "vacancy_pct": 6.3,
+          "status": "sourced",
+          "sources": [
+            "https://www.institutionalpropertyadvisors.com/research/market-report/retail/washington-dc/washingtondc-2026-investment-forecast-retail-market-report",
+            "https://dmped.dc.gov/release/mayor-bowser-releases-key-findings-new-study-and-strategic-plan-grow-dcs-retail-market-and"
+          ],
+          "note": "Institutional Property Advisors (Marcus & Millichap’s institutional arm) 2026 Investment Forecast: District retail vacancy at a HISTORIC HIGH 6.3% entering 2026 — record restaurant closures through 2025 on rising labor costs, softer consumer spending, federal workforce reductions, and weaker tourism. VINTAGE: “entering 2026” = a year-end-2025 read, the newest district-wide figure to clear the source bar after four earlier sweeps returned only national prints or a stale 2022 article (rejected on URL vintage). The city’s own WDCEP/Streetsense Retail Strategic Plan (2026) corroborates the restructuring story. Asking-rent level not published — held null."
+        }
       }
     },
     {
@@ -168,6 +177,16 @@
             "https://www.colliers.com/en/research/washington-dc/suburban-maryland-office-market-report-2026-q1"
           ],
           "note": "Colliers Q1 2026, Suburban Maryland survey area (Montgomery + Prince George’s together — not a county split): 19.2% vacancy, down 20bps on marginal positive demand. Newmark’s prior read (Q3 2025) was 20.1%, same direction, older vintage — kept as context, not banded. Avison Young’s 21.9% is AVAILABILITY (direct) plus 1.7% sublet — a different construct than vacancy, recorded here so nobody mistakes the two."
+        },
+        "industrial": {
+          "asking_rent_psf": 6.94,
+          "rent_basis": "avg asking — Q4 2024 print, vintage declared",
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/washington-dc/maryland-industrial-report-q4-2024",
+            "https://klnb.com/wp-content/uploads/2025/04/NAIKLNB_MD_Industrial_Q1_2025-1.pdf"
+          ],
+          "note": "County-specific print from the Colliers/KLNB Maryland industrial series, Q4 2024 VINTAGE (declared — the newest MoCo-specific level to clear the bar): asking .94/SF, up /bin/bash.09 QoQ; +15,360 SF Q4 absorption (2024 total −12,839 SF); NO projects under construction, so new supply pressure is nil and absorption works straight against vacancy. A vacancy RATE for the county has not cleared the bar: Colliers’ Q1 2026 “Maryland 10.1%” runs on a Baltimore/I-95-corridor-shaped base (its own narrative ties the print to that corridor) and is rejected as a MoCo read; Transwestern’s 6.9% suburban-MD figure is Q2 2025 vintage on the two-county base. Both stay recorded, neither is a county vacancy."
         },
         "multifamily": {
           "vacancy_pct": 5.2,
@@ -506,7 +525,15 @@
           ],
           "note": "Vacancy 4.8% Q2 2026 (Northmarq, citing Fannie Mae; ~5.1% projected by Q4). CAP RATE deliberately null: the one aggregator carrying per-class figures (4.74/4.92/5.38% A/B/C) also states '5.6% all classes' on the same pages — internally inconsistent, templated-page smell — so no number is encoded until a brokerage survey figure is pulled. Never estimated. Provenance closed Aug 25: those templated per-class figures (4.74/4.92/5.38) are CBRE's NATIONAL H1 2026 class averages — the aggregator republishes them as local numbers on its city pages, which is exactly the conflation the null guards against. Cap FILLED Aug 25 from a named house at last: Northmarq has urban core trades at 5.2-5.7% and suburban 5.0-5.3% (late 2025/early 2026, stabilized, bid-ask narrowing) — the 5.0-5.7 band spans both, split in this note. The original null and its templated-page catch above stand as the provenance history."
         },
-        "as_of": "2026-08-25"
+        "as_of": "2026-08-25",
+        "retail": {
+          "status": "sourced",
+          "sources": [
+            "https://centercityphila.org/research-reports/retail",
+            "https://www.marcusmillichap.com/research/market-report/philadelphia/philadelphia-2026-investment-forecast-retail-market-report"
+          ],
+          "note": "NUMERIC FIELD HELD OPEN — two reads exist and neither is an SF-based metro vacancy print. Center City District’s on-foot storefront survey (April 2026, PRIMARY): occupancy 84.2%, a two-year high, up from 82.6% in six months (+32 storefronts); Walnut St 87.5% (west side 88.6%), Sansom 85.1%, Market St 68.2→71.6%. CONSTRUCT DECLARED: a storefront COUNT, not square-footage vacancy — never compare it to the SF-based figures on other tiles. Marcus & Millichap’s 2026 forecast notes East Center City retail vacancy under 2% in 2025 on CBD apartment growth (+30% occupied units since 2019), but a digest of that report interleaved multifamily-shaped numbers (.56/SF rent, 4.7% inventory growth) into the retail answer, so its “7.3%” print is REJECTED as probable report conflation until the primary confirms."
+        }
       }
     },
     {
