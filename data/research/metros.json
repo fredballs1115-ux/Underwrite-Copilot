@@ -880,13 +880,14 @@
       "sector_snapshot": {
         "as_of": "2026-08-25",
         "office": {
-          "vacancy_pct_low": 28.2,
-          "vacancy_pct_high": 28.2,
+          "vacancy_pct_low": 23.4,
+          "vacancy_pct_high": 28.6,
           "status": "sourced",
           "sources": [
-            "https://kidder.com/market-reports/seattle-office-market-report/"
+            "https://kidder.com/market-reports/seattle-office-market-report/",
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/seattle-bellevue-marketbeats"
           ],
-          "note": "Kidder Q2 2026, Seattle Close-In: vacancy 28.2% (from 28.0% in Q1 — the region's highest), average asking $35.00/SF across classes (-0.5% QoQ, -6.8% YoY). Still repricing."
+          "note": "Metro band widened Aug 25 (was carried as the Close-In 28.2% alone): Kidder has the Puget Sound region at 23.4% (multi-tenant buildings >10k SF; Seattle proper 28.2%, South King 21.7%, East King 21.0%) vs Cushman region overall 28.6% (downtown Seattle 35.8%, suburban 23.6%, Eastside 21.4%) — inventory bases differ; spread carried. Average asking $35.00/SF all classes (-6.8% YoY, Kidder). Pace of increase slowing — the sharpest losses look behind the market."
         },
         "industrial": {
           "vacancy_pct_low": 9.5,
