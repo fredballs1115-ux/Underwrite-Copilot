@@ -635,15 +635,14 @@
           "note": "Q2 2026: Cushman & Wakefield 19.0% (+30bps, smallest quarterly increase in a year); another Greater-Boston tracker prints 23.6% total vacancy — measurement-basis spread. First back-to-back occupancy gains since 2019. Class A direct asking $51.28/SF, overall $45.68."
         },
         "industrial": {
-          "vacancy_pct_low": null,
-          "vacancy_pct_high": null,
-          "asking_rent_psf": null,
-          "rent_basis": null,
-          "status": "unverified_not_found",
+          "vacancy_pct_low": 12.8,
+          "vacancy_pct_high": 12.8,
+          "status": "sourced",
           "sources": [
-            "https://www.remmesco.com/blog/posts/2026/04/17/boston-commercial-real-estate-market-2026-office-industrial-life-science-retail-outlookboston-commercial-real-estate-market-2026-office-industrial-life-science-retail-outlook/"
+            "https://www.colliers.com/en/research/boston/greater-boston-industrial-report-2026q1",
+            "https://www.colliers.com/en/research/boston/greater-boston-industrial-report-q2-2026"
           ],
-          "note": "Q2 2026 narrative only, no clean level captured this pass: vacancy at a decade high as a completion wave digests, met by a ~73% pullback in speculative groundbreakings. Numeric level + asking rent queued for the next sweep — never estimated."
+          "note": "Gap filled Aug 25 (was recorded as unverified — no level had cleared the bar). Colliers Q1 2026: overall vacancy 12.8% (+30bps, near an 11-year high; the post-Covid low was 5.6% in 3Q22), a fourth straight quarter of negative absorption (-432k SF), annual rent growth swung from +33.5% at the 2022 peak to -1.5%. Colliers Q2: absorption back positive (+440k SF, logistics-led); South submarket availability 15.6%, a 14-year high, while the West grew rents 5.7% YoY. Market-wide asking rent level still not published — held null."
         },
         "multifamily": {
           "vacancy_pct_low": 4.9,
