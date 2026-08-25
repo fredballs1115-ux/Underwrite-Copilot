@@ -88,6 +88,11 @@ jobs:
           # DMV office fills: NoVA's brief must carry the Newmark/CBRE spread note.
           curl -sS -o p_market_nova.html --max-time 60 "https://underwrite-copilot.onrender.com/market?metro=nova" || true
           grep -q "tightening while the District" p_market_nova.html && echo "NOVA OFFICE SPREAD (Aug 25): present" || echo "NOVA OFFICE SPREAD (Aug 25): not yet deployed"
+          # Sector leaderboard: the retail tab must rank the covered markets AND
+          # name the metros whose numeric level is held open (never dropped).
+          curl -sS -o p_market_retail.html --max-time 60 "https://underwrite-copilot.onrender.com/market?sector=retail" || true
+          grep -q "ranked tightest to loosest" p_market_retail.html && echo "SECTOR LEADERBOARD (Aug 25): present" || echo "SECTOR LEADERBOARD (Aug 25): not yet deployed"
+          grep -q "numeric level held open" p_market_retail.html && echo "SECTOR LEADERBOARD held-open line (Aug 25): present" || echo "SECTOR LEADERBOARD held-open line (Aug 25): not yet deployed"
           grep -q "It knows the ground" p_why.html && echo "/why: current copy present" || echo "/why: OLD copy"
           grep -q "takes your answer right on the deal" p_why.html && echo "/why: overnight copy present" || echo "/why: overnight copy MISSING"
           grep -q "ticker-track-reverse" p_why.html && echo "/why: markets band present" || echo "/why: markets band not yet deployed"

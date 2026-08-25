@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-25",
+      "title": "Sector leaderboards — every covered market ranked, one asset class at a time",
+      "blurb": "The market page's asset-class explorer now flips the metro tiles the other way: pick office, industrial, multifamily, or retail and see every covered market with a numeric read ranked tightest to loosest — vacancy bands kept as bands (a spread is never averaged into one printed number), asking $/SF and cap ranges where sourced, a source link on every row. Metros whose level is honestly held open are named under the table, never silently dropped.",
+      "href": "/market?sector=office"
+    },
+    {
+      "date": "2026-08-25",
       "title": "Retail coverage closes out — every covered market now carries a read or an honest hold",
       "blurb": "Hampton Roads was the last open retail gap; Old Dominion University’s 30th annual E.V. Williams Market Review (March 2026, advisory board chaired by Divaris — the region’s dominant retail house) prints it exceptionally tight at 4.4–4.6%, carried as the band. That completes the retail program: thirteen markets with sourced square-footage reads, Philadelphia held open with its storefront-count survey construct-declared, and the county tiles inheriting the District’s read conceptually while their own faces stay honest. The board’s derived counter stands at 101 sourced sector figures across office, industrial, multifamily, and retail.",
       "href": "/market?metro=norfolk_hampton_roads"
