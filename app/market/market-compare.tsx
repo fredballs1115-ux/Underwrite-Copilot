@@ -21,12 +21,14 @@ export type CompareMetro = {
   fmr: Partial<Record<"0br" | "1br" | "2br" | "3br", number>> & {
     status?: string;
   };
-  sectors?: Partial<Record<"office" | "industrial" | "multifamily", CompareSector>>;
+  sectors?: Partial<
+    Record<"office" | "industrial" | "multifamily" | "retail", CompareSector>
+  >;
   ruleCount: number;
   compsLive: boolean;
 };
 
-const SECTOR_ROWS = ["office", "industrial", "multifamily"] as const;
+const SECTOR_ROWS = ["office", "industrial", "multifamily", "retail"] as const;
 
 // One cell of the asset-type table: the vacancy read (single figure or the
 // tracker spread), with rent / cap appended when the research carries them.
