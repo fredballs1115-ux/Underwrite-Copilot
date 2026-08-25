@@ -464,6 +464,16 @@
             "https://nmrk.imgix.net/uploads/fields/pdf-market-reports/1Q26-Richmond-Hampton-Roads-Multifamily-Report_2026-05-21-185215_gnmm.pdf"
           ],
           "note": "Northmarq: vacancy 5.2% (down from 5.6% at Q2 2025), rents ~$1,650 (+3% YoY) — tight new-supply backdrop keeps rent growth above the national pace into 2026. Cap filled Aug 25: a tight 5.25-5.5% range (Newmark 1Q26 Richmond & Hampton Roads report) — Class A near the low end, B/C clustering toward 5.5; Q1 average 5.4% (-30bps YoY) on ~$140M volume (-45.1% YoY), with institutional-size deals still clearing."
+        },
+        "retail": {
+          "vacancy_pct_low": 4.4,
+          "vacancy_pct_high": 4.6,
+          "status": "sourced",
+          "sources": [
+            "https://www.odu.edu/evwilliams-center/reports",
+            "https://www.odu.edu/sites/default/files/2026/documents/2026-mr-presentation.pdf"
+          ],
+          "note": "Old Dominion University E.V. Williams Center, 2026 Hampton Roads Real Estate Market Review & Forecast (the 30th annual survey, presented March 2026; advisory board chaired by Divaris Real Estate’s EVP — the region’s dominant retail house): metro retail vacancy exceptionally tight at 4.4–4.6%, carried as the printed band. Limited new construction plus steady consumer demand favors well-located neighborhood centers and service retail; the review flags an adaptive-reuse trend (e.g. former Rite Aids converting to car washes). Asking-rent level not published — held null."
         }
       }
     },
