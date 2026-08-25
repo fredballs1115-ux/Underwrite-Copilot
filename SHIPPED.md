@@ -115,6 +115,7 @@ written down, not papered over.
 | Cap hunt: 8th + 9th loan-store catches · Yardi Baltimore texture | /market?metro=baltimore · richmond (#160) |
 | Sample screen carries Philly's pack positions | /demo asset-type line (#161) |
 | Changelog becomes a tour — day groups, momentum line, live links | /whats-new (#162) |
+| Deal-page benchmark units fixed ($17.7 vacancy no more) + rank chips | deal pages' vs-market panel (#163) |
 | Sector-aware challenger + market check | upload any office/industrial/retail OM (#141) |
 | Retail — the fourth asset type, 10 of 15 markets | /market briefs (#141, #142) |
 | Baltimore's 10.0-vs-20.9 denominator lesson | /market?metro=baltimore + spread board (#142) |

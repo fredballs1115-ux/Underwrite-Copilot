@@ -4,7 +4,11 @@
 // nothing.
 
 import { describe, expect, it } from "vitest";
-import { benchmarksForDeal, seedBenchmarks } from "@/lib/research-data";
+import {
+  benchmarksForDeal,
+  fmtBenchValue,
+  seedBenchmarks,
+} from "@/lib/research-data";
 import { metroForAddress } from "@/lib/market-match";
 import metrosSeed from "@/data/research/metros.json";
 
@@ -139,5 +143,24 @@ describe("sector snapshot benchmark rows", () => {
     expect(
       rows.slice(0, 3).some((r) => r.name === "Los Angeles" && r.sector === "office"),
     ).toBe(true);
+  });
+});
+
+describe("fmtBenchValue", () => {
+  it("formats percent metrics with % and never $", () => {
+    expect(fmtBenchValue("office_vacancy_pct", 17.7, 22.3)).toBe("17.7%–22.3%");
+    expect(fmtBenchValue("multifamily_cap_rate_pct", 4.75, 5.5)).toBe("4.75%–5.5%");
+    expect(fmtBenchValue("multifamily_vacancy_pct", 5.2, 5.2)).toBe("5.2%");
+    expect(fmtBenchValue("pmms_30y_fixed", 6.5, null)).toBe("6.5%");
+  });
+  it("formats rents as $/SF and counts plain", () => {
+    expect(fmtBenchValue("industrial_asking_rent_psf", 13.27, 13.27)).toBe("$13.27/SF");
+    expect(fmtBenchValue("monthly_sales_2_4_unit", 58, 58)).toBe("58");
+    expect(fmtBenchValue("active_listings_2_4_unit", 1200, null)).toBe("1,200");
+  });
+  it("keeps dollars for sale medians and FMRs, dash for missing", () => {
+    expect(fmtBenchValue("median_sale_price_2_4_unit", 450000, 520000)).toBe("$450,000–$520,000");
+    expect(fmtBenchValue("hud_fmr_fy2026_2br", 2044, 2044)).toBe("$2,044");
+    expect(fmtBenchValue("median_sale_price_2_4_unit", null, null)).toBe("—");
   });
 });
