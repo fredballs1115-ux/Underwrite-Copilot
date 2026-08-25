@@ -595,9 +595,10 @@
           "status": "sourced",
           "sources": [
             "https://www.marcusmillichap.com/research/market-report/new-york-city/new-york-city-2026-investment-forecast-multifamily-market-report",
-            "https://inhabit.corcoran.com/nyc-residential-rental-market-report-july-2026/"
+            "https://inhabit.corcoran.com/nyc-residential-rental-market-report-july-2026/",
+            "https://arielpa.nyc/news/press-releases/second-quarter-nyc-multifamily-sales-jump-268-year-over-year-ariel-property-advisors-q2-multifamily-quarter-in-review-shows"
           ],
-          "note": "Band spans Manhattan borough monthlies (~1.5-1.9% through 2026, Corcoran; 19 straight months of inventory contraction, median rent at a record ~$5,000) to M&M's 2.4% citywide 2026 projection — the nation's lowest metro vacancy. Cap rate: no clean two-source band captured; rent-stabilization exposure is the underwriting gate here (see this metro's rules)."
+          "note": "Band spans Manhattan borough monthlies (~1.5-1.9% through 2026, Corcoran; 19 straight months of inventory contraction, median rent at a record ~$5,000) to M&M's 2.4% citywide 2026 projection — the nation's lowest metro vacancy. Cap rate: no clean two-source band captured; rent-stabilization exposure is the underwriting gate here (see this metro's rules). Cap held null after the Aug 25 hunt — only a single agent survey quotes a band (4.5-5.5 going-in typical, 3.5-6.5 full span), below the source bar. What IS documented (Ariel Property Advisors, H1/Q2 2026): two very different markets — Manhattan free-market strength (rents +10% YoY; H1 multifamily sales $4.95B, +21%) against a rent-stabilized valuation reset, refinancings at roughly double original rates and stabilized trading dominated by distress; the free-market-vs-stabilized cap spread runs a structural 100-300bps. Screen the regulation status before the cap."
         }
       }
     },
