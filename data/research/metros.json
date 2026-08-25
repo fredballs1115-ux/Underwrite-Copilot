@@ -729,6 +729,16 @@
             "https://essexrealtygroup.com/chicago-multifamily-report-april-2026/"
           ],
           "note": "Band spans stabilized-asset occupancy 96.3% (=3.7% vacancy, JPMorgan) to 4.6% market vacancy (projected 5.1% by Q3 2026); rent growth ~3.8% YoY — supply discipline doing the work. Cap rate: no two-source band captured; null. Cook County landlord rules already on file for this metro. Cap filled Aug 25 with the basis named: Essex Realty (local multifamily brokerage) April 2026 rolling data — 175 transactions, $587.8M, average cap 8.3%. That average is dominated by the Class B/C neighborhood buildings that drive Chicago volume (Northmarq: B/C sales fuel the market); institutional Class A trades price far tighter (gateway core ~4-5% nationally). A transaction average for the small-building stock, not a metro-wide quoted band."
+        },
+        "retail": {
+          "vacancy_pct_low": 7.8,
+          "vacancy_pct_high": 7.8,
+          "status": "sourced",
+          "sources": [
+            "https://assets.cushmanwakefield.com/-/media/cw/marketbeat-pdfs/2026/q2/us-reports/national/q22026usretailmarketbeat.pdf",
+            "https://www.colliers.com/-/media/files/unitedstates/national/2026/colliers-us-retail-statistics-report-2026-q2.ashx"
+          ],
+          "note": "Cushman Q2 2026: retail vacancy 7.8%. Metro asking rent not surfaced this pass (US average runs $24.79/SF, +2.4% YoY per CBRE) — level held null. Chicago is among the Midwest markets carrying new retail construction."
         }
       }
     },
