@@ -241,6 +241,25 @@ export default function DemoPage() {
       ? leverageRead(sampleCapPct, pmmsRow.low)
       : null;
 
+  // The sample's metro through the sector-fundamentals generator — the same
+  // rows deal pages benchmark against. Formats a band or a point honestly.
+  const phillyRows = seedBenchmarks().filter((b) =>
+    b.metro.startsWith("Philadelphia"),
+  );
+  const band = (metric: string): string | null => {
+    const r = phillyRows.find((b) => b.metric === metric);
+    if (!r || typeof r.low !== "number") return null;
+    return r.high !== r.low ? `${r.low}–${r.high}%` : `${r.low}%`;
+  };
+  const phillySectors = {
+    office: band("office_vacancy_pct"),
+    industrial: band("industrial_vacancy_pct"),
+    industrialRent: phillyRows.find(
+      (b) => b.metric === "industrial_asking_rent_psf",
+    )?.low,
+    multifamily: band("multifamily_vacancy_pct"),
+  };
+
   return (
     <div className="flex flex-1 flex-col bg-canvas">
       <header className="border-b border-line bg-paper">
@@ -455,6 +474,50 @@ export default function DemoPage() {
                 Signed-in sample screens run the live pull — real recorded
                 sales around Brewerytown, source-linked row by row.
               </p>
+              {(phillySectors.office || phillySectors.multifamily) && (
+                <p className="mt-2 border-t border-line/60 pt-2 text-[11px] leading-relaxed text-muted">
+                  Philadelphia by asset type:{" "}
+                  {phillySectors.office && (
+                    <>
+                      office vacancy{" "}
+                      <span className="font-mono tabular-nums text-ink">
+                        {phillySectors.office}
+                      </span>
+                    </>
+                  )}
+                  {phillySectors.industrial && (
+                    <>
+                      {" · "}industrial{" "}
+                      <span className="font-mono tabular-nums text-ink">
+                        {phillySectors.industrial}
+                      </span>
+                      {typeof phillySectors.industrialRent === "number" && (
+                        <>
+                          {" at "}
+                          <span className="font-mono tabular-nums text-ink">
+                            ${phillySectors.industrialRent.toFixed(2)}/SF
+                          </span>
+                        </>
+                      )}
+                    </>
+                  )}
+                  {phillySectors.multifamily && (
+                    <>
+                      {" · "}multifamily{" "}
+                      <span className="font-mono tabular-nums text-ink">
+                        {phillySectors.multifamily}
+                      </span>
+                    </>
+                  )}{" "}
+                  — ranges are tracker spreads, never averaged.{" "}
+                  <Link
+                    href="/market?metro=philadelphia"
+                    className="font-medium text-brand underline-offset-2 hover:underline"
+                  >
+                    Full brief →
+                  </Link>
+                </p>
+              )}
             </div>
           </div>
           {sampleLeverage && pmmsRow && sampleCapPct != null && (
