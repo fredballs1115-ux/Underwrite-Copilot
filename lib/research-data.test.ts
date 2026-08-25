@@ -81,12 +81,20 @@ describe("sector snapshot benchmark rows", () => {
   });
 
   it("emits NO cap-rate row where the research deliberately carries null", () => {
-    // Philadelphia's MF cap is a documented gap (inconsistent aggregator) —
-    // the generator must not conjure a row from the nulls.
+    // Atlanta's MF cap is a documented gap (conflicting constructs across
+    // trackers) — the generator must not conjure a row from the nulls.
+    // (Philadelphia held this role until its Northmarq fill on Aug 25.)
     const row = seeds.find(
-      (b) => b.metric === "multifamily_cap_rate_pct" && b.metro.startsWith("Philadelphia"),
+      (b) => b.metric === "multifamily_cap_rate_pct" && b.metro.startsWith("Atlanta"),
     );
     expect(row).toBeUndefined();
+    // And the Philadelphia fill emits with its exact Northmarq band.
+    const philly = seeds.find(
+      (b) => b.metric === "multifamily_cap_rate_pct" && b.metro.startsWith("Philadelphia"),
+    );
+    expect(philly).toBeTruthy();
+    expect(philly!.low).toBe(5.0);
+    expect(philly!.high).toBe(5.7);
   });
 
   it("every snapshot row carries provenance", () => {
