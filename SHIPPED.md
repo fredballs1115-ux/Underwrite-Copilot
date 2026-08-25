@@ -17,7 +17,7 @@ say exactly what's missing and why.
 
 ## Monday night (Aug 24–25 ET) — homescreen eye-catchers, then the big one: real data on the asset types that matter
 
-**Your call: "more than 2BR info… research on all asset types… real data on assets that matter… way more info on each metro."** Answered in two probe-verified PRs (#134, #136):
+**Your call: "more than 2BR info… research on all asset types… real data on assets that matter… way more info on each metro."** Answered across five probe-verified PRs (#134, #136–#138, each an exact live-sha match):
 
 **Every covered market now carries an office / industrial / multifamily read.**
 Each metro brief on /market has a "By asset type" panel: vacancy, asking
@@ -51,10 +51,28 @@ verdict flips to Go — all from the sample fixture), the reading-progress
 hairline, and the primary-sources strip derived from the research file's
 actual URL hosts.
 
+**Then the data went everywhere (#137, #138).** A new homepage
+eye-catcher — the **spread board**: "The trackers disagree too. We carry
+the spread," drawing the three widest real divergences as range bars
+(LA office 17.8–25.8% is 8 points of honest daylight). The
+compare-two-markets tool sets office/industrial/multifamily side by
+side for any two metros. Deal pages sort your sector's benchmarks
+first. /demo shows the sample submarket's asset-type line, /why tells
+the story, and the pulse board credits its "68 sourced sector figures"
+— a derived count, not a typed claim. Plus six research gap fills
+(Boston industrial 12.8%, Chicago office rent $43.90, LA industrial
+rent, NYC office rent, Seattle office widened to its honest metro band,
+four multifamily cap fills each with the basis named), one more
+implausible aggregator figure rejected on the record, and the
+Philadelphia cap mystery solved: the templated page's "local" caps are
+CBRE's national averages in disguise.
+
 | Change | Where to look |
 |---|---|
 | "By asset type" sector panel, all 15 markets | /market, any metro (#134, #136) |
-| Sector figures in deal benchmarks + labels | any deal's vs-market panel |
+| Spread board — the trackers disagree | homepage (#137) |
+| Compare: sectors side by side | /market, compare card (#138) |
+| Sector figures in deal benchmarks, your sector first | any deal's vs-market panel |
 | Pulse board · IRR gauge · verdict stamp | homepage (#132) |
 | Retrade replay · scroll hairline · sources strip | homepage (#133) |
 

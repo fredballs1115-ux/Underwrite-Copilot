@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-25",
+      "title": "Cap rates land on the metro briefs — with the basis always named",
+      "blurb": "Seven multifamily cap reads filled tonight: Philadelphia 5.0–5.7% (Northmarq core-vs-suburban split — the metro whose templated-page conflation started the whole cap discipline finally gets its named-house number), Seattle 5.7% and LA 5.8% (Kidder transaction averages), DFW 5.8% (Matthews, ~$183K/unit), Boston 4.5–4.75% core, Miami 4.75–5.0% Class A core (vintage declared), and Chicago 8.3% — explicitly labeled as the Class B/C small-building stock that drives that market's volume. Each figure says what kind of number it is. NYC's stays null for a reason worth reading: the free-market-vs-rent-stabilized cap spread runs a structural 100–300bps, so screen the regulation status before the cap.",
+      "href": "/market?metro=chicago"
+    },
+    {
+      "date": "2026-08-25",
       "title": "The trackers disagree — now the site shows you where",
       "blurb": "A new homepage board draws the research file's three widest tracker divergences as range bars (LA office runs 17.8–25.8% depending on who's counting and how) — the spread carried, never averaged, each card opening its metro brief. And the compare-two-markets tool now sets office, industrial, and multifamily reads side by side for any two covered metros: vacancy spreads, asking rents, and cap bands where sourced, an em dash where the research honestly has a gap.",
       "href": "/market"
@@ -65,12 +71,6 @@
       "date": "2026-08-24",
       "title": "The sample artifacts are one click from the homepage",
       "blurb": "The full multi-page report joined the memo and the Excel model as a public demo download, and the homepage now hands you all three — under the hero card and on the memo tile — so the artifact buttons in the miniature summary bar have the real files behind them.",
-      "href": "/demo"
-    },
-    {
-      "date": "2026-08-24",
-      "title": "The full report now matches the memo's design language",
-      "blurb": "Every page of the multi-page report picked up the redesigned memo's system: brand-ticked titles with live count pills (figures pulled, comps rated, checks aggressive), zebra-striped tables, ratings as tinted chips, and summary cards with the brand bar. The sample's extracted terms now carry their in-place / pro-forma basis, and a second CI smoke test renders the whole report to PDF bytes.",
       "href": "/demo"
     }
   ]
