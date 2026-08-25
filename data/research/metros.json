@@ -535,6 +535,18 @@
             "https://www.matthews.com/insights/top-10-multifamily-markets-in-2026"
           ],
           "note": "M&M 2026 forecast: vacancy 5.6% overall but Class A at 10.7% on new-supply concentration; rents ~$2,253 (+2.0% YoY, decelerating). Jersey City has 4,000+ units slated for 2026 (The Journal towers, 505 Summit) — upward vacancy pressure in the urban core while Union/Essex/Bergen pipelines shrink. Lument: 77.9% lease-renewal rate, best of the top-20 metros (June 2025). Cap filled + vacancy banded Aug 25: Matthews (Top 10 Multifamily Markets 2026) has Northern NJ at a 5.7% cap on $1.1B volume (~$314K/unit) with vacancy driven to 3.0% by 4,329 units of absorption — vs M&M's 5.6% overall; two named houses, different bases and vintages, spread carried. Third sighting of CBRE-national class figures republished as local (Newark/JC loan-store pages) rejected on sight."
+        },
+        "retail": {
+          "vacancy_pct_low": 3.4,
+          "vacancy_pct_high": 3.4,
+          "asking_rent_psf": 17.92,
+          "rent_basis": "avg asking, $/SF/yr",
+          "status": "sourced",
+          "sources": [
+            "https://chainstoreage.com/new-jersey-retail-vacancy-rates-continue-drop",
+            "https://www.roi-nj.com/2024/08/15/real_estate_development/marcus-millichap-report-finds-record-low-vacancy-and-strong-rent-growth-in-north-jersey-retail-market/"
+          ],
+          "note": "Northern NJ retail runs a tight 3.4% — Hudson County at 1.7% is reported as the lowest of any major US submarket. Asking $17.92/SF with a +12.0% YoY growth print carried as reported (an outlier pace; flagged for re-verification next sweep). M&M has called North Jersey retail record-low vacancy with strong rent growth since 2024 — the trend, corroborated."
         }
       }
     },
