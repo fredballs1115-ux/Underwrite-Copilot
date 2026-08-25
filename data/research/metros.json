@@ -311,7 +311,43 @@
         "2-4 unit price series",
         "Richmond city assessor open-data provider"
       ],
-      "region": "Mid-Atlantic"
+      "region": "Mid-Atlantic",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 12.8,
+          "vacancy_pct_high": 12.8,
+          "status": "sourced",
+          "sources": [
+            "https://www.nmrk.com/insights/market-report/richmond-real-estate-market-reports",
+            "https://www.cbre.com/insights/figures/richmond-office-figures-q1-2026"
+          ],
+          "note": "Newmark 1Q26: vacancy 12.8% (+30bps QoQ, -40bps YoY) — one of the healthier office markets covered. CBRE Q1 2026 puts average asking at $21.85/SF (+0.8% YoY). Q2 roundups tick vacancy to ~12.9%."
+        },
+        "industrial": {
+          "vacancy_pct_low": 5.5,
+          "vacancy_pct_high": 5.5,
+          "asking_rent_psf": 8.86,
+          "rent_basis": "avg asking",
+          "status": "sourced",
+          "sources": [
+            "https://www.cbre.com/insights/figures/richmond-industrial-figures-q2-2026"
+          ],
+          "note": "CBRE Q2 2026: vacancy held at 5.5%, asking $8.86/SF (+2.4% QoQ) — post-delivery absorption phase. Aggregator roundups cite mid-4s on other bases; CBRE-tracked inventory carried."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 7.2,
+          "vacancy_pct_high": 7.2,
+          "cap_rate_low_pct": null,
+          "cap_rate_high_pct": null,
+          "status": "sourced",
+          "sources": [
+            "https://www.northmarq.com/insights/insights/vacancy-rises-richmond-new-multifamily-supply-continues-deliver",
+            "https://www.northmarq.com/insights/insights/richmonds-multifamily-vacancy-holds-steady-amid-elevated-supply-q1-2026"
+          ],
+          "note": "Northmarq mid-2026: vacancy 7.2%, forecast ~7.7% by year-end as ~3,300 more units deliver; rents $1,625 (+1.7% YoY). Supply-heavy but demand steady. No house-published cap band cleared the source bar this sweep — null, not guessed."
+        }
+      }
     },
     {
       "id": "norfolk_hampton_roads",
@@ -337,7 +373,42 @@
         "stock counts",
         "city assessor feeds (Norfolk/VB open-data portals exist — unassessed)"
       ],
-      "region": "Mid-Atlantic"
+      "region": "Mid-Atlantic",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 7.1,
+          "vacancy_pct_high": 12.7,
+          "status": "sourced",
+          "sources": [
+            "https://www.nmrk.com/insights/market-report/hampton-roads-real-estate-market-reports",
+            "https://www.odu.edu/article/the-hampton-roads-real-estate-market-review-forecast-celebrates-its-30th-year"
+          ],
+          "note": "Trackers diverge sharply on basis: ODU's local Market Review survey ~7.1% (competitive inventory) vs Newmark 1Q26 at 12.7% — spread carried, never averaged. CoStar reports H1 2026 office leasing the worst in five years."
+        },
+        "industrial": {
+          "vacancy_pct_low": 7.8,
+          "vacancy_pct_high": 7.8,
+          "status": "sourced",
+          "sources": [
+            "https://assets.cushmanwakefield.com/-/media/cw/marketbeat-pdfs/2026/q1/us-reports/industrial/hampton_roads_americas_alliance_marketbeat_industrial_q1_2026.pdf",
+            "https://www.jll.com/en-us/insights/market-dynamics/hampton-roads-industrial"
+          ],
+          "note": "Cushman MarketBeat Q1 2026: vacancy 7.8% as new deliveries outpace absorption; port-anchored demand base (Port of Virginia). Market-wide asking rent not captured this sweep — gap recorded, not estimated."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 5.2,
+          "vacancy_pct_high": 5.2,
+          "cap_rate_low_pct": null,
+          "cap_rate_high_pct": null,
+          "status": "sourced",
+          "sources": [
+            "https://www.northmarq.com/insights/insights/declining-multifamily-vacancy-fuels-continued-rent-growth-hampton-roads",
+            "https://www.virginiamultifamily.com/post/hampton-roads-commercial-real-estate-stability-opportunity-and-a-market-in-transition"
+          ],
+          "note": "Northmarq: vacancy 5.2% (down from 5.6% at Q2 2025), rents ~$1,650 (+3% YoY) — tight new-supply backdrop keeps rent growth above the national pace into 2026. Cap band not published in the pieces reviewed — null."
+        }
+      }
     },
     {
       "id": "philadelphia",
@@ -427,7 +498,42 @@
       "gaps": [
         "per-ordinance screen for other NJ municipalities"
       ],
-      "region": "Mid-Atlantic"
+      "region": "Mid-Atlantic",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 22.0,
+          "vacancy_pct_high": 22.0,
+          "status": "sourced",
+          "sources": [
+            "https://www.roi-nj.com/2026/07/02/real_estate_development/northern-and-central-n-j-office-market-pauses-after-recovery-industrial-leasing-strong-in-q2-cushman-wakefield-report/",
+            "https://www.nmrk.com/insights/market-report/northern-new-jersey-market-reports"
+          ],
+          "note": "Cushman & Wakefield Q2 2026 (via ROI-NJ): vacancy 22.0% (+60bps QoQ), average asking $32.29/SF; leasing 1.6M SF (+33% QoQ) with Class A over half of volume at $35.29/SF (Q1) — a 9.3% premium to market."
+        },
+        "industrial": {
+          "vacancy_pct_low": 9.3,
+          "vacancy_pct_high": 9.3,
+          "status": "sourced",
+          "sources": [
+            "https://njbmagazine.com/njb-news-now/strong-industrial-demand-and-resilient-office-market-for-q1/",
+            "https://www.savills.us/research_articles/256536/389555-0/northern-new-jersey-q1-2026-industrial-market-report"
+          ],
+          "note": "Q1 2026 level 9.3% via NJ Business Magazine's report on the quarter's house data; Savills Q1 confirms climbing vacancy with port-centric submarkets (Linden/Elizabeth, Hudson Waterfront) off ≥16% from peak rents. Colliers Q2 shows leasing rebounding to 9.8M SF. Market-wide asking rent not pinned — gap recorded."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 5.6,
+          "vacancy_pct_high": 5.6,
+          "cap_rate_low_pct": null,
+          "cap_rate_high_pct": null,
+          "status": "sourced",
+          "sources": [
+            "https://www.marcusmillichap.com/research/market-report/northern-new-jersey/northern-new-jersey-2026-investment-forecast-multifamily-market-report",
+            "https://www.lument.com/momentum-building-in-northern-new-jersey-multifamily-market/"
+          ],
+          "note": "M&M 2026 forecast: vacancy 5.6% overall but Class A at 10.7% on new-supply concentration; rents ~$2,253 (+2.0% YoY, decelerating). Jersey City has 4,000+ units slated for 2026 (The Journal towers, 505 Summit) — upward vacancy pressure in the urban core while Union/Essex/Bergen pipelines shrink. Lument: 77.9% lease-renewal rate, best of the top-20 metros (June 2025)."
+        }
+      }
     },
     {
       "id": "nyc",
