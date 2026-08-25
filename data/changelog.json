@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-25",
+      "title": "Every covered market now has the asset-type read",
+      "blurb": "The 'By asset type' panel is complete: all 15 covered markets carry sourced office, industrial, and multifamily fundamentals — vacancy, asking rents, and cap bands where they cleared the source bar — from Baltimore and Richmond through NYC, Boston, Chicago, LA, SF, Seattle, Miami, Atlanta, and Dallas. Where trackers diverge the spread is shown with the basis named (LA office runs 17.8–25.8% depending on who's counting), where nothing cleared the bar the gap is recorded (Boston industrial), and two templated aggregator figures were caught and rejected in-note. Every figure links its source and flows into deal-page benchmarks.",
+      "href": "/market?metro=dallas"
+    },
+    {
+      "date": "2026-08-25",
       "title": "Metro briefs now cover the asset types that matter",
       "blurb": "A new 'By asset type' panel carries sourced sector fundamentals per metro — office vacancy, industrial vacancy and asking rent, multifamily vacancy and cap-rate bands — starting with Philadelphia and the DMV (DC, NoVA, PG County): NoVA small-bay industrial at ~4-5% vacancy and $17.44 NNN, DC office at 21-22%, the DMV multifamily luxury-vs-B/C vacancy split. Where trackers diverge the spread is shown, never averaged; where a figure failed the source bar it stays an honest null. Every row flows into deal-page benchmarks automatically.",
       "href": "/market?metro=philadelphia"
@@ -66,12 +72,6 @@
       "title": "The IC memo and the Excel model got a design overhaul",
       "blurb": "The one-page memo now leads with a color-coded verdict banner, chip-style buy box, zebra ranges with a highlighted base case, deal-killer cards, and a scenario trio — and a new CI test renders it to real PDF bytes on every change. The workbook's KPI tiles are outlined and its cash-flow ladder zebra-striped, with every layout-anchored test intact.",
       "href": "/api/demo/memo"
-    },
-    {
-      "date": "2026-08-24",
-      "title": "The homepage sample screen now mirrors the real deal page",
-      "blurb": "The walkthrough widget uses the deal page's own five sections — Overview, Financials, Buy box, Analyses, Documents — with the real analysis names, verdict and mandate chips, and figures computed from the sample deal through the live engine. The hero card is a faithful miniature of the real summary bar, artifact buttons and all.",
-      "href": "/demo"
     }
   ]
 }
