@@ -649,14 +649,16 @@
         "multifamily": {
           "vacancy_pct_low": 4.9,
           "vacancy_pct_high": 6.1,
-          "cap_rate_low_pct": null,
-          "cap_rate_high_pct": null,
+          "cap_rate_low_pct": 4.5,
+          "cap_rate_high_pct": 4.75,
           "status": "sourced",
           "sources": [
             "https://bostonrealestatetimes.com/boston-multifamily-market-strengthens-in-q2-as-vacancy-falls-and-rents-rise/",
-            "https://www.matthews.com/insights/boston-ma-multifamily-market-report-june-2026"
+            "https://www.matthews.com/insights/boston-ma-multifamily-market-report-june-2026",
+            "https://realcostiq.com/cap-rate/boston/",
+            "https://www.northmarq.com/insights/insights/boston-multifamily-transaction-activity-accelerates-q1-2026"
           ],
-          "note": "Q2 2026 divergent trackers: 4.9% (-20bps QoQ, asking $3,108/mo) vs 6.1% ($2,999/unit, +1.1% YoY; ~220bps below the 8.3% national) — band is the tracker spread. Either reading is tight vs national. Cap rate: no two-source band captured; null."
+          "note": "Q2 2026 divergent trackers: 4.9% (-20bps QoQ, asking $3,108/mo) vs 6.1% ($2,999/unit, +1.1% YoY; ~220bps below the 8.3% national) — band is the tracker spread. Either reading is tight vs national. Cap rate: no two-source band captured; null. Cap filled Aug 25: core stabilized ~4.5-4.75% per two independent aggregator surveys agreeing (Class A 4-4.75, B value-add 4.75-5.75) — consistent with CBRE's gateway-core 4-5% national read; among the tightest ranges of any US metro. Northmarq: Q1 2026 transaction totals ran 50%+ ahead of last year."
         }
       }
     },
@@ -715,14 +717,15 @@
         "multifamily": {
           "vacancy_pct_low": 3.7,
           "vacancy_pct_high": 4.6,
-          "cap_rate_low_pct": null,
-          "cap_rate_high_pct": null,
+          "cap_rate_low_pct": 8.3,
+          "cap_rate_high_pct": 8.3,
           "status": "sourced",
           "sources": [
             "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/chicago-multifamily-market-outlook",
-            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats"
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats",
+            "https://essexrealtygroup.com/chicago-multifamily-report-april-2026/"
           ],
-          "note": "Band spans stabilized-asset occupancy 96.3% (=3.7% vacancy, JPMorgan) to 4.6% market vacancy (projected 5.1% by Q3 2026); rent growth ~3.8% YoY — supply discipline doing the work. Cap rate: no two-source band captured; null. Cook County landlord rules already on file for this metro."
+          "note": "Band spans stabilized-asset occupancy 96.3% (=3.7% vacancy, JPMorgan) to 4.6% market vacancy (projected 5.1% by Q3 2026); rent growth ~3.8% YoY — supply discipline doing the work. Cap rate: no two-source band captured; null. Cook County landlord rules already on file for this metro. Cap filled Aug 25 with the basis named: Essex Realty (local multifamily brokerage) April 2026 rolling data — 175 transactions, $587.8M, average cap 8.3%. That average is dominated by the Class B/C neighborhood buildings that drive Chicago volume (Northmarq: B/C sales fuel the market); institutional Class A trades price far tighter (gateway core ~4-5% nationally). A transaction average for the small-building stock, not a metro-wide quoted band."
         }
       }
     },
