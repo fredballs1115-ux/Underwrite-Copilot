@@ -51,10 +51,12 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
 /** Friendly names for benchmark metrics — raw keys like "hud_fmr_fy2026_0br"
  *  read like plumbing. Unknown metrics fall back to de-underscored text. */
 function metricLabel(metric: string): string {
-  const fmr = metric.match(/^hud_fmr_fy2026_(\w+)$/);
+  // Any fiscal year — the FMR cron (scripts/fetch-fmr.mjs) writes fy2027+
+  // rows when HUD rolls forward; those must not fall to the raw-key fallback.
+  const fmr = metric.match(/^hud_fmr_fy(\d{4})_(\w+)$/);
   if (fmr) {
-    const br = fmr[1] === "0br" ? "studio" : fmr[1].toUpperCase();
-    return `FY2026 fair market rent · ${br}`;
+    const br = fmr[2] === "0br" ? "studio" : fmr[2].toUpperCase();
+    return `FY${fmr[1]} fair market rent · ${br}`;
   }
   if (metric === "median_sale_price_2_4_unit") return "2–4 unit median sale";
   if (metric === "monthly_sales_2_4_unit") return "2–4 unit sales / month";

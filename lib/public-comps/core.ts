@@ -434,6 +434,25 @@ const newCastle = discovery(
   (a) => a.state.toUpperCase() === "DE" && /new castle|wilmington|newark/i.test(a.county || a.city),
   "https://gis.nccde.org/agsserver/rest/services?f=json"
 );
+// Registry round (docs/data-sources, 2026-08-25): both portals search-
+// confirmed; the exact sales layer resolves via the hub/catalog probe in
+// production, same protocol as the entries above.
+const miamiDade = discovery(
+  "fl_miami_dade",
+  "Miami-Dade County FL — open-data parcels/sales (discovery)",
+  "Miami-Dade County FL",
+  "https://gis-mdc.opendata.arcgis.com/",
+  (a) => a.state.toUpperCase() === "FL" && /miami|dade/i.test(a.county || a.city),
+  "https://gis-mdc.opendata.arcgis.com/api/search/definition/?f=json"
+);
+const richmondVa = discovery(
+  "va_richmond",
+  "Richmond VA — city assessor open data (discovery)",
+  "Richmond VA (city)",
+  "https://richmond-geo-hub-cor.hub.arcgis.com/",
+  (a) => a.state.toUpperCase() === "VA" && /richmond/i.test(a.city || a.county),
+  "https://data.richmondgov.com/api/catalog/v1?limit=1"
+);
 
 export const PROVIDERS: ProviderConfig[] = [
   philadelphia,
@@ -444,6 +463,8 @@ export const PROVIDERS: ProviderConfig[] = [
   arlington,
   allegheny,
   newCastle,
+  miamiDade,
+  richmondVa,
 ];
 
 /** Human-readable coverage, derived from the configs so copy can't drift. */

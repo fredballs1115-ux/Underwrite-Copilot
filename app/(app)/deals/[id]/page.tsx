@@ -7,6 +7,10 @@ import { PublicCompsPanel } from "./public-comps-panel";
 import { BuildingPhoto } from "./building-photo";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
+import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
+import type { SiteFlagsResult } from "@/lib/site-flags/core";
+import { SiteFlagsCard } from "./site-flags-card";
+import { PublicRecordCard } from "./public-record-card";
 import { parseMoney } from "@/lib/criteria";
 import { after } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
@@ -464,6 +468,23 @@ export default async function DealPage({
     });
   }
 
+  // Site flags (flood zone / Opportunity Zone / census tract): same stored-
+  // result + backfill-on-render protocol as public comps above. The column
+  // may predate migration 0030 on a live DB — a missing column simply reads
+  // as null here and the claim's update no-ops server-side, so the card
+  // shows "checking…" instead of erroring.
+  const siteFlags =
+    ((deal as { site_flags?: SiteFlagsResult | null }).site_flags) ?? null;
+  if (dealAddress?.label && (!siteFlags || siteFlags.status === "pending")) {
+    after(async () => {
+      try {
+        if (await claimSiteFlags(id)) await runSiteFlags(id);
+      } catch {
+        // pre-0030 DB — nothing to store onto yet
+      }
+    });
+  }
+
   // The buy-box call as one chip. When there's a numeric mandate-fit score,
   // it leads — "Buy box 82 · Pursue", coloured by the PURSUE/WATCH/PASS call.
   // Otherwise the older fold (Outside / Near / Fits) stands in.
@@ -746,6 +767,11 @@ export default async function DealPage({
           result={publicComps}
           hasAddress={!!dealAddress?.label}
           subjectPrice={subjectPriceNumber}
+        />
+        <SiteFlagsCard result={siteFlags} hasAddress={!!dealAddress?.label} />
+        <PublicRecordCard
+          address={dealAddress}
+          subject={publicComps?.subject ?? siteFlags?.subject ?? null}
         />
         {/* Anchor target for the Regulation panel's "answer in Deal facts"
             links; scroll-mt keeps the jump clear of the sticky header. */}
