@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
+import { MarketsMarquee } from "@/app/markets-marquee";
 import { changelogEntries } from "@/lib/changelog";
 
 // ISR, five-minute window — same freshness cap as the homepage, so a new
@@ -16,9 +17,10 @@ export const metadata: Metadata = {
 
 /** PUBLIC changelog — no login needed. The homepage's shipped block and the
  *  pipeline's What's-new card both link here; one checked-in source feeds
- *  all three, so no surface can outrun another. */
+ *  all three, so no surface can outrun another. Every entry names where in
+ *  the app to see it, so the log doubles as a tour. */
 export default function WhatsNewPage() {
-  const entries = changelogEntries(12);
+  const entries = changelogEntries(100);
   const fmt = (iso: string) =>
     new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", {
       weekday: "short",
@@ -26,6 +28,15 @@ export default function WhatsNewPage() {
       day: "numeric",
       timeZone: "UTC",
     });
+  // Group by ship date, newest day first — the source is already newest-first,
+  // so insertion order into the map is the display order.
+  const byDay = new Map<string, typeof entries>();
+  for (const e of entries) {
+    const list = byDay.get(e.date);
+    if (list) list.push(e);
+    else byDay.set(e.date, [e]);
+  }
+  const oldest = entries[entries.length - 1];
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -55,27 +66,57 @@ export default function WhatsNewPage() {
           daily. The homepage and the app draw from this same list, and the
           site&apos;s footer names the exact build it&apos;s running.
         </p>
+        {entries.length > 0 && oldest && (
+          <p className="mt-2 text-xs font-medium text-brand">
+            {entries.length} improvements logged since {fmt(oldest.date)} —
+            every one live on this build, every one linking to where it landed.
+          </p>
+        )}
         {entries.length === 0 ? (
           <p className="mt-8 rounded-xl border border-dashed border-line p-5 text-sm text-muted">
             Nothing logged yet.
           </p>
         ) : (
-          <ul className="mt-8 space-y-3">
-            {entries.map((e) => (
-              <li
-                key={`${e.date}|${e.title}`}
-                className="rounded-xl border border-line bg-surface p-4"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <p className="text-sm font-semibold">{e.title}</p>
-                  <span className="text-[11px] text-muted">{fmt(e.date)}</span>
+          <div className="mt-8 space-y-8">
+            {[...byDay.entries()].map(([date, dayEntries]) => (
+              <section key={date}>
+                <div className="flex items-baseline gap-2.5">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">
+                    {fmt(date)}
+                  </h2>
+                  <span className="text-[11px] text-muted/70">
+                    {dayEntries.length} improvement
+                    {dayEntries.length === 1 ? "" : "s"}
+                  </span>
+                  <span
+                    aria-hidden
+                    className="h-px flex-1 translate-y-[-3px] bg-line/70"
+                  />
                 </div>
-                <p className="mt-1 text-sm leading-relaxed text-muted">
-                  {e.blurb}
-                </p>
-              </li>
+                <ul className="mt-3 space-y-3">
+                  {dayEntries.map((e) => (
+                    <li
+                      key={`${e.date}|${e.title}`}
+                      className="rounded-xl border border-line bg-surface p-4 transition-colors hover:border-brand/40"
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <p className="text-sm font-semibold">{e.title}</p>
+                        <Link
+                          href={e.href}
+                          className="shrink-0 text-[11px] font-medium text-brand underline-offset-2 hover:underline"
+                        >
+                          See it live →
+                        </Link>
+                      </div>
+                      <p className="mt-1 text-sm leading-relaxed text-muted">
+                        {e.blurb}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             ))}
-          </ul>
+          </div>
         )}
         <p className="mt-10 text-sm text-muted">
           Want these features on your own deals?{" "}
@@ -88,6 +129,8 @@ export default function WhatsNewPage() {
           .
         </p>
       </main>
+
+      <MarketsMarquee />
 
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-6 py-6 text-xs text-muted">

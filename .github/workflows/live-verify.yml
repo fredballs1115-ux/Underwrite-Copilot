@@ -106,6 +106,10 @@ jobs:
           grep -q "screenrun-line" p_why.html && echo "/why: screen-run trace present" || echo "/why: screen-run trace not yet deployed"
           grep -q "multifamily, and retail vacancy" p_why.html && echo "/why: asset-type copy includes retail (Aug 25)" || echo "/why: asset-type copy still pre-retail"
           grep -q "improvement" p_whats-new.html && echo "/whats-new: public changelog serves" || echo "/whats-new: not serving (pre-#98 build or auth-walled)"
+          # The changelog-as-tour rebuild: day groups, momentum line, and
+          # every entry linking to where it landed.
+          grep -q "improvements logged since" p_whats-new.html && echo "WHATS-NEW TOUR (Aug 25): present" || echo "WHATS-NEW TOUR (Aug 25): not yet deployed"
+          grep -q "See it live" p_whats-new.html && echo "WHATS-NEW entry links (Aug 25): present" || echo "WHATS-NEW entry links (Aug 25): not yet deployed"
           # /market must open for ANONYMOUS visitors (no cookies here): the
           # signed-out chrome says "Get started"; a login redirect would 200
           # on /login and fail the covered-market grep instead.
