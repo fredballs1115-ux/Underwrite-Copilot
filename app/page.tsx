@@ -704,7 +704,11 @@ export default function Home() {
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
               A first read — headline numbers and buy-box fit — lands in about
-              {FIRST_READ_CLAIM}, while the six deeper stages keep working.
+              {FIRST_READ_CLAIM}, while the six deeper stages keep working. And
+              the grilling speaks each asset type&apos;s language: office deals
+              get pressed on lease rollover and today&apos;s TI packages,
+              industrial on clear height and mark-to-market claims, retail on
+              co-tenancy — multifamily&apos;s playbook was the foundation.
             </p>
             <Reveal delay={60}>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
