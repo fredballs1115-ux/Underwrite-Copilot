@@ -103,6 +103,9 @@ written down, not papered over.
 | DMV office fills — NoVA spread, Suburban MD base | /market?metro=nova (#145) |
 | PG industrial banded 6.0–10.1 · NNJ retail vintage declared | /market briefs (#146) |
 | Richmond retail — 12th retail market · Atlanta cap texture | /market?metro=richmond (#147) |
+| Hero rotator + markets band lead with sector reads | homepage · /why · /demo (#150) |
+| /why claims all four asset types · /demo retail-ready | /why (#151) |
+| Mobile fix — hero no longer clips, walkthrough tabs swipe | homepage on a phone (#152) |
 | Sector-aware challenger + market check | upload any office/industrial/retail OM (#141) |
 | Retail — the fourth asset type, 10 of 15 markets | /market briefs (#141, #142) |
 | Baltimore's 10.0-vs-20.9 denominator lesson | /market?metro=baltimore + spread board (#142) |
