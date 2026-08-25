@@ -72,6 +72,11 @@ jobs:
           grep -q "Eviction Diversion Program" p_demo.html && echo "/demo: legal panel present (real rule text serves)" || echo "/demo: legal panel not yet deployed"
           grep -q "would you ask the broker" p_demo.html && echo "/demo: broker-question cards present" || echo "/demo: broker-question cards not yet deployed"
           grep -q "copy citation" p_market.html && echo "/market: copy-citation + FMR ladder present" || echo "/market: citation tools not yet deployed"
+          grep -q "By asset type" p_market.html && echo "/market: sector snapshot panel present (Aug 25)" || echo "/market: sector panel not yet deployed"
+          # Full-coverage spot check: Dallas's brief must carry its encoded
+          # industrial note — proves the batch-2-5 metros serve, not just batch 1.
+          curl -sS -o p_market_dfw.html --max-time 60 "https://underwrite-copilot.onrender.com/market?metro=dallas" || true
+          grep -q "biggest industrial build" p_market_dfw.html && echo "/market?metro=dallas: full-coverage sector data serves (Aug 25)" || echo "/market?metro=dallas: batch 2-5 sector data not yet deployed"
           grep -q "It knows the ground" p_why.html && echo "/why: current copy present" || echo "/why: OLD copy"
           grep -q "takes your answer right on the deal" p_why.html && echo "/why: overnight copy present" || echo "/why: overnight copy MISSING"
           grep -q "ticker-track-reverse" p_why.html && echo "/why: markets band present" || echo "/why: markets band not yet deployed"
