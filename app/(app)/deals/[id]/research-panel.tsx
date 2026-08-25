@@ -152,6 +152,7 @@ export async function ResearchPanel({
   capText,
   yearBuilt,
   sectorFields,
+  assetClass,
 }: {
   address: StructuredAddress | null;
   sizeText?: string | null;
@@ -161,6 +162,8 @@ export async function ResearchPanel({
   /** parsed from the deal's extraction metrics (manual entry or OM) */
   yearBuilt?: number | null;
   sectorFields?: Record<string, string | number | boolean> | null;
+  /** the deal's asset class — same-sector benchmark rows sort first */
+  assetClass?: string | null;
 }) {
   // DB first, seeds as fallback — a missing table (migration not yet run)
   // must degrade silently to the checked-in research layer.
@@ -190,8 +193,31 @@ export async function ResearchPanel({
   const metro = address ? metroForAddress(address) : null;
 
   // vs-market: covered-market name first (a Brooklyn deal must find the
-  // "New York City" FMR row), raw city as the fallback.
-  const metroBench = benchmarksForDeal(benchmarks, address?.city, metro?.name);
+  // "New York City" FMR row), raw city as the fallback. Same-sector rows
+  // (office_vacancy_pct on an office deal) sort ahead of the cross-sector
+  // context — stable, so within each group the research order holds.
+  const dealSector = (() => {
+    const cls = (assetClass ?? "").toLowerCase();
+    if (cls === "office" || cls === "industrial") return cls;
+    if (cls === "multifamily" || cls === "sfr_btr" || cls === "student_housing")
+      return "multifamily";
+    return null;
+  })();
+  const metroBench = benchmarksForDeal(
+    benchmarks,
+    address?.city,
+    metro?.name,
+  ).sort((a, b) => {
+    if (!dealSector) return 0;
+    // FMR and 2-4-unit rows are residential — own-sector for multifamily deals.
+    const own = (m: string) =>
+      m.startsWith(`${dealSector}_`) ||
+      (dealSector === "multifamily" &&
+        (m.startsWith("hud_fmr_") || m.includes("2_4_unit")))
+        ? 0
+        : 1;
+    return own(a.metric) - own(b.metric);
+  });
   const ppu = pricePerUnit(priceText, sizeText);
 
   // Leverage check (deterministic code, not a model call): the going-in cap

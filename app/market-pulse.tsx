@@ -63,6 +63,14 @@ const FOUND_PRIMARY: string[] = (() => {
   }
   return Object.keys(PRIMARY_HOSTS).filter((k) => found.has(k));
 })();
+// Sourced sector figures (office/industrial/multifamily vacancy, rents,
+// caps) flowing out of the metros' snapshot blocks — counted, not typed.
+const SECTOR_FIGURES = seedBenchmarks().filter((b) =>
+  /^(office|industrial|multifamily)_(vacancy_pct|asking_rent_psf|cap_rate_pct)$/.test(
+    b.metric,
+  ),
+).length;
+
 const HAS_FRED = seedBenchmarks().some((b) =>
   (b.source ?? "").toLowerCase().includes("fred"),
 );
@@ -81,8 +89,10 @@ export function MarketPulseBoard() {
             layer
           </h2>
           <p className="text-xs text-white/45">
-            {priced} priced with FY2026 HUD rents · dots mark verified /
-            sourced / open gap · every tile opens its brief
+            {priced} priced with FY2026 HUD rents ·{" "}
+            <span className="text-white/60">{SECTOR_FIGURES}</span> sourced
+            office / industrial / multifamily figures behind the tiles · every
+            tile opens its brief
           </p>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
