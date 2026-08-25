@@ -2150,6 +2150,49 @@ function ResearchTicker() {
       ] as readonly [string, string, string];
     })
     .filter((x): x is readonly [string, string, string] => x !== null);
+  // A handful of sector reads ride the ticker too — the pick list is fixed,
+  // but every figure derives from the snapshot blocks: if a number changes
+  // the ticker follows, and a metro gone null simply drops its item.
+  const sectorItems = (
+    [
+      ["san_francisco", "office", "SF office vacancy"],
+      ["dallas", "office", "DFW office vacancy"],
+      ["chicago", "industrial", "Chicago industrial"],
+      ["miami", "industrial", "Miami industrial"],
+      ["los_angeles", "multifamily", "LA multifamily vacancy"],
+    ] as const
+  )
+    .map(([id, sector, label]) => {
+      const m = (metrosSeed.metros ?? []).find((x) => x.id === id);
+      const blk = (
+        m as {
+          sector_snapshot?: Record<
+            string,
+            {
+              vacancy_pct?: number | null;
+              vacancy_pct_low?: number | null;
+              vacancy_pct_high?: number | null;
+              asking_rent_psf?: number | null;
+            }
+          > | null;
+        }
+      )?.sector_snapshot?.[sector];
+      if (!blk) return null;
+      const lo = blk.vacancy_pct ?? blk.vacancy_pct_low;
+      const hi = blk.vacancy_pct ?? blk.vacancy_pct_high ?? lo;
+      const bits: string[] = [];
+      if (typeof lo === "number")
+        bits.push(lo === hi ? `${lo}%` : `${lo}–${hi}%`);
+      if (typeof blk.asking_rent_psf === "number")
+        bits.push(`$${blk.asking_rent_psf.toFixed(2)}/SF`);
+      if (bits.length === 0) return null;
+      return [label, bits.join(" · "), `/market?metro=${id}`] as readonly [
+        string,
+        string,
+        string,
+      ];
+    })
+    .filter((x): x is readonly [string, string, string] => x !== null);
   const phillyMed = money(pick("Philadelphia, PA", "median_sale_price_2_4_unit"));
   // YoY comes from the SAME seed row as the median — never typed beside it.
   const phillyYoY = bench
@@ -2168,6 +2211,7 @@ function ResearchTicker() {
         "/market?metro=philadelphia",
       ],
       ...fmrItems,
+      ...sectorItems,
       ["MoCo rent cap", "CPI+3% · max 6%", "/market?metro=montgomery_county"],
       ["Chicago owner-occupied ≤6 units", "RLTO exempt", "/market?metro=chicago"],
       ["NY Good Cause", "≤10-unit landlords exempt", "/market?metro=nyc"],
