@@ -56,6 +56,17 @@ function metricLabel(metric: string): string {
     const br = fmr[1] === "0br" ? "studio" : fmr[1].toUpperCase();
     return `FY2026 fair market rent · ${br}`;
   }
+  const snap = metric.match(/^(\w+?)_(vacancy_pct|asking_rent_psf|cap_rate_pct)$/);
+  if (snap) {
+    const sector = snap[1].replace(/_/g, " ");
+    const what =
+      snap[2] === "vacancy_pct"
+        ? "vacancy"
+        : snap[2] === "asking_rent_psf"
+          ? "asking rent $/SF"
+          : "cap rate";
+    return `${sector} ${what}`;
+  }
   if (metric === "median_sale_price_2_4_unit") return "2–4 unit median sale";
   if (metric === "monthly_sales_2_4_unit") return "2–4 unit sales / month";
   if (metric === "active_listings_2_4_unit") return "2–4 unit active listings";

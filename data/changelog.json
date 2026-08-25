@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-25",
+      "title": "Metro briefs now cover the asset types that matter",
+      "blurb": "A new 'By asset type' panel carries sourced sector fundamentals per metro — office vacancy, industrial vacancy and asking rent, multifamily vacancy and cap-rate bands — starting with Philadelphia and the DMV (DC, NoVA, PG County): NoVA small-bay industrial at ~4-5% vacancy and $17.44 NNN, DC office at 21-22%, the DMV multifamily luxury-vs-B/C vacancy split. Where trackers diverge the spread is shown, never averaged; where a figure failed the source bar it stays an honest null. Every row flows into deal-page benchmarks automatically.",
+      "href": "/market?metro=philadelphia"
+    },
+    {
+      "date": "2026-08-25",
       "title": "The pulse board names its primary documents",
       "blurb": "A credibility strip under the market board lists the primary-document hosts actually present in the research file's source URLs — HUD, the Federal Register, the DC and SF housing authorities, NJ Treasury, and FRED for rates. Derived, not typed: if a primary source leaves the data, its chip leaves the strip.",
       "href": "/"
@@ -66,12 +72,6 @@
       "title": "The homepage sample screen now mirrors the real deal page",
       "blurb": "The walkthrough widget uses the deal page's own five sections — Overview, Financials, Buy box, Analyses, Documents — with the real analysis names, verdict and mandate chips, and figures computed from the sample deal through the live engine. The hero card is a faithful miniature of the real summary bar, artifact buttons and all.",
       "href": "/demo"
-    },
-    {
-      "date": "2026-08-24",
-      "title": "Market briefs show full bedroom rents and their provenance",
-      "blurb": "Where the research carries a full FY2026 row — LA's Federal-Register revision, San Francisco's housing-authority sheet, Newark's state-treasury table — the brief now lists 0BR through 3BR with a verified/sourced chip, and prints the provenance note under the figure: where the number came from, and what was rejected on the way.",
-      "href": "/market"
     }
   ]
 }

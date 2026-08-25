@@ -33,7 +33,43 @@
         "Class 1 tax-rate row not yet a benchmark",
         "ACS 2-4 unit stock count (API blocked)"
       ],
-      "region": "DMV core"
+      "region": "DMV core",
+      "sector_snapshot": {
+        "office": {
+          "vacancy_pct_low": 21.3,
+          "vacancy_pct_high": 22.2,
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/washington-dc/washington-dc-office-market-report-2026-q2",
+            "https://www.cbre.com/insights/figures/washington-dc-office-figures-q2-2026"
+          ],
+          "note": "Q2 2026 District office vacancy: Colliers 21.3%, CBRE 22.2% (first quarterly occupancy gain in several periods; office-to-residential conversions steadily removing obsolete stock)."
+        },
+        "industrial": {
+          "vacancy_pct_low": 7.4,
+          "vacancy_pct_high": 7.4,
+          "asking_rent_psf": null,
+          "rent_basis": null,
+          "status": "sourced",
+          "sources": [
+            "https://nmrk.imgix.net/uploads/fields/pdf-market-reports/1Q26-Washington-Metro-Industrial-Market-Report.pdf",
+            "https://www.marcusmillichap.com/research/market-report/washington-dc/washington-dc-2q26-industrial-market-report"
+          ],
+          "note": "Metro-wide industrial vacancy 7.4% (Q1 2026, Newmark). Only coastal metro with no YoY asking-rent decline since 2021. Submarket detail carried on the NoVA and PG County entries."
+        },
+        "multifamily": {
+          "vacancy_pct": 5.2,
+          "cap_rate_low_pct": 4.75,
+          "cap_rate_high_pct": 5.5,
+          "status": "sourced",
+          "sources": [
+            "https://www.northmarq.com/insights/insights/easing-construction-rebalances-regional-outlook-washington-dc-multifamily-market",
+            "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/washington-dc-multifamily-market-outlook"
+          ],
+          "note": "Regional vacancy 5.2% at YE2025 (+50bps YoY); Q1 2026 by class: luxury 11.9%, B/C 7.9% — the spread IS the decision datum. Cap band 4.75-5.5% vs CBRE's 4.73% US core going-in average; deal mix leaning Class B / value-add. 2026 deliveries projected under 10k units (decade low). Federal-employment uncertainty is the named headwind."
+        },
+        "as_of": "2026-08-25"
+      }
     },
     {
       "id": "pg_county",
@@ -60,7 +96,33 @@
         "FY2026 SAFMRs by PG ZIP",
         "county tax-rate + municipal add-on benchmark rows"
       ],
-      "region": "DMV core"
+      "region": "DMV core",
+      "sector_snapshot": {
+        "industrial": {
+          "vacancy_pct_low": 6.0,
+          "vacancy_pct_high": 6.0,
+          "asking_rent_psf": 12.5,
+          "rent_basis": "NNN midpoint of $10-15 band",
+          "status": "sourced",
+          "sources": [
+            "https://warespace.com/resources/market-reports/washington-dc",
+            "https://nmrk.imgix.net/uploads/fields/pdf-market-reports/1Q26-Washington-Metro-Industrial-Market-Report.pdf"
+          ],
+          "note": "Central PG County ~6.0% vacancy, asking ~$10-15/SF NNN — a 30-40% discount to close-in NoVA. The encoded $12.50 is the stated band's midpoint, labeled as such."
+        },
+        "multifamily": {
+          "vacancy_pct": 5.2,
+          "cap_rate_low_pct": 4.75,
+          "cap_rate_high_pct": 5.5,
+          "status": "sourced",
+          "sources": [
+            "https://www.northmarq.com/insights/insights/easing-construction-rebalances-regional-outlook-washington-dc-multifamily-market",
+            "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/washington-dc-multifamily-market-outlook"
+          ],
+          "note": "Regional vacancy 5.2% at YE2025 (+50bps YoY); Q1 2026 by class: luxury 11.9%, B/C 7.9% — the spread IS the decision datum. Cap band 4.75-5.5% vs CBRE's 4.73% US core going-in average; deal mix leaning Class B / value-add. 2026 deliveries projected under 10k units (decade low). Federal-employment uncertainty is the named headwind."
+        },
+        "as_of": "2026-08-25"
+      }
     },
     {
       "id": "montgomery_county",
@@ -87,7 +149,21 @@
         "MoCo exemption list verbatim",
         "Takoma Park vacancy-control confirmation"
       ],
-      "region": "DMV core"
+      "region": "DMV core",
+      "sector_snapshot": {
+        "multifamily": {
+          "vacancy_pct": 5.2,
+          "cap_rate_low_pct": 4.75,
+          "cap_rate_high_pct": 5.5,
+          "status": "sourced",
+          "sources": [
+            "https://www.northmarq.com/insights/insights/easing-construction-rebalances-regional-outlook-washington-dc-multifamily-market",
+            "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/washington-dc-multifamily-market-outlook"
+          ],
+          "note": "Regional vacancy 5.2% at YE2025 (+50bps YoY); Q1 2026 by class: luxury 11.9%, B/C 7.9% — the spread IS the decision datum. Cap band 4.75-5.5% vs CBRE's 4.73% US core going-in average; deal mix leaning Class B / value-add. 2026 deliveries projected under 10k units (decade low). Federal-employment uncertainty is the named headwind."
+        },
+        "as_of": "2026-08-25"
+      }
     },
     {
       "id": "nova",
@@ -113,7 +189,33 @@
         "Fairfax/Arlington provider wiring (needs /api/comps/health output)",
         "PW County assessment URL pattern documented in county_data_sources.json"
       ],
-      "region": "DMV core"
+      "region": "DMV core",
+      "sector_snapshot": {
+        "industrial": {
+          "vacancy_pct_low": 3.9,
+          "vacancy_pct_high": 5.0,
+          "asking_rent_psf": 17.44,
+          "rent_basis": "NNN",
+          "status": "sourced",
+          "sources": [
+            "https://nmrk.imgix.net/uploads/fields/pdf-market-reports/1Q26-Washington-Metro-Industrial-Market-Report.pdf",
+            "https://warespace.com/resources/market-reports/washington-dc"
+          ],
+          "note": "NoVA is among the tightest small-bay markets in the country: ~3.9-5.0% vacancy (roughly half the national average), $17.44/SF NNN asking; close-in Alexandria ~$17-20 NNN. Infill small-bay under 50k SF intensely supply-constrained."
+        },
+        "multifamily": {
+          "vacancy_pct": 5.2,
+          "cap_rate_low_pct": 4.75,
+          "cap_rate_high_pct": 5.5,
+          "status": "sourced",
+          "sources": [
+            "https://www.northmarq.com/insights/insights/easing-construction-rebalances-regional-outlook-washington-dc-multifamily-market",
+            "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/washington-dc-multifamily-market-outlook"
+          ],
+          "note": "Regional vacancy 5.2% at YE2025 (+50bps YoY); Q1 2026 by class: luxury 11.9%, B/C 7.9% — the spread IS the decision datum. Cap band 4.75-5.5% vs CBRE's 4.73% US core going-in average; deal mix leaning Class B / value-add. 2026 deliveries projected under 10k units (decade low). Federal-employment uncertainty is the named headwind."
+        },
+        "as_of": "2026-08-25"
+      }
     },
     {
       "id": "baltimore",
@@ -224,7 +326,43 @@
         "City permits pipeline (BPS blocked)"
       ],
       "ingest_market": "philadelphia",
-      "region": "Mid-Atlantic"
+      "region": "Mid-Atlantic",
+      "sector_snapshot": {
+        "office": {
+          "vacancy_pct_low": 17.7,
+          "vacancy_pct_high": 22.3,
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/philadelphia/2026-q2-philadelphia-regional-office-report",
+            "https://www.jll.com/en-us/insights/market-dynamics/philadelphia-cbd-office"
+          ],
+          "note": "Q2 2026: Colliers CBD 17.7%, suburban 22.3% (overall availability 20.8%). JLL tracks CBD vacancy at 19.8% on its stock — measurement bases differ across trackers; the band spans CBD-to-suburban, not an error bar."
+        },
+        "industrial": {
+          "vacancy_pct_low": 10.3,
+          "vacancy_pct_high": 15.5,
+          "asking_rent_psf": 13.27,
+          "rent_basis": "Class A avg",
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/philadelphia/2026-q2-philadelphia-regional-industrial-report",
+            "https://www.kbcadvisors.com/insights/q2-2026-greater-philadelphia-market-report"
+          ],
+          "note": "Q2 2026 Class-A asking $13.27/SF (Colliers; submarkets $11.25 95-South to $14.65 SE-PA). Vacancy DIVERGES across trackers (10.3% vs 15.5% Greater-Philadelphia) — recorded as the observed spread, not averaged. Rents -3.2% QoQ."
+        },
+        "multifamily": {
+          "vacancy_pct": 4.8,
+          "cap_rate_low_pct": null,
+          "cap_rate_high_pct": null,
+          "status": "sourced",
+          "sources": [
+            "https://www.northmarq.com/insights/insights/multifamily-fundamentals-philadelphia-remain-stable-despite-wave-new-supply",
+            "https://www.cbre.com/insights/figures/philadelphia-multifamily-figures-report-q2-2026"
+          ],
+          "note": "Vacancy 4.8% Q2 2026 (Northmarq, citing Fannie Mae; ~5.1% projected by Q4). CAP RATE deliberately null: the one aggregator carrying per-class figures (4.74/4.92/5.38% A/B/C) also states '5.6% all classes' on the same pages — internally inconsistent, templated-page smell — so no number is encoded until a brokerage survey figure is pulled. Never estimated."
+        },
+        "as_of": "2026-08-25"
+      }
     },
     {
       "id": "newark_jc",

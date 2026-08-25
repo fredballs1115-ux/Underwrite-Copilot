@@ -20,6 +20,120 @@ import { MarketCompare, type CompareMetro } from "./market-compare";
 // The compare tool's compact per-metro facts, derived once from the research
 // layer — FMR row, rule count, comps-feed state. Serializable: it crosses the
 // server → client boundary as props.
+/** "By asset type" — the metro's sector fundamentals from the research
+ *  layer's snapshot blocks: vacancy (a spread when trackers diverge — the
+ *  divergence is shown, never averaged), asking rent, and cap-rate bands,
+ *  each with its status chip and provenance note. Metros without a snapshot
+ *  say so honestly. */
+type SnapBlock = {
+  vacancy_pct?: number | null;
+  vacancy_pct_low?: number | null;
+  vacancy_pct_high?: number | null;
+  asking_rent_psf?: number | null;
+  rent_basis?: string | null;
+  cap_rate_low_pct?: number | null;
+  cap_rate_high_pct?: number | null;
+  status?: string;
+  sources?: string[];
+  note?: string;
+};
+const SECTOR_LABEL: Record<string, string> = {
+  multifamily: "Multifamily",
+  office: "Office",
+  industrial: "Industrial",
+  retail: "Retail",
+};
+function SectorSnapshotPanel({
+  snapshot,
+}: {
+  snapshot: Record<string, unknown> | null;
+}) {
+  const entries = Object.entries(snapshot ?? {}).filter(
+    (e): e is [string, SnapBlock] => e[0] !== "as_of" && typeof e[1] === "object",
+  );
+  const asOf = typeof snapshot?.as_of === "string" ? snapshot.as_of : null;
+  return (
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+        By asset type
+        {asOf && (
+          <span className="ml-1.5 font-normal normal-case tracking-normal">
+            · fundamentals as of {asOf}
+          </span>
+        )}
+      </p>
+      {entries.length === 0 ? (
+        <p className="mt-1.5 text-xs text-muted">
+          Sector fundamentals for this metro queue in the next research batch
+          — unscreened, never guessed.
+        </p>
+      ) : (
+        <ul className="mt-2 space-y-2.5">
+          {entries.map(([sector, b]) => {
+            const vLow = b.vacancy_pct ?? b.vacancy_pct_low;
+            const vHigh = b.vacancy_pct ?? b.vacancy_pct_high ?? vLow;
+            const bits: string[] = [];
+            if (typeof vLow === "number") {
+              bits.push(
+                vLow === vHigh
+                  ? `vacancy ${vLow}%`
+                  : `vacancy ${vLow}–${vHigh}%`,
+              );
+            }
+            if (typeof b.asking_rent_psf === "number") {
+              bits.push(
+                `asking $${b.asking_rent_psf.toFixed(2)}/SF${b.rent_basis ? ` (${b.rent_basis})` : ""}`,
+              );
+            }
+            if (
+              typeof b.cap_rate_low_pct === "number" &&
+              typeof b.cap_rate_high_pct === "number"
+            ) {
+              bits.push(`cap ${b.cap_rate_low_pct}–${b.cap_rate_high_pct}%`);
+            }
+            return (
+              <li key={sector} className="rounded-lg border border-line/70 p-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold">
+                    {SECTOR_LABEL[sector] ?? sector.replace(/_/g, " ")}
+                  </span>
+                  <span className="font-mono text-xs tabular-nums text-ink">
+                    {bits.length > 0 ? bits.join(" · ") : "figures pending"}
+                  </span>
+                  <span
+                    className={`ml-auto rounded px-1.5 py-px text-[10px] font-medium ${
+                      b.status === "verified"
+                        ? "bg-emerald-500/10 text-emerald-600"
+                        : "bg-brand/10 text-brand"
+                    }`}
+                  >
+                    {b.status ?? "sourced"}
+                  </span>
+                  {b.sources?.[0] && (
+                    <a
+                      href={b.sources[0]}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[10px] text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
+                    >
+                      source
+                    </a>
+                  )}
+                </div>
+                {b.note && (
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted">
+                    {b.note}
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) => {
   const fmr = (m as { fmr_fy2026?: CompareMetro["fmr"] | null }).fmr_fy2026 ?? {};
   const beds: CompareMetro["fmr"] = { status: fmr.status };
@@ -413,6 +527,14 @@ async function MetroExplorer({ selected }: { selected?: string }) {
             {noteStatus}
           </span>
         </p>
+
+        <SectorSnapshotPanel
+          snapshot={
+            (active as {
+              sector_snapshot?: Record<string, unknown> | null;
+            }).sector_snapshot ?? null
+          }
+        />
 
         {typeof fmr?.["2br"] === "number" ? (
           <div className="text-sm">
