@@ -572,7 +572,9 @@
             "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/new-york-city-area-marketbeats/manhattan-office",
             "https://www.propertyshark.com/Real-Estate-Reports/2026/07/28/nyc-office-market-report-q2-2026/"
           ],
-          "note": "Q2 2026 Manhattan: Cushman & Wakefield 19.3% (-60bps QoQ, lowest since Q3 2021; overall asking $72.83/SF, Class A $84.79); PropertyShark tracks 13.1% on its stock incl. coworking — the band is a measurement-basis spread, not an error bar. Plaza District asking crossed $100/SF."
+          "note": "Q2 2026 Manhattan: Cushman & Wakefield 19.3% (-60bps QoQ, lowest since Q3 2021; overall asking $72.83/SF, Class A $84.79); PropertyShark tracks 13.1% on its stock incl. coworking — the band is a measurement-basis spread, not an error bar. Plaza District asking crossed $100/SF. Rent gap filled Aug 25, and the houses diverge here too: Cushman $72.83 overall (Class A $84.79), Colliers $78.03, CBRE $80.17 (+3% QoQ) — Cushman carried for house-consistency with the vacancy line, the others on record. Q2 2026: rents +5.7% YoY (sharpest midyear rise since 2016) on 22.8M SF of H1 leasing, the strongest first half since 2002; Cushman vacancy tightened 60bps to 19.3%, Colliers availability 13.0%.",
+          "asking_rent_psf": 72.83,
+          "rent_basis": "avg gross asking, Manhattan overall (Cushman)"
         },
         "industrial": {
           "vacancy_pct_low": 7.7,
