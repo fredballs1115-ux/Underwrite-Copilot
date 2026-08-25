@@ -246,7 +246,43 @@
       "gaps": [
         "City 2-4 unit median (metro Redfin series not broken out for Baltimore in the May pull)"
       ],
-      "region": "Mid-Atlantic"
+      "region": "Mid-Atlantic",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 20.9,
+          "vacancy_pct_high": 20.9,
+          "status": "sourced",
+          "sources": [
+            "https://www.cbre.com/insights/figures/baltimore-office-figures-q2-2026",
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/baltimore-marketbeats"
+          ],
+          "note": "Q2 2026: vacancy 20.9% (+10bps QoQ), direct asking $26.77/SF (flat QoQ, -0.5% YoY); 60k SF occupancy loss in Q2, YTD absorption -37k SF (CBRE)."
+        },
+        "industrial": {
+          "vacancy_pct_low": 8.5,
+          "vacancy_pct_high": 8.5,
+          "asking_rent_psf": 11.17,
+          "rent_basis": "avg asking",
+          "status": "sourced",
+          "sources": [
+            "https://www.cbre.com/insights/figures/baltimore-industrial-figures-q2-2026",
+            "https://www.nmrk.com/insights/market-report/baltimore-market-reports"
+          ],
+          "note": "Vacancy level 8.5% is Newmark's Q1 2026 figure; CBRE's Q2 report has vacancy holding steady QoQ (+80bps YoY) with asking $11.17/SF and absorption back positive at +288k SF — the level is a stated stitch, not a fresh Q2 print. 2.1M SF under construction."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 4.2,
+          "vacancy_pct_high": 5.1,
+          "cap_rate_low_pct": null,
+          "cap_rate_high_pct": null,
+          "status": "sourced",
+          "sources": [
+            "https://www.marcusmillichap.com/research/market-report/baltimore/baltimore-2q-2026-multifamily-market-report"
+          ],
+          "note": "Q2 2026 by class: Class A 5.1% (+40bps YoY), Class C 4.2% (-90bps) — the band spans the class split. Disciplined construction pipeline; positive rent appreciation. Cap rate: no two-source figure captured this pass — null, never estimated. Single-source (M&M) pending corroboration."
+        }
+      }
     },
     {
       "id": "richmond",
@@ -419,7 +455,43 @@
         "borough-level 2-4 unit medians"
       ],
       "ingest_market": "nyc",
-      "region": "Major US markets"
+      "region": "Major US markets",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 13.1,
+          "vacancy_pct_high": 19.3,
+          "status": "sourced",
+          "sources": [
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/new-york-city-area-marketbeats/manhattan-office",
+            "https://www.propertyshark.com/Real-Estate-Reports/2026/07/28/nyc-office-market-report-q2-2026/"
+          ],
+          "note": "Q2 2026 Manhattan: Cushman & Wakefield 19.3% (-60bps QoQ, lowest since Q3 2021; overall asking $72.83/SF, Class A $84.79); PropertyShark tracks 13.1% on its stock incl. coworking — the band is a measurement-basis spread, not an error bar. Plaza District asking crossed $100/SF."
+        },
+        "industrial": {
+          "vacancy_pct_low": 7.7,
+          "vacancy_pct_high": 7.7,
+          "asking_rent_psf": 22.65,
+          "rent_basis": "avg asking",
+          "status": "sourced",
+          "sources": [
+            "https://www.matthews.com/insights/new-york-industrial-market-report-q2-2026"
+          ],
+          "note": "Q2 2026 (Matthews own survey): metro vacancy 7.7% (availability 9.5%), asking $22.65/SF, rent growth -0.9% YoY as landlords compete; Manhattan borough itself 4.15% with absorption back positive."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 1.6,
+          "vacancy_pct_high": 2.4,
+          "cap_rate_low_pct": null,
+          "cap_rate_high_pct": null,
+          "status": "sourced",
+          "sources": [
+            "https://www.marcusmillichap.com/research/market-report/new-york-city/new-york-city-2026-investment-forecast-multifamily-market-report",
+            "https://inhabit.corcoran.com/nyc-residential-rental-market-report-july-2026/"
+          ],
+          "note": "Band spans Manhattan borough monthlies (~1.5-1.9% through 2026, Corcoran; 19 straight months of inventory contraction, median rent at a record ~$5,000) to M&M's 2.4% citywide 2026 projection — the nation's lowest metro vacancy. Cap rate: no clean two-source band captured; rent-stabilization exposure is the underwriting gate here (see this metro's rules)."
+        }
+      }
     },
     {
       "id": "boston",
@@ -443,7 +515,43 @@
       "gaps": [
         "assessment-roll ingest wiring"
       ],
-      "region": "Major US markets"
+      "region": "Major US markets",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 19.0,
+          "vacancy_pct_high": 23.6,
+          "status": "sourced",
+          "sources": [
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/boston-marketbeats/office",
+            "https://www.colliers.com/en/research/boston/greater-boston-office-report-q2-2026"
+          ],
+          "note": "Q2 2026: Cushman & Wakefield 19.0% (+30bps, smallest quarterly increase in a year); another Greater-Boston tracker prints 23.6% total vacancy — measurement-basis spread. First back-to-back occupancy gains since 2019. Class A direct asking $51.28/SF, overall $45.68."
+        },
+        "industrial": {
+          "vacancy_pct_low": null,
+          "vacancy_pct_high": null,
+          "asking_rent_psf": null,
+          "rent_basis": null,
+          "status": "unverified_not_found",
+          "sources": [
+            "https://www.remmesco.com/blog/posts/2026/04/17/boston-commercial-real-estate-market-2026-office-industrial-life-science-retail-outlookboston-commercial-real-estate-market-2026-office-industrial-life-science-retail-outlook/"
+          ],
+          "note": "Q2 2026 narrative only, no clean level captured this pass: vacancy at a decade high as a completion wave digests, met by a ~73% pullback in speculative groundbreakings. Numeric level + asking rent queued for the next sweep — never estimated."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 4.9,
+          "vacancy_pct_high": 6.1,
+          "cap_rate_low_pct": null,
+          "cap_rate_high_pct": null,
+          "status": "sourced",
+          "sources": [
+            "https://bostonrealestatetimes.com/boston-multifamily-market-strengthens-in-q2-as-vacancy-falls-and-rents-rise/",
+            "https://www.matthews.com/insights/boston-ma-multifamily-market-report-june-2026"
+          ],
+          "note": "Q2 2026 divergent trackers: 4.9% (-20bps QoQ, asking $3,108/mo) vs 6.1% ($2,999/unit, +1.1% YoY; ~220bps below the 8.3% national) — band is the tracker spread. Either reading is tight vs national. Cap rate: no two-source band captured; null."
+        }
+      }
     },
     {
       "id": "chicago",
@@ -469,7 +577,44 @@
         "Cook County Socrata dataset ids (resolve at wiring)"
       ],
       "ingest_market": "cook_county",
-      "region": "Major US markets"
+      "region": "Major US markets",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 27.3,
+          "vacancy_pct_high": 27.3,
+          "status": "sourced",
+          "sources": [
+            "https://www.tenantbase.com/chicago/q1-2026/",
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats"
+          ],
+          "note": "Vacancy 27.3% (Q1 2026 print; among the highest of the covered metros). The co-reported '$22.99/SF average asking' fails plausibility for Chicago office (CBD asking runs far higher) — likely a net or suburban figure, so no rent is encoded. Rent level queued for the next sweep."
+        },
+        "industrial": {
+          "vacancy_pct_low": 4.7,
+          "vacancy_pct_high": 4.7,
+          "asking_rent_psf": 6.57,
+          "rent_basis": "avg asking",
+          "status": "sourced",
+          "sources": [
+            "https://warecre.com/cre-insights/market-property-insights/chicago-warehouse-market-report/",
+            "https://www.avisonyoung.us/w/big-box-vacancy-compresses-across-chicago-s-industrial-market"
+          ],
+          "note": "2026: market vacancy holding at 4.7%, avg asking $6.57/SF; big-box (>500k SF) vacancy compressed to 6.5% in Q2 with big-box rents +6.6% YoY (Avison Young)."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 3.7,
+          "vacancy_pct_high": 4.6,
+          "cap_rate_low_pct": null,
+          "cap_rate_high_pct": null,
+          "status": "sourced",
+          "sources": [
+            "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/chicago-multifamily-market-outlook",
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats"
+          ],
+          "note": "Band spans stabilized-asset occupancy 96.3% (=3.7% vacancy, JPMorgan) to 4.6% market vacancy (projected 5.1% by Q3 2026); rent growth ~3.8% YoY — supply discipline doing the work. Cap rate: no two-source band captured; null. Cook County landlord rules already on file for this metro."
+        }
+      }
     },
     {
       "id": "los_angeles",
