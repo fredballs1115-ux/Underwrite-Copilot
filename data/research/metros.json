@@ -674,6 +674,18 @@
             "https://www.northmarq.com/insights/insights/boston-multifamily-transaction-activity-accelerates-q1-2026"
           ],
           "note": "Q2 2026 divergent trackers: 4.9% (-20bps QoQ, asking $3,108/mo) vs 6.1% ($2,999/unit, +1.1% YoY; ~220bps below the 8.3% national) — band is the tracker spread. Either reading is tight vs national. Cap rate: no two-source band captured; null. Cap filled Aug 25: core stabilized ~4.5-4.75% per two independent aggregator surveys agreeing (Class A 4-4.75, B value-add 4.75-5.75) — consistent with CBRE's gateway-core 4-5% national read; among the tightest ranges of any US metro. Northmarq: Q1 2026 transaction totals ran 50%+ ahead of last year."
+        },
+        "retail": {
+          "vacancy_pct_low": 2.6,
+          "vacancy_pct_high": 3.2,
+          "asking_rent_psf": 24.93,
+          "rent_basis": "avg asking (Matthews, year-end 2025 — vintage declared)",
+          "status": "sourced",
+          "sources": [
+            "https://www.matthews.com/insights/boston-retail-2025",
+            "https://abgrealty.com/boston-retail-real-estate-trends-what-tenants-and-property-owners-should-watch-in-2026/"
+          ],
+          "note": "Band spans vintages: Matthews year-end 2025 at 3.2% vs a 2026 read of 2.6% overall (availability ~3.1%) — Boston is among the tightest retail markets tracked, and led national Q2 2026 absorption on grocery/apparel expansion downtown. Asking $24.93/SF (+2.5% YoY, YE2025). Supply disciplined: 488k SF delivered, 485k SF under construction."
         }
       }
     },
