@@ -399,14 +399,15 @@
         "multifamily": {
           "vacancy_pct_low": 5.2,
           "vacancy_pct_high": 5.2,
-          "cap_rate_low_pct": null,
-          "cap_rate_high_pct": null,
+          "cap_rate_low_pct": 5.25,
+          "cap_rate_high_pct": 5.5,
           "status": "sourced",
           "sources": [
             "https://www.northmarq.com/insights/insights/declining-multifamily-vacancy-fuels-continued-rent-growth-hampton-roads",
-            "https://www.virginiamultifamily.com/post/hampton-roads-commercial-real-estate-stability-opportunity-and-a-market-in-transition"
+            "https://www.virginiamultifamily.com/post/hampton-roads-commercial-real-estate-stability-opportunity-and-a-market-in-transition",
+            "https://nmrk.imgix.net/uploads/fields/pdf-market-reports/1Q26-Richmond-Hampton-Roads-Multifamily-Report_2026-05-21-185215_gnmm.pdf"
           ],
-          "note": "Northmarq: vacancy 5.2% (down from 5.6% at Q2 2025), rents ~$1,650 (+3% YoY) — tight new-supply backdrop keeps rent growth above the national pace into 2026. Cap band not published in the pieces reviewed — null."
+          "note": "Northmarq: vacancy 5.2% (down from 5.6% at Q2 2025), rents ~$1,650 (+3% YoY) — tight new-supply backdrop keeps rent growth above the national pace into 2026. Cap filled Aug 25: a tight 5.25-5.5% range (Newmark 1Q26 Richmond & Hampton Roads report) — Class A near the low end, B/C clustering toward 5.5; Q1 average 5.4% (-30bps YoY) on ~$140M volume (-45.1% YoY), with institutional-size deals still clearing."
         }
       }
     },
