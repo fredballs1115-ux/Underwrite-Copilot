@@ -1121,6 +1121,18 @@
             "https://www.matthews.com/insights/dallas-fort-worth-multifamily-q1-2026"
           ],
           "note": "Northmarq Q1 2026: occupancy 93.2% (+10bps) = 6.8% vacancy; absorption ~8,500 units vs ~7,500 delivered; pipeline 43% below the 2023 peak. Average metro rent $1,482 (-3.0% YoY) while Class A rose 3.2% YoY for a fifth straight quarter — the mix, not a contradiction. A templated aggregator line quoting 4.6% was rejected (same boilerplate seen on another metro's page). No. 1 metro for absolute population growth (+100k residents YoY). Cap filled Aug 25: Matthews Q1 2026 transaction average 5.8% at ~$183K/unit — expansion slowing as borrowing costs still shape underwriting."
+        },
+        "retail": {
+          "vacancy_pct_low": 5.1,
+          "vacancy_pct_high": 5.1,
+          "asking_rent_psf": 25.47,
+          "rent_basis": "avg asking, $/SF/yr",
+          "status": "sourced",
+          "sources": [
+            "https://www.matthews.com/insights/q1-2026-dallas-fort-worth-tx-retail-market-report",
+            "https://www.bisnow.com/dallas-ft-worth/news/retail/weitzman-projects-grocery-anchored-retail-will-drive-dfw-to-4th-straight-year-of-record-occupancy-in-2026-132610"
+          ],
+          "note": "Q2 2026: vacancy 5.1% on 471.9M SF with asking $25.47/SF (+2.4% YoY) — CoStar-derived tracking, anchored by Matthews' Q1 report and Weitzman's outlook (grocery-anchored demand driving a fourth straight year of record occupancy). Tight and getting tighter."
         }
       }
     }
