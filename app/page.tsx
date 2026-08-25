@@ -2080,18 +2080,24 @@ function ShippedThisWeek() {
 function HeroNowScreening() {
   const withFacts = (metrosSeed.metros ?? [])
     .map((m) => {
-      const fact = metroFact(m);
-      return fact ? ([(m as { name: string }).name, fact] as const) : null;
+      return metroFact(m) !== null ? m : null;
     })
-    .filter((x): x is readonly [string, string] => x !== null);
+    .filter((m): m is NonNullable<typeof m> => m !== null);
   // Stride across the seed's region ordering so the six picks span the
-  // coverage map instead of clustering in the DMV block at the top.
+  // coverage map instead of clustering in the DMV block at the top; the
+  // pick slot drives which sector leads, so six slots never read as an
+  // all-office wall even when the stride lands on same-shaped metros.
   const step = Math.floor(withFacts.length / 6);
   const picks =
     step >= 1
-      ? Array.from({ length: 6 }, (_, i) => withFacts[i * step]).filter(
-          (x): x is readonly [string, string] => x !== undefined,
-        )
+      ? Array.from({ length: 6 }, (_, i) => {
+          const m = withFacts[i * step];
+          if (m === undefined) return undefined;
+          const fact = metroFact(m, i);
+          return fact
+            ? ([(m as { name: string }).name, fact] as const)
+            : undefined;
+        }).filter((x): x is readonly [string, string] => x !== undefined)
       : [];
   if (picks.length !== 6) return null;
   return (
