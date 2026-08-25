@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-25",
+      "title": "The changelog becomes a tour — every improvement links to where it landed",
+      "blurb": "What's-new now shows the full log grouped by ship day with a running count (19 improvements landed on Aug 25 alone), a momentum line derived from the log itself, and a 'See it live' link on every entry — the log names where in the app each change lives, so the page doubles as a guided tour. The covered-markets band now runs here too, same as /why and /demo.",
+      "href": "/whats-new"
+    },
+    {
+      "date": "2026-08-25",
       "title": "The sample screen says where Philadelphia sits in the pack",
       "blurb": "The demo's asset-type line now carries pack positions from the same shared ranking builder as the market page: Philadelphia office #10 of 18, industrial #17 of 17 — the wide 10.3–15.5% two-tracker band honestly lands it loosest — and multifamily #6 of 18. Retail carries no rank because its numeric level is held open, so no position is invented. Ranks run tightest first, and all three surfaces (sample screen, metro briefs, rankings) derive from one function.",
       "href": "/demo"
