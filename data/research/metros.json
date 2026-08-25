@@ -325,9 +325,10 @@
           "cap_rate_high_pct": null,
           "status": "sourced",
           "sources": [
-            "https://www.marcusmillichap.com/research/market-report/baltimore/baltimore-2q-2026-multifamily-market-report"
+            "https://www.marcusmillichap.com/research/market-report/baltimore/baltimore-2q-2026-multifamily-market-report",
+            "https://www.yardimatrix.com/blog/baltimore-multifamily-market-report/"
           ],
-          "note": "Q2 2026 by class: Class A 5.1% (+40bps YoY), Class C 4.2% (-90bps) — the band spans the class split. Disciplined construction pipeline; positive rent appreciation. Cap rate: no two-source figure captured this pass — null, never estimated. Single-source (M&M) pending corroboration."
+          "note": "Q2 2026 by class: Class A 5.1% (+40bps YoY), Class C 4.2% (-90bps) — the band spans the class split. Disciplined construction pipeline; positive rent appreciation. Cap rate: no two-source figure captured this pass — null, never estimated. Single-source (M&M) pending corroboration. Aug 25 sweep: Yardi Matrix (March 2026 Baltimore report) prints occupancy 94.8% for STABILIZED assets as of December (construct declared: stabilized-only base — not comparable to the vacancy band above), avg advertised asking $1,744/mo (+0.4% YoY, double the national pace), Q1 2026 absorption 219 units vs 260 delivered. Cap still null: the same hunt surfaced only an unattributed 'averaging 8.5–9%' claim (guru-site-shaped, no research house named — rejected) and the loan-store '5.6% across all classes combined' boilerplate spliced into a digest under Berkadia's Q1 framing (eighth loan-store sighting; the fingerprint phrase gave it away)."
         },
         "retail": {
           "status": "sourced",
@@ -399,7 +400,7 @@
             "https://www.northmarq.com/insights/insights/vacancy-rises-richmond-new-multifamily-supply-continues-deliver",
             "https://www.northmarq.com/insights/insights/richmonds-multifamily-vacancy-holds-steady-amid-elevated-supply-q1-2026"
           ],
-          "note": "Northmarq mid-2026: vacancy 7.2%, forecast ~7.7% by year-end as ~3,300 more units deliver; rents $1,625 (+1.7% YoY). Supply-heavy but demand steady. Cap held null through the Aug 25 hunt too: the only figure surfacing is the templated loan-store '5.6% all classes' line (fourth metro caught republishing it). Northmarq's outlook instead: vacancy peaking ~7.5% then leveling in early 2026; transaction volume expected to return via value-add first, stabilized Class A after, as rent growth accelerates."
+          "note": "Northmarq mid-2026: vacancy 7.2%, forecast ~7.7% by year-end as ~3,300 more units deliver; rents $1,625 (+1.7% YoY). Supply-heavy but demand steady. Cap held null through the Aug 25 hunt too: the only figure surfacing is the templated loan-store '5.6% all classes' line (fourth metro caught republishing it). Northmarq's outlook instead: vacancy peaking ~7.5% then leveling in early 2026; transaction volume expected to return via value-add first, stabilized Class A after, as rent growth accelerates. Aug 25: the same boilerplate resurfaced printed at the STATE level ('5.6% in Virginia markets, all classes combined') — one number claiming to price every market in Virginia is self-refuting; rejection stands (ninth loan-store sighting on file)."
         },
         "retail": {
           "vacancy_pct": 4.4,

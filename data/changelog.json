@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-25",
+      "title": "The cap hunt continues — two more templated catches, real Yardi texture for Baltimore",
+      "blurb": "The Baltimore and Richmond multifamily cap fields stay honestly null after another sweep: the loan-store '5.6% across all classes' boilerplate turned up twice more — once spliced into a digest under Berkadia's Q1 framing (the fingerprint phrase gave it away; eighth sighting), once printed at the state level for all of Virginia (one number claiming to price every market in a state is self-refuting; ninth). A separate unattributed 'averaging 8.5–9%' claim was rejected for naming no research house. What did survive the filter: Yardi Matrix's March 2026 Baltimore print — 94.8% occupancy for stabilized assets (construct declared, not comparable to the vacancy band), $1,744/mo average advertised asking, Q1 absorption 219 units against 260 delivered.",
+      "href": "/market?metro=baltimore"
+    },
+    {
+      "date": "2026-08-25",
       "title": "Rank chips on every brief — each sector read says where it sits in the pack",
       "blurb": "Every metro brief's asset-type rows now carry a rank chip — Northern Virginia industrial reads #1 of 17, DC office #13 of 18 — computed from the same shared leaderboard builder as the rankings table and the homepage lens, so the three surfaces can never disagree. Chips only appear where a numeric vacancy ranks; a metro whose level is held open gets no invented position. Each chip clicks through to the full cross-metro ranking.",
       "href": "/market?metro=nova"
