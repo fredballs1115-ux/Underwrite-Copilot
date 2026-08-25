@@ -14,28 +14,67 @@ export const MARKET_COUNT = new Set(
   )
 ).size;
 
-/** The strongest honest fact string for a metro — the published FMR and the
- *  rules-on-file count TOGETHER when both exist — or null when the seed
- *  carries neither. Shared by the marquee and the hero rotator so the two
- *  surfaces can never describe the same market differently. */
-export function metroFact(m: unknown): string | null {
+/** The strongest honest fact string for a metro — its leading ASSET-CLASS
+ *  read (office / industrial / multifamily / retail, same derivation as the
+ *  pulse tiles) plus the rules-on-file count; the FY2026 FMR is the fallback
+ *  only when no sector read exists yet. `rotate` varies which sector leads,
+ *  so a strip of many metros shows a mix instead of an all-office wall.
+ *  Shared by the marquee and the hero rotator so the two surfaces can never
+ *  describe the same market differently. */
+const SECTOR_LABEL: Record<string, string> = {
+  office: "Office",
+  industrial: "Industrial",
+  multifamily: "Multifamily",
+  retail: "Retail",
+};
+
+export function metroFact(m: unknown, rotate = 0): string | null {
   const entry = m as {
     rule_ids?: string[];
     fmr_fy2026?: { "2br"?: number | null };
+    sector_snapshot?: Record<
+      string,
+      {
+        vacancy_pct?: number | null;
+        vacancy_pct_low?: number | null;
+        vacancy_pct_high?: number | null;
+        asking_rent_psf?: number | null;
+      } | null
+    > | null;
   };
-  const fmr = entry.fmr_fy2026?.["2br"];
   const rules = entry.rule_ids?.length ?? 0;
+  const rulesPart = rules > 0 ? `${rules} rule${rules === 1 ? "" : "s"} on file` : null;
+
+  // Sectors that actually carry a vacancy read, in canonical order.
+  const readable = Object.keys(SECTOR_LABEL).filter((s) => {
+    const b = entry.sector_snapshot?.[s];
+    return b != null && typeof (b.vacancy_pct ?? b.vacancy_pct_low) === "number";
+  });
+  if (readable.length > 0) {
+    const sector = readable[((rotate % readable.length) + readable.length) % readable.length];
+    const b = entry.sector_snapshot![sector]!;
+    const lo = b.vacancy_pct ?? b.vacancy_pct_low;
+    const hi = b.vacancy_pct ?? b.vacancy_pct_high ?? lo;
+    const vac = lo === hi ? `${lo}%` : `${lo}–${hi}%`;
+    const rent =
+      typeof b.asking_rent_psf === "number" ? ` · $${b.asking_rent_psf.toFixed(2)}/SF` : "";
+    return [`${SECTOR_LABEL[sector]} ${vac} vac${rent}`, rulesPart]
+      .filter((x): x is string => x !== null)
+      .join(" · ");
+  }
+
+  const fmr = entry.fmr_fy2026?.["2br"];
   const parts = [
     typeof fmr === "number" ? `2BR FMR $${fmr.toLocaleString()}/mo` : null,
-    rules > 0 ? `${rules} rule${rules === 1 ? "" : "s"} on file` : null,
+    rulesPart,
   ].filter((x): x is string => x !== null);
   return parts.length ? parts.join(" · ") : null;
 }
 
 export function MarketsMarquee() {
-  const items = (metrosSeed.metros ?? []).map((m) => {
+  const items = (metrosSeed.metros ?? []).map((m, i) => {
     const entry = m as { id: string; name: string; region?: string };
-    const fact = metroFact(m) ?? (entry.region ?? "covered market");
+    const fact = metroFact(m, i) ?? (entry.region ?? "covered market");
     return [entry.id, entry.name, fact] as const;
   });
   // Each item is a real link into that market's brief — the marquee is a
