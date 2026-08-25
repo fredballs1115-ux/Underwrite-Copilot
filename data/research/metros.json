@@ -769,9 +769,12 @@
           "vacancy_pct_high": 5.0,
           "status": "sourced",
           "sources": [
-            "https://www.cbre.com/insights/figures/los-angeles-industrial-figures-q2-2026"
+            "https://www.cbre.com/insights/figures/los-angeles-industrial-figures-q2-2026",
+            "https://kidder.com/market-reports/los-angeles-industrial-market-report/"
           ],
-          "note": "CBRE Q2 2026: vacancy 5.0% (-22bps QoQ), third straight quarter of positive absorption — but asking rents still repricing: -2.5% QoQ, -7.0% YoY, -32.4% over 36 months. Rent level not published in the pieces reviewed — trajectory carried, level null."
+          "note": "CBRE Q2 2026: vacancy 5.0% (-22bps QoQ), third straight quarter of positive absorption. Rent gap filled Aug 25: Kidder Q2 has average direct asking at $1.37/SF/month NNN ($16.44/yr, a x12 annualization - arithmetic, not an estimate), down 6.16% YoY from $1.46 - consistent with CBRE's reported -7.0% YoY trajectory and the -32.4% 36-month reprice.",
+          "asking_rent_psf": 16.44,
+          "rent_basis": "NNN annualized from Kidder's $1.37/SF monthly"
         },
         "multifamily": {
           "vacancy_pct_low": 4.5,
