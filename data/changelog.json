@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-25",
+      "title": "The sample screen says where Philadelphia sits in the pack",
+      "blurb": "The demo's asset-type line now carries pack positions from the same shared ranking builder as the market page: Philadelphia office #10 of 18, industrial #17 of 17 — the wide 10.3–15.5% two-tracker band honestly lands it loosest — and multifamily #6 of 18. Retail carries no rank because its numeric level is held open, so no position is invented. Ranks run tightest first, and all three surfaces (sample screen, metro briefs, rankings) derive from one function.",
+      "href": "/demo"
+    },
+    {
+      "date": "2026-08-25",
       "title": "The cap hunt continues — two more templated catches, real Yardi texture for Baltimore",
       "blurb": "The Baltimore and Richmond multifamily cap fields stay honestly null after another sweep: the loan-store '5.6% across all classes' boilerplate turned up twice more — once spliced into a digest under Berkadia's Q1 framing (the fingerprint phrase gave it away; eighth sighting), once printed at the state level for all of Virginia (one number claiming to price every market in a state is self-refuting; ninth). A separate unattributed 'averaging 8.5–9%' claim was rejected for naming no research house. What did survive the filter: Yardi Matrix's March 2026 Baltimore print — 94.8% occupancy for stabilized assets (construct declared, not comparable to the vacancy band), $1,744/mo average advertised asking, Q1 absorption 219 units against 260 delivered.",
       "href": "/market?metro=baltimore"
