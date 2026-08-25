@@ -2161,6 +2161,7 @@ function ResearchTicker() {
     [
       ["san_francisco", "office", "SF office vacancy"],
       ["dallas", "office", "DFW office vacancy"],
+      ["nova", "office", "NoVA office vacancy"],
       ["chicago", "industrial", "Chicago industrial"],
       ["miami", "industrial", "Miami industrial"],
       ["los_angeles", "multifamily", "LA multifamily vacancy"],
