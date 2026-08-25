@@ -394,7 +394,7 @@
             "https://assets.cushmanwakefield.com/-/media/cw/marketbeat-pdfs/2026/q1/us-reports/industrial/hampton_roads_americas_alliance_marketbeat_industrial_q1_2026.pdf",
             "https://www.jll.com/en-us/insights/market-dynamics/hampton-roads-industrial"
           ],
-          "note": "Cushman MarketBeat Q1 2026: vacancy 7.8% as new deliveries outpace absorption; port-anchored demand base (Port of Virginia). Market-wide asking rent not captured this sweep — gap recorded, not estimated."
+          "note": "Cushman MarketBeat Q1 2026: vacancy 7.8% as new deliveries outpace absorption; port-anchored demand base (Port of Virginia). Asking rent stays null: the only figure surfacing ($23.33/SF, +2.3% YoY, aggregator-attributed) fails plausibility for port-market warehouse at 2-3x peer ports (Richmond $8.86, Baltimore $11.17) — likely a flex/office conflation; rejected on the record rather than carried."
         },
         "multifamily": {
           "vacancy_pct_low": 5.2,
