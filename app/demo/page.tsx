@@ -9,6 +9,7 @@ import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { evaluateBuyBox, parsePct } from "@/lib/criteria";
 import { leverageRead } from "@/lib/leverage";
 import { seedBenchmarks } from "@/lib/research-data";
+import { sectorLeaderboard } from "@/lib/sector-leaderboard";
 import { sampleLegal } from "@/lib/sample-legal";
 import { scoreMandateFit } from "@/lib/mandate";
 import type { ExtractedMetric } from "@/lib/anthropic/types";
@@ -262,6 +263,23 @@ export default function DemoPage() {
     // the line picks it up the moment a sourced figure lands in the seed.
     retail: band("retail_vacancy_pct"),
   };
+  // Where each Philadelphia read sits across the covered markets — the same
+  // shared leaderboard builder behind the market page's rankings and rank
+  // chips, so the sample screen can never disagree with them. A sector with
+  // no numeric vacancy (retail's held-open level) simply gets no rank.
+  const phillyRank = (sector: string): string | null => {
+    const ranked = sectorLeaderboard(sector).rows.filter(
+      (r) => r.vLow !== null,
+    );
+    const i = ranked.findIndex((r) => r.id === "philadelphia");
+    return i >= 0 ? `#${i + 1} of ${ranked.length}` : null;
+  };
+  const phillyRanks = {
+    office: phillyRank("office"),
+    industrial: phillyRank("industrial"),
+    multifamily: phillyRank("multifamily"),
+    retail: phillyRank("retail"),
+  };
 
   return (
     <div className="flex flex-1 flex-col bg-canvas">
@@ -486,6 +504,7 @@ export default function DemoPage() {
                       <span className="font-mono tabular-nums text-ink">
                         {phillySectors.office}
                       </span>
+                      {phillyRanks.office && <> ({phillyRanks.office})</>}
                     </>
                   )}
                   {phillySectors.industrial && (
@@ -502,6 +521,9 @@ export default function DemoPage() {
                           </span>
                         </>
                       )}
+                      {phillyRanks.industrial && (
+                        <> ({phillyRanks.industrial})</>
+                      )}
                     </>
                   )}
                   {phillySectors.multifamily && (
@@ -510,6 +532,9 @@ export default function DemoPage() {
                       <span className="font-mono tabular-nums text-ink">
                         {phillySectors.multifamily}
                       </span>
+                      {phillyRanks.multifamily && (
+                        <> ({phillyRanks.multifamily})</>
+                      )}
                     </>
                   )}
                   {phillySectors.retail && (
@@ -518,9 +543,11 @@ export default function DemoPage() {
                       <span className="font-mono tabular-nums text-ink">
                         {phillySectors.retail}
                       </span>
+                      {phillyRanks.retail && <> ({phillyRanks.retail})</>}
                     </>
                   )}{" "}
-                  — ranges are tracker spreads, never averaged.{" "}
+                  — ranges are tracker spreads, never averaged; ranks run
+                  tightest first across the covered markets.{" "}
                   <Link
                     href="/market?metro=philadelphia"
                     className="font-medium text-brand underline-offset-2 hover:underline"
