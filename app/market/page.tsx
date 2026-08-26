@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Fragment } from "react";
 import Link from "next/link";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import {
@@ -322,6 +323,8 @@ export default async function MarketDataPage({
       {/* Side-by-side: any two covered markets on one shared dollar scale,
           straight off the research layer. */}
       <MarketCompare metros={COMPARE_METROS} />
+      {/* The research layer at a glance — every market × every asset class. */}
+      <SectorHeatGrid />
       <MidAtlanticTable />
       <SectorExplorer selected={sectorParam} />
       <RatesStrip />
@@ -783,6 +786,144 @@ async function MetroExplorer({ selected }: { selected?: string }) {
           </div>
         )}
       </div>
+    </section>
+  );
+}
+
+// ── Coverage heat grid (every metro × every asset class) ─────────────────────
+// The whole research layer in one table: 18 metro entries down, four asset
+// classes across, each cell the metro's vacancy read for that class. Shading
+// is computed WITHIN each column — office compares to office, never to
+// industrial, because a 5% industrial market and a 5% office market are not
+// the same news. Cells with no numeric read render as gaps and say why, so
+// the grid shows coverage honestly rather than implying completeness.
+const HEAT_SECTORS = ["office", "industrial", "multifamily", "retail"] as const;
+
+function SectorHeatGrid() {
+  // Rank position per (sector, metro) drives the shade; the shared builder is
+  // the same one the leaderboard, the rank chips, and /demo read.
+  const ranks = new Map<string, { t: number; label: string }>();
+  for (const sec of HEAT_SECTORS) {
+    const rows = sectorLeaderboard(sec).rows.filter((r) => r.vLow !== null);
+    rows.forEach((r, i) => {
+      const hi = r.vHigh ?? r.vLow!;
+      ranks.set(`${sec}|${r.id}`, {
+        // 0 = tightest in this column, 1 = loosest.
+        t: rows.length > 1 ? i / (rows.length - 1) : 0,
+        label: r.vLow === hi ? `${r.vLow}` : `${r.vLow}–${hi}`,
+      });
+    });
+  }
+  const metros = (metrosSeed.metros ?? []) as {
+    id: string;
+    name: string;
+    region?: string;
+  }[];
+  const regions: string[] = [];
+  for (const m of metros) {
+    const r = m.region ?? "More markets";
+    if (!regions.includes(r)) regions.push(r);
+  }
+  const filled = ranks.size;
+  const total = metros.length * HEAT_SECTORS.length;
+  // Emerald (tight) → amber (loose), low alpha so the figure stays readable.
+  const shade = (t: number) => {
+    const c = [
+      Math.round(16 + (217 - 16) * t),
+      Math.round(185 + (119 - 185) * t),
+      Math.round(129 + (6 - 129) * t),
+    ];
+    return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${(0.10 + 0.14 * (1 - Math.abs(0.5 - t) * 2) + 0.08 * t).toFixed(3)})`;
+  };
+
+  return (
+    <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold tracking-tight">
+          The whole board — vacancy by market and asset class
+        </h2>
+        <span className="text-[11px] text-muted">
+          {filled} of {total} cells carry a numeric read · shaded within each
+          column, so office compares to office
+        </span>
+      </div>
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full min-w-[560px] text-left text-sm">
+          <thead>
+            <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
+              <th className="py-1.5 pr-3 font-medium">Market</th>
+              {HEAT_SECTORS.map((s) => (
+                <th key={s} className="py-1.5 pr-3 text-center font-medium">
+                  <Link
+                    href={`/market?sector=${s}`}
+                    className="transition-colors hover:text-brand"
+                  >
+                    {SECTOR_LABEL[s]} %
+                  </Link>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {regions.map((region) => (
+              <Fragment key={region}>
+                <tr>
+                  <td
+                    colSpan={HEAT_SECTORS.length + 1}
+                    className="pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-muted"
+                  >
+                    {region}
+                  </td>
+                </tr>
+                {metros
+                  .filter((m) => (m.region ?? "More markets") === region)
+                  .map((m) => (
+                    <tr key={m.id} className="border-b border-line/60">
+                      <td className="py-1.5 pr-3">
+                        <Link
+                          href={`/market?metro=${m.id}`}
+                          className="text-xs font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
+                        >
+                          {m.name}
+                        </Link>
+                      </td>
+                      {HEAT_SECTORS.map((s) => {
+                        const cell = ranks.get(`${s}|${m.id}`);
+                        return (
+                          <td key={s} className="px-1 py-1">
+                            {cell ? (
+                              <div
+                                className="rounded-md px-1.5 py-1 text-center font-mono text-xs tabular-nums text-ink"
+                                style={{ backgroundColor: shade(cell.t) }}
+                                title={`${SECTOR_LABEL[s]} vacancy — shaded by rank within this column, tightest first`}
+                              >
+                                {cell.label}
+                              </div>
+                            ) : (
+                              <div
+                                className="rounded-md border border-dashed border-line/70 px-1.5 py-1 text-center text-[11px] text-muted"
+                                title="No numeric level on file for this market and asset class — a recorded gap, never estimated."
+                              >
+                                —
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-3 text-[11px] leading-relaxed text-muted">
+        Every filled cell is a sourced figure from a named research house, and
+        a band is shown as a band — where two trackers disagree, the spread
+        rides rather than an average. Dashes are honest gaps: no numeric level
+        cleared the source bar for that market and asset class, and the metro
+        brief says why. County entries carry no retail face by design.
+      </p>
     </section>
   );
 }

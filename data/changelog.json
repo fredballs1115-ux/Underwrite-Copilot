@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-08-25",
+      "title": "The whole board — every market and asset class in one grid",
+      "blurb": "The market page gains a coverage grid: 18 metro entries down, office/industrial/multifamily/retail across, each cell that market's vacancy read. Shading is computed within each column, so office compares to office — DC industrial at 7.4% shades tight while DC retail at 6.3% shades loose, because those are different worlds. 66 of the 72 cells carry a sourced figure; the other 6 render as dashed gaps that say why rather than implying coverage that isn't there. Bands stay bands throughout.",
+      "href": "/market"
+    },
+    {
+      "date": "2026-08-25",
       "title": "Deal pages: benchmark units follow the metric, and vacancy rows get pack positions",
       "blurb": "The vs-market panel on deal pages printed every benchmark with a dollar sign — including percent figures, so an office deal read 'office vacancy: $17.7–$22.3'. Units now follow the metric: vacancy, cap rates, and the 30-yr PMMS print as percents, rents as $/SF, sales and listing counts plain, medians and FMRs keep their dollars — locked in by unit tests. And each vacancy row now carries the metro's rank across the covered markets, from the same shared builder as the rankings, the briefs, and the sample screen — the deal page is the fourth surface that can never disagree.",
       "href": "/demo"

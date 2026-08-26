@@ -74,6 +74,9 @@ jobs:
           grep -q "ranks run tightest first" p_demo.html && echo "DEMO PACK POSITION (Aug 25): present" || echo "DEMO PACK POSITION (Aug 25): not yet deployed"
           grep -q "copy citation" p_market.html && echo "/market: copy-citation + FMR ladder present" || echo "/market: citation tools not yet deployed"
           grep -q "By asset type" p_market.html && echo "/market: sector snapshot panel present (Aug 25)" || echo "/market: sector panel not yet deployed"
+          # Coverage heat grid: every market x every asset class, with the
+          # within-column shading rule stated in the header.
+          grep -q "so office compares to office" p_market.html && echo "COVERAGE HEAT GRID (Aug 25): present" || echo "COVERAGE HEAT GRID (Aug 25): not yet deployed"
           grep -q "Asset-type read" p_market.html && echo "/market: compare sector table present (Aug 25)" || echo "/market: compare sector table not yet deployed"
           grep -q "The trackers disagree too" body.html && echo "SPREAD BOARD (Aug 25): present" || echo "SPREAD BOARD (Aug 25): not yet deployed"
           grep -q "DFW office vacancy" body.html && echo "TICKER SECTOR ITEMS (Aug 25): present" || echo "TICKER SECTOR ITEMS (Aug 25): not yet deployed"
