@@ -20,11 +20,13 @@ import {
 import {
   benchmarksForDeal,
   buildSubject,
+  fmtBenchValue,
   mergeBenchmarks,
   pricePerUnit,
   seedBenchmarks,
   seedRules,
 } from "@/lib/research-data";
+import { sectorLeaderboard } from "@/lib/sector-leaderboard";
 import { linkOk } from "@/lib/link-audit";
 import { coveredState, metroForAddress } from "@/lib/market-match";
 import { parsePct } from "@/lib/criteria";
@@ -58,12 +60,42 @@ function metricLabel(metric: string): string {
     const br = fmr[2] === "0br" ? "studio" : fmr[2].toUpperCase();
     return `FY${fmr[1]} fair market rent · ${br}`;
   }
+  const snap = metric.match(/^(\w+?)_(vacancy_pct|asking_rent_psf|cap_rate_pct)$/);
+  if (snap) {
+    const sector = snap[1].replace(/_/g, " ");
+    const what =
+      snap[2] === "vacancy_pct"
+        ? "vacancy"
+        : snap[2] === "asking_rent_psf"
+          ? "asking rent $/SF"
+          : "cap rate";
+    return `${sector} ${what}`;
+  }
   if (metric === "median_sale_price_2_4_unit") return "2–4 unit median sale";
   if (metric === "monthly_sales_2_4_unit") return "2–4 unit sales / month";
   if (metric === "active_listings_2_4_unit") return "2–4 unit active listings";
   if (metric === "pmms_30y_fixed") return "30-yr fixed (PMMS)";
   return metric.replace(/__/g, ": ").replace(/_/g, " ");
 }
+
+// Where each covered metro sits per sector across the covered markets
+// (tightest vacancy first) — the same shared builder behind the market
+// page's rankings, the briefs' chips, and the sample screen, so a deal's
+// vs-market row can never disagree with them.
+const SECTOR_RANKS: Record<
+  string,
+  Record<string, { rank: number; total: number }>
+> = Object.fromEntries(
+  ["office", "industrial", "multifamily", "retail"].map((sec) => {
+    const ranked = sectorLeaderboard(sec).rows.filter((r) => r.vLow !== null);
+    return [
+      sec,
+      Object.fromEntries(
+        ranked.map((r, i) => [r.id, { rank: i + 1, total: ranked.length }]),
+      ),
+    ];
+  }),
+);
 
 /** Plain-English labels for condition keys surfaced as open questions. */
 const UNKNOWN_LABELS: Record<string, string> = {
@@ -143,6 +175,7 @@ export async function ResearchPanel({
   capText,
   yearBuilt,
   sectorFields,
+  assetClass,
 }: {
   address: StructuredAddress | null;
   sizeText?: string | null;
@@ -152,6 +185,8 @@ export async function ResearchPanel({
   /** parsed from the deal's extraction metrics (manual entry or OM) */
   yearBuilt?: number | null;
   sectorFields?: Record<string, string | number | boolean> | null;
+  /** the deal's asset class — same-sector benchmark rows sort first */
+  assetClass?: string | null;
 }) {
   // DB first, seeds as fallback — a missing table (migration not yet run)
   // must degrade silently to the checked-in research layer.
@@ -181,8 +216,31 @@ export async function ResearchPanel({
   const metro = address ? metroForAddress(address) : null;
 
   // vs-market: covered-market name first (a Brooklyn deal must find the
-  // "New York City" FMR row), raw city as the fallback.
-  const metroBench = benchmarksForDeal(benchmarks, address?.city, metro?.name);
+  // "New York City" FMR row), raw city as the fallback. Same-sector rows
+  // (office_vacancy_pct on an office deal) sort ahead of the cross-sector
+  // context — stable, so within each group the research order holds.
+  const dealSector = (() => {
+    const cls = (assetClass ?? "").toLowerCase();
+    if (cls === "office" || cls === "industrial") return cls;
+    if (cls === "multifamily" || cls === "sfr_btr" || cls === "student_housing")
+      return "multifamily";
+    return null;
+  })();
+  const metroBench = benchmarksForDeal(
+    benchmarks,
+    address?.city,
+    metro?.name,
+  ).sort((a, b) => {
+    if (!dealSector) return 0;
+    // FMR and 2-4-unit rows are residential — own-sector for multifamily deals.
+    const own = (m: string) =>
+      m.startsWith(`${dealSector}_`) ||
+      (dealSector === "multifamily" &&
+        (m.startsWith("hud_fmr_") || m.includes("2_4_unit")))
+        ? 0
+        : 1;
+    return own(a.metric) - own(b.metric);
+  });
   const ppu = pricePerUnit(priceText, sizeText);
 
   // Leverage check (deterministic code, not a model call): the going-in cap
@@ -385,6 +443,11 @@ export async function ResearchPanel({
                 ppu && b.metric === "median_sale_price_2_4_unit"
                   ? vsRange(ppu, b.low, b.high)
                   : null;
+              // Vacancy rows also say where this metro sits in its sector's
+              // cross-metro ranking — same builder as the market page.
+              const vac = b.metric.match(/^(\w+?)_vacancy_pct$/);
+              const rank =
+                vac && metro ? SECTOR_RANKS[vac[1]]?.[metro.id] : undefined;
               return (
                 <li
                   key={`${b.metro}|${b.metric}`}
@@ -394,10 +457,17 @@ export async function ResearchPanel({
                     {metricLabel(b.metric)}
                     {": "}
                     <span className="font-mono tabular-nums">
-                      {b.low === b.high
-                        ? `$${(b.low ?? 0).toLocaleString()}`
-                        : `$${(b.low ?? 0).toLocaleString()}–$${(b.high ?? 0).toLocaleString()}`}
+                      {fmtBenchValue(b.metric, b.low, b.high)}
                     </span>
+                    {rank && vac && (
+                      <Link
+                        href={`/market?sector=${vac[1]}`}
+                        title="rank across covered markets, tightest first"
+                        className="ml-2 rounded-full border border-line px-1.5 py-px text-[11px] font-medium text-muted transition-colors hover:border-brand hover:text-brand"
+                      >
+                        #{rank.rank} of {rank.total}
+                      </Link>
+                    )}
                     {cmp && cmp !== "no_range" && (
                       <span
                         className={`ml-2 rounded px-1.5 py-px text-[11px] font-medium ${

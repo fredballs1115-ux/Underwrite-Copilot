@@ -4,6 +4,9 @@ import { LogoMark } from "./logo";
 import { Reveal, CountUp, DemoTabs } from "./landing-interactive";
 import { ScreenRunStrip } from "./screen-run-strip";
 import { MarketPulseBoard } from "./market-pulse";
+import { RetradeReplay } from "./retrade-replay";
+import { SpreadBoard } from "./spread-board";
+import { ScrollProgress } from "./scroll-progress";
 import type { Metadata } from "next";
 import {
   SPREAD_LOW_IRR_PCT,
@@ -281,6 +284,9 @@ export default function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
       />
+      {/* Hairline reading-progress bar over everything (accent, so it reads
+          on the dark hero and the light body alike). */}
+      <ScrollProgress />
       {/* Nav — dark, so it reads as one piece with the hero. */}
       <header className="sticky top-0 z-10 border-b border-white/10 bg-sidebar text-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-3.5">
@@ -389,7 +395,12 @@ export default function Home() {
             }}
           />
           <div className="relative mx-auto max-w-6xl px-6 pb-14 pt-16 sm:pt-24">
-            <div className="grid items-center gap-12 lg:grid-cols-2">
+            {/* grid-cols-1 matters (same as the walkthrough section): the
+                implicit mobile track is `auto` and cannot shrink below the
+                sample card's intrinsic width, which pushed the whole hero
+                wider than small phones — masked by the section's
+                overflow-hidden, so the page didn't scroll, it just clipped. */}
+            <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
               <div>
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-xs font-medium text-accent">
                   <span className="h-1.5 w-1.5 rounded-full bg-accent" />
@@ -649,9 +660,18 @@ export default function Home() {
           </div>
         </section>
 
+        {/* The spread board — even the professional trackers disagree; the
+            three widest real divergences from the research file, drawn as
+            ranges. Data-derived, links into the metro briefs. */}
+        <SpreadBoard />
+
         {/* Inside the screen — interactive walkthrough on sample data */}
         <section className="border-y border-line bg-faint">
-          <div className="mx-auto grid max-w-6xl items-start gap-10 px-6 py-16 sm:py-20 lg:grid-cols-2">
+          {/* grid-cols-1 matters: the implicit mobile track is `auto`, which
+              cannot shrink below the walkthrough card's intrinsic tab-strip
+              width and forces the page wider than small phones. Tailwind's
+              track values are minmax(0,1fr), so the explicit column shrinks. */}
+          <div className="mx-auto grid max-w-6xl grid-cols-1 items-start gap-10 px-6 py-16 sm:py-20 lg:grid-cols-2">
             <Reveal>
               <p className="text-xs font-medium uppercase tracking-wider text-muted">
                 Inside the screen
@@ -679,6 +699,10 @@ export default function Home() {
         </section>
 
         {/* The six-stage screen */}
+        {/* Eye-catcher: the retrade story on a 12s loop — price struck,
+            deck reissued, verdict stamps over to Go. */}
+        <RetradeReplay />
+
         <section id="screen" className="scroll-mt-16">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <p className="text-xs font-medium uppercase tracking-wider text-muted">
@@ -689,7 +713,11 @@ export default function Home() {
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
               A first read — headline numbers and buy-box fit — lands in about
-              {FIRST_READ_CLAIM}, while the six deeper stages keep working.
+              {FIRST_READ_CLAIM}, while the six deeper stages keep working. And
+              the grilling speaks each asset type&apos;s language: office deals
+              get pressed on lease rollover and today&apos;s TI packages,
+              industrial on clear height and mark-to-market claims, retail on
+              co-tenancy — multifamily&apos;s playbook was the foundation.
             </p>
             <Reveal delay={60}>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -2061,18 +2089,24 @@ function ShippedThisWeek() {
 function HeroNowScreening() {
   const withFacts = (metrosSeed.metros ?? [])
     .map((m) => {
-      const fact = metroFact(m);
-      return fact ? ([(m as { name: string }).name, fact] as const) : null;
+      return metroFact(m) !== null ? m : null;
     })
-    .filter((x): x is readonly [string, string] => x !== null);
+    .filter((m): m is NonNullable<typeof m> => m !== null);
   // Stride across the seed's region ordering so the six picks span the
-  // coverage map instead of clustering in the DMV block at the top.
+  // coverage map instead of clustering in the DMV block at the top; the
+  // pick slot drives which sector leads, so six slots never read as an
+  // all-office wall even when the stride lands on same-shaped metros.
   const step = Math.floor(withFacts.length / 6);
   const picks =
     step >= 1
-      ? Array.from({ length: 6 }, (_, i) => withFacts[i * step]).filter(
-          (x): x is readonly [string, string] => x !== undefined,
-        )
+      ? Array.from({ length: 6 }, (_, i) => {
+          const m = withFacts[i * step];
+          if (m === undefined) return undefined;
+          const fact = metroFact(m, i);
+          return fact
+            ? ([(m as { name: string }).name, fact] as const)
+            : undefined;
+        }).filter((x): x is readonly [string, string] => x !== undefined)
       : [];
   if (picks.length !== 6) return null;
   return (
@@ -2135,6 +2169,50 @@ function ResearchTicker() {
       ] as readonly [string, string, string];
     })
     .filter((x): x is readonly [string, string, string] => x !== null);
+  // A handful of sector reads ride the ticker too — the pick list is fixed,
+  // but every figure derives from the snapshot blocks: if a number changes
+  // the ticker follows, and a metro gone null simply drops its item.
+  const sectorItems = (
+    [
+      ["san_francisco", "office", "SF office vacancy"],
+      ["dallas", "office", "DFW office vacancy"],
+      ["nova", "office", "NoVA office vacancy"],
+      ["chicago", "industrial", "Chicago industrial"],
+      ["miami", "industrial", "Miami industrial"],
+      ["los_angeles", "multifamily", "LA multifamily vacancy"],
+    ] as const
+  )
+    .map(([id, sector, label]) => {
+      const m = (metrosSeed.metros ?? []).find((x) => x.id === id);
+      const blk = (
+        m as {
+          sector_snapshot?: Record<
+            string,
+            {
+              vacancy_pct?: number | null;
+              vacancy_pct_low?: number | null;
+              vacancy_pct_high?: number | null;
+              asking_rent_psf?: number | null;
+            }
+          > | null;
+        }
+      )?.sector_snapshot?.[sector];
+      if (!blk) return null;
+      const lo = blk.vacancy_pct ?? blk.vacancy_pct_low;
+      const hi = blk.vacancy_pct ?? blk.vacancy_pct_high ?? lo;
+      const bits: string[] = [];
+      if (typeof lo === "number")
+        bits.push(lo === hi ? `${lo}%` : `${lo}–${hi}%`);
+      if (typeof blk.asking_rent_psf === "number")
+        bits.push(`$${blk.asking_rent_psf.toFixed(2)}/SF`);
+      if (bits.length === 0) return null;
+      return [label, bits.join(" · "), `/market?metro=${id}`] as readonly [
+        string,
+        string,
+        string,
+      ];
+    })
+    .filter((x): x is readonly [string, string, string] => x !== null);
   const phillyMed = money(pick("Philadelphia, PA", "median_sale_price_2_4_unit"));
   // YoY comes from the SAME seed row as the median — never typed beside it.
   const phillyYoY = bench
@@ -2153,6 +2231,7 @@ function ResearchTicker() {
         "/market?metro=philadelphia",
       ],
       ...fmrItems,
+      ...sectorItems,
       ["MoCo rent cap", "CPI+3% · max 6%", "/market?metro=montgomery_county"],
       ["Chicago owner-occupied ≤6 units", "RLTO exempt", "/market?metro=chicago"],
       ["NY Good Cause", "≤10-unit landlords exempt", "/market?metro=nyc"],

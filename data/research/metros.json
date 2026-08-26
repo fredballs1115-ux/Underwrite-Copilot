@@ -33,7 +33,52 @@
         "Class 1 tax-rate row not yet a benchmark",
         "ACS 2-4 unit stock count (API blocked)"
       ],
-      "region": "DMV core"
+      "region": "DMV core",
+      "sector_snapshot": {
+        "office": {
+          "vacancy_pct_low": 21.3,
+          "vacancy_pct_high": 22.2,
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/washington-dc/washington-dc-office-market-report-2026-q2",
+            "https://www.cbre.com/insights/figures/washington-dc-office-figures-q2-2026"
+          ],
+          "note": "Q2 2026 District office vacancy: Colliers 21.3%, CBRE 22.2% (first quarterly occupancy gain in several periods; office-to-residential conversions steadily removing obsolete stock)."
+        },
+        "industrial": {
+          "vacancy_pct_low": 7.4,
+          "vacancy_pct_high": 7.4,
+          "asking_rent_psf": null,
+          "rent_basis": null,
+          "status": "sourced",
+          "sources": [
+            "https://nmrk.imgix.net/uploads/fields/pdf-market-reports/1Q26-Washington-Metro-Industrial-Market-Report.pdf",
+            "https://www.marcusmillichap.com/research/market-report/washington-dc/washington-dc-2q26-industrial-market-report"
+          ],
+          "note": "Metro-wide industrial vacancy 7.4% (Q1 2026, Newmark). Only coastal metro with no YoY asking-rent decline since 2021. Submarket detail carried on the NoVA and PG County entries."
+        },
+        "multifamily": {
+          "vacancy_pct": 5.2,
+          "cap_rate_low_pct": 4.75,
+          "cap_rate_high_pct": 5.5,
+          "status": "sourced",
+          "sources": [
+            "https://www.northmarq.com/insights/insights/easing-construction-rebalances-regional-outlook-washington-dc-multifamily-market",
+            "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/washington-dc-multifamily-market-outlook"
+          ],
+          "note": "Regional vacancy 5.2% at YE2025 (+50bps YoY); Q1 2026 by class: luxury 11.9%, B/C 7.9% — the spread IS the decision datum. Cap band 4.75-5.5% vs CBRE's 4.73% US core going-in average; deal mix leaning Class B / value-add. 2026 deliveries projected under 10k units (decade low). Federal-employment uncertainty is the named headwind."
+        },
+        "as_of": "2026-08-25",
+        "retail": {
+          "vacancy_pct": 6.3,
+          "status": "sourced",
+          "sources": [
+            "https://www.institutionalpropertyadvisors.com/research/market-report/retail/washington-dc/washingtondc-2026-investment-forecast-retail-market-report",
+            "https://dmped.dc.gov/release/mayor-bowser-releases-key-findings-new-study-and-strategic-plan-grow-dcs-retail-market-and"
+          ],
+          "note": "Institutional Property Advisors (Marcus & Millichap’s institutional arm) 2026 Investment Forecast: District retail vacancy at a HISTORIC HIGH 6.3% entering 2026 — record restaurant closures through 2025 on rising labor costs, softer consumer spending, federal workforce reductions, and weaker tourism. VINTAGE: “entering 2026” = a year-end-2025 read, the newest district-wide figure to clear the source bar after four earlier sweeps returned only national prints or a stale 2022 article (rejected on URL vintage). The city’s own WDCEP/Streetsense Retail Strategic Plan (2026) corroborates the restructuring story. Asking-rent level not published — held null."
+        }
+      }
     },
     {
       "id": "pg_county",
@@ -60,7 +105,42 @@
         "FY2026 SAFMRs by PG ZIP",
         "county tax-rate + municipal add-on benchmark rows"
       ],
-      "region": "DMV core"
+      "region": "DMV core",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct": 19.2,
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/washington-dc/suburban-maryland-office-market-report-2026-q1"
+          ],
+          "note": "Colliers Q1 2026, Suburban Maryland survey area (Montgomery + Prince George’s together — not a county split): 19.2% vacancy, down 20bps on marginal positive demand. Newmark’s prior read (Q3 2025) was 20.1%, same direction, older vintage — kept as context, not banded. Avison Young’s 21.9% is AVAILABILITY (direct) plus 1.7% sublet — a different construct than vacancy, recorded here so nobody mistakes the two."
+        },
+        "industrial": {
+          "vacancy_pct_low": 6.0,
+          "vacancy_pct_high": 10.1,
+          "asking_rent_psf": 12.5,
+          "rent_basis": "NNN midpoint of $10-15 band",
+          "status": "sourced",
+          "sources": [
+            "https://warespace.com/resources/market-reports/washington-dc",
+            "https://nmrk.imgix.net/uploads/fields/pdf-market-reports/1Q26-Washington-Metro-Industrial-Market-Report.pdf",
+            "https://www.colliers.com/en/research/washington-dc/maryland-industrial-market-report-2026-q1"
+          ],
+          "note": "Two bases, recorded as the spread: the close-in Central PG corridor runs ~6.0% (Newmark 1Q26 Washington-metro survey / WareSpace small-bay), while Colliers’ Maryland report prints the WHOLE county at 10.1% for Q1 2026 (down 110bps QoQ) — outer big-box product loosens the county-wide number. Ask which submarket your deal sits in before picking a benchmark. Asking ~0-15/SF NNN; the encoded 2.50 is the band midpoint, labeled as such — a 30-40% discount to close-in NoVA."
+        },
+        "multifamily": {
+          "vacancy_pct": 5.2,
+          "cap_rate_low_pct": 4.75,
+          "cap_rate_high_pct": 5.5,
+          "status": "sourced",
+          "sources": [
+            "https://www.northmarq.com/insights/insights/easing-construction-rebalances-regional-outlook-washington-dc-multifamily-market",
+            "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/washington-dc-multifamily-market-outlook"
+          ],
+          "note": "Regional vacancy 5.2% at YE2025 (+50bps YoY); Q1 2026 by class: luxury 11.9%, B/C 7.9% — the spread IS the decision datum. Cap band 4.75-5.5% vs CBRE's 4.73% US core going-in average; deal mix leaning Class B / value-add. 2026 deliveries projected under 10k units (decade low). Federal-employment uncertainty is the named headwind."
+        }
+      }
     },
     {
       "id": "montgomery_county",
@@ -87,7 +167,39 @@
         "MoCo exemption list verbatim",
         "Takoma Park vacancy-control confirmation"
       ],
-      "region": "DMV core"
+      "region": "DMV core",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct": 19.2,
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/washington-dc/suburban-maryland-office-market-report-2026-q1"
+          ],
+          "note": "Colliers Q1 2026, Suburban Maryland survey area (Montgomery + Prince George’s together — not a county split): 19.2% vacancy, down 20bps on marginal positive demand. Newmark’s prior read (Q3 2025) was 20.1%, same direction, older vintage — kept as context, not banded. Avison Young’s 21.9% is AVAILABILITY (direct) plus 1.7% sublet — a different construct than vacancy, recorded here so nobody mistakes the two."
+        },
+        "industrial": {
+          "asking_rent_psf": 6.94,
+          "rent_basis": "avg asking — Q4 2024 print, vintage declared",
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/washington-dc/maryland-industrial-report-q4-2024",
+            "https://klnb.com/wp-content/uploads/2025/04/NAIKLNB_MD_Industrial_Q1_2025-1.pdf"
+          ],
+          "note": "County-specific print from the Colliers/KLNB Maryland industrial series, Q4 2024 VINTAGE (declared — the newest MoCo-specific level to clear the bar): asking .94/SF, up /bin/bash.09 QoQ; +15,360 SF Q4 absorption (2024 total −12,839 SF); NO projects under construction, so new supply pressure is nil and absorption works straight against vacancy. A vacancy RATE for the county has not cleared the bar: Colliers’ Q1 2026 “Maryland 10.1%” runs on a Baltimore/I-95-corridor-shaped base (its own narrative ties the print to that corridor) and is rejected as a MoCo read; Transwestern’s 6.9% suburban-MD figure is Q2 2025 vintage on the two-county base. Both stay recorded, neither is a county vacancy."
+        },
+        "multifamily": {
+          "vacancy_pct": 5.2,
+          "cap_rate_low_pct": 4.75,
+          "cap_rate_high_pct": 5.5,
+          "status": "sourced",
+          "sources": [
+            "https://www.northmarq.com/insights/insights/easing-construction-rebalances-regional-outlook-washington-dc-multifamily-market",
+            "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/washington-dc-multifamily-market-outlook"
+          ],
+          "note": "Regional vacancy 5.2% at YE2025 (+50bps YoY); Q1 2026 by class: luxury 11.9%, B/C 7.9% — the spread IS the decision datum. Cap band 4.75-5.5% vs CBRE's 4.73% US core going-in average; deal mix leaning Class B / value-add. 2026 deliveries projected under 10k units (decade low). Federal-employment uncertainty is the named headwind."
+        }
+      }
     },
     {
       "id": "nova",
@@ -113,7 +225,43 @@
         "Fairfax/Arlington provider wiring (needs /api/comps/health output)",
         "PW County assessment URL pattern documented in county_data_sources.json"
       ],
-      "region": "DMV core"
+      "region": "DMV core",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 20.8,
+          "vacancy_pct_high": 21.3,
+          "status": "sourced",
+          "sources": [
+            "https://www.cbre.com/insights/figures/northern-virginia-office-figures-q2-2026",
+            "https://www.nmrk.com/insights/market-report/northern-virginia-market-reports"
+          ],
+          "note": "Two trackers, Q2 2026: Newmark prints 20.8% (down 60bps YoY), CBRE 21.3% (down 50bps, its lowest NoVA read since 2021) — recorded as the spread, not averaged. Direction agrees across both: NoVA office is tightening while the District sets record highs. Defense/GovCon demand is the usual driver cited; underwrite tenancy by agency exposure, not the metro headline."
+        },
+        "industrial": {
+          "vacancy_pct_low": 3.9,
+          "vacancy_pct_high": 5.0,
+          "asking_rent_psf": 17.44,
+          "rent_basis": "NNN",
+          "status": "sourced",
+          "sources": [
+            "https://nmrk.imgix.net/uploads/fields/pdf-market-reports/1Q26-Washington-Metro-Industrial-Market-Report.pdf",
+            "https://warespace.com/resources/market-reports/washington-dc"
+          ],
+          "note": "NoVA is among the tightest small-bay markets in the country: ~3.9-5.0% vacancy (roughly half the national average), $17.44/SF NNN asking; close-in Alexandria ~$17-20 NNN. Infill small-bay under 50k SF intensely supply-constrained."
+        },
+        "multifamily": {
+          "vacancy_pct": 5.2,
+          "cap_rate_low_pct": 4.75,
+          "cap_rate_high_pct": 5.5,
+          "status": "sourced",
+          "sources": [
+            "https://www.northmarq.com/insights/insights/easing-construction-rebalances-regional-outlook-washington-dc-multifamily-market",
+            "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/washington-dc-multifamily-market-outlook"
+          ],
+          "note": "Regional vacancy 5.2% at YE2025 (+50bps YoY); Q1 2026 by class: luxury 11.9%, B/C 7.9% — the spread IS the decision datum. Cap band 4.75-5.5% vs CBRE's 4.73% US core going-in average; deal mix leaning Class B / value-add. 2026 deliveries projected under 10k units (decade low). Federal-employment uncertainty is the named headwind."
+        }
+      }
     },
     {
       "id": "baltimore",
@@ -144,7 +292,52 @@
       "gaps": [
         "City 2-4 unit median (metro Redfin series not broken out for Baltimore in the May pull)"
       ],
-      "region": "Mid-Atlantic"
+      "region": "Mid-Atlantic",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 10.0,
+          "vacancy_pct_high": 20.9,
+          "status": "sourced",
+          "sources": [
+            "https://www.cbre.com/insights/figures/baltimore-office-figures-q2-2026",
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/baltimore-marketbeats",
+            "https://klnb.com/wp-content/uploads/2026/04/NAIKLNB_MD_Office_Q1_2026.pdf"
+          ],
+          "note": "Q2 2026: vacancy 20.9% (+10bps QoQ), direct asking $26.77/SF (flat QoQ, -0.5% YoY); 60k SF occupancy loss in Q2, YTD absorption -37k SF (CBRE). Band widened Aug 25 into the starkest basis divergence on the board: KLNB (CoStar-sourced, Greater Baltimore all-inventory) prints 10.0% with CBD asking $26.35 while CBRE's competitive set runs 20.9% at $26.77 — same city, half the vacancy, because the denominators differ. Spread carried with both bases named; ask which inventory a broker is quoting before comparing."
+        },
+        "industrial": {
+          "vacancy_pct_low": 8.5,
+          "vacancy_pct_high": 8.5,
+          "asking_rent_psf": 11.17,
+          "rent_basis": "avg asking",
+          "status": "sourced",
+          "sources": [
+            "https://www.cbre.com/insights/figures/baltimore-industrial-figures-q2-2026",
+            "https://www.nmrk.com/insights/market-report/baltimore-market-reports"
+          ],
+          "note": "Vacancy level 8.5% is Newmark's Q1 2026 figure; CBRE's Q2 report has vacancy holding steady QoQ (+80bps YoY) with asking $11.17/SF and absorption back positive at +288k SF — the level is a stated stitch, not a fresh Q2 print. 2.1M SF under construction."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 4.2,
+          "vacancy_pct_high": 5.1,
+          "cap_rate_low_pct": null,
+          "cap_rate_high_pct": null,
+          "status": "sourced",
+          "sources": [
+            "https://www.marcusmillichap.com/research/market-report/baltimore/baltimore-2q-2026-multifamily-market-report",
+            "https://www.yardimatrix.com/blog/baltimore-multifamily-market-report/"
+          ],
+          "note": "Q2 2026 by class: Class A 5.1% (+40bps YoY), Class C 4.2% (-90bps) — the band spans the class split. Disciplined construction pipeline; positive rent appreciation. Cap rate: no two-source figure captured this pass — null, never estimated. Single-source (M&M) pending corroboration. Aug 25 sweep: Yardi Matrix (March 2026 Baltimore report) prints occupancy 94.8% for STABILIZED assets as of December (construct declared: stabilized-only base — not comparable to the vacancy band above), avg advertised asking $1,744/mo (+0.4% YoY, double the national pace), Q1 2026 absorption 219 units vs 260 delivered. Cap still null: the same hunt surfaced only an unattributed 'averaging 8.5–9%' claim (guru-site-shaped, no research house named — rejected) and the loan-store '5.6% across all classes combined' boilerplate spliced into a digest under Berkadia's Q1 framing (eighth loan-store sighting; the fingerprint phrase gave it away)."
+        },
+        "retail": {
+          "status": "sourced",
+          "sources": [
+            "https://www.marcusmillichap.com/research/market-report/baltimore/baltimore-2026-investment-forecast-retail-market-report"
+          ],
+          "note": "NUMERIC FIELD HELD OPEN — direction sourced, level not yet. Marcus & Millichap’s 2026 Baltimore retail forecast: development at its LOWEST since at least 2007, but a contraction in gross metro product plus below-average population growth keep net absorption negative, lifting vacancy to a comparatively HIGH level among major U.S. metros — the limited pipeline insulates neighborhood centers from legacy big-box closures. A digest print of “1.04/SF NNN with BW-Corridor transport slots at 2.84” was REJECTED as industrial-shaped warehouse figures spliced under a retail heading (sixth sector-conflation catch). A dated vacancy level from a named house has not cleared the bar."
+        }
+      }
     },
     {
       "id": "richmond",
@@ -173,7 +366,52 @@
         "2-4 unit price series",
         "Richmond city assessor open-data provider"
       ],
-      "region": "Mid-Atlantic"
+      "region": "Mid-Atlantic",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 12.8,
+          "vacancy_pct_high": 12.8,
+          "status": "sourced",
+          "sources": [
+            "https://www.nmrk.com/insights/market-report/richmond-real-estate-market-reports",
+            "https://www.cbre.com/insights/figures/richmond-office-figures-q1-2026"
+          ],
+          "note": "Newmark 1Q26: vacancy 12.8% (+30bps QoQ, -40bps YoY) — one of the healthier office markets covered. CBRE Q1 2026 puts average asking at $21.85/SF (+0.8% YoY). Q2 roundups tick vacancy to ~12.9%."
+        },
+        "industrial": {
+          "vacancy_pct_low": 5.5,
+          "vacancy_pct_high": 5.5,
+          "asking_rent_psf": 8.86,
+          "rent_basis": "avg asking",
+          "status": "sourced",
+          "sources": [
+            "https://www.cbre.com/insights/figures/richmond-industrial-figures-q2-2026"
+          ],
+          "note": "CBRE Q2 2026: vacancy held at 5.5%, asking $8.86/SF (+2.4% QoQ) — post-delivery absorption phase. Aggregator roundups cite mid-4s on other bases; CBRE-tracked inventory carried."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 7.2,
+          "vacancy_pct_high": 7.2,
+          "cap_rate_low_pct": null,
+          "cap_rate_high_pct": null,
+          "status": "sourced",
+          "sources": [
+            "https://www.northmarq.com/insights/insights/vacancy-rises-richmond-new-multifamily-supply-continues-deliver",
+            "https://www.northmarq.com/insights/insights/richmonds-multifamily-vacancy-holds-steady-amid-elevated-supply-q1-2026"
+          ],
+          "note": "Northmarq mid-2026: vacancy 7.2%, forecast ~7.7% by year-end as ~3,300 more units deliver; rents $1,625 (+1.7% YoY). Supply-heavy but demand steady. Cap held null through the Aug 25 hunt too: the only figure surfacing is the templated loan-store '5.6% all classes' line (fourth metro caught republishing it). Northmarq's outlook instead: vacancy peaking ~7.5% then leveling in early 2026; transaction volume expected to return via value-add first, stabilized Class A after, as rent growth accelerates. Aug 25: the same boilerplate resurfaced printed at the STATE level ('5.6% in Virginia markets, all classes combined') — one number claiming to price every market in Virginia is self-refuting; rejection stands (ninth loan-store sighting on file)."
+        },
+        "retail": {
+          "vacancy_pct": 4.4,
+          "status": "sourced",
+          "sources": [
+            "https://rebusinessonline.com/richmonds-mixed-use-boom-fuels-the-citys-retail-market/",
+            "https://rebusinessonline.com/mid-atlantic-retail-market-is-experiencing-methodical-growth/"
+          ],
+          "note": "Cushman & Wakefield | Thalhimer (Jim Ashby, SVP Retail Services — the dominant local house): greater Richmond retail vacancy ~4.4% on ~81M SF of inventory, held tight by years of limited new development and zoning constraints. VINTAGE CAVEAT: the accessible articles do not print the survey quarter — treated as a recent-cycle (2025–26 era) read, not a dated quarterly print. Pipeline to watch: Diamond District, Genworth HQ, Nunnally Village add supply over the next several years. Asking-rent level not published — held null."
+        }
+      }
     },
     {
       "id": "norfolk_hampton_roads",
@@ -199,7 +437,53 @@
         "stock counts",
         "city assessor feeds (Norfolk/VB open-data portals exist — unassessed)"
       ],
-      "region": "Mid-Atlantic"
+      "region": "Mid-Atlantic",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 7.1,
+          "vacancy_pct_high": 12.7,
+          "status": "sourced",
+          "sources": [
+            "https://www.nmrk.com/insights/market-report/hampton-roads-real-estate-market-reports",
+            "https://www.odu.edu/article/the-hampton-roads-real-estate-market-review-forecast-celebrates-its-30th-year"
+          ],
+          "note": "Trackers diverge sharply on basis: ODU's local Market Review survey ~7.1% (competitive inventory) vs Newmark 1Q26 at 12.7% — spread carried, never averaged. CoStar reports H1 2026 office leasing the worst in five years."
+        },
+        "industrial": {
+          "vacancy_pct_low": 7.8,
+          "vacancy_pct_high": 7.8,
+          "status": "sourced",
+          "sources": [
+            "https://assets.cushmanwakefield.com/-/media/cw/marketbeat-pdfs/2026/q1/us-reports/industrial/hampton_roads_americas_alliance_marketbeat_industrial_q1_2026.pdf",
+            "https://www.jll.com/en-us/insights/market-dynamics/hampton-roads-industrial"
+          ],
+          "note": "Cushman MarketBeat Q1 2026: vacancy 7.8% as new deliveries outpace absorption; port-anchored demand base (Port of Virginia). Asking rent stays null: the only figure surfacing ($23.33/SF, +2.3% YoY, aggregator-attributed) fails plausibility for port-market warehouse at 2-3x peer ports (Richmond $8.86, Baltimore $11.17) — likely a flex/office conflation; rejected on the record rather than carried."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 5.2,
+          "vacancy_pct_high": 5.2,
+          "cap_rate_low_pct": 5.25,
+          "cap_rate_high_pct": 5.5,
+          "status": "sourced",
+          "sources": [
+            "https://www.northmarq.com/insights/insights/declining-multifamily-vacancy-fuels-continued-rent-growth-hampton-roads",
+            "https://www.virginiamultifamily.com/post/hampton-roads-commercial-real-estate-stability-opportunity-and-a-market-in-transition",
+            "https://nmrk.imgix.net/uploads/fields/pdf-market-reports/1Q26-Richmond-Hampton-Roads-Multifamily-Report_2026-05-21-185215_gnmm.pdf"
+          ],
+          "note": "Northmarq: vacancy 5.2% (down from 5.6% at Q2 2025), rents ~$1,650 (+3% YoY) — tight new-supply backdrop keeps rent growth above the national pace into 2026. Cap filled Aug 25: a tight 5.25-5.5% range (Newmark 1Q26 Richmond & Hampton Roads report) — Class A near the low end, B/C clustering toward 5.5; Q1 average 5.4% (-30bps YoY) on ~$140M volume (-45.1% YoY), with institutional-size deals still clearing."
+        },
+        "retail": {
+          "vacancy_pct_low": 4.4,
+          "vacancy_pct_high": 4.6,
+          "status": "sourced",
+          "sources": [
+            "https://www.odu.edu/evwilliams-center/reports",
+            "https://www.odu.edu/sites/default/files/2026/documents/2026-mr-presentation.pdf"
+          ],
+          "note": "Old Dominion University E.V. Williams Center, 2026 Hampton Roads Real Estate Market Review & Forecast (the 30th annual survey, presented March 2026; advisory board chaired by Divaris Real Estate’s EVP — the region’s dominant retail house): metro retail vacancy exceptionally tight at 4.4–4.6%, carried as the printed band. Limited new construction plus steady consumer demand favors well-located neighborhood centers and service retail; the review flags an adaptive-reuse trend (e.g. former Rite Aids converting to car washes). Asking-rent level not published — held null."
+        }
+      }
     },
     {
       "id": "philadelphia",
@@ -224,7 +508,51 @@
         "City permits pipeline (BPS blocked)"
       ],
       "ingest_market": "philadelphia",
-      "region": "Mid-Atlantic"
+      "region": "Mid-Atlantic",
+      "sector_snapshot": {
+        "office": {
+          "vacancy_pct_low": 17.7,
+          "vacancy_pct_high": 22.3,
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/philadelphia/2026-q2-philadelphia-regional-office-report",
+            "https://www.jll.com/en-us/insights/market-dynamics/philadelphia-cbd-office"
+          ],
+          "note": "Q2 2026: Colliers CBD 17.7%, suburban 22.3% (overall availability 20.8%). JLL tracks CBD vacancy at 19.8% on its stock — measurement bases differ across trackers; the band spans CBD-to-suburban, not an error bar."
+        },
+        "industrial": {
+          "vacancy_pct_low": 10.3,
+          "vacancy_pct_high": 15.5,
+          "asking_rent_psf": 13.27,
+          "rent_basis": "Class A avg",
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/philadelphia/2026-q2-philadelphia-regional-industrial-report",
+            "https://www.kbcadvisors.com/insights/q2-2026-greater-philadelphia-market-report"
+          ],
+          "note": "Q2 2026 Class-A asking $13.27/SF (Colliers; submarkets $11.25 95-South to $14.65 SE-PA). Vacancy DIVERGES across trackers (10.3% vs 15.5% Greater-Philadelphia) — recorded as the observed spread, not averaged. Rents -3.2% QoQ."
+        },
+        "multifamily": {
+          "vacancy_pct": 4.8,
+          "cap_rate_low_pct": 5.0,
+          "cap_rate_high_pct": 5.7,
+          "status": "sourced",
+          "sources": [
+            "https://www.northmarq.com/insights/insights/multifamily-fundamentals-philadelphia-remain-stable-despite-wave-new-supply",
+            "https://www.cbre.com/insights/figures/philadelphia-multifamily-figures-report-q2-2026"
+          ],
+          "note": "Vacancy 4.8% Q2 2026 (Northmarq, citing Fannie Mae; ~5.1% projected by Q4). CAP RATE deliberately null: the one aggregator carrying per-class figures (4.74/4.92/5.38% A/B/C) also states '5.6% all classes' on the same pages — internally inconsistent, templated-page smell — so no number is encoded until a brokerage survey figure is pulled. Never estimated. Provenance closed Aug 25: those templated per-class figures (4.74/4.92/5.38) are CBRE's NATIONAL H1 2026 class averages — the aggregator republishes them as local numbers on its city pages, which is exactly the conflation the null guards against. Cap FILLED Aug 25 from a named house at last: Northmarq has urban core trades at 5.2-5.7% and suburban 5.0-5.3% (late 2025/early 2026, stabilized, bid-ask narrowing) — the 5.0-5.7 band spans both, split in this note. The original null and its templated-page catch above stand as the provenance history."
+        },
+        "as_of": "2026-08-25",
+        "retail": {
+          "status": "sourced",
+          "sources": [
+            "https://centercityphila.org/research-reports/retail",
+            "https://www.marcusmillichap.com/research/market-report/philadelphia/philadelphia-2026-investment-forecast-retail-market-report"
+          ],
+          "note": "NUMERIC FIELD HELD OPEN — two reads exist and neither is an SF-based metro vacancy print. Center City District’s on-foot storefront survey (April 2026, PRIMARY): occupancy 84.2%, a two-year high, up from 82.6% in six months (+32 storefronts); Walnut St 87.5% (west side 88.6%), Sansom 85.1%, Market St 68.2→71.6%. CONSTRUCT DECLARED: a storefront COUNT, not square-footage vacancy — never compare it to the SF-based figures on other tiles. Marcus & Millichap’s 2026 forecast notes East Center City retail vacancy under 2% in 2025 on CBD apartment growth (+30% occupied units since 2019), but a digest of that report interleaved multifamily-shaped numbers (.56/SF rent, 4.7% inventory growth) into the retail answer, so its “7.3%” print is REJECTED as probable report conflation until the primary confirms."
+        }
+      }
     },
     {
       "id": "newark_jc",
@@ -253,7 +581,55 @@
       "gaps": [
         "per-ordinance screen for other NJ municipalities"
       ],
-      "region": "Mid-Atlantic"
+      "region": "Mid-Atlantic",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 22.0,
+          "vacancy_pct_high": 22.0,
+          "status": "sourced",
+          "sources": [
+            "https://www.roi-nj.com/2026/07/02/real_estate_development/northern-and-central-n-j-office-market-pauses-after-recovery-industrial-leasing-strong-in-q2-cushman-wakefield-report/",
+            "https://www.nmrk.com/insights/market-report/northern-new-jersey-market-reports"
+          ],
+          "note": "Cushman & Wakefield Q2 2026 (via ROI-NJ): vacancy 22.0% (+60bps QoQ), average asking $32.29/SF; leasing 1.6M SF (+33% QoQ) with Class A over half of volume at $35.29/SF (Q1) — a 9.3% premium to market."
+        },
+        "industrial": {
+          "vacancy_pct_low": 9.3,
+          "vacancy_pct_high": 9.3,
+          "status": "sourced",
+          "sources": [
+            "https://njbmagazine.com/njb-news-now/strong-industrial-demand-and-resilient-office-market-for-q1/",
+            "https://www.savills.us/research_articles/256536/389555-0/northern-new-jersey-q1-2026-industrial-market-report"
+          ],
+          "note": "Q1 2026 level 9.3% via NJ Business Magazine's report on the quarter's house data; Savills Q1 confirms climbing vacancy with port-centric submarkets (Linden/Elizabeth, Hudson Waterfront) off ≥16% from peak rents. Colliers Q2 shows leasing rebounding to 9.8M SF. Market-wide asking rent not pinned — gap recorded."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 3.0,
+          "vacancy_pct_high": 5.6,
+          "cap_rate_low_pct": 5.7,
+          "cap_rate_high_pct": 5.7,
+          "status": "sourced",
+          "sources": [
+            "https://www.marcusmillichap.com/research/market-report/northern-new-jersey/northern-new-jersey-2026-investment-forecast-multifamily-market-report",
+            "https://www.lument.com/momentum-building-in-northern-new-jersey-multifamily-market/",
+            "https://www.matthews.com/insights/top-10-multifamily-markets-in-2026"
+          ],
+          "note": "M&M 2026 forecast: vacancy 5.6% overall but Class A at 10.7% on new-supply concentration; rents ~$2,253 (+2.0% YoY, decelerating). Jersey City has 4,000+ units slated for 2026 (The Journal towers, 505 Summit) — upward vacancy pressure in the urban core while Union/Essex/Bergen pipelines shrink. Lument: 77.9% lease-renewal rate, best of the top-20 metros (June 2025). Cap filled + vacancy banded Aug 25: Matthews (Top 10 Multifamily Markets 2026) has Northern NJ at a 5.7% cap on $1.1B volume (~$314K/unit) with vacancy driven to 3.0% by 4,329 units of absorption — vs M&M's 5.6% overall; two named houses, different bases and vintages, spread carried. Third sighting of CBRE-national class figures republished as local (Newark/JC loan-store pages) rejected on sight."
+        },
+        "retail": {
+          "vacancy_pct_low": 3.4,
+          "vacancy_pct_high": 3.4,
+          "asking_rent_psf": 17.92,
+          "rent_basis": "avg asking, $/SF/yr",
+          "status": "sourced",
+          "sources": [
+            "https://chainstoreage.com/new-jersey-retail-vacancy-rates-continue-drop",
+            "https://www.roi-nj.com/2024/08/15/real_estate_development/marcus-millichap-report-finds-record-low-vacancy-and-strong-rent-growth-in-north-jersey-retail-market/"
+          ],
+          "note": "VINTAGE DECLARED: the 3.4% vacancy (Hudson County 1.7%, reported lowest of any major US submarket) and $17.92/SF with +12.0% YoY are Marcus & Millichap-era prints of 2024 vintage, recycled since by trade digests. Aug 2026 re-verification found NO dated 2026 named-house NNJ retail report — and one 2026 digest attaches an 8.2% “vacancy” to the same $17.92 rent print, a probable conflation with the industrial series (8%+ vacancy at 3.5M SF of half-year leasing is an industrial-shaped number), rejected. Treat the tightness story as directional and the levels as dated until a 2026 report clears the bar."
+        }
+      }
     },
     {
       "id": "nyc",
@@ -281,7 +657,57 @@
         "borough-level 2-4 unit medians"
       ],
       "ingest_market": "nyc",
-      "region": "Major US markets"
+      "region": "Major US markets",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 13.1,
+          "vacancy_pct_high": 19.3,
+          "status": "sourced",
+          "sources": [
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/new-york-city-area-marketbeats/manhattan-office",
+            "https://www.propertyshark.com/Real-Estate-Reports/2026/07/28/nyc-office-market-report-q2-2026/"
+          ],
+          "note": "Q2 2026 Manhattan: Cushman & Wakefield 19.3% (-60bps QoQ, lowest since Q3 2021; overall asking $72.83/SF, Class A $84.79); PropertyShark tracks 13.1% on its stock incl. coworking — the band is a measurement-basis spread, not an error bar. Plaza District asking crossed $100/SF. Rent gap filled Aug 25, and the houses diverge here too: Cushman $72.83 overall (Class A $84.79), Colliers $78.03, CBRE $80.17 (+3% QoQ) — Cushman carried for house-consistency with the vacancy line, the others on record. Q2 2026: rents +5.7% YoY (sharpest midyear rise since 2016) on 22.8M SF of H1 leasing, the strongest first half since 2002; Cushman vacancy tightened 60bps to 19.3%, Colliers availability 13.0%.",
+          "asking_rent_psf": 72.83,
+          "rent_basis": "avg gross asking, Manhattan overall (Cushman)"
+        },
+        "industrial": {
+          "vacancy_pct_low": 7.7,
+          "vacancy_pct_high": 7.7,
+          "asking_rent_psf": 22.65,
+          "rent_basis": "avg asking",
+          "status": "sourced",
+          "sources": [
+            "https://www.matthews.com/insights/new-york-industrial-market-report-q2-2026"
+          ],
+          "note": "Q2 2026 (Matthews own survey): metro vacancy 7.7% (availability 9.5%), asking $22.65/SF, rent growth -0.9% YoY as landlords compete; Manhattan borough itself 4.15% with absorption back positive."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 1.6,
+          "vacancy_pct_high": 2.4,
+          "cap_rate_low_pct": null,
+          "cap_rate_high_pct": null,
+          "status": "sourced",
+          "sources": [
+            "https://www.marcusmillichap.com/research/market-report/new-york-city/new-york-city-2026-investment-forecast-multifamily-market-report",
+            "https://inhabit.corcoran.com/nyc-residential-rental-market-report-july-2026/",
+            "https://arielpa.nyc/news/press-releases/second-quarter-nyc-multifamily-sales-jump-268-year-over-year-ariel-property-advisors-q2-multifamily-quarter-in-review-shows"
+          ],
+          "note": "Band spans Manhattan borough monthlies (~1.5-1.9% through 2026, Corcoran; 19 straight months of inventory contraction, median rent at a record ~$5,000) to M&M's 2.4% citywide 2026 projection — the nation's lowest metro vacancy. Cap rate: no clean two-source band captured; rent-stabilization exposure is the underwriting gate here (see this metro's rules). Cap held null after the Aug 25 hunt — only a single agent survey quotes a band (4.5-5.5 going-in typical, 3.5-6.5 full span), below the source bar. What IS documented (Ariel Property Advisors, H1/Q2 2026): two very different markets — Manhattan free-market strength (rents +10% YoY; H1 multifamily sales $4.95B, +21%) against a rent-stabilized valuation reset, refinancings at roughly double original rates and stabilized trading dominated by distress; the free-market-vs-stabilized cap spread runs a structural 100-300bps. Screen the regulation status before the cap."
+        },
+        "retail": {
+          "vacancy_pct_low": 3.6,
+          "vacancy_pct_high": 6.6,
+          "asking_rent_psf": 54.6,
+          "rent_basis": "Manhattan avg asking (Matthews)",
+          "status": "sourced",
+          "sources": [
+            "https://www.matthews.com/insights/new-york-retail-market-report-q2-2026"
+          ],
+          "note": "Matthews Q2 2026, carried as the borough spread: Brooklyn 3.6% (down from 3.7%, +52k SF absorbed) to Manhattan 6.6% (down from 7.0% in Q1); Manhattan asking $54.60/SF (+0.9% YoY). Metro availability ran ~4.2% in Q1, near historic lows."
+        }
+      }
     },
     {
       "id": "boston",
@@ -306,7 +732,56 @@
         "MassGIS L3 sale-field join (roll has no sale data)"
       ],
       "ingest_market": "boston",
-      "region": "Major US markets"
+      "region": "Major US markets",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 19.0,
+          "vacancy_pct_high": 23.6,
+          "status": "sourced",
+          "sources": [
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/boston-marketbeats/office",
+            "https://www.colliers.com/en/research/boston/greater-boston-office-report-q2-2026"
+          ],
+          "note": "Q2 2026: Cushman & Wakefield 19.0% (+30bps, smallest quarterly increase in a year); another Greater-Boston tracker prints 23.6% total vacancy — measurement-basis spread. First back-to-back occupancy gains since 2019. Class A direct asking $51.28/SF, overall $45.68."
+        },
+        "industrial": {
+          "vacancy_pct_low": 12.8,
+          "vacancy_pct_high": 12.8,
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/boston/greater-boston-industrial-report-2026q1",
+            "https://www.colliers.com/en/research/boston/greater-boston-industrial-report-q2-2026"
+          ],
+          "note": "Gap filled Aug 25 (was recorded as unverified — no level had cleared the bar). Colliers Q1 2026: overall vacancy 12.8% (+30bps, near an 11-year high; the post-Covid low was 5.6% in 3Q22), a fourth straight quarter of negative absorption (-432k SF), annual rent growth swung from +33.5% at the 2022 peak to -1.5%. Colliers Q2: absorption back positive (+440k SF, logistics-led); South submarket availability 15.6%, a 14-year high, while the West grew rents 5.7% YoY; total AVAILABILITY printed 13.5% (+50bps QoQ, vacant new deliveries) — availability, not vacancy, never band the two. Market-wide asking rent level still not published — held null."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 4.9,
+          "vacancy_pct_high": 6.1,
+          "cap_rate_low_pct": 4.5,
+          "cap_rate_high_pct": 4.75,
+          "status": "sourced",
+          "sources": [
+            "https://bostonrealestatetimes.com/boston-multifamily-market-strengthens-in-q2-as-vacancy-falls-and-rents-rise/",
+            "https://www.matthews.com/insights/boston-ma-multifamily-market-report-june-2026",
+            "https://realcostiq.com/cap-rate/boston/",
+            "https://www.northmarq.com/insights/insights/boston-multifamily-transaction-activity-accelerates-q1-2026"
+          ],
+          "note": "Q2 2026 divergent trackers: 4.9% (-20bps QoQ, asking $3,108/mo) vs 6.1% ($2,999/unit, +1.1% YoY; ~220bps below the 8.3% national) — band is the tracker spread. Either reading is tight vs national. Cap rate: no two-source band captured; null. Cap filled Aug 25: core stabilized ~4.5-4.75% per two independent aggregator surveys agreeing (Class A 4-4.75, B value-add 4.75-5.75) — consistent with CBRE's gateway-core 4-5% national read; among the tightest ranges of any US metro. Northmarq: Q1 2026 transaction totals ran 50%+ ahead of last year."
+        },
+        "retail": {
+          "vacancy_pct_low": 2.6,
+          "vacancy_pct_high": 3.2,
+          "asking_rent_psf": 24.93,
+          "rent_basis": "avg asking (Matthews, year-end 2025 — vintage declared)",
+          "status": "sourced",
+          "sources": [
+            "https://www.matthews.com/insights/boston-retail-2025",
+            "https://abgrealty.com/boston-retail-real-estate-trends-what-tenants-and-property-owners-should-watch-in-2026/"
+          ],
+          "note": "Band spans vintages: Matthews year-end 2025 at 3.2% vs a 2026 read of 2.6% overall (availability ~3.1%) — Boston is among the tightest retail markets tracked, and led national Q2 2026 absorption on grocery/apparel expansion downtown. Asking $24.93/SF (+2.5% YoY, YE2025). Supply disciplined: 488k SF delivered, 485k SF under construction."
+        }
+      }
     },
     {
       "id": "chicago",
@@ -332,7 +807,58 @@
         "Cook County Socrata dataset ids (resolve at wiring)"
       ],
       "ingest_market": "cook_county",
-      "region": "Major US markets"
+      "region": "Major US markets",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 27.3,
+          "vacancy_pct_high": 27.3,
+          "status": "sourced",
+          "sources": [
+            "https://www.tenantbase.com/chicago/q1-2026/",
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats",
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats/cbd-office"
+          ],
+          "note": "Vacancy 27.3% (Q1 2026 print; among the highest of the covered metros). The co-reported '$22.99/SF average asking' fails plausibility for Chicago office (CBD asking runs far higher) — likely a net or suburban figure, so no rent is encoded. Rent level queued for the next sweep. Rent gap filled Aug 25: Cushman CBD MarketBeat Q2 2026 has average gross asking at $43.90/SF (+0.8% QoQ; Class A $54.06, Trophy $57.45, B $41.30, C $30.32) — confirming the earlier $22.99 aggregator figure was implausible and rightly rejected. Eleventh straight quarter of negative absorption (-215k SF), but H1 leasing +1.7% YoY and sublease down 24.3% YoY.",
+          "asking_rent_psf": 43.9,
+          "rent_basis": "avg gross asking, CBD (Cushman)"
+        },
+        "industrial": {
+          "vacancy_pct_low": 4.7,
+          "vacancy_pct_high": 4.7,
+          "asking_rent_psf": 6.57,
+          "rent_basis": "avg asking",
+          "status": "sourced",
+          "sources": [
+            "https://warecre.com/cre-insights/market-property-insights/chicago-warehouse-market-report/",
+            "https://www.avisonyoung.us/w/big-box-vacancy-compresses-across-chicago-s-industrial-market"
+          ],
+          "note": "2026: market vacancy holding at 4.7%, avg asking $6.57/SF; big-box (>500k SF) vacancy compressed to 6.5% in Q2 with big-box rents +6.6% YoY (Avison Young)."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 3.7,
+          "vacancy_pct_high": 4.6,
+          "cap_rate_low_pct": 8.3,
+          "cap_rate_high_pct": 8.3,
+          "status": "sourced",
+          "sources": [
+            "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/chicago-multifamily-market-outlook",
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats",
+            "https://essexrealtygroup.com/chicago-multifamily-report-april-2026/"
+          ],
+          "note": "Band spans stabilized-asset occupancy 96.3% (=3.7% vacancy, JPMorgan) to 4.6% market vacancy (projected 5.1% by Q3 2026); rent growth ~3.8% YoY — supply discipline doing the work. Cap rate: no two-source band captured; null. Cook County landlord rules already on file for this metro. Cap filled Aug 25 with the basis named: Essex Realty (local multifamily brokerage) April 2026 rolling data — 175 transactions, $587.8M, average cap 8.3%. That average is dominated by the Class B/C neighborhood buildings that drive Chicago volume (Northmarq: B/C sales fuel the market); institutional Class A trades price far tighter (gateway core ~4-5% nationally). A transaction average for the small-building stock, not a metro-wide quoted band."
+        },
+        "retail": {
+          "vacancy_pct_low": 7.8,
+          "vacancy_pct_high": 7.8,
+          "status": "sourced",
+          "sources": [
+            "https://assets.cushmanwakefield.com/-/media/cw/marketbeat-pdfs/2026/q2/us-reports/national/q22026usretailmarketbeat.pdf",
+            "https://www.colliers.com/-/media/files/unitedstates/national/2026/colliers-us-retail-statistics-report-2026-q2.ashx"
+          ],
+          "note": "Cushman Q2 2026: retail vacancy 7.8%. Metro asking rent not surfaced this pass (US average runs $24.79/SF, +2.4% YoY per CBRE) — level held null. Chicago is among the Midwest markets carrying new retail construction."
+        }
+      }
     },
     {
       "id": "los_angeles",
@@ -361,7 +887,54 @@
         "current RSO cap % (single-source)",
         "assessor-roll ingest"
       ],
-      "region": "Major US markets"
+      "region": "Major US markets",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 17.8,
+          "vacancy_pct_high": 25.8,
+          "status": "sourced",
+          "sources": [
+            "https://kidder.com/market-reports/los-angeles-office-market-report/",
+            "https://www.avisonyoung.us/web/los-angeles/office-market-report"
+          ],
+          "note": "Q2 2026 total vacancy by tracker: Kidder Mathews 17.8% (direct 16.4%), Avison Young 21.2% (availability 23.5%), CBRE 25.8%, Savills availability 26.6% — direct-vs-total-vs-availability bases drive the spread; carried, never averaged. Submarkets run 5.6% (Southeast LA) to 28.6% (Miracle Mile). Leasing improving as tenants re-commit to longer terms."
+        },
+        "industrial": {
+          "vacancy_pct_low": 5.0,
+          "vacancy_pct_high": 5.0,
+          "status": "sourced",
+          "sources": [
+            "https://www.cbre.com/insights/figures/los-angeles-industrial-figures-q2-2026",
+            "https://kidder.com/market-reports/los-angeles-industrial-market-report/"
+          ],
+          "note": "CBRE Q2 2026: vacancy 5.0% (-22bps QoQ), third straight quarter of positive absorption. Rent gap filled Aug 25: Kidder Q2 has average direct asking at $1.37/SF/month NNN ($16.44/yr, a x12 annualization - arithmetic, not an estimate), down 6.16% YoY from $1.46 - consistent with CBRE's reported -7.0% YoY trajectory and the -32.4% 36-month reprice.",
+          "asking_rent_psf": 16.44,
+          "rent_basis": "NNN annualized from Kidder's $1.37/SF monthly"
+        },
+        "multifamily": {
+          "vacancy_pct_low": 4.5,
+          "vacancy_pct_high": 5.6,
+          "cap_rate_low_pct": 5.8,
+          "cap_rate_high_pct": 5.8,
+          "status": "sourced",
+          "sources": [
+            "https://kidder.com/market-reports/los-angeles-multifamily-market-report/",
+            "https://www.matthews.com/insights/los-angeles-multifamily-q2-2026"
+          ],
+          "note": "Q2 2026: Kidder 5.5% (Q1 5.6%) vs Matthews 4.52% — spread carried. Average asking $2,310/unit (studios $1,700 to 3BR $3,230). Cap filled Aug 25: Kidder Q2 2026 average expanded to 5.8% (CoStar-sourced transaction average, not a quoted band); average sale $280,591/unit (+3.3% YoY). Earlier fuzzy-attribution cluster reads (~5.1-5.4) superseded by the named-house average; agent surveys still quote 4.5-5.5 for stabilized mid-tier."
+        },
+        "retail": {
+          "vacancy_pct_low": 5.6,
+          "vacancy_pct_high": 5.6,
+          "status": "sourced",
+          "sources": [
+            "https://kidder.com/market-reports/los-angeles-retail-market-report/",
+            "https://www.matthews.com/insights/los-angeles-ca-retail-market-report-q2-2026"
+          ],
+          "note": "Kidder Q2 2026: vacancy 5.6% (+10bps YoY from 5.5%). Asking-rent level not captured this pass — held null."
+        }
+      }
     },
     {
       "id": "san_francisco",
@@ -387,7 +960,53 @@
       ],
       "comps_provider": null,
       "gaps": [],
-      "region": "Major US markets"
+      "region": "Major US markets",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 27.2,
+          "vacancy_pct_high": 30.1,
+          "status": "sourced",
+          "sources": [
+            "https://www.cbre.com/insights/figures/san-francisco-office-figures-q2-2026",
+            "https://kidder.com/market-reports/san-francisco-office-market-report/"
+          ],
+          "note": "Q2 2026 overall vacancy: Kidder 27.2% (-440bps YoY), CBRE 29.2% (asking $72.96/SF), Cushman 30.1% (-360bps YoY, asking $70.31/SF gross) — spread carried. The recovery is real: fifth consecutive quarter of positive absorption (+1.0M SF in Q2, +2.2M SF H1), sublease inventory at its lowest since early 2020."
+        },
+        "industrial": {
+          "vacancy_pct_low": 12.5,
+          "vacancy_pct_high": 12.5,
+          "asking_rent_psf": 29.65,
+          "rent_basis": "avg asking",
+          "status": "sourced",
+          "sources": [
+            "https://www.matthews.com/insights/san-francisco-industrial-q2-2026",
+            "https://www.colliers.com/en/download-article?itemId=e740e46c-55f6-4fdb-ac63-52f0bbb99be3"
+          ],
+          "note": "City-proper (Matthews Q2 2026): vacancy 12.5% on slow leasing plus completed deliveries, asking $29.65/SF (+1.0% YoY). Sharply different next door: Colliers Q1 has the SF Peninsula at 4.8% (~$23.16/yr NNN), Silicon Valley warehouse 4.2%, East Bay ~8%."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 4.4,
+          "vacancy_pct_high": 4.7,
+          "cap_rate_low_pct": null,
+          "cap_rate_high_pct": null,
+          "status": "sourced",
+          "sources": [
+            "https://kidder.com/wp-content/uploads/market_report/multifamily-market-research-san-francisco-2026-1q.pdf",
+            "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/san-francisco-multifamily-market-outlook"
+          ],
+          "note": "1Q26: Kidder's own table reads 4.7% (4Q25 4.8%, 1Q25 5.3% — tightening 60bps YoY); Moody's via JPMorgan has 4.4% stable with rents +7% YoY, above pre-pandemic. Kidder 1Q26: average asking $2,652/unit (-3.0% YoY — the trend now corroborated by a second independent digest, resolving the earlier summary conflict), average sale $323,825/unit (-18% YoY). A third-party prose summary had inverted Kidder's vacancy trend; the report's own table text is carried here. Cap held null: an agent-reported Q1 average of ~5.9% (in line with the past three years, well above last cycle's sub-4s) is single-source — below the bar, on record."
+        },
+        "retail": {
+          "vacancy_pct_low": 6.0,
+          "vacancy_pct_high": 6.0,
+          "status": "sourced",
+          "sources": [
+            "https://kidder.com/wp-content/uploads/market_report/retail-market-research-san-francisco-2026-1q.pdf"
+          ],
+          "note": "Kidder 1Q26, from the report's own table text: vacancy 6.0% (4Q25 6.3%, 1Q25 6.8% — tightening 80bps YoY as the city recovery broadens). Asking rent not captured — held null."
+        }
+      }
     },
     {
       "id": "seattle",
@@ -411,7 +1030,52 @@
         "FY2026 FMR (fetch-fmr.mjs closes this once HUD_API_TOKEN is set)"
       ],
       "ingest_market": "king_county",
-      "region": "Major US markets"
+      "region": "Major US markets",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 23.4,
+          "vacancy_pct_high": 28.6,
+          "status": "sourced",
+          "sources": [
+            "https://kidder.com/market-reports/seattle-office-market-report/",
+            "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/seattle-bellevue-marketbeats"
+          ],
+          "note": "Metro band widened Aug 25 (was carried as the Close-In 28.2% alone): Kidder has the Puget Sound region at 23.4% (multi-tenant buildings >10k SF; Seattle proper 28.2%, South King 21.7%, East King 21.0%) vs Cushman region overall 28.6% (downtown Seattle 35.8%, suburban 23.6%, Eastside 21.4%) — inventory bases differ; spread carried. Average asking $35.00/SF all classes (-6.8% YoY, Kidder). Pace of increase slowing — the sharpest losses look behind the market."
+        },
+        "industrial": {
+          "vacancy_pct_low": 9.5,
+          "vacancy_pct_high": 9.5,
+          "status": "sourced",
+          "sources": [
+            "https://kidder.com/market-reports/seattle-industrial-market-report/",
+            "https://warecre.com/cre-insights/market-property-insights/seattle-warehouse-market-report/"
+          ],
+          "note": "Kidder Q2 2026: vacancy 9.5%, up from 7.0% at year-end 2023 as supply outpaces demand. Asking rents quoted monthly here: roughly $0.90-1.35/SF shell, $1.50-2.00 close-in (warecre) — too wide and mixed-basis to carry as one annual figure, so the level stays null with the range on record."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 6.7,
+          "vacancy_pct_high": 6.7,
+          "cap_rate_low_pct": 5.7,
+          "cap_rate_high_pct": 5.7,
+          "status": "sourced",
+          "sources": [
+            "https://kidder.com/market-reports/seattle-multifamily-market-report/"
+          ],
+          "note": "Kidder Q2 2026: vacancy 6.7%, improving from 7.0% in Q1. Asking rents by type: studio $1,544 / 1BR $1,908 / 2BR $2,285 / 3BR $2,631. The market-rate 2BR asking sits below the FY2026 FMR — see this metro's FMR note for the conflation history. Cap filled Aug 25: Kidder Q2 2026 sales average 5.7% (+10bps YoY from 5.6%) — a transaction average, not a quoted band; average sale $276,610/unit (-14.75% YoY)."
+        },
+        "retail": {
+          "vacancy_pct_low": 3.9,
+          "vacancy_pct_high": 4.0,
+          "asking_rent_psf": 23.4,
+          "rent_basis": "NNN annualized from Kidder's $1.95/SF monthly (1Q26)",
+          "status": "sourced",
+          "sources": [
+            "https://kidder.com/market-reports/seattle-retail-market-report/"
+          ],
+          "note": "Kidder: 1Q26 vacancy 4.0% (up from 3.3% a year earlier) with asking stable at $1.95/SF/month ($23.40/yr, x12 annualization named); 2Q26 prints 3.9% — the two quarters carried as the band. ~50k SF delivered in Q1; one of the tightest retail markets on the board."
+        }
+      }
     },
     {
       "id": "miami",
@@ -435,7 +1099,57 @@
       "gaps": [
         "statute text pull to upgrade FL rule"
       ],
-      "region": "Major US markets"
+      "region": "Major US markets",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 10.8,
+          "vacancy_pct_high": 14.9,
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/miami/2q26-miami-dade-county-office",
+            "https://www.cbre.com/insights/figures/miami-office-figures-report-q2-2026"
+          ],
+          "note": "Q2 2026: Colliers 10.8% (-10bps, record asking $65.50/SF full-service, Class A $73.37) vs CBRE 14.9% ($68.60/SF) — tracker bases differ; spread carried. One of the tightest office markets covered, with premium demand setting rent records."
+        },
+        "industrial": {
+          "vacancy_pct_low": 7.7,
+          "vacancy_pct_high": 7.7,
+          "asking_rent_psf": 17.19,
+          "rent_basis": "NNN asking",
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/miami/2q26-miami-dade-county-industrial",
+            "https://www.cbre.com/insights/figures/miami-industrial-figures-q2-2026"
+          ],
+          "note": "Colliers Q2 2026: vacancy 7.7% (+60bps as 769k SF delivered), asking $17.19/SF NNN (+0.9% QoQ, +1.5% YoY). Supply wave absorbing."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 5.4,
+          "vacancy_pct_high": 6.6,
+          "cap_rate_low_pct": 4.75,
+          "cap_rate_high_pct": 5.0,
+          "status": "sourced",
+          "sources": [
+            "https://www.miamirealtors.com/2026/04/20/broward-county-emerging-as-top-multifamily-investment-market/",
+            "https://www.marcusmillichap.com/research/market-report/miami-dade/miami-dade-2q26-multifamily-market-report",
+            "https://realcostiq.com/cap-rate/miami/"
+          ],
+          "note": "Measured reads span 5.4% (MMG Q2: occupancy 94.6%, rents -0.2% YoY, absorption ~= completions) to 6.6% (Miami Realtors, March 2026, best of the large South-Region metros); M&M projects ~4.9% for 2026 — a forecast, noted not banded. Miami-Dade median asking $2,660 (May 2026, +1.5% YoY); Class A occupancy 95-96%. ~13,800-unit pipeline, 30.7% of it Downtown. Cap filled Aug 25 with vintage declared: Class A stabilized core 4.75-5.0% (CBRE H2 2025 read, corroborated across three independent surveys; core Brickell/Edgewater/Wynwood 4-5, value-add South Dade 5-6.5). Q2 2026: A/B caps expanded ~5bps on softening rents, Class C stable. No fresher named-house metro average surfaced."
+        },
+        "retail": {
+          "vacancy_pct_low": 3.0,
+          "vacancy_pct_high": 3.0,
+          "asking_rent_psf": 42.5,
+          "rent_basis": "avg asking, $/SF/yr",
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/miami/1q26-miami-dade-county-retail",
+            "https://commercialobserver.com/2026/07/south-florida-miami-retail-leasing-vacancy-rent/"
+          ],
+          "note": "Retail pilot (first metro with a fourth sector): Colliers Q2 2026 has Miami-Dade retail at 3.0% vacancy with asking $42.50/SF/yr (+2.6% QoQ), net absorption +378,795 SF and 1.3M SF under construction — among the tightest retail markets in the country (South Florida runs sub-5% across all three counties). Remaining metros' retail queues for the next research batches."
+        }
+      }
     },
     {
       "id": "atlanta",
@@ -459,7 +1173,55 @@
       "gaps": [
         "Fulton bulk endpoint"
       ],
-      "region": "Major US markets"
+      "region": "Major US markets",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 18.0,
+          "vacancy_pct_high": 18.0,
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/atlanta/2026-q2-atlanta-office-market-report"
+          ],
+          "note": "Colliers Q2 2026: vacancy eased to ~18% from a 26% peak (narrative round figure — carried as stated); Class A asking $35.86/SF with >5% YoY growth for a third straight quarter; sublease availability under 5.0M SF for the first time since Q4 2021. Stabilizing on HQ demand."
+        },
+        "industrial": {
+          "vacancy_pct_low": 8.2,
+          "vacancy_pct_high": 9.0,
+          "asking_rent_psf": 7.53,
+          "rent_basis": "direct asking, all product (Cushman)",
+          "status": "sourced",
+          "sources": [
+            "https://www.cbre.com/insights/figures/atlanta-industrial-figures-report-q2-2026",
+            "https://www.jll.com/en-us/insights/market-dynamics/atlanta-industrial"
+          ],
+          "note": "Q2 2026: CBRE direct 8.2% vs JLL 9.0% (4.4M SF absorbed) — spread carried. Rents cluster tightly: Cushman $7.53 direct all-product (warehouse/distribution $7.38), JLL $7.43. Pressure concentrated in smaller-format and legacy product."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 5.6,
+          "vacancy_pct_high": 7.2,
+          "cap_rate_low_pct": null,
+          "cap_rate_high_pct": null,
+          "status": "sourced",
+          "sources": [
+            "https://www.northmarq.com/insights/insights/atlantas-multifamily-vacancy-shrinks-lowest-level-nearly-three-years",
+            "https://www.marcusmillichap.com/research/market-report/atlanta/atlanta-2q26-multifamily-market-report"
+          ],
+          "note": "Reads span Northmarq 5.6% (lowest in nearly three years, expected to reach 5.2%) to a CRE Daily brief's 7.2% declining — spread carried. M&M 2Q26: deliveries slowing 43% YoY (9,300 units, +1.6% inventory), rents ~$1,600 (+1% — among the stronger early-2026 metros). Cap reads conflict by construct (5.2% A/B average vs low-to-mid-5s deal narrative vs a 5.5-6.0 aggregator quote) — no single band carried. Northmarq’s 2026 deal commentary splits the tape by deal type: sub-5% in-place for value-add quality bought at a discount to replacement cost, mid-5s for stabilized assets with less upside — useful for placing YOUR deal on the conflicted tape. A templated “Q2 2026 Class A/B 5.2%” print (loan-store family, fifth sighting) rejected again."
+        },
+        "retail": {
+          "vacancy_pct_low": 4.6,
+          "vacancy_pct_high": 4.6,
+          "asking_rent_psf": 19.19,
+          "rent_basis": "avg asking, $/SF/yr",
+          "status": "sourced",
+          "sources": [
+            "https://partnersrealestate.com/research/atlanta-retail-q1-2026-quarterly-market-report/",
+            "https://www.colliers.com/en/research/atlanta/2026-q2-atlanta-retail-market-report"
+          ],
+          "note": "Q1 2026 vacancy 4.6% (Partners); asking $19.19/SF by Q2 (+3.3% QoQ). Rent trend splits by tracker — Colliers has +1.0% over 12 months while Partners-tracked runs -1.0% YoY — recorded, not averaged. Colliers Q2: vacancy rising in second-tier space, premier centers still favored; 180k SF under construction, the most since 2024. Inventory-constrained overall."
+        }
+      }
     },
     {
       "id": "dallas",
@@ -485,7 +1247,55 @@
         "DCAD roll ingest wiring",
         "Fort Worth-Arlington-Grapevine HMFA FMR (separate area, not yet sourced)"
       ],
-      "region": "Major US markets"
+      "region": "Major US markets",
+      "sector_snapshot": {
+        "as_of": "2026-08-25",
+        "office": {
+          "vacancy_pct_low": 19.9,
+          "vacancy_pct_high": 19.9,
+          "status": "sourced",
+          "sources": [
+            "https://www.colliers.com/en/research/dallas/dfw-office-market-report-2026-q2"
+          ],
+          "note": "Q2 2026: vacancy 19.9% — below 20% for the first time since Q2 2023 — on +1.4M SF net absorption; average asking $34.01/SF. Recovery led by corporate relocations."
+        },
+        "industrial": {
+          "vacancy_pct_low": 8.3,
+          "vacancy_pct_high": 9.3,
+          "asking_rent_psf": 8.99,
+          "rent_basis": "avg asking",
+          "status": "sourced",
+          "sources": [
+            "https://www.cbre.com/insights/figures/dallas-fort-worth-industrial-figures-q2-2026",
+            "https://www.jll.com/en-us/insights/market-dynamics/dallas-fort-worth-industrial"
+          ],
+          "note": "Q2 2026: CBRE 8.3% (-20bps QoQ) vs JLL 9.3% (a seventh straight quarterly decline) — spread carried. Asking $8.99/SF; 16.9M SF leased in the quarter; 31.2M SF under construction — the nation's biggest industrial build."
+        },
+        "multifamily": {
+          "vacancy_pct_low": 6.8,
+          "vacancy_pct_high": 6.8,
+          "cap_rate_low_pct": 5.8,
+          "cap_rate_high_pct": 5.8,
+          "status": "sourced",
+          "sources": [
+            "https://www.northmarq.com/insights/insights/dallas-fort-worth-multifamily-rents-and-occupancy-climb-open-q1-2026",
+            "https://www.matthews.com/insights/dallas-fort-worth-multifamily-q1-2026"
+          ],
+          "note": "Northmarq Q1 2026: occupancy 93.2% (+10bps) = 6.8% vacancy; absorption ~8,500 units vs ~7,500 delivered; pipeline 43% below the 2023 peak. Average metro rent $1,482 (-3.0% YoY) while Class A rose 3.2% YoY for a fifth straight quarter — the mix, not a contradiction. A templated aggregator line quoting 4.6% was rejected (same boilerplate seen on another metro's page). No. 1 metro for absolute population growth (+100k residents YoY). Cap filled Aug 25: Matthews Q1 2026 transaction average 5.8% at ~$183K/unit — expansion slowing as borrowing costs still shape underwriting."
+        },
+        "retail": {
+          "vacancy_pct_low": 5.1,
+          "vacancy_pct_high": 5.1,
+          "asking_rent_psf": 25.47,
+          "rent_basis": "avg asking, $/SF/yr",
+          "status": "sourced",
+          "sources": [
+            "https://www.matthews.com/insights/q1-2026-dallas-fort-worth-tx-retail-market-report",
+            "https://www.bisnow.com/dallas-ft-worth/news/retail/weitzman-projects-grocery-anchored-retail-will-drive-dfw-to-4th-straight-year-of-record-occupancy-in-2026-132610"
+          ],
+          "note": "Q2 2026: vacancy 5.1% on 471.9M SF with asking $25.47/SF (+2.4% YoY) — CoStar-derived tracking, anchored by Matthews' Q1 report and Weitzman's outlook (grocery-anchored demand driving a fourth straight year of record occupancy). Tight and getting tighter."
+        }
+      }
     }
   ]
 }

@@ -15,6 +15,119 @@ since you pointed the web service at `main`). What gates the new features is
 Everything ships dark-safe: nothing breaks while those are pending, pages
 say exactly what's missing and why.
 
+## Monday night (Aug 24–25 ET) — homescreen eye-catchers, then the big one: real data on the asset types that matter
+
+**Your call: "more than 2BR info… research on all asset types… real data on assets that matter… way more info on each metro."** Answered across five probe-verified PRs (#134, #136–#138, each an exact live-sha match):
+
+**Every covered market now carries an office / industrial / multifamily read.**
+Each metro brief on /market has a "By asset type" panel: vacancy, asking
+rent, and cap-rate bands, each with a status chip, a clickable source, an
+as-of date, and a provenance note. All 18 metro entries across the 15
+markets are covered — nothing queued, nothing guessed. The same figures
+flow automatically into deal-page vs-market benchmarks (labeled "office
+vacancy," "industrial asking rent $/SF," …) and the Compare tool's data
+spine.
+
+The integrity rules did real work in the sweeps:
+- **Divergence is shown, never averaged** — LA office runs 17.8–25.8%
+  depending on the tracker and whether you count direct, total, or
+  available space; the panel says exactly that. Same for Hampton Roads
+  (7.1 vs 12.7, bases named), NYC, Miami, Atlanta, DFW.
+- **Two templated aggregator numbers caught and rejected** — one
+  boilerplate "4.6% trending to 5.1%" line that appears verbatim on
+  multiple metros' pages, and a prose summary that inverted SF
+  multifamily's trend (claimed rising when Kidder's own table shows it
+  falling). The table text is what shipped.
+- **Gaps stay gaps** — Boston industrial has a decade-high-vacancy
+  narrative but no tracker level that cleared the source bar, so the
+  panel records exactly that instead of a made-up number. Six cap bands
+  held null with the reasoning written down.
+
+**Homescreen eye-catchers rounds 2–3 (#132, #133, verified live before the
+sector work):** the market pulse board (18 breathing tiles, each a real
+metro), the live IRR gauge wired to the stress bench, the verdict stamp
+animation, the retrade replay loop (ask struck through, price drops,
+verdict flips to Go — all from the sample fixture), the reading-progress
+hairline, and the primary-sources strip derived from the research file's
+actual URL hosts.
+
+**Then the data went everywhere (#137, #138).** A new homepage
+eye-catcher — the **spread board**: "The trackers disagree too. We carry
+the spread," drawing the three widest real divergences as range bars
+(LA office 17.8–25.8% is 8 points of honest daylight). The
+compare-two-markets tool sets office/industrial/multifamily side by
+side for any two metros. Deal pages sort your sector's benchmarks
+first. /demo shows the sample submarket's asset-type line, /why tells
+the story, and the pulse board credits its "68 sourced sector figures"
+— a derived count, not a typed claim. Plus six research gap fills
+(Boston industrial 12.8%, Chicago office rent $43.90, LA industrial
+rent, NYC office rent, Seattle office widened to its honest metro band,
+four multifamily cap fills each with the basis named), one more
+implausible aggregator figure rejected on the record, and the
+Philadelphia cap mystery solved: the templated page's "local" caps are
+CBRE's national averages in disguise.
+
+**And the screen itself now speaks each sector's language (#141).** The
+assumption challenger keeps its shared floor (tax reset, opex ratio,
+loss-to-lease, legacy insurance — the multifamily playbook that was
+always the foundation) and adds named trap lists per asset type: office
+OMs get grilled on WALT rollover inside the hold, TI/LC at today's
+packages, face-vs-effective rent, and sublease shadow space; industrial
+on clear height and dock fit, mark-to-market proven against current
+asking, tenant concentration, and excess-land stories; retail on
+co-tenancy clauses, occupancy-cost ratios, and recovery math. The
+market check calibrates each sector past its prior cycle. Nine lock
+tests pin the contract; multifamily prompts are byte-identical to
+before.
+
+**And the board itself now rotates asset classes (#144, your call).** You
+said the pulse tiles shouldn't lead with a 2BR rent — "relation to
+something with a real asset class like office industrial multi and rotate
+it." Now every tile cycles through the sectors its metro's research
+actually carries: office first, then industrial, multifamily, retail —
+vacancy (or the tracker spread), asking rent, cap band per face. A metro
+missing a sector skips that face rather than faking one; reduced-motion
+visitors get a pinned first face; screen readers get every read as one
+plain sentence. The rotation exposed the thinnest tiles, so #145 filled
+them the same hour: NoVA office lands as the honest 20.8–21.3% Newmark/
+CBRE spread (both Q2 2026, both tightening while the District sets record
+highs), and PG + Montgomery County get Colliers' 19.2% with the base
+declared — it's the Suburban-Maryland survey area, both counties
+together, not a county split. DC-district retail still has no dated 2026
+figure from a named house after three more search angles; that gap stays
+written down, not papered over.
+
+| Change | Where to look |
+|---|---|
+| Pulse tiles rotate office / industrial / MF / retail | homepage board (#144) |
+| DMV office fills — NoVA spread, Suburban MD base | /market?metro=nova (#145) |
+| PG industrial banded 6.0–10.1 · NNJ retail vintage declared | /market briefs (#146) |
+| Richmond retail — 12th retail market · Atlanta cap texture | /market?metro=richmond (#147) |
+| Hero rotator + markets band lead with sector reads | homepage · /why · /demo (#150) |
+| /why claims all four asset types · /demo retail-ready | /why (#151) |
+| Mobile fix — hero no longer clips, walkthrough tabs swipe | homepage on a phone (#152) |
+| DC retail 6.3% historic high · Philly construct-held · MoCo $6.94/SF | /market briefs (#154) |
+| Hampton Roads retail 4.4–4.6% — the retail program closes | /market?metro=norfolk_hampton_roads (#155) |
+| Baltimore retail direction sourced, level held open honestly | /market?metro=baltimore (#156) |
+| Sector leaderboards — 15 markets ranked per asset class | /market?sector=office · industrial · multifamily · retail (#157) |
+| The sector lens — board names the tightest market per class | homepage board strip → the rankings (#158) |
+| Rank chips — every brief's sector read says where it sits | /market?metro=nova industrial #1 of 17 (#159) |
+| Cap hunt: 8th + 9th loan-store catches · Yardi Baltimore texture | /market?metro=baltimore · richmond (#160) |
+| Sample screen carries Philly's pack positions | /demo asset-type line (#161) |
+| Changelog becomes a tour — day groups, momentum line, live links | /whats-new (#162) |
+| Deal-page benchmark units fixed ($17.7 vacancy no more) + rank chips | deal pages' vs-market panel (#163) |
+| Sector-aware challenger + market check | upload any office/industrial/retail OM (#141) |
+| Retail — the fourth asset type, 10 of 15 markets | /market briefs (#141, #142) |
+| Baltimore's 10.0-vs-20.9 denominator lesson | /market?metro=baltimore + spread board (#142) |
+| Cap rates on the briefs, basis always named | /market, any metro (#139, #140) |
+| Sector reads on the research ticker | homepage ticker (#140) |
+| "By asset type" sector panel, all 15 markets | /market, any metro (#134, #136) |
+| Spread board — the trackers disagree | homepage (#137) |
+| Compare: sectors side by side | /market, compare card (#138) |
+| Sector figures in deal benchmarks, your sector first | any deal's vs-market panel |
+| Pulse board · IRR gauge · verdict stamp | homepage (#132) |
+| Retrade replay · scroll hairline · sources strip | homepage (#133) |
+
 ## Monday evening (Aug 24 ET) — your three call-outs, answered: legal on the sample, a deeper model, cool stuff everywhere
 
 Three more PRs, each probe-verified live (#128–#130), built directly

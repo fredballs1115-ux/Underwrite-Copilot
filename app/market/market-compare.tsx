@@ -6,6 +6,14 @@ import Link from "next/link";
 // Compact, serializable per-metro facts the server derives from the research
 // layer (metros.json) — this component only arranges them. Bars share ONE
 // dollar scale across both picks so the visual comparison is honest.
+export type CompareSector = {
+  vLow?: number;
+  vHigh?: number;
+  rent?: number;
+  capLow?: number;
+  capHigh?: number;
+};
+
 export type CompareMetro = {
   id: string;
   name: string;
@@ -13,9 +21,30 @@ export type CompareMetro = {
   fmr: Partial<Record<"0br" | "1br" | "2br" | "3br", number>> & {
     status?: string;
   };
+  sectors?: Partial<
+    Record<"office" | "industrial" | "multifamily" | "retail", CompareSector>
+  >;
   ruleCount: number;
   compsLive: boolean;
 };
+
+const SECTOR_ROWS = ["office", "industrial", "multifamily", "retail"] as const;
+
+// One cell of the asset-type table: the vacancy read (single figure or the
+// tracker spread), with rent / cap appended when the research carries them.
+// A missing read renders an em dash — a gap, not a zero.
+function sectorCell(s: CompareSector | undefined): string {
+  if (!s || typeof s.vLow !== "number") return "—";
+  const v =
+    s.vHigh != null && s.vHigh !== s.vLow
+      ? `${s.vLow}–${s.vHigh}%`
+      : `${s.vLow}%`;
+  const extras: string[] = [];
+  if (typeof s.rent === "number") extras.push(`$${s.rent.toFixed(2)}/SF`);
+  if (typeof s.capLow === "number" && typeof s.capHigh === "number")
+    extras.push(`cap ${s.capLow}–${s.capHigh}%`);
+  return extras.length > 0 ? `${v} · ${extras.join(" · ")}` : v;
+}
 
 const BEDS = ["0br", "1br", "2br", "3br"] as const;
 
@@ -156,6 +185,43 @@ export function MarketCompare({ metros }: { metros: CompareMetro[] }) {
           </div>
         ))}
       </div>
+      {(a.sectors || b.sectors) && (
+        <div className="mt-4 overflow-x-auto">
+          <p className="text-[10px] uppercase tracking-wide text-muted">
+            Asset-type read · vacancy, asking rent, cap where sourced
+          </p>
+          <table className="mt-1.5 w-full min-w-[28rem] text-left text-[11px]">
+            <thead>
+              <tr className="text-muted">
+                <th className="w-24 py-1 pr-2 font-medium">Sector</th>
+                <th className="py-1 pr-2 font-medium">{a.name}</th>
+                <th className="py-1 font-medium">{b.name}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {SECTOR_ROWS.map((sec) => (
+                <tr key={sec} className="border-t border-line/60">
+                  <td className="py-1.5 pr-2 font-medium capitalize text-ink">
+                    {sec}
+                  </td>
+                  {[a, b].map((m) => (
+                    <td
+                      key={m.id}
+                      className="py-1.5 pr-2 font-mono tabular-nums text-muted"
+                    >
+                      {sectorCell(m.sectors?.[sec])}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="mt-1 text-[10px] text-muted">
+            Ranges are tracker spreads, shown rather than averaged; an em dash
+            is a recorded gap. Sources and bases in each metro brief.
+          </p>
+        </div>
+      )}
       {spread !== null && (
         <p className="mt-3 text-[12px] text-muted">
           2BR spread:{" "}

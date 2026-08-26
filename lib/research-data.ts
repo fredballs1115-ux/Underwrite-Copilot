@@ -136,6 +136,73 @@ export function seedBenchmarks(): Benchmark[] {
     }
   }
 
+  // Per-metro sector snapshots (office / industrial / multifamily
+  // fundamentals from brokerage research, two-source bar) — one benchmark
+  // row per figure actually carried, flowing to deal pages and Compare via
+  // benchmarksForDeal. Divergent trackers encode as the observed low–high
+  // spread, never averaged; a null figure emits no row (a gap is a gap).
+  type SnapshotBlock = {
+    vacancy_pct?: number | null;
+    vacancy_pct_low?: number | null;
+    vacancy_pct_high?: number | null;
+    asking_rent_psf?: number | null;
+    cap_rate_low_pct?: number | null;
+    cap_rate_high_pct?: number | null;
+    status?: string;
+    sources?: string[];
+    note?: string;
+  };
+  for (const m of metrosSeed.metros ?? []) {
+    const snap = (
+      m as { sector_snapshot?: Record<string, SnapshotBlock | string> | null }
+    ).sector_snapshot;
+    if (!snap) continue;
+    const snapAsOf = typeof snap.as_of === "string" ? snap.as_of : "2026-08-25";
+    for (const [sector, blk] of Object.entries(snap)) {
+      if (sector === "as_of" || typeof blk === "string" || !blk) continue;
+      const base = {
+        sector,
+        metro: m.name,
+        as_of: snapAsOf,
+        status: (blk.status as Benchmark["status"]) ?? "sourced",
+        source: blk.sources?.[0] ?? "",
+        note: blk.note ?? null,
+      };
+      const vLow = blk.vacancy_pct ?? blk.vacancy_pct_low;
+      const vHigh = blk.vacancy_pct ?? blk.vacancy_pct_high ?? vLow;
+      if (typeof vLow === "number") {
+        out.push({
+          ...base,
+          metric: `${sector}_vacancy_pct`,
+          low: vLow,
+          high: typeof vHigh === "number" ? vHigh : vLow,
+          unit: "pct",
+        });
+      }
+      if (typeof blk.asking_rent_psf === "number") {
+        out.push({
+          ...base,
+          metric: `${sector}_asking_rent_psf`,
+          low: blk.asking_rent_psf,
+          high: blk.asking_rent_psf,
+          unit: "usd_sf_yr",
+        });
+      }
+      if (
+        typeof blk.cap_rate_low_pct === "number" &&
+        typeof blk.cap_rate_high_pct === "number"
+      ) {
+        out.push({
+          ...base,
+          metric: `${sector}_cap_rate_pct`,
+          low: blk.cap_rate_low_pct,
+          high: blk.cap_rate_high_pct,
+          unit: "pct",
+        });
+      }
+    }
+  }
+
   // Sector cap-rate bands from the sector research files — national tiers
   // (metro ""), one row per tier that actually carries a number. Unverified
   // tiers (low/high null) are deliberately NOT rows: a gap is a gap.
@@ -297,4 +364,28 @@ export function pricePerUnit(priceText?: string | null, sizeText?: string | null
   const u = sizeText && /\bunits?\b/i.test(sizeText) ? num(sizeText) : undefined;
   if (!p || !u || u < 1) return null;
   return Math.round(p / u);
+}
+
+/** Format a benchmark's low–high for display, by what the metric IS: percent
+ *  figures (vacancy, cap rates, PMMS) get %, per-square-foot rents get $/SF,
+ *  monthly-sales and listing counts are plain counts, and dollar figures
+ *  (FMRs, sale medians) keep the $ prefix. A blanket $ prefix printed
+ *  "office vacancy: $17.7" on deal pages — units follow the metric now. */
+export function fmtBenchValue(
+  metric: string,
+  low?: number | null,
+  high?: number | null,
+): string {
+  const range = (f: (n: number) => string): string => {
+    if (typeof low !== "number") return "—";
+    return typeof high !== "number" || high === low
+      ? f(low)
+      : `${f(low)}–${f(high)}`;
+  };
+  if (/_vacancy_pct$|_cap_rate_pct$/.test(metric) || metric === "pmms_30y_fixed")
+    return range((n) => `${n}%`);
+  if (/_asking_rent_psf$/.test(metric)) return range((n) => `$${n.toFixed(2)}/SF`);
+  if (metric === "monthly_sales_2_4_unit" || metric === "active_listings_2_4_unit")
+    return range((n) => n.toLocaleString());
+  return range((n) => `$${n.toLocaleString()}`);
 }

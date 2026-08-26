@@ -4,8 +4,13 @@
 // nothing.
 
 import { describe, expect, it } from "vitest";
-import { benchmarksForDeal, seedBenchmarks } from "@/lib/research-data";
+import {
+  benchmarksForDeal,
+  fmtBenchValue,
+  seedBenchmarks,
+} from "@/lib/research-data";
 import { metroForAddress } from "@/lib/market-match";
+import metrosSeed from "@/data/research/metros.json";
 
 const seeds = seedBenchmarks();
 
@@ -51,5 +56,111 @@ describe("benchmarksForDeal", () => {
   it("no city and no metro means no rows — never the whole national list", () => {
     expect(benchmarksForDeal(seeds, null, null)).toHaveLength(0);
     expect(benchmarksForDeal(seeds, "", "")).toHaveLength(0);
+  });
+});
+
+describe("sector snapshot benchmark rows", () => {
+  it("emits Philadelphia office vacancy as the observed tracker spread", () => {
+    const row = seeds.find(
+      (b) => b.metric === "office_vacancy_pct" && b.metro.startsWith("Philadelphia"),
+    );
+    expect(row).toBeTruthy();
+    expect(row!.low).toBe(17.7);
+    expect(row!.high).toBe(22.3);
+    expect(row!.sector).toBe("office");
+  });
+
+  it("emits the DC multifamily cap band and NoVA industrial rent", () => {
+    const cap = seeds.find(
+      (b) => b.metric === "multifamily_cap_rate_pct" && b.metro === "Washington DC",
+    );
+    expect(cap).toBeTruthy();
+    expect(cap!.low).toBe(4.75);
+    expect(cap!.high).toBe(5.5);
+    const nova = seeds.find(
+      (b) => b.metric === "industrial_asking_rent_psf" && b.metro === "Northern Virginia",
+    );
+    expect(nova).toBeTruthy();
+    expect(nova!.low).toBeCloseTo(17.44, 2);
+  });
+
+  it("emits NO cap-rate row where the research deliberately carries null", () => {
+    // Atlanta's MF cap is a documented gap (conflicting constructs across
+    // trackers) — the generator must not conjure a row from the nulls.
+    // (Philadelphia held this role until its Northmarq fill on Aug 25.)
+    const row = seeds.find(
+      (b) => b.metric === "multifamily_cap_rate_pct" && b.metro.startsWith("Atlanta"),
+    );
+    expect(row).toBeUndefined();
+    // And the Philadelphia fill emits with its exact Northmarq band.
+    const philly = seeds.find(
+      (b) => b.metric === "multifamily_cap_rate_pct" && b.metro.startsWith("Philadelphia"),
+    );
+    expect(philly).toBeTruthy();
+    expect(philly!.low).toBe(5.0);
+    expect(philly!.high).toBe(5.7);
+  });
+
+  it("every snapshot row carries provenance", () => {
+    const snapRows = seeds.filter((b) =>
+      /_(vacancy_pct|asking_rent_psf|cap_rate_pct)$/.test(b.metric),
+    );
+    expect(snapRows.length).toBeGreaterThanOrEqual(8);
+    for (const r of snapRows) {
+      expect(r.source, `${r.metro} ${r.metric}`).toMatch(/^https?:\/\//);
+      expect(r.as_of).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    }
+  });
+  it("the homepage spread board has at least three real divergences to draw", () => {
+    // The SpreadBoard derives (metro, sector) pairs where two named trackers
+    // publish different vacancy figures. Lock the derivation's ground truth:
+    // the widest spread today is LA office (17.8-25.8), and there are always
+    // at least three genuine spreads to fill the board.
+    const rows: { name: string; sector: string; low: number; high: number }[] = [];
+    for (const m of metrosSeed.metros ?? []) {
+      const snap = (m as { sector_snapshot?: Record<string, unknown> | null }).sector_snapshot;
+      if (!snap) continue;
+      for (const [sector, blk] of Object.entries(snap)) {
+        if (sector === "as_of" || typeof blk !== "object" || blk == null) continue;
+        const b = blk as { vacancy_pct?: number | null; vacancy_pct_low?: number | null; vacancy_pct_high?: number | null };
+        const low = b.vacancy_pct ?? b.vacancy_pct_low;
+        const high = b.vacancy_pct ?? b.vacancy_pct_high;
+        if (typeof low === "number" && typeof high === "number" && high > low) {
+          rows.push({ name: m.name, sector, low, high });
+        }
+      }
+    }
+    rows.sort((a, b) => b.high - b.low - (a.high - a.low));
+    expect(rows.length).toBeGreaterThanOrEqual(3);
+    // Baltimore office took the top slot on Aug 25 when the KLNB all-inventory
+    // read (10.0) widened the band against CBRE's competitive 20.9 — the
+    // starkest basis divergence on the board.
+    expect(rows[0].name).toBe("Baltimore MD");
+    expect(rows[0].sector).toBe("office");
+    expect(rows[0].low).toBeCloseTo(10.0, 3);
+    expect(rows[0].high).toBeCloseTo(20.9, 3);
+    // LA office (17.8–25.8) still rides in the top three.
+    expect(
+      rows.slice(0, 3).some((r) => r.name === "Los Angeles" && r.sector === "office"),
+    ).toBe(true);
+  });
+});
+
+describe("fmtBenchValue", () => {
+  it("formats percent metrics with % and never $", () => {
+    expect(fmtBenchValue("office_vacancy_pct", 17.7, 22.3)).toBe("17.7%–22.3%");
+    expect(fmtBenchValue("multifamily_cap_rate_pct", 4.75, 5.5)).toBe("4.75%–5.5%");
+    expect(fmtBenchValue("multifamily_vacancy_pct", 5.2, 5.2)).toBe("5.2%");
+    expect(fmtBenchValue("pmms_30y_fixed", 6.5, null)).toBe("6.5%");
+  });
+  it("formats rents as $/SF and counts plain", () => {
+    expect(fmtBenchValue("industrial_asking_rent_psf", 13.27, 13.27)).toBe("$13.27/SF");
+    expect(fmtBenchValue("monthly_sales_2_4_unit", 58, 58)).toBe("58");
+    expect(fmtBenchValue("active_listings_2_4_unit", 1200, null)).toBe("1,200");
+  });
+  it("keeps dollars for sale medians and FMRs, dash for missing", () => {
+    expect(fmtBenchValue("median_sale_price_2_4_unit", 450000, 520000)).toBe("$450,000–$520,000");
+    expect(fmtBenchValue("hud_fmr_fy2026_2br", 2044, 2044)).toBe("$2,044");
+    expect(fmtBenchValue("median_sale_price_2_4_unit", null, null)).toBe("—");
   });
 });

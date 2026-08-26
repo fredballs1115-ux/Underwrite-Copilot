@@ -68,6 +68,7 @@ const SECTIONS: { h: string; body: string[] }[] = [
     body: [
       `Give a deal an address and the app checks the local rules: rent control coverage, small-landlord exemptions, purchase rights — ${RULE_COUNT} machine-evaluable rules focused on the Mid-Atlantic and the ${MAJOR_MARKET_COUNT} biggest US markets, DC to Brooklyn to LA to Chicago. It answers with the statute linked, or names the exact open question — year built, whether you'll live in a unit — and takes your answer right on the deal. Unknown jurisdictions say so — never a silent pass.`,
       `Recorded sales nearby pull automatically from government records — live county APIs in ${COVERAGE_SUMMARY} today, plus a bulk property database of government deed records with ${WIRED_MARKETS.join(", ")} pipelines wired. Public records, clearly labeled. Not an appraisal.`,
+      `And every covered market carries an asset-type read — office, industrial, multifamily, and retail vacancy, asking rents, and cap bands from named research houses, each figure dated and source-linked. Where the trackers disagree the brief shows the spread instead of averaging it away, and a gap stays a recorded gap. Deal pages benchmark against the same rows automatically, your sector first.`,
     ],
   },
   {

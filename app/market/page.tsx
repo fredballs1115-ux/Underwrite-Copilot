@@ -14,12 +14,152 @@ import { looseValue, SECTORS } from "@/lib/research-sectors";
 import { COVERAGE_DISCOVERY, COVERAGE_SUMMARY, PROVIDERS } from "@/lib/public-comps/core";
 import metrosSeed from "@/data/research/metros.json";
 import multifamilySeed from "@/data/research/multifamily.json";
+import {
+  sectorLeaderboard,
+  type SnapBlock,
+} from "@/lib/sector-leaderboard";
 import { CopyCite } from "./copy-cite";
-import { MarketCompare, type CompareMetro } from "./market-compare";
+import {
+  MarketCompare,
+  type CompareMetro,
+  type CompareSector,
+} from "./market-compare";
 
 // The compare tool's compact per-metro facts, derived once from the research
 // layer — FMR row, rule count, comps-feed state. Serializable: it crosses the
 // server → client boundary as props.
+/** "By asset type" — the metro's sector fundamentals from the research
+ *  layer's snapshot blocks: vacancy (a spread when trackers diverge — the
+ *  divergence is shown, never averaged), asking rent, and cap-rate bands,
+ *  each with its status chip and provenance note. Metros without a snapshot
+ *  say so honestly. */
+const SECTOR_LABEL: Record<string, string> = {
+  multifamily: "Multifamily",
+  office: "Office",
+  industrial: "Industrial",
+  retail: "Retail",
+};
+// Where each metro sits in its sector's cross-metro ranking (tightest first),
+// keyed sector → metro id — same shared builder the leaderboard table and the
+// homepage lens render, so a brief's chip can never disagree with the table.
+// Metros without a numeric vacancy for a sector simply have no rank entry.
+const SECTOR_RANKS: Record<
+  string,
+  Record<string, { rank: number; total: number }>
+> = Object.fromEntries(
+  ["office", "industrial", "multifamily", "retail"].map((sec) => {
+    const ranked = sectorLeaderboard(sec).rows.filter((r) => r.vLow !== null);
+    return [
+      sec,
+      Object.fromEntries(
+        ranked.map((r, i) => [r.id, { rank: i + 1, total: ranked.length }]),
+      ),
+    ];
+  }),
+);
+function SectorSnapshotPanel({
+  snapshot,
+  metroId,
+}: {
+  snapshot: Record<string, unknown> | null;
+  metroId?: string;
+}) {
+  const entries = Object.entries(snapshot ?? {}).filter(
+    (e): e is [string, SnapBlock] => e[0] !== "as_of" && typeof e[1] === "object",
+  );
+  const asOf = typeof snapshot?.as_of === "string" ? snapshot.as_of : null;
+  return (
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+        By asset type
+        {asOf && (
+          <span className="ml-1.5 font-normal normal-case tracking-normal">
+            · fundamentals as of {asOf}
+          </span>
+        )}
+      </p>
+      {entries.length === 0 ? (
+        <p className="mt-1.5 text-xs text-muted">
+          Sector fundamentals for this metro queue in the next research batch
+          — unscreened, never guessed.
+        </p>
+      ) : (
+        <ul className="mt-2 space-y-2.5">
+          {entries.map(([sector, b]) => {
+            const vLow = b.vacancy_pct ?? b.vacancy_pct_low;
+            const vHigh = b.vacancy_pct ?? b.vacancy_pct_high ?? vLow;
+            const bits: string[] = [];
+            if (typeof vLow === "number") {
+              bits.push(
+                vLow === vHigh
+                  ? `vacancy ${vLow}%`
+                  : `vacancy ${vLow}–${vHigh}%`,
+              );
+            }
+            if (typeof b.asking_rent_psf === "number") {
+              bits.push(
+                `asking $${b.asking_rent_psf.toFixed(2)}/SF${b.rent_basis ? ` (${b.rent_basis})` : ""}`,
+              );
+            }
+            if (
+              typeof b.cap_rate_low_pct === "number" &&
+              typeof b.cap_rate_high_pct === "number"
+            ) {
+              bits.push(`cap ${b.cap_rate_low_pct}–${b.cap_rate_high_pct}%`);
+            }
+            return (
+              <li key={sector} className="rounded-lg border border-line/70 p-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold">
+                    {SECTOR_LABEL[sector] ?? sector.replace(/_/g, " ")}
+                  </span>
+                  <span className="font-mono text-xs tabular-nums text-ink">
+                    {bits.length > 0 ? bits.join(" · ") : "figures pending"}
+                  </span>
+                  {metroId && SECTOR_RANKS[sector]?.[metroId] && (
+                    <Link
+                      href={`/market?sector=${sector}`}
+                      title={`rank among covered-market ${SECTOR_LABEL[sector] ?? sector} vacancy reads, tightest first`}
+                      className="rounded-full border border-line px-1.5 py-px text-[10px] font-medium text-muted transition-colors hover:border-brand hover:text-brand"
+                    >
+                      #{SECTOR_RANKS[sector][metroId].rank} of{" "}
+                      {SECTOR_RANKS[sector][metroId].total}
+                    </Link>
+                  )}
+                  <span
+                    className={`ml-auto rounded px-1.5 py-px text-[10px] font-medium ${
+                      b.status === "verified"
+                        ? "bg-emerald-500/10 text-emerald-600"
+                        : "bg-brand/10 text-brand"
+                    }`}
+                  >
+                    {b.status ?? "sourced"}
+                  </span>
+                  {b.sources?.[0] && (
+                    <a
+                      href={b.sources[0]}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[10px] text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
+                    >
+                      source
+                    </a>
+                  )}
+                </div>
+                {b.note && (
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted">
+                    {b.note}
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) => {
   const fmr = (m as { fmr_fy2026?: CompareMetro["fmr"] | null }).fmr_fy2026 ?? {};
   const beds: CompareMetro["fmr"] = { status: fmr.status };
@@ -27,11 +167,49 @@ const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) => {
     const v = fmr[k];
     if (typeof v === "number") beds[k] = v;
   }
+  // Sector fundamentals for the compare table, from the same snapshot blocks
+  // the "By asset type" panel renders — nulls simply produce no entry.
+  const snap = (m as { sector_snapshot?: Record<string, unknown> | null })
+    .sector_snapshot;
+  let sectors: CompareMetro["sectors"];
+  if (snap) {
+    sectors = {};
+    for (const sec of ["office", "industrial", "multifamily", "retail"] as const) {
+      const blk = snap[sec] as
+        | {
+            vacancy_pct?: number | null;
+            vacancy_pct_low?: number | null;
+            vacancy_pct_high?: number | null;
+            asking_rent_psf?: number | null;
+            cap_rate_low_pct?: number | null;
+            cap_rate_high_pct?: number | null;
+          }
+        | undefined;
+      if (!blk) continue;
+      const s: CompareSector = {};
+      const vLow = blk.vacancy_pct ?? blk.vacancy_pct_low;
+      const vHigh = blk.vacancy_pct ?? blk.vacancy_pct_high ?? vLow;
+      if (typeof vLow === "number") {
+        s.vLow = vLow;
+        if (typeof vHigh === "number") s.vHigh = vHigh;
+      }
+      if (typeof blk.asking_rent_psf === "number") s.rent = blk.asking_rent_psf;
+      if (
+        typeof blk.cap_rate_low_pct === "number" &&
+        typeof blk.cap_rate_high_pct === "number"
+      ) {
+        s.capLow = blk.cap_rate_low_pct;
+        s.capHigh = blk.cap_rate_high_pct;
+      }
+      if (Object.keys(s).length > 0) sectors[sec] = s;
+    }
+  }
   return {
     id: m.id,
     name: m.name,
     region: (m as { region?: string }).region ?? "More markets",
     fmr: beds,
+    sectors,
     ruleCount: ((m as { rule_ids?: string[] }).rule_ids ?? []).length,
     compsLive:
       typeof m.comps_provider === "string" && m.comps_provider !== "discovery",
@@ -414,6 +592,15 @@ async function MetroExplorer({ selected }: { selected?: string }) {
           </span>
         </p>
 
+        <SectorSnapshotPanel
+          snapshot={
+            (active as {
+              sector_snapshot?: Record<string, unknown> | null;
+            }).sector_snapshot ?? null
+          }
+          metroId={active.id}
+        />
+
         {typeof fmr?.["2br"] === "number" ? (
           <div className="text-sm">
             <span className="text-[11px] uppercase tracking-wide text-muted">
@@ -600,6 +787,108 @@ async function MetroExplorer({ selected }: { selected?: string }) {
   );
 }
 
+// ── Sector leaderboard (cross-metro) ─────────────────────────────────────────
+// The same snapshot blocks the metro tiles render, flipped the other way: one
+// asset class at a time, every covered market with a numeric read, ranked
+// tightest to loosest — built by the shared lib/sector-leaderboard helper
+// (the homepage sector-lens strip derives from the same function). Only the
+// four snapshot-tracked classes produce rows; other sector tabs render the
+// research doc alone.
+function SectorLeaderboard({ sector }: { sector: string }) {
+  const { rows, heldOpen } = sectorLeaderboard(sector);
+  if (rows.length === 0 && heldOpen.length === 0) return null;
+  const label = SECTOR_LABEL[sector] ?? sector;
+  const anyRent = rows.some((r) => r.rent !== null);
+  const anyCap = rows.some((r) => r.capLow !== null);
+  const band = (lo: number, hi: number | null) =>
+    hi === null || hi === lo ? `${lo}%` : `${lo}–${hi}%`;
+  return (
+    <div>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
+          {label} across the covered markets
+        </h3>
+        <span className="text-[11px] text-muted">
+          ranked tightest to loosest · vintages vary by print — each metro page
+          declares them
+        </span>
+      </div>
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full min-w-[440px] text-left text-sm">
+          <thead>
+            <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
+              <th className="py-1.5 pr-2 font-medium">#</th>
+              <th className="py-1.5 pr-3 font-medium">Market</th>
+              <th className="py-1.5 pr-3 font-medium">Vacancy</th>
+              {anyRent && <th className="py-1.5 pr-3 font-medium">Asking $/SF</th>}
+              {anyCap && <th className="py-1.5 pr-3 font-medium">Cap range</th>}
+              <th className="py-1.5 font-medium">Src</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => {
+              // Sorted with every vacancy-ranked row first, so index = rank.
+              return (
+                <tr key={r.id} className="border-b border-line/60">
+                  <td className="py-1.5 pr-2 font-mono text-[11px] tabular-nums text-muted">
+                    {r.vLow !== null ? i + 1 : "—"}
+                  </td>
+                  <td className="py-1.5 pr-3">
+                    <Link
+                      href={`/market?metro=${r.id}`}
+                      className="text-xs font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
+                    >
+                      {r.name}
+                    </Link>
+                  </td>
+                  <td className="py-1.5 pr-3 font-mono text-xs tabular-nums">
+                    {r.vLow !== null ? band(r.vLow, r.vHigh) : "level open"}
+                  </td>
+                  {anyRent && (
+                    <td
+                      className="py-1.5 pr-3 font-mono text-xs tabular-nums"
+                      title={r.rentBasis ?? undefined}
+                    >
+                      {r.rent !== null ? `$${r.rent.toFixed(2)}` : "—"}
+                    </td>
+                  )}
+                  {anyCap && (
+                    <td className="py-1.5 pr-3 font-mono text-xs tabular-nums">
+                      {r.capLow !== null && r.capHigh !== null
+                        ? band(r.capLow, r.capHigh)
+                        : "—"}
+                    </td>
+                  )}
+                  <td className="py-1.5 text-[11px] text-muted">
+                    {r.source && linkOk(r.source) !== false ? (
+                      <a
+                        href={r.source}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline decoration-dotted underline-offset-2 hover:text-ink"
+                      >
+                        source
+                      </a>
+                    ) : (
+                      "on file"
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {heldOpen.length > 0 && (
+        <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
+          Direction on file, numeric level held open: {heldOpen.join(" · ")} —
+          the metro pages carry the sourced notes.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ── Sector explorer (every asset type) ──────────────────────────────────────
 // The full research file for EVERY asset class, rendered: cycle position,
 // cap-rate ranges (ranges, never single numbers), supply/demand, debt terms,
@@ -727,6 +1016,8 @@ function SectorExplorer({ selected }: { selected?: string }) {
             {unpriced.map((r) => r.tier).filter(Boolean).join("; ")}.
           </p>
         )}
+
+        <SectorLeaderboard sector={active.id} />
 
         {(supply || debt) && (
           <div className="grid gap-3 sm:grid-cols-2">

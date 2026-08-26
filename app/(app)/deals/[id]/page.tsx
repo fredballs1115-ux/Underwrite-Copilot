@@ -793,6 +793,7 @@ export default async function DealPage({
           sectorFields={
             ((deal as { sector_fields?: SectorFieldValues | null }).sector_fields) ?? null
           }
+          assetClass={(deal.asset_class as string) ?? null}
         />
       </div>
     </div>

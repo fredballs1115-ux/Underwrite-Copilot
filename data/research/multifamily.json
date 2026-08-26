@@ -26,48 +26,95 @@
       "status": "sourced",
       "sources": [
         "https://blog.firstam.com/cre-insights/multifamily-cap-rates-poised-to-slip-in-2026",
-        "https://www.cbre.com/insights/books/us-real-estate-market-outlook-2026/multifamily"
+        "https://www.cbre.com/insights/books/us-real-estate-market-outlook-2026/multifamily",
+        "https://www.cbre.com/insights/reports/us-cap-rate-survey-h1-2026"
       ],
-      "note": "National average ~5.04%, flat for several quarters (longest plateau in 25 years); stable assets 4.5-5.0%, value-add ~6.0%. Sector enters 2026 after absorbing the largest supply wave since the 1980s; vacancy 4.4% vs 5.2% 2010s average, expected to drift up near-term. As-of 2026-08-21 snippet pass."
+      "note": "National average ~5.04%, flat for several quarters (longest plateau in 25 years); stable assets 4.5-5.0%, value-add ~6.0%. Sector enters 2026 after absorbing the largest supply wave since the 1980s; vacancy 4.4% vs 5.2% 2010s average, expected to drift up near-term. CBRE's H1 2026 Cap Rate Survey (3,600 estimates, 50+ markets) adds the per-class detail: Class A 4.74% flat, Class B compressed to 4.92%, Class C 5.38%; gateway core (NY/Boston/LA) most compressed at 4-5%, secondary/value-add 5.5-6.5%; infill multifamily the most bearish subtype. As-of 2026-08-25 pass (prior 08-21)."
     },
     {
       "tier": "value-add multifamily (institutional)",
       "low": 0.06,
       "high": 0.06,
       "status": "sourced",
-      "sources": ["https://www.pwc.com/us/en/industries/financial-services/asset-wealth-management/real-estate/emerging-trends-in-real-estate-pwc-uli/property-type-outlook/multifamily-housing.html"],
+      "sources": [
+        "https://www.pwc.com/us/en/industries/financial-services/asset-wealth-management/real-estate/emerging-trends-in-real-estate-pwc-uli/property-type-outlook/multifamily-housing.html"
+      ],
       "note": "~6.0% per 2026 outlook coverage; single point, not a band."
     }
   ],
   "supply_demand": {
     "on_market_depth_may_2026": {
       "value": {
-        "providence_ri": { "monthly_sales": "151-155 (Mar-May 2026)", "active_listings": 438, "median_sale_price": 610000 },
-        "philadelphia_pa": { "monthly_sales": 40, "active_listings": 366, "median_sale_price": 363500, "yoy": "+6.9%" },
-        "scranton_pa": { "monthly_sales": 67, "median_sale_price": 225000, "yoy": "flat" },
-        "albany_ny": { "monthly_sales": 63, "median_sale_price": 255000, "yoy": "+6.2%" },
-        "reading_pa": { "monthly_sales": 12, "median_sale_price": 279000 },
-        "hartford_ct": { "monthly_sales": 61, "median_sale_price": 426000, "yoy": "+12.8%" },
-        "new_haven_ct": { "monthly_sales": 81, "median_sale_price": 475000, "yoy": "+17.9%" },
-        "bridgeport_ct": { "monthly_sales": 42, "median_sale_price": 700000, "yoy": "+8.1%" }
+        "providence_ri": {
+          "monthly_sales": "151-155 (Mar-May 2026)",
+          "active_listings": 438,
+          "median_sale_price": 610000
+        },
+        "philadelphia_pa": {
+          "monthly_sales": 40,
+          "active_listings": 366,
+          "median_sale_price": 363500,
+          "yoy": "+6.9%"
+        },
+        "scranton_pa": {
+          "monthly_sales": 67,
+          "median_sale_price": 225000,
+          "yoy": "flat"
+        },
+        "albany_ny": {
+          "monthly_sales": 63,
+          "median_sale_price": 255000,
+          "yoy": "+6.2%"
+        },
+        "reading_pa": {
+          "monthly_sales": 12,
+          "median_sale_price": 279000
+        },
+        "hartford_ct": {
+          "monthly_sales": 61,
+          "median_sale_price": 426000,
+          "yoy": "+12.8%"
+        },
+        "new_haven_ct": {
+          "monthly_sales": 81,
+          "median_sale_price": 475000,
+          "yoy": "+17.9%"
+        },
+        "bridgeport_ct": {
+          "monthly_sales": 42,
+          "median_sale_price": 700000,
+          "yoy": "+8.1%"
+        }
       },
       "status": "sourced",
-      "sources": ["https://www.redfin.com/news/data-center/downloads/ — redfin_metro_market_tracker.tsv000.gz (S3, HTTP 200, updated 2026-06-02, periods through 2026-05-31, PROPERTY_TYPE='Multi-Family (2-4 Unit)')"],
+      "sources": [
+        "https://www.redfin.com/news/data-center/downloads/ — redfin_metro_market_tracker.tsv000.gz (S3, HTTP 200, updated 2026-06-02, periods through 2026-05-31, PROPERTY_TYPE='Multi-Family (2-4 Unit)')"
+      ],
       "note": "Directly fetched public dataset (single primary source)."
     },
     "stock_counts_acs_b25024": {
       "value": null,
       "status": "unverified_not_found",
-      "sources": ["https://api.census.gov/data/2023/acs/acs5/groups/B25024.html"],
+      "sources": [
+        "https://api.census.gov/data/2023/acs/acs5/groups/B25024.html"
+      ],
       "note": "Method verified (B25024_004E = 2-unit structures, B25024_005E = 3-4 unit structures, place-level queries documented); api.census.gov 403-blocked from this environment in prior passes — live re-fetch in progress; per-city counts land here when it succeeds."
     },
     "nova_scarcity": {
       "value": "Zillow category page 'Prince William County VA Duplex & Triplex Homes For Sale - 0 Homes' (July 2026); zero on-market 2-4 unit inventory in the county at snippet date.",
       "status": "sourced",
-      "sources": ["exact-phrase snippet confirmation across independent queries, July 2026"]
+      "sources": [
+        "exact-phrase snippet confirmation across independent queries, July 2026"
+      ]
     },
     "rents_fy2026_hud_fmr_dc_area": {
-      "value": { "0br": 1953, "1br": 2015, "2br": 2246, "3br": 2835, "4br": null },
+      "value": {
+        "0br": 1953,
+        "1br": 2015,
+        "2br": 2246,
+        "3br": 2835,
+        "4br": null
+      },
       "unit": "usd_month",
       "yoy_2br": "-2.9% (FY2025 metro 2BR was $2,314)",
       "status": "verified",
@@ -83,13 +130,17 @@
     "conventional_investor_2_4": {
       "value": "15-25% down investor conventional; rate premium over Freddie PMMS varies by LLPA grid. Current PMMS value pending live FRED fetch (MORTGAGE30US).",
       "status": "unverified_not_found",
-      "sources": ["https://fred.stlouisfed.org/series/MORTGAGE30US"],
+      "sources": [
+        "https://fred.stlouisfed.org/series/MORTGAGE30US"
+      ],
       "note": "Parameter fetch in progress; grid specifics (LLPAs by LTV/property type) queued."
     },
     "fha_house_hack_3_4_unit": {
       "value": "FHA owner-occupant on 3-4 units requires the HUD 4000.1 self-sufficiency test (net rental income from all units must cover PITI at the prescribed vacancy factor); CY2026 FHA loan limits for the DC metro by unit count reported via ML 2025-23 but dollar values did not survive verification.",
       "status": "unverified_not_found",
-      "sources": ["https://www.hud.gov/program_offices/administration/hudclips/handbooks/hsgh (Handbook 4000.1)"],
+      "sources": [
+        "https://www.hud.gov/program_offices/administration/hudclips/handbooks/hsgh (Handbook 4000.1)"
+      ],
       "note": "Test mechanics and limit dollar values queued for the FY2026 fetch; never estimate."
     },
     "dscr": {
@@ -104,8 +155,24 @@
       "metro": "Philadelphia, PA",
       "why": "Deepest accessible stock at working prices: 366 active 2-4 unit listings (Redfin, May 2026) and ~1,075 multi-family listings on Homes.com (July 2026, $70k-$6M); $363,500 May 2026 median (+6.9% YoY); rowhouse duplex/triplex vintage matches a dated-product strategy; no rent control (PA); the one verified burden is the § 9-811 eviction-diversion 30-day pre-filing requirement.",
       "example_properties": [
-        { "address": "922 Ellsworth St, Philadelphia, PA 19147", "price": 575000, "metric": "duplex, ~1,665 sqft, Bella Vista/Italian Market, separately metered, listed ~2026-06-05", "source": "homes.com + remax.com + listing broker (snippet-confirmed x3)", "as_of": "2026-07-16", "status": "sourced", "note": "reconfirm live before acting" },
-        { "address": "2819 W Oxford St, Philadelphia, PA 19121", "price": null, "metric": "permitted 3-unit triplex, Brewerytown, all units occupied, stated unit rents ~$1,200-1,400/mo", "source": "homes.com + redfin + trulia + movoto (snippet-confirmed)", "as_of": "2026-07-16", "status": "sourced", "note": "reconfirm live before acting; list price NOT verified, unit mix inconsistent across sources" }
+        {
+          "address": "922 Ellsworth St, Philadelphia, PA 19147",
+          "price": 575000,
+          "metric": "duplex, ~1,665 sqft, Bella Vista/Italian Market, separately metered, listed ~2026-06-05",
+          "source": "homes.com + remax.com + listing broker (snippet-confirmed x3)",
+          "as_of": "2026-07-16",
+          "status": "sourced",
+          "note": "reconfirm live before acting"
+        },
+        {
+          "address": "2819 W Oxford St, Philadelphia, PA 19121",
+          "price": null,
+          "metric": "permitted 3-unit triplex, Brewerytown, all units occupied, stated unit rents ~$1,200-1,400/mo",
+          "source": "homes.com + redfin + trulia + movoto (snippet-confirmed)",
+          "as_of": "2026-07-16",
+          "status": "sourced",
+          "note": "reconfirm live before acting; list price NOT verified, unit mix inconsistent across sources"
+        }
       ]
     },
     {
@@ -127,7 +194,15 @@
       "metro": "DMV core (DC / PG County MD / NoVA)",
       "why": "Home market. DC: pre-1976 stock rent-stabilized UNLESS the verified natural-person <=4-unit exemption applies (LLC disqualifies) — post-1975 buildings exempt entirely; TOPA timeline on every purchase. PG County: PRSA cap (lesser of 6% or CPI-U+3%) with the natural-person <=5-unit exemption (no domicile condition per county FAQ). NoVA: no rent control anywhere, but near-zero on-market 2-4 inventory (Prince William read 0 listings in July 2026) — off-market sourcing (tax-delinquency pipeline verified in July 15 pass) is the entry.",
       "example_properties": [
-        { "address": "17423 & 17419 Wilson St, Dumfries, VA 22026", "price": 589000, "metric": "renovated 2-unit, in-place $4,300/mo (~8.8% gross yield), Bright MLS #VAPW2118338, re-listed after financing fall-through", "source": "snippet-confirmed across independent queries (Bright MLS via portal snippets)", "as_of": "2026-07-15", "status": "sourced", "note": "reconfirm live before acting" }
+        {
+          "address": "17423 & 17419 Wilson St, Dumfries, VA 22026",
+          "price": 589000,
+          "metric": "renovated 2-unit, in-place $4,300/mo (~8.8% gross yield), Bright MLS #VAPW2118338, re-listed after financing fall-through",
+          "source": "snippet-confirmed across independent queries (Bright MLS via portal snippets)",
+          "as_of": "2026-07-15",
+          "status": "sourced",
+          "note": "reconfirm live before acting"
+        }
       ]
     },
     {
