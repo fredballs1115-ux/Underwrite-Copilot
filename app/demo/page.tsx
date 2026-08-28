@@ -3,7 +3,7 @@ import Link from "next/link";
 import { LogoMark } from "@/app/logo";
 import { MarketsMarquee } from "@/app/markets-marquee";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
-import { FREE_DEALS } from "@/lib/marketing-constants";
+import { FREE_DEALS, DEEP_TOOLS } from "@/lib/marketing-constants";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { evaluateBuyBox, parsePct } from "@/lib/criteria";
@@ -413,6 +413,36 @@ export default function DemoPage() {
             makes the screen concrete. */}
         <div className="mt-10">
           <ModelSlideshow model={data.model} />
+        </div>
+
+        {/* What comes after the screen. Rendered from the SAME DEEP_TOOLS
+            constant the homepage's grid uses, so the sample screen and the
+            marketing page can never describe the product differently. */}
+        <div className="mt-12 rounded-2xl border border-line bg-faint/60 p-6">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted">
+            Past the screen
+          </p>
+          <h2 className="mt-2 text-xl font-semibold tracking-tight">
+            This sample is the triage. Four more tools pick up where it stops.
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
+            Everything above is the six-stage screen. Once a deal survives it,
+            these are the pages you actually work in — each one live in the app
+            on your own deals.
+          </p>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            {DEEP_TOOLS.map((t) => (
+              <div key={t.title} className="rounded-xl border border-line bg-surface p-4">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h3 className="text-sm font-semibold">{t.title}</h3>
+                  <span className="text-[11px] uppercase tracking-wide text-muted">
+                    {t.where}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm leading-relaxed text-muted">{t.blurb}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* The conversion moment — after they've seen the whole screen. */}

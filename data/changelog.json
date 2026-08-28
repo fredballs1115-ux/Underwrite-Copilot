@@ -2,6 +2,30 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-08-28",
+      "title": "Which assumption moved the IRR — the assumption bridge",
+      "blurb": "Re-run a deal with a lower price and a tighter exit cap and the return jumps, but nothing used to say which change did the work. It can't be answered one-at-a-time either: cutting price is worth more after the cap tightens than before it, so the answer depends on the order. The bridge uses Shapley values over the changed assumptions instead — order-independent, exact to six changed fields and sampled above that, with the waterfall's bars summing to the headline move exactly. Every model run is snapshotted as a version, so the comparison is always available.",
+      "href": "/demo"
+    },
+    {
+      "date": "2026-08-28",
+      "title": "Two brokers, one asset — the BOV reconciler",
+      "blurb": "JLL says $71.5M, Eastdil says $65M, and finding where the $6.5M lives used to take an afternoon in Excel. Upload both and the gap decomposes into Year-1 NOI, cap rate and capex treatment, using the symmetric split so the answer doesn't depend on which factor you apply first. Anything the identity can't explain is shown as unexplained rather than smoothed away, a cap rate backed out of a value and an NOI is labelled derived rather than stated, and each broker's price then runs through your own model so you see the levered IRR each one actually implies.",
+      "href": "/demo"
+    },
+    {
+      "date": "2026-08-28",
+      "title": "Rent rolls in, and an Excel model whose formulas are alive",
+      "blurb": "Broker rent rolls are never the same twice — the header is rarely row 1, the columns never match, and rent is monthly on one file and annual on the next. Upload a CSV or XLSX, correct whatever the column mapper missed (it remembers, so the next file from the same broker is one click), and get WALT weighted by both SF and rent, the rollover schedule, mark-to-market and the rollover cost forecast. Then download a four-tab workbook that is a real model: change the exit cap on the Assumptions tab and the IRR recalculates. CI proves it, recalculating the generated file in LibreOffice and asserting its IRR matches the app's to four decimals.",
+      "href": "/demo"
+    },
+    {
+      "date": "2026-08-28",
+      "title": "Exit cap and rent growth, checked against the submarket",
+      "blurb": "The two assumptions that swing returns most are usually just typed in, and nothing checks them — a deal underwritten to 4% rent growth in a market with 18 months of supply under construction is a bad deal that screens well. Build a submarket from your own market export and those assumptions get measured against what it actually did: months of supply, trailing rent CAGR on a consistent basis, trough vacancy. Four data traps are handled by name — data-center campuses excluded by a persistent rule, rent-basis changes breaking the trend line instead of being averaged through, a pipeline that doesn't tie reconciled with the delta shown, and round-number placeholders flagged for review. Overriding a warning is normal; it needs a one-line reason, and the reason lands in the memo.",
+      "href": "/submarkets"
+    },
+    {
       "date": "2026-08-25",
       "title": "The whole board — every market and asset class in one grid",
       "blurb": "The market page gains a coverage grid: 18 metro entries down, office/industrial/multifamily/retail across, each cell that market's vacancy read. Shading is computed within each column, so office compares to office — DC industrial at 7.4% shades tight while DC retail at 6.3% shades loose, because those are different worlds. 66 of the 72 cells carry a sourced figure; the other 6 render as dashed gaps that say why rather than implying coverage that isn't there. Bands stay bands throughout.",
@@ -48,114 +72,6 @@
       "title": "Sector leaderboards — every covered market ranked, one asset class at a time",
       "blurb": "The market page's asset-class explorer now flips the metro tiles the other way: pick office, industrial, multifamily, or retail and see every covered market with a numeric read ranked tightest to loosest — vacancy bands kept as bands (a spread is never averaged into one printed number), asking $/SF and cap ranges where sourced, a source link on every row. Metros whose level is honestly held open are named under the table, never silently dropped.",
       "href": "/market?sector=office"
-    },
-    {
-      "date": "2026-08-25",
-      "title": "Retail coverage closes out — every covered market now carries a read or an honest hold",
-      "blurb": "Hampton Roads was the last open retail gap; Old Dominion University’s 30th annual E.V. Williams Market Review (March 2026, advisory board chaired by Divaris — the region’s dominant retail house) prints it exceptionally tight at 4.4–4.6%, carried as the band. That completes the retail program: thirteen markets with sourced square-footage reads, Philadelphia held open with its storefront-count survey construct-declared, and the county tiles inheriting the District’s read conceptually while their own faces stay honest. The board’s derived counter stands at 101 sourced sector figures across office, industrial, multifamily, and retail.",
-      "href": "/market?metro=norfolk_hampton_roads"
-    },
-    {
-      "date": "2026-08-25",
-      "title": "The stubborn gaps give ground — DC retail lands, Philly and MoCo carry honest reads",
-      "blurb": "Four sweeps came back empty on DC retail; the fifth landed it: Marcus & Millichap’s institutional arm prints District retail vacancy at a historic-high 6.3% entering 2026 — record restaurant closures, federal workforce cuts — with the city’s own Streetsense retail plan corroborating, so the flagship DC tile now rotates all four asset classes. Philadelphia retail arrives as a construct lesson: Center City’s on-foot storefront survey (occupancy 84.2%, a two-year high) is a storefront COUNT, not square-footage vacancy, so the number stays out of the comparable fields and a digest’s “7.3%” was rejected after it stitched multifamily-shaped figures into the retail answer. Montgomery County industrial lands as a county-specific .94/SF print with zero construction pipeline, vintage declared.",
-      "href": "/market?metro=dc"
-    },
-    {
-      "date": "2026-08-25",
-      "title": "The homepage fits your phone again",
-      "blurb": "A mobile audit caught two layout bugs invisible on desktop: the hero and the interactive walkthrough each used a grid whose phone-width column could not shrink below its content, so on small screens the hero clipped its right edge (the headline lost words, the sample card ran off) and the walkthrough forced sideways page scroll. Both grids now declare a shrinkable column; the walkthrough’s tab strip scrolls inside its card instead of stretching the page. Verified at 390px: no horizontal scroll, nothing clipped but the decorative glow that was always meant to bleed.",
-      "href": "/"
-    },
-    {
-      "date": "2026-08-25",
-      "title": "The hero and the markets band speak asset classes now too",
-      "blurb": "The “Now screening” line under the hero and the covered-markets band that scrolls across the homepage, /why, and /demo used to lead every market with its 2BR fair-market rent. They now lead with the market’s real asset-class read — office, industrial, multifamily, or retail vacancy with the asking rent where sourced — varied across the strip so six hero slots show four different sectors instead of an all-office wall. The FMR ladders stay where they belong: the ticker’s dedicated items, the metro briefs, and the compare tool.",
-      "href": "/"
-    },
-    {
-      "date": "2026-08-25",
-      "title": "The research layer gets tougher on itself — spreads banded, a vintage declared, Richmond retail lands",
-      "blurb": "Tonight’s sweep upgraded honesty, not just coverage. Prince George’s industrial now shows its real 6.0–10.1% spread — the close-in corridor vs the whole county, two denominators named instead of one flattering number. Northern New Jersey’s retail figures turned out to trace to 2024-era reporting recycled by trade digests, so the record now says exactly that — vintage declared, a conflated 2026 “8.2%” print rejected as an industrial-shaped number. NoVA office arrived as the honest 20.8–21.3% two-tracker spread, both counties of suburban Maryland got their office read with the survey base spelled out, and Richmond became the twelfth market with a sourced retail figure (~4.4% via the dominant local house, quarter-caveat recorded). Five templated aggregator prints rejected on sight across the night.",
-      "href": "/market"
-    },
-    {
-      "date": "2026-08-25",
-      "title": "The pulse board now speaks asset classes — every tile rotates office, industrial, multifamily, retail",
-      "blurb": "The homepage board used to lead every metro with its 2BR fair-market rent. Real deals are screened by asset class, so now each tile rotates through the sectors its research actually carries: office, industrial, multifamily, and retail vacancy, asking rents, and cap bands — Baltimore surfaces its 10–20.9% office tracker spread, Miami shows 3.0% retail at $42.50/SF, DFW its 5.8% multifamily cap. A metro missing a sector simply skips that face; nothing is invented to fill a slot. Reduced-motion visitors get a pinned first face, and screen readers get every read as one plain sentence.",
-      "href": "/"
-    },
-    {
-      "date": "2026-08-25",
-      "title": "Retail becomes the fourth asset type on the board — and Baltimore shows why bases matter",
-      "blurb": "Nine covered markets now carry a sourced retail read alongside office, industrial, and multifamily — from Boston and Seattle at the tight end (2.6–3.2% and 3.9–4.0%) through Miami (3.0% at $42.50/SF) to Chicago (7.8%), with NYC carried as its honest borough spread (Brooklyn 3.6% to Manhattan 6.6%). And the widest divergence on the homepage spread board is now Baltimore office: one tracker's all-inventory base prints 10.0% while another's competitive set prints 20.9% — same city, half the vacancy, because the denominators differ. The brief names both bases and says the practical thing: ask which inventory a broker is quoting.",
-      "href": "/market?metro=baltimore"
-    },
-    {
-      "date": "2026-08-25",
-      "title": "The screen now grills each asset type in its own language",
-      "blurb": "The assumption challenger keeps its shared floor — taxes reset to sale price, expense ratios vs gross rent, loss-to-lease burn-off, legacy insurance — and now adds sector-specific trap lists: office deals get grilled on lease rollover inside the hold (WALT), re-leasing costs at today's TI/LC packages, face-vs-effective rent, and sublease shadow space; industrial on clear height and dock fit, mark-to-market claims proven against current asking, and tenant concentration; retail on co-tenancy clauses and occupancy-cost ratios. The market check calibrates each sector past its prior cycle. Multifamily deals are unchanged — that playbook was already the foundation.",
-      "href": "/why"
-    },
-    {
-      "date": "2026-08-25",
-      "title": "Cap rates land on the metro briefs — with the basis always named",
-      "blurb": "Seven multifamily cap reads filled tonight: Philadelphia 5.0–5.7% (Northmarq core-vs-suburban split — the metro whose templated-page conflation started the whole cap discipline finally gets its named-house number), Seattle 5.7% and LA 5.8% (Kidder transaction averages), DFW 5.8% (Matthews, ~$183K/unit), Boston 4.5–4.75% core, Miami 4.75–5.0% Class A core (vintage declared), and Chicago 8.3% — explicitly labeled as the Class B/C small-building stock that drives that market's volume. Each figure says what kind of number it is. NYC's stays null for a reason worth reading: the free-market-vs-rent-stabilized cap spread runs a structural 100–300bps, so screen the regulation status before the cap.",
-      "href": "/market?metro=chicago"
-    },
-    {
-      "date": "2026-08-25",
-      "title": "The trackers disagree — now the site shows you where",
-      "blurb": "A new homepage board draws the research file's three widest tracker divergences as range bars (LA office runs 17.8–25.8% depending on who's counting and how) — the spread carried, never averaged, each card opening its metro brief. And the compare-two-markets tool now sets office, industrial, and multifamily reads side by side for any two covered metros: vacancy spreads, asking rents, and cap bands where sourced, an em dash where the research honestly has a gap.",
-      "href": "/market"
-    },
-    {
-      "date": "2026-08-25",
-      "title": "Every covered market now has the asset-type read",
-      "blurb": "The 'By asset type' panel is complete: all 15 covered markets carry sourced office, industrial, and multifamily fundamentals — vacancy, asking rents, and cap bands where they cleared the source bar — from Baltimore and Richmond through NYC, Boston, Chicago, LA, SF, Seattle, Miami, Atlanta, and Dallas. Where trackers diverge the spread is shown with the basis named (LA office runs 17.8–25.8% depending on who's counting), where nothing cleared the bar the gap is recorded (Boston industrial), and two templated aggregator figures were caught and rejected in-note. Every figure links its source and flows into deal-page benchmarks.",
-      "href": "/market?metro=dallas"
-    },
-    {
-      "date": "2026-08-25",
-      "title": "Metro briefs now cover the asset types that matter",
-      "blurb": "A new 'By asset type' panel carries sourced sector fundamentals per metro — office vacancy, industrial vacancy and asking rent, multifamily vacancy and cap-rate bands — starting with Philadelphia and the DMV (DC, NoVA, PG County): NoVA small-bay industrial at ~4-5% vacancy and $17.44 NNN, DC office at 21-22%, the DMV multifamily luxury-vs-B/C vacancy split. Where trackers diverge the spread is shown, never averaged; where a figure failed the source bar it stays an honest null. Every row flows into deal-page benchmarks automatically.",
-      "href": "/market?metro=philadelphia"
-    },
-    {
-      "date": "2026-08-25",
-      "title": "The pulse board names its primary documents",
-      "blurb": "A credibility strip under the market board lists the primary-document hosts actually present in the research file's source URLs — HUD, the Federal Register, the DC and SF housing authorities, NJ Treasury, and FRED for rates. Derived, not typed: if a primary source leaves the data, its chip leaves the strip.",
-      "href": "/"
-    },
-    {
-      "date": "2026-08-25",
-      "title": "The retrade plays itself on the homepage",
-      "blurb": "A looping story card: the sample deal's original ask gets struck through, the reissued deck lands at the canonical −$1.8M, and the verdict stamps over from Caution to Go — the product's one-click re-screen, told in twelve seconds of pure CSS. A hairline reading-progress bar now rides the top of the page too.",
-      "href": "/"
-    },
-    {
-      "date": "2026-08-24",
-      "title": "The homepage got its board, its gauge, and its stamp",
-      "blurb": "Three new eye-catchers, every number real: a market pulse board — all covered metros as breathing tiles with their FY2026 rents, statuses, and rule counts, each opening its brief; an analog IRR gauge inside 'Break it yourself' whose needle swings live as you drag the levers, with the demo mandate's 13% target ticked; and the hero card's verdict chip now stamps itself on like an IC decision.",
-      "href": "/"
-    },
-    {
-      "date": "2026-08-24",
-      "title": "Compare any two covered markets, side by side",
-      "blurb": "A new tool on /market puts two metros next to each other on one shared dollar scale: the FY2026 bedroom rent ladders drawn as bars, the 2BR spread computed, rules on file, comps-feed status, and verified/sourced chips — every figure straight off the research layer, with a one-click jump into either brief.",
-      "href": "/market"
-    },
-    {
-      "date": "2026-08-24",
-      "title": "More to play with, on every public page",
-      "blurb": "The sample screen's broker questions became reveal-on-click cards on /demo — play analyst, then see the exact question the screen drafts. Market briefs draw the bedroom rent ladder as bars scaled to the real dollars and add a one-click copy-citation button. And the six-stage screen-run trace now plays on /why too.",
-      "href": "/demo"
-    },
-    {
-      "date": "2026-08-24",
-      "title": "The Excel model goes deeper: an Operating Metrics tab",
-      "blurb": "A ninth tab carries the ratio ladder an IC actually checks year by year — expense ratio, NOI margin, DSCR, debt yield, breakeven occupancy, cash-on-cash — plus price, rent, NOI and OpEx per unit and per SF. Every cell is a live formula over the Cash Flow tab, so changing any assumption re-prices the ladder; when nothing states a unit count, the per-unit block says so instead of guessing.",
-      "href": "/api/demo/underwrite.xlsx"
     }
   ]
 }
