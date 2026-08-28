@@ -47,6 +47,9 @@ import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { ActualsData } from "./property-actuals";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { snapshotVersion } from "@/lib/bridge/versions";
+import { listSubmarkets } from "@/lib/market/store";
+import { dealSubmarketCheck } from "@/lib/market/deal-checks";
+import { SubmarketCard } from "./submarket-card";
 import type { PlaygroundData } from "./sensitivity-playground";
 
 const VERDICT_PILL = {
@@ -367,6 +370,16 @@ export default async function DealPage({
         box: buyBox,
       }
     : null;
+
+  // Submarket supply & pipeline (Phase 4). Both reads are best-effort: on a
+  // pre-0033 schema the queries error, the card doesn't render, and nothing
+  // else on the page notices.
+  const [userSubmarkets, submarketCheck] = await Promise.all([
+    user
+      ? listSubmarkets(supabase, user.id).catch(() => [])
+      : Promise.resolve([]),
+    dealSubmarketCheck(supabase, id, deal.name, extraction).catch(() => null),
+  ]);
 
   // Assumption Bridge (Phase 1): snapshot the deal's live assumption set
   // whenever it has actually MOVED since the last version. Deferred with
@@ -785,6 +798,16 @@ export default async function DealPage({
           </p>
         )}
       </header>
+
+      {/* Submarket supply (Phase 4): the deal's rent growth, exit cap and
+          vacancy, checked against what the linked submarket has actually
+          done. Absent entirely on a pre-0033 schema. */}
+      <SubmarketCard
+        dealId={id}
+        view={submarketCheck?.view ?? null}
+        warnings={submarketCheck?.warnings ?? []}
+        submarkets={userSubmarkets}
+      />
 
       <DealView
         dealId={id}

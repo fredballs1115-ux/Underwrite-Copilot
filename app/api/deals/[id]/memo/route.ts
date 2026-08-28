@@ -12,6 +12,7 @@ import { getBrandingForDeal, brandingLogoDataUri } from "@/lib/branding-server";
 import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
+import { dealOverrideLines } from "@/lib/market/deal-checks";
 
 // PDF generation needs the Node runtime (not edge).
 export const runtime = "nodejs";
@@ -121,7 +122,15 @@ export async function GET(
   // a raw "Internal Server Error" in the browser. Catch it and bounce back to
   // the deal with a friendly, mapped error instead.
   try {
-    const memo = buildMemoData(deal, dateStr, buyBoxChecks, branding);
+    // Submarket checks the analyst overrode travel with the memo (Phase 4).
+    // Best-effort: a pre-0033 schema returns nothing and the section is absent.
+    const overrides = await dealOverrideLines(
+      supabase,
+      id,
+      deal.name,
+      (deal.extraction as ExtractionResult | null) ?? null,
+    );
+    const memo = buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides);
     // MemoDocument renders a <Document>; cast to the element type renderToBuffer
     // expects (it's typed for a Document element, not a wrapping component).
     const element = React.createElement(MemoDocument, {

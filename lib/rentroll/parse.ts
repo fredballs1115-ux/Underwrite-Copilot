@@ -166,10 +166,15 @@ const ALL_ALIASES: { key: CanonicalKey; alias: string; monthly: boolean }[] = CA
   ],
 );
 
-/** How well a header cell matches an alias, 0..1. Exact beats prefix beats
- *  token-overlap; a bare substring scores lowest so "rate" doesn't outrank
- *  "rent psf" for the same column. */
-function aliasScore(header: string, alias: string): number {
+/**
+ * How well a header cell matches an alias, 0..1. Exact beats prefix beats
+ * token-overlap; a bare substring scores lowest so "rate" doesn't outrank
+ * "rent psf" for the same column.
+ *
+ * Exported because the submarket importer (lib/market/import.ts) scores its own
+ * vocabulary the same way — one matching rule, two vocabularies.
+ */
+export function aliasScore(header: string, alias: string): number {
   if (!header) return 0;
   if (header === alias) return 1;
   if (header.startsWith(`${alias} `) || header.endsWith(` ${alias}`)) return 0.85;
