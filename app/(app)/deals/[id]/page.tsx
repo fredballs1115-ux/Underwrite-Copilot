@@ -680,6 +680,26 @@ export default async function DealPage({
                 )}
               </a>
             )}
+            <Link
+              href={`/deals/${id}/rent-roll`}
+              title="Rent roll engine — WALT, rollover, mark-to-market, and a live-formula Excel model"
+              className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-3.5 w-3.5 text-muted"
+                aria-hidden
+              >
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <path d="M3 10h18M9 4v16" />
+              </svg>
+              Rent roll
+            </Link>
             {extraction && (
               <Link
                 href={`/deals/${id}/valuations`}

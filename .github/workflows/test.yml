@@ -1,0 +1,36 @@
+name: test
+# Typecheck, lint, unit tests, and a production build on every push and PR.
+#
+# libreoffice-calc is a REAL dependency of this suite, not a convenience: the
+# Excel export test loads the generated workbook into LibreOffice headless,
+# recalculates it, and asserts the IRR cell matches the app's own number. The
+# `libreoffice-core` package alone cannot open a spreadsheet, so `calc` has to
+# be installed explicitly or that test skips and the export ships unverified.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install LibreOffice Calc (for the workbook recalculation test)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-calc
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+        env:
+          # The build must not need real credentials — a missing key is only an
+          # error at call time (lib/anthropic/client.ts), never at build time.
+          NEXT_TELEMETRY_DISABLED: "1"
