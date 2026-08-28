@@ -10,6 +10,7 @@ export const DOC_KINDS = [
   { key: "t12", label: "T-12 / operating statement" },
   { key: "financials", label: "Offering financials" },
   { key: "loan_terms", label: "Loan terms" },
+  { key: "bov", label: "Broker opinion of value (BOV)" },
   { key: "other", label: "Other document" },
 ] as const;
 

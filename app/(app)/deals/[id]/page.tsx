@@ -680,6 +680,28 @@ export default async function DealPage({
                 )}
               </a>
             )}
+            {extraction && (
+              <Link
+                href={`/deals/${id}/valuations`}
+                title="BOV reconciler — decompose the gap between two opinions of value"
+                className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-3.5 w-3.5 text-muted"
+                  aria-hidden
+                >
+                  <path d="M12 3v18M5 8l7-5 7 5" />
+                  <path d="M3 12h6l-3 6-3-6zM15 12h6l-3 6-3-6z" />
+                </svg>
+                Valuations
+              </Link>
+            )}
             {versionCount >= 2 && (
               <Link
                 href={`/deals/${id}/bridge`}
