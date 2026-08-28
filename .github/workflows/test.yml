@@ -25,6 +25,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libreoffice-calc
+          # The test SKIPS when soffice is missing, so a broken install would
+          # look identical to a passing run. Assert it here instead: this fails
+          # the job, loudly, rather than letting the export ship unverified.
+          test -x /usr/bin/soffice
+          soffice --version
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
