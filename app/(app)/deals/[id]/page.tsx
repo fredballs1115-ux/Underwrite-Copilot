@@ -46,6 +46,10 @@ import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { ActualsData } from "./property-actuals";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { snapshotVersion } from "@/lib/bridge/versions";
+import { listSubmarkets } from "@/lib/market/store";
+import { dealSubmarketCheck } from "@/lib/market/deal-checks";
+import { SubmarketCard } from "./submarket-card";
 import type { PlaygroundData } from "./sensitivity-playground";
 
 const VERDICT_PILL = {
@@ -286,7 +290,7 @@ export default async function DealPage({
   // roster — four independent reads, one round-trip. All best-effort: the
   // actuals/tasks tables arrived in 0020/0022, and on an older schema the
   // queries error and read null (the cards simply don't render).
-  const [rrRes, t12Res, tasksRes, memberRes] = await Promise.all([
+  const [rrRes, t12Res, tasksRes, versionsRes, memberRes] = await Promise.all([
     supabase
       .from("deal_rent_rolls")
       .select("as_of_date, summary")
@@ -308,6 +312,12 @@ export default async function DealPage({
       )
       .eq("deal_id", id)
       .order("created_at", { ascending: true }),
+    // Saved assumption versions (Phase 1). Best-effort: pre-0030 schemas
+    // error and the bridge link simply doesn't render.
+    supabase
+      .from("deal_versions")
+      .select("id", { count: "exact", head: true })
+      .eq("deal_id", id),
     ownership.team_id
       ? supabase
           .from("team_members")
@@ -360,6 +370,37 @@ export default async function DealPage({
         box: buyBox,
       }
     : null;
+
+  // Submarket supply & pipeline (Phase 4). Both reads are best-effort: on a
+  // pre-0033 schema the queries error, the card doesn't render, and nothing
+  // else on the page notices.
+  const [userSubmarkets, submarketCheck] = await Promise.all([
+    user
+      ? listSubmarkets(supabase, user.id).catch(() => [])
+      : Promise.resolve([]),
+    dealSubmarketCheck(supabase, id, deal.name, extraction).catch(() => null),
+  ]);
+
+  // Assumption Bridge (Phase 1): snapshot the deal's live assumption set
+  // whenever it has actually MOVED since the last version. Deferred with
+  // after() so it never sits in the render path, and silent on a pre-0030
+  // schema — a missing versions table must not break the deal page.
+  const versionCount = versionsRes.error ? 0 : (versionsRes.count ?? 0);
+  if (playground && user) {
+    const snapshotInputs = playground.inputs;
+    after(async () => {
+      try {
+        const client = await createSupabaseServerClient();
+        await snapshotVersion(client, {
+          dealId: id,
+          userId: user.id,
+          assumptions: snapshotInputs,
+        });
+      } catch {
+        // best-effort
+      }
+    });
+  }
 
   // Deal tasks (Feature 7): assignable to-dos with owners and due dates.
   // Best-effort — pre-0022 schemas error and the card doesn't render.
@@ -652,6 +693,72 @@ export default async function DealPage({
                 )}
               </a>
             )}
+            <Link
+              href={`/deals/${id}/rent-roll`}
+              title="Rent roll engine — WALT, rollover, mark-to-market, and a live-formula Excel model"
+              className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-3.5 w-3.5 text-muted"
+                aria-hidden
+              >
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <path d="M3 10h18M9 4v16" />
+              </svg>
+              Rent roll
+            </Link>
+            {extraction && (
+              <Link
+                href={`/deals/${id}/valuations`}
+                title="BOV reconciler — decompose the gap between two opinions of value"
+                className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-3.5 w-3.5 text-muted"
+                  aria-hidden
+                >
+                  <path d="M12 3v18M5 8l7-5 7 5" />
+                  <path d="M3 12h6l-3 6-3-6zM15 12h6l-3 6-3-6z" />
+                </svg>
+                Valuations
+              </Link>
+            )}
+            {versionCount >= 2 && (
+              <Link
+                href={`/deals/${id}/bridge`}
+                title="Assumption bridge — which input moved the IRR, and by how much"
+                className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-3.5 w-3.5 text-muted"
+                  aria-hidden
+                >
+                  <path d="M4 19V9M10 19V5M16 19v-7M22 19h-20" />
+                </svg>
+                Bridge
+                <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
+                  {versionCount}
+                </span>
+              </Link>
+            )}
             <OffersDueControl
               key={`due-${offersDue ?? "unset"}`}
               dealId={id}
@@ -691,6 +798,16 @@ export default async function DealPage({
           </p>
         )}
       </header>
+
+      {/* Submarket supply (Phase 4): the deal's rent growth, exit cap and
+          vacancy, checked against what the linked submarket has actually
+          done. Absent entirely on a pre-0033 schema. */}
+      <SubmarketCard
+        dealId={id}
+        view={submarketCheck?.view ?? null}
+        warnings={submarketCheck?.warnings ?? []}
+        submarkets={userSubmarkets}
+      />
 
       <DealView
         dealId={id}
