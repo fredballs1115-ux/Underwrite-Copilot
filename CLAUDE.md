@@ -41,6 +41,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
 - This is **Next.js 16** — see AGENTS.md; check `node_modules/next/dist/docs/`
   before using unfamiliar Next APIs.
 
+## Outstanding work
+
+`WILL_TODO.md` is the forward list — read it first in a new session. It names
+whose move each item is. As of 2026-08-28 the blocking item is **running
+migrations 0030–0033 in Supabase**: phases 1–4 are merged and deployed but
+their four pages stay inert (empty states, saves fail) until those tables
+exist.
+
 ## Build roadmap
 
 Phase 0 ✅ scaffold. Phase 1 auth + saved deals. Phase 2 OM upload + extraction +

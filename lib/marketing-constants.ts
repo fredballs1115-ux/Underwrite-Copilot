@@ -46,6 +46,46 @@ export { COVERAGE_SUMMARY as COMPS_JURISDICTIONS } from "@/lib/public-comps/core
 // 10Y Treasury, SOFR, 30-year mortgage survey, CRE loan delinquency.
 export const RATE_SERIES = 4;
 
+// ── The four deeper tools (beyond the six-stage screen) ─────────────────────
+// ONE source for the homepage toolkit grid AND the sample screen's "what comes
+// after the screen" block, so those two surfaces can never describe the
+// product differently. Each entry names a real, shipped page — if a tool is
+// removed from the app, its claim has to be deleted here, which deletes it
+// from both surfaces at once.
+export interface DeepTool {
+  title: string;
+  /** where it lives in the app, for the sample screen's label */
+  where: string;
+  blurb: string;
+}
+
+export const DEEP_TOOLS: readonly DeepTool[] = [
+  {
+    title: "Which assumption moved the IRR",
+    where: "Deal → Bridge",
+    blurb:
+      "Re-run a deal with a lower price and a tighter exit cap and the return jumps — but which change did the work? The bridge attributes the move to each input by Shapley value, so the answer doesn't depend on the order you'd have applied them, and the bars sum to the headline change exactly.",
+  },
+  {
+    title: "Two brokers, one asset, a $6.5M gap",
+    where: "Deal → Valuations",
+    blurb:
+      "Upload both BOVs and the gap gets decomposed into Year-1 NOI, cap rate and capex treatment — with anything the identity can't explain shown as unexplained rather than smoothed over. Then each broker's price runs through your own model, so you see the levered IRR each one actually implies.",
+  },
+  {
+    title: "The rent roll, normalized — and a workbook that's alive",
+    where: "Deal → Rent roll",
+    blurb:
+      "Broker rent rolls are never the same twice: the header is rarely row 1 and the columns never match. Upload one, correct what the mapper missed, and get WALT weighted both ways, the rollover schedule and mark-to-market. Then download an Excel model whose formulas are live — change the exit cap on the Assumptions tab and the IRR recalculates.",
+  },
+  {
+    title: "Exit cap and rent growth, checked against the submarket",
+    where: "Submarkets",
+    blurb:
+      "The two assumptions that swing returns most are usually just typed in. Link a submarket and they get measured against what it has actually done — months of supply under construction, trailing rent CAGR on a consistent basis, trough vacancy. Overriding a warning is normal; it just needs a one-line reason, and that reason lands in the memo.",
+  },
+] as const;
+
 // ── Pricing ─────────────────────────────────────────────────────────────────
 // THE canonical price + free-tier numbers. lib/billing (server-only) derives
 // its labels and arithmetic from these — that direction, because this module

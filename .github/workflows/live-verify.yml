@@ -44,6 +44,9 @@ jobs:
           grep -c "rt-strike" body.html && echo "RETRADE REPLAY (Aug 25): present" || echo "RETRADE REPLAY: not yet deployed"
           grep -c "scroll-progress" body.html && echo "SCROLL PROGRESS (Aug 25): present" || echo "SCROLL PROGRESS: not yet deployed"
           grep -c "Primary documents on file" body.html && echo "PRIMARY SOURCES STRIP (Aug 25): present" || echo "PRIMARY SOURCES STRIP: not yet deployed"
+          grep -c "when a screen turns into real work" body.html && echo "DEEP TOOLS GRID (Aug 28, phases 1-4): present" || echo "DEEP TOOLS GRID: not yet deployed"
+          grep -c "Which assumption moved the IRR" body.html && echo "ASSUMPTION BRIDGE COPY (Aug 28): present" || echo "ASSUMPTION BRIDGE COPY: not yet deployed"
+          grep -c "checked against the submarket" body.html && echo "SUBMARKET SUPPLY COPY (Aug 28): present" || echo "SUBMARKET SUPPLY COPY: not yet deployed"
           grep -o 'name="uc-build" content="[0-9a-f]*"' body.html | head -1 && echo "SELF-HEAL SENTINEL: armed (stale browser copies reload themselves)" || echo "SELF-HEAL SENTINEL: not yet deployed"
           live=$(grep -o 'commit/[0-9a-f]\{7\}' body.html | head -1 | cut -d/ -f2)
           echo "LIVE BUILD SHA: ${live:-not stamped yet} · this run's main tip: ${GITHUB_SHA:0:7}"
@@ -72,6 +75,10 @@ jobs:
           grep -q "Eviction Diversion Program" p_demo.html && echo "/demo: legal panel present (real rule text serves)" || echo "/demo: legal panel not yet deployed"
           grep -q "would you ask the broker" p_demo.html && echo "/demo: broker-question cards present" || echo "/demo: broker-question cards not yet deployed"
           grep -q "ranks run tightest first" p_demo.html && echo "DEMO PACK POSITION (Aug 25): present" || echo "DEMO PACK POSITION (Aug 25): not yet deployed"
+          # The sample screen and the homepage render the same DEEP_TOOLS
+          # constant, so this marker failing while the homepage one passes
+          # means the two surfaces have drifted.
+          grep -q "Four more tools pick up where it stops" p_demo.html && echo "DEMO DEEP TOOLS BLOCK (Aug 28): present" || echo "DEMO DEEP TOOLS BLOCK: not yet deployed"
           grep -q "copy citation" p_market.html && echo "/market: copy-citation + FMR ladder present" || echo "/market: citation tools not yet deployed"
           grep -q "By asset type" p_market.html && echo "/market: sector snapshot panel present (Aug 25)" || echo "/market: sector panel not yet deployed"
           # Coverage heat grid: every market x every asset class, with the
