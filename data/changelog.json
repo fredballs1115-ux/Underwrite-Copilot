@@ -4,7 +4,7 @@
     {
       "date": "2026-08-31",
       "title": "Verification sweep — every internal link checked, and a scope contradiction caught",
-      "blurb": "A full crawl of the public site: all 41 pages (every metro brief, all 14 sector tabs, every marketing page) return 200, and all 53 unique internal links resolve — no dead ends. The sweep also caught the homepage contradicting itself: the pulse board called its 18 tiles '18 covered markets' while the same page said '15 markets, deliberately.' Tiles are per jurisdiction — DC, Prince George's, Montgomery and Northern Virginia are four tiles inside one DMV-core market — so the board now reads '18 jurisdiction tiles across 15 covered markets,' both numbers derived. Three tests pin the counts so a future market can't reopen the gap.",
+      "blurb": "A full crawl of the public site: all 41 pages (every metro brief, all 14 sector tabs, every marketing page) return 200, and all 53 unique internal links resolve — no dead ends. The sweep also caught the homepage contradicting itself: the pulse board counted its 18 jurisdiction tiles as though each were a market, while the same page said '15 markets, deliberately.' DC, Prince George's, Montgomery and Northern Virginia are four tiles inside one DMV-core market, so the board now reads '18 jurisdiction tiles across 15 covered markets,' both numbers derived. Three tests pin the counts so a future market can't reopen the gap.",
       "href": "/"
     },
     {
