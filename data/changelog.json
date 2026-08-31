@@ -2,6 +2,12 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-08-26",
+      "title": "Verification sweep — every internal link checked, and a scope contradiction caught",
+      "blurb": "A full crawl of the public site: all 41 pages (every metro brief, all 14 sector tabs, every marketing page) return 200, and all 53 unique internal links resolve — no dead ends. The sweep also caught the homepage contradicting itself: the pulse board called its 18 tiles '18 covered markets' while the same page said '15 markets, deliberately.' Tiles are per jurisdiction — DC, Prince George's, Montgomery and Northern Virginia are four tiles inside one DMV-core market — so the board now reads '18 jurisdiction tiles across 15 covered markets,' both numbers derived. Three tests pin the two counts and their relationship so a future market can't reopen the gap.",
+      "href": "/"
+    },
+    {
       "date": "2026-08-25",
       "title": "The whole board — every market and asset class in one grid",
       "blurb": "The market page gains a coverage grid: 18 metro entries down, office/industrial/multifamily/retail across, each cell that market's vacancy read. Shading is computed within each column, so office compares to office — DC industrial at 7.4% shades tight while DC retail at 6.3% shades loose, because those are different worlds. 66 of the 72 cells carry a sourced figure; the other 6 render as dashed gaps that say why rather than implying coverage that isn't there. Bands stay bands throughout.",

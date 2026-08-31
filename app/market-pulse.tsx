@@ -1,5 +1,6 @@
 import Link from "next/link";
 import metrosSeed from "@/data/research/metros.json";
+import { MARKET_COUNT } from "@/app/markets-marquee";
 import { seedBenchmarks } from "@/lib/research-data";
 import {
   sectorLeaderboard,
@@ -146,9 +147,14 @@ export function MarketPulseBoard() {
     >
       <div className="mx-auto max-w-6xl px-6 py-12">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
+          {/* Tiles are per JURISDICTION, markets are what a buyer counts:
+              DC, PG, Montgomery and NoVA are four tiles inside one DMV-core
+              market. Saying "18 covered markets" here contradicted the
+              15-market scope stated everywhere else on this very page, so
+              both numbers are named and both are derived. */}
           <h2 className="text-lg font-semibold tracking-tight">
-            The board — {TILES.length} covered markets, live from the research
-            layer
+            The board — {TILES.length} jurisdiction tiles across{" "}
+            {MARKET_COUNT} covered markets, live from the research layer
           </h2>
           <p className="text-xs text-white/45">
             every tile rotates its office / industrial / multifamily / retail
