@@ -25,6 +25,7 @@ import {
   SAMPLE_RETRADE_DELTA,
   SAMPLE_RECONCILE_ROWS,
   SAMPLE_COMP_PREMIUM_LINE,
+  DEEP_TOOLS,
 } from "@/lib/marketing-constants";
 // The Excel-preview rows are COMPUTED from the live engine on the sample
 // model at render time — hardcoded copies of these figures are exactly what
@@ -856,6 +857,39 @@ export default function Home() {
                 ))}
               </div>
             </Reveal>
+            {/* The four deeper tools that run past the six-stage screen.
+                Rendered from DEEP_TOOLS so this grid and the sample screen's
+                equivalent block can never describe the product differently. */}
+            <Reveal delay={100}>
+              <div className="mt-10">
+                <h3 className="text-sm font-semibold tracking-tight">
+                  And when a screen turns into real work
+                </h3>
+                <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">
+                  The six stages triage a deal. These four are what you reach for
+                  once it survives triage — each one a page under the deal.
+                </p>
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  {DEEP_TOOLS.map((t) => (
+                    <div
+                      key={t.title}
+                      className="hover-lift rounded-xl border border-line bg-surface p-5 shadow-card hover:border-brand/30"
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-brand/10 pb-2.5">
+                        <h4 className="font-medium">{t.title}</h4>
+                        <span className="text-[11px] uppercase tracking-wide text-muted">
+                          {t.where}
+                        </span>
+                      </div>
+                      <p className="mt-2.5 text-sm leading-relaxed text-muted">
+                        {t.blurb}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Reveal>
+
             {/* The workflow around the analysis — every item real and live,
                 pulled from the product audit, one line each. */}
             <Reveal delay={120}>

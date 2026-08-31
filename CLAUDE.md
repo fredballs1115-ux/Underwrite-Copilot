@@ -41,8 +41,41 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
 - This is **Next.js 16** — see AGENTS.md; check `node_modules/next/dist/docs/`
   before using unfamiliar Next APIs.
 
+## Outstanding work
+
+`WILL_TODO.md` is the forward list — read it first in a new session. It names
+whose move each item is. As of 2026-08-28 the blocking item is **running
+migrations 0030–0033 in Supabase**: phases 1–4 are merged and deployed but
+their four pages stay inert (empty states, saves fail) until those tables
+exist.
+
 ## Build roadmap
 
 Phase 0 ✅ scaffold. Phase 1 auth + saved deals. Phase 2 OM upload + extraction +
 worker engine. Phase 3 challenger. Phase 4 broker-comp scrutiny. Phase 5 reconciler.
 Phase 6 market check. Phase 7 verdict. Later: Stripe billing, polish.
+
+## The four LPC-derived builds (all shipped)
+
+Layered on top of the screening loop. Each is standalone; each has its own pure
+math layer with tests, and its own page under the deal.
+
+| # | Feature | Where it lives |
+|---|---------|----------------|
+| 1 | **Assumption Bridge** — attribute an IRR move to the inputs that caused it, via Shapley values over the changed assumptions | `lib/bridge/`, `app/(app)/deals/[id]/bridge/`, migration 0030 |
+| 2 | **BOV Reconciler** — decompose the gap between two opinions of value; run each implied price through the user's own model | `lib/valuation/`, `lib/anthropic/bov-extract.ts`, `app/(app)/deals/[id]/valuations/`, migration 0031 |
+| 3 | **Rent Roll Engine + live-formula Excel export** — CSV/XLSX ingestion with saved fuzzy mappings, WALT / rollover / mark-to-market, and a four-tab workbook whose formulas are live | `lib/rentroll/`, `lib/export/`, `app/(app)/deals/[id]/rent-roll/`, migration 0032 |
+| 4 | **Submarket Supply & Pipeline** — exclusion rules, basis-aware rent trends, pipeline reconciliation, months of supply, and assumption checks on the deal page | `lib/market/`, `app/(app)/submarkets/`, migration 0033 |
+
+Rules these share with the rest of the codebase:
+
+- **The math layer is pure and LLM-free.** Every one of these has a tested
+  `lib/` module with no I/O; the LLM only ever reads documents.
+- **A blank is null, never zero.** An assumption a document doesn't state is
+  absent, and absent is a different claim from zero. This is asserted in tests
+  across phases 2, 3 and 4.
+- **Never write a computed value into a cell that should hold a formula.** The
+  Excel exports are live models. `lib/export/cashflow.ts` mirrors the workbook's
+  formulas so the two are checked against each other in CI (HyperFormula, plus
+  a real LibreOffice headless recalculation — which is why
+  `.github/workflows/test.yml` installs `libreoffice-calc`).

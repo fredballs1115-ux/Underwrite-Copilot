@@ -80,6 +80,12 @@ export type MemoData = {
   buyBox: { label: string; status: "pass" | "near" | "miss" | "unknown" }[];
   // One-line retrade summary ("Caution → Go · Price −$1.8M (−2.5%) · …"), or null.
   sinceLast: string | null;
+  /**
+   * Submarket assumption checks the analyst dismissed, each with the reason
+   * they gave (Phase 4). Overriding a check is normal. Doing it silently is
+   * not — so the override travels with the memo, in the analyst's own words.
+   */
+  overrides: string[];
   /** Custom firm branding (Feature 6, Pro/Team) — null renders the default
    *  Underwrite Copilot identity. */
   branding: {
@@ -114,6 +120,7 @@ export function buildMemoData(
   dateStr: string,
   buyBoxChecks?: BuyBoxCheck[] | null,
   branding?: MemoData["branding"],
+  overrides?: string[] | null,
 ): MemoData {
   const extraction = deal.extraction as ExtractionResult | null;
   const challenges = deal.challenges as ChallengerResult | null;
@@ -270,6 +277,8 @@ export function buildMemoData(
       status: c.status,
     })),
     sinceLast,
+    // The analyst's own words, clamped but never paraphrased.
+    overrides: (overrides ?? []).map((o) => clamp(o, 220)).slice(0, 4),
     branding: branding ?? null,
   };
 }
@@ -820,6 +829,17 @@ export function MemoPage({ data }: { data: MemoData }) {
                   <Text style={s.chTitle}>{c.assumption}</Text>
                 </View>
                 <Text style={s.chBody}>{c.challenge}</Text>
+              </View>
+            ))}
+          </Section>
+        )}
+
+        {data.overrides.length > 0 && (
+          <Section title="Submarket checks overridden">
+            {data.overrides.map((o, i) => (
+              <View key={i} style={s.flagRow}>
+                <Text style={s.flagTag}>Override</Text>
+                <Text style={s.itemText}>{o}</Text>
               </View>
             ))}
           </Section>

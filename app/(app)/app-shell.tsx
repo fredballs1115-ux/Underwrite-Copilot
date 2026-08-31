@@ -73,6 +73,15 @@ const IconChart = (p: { className?: string }) => (
     <path d="M18 17v-6" />
   </NavIcon>
 );
+/** Submarket supply: buildings going up. */
+const IconSupply = (p: { className?: string }) => (
+  <NavIcon className={p.className}>
+    <path d="M3 21h18" />
+    <path d="M5 21V10l5-3v14" />
+    <path d="M14 21V6l5 3v12" />
+    <path d="M7.5 12h0M7.5 15h0M16.5 12h0M16.5 15h0" />
+  </NavIcon>
+);
 const IconMemory = (p: { className?: string }) => (
   <NavIcon className={p.className}>
     <path d="M4 4h16v5H4z" />
@@ -113,6 +122,7 @@ export function AppShell({
   const inComps = pathname.startsWith("/comps");
   const inAnalytics = pathname.startsWith("/analytics");
   const inMarket = pathname.startsWith("/market");
+  const inSubmarkets = pathname.startsWith("/submarkets");
   const inNews = pathname.startsWith("/news");
   const inTeam = pathname.startsWith("/team");
   const inBilling = pathname.startsWith("/billing");
@@ -171,6 +181,7 @@ export function AppShell({
               ["/criteria", "Buy box", inCriteria, IconTarget],
               ["/comps", "Pull comps", inComps, IconPin],
               ["/market", "Market data", inMarket, IconMemory],
+              ["/submarkets", "Submarkets", inSubmarkets, IconSupply],
               ["/news", "News", inNews, IconNews],
               ["/analytics", "Analytics", inAnalytics, IconChart],
               ["/team", "Team", inTeam, IconUsers],
@@ -280,6 +291,7 @@ export function AppShell({
               { href: "/criteria", label: "Buy box", active: inCriteria },
               { href: "/comps", label: "Pull comps", active: inComps },
               { href: "/market", label: "Market data", active: inMarket },
+              { href: "/submarkets", label: "Submarkets", active: inSubmarkets },
               { href: "/news", label: "News", active: inNews },
               { href: "/analytics", label: "Analytics", active: inAnalytics },
               { href: "/team", label: "Team", active: inTeam },
