@@ -95,6 +95,10 @@ jobs:
           # The board's sector-lens strip: tightest market per asset class,
           # each chip opening the full /market?sector= ranking.
           grep -q "tightest on file" body.html && echo "SECTOR LENS STRIP (Aug 25): present" || echo "SECTOR LENS STRIP (Aug 25): not yet deployed"
+          # Scope consistency: the board counts jurisdiction TILES, not
+          # markets — "18 covered markets" contradicted the 15-market scope.
+          grep -q "jurisdiction tiles across" body.html && echo "SCOPE WORDING FIX (Aug 26): present" || echo "SCOPE WORDING FIX (Aug 26): not yet deployed"
+          grep -q "18 covered markets" body.html && echo "SCOPE CONTRADICTION: REGRESSED (18 covered markets is back)" || echo "SCOPE CONTRADICTION: absent (correct)"
           # Full-coverage spot check: Dallas's brief must carry its encoded
           # industrial note — proves the batch-2-5 metros serve, not just batch 1.
           curl -sS -o p_market_dfw.html --max-time 60 "https://underwrite-copilot.onrender.com/market?metro=dallas" || true

@@ -2,6 +2,12 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-08-31",
+      "title": "Verification sweep — every internal link checked, and a scope contradiction caught",
+      "blurb": "A full crawl of the public site: all 41 pages (every metro brief, all 14 sector tabs, every marketing page) return 200, and all 53 unique internal links resolve — no dead ends. The sweep also caught the homepage contradicting itself: the pulse board counted its 18 jurisdiction tiles as though each were a market, while the same page said '15 markets, deliberately.' DC, Prince George's, Montgomery and Northern Virginia are four tiles inside one DMV-core market, so the board now reads '18 jurisdiction tiles across 15 covered markets,' both numbers derived. Three tests pin the counts so a future market can't reopen the gap.",
+      "href": "/"
+    },
+    {
       "date": "2026-08-28",
       "title": "Which assumption moved the IRR — the assumption bridge",
       "blurb": "Re-run a deal with a lower price and a tighter exit cap and the return jumps, but nothing used to say which change did the work. It can't be answered one-at-a-time either: cutting price is worth more after the cap tightens than before it, so the answer depends on the order. The bridge uses Shapley values over the changed assumptions instead — order-independent, exact to six changed fields and sampled above that, with the waterfall's bars summing to the headline move exactly. Every model run is snapshotted as a version, so the comparison is always available.",
