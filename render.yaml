@@ -59,7 +59,12 @@ services:
       # - key: BILLING_ALERT_EMAIL
       #   sync: false
       # Street View building photos (optional): metadata-checked, key stays
-      # server-side behind /api/deals/[id]/photo. No key = clean no-photo cards.
+      # server-side behind /api/deals/[id]/photo and /image. With it, a
+      # street-addressed deal's picture is a photo of the building front; with
+      # no key every deal still gets a real USGS aerial of its site, which
+      # needs no key at all. Restrict the key to the Street View Static API
+      # ONLY — no HTTP-referrer rule, this is a server-side caller that sends
+      # no referrer. Verify at /api/imagery/health after deploying.
       - key: GOOGLE_MAPS_API_KEY
         sync: false
       # Hand analyses to the dedicated worker below. ONLY set this to "1"
