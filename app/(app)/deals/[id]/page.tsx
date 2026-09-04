@@ -820,15 +820,16 @@ export default async function DealPage({
         )}
       </header>
 
-      {/* What the place actually looks like. Aerial photography needs no API
-          key, so this renders for every deal with an address; the Street tab
-          appears only where Google has imagery AND a key is configured. */}
+      {/* What the place actually looks like. The USGS aerial needs no API key,
+          so something real renders for every deal with an address; the Street
+          and Satellite tabs need GOOGLE_MAPS_API_KEY (two separate Google
+          APIs on the one key) and are where the sharp imagery comes from. */}
       {dealAddress?.label && (
         <PropertyVisual
           dealId={id}
           label={dealAddress.label}
           hasStreetAddress={!!dealAddress.street}
-          streetViewEnabled={!!process.env.GOOGLE_MAPS_API_KEY}
+          googleEnabled={!!process.env.GOOGLE_MAPS_API_KEY}
         />
       )}
 

@@ -3,18 +3,23 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StructuredAddress } from "@/lib/address";
 import { usgsAerialUrl } from "@/lib/basemaps";
 import {
-  aerialZoom,
   resolveDealLocation,
   writeCache,
   type DealLocation,
   type DealVisualCache,
 } from "@/lib/deal-location";
-import { IMAGE_CREDIT, imagePlan, type ImageSource } from "@/lib/imagery-plan";
+import {
+  IMAGE_CREDIT,
+  aerialPlan,
+  frameZoom,
+  imagePlan,
+  type ImageSource,
+} from "@/lib/imagery-plan";
 
 // The ordering rule and the credits are pure, so they live in a universal
 // module the client can import too — re-exported here so server callers have
 // one import for all of it.
-export { IMAGE_CREDIT, imagePlan };
+export { IMAGE_CREDIT, aerialPlan, frameZoom, imagePlan };
 export type { ImageSource };
 
 /**
@@ -37,8 +42,12 @@ export type { ImageSource };
  * is worse than no picture.
  */
 
-/** Whether Street View can be attempted at all in this deployment. */
-export function streetViewConfigured(): boolean {
+/**
+ * Whether the Google sources (Street View photos, satellite imagery) can be
+ * attempted at all. One key covers both; the project must have the Street
+ * View Static API and the Maps Static API enabled on it.
+ */
+export function googleConfigured(): boolean {
   return !!process.env.GOOGLE_MAPS_API_KEY;
 }
 
@@ -123,14 +132,65 @@ export async function fetchStreetViewImage(
 }
 
 /**
+ * Google satellite imagery — the sharp overhead shot.
+ *
+ * The reason this exists: USGS NAIP is natively 0.6-1.0 m/px, so a frame
+ * tight enough to show a building is already upscaled and soft. Google runs
+ * about 0.15 m/px in cities, which is the difference between "a roof among
+ * roofs" and a building you can actually read.
+ *
+ * `scale=2` is the other half of it: Google caps `size` at 640x640 on the
+ * standard tier, but scale=2 returns twice the pixels for the SAME ground
+ * area — so a 640x360 request comes back as a 1280x720 image of the same
+ * frame. That is real added detail, not upscaling, and it is what makes the
+ * shot look right on a retina display.
+ */
+export async function fetchGoogleSatelliteImage(
+  loc: DealLocation,
+  size: { width: number; height: number; zoom?: number },
+): Promise<Response | null> {
+  const key = process.env.GOOGLE_MAPS_API_KEY;
+  if (!key) return null;
+  // Ask for half the pixels at scale=2 — same frame, twice the detail.
+  const w = Math.min(640, Math.max(48, Math.round(size.width / 2)));
+  const h = Math.min(640, Math.max(48, Math.round(size.height / 2)));
+  // Zoom is derived from `w`, the CSS-pixel width Google frames against —
+  // NOT the output width, which scale=2 has already doubled.
+  const zoom =
+    size.zoom ??
+    frameZoom({ widthPx: w, lat: loc.lat, precision: loc.precision, source: "satellite" });
+  const url =
+    `https://maps.googleapis.com/maps/api/staticmap?center=${loc.lat},${loc.lng}` +
+    `&zoom=${zoom}&size=${w}x${h}&scale=2&maptype=satellite&format=jpg&key=${key}`;
+  try {
+    const img = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    const type = img.headers.get("content-type") ?? "";
+    // Static Maps answers 4xx with a text body when the key or the enabled-API
+    // set is wrong, so content-type is the real success test.
+    if (!img.ok || !img.body || !type.startsWith("image/")) return null;
+    return img;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * USGS aerial orthoimagery of the site. Needs no key, so this is what makes
- * "every deal has a real picture" true rather than aspirational.
+ * "every deal has a real picture" true rather than aspirational — but at
+ * 0.6-1.0 m/px it is the floor, not the good shot.
  */
 export async function fetchAerialImage(
   loc: DealLocation,
   size: { width: number; height: number; zoom?: number },
 ): Promise<Response | null> {
-  const zoom = size.zoom ?? aerialZoom(loc.precision);
+  const zoom =
+    size.zoom ??
+    frameZoom({
+      widthPx: size.width,
+      lat: loc.lat,
+      precision: loc.precision,
+      source: "aerial",
+    });
   try {
     const img = await fetch(
       usgsAerialUrl({
@@ -156,10 +216,63 @@ export interface BestImage {
   source: ImageSource;
 }
 
+/** Fetch one named source. Null when it is unavailable or fails. */
+async function fetchOneRaw(
+  source: ImageSource,
+  supabase: SupabaseClient,
+  dealId: string,
+  address: StructuredAddress | null,
+  cache: DealVisualCache | null,
+  size: { width: number; height: number; zoom?: number },
+): Promise<Response | null> {
+  if (source === "streetview") {
+    return fetchStreetViewImage(supabase, dealId, address, cache, size);
+  }
+  // Both overhead sources need coordinates; resolving also caches them for
+  // the map, so the pin and the photo can never disagree.
+  const loc = await resolveDealLocation(supabase, dealId, address, cache);
+  if (!loc) return null;
+  return source === "satellite"
+    ? fetchGoogleSatelliteImage(loc, size)
+    : fetchAerialImage(loc, size);
+}
+
 /**
- * The best real picture of this building we can get right now: Street View
- * where it exists, the aerial otherwise. Null when the deal has no address,
- * nothing geocodes, or every source failed — callers then render nothing.
+ * Exactly one source, no fallback. Callers use this when the answer must be
+ * attributable: a tab that credits Google must not silently show USGS.
+ */
+export async function fetchOneImage(
+  source: ImageSource,
+  supabase: SupabaseClient,
+  dealId: string,
+  address: StructuredAddress | null,
+  cache: DealVisualCache | null,
+  size: { width: number; height: number; zoom?: number },
+): Promise<BestImage | null> {
+  const res = await fetchOneRaw(source, supabase, dealId, address, cache, size);
+  return res ? { response: res, source } : null;
+}
+
+async function runPlan(
+  plan: ImageSource[],
+  supabase: SupabaseClient,
+  dealId: string,
+  address: StructuredAddress | null,
+  cache: DealVisualCache | null,
+  size: { width: number; height: number; zoom?: number },
+): Promise<BestImage | null> {
+  for (const source of plan) {
+    const res = await fetchOneRaw(source, supabase, dealId, address, cache, size);
+    if (res) return { response: res, source };
+  }
+  return null;
+}
+
+/**
+ * The best real picture of this building we can get right now: the Street
+ * View photograph, else the sharp Google satellite frame, else the USGS
+ * aerial. Null when the deal has no address, nothing geocodes, or every
+ * source failed — callers then render nothing.
  */
 export async function fetchBestBuildingImage(
   supabase: SupabaseClient,
@@ -168,22 +281,36 @@ export async function fetchBestBuildingImage(
   cache: DealVisualCache | null,
   size: { width: number; height: number },
 ): Promise<BestImage | null> {
-  const plan = imagePlan({
-    hasStreetAddress: !!address?.street?.trim(),
-    streetViewConfigured: streetViewConfigured(),
-  });
+  return runPlan(
+    imagePlan({
+      hasStreetAddress: !!address?.street?.trim(),
+      googleConfigured: googleConfigured(),
+    }),
+    supabase,
+    dealId,
+    address,
+    cache,
+    size,
+  );
+}
 
-  for (const source of plan) {
-    if (source === "streetview") {
-      const res = await fetchStreetViewImage(supabase, dealId, address, cache, size);
-      if (res) return { response: res, source };
-      continue;
-    }
-    // Aerial needs coordinates; resolving also caches them for the map.
-    const loc = await resolveDealLocation(supabase, dealId, address, cache);
-    if (!loc) return null;
-    const res = await fetchAerialImage(loc, size);
-    if (res) return { response: res, source };
-  }
-  return null;
+/**
+ * The best OVERHEAD picture — the Aerial tab means "the view from above",
+ * so Street View is never a candidate here however good it is.
+ */
+export async function fetchBestAerialImage(
+  supabase: SupabaseClient,
+  dealId: string,
+  address: StructuredAddress | null,
+  cache: DealVisualCache | null,
+  size: { width: number; height: number; zoom?: number },
+): Promise<BestImage | null> {
+  return runPlan(
+    aerialPlan({ googleConfigured: googleConfigured() }),
+    supabase,
+    dealId,
+    address,
+    cache,
+    size,
+  );
 }

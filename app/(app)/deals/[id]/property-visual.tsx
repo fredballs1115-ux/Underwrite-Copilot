@@ -5,8 +5,14 @@ import { PropertyMap } from "./property-map";
 
 /**
  * The real property, at the top of its deal page: a street-level photograph
- * of the building where one exists, an aerial photograph of the site, and an
- * interactive map — three views of the same real place, no illustration.
+ * of the building where one exists, a sharp satellite frame, the keyless
+ * USGS aerial, and an interactive map — every one a real view of the same
+ * real place, no illustration.
+ *
+ * Each tab pins ONE source (`?src=`) rather than taking best-available, so
+ * its credit line is always exactly what is on screen: crediting Google for
+ * a USGS frame is sloppy, and crediting USGS for a Google frame drops an
+ * attribution Google requires.
  *
  * The Street tab leads whenever it can, because a photo of the building's
  * front is what "a picture of this property" means; the aerial leads when it
@@ -24,7 +30,7 @@ import { PropertyMap } from "./property-map";
  * before. No stock photos, no AI imagery, no "photo unavailable" graphic.
  */
 
-type View = "aerial" | "street" | "map";
+type View = "street" | "satellite" | "aerial" | "map";
 
 const AERIAL = { w: 1280, h: 576 }; // 16:9, the route's max width
 
@@ -32,29 +38,33 @@ export function PropertyVisual({
   dealId,
   label,
   hasStreetAddress,
-  streetViewEnabled,
+  googleEnabled,
 }: {
   dealId: string;
   /** the deal's address line — the caption, and the map pin's tooltip */
   label: string;
   /** street-level imagery is only honest for a street-level address */
   hasStreetAddress: boolean;
-  /** GOOGLE_MAPS_API_KEY is set (checked server-side) */
-  streetViewEnabled: boolean;
+  /** GOOGLE_MAPS_API_KEY is set (checked server-side) — unlocks the Street
+   *  photo AND the sharp satellite frame, which are separate Google APIs */
+  googleEnabled: boolean;
 }) {
   // Lead with the building's own photograph wherever one can exist; the
   // aerial leads only when it is the best picture available.
-  const canStreet = hasStreetAddress && streetViewEnabled;
+  const canStreet = hasStreetAddress && googleEnabled;
   const [view, setView] = useState<View>(canStreet ? "street" : "aerial");
   const [aerialGone, setAerialGone] = useState(false);
   const [streetGone, setStreetGone] = useState(false);
+  const [satelliteGone, setSatelliteGone] = useState(false);
 
   const streetPossible = canStreet && !streetGone;
+  const satellitePossible = googleEnabled && !satelliteGone;
   // Nothing photographic resolved — collapse entirely.
-  if (aerialGone && !streetPossible) return null;
+  if (aerialGone && !streetPossible && !satellitePossible) return null;
 
   const views: { id: View; label: string }[] = [
     ...(streetPossible ? [{ id: "street" as const, label: "Street" }] : []),
+    ...(satellitePossible ? [{ id: "satellite" as const, label: "Satellite" }] : []),
     ...(aerialGone ? [] : [{ id: "aerial" as const, label: "Aerial" }]),
     { id: "map" as const, label: "Map" },
   ];
@@ -85,13 +95,31 @@ export function PropertyVisual({
       <div className="relative">
         {/* The aerial stays mounted across tab switches so returning to it is
             instant and never re-fetches. */}
+        {satellitePossible && (
+          <div className={active === "satellite" ? "" : "hidden"}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- proxied,
+                auth-scoped route with its own cache headers */}
+            <img
+              src={`/api/deals/${dealId}/aerial?src=satellite&w=${AERIAL.w}&h=${AERIAL.h}`}
+              alt={`Satellite view of ${label}`}
+              width={AERIAL.w}
+              height={AERIAL.h}
+              className="aspect-[16/9] w-full bg-faint object-cover"
+              onError={() => setSatelliteGone(true)}
+            />
+            <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
+              Satellite imagery &copy; Google
+            </span>
+          </div>
+        )}
+
         {!aerialGone && (
           <div className={active === "aerial" ? "" : "hidden"}>
             {/* eslint-disable-next-line @next/next/no-img-element -- proxied,
                 auth-scoped route; next/image would add a second cache layer
                 over an image that is already cached server- and client-side */}
             <img
-              src={`/api/deals/${dealId}/aerial?w=${AERIAL.w}&h=${AERIAL.h}`}
+              src={`/api/deals/${dealId}/aerial?src=usgs&w=${AERIAL.w}&h=${AERIAL.h}`}
               alt={`Aerial photograph of ${label}`}
               width={AERIAL.w}
               height={AERIAL.h}

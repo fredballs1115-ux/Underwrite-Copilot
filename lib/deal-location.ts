@@ -29,8 +29,10 @@ export interface DealVisualCache {
   geoMiss?: boolean;
 }
 
-/** A street address frames one building; anything vaguer frames a district. */
-export type LocationPrecision = "street" | "area";
+// Precision now lives with the framing rules it drives (lib/imagery-plan),
+// so the zoom table and the thing it switches on cannot drift apart.
+export type { LocationPrecision } from "@/lib/imagery-plan";
+import type { LocationPrecision } from "@/lib/imagery-plan";
 
 export interface DealLocation extends Point {
   precision: LocationPrecision;
@@ -41,13 +43,6 @@ const GEO_TTL_MS = 30 * 86_400_000;
 
 export function addressPrecision(a: StructuredAddress | null): LocationPrecision {
   return a?.street?.trim() ? "street" : "area";
-}
-
-/** Zoom that frames the subject honestly for how precisely we located it. */
-export function aerialZoom(precision: LocationPrecision): number {
-  // z18 ≈ 0.4 m/px — one building and its parking. z15 ≈ 3 m/px — a district,
-  // which is the most an area-level placement can truthfully claim.
-  return precision === "street" ? 18 : 15;
 }
 
 function cacheFresh(cache: DealVisualCache | null): boolean {
