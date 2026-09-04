@@ -1,31 +1,20 @@
-// GET /api/deals/[id]/aerial — a real aerial photograph of the deal's actual
-// site, as a plain JPEG.
+// GET /api/deals/[id]/aerial — the deal's AERIAL photograph, and only that.
 //
-// This is the imagery floor of the app: unlike Street View it needs no API
-// key and no billing account, so EVERY deal with an address gets a real
-// picture of the real place from the moment it is saved. Source is the USGS
-// National Map (public domain — see lib/basemaps.ts for why not Esri).
+// Backs the "Aerial" tab, and any caller that specifically wants the
+// overhead view. Needs no API key and no billing account: USGS National Map
+// orthoimagery is a US federal work in the public domain, which is what makes
+// "every deal with an address has a real picture" true rather than
+// conditional on someone buying a Google key.
 //
-// Being an <img> rather than a Leaflet canvas is the point: the same URL
-// works in the deal header, a list thumbnail, the shared report and an
-// exported memo.
-//
-// No address, or nothing geocodes -> 404, and the caller renders its
-// address-only state. Never a stock photo, never AI imagery, never a
-// different building.
+// For "whichever real picture we can get", use /image instead.
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import type { StructuredAddress } from "@/lib/address";
-import { usgsAerialUrl } from "@/lib/basemaps";
-import {
-  aerialZoom,
-  resolveDealLocation,
-  type DealVisualCache,
-} from "@/lib/deal-location";
+import { resolveDealLocation, type DealVisualCache } from "@/lib/deal-location";
+import { IMAGE_CREDIT, fetchAerialImage } from "@/lib/imagery";
 
-/** Requests are clamped to sizes a page actually renders. */
-const SIZE = { min: 64, max: 1280, defaultW: 800, defaultH: 450 };
+const SIZE = { min: 48, max: 1280, defaultW: 800, defaultH: 450 };
 /** z12 is a metro, z19 is a rooftop; outside that the frame is never useful. */
 const ZOOM = { min: 12, max: 19 };
 
@@ -44,7 +33,6 @@ export async function GET(
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
   const supabase = await createSupabaseServerClient();
-  // RLS scopes this: a deal the caller can't read simply isn't returned.
   const { data: deal } = await supabase
     .from("deals")
     .select("id, address, photo")
@@ -52,42 +40,30 @@ export async function GET(
     .maybeSingle();
   if (!deal) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  const address = (deal.address as StructuredAddress | null) ?? null;
-  const cache = (deal.photo as DealVisualCache | null) ?? null;
-  const loc = await resolveDealLocation(supabase, id, address, cache);
+  const loc = await resolveDealLocation(
+    supabase,
+    id,
+    (deal.address as StructuredAddress | null) ?? null,
+    (deal.photo as DealVisualCache | null) ?? null,
+  );
   if (!loc) return new NextResponse(null, { status: 404 });
 
   const q = new URL(req.url).searchParams;
-  const width = clamp(q.get("w"), SIZE.min, SIZE.max, SIZE.defaultW);
-  const height = clamp(q.get("h"), SIZE.min, SIZE.max, SIZE.defaultH);
-  // Default zoom follows how precisely we located the deal — an area-level
-  // placement must not be framed as if it were one rooftop.
-  const zoom = clamp(q.get("z"), ZOOM.min, ZOOM.max, aerialZoom(loc.precision));
-
-  let img: Response;
-  try {
-    img = await fetch(
-      usgsAerialUrl({ center: { lat: loc.lat, lng: loc.lng }, zoom, width, height }),
-      { signal: AbortSignal.timeout(10_000) },
-    );
-  } catch {
-    return new NextResponse(null, { status: 404 });
-  }
-  // The export endpoint answers 200 with a JSON error body when it dislikes a
-  // request — treat anything that isn't an image as no image.
-  const type = img.headers.get("content-type") ?? "";
-  if (!img.ok || !img.body || !type.startsWith("image/")) {
-    return new NextResponse(null, { status: 404 });
-  }
+  const img = await fetchAerialImage(loc, {
+    width: clamp(q.get("w"), SIZE.min, SIZE.max, SIZE.defaultW),
+    height: clamp(q.get("h"), SIZE.min, SIZE.max, SIZE.defaultH),
+    // Zoom defaults to how precisely the deal is located (lib/deal-location),
+    // so an area-level placement is never framed as if it were one rooftop.
+    zoom: q.get("z") ? clamp(q.get("z"), ZOOM.min, ZOOM.max, 0) : undefined,
+  });
+  if (!img) return new NextResponse(null, { status: 404 });
 
   return new NextResponse(img.body, {
     headers: {
-      "content-type": type,
-      // Aerial mosaics refresh on a multi-year cycle; a week of private
-      // caching keeps this to roughly one upstream fetch per deal.
+      "content-type": img.headers.get("content-type") ?? "image/jpeg",
+      // Aerial mosaics refresh on a multi-year cycle.
       "cache-control": "private, max-age=604800",
-      // The deal is confidential even though the imagery is public domain.
-      "x-imagery-source": "USGS The National Map (public domain)",
+      "x-image-credit": IMAGE_CREDIT.aerial,
     },
   });
 }

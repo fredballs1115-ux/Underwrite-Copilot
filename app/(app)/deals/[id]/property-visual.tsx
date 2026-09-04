@@ -4,9 +4,14 @@ import { useState } from "react";
 import { PropertyMap } from "./property-map";
 
 /**
- * The real property, at the top of its deal page: an aerial photograph of the
- * actual site, the street-level view when Google has one, and an interactive
- * map — three views of the same real place, no illustration.
+ * The real property, at the top of its deal page: a street-level photograph
+ * of the building where one exists, an aerial photograph of the site, and an
+ * interactive map — three views of the same real place, no illustration.
+ *
+ * The Street tab leads whenever it can, because a photo of the building's
+ * front is what "a picture of this property" means; the aerial leads when it
+ * is the best picture available, which is every deal until a Google key is
+ * configured.
  *
  * Sourcing is unchanged from the site-polish rule: only imagery OF this
  * address, from a source we may use. Aerial is USGS (public domain, always
@@ -37,17 +42,20 @@ export function PropertyVisual({
   /** GOOGLE_MAPS_API_KEY is set (checked server-side) */
   streetViewEnabled: boolean;
 }) {
-  const [view, setView] = useState<View>("aerial");
+  // Lead with the building's own photograph wherever one can exist; the
+  // aerial leads only when it is the best picture available.
+  const canStreet = hasStreetAddress && streetViewEnabled;
+  const [view, setView] = useState<View>(canStreet ? "street" : "aerial");
   const [aerialGone, setAerialGone] = useState(false);
   const [streetGone, setStreetGone] = useState(false);
 
-  const streetPossible = hasStreetAddress && streetViewEnabled && !streetGone;
+  const streetPossible = canStreet && !streetGone;
   // Nothing photographic resolved — collapse entirely.
   if (aerialGone && !streetPossible) return null;
 
   const views: { id: View; label: string }[] = [
-    ...(aerialGone ? [] : [{ id: "aerial" as const, label: "Aerial" }]),
     ...(streetPossible ? [{ id: "street" as const, label: "Street" }] : []),
+    ...(aerialGone ? [] : [{ id: "aerial" as const, label: "Aerial" }]),
     { id: "map" as const, label: "Map" },
   ];
   // The active view can disappear underneath us when an image 404s.

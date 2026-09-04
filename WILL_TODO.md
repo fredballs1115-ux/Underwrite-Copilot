@@ -119,10 +119,34 @@ public domain (`lib/basemaps.ts` explains why USGS and not Esri). That covers
 the deal header, the deal-list thumbnails and both maps.
 
 `GOOGLE_MAPS_API_KEY` is still worth setting, but it is now an *upgrade*, not
-the difference between imagery and none: it adds the **Street** tab (a
-street-level photo of the building front) to the deal header wherever Google
-has coverage. Set it in Render and the tab appears on next view; leave it and
-nothing breaks or looks broken.
+the difference between imagery and none. With it, a street-addressed deal's
+picture becomes an actual **photograph of the building front** — in the deal
+header AND as the deal's thumbnail in the pipeline list — instead of the
+overhead shot. Without it nothing breaks or looks broken.
+
+### Setting the Street View key (your move, ~10 min)
+
+1. **console.cloud.google.com** → create or pick a project.
+2. **APIs & Services → Library** → enable **Street View Static API**. This is
+   the step that is easiest to skip; the key works for other Google APIs
+   without it and fails only here.
+3. **Billing** must be enabled on the project. Google's free allowance for
+   Street View is a Pro-SKU tier (roughly 5,000 calls/month at the time of
+   writing — confirm on Google's pricing page, it changes). Our metadata
+   verdict is cached per deal for 30 days, so a deal costs about one call,
+   not one per page view.
+4. **Credentials → Create credentials → API key.** Restrict it under **API
+   restrictions** to the Street View Static API. Do NOT add an HTTP-referrer
+   restriction: this key is used server-side and sends no referrer, so a
+   referrer rule rejects every call.
+5. Paste it into Render as `GOOGLE_MAPS_API_KEY` on the **web** service and
+   redeploy.
+6. Confirm with **`/api/imagery/health`** while signed in. It probes Google
+   and USGS live with a known address and reports what each said — including
+   Google's own `error_message`, which names the unenabled API or the
+   restriction that rejected the key. Several ways of half-succeeding all
+   look identical from the outside (deals just keep showing aerials), so
+   check this rather than guessing.
 
 Not yet covered by imagery, in rough value order:
 
