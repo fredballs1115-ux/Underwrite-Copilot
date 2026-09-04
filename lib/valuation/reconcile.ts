@@ -39,7 +39,18 @@ export function resolveGoingInCap(v: ValuationFacts): ResolvedCap {
     v.headlineValue > 0 &&
     v.year1Noi > 0
   ) {
-    return { value: v.year1Noi / v.headlineValue, basis: "derived" };
+    // The identity is `headline = NOI/cap − deduction`, so a cap has to be
+    // backed out of the CAPITALIZED value, not the headline. Dividing by the
+    // headline alone folds the deduction INTO the cap; `reconcileValuations`
+    // then adds that same deduction again as its own term, and the double
+    // count lands in the residual labelled "Unexplained" — a gap the two
+    // documents fully explain, reported as inexplicable.
+    //
+    // When no deduction is stated there is nothing to add back: the unknown
+    // stays unknown and surfaces in the residual rather than being invented.
+    const gross =
+      v.capexDeduction != null ? v.headlineValue + v.capexDeduction : v.headlineValue;
+    if (gross > 0) return { value: v.year1Noi / gross, basis: "derived" };
   }
   return { value: null, basis: "missing" };
 }

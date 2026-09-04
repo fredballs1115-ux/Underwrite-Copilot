@@ -36,12 +36,28 @@ services:
       - key: NEXT_PUBLIC_APP_URL
         sync: false
       # Stripe billing — set in the dashboard (see .env.example for how to get each).
+      # All FIVE price/secret vars belong here: the webhook checks every
+      # incoming subscription's price ids against them and ALERTS instead of
+      # processing anything it doesn't recognize — so a missing team price id
+      # doesn't misbill, it stops the subscription from being honoured at all.
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_PRICE_ID
-        sync: false
+        sync: false # Pro, $29.99/mo
+      - key: STRIPE_TEAM_PRICE_ID
+        sync: false # Team base, $49.99/mo (owner; quantity 1)
+      - key: STRIPE_TEAM_SEAT_PRICE_ID
+        sync: false # each ADDED member, $9.99/mo
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
+      # Optional emails — analysis-ready notices and the billing price-mismatch
+      # alert both send from the web service. No key = those stay silently off.
+      # - key: RESEND_API_KEY
+      #   sync: false
+      # - key: RESEND_FROM
+      #   sync: false
+      # - key: BILLING_ALERT_EMAIL
+      #   sync: false
       # Street View building photos (optional): metadata-checked, key stays
       # server-side behind /api/deals/[id]/photo. No key = clean no-photo cards.
       - key: GOOGLE_MAPS_API_KEY

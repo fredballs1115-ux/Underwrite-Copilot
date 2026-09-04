@@ -6,14 +6,26 @@ The deploy pipeline itself is **proven working** (live-verify runs green
 since you pointed the web service at `main`). What gates the new features is
 **data plumbing only you can touch**:
 
-- **Migration 0028 not yet run** → property DB, journal, laws alerts feed,
-  steward, Data Health all render honest empty states until it is.
+- **Unrun migrations.** This file used to assert "0028 not yet run" and
+  `WILL_TODO.md` later recorded 0017–0029 as done — two documents, one
+  contradiction, neither checked against the database. Don't trust either.
+  **Paste `supabase/CHECK_MIGRATIONS.sql` into the Supabase SQL editor
+  and run it**: it reads the live schema and marks every migration ✅ run or
+  ❌ NOT RUN with the exact tables it's missing. That output is the answer.
+  - Known trap: **0028 needs PostGIS enabled first** (Database → Extensions →
+    postgis). Without it, line 21 errors and the entire file rolls back — so
+    0028 leaves nothing behind and looks unrun even if you ran it.
+  - Verified independently: 0030–0033 do **not** depend on 0028, and all
+    33 migrations apply cleanly in order to a stock Postgres 16.
 - **No GitHub Actions secrets** → the ingest/steward/link-audit workflows
   no-op with instructions instead of running.
 - **Supabase plan decision** (money — your call, task 1 below).
 
 Everything ships dark-safe: nothing breaks while those are pending, pages
 say exactly what's missing and why.
+
+**The single current to-do list is `WILL_TODO.md`.** This file is a record of
+what shipped; that one is the forward list.
 
 ## Monday night (Aug 24–25 ET) — homescreen eye-catchers, then the big one: real data on the asset types that matter
 
