@@ -1,0 +1,38 @@
+name: fmr
+# Monthly HUD Fair Market Rents pull → the `benchmarks` table, straight from
+# huduser's own API. This is the PRIMARY source for every covered metro's
+# FMRs; monthly because FMRs change annually on 1 October with occasional
+# mid-year revisions.
+#
+# This is the FREE way to run it. render.yaml also defines a
+# `underwrite-copilot-fmr` cron service running the identical script; you want
+# ONE of the two, not both.
+#
+# No-ops with instructions until the Actions secrets exist.
+on:
+  schedule:
+    - cron: "45 12 3 * *" # the 3rd of each month
+  workflow_dispatch:
+jobs:
+  fmr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --omit=dev
+      - name: Pull FMRs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          HUD_API_TOKEN: ${{ secrets.HUD_API_TOKEN }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "Supabase Actions secrets not set (repo Settings → Secrets → Actions: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY). Skipping."
+            exit 0
+          fi
+          if [ -z "$HUD_API_TOKEN" ]; then
+            echo "HUD_API_TOKEN not set. Register free at https://www.huduser.gov/hudapi/public/register and add it as an Actions secret. Skipping."
+            exit 0
+          fi
+          node scripts/fetch-fmr.mjs

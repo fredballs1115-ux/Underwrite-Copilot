@@ -15,14 +15,30 @@ tables exist. Open the Supabase SQL editor and run these four files from
 
 | File | Creates | Unblocks |
 |------|---------|----------|
+| `0028_property_database.sql` † | `properties`, `recorded_sales`, `journal_entries`, … | Property DB, journal, Data Health, steward — **and it now gates the file below** |
+| `0030_public_data_layer.sql` † | `incentive_zones`, `deals.site_flags`, `nearest_property()` | Opportunity-zone flags + the deal page's closest-parcel card |
 | `0030_deal_versions.sql` | `deal_versions`, `deal_version_bridges` | Deal → **Bridge** |
 | `0031_valuations.sql` | `valuations` | Deal → **Valuations** |
 | `0032_rent_roll_engine.sql` | `rent_roll_imports`, `rent_roll_mappings`, `market_leasing_profiles` | Deal → **Rent roll** |
 | `0033_submarkets.sql` | `submarkets`, `submarket_periods`, `pipeline_properties`, `deal_submarkets` | **Submarkets** + the deal-page supply card |
 
-All four are additive, idempotent and RLS-scoped — no destructive step, safe to
+All are additive, idempotent and RLS-scoped — no destructive step, safe to
 re-run. Run each file **whole** (the SQL editor only runs highlighted text if
 anything is selected — click once at the end so nothing is highlighted).
+
+† **Two ordering traps, both verified against a real Postgres:**
+
+1. **0028 needs PostGIS enabled first** (Database → Extensions → postgis).
+   Its first statement creates that extension; without it nothing in the file
+   gets created, which is exactly why 0028 can look unrun even after you ran it.
+2. **There are two files numbered `0030`.** `0030_public_data_layer.sql` came
+   from a different branch and declares an RPC returning
+   `setof public.properties`, so it fails with
+   `type "public.properties" does not exist` unless 0028 ran first — and it
+   fails *halfway*, keeping `incentive_zones` and `deals.site_flags` while
+   losing the RPC. A table-only check would call that done, so the checker
+   below tests the function too. Run order: **0028 → 0030_public_data_layer →
+   0030_deal_versions → 0031 → 0032 → 0033.**
 
 Until they run, the behaviour is deliberate, not broken: every new read is
 best-effort, so the pages render with empty states rather than erroring. Saving
@@ -49,17 +65,18 @@ depends on 0028, so this doesn't block the four pages above.
 
 1. **Run migrations 0030–0033** — see above. Nothing else in phases 1–4 works
    until this happens.
-2. **The scheduled jobs — pick GitHub Actions, not Render crons.** All three
-   (intel, rates, steward) now exist BOTH as Render cron services in
+2. **The scheduled jobs — pick GitHub Actions, not Render crons.** All four
+   (intel, rates, fmr, steward) now exist BOTH as Render cron services in
    `render.yaml` and as free workflows in `.github/workflows/`, running the
    identical scripts on the same schedules. Run one of each pair, never both.
-   The Actions route costs nothing and needs only four repo secrets (Settings
-   → Secrets and variables → Actions): `SUPABASE_URL`,
-   `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `FRED_API_KEY` (free key
-   from FRED). Each workflow no-ops with a printed instruction until its
-   secrets exist, so nothing fails while you set them up.
-   If you'd rather run them on Render, a **Blueprint sync** creates the three
-   cron services instead — same four env vars. Note the rates command is
+   The Actions route costs nothing and needs five repo secrets (Settings →
+   Secrets and variables → Actions): `SUPABASE_URL`,
+   `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `FRED_API_KEY` (free) and
+   `HUD_API_TOKEN` (free, huduser.gov/hudapi/public/register). Each workflow
+   no-ops with a printed instruction until its secrets exist, so nothing fails
+   while you set them up.
+   If you'd rather run them on Render, a **Blueprint sync** creates the four
+   cron services instead — same env vars. Note the rates command is
    `node scripts/fetch-rates.mjs`, not `daily-rates.mjs`.
    A Blueprint sync also now prompts for **`STRIPE_TEAM_PRICE_ID` and
    `STRIPE_TEAM_SEAT_PRICE_ID`** on the web service. They were documented in
