@@ -231,6 +231,9 @@ export default async function DealsPage({
           : job === "error"
             ? ("failed" as const)
             : null,
+      // Gate the aerial thumbnail here rather than letting every row fire a
+      // request that can only 404: no address, no possible photograph.
+      hasAddress: !!(d.address as StructuredAddress | null)?.label?.trim(),
     };
   });
 

@@ -4,6 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type * as Leaflet from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { haversineKm, fmtMiles, MAX_PLAUSIBLE_KM, type LatLng } from "@/lib/geo";
+import {
+  BASEMAPS,
+  BASEMAP_ORDER,
+  DEFAULT_BASEMAP,
+  type BasemapId,
+} from "@/lib/basemaps";
 import { safeHttpUrl } from "@/lib/safe-url";
 
 /** One pin/row on the comps map — OM broker comps and public-web comps carry
@@ -96,8 +102,9 @@ function subjectPinHtml(): string {
 /**
  * COMPARABLE ANALYSIS map (Feature 4). Plots the subject property and the
  * comps — broker comps from the OM in teal, public-web comps in orange — on
- * a desaturated OpenStreetMap base (no API key), geocoded via Photon with an
- * address-first query ladder. Pins are numbered to match the table rows;
+ * real USGS aerial photography by default, with an OpenStreetMap street base
+ * one click away (neither needs an API key). Positions come from Photon via
+ * an address-first query ladder. Pins are numbered to match the table rows;
  * hovering a row lifts its pin, clicking flies to it. Dashed rings mark 1
  * and 3 miles around the subject. A pin that geocodes implausibly far from
  * the subject is dropped from the MAP but stays in the table with no
@@ -118,6 +125,13 @@ export function CompsMap({
   const [subjectPos, setSubjectPos] = useState<LatLng | null>(null);
   const [phase, setPhase] = useState<"locating" | "ready" | "nomap">("locating");
   const [sortKey, setSortKey] = useState<SortKey>("distance");
+  const [basemap, setBasemap] = useState<BasemapId>(DEFAULT_BASEMAP);
+  // The map is rebuilt whenever the pins change, so the chosen basemap lives
+  // in a ref too — otherwise a rebuild would silently snap back to satellite.
+  const basemapRef = useRef<BasemapId>(DEFAULT_BASEMAP);
+  const appliedRef = useRef<BasemapId>(DEFAULT_BASEMAP);
+  const leafletRef = useRef<typeof Leaflet | null>(null);
+  const baseLayerRef = useRef<Leaflet.TileLayer | null>(null);
   const mapRef = useRef<Leaflet.Map | null>(null);
   const markersRef = useRef<Map<string, Leaflet.Marker>>(new Map());
   const mapDivRef = useRef<HTMLDivElement | null>(null);
@@ -195,10 +209,17 @@ export function CompsMap({
 
       const map = L.map(mapDivRef.current, { scrollWheelZoom: false });
       mapRef.current = map;
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 18,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      leafletRef.current = L;
+      // Aerial photography by default: seeing the actual roofs, parking and
+      // frontage around a comp says more than a street drawing does.
+      const base = BASEMAPS[basemapRef.current];
+      appliedRef.current = basemapRef.current;
+      baseLayerRef.current = L.tileLayer(base.url, {
+        maxZoom: base.maxZoom,
+        maxNativeZoom: base.maxNativeZoom,
+        attribution: base.attribution,
       }).addTo(map);
+      L.control.scale({ imperial: true, metric: false }).addTo(map);
 
       if (subjectPos) {
         // Distance rings before the pins so they sit underneath.
@@ -274,8 +295,29 @@ export function CompsMap({
       markers.clear();
       mapRef.current?.remove();
       mapRef.current = null;
+      baseLayerRef.current = null;
+      leafletRef.current = null;
     };
   }, [phase, placed, subjectPos]);
+
+  // Basemap switch: swap the tile layer in place so pins, zoom and popups
+  // all survive the change.
+  useEffect(() => {
+    basemapRef.current = basemap;
+    const L = leafletRef.current;
+    const map = mapRef.current;
+    if (!L || !map || appliedRef.current === basemap) return;
+    const next = BASEMAPS[basemap];
+    baseLayerRef.current?.remove();
+    baseLayerRef.current = L.tileLayer(next.url, {
+      maxZoom: next.maxZoom,
+      maxNativeZoom: next.maxNativeZoom,
+      attribution: next.attribution,
+    }).addTo(map);
+    // Keep the base underneath the pins after a re-add.
+    baseLayerRef.current.bringToBack();
+    appliedRef.current = basemap;
+  }, [basemap, phase]);
 
   const rows = useMemo(() => {
     // The comps are already in hand — list them immediately; distances fill
@@ -348,7 +390,24 @@ export function CompsMap({
         </div>
       )}
       {phase === "ready" && (
-        <div ref={mapDivRef} className="uc-map mt-3 h-80 overflow-hidden rounded-lg border border-line md:h-96" />
+        <div className="relative mt-3">
+          <div ref={mapDivRef} className="uc-map h-80 overflow-hidden rounded-lg border border-line md:h-96" />
+          <div className="absolute right-2 top-2 z-[1000] flex overflow-hidden rounded-lg border border-line bg-surface shadow-sm">
+            {BASEMAP_ORDER.map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setBasemap(id)}
+                aria-pressed={basemap === id}
+                className={`px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                  basemap === id ? "bg-brand text-white" : "hover:bg-faint"
+                }`}
+              >
+                {BASEMAPS[id].label}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
       {phase === "nomap" && (
         <div className="mt-3 rounded-lg bg-faint px-3 py-2 text-sm text-muted">

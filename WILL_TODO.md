@@ -74,6 +74,27 @@ if you ran 0017–0029, which the earlier list confirms you did.
 
 ---
 
+## Property imagery — where it stands after the aerial work
+
+Every deal with an address now shows a **real aerial photograph of its actual
+site**, with no API key and no billing account: USGS National Map imagery is
+public domain (`lib/basemaps.ts` explains why USGS and not Esri). That covers
+the deal header, the deal-list thumbnails and both maps.
+
+`GOOGLE_MAPS_API_KEY` is still worth setting, but it is now an *upgrade*, not
+the difference between imagery and none: it adds the **Street** tab (a
+street-level photo of the building front) to the deal header wherever Google
+has coverage. Set it in Render and the tab appears on next view; leave it and
+nothing breaks or looks broken.
+
+Not yet covered by imagery, in rough value order:
+
+1. **The shared report** (`/share/[token]`) — needs a token-scoped aerial
+   route, since `/api/deals/[id]/aerial` requires a signed-in session.
+2. **The exported PDF memo** — same static URL would work, same auth problem.
+3. **Submarket pages** — a map of the submarket with its pipeline properties
+   plotted; needs submarket geocoding, which does not exist yet.
+
 ## Claude's moves (next session)
 
 1. **Verify phases 1–4 end to end once the migrations land** — create a

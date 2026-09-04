@@ -12,16 +12,14 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import type { StructuredAddress } from "@/lib/address";
+import { writeCache, type DealVisualCache } from "@/lib/deal-location";
 
 const SIZE = "800x450";
 
-interface PhotoCache {
-  status: "ok" | "none" | "unconfigured";
-  checkedAt: string;
-  /** pano location echo from metadata — keeps the image call deterministic */
-  panoLat?: number;
-  panoLng?: number;
-}
+// The verdict shares `deals.photo` with the geocode cache, so writes MERGE
+// (lib/deal-location writeCache) — a Street View check must not wipe the
+// coordinates the aerial route and the map depend on, or vice versa.
+type PhotoCache = DealVisualCache;
 
 export async function GET(
   _req: Request,
@@ -50,9 +48,13 @@ export async function GET(
   }
 
   // Cached metadata verdict (fresh within 30 days) skips the round trip.
-  let cache = (deal.photo as PhotoCache | null) ?? null;
+  const stored = (deal.photo as PhotoCache | null) ?? null;
+  let cache = stored;
+  // `checkedAt` is absent when the geocode wrote this object first — that is
+  // "never checked", so the metadata call still has to run.
   const fresh =
-    cache && Date.now() - Date.parse(cache.checkedAt) < 30 * 86_400_000;
+    !!cache?.checkedAt &&
+    Date.now() - Date.parse(cache.checkedAt) < 30 * 86_400_000;
   if (!fresh) {
     try {
       const metaUrl =
@@ -63,6 +65,7 @@ export async function GET(
       };
       if (meta.status === "OK") {
         cache = {
+          ...stored,
           status: "ok",
           checkedAt: new Date().toISOString(),
           panoLat: meta.location?.lat,
@@ -70,7 +73,7 @@ export async function GET(
         };
       } else if (meta.status === "ZERO_RESULTS" || meta.status === "NOT_FOUND") {
         // Definitive "no imagery here" — safe to cache.
-        cache = { status: "none", checkedAt: new Date().toISOString() };
+        cache = { ...stored, status: "none", checkedAt: new Date().toISOString() };
       } else {
         // OVER_QUERY_LIMIT / REQUEST_DENIED / UNKNOWN_ERROR are transient or
         // config states — 404 this request but never poison the 30-day cache.
@@ -80,12 +83,8 @@ export async function GET(
       // Transient failure: report no image THIS request, don't cache a "none".
       return new NextResponse(null, { status: 404 });
     }
-    // Best-effort cache write (pre-0027 schema just skips it).
-    try {
-      await supabase.from("deals").update({ photo: cache }).eq("id", id);
-    } catch {
-      /* pre-0027 — fine */
-    }
+    // Best-effort, merged write (pre-0027 schema just skips it).
+    await writeCache(supabase, id, stored, cache ?? {});
   }
   if (cache?.status !== "ok") return new NextResponse(null, { status: 404 });
 

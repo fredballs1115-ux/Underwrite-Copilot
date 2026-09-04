@@ -4,7 +4,7 @@ import { ResearchPanel } from "./research-panel";
 import { SectorFieldsForm } from "./sector-fields-form";
 import type { SectorFieldValues } from "@/lib/sector-fields";
 import { PublicCompsPanel } from "./public-comps-panel";
-import { BuildingPhoto } from "./building-photo";
+import { PropertyVisual } from "./property-visual";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
 import { parseMoney } from "@/lib/criteria";
@@ -799,6 +799,18 @@ export default async function DealPage({
         )}
       </header>
 
+      {/* What the place actually looks like. Aerial photography needs no API
+          key, so this renders for every deal with an address; the Street tab
+          appears only where Google has imagery AND a key is configured. */}
+      {dealAddress?.label && (
+        <PropertyVisual
+          dealId={id}
+          label={dealAddress.label}
+          hasStreetAddress={!!dealAddress.street}
+          streetViewEnabled={!!process.env.GOOGLE_MAPS_API_KEY}
+        />
+      )}
+
       {/* Submarket supply (Phase 4): the deal's rent growth, exit cap and
           vacancy, checked against what the linked submarket has actually
           done. Absent entirely on a pre-0033 schema. */}
@@ -852,12 +864,6 @@ export default async function DealPage({
       />
 
       <div className="mt-6 space-y-4">
-        {/* Street-level imagery requires a street-level address: a
-            neighborhood-only placement (like the sample) would render some
-            random block — wrong in context. */}
-        {dealAddress?.label && dealAddress.street && (
-          <BuildingPhoto dealId={id} alt={`Street view of ${dealAddress.label}`} />
-        )}
         <PublicCompsPanel
           dealId={id}
           result={publicComps}
