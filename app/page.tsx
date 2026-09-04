@@ -41,6 +41,7 @@ import { StressBench } from "./landing-stress";
 import { COVERAGE_LIVE, COVERAGE_DISCOVERY } from "@/lib/public-comps/core";
 import metrosSeed from "@/data/research/metros.json";
 import { MarketsMarquee, MARKET_COUNT, metroFact } from "./markets-marquee";
+import { MarketsGallery } from "./markets-gallery";
 
 // The research layer's scale, DERIVED from the same seeds the app evaluates
 // — the homepage can never claim coverage the rules engine doesn't have.
@@ -1025,6 +1026,12 @@ export default function Home() {
         {/* Second across-the-screen band: every covered market with a real
             fact, scrolling the other way from the price ticker. */}
         <MarketsMarquee />
+
+        {/* The same markets, photographed. The page was entirely drawn — icons,
+            CSS bands and text — which is a strange look for a product about
+            real buildings. These are real aerial frames of the actual
+            downtowns, and each one links where the marquee entry does. */}
+        <MarketsGallery />
 
         {/* The ground layer — the data floor under every screen: property DB,
             laws-on-the-building, scored news, and the steward policing it. */}

@@ -16,7 +16,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { BASEMAPS, usgsAerialUrl } from "@/lib/basemaps";
 import { imagePlan } from "@/lib/imagery-plan";
-import { streetViewConfigured } from "@/lib/imagery";
+import { googleConfigured } from "@/lib/imagery";
 
 /** A street Google has certainly photographed — so a miss is our config. */
 const PROBE = {
@@ -55,6 +55,36 @@ async function probeStreetView(key: string | undefined): Promise<Probe> {
       detail: body.error_message
         ? `${status}: ${body.error_message}`
         : `${status}. REQUEST_DENIED usually means the Street View Static API is not enabled on the project, the key's API restrictions exclude it, or billing is off.`,
+    };
+  } catch (e) {
+    return { ok: false, detail: `Could not reach Google: ${(e as Error).message}` };
+  }
+}
+
+/** Google satellite via the Maps Static API — a SEPARATE API from Street
+ *  View on the same key, so it has its own way of being un-enabled. */
+async function probeSatellite(key: string | undefined): Promise<Probe> {
+  if (!key) {
+    return {
+      ok: false,
+      detail:
+        "GOOGLE_MAPS_API_KEY is not set. Overhead shots fall back to USGS, which is ~0.6-1.0 m/px and cannot frame a single building sharply.",
+    };
+  }
+  const url =
+    `https://maps.googleapis.com/maps/api/staticmap?center=${PROBE.lat},${PROBE.lng}` +
+    `&zoom=19&size=64x64&scale=2&maptype=satellite&format=jpg&key=${key}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(12_000), cache: "no-store" });
+    const type = res.headers.get("content-type") ?? "";
+    if (res.ok && type.startsWith("image/")) {
+      return { ok: true, detail: `OK — Google satellite is being served (${type}).` };
+    }
+    // Static Maps returns a plain-text reason on 4xx, and it is the actionable
+    // part: it names the unenabled API or the restriction that rejected it.
+    return {
+      ok: false,
+      detail: `HTTP ${res.status}: ${(await res.text()).slice(0, 300)} — usually the Maps Static API is not enabled on the project, or the key's API restrictions exclude it.`,
     };
   } catch (e) {
     return { ok: false, detail: `Could not reach Google: ${(e as Error).message}` };
@@ -119,8 +149,9 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
   const key = process.env.GOOGLE_MAPS_API_KEY;
-  const [streetView, aerial, tiles] = await Promise.all([
+  const [streetView, satellite, aerial, tiles] = await Promise.all([
     probeStreetView(key),
+    probeSatellite(key),
     probeAerial(),
     probeTiles(),
   ]);
@@ -128,13 +159,13 @@ export async function GET() {
   return NextResponse.json(
     {
       probeAddress: PROBE.label,
-      streetViewConfigured: streetViewConfigured(),
+      googleConfigured: googleConfigured(),
       // What a street-addressed deal will actually try, in order, right now.
       planForStreetAddressedDeal: imagePlan({
         hasStreetAddress: true,
-        streetViewConfigured: streetViewConfigured(),
+        googleConfigured: googleConfigured(),
       }),
-      sources: { streetView, aerial },
+      sources: { streetView, satellite, aerial },
       basemapTiles: tiles,
     },
     { headers: { "cache-control": "no-store" } },
