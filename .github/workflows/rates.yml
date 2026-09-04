@@ -1,0 +1,39 @@
+name: rates
+# Weekday FRED pull → the `rates` table, so screens use today's 10Y / SOFR /
+# PMMS instead of hardcoded numbers.
+#
+# This is the FREE way to run it. render.yaml also defines a
+# `underwrite-copilot-rates` cron service that runs the identical script; you
+# want ONE of the two, not both. On Render it's a paid always-on service; here
+# it costs nothing. Pick this one unless you specifically want the job on
+# Render's network.
+#
+# No-ops with instructions until the Actions secrets exist, so a fresh fork
+# never fails a run it was never configured for.
+on:
+  schedule:
+    - cron: "30 12 * * 1-5" # weekdays, after the FRED morning release
+  workflow_dispatch:
+jobs:
+  rates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --omit=dev
+      - name: Pull rates
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "Supabase Actions secrets not set (repo Settings → Secrets → Actions: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY). Skipping."
+            exit 0
+          fi
+          if [ -z "$FRED_API_KEY" ]; then
+            echo "FRED_API_KEY not set. Get a free key at https://fred.stlouisfed.org/docs/api/api_key.html and add it as an Actions secret. Skipping."
+            exit 0
+          fi
+          node scripts/fetch-rates.mjs

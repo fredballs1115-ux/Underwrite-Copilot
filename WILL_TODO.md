@@ -28,8 +28,20 @@ Until they run, the behaviour is deliberate, not broken: every new read is
 best-effort, so the pages render with empty states rather than erroring. Saving
 anything on them will fail. That is the tell that this step is still pending.
 
-`0033` also depends on `public.can_access_deal(...)` from `0017` — already live
-if you ran 0017–0029, which the earlier list confirms you did.
+`0033` also depends on `public.can_access_deal(...)` from `0017`.
+
+**Don't take that on faith — check it.** Paste `supabase/CHECK_MIGRATIONS.sql`
+into the SQL editor and run it: it reads the live schema and marks every
+migration ✅ run or ❌ NOT RUN, naming the exact tables any missing one still
+owes. It writes nothing. Run it before this section and again after, and the
+question "which migrations do I still need?" stops being a guess.
+
+**The one trap it will surface: `0028` needs PostGIS.** Its line 21 is
+`create extension if not exists postgis`, and if the extension isn't enabled
+that line errors and Postgres rolls the *whole file* back — 0028 leaves
+nothing behind and looks unrun even if you ran it. Enable it first at
+Database → Extensions → postgis, then re-run 0028. Nothing in 0030–0033
+depends on 0028, so this doesn't block the four pages above.
 
 ---
 
@@ -37,11 +49,24 @@ if you ran 0017–0029, which the earlier list confirms you did.
 
 1. **Run migrations 0030–0033** — see above. Nothing else in phases 1–4 works
    until this happens.
-2. **Render Blueprint sync** — creates the two cron services already defined in
-   `render.yaml` (`underwrite-copilot-intel`, `underwrite-copilot-rates`); fill
-   env vars: `ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
-   and `FRED_API_KEY` (free key). Note: the rates command is
-   `node scripts/fetch-rates.mjs` — not `daily-rates.mjs`.
+2. **The scheduled jobs — pick GitHub Actions, not Render crons.** All three
+   (intel, rates, steward) now exist BOTH as Render cron services in
+   `render.yaml` and as free workflows in `.github/workflows/`, running the
+   identical scripts on the same schedules. Run one of each pair, never both.
+   The Actions route costs nothing and needs only four repo secrets (Settings
+   → Secrets and variables → Actions): `SUPABASE_URL`,
+   `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `FRED_API_KEY` (free key
+   from FRED). Each workflow no-ops with a printed instruction until its
+   secrets exist, so nothing fails while you set them up.
+   If you'd rather run them on Render, a **Blueprint sync** creates the three
+   cron services instead — same four env vars. Note the rates command is
+   `node scripts/fetch-rates.mjs`, not `daily-rates.mjs`.
+   A Blueprint sync also now prompts for **`STRIPE_TEAM_PRICE_ID` and
+   `STRIPE_TEAM_SEAT_PRICE_ID`** on the web service. They were documented in
+   `.env.example` but missing from the Blueprint, so a sync never asked for
+   them — and the Stripe webhook refuses to process a subscription whose price
+   ids it can't match, so Team checkouts would have alerted instead of
+   activating. Set both, or leave Team billing off until you create the prices.
 3. **Hit `/api/comps/health` signed in and paste the JSON back** — it returns
    each data portal's own layer lists / field schemas / backing URLs. That
    output is everything needed to finish wiring DC, Maryland and New Jersey

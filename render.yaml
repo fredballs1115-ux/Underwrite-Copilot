@@ -36,12 +36,28 @@ services:
       - key: NEXT_PUBLIC_APP_URL
         sync: false
       # Stripe billing — set in the dashboard (see .env.example for how to get each).
+      # All FIVE price/secret vars belong here: the webhook checks every
+      # incoming subscription's price ids against them and ALERTS instead of
+      # processing anything it doesn't recognize — so a missing team price id
+      # doesn't misbill, it stops the subscription from being honoured at all.
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_PRICE_ID
-        sync: false
+        sync: false # Pro, $29.99/mo
+      - key: STRIPE_TEAM_PRICE_ID
+        sync: false # Team base, $49.99/mo (owner; quantity 1)
+      - key: STRIPE_TEAM_SEAT_PRICE_ID
+        sync: false # each ADDED member, $9.99/mo
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
+      # Optional emails — analysis-ready notices and the billing price-mismatch
+      # alert both send from the web service. No key = those stay silently off.
+      # - key: RESEND_API_KEY
+      #   sync: false
+      # - key: RESEND_FROM
+      #   sync: false
+      # - key: BILLING_ALERT_EMAIL
+      #   sync: false
       # Street View building photos (optional): metadata-checked, key stays
       # server-side behind /api/deals/[id]/photo. No key = clean no-photo cards.
       - key: GOOGLE_MAPS_API_KEY
@@ -85,6 +101,15 @@ services:
       # - key: RESEND_FROM
       #   sync: false
 
+  # ── The three crons below have FREE GitHub Actions twins ───────────────────
+  # .github/workflows/{intel,rates,steward}.yml run the identical scripts on
+  # GitHub's runners at the same schedules, for nothing. Run ONE of each pair,
+  # never both — two schedulers writing the same tables is duplicated work and
+  # a doubled Anthropic bill. Keep these Render definitions if you want the
+  # jobs on Render's network or inside its private egress; otherwise set the
+  # Actions secrets (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY,
+  # FRED_API_KEY) and don't create these three services at all.
+  #
   # ── Daily market intel (research build) ────────────────────────────────────
   # Weekday news sweep for the jurisdictions + sectors on file: Google News
   # RSS → dedupe → Claude scores relevance → digest + red-banner alerts for

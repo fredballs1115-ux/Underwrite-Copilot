@@ -58,13 +58,24 @@ describe("resolveGoingInCap", () => {
     expect(resolveGoingInCap(JLL)).toEqual({ value: 0.06, basis: "stated" });
   });
 
-  it("backs a cap out of value and NOI, labelled as derived", () => {
+  it("backs a cap out of the CAPITALIZED value, not the headline", () => {
     const r = resolveGoingInCap({ ...JLL, goingInCap: null });
     expect(r.basis).toBe("derived");
-    expect(r.value).toBeCloseTo(JLL.year1Noi! / JLL.headlineValue!, 12);
-    // And it is NOT the stated 6.00% — the deduction sits between the two,
-    // which is exactly why a derived cap has to be labelled as one.
-    expect(r.value).not.toBeCloseTo(JLL.goingInCap!, 5);
+    // headline = NOI/cap − deduction, so the deduction has to be added back
+    // before dividing. Do that and the derivation recovers the stated 6.00%
+    // exactly; divide by the headline alone and the deduction is folded into
+    // the cap, where reconcileValuations then counts it a second time.
+    expectClose(r.value!, JLL.year1Noi! / (JLL.headlineValue! + JLL.capexDeduction!));
+    expect(r.value).toBeCloseTo(JLL.goingInCap!, 12);
+    expect(r.value).not.toBeCloseTo(JLL.year1Noi! / JLL.headlineValue!, 5);
+  });
+
+  it("divides by the headline when no deduction is stated", () => {
+    // Nothing to add back, and nothing invented: the unknown stays unknown
+    // and surfaces later in the bridge's residual.
+    const r = resolveGoingInCap({ ...JLL, goingInCap: null, capexDeduction: null });
+    expect(r.basis).toBe("derived");
+    expectClose(r.value!, JLL.year1Noi! / JLL.headlineValue!);
   });
 
   it("reports missing rather than guessing", () => {
@@ -141,6 +152,27 @@ describe("reconcileValuations — the symmetric split", () => {
     const bridge = ok(reconcileValuations(JLL, derivedSide));
     expect(bridge.fromCapBasis).toBe("stated");
     expect(bridge.toCapBasis).toBe("derived");
+  });
+
+  it("does not count a stated deduction twice when the cap is derived", () => {
+    // The regression this guards: derive Eastdil's cap off its headline and
+    // the $1.4M deduction is baked into the cap AND added again as its own
+    // term. The two components sum to $1.4M too much, the residual absorbs
+    // the difference, and the summary line reports a fully-explained gap as
+    // "-22% unexplained". Both sides are internally consistent here, so the
+    // honest answer is that NOTHING is unexplained.
+    const derivedSide: NamedValuation = { ...EASTDIL, goingInCap: null };
+    const bridge = ok(reconcileValuations(JLL, derivedSide));
+
+    const stated = ok(reconcileValuations(JLL, EASTDIL));
+    for (const c of stated.components) {
+      const mirror = bridge.components.find((x) => x.key === c.key)!;
+      expectClose(mirror.amount, c.amount, 1e-9);
+    }
+    expect(
+      Math.abs(bridge.components.find((c) => c.key === "residual")!.amount),
+    ).toBeLessThan(0.01);
+    expect(bridgeSummaryLine(bridge)).not.toContain("unexplained");
   });
 
   it("never turns an unstated capex deduction into a zero deduction", () => {
