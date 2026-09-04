@@ -35,10 +35,15 @@ export interface Basemap {
   photographic: boolean;
 }
 
-export type BasemapId = "satellite" | "streets";
+export type BasemapId = "satellite" | "hybrid" | "streets";
 
 const USGS_IMAGERY =
   "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer";
+// The same orthoimagery with the National Map's transportation, boundary and
+// place-name layers drawn over it — the "hybrid" view, and the reason Google's
+// satellite mode is readable rather than just pretty. Also public domain.
+const USGS_IMAGERY_TOPO =
+  "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryTopo/MapServer";
 
 export const BASEMAPS: Record<BasemapId, Basemap> = {
   // ArcGIS tile services address tiles as {z}/{row}/{col} — i.e. y before x.
@@ -53,6 +58,16 @@ export const BASEMAPS: Record<BasemapId, Basemap> = {
     maxZoom: 19,
     // The national mosaic thins out past z18; over-zoom rather than show the
     // gray "no tile" checkerboard at the zoom people actually want.
+    maxNativeZoom: 18,
+    photographic: true,
+  },
+  hybrid: {
+    id: "hybrid",
+    label: "Hybrid",
+    url: `${USGS_IMAGERY_TOPO}/tile/{z}/{y}/{x}`,
+    attribution:
+      'Imagery &amp; map: <a href="https://www.usgs.gov/" target="_blank" rel="noopener noreferrer">USGS</a> The National Map — public domain',
+    maxZoom: 19,
     maxNativeZoom: 18,
     photographic: true,
   },
@@ -71,7 +86,7 @@ export const BASEMAPS: Record<BasemapId, Basemap> = {
 /** Photography first: the point of the map is to show the real place. */
 export const DEFAULT_BASEMAP: BasemapId = "satellite";
 
-export const BASEMAP_ORDER: BasemapId[] = ["satellite", "streets"];
+export const BASEMAP_ORDER: BasemapId[] = ["satellite", "hybrid", "streets"];
 
 export function basemapById(id: string | null | undefined): Basemap {
   return BASEMAPS[(id ?? "") as BasemapId] ?? BASEMAPS[DEFAULT_BASEMAP];

@@ -1,29 +1,29 @@
-// GET /api/deals/[id]/photo — streams the deal's Street View image with the
-// API key kept server-side. Strict sourcing rules (site-polish spec):
-//   1. Google Street View Static API ONLY, and only after the METADATA
-//      endpoint confirms real imagery exists at the address (status OK).
-//   2. No key configured, or no imagery -> 404. The page then shows its
-//      clean address-only card. Never a stock photo, never AI imagery,
-//      never a scraped listing photo.
-// The metadata verdict is cached on deals.photo (0027) so Google is asked
-// once per address, not per page view. RLS scopes access: the deal must be
-// readable by the signed-in caller.
+// GET /api/deals/[id]/photo — the deal's STREET-LEVEL photograph, and only
+// that. A picture of the building's front, from Google Street View.
+//
+// This route is deliberately single-source: it backs the "Street" tab, whose
+// whole meaning is "the actual street-level photo". Callers that want
+// whichever real picture is available should use /image instead, which falls
+// back to the aerial.
+//
+// Sourcing rules (unchanged since the site-polish spec, now enforced in
+// lib/imagery.ts): Street View Static API only, only after the metadata
+// endpoint confirms real imagery exists, only for a street-level address, and
+// the key never leaves the server. No key or no imagery -> 404, and the page
+// shows its clean address-only layout. Never a stock photo, never AI imagery,
+// never a scraped listing photo.
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import type { StructuredAddress } from "@/lib/address";
-import { writeCache, type DealVisualCache } from "@/lib/deal-location";
+import type { DealVisualCache } from "@/lib/deal-location";
+import { IMAGE_CREDIT, fetchStreetViewImage } from "@/lib/imagery";
 
-const SIZE = "800x450";
-
-// The verdict shares `deals.photo` with the geocode cache, so writes MERGE
-// (lib/deal-location writeCache) — a Street View check must not wipe the
-// coordinates the aerial route and the map depend on, or vice versa.
-type PhotoCache = DealVisualCache;
+const SIZE = { width: 800, height: 450 };
 
 export async function GET(
   _req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   const user = await getCurrentUser();
@@ -37,71 +37,21 @@ export async function GET(
     .maybeSingle();
   if (!deal) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  const key = process.env.GOOGLE_MAPS_API_KEY;
-  const structured = deal.address as StructuredAddress | null;
-  const address = structured?.label;
-  // Street-level imagery only for street-level addresses — a neighborhood
-  // placement must never show a random block's photo (defense in depth with
-  // the page-side gate; also covers stale cached 'ok' verdicts).
-  if (!key || !address || !structured?.street) {
-    return new NextResponse(null, { status: 404 });
-  }
+  const img = await fetchStreetViewImage(
+    supabase,
+    id,
+    (deal.address as StructuredAddress | null) ?? null,
+    (deal.photo as DealVisualCache | null) ?? null,
+    SIZE,
+  );
+  if (!img) return new NextResponse(null, { status: 404 });
 
-  // Cached metadata verdict (fresh within 30 days) skips the round trip.
-  const stored = (deal.photo as PhotoCache | null) ?? null;
-  let cache = stored;
-  // `checkedAt` is absent when the geocode wrote this object first — that is
-  // "never checked", so the metadata call still has to run.
-  const fresh =
-    !!cache?.checkedAt &&
-    Date.now() - Date.parse(cache.checkedAt) < 30 * 86_400_000;
-  if (!fresh) {
-    try {
-      const metaUrl =
-        `https://maps.googleapis.com/maps/api/streetview/metadata?location=${encodeURIComponent(address)}&key=${key}`;
-      const meta = (await (await fetch(metaUrl)).json()) as {
-        status?: string;
-        location?: { lat?: number; lng?: number };
-      };
-      if (meta.status === "OK") {
-        cache = {
-          ...stored,
-          status: "ok",
-          checkedAt: new Date().toISOString(),
-          panoLat: meta.location?.lat,
-          panoLng: meta.location?.lng,
-        };
-      } else if (meta.status === "ZERO_RESULTS" || meta.status === "NOT_FOUND") {
-        // Definitive "no imagery here" — safe to cache.
-        cache = { ...stored, status: "none", checkedAt: new Date().toISOString() };
-      } else {
-        // OVER_QUERY_LIMIT / REQUEST_DENIED / UNKNOWN_ERROR are transient or
-        // config states — 404 this request but never poison the 30-day cache.
-        return new NextResponse(null, { status: 404 });
-      }
-    } catch {
-      // Transient failure: report no image THIS request, don't cache a "none".
-      return new NextResponse(null, { status: 404 });
-    }
-    // Best-effort, merged write (pre-0027 schema just skips it).
-    await writeCache(supabase, id, stored, cache ?? {});
-  }
-  if (cache?.status !== "ok") return new NextResponse(null, { status: 404 });
-
-  const loc =
-    cache.panoLat !== undefined && cache.panoLng !== undefined
-      ? `${cache.panoLat},${cache.panoLng}`
-      : address;
-  const imgUrl =
-    `https://maps.googleapis.com/maps/api/streetview?size=${SIZE}&location=${encodeURIComponent(loc)}&key=${key}`;
-  const img = await fetch(imgUrl);
-  if (!img.ok || !img.body) return new NextResponse(null, { status: 404 });
   return new NextResponse(img.body, {
     headers: {
       "content-type": img.headers.get("content-type") ?? "image/jpeg",
-      // Immutable-ish: street imagery changes rarely; a day of caching keeps
-      // quota use near zero.
+      // Street imagery changes rarely; a day of caching keeps quota near zero.
       "cache-control": "private, max-age=86400",
+      "x-image-credit": IMAGE_CREDIT.streetview,
     },
   });
 }
