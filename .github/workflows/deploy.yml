@@ -1,13 +1,25 @@
 name: deploy-to-render
-# GitHub-driven deploys: Render's auto-deploy is confirmed not firing
-# (live-verify run #1 proved the live site serves a pre-session build), so
-# this workflow POSTs Render's Deploy Hook on every push to main instead.
+# GitHub-driven deploys, as a BACKUP to Render's own auto-deploy.
+#
+# The header here used to say auto-deploy was "confirmed not firing", from a
+# one-off diagnosis early on. That has not been true for a long time: every
+# deploy since has landed through Render's `autoDeploy: true`, and dozens of
+# live-verify runs have matched the live build to main's tip. So this workflow
+# is redundancy, not the delivery path — and it has never actually run, because
+# RENDER_DEPLOY_HOOK was never set.
+#
+# That is the real problem it had: with no secret it exited 0 and the job went
+# green, so the Actions tab showed a successful "deploy" that deployed nothing.
+# It now emits a ::warning:: annotation in that case, so an un-activated run
+# is visibly un-activated on the run summary rather than quietly passing.
 #
 # ACTIVATION (one step, ~2 min): Render dashboard → underwrite-copilot-web →
 # Settings → Deploy Hook → copy the URL → GitHub repo → Settings → Secrets
 # and variables → Actions → New repository secret →
 #   name: RENDER_DEPLOY_HOOK   value: <the URL>
-# Until the secret exists this job no-ops with a reminder instead of failing.
+#
+# If you would rather not have it at all, deleting this file loses nothing:
+# autoDeploy is what has been shipping the site.
 on:
   workflow_dispatch:
   push:
@@ -21,7 +33,8 @@ jobs:
           HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
         run: |
           if [ -z "$HOOK" ]; then
-            echo "RENDER_DEPLOY_HOOK secret not set — skipping. Add it (Render → Settings → Deploy Hook) to enable GitHub-driven deploys."
+            echo "::warning title=No deploy was triggered::RENDER_DEPLOY_HOOK is not set, so this job did nothing. Render's own autoDeploy is what shipped this commit. Set the secret (Render → underwrite-copilot-web → Settings → Deploy Hook) to activate this workflow, or delete .github/workflows/deploy.yml."
+            echo "RENDER_DEPLOY_HOOK secret not set — nothing was deployed by this job."
             exit 0
           fi
           code=$(curl -sS -o /dev/null -w "%{http_code}" -X POST "$HOOK")
