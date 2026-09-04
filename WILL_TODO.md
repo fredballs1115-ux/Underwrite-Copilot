@@ -49,13 +49,19 @@ depends on 0028, so this doesn't block the four pages above.
 
 1. **Run migrations 0030–0033** — see above. Nothing else in phases 1–4 works
    until this happens.
-2. **Render Blueprint sync** — creates the three cron services already defined
-   in `render.yaml` (`underwrite-copilot-intel`, `underwrite-copilot-rates`,
-   `underwrite-copilot-steward`); fill env vars: `ANTHROPIC_API_KEY`,
-   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `FRED_API_KEY` (free key).
-   Note: the rates command is `node scripts/fetch-rates.mjs` — not
-   `daily-rates.mjs`.
-   The sync also now prompts for **`STRIPE_TEAM_PRICE_ID` and
+2. **The scheduled jobs — pick GitHub Actions, not Render crons.** All three
+   (intel, rates, steward) now exist BOTH as Render cron services in
+   `render.yaml` and as free workflows in `.github/workflows/`, running the
+   identical scripts on the same schedules. Run one of each pair, never both.
+   The Actions route costs nothing and needs only four repo secrets (Settings
+   → Secrets and variables → Actions): `SUPABASE_URL`,
+   `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `FRED_API_KEY` (free key
+   from FRED). Each workflow no-ops with a printed instruction until its
+   secrets exist, so nothing fails while you set them up.
+   If you'd rather run them on Render, a **Blueprint sync** creates the three
+   cron services instead — same four env vars. Note the rates command is
+   `node scripts/fetch-rates.mjs`, not `daily-rates.mjs`.
+   A Blueprint sync also now prompts for **`STRIPE_TEAM_PRICE_ID` and
    `STRIPE_TEAM_SEAT_PRICE_ID`** on the web service. They were documented in
    `.env.example` but missing from the Blueprint, so a sync never asked for
    them — and the Stripe webhook refuses to process a subscription whose price

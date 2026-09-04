@@ -1,0 +1,38 @@
+name: intel
+# Weekday market-intel sweep for the jurisdictions and sectors on file:
+# Google News RSS → dedupe → Claude scores relevance → digest, plus
+# red-banner alerts for likely rule changes. Requires migrations 0023 + 0024.
+#
+# This is the FREE way to run it. render.yaml also defines a
+# `underwrite-copilot-intel` cron service that runs the identical script; you
+# want ONE of the two, not both. On Render it's a paid always-on service; here
+# it costs nothing (the Anthropic usage is billed either way).
+#
+# No-ops with instructions until the Actions secrets exist.
+on:
+  schedule:
+    - cron: "0 12 * * 1-5" # weekdays, before the rates pull
+  workflow_dispatch:
+jobs:
+  intel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --omit=dev
+      - name: Run the sweep
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "Supabase Actions secrets not set (repo Settings → Secrets → Actions: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY). Skipping."
+            exit 0
+          fi
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "ANTHROPIC_API_KEY not set — the sweep scores relevance with Claude and cannot run without it. Skipping."
+            exit 0
+          fi
+          node scripts/daily-intel.mjs
