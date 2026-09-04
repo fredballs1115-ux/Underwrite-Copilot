@@ -29,13 +29,13 @@ from here says so.
 |---|---|---|
 | NYC | PLUTO `64uk-42ks` + DOF Rolling Sales `usep-8jbt` (no coords — BBL join to PLUTO, implemented); ACRIS deeper deed history documented | **wired** (`nyc.ts`); one-family (A*) + condo units (R*) drop at the gate |
 | Chicago / Cook County | Parcel Universe `nj4t-kc8j` (latest year, centroid coords) + Parcel Sales `wvhk-k5uv`, PIN join | **wired** (`cook_county.ts`); CCAO 211/212 (2-6 unit) kept, rest of 2xx drops |
-| Boston | Property Assessment (data.boston.gov, CKAN) | yearly roll CSV |
+| Boston | Property Assessment (data.boston.gov, CKAN) | **wired** (`boston.ts`, self-resolving resource; no coords/sales — MassGIS L3 is the follow-up) |
 | Atlanta / Fulton | Fulton assessor GIS hub | portal |
 | Miami-Dade | Open data hub parcels + sales | portal |
 | Dallas (DCAD) / Houston (HCAD) | TX CADs publish full roll downloads (zip/CSV) | large files; annual certified + supplements |
 | LA County | Assessor parcel roll (open data portal, yearly) | ~2.4M parcels — plan-size driver |
 | San Francisco | data.sfgov.org assessor secured roll | Socrata |
-| Seattle / King County | assessor extracts (real property sales file!) | dedicated sales file = easy comps win |
+| Seattle / King County | assessor extracts (real property sales file!) | **wired** (`king_county.ts`; set KC_PARCEL_LAYER_URL for coordinates) |
 | Denver | opendata.denvergov.org parcels + sales | portal |
 | Phoenix / Maricopa | assessor bulk data page | portal |
 

@@ -729,8 +729,9 @@
       ],
       "comps_provider": null,
       "gaps": [
-        "assessment-roll ingest wiring"
+        "MassGIS L3 sale-field join (roll has no sale data)"
       ],
+      "ingest_market": "boston",
       "region": "Major US markets",
       "sector_snapshot": {
         "as_of": "2026-08-25",
@@ -1025,9 +1026,10 @@
       ],
       "comps_provider": null,
       "gaps": [
-        "King County sales-file ingest wiring",
-        "FY2026 FMR"
+        "KC_PARCEL_LAYER_URL for sale coordinates",
+        "FY2026 FMR (fetch-fmr.mjs closes this once HUD_API_TOKEN is set)"
       ],
+      "ingest_market": "king_county",
       "region": "Major US markets",
       "sector_snapshot": {
         "as_of": "2026-08-25",

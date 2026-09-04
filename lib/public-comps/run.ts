@@ -69,7 +69,8 @@ export async function claimRecordComps(dealId: string, force = false): Promise<b
   return (data?.length ?? 0) > 0;
 }
 
-async function geocode(label: string): Promise<{
+/** Exported for lib/site-flags/run.ts — same Photon geocode, one behavior. */
+export async function geocode(label: string): Promise<{
   lat: number;
   lng: number;
   state: string;

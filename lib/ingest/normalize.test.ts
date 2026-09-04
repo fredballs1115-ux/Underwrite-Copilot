@@ -1,12 +1,59 @@
 import { describe, expect, it } from "vitest";
 import {
   absenteeFlag,
+  normalizeBostonLU,
   normalizeCookClass,
+  normalizeKingCountyUseDesc,
   normalizeNycBuildingClass,
   normalizeNycCategory,
   normalizePhillyCategory,
   numOrNull,
 } from "./normalize";
+
+describe("normalizeBostonLU", () => {
+  it("drops R1 and condo-unit rows — the SFR gate", () => {
+    expect(normalizeBostonLU("R1").assetClass).toBeNull();
+    expect(normalizeBostonLU("CD").assetClass).toBeNull();
+    expect(normalizeBostonLU("CP").assetClass).toBeNull();
+  });
+  it("keeps the investable classes (the 2-3-4 family core)", () => {
+    expect(normalizeBostonLU("R2").assetClass).toBe("multifamily");
+    expect(normalizeBostonLU("R3").assetClass).toBe("multifamily");
+    expect(normalizeBostonLU("R4").assetClass).toBe("multifamily");
+    expect(normalizeBostonLU("A").assetClass).toBe("multifamily");
+    expect(normalizeBostonLU("RC").assetClass).toBe("mixed_use");
+    expect(normalizeBostonLU("C").assetClass).toBe("commercial_retail");
+    expect(normalizeBostonLU("I").assetClass).toBe("industrial");
+    expect(normalizeBostonLU("RL").assetClass).toBe("land");
+  });
+  it("unknown LU falls to 'other' with the raw code kept", () => {
+    const r = normalizeBostonLU("ZZ");
+    expect(r.assetClass).toBe("other");
+    expect(r.note).toContain("ZZ");
+  });
+});
+
+describe("normalizeKingCountyUseDesc", () => {
+  it("drops single-family, townhouse, mobile home, and condo units", () => {
+    expect(normalizeKingCountyUseDesc("Single Family(Res Use/Zone)").assetClass).toBeNull();
+    expect(normalizeKingCountyUseDesc("Townhouse Plat").assetClass).toBeNull();
+    expect(normalizeKingCountyUseDesc("Condominium(Residential)").assetClass).toBeNull();
+  });
+  it("keeps duplex/triplex/4-plex/apartment tiers as multifamily", () => {
+    expect(normalizeKingCountyUseDesc("Duplex").assetClass).toBe("multifamily");
+    expect(normalizeKingCountyUseDesc("Triplex").assetClass).toBe("multifamily");
+    expect(normalizeKingCountyUseDesc("4-Plex").assetClass).toBe("multifamily");
+    expect(normalizeKingCountyUseDesc("Apartment(Mixed Use)").assetClass).toBe("multifamily");
+  });
+  it("maps commercial vocab and keeps unknowns honest", () => {
+    expect(normalizeKingCountyUseDesc("Retail Store").assetClass).toBe("commercial_retail");
+    expect(normalizeKingCountyUseDesc("Warehouse").assetClass).toBe("industrial");
+    expect(normalizeKingCountyUseDesc("Vacant(Multi-family)").assetClass).toBe("land");
+    const r = normalizeKingCountyUseDesc("Something Novel");
+    expect(r.assetClass).toBe("other");
+    expect(r.note).toContain("SOMETHING NOVEL");
+  });
+});
 
 describe("normalizePhillyCategory", () => {
   it("drops single-family and single condo units — the SFR gate", () => {

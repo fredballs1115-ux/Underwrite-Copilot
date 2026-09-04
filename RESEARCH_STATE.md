@@ -4,6 +4,39 @@ Resume file per project protocol: a future session starts HERE and does not
 repeat finished work. Ops/go-live steps + the ranked gap list live in
 `INTEGRATION_NOTES.md`.
 
+**2026-08-25 (session 5, public-data registry + ingestion round 2)** —
+PHASE 1: full source registry at `docs/data-sources/` — 18 metro files +
+`sources.json` (646 validated entries: 382 search-confirmed / 264 honestly
+unverified; 278 easy / 285 medium / 83 hard), `COVERAGE.md` (metro → county →
+municipality enumeration incl. app-matcher gaps), `RESEARCH_PROTOCOL.md`,
+`ROADMAP.md` (value × ease tiers + the access-disparity list). Research ran
+as 13 parallel WebSearch agents + one sibling cloud session (this container's
+200-search budget exhausted mid-run; Seattle/Miami/Atlanta/Dallas researched
+in the sibling and merged via git). SF + Hampton Roads carry the most
+verification debt (agent search budget died mid-metro — all entries marked).
+PHASE 2 (built, needs ops steps below): migration **0030** (incentive_zones +
+deals.site_flags + nearest_property RPC); ingest pipelines `king_county.ts`
+(RPSALE/parcel extracts + GIS centroid join; zip URLs env-overridable),
+`boston.ts` (CKAN, self-resolving resource + field names), `opportunity_zones.ts`
+(MD Socrata hu7s-ph9b + config-first national layer); `scripts/fetch-fmr.mjs`
+(huduser FMR API → benchmarks, PRIMARY source — closes the FY2026 FMR gap for
+all 18 metros once HUD_API_TOKEN is set; monthly Render cron added);
+site-flags layer (`lib/site-flags/`): census tract → OZ membership + FEMA
+NFHL flood zone, stored on the deal like public_comps, rendered as the deal
+page's "Site flags" card; "Public record (assessor)" card (nearest ingested
+parcel, assessed value/owner/absentee/last sale w/ provenance); comps
+discovery providers added for Miami-Dade + Richmond city; ingest workflow
+options king_county/boston/opportunity_zones. NEW OPS GATES (user): run
+migration 0030; set HUD_API_TOKEN (free, huduser register) on the new
+`underwrite-copilot-fmr` cron; run opportunity_zones + king_county + boston
+ingest Actions (KC_PARCEL_LAYER_URL needed for KC sale coordinates —
+resolve on the King County GIS hub); OZ_NATIONAL_LAYER_URL for national OZ
+coverage beyond MD. Verification limits stated plainly: the build container
+could not reach any portal (only WebSearch), so live-parcel smoke tests
+could not run here — every pipeline fails loudly on drift (resolveFields /
+self-resolving resources / stored error statuses) and first real runs happen
+in Actions/production per the established pattern.
+
 **2026-08-22 (session 4h, HARD 15-market cut per direction)** — "DO NOT do
 all 50 states. Top 15 markets only." Executed literally: metros = 15 markets
 (DMV core [1 market, 4 jurisdiction entries] + Baltimore, Richmond, Hampton

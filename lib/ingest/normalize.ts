@@ -114,6 +114,60 @@ export function normalizeCookClass(raw: string | number | null | undefined): Nor
   return { assetClass: "other", note: `unmapped class: ${v}` };
 }
 
+/** Boston Property Assessment `LU` land-use codes (documented vocabulary from
+ *  the yearly Analyze Boston roll: R1 single-family, R2 two-family, R3
+ *  three-family, R4 four-to-six-plus apartment, RL residential land, RC
+ *  residential/commercial mix, CD condo unit, CM condo main, CP condo parking,
+ *  A apartment 7+, C/CC commercial, CL commercial land, I industrial, E/EA
+ *  exempt, AH agricultural). R1 and per-unit condo rows drop at the gate. */
+export function normalizeBostonLU(raw: string | null | undefined): NormalizeResult {
+  const v = (raw ?? "").trim().toUpperCase();
+  if (!v) return { assetClass: "other", note: "empty LU" };
+  if (v === "R1") return { assetClass: null, note: "single-family dropped" };
+  if (v === "CD" || v === "CP") return { assetClass: null, note: "condo unit dropped" };
+  if (v === "R2" || v === "R3" || v === "R4" || v === "A" || v === "CM") {
+    return { assetClass: "multifamily" };
+  }
+  if (v === "RC") return { assetClass: "mixed_use" };
+  if (v === "C" || v === "CC") return { assetClass: "commercial_retail" };
+  if (v === "I") return { assetClass: "industrial" };
+  if (v === "RL" || v === "CL" || v === "AH") return { assetClass: "land" };
+  if (v === "E" || v === "EA") return { assetClass: "other", note: "exempt" };
+  return { assetClass: "other", note: `unmapped LU: ${v}` };
+}
+
+/** King County assessor PresentUse — normalized from the DESCRIPTION text in
+ *  the LOOKUP file that ships inside the EXTR bundle (LU type 102), never
+ *  from bare numeric codes (the code list isn't verifiable from the build
+ *  environment; descriptions are self-describing). The ingest script joins
+ *  code → description first and fails loudly when the lookup is missing. */
+export function normalizeKingCountyUseDesc(raw: string | null | undefined): NormalizeResult {
+  const v = (raw ?? "").trim().toUpperCase();
+  if (!v) return { assetClass: "other", note: "empty present use" };
+  if (v.includes("SINGLE FAMILY") || v.includes("TOWNHOUSE") || v.includes("MOBILE HOME"))
+    return { assetClass: null, note: "sfr/townhome dropped" };
+  if (v.includes("CONDO")) return { assetClass: null, note: "condo unit dropped" };
+  if (
+    v.includes("DUPLEX") ||
+    v.includes("TRIPLEX") ||
+    v.includes("4-PLEX") ||
+    v.includes("APARTMENT")
+  ) {
+    return { assetClass: "multifamily" };
+  }
+  if (v.includes("HOTEL") || v.includes("MOTEL")) return { assetClass: "hospitality" };
+  if (v.includes("WAREHOUSE") || v.includes("INDUSTRIAL")) return { assetClass: "industrial" };
+  if (v.includes("OFFICE")) return { assetClass: "office" };
+  if (v.includes("PARKING") || v.includes("GARAGE")) return { assetClass: "specialty" };
+  if (v.includes("RETAIL") || v.includes("STORE") || v.includes("SHOPPING") || v.includes("RESTAURANT")) {
+    return { assetClass: "commercial_retail" };
+  }
+  if (v.includes("VACANT") || v.includes("LAND") || v.includes("ACREAGE")) {
+    return { assetClass: "land" };
+  }
+  return { assetClass: "other", note: `unmapped: ${v}` };
+}
+
 /** Absentee-owner heuristic: the mailing address differs materially from the
  *  situs address. Conservative — null when either side is missing; matching
  *  street numbers on the same street = owner-occupied-ish. */
