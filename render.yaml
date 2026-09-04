@@ -101,14 +101,15 @@ services:
       # - key: RESEND_FROM
       #   sync: false
 
-  # ── The three crons below have FREE GitHub Actions twins ───────────────────
-  # .github/workflows/{intel,rates,steward}.yml run the identical scripts on
-  # GitHub's runners at the same schedules, for nothing. Run ONE of each pair,
-  # never both — two schedulers writing the same tables is duplicated work and
-  # a doubled Anthropic bill. Keep these Render definitions if you want the
-  # jobs on Render's network or inside its private egress; otherwise set the
-  # Actions secrets (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY,
-  # FRED_API_KEY) and don't create these three services at all.
+  # ── The four crons below all have FREE GitHub Actions twins ────────────────
+  # .github/workflows/{intel,rates,fmr,steward}.yml run the identical scripts
+  # on GitHub's runners at the same schedules, for nothing. Run ONE of each
+  # pair, never both — two schedulers writing the same tables is duplicated
+  # work and, for intel, a doubled Anthropic bill. Keep these Render
+  # definitions if you want the jobs on Render's network or inside its private
+  # egress; otherwise set the Actions secrets (SUPABASE_URL,
+  # SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY, FRED_API_KEY, HUD_API_TOKEN)
+  # and don't create these four services at all.
   #
   # ── Daily market intel (research build) ────────────────────────────────────
   # Weekday news sweep for the jurisdictions + sectors on file: Google News
