@@ -113,9 +113,14 @@ const num = (v: unknown): number | null => {
 const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 
 // ── Philadelphia — OPA properties via the Carto SQL API ─────────────────────
-// Long-documented public endpoint; fields per the city's carto-api-explorer:
-// location, unit, sale_date, sale_price, total_livable_area,
-// category_code_description, parcel_number, lat, lng.
+// Fields per the city's carto-api-explorer: location, unit, sale_date,
+// sale_price, total_livable_area, category_code_description, parcel_number.
+//
+// There are NO `lat`/`lng` columns. The live health probe returned
+// `column "lat" does not exist` — the table carries PostGIS geometry instead,
+// so the coordinates come out of `the_geom` and are aliased back to lat/lng so
+// the parser below is unchanged. The same mistake was in the WHERE clause
+// (`lat IS NOT NULL`), which would have been the next error.
 const philadelphia: ProviderConfig = {
   id: "philly_opa",
   name: "Philadelphia OPA (Carto SQL API)",
@@ -129,10 +134,11 @@ const philadelphia: ProviderConfig = {
       : "";
     const sql =
       "SELECT location, unit, sale_date, sale_price, total_livable_area, " +
-      "category_code_description, parcel_number, lat, lng " +
+      "category_code_description, parcel_number, " +
+      "ST_Y(the_geom) AS lat, ST_X(the_geom) AS lng " +
       "FROM opa_properties_public " +
       `WHERE sale_price > 10000 AND sale_date >= '${since}' ` +
-      "AND lat IS NOT NULL " +
+      "AND the_geom IS NOT NULL " +
       `AND ST_DWithin(the_geom::geography, ST_SetSRID(ST_MakePoint(${q.lng}, ${q.lat}), 4326)::geography, ${meters})` +
       classWhere +
       " ORDER BY sale_date DESC LIMIT 80";
@@ -163,18 +169,33 @@ const philadelphia: ProviderConfig = {
   },
   healthUrl:
     "https://phl.carto.com/api/v2/sql?q=" +
-    encodeURIComponent("SELECT sale_date, sale_price, lat, lng FROM opa_properties_public LIMIT 1"),
+    encodeURIComponent(
+      "SELECT sale_date, sale_price, ST_Y(the_geom) AS lat, ST_X(the_geom) AS lng " +
+        "FROM opa_properties_public WHERE the_geom IS NOT NULL LIMIT 1",
+    ),
   needsFieldVerification: false,
   configured: true,
   regionLabel: "Philadelphia",
 };
 
 // ── Washington, DC — ITS Public Extract via ArcGIS FeatureServer ────────────
-// Endpoint/layer index UNVERIFIED from the build env (proxy-blocked). The
-// health probe fetches the service root (?f=json), whose layer list names the
-// correct index — fixing this config is a one-line edit. Field names below
-// follow the published ITS Public Extract schema (PREMISEADD, SALEDATE,
-// SALEPRICE, USECODE, LATITUDE/LONGITUDE).
+// NOT WIRED, and now for a known reason rather than an unknown one.
+//
+// The health probe fetched this service root and returned its full layer list:
+// 1–11, 29, 32–42, 44, 48–51, 61–63, 74–75, 77–79, 81–82. There is no layer
+// 53, so the query below was addressing a layer that does not exist — and
+// nothing in that list is a sales table either. Property_and_Land is a
+// CADASTRAL service (lots, squares, ownership polygons, easements); the ITS
+// Public Extract *sales* data is a separate Open Data DC dataset whose
+// FeatureServer URL this environment cannot reach to confirm.
+//
+// So `configured` is false: a DC deal now reads "no source wired yet" instead
+// of failing a request to a missing layer. The query builder is kept intact
+// because wiring it is a two-value edit once the real service is known —
+// which is what the new health probe below is for: it asks Open Data DC's own
+// catalogue for the sales dataset and returns the records, URLs included.
+// (That endpoint shape is not a guess: the same health run returned the Hub
+// search API's OpenAPI spec from the Miami-Dade probe, which documents it.)
 const DC_SERVICE_ROOT =
   "https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/Property_and_Land_WebMercator/MapServer";
 const dc: ProviderConfig = {
@@ -227,16 +248,41 @@ const dc: ProviderConfig = {
     }
     return out;
   },
-  healthUrl: `${DC_SERVICE_ROOT}?f=json`,
+  healthUrl:
+    "https://opendata.dc.gov/api/search/v1/collections/dataset/items?" +
+    new URLSearchParams({
+      q: "integrated tax system public extract property sales",
+      limit: "5",
+    }).toString(),
   needsFieldVerification: true,
-  configured: true,
+  configured: false,
   regionLabel: "Washington DC",
 };
 
 // ── Maryland (statewide) — SDAT assessments via Socrata ─────────────────────
-// Dataset id ed4q-f8tm confirmed; COLUMN NAMES unverified from the build env
-// (the fields-reference PDF is proxy-blocked). A wrong column makes Socrata
-// return a named error — /api/comps/health surfaces it verbatim.
+// Dataset id ed4q-f8tm confirmed. The column names were guesses until a live
+// health probe came back `No such column: premise_address_line_1` — and
+// Socrata's error helpfully names every real column in the dataset. These are
+// taken verbatim from that response, so they are read off the source rather
+// than inferred. SDAT keeps the MDP alias inside the column name, hence the
+// length.
+const MD = {
+  address: "mdp_street_address_mdp_field_address",
+  city: "mdp_street_address_city_mdp_field_city",
+  date: "sales_segment_1_transfer_date_yyyy_mm_dd_mdp_field_tradate_sdat_field_89",
+  price: "sales_segment_1_consideration_mdp_field_considr1_sdat_field_90",
+  lat: "mdp_latitude_mdp_field_digycord_converted_to_wgs84",
+  lng: "mdp_longitude_mdp_field_digxcord_converted_to_wgs84",
+  landUse: "land_use_code_mdp_field_lu_desclu_sdat_field_50",
+  account: "account_id_mdp_field_acctid",
+  // Building area, not land — so Maryland comps can carry a $/SF the DC ones
+  // still cannot. SDAT names it "structure area sq ft".
+  sqft: "c_a_m_a_system_data_structure_area_sq_ft_mdp_field_sqftstrc_sdat_field_241",
+  // The Socrata location column for within_circle(). `mdp_location` was also a
+  // guess and is absent from the real column list; this is the one that exists.
+  point: "mappable_latitude_and_longitude",
+} as const;
+
 const md: ProviderConfig = {
   id: "md_sdat",
   name: "Maryland SDAT Real Property (Socrata)",
@@ -244,17 +290,27 @@ const md: ProviderConfig = {
   matches: (a) => a.state.toUpperCase() === "MD",
   buildUrl: (q) => {
     const meters = Math.round(q.radiusKm * 1000);
-    const since = monthsAgoIso(q.nowIso, q.monthsBack).replace(/-/g, "");
+    // The column is named "..._yyyy_mm_dd_...", so compare against an ISO date
+    // rather than the packed YYYYMMDD this used to send.
+    const since = monthsAgoIso(q.nowIso, q.monthsBack);
     const where =
-      `within_circle(mdp_location, ${q.lat}, ${q.lng}, ${meters})` +
-      ` AND sales_segment_1_consideration > 10000` +
-      ` AND sales_segment_1_transfer_date >= '${since}'`;
+      `within_circle(${MD.point}, ${q.lat}, ${q.lng}, ${meters})` +
+      ` AND ${MD.price} > 10000` +
+      ` AND ${MD.date} >= '${since}'`;
     const params = new URLSearchParams({
-      $select:
-        "premise_address_line_1, premise_address_city, sales_segment_1_transfer_date, " +
-        "sales_segment_1_consideration, land_use_code, mdp_latitude, mdp_longitude, account_id",
+      $select: [
+        MD.address,
+        MD.city,
+        MD.date,
+        MD.price,
+        MD.landUse,
+        MD.lat,
+        MD.lng,
+        MD.account,
+        MD.sqft,
+      ].join(", "),
       $where: where,
-      $order: "sales_segment_1_transfer_date DESC",
+      $order: `${MD.date} DESC`,
       $limit: "80",
     });
     return `https://opendata.maryland.gov/resource/ed4q-f8tm.json?${params.toString()}`;
@@ -263,35 +319,39 @@ const md: ProviderConfig = {
     const rows = Array.isArray(json) ? (json as Record<string, unknown>[]) : [];
     const out: Omit<RecordComp, "distanceKm">[] = [];
     for (const r of rows) {
-      const price = num(r.sales_segment_1_consideration);
-      const lat = num(r.mdp_latitude);
-      const lng = num(r.mdp_longitude);
-      const rawDate = str(r.sales_segment_1_transfer_date);
+      const price = num(r[MD.price]);
+      const lat = num(r[MD.lat]);
+      const lng = num(r[MD.lng]);
+      const rawDate = str(r[MD.date]);
       const date =
         rawDate.length === 8
           ? `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`
           : rawDate.slice(0, 10);
       if (!price || lat === null || lng === null || !date) continue;
       out.push({
-        address: [str(r.premise_address_line_1), str(r.premise_address_city)]
-          .filter(Boolean)
-          .join(", "),
+        address: [str(r[MD.address]), str(r[MD.city])].filter(Boolean).join(", "),
         lat,
         lng,
         saleDate: date,
         price,
-        sqft: null,
-        propertyType: `land use ${str(r.land_use_code) || "?"}`,
+        sqft: num(r[MD.sqft]),
+        propertyType: `land use ${str(r[MD.landUse]) || "?"}`,
         sourceUrl: "https://opendata.maryland.gov/d/ed4q-f8tm",
       });
     }
     return out;
   },
+  // Ordered newest-first and limited to one row on purpose: the sample that
+  // comes back shows the transfer date's LITERAL format, which is the one
+  // thing the column dump could not tell us (is it 2026-08-14 or 20260814?).
+  // The parser handles both, but the >= comparison in the WHERE only works if
+  // the format matches — so this probe is what settles it.
   healthUrl:
     "https://opendata.maryland.gov/resource/ed4q-f8tm.json?" +
     new URLSearchParams({
-      $select:
-        "premise_address_line_1, sales_segment_1_transfer_date, sales_segment_1_consideration, mdp_latitude, mdp_longitude",
+      $select: [MD.address, MD.date, MD.price, MD.lat, MD.lng, MD.sqft].join(", "),
+      $where: `${MD.price} > 10000`,
+      $order: `${MD.date} DESC`,
       $limit: "1",
     }).toString(),
   needsFieldVerification: true,
@@ -302,10 +362,14 @@ const md: ProviderConfig = {
 // ── New Jersey (statewide) — Parcels + MOD-IV composite via ArcGIS ──────────
 // Current service URL confirmed via NJGIN's retired-services notice (the
 // pre-March-2026 URL was replaced): Parcels_Composite_NJ_WM. MOD-IV joins
-// tax-assessor attributes onto every parcel; the sale-related COLUMN NAMES
-// are unverified from the build env — the health probe fetches layer 0's
-// schema so the real names land in /api/comps/health. Polygon layer, so the
-// query asks for centroids.
+// tax-assessor attributes onto every parcel. Polygon layer, so the query asks
+// for centroids.
+//
+// FIELDS NOW VERIFIED. The live health probe returned layer 0's schema and all
+// six fields this queries — PROP_LOC, MUN_NAME, SALE_PRICE, DEED_DATE,
+// PROP_CLASS, PAMS_PIN — are present exactly as spelled. New Jersey was the
+// one provider that needed no correction, so it stops claiming it needs
+// verification.
 const NJ_LAYER =
   "https://services2.arcgis.com/XVOqAjTOJ5P6ngMu/arcgis/rest/services/Parcels_Composite_NJ_WM/FeatureServer/0";
 const nj: ProviderConfig = {
@@ -366,7 +430,7 @@ const nj: ProviderConfig = {
     return out;
   },
   healthUrl: `${NJ_LAYER}?f=json`,
-  needsFieldVerification: true,
+  needsFieldVerification: false,
   configured: true,
   regionLabel: "New Jersey (statewide)",
 };
@@ -378,6 +442,46 @@ const nj: ProviderConfig = {
 // field list — the wiring step is then mechanical: fill the query builder,
 // flip configured to true. Until then providerFor skips them and deals there
 // read "no source wired yet".
+//
+// ── What a live health run proved about each, so the next pass starts here ──
+//
+//   va_fairfax    READY TO WIRE, with a catch. Probe returned the backing
+//                 layer and its fields: OBJECTID, PARID, TAXYR, SALEDT, PRICE,
+//                 BOOK, PAGE, SALEVAL_DESC at
+//                 services1.arcgis.com/ioennV6PpG5Xodq0/ArcGIS/rest/services/
+//                 OpenData_A5/FeatureServer/1. Note what is NOT there: no
+//                 address, no geometry. It is a flat sales TABLE keyed by
+//                 PARID, so it needs a second query against the parcel layer
+//                 to get a point and a street address — the two-stage join
+//                 this was always expected to need.
+//
+//   pa_allegheny  READY TO WIRE, same catch. Probe returned FULL_ADDRESS,
+//                 SALEDATE, PRICE, SALEDESC, MUNIDESC, PROPERTYZIP and more —
+//                 richer than Fairfax, and it carries the address. But there
+//                 is no latitude/longitude in the WPRDC sales resource, and
+//                 this engine ranks comps by distance, so it needs either the
+//                 parcel-geometry join or geocoding before it can be honest.
+//
+//   va_arlington  WRONG URL. The probe came back as an HTML "Map Gallery"
+//                 page, not JSON — it is pointed at a human-facing gallery
+//                 rather than a REST endpoint.
+//
+//   de_new_castle WRONG URL. The service root resolves, but it lists only
+//                 Composite_Locator, ImageryBasemap and multirole_locator:
+//                 geocoders and a basemap. No parcel or sales service lives
+//                 at that root.
+//
+//   fl_miami_dade WRONG URL. Returned the ArcGIS Hub search API's OpenAPI
+//                 spec — the API documentation, not a dataset. Useful by
+//                 accident: that spec is what documents the /api/search/v1/
+//                 collections/dataset/items shape the DC probe above now uses.
+//
+//   va_richmond   WRONG URL, and the most misleading of the five. It returned
+//                 a Socrata catalogue search whose first result is "Dallas
+//                 Police Active Calls" — a generic discovery endpoint that is
+//                 not scoped to Richmond at all. A config that looks alive and
+//                 answers with another city's data is worse than one that
+//                 errors, so this is the first of the four to re-point.
 const discovery = (
   id: string,
   name: string,

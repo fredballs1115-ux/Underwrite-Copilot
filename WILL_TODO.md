@@ -79,10 +79,22 @@ migrations do I still need?" stops being a guess.
    them — and the Stripe webhook refuses to process a subscription whose price
    ids it can't match, so Team checkouts would have alerted instead of
    activating. Set both, or leave Team billing off until you create the prices.
-3. **Hit `/api/comps/health` signed in and paste the JSON back** — it returns
-   each data portal's own layer lists / field schemas / backing URLs. That
-   output is everything needed to finish wiring DC, Maryland and New Jersey
-   field names and to configure the four discovery providers below.
+3. ~~**Hit `/api/comps/health` signed in and paste the JSON back**~~ — **done
+   2026-09-04**, and it earned its keep. What the live run settled:
+   - **Philadelphia** was broken (`column "lat" does not exist`) — the table
+     carries PostGIS geometry, not lat/lng columns. Fixed.
+   - **Maryland** was broken on every column name at once. Socrata's error
+     named the real ones, so all nine are now read off the source rather than
+     guessed — including structure area, so MD comps can carry a $/SF.
+   - **New Jersey** needed nothing. All six fields verified present.
+   - **DC** is not wired and now says so: the service's own layer list has no
+     layer 53 and no sales table at all (it is a cadastral service).
+   - Four discovery providers point at wrong URLs; two more (Fairfax,
+     Allegheny) are ready to wire but need a parcel join for geometry.
+   `lib/public-comps/core.ts` records all of it inline.
+   **Re-run the probe after this deploys** — it will confirm Philadelphia and
+   Maryland, and Maryland's sample will reveal the transfer date's literal
+   format, which is the one thing still unproven.
 4. **The two human verifications** (high stakes, ~30 min):
    - PG County DPIE PRSA FAQ PDF — confirm the ≤5-unit natural-person
      exemption's conditions in the current revision; optionally email DPIE for
@@ -93,15 +105,11 @@ migrations do I still need?" stops being a guess.
      rent-control exemption's RAD registration requirement (unregistered =
      stabilization applies).
    Paste findings back → `regulatory_rules` rows upgrade sourced → verified.
-5. **Optional but high-leverage: `RENDER_DEPLOY_HOOK`.** The
-   `deploy-to-render` workflow exists but has been a no-op on every run — the
-   secret was never set, so its "Trigger Render deploy" step exits in 0s and
-   the job still reports success. Deploys have in fact been landing via
-   Render's own `autoDeploy: true`, so this is redundancy rather than a
-   breakage — but a green deploy job that deployed nothing is a misleading
-   signal. Either set the secret (Render → underwrite-copilot-web → Settings →
-   Deploy Hook → copy URL → GitHub → Settings → Secrets → Actions →
-   `RENDER_DEPLOY_HOOK`) or delete the workflow.
+5. ~~**`RENDER_DEPLOY_HOOK`**~~ — **settled 2026-09-04: deleted.** The
+   `deploy-to-render` workflow was a no-op on every run (the secret was never
+   set, so its trigger step exited in 0s and the job still went green).
+   Deploys have always landed through Render's own `autoDeploy: true`, so
+   removing it loses nothing and removes a green job that deployed nothing.
 6. **Optionally**: add `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` +
    `FRED_API_KEY` to this repo's Claude environment (code.claude.com) and allow
    `*.supabase.co` in its network policy — then future sessions can run

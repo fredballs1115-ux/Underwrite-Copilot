@@ -18,7 +18,12 @@ describe("providerFor — jurisdiction routing", () => {
     expect(providerFor({ state: "PA", city: "Philadelphia", county: "" })?.id).toBe("philly_opa");
     expect(providerFor({ state: "PA", city: "", county: "Philadelphia County" })?.id).toBe("philly_opa");
     expect(providerFor({ state: "PA", city: "Scranton", county: "Lackawanna" })).toBeNull();
-    expect(providerFor({ state: "DC", city: "Washington", county: "" })?.id).toBe("dc_its");
+    // DC deliberately routes to NOTHING. Its service's own layer list, read
+    // from a live health probe, contains no layer 53 and no sales table at
+    // all — Property_and_Land is cadastral. Routing there would send every DC
+    // deal at a layer that does not exist; "no source wired yet" is the honest
+    // answer until the real ITS sales endpoint is confirmed.
+    expect(providerFor({ state: "DC", city: "Washington", county: "" })).toBeNull();
     expect(providerFor({ state: "MD", city: "Hyattsville", county: "Prince George's County" })?.id).toBe("md_sdat");
     expect(providerFor({ state: "NJ", city: "Trenton", county: "Mercer" })?.id).toBe("nj_modiv");
     expect(providerFor({ state: "VA", city: "Woodbridge", county: "Prince William" })).toBeNull();
@@ -112,11 +117,18 @@ describe("query builders — deterministic, correctly parameterized", () => {
       "SALEDATE >= DATE '2024-08-21'"
     );
   });
-  it("md: within_circle with compact date format", () => {
+  // Both of these were wrong until a live health probe returned the dataset's
+  // real column list: there is no `mdp_location` and no `..._transfer_date`,
+  // and the date column is named "..._yyyy_mm_dd_...", so the comparison is
+  // an ISO date rather than the packed YYYYMMDD this used to send.
+  it("md: within_circle on the real location column, ISO date bound", () => {
     const url = md.buildUrl(q);
     const decoded = decodeURIComponent(url.replace(/\+/g, " "));
-    expect(decoded).toContain("within_circle(mdp_location, 39.9526, -75.1652, 1600)");
-    expect(decoded).toContain(">= '20240821'");
+    expect(decoded).toContain(
+      "within_circle(mappable_latitude_and_longitude, 39.9526, -75.1652, 1600)",
+    );
+    expect(decoded).toContain(">= '2024-08-21'");
+    expect(decoded).not.toContain("mdp_location");
   });
 });
 
@@ -170,20 +182,50 @@ describe("parsers — fixture rows in, comps out, junk dropped", () => {
     expect(out[0].saleDate).toBe("2026-04-15");
     expect(out[0].lat).toBeCloseTo(38.926);
   });
+  // Column names verbatim from the dataset's own schema, as returned by a live
+  // health probe. The parser still accepts BOTH date shapes, because the probe
+  // proved the names but not the format — so the packed form is exercised here
+  // and the ISO form in the test below.
   it("md rows parse compact dates", () => {
     const out = md.parse([
       {
-        premise_address_line_1: "4507 30TH ST",
-        premise_address_city: "MOUNT RAINIER",
-        sales_segment_1_transfer_date: "20260210",
-        sales_segment_1_consideration: "610000",
-        land_use_code: "R",
-        mdp_latitude: "38.941",
-        mdp_longitude: "-76.965",
+        mdp_street_address_mdp_field_address: "4507 30TH ST",
+        mdp_street_address_city_mdp_field_city: "MOUNT RAINIER",
+        sales_segment_1_transfer_date_yyyy_mm_dd_mdp_field_tradate_sdat_field_89: "20260210",
+        sales_segment_1_consideration_mdp_field_considr1_sdat_field_90: "610000",
+        land_use_code_mdp_field_lu_desclu_sdat_field_50: "R",
+        mdp_latitude_mdp_field_digycord_converted_to_wgs84: "38.941",
+        mdp_longitude_mdp_field_digxcord_converted_to_wgs84: "-76.965",
+        c_a_m_a_system_data_structure_area_sq_ft_mdp_field_sqftstrc_sdat_field_241: "2140",
       },
     ]);
     expect(out).toHaveLength(1);
-    expect(out[0]).toMatchObject({ saleDate: "2026-02-10", price: 610000 });
+    expect(out[0]).toMatchObject({
+      saleDate: "2026-02-10",
+      price: 610000,
+      address: "4507 30TH ST, MOUNT RAINIER",
+      // Building area, newly available now the real column is known — this is
+      // what lets a Maryland comp carry a $/SF at all.
+      sqft: 2140,
+    });
+  });
+
+  it("md rows parse ISO dates too, and a missing structure area stays null", () => {
+    const out = md.parse([
+      {
+        mdp_street_address_mdp_field_address: "8100 GEORGIA AVE",
+        mdp_street_address_city_mdp_field_city: "SILVER SPRING",
+        sales_segment_1_transfer_date_yyyy_mm_dd_mdp_field_tradate_sdat_field_89: "2026-02-10T00:00:00.000",
+        sales_segment_1_consideration_mdp_field_considr1_sdat_field_90: "1250000",
+        mdp_latitude_mdp_field_digycord_converted_to_wgs84: "39.001",
+        mdp_longitude_mdp_field_digxcord_converted_to_wgs84: "-77.031",
+      },
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].saleDate).toBe("2026-02-10");
+    // Absent is absent: an unstated area must not become a zero that would
+    // divide into a nonsense $/SF downstream.
+    expect(out[0].sqft).toBeNull();
   });
   it("all parsers survive garbage payloads", () => {
     for (const p of PROVIDERS) {
