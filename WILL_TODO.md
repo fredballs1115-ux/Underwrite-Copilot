@@ -7,11 +7,12 @@ Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 
 ---
 
-## 🔴 Blocking everything: run migrations 0030–0033
+## 🔴 Blocking everything: run the outstanding migrations
 
-Phases 1–4 are merged and deployed, but their four pages are inert until the
-tables exist. Open the Supabase SQL editor and run these four files from
-`supabase/migrations/`, in order:
+Several pages are merged and deployed but inert until their tables exist.
+**Run `supabase/CHECK_MIGRATIONS.sql` first** — it reports which of these you
+actually still owe. Then run those, from `supabase/migrations/`, in exactly
+this order:
 
 | File | Creates | Unblocks |
 |------|---------|----------|
@@ -46,25 +47,19 @@ anything on them will fail. That is the tell that this step is still pending.
 
 `0033` also depends on `public.can_access_deal(...)` from `0017`.
 
-**Don't take that on faith — check it.** Paste `supabase/CHECK_MIGRATIONS.sql`
-into the SQL editor and run it: it reads the live schema and marks every
-migration ✅ run or ❌ NOT RUN, naming the exact tables any missing one still
-owes. It writes nothing. Run it before this section and again after, and the
-question "which migrations do I still need?" stops being a guess.
-
-**The one trap it will surface: `0028` needs PostGIS.** Its line 21 is
-`create extension if not exists postgis`, and if the extension isn't enabled
-that line errors and Postgres rolls the *whole file* back — 0028 leaves
-nothing behind and looks unrun even if you ran it. Enable it first at
-Database → Extensions → postgis, then re-run 0028. Nothing in 0030–0033
-depends on 0028, so this doesn't block the four pages above.
+**Don't take any of that on faith — check it.** Paste
+`supabase/CHECK_MIGRATIONS.sql` into the SQL editor and run it: it reads the
+live schema and marks every migration ✅ run or ❌ NOT RUN, naming the exact
+tables, columns or functions any missing one still owes. It writes nothing.
+Run it before this section and again after, and the question "which
+migrations do I still need?" stops being a guess.
 
 ---
 
 ## Your moves (need your logins / a human's judgment)
 
-1. **Run migrations 0030–0033** — see above. Nothing else in phases 1–4 works
-   until this happens.
+1. **Run `supabase/CHECK_MIGRATIONS.sql`, then run whatever it flags** — see
+   above. Nothing else in phases 1–4 works until this happens.
 2. **The scheduled jobs — pick GitHub Actions, not Render crons.** All four
    (intel, rates, fmr, steward) now exist BOTH as Render cron services in
    `render.yaml` and as free workflows in `.github/workflows/`, running the
