@@ -19,9 +19,12 @@ const CSP = [
   // until a nonce-based CSP is wired through the framework.
   scriptSrc,
   "style-src 'self' 'unsafe-inline'",
-  // OpenStreetMap raster tiles power the comps map — without these hosts the
-  // map renders as a blank gray canvas (tiles are <img> loads, so img-src).
-  "img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.org",
+  // Map tiles are <img> loads, so they need img-src, not connect-src. Two
+  // sources, both keyless: USGS National Map (public-domain aerial imagery,
+  // the default basemap and the property photos) and OpenStreetMap (the
+  // street base). Drop either host and its basemap renders as gray canvas.
+  // Kept in step with BASEMAP_IMG_HOSTS in lib/basemaps.ts.
+  "img-src 'self' data: blob: https://basemap.nationalmap.gov https://tile.openstreetmap.org https://*.tile.openstreetmap.org",
   "font-src 'self' data:",
   // Supabase (auth/storage/signed URLs) + Photon geocoder are the only
   // cross-origin fetch targets from the browser.

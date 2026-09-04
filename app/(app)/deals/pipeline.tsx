@@ -15,6 +15,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createDeal, createSampleDeal } from "./actions";
 import { BatchUpload } from "./batch-upload";
+import { DealThumb } from "./deal-thumb";
 import { ManualDealForm } from "./manual-deal-form";
 import { FileDrop } from "../file-drop";
 import { PendingButton } from "../pending-button";
@@ -56,6 +57,8 @@ export type DealCard = {
   slots: { cap: string | null; price: string | null };
   /** latest analysis-job state, for deals still screening */
   jobStatus?: "running" | "failed" | null;
+  /** the deal has an address, so an aerial thumbnail can be attempted */
+  hasAddress: boolean;
 };
 
 /** One row per deal: name · asset · price · cap · buy box · status · added.
@@ -1163,6 +1166,7 @@ const DealRow = memo(function DealRow({
           )}
         </span>
       )}
+      {d.hasAddress && <DealThumb dealId={d.id} />}
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium">{d.name}</p>
         <MetaLine
