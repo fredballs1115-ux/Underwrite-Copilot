@@ -4,6 +4,27 @@ import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/serve
 import { hoursSince } from "@/lib/research";
 
 export const metadata: Metadata = { title: "Data health" };
+
+/** The live service probes — signed-in JSON endpoints that report what each
+ *  service actually returned from THIS deployment. The checks an operator is
+ *  asked to run live here, on the page, not in a chat transcript. */
+const PROBES: { href: string; name: string; what: string }[] = [
+  {
+    href: "/api/comps/health",
+    name: "Public-record comps",
+    what: "every county and city data portal: reachable, the columns it expects, rows on file.",
+  },
+  {
+    href: "/api/imagery/health",
+    name: "Maps & building photos",
+    what: "where the geocoder places a known address, then Street View, satellite, the USGS aerial and the basemap tiles.",
+  },
+  {
+    href: "/api/news/health",
+    name: "News feeds",
+    what: "each publisher feed and Google News search: HTTP status, items parsed, latency, whether a stale copy stood in.",
+  },
+];
 export const dynamic = "force-dynamic";
 
 // The steward's public ledger: every nightly run, every open issue, every
@@ -103,6 +124,30 @@ export default async function DataHealthPage() {
           corrections are made in the open in the changelog, never silently.
         </p>
       </header>
+
+      <section className="rounded-xl border border-line bg-surface p-4">
+        <h2 className="text-sm font-semibold">Service probes</h2>
+        <p className="mt-1 text-sm text-muted">
+          Each opens as JSON and names what the service actually said from this
+          deployment, so a thin feature is diagnosed rather than guessed at.
+        </p>
+        <ul className="mt-3 grid gap-2 sm:grid-cols-3">
+          {PROBES.map((p) => (
+            <li key={p.href} className="rounded-lg border border-line/70 p-3">
+              <a
+                href={p.href}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
+              >
+                {p.name}
+              </a>
+              <p className="mt-1 text-xs leading-relaxed text-muted">{p.what}</p>
+              <p className="mt-1 font-mono text-[10px] text-muted">{p.href}</p>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <section
         className={`rounded-xl border p-4 ${

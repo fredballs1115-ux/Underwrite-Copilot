@@ -33,7 +33,8 @@ Four PRs landed from one review session; each is live once Render finishes the
   buyer-specific feed still follows once the weekday sweep runs. Two optional
   cost levers, `MODEL_EXTRACTION` and `MODEL_REASONING`, are read at boot.
 
-**Your three checks (~10 min, after the deploy):**
+**Your checks (~10 min, after the deploy)** — the three JSON probes below are
+also linked from `/data-health` under "Service probes":
 
 1. **Open the conversion deal that showed Year-1 NOI above its price.** The
    header should now say *Deal type: Conversion* and show a teal "The plan"
