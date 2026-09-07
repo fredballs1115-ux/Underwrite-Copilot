@@ -28,7 +28,12 @@ export interface PlaygroundData {
     metrics: { label: string; value: string }[];
   } | null;
   box: BuyBox | null;
+  /** the deal's strategy kind from the derived model (stabilized / value_add /
+   *  conversion …). A plan deal's price ⇄ cap control says what its cap is. */
+  strategy?: string | null;
 }
+
+const PLAN_KINDS = new Set(["value_add", "lease_up", "conversion", "development"]);
 
 const MANDATE_CHIP: Record<MandateVerdict, string> = {
   PURSUE: "bg-pass/15 text-pass",
@@ -69,6 +74,7 @@ function withScenarioReturns(
  */
 export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   const { inputs, dealAssetClass, checkSource, box } = data;
+  const planDeal = PLAN_KINDS.has(data.strategy ?? "");
   // Slider stops are fixed by the base model; each lever carries its own
   // base index (range ends can collapse when the base sits near a bound).
   const caps = useMemo(() => sliderValues("exitCapPct", inputs.exitCapPct), [inputs]);
@@ -198,6 +204,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         noiY1={noiY1}
         value={priceOverride}
         onChange={setPriceOverride}
+        planDeal={planDeal}
       />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
@@ -325,11 +332,16 @@ function PriceCapControls({
   noiY1,
   value,
   onChange,
+  planDeal = false,
 }: {
   basePrice: number;
   noiY1: number;
   value: number | null;
   onChange: (v: number | null) => void;
+  /** a conversion / development / lease-up / value-add: the cap here runs on
+   *  year-1 income as modelled, never on the finished project's stabilized
+   *  pro forma — say so, or the control reads as the plan's yield */
+  planDeal?: boolean;
 }) {
   const [editing, setEditing] = useState<"price" | "cap" | null>(null);
   const [draft, setDraft] = useState("");
@@ -367,7 +379,9 @@ function PriceCapControls({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="text-xs font-semibold tracking-tight">Your price</span>
         <span className="text-[11px] text-muted">
-          type a price or a going-in cap — the whole model reprices
+          {planDeal
+            ? "type a price or a cap — the cap here is year-1 income as modelled, not the plan's stabilized pro forma; the plan is judged on yield on cost"
+            : "type a price or a going-in cap — the whole model reprices"}
         </span>
       </div>
       <div className="mt-2 grid gap-3 sm:grid-cols-3">
@@ -390,7 +404,7 @@ function PriceCapControls({
         </label>
         <label className="block">
           <span className="text-[11px] uppercase tracking-wide text-muted">
-            Going-in cap
+            {planDeal ? "Cap on Yr-1 income (as modelled)" : "Going-in cap"}
           </span>
           <input
             inputMode="decimal"
