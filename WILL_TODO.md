@@ -3,7 +3,8 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-07**, after PRs #176–#179 merged to main.
+**Last updated 2026-09-07**, after PRs #176–#189 merged to main (live build
+sha confirmed equal to the main tip by live-verify at 23:12 UTC).
 
 ---
 
