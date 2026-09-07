@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-07",
+      "title": "The deal's strategy is read first — a conversion no longer screens as a stabilized building",
+      "blurb": "An office-to-residential conversion came through with a Year-1 NOI above its asking price: a 105% cap rate, shown as fact. The OM's $21M was the finished building's stabilized pro forma, years and a construction budget away, and the screen had read it as today's income. Every deal now carries a strategy — stabilized, value-add, lease-up, conversion or development — read from the OM and shown in the header, and every NOI is labelled as in-place, Year 1 or stabilized pro forma. Figures are checked against each other in code before anything is believed: an NOI at or above a quarter of the price, a stated cap that disagrees with NOI ÷ price, a per-unit basis no market trades at — each is named on the deal page, put to the challenger and carried into the verdict. The Excel model never anchors on a stabilized pro forma and books the construction budget, and a generated model whose numbers cannot tie says so above its returns.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-07",
       "title": "Building photos and maps now point at the building",
       "blurb": "For most deals the picture was of the wrong place. The geocoder put a street address on the street's centreline or on the city, the app called that point 'the building', and the aerial, the Street View photo and the map pin all inherited the error. Street addresses now go to the US Census Bureau's geocoder first, which matches the house number to the right block face; how precisely a point was found — building, block or area — is read off the answer, and every frame, pin label and photo attempt is honest about it. The Street View camera is aimed at the building rather than at the spot it was standing on, and the USGS aerial resolves one zoom level sharper. Existing deals re-place themselves on their next view.",
       "href": "/deals"

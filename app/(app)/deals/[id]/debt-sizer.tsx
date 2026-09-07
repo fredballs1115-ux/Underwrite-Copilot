@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { findMetric, parseMoney } from "@/lib/criteria";
+import { IMPLIED_CAP_CEILING, noiFigures } from "@/lib/deal-strategy";
 import type { UnderwritingModel } from "@/lib/model/types";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { ExtractionResult } from "@/lib/anthropic/types";
@@ -137,10 +138,17 @@ function deriveSeed(
   model: UnderwritingModel | null,
   extraction: ExtractionResult | null,
 ): Seed {
+  // An NOI at or above a quarter of the price is not the building's income —
+  // it is a stabilized pro forma (the finished conversion) or a misread. A
+  // lender sizes off in-place income; seeding the sizer with the pro forma
+  // would print a loan the property cannot carry. Leave it blank instead.
+  const plausible = (noi: number | null, price: number | null) =>
+    noi != null && noi > 0 && (price == null || noi / price < IMPLIED_CAP_CEILING) ? noi : null;
   if (model?.inputs) {
+    const price = model.inputs.purchasePrice || null;
     return {
-      price: model.inputs.purchasePrice || null,
-      noi: model.cashFlow?.[0]?.noi ?? null,
+      price,
+      noi: plausible(model.cashFlow?.[0]?.noi ?? null, price),
       ratePct: model.inputs.loan?.ratePct ?? 6.5,
       amortYears: model.inputs.loan?.amortYears ?? 30,
       seededFrom: "model",
@@ -152,9 +160,11 @@ function deriveSeed(
     /purchase price|asking price|\bprice\b/i,
     /unit|\/sf|per sf|per unit|psf/i,
   );
-  const noiMetric = findMetric(metrics, /\bnoi\b/i, /margin|growth|debt/i);
   const price = priceMetric ? parseMoney(priceMetric.value) : null;
-  const noi = noiMetric ? parseMoney(noiMetric.value) : null;
+  // The in-place or Year-1 NOI, never the stabilized pro forma.
+  const figs = noiFigures(metrics);
+  const going = figs.find((f) => f.kind === "in_place") ?? figs.find((f) => f.kind === "year1") ?? null;
+  const noi = plausible(going?.value ?? null, price);
   return {
     price,
     noi,

@@ -19,6 +19,15 @@ const ExtractionSchema = z.object({
   // VALIDATE cited pages (a byte-level counter mis-reads object-stream and
   // bookmarked PDFs); 0 if the model can't tell.
   totalPages: z.number(),
+  // What kind of deal this is. Read BEFORE the figures, because it decides
+  // what they mean: a stabilized pro forma on a conversion is a yield on
+  // total cost years out, not a going-in cap on the price.
+  strategy: z.object({
+    kind: z.enum(["stabilized", "value_add", "lease_up", "conversion", "development", "unknown"]),
+    summary: z.string(),
+    capitalBudget: z.string(),
+    timeline: z.string(),
+  }),
   metrics: z.array(
     z.object({
       label: z.string(),
@@ -78,6 +87,12 @@ export async function extractTerms(
     // this field made "Dallas" fail on a deal whose street address is Dallas.
     address: out.address,
     totalPages: Number.isFinite(out.totalPages) && out.totalPages > 0 ? Math.round(out.totalPages) : 0,
+    strategy: {
+      kind: out.strategy.kind,
+      summary: out.strategy.summary.trim(),
+      capitalBudget: out.strategy.capitalBudget.trim(),
+      timeline: out.strategy.timeline.trim(),
+    },
     metrics: out.metrics.map((m) => ({
       ...m,
       // Guard the ≤10-word cap even if the model over-quotes.

@@ -129,6 +129,19 @@ const VERDICT_META: Record<
   pass: { label: "Go", cls: "bg-pass/15 text-pass", rank: 2 },
 };
 
+/** Each asset class reads as its own kind of thing at a glance: a colour dot
+ *  beside the class name and a thin rail down the row's left edge, one hue per
+ *  class (tokens in globals.css). Deliberately quiet — the verdict colours
+ *  still carry the loudest signal on the row. */
+const ASSET_META: Record<string, { dot: string; rail: string }> = {
+  multifamily: { dot: "bg-asset-multifamily", rail: "border-l-asset-multifamily" },
+  office: { dot: "bg-asset-office", rail: "border-l-asset-office" },
+  industrial: { dot: "bg-asset-industrial", rail: "border-l-asset-industrial" },
+  retail: { dot: "bg-asset-retail", rail: "border-l-asset-retail" },
+};
+const OTHER_ASSET = { dot: "bg-asset-other", rail: "border-l-asset-other" };
+const assetMeta = (cls: string) => ASSET_META[cls.toLowerCase()] ?? OTHER_ASSET;
+
 // One cached formatter — constructing Intl.DateTimeFormat per call costs
 // ~50ms per full-list render at 500 rows. Pinned to UTC so the server and
 // client render the same string (no hydration mismatch from timezones).
@@ -895,7 +908,7 @@ export function Pipeline({
               <SortHead label="Asset" k="asset" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="hidden w-20 lg:flex" />
               <SortHead label="Price" k="price" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="w-20" right />
               <SortHead label="Cap" k="cap" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="w-12" right />
-              <SortHead label="Buy box" k="fit" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="hidden w-16 lg:flex" right />
+              <SortHead label="Fit" k="fit" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="hidden w-16 lg:flex" right />
               <SortHead label="Status" k="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="w-22" right />
               <SortHead label="Added" k="added" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="hidden w-24 xl:flex" right />
               {!compareMode && (
@@ -1109,8 +1122,12 @@ const DealRow = memo(function DealRow({
       {d.coveredMarket}
     </span>
   ) : null;
+  const asset = assetMeta(d.assetClass ?? "");
   const assetBit = d.assetClass ? (
-    <span className="capitalize">{d.assetClass}</span>
+    <span className="inline-flex items-center gap-1 capitalize">
+      <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${asset.dot}`} />
+      {d.assetClass}
+    </span>
   ) : null;
   const priceBit = d.slots.price ? (
     <span className="font-mono tabular-nums">{d.slots.price}</span>
@@ -1122,16 +1139,18 @@ const DealRow = memo(function DealRow({
   ) : null;
   const fitBit =
     d.score != null && d.mandateVerdict ? (
+      // "Fit 82 · Pursue": the mandate score. The words "buy box" live on the
+      // Buy box page and the deal header's chip — the row doesn't repeat them.
       d.fit === "outside" ? (
-        <span className="font-medium text-kill">Buy box {d.score} · Outside box</span>
+        <span className="font-medium text-kill">Fit {d.score} · Outside box</span>
       ) : (
         <span className={`font-medium ${MANDATE_META[d.mandateVerdict].cls}`}>
-          Buy box {d.score} · {MANDATE_META[d.mandateVerdict].label}
+          Fit {d.score} · {MANDATE_META[d.mandateVerdict].label}
         </span>
       )
     ) : d.fit ? (
       <span className={`font-medium ${FIT_META[d.fit].cls}`}>
-        {FIT_META[d.fit].label} buy box
+        {FIT_META[d.fit].label} box
       </span>
     ) : null;
   const dateBit = (
@@ -1187,8 +1206,15 @@ const DealRow = memo(function DealRow({
         />
       </div>
       {/* Column cells — widths, order, and gaps mirror the header row. */}
-      <span className="hidden w-20 shrink-0 truncate text-sm capitalize text-muted lg:block">
-        {d.assetClass || <span className="text-line">—</span>}
+      <span className="hidden w-20 shrink-0 items-center gap-1.5 truncate text-sm capitalize text-muted lg:flex">
+        {d.assetClass ? (
+          <>
+            <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${asset.dot}`} />
+            <span className="truncate">{d.assetClass}</span>
+          </>
+        ) : (
+          <span className="text-line">—</span>
+        )}
       </span>
       <span className="hidden w-20 shrink-0 truncate text-right font-mono text-sm tabular-nums md:block">
         {d.slots.price ?? <span className="text-line">—</span>}
@@ -1243,7 +1269,11 @@ const DealRow = memo(function DealRow({
   return (
     <li
       style={{ "--i": i } as React.CSSProperties}
-      className={isDead ? "opacity-60" : undefined}
+      // The asset-class rail: a 3px line in the class's hue down the left
+      // edge, so a mixed section reads as its kinds without a legend.
+      className={`border-l-[3px] ${d.assetClass ? asset.rail : "border-l-transparent"} ${
+        isDead ? "opacity-60" : ""
+      }`}
     >
       {compareMode ? (
         <button

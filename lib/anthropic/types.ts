@@ -58,9 +58,34 @@ export interface ExtractedMetric {
    *  hover. Optional for extractions saved before citations existed. */
   locatorSnippet?: string;
 }
+/**
+ * What kind of deal the OM describes — the lens every figure is read
+ * through. A "stabilized NOI" on a stabilized asset is next year's income;
+ * on a conversion it is the finished building's income, years and a
+ * construction budget away, and comparable only to total cost.
+ */
+export type DealStrategyKind =
+  | "stabilized"
+  | "value_add"
+  | "lease_up"
+  | "conversion"
+  | "development"
+  | "unknown";
+export interface ExtractedStrategy {
+  kind: DealStrategyKind;
+  /** one sentence: the plan in the OM's own terms ("" if the OM states none) */
+  summary: string;
+  /** the renovation / construction budget as stated, hard and soft ("" if none) */
+  capitalBudget: string;
+  /** construction, downtime and lease-up timing to stabilization as stated ("" if none) */
+  timeline: string;
+}
 export interface ExtractionResult {
   dealName: string | null;
   assetClass: string;
+  /** The deal's strategy as the OM states it. Optional for extractions saved
+   *  before this existed — lib/deal-strategy infers it from the words then. */
+  strategy?: ExtractedStrategy;
   /** Submarket / metro, e.g. "North Dallas, TX" ("" if unclear). Optional for
    *  backward-compatibility with extractions saved before this field existed. */
   market?: string;
