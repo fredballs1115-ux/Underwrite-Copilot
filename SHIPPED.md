@@ -73,6 +73,15 @@ gated on tsc / eslint / the full suite / a production build.
   forma is as conservative as the deck says. A misread is only called on a
   deal read as stabilized; a stabilized figure on such a deal now reads as
   "strategy unsettled", a Year-1 label on a plan deal as a label mix-up.
+- **#183–#187 The follow-through.** The plan vocabulary in every prompt
+  (challenger grills total cost, development spread and construction debt;
+  the market check tests the figures behind the pro forma; the verdict reads
+  basis / exit / debt on the plan's terms) and on the memo's subtitle; a
+  stabilized or pro forma cap is never read as the going-in cap on any of the
+  four surfaces that pick one; extracted-term cards carry an "in place" /
+  "pro forma" chip; the compare table gains Deal type and Yield on cost rows
+  and never puts the stabilized NOI in the Year-1 row; the News page streams
+  its headlines behind a skeleton instead of waiting on the slowest feed.
 - **#180 News, never empty.** "That section needs to be filled with the most
   important real estate news coming out and links to the sources." The page
   now opens with live headlines from eight publishers' own feeds plus Google
