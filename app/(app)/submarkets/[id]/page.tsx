@@ -61,10 +61,10 @@ export default async function SubmarketPage({
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6">
       <header className="flex flex-col gap-1">
         <Link
-          href="/submarkets"
+          href="/market#submarkets"
           className="text-sm text-muted underline-offset-2 hover:text-brand hover:underline"
         >
-          ← Submarkets
+          ← Market data · your submarkets
         </Link>
         <h1 className="text-2xl font-semibold tracking-tight text-ink">{submarket.name}</h1>
         <p className="text-sm text-muted">

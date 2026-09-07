@@ -2,6 +2,18 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-09-07",
+      "title": "Building photos and maps now point at the building",
+      "blurb": "For most deals the picture was of the wrong place. The geocoder put a street address on the street's centreline or on the city, the app called that point 'the building', and the aerial, the Street View photo and the map pin all inherited the error. Street addresses now go to the US Census Bureau's geocoder first, which matches the house number to the right block face; how precisely a point was found — building, block or area — is read off the answer, and every frame, pin label and photo attempt is honest about it. The Street View camera is aimed at the building rather than at the spot it was standing on, and the USGS aerial resolves one zoom level sharper. Existing deals re-place themselves on their next view.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-07",
+      "title": "Submarkets live on Market data now",
+      "blurb": "Submarkets never needed a section of their own — a submarket is part of the market picture. The list and the create form now sit on Market data as 'Your submarkets', next to your own comp memory. Each submarket's own page, the deal-page assumption check and every old link still work; /submarkets simply lands on the panel.",
+      "href": "/market#submarkets"
+    },
+    {
       "date": "2026-08-31",
       "title": "Verification sweep — every internal link checked, and a scope contradiction caught",
       "blurb": "A full crawl of the public site: all 41 pages (every metro brief, all 14 sector tabs, every marketing page) return 200, and all 53 unique internal links resolve — no dead ends. The sweep also caught the homepage contradicting itself: the pulse board counted its 18 jurisdiction tiles as though each were a market, while the same page said '15 markets, deliberately.' DC, Prince George's, Montgomery and Northern Virginia are four tiles inside one DMV-core market, so the board now reads '18 jurisdiction tiles across 15 covered markets,' both numbers derived. Three tests pin the counts so a future market can't reopen the gap.",
@@ -29,7 +41,7 @@
       "date": "2026-08-28",
       "title": "Exit cap and rent growth, checked against the submarket",
       "blurb": "The two assumptions that swing returns most are usually just typed in, and nothing checks them — a deal underwritten to 4% rent growth in a market with 18 months of supply under construction is a bad deal that screens well. Build a submarket from your own market export and those assumptions get measured against what it actually did: months of supply, trailing rent CAGR on a consistent basis, trough vacancy. Four data traps are handled by name — data-center campuses excluded by a persistent rule, rent-basis changes breaking the trend line instead of being averaged through, a pipeline that doesn't tie reconciled with the delta shown, and round-number placeholders flagged for review. Overriding a warning is normal; it needs a one-line reason, and the reason lands in the memo.",
-      "href": "/submarkets"
+      "href": "/market#submarkets"
     },
     {
       "date": "2026-08-25",

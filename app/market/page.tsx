@@ -20,6 +20,7 @@ import {
   type SnapBlock,
 } from "@/lib/sector-leaderboard";
 import { CopyCite } from "./copy-cite";
+import { SubmarketsPanel } from "./submarkets-panel";
 import {
   MarketCompare,
   type CompareMetro,
@@ -228,9 +229,13 @@ const CALL_META: Record<string, { label: string; cls: string }> = {
 export default async function MarketDataPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ metro?: string; sector?: string }>;
+  searchParams?: Promise<{ metro?: string; sector?: string; submarketError?: string }>;
 }) {
-  const { metro: metroParam, sector: sectorParam } = (await searchParams) ?? {};
+  const {
+    metro: metroParam,
+    sector: sectorParam,
+    submarketError,
+  } = (await searchParams) ?? {};
   const supabase = await createSupabaseServerClient();
   const user = await getCurrentUser();
 
@@ -318,6 +323,12 @@ export default async function MarketDataPage({
           </div>
         </>
       )}
+
+      {/* The user's own submarkets — supply, rent trend and vacancy from their
+          own market exports, checked against deal assumptions. Part of the
+          market picture, so it lives here rather than in a section of its own;
+          /submarkets redirects to this anchor. */}
+      {user ? <SubmarketsPanel userId={user.id} errorCode={submarketError} /> : null}
 
       <MetroExplorer selected={metroParam} />
       {/* Side-by-side: any two covered markets on one shared dollar scale,

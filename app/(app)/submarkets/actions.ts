@@ -40,10 +40,16 @@ const list = (raw: FormDataEntryValue | null): string[] =>
     .map((s) => s.trim())
     .filter(Boolean);
 
+// The submarket LIST is the "Your submarkets" panel on /market (anchor
+// #submarkets); list-level errors travel there as ?submarketError=. Each
+// submarket's own page is still /submarkets/[id].
+const LIST = "/market#submarkets";
+const listError = (code: string) => `/market?submarketError=${code}#submarkets`;
+
 export async function createSubmarket(formData: FormData) {
   const { supabase, user } = await requireUser();
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) redirect("/submarkets?error=name");
+  if (!name) redirect(listError("name"));
 
   const { data, error } = await supabase
     .from("submarkets")
@@ -58,8 +64,8 @@ export async function createSubmarket(formData: FormData) {
     .select("id")
     .maybeSingle();
 
-  if (error || !data) redirect("/submarkets?error=save");
-  revalidatePath("/submarkets");
+  if (error || !data) redirect(listError("save"));
+  revalidatePath("/market");
   redirect(`/submarkets/${data.id}`);
 }
 
@@ -68,8 +74,8 @@ export async function deleteSubmarket(formData: FormData) {
   const id = String(formData.get("submarketId") ?? "");
   if (!id) return;
   await supabase.from("submarkets").delete().eq("id", id).eq("user_id", user.id);
-  revalidatePath("/submarkets");
-  redirect("/submarkets");
+  revalidatePath("/market");
+  redirect(LIST);
 }
 
 /**
@@ -111,7 +117,7 @@ export async function importSubmarketFile(formData: FormData) {
   if (!id) return;
 
   const submarket = await getSubmarket(supabase, id);
-  if (!submarket) redirect("/submarkets?error=notfound");
+  if (!submarket) redirect(listError("notfound"));
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) redirect(`/submarkets/${id}?error=file`);
