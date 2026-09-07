@@ -35,12 +35,15 @@ Four PRs landed from one review session; each is live once Render finishes the
 **Your three checks (~10 min, after the deploy):**
 
 1. **Open the conversion deal that showed Year-1 NOI above its price.** The
-   header should now say *Deal type: Conversion* and show the red "These
-   figures can't all be true at once" panel; the Excel model's SOURCE column
-   names the pro forma it refused to anchor on. Then **re-screen it** (the
-   stated strategy and the three NOI labels arrive with the next screen) and
-   **regenerate its model** — the model tab should show Yield on cost (Yr N)
-   and a dark year 1, not a 105% cap.
+   header should now say *Deal type: Conversion* and show a teal "The plan"
+   strip — stabilized NOI $21M, price, budget, total cost, yield on cost — not
+   a red panel: on a conversion that figure is the plan, and the challenger is
+   briefed to test whether it is as conservative as the OM says. The Excel
+   model's SOURCE column names the stabilized figure it kept out of year 1.
+   Then **re-screen it** (the stated strategy, the timeline and the three NOI
+   labels arrive with the next screen, and the challenger gets the plan
+   brief) and **regenerate its model** — the model tab should show Yield on
+   cost (Yr N) and a dark year 1, not a 105% cap.
 2. **Hit `/api/imagery/health` signed in.** A new `geocoder` key leads the
    JSON: it should read `ok: true`, `source: "census"`, `precision: "street"`,
    a few tens of metres off. Paste it back if anything else shows.
