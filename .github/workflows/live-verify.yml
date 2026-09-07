@@ -124,6 +124,11 @@ jobs:
           # every entry linking to where it landed.
           grep -q "improvements logged since" p_whats-new.html && echo "WHATS-NEW TOUR (Aug 25): present" || echo "WHATS-NEW TOUR (Aug 25): not yet deployed"
           grep -q "See it live" p_whats-new.html && echo "WHATS-NEW entry links (Aug 25): present" || echo "WHATS-NEW entry links (Aug 25): not yet deployed"
+          # The Sep 7 review round (#176-#180): the changelog titles are the
+          # public trace of the deploy — imagery, strategy-first, News live
+          # layer. Present = Render is serving a build that carries them.
+          grep -q "strategy is read first" p_whats-new.html && echo "SEP 7 STRATEGY-FIRST (#178): present" || echo "SEP 7 STRATEGY-FIRST (#178): not yet deployed"
+          grep -q "News is never empty" p_whats-new.html && echo "SEP 7 NEWS LIVE LAYER (#180): present" || echo "SEP 7 NEWS LIVE LAYER (#180): not yet deployed"
           # /market must open for ANONYMOUS visitors (no cookies here): the
           # signed-out chrome says "Get started"; a login redirect would 200
           # on /login and fail the covered-market grep instead.
