@@ -509,6 +509,19 @@ export function TermsView({
     >
       <p className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-muted">
         <span className="truncate">{m.label}</span>
+        {/* The property's reality vs the sponsor's story, on the card
+            itself — on a plan deal the difference between a $21M stabilized
+            pro forma and today's income is the whole deal. */}
+        {m.basis === "pro_forma" && (
+          <span className="shrink-0 rounded bg-caution/10 px-1 py-px text-[9px] font-semibold normal-case tracking-normal text-caution">
+            pro forma
+          </span>
+        )}
+        {m.basis === "in_place" && (
+          <span className="shrink-0 rounded bg-pass/10 px-1 py-px text-[9px] font-semibold normal-case tracking-normal text-pass">
+            in place
+          </span>
+        )}
         {m.flagged && <span className="shrink-0 text-caution">⚑</span>}
       </p>
       <p className="mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums">
