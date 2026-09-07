@@ -12,7 +12,7 @@ name: rates
 # never fails a run it was never configured for.
 on:
   schedule:
-    - cron: "43 12 * * 1-5"  # off :00/:30 — GitHub load-sheds those minutes # weekdays, after the FRED morning release
+    - cron: "43 12 * * 1-5" # weekdays, after the FRED morning release; off :00/:30, which GitHub load-sheds
   workflow_dispatch:
 jobs:
   rates:
