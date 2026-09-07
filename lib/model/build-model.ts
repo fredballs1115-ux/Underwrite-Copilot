@@ -5,7 +5,7 @@ import { parseModelFile } from "@/lib/model-parse";
 import { extractDocFacts } from "@/lib/anthropic/model-extract";
 import { reconcileDocs } from "@/lib/anthropic/model-reconcile";
 import { DOC_KIND_LABEL } from "@/lib/documents";
-import { computeModel } from "./compute";
+import { computeModel, planCaveats } from "./compute";
 import type { DocFacts, UnderwritingModel } from "./types";
 
 type JobPatch = {
@@ -88,7 +88,10 @@ export async function runModelGeneration(dealId: string): Promise<void> {
     // Pass 3 — compute the cash flow and returns deterministically.
     const { cashFlow, returns } = computeModel(recon.inputs);
 
-    const caveats = [...recon.caveats];
+    // The plan's labelled defaults (a dark works year, carrying costs at a
+    // documented share of opex, a lease-up from empty) go on the record with
+    // the reconciliation's own caveats.
+    const caveats = [...recon.caveats, ...planCaveats(recon.inputs)];
     if (skipped.length > 0) {
       caveats.push(
         `Could not read and incorporate: ${skipped.join(", ")}. Re-upload as PDF or Excel/CSV.`,

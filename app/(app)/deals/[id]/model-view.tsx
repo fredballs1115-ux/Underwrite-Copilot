@@ -237,14 +237,41 @@ export function ReturnsHeadline({ model }: { model: UnderwritingModel }) {
           </p>
         </div>
       )}
+      {/* A deal with a plan is judged on what the finished building earns
+          against everything it cost to get there — the yield on cost — and
+          its going-in cap is whatever year 1 really is, dark or not. Models
+          stored before the plan existed carry no yardsticks (undefined) and
+          render as before. */}
+      {r.yieldOnCostPct != null && (
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Stat
+            label={r.stabilizedYear ? `Yield on cost (Yr ${r.stabilizedYear})` : "Yield on cost"}
+            value={pct(r.yieldOnCostPct)}
+          />
+          <Stat label="Total cost" value={usd(r.totalCost)} />
+          <Stat label="Capital budget" value={usd(r.capitalBudget)} />
+          <Stat
+            label={r.stabilizedYear ? `Stabilized NOI (Yr ${r.stabilizedYear})` : "Stabilized NOI"}
+            value={r.stabilizedNoi != null ? usd(r.stabilizedNoi) : "—"}
+          />
+        </div>
+      )}
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Levered IRR" value={pct(r.leveredIrrPct)} tone={implausible ? "kill" : undefined} />
         <Stat label="Cash-on-cash (Yr 1)" value={pct(r.cashOnCashPct)} tone={implausible ? "kill" : undefined} />
         <Stat label="Equity multiple" value={mult(r.equityMultiple)} tone={implausible ? "kill" : undefined} />
-        <Stat label="Going-in cap" value={pct(r.goingInCapPct)} tone={implausible ? "kill" : undefined} />
+        <Stat
+          label={r.yieldOnCostPct != null ? "Going-in cap (Yr 1)" : "Going-in cap"}
+          value={pct(r.goingInCapPct)}
+          tone={implausible ? "kill" : r.goingInCapPct < 0 ? "caution" : undefined}
+        />
         <Stat label="Purchase price" value={usd(r.purchasePrice)} />
         <Stat label="Equity" value={usd(r.equity)} />
-        <Stat label="Year-1 NOI" value={usd(r.year1Noi)} tone={implausible ? "kill" : undefined} />
+        <Stat
+          label="Year-1 NOI"
+          value={usd(r.year1Noi)}
+          tone={implausible ? "kill" : r.year1Noi < 0 ? "caution" : undefined}
+        />
         <Stat label="Exit value" value={usd(r.exitValue)} tone={implausible ? "kill" : undefined} />
       </div>
     </section>
@@ -736,6 +763,9 @@ export function CashFlow({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   if (cashFlow.length === 0) return null;
+  // The plan's spend gets its own line only when there is one — models
+  // stored before the plan existed carry no capitalSpend and read as before.
+  const hasPlanSpend = cashFlow.some((c) => (c.capitalSpend ?? 0) > 0);
   const rows: [string, (c: CashFlowYear) => number][] = [
     ["Gross potential rent", (c) => c.gpr],
     ["Vacancy loss", (c) => -c.vacancyLoss],
@@ -744,6 +774,9 @@ export function CashFlow({
     ["Operating expenses", (c) => -c.opex],
     ["Net operating income", (c) => c.noi],
     ["Capital reserve", (c) => -(c.capexReserve ?? 0)],
+    ...(hasPlanSpend
+      ? ([["Capital spend (the plan)", (c) => -(c.capitalSpend ?? 0)]] as [string, (c: CashFlowYear) => number][])
+      : []),
     ["Debt service", (c) => -c.debtService],
     ["Levered cash flow", (c) => c.cashFlow],
   ];

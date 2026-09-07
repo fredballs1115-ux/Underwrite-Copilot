@@ -47,6 +47,15 @@ const InputsSchema = z.object({
     amortYears: z.number(),
     ioYears: z.number(),
   }),
+  // The plan. Null means "the documents do not state it" — never zero, and
+  // never a guess; lib/model/compute labels every default it has to supply.
+  strategy: z.enum(["stabilized", "value_add", "lease_up", "conversion", "development", "unknown"]),
+  capitalBudget: z.number().nullable(),
+  constructionYears: z.number().nullable(),
+  leaseUpYears: z.number().nullable(),
+  inPlaceGprDuringWorks: z.number().nullable(),
+  worksOpexAnnual: z.number().nullable(),
+  leaseUpStartOccupancyPct: z.number().nullable(),
 });
 
 const ReconSchema = z.object({
@@ -105,6 +114,10 @@ export async function reconcileDocs(
   inp.loan.ratePct = rescale(inp.loan.ratePct, 1);
   inp.loan.ltvPct = rescale(inp.loan.ltvPct, 1.5);
   inp.vacancyPct = rescale(inp.vacancyPct, 0.5);
+  if (inp.leaseUpStartOccupancyPct != null) {
+    // A starting occupancy of 0.4 is 40%, not four-tenths of a percent.
+    inp.leaseUpStartOccupancyPct = rescale(inp.leaseUpStartOccupancyPct, 1);
+  }
 
   return out;
 }
