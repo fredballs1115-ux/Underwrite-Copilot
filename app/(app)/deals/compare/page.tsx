@@ -11,6 +11,7 @@ import { metroForAddress } from "@/lib/market-match";
 import type { StructuredAddress } from "@/lib/address";
 import { leverageRead } from "@/lib/leverage";
 import { seedBenchmarks } from "@/lib/research-data";
+import { inferStrategy, noiFigures } from "@/lib/deal-strategy";
 
 export const metadata: Metadata = { title: "Compare deals" };
 
@@ -19,6 +20,16 @@ function fromExtraction(ex: ExtractionResult | null, re: RegExp): string | null 
   if (!ex) return null;
   const m = ex.metrics.find((x) => re.test(x.label));
   return m ? m.value : null;
+}
+
+/** The OM's in-place or Year-1 NOI as stated — never the stabilized pro
+ *  forma, which on a plan deal would land in the "Year-1 NOI" row as if the
+ *  building earned it today. */
+function goingInNoiText(ex: ExtractionResult | null): string | null {
+  if (!ex) return null;
+  const figs = noiFigures(ex.metrics);
+  const going = figs.find((f) => f.kind === "in_place") ?? figs.find((f) => f.kind === "year1");
+  return going ? ex.metrics.find((m) => m.label === going.label)?.value ?? null : null;
 }
 
 function toCol(deal: DealRow, box: BuyBox | null, bench30: number | null): Col {
@@ -60,10 +71,15 @@ function toCol(deal: DealRow, box: BuyBox | null, bench30: number | null): Col {
     hasModel: model != null,
     fit,
     fitNote,
+    strategy: (() => {
+      const s = inferStrategy(ex);
+      return s.kind === "unknown" ? null : s.label;
+    })(),
     irr: r?.leveredIrrPct ?? null,
     em: r?.equityMultiple ?? null,
     coc: r?.cashOnCashPct ?? null,
     cap: r?.goingInCapPct ?? null,
+    yoc: r?.yieldOnCostPct ?? null,
     // Same arithmetic as the deal page's leverage check, run on the SAME cap
     // this table shows one row above — never a differently-sourced number.
     leverage:
@@ -71,7 +87,7 @@ function toCol(deal: DealRow, box: BuyBox | null, bench30: number | null): Col {
         ? leverageRead(r.goingInCapPct, bench30)
         : null,
     price: usd(r?.purchasePrice) ?? fromExtraction(ex, /\bprice\b/i),
-    noi: usd(r?.year1Noi) ?? fromExtraction(ex, /\bnoi\b/i),
+    noi: usd(r?.year1Noi) ?? goingInNoiText(ex),
   };
 }
 
