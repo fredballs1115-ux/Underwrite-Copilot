@@ -1612,6 +1612,9 @@ function DealPreview() {
               ["Price", `$${(inputs.purchasePrice / 1e6).toFixed(0)}M`],
               ["Size", `${inputs.units} units`],
               ["Going-in cap", `${r.goingInCapPct.toFixed(2)}%`],
+              // The real deal header carries a fourth figure now — the deal's
+              // strategy — and the sample mirrors the real page or it lies.
+              ["Deal type", "Stabilized"],
             ] as const
           ).map(([k, v]) => (
             <div key={k}>
