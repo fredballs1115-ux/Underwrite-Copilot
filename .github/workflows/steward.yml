@@ -7,7 +7,7 @@ name: steward
 # without it and the run notes say so).
 on:
   schedule:
-    - cron: "30 6 * * *"
+    - cron: "38 6 * * *"  # off :00/:30 — GitHub load-sheds those minutes
   workflow_dispatch:
 jobs:
   steward:

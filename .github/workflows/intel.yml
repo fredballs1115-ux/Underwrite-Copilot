@@ -11,7 +11,7 @@ name: intel
 # No-ops with instructions until the Actions secrets exist.
 on:
   schedule:
-    - cron: "0 12 * * 1-5" # weekdays, before the rates pull
+    - cron: "17 12 * * 1-5"  # off :00/:30 — GitHub load-sheds those minutes # weekdays, before the rates pull
   workflow_dispatch:
 jobs:
   intel:
