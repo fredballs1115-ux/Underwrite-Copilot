@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-07",
+      "title": "News is never empty: live headlines from the publishers, ranked, linked",
+      "blurb": "The News page waited on a weekday sweep that had not yet run, so it sat empty. It now opens with the day's real estate headlines read live from the publishers' own feeds — Commercial Observer, The Real Deal, GlobeSt, Multi-Housing News, Commercial Property Executive, Connect CRE, REBusinessOnline and the Federal Reserve — plus Google News topic searches on commercial real estate, multifamily, CRE debt and rent regulation, each naming its outlet. Headlines are ranked by recency and by how much they touch what moves a deal (rates, cap rates, distress, regulation, supply), refreshed every half hour, every one linking straight to the article. The sources that answered are listed under the headlines; any that did not are named rather than papered over. The scored, buyer-specific feed still follows once the sweep runs.",
+      "href": "/news"
+    },
+    {
+      "date": "2026-09-07",
       "title": "The deal's strategy is read first — a conversion no longer screens as a stabilized building",
       "blurb": "An office-to-residential conversion came through with a Year-1 NOI above its asking price: a 105% cap rate, shown as fact. The OM's $21M was the finished building's stabilized pro forma, years and a construction budget away, and the screen had read it as today's income. Every deal now carries a strategy — stabilized, value-add, lease-up, conversion or development — read from the OM and shown in the header, and every NOI is labelled as in-place, Year 1 or stabilized pro forma. Figures are checked against each other in code before anything is believed: an NOI at or above a quarter of the price, a stated cap that disagrees with NOI ÷ price, a per-unit basis no market trades at — each is named on the deal page, put to the challenger and carried into the verdict. The Excel model never anchors on a stabilized pro forma and books the construction budget, and a generated model whose numbers cannot tie says so above its returns.",
       "href": "/deals"
