@@ -62,6 +62,17 @@ gated on tsc / eslint / the full suite / a production build.
   fixture goes dark two years, spends $160M, and earns its $21M in year four at
   an 11.7% yield on cost with a negative going-in cap — the truth of it.
 
+- **#182 The plan is the plan.** Your correction: "the one deal, once the
+  multi was built and fully occupied, the NOI would be 21 million — that NOI
+  makes sense; it's a conservative estimate and that's what it should flag
+  in the challenger and assumptions checker." So on a conversion,
+  development, lease-up or value-add the stabilized figure is never a
+  finding: the header shows a teal "The plan" strip (stabilized NOI, price,
+  budget, total cost, yield on cost, timeline) and the challenger and
+  verdict are briefed with those figures and told to test whether the pro
+  forma is as conservative as the deck says. A misread is only called on a
+  deal read as stabilized; a stabilized figure on such a deal now reads as
+  "strategy unsettled", a Year-1 label on a plan deal as a label mix-up.
 - **#180 News, never empty.** "That section needs to be filled with the most
   important real estate news coming out and links to the sources." The page
   now opens with live headlines from eight publishers' own feeds plus Google

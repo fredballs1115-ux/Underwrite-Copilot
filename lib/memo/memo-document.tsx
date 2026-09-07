@@ -18,6 +18,7 @@ import type {
   MarketResult,
   VerdictResult,
 } from "@/lib/anthropic/types";
+import { inferStrategy, planSummary } from "@/lib/deal-strategy";
 
 const C = {
   brand: "#114e54",
@@ -58,10 +59,32 @@ const STATUS_CHIP: Record<
   unknown: { color: C.muted, bg: C.faint, mark: "—" },
 };
 
+/**
+ * The deal type for the memo's subtitle — and, on a plan deal, the plan's
+ * headline in one clause: the stabilized NOI over the total cost it takes to
+ * earn it. A stabilized asset adds nothing (the subtitle already says what
+ * the building is); an unknown strategy adds nothing rather than a guess.
+ */
+function strategyLineFor(extraction: ExtractionResult | null): string {
+  const strategy = inferStrategy(extraction);
+  if (strategy.kind === "unknown" || strategy.kind === "stabilized") return "";
+  const plan = planSummary(extraction, strategy);
+  const m = (n: number) =>
+    n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${Math.round(n).toLocaleString("en-US")}`;
+  if (plan?.stabilizedNoi && plan.totalCost != null && plan.yieldOnCost != null) {
+    return `${strategy.label} · stabilized NOI ${m(plan.stabilizedNoi.value)} on ${m(plan.totalCost)} total cost (${(plan.yieldOnCost * 100).toFixed(1)}% yield on cost)`;
+  }
+  if (plan?.stabilizedNoi) return `${strategy.label} · stabilized NOI ${m(plan.stabilizedNoi.value)}`;
+  return strategy.label;
+}
+
 export type MemoData = {
   name: string;
   market: string;
   assetClass: string;
+  /** deal type and, for a plan deal, the plan's headline figures ("" for a
+   *  stabilized asset). Optional for callers built before it existed. */
+  strategyLine?: string;
   dateStr: string;
   verdictWord: string | null;
   verdictColor: string;
@@ -256,6 +279,7 @@ export function buildMemoData(
     name: str(deal.name) || "Deal",
     market: str(extraction?.market),
     assetClass: str(deal.asset_class),
+    strategyLine: pdfSafe(strategyLineFor(extraction ?? null)),
     dateStr,
     verdictWord: vmeta?.word ?? null,
     verdictColor: vmeta?.color ?? C.muted,
@@ -615,7 +639,7 @@ export function MemoDocument({ data }: { data: MemoData }) {
 
 /** The memo's single page, exported so the full report can lead with it. */
 export function MemoPage({ data }: { data: MemoData }) {
-  const subParts = [data.market, cap(data.assetClass)].filter(Boolean);
+  const subParts = [data.market, cap(data.assetClass), data.strategyLine ?? ""].filter(Boolean);
   const b = data.branding;
   const branded = !!(b && (b.firmName || b.logoDataUri || b.footerText));
   return (
