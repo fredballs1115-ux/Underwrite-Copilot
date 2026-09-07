@@ -362,19 +362,25 @@ export default async function DealPage({
   // base underwriting model — actuals folded in — computed once server-side;
   // the sliders recompute it in the browser via the same pure engine.
   const playground: PlaygroundData | null = extraction
-    ? {
-        inputs: deriveUnderwriteInputs(extraction, deal.name, {
+    ? (() => {
+        const derived = deriveUnderwriteInputs(extraction, deal.name, {
           rentRoll: actuals.rentRoll
             ? { summary: actuals.rentRoll.summary, asOf: actuals.rentRoll.asOf }
             : null,
           t12: actuals.t12
             ? { summary: actuals.t12.summary, periodEnd: actuals.t12.periodEnd }
             : null,
-        }).inputs,
-        dealAssetClass: deal.asset_class,
-        checkSource,
-        box: buyBox,
-      }
+        });
+        return {
+          inputs: derived.inputs,
+          dealAssetClass: deal.asset_class,
+          checkSource,
+          box: buyBox,
+          // A plan deal's price ⇄ cap control must say its cap is year-1
+          // income as modelled, not the finished project's pro forma.
+          strategy: derived.meta.strategy ?? null,
+        };
+      })()
     : null;
 
   // Submarket supply & pipeline (Phase 4). Both reads are best-effort: on a
