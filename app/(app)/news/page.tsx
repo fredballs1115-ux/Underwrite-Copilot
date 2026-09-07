@@ -2,16 +2,26 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
+import { fetchLiveHeadlines, type LiveHeadlines } from "@/lib/news/live";
+import { timeAgo } from "@/lib/news/feeds";
 
 export const metadata: Metadata = { title: "News" };
 export const dynamic = "force-dynamic";
 
-// The stories feed: every headline the weekday intel sweep gathered and
-// scored for THIS buyer, newest day first, each linking straight to the
-// source. Big law/regulation changes get the top strip (they also red-banner
-// app-wide until dismissed). Nothing here is written by us — it's the
-// news itself, scored and linked; a quiet feed means the cron hasn't run,
-// and the empty state says exactly that.
+// Two layers, both real news and both linked to the source:
+//
+//   1. LIVE HEADLINES — the publishers' own feeds (Commercial Observer, The
+//      Real Deal, GlobeSt, Multi-Housing News, CPE, Connect CRE, REBusiness,
+//      the Fed) plus Google News topic searches, fetched at request time with
+//      a half-hour cache and ranked by recency and how much the headline
+//      touches what moves a deal. Needs no key and no cron, so this page is
+//      never empty.
+//   2. THE SCORED FEED — every headline the weekday intel sweep gathered and
+//      scored 0–10 for THIS buyer, newest day first. Big law/regulation
+//      changes get the top strip (they also red-banner app-wide until
+//      dismissed). Quiet until the cron has run, and it says so.
+//
+// Nothing here is written by us — it's the news itself, ranked and linked.
 
 interface ItemRow {
   url: string;
@@ -55,6 +65,111 @@ const fmtDay = (iso: string) =>
     timeZone: "UTC",
   });
 
+/**
+ * The live layer: ranked headlines with publisher, age and a one-line
+ * snippet, then the sources — the ones that answered as links, the ones
+ * that did not, named. Renders a plain sentence, never a fake list, when
+ * every source is unreachable.
+ */
+function LiveHeadlinesSection({ live }: { live: LiveHeadlines }) {
+  const answered = live.sources.filter((s) => s.ok || s.stale);
+  const missing = live.sources.filter((s) => !s.ok && !s.stale);
+  const publishers = answered.filter((s) => s.kind === "publisher");
+  const now = Date.parse(live.fetchedAt);
+  return (
+    <section aria-labelledby="live-news">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="live-news" className="text-xs font-semibold uppercase tracking-wide text-muted">
+          Headlines now
+        </h2>
+        <span className="text-[11px] text-muted">
+          live from the sources · refreshed every 30 min
+        </span>
+      </div>
+
+      {live.headlines.length === 0 ? (
+        <p className="mt-2 rounded-xl border border-dashed border-line p-4 text-sm text-muted">
+          None of the publishers answered just now — their feeds are checked
+          again on the next visit. <code className="text-[11px]">/api/news/health</code>{" "}
+          shows what each one said.
+        </p>
+      ) : (
+        <ol className="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
+          {live.headlines.map((h, i) => (
+            <li key={h.url} className="flex gap-3 px-3.5 py-3 text-sm leading-snug">
+              <span className="mt-px w-5 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted">
+                {i + 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <a
+                  href={h.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
+                >
+                  {h.title}
+                </a>
+                <span className="ml-2 whitespace-nowrap text-[11px] text-muted">
+                  {h.publisherUrl ? (
+                    <a href={h.publisherUrl} target="_blank" rel="noreferrer" className="hover:text-brand">
+                      {h.publisher}
+                    </a>
+                  ) : (
+                    h.publisher
+                  )}
+                  {h.publishedAt ? ` · ${timeAgo(h.publishedAt, now)}` : ""}
+                </span>
+                {h.snippet && (
+                  <p className="mt-0.5 line-clamp-2 text-[13px] text-muted">{h.snippet}</p>
+                )}
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      <p className="mt-2 text-[11px] leading-relaxed text-muted">
+        Sources:{" "}
+        {publishers.length > 0
+          ? publishers.map((s, i) => (
+              <span key={s.id}>
+                {i > 0 && ", "}
+                <a href={s.home} target="_blank" rel="noreferrer" className="hover:text-brand">
+                  {s.name}
+                </a>
+                {s.stale ? " (earlier copy)" : ""}
+              </span>
+            ))
+          : "no publisher feed answered"}
+        {answered.some((s) => s.kind === "topic") && (
+          <>
+            {publishers.length > 0 ? ", plus " : ", "}
+            <a
+              href="https://news.google.com/"
+              target="_blank"
+              rel="noreferrer"
+              className="hover:text-brand"
+            >
+              Google News
+            </a>{" "}
+            topic searches naming each outlet
+          </>
+        )}
+        .
+        {missing.length > 0 && (
+          <>
+            {" "}
+            Did not answer just now:{" "}
+            {missing.map((s) => s.name.replace(/^Google News · /, "GN ")).join(", ")}.
+          </>
+        )}{" "}
+        Ranked by recency and by how much the headline touches rates, cap
+        rates, distress, regulation and supply — nothing here is written by us.
+      </p>
+    </section>
+  );
+}
+
 export default async function NewsPage({
   searchParams,
 }: {
@@ -63,6 +178,10 @@ export default async function NewsPage({
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/news");
   const params = await searchParams;
+
+  // The live layer and the database read are independent — start the feeds
+  // first, they are the slow half.
+  const livePromise = fetchLiveHeadlines();
 
   const supabase = await createSupabaseServerClient();
   let items: ItemRow[] = [];
@@ -87,6 +206,7 @@ export default async function NewsPage({
   } catch {
     // tables absent until migrations run — empty state below explains
   }
+  const live = await livePromise;
 
   const sectors = [...new Set(items.map((i) => i.sector))].sort();
   const want = (params.sector ?? "").slice(0, 40);
@@ -112,12 +232,15 @@ export default async function NewsPage({
       <header>
         <h1 className="text-xl font-semibold tracking-tight">News</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          Every story the weekday sweep gathered for your markets and
-          strategy, scored 0–10 for how much it matters to your buy box —
-          each headline links straight to the source. Law and regulation
-          changes get flagged here and as red banners app-wide.
+          The day&apos;s real estate news, live from the publishers&apos; own
+          feeds, most decision-relevant first — every headline links straight
+          to the source. When the weekday sweep has run, its stories for your
+          markets follow, scored 0–10; law and regulation changes are flagged
+          here and as red banners app-wide.
         </p>
       </header>
+
+      <LiveHeadlinesSection live={live} />
 
       {alerts.length > 0 && (
         <section className="rounded-xl border border-red-500/30 bg-red-500/5 p-4">
@@ -178,11 +301,12 @@ export default async function NewsPage({
       )}
 
       {items.length === 0 ? (
-        <section className="rounded-xl border border-dashed border-line p-5 text-sm text-muted">
-          No stories yet. The weekday intel cron gathers and scores the news
-          each morning (migrations 0023/0024 + the cron with its env vars) —
-          until it runs, this feed stays honestly empty rather than showing
-          filler.
+        <section className="rounded-xl border border-dashed border-line p-4 text-sm text-muted">
+          <span className="font-medium text-ink">Scored for your markets — not yet.</span>{" "}
+          The weekday sweep gathers the news each morning and scores every
+          story 0–10 for your buy box, with law and rule changes flagged. It
+          runs from GitHub Actions once its secrets are set; until then the
+          live headlines above are the news, unscored.
         </section>
       ) : (
         [...byDay.entries()].map(([day, list]) => (

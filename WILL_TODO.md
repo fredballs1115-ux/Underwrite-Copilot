@@ -3,7 +3,67 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-08-28**, after PR #165 (build phases 1–4) merged to main.
+**Last updated 2026-09-07**, after PRs #176–#179 merged to main.
+
+---
+
+## 🟢 What changed on 2026-09-07, and the three checks it asks of you
+
+Four PRs landed from one review session; each is live once Render finishes the
+`main` deploy (live-verify shows the sha).
+
+- **Maps and building photos point at the building** (#176). Street addresses
+  go to the US Census geocoder first, precision is read off the answer, the
+  Street View camera is aimed at the building, the USGS aerial resolves one
+  zoom sharper. Deals re-place themselves on their next view.
+- **Submarkets are a panel on Market data** (#177), not a nav section.
+  `/submarkets` redirects there; each submarket's own page is unchanged.
+- **The deal's strategy is read first** (#178). Stabilized / value-add /
+  lease-up / conversion / development, shown in the deal header; every NOI
+  labelled in-place, Year 1 or stabilized pro forma; figures that cannot all be
+  true (an NOI above the price, a cap that disagrees with NOI ÷ price) are named
+  on the page and put to the challenger and the verdict. Pipeline rows carry an
+  asset-class colour; the mandate score reads "Fit 82 · Pursue".
+- **The model climbs to stabilization** (#179): capital budget, works years,
+  downtime income and costs, lease-up ramp, yield on total cost.
+- **News is never empty** (#180): the page opens with live headlines from the
+  publishers' own feeds (eight outlets plus Google News topic searches),
+  ranked and linked, refreshed every half hour, no key and no cron. The scored
+  buyer-specific feed still follows once the weekday sweep runs. Two optional
+  cost levers, `MODEL_EXTRACTION` and `MODEL_REASONING`, are read at boot.
+
+**Your three checks (~10 min, after the deploy):**
+
+1. **Open the conversion deal that showed Year-1 NOI above its price.** The
+   header should now say *Deal type: Conversion* and show the red "These
+   figures can't all be true at once" panel; the Excel model's SOURCE column
+   names the pro forma it refused to anchor on. Then **re-screen it** (the
+   stated strategy and the three NOI labels arrive with the next screen) and
+   **regenerate its model** — the model tab should show Yield on cost (Yr N)
+   and a dark year 1, not a 105% cap.
+2. **Hit `/api/imagery/health` signed in.** A new `geocoder` key leads the
+   JSON: it should read `ok: true`, `source: "census"`, `precision: "street"`,
+   a few tens of metres off. Paste it back if anything else shows.
+3. **Cost (your call, one env var).** Screening runs every step on the
+   flagship tier. The extraction and first signal are look-up work and carry
+   the one uncached full read of the PDF; setting `MODEL_EXTRACTION` on the
+   web service (and the worker, if `ANALYSIS_WORKER=1`) to the mid-tier model
+   id and redeploying moves that read to a tier at roughly 40% of the price —
+   `lib/anthropic/models.ts` names the levers in order. Judge a screen or two
+   before deciding; the judgement steps stay on the flagship unless you also
+   set `MODEL_REASONING`.
+4. **Open `/news`, then hit `/api/news/health` signed in.** The page should
+   open with a ranked list of today's headlines and a "Sources:" line naming
+   the publishers that answered. The health JSON says what each feed returned
+   from Render; publisher feeds were chosen from public feed directories, not
+   fetched from here (the sandbox cannot reach them), so a feed that has moved
+   shows up there as `HTTP 404` — paste the JSON back and it gets corrected.
+   The scored feed under the headlines fills in once the GitHub Actions
+   secret is spelled `ANTHROPIC_API_KEY` (it is `NTHROPIC_API_KEY` today) and
+   the weekday sweep runs.
+
+Everything in the red section below still stands — the migrations remain the
+blocker for Bridge, Valuations, Rent roll and Submarkets.
 
 ---
 

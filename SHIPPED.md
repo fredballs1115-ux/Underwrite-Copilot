@@ -27,6 +27,51 @@ say exactly what's missing and why.
 **The single current to-do list is `WILL_TODO.md`.** This file is a record of
 what shipped; that one is the forward list.
 
+## Sunday Sep 7 — the review round: pictures, submarkets, and the conversion that screened as stabilized
+
+**Your calls:** "the maps and live pictures are terrible for most buildings";
+"the website doesn't need a full section for submarkets"; "for one of my
+deals, an office conversion to multi, Year 1 NOI is calculated to be more
+than the purchase price, 21 million to 20 — it has to take into account
+construction and downtime and what the deal is"; "split the pipeline up by
+asset class"; "too much emphasis on the buy box". Four PRs, #176–#179, each
+gated on tsc / eslint / the full suite / a production build.
+
+- **#176 Imagery.** Root cause was the point, not the pictures: Photon put a
+  street address on the street centreline or the city and the code stamped it
+  "street precision" because the *input* had a street; Street View was then
+  aimed at the spot the camera stood on. Now the US Census geocoder goes
+  first, precision is read off the result (street / block / area), the camera
+  is aimed at the building by bearing, the USGS cap moves to z19, cached
+  points are versioned and re-geocoded, and `/api/imagery/health` leads with a
+  `geocoder` probe. 48 tests on the services' real response shapes.
+- **#177 Submarkets → Market data.** One "Your submarkets" panel next to the
+  user's comp memory; `/submarkets` redirects; nav entries gone.
+- **#178 Strategy first.** `lib/deal-strategy.ts` (pure): a strategy per deal,
+  three kinds of NOI, and plausibility findings checked in code — an NOI at or
+  above a quarter of the price, a stated cap more than 150 bps from NOI ÷
+  price, a per-unit basis no market trades at. Named in the deal header, fed
+  to the challenger and the verdict; the Excel inputs refuse to anchor on a
+  stabilized pro forma and book the construction budget; the model tab and the
+  debt sizer guard the same ratio. Pipeline rows carry an asset-class hue and
+  the mandate score reads "Fit 82 · Pursue"; the homepage's repeated "for your
+  buy box" refrains are gone.
+- **#179 The plan in the model.** Optional inputs (budget, works years, income
+  and costs during the works, lease-up ramp) make the generated model climb to
+  its stabilized figures and report yield on total cost; the conversion
+  fixture goes dark two years, spends $160M, and earns its $21M in year four at
+  an 11.7% yield on cost with a negative going-in cap — the truth of it.
+
+- **#180 News, never empty.** "That section needs to be filled with the most
+  important real estate news coming out and links to the sources." The page
+  now opens with live headlines from eight publishers' own feeds plus Google
+  News topic searches, parsed and ranked in pure code (19 tests on the feeds'
+  real shapes), refreshed every half hour, every headline linked and every
+  outlet named; `/api/news/health` reports what each feed returned. The
+  scored buyer-specific feed follows once the sweep's secret is fixed.
+
+What only you can do next is at the top of `WILL_TODO.md`.
+
 ## Monday night (Aug 24–25 ET) — homescreen eye-catchers, then the big one: real data on the asset types that matter
 
 **Your call: "more than 2BR info… research on all asset types… real data on assets that matter… way more info on each metro."** Answered across five probe-verified PRs (#134, #136–#138, each an exact live-sha match):
