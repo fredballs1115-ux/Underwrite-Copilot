@@ -215,7 +215,10 @@ const pct = (x: number, dp = 1): string => `${(x * 100).toFixed(dp)}%`;
 const PRICE_INCLUDE = /asking price|purchase price|guidance|^price\b|offering price/i;
 const PRICE_EXCLUDE = /unit|\bsf\b|\bper\b|\/|psf/i;
 const CAP_INCLUDE = /going[- ]?in cap|^cap rate|\bcap\b/i;
-const CAP_EXCLUDE = /exit|reversion|terminal|expense|capex|capital|rate cap/i;
+// Not the going-in cap: the exit, an expense cap, a rate cap — and on a plan
+// deal the stabilized / pro forma cap or the yield on cost, which describe
+// the finished project, not the price being paid today.
+const CAP_EXCLUDE = /exit|reversion|terminal|expense|capex|capital|rate cap|stabili[sz]|pro ?forma|forward|projected|yield/i;
 
 const NON_STABILIZED: ReadonlySet<StrategyKind> = new Set([
   "value_add",

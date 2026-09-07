@@ -482,9 +482,16 @@ export default async function DealPage({
         : sizeUnits
       : null) ??
     (firstSignal?.size.trim() || null);
+  // The going-in cap only: a stabilized / pro forma cap or a yield on cost
+  // describes the finished project on a plan deal, and would read as the
+  // price's cap rate in this slot.
   const summaryCap =
-    findValue(metrics, /going[- ]?in cap/i) ??
-    findValue(metrics, /\bcap rate\b/i, /exit|terminal|reversion/i) ??
+    findValue(metrics, /going[- ]?in cap/i, /stabili[sz]|pro ?forma|forward|projected/i) ??
+    findValue(
+      metrics,
+      /\bcap rate\b/i,
+      /exit|terminal|reversion|stabili[sz]|pro ?forma|forward|projected|yield/i,
+    ) ??
     (firstSignal?.goingInCap.trim() || null);
   // Year built feeds the rules engine's age-based coverage tests (NYC
   // pre-1974, JC pre-1987, LA pre-1979, MoCo's rolling-age exemption). The

@@ -148,6 +148,27 @@ describe("deriveUnderwriteInputs — which NOI anchors a stabilized deal", () =>
   });
 });
 
+describe("deriveUnderwriteInputs — a stabilized cap is not the going-in cap", () => {
+  it("does not price year-1 NOI or the exit off a plan deal's stabilized / pro forma cap", () => {
+    const { inputs, sources } = deriveUnderwriteInputs(
+      ex(
+        [
+          metric("Asking price", "$20,000,000"),
+          metric("Stabilized cap rate (pro forma)", "11.7%", { basis: "pro_forma" }),
+          metric("NOI (stabilized, pro forma)", "$21,000,000", { basis: "pro_forma" }),
+        ],
+        { dealName: "Office-to-Residential Conversion" },
+      ),
+      "fallback",
+    );
+    const r = computeUnderwrite(inputs);
+    // No going-in cap in the OM → the labelled 6% default, not 11.7%.
+    expect(r.cashFlow[0].noi).toBeCloseTo(1_200_000, 0);
+    expect(inputs.exitCapPct).toBeCloseTo(0.06, 6);
+    expect(sources.exitCapPct?.provenance).toBe("assumption");
+  });
+});
+
 describe("deriveUnderwriteInputs — capital budget guards", () => {
   it("takes a capital improvements line on a stabilized deal into Uses", () => {
     const { inputs, sources } = deriveUnderwriteInputs(
