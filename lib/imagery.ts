@@ -11,6 +11,7 @@ import {
 import {
   IMAGE_CREDIT,
   aerialPlan,
+  bearingDeg,
   frameZoom,
   imagePlan,
   type ImageSource,
@@ -73,6 +74,15 @@ export async function fetchStreetViewImage(
   const label = address?.label?.trim();
   if (!key || !label || !address?.street?.trim()) return null;
 
+  // Where the BUILDING is, from the shared geocoder. Street View is only
+  // honest when the geocoder actually found the address: a block- or
+  // area-level placement would photograph some other building on the same
+  // road, which is worse than no photo. The same point drives the aerial
+  // and the map pin, so all three agree by construction.
+  const building = await resolveDealLocation(supabase, dealId, address, cache);
+  if (!building || building.precision !== "street") return null;
+  const target = `${building.lat},${building.lng}`;
+
   let verdict = cache;
   const fresh =
     !!verdict?.checkedAt &&
@@ -80,8 +90,12 @@ export async function fetchStreetViewImage(
 
   if (!fresh) {
     try {
+      // Metadata by COORDINATES, not by re-sending the address string: Google
+      // would geocode the string its own way, and a disagreement with our pin
+      // meant the photo and the map showed two different places. `outdoor`
+      // rules out business interiors and user-uploaded panos.
       const metaUrl =
-        `https://maps.googleapis.com/maps/api/streetview/metadata?location=${encodeURIComponent(label)}&key=${key}`;
+        `https://maps.googleapis.com/maps/api/streetview/metadata?location=${target}&source=outdoor&key=${key}`;
       const meta = (await (
         await fetch(metaUrl, { signal: AbortSignal.timeout(8_000) })
       ).json()) as {
@@ -112,15 +126,29 @@ export async function fetchStreetViewImage(
 
   if (verdict?.status !== "ok") return null;
 
-  // Prefer the pano coordinates the metadata echoed — same address string can
-  // otherwise resolve differently between the two calls.
-  const loc =
-    verdict.panoLat !== undefined && verdict.panoLng !== undefined
-      ? `${verdict.panoLat},${verdict.panoLng}`
-      : label;
+  // The camera stands where the pano is and must LOOK AT the building. The
+  // first cut passed the pano's own coordinates as `location`, which asked
+  // Google to point the camera at the spot it was standing on — an arbitrary
+  // heading, and the reason so many "building photos" were a stretch of road.
+  // `location` is the building; `heading` is computed from pano to building
+  // so the orientation does not depend on Google inferring it.
+  const params = new URLSearchParams({
+    size: `${size.width}x${size.height}`,
+    location: target,
+    source: "outdoor",
+    fov: "80",
+    pitch: "0",
+    key,
+  });
+  if (typeof verdict.panoLat === "number" && typeof verdict.panoLng === "number") {
+    params.set(
+      "heading",
+      bearingDeg({ lat: verdict.panoLat, lng: verdict.panoLng }, building).toFixed(1),
+    );
+  }
   try {
     const img = await fetch(
-      `https://maps.googleapis.com/maps/api/streetview?size=${size.width}x${size.height}&location=${encodeURIComponent(loc)}&key=${key}`,
+      `https://maps.googleapis.com/maps/api/streetview?${params.toString()}`,
       { signal: AbortSignal.timeout(10_000) },
     );
     const type = img.headers.get("content-type") ?? "";

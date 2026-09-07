@@ -131,7 +131,9 @@ export function PropertyVisual({
             </span>
             {/* An area-level address (the sample deal, say) can only truthfully
                 show the district — never let a wide frame read as "this is the
-                building". */}
+                building". A street address that the geocoder could only place
+                to the block is framed wider by the route itself; the map tab's
+                pin tooltip says exactly how far the placement can be trusted. */}
             {!hasStreetAddress && (
               <span className="absolute bottom-0 left-0 rounded-tr bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
                 Neighborhood placement — no street address on this deal

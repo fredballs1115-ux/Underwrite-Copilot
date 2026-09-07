@@ -17,6 +17,7 @@ import { getCurrentUser } from "@/lib/supabase/server";
 import { BASEMAPS, usgsAerialUrl } from "@/lib/basemaps";
 import { imagePlan } from "@/lib/imagery-plan";
 import { googleConfigured } from "@/lib/imagery";
+import { geocodeAddress } from "@/lib/geocode";
 
 /** A street Google has certainly photographed — so a miss is our config. */
 const PROBE = {
@@ -91,6 +92,48 @@ async function probeSatellite(key: string | undefined): Promise<Probe> {
   }
 }
 
+/**
+ * The geocoder is the root of every picture: a wrong point makes the aerial,
+ * the Street View photo and the map pin all wrong together. Report which
+ * service placed the probe address and how far it is from where that
+ * address really is — a Census hit within ~50 m is the healthy answer.
+ */
+async function probeGeocoder(): Promise<Probe & { source?: string; precision?: string; metresOff?: number }> {
+  try {
+    const g = await geocodeAddress({
+      label: PROBE.label,
+      street: "1600 Pennsylvania Avenue NW",
+      city: "Washington",
+      state: "DC",
+      zip: "20500",
+      county: "",
+      submarket: "",
+    });
+    if (!g) return { ok: false, detail: "Neither Census nor Photon could place a well-known address — both services may be unreachable." };
+    // Haversine, metres — small distances, so the sphere is plenty.
+    const R = 6371000;
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    const dLat = toRad(g.lat - PROBE.lat);
+    const dLng = toRad(g.lng - PROBE.lng);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(PROBE.lat)) * Math.cos(toRad(g.lat)) * Math.sin(dLng / 2) ** 2;
+    const metresOff = Math.round(2 * R * Math.asin(Math.sqrt(a)));
+    const ok = g.precision === "street" && metresOff < 250;
+    return {
+      ok,
+      source: g.source,
+      precision: g.precision,
+      metresOff,
+      detail: ok
+        ? `OK — ${g.source} placed it at ${g.precision} precision, ${metresOff} m from the reference point (matched: ${g.matched || "n/a"}).`
+        : `${g.source} answered at ${g.precision} precision, ${metresOff} m off. Street-addressed deals will frame wider than a building until Census is reachable.`,
+    };
+  } catch (e) {
+    return { ok: false, detail: `Could not reach the geocoders: ${(e as Error).message}` };
+  }
+}
+
 async function probeAerial(): Promise<Probe> {
   const url = usgsAerialUrl({
     center: { lat: PROBE.lat, lng: PROBE.lng },
@@ -149,7 +192,8 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
   const key = process.env.GOOGLE_MAPS_API_KEY;
-  const [streetView, satellite, aerial, tiles] = await Promise.all([
+  const [geocoder, streetView, satellite, aerial, tiles] = await Promise.all([
+    probeGeocoder(),
     probeStreetView(key),
     probeSatellite(key),
     probeAerial(),
@@ -165,6 +209,8 @@ export async function GET() {
         hasStreetAddress: true,
         googleConfigured: googleConfigured(),
       }),
+      // First, because every other picture is only as right as this point.
+      geocoder,
       sources: { streetView, satellite, aerial },
       basemapTiles: tiles,
     },

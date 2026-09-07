@@ -26,8 +26,16 @@ interface DealLocation {
   precision: LocationPrecision;
 }
 
-/** A street address frames the building; an area placement frames the district. */
-const ZOOM: Record<LocationPrecision, number> = { street: 17, area: 13 };
+/** A street address frames the building; a block-level placement the road it
+ *  is on; an area placement the district. Precision comes from the
+ *  geocoder's RESULT (lib/geocode), so these zooms never overclaim. */
+const ZOOM: Record<LocationPrecision, number> = { street: 17, block: 16, area: 13 };
+
+const PIN_TOOLTIP: Record<LocationPrecision, string> = {
+  street: "Subject property",
+  block: "On the right street — house number not in the map data",
+  area: "Approximate — no street address on this deal",
+};
 
 function subjectPinHtml(): string {
   return (
@@ -111,11 +119,7 @@ export function PropertyMap({
         title: label,
       })
         .addTo(map)
-        .bindTooltip(
-          loc.precision === "street"
-            ? "Subject property"
-            : "Approximate — no street address on this deal",
-        );
+        .bindTooltip(PIN_TOOLTIP[loc.precision] ?? PIN_TOOLTIP.area);
     })();
     return () => {
       disposed = true;
