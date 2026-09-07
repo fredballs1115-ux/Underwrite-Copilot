@@ -80,7 +80,7 @@ export const DEEP_TOOLS: readonly DeepTool[] = [
   },
   {
     title: "Exit cap and rent growth, checked against the submarket",
-    where: "Submarkets",
+    where: "Market data → Submarkets",
     blurb:
       "The two assumptions that swing returns most are usually just typed in. Link a submarket and they get measured against what it has actually done — months of supply under construction, trailing rent CAGR on a consistent basis, trough vacancy. Overriding a warning is normal; it just needs a one-line reason, and that reason lands in the memo.",
   },
