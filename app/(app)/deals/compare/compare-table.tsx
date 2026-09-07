@@ -27,10 +27,15 @@ export type Col = {
   /** deterministic mandate fit + a one-line why (misses / near-misses) */
   fit: "fits" | "near" | "outside" | null;
   fitNote: string | null;
+  /** the deal's strategy label (Stabilized / Value-add / Conversion …), null when unknown */
+  strategy: string | null;
   irr: number | null;
   em: number | null;
   coc: number | null;
   cap: number | null;
+  /** stabilized NOI ÷ total cost, % — the yardstick for a deal with a plan;
+   *  null for a stabilized asset or a model built before the plan existed */
+  yoc: number | null;
   /** cap vs the freshest 30-yr fixed — same arithmetic as the deal page */
   leverage: LeverageRead | null;
   price: string | null;
@@ -64,6 +69,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       label: "Asset class",
       get: (c) => c.assetClass.charAt(0).toUpperCase() + c.assetClass.slice(1),
     },
+    // A conversion and a stabilized building are not the same kind of thing,
+    // and a side-by-side that hides that compares apples to plans.
+    { label: "Deal type", get: (c) => c.strategy ?? "—" },
     {
       label: "Levered IRR",
       get: (c) => pct(c.irr),
@@ -78,6 +86,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     },
     { label: "Cash-on-cash (Yr 1)", get: (c) => pct(c.coc), mono: true },
     { label: "Going-in cap", get: (c) => pct(c.cap), mono: true },
+    // The plan's yardstick: stabilized NOI over everything it cost to get
+    // there. Blank for a stabilized asset — its going-in cap is the answer.
+    { label: "Yield on cost (stabilized)", get: (c) => pct(c.yoc), mono: true },
     {
       label: "Leverage vs 30-yr",
       // Signed spread only — the full sentence lives on each deal's page.
