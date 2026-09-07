@@ -147,8 +147,10 @@ export function deriveUnderwriteInputs(
   const capMetric = findMetric(
     metrics,
     /going[- ]?in cap|^cap rate|\bcap\b/i,
-    // "expense cap" / "rate cap" / "capex" are not cap RATES.
-    /exit|reversion|terminal|expense|capex|capital|rate cap/i,
+    // "expense cap" / "rate cap" / "capex" are not cap RATES — and a
+    // stabilized / pro forma cap or a yield on cost describes the finished
+    // project on a plan deal, not the price paid today.
+    /exit|reversion|terminal|expense|capex|capital|rate cap|stabili[sz]|pro ?forma|forward|projected|yield/i,
   );
   // Which NOI is which. The OM may state an in-place figure, a Year-1 figure
   // and a stabilized pro forma; only the first two describe the building as

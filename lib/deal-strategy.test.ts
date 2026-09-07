@@ -340,6 +340,25 @@ describe("assessPlausibility", () => {
   });
 });
 
+describe("the going-in cap is never read off a plan deal's stabilized cap", () => {
+  it("ignores a stabilized / pro forma cap rate when testing the stated cap against NOI ÷ price", () => {
+    // 11.7% is the finished project's yield, not a going-in cap. Against the
+    // in-place NOI it would read as a 500 bps mismatch — a false alarm.
+    const f = assessPlausibility(
+      ex(
+        [
+          metric("Asking price", "$20,000,000"),
+          metric("NOI (in-place)", "$1,200,000", { basis: "in_place" }),
+          metric("Stabilized cap rate (pro forma)", "11.7%", { basis: "pro_forma" }),
+          metric("Total project cost", "$180,000,000"),
+        ],
+        { dealName: "Office-to-Residential Conversion" },
+      ),
+    );
+    expect(f.find((x) => x.code === "cap_mismatch")).toBeUndefined();
+  });
+});
+
 describe("plausibilityNote", () => {
   it("is empty for a clean stabilized deal — nothing to tell the skeptic", () => {
     expect(plausibilityNote([], inferStrategy(STABILIZED))).toBe("");

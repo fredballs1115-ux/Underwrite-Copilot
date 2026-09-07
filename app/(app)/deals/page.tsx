@@ -42,9 +42,11 @@ function pickSlots(metrics: ExtractedMetric[]): {
     metrics.find((m) => inc.test(m.label) && !(exc && exc.test(m.label)))
       ?.value ?? null;
   return {
+    // The going-in cap only — a stabilized / pro forma cap or a yield on
+    // cost describes a plan deal's finished project, not the price paid.
     cap:
-      find(/going[- ]?in cap/i) ??
-      find(/\bcap rate\b/i, /exit|terminal|reversion|pro ?forma/i),
+      find(/going[- ]?in cap/i, /stabili[sz]|pro ?forma|forward|projected/i) ??
+      find(/\bcap rate\b/i, /exit|terminal|reversion|stabili[sz]|pro ?forma|forward|projected|yield/i),
     price: find(/purchase price|asking price|\bprice\b/i, /unit|\/sf|per sf|per unit|psf/i),
   };
 }
