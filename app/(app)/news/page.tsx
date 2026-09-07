@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
-import { fetchLiveHeadlines, type LiveHeadlines } from "@/lib/news/live";
+import { fetchLiveHeadlines } from "@/lib/news/live";
 import { timeAgo } from "@/lib/news/feeds";
 
 export const metadata: Metadata = { title: "News" };
@@ -65,13 +66,40 @@ const fmtDay = (iso: string) =>
     timeZone: "UTC",
   });
 
+/** What the live section looks like while the feeds are still answering. */
+function LiveHeadlinesFallback() {
+  return (
+    <section aria-busy="true" aria-label="Headlines loading">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Headlines now</h2>
+        <span className="text-[11px] text-muted">reading the publishers’ feeds…</span>
+      </div>
+      <ol className="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
+        {Array.from({ length: 6 }, (_, i) => (
+          <li key={i} className="flex gap-3 px-3.5 py-3">
+            <span className="mt-px w-5 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted">
+              {i + 1}
+            </span>
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <div className="h-3.5 animate-pulse rounded bg-faint" style={{ width: `${62 + ((i * 13) % 30)}%` }} />
+              <div className="h-3 w-1/3 animate-pulse rounded bg-faint" />
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 /**
  * The live layer: ranked headlines with publisher, age and a one-line
  * snippet, then the sources — the ones that answered as links, the ones
  * that did not, named. Renders a plain sentence, never a fake list, when
- * every source is unreachable.
+ * every source is unreachable. Async so it streams in behind the rest of
+ * the page (see the Suspense boundary in NewsPage).
  */
-function LiveHeadlinesSection({ live }: { live: LiveHeadlines }) {
+async function LiveHeadlinesSection() {
+  const live = await fetchLiveHeadlines();
   const answered = live.sources.filter((s) => s.ok || s.stale);
   const missing = live.sources.filter((s) => !s.ok && !s.stale);
   const publishers = answered.filter((s) => s.kind === "publisher");
@@ -179,10 +207,6 @@ export default async function NewsPage({
   if (!user) redirect("/login?next=/news");
   const params = await searchParams;
 
-  // The live layer and the database read are independent — start the feeds
-  // first, they are the slow half.
-  const livePromise = fetchLiveHeadlines();
-
   const supabase = await createSupabaseServerClient();
   let items: ItemRow[] = [];
   let alerts: AlertRow[] = [];
@@ -206,7 +230,6 @@ export default async function NewsPage({
   } catch {
     // tables absent until migrations run — empty state below explains
   }
-  const live = await livePromise;
 
   const sectors = [...new Set(items.map((i) => i.sector))].sort();
   const want = (params.sector ?? "").slice(0, 40);
@@ -240,7 +263,12 @@ export default async function NewsPage({
         </p>
       </header>
 
-      <LiveHeadlinesSection live={live} />
+      {/* Streamed: the page paints at once and the headlines land when the
+          slowest feed answers (or times out) — up to eight seconds on a cold
+          cache, which no one should wait for staring at a blank page. */}
+      <Suspense fallback={<LiveHeadlinesFallback />}>
+        <LiveHeadlinesSection />
+      </Suspense>
 
       {alerts.length > 0 && (
         <section className="rounded-xl border border-red-500/30 bg-red-500/5 p-4">
