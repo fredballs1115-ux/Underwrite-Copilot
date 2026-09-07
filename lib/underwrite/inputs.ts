@@ -16,6 +16,7 @@
 import { findMetric, parseMoney, parsePct } from "@/lib/criteria";
 import {
   IMPLIED_CAP_CEILING,
+  capitalBudgetFromMetrics,
   inferStrategy,
   noiFigures,
   type StrategyKind,
@@ -195,7 +196,7 @@ export function deriveUnderwriteInputs(
   // cannot be a going-in NOI on this price is named, not used.
   const ttmNote = t12End ? ` (TTM to ${t12End})` : "";
   const implausible = (f: { label: string; value: number }) =>
-    `The OM's ${f.label} of $${Math.round(f.value).toLocaleString("en-US")} is ${pctOfPrice(f.value)} — it cannot be the going-in figure on a ${strategy.label.toLowerCase()} deal, so it is not used here`;
+    `The OM's ${f.label} of $${Math.round(f.value).toLocaleString("en-US")} is ${pctOfPrice(f.value)} — the finished project's stabilized figure on a ${strategy.label.toLowerCase()} deal, not year-1 income, so it does not anchor year 1 here`;
   let noi: number;
   if (t12Noi != null) {
     noi = t12Noi;
@@ -247,22 +248,12 @@ export function deriveUnderwriteInputs(
   }
 
   // ── Capital / construction budget ──────────────────────────────────────
-  // The plan's cost belongs in Sources & Uses, so the yield on cost the
-  // workbook reports is on the real basis. A "total project cost" includes
-  // the price; a budget line does not. Bounded so a mis-parsed figure never
-  // lands here, and never invented: absent is absent.
-  const budgetMetric = findMetric(
-    metrics,
-    /renovation (budget|cost|plan)|capex budget|capital (budget|plan|improvements?|expenditures?)|construction (cost|budget)|hard costs?|redevelopment (cost|budget)|conversion (cost|budget)|improvement budget|total (project|development) cost|all[- ]?in (cost|basis)/i,
-    /\bper\b|\/|psf|unit|reserve|annual|\byr\b|year/i,
-  );
-  const budgetRaw = budgetMetric ? parseMoney(budgetMetric.value) : null;
-  let capitalBudget = 0;
-  if (budgetRaw != null && budgetRaw > 0) {
-    const allIn = /total (project|development) cost|all[- ]?in/i.test(budgetMetric!.label);
-    const candidate = allIn ? budgetRaw - price : budgetRaw;
-    if (candidate > 0 && candidate <= price * 10) capitalBudget = candidate;
-  }
+  // The plan's cost goes into the model's capital line, so the returns pay
+  // for it. Shared reader with the deal page and the challenger's brief
+  // (lib/deal-strategy): a "total project cost" includes the price, a budget
+  // line does not, a mis-parsed figure never lands, absent is absent.
+  const budgetRead = capitalBudgetFromMetrics(metrics, price);
+  const capitalBudget = budgetRead?.budget ?? 0;
 
   // ── RSF ────────────────────────────────────────────────────────────────
   // The rent roll's summed SF outranks the OM's stated building size.
@@ -360,12 +351,12 @@ export function deriveUnderwriteInputs(
       };
   mark("mgmtFeePct", "assumption", "Folded into operating expenses — split out if you track it");
   mark("reservesPsf", "assumption", `${assetClass} default $${cd.reservesPsf.toFixed(2)}/SF/yr`);
-  if (capitalBudget > 0) {
+  if (budgetRead) {
     mark(
       "capitalImprovementsYr1",
       "extracted",
-      `OM ${budgetMetric!.label}${/total (project|development) cost|all[- ]?in/i.test(budgetMetric!.label) ? " less the price" : ""} — spent in year 1 in this annual model; the OM's own timeline may run longer`,
-      pageOf(budgetMetric),
+      `OM ${budgetRead.label}${budgetRead.allIn ? " less the price" : ""} — spent in year 1 in this annual model; the OM's own timeline may run longer`,
+      budgetRead.page,
     );
   } else {
     mark(

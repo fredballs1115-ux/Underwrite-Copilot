@@ -4,7 +4,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, verdictInstruction } from "./prompts";
-import { assessPlausibility, inferStrategy, plausibilityNote } from "@/lib/deal-strategy";
+import { assessPlausibility, inferStrategy, planSummary, plausibilityNote } from "@/lib/deal-strategy";
 import type {
   ExtractionResult,
   ChallengerResult,
@@ -77,14 +77,19 @@ function buildBrief(input: VerdictInputs): string {
       : "Not available.",
   );
 
-  // What kind of deal this is, and whether its figures tie — checked in code
-  // before the synthesizer reads a single extracted number, so a stabilized
-  // pro forma capitalised against the acquisition price is named as such
-  // rather than carried into the call as a 105% cap rate.
+  // What kind of deal this is, the plan's own figures, and whether the
+  // numbers tie — checked in code before the synthesizer reads a single
+  // extracted number. On a conversion the stabilized NOI is the finished
+  // building's, judged on yield on total cost; on a stabilized asset an NOI
+  // above the price is a misread. The brief says which.
   if (ex) {
     const strategy = inferStrategy(ex);
-    const note = plausibilityNote(assessPlausibility(ex, strategy), strategy);
-    if (note) sections.push("## Deal strategy and figures that do not tie", note);
+    const note = plausibilityNote(
+      assessPlausibility(ex, strategy),
+      strategy,
+      planSummary(ex, strategy),
+    );
+    if (note) sections.push("## Deal strategy, the plan, and figures that do not tie", note);
   }
 
   // The buyer's standing criteria — the verdict must judge fit against THEIR

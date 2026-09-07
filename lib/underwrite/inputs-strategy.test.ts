@@ -49,7 +49,8 @@ describe("deriveUnderwriteInputs — a conversion's stabilized pro forma is not 
     const note = sources.inPlaceRentAnnual?.note ?? "";
     expect(note).toMatch(/\$21,000,000/);
     expect(note).toMatch(/105% of price/);
-    expect(note).toMatch(/cannot be the going-in figure/);
+    expect(note).toMatch(/finished project's stabilized figure/);
+    expect(note).toMatch(/does not anchor year 1/);
     expect(note).toMatch(/conversion/);
     expect(sources.inPlaceRentAnnual?.provenance).toBe("assumption");
   });

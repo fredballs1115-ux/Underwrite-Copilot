@@ -46,8 +46,8 @@ import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource, type BuyBoxCheck } from "@/lib/criteria";
 import { scoreMandateFit, type MandateScore, type MandateVerdict } from "@/lib/mandate";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
-import { assessPlausibility, inferStrategy } from "@/lib/deal-strategy";
-import { PlausibilityPanel } from "./plausibility-panel";
+import { assessPlausibility, inferStrategy, planSummary } from "@/lib/deal-strategy";
+import { PlanStrip, PlausibilityPanel } from "./plausibility-panel";
 import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { ActualsData } from "./property-actuals";
@@ -494,11 +494,14 @@ export default async function DealPage({
   const summaryYearBuilt =
     yearBuiltNum != null && yearBuiltNum >= 1700 && yearBuiltNum <= 2100 ? yearBuiltNum : null;
 
-  // What kind of deal this is, and whether its headline figures can all be
-  // true at once — pure code over the extraction. A $21M "NOI" on a $20M
-  // price is a stabilized pro forma being read as in-place income, and it is
-  // named as such here, above every number built on it.
+  // What kind of deal this is, what its plan says (stabilized NOI, cost,
+  // yield on cost), and whether its headline figures can all be true at
+  // once — pure code over the extraction. On a conversion a $21M stabilized
+  // NOI over a $20M price is the plan and shows as such; on a deal read as
+  // stabilized the same pair is a misread, and is named as such, above
+  // every number built on it.
   const strategy = inferStrategy(extraction, firstSignal);
+  const plan = planSummary(extraction, strategy);
   const plausibility = assessPlausibility(extraction, strategy);
   const summaryStrategy = strategy.kind === "unknown" ? null : strategy.label;
 
@@ -829,14 +832,10 @@ export default async function DealPage({
           ))}
         </dl>
 
-        {/* The plan, in the OM's words, when the deal is not a stabilized
-            asset — it changes what every figure below means. */}
-        {strategy.kind !== "stabilized" && strategy.kind !== "unknown" && strategy.summary && (
-          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted">
-            <span className="font-medium text-ink">{strategy.label}.</span> {strategy.summary}
-          </p>
-        )}
-
+        {/* The plan, as the OM states it, when the deal is not a stabilized
+            asset — it changes what every figure below means. Then anything
+            that genuinely does not tie. */}
+        <PlanStrip strategy={strategy} plan={plan} />
         <PlausibilityPanel findings={plausibility} strategy={strategy} />
 
         {!extraction && firstSignal?.take && (

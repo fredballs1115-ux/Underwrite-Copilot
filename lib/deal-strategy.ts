@@ -189,6 +189,8 @@ export function noiFigures(metrics: MetricLike[]): NoiFigure[] {
 export type FindingCode =
   | "noi_exceeds_price"
   | "implied_cap_impossible"
+  | "label_mismatch"
+  | "strategy_unsettled"
   | "cap_mismatch"
   | "basis_out_of_band"
   | "no_income_in_place";
@@ -222,6 +224,88 @@ const NON_STABILIZED: ReadonlySet<StrategyKind> = new Set([
   "development",
 ]);
 
+/** A deal with a plan: the stabilized figures describe the finished project. */
+export const isPlanDeal = (kind: StrategyKind): boolean => NON_STABILIZED.has(kind);
+
+// ── The plan's cost ──────────────────────────────────────────────────────
+
+const BUDGET_INCLUDE =
+  /renovation (budget|cost|plan)|capex budget|capital (budget|plan|improvements?|expenditures?)|construction (cost|budget)|hard costs?|redevelopment (cost|budget)|conversion (cost|budget)|improvement budget|total (project|development) cost|all[- ]?in (cost|basis)/i;
+const BUDGET_EXCLUDE = /\bper\b|\/|psf|unit|reserve|annual|\byr\b|year/i;
+const ALL_IN = /total (project|development) cost|all[- ]?in/i;
+
+export interface CapitalBudget {
+  /** the plan's spend, $ — excludes the price even when the OM stated an all-in figure */
+  budget: number;
+  /** the OM stated a total that included the price, and the price was taken out */
+  allIn: boolean;
+  label: string;
+  page?: string;
+}
+
+/**
+ * The plan's cost from the metrics. A "total project cost" includes the
+ * price; a budget line does not. Bounded so a mis-parsed figure never lands
+ * here (nothing, or ten times the price, is not a budget) — and never
+ * invented: absent is absent.
+ */
+export function capitalBudgetFromMetrics(metrics: MetricLike[], price: number | null): CapitalBudget | null {
+  const m = findMetric(metrics, BUDGET_INCLUDE, BUDGET_EXCLUDE) as MetricLike | null;
+  if (!m) return null;
+  const raw = parseMoney(m.value);
+  if (raw == null || !(raw > 0)) return null;
+  const allIn = ALL_IN.test(m.label);
+  const budget = allIn && price != null ? raw - price : raw;
+  if (!(budget > 0)) return null;
+  if (price != null && budget > price * 10) return null;
+  return { budget, allIn, label: m.label, page: m.page };
+}
+
+/** What the OM says the finished project earns and costs — the figures a
+ *  plan is judged on, for the deal page and for the challenger's brief. */
+export interface PlanSummary {
+  kind: StrategyKind;
+  price: number | null;
+  /** the stabilized pro forma NOI, when the OM states one */
+  stabilizedNoi: NoiFigure | null;
+  budget: CapitalBudget | null;
+  /** price + budget, when both are known */
+  totalCost: number | null;
+  /** stabilized NOI ÷ total cost, decimal, when both are known */
+  yieldOnCost: number | null;
+  /** construction / downtime / lease-up timing as the OM states it ("" if none) */
+  timeline: string;
+  /** the budget as the OM words it ("" if none) */
+  capitalBudgetText: string;
+}
+
+/** Null for a stabilized asset (nothing to summarize) or a missing extraction. */
+export function planSummary(
+  extraction: ExtractionResult | null,
+  strategy: DealStrategy = inferStrategy(extraction),
+): PlanSummary | null {
+  if (!extraction || !isPlanDeal(strategy.kind)) return null;
+  const metrics = extraction.metrics;
+  const priceMetric = findMetric(metrics, PRICE_INCLUDE, PRICE_EXCLUDE);
+  const priceRaw = priceMetric ? parseMoney(priceMetric.value) : null;
+  const price = priceRaw != null && priceRaw > 0 ? priceRaw : null;
+  const stabilizedNoi = noiFigures(metrics).find((f) => f.kind === "stabilized") ?? null;
+  const budget = capitalBudgetFromMetrics(metrics, price);
+  const totalCost = price != null && budget ? price + budget.budget : null;
+  const yieldOnCost =
+    stabilizedNoi && totalCost != null && totalCost > 0 ? stabilizedNoi.value / totalCost : null;
+  return {
+    kind: strategy.kind,
+    price,
+    stabilizedNoi,
+    budget,
+    totalCost,
+    yieldOnCost,
+    timeline: extraction.strategy?.timeline?.trim() ?? "",
+    capitalBudgetText: extraction.strategy?.capitalBudget?.trim() ?? "",
+  };
+}
+
 /**
  * Check the extraction's headline figures against each other. Returns the
  * findings, most severe first, deduplicated by code. Empty when the figures
@@ -242,11 +326,37 @@ export function assessPlausibility(
   const planDeal = NON_STABILIZED.has(strategy.kind);
   const figs = noiFigures(metrics);
 
-  // 1. Any NOI that cannot be capitalised against this price.
+  // 1. An NOI far above what this price could ever yield. What that MEANS
+  //    depends on the deal. On a conversion, development, lease-up or
+  //    value-add, the stabilized pro forma is expected to dwarf the price —
+  //    a $21M finished-building NOI on a $20M shell is the plan, not a
+  //    contradiction, and it is judged elsewhere (yield on total cost, the
+  //    challenger's brief). The only problem on a plan deal is a figure
+  //    labelled as TODAY's income that size. On a deal read as stabilized, a
+  //    stabilized figure that size means the strategy is unsettled, and an
+  //    in-place / Year-1 figure that size is a misread.
   for (const f of figs) {
     const implied = f.value / price;
     if (implied < IMPLIED_CAP_CEILING) continue;
-    const forward = planDeal || f.kind === "stabilized";
+    if (planDeal) {
+      if (f.kind === "stabilized") continue;
+      findings.push({
+        code: "label_mismatch",
+        severity: "medium",
+        title: `${f.label} of ${money(f.value)} is ${pct(implied, 0)} of the ${money(price)} price on a ${strategy.label.toLowerCase()} deal`,
+        detail: `A building mid-plan does not earn that today. This is almost certainly the finished project's stabilized pro forma carrying an in-place or Year-1 label — read it as the stabilized figure, and confirm what the building actually earns during the works.`,
+      });
+      continue;
+    }
+    if (f.kind === "stabilized") {
+      findings.push({
+        code: "strategy_unsettled",
+        severity: "medium",
+        title: `${f.label} of ${money(f.value)} is ${pct(implied, 0)} of the ${money(price)} price`,
+        detail: `A stabilized figure that far above the price belongs to a plan — a conversion, a development, a lease-up — that the deck does not name plainly. Settle what the deal is first: measured against total cost it may be a fine yield; against the price alone it means nothing.`,
+      });
+      continue;
+    }
     findings.push({
       code: f.value >= price ? "noi_exceeds_price" : "implied_cap_impossible",
       severity: "high",
@@ -254,9 +364,7 @@ export function assessPlausibility(
         f.value >= price
           ? `${f.label} of ${money(f.value)} is above the ${money(price)} price`
           : `${f.label} of ${money(f.value)} implies a ${pct(implied, 0)} cap rate`,
-      detail: forward
-        ? `That is the stabilized pro forma for the finished ${strategy.kind === "conversion" ? "conversion" : "project"}, not income the building produces today. It cannot be capitalised against the acquisition price: measure it against total cost — price plus the construction budget — as a yield on cost, and expect little or no NOI through the works.`
-        : `No operating property yields ${pct(implied, 0)}. Either the NOI or the price was misread, or the OM's NOI is a stabilized pro forma for a plan the deck describes elsewhere. Check the source pages before relying on any return built from these two figures.`,
+      detail: `No operating property yields ${pct(implied, 0)}. Either the NOI or the price was misread, or the OM's NOI is a stabilized pro forma for a plan the deck describes elsewhere. Check the source pages before relying on any return built from these two figures.`,
     });
   }
 
@@ -329,18 +437,46 @@ export function assessPlausibility(
     .sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "high" ? -1 : 1));
 }
 
+/** The plan's figures as one sentence for the brief — what is stated, and
+ *  plainly what is not. */
+function planLine(plan: PlanSummary): string {
+  const parts: string[] = [];
+  parts.push(
+    plan.stabilizedNoi
+      ? `stabilized NOI ${money(plan.stabilizedNoi.value)} (${plan.stabilizedNoi.label})`
+      : "stabilized NOI not stated",
+  );
+  parts.push(plan.price != null ? `price ${money(plan.price)}` : "price not stated");
+  parts.push(
+    plan.budget
+      ? `${plan.budget.allIn ? "budget " : ""}${money(plan.budget.budget)}${plan.budget.allIn ? ` (${plan.budget.label} less the price)` : ` (${plan.budget.label})`}`
+      : "construction / renovation budget not stated in the figures",
+  );
+  if (plan.totalCost != null) parts.push(`total cost ${money(plan.totalCost)}`);
+  if (plan.yieldOnCost != null) parts.push(`yield on total cost ${pct(plan.yieldOnCost, 1)}`);
+  parts.push(plan.timeline ? `timeline: ${plan.timeline}` : "timeline to stabilization not stated");
+  if (plan.capitalBudgetText) parts.push(`budget as worded: ${plan.capitalBudgetText}`);
+  return parts.join("; ");
+}
+
 /**
- * The findings and the strategy as one paragraph for the challenger and the
- * verdict. Empty when there is nothing to say: a clean stabilized deal.
+ * The strategy, the plan's figures and the findings as one paragraph for the
+ * challenger and the verdict. Empty when there is nothing to say: a clean
+ * stabilized deal.
  */
 export function plausibilityNote(
   findings: PlausibilityFinding[],
   strategy: DealStrategy,
+  plan: PlanSummary | null = null,
 ): string {
   const bits: string[] = [];
-  if (strategy.kind !== "unknown" && strategy.kind !== "stabilized") {
+  if (isPlanDeal(strategy.kind)) {
     bits.push(
-      `DEAL STRATEGY: ${strategy.label}${strategy.summary ? ` — ${strategy.summary}` : ""} ${STRATEGY_READING[strategy.kind]} Judge the plan: the construction or renovation budget, the downtime and lease-up before stabilization, the yield on total cost, and what the building earns (or loses) in the meantime — not a going-in cap on the acquisition price.`,
+      `DEAL STRATEGY: ${strategy.label}${strategy.summary ? ` — ${strategy.summary}` : ""} ${STRATEGY_READING[strategy.kind]}`,
+    );
+    if (plan) bits.push(`THE PLAN AS THE OM STATES IT: ${planLine(plan)}.`);
+    bits.push(
+      "The stabilized NOI is the sponsor's post-completion pro forma — not a misread and not today's income, and it is expected to sit far above the acquisition price. Test whether it is as conservative as the deck presents it: the rents and occupancy behind it against today's market, the operating ratio, the construction or renovation budget and schedule against comparable projects, the carry and the income (if any) through the works, and the yield on total cost against the exit cap and against the cost of construction debt. Judge the plan on yield on cost, downtime and execution risk — never on a going-in cap on the acquisition price.",
     );
   }
   if (findings.length) {

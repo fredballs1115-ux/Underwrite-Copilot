@@ -3,9 +3,12 @@ import type { ExtractionResult, ExtractedMetric } from "@/lib/anthropic/types";
 import {
   IMPLIED_CAP_CEILING,
   assessPlausibility,
+  capitalBudgetFromMetrics,
   classifyNoi,
   inferStrategy,
+  isPlanDeal,
   noiFigures,
+  planSummary,
   plausibilityNote,
 } from "./deal-strategy";
 
@@ -133,15 +136,96 @@ describe("classifyNoi / noiFigures", () => {
   });
 });
 
+describe("planSummary / capitalBudgetFromMetrics", () => {
+  it("reads the plan off the conversion: stabilized NOI, budget less price, total cost, yield on cost", () => {
+    const p = planSummary(CONVERSION)!;
+    expect(p).not.toBeNull();
+    expect(p.kind).toBe("conversion");
+    expect(p.price).toBe(20_000_000);
+    expect(p.stabilizedNoi?.value).toBe(21_000_000);
+    expect(p.budget).toMatchObject({ budget: 160_000_000, allIn: true, label: "Total project cost", page: "p. 44" });
+    expect(p.totalCost).toBe(180_000_000);
+    expect(p.yieldOnCost).toBeCloseTo(21 / 180, 4);
+  });
+
+  it("is null for a stabilized asset — there is no plan to summarize", () => {
+    expect(planSummary(STABILIZED)).toBeNull();
+    expect(planSummary(null)).toBeNull();
+    expect(isPlanDeal("stabilized")).toBe(false);
+    expect(isPlanDeal("conversion")).toBe(true);
+  });
+
+  it("carries the OM's own words for the budget and the timeline when the extraction states them", () => {
+    const p = planSummary(
+      ex(CONVERSION.metrics, {
+        dealName: CONVERSION.dealName,
+        strategy: {
+          kind: "conversion",
+          summary: "Convert 18 office floors to 612 apartments.",
+          capitalBudget: "$160M hard and soft",
+          timeline: "30 months of construction, stabilized in year 4",
+        },
+      }),
+    )!;
+    expect(p.capitalBudgetText).toBe("$160M hard and soft");
+    expect(p.timeline).toBe("30 months of construction, stabilized in year 4");
+  });
+
+  it("reads a budget line as-is and an all-in figure less the price", () => {
+    expect(capitalBudgetFromMetrics([metric("Renovation budget", "$6,000,000")], 50_000_000)).toMatchObject({
+      budget: 6_000_000,
+      allIn: false,
+    });
+    expect(capitalBudgetFromMetrics([metric("Total project cost", "$180M")], 20_000_000)).toMatchObject({
+      budget: 160_000_000,
+      allIn: true,
+    });
+    // No price to take out of an all-in figure: the figure stands, flagged all-in.
+    expect(capitalBudgetFromMetrics([metric("All-in cost", "$180M")], null)).toMatchObject({
+      budget: 180_000_000,
+      allIn: true,
+    });
+  });
+
+  it("never reads a per-unit line, an annual reserve, or a misparse as the budget", () => {
+    expect(capitalBudgetFromMetrics([metric("Renovation cost per unit", "$12,000")], 50_000_000)).toBeNull();
+    expect(capitalBudgetFromMetrics([metric("Capital reserve (annual)", "$74,400")], 50_000_000)).toBeNull();
+    expect(capitalBudgetFromMetrics([metric("Construction budget", "$900,000,000")], 30_000_000)).toBeNull();
+    expect(capitalBudgetFromMetrics([metric("Total project cost", "$15M")], 20_000_000)).toBeNull(); // below the price
+    expect(capitalBudgetFromMetrics([metric("Construction budget", "—")], 20_000_000)).toBeNull();
+  });
+});
+
 describe("assessPlausibility", () => {
-  it("names a stabilized pro forma above the price as a yield-on-cost figure, never a cap rate", () => {
-    const f = assessPlausibility(CONVERSION);
-    expect(f.length).toBeGreaterThan(0);
-    expect(f[0]).toMatchObject({ code: "noi_exceeds_price", severity: "high" });
-    expect(f[0].title).toContain("$21.0M");
-    expect(f[0].title).toContain("$20.0M");
-    expect(f[0].detail).toMatch(/yield on cost/);
-    expect(f[0].detail).toMatch(/construction budget/);
+  it("does NOT flag a conversion's stabilized NOI above the price — that is the plan, judged on yield on cost", () => {
+    expect(assessPlausibility(CONVERSION)).toEqual([]);
+  });
+
+  it("on a plan deal, flags only a figure labelled as TODAY's income at that size — a label mix-up", () => {
+    const f = assessPlausibility(
+      ex(
+        [
+          metric("Asking price", "$20,000,000"),
+          metric("NOI (Year 1)", "$21,000,000", { basis: "pro_forma" }),
+          metric("Total project cost", "$180,000,000"),
+        ],
+        { dealName: "1200 K Street — Office-to-Residential Conversion" },
+      ),
+    );
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ code: "label_mismatch", severity: "medium" });
+    expect(f[0].detail).toMatch(/stabilized pro forma carrying an in-place or Year-1 label/);
+  });
+
+  it("on a deal read as stabilized, a stabilized figure far above the price means the strategy is unsettled", () => {
+    const f = assessPlausibility(
+      ex([metric("Asking price", "$20,000,000"), metric("Stabilized NOI (pro forma)", "$21,000,000")], {
+        dealName: "Plain Building",
+      }),
+    );
+    expect(f).toHaveLength(1);
+    expect(f[0]).toMatchObject({ code: "strategy_unsettled", severity: "medium" });
+    expect(f[0].detail).toMatch(/Settle what the deal is first/);
   });
 
   it("calls the same impossible ratio a misread when nothing says there is a plan", () => {
@@ -261,19 +345,43 @@ describe("plausibilityNote", () => {
     expect(plausibilityNote([], inferStrategy(STABILIZED))).toBe("");
   });
 
-  it("carries the strategy and the findings to the challenger and the verdict", () => {
+  it("hands the challenger the plan's figures and asks it to test the pro forma's conservatism — not a misread", () => {
     const s = inferStrategy(CONVERSION);
-    const note = plausibilityNote(assessPlausibility(CONVERSION, s), s);
+    const note = plausibilityNote(assessPlausibility(CONVERSION, s), s, planSummary(CONVERSION, s));
     expect(note).toMatch(/DEAL STRATEGY: Conversion/);
-    expect(note).toMatch(/FIGURES THAT DO NOT TIE/);
-    expect(note).toMatch(/\$21\.0M/);
-    expect(note).toMatch(/yield on total cost|yield on cost/);
+    expect(note).toMatch(/THE PLAN AS THE OM STATES IT/);
+    expect(note).toMatch(/stabilized NOI \$21\.0M/);
+    expect(note).toMatch(/total cost \$180\.0M/);
+    expect(note).toMatch(/yield on total cost 11\.7%/);
+    expect(note).toMatch(/not a misread/);
+    expect(note).toMatch(/as conservative as the deck presents it/);
+    expect(note).not.toMatch(/FIGURES THAT DO NOT TIE/);
   });
 
-  it("names the strategy alone when the figures tie on a plan deal", () => {
-    const s = inferStrategy(ex([metric("Asking price", "$9M"), metric("Renovation budget", "$1M")]));
-    const note = plausibilityNote([], s);
+  it("says plainly what the plan does not state", () => {
+    const e = ex([metric("Asking price", "$9M"), metric("Renovation budget", "$1M")]);
+    const s = inferStrategy(e);
+    const note = plausibilityNote([], s, planSummary(e, s));
     expect(note).toMatch(/DEAL STRATEGY: Value-add/);
+    expect(note).toMatch(/stabilized NOI not stated/);
+    expect(note).toMatch(/timeline to stabilization not stated/);
+    expect(note).toMatch(/total cost \$10\.0M/);
     expect(note).not.toMatch(/FIGURES THAT DO NOT TIE/);
+  });
+
+  it("still carries a plan deal's genuine findings alongside the plan", () => {
+    const e = ex(
+      [
+        metric("Asking price", "$20,000,000"),
+        metric("NOI (Year 1)", "$21,000,000"),
+        metric("Total project cost", "$180,000,000"),
+      ],
+      { dealName: "Office-to-Residential Conversion" },
+    );
+    const s = inferStrategy(e);
+    const note = plausibilityNote(assessPlausibility(e, s), s, planSummary(e, s));
+    expect(note).toMatch(/THE PLAN AS THE OM STATES IT/);
+    expect(note).toMatch(/FIGURES THAT DO NOT TIE/);
+    expect(note).toMatch(/label/);
   });
 });

@@ -223,17 +223,17 @@ export function ReturnsHeadline({ model }: { model: UnderwritingModel }) {
       {implausible && (
         <div className="mt-3 rounded-xl border border-kill/30 border-l-4 border-l-kill bg-kill/5 px-4 py-3">
           <p className="text-sm font-semibold text-kill">
-            This model’s Year-1 NOI cannot be the building’s income
+            This model books the finished project’s NOI as year-1 income
           </p>
           <p className="mt-0.5 text-xs leading-relaxed text-muted">
             {usd(r.year1Noi)} of NOI against a {usd(r.purchasePrice)} price is a{" "}
             {pct(r.goingInCapPct)} cap rate, which no operating property yields. The
-            reconciled income is a stabilized pro forma — the finished project’s
-            figure — capitalised against the acquisition price. Until the model
-            carries the construction budget, the downtime and the lease-up,
-            treat every return below as unreliable: regenerate the model now
-            that the screen reads the deal’s strategy, or enter the in-place
-            income by hand.
+            figure is the stabilized pro forma — what the building earns once
+            the plan is complete and leased — but this model carries no
+            construction budget, downtime or lease-up, so every return below is
+            computed against the acquisition price alone and overstates the
+            deal. Regenerate the model: the screen now reads the plan and
+            reports yield on total cost with the years it takes to get there.
           </p>
         </div>
       )}
