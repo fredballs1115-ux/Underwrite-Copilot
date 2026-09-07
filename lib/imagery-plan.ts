@@ -43,8 +43,17 @@ export function aerialPlan(opts: { googleConfigured: boolean }): ImageSource[] {
   return opts.googleConfigured ? ["satellite", "aerial"] : ["aerial"];
 }
 
-/** A street address frames the building; anything vaguer frames a district. */
-export type LocationPrecision = "street" | "area";
+/**
+ * How much the geocoder actually pinned down — read off the geocoder's
+ * RESULT, never assumed from the input (lib/geocode).
+ *
+ *   street — an address point or a Census address-range match: the right
+ *            building's side of the right street. Frame the building.
+ *   block  — the street centreline only: the right road, house number not
+ *            in the map data. Frame the block; never call it the building.
+ *   area   — a city, district or postcode. Frame the district.
+ */
+export type LocationPrecision = "street" | "block" | "area";
 
 /** Metres of projected space per pixel at zoom 0, 256px tiles. */
 const RES_Z0 = (2 * Math.PI * 6378137) / 256;
@@ -53,11 +62,14 @@ const RES_Z0 = (2 * Math.PI * 6378137) / 256;
  * How wide a frame each precision deserves, in metres of ground.
  *
  * A street address gets ~140m: a building, its parking and enough of the
- * neighbours to read the context. An area-level placement gets ~1.5km, which
- * is a district — the most such a placement can honestly claim.
+ * neighbours to read the context. A block-level placement gets ~400m — a
+ * few parcels either way of a point that is somewhere along the right road.
+ * An area-level placement gets ~1.5km, which is a district — the most such a
+ * placement can honestly claim.
  */
 export const FRAME_METRES: Record<LocationPrecision, number> = {
   street: 140,
+  block: 400,
   area: 1500,
 };
 
@@ -65,12 +77,34 @@ export const FRAME_METRES: Record<LocationPrecision, number> = {
 export const MAX_SOURCE_ZOOM: Record<ImageSource, number> = {
   // Google's satellite runs ~0.15 m/px in cities.
   satellite: 20,
-  // USGS NAIP is natively 0.6-1.0 m/px; past z18 it is upscaling, not
-  // resolving, which is exactly what made the first cut look soft.
-  aerial: 18,
+  // USGS is fetched through the National Map's bbox EXPORT endpoint, which
+  // resamples from the best orthoimagery it holds for that spot. Nationally
+  // that is NAIP at 0.6–1.0 m/px, but across the metros this product covers
+  // the service carries high-resolution orthos at 0.3 m/px and finer. Capping
+  // at z18 (~0.6 m/px) threw that away everywhere it existed, which is why
+  // every aerial looked like a soft NAIP frame even downtown. z19 asks for
+  // ~0.3 m/px: sharp where the data is there, and where it is not the server
+  // returns the same NAIP it would have anyway.
+  aerial: 19,
   // Not an overhead source; present so the record is total.
   streetview: 20,
 };
+
+/**
+ * Initial compass bearing from one point to another, in degrees clockwise
+ * from north — the `heading` a Street View camera at `from` needs to look at
+ * `to`. Standard great-circle formula; fine at the scale of one street.
+ */
+export function bearingDeg(from: { lat: number; lng: number }, to: { lat: number; lng: number }): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const φ1 = toRad(from.lat);
+  const φ2 = toRad(to.lat);
+  const Δλ = toRad(to.lng - from.lng);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  const deg = (Math.atan2(y, x) * 180) / Math.PI;
+  return (deg + 360) % 360;
+}
 
 const MIN_ZOOM = 12;
 

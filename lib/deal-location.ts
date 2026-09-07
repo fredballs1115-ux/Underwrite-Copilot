@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StructuredAddress } from "@/lib/address";
 import type { Point } from "@/lib/basemaps";
+import { geocodeAddress, type Geocoded, type GeocodeSource } from "@/lib/geocode";
 
 /**
  * Where a deal IS, resolved once and cached — the shared dependency of every
@@ -23,8 +24,12 @@ export interface DealVisualCache {
   lat?: number;
   lng?: number;
   geoAt?: string;
-  /** how specific the address behind lat/lng was — drives the aerial's zoom */
+  /** how specific the geocoder's ANSWER was — drives the aerial's zoom */
   geoPrecision?: LocationPrecision;
+  /** which service placed it */
+  geoSource?: GeocodeSource;
+  /** the geocoding rules this entry was produced under; see GEO_VERSION */
+  geoV?: number;
   /** a geocode that definitively found nothing, so we stop re-asking */
   geoMiss?: boolean;
 }
@@ -38,113 +43,128 @@ export interface DealLocation extends Point {
   precision: LocationPrecision;
 }
 
-/** 30 days: buildings do not move, and Photon is a free service. */
+/** 30 days: buildings do not move, and both geocoders are free services. */
 const GEO_TTL_MS = 30 * 86_400_000;
 
+/**
+ * Bump this when the geocoding RULES change, not just the data. Entries
+ * written under an older version are re-resolved on their next view even if
+ * their TTL has not expired — otherwise a rules fix would take a month to
+ * reach the deals that already exist.
+ *
+ *   1 — Photon first result, precision assumed from the input address.
+ *   2 — Census first for street addresses, Photon fallback, precision read
+ *       off the geocoder's answer (lib/geocode). The fix for "the pictures
+ *       are terrible for most buildings".
+ */
+export const GEO_VERSION = 2;
+
+/** The most an address's WORDING can support — the geocoder may deliver less. */
 export function addressPrecision(a: StructuredAddress | null): LocationPrecision {
   return a?.street?.trim() ? "street" : "area";
 }
 
-function cacheFresh(cache: DealVisualCache | null): boolean {
+export function cacheFresh(cache: DealVisualCache | null, now = Date.now()): boolean {
   return (
-    !!cache?.geoAt && Date.now() - Date.parse(cache.geoAt) < GEO_TTL_MS
+    !!cache?.geoAt &&
+    cache.geoV === GEO_VERSION &&
+    now - Date.parse(cache.geoAt) < GEO_TTL_MS
   );
 }
 
-/**
- * Free-text geocode via Photon — the same service the address autocomplete
- * and the comps map already use, so the subject pin agrees with the comps.
- */
-async function geocode(q: string): Promise<Point | null> {
-  const res = await fetch(
-    `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`,
-    { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(8_000) },
-  );
-  if (!res.ok) return null;
-  const json = (await res.json()) as {
-    features?: { geometry?: { coordinates?: [number, number] } }[];
-  };
-  const c = json.features?.[0]?.geometry?.coordinates;
-  return c && Number.isFinite(c[0]) && Number.isFinite(c[1])
-    ? { lat: c[1], lng: c[0] }
-    : null;
+/** Swappable in tests; production uses the shared resolver. */
+export interface LocationDeps {
+  geocode?: (address: StructuredAddress | null) => Promise<Geocoded | null>;
+  now?: () => number;
 }
 
 /**
- * The deal's position, from cache when we have it and from Photon when we
- * don't. Returns null when the deal has no address or nothing matched — the
- * callers then render their no-imagery state. A transient failure is never
- * cached as a miss: a blocked network must not permanently blank a deal.
+ * The deal's position, from cache when we have a current one and from the
+ * geocoders when we don't. Returns null when the deal has no address or
+ * nothing matched — the callers then render their no-imagery state.
+ *
+ * A network failure is never cached as a miss: a blocked network must not
+ * permanently blank a deal. A definitive miss IS cached, so a deal at an
+ * address no service knows costs one lookup, not one per page view.
  */
 export async function resolveDealLocation(
   supabase: SupabaseClient,
   dealId: string,
   address: StructuredAddress | null,
   cache: DealVisualCache | null,
+  deps: LocationDeps = {},
 ): Promise<DealLocation | null> {
-  const precision = addressPrecision(address);
+  const now = deps.now ?? Date.now;
+  const geocode = deps.geocode ?? geocodeAddress;
 
-  if (cacheFresh(cache)) {
+  if (cacheFresh(cache, now())) {
     if (cache?.geoMiss) return null;
     if (typeof cache?.lat === "number" && typeof cache?.lng === "number") {
-      return { lat: cache.lat, lng: cache.lng, precision: cache.geoPrecision ?? precision };
+      return {
+        lat: cache.lat,
+        lng: cache.lng,
+        precision: cache.geoPrecision ?? addressPrecision(address),
+      };
     }
   }
 
-  const label = address?.label?.trim();
-  if (!label) return null;
+  if (!address?.label?.trim()) return null;
 
-  let pos: Point | null = null;
+  let hit: Geocoded | null;
   try {
-    pos = await geocode(label);
-    // A full street address that misses often still resolves at city level —
-    // useful, but only if we downgrade the claim we make about it.
-    if (!pos && precision === "street") {
-      const area = [address?.city, address?.state].filter(Boolean).join(", ");
-      if (area.trim()) {
-        const areaPos = await geocode(area);
-        if (areaPos) {
-          await writeCache(supabase, dealId, cache, {
-            lat: areaPos.lat,
-            lng: areaPos.lng,
-            geoAt: new Date().toISOString(),
-            geoPrecision: "area",
-            geoMiss: false,
-          });
-          return { ...areaPos, precision: "area" };
-        }
-      }
-    }
+    hit = await geocode(address);
   } catch {
-    // Network/timeout — no imagery THIS request, but don't poison the cache.
+    // Every service failed to answer — no imagery THIS request, and nothing
+    // written, so the next view asks again.
     return null;
   }
 
-  const patch: Partial<DealVisualCache> = pos
+  const stamp = { geoAt: new Date(now()).toISOString(), geoV: GEO_VERSION };
+  const patch: Partial<DealVisualCache> = hit
     ? {
-        lat: pos.lat,
-        lng: pos.lng,
-        geoAt: new Date().toISOString(),
-        geoPrecision: precision,
+        ...stamp,
+        lat: hit.lat,
+        lng: hit.lng,
+        geoPrecision: hit.precision,
+        geoSource: hit.source,
         geoMiss: false,
       }
-    : { geoAt: new Date().toISOString(), geoMiss: true, lat: undefined, lng: undefined };
+    : { ...stamp, geoMiss: true, lat: undefined, lng: undefined, geoPrecision: undefined, geoSource: undefined };
   await writeCache(supabase, dealId, cache, patch);
 
-  return pos ? { ...pos, precision } : null;
+  return hit ? { lat: hit.lat, lng: hit.lng, precision: hit.precision } : null;
 }
 
-/** Merge — never replace — so the Street View verdict and the geocode coexist. */
+/**
+ * Merge a patch into the deal's imagery cache without losing anything another
+ * writer just stored.
+ *
+ * The cache is one jsonb column shared by the geocoder and the Street View
+ * verdict. The first cut merged the patch over the copy of the column the
+ * CALLER had loaded — so when the geocoder wrote a fresh point and the Street
+ * View check then wrote its verdict over its own, older copy, the new point
+ * was silently dropped and the deal went back to the wrong spot. Now the
+ * current row is read first and the patch merged over THAT. One small extra
+ * read, on a path that runs about once a month per deal.
+ */
 export async function writeCache(
   supabase: SupabaseClient,
   dealId: string,
-  current: DealVisualCache | null,
+  fallback: DealVisualCache | null,
   patch: Partial<DealVisualCache>,
 ): Promise<void> {
   try {
+    const { data } = await supabase
+      .from("deals")
+      .select("photo")
+      .eq("id", dealId)
+      .maybeSingle();
+    const current = ((data as { photo?: DealVisualCache | null } | null)?.photo ??
+      fallback ??
+      {}) as DealVisualCache;
     await supabase
       .from("deals")
-      .update({ photo: { ...(current ?? {}), ...patch } })
+      .update({ photo: { ...current, ...patch } })
       .eq("id", dealId);
   } catch {
     // Pre-0027 schema has no `photo` column — imagery still works, just

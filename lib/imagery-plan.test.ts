@@ -4,6 +4,7 @@ import {
   FRAME_METRES,
   MAX_SOURCE_ZOOM,
   aerialPlan,
+  bearingDeg,
   frameZoom,
   imagePlan,
   type ImageSource,
@@ -126,6 +127,25 @@ describe("frameZoom", () => {
     );
   });
 
+  it("frames a block-level placement between the building and the district", () => {
+    // The right road, house number unknown: a few parcels either way, never
+    // a single-building frame that would claim more than the geocode knows.
+    expect(FRAME_METRES.block).toBeGreaterThan(FRAME_METRES.street);
+    expect(FRAME_METRES.block).toBeLessThan(FRAME_METRES.area);
+    const base = { widthPx: 1280, lat: DC, source: "satellite" as const };
+    const z = (p: "street" | "block" | "area") => frameZoom({ ...base, precision: p });
+    expect(z("block")).toBeLessThan(z("street"));
+    expect(z("block")).toBeGreaterThan(z("area"));
+  });
+
+  it("lets USGS resolve to ~0.3 m/px, where the export service has it", () => {
+    // z19 at DC's latitude is ~0.23 m of ground per pixel — the high-res
+    // ortho scale the National Map carries in covered metros. The old z18 cap
+    // was NAIP scale, and made every downtown look like farmland imagery.
+    expect(MAX_SOURCE_ZOOM.aerial).toBe(19);
+    expect(covers(1, 19, DC)).toBeLessThan(0.3);
+  });
+
   it("compensates for Mercator stretch with latitude", () => {
     // A tile covers LESS ground the further from the equator you go, so
     // holding the frame at a fixed number of metres means zooming OUT.
@@ -140,7 +160,7 @@ describe("frameZoom", () => {
 
   it("stays inside the zoom range the routes accept (12-20)", () => {
     for (const source of ALL) {
-      for (const precision of ["street", "area"] as const) {
+      for (const precision of ["street", "block", "area"] as const) {
         for (const widthPx of [1, 96, 1280, 100000]) {
           const z = frameZoom({ widthPx, lat: DC, precision, source });
           expect(z).toBeGreaterThanOrEqual(12);
@@ -148,6 +168,38 @@ describe("frameZoom", () => {
         }
       }
     }
+  });
+});
+
+describe("bearingDeg", () => {
+  const origin = { lat: 38.9, lng: -77.0 };
+  it("points north, east, south and west", () => {
+    expect(bearingDeg(origin, { lat: 38.91, lng: -77.0 })).toBeCloseTo(0, 0);
+    expect(bearingDeg(origin, { lat: 38.9, lng: -76.99 })).toBeCloseTo(90, 0);
+    expect(bearingDeg(origin, { lat: 38.89, lng: -77.0 })).toBeCloseTo(180, 0);
+    expect(bearingDeg(origin, { lat: 38.9, lng: -77.01 })).toBeCloseTo(270, 0);
+  });
+
+  it("always lands in [0, 360)", () => {
+    for (const to of [
+      { lat: 38.95, lng: -77.05 },
+      { lat: 38.85, lng: -76.95 },
+      { lat: 38.85, lng: -77.05 },
+    ]) {
+      const b = bearingDeg(origin, to);
+      expect(b).toBeGreaterThanOrEqual(0);
+      expect(b).toBeLessThan(360);
+    }
+  });
+
+  it("is the reverse bearing going back, give or take the antimeridian", () => {
+    const pano = { lat: 38.9012, lng: -77.0341 };
+    const bldg = { lat: 38.9019, lng: -77.0329 };
+    const there = bearingDeg(pano, bldg);
+    const back = bearingDeg(bldg, pano);
+    // |back − there| should be 180°, modulo the wrap.
+    const diff = (((back - there) % 360) + 360) % 360;
+    expect(Math.abs(diff - 180)).toBeLessThan(0.05);
   });
 });
 
