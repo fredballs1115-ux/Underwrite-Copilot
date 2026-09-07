@@ -14,6 +14,12 @@
  * and vacancy — the split is a labelled assumption, the NOI is real.
  */
 import { findMetric, parseMoney, parsePct } from "@/lib/criteria";
+import {
+  IMPLIED_CAP_CEILING,
+  inferStrategy,
+  noiFigures,
+  type StrategyKind,
+} from "@/lib/deal-strategy";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { UnderwriteInputs } from "./engine";
@@ -46,6 +52,9 @@ export interface WorkbookMeta {
   /** unit count for per-unit yardsticks — rent-roll actual first, then the
    *  OM's stated figure; null when neither states one (never guessed) */
   units: number | null;
+  /** the deal's strategy (stabilized / value-add / conversion …), which
+   *  decides what the OM's NOI figures may anchor */
+  strategy?: StrategyKind;
 }
 
 export interface DerivedModel {
@@ -140,34 +149,53 @@ export function deriveUnderwriteInputs(
     // "expense cap" / "rate cap" / "capex" are not cap RATES.
     /exit|reversion|terminal|expense|capex|capital|rate cap/i,
   );
-  const noiMetric = findMetric(metrics, /net operating income|\bnoi\b/i, /\bper\b|\/|psf|unit/i);
+  // Which NOI is which. The OM may state an in-place figure, a Year-1 figure
+  // and a stabilized pro forma; only the first two describe the building as
+  // bought. The stabilized figure belongs over total cost on a plan deal
+  // (value-add, conversion, development, lease-up) — capitalising it against
+  // the acquisition price is how a $21M NOI met a $20M price as a "105% cap".
+  const strategy = inferStrategy(extraction);
+  const figs = noiFigures(metrics);
+  const goingFig = figs.find((f) => f.kind === "in_place") ?? figs.find((f) => f.kind === "year1") ?? null;
+  const stabilizedFig = figs.find((f) => f.kind === "stabilized") ?? null;
+  const pageOfFig = (f: { page?: string } | null) => f?.page;
 
   const capDecimal = capMetric ? (parsePct(capMetric.value) ?? null) : null;
   // Plausibility band: a parsed 0% (garbled extraction) or a 35% "cap" (an
   // expense-cap style figure that slipped the excludes) must never anchor
   // pricing or the exit assumption — treat as absent.
   const capPct =
-    capDecimal != null && capDecimal / 100 > 0.005 && capDecimal / 100 <= 0.25
+    capDecimal != null && capDecimal / 100 > 0.005 && capDecimal / 100 <= IMPLIED_CAP_CEILING
       ? capDecimal / 100
       : null;
-  const extractedNoi = noiMetric ? parseMoney(noiMetric.value) : null;
   let price = priceMetric ? parseMoney(priceMetric.value) : null;
 
   if (price != null) {
     mark("purchasePrice", "extracted", "OM asking / purchase price", pageOf(priceMetric));
-  } else if (extractedNoi != null && capPct) {
-    price = extractedNoi / capPct;
+  } else if (goingFig && capPct) {
+    // Only an in-place / Year-1 NOI may back a price out of the going-in cap.
+    price = goingFig.value / capPct;
     mark("purchasePrice", "derived", "NOI ÷ going-in cap");
   } else {
     price = 10_000_000;
     mark("purchasePrice", "assumption", "Enter the purchase price");
   }
 
+  /** Can this NOI be the going-in figure on THIS price? Positive, and under
+   *  the cap ceiling — past it the two cannot describe the same building. */
+  const plausibleOnPrice = (n: number) => n > 0 && n / price < IMPLIED_CAP_CEILING;
+  const pctOfPrice = (n: number) => `${Math.round((n / price) * 100)}% of price`;
+
   // ── NOI (the anchor) ───────────────────────────────────────────────────
   // T-12 actual NOI outranks the OM narrative when a statement was uploaded —
   // this is the Feature-1 point: the model runs on what the property actually
-  // produced, not the deck's story.
+  // produced, not the deck's story. Then the OM's in-place / Year-1 NOI; then,
+  // ONLY on a stabilized deal, its stabilized figure (there it is next year's
+  // income); then price × cap; then a labelled default. An OM figure that
+  // cannot be a going-in NOI on this price is named, not used.
   const ttmNote = t12End ? ` (TTM to ${t12End})` : "";
+  const implausible = (f: { label: string; value: number }) =>
+    `The OM's ${f.label} of $${Math.round(f.value).toLocaleString("en-US")} is ${pctOfPrice(f.value)} — it cannot be the going-in figure on a ${strategy.label.toLowerCase()} deal, so it is not used here`;
   let noi: number;
   if (t12Noi != null) {
     noi = t12Noi;
@@ -176,15 +204,64 @@ export function deriveUnderwriteInputs(
       "derived",
       `Grossed up from the T-12 actual NOI${ttmNote} at ${t12Er != null ? "the T-12 actual" : "an assumed"} expense ratio`,
     );
-  } else if (extractedNoi != null) {
-    noi = extractedNoi;
-    mark("inPlaceRentAnnual", "derived", "Grossed up from OM NOI at an assumed expense ratio", pageOf(noiMetric));
+  } else if (goingFig && plausibleOnPrice(goingFig.value)) {
+    noi = goingFig.value;
+    mark(
+      "inPlaceRentAnnual",
+      "derived",
+      `Grossed up from the OM's ${goingFig.label} at an assumed expense ratio`,
+      pageOfFig(goingFig),
+    );
+  } else if (
+    strategy.kind === "stabilized" &&
+    stabilizedFig &&
+    plausibleOnPrice(stabilizedFig.value)
+  ) {
+    noi = stabilizedFig.value;
+    mark(
+      "inPlaceRentAnnual",
+      "derived",
+      `Grossed up from the OM's ${stabilizedFig.label} — the only NOI stated; on a stabilized asset it is next year's income`,
+      pageOfFig(stabilizedFig),
+    );
   } else if (capPct) {
     noi = price * capPct;
-    mark("inPlaceRentAnnual", "derived", "From price × going-in cap, at an assumed expense ratio");
+    const skipped = goingFig ?? stabilizedFig;
+    mark(
+      "inPlaceRentAnnual",
+      "derived",
+      skipped
+        ? `${implausible(skipped)}. Year-1 NOI set from price × the stated going-in cap instead`
+        : "From price × going-in cap, at an assumed expense ratio",
+    );
   } else {
     noi = price * 0.06;
-    mark("inPlaceRentAnnual", "assumption", "No NOI or cap in the OM — assumed 6% going-in");
+    const skipped = goingFig ?? stabilizedFig;
+    mark(
+      "inPlaceRentAnnual",
+      "assumption",
+      skipped
+        ? `${implausible(skipped)}. No going-in cap in the OM either — assumed 6% going-in; enter the in-place NOI`
+        : "No NOI or cap in the OM — assumed 6% going-in",
+    );
+  }
+
+  // ── Capital / construction budget ──────────────────────────────────────
+  // The plan's cost belongs in Sources & Uses, so the yield on cost the
+  // workbook reports is on the real basis. A "total project cost" includes
+  // the price; a budget line does not. Bounded so a mis-parsed figure never
+  // lands here, and never invented: absent is absent.
+  const budgetMetric = findMetric(
+    metrics,
+    /renovation (budget|cost|plan)|capex budget|capital (budget|plan|improvements?|expenditures?)|construction (cost|budget)|hard costs?|redevelopment (cost|budget)|conversion (cost|budget)|improvement budget|total (project|development) cost|all[- ]?in (cost|basis)/i,
+    /\bper\b|\/|psf|unit|reserve|annual|\byr\b|year/i,
+  );
+  const budgetRaw = budgetMetric ? parseMoney(budgetMetric.value) : null;
+  let capitalBudget = 0;
+  if (budgetRaw != null && budgetRaw > 0) {
+    const allIn = /total (project|development) cost|all[- ]?in/i.test(budgetMetric!.label);
+    const candidate = allIn ? budgetRaw - price : budgetRaw;
+    if (candidate > 0 && candidate <= price * 10) capitalBudget = candidate;
   }
 
   // ── RSF ────────────────────────────────────────────────────────────────
@@ -241,7 +318,7 @@ export function deriveUnderwriteInputs(
 
     rsf,
     reservesPsf: cd.reservesPsf,
-    capitalImprovementsYr1: 0,
+    capitalImprovementsYr1: capitalBudget,
     tiPsf: 0,
     lcPct: 0,
 
@@ -276,11 +353,29 @@ export function deriveUnderwriteInputs(
         note: `T-12 actual expense load${ttmNote} — ${Math.round(t12Er * 100)}% of EGI`,
       }
     : {
-        provenance: extractedNoi != null ? "derived" : "assumption",
+        // Derived when the NOI it ties to came from the OM; an assumption when
+        // the NOI itself was assumed.
+        provenance: sources.inPlaceRentAnnual?.provenance === "derived" ? "derived" : "assumption",
         note: `Total opex to tie NOI (${Math.round(cd.expenseRatio * 100)}% of EGI ${assetClass} default) — break out from a T-12`,
       };
   mark("mgmtFeePct", "assumption", "Folded into operating expenses — split out if you track it");
   mark("reservesPsf", "assumption", `${assetClass} default $${cd.reservesPsf.toFixed(2)}/SF/yr`);
+  if (capitalBudget > 0) {
+    mark(
+      "capitalImprovementsYr1",
+      "extracted",
+      `OM ${budgetMetric!.label}${/total (project|development) cost|all[- ]?in/i.test(budgetMetric!.label) ? " less the price" : ""} — spent in year 1 in this annual model; the OM's own timeline may run longer`,
+      pageOf(budgetMetric),
+    );
+  } else {
+    mark(
+      "capitalImprovementsYr1",
+      "assumption",
+      strategy.kind === "stabilized" || strategy.kind === "unknown"
+        ? "No capital plan in the OM — enter one if the PCA finds work"
+        : `A ${strategy.label.toLowerCase()} deal with no budget in the OM — enter the construction / renovation cost; yield on cost is meaningless without it`,
+    );
+  }
   mark("amFeePctEquity", "assumption", "Default 0.5% of equity/yr");
   mark("ltc", "assumption", "Default 60% loan-to-cost — enter your quote");
   mark("allInRatePct", "assumption", "Enter your all-in rate (index + spread)");
@@ -317,6 +412,7 @@ export function deriveUnderwriteInputs(
       occupancyPct: rrOcc ?? (occPct != null ? occPct / 100 : null),
       rsf,
       units,
+      strategy: strategy.kind,
     },
   };
 }

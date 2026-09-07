@@ -177,19 +177,39 @@ function FirstDraftBanner() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  /** colour the figure when it is a warning rather than a result */
+  tone?: "kill" | "caution";
+}) {
   return (
     <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
       <p className="text-[11px] uppercase tracking-wide text-muted">{label}</p>
-      <p className="mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums">
+      <p
+        className={`mt-1.5 font-mono text-lg font-semibold leading-none tabular-nums ${
+          tone === "kill" ? "text-kill" : tone === "caution" ? "text-caution" : ""
+        }`}
+      >
         {value}
       </p>
     </div>
   );
 }
 
+/** Past this, NOI ÷ price is not a cap rate: no operating US property yields
+ *  a quarter of its price a year. The figure is a stabilized pro forma on a
+ *  different basis (the finished conversion, the renovated building) or a
+ *  misread — either way not a return. Mirrors lib/deal-strategy. */
+const IMPLAUSIBLE_CAP = 0.25;
+
 export function ReturnsHeadline({ model }: { model: UnderwritingModel }) {
   const r = model.returns;
+  const implausible = r.purchasePrice > 0 && r.year1Noi / r.purchasePrice >= IMPLAUSIBLE_CAP;
   return (
     <section>
       <div className="flex items-center justify-between gap-3">
@@ -200,15 +220,32 @@ export function ReturnsHeadline({ model }: { model: UnderwritingModel }) {
           {model.holdYears}-yr hold
         </span>
       </div>
+      {implausible && (
+        <div className="mt-3 rounded-xl border border-kill/30 border-l-4 border-l-kill bg-kill/5 px-4 py-3">
+          <p className="text-sm font-semibold text-kill">
+            This model’s Year-1 NOI cannot be the building’s income
+          </p>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted">
+            {usd(r.year1Noi)} of NOI against a {usd(r.purchasePrice)} price is a{" "}
+            {pct(r.goingInCapPct)} cap rate, which no operating property yields. The
+            reconciled income is a stabilized pro forma — the finished project’s
+            figure — capitalised against the acquisition price. Until the model
+            carries the construction budget, the downtime and the lease-up,
+            treat every return below as unreliable: regenerate the model now
+            that the screen reads the deal’s strategy, or enter the in-place
+            income by hand.
+          </p>
+        </div>
+      )}
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Levered IRR" value={pct(r.leveredIrrPct)} />
-        <Stat label="Cash-on-cash (Yr 1)" value={pct(r.cashOnCashPct)} />
-        <Stat label="Equity multiple" value={mult(r.equityMultiple)} />
-        <Stat label="Going-in cap" value={pct(r.goingInCapPct)} />
+        <Stat label="Levered IRR" value={pct(r.leveredIrrPct)} tone={implausible ? "kill" : undefined} />
+        <Stat label="Cash-on-cash (Yr 1)" value={pct(r.cashOnCashPct)} tone={implausible ? "kill" : undefined} />
+        <Stat label="Equity multiple" value={mult(r.equityMultiple)} tone={implausible ? "kill" : undefined} />
+        <Stat label="Going-in cap" value={pct(r.goingInCapPct)} tone={implausible ? "kill" : undefined} />
         <Stat label="Purchase price" value={usd(r.purchasePrice)} />
         <Stat label="Equity" value={usd(r.equity)} />
-        <Stat label="Year-1 NOI" value={usd(r.year1Noi)} />
-        <Stat label="Exit value" value={usd(r.exitValue)} />
+        <Stat label="Year-1 NOI" value={usd(r.year1Noi)} tone={implausible ? "kill" : undefined} />
+        <Stat label="Exit value" value={usd(r.exitValue)} tone={implausible ? "kill" : undefined} />
       </div>
     </section>
   );

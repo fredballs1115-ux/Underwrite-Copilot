@@ -46,6 +46,8 @@ import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource, type BuyBoxCheck } from "@/lib/criteria";
 import { scoreMandateFit, type MandateScore, type MandateVerdict } from "@/lib/mandate";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
+import { assessPlausibility, inferStrategy } from "@/lib/deal-strategy";
+import { PlausibilityPanel } from "./plausibility-panel";
 import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { ActualsData } from "./property-actuals";
@@ -492,6 +494,14 @@ export default async function DealPage({
   const summaryYearBuilt =
     yearBuiltNum != null && yearBuiltNum >= 1700 && yearBuiltNum <= 2100 ? yearBuiltNum : null;
 
+  // What kind of deal this is, and whether its headline figures can all be
+  // true at once — pure code over the extraction. A $21M "NOI" on a $20M
+  // price is a stabilized pro forma being read as in-place income, and it is
+  // named as such here, above every number built on it.
+  const strategy = inferStrategy(extraction, firstSignal);
+  const plausibility = assessPlausibility(extraction, strategy);
+  const summaryStrategy = strategy.kind === "unknown" ? null : strategy.label;
+
   // Public-record comps (auto-comps v2): render whatever the background pull
   // stored; when a deal has an address but nothing stored yet (pre-feature
   // deals, or a save whose after() died in a deploy), kick the pull now —
@@ -544,11 +554,11 @@ export default async function DealPage({
     : mandate?.score != null && mandate.verdict
       ? buyBoxFold === "outside" && mandate.verdict !== "PASS"
         ? {
-            label: `Buy box ${mandate.score} · Outside box`,
+            label: `Fit ${mandate.score} · Outside box`,
             cls: "bg-kill/10 text-kill",
           }
         : {
-            label: `Buy box ${mandate.score} · ${mandate.verdict === "PURSUE" ? "Pursue" : mandate.verdict === "WATCH" ? "Watch" : "Pass"}`,
+            label: `Fit ${mandate.score} · ${mandate.verdict === "PURSUE" ? "Pursue" : mandate.verdict === "WATCH" ? "Watch" : "Pass"}`,
             cls: MANDATE_PILL[mandate.verdict],
           }
       : buyBoxChecks.some((c) => c.status === "miss")
@@ -800,18 +810,34 @@ export default async function DealPage({
               ["Price", summaryPrice],
               ["Size", summarySize],
               ["Going-in cap", summaryCap],
+              ["Deal type", summaryStrategy],
             ] as const
           ).map(([label, value]) => (
             <div key={label}>
               <dt className="text-[11px] uppercase tracking-wide text-muted">
                 {label}
               </dt>
-              <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums">
+              <dd
+                className={`mt-0.5 text-base font-semibold ${
+                  label === "Deal type" ? "" : "font-mono tabular-nums"
+                }`}
+                title={label === "Deal type" && strategy.summary ? strategy.summary : undefined}
+              >
                 {value ?? "—"}
               </dd>
             </div>
           ))}
         </dl>
+
+        {/* The plan, in the OM's words, when the deal is not a stabilized
+            asset — it changes what every figure below means. */}
+        {strategy.kind !== "stabilized" && strategy.kind !== "unknown" && strategy.summary && (
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted">
+            <span className="font-medium text-ink">{strategy.label}.</span> {strategy.summary}
+          </p>
+        )}
+
+        <PlausibilityPanel findings={plausibility} strategy={strategy} />
 
         {!extraction && firstSignal?.take && (
           <p className="mt-3 border-t border-line pt-3 text-sm leading-relaxed text-muted">

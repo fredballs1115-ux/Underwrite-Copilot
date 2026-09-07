@@ -29,6 +29,15 @@
   --color-caution: #a05a1c;
   --color-kill: #b23a30;
 
+  /* Asset classes — one hue each, so a mixed pipeline reads as four kinds of
+     thing at a glance (dot beside the class name, rail down the row). Muted
+     to sit under the verdict colours, never compete with them. */
+  --color-asset-multifamily: #2f7f6f; /* sea green — the house's core class */
+  --color-asset-office: #4f61b3; /* slate indigo */
+  --color-asset-industrial: #b0842c; /* ochre */
+  --color-asset-retail: #b34f6b; /* dusty rose */
+  --color-asset-other: #8a9391; /* neutral for anything else */
+
   /* One font family. Figures align via tabular numerals, not a second face. */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-sans);

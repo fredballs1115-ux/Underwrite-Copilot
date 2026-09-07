@@ -836,7 +836,7 @@ export default function Home() {
                     ],
                     [
                       "Rates that refresh themselves",
-                      "The 10-Year, SOFR, the 30-year survey, and CRE delinquency land daily from FRED; a weekday intel sweep scores the news for your buy box and raises a red banner when a rent law moves.",
+                      "The 10-Year, SOFR, the 30-year survey, and CRE delinquency land daily from FRED; a weekday intel sweep scores the news against your criteria and raises a red banner when a rent law moves.",
                     ],
                     [
                       "Market data with receipts",
@@ -1750,7 +1750,7 @@ async function LiveProofStrip() {
     ),
     storyTitle && (
       <>
-        top story for this buy box:{" "}
+        top story by relevance:{" "}
         <span className="font-semibold">“{storyTitle}”</span>
       </>
     ),
@@ -1932,7 +1932,7 @@ async function GroundLayerSection() {
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
             Under every screen sits a data floor the broker didn&apos;t write:
             government parcel and deed records, landlord law encoded as logic
-            on each building, the news scored for your buy box — and a
+            on each building, the news scored for relevance to your mandate — and a
             nightly steward that re-verifies all of it while you sleep.
           </p>
         </Reveal>
@@ -2002,7 +2002,7 @@ async function GroundLayerSection() {
                 <p className="mt-2 text-sm leading-relaxed">
                   <span className="font-semibold">“{topStory.title}”</span>{" "}
                   <span className="text-muted">
-                    — {topStory.relevance}/10 for this buy box
+                    — relevance {topStory.relevance}/10
                     {topStory.source ? ` (${topStory.source})` : ""}
                     {storyCount > 0 && ` · ${num(storyCount)} stories tracked`}
                   </span>
@@ -2010,7 +2010,7 @@ async function GroundLayerSection() {
               ) : (
                 <p className="mt-2 text-sm leading-relaxed">
                   <span className="font-semibold">
-                    Every weekday&apos;s stories, scored 0–10 for your buy box.
+                    Every weekday&apos;s stories, scored 0–10 for relevance to your mandate.
                   </span>
                 </p>
               )}

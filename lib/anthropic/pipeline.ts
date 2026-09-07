@@ -20,6 +20,7 @@ import { buildDealFacts, toFactRows } from "@/lib/facts";
 import { runDocReconciliation } from "./reconcile-facts";
 import { runActualsIngestion } from "./actuals-ingest";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
+import { assessPlausibility, inferStrategy, plausibilityNote } from "@/lib/deal-strategy";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxLines } from "@/lib/criteria";
 import { notifyAnalysisReady } from "@/lib/email";
@@ -389,6 +390,15 @@ export async function runAnalysis(
         } catch {
           // no T-12 stored (or pre-0020 schema) — skip the comparison
         }
+
+        // The deal's strategy and any figures that cannot all be true at
+        // once (an NOI above the price, a cap that disagrees with NOI ÷
+        // price) — checked in code, so the skeptic grills the plan and the
+        // misread rather than a 105% cap rate.
+        const ex = (dr?.extraction as ExtractionResult | null) ?? null;
+        const strategy = inferStrategy(ex);
+        const plausibility = plausibilityNote(assessPlausibility(ex, strategy), strategy);
+        if (plausibility) notes.push(plausibility);
 
         if (flagged.length) {
           notes.push(
