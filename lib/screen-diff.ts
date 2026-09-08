@@ -90,9 +90,10 @@ const TRACKED: Tracked[] = [
   {
     label: "NOI",
     include: /\bnoi\b/i,
-    // Not the finished project's figure, and never a per-unit / per-SF
-    // expression, a margin, a growth rate or a yield.
-    exclude: /stabili[sz]ed|pro ?forma|\bper\b|\/|unit|psf|\bsf\b|margin|growth|yield|multiple/i,
+    // Not the finished project's figure under any spelling ("Stabilized
+    // NOI", "NOI at stabilization", "NOI at completion"), and never a
+    // per-unit / per-SF expression, a margin, a growth rate or a yield.
+    exclude: /stabili[sz]|pro ?forma|(at|upon) (completion|stabili[sz]ation)|\bper\b|\/|unit|psf|\bsf\b|margin|growth|yield|multiple/i,
     kind: "money",
     betterWhen: "up",
   },
@@ -101,7 +102,8 @@ const TRACKED: Tracked[] = [
   // rest, so an OM that carries none of these adds no rows.
   {
     label: "Stabilized NOI (pro forma)",
-    include: /(stabili[sz]ed|pro ?forma)[^a-z]*\bnoi\b|\bnoi\b[^a-z]*\((stabili[sz]ed|pro ?forma)/i,
+    include:
+      /(stabili[sz]ed|pro ?forma)[^a-z]*\bnoi\b|\bnoi\b[^a-z]*\((stabili[sz]ed|pro ?forma)|\bnoi\b[^a-z]*(at|upon) (completion|stabili[sz]ation)/i,
     // The headline figure, never its per-unit or per-SF expression.
     exclude: /\bper\b|\/|unit|psf|\bsf\b/i,
     kind: "money",

@@ -15,7 +15,7 @@
  */
 import {
   buildingSfRow,
-  findMetric,
+  findGoingInCap,
   occupancyPctFromMetrics,
   parseMoney,
   parsePct,
@@ -150,14 +150,10 @@ export function deriveUnderwriteInputs(
   // development only — the land or site cost, which is what is being bought.
   const priceMetric = findPriceMetric(metrics, inferStrategy(extraction).kind);
   const priceIsLand = priceMetric != null && /\b(land|site)\b/i.test(priceMetric.label);
-  const capMetric = findMetric(
-    metrics,
-    /going[- ]?in cap|^cap rate|\bcap\b/i,
-    // "expense cap" / "rate cap" / "capex" are not cap RATES — and a
-    // stabilized / pro forma cap or a yield on cost describes the finished
-    // project on a plan deal, not the price paid today.
-    /exit|reversion|terminal|expense|capex|capital|rate cap|stabili[sz]|pro ?forma|forward|projected|yield/i,
-  );
+  // The shared going-in cap reader — the same call the deal page, the buy
+  // box and the mandate score make — so the workbook never backs a price
+  // out of a residual or an at-completion cap the page refused to show.
+  const capMetric = findGoingInCap(metrics);
   // Which NOI is which. The OM may state an in-place figure, a Year-1 figure
   // and a stabilized pro forma; only the first two describe the building as
   // bought. The stabilized figure belongs over total cost on a plan deal

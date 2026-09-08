@@ -234,6 +234,31 @@ describe("scoreMandateFit — agrees with the buy-box check on the shared figure
   });
 });
 
+describe("scoreMandateFit — the fifth review's dealbreaker cases", () => {
+  it("an opex per unit never clears a basis dealbreaker the price per unit trips", () => {
+    const box: BuyBox = { maxPerUnitK: 100, dealbreakers: { maxPerUnitK: 100 } };
+    const r = scoreMandateFit(
+      "multifamily",
+      ex([["Opex per unit", "$4,800"], ["Price per unit", "$252,000"]]),
+      box,
+    );
+    expect(r.dealbreakerTripped).toBe(true);
+    expect(dim(r, "dealbreakers")?.status).toBe("miss");
+  });
+
+  it("a development's land cost is judged against the price ceiling", () => {
+    const box: BuyBox = { maxPriceM: 3, dealbreakers: { maxPriceM: 3 } };
+    const land: Array<[string, string]> = [["Land cost", "$4,000,000"], ["Acres", "12"]];
+    const dev = { ...ex(land), strategy: { kind: "development" } };
+    expect(scoreMandateFit("multifamily", dev, box).dealbreakerTripped).toBe(true);
+    // On an operating asset the land line is an allocation: unknown, never a
+    // pass and never a trip.
+    const op = scoreMandateFit("multifamily", ex(land), box);
+    expect(op.dealbreakerTripped).toBe(false);
+    expect(dim(op, "dealbreakers")?.status).not.toBe("pass");
+  });
+});
+
 describe("scoreMandateFit — a plan deal's stabilized cap never earns cap credit", () => {
   it("a conversion showing only a stabilized 11.7% cap leaves the cap dimension unknown", () => {
     const box: BuyBox = { minCapPct: 5.0 };

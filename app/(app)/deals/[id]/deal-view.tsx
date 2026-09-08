@@ -10,6 +10,7 @@ import type {
   ReconciliationResult,
   MarketResult,
   VerdictResult,
+  FirstSignal,
 } from "@/lib/anthropic/types";
 import type { BuyBoxCheck } from "@/lib/criteria";
 import type { MandateScore, MandateVerdict } from "@/lib/mandate";
@@ -219,20 +220,24 @@ const MODEL_ERRORS: Record<string, string> = {
 const RECONCILE_ERROR_CODES = new Set(["modelfile", "modeltype", "modelsize"]);
 
 /** The extraction's asking-price string, for the LOI prefill ("" unknown). */
-function askingPriceValue(extraction: ExtractionResult | null): string {
+function askingPriceValue(extraction: ExtractionResult | null, signal: FirstSignal | null): string {
   // The shared price reader — the same rows the deal page's summary bar,
   // the buy box and the pipeline card read — so the letter never prefills
   // an "Asking rent", a price per key or a prior trade. Among the price
   // rows the first whose value is a figure wins ("Asking price: call for
   // pricing" above "Purchase price: $42,000,000" prefills $42M); on a
   // development with no asking price it is the land or site cost, the land
-  // being bought.
-  return findPricedMetric(extraction?.metrics ?? [], inferStrategy(extraction).kind)?.value ?? "";
+  // being bought. The kind is inferred with the first signal, exactly as the
+  // page infers it, so the letter and the page never name two prices.
+  return findPricedMetric(extraction?.metrics ?? [], inferStrategy(extraction, signal).kind)?.value ?? "";
 }
 
 /** The deal's plan for the LOI draft — its clauses follow the kind. */
-function loiPlan(extraction: ExtractionResult | null): { kind: string; label: string } | null {
-  const s = inferStrategy(extraction);
+function loiPlan(
+  extraction: ExtractionResult | null,
+  signal: FirstSignal | null,
+): { kind: string; label: string } | null {
+  const s = inferStrategy(extraction, signal);
   return isPlanDeal(s.kind) ? { kind: s.kind, label: s.label } : null;
 }
 
@@ -297,6 +302,7 @@ export function DealView({
   userEmail = null,
   qa = [],
   isSample = false,
+  firstSignal = null,
   userId = null,
   marketMemory = null,
   actuals = { rentRoll: null, t12: null, noiComparison: null },
@@ -329,6 +335,8 @@ export function DealView({
   userEmail?: string | null;
   qa?: AskEntry[];
   isSample?: boolean;
+  /** the ~30s first read, so the LOI infers the deal's kind as the page does */
+  firstSignal?: FirstSignal | null;
   userId?: string | null;
   marketMemory?: MarketGroup | null;
   actuals?: ActualsData;
@@ -805,9 +813,9 @@ export function DealView({
             {!isSample && (
               <LoiPanel
                 dealId={dealId}
-                askingPrice={askingPriceValue(results.extraction)}
+                askingPrice={askingPriceValue(results.extraction, firstSignal)}
                 isPro={isPro}
-                plan={loiPlan(results.extraction)}
+                plan={loiPlan(results.extraction, firstSignal)}
               />
             )}
           </div>

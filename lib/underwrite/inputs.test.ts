@@ -44,6 +44,25 @@ describe("deriveUnderwriteInputs — NOI anchor", () => {
   });
 });
 
+describe("deriveUnderwriteInputs — the cap the workbook reads is the going-in cap the page shows", () => {
+  it("a residual or at-completion cap never backs a price out, and never seeds the exit cap", () => {
+    for (const label of ["Residual cap rate", "Cap rate at completion", "Cap rate (Year 3)"]) {
+      const { inputs, sources } = deriveUnderwriteInputs(
+        {
+          ...extraction,
+          metrics: [
+            { label, value: "7.50%", flagged: false, page: "p. 6" },
+            { label: "NOI (in-place)", value: "$1,000,000", flagged: false, page: "p. 7" },
+          ],
+        },
+        "fallback",
+      );
+      expect(sources.purchasePrice?.provenance, label).toBe("assumption");
+      expect(inputs.exitCapPct, label).not.toBeCloseTo(0.075, 4);
+    }
+  });
+});
+
 describe("deriveUnderwriteInputs — the unit count is the row that counts units", () => {
   const mf = (metrics: Array<[string, string]>): ExtractionResult => ({
     dealName: "Maddox Apartments",

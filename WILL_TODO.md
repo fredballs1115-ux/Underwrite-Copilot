@@ -3,15 +3,15 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#226 merged to main (live build
-sha `cd87ff9`, #225, confirmed equal to the main tip by live-verify at 03:48
-UTC; #226 follows on the next Render deploy).
+**Last updated 2026-09-08**, after PRs #176–#227 merged to main (live build
+sha `2c61b56`, #226, confirmed equal to the main tip by live-verify at 05:01
+UTC; #227 follows on the next Render deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Fifty-one PRs (#176–#226) landed across one review session and the
+Fifty-two PRs (#176–#227) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -171,6 +171,19 @@ deploy (live-verify shows the sha).
   long note instead of printing a page of it; a doubled period on a rule
   effect; and a screen of blank space in the demo's model slideshow on a
   phone.
+- **The readers, read a fifth time — on the whole code** (#227): sixteen
+  verified findings closed with tests. An opex, R&M, concession or
+  renovation spend per unit never clears a basis dealbreaker and "Price /
+  Unit" reads; a price per home / apartment / bay / any noun is never the
+  ask, nor is a projected, residual, disposition, forward, pro forma or
+  prior-year sale price; "Size:" is as bare as "Size"; a Year-2+ cap or a
+  cap on cost is never the going-in cap; an occupancy whose value says
+  stabilized is not today's; a deck with the plan's rows but no strategy
+  and no income in place is a development; "NOI at stabilization" is the
+  diff's plan row; the workbook, the buy box's price band and the mandate
+  ceiling read through the shared readers; parseMoney reads ±, ~, approx.,
+  circa, USD and negatives; "312 residential units" and a footnoted count
+  read; and the LOI infers the kind with the first signal as the page does.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":
