@@ -119,6 +119,24 @@ describe("buildRentRollWorkbook — structure", () => {
     ]);
   });
 
+  it("the Rollover tab's SF-expiring and leasing-capital columns carry data bars over the year rows only", async () => {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buffer as unknown as ArrayBuffer);
+    const ws = wb.getWorksheet("Rollover")!;
+    const cfs = (
+      ws as unknown as { conditionalFormattings: { ref: string; rules: { type: string; cfvo?: { type: string }[] }[] }[] }
+    ).conditionalFormattings;
+    const bars = cfs.filter((cf) => cf.rules.some((r) => r.type === "dataBar"));
+    // Year rows 4 through 14 (a ten-year hold plus the forward year); the
+    // Total row (15) draws no bar.
+    expect(bars.map((cf) => cf.ref).sort()).toEqual(["C4:C14", "M4:M14"]);
+    for (const cf of bars) {
+      const rule = cf.rules.find((r) => r.type === "dataBar")!;
+      expect(rule.cfvo?.map((c) => c.type)).toEqual(["min", "max"]);
+    }
+    expect(ws.getCell(15, 1).value).toBe("Total");
+  });
+
   it("never writes a computed value where a formula belongs", async () => {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(buffer as unknown as ArrayBuffer);
