@@ -240,9 +240,8 @@ export default async function ValuationsPage({
         </Link>
         <h1 className="text-2xl font-semibold tracking-tight text-ink">Valuations</h1>
         <p className="max-w-2xl text-sm text-muted">
-          Two brokers value the same asset and the numbers don&apos;t match. This decomposes the gap
-          into Year-1 NOI, cap rate and capex treatment, and then answers the question that actually
-          matters: what levered IRR each implied price produces under your model.
+          Two opinions of value, one asset: the gap decomposed into NOI, cap rate and capex, and each
+          implied price run through your model.
         </p>
       </header>
 

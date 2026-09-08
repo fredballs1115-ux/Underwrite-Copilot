@@ -92,9 +92,8 @@ export default async function BridgePage({
         </Link>
         <h1 className="text-2xl font-semibold tracking-tight text-ink">Assumption bridge</h1>
         <p className="max-w-2xl text-sm text-muted">
-          Which input moved the return, and by how much. Contributions are Shapley values over the
-          changed assumptions, so they don&apos;t depend on the order you apply the changes — and
-          they add up to the headline move exactly.
+          Which input moved the return, and by how much — Shapley values, so the order of changes
+          doesn&apos;t matter and the parts sum to the move.
         </p>
       </header>
 
@@ -170,9 +169,8 @@ export default async function BridgePage({
         <section className="rounded-lg border border-line bg-surface p-5">
           <h2 className="text-base font-semibold text-ink">Save a scenario</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted">
-            Starts from this deal&apos;s current assumptions. Change only what you&apos;re testing —
-            everything you leave alone stays exactly what the OM and your documents produced, so the
-            bridge attributes the move to your changes and nothing else.
+            Starts from this deal&apos;s current assumptions; change only what you&apos;re testing,
+            so the bridge attributes the move to that alone.
           </p>
           <form action={saveScenarioVersion} className="mt-4 flex flex-col gap-4">
             <input type="hidden" name="dealId" value={id} />

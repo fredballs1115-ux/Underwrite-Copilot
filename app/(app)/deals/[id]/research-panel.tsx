@@ -385,12 +385,9 @@ export async function ResearchPanel({
             </span>
           </div>
           <p className="mt-1 text-xs leading-relaxed text-muted">
-            No going-in cap to spread against debt: the building earns little or
-            nothing until the works are done. The plan is judged on yield on
-            total cost against the cap the finished product trades at — the
-            &ldquo;Yield on cost, stressed&rdquo; grid under the plan strip —
-            and its debt is construction or bridge debt sized to cost, not
-            permanent debt sized to today&apos;s income.
+            No going-in cap to spread against debt until the works are done; the
+            plan is judged on yield on total cost (the stressed grid under the
+            plan strip) and its debt is sized to cost.
           </p>
         </div>
       )}

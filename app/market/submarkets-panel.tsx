@@ -171,10 +171,9 @@ export async function SubmarketsPanel({
       </details>
 
       <p className="mt-3 text-[11px] leading-relaxed text-muted">
-        Licensed market data belongs to whoever licenses it. What you import
-        stays in your own account — never pooled into a shared dataset, never
-        read by another tenant, never redistributed. Check the terms of your
-        own licence before you import.
+        Licensed data stays in your own account — never pooled, never read by
+        another tenant, never redistributed. Check your licence&apos;s terms
+        before importing.
       </p>
     </section>
   );

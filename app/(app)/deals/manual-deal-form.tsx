@@ -233,9 +233,8 @@ export function ManualDealForm({
       </div>
 
       <p className="text-xs leading-relaxed text-muted">
-        *Enough to screen = the asking price — or NOI + cap rate, and the price
-        gets derived. Everything else sharpens the analysis: the challenger and
-        market check run on exactly what you give them.
+        *Enough to screen: the asking price, or NOI + cap rate (the price gets derived). Everything
+        else sharpens the analysis.
       </p>
 
       <SubmitButton mode={mode} />

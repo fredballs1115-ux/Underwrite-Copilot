@@ -103,10 +103,8 @@ export default async function AnalyticsPage() {
             Screen a few deals first
           </h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted">
-            Analytics needs at least three screened deals to say anything
-            honest. Run your next OMs through the pipeline and this page
-            starts paying rent — cap-rate trends, pricing over time, and
-            where your funnel actually thins out.
+            Analytics needs at least three screened deals — then cap-rate trends, pricing over time
+            and where the funnel thins show here.
           </p>
           <Link
             href="/deals"

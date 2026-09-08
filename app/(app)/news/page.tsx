@@ -255,11 +255,8 @@ export default async function NewsPage({
       <header>
         <h1 className="text-xl font-semibold tracking-tight">News</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          The day&apos;s real estate news, live from the publishers&apos; own
-          feeds, most decision-relevant first — every headline links straight
-          to the source. When the weekday sweep has run, its stories for your
-          markets follow, scored 0–10; law and regulation changes are flagged
-          here and as red banners app-wide.
+          Live from the publishers&apos; own feeds, most decision-relevant first; every headline
+          links to its source.
         </p>
       </header>
 

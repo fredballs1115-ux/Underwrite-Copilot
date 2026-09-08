@@ -73,10 +73,8 @@ export function ReconciliationPanel({
         </p>
       </div>
       <p className="mt-0.5 text-xs leading-relaxed text-muted">
-        Where the OM, rent roll, and T-12 disagree. The source in use is the one
-        treated as authoritative here — switch it per line if you trust a
-        different document, and the challenger uses your choice on the next
-        screen.
+        Where the OM, rent roll and T-12 disagree; switch the source per line and the next screen
+        uses your choice.
       </p>
 
       <div className="mt-4 flex flex-col gap-3">

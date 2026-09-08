@@ -126,8 +126,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   in the HTML for the lints, live-verify and screen readers.
   Before adding a section or a sentence, measure the page (`scratchpad`'s
   shoot script pattern: full-page height, word count, pictures, headings;
-  the fixture views via `VIEW_SHOTS_DIR` for signed-in pages) and ask what
-  picture replaces the words.
+  the fixture views via `VIEW_SHOTS_DIR` for signed-in pages;
+  `node scripts/prose-census.mjs` lists every JSX text run of 25+ words in
+  the sources, login or no login) and ask what picture replaces the words.
   live-verify gates on the hero headline and the build-sha stamp only, so a
   redesign never has to preserve copy to stay green.
 - Anything that touches a secret (Anthropic key, Supabase service-role key) is server-only.

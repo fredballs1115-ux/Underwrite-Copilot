@@ -67,12 +67,9 @@ export function PlanSensitivity({
         </p>
       </div>
       <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted">
-        The plan is judged on this spread, not on a cap rate against the price.
-        Stabilized NOI under the pro forma runs down the rows, budget over the
-        OM&apos;s across; each cell is the yield on total cost and its spread over
-        the reference cap. A pro forma that keeps its spread with NOI 20% short
-        and the budget 30% over is conservative; one that needs its own base case
-        is not.
+        Yield on total cost and its spread over the reference cap — NOI short
+        down the rows, budget over across. A plan that keeps its spread at 20%
+        short and 30% over is conservative.
       </p>
 
       <div className="mt-3 overflow-x-auto">

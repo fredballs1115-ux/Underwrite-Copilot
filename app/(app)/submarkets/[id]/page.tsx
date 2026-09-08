@@ -164,9 +164,8 @@ export default async function SubmarketPage({
       <section className="rounded-lg border border-line bg-surface p-5">
         <h2 className="text-base font-semibold text-ink">Exclusion rules</h2>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          A category that doesn&apos;t belong in this submarket distorts inventory, absorption and
-          the pipeline all at once — a hyperscale data-center campus in an industrial pull is the
-          classic case. These rules are persistent: set once, applied to every future import.
+          A category that doesn&apos;t belong here — a hyperscale data-center campus in an industrial
+          pull — distorts every figure. Rules persist across imports.
         </p>
         <p className="mt-3 rounded-md bg-faint px-3 py-2 font-mono text-sm text-ink">
           {exclusionSummary(applied)}
@@ -243,9 +242,8 @@ export default async function SubmarketPage({
       <section className="rounded-lg border border-line bg-surface p-5">
         <h2 className="text-base font-semibold text-ink">Import a market export</h2>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          CSV or XLSX, mapped the same way the rent roll is. Statistics rows upsert on their period;
-          a re-imported pipeline file replaces the rows it wrote before, so importing twice never
-          doubles the pipeline.
+          CSV or XLSX, mapped like the rent roll. A re-import replaces the rows its file wrote
+          before, so nothing doubles.
         </p>
         <form action={importSubmarketFile} className="mt-4 flex flex-wrap items-end gap-3">
           <input type="hidden" name="submarketId" value={id} />

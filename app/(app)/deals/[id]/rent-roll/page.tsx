@@ -161,9 +161,8 @@ export default async function RentRollPage({
         </Link>
         <h1 className="text-2xl font-semibold tracking-tight text-ink">Rent roll</h1>
         <p className="max-w-2xl text-sm text-muted">
-          Upload the broker&apos;s file, correct whatever the column mapper got wrong, and get WALT,
-          rollover and mark-to-market — then download a workbook whose formulas are live, so
-          changing the exit cap on the Assumptions tab moves the IRR.
+          Upload the broker&apos;s file, fix the mapping, get WALT, rollover and mark-to-market — and
+          a workbook whose formulas are live.
         </p>
       </header>
 
@@ -177,8 +176,8 @@ export default async function RentRollPage({
       <section className="rounded-lg border border-line bg-surface p-5">
         <h2 className="text-base font-semibold text-ink">Upload a rent roll</h2>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          CSV or XLSX. The header is rarely row 1 and the column names are never the same twice, so
-          the file is scanned for both — you confirm the result before anything is computed.
+          CSV or XLSX; the header row and columns are found for you, and you confirm the mapping
+          before anything is computed.
         </p>
         <form action={uploadRentRoll} className="mt-4 flex flex-wrap items-end gap-3">
           <input type="hidden" name="dealId" value={id} />
@@ -217,9 +216,8 @@ export default async function RentRollPage({
           </button>
         </form>
         <p className="mt-3 text-xs text-muted">
-          Rent rolls are client data. The file is stored under this deal&apos;s own path with
-          row-level security, its contents are never logged, and nothing in it is shared across
-          accounts.
+          Client data: stored under this deal with row-level security, never logged, never shared
+          across accounts.
         </p>
       </section>
 
@@ -304,10 +302,8 @@ export default async function RentRollPage({
           ) : null}
         </div>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          What happens when a lease rolls: does the tenant renew, at what rent, with how much TI and
-          LC, after how much downtime and free rent. Saved profiles are yours and reusable across
-          deals. The starting values are ordinary market convention, not any firm&apos;s internal
-          standards — change them to your own view.
+          How a lease rolls: renewal, rent, TI and LC, downtime and free rent. Profiles are yours
+          and reusable across deals; the defaults are market convention.
         </p>
         <form action={saveLeasingProfile} className="mt-4 flex flex-col gap-4">
           <input type="hidden" name="dealId" value={id} />

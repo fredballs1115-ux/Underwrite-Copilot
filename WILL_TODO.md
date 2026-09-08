@@ -3,18 +3,18 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#241 merged to main (live build
-sha `b36628a`, #241, confirmed equal to the main tip by live-verify at 15:19
-UTC — every one of the sixty-six is live, the homepage serves at 197 KB
-where it served at 488 KB, and the public-page lint #231 added reads all
-twelve public pages clean on every run; #242 and #243 followed and await
-the same proof).
+**Last updated 2026-09-08**, after PRs #176–#243 merged to main (live build
+sha `5fd662a`, #243, confirmed equal to the main tip by live-verify at 15:31
+UTC with its new `DEPLOY: LIVE` line — every one of the sixty-eight is live,
+the homepage serves at 197 KB where it served at 488 KB, and the public-page
+lint #231 added reads all twelve public pages clean on every run; #244
+follows and awaits the same proof).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Sixty-eight PRs (#176–#243) landed across one review session and the
+Sixty-nine PRs (#176–#244) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -335,6 +335,12 @@ deploy (live-verify shows the sha).
   "more", the whole text still in the HTML for the lints and the greps.
   1,267 words and three long paragraphs now; the research depth you asked
   for is one click away rather than gone.
+- **Twenty-two helper paragraphs on the tool pages, cut to a line each**
+  (#244) — found by a census of the sources for JSX text runs of
+  twenty-five words or more (`node scripts/prose-census.mjs`, kept in the
+  repo): rent roll, valuations, bridge, submarkets, comps, news,
+  data-health, analytics, the manual deal form, the LOI panel, the
+  reconciliation panel, the plan-sensitivity caption, the What's-new intro.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
