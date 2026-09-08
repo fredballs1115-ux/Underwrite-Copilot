@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "The rent roll draws each lease against market",
+      "blurb": "On the rent-roll page, each lease's mark to market is now a bar from a centre line — green to the right when the lease sits below market and has room to roll up, red to the left when it sits above market and will roll down — scaled to the widest gap in the roll, so the leases that matter stand out before the figures do. On a phone the table gives way to a card per lease: tenant and gap, the bar, then the rents.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-08",
       "title": "Both workbooks draw NOI and cash flow across the years as bars",
       "blurb": "The model workbook's Cash Flow tab and the rent-roll export's now carry Excel's own data bars across the NOI and levered cash-flow rows, so the growth — or a lease-up's dip — reads at a glance without a chart. Excel draws them off the live formulas, so they move as you change an assumption; the reversion column and the sale proceeds stay figures, so the bars compare year with year.",
       "href": "/deals"
