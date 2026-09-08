@@ -213,6 +213,11 @@ confirmed equal to the main tip after each batch.
   never a per-acre figure, and never on an operating asset or a conversion.
   The Excel source column names it as the acquisition basis with the build in
   the capital plan. Tests on the reader, the plan summary and the inputs.
+- **#206 The plan strip and the report say "Land cost" when that is what the
+  price is.** The plan summary now carries the label of its price figure, set
+  where the figure is read, and both surfaces print it — a development's
+  strip reads Stabilized NOI · Land cost · Budget · Total cost · Yield on
+  cost; a development with a stated asking price keeps "Price".
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
