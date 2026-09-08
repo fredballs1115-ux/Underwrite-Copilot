@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   challengerInstruction,
   extractionInstruction,
+  firstSignalInstruction,
   marketCheckInstruction,
   reconciliationInstruction,
   verdictInstruction,
@@ -128,5 +129,22 @@ describe("sector-aware market-check calibration", () => {
     const p = marketCheckInstruction("multifamily");
     expect(p).not.toContain("repriced double digits");
     expect(p).not.toContain("2019-vintage");
+  });
+});
+
+// The first signal is the first thing a buyer sees after upload, before any
+// label can be checked — so it has to know that a yield on cost or a
+// stabilized pro forma is not a going-in cap, for every asset class.
+describe("first signal — the going-in cap is today's income against the price, nothing else", () => {
+  it("tells the fast read to leave goingInCap empty for a stabilized, pro forma or yield-on-cost figure", () => {
+    for (const cls of ["multifamily", "office", "industrial", "retail", "auto"] as const) {
+      const p = firstSignalInstruction(cls);
+      expect(p, cls).toContain("TODAY's in-place income against the asking price");
+      expect(p, cls).toContain("yield on cost");
+      expect(p, cls).toContain("not a going-in cap at all");
+      expect(p, cls).toMatch(/leave `goingInCap` empty/);
+      // The take names the kind of deal in the plan vocabulary.
+      expect(p, cls).toContain("(stabilized, value-add, lease-up, conversion, development)");
+    }
   });
 });

@@ -46,7 +46,12 @@ import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource, type BuyBoxCheck } from "@/lib/criteria";
 import { scoreMandateFit, type MandateScore, type MandateVerdict } from "@/lib/mandate";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
-import { assessPlausibility, inferStrategy, planSummary } from "@/lib/deal-strategy";
+import {
+  IMPLIED_CAP_CEILING,
+  assessPlausibility,
+  inferStrategy,
+  planSummary,
+} from "@/lib/deal-strategy";
 import { PlanStrip, PlausibilityPanel } from "./plausibility-panel";
 import { PlanSensitivity } from "./plan-sensitivity";
 import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
@@ -501,6 +506,16 @@ export default async function DealPage({
   // The going-in cap only: a stabilized / pro forma cap or a yield on cost
   // describes the finished project on a plan deal, and would read as the
   // price's cap rate in this slot.
+  // The first signal's cap is a fast read with no label to check; before the
+  // extraction lands it fills this slot only when it can be a cap on the
+  // price at all (a 105% "cap" is a yield on cost or a pro forma, not a cap).
+  const signalCap = firstSignal?.goingInCap.trim() || null;
+  const signalCapPct = signalCap ? Number(signalCap.replace(/[^\d.]/g, "")) : NaN;
+  const signalCapPlausible =
+    signalCap != null &&
+    Number.isFinite(signalCapPct) &&
+    signalCapPct > 0.5 &&
+    signalCapPct <= IMPLIED_CAP_CEILING * 100;
   const summaryCap =
     findValue(metrics, /going[- ]?in cap/i, /stabili[sz]|pro ?forma|forward|projected/i) ??
     findValue(
@@ -508,7 +523,7 @@ export default async function DealPage({
       /\bcap rate\b/i,
       /exit|terminal|reversion|stabili[sz]|pro ?forma|forward|projected|yield/i,
     ) ??
-    (firstSignal?.goingInCap.trim() || null);
+    (signalCapPlausible ? signalCap : null);
   // Year built feeds the rules engine's age-based coverage tests (NYC
   // pre-1974, JC pre-1987, LA pre-1979, MoCo's rolling-age exemption). The
   // plausibility window guards against a mis-matched metric value.

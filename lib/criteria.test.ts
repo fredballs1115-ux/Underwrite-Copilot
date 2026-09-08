@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  buyBoxCheckSource,
   evaluateBuyBox,
   foldBuyBoxChecks,
   isEmptyBuyBox,
@@ -243,5 +244,46 @@ describe("geography — market-level territory chips", () => {
     // Without any state token the aliases stay off; the label still works.
     const bare = evaluateBuyBox("auto", ex([], { market: "Seattle" }), seattle);
     expect(check(bare, "Geography")?.status).toBe("pass"); // label needle, ungated
+  });
+});
+
+// The first signal stands in for the extraction mid-screen. Its cap is a fast
+// read with no label to check, so it counts as the going-in cap only when it
+// can be a cap on the price at all — a yield on cost or a stabilized pro
+// forma on a conversion reads as "105%" here, and a buy-box check on that
+// would be confidently wrong.
+describe("buyBoxCheckSource — the first signal's cap only when it can be a cap", () => {
+  const signal = (goingInCap: string) => ({
+    dealName: "1200 K Street — Office-to-Residential Conversion",
+    assetClass: "multifamily",
+    market: "Washington, DC",
+    askPrice: "$20,000,000",
+    goingInCap,
+    perUnit: "$62,500 per unit",
+  });
+  const capRow = (src: ReturnType<typeof buyBoxCheckSource>) =>
+    src?.metrics.find((m) => /going-in cap/i.test(m.label)) ?? null;
+
+  it("keeps a plausible going-in cap", () => {
+    const src = buyBoxCheckSource(null, signal("6.2%"), null);
+    expect(capRow(src)?.value).toBe("6.2%");
+    expect(src?.metrics.find((m) => m.label === "Asking price")?.value).toBe("$20,000,000");
+  });
+
+  it("drops a figure that cannot be a cap on the price — a yield on cost, a garbled read, a blank", () => {
+    expect(capRow(buyBoxCheckSource(null, signal("105%"), null))).toBeNull();
+    expect(capRow(buyBoxCheckSource(null, signal("0%"), null))).toBeNull();
+    expect(capRow(buyBoxCheckSource(null, signal(""), null))).toBeNull();
+    // The price still stands in either way.
+    expect(buyBoxCheckSource(null, signal("105%"), null)?.metrics.length).toBeGreaterThan(0);
+  });
+
+  it("the full extraction, when present, is used as-is", () => {
+    const extraction = {
+      assetClass: "multifamily",
+      market: "Washington, DC",
+      metrics: [{ label: "Going-in cap rate", value: "5.9%" }],
+    };
+    expect(capRow(buyBoxCheckSource(extraction, signal("105%"), null))?.value).toBe("5.9%");
   });
 });
