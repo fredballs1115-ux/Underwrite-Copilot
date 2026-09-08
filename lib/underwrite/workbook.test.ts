@@ -322,3 +322,110 @@ describe("Operating Metrics tab — the ratio ladder ties to the engine", () => 
     );
   }, 30000);
 });
+
+// ── Plan deals ────────────────────────────────────────────────────────────────
+// A conversion whose stabilized pro forma NOI exceeds the price. The workbook
+// must say what the deal is, book the OM's budget as year-1 capital with its
+// provenance beside it, keep the stabilized figure out of year-1 income, and
+// still evaluate error-free — an IRR that cannot converge on a year-1 outflow
+// eight times the price is a guarded dash, never #NUM!.
+const conversion: ExtractionResult = {
+  dealName: "1200 K Street — Office-to-Residential Conversion",
+  assetClass: "multifamily",
+  market: "Washington, DC",
+  address: "1200 K St NW, Washington, DC",
+  strategy: {
+    kind: "conversion",
+    summary: "Convert a vacant 300,000 SF office building into 320 apartments.",
+    capitalBudget: "$160M hard and soft costs",
+    timeline: "24 months of construction, 12 months of lease-up",
+  },
+  metrics: [
+    { label: "Purchase price", value: "$20,000,000", flagged: false, page: "p. 3" },
+    { label: "NOI (stabilized, pro forma)", value: "$21,000,000", flagged: false, page: "p. 12" },
+    { label: "Total project cost", value: "$180,000,000", flagged: false, page: "p. 14" },
+    { label: "Rentable square feet", value: "300,000", flagged: false, page: "p. 4" },
+  ],
+};
+
+function findRow(ws: ExcelJS.Worksheet, col: number, text: string): number {
+  for (let r = 1; r <= ws.rowCount; r++) {
+    if (ws.getCell(r, col).value === text) return r;
+  }
+  throw new Error(`"${text}" not found in column ${col} of ${ws.name}`);
+}
+
+describe("plan deals — the workbook says what the deal is and keeps the plan out of year 1", () => {
+  let hf: ReturnType<typeof HyperFormula.buildFromSheets>;
+  let wb: ExcelJS.Workbook;
+  const plan = deriveUnderwriteInputs(conversion, "fallback");
+  const planEngine = computeUnderwrite(plan.inputs);
+  beforeAll(async () => {
+    ({ hf, wb } = await loadIntoHf(await buildUnderwriteWorkbook(plan)));
+  });
+
+  it("names the deal type on the Cover, the Deal Summary and the Assumptions tab", () => {
+    const cover = wb.getWorksheet("Cover")!;
+    const cr = findRow(cover, 2, "Deal type");
+    expect(cover.getCell(cr, 3).value).toBe("Conversion");
+    expect(String(cover.getCell(cr + 1, 3).value)).toMatch(/yield on total cost/);
+    expect(String(cover.getCell(cr + 1, 3).value)).toMatch(/books the capital budget in year 1/);
+
+    const summary = wb.getWorksheet("Deal Summary")!;
+    const sr = findRow(summary, 1, "Deal Type");
+    expect(summary.getCell(sr, 2).value).toBe("Conversion");
+    expect(summary.getCell(sr, 4).value).toBe("Capital Budget (yr 1)");
+
+    const assum = wb.getWorksheet("Assumptions")!;
+    const ar = findRow(assum, 1, "Deal Type");
+    expect(assum.getCell(ar, 2).value).toBe("Conversion");
+    expect(String(assum.getCell(ar, 3).value)).toMatch(/never the OM's stabilized pro forma/);
+  });
+
+  it("books the OM's budget as year-1 capital, with its page and derivation beside it", () => {
+    const assum = wb.getWorksheet("Assumptions")!;
+    const row = findRow(assum, 1, "Capital Improvements (yr 1)");
+    expect(assum.getCell(row, 2).value).toBe(160_000_000);
+    expect(String(assum.getCell(row, 3).value)).toMatch(/^OM p\. 14 — Total project cost less the price/);
+    expect(Number(named(hf, "CapImprovements"))).toBe(160_000_000);
+  });
+
+  it("keeps the stabilized pro forma out of year-1 income and says why", () => {
+    const assum = wb.getWorksheet("Assumptions")!;
+    const row = findRow(assum, 1, "In-Place Rental Revenue (annual)");
+    expect(String(assum.getCell(row, 3).value)).toMatch(/does not anchor year 1/);
+    // Year-1 NOI is the 6% screening default on a $20M price — not $21M.
+    expect(planEngine.cashFlow[0].noi).toBeGreaterThan(0);
+    expect(planEngine.cashFlow[0].noi).toBeLessThan(2_000_000);
+    expect(planEngine.cashFlow[0].capitalImprovements).toBe(160_000_000);
+  });
+
+  it("a stabilized deal gets no plan wording (the row is absent, not blank)", async () => {
+    const stabilized = deriveUnderwriteInputs(
+      { ...extraction, strategy: { kind: "stabilized", summary: "", capitalBudget: "", timeline: "" } },
+      "fallback",
+    );
+    const { wb: sb } = await loadIntoHf(await buildUnderwriteWorkbook(stabilized));
+    const summary = sb.getWorksheet("Deal Summary")!;
+    const sr = findRow(summary, 1, "Deal Type");
+    expect(summary.getCell(sr, 2).value).toBe("Stabilized");
+    expect(summary.getCell(sr, 4).value ?? null).toBeNull();
+    const cover = sb.getWorksheet("Cover")!;
+    const cr = findRow(cover, 2, "Deal type");
+    expect(String(cover.getCell(cr + 1, 3).value)).not.toMatch(/capital budget/);
+  });
+
+  it("still has zero formula errors, and total uses tie to the engine", () => {
+    const errors: string[] = [];
+    for (const name of hf.getSheetNames()) {
+      const id = hf.getSheetId(name)!;
+      (hf.getSheetValues(id) as unknown[][]).forEach((row, ri) =>
+        row.forEach((v, ci) => {
+          if (isErr(v)) errors.push(`${name}[${ri},${ci}]=${JSON.stringify(v)}`);
+        }),
+      );
+    }
+    expect(errors).toEqual([]);
+    expect(Number(named(hf, "TotalUses"))).toBeCloseTo(planEngine.sourcesUses.totalUses, 0);
+  });
+});

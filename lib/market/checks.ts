@@ -14,6 +14,7 @@
  * Pure.
  */
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
+import { STRATEGY_LABEL, isPlanDeal, type StrategyKind } from "@/lib/deal-strategy";
 import type { SubmarketMetrics } from "./metrics";
 import { RENT_BASIS_LABEL, type Dismissal, type Submarket } from "./types";
 
@@ -51,11 +52,21 @@ export function assumptionWarnings(
   metrics: SubmarketMetrics,
   submarket: Submarket,
   dismissals: Dismissal[] = [],
+  strategy: StrategyKind = "unknown",
 ): AssumptionWarning[] {
   const byCode = new Map(dismissals.map((d) => [d.code, d]));
   const out: AssumptionWarning[] = [];
   const push = (w: Omit<AssumptionWarning, "dismissed">) =>
     out.push({ ...w, dismissed: byCode.get(w.code) ?? null });
+
+  // A plan deal (conversion, development, lease-up, value-add) is not a
+  // bystander to the construction pipeline — it IS part of it. Its lease-up
+  // competes with every building in that pipeline for the same tenants, so
+  // the supply warnings say so rather than treating the deal as an operating
+  // asset watching supply arrive around it.
+  const planClause = isPlanDeal(strategy)
+    ? ` This ${STRATEGY_LABEL[strategy].toLowerCase()} deal delivers into that same pipeline — its lease-up competes with every one of those buildings for the same tenants.`
+    : "";
 
   // ── Rent growth vs the submarket's own trailing CAGR ────────────────────
   const { rent } = metrics;
@@ -85,7 +96,7 @@ export function assumptionWarnings(
         "en-US",
       )} SF under construction against ${Math.round(metrics.supply.t12Absorption).toLocaleString(
         "en-US",
-      )} SF of trailing-12 net absorption — the market is giving space back while more is being built. An exit cap at or below the going-in cap is hard to defend here.`,
+      )} SF of trailing-12 net absorption — the market is giving space back while more is being built. An exit cap at or below the going-in cap is hard to defend here.${planClause}`,
       basis: `${metrics.absorption.quartersUsed} quarter(s): ${metrics.absorption.periods.join(", ")}`,
     });
   } else if (metrics.supply.status === "ok" && metrics.supply.months > threshold) {
@@ -100,7 +111,7 @@ export function assumptionWarnings(
         compressing
           ? ` Your ${pct(inputs.exitCapPct, 2)} exit cap assumes the market tightens while that delivers.`
           : ` Exit cap compression is hard to defend while that delivers.`
-      }`,
+      }${planClause}`,
       basis: `${Math.round(metrics.supply.ucSf).toLocaleString("en-US")} SF UC ÷ ${Math.round(
         metrics.supply.monthlyAbsorption,
       ).toLocaleString("en-US")} SF/mo absorption`,
