@@ -1262,6 +1262,19 @@ function MetaLine({
   );
 }
 
+/** The mandate score drawn: a 0–100 bar in the current text colour (the
+ *  call's), so a row reads its fit before the number does. */
+function FitBar({ score }: { score: number }) {
+  return (
+    <span aria-hidden data-fit-bar className="h-1 w-10 overflow-hidden rounded-full bg-faint">
+      <span
+        className="block h-full rounded-full bg-current"
+        style={{ width: `${Math.max(0, Math.min(100, score))}%` }}
+      />
+    </span>
+  );
+}
+
 // Memoized: a keystroke in the search box or a compare toggle must not
 // re-render every row of a large pipeline.
 const DealRow = memo(function DealRow({
@@ -1316,26 +1329,54 @@ const DealRow = memo(function DealRow({
       <span className="font-mono tabular-nums">{d.slots.cap}</span> cap
     </>
   ) : d.slots.yoc ? (
-    <>
-      <span className="font-mono tabular-nums">{d.slots.yoc}</span> yield on cost
-    </>
+    // This bit only shows below `md` (the cap column takes over there), so
+    // it wears the column's "yoc" micro-label: "7.2% yield on cost" was the
+    // part a phone's one-line truncation cut.
+    <span title="Yield on total cost — a plan deal has no going-in cap">
+      <span className="font-mono tabular-nums">{d.slots.yoc}</span>{" "}
+      <span className="text-[9px] font-medium uppercase">yoc</span>
+    </span>
   ) : null;
+  // The mandate score, when there is one: a call's colour, the words a
+  // screen reader gets, and the tooltip — shared by the `lg` column and the
+  // bar the narrower widths draw. The words "buy box" live on the Buy box
+  // page and the deal header's chip — the row doesn't repeat them.
+  const scored = d.score != null && d.mandateVerdict ? { score: d.score, verdict: d.mandateVerdict } : null;
+  const fitCls = scored ? (d.fit === "outside" ? "text-kill" : MANDATE_META[scored.verdict].cls) : "";
+  const fitWords = scored
+    ? d.fit === "outside"
+      ? `Fit ${scored.score} · Outside box`
+      : `Fit ${scored.score} · ${MANDATE_META[scored.verdict].label}`
+    : null;
+  const fitTitle = scored
+    ? d.fit === "outside"
+      ? `${scored.score} / 100 mandate fit, but outside the box on a criterion the score doesn't weigh (e.g. price)`
+      : `${scored.score} / 100 · ${MANDATE_META[scored.verdict].label} — mandate fit`
+    : null;
+  // Without a score there is no bar to draw, so the fit stays a word in the
+  // meta line; with one, the bar below carries it and the word goes.
   const fitBit =
-    d.score != null && d.mandateVerdict ? (
-      // "Fit 82 · Pursue": the mandate score. The words "buy box" live on the
-      // Buy box page and the deal header's chip — the row doesn't repeat them.
-      d.fit === "outside" ? (
-        <span className="font-medium text-kill">Fit {d.score} · Outside box</span>
-      ) : (
-        <span className={`font-medium ${MANDATE_META[d.mandateVerdict].cls}`}>
-          Fit {d.score} · {MANDATE_META[d.mandateVerdict].label}
-        </span>
-      )
-    ) : d.fit ? (
+    !scored && d.fit ? (
       <span className={`font-medium ${FIT_META[d.fit].cls}`}>
         {FIT_META[d.fit].label} box
       </span>
     ) : null;
+  // Below `lg` the score column is hidden, and as a word at the end of the
+  // meta line the fit was the part a one-line truncation cut first. Draw it
+  // instead: the same bar the column draws, on its own line, in the call's
+  // colour — the words stay for a screen reader.
+  const fitBar = scored ? (
+    <span
+      className={`mt-1.5 flex items-center gap-1.5 lg:hidden ${fitCls}`}
+      title={fitTitle ?? undefined}
+    >
+      <span aria-hidden className="text-[9px] font-medium uppercase tracking-wide text-muted">
+        fit
+      </span>
+      <FitBar score={scored.score} />
+      <span className="sr-only">{fitWords}</span>
+    </span>
+  ) : null;
   const dateBit = (
     <span className="font-mono tabular-nums">{fmtDate(d.createdAt)}</span>
   );
@@ -1403,6 +1444,7 @@ const DealRow = memo(function DealRow({
           className="hidden xl:block"
           bits={[dueBit, marketBit, coveredBit, addedByBit]}
         />
+        {fitBar}
       </div>
       {/* Column cells — widths, order, and gaps mirror the header row. */}
       <span className="hidden w-24 shrink-0 items-center gap-1.5 truncate text-sm capitalize text-muted lg:flex">
@@ -1433,23 +1475,14 @@ const DealRow = memo(function DealRow({
           ))}
       </span>
       <span className="hidden w-16 shrink-0 flex-col items-end text-right text-xs font-semibold lg:flex">
-        {d.score != null && d.mandateVerdict ? (
+        {scored ? (
           // The score, and the score drawn: a 0–100 bar in the call's colour.
           <span
-            className={`flex flex-col items-end gap-1 tabular-nums ${d.fit === "outside" ? "text-kill" : MANDATE_META[d.mandateVerdict].cls}`}
-            title={
-              d.fit === "outside"
-                ? `${d.score} / 100 mandate fit, but outside the box on a criterion the score doesn't weigh (e.g. price)`
-                : `${d.score} / 100 · ${MANDATE_META[d.mandateVerdict].label} — mandate fit`
-            }
+            className={`flex flex-col items-end gap-1 tabular-nums ${fitCls}`}
+            title={fitTitle ?? undefined}
           >
-            {d.score}
-            <span aria-hidden className="h-1 w-10 overflow-hidden rounded-full bg-faint">
-              <span
-                className="block h-full rounded-full bg-current"
-                style={{ width: `${Math.max(0, Math.min(100, d.score))}%` }}
-              />
-            </span>
+            {scored.score}
+            <FitBar score={scored.score} />
           </span>
         ) : d.fit ? (
           <span className={FIT_META[d.fit].cls}>{FIT_META[d.fit].label}</span>
