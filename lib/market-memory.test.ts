@@ -184,3 +184,24 @@ describe("range formatting", () => {
     expect(fmtBasisRange({ min: 200, median: 200, max: 200, basis: "sf" })).toBe("$200/SF");
   });
 });
+
+describe("a plan deal's stabilized cap never enters the market read", () => {
+  it("drops the stabilized / pro forma cap but keeps the deal on its basis", () => {
+    const comps = buildComps([
+      deal("k", {
+        market: "Washington, DC",
+        metrics: [["Stabilized cap rate", "11.7%"], ["Purchase price", "$20,000,000"], ["Units", "320"]],
+      }),
+      deal("l", {
+        market: "Washington, DC",
+        metrics: [["Going-in cap rate", "5.8%"], ["Purchase price", "$40,000,000"], ["Units", "200"]],
+      }),
+    ]);
+    expect(comps.map((c) => c.dealId).sort()).toEqual(["k", "l"]);
+    expect(comps.find((c) => c.dealId === "k")!.capPct).toBeNull();
+    expect(comps.find((c) => c.dealId === "l")!.capPct).toBeCloseTo(5.8, 6);
+    // The market's cap read stands on the one real going-in figure.
+    const g = summarizeMarkets(comps)[0];
+    expect(g.cap).not.toBeNull();
+  });
+});

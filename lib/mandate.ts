@@ -23,6 +23,7 @@ import {
   findMetric,
   parseMoney,
   parsePct,
+  findGoingInCap,
   geoTargets,
   hasNoDealbreakers,
   METRIC_FIND,
@@ -106,12 +107,12 @@ function moneyOf(metrics: MetricLike[], pat: Pattern): number | null {
   return m ? parseMoney(m.value) : null;
 }
 
-/** Going-in cap: prefer the labelled going-in figure, else a generic cap rate
- *  that isn't the exit/terminal cap. Mirrors evaluateBuyBox exactly. */
+/** Going-in cap: the shared reader — the labelled going-in figure, else a
+ *  plain cap rate that is neither the exit cap nor a plan deal's stabilized /
+ *  pro forma figure. The same call evaluateBuyBox makes, so the score and the
+ *  check can never disagree on which number is the cap. */
 function goingInCapPct(metrics: MetricLike[]): number | null {
-  const m =
-    findMetric(metrics, METRIC_FIND.goingInCap.inc) ??
-    findMetric(metrics, METRIC_FIND.capRate.inc, METRIC_FIND.capRate.exc);
+  const m = findGoingInCap(metrics);
   return m ? parsePct(m.value) : null;
 }
 

@@ -135,6 +135,16 @@ gated on tsc / eslint / the full suite / a production build.
   it — the deal header's cap slot and the buy-box check that runs mid-screen
   — accept it only inside (0.5%, 25%]. Tests on the prompt for every asset
   class and on the buy-box source for both sides of the guard.
+- **#198 The buy-box check, the mandate score and the market memory read
+  the same going-in cap — and never the finished project's.** Three
+  surfaces still fell back from "going-in cap" to any "cap rate" that was
+  not the exit cap, so a conversion's "Stabilized cap rate 11.7%" cleared a
+  6% floor, scored "Fit 100 · Pursue", and averaged into what the account
+  "usually sees" in the market. One shared reader (`findGoingInCap`) now
+  excludes stabilized / pro forma / forward / at-completion caps and yields
+  on cost everywhere, and on a plan deal the buy-box check says why there
+  is no going-in cap to judge — the plan is judged on yield on total cost —
+  instead of "no parseable cap rate yet". Tests on all three.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

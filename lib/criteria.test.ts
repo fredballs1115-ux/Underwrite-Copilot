@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buyBoxCheckSource,
   evaluateBuyBox,
+  findGoingInCap,
   foldBuyBoxChecks,
   isEmptyBuyBox,
   buyBoxLines,
@@ -285,5 +286,49 @@ describe("buyBoxCheckSource — the first signal's cap only when it can be a cap
       metrics: [{ label: "Going-in cap rate", value: "5.9%" }],
     };
     expect(capRow(buyBoxCheckSource(extraction, signal("105%"), null))?.value).toBe("5.9%");
+  });
+});
+
+// The going-in cap is today's income against the price. A plan deal's
+// stabilized / pro forma cap or yield on cost describes the finished project,
+// and reading it as the going-in cap is how a conversion "cleared" a 6% floor
+// at 11.7%. One reader for the buy-box check, the mandate score and the
+// market memory.
+describe("findGoingInCap — never the finished project's figure", () => {
+  const rows = (pairs: Array<[string, string]>) => pairs.map(([label, value]) => ({ label, value }));
+
+  it("prefers the labelled going-in figure over a stabilized cap in the same OM", () => {
+    const m = findGoingInCap(rows([["Stabilized cap rate", "11.7%"], ["Going-in cap rate", "6.2%"]]));
+    expect(m?.value).toBe("6.2%");
+  });
+
+  it("accepts a plain cap rate, but not the exit cap or the finished project's", () => {
+    expect(findGoingInCap(rows([["Cap rate", "6.0%"]]))?.value).toBe("6.0%");
+    expect(findGoingInCap(rows([["Exit cap rate", "5.5%"]]))).toBeNull();
+    expect(findGoingInCap(rows([["Cap rate (stabilized, pro forma)", "11.7%"]]))).toBeNull();
+    expect(findGoingInCap(rows([["Stabilized cap rate", "11.7%"]]))).toBeNull();
+    expect(findGoingInCap(rows([["Going-in cap rate (stabilized)", "11.7%"]]))).toBeNull();
+    expect(findGoingInCap(rows([["Yield on cost", "11.7%"]]))).toBeNull();
+    expect(findGoingInCap(rows([["Cap rate at completion", "7.0%"]]))).toBeNull();
+  });
+
+  it("evaluateBuyBox: a conversion with only a stabilized cap is 'unknown' and says why, never a pass", () => {
+    const box: BuyBox = { minCapPct: 5.0 };
+    const conversion = {
+      ...ex([
+        ["Purchase price", "$20,000,000"],
+        ["Stabilized cap rate", "11.7%"],
+        ["NOI (stabilized, pro forma)", "$21,000,000"],
+      ]),
+      strategy: { kind: "conversion" },
+    };
+    const c = check(evaluateBuyBox("multifamily", conversion, box), "Going-in cap")!;
+    expect(c.status).toBe("unknown");
+    expect(c.detail).toMatch(/a conversion deal has no going-in cap/);
+    expect(c.detail).toMatch(/yield on total cost/);
+    // A stabilized asset with the same missing figure keeps the plain wording.
+    const plain = check(evaluateBuyBox("multifamily", ex([["Purchase price", "$20,000,000"]]), box), "Going-in cap")!;
+    expect(plain.status).toBe("unknown");
+    expect(plain.detail).toMatch(/no parseable cap rate yet/);
   });
 });

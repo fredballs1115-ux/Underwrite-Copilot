@@ -233,3 +233,24 @@ describe("scoreMandateFit — agrees with the buy-box check on the shared figure
     expect(dim(r, "cap")?.status).toBe("miss");
   });
 });
+
+describe("scoreMandateFit — a plan deal's stabilized cap never earns cap credit", () => {
+  it("a conversion showing only a stabilized 11.7% cap leaves the cap dimension unknown", () => {
+    const box: BuyBox = { minCapPct: 5.0 };
+    const conversion = ex([
+      ["Purchase price", "$20,000,000"],
+      ["Stabilized cap rate", "11.7%"],
+      ["NOI (stabilized, pro forma)", "$21,000,000"],
+    ]);
+    const r = scoreMandateFit("multifamily", conversion, box);
+    expect(dim(r, "cap")!.status).toBe("unknown");
+    expect(r.score).toBeNull(); // nothing checkable → no score, not a PURSUE
+    // The same OM with a labelled going-in figure scores on THAT figure.
+    const withGoingIn = ex([
+      ["Purchase price", "$20,000,000"],
+      ["Stabilized cap rate", "11.7%"],
+      ["Going-in cap rate", "4.90%"],
+    ]);
+    expect(dim(scoreMandateFit("multifamily", withGoingIn, box), "cap")!.status).toBe("partial");
+  });
+});
