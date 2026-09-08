@@ -3,15 +3,15 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#221 merged to main (live build
-sha `a9f3d10`, #220, confirmed equal to the main tip by live-verify at 02:50
-UTC; #221 follows on the next Render deploy).
+**Last updated 2026-09-08**, after PRs #176–#222 merged to main (live build
+sha `75c6dcb`, #221, confirmed equal to the main tip by live-verify at 02:55
+UTC; #222 follows on the next Render deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Forty-six PRs (#176–#221) landed across one review session and the
+Forty-seven PRs (#176–#222) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -137,6 +137,10 @@ deploy (live-verify shows the sha).
   building's square footage through one reader — a "Land SF", an average
   unit size, a "Retail SF" component or a "Vacant SF" row is never the
   building.
+- **The occupancy the model calls "in place" is today's** (#222): the Excel
+  model's "In-Place Occupancy" cell and the retrade diff's Occupancy row
+  never carry a stabilized or pro forma figure; an OM that states only the
+  finished project's occupancy leaves the cell "n/a".
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":

@@ -228,3 +228,36 @@ describe("deriveUnderwriteInputs — a spelled-out NOI label anchors", () => {
     expect(r.cashFlow[0].noi).toBeCloseTo(2_600_000, 0);
   });
 });
+
+describe("deriveUnderwriteInputs — the In-Place Occupancy cell reads today's figure", () => {
+  const mf = (metrics: Array<[string, string]>): ExtractionResult => ({
+    dealName: "Maddox Apartments",
+    assetClass: "multifamily",
+    market: "Dallas, TX",
+    address: "",
+    metrics: metrics.map(([label, value]) => ({ label, value, flagged: false, page: "" })),
+  });
+
+  it("a stabilized occupancy listed first never fills it; the current figure does", () => {
+    const { meta } = deriveUnderwriteInputs(
+      mf([
+        ["Asking price", "$50,000,000"],
+        ["Stabilized occupancy", "95%"],
+        ["Current occupancy", "42%"],
+      ]),
+      "x",
+    );
+    expect(meta.occupancyPct).toBeCloseTo(0.42, 6);
+  });
+
+  it("an OM that states only the finished project's occupancy states none", () => {
+    const { meta } = deriveUnderwriteInputs(
+      mf([
+        ["Asking price", "$50,000,000"],
+        ["Stabilized occupancy", "95%"],
+      ]),
+      "x",
+    );
+    expect(meta.occupancyPct).toBeNull();
+  });
+});

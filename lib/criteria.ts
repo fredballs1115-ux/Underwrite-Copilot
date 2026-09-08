@@ -410,6 +410,35 @@ export function buildingSfFromMetrics(metrics: MetricLike[]): number | null {
   return row ? parseSf(row.value) : null;
 }
 
+// ── Today's occupancy ────────────────────────────────────────────────────
+//
+// The occupancy an OM states for the building as it stands — never the
+// sponsor's stabilized / pro forma / target figure, a break-even, a market
+// average, or a development's pre-leasing — for the cell the Excel model
+// labels "In-Place Occupancy" and the retrade diff's Occupancy row. An OM
+// that lists "Stabilized occupancy: 95%" above "Current occupancy: 42%"
+// must read 42%; one that states only the stabilized figure states no
+// occupancy today.
+const OCC_INCLUDE = /occupancy|occupied|\bleased\b/i;
+const OCC_EXCLUDE =
+  /economic|physical vacancy|stabili[sz]|pro ?forma|projected|forward|target|underwritten|year ?\d|\byr ?\d|\by\d\b|at (completion|stabili[sz]ation)|pre-?leas|break-?even|market|submarket|comp|average|avg\b|history|historical/i;
+const OCC_IN_PLACE = /current|in[- ]?place|physical|actual|as of|t-?12|ttm|trailing|existing|today|in place/i;
+
+/** The metric row stating today's occupancy: an explicitly in-place row
+ *  first, else a plain occupancy row that carries no forward word; null
+ *  when the OM states only the finished project's figure. */
+export function occupancyRow(metrics: MetricLike[]): MetricLike | null {
+  const eligible = metrics.filter((m) => OCC_INCLUDE.test(m.label) && !OCC_EXCLUDE.test(m.label));
+  return eligible.find((m) => OCC_IN_PLACE.test(m.label)) ?? eligible[0] ?? null;
+}
+
+/** Today's occupancy as a percentage (0–100), or null. */
+export function occupancyPctFromMetrics(metrics: MetricLike[]): number | null {
+  const row = occupancyRow(metrics);
+  const n = row ? parsePct(row.value) : null;
+  return n != null && n >= 0 && n <= 100 ? n : null;
+}
+
 /** The effective price band, folding the legacy max-only field in. */
 export function priceBand(box: BuyBox): { min?: number; max?: number } {
   return {

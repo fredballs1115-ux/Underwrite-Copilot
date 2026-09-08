@@ -3,6 +3,7 @@ import {
   buildingSfFromMetrics,
   buyBoxCheckSource,
   evaluateBuyBox,
+  occupancyPctFromMetrics,
   parseSf,
   findGoingInCap,
   foldBuyBoxChecks,
@@ -489,5 +490,47 @@ describe("buildingSfFromMetrics — the building's size, never the land's, a uni
     // A bare "Size" row whose value is an acreage is a land size, not a building.
     expect(buildingSfFromMetrics([{ label: "Size", value: "12 acres" }])).toBeNull();
     expect(buildingSfFromMetrics([{ label: "Size", value: "250,000 SF" }])).toBe(250_000);
+  });
+});
+
+// Today's occupancy — the cell the Excel model labels "In-Place Occupancy"
+// and the retrade diff's Occupancy row — is never the sponsor's stabilized
+// or pro forma figure.
+describe("occupancyPctFromMetrics — today's occupancy, never the sponsor's stabilized figure", () => {
+  it("an in-place row wins over a stabilized one listed first", () => {
+    expect(
+      occupancyPctFromMetrics([
+        { label: "Stabilized occupancy", value: "95%" },
+        { label: "Current occupancy", value: "42%" },
+      ]),
+    ).toBe(42);
+    expect(
+      occupancyPctFromMetrics([
+        { label: "Occupancy (pro forma)", value: "95%" },
+        { label: "Occupancy", value: "88%" },
+      ]),
+    ).toBe(88);
+  });
+
+  it("a plain occupancy row reads; a forward, break-even, market or pre-leasing row never does", () => {
+    expect(occupancyPctFromMetrics([{ label: "Occupancy", value: "93.5%" }])).toBe(93.5);
+    expect(occupancyPctFromMetrics([{ label: "Physical occupancy", value: "91%" }])).toBe(91);
+    expect(occupancyPctFromMetrics([{ label: "Leased", value: "96%" }])).toBe(96);
+    for (const label of [
+      "Stabilized occupancy",
+      "Occupancy (pro forma)",
+      "Projected occupancy",
+      "Target occupancy",
+      "Year 1 occupancy",
+      "Occupancy at stabilization",
+      "Pre-leased",
+      "Break-even occupancy",
+      "Submarket occupancy",
+      "Market occupancy",
+      "Average occupancy (comps)",
+      "Economic occupancy",
+    ]) {
+      expect(occupancyPctFromMetrics([{ label, value: "95%" }]), label).toBeNull();
+    }
   });
 });
