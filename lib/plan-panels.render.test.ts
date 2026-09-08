@@ -95,3 +95,40 @@ describe("ConstructionDebtPanel — the plan's debt", () => {
     expect(html).toMatch(/aria-label="Years to take-out"[^>]*value="2"/);
   });
 });
+
+describe("ConstructionDebtPanel — the opening sentence follows the kind of plan", () => {
+  it("a value-add is bridge debt on an income-producing asset; a conversion borrows against cost alone", () => {
+    const valueAdd = planSummary(
+      {
+        ...CONVERSION,
+        dealName: "Maddox Apartments — value-add",
+        strategy: { kind: "value_add", summary: "Renovate 248 units.", capitalBudget: "$6M", timeline: "18 months" },
+        metrics: [
+          { label: "Asking price", value: "$50,000,000", flagged: false, page: "p. 3" },
+          { label: "NOI (in-place)", value: "$3,000,000", flagged: false, page: "p. 7" },
+          { label: "NOI (stabilized, pro forma)", value: "$3,900,000", flagged: false, page: "p. 12" },
+          { label: "Renovation budget", value: "$6,000,000", flagged: false, page: "p. 14" },
+        ],
+      },
+      { kind: "value_add", label: "Value-add", summary: "Renovate 248 units.", source: "extraction" },
+    )!;
+    const base = {
+      planLabel: "Value-add",
+      exitCapPct: 6,
+      takeOutRatePct: 6.25,
+      amortYears: 30,
+      minDscr: 1.25,
+      minDebtYieldPct: 8,
+      maxLtvPct: 65,
+      numCls: "input",
+    };
+    const va = renderToStaticMarkup(React.createElement(ConstructionDebtPanel, { ...base, plan: valueAdd }));
+    expect(va).toContain("bridge debt sized to total cost");
+    expect(va).not.toContain("income it does not have yet");
+    expect(va).toMatch(/aria-label="Years to take-out"[^>]*value="1.5"/);
+    const conv = renderToStaticMarkup(
+      React.createElement(ConstructionDebtPanel, { ...base, plan, planLabel: "Conversion" }),
+    );
+    expect(conv).toContain("income it does not have yet");
+  });
+});

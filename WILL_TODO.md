@@ -3,16 +3,17 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#202 merged to main (live build
-sha `ec328d0`, #200, confirmed equal to the main tip by live-verify at 00:46
-UTC; #201–#202 follow on the next Render deploy).
+**Last updated 2026-09-08**, after PRs #176–#203 merged to main (live build
+sha `ea4807e`, #201, confirmed equal to the main tip by live-verify at 00:51
+UTC; #202–#203 follow on the next Render deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Four PRs landed from one review session; each is live once Render finishes the
-`main` deploy (live-verify shows the sha).
+Twenty-seven PRs (#176–#202) landed across one review session and the
+correction round that followed; each is live once Render finishes the `main`
+deploy (live-verify shows the sha).
 
 - **Maps and building photos point at the building** (#176). Street addresses
   go to the US Census geocoder first, precision is read off the answer, the
