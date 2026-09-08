@@ -268,6 +268,7 @@ describe("Operating Metrics tab — the ratio ladder ties to the engine", () => 
       "Breakeven Occupancy",
       "Cash-on-Cash (levered)",
       "Price / SF",
+      "All-in Basis / SF (price + capital plan)",
       "Year-1 NOI / SF",
     ]) {
       expect(opsLabelRow(wb, lab), lab).toBeGreaterThan(0);
@@ -318,6 +319,14 @@ describe("Operating Metrics tab — the ratio ladder ties to the engine", () => 
     expect(priceRow).toBeGreaterThan(0);
     expect(Number(opsValue(hf2, priceRow, 2))).toBeCloseTo(
       m2.inputs.purchasePrice / 250,
+      0,
+    );
+    // The all-in basis is a live formula over the capital-plan input: with
+    // no capital plan it equals the price per unit.
+    const basisRow = opsLabelRow(wb2, "All-in Basis / Unit (price + capital plan)");
+    expect(basisRow).toBeGreaterThan(0);
+    expect(Number(opsValue(hf2, basisRow, 2))).toBeCloseTo(
+      (m2.inputs.purchasePrice + m2.inputs.capitalImprovementsYr1) / 250,
       0,
     );
   }, 30000);
@@ -388,6 +397,18 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
     expect(assum.getCell(row, 2).value).toBe(160_000_000);
     expect(String(assum.getCell(row, 3).value)).toMatch(/^OM p\. 14 — Total project cost less the price/);
     expect(Number(named(hf, "CapImprovements"))).toBe(160_000_000);
+  });
+
+  it("the all-in basis per SF is a live formula over price plus the capital plan — $600/SF", () => {
+    const ws = wb.getWorksheet("Operating Metrics")!;
+    const row = findRow(ws, 1, "All-in Basis / SF (price + capital plan)");
+    const id = hf.getSheetId("Operating Metrics")!;
+    const value = (hf.getSheetValues(id) as unknown[][])[row - 1]?.[1];
+    expect(Number(value)).toBeCloseTo(180_000_000 / 300_000, 6);
+    // The shell's price alone is a different, smaller number — never the basis here.
+    const priceRow = findRow(ws, 1, "Price / SF");
+    const priceValue = (hf.getSheetValues(id) as unknown[][])[priceRow - 1]?.[1];
+    expect(Number(priceValue)).toBeCloseTo(20_000_000 / 300_000, 6);
   });
 
   it("keeps the stabilized pro forma out of year-1 income and says why", () => {

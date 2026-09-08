@@ -1060,6 +1060,15 @@ function buildOperatingMetrics(
     u.alignment = { horizontal: "right" };
     r++;
     twoCol("Price / Unit", "PurchasePrice/UnitsCount", FMT.usd, (zebra = !zebra));
+    // What a finished unit costs all-in — the basis a comp is held against
+    // on a plan deal; on a stabilized asset with no capital plan it equals
+    // the price per unit. Live: it moves with the capital plan input.
+    twoCol(
+      "All-in Basis / Unit (price + capital plan)",
+      "(PurchasePrice+CapImprovements)/UnitsCount",
+      FMT.usd,
+      (zebra = !zebra),
+    );
     twoCol(
       "Year-1 Rent / Unit / Month",
       `${at("rent", 0)}/UnitsCount/12`,
@@ -1082,6 +1091,12 @@ function buildOperatingMetrics(
     r++;
   }
   twoCol("Price / SF", "PurchasePrice/RSF", FMT.psf, (zebra = !zebra));
+  twoCol(
+    "All-in Basis / SF (price + capital plan)",
+    "(PurchasePrice+CapImprovements)/RSF",
+    FMT.psf,
+    (zebra = !zebra),
+  );
   twoCol("Year-1 NOI / SF", `${at("noi", 0)}/RSF`, FMT.psf, (zebra = !zebra));
   twoCol(
     "Year-1 Rent / SF / Year",

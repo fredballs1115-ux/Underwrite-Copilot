@@ -302,9 +302,20 @@ confirmed equal to the main tip after each batch.
   exported reader (`unitCountFromMetrics`) now sits behind the plan
   summary's new `units` and `costPerUnit`, and the plan facts add "Basis
   per unit (all-in)" when the OM states the count — on the deal page's
-  strip and on the shared screen. Analytics and the deal context read the
-  same fields. Tests in `lib/plan-total.test.ts` ($250k on 240 planned
-  units; no count, no row).
+  strip, on the shared screen, on the report's plan page and in the IC
+  memo's plan line. Analytics and the deal context read the same fields.
+  Tests in `lib/plan-total.test.ts` ($250k on 240 planned units; no count,
+  no row).
+- **#215 The Excel model's yardsticks carry the all-in basis.** The
+  Operating Metrics tab divided the purchase price alone by units and by
+  SF, so a conversion's workbook showed the shell's $67/SF where every other
+  surface now shows all-in. Two live rows — "All-in Basis / Unit (price +
+  capital plan)" and "All-in Basis / SF (price + capital plan)" — are
+  formulas over the named PurchasePrice, CapImprovements, UnitsCount and
+  RSF cells, so they move with the capital-plan input; on a stabilized
+  asset with no capital plan they equal the price rows. The workbook test
+  evaluates both in HyperFormula ($600/SF on the conversion; price plus
+  capital plan over 250 units on the stabilized fixture).
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

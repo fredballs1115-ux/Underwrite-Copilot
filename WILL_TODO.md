@@ -3,15 +3,15 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#214 merged to main (live build
+**Last updated 2026-09-08**, after PRs #176–#215 merged to main (live build
 sha `86879b2`, #213, confirmed equal to the main tip by live-verify at 01:57
-UTC; #214 follows on the next Render deploy).
+UTC; #214–#215 follow on the next Render deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Thirty-nine PRs (#176–#214) landed across one review session and the
+Forty PRs (#176–#215) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -98,6 +98,10 @@ deploy (live-verify shows the sha).
 - **The plan strip shows the all-in basis per planned unit** (#214) — total
   cost over the finished unit count, on the deal page and the shared
   screen, from the same reader analytics and the prompt context use.
+- **The Excel model's yardsticks carry the all-in basis** (#215): two live
+  rows on the Operating Metrics tab, per unit and per SF, over price plus
+  the capital plan — a regenerated conversion model reads $600/SF all-in
+  beside the shell's $67/SF.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":
