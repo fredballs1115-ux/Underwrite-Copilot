@@ -3,15 +3,15 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#223 merged to main (live build
+**Last updated 2026-09-08**, after PRs #176–#224 merged to main (live build
 sha `47ca288`, #222, confirmed equal to the main tip by live-verify at 03:02
-UTC; #223 follows on the next Render deploy).
+UTC; #223 and #224 follow on the next Render deploys).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Forty-eight PRs (#176–#223) landed across one review session and the
+Forty-nine PRs (#176–#224) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -147,6 +147,11 @@ deploy (live-verify shows the sha).
   falls back to 100,000 SF on them); NRSF / GSF, "No. Units", "Guestrooms"
   and "Keys / Rooms" count; the LOI prefill and the pipeline card read the
   price the deal page does.
+- **The extraction names the headline rows exactly** (#224): every new
+  screen is asked for "Asking price", "Units", "Total SF", "Occupancy" and
+  "Going-in cap rate" by name, with the per-unit, subset, land, stabilized
+  and prior-trade figures under their own labels, so the readers' first
+  choice is what the OM's rows are called.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":
