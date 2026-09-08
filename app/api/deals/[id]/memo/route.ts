@@ -15,6 +15,7 @@ import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import type { StructuredAddress } from "@/lib/address";
 import { inferStrategy } from "@/lib/deal-strategy";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
+import { staleAfterFailure } from "@/lib/screen-run";
 
 // PDF generation needs the Node runtime (not edge).
 export const runtime = "nodejs";
@@ -71,6 +72,22 @@ export async function GET(
   if (!deal.verdict) {
     return Response.redirect(
       new URL(`/deals/${id}?error=memoempty`, req.url),
+      302,
+    );
+  }
+  // A screen that failed before reaching the verdict left today's terms
+  // beside the previous screen's call — a memo pairing the two would read as
+  // one screen. Refuse it until the run is re-run.
+  const { data: latestJob } = await supabase
+    .from("analysis_jobs")
+    .select("status, step")
+    .eq("deal_id", id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (staleAfterFailure(latestJob).has("verdict")) {
+    return Response.redirect(
+      new URL(`/deals/${id}?error=memostale`, req.url),
       302,
     );
   }

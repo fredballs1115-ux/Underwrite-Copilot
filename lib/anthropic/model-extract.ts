@@ -3,7 +3,14 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
-import { omDocument, omRequestOptions, omSourceFor, type OmSource } from "./om-source";
+import { structured } from "./failure";
+import {
+  omDocument,
+  omRequestOptions,
+  omSourceFor,
+  releaseOmSource,
+  type OmSource,
+} from "./om-source";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, docExtractionInstruction } from "./prompts";
 import type { ParsedModel } from "@/lib/model-parse";
@@ -51,17 +58,19 @@ export async function extractDocFacts(doc: {
     text: docExtractionInstruction(doc.kind, doc.name),
   });
 
-  const response = await client.messages.parse({
-    model: MODELS.reasoning,
-    max_tokens: MAX_TOKENS.analysis,
-    system: ANALYST_SYSTEM,
-    messages: [{ role: "user", content }],
-    output_config: { format: zodOutputFormat(FactsSchema) },
-  }, om ? omRequestOptions(om) : {});
-
-  const out = response.parsed_output;
-  if (!out) {
-    throw new Error(`Could not extract facts from "${doc.name}".`);
+  try {
+    const out = await structured(`Fact extraction from "${doc.name}"`, () =>
+      client.messages.parse({
+        model: MODELS.reasoning,
+        max_tokens: MAX_TOKENS.analysis,
+        system: ANALYST_SYSTEM,
+        messages: [{ role: "user", content }],
+        output_config: { format: zodOutputFormat(FactsSchema) },
+      }, om ? omRequestOptions(om) : {}),
+    );
+    return { docName: doc.name, kind: doc.kind, facts: out.facts };
+  } finally {
+    // A PDF's Files-API copy lives only for this pass.
+    await releaseOmSource(om);
   }
-  return { docName: doc.name, kind: doc.kind, facts: out.facts };
 }

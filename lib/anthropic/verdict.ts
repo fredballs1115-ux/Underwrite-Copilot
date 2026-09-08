@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
+import { structured } from "./failure";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, verdictInstruction } from "./prompts";
 import { assessPlausibility, inferStrategy, planSummary, plausibilityNote } from "@/lib/deal-strategy";
@@ -191,7 +192,7 @@ export async function synthesizeVerdict(
 ): Promise<VerdictResult> {
   const client = getAnthropic();
 
-  const response = await client.messages.parse({
+  const out = await structured("The verdict", () => client.messages.parse({
     model: MODELS.reasoning,
     max_tokens: MAX_TOKENS.verdict,
     system: ANALYST_SYSTEM,
@@ -210,11 +211,6 @@ export async function synthesizeVerdict(
       },
     ],
     output_config: { format: zodOutputFormat(VerdictSchema) },
-  });
-
-  const out = response.parsed_output;
-  if (!out) {
-    throw new Error("Verdict did not return structured output.");
-  }
+  }));
   return out;
 }

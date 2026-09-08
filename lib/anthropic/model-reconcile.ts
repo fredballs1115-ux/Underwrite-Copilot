@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
+import { structured } from "./failure";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, reconciliationInstruction } from "./prompts";
 import type { DocFacts } from "@/lib/model/types";
@@ -79,7 +80,7 @@ export async function reconcileDocs(
   const client = getAnthropic();
   const factsJson = JSON.stringify(allFacts, null, 2);
 
-  const response = await client.messages.parse({
+  const out = await structured("The reconciliation", () => client.messages.parse({
     model: MODELS.reasoning,
     max_tokens: MAX_TOKENS.model,
     system: ANALYST_SYSTEM,
@@ -96,12 +97,7 @@ export async function reconcileDocs(
       },
     ],
     output_config: { format: zodOutputFormat(ReconSchema) },
-  });
-
-  const out = response.parsed_output;
-  if (!out) {
-    throw new Error("Reconciliation did not return structured output.");
-  }
+  }));
 
   // Percent-convention guard: the prompt demands 0-100 scale ("5.5% -> 5.5"),
   // but a fraction slipping through (0.055) silently corrupts the whole model.

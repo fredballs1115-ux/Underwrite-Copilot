@@ -58,6 +58,7 @@ import { ReplaceOm } from "./replace-om";
 import { ManualDealForm } from "../manual-deal-form";
 import { factsFromExtraction, type ManualDealFacts } from "@/lib/manual-deal";
 import { findPricedMetric, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
+import type { ResultKey } from "@/lib/screen-run";
 import { useToast } from "../../toaster";
 import type { UnderwritingModel } from "@/lib/model/types";
 import type { DealDocument } from "@/lib/documents";
@@ -213,6 +214,11 @@ const MODEL_ERRORS: Record<string, string> = {
     "Couldn’t build the Excel model just now — please try again in a moment.",
   shareempty: "Run the screen first — a share link leads with the verdict.",
   deadline: "Couldn’t save the offers-due date — please try again.",
+  dismissreason: "Give a short reason before dismissing the warning — it travels with the memo.",
+  memostale:
+    "The latest screen failed before it reached the verdict — run it again so the memo pairs today’s terms with today’s call.",
+  reportstale:
+    "The latest screen failed before it reached the verdict — run it again so the report pairs today’s terms with today’s call.",
 };
 
 // Errors from the Reconciler tab's own upload are shown inline there; every
@@ -310,6 +316,7 @@ export function DealView({
   tasks = null,
   taskAssignees = [],
   todayIso = "",
+  staleResults = [],
 }: {
   dealId: string;
   dealName: string;
@@ -319,6 +326,9 @@ export function DealView({
   modelErrorCode: string | null;
   job: Job;
   results: Results;
+  /** results a FAILED latest screen never reached — they belong to the
+   *  previous screen and every surface here says so (lib/screen-run.ts) */
+  staleResults?: ResultKey[];
   supplements: SupplementsMap;
   model: UnderwritingModel | null;
   documents: DealDocument[];
@@ -356,6 +366,8 @@ export function DealView({
   const lastStep = useRef<string | null>(initialJob?.step ?? null);
   // Fire the "complete" toast once per run.
   const notified = useRef(false);
+  // Say "you were signed out" once, not on every 2-second poll.
+  const signedOut = useRef(false);
   // A run whose job row hasn't advanced in STALL_MS almost certainly lost its
   // background process (a deploy/restart). Computed in the poll (where reading
   // the clock is a side effect, not render), it flips the rail to a restart.
@@ -374,7 +386,19 @@ export function DealView({
         const res = await fetch(`/api/deals/${dealId}/status`, {
           cache: "no-store",
         });
-        if (!res.ok || cancelled) return;
+        if (cancelled) return;
+        if (res.status === 401) {
+          // The session expired mid-screen. Only a successful poll can move
+          // the rail, so without this it sat on its last step forever with
+          // no explanation; the refresh lets the layout bounce to sign-in.
+          if (!signedOut.current) {
+            signedOut.current = true;
+            toast("You were signed out — sign in again to watch the screen finish.", "error");
+            router.refresh();
+          }
+          return;
+        }
+        if (!res.ok) return;
         const data = (await res.json()) as NonNullable<Job>;
         if (cancelled) return;
 
@@ -528,23 +552,22 @@ export function DealView({
 
   // Finding counts, so a finished run shows where the problems live without
   // opening every section.
+  // Each array is guarded: the schemas force these shapes on every write
+  // the app makes, but a legacy or hand-edited row with a null list must
+  // not take every tab down with it.
   const analysisCounts: Record<AnalysisKey, number> = {
     verdict: 0,
-    challenger:
-      results.challenges?.challenges.filter((c) => c.severity === "high")
-        .length ?? 0,
+    challenger: (results.challenges?.challenges ?? []).filter((c) => c.severity === "high")
+      .length,
     comps: results.comps
-      ? results.comps.redFlags.length +
-        [...results.comps.saleComps, ...results.comps.leaseComps].filter(
+      ? (results.comps.redFlags ?? []).length +
+        [...(results.comps.saleComps ?? []), ...(results.comps.leaseComps ?? [])].filter(
           (x) => x.support === "stretched",
         ).length
       : 0,
-    market:
-      results.market?.checks.filter((c) => c.assessment === "aggressive")
-        .length ?? 0,
-    reconciler:
-      results.reconciliation?.rows.filter((r) => r.direction === "unfavorable")
-        .length ?? 0,
+    market: (results.market?.checks ?? []).filter((c) => c.assessment === "aggressive").length,
+    reconciler: (results.reconciliation?.rows ?? []).filter((r) => r.direction === "unfavorable")
+      .length,
   };
   const sectionCounts: Record<SectionKey, number> = {
     overview: 0,
@@ -613,8 +636,15 @@ export function DealView({
           <p className="text-sm font-medium text-kill">
             The screen hit a snag and stopped
           </p>
+          {/* The pipeline stores one sentence the analyst can act on (the
+              raw provider or configuration text goes to the server log, never
+              here), so it reads in the open rather than behind a toggle. */}
+          {job.error && <p className="mt-1 text-sm leading-relaxed">{job.error}</p>}
           <p className="mt-1 text-sm text-muted">
-            Nothing was lost — try again below. If it fails twice, email{" "}
+            {staleResults.length > 0
+              ? "The results it did not reach still show below, marked as the previous screen's. "
+              : "Nothing was lost. "}
+            If it fails twice, email{" "}
             <a
               className="font-medium text-brand hover:text-brand-strong"
               href="mailto:underwritecopilot.support@gmail.com"
@@ -623,16 +653,6 @@ export function DealView({
             </a>{" "}
             and we&apos;ll dig in.
           </p>
-          {job.error && (
-            <details className="mt-2">
-              <summary className="cursor-pointer text-xs font-medium text-muted hover:text-ink">
-                Technical details
-              </summary>
-              <p className="mt-1 break-words font-mono text-[11px] text-muted">
-                {job.error}
-              </p>
-            </details>
-          )}
           <RetryForm dealId={dealId} label="Try again" />
         </div>
       )}
@@ -724,6 +744,7 @@ export function DealView({
               results={results}
               active={active}
               onNavigate={navigateLegacy}
+              stale={staleResults}
             />
             {playground && <SensitivityPlayground data={playground} />}
             {tasks !== null && (
@@ -788,6 +809,7 @@ export function DealView({
             supplements={supplements}
             internalComps={internalComps}
             omUrl={omUrl}
+            staleVerdict={staleResults.includes("verdict")}
           />
         )}
 
@@ -1156,6 +1178,7 @@ function AnalysesPanel({
   supplements,
   internalComps,
   omUrl,
+  staleVerdict = false,
 }: {
   analysis: AnalysisKey;
   onSelect: (key: AnalysisKey) => void;
@@ -1172,6 +1195,8 @@ function AnalysesPanel({
   supplements: SupplementsMap;
   internalComps: InternalComp[];
   omUrl: string | null;
+  /** the latest screen failed before re-running the verdict */
+  staleVerdict?: boolean;
 }) {
   const STEP_FOR: Record<AnalysisKey, string> = {
     verdict: "verdict",
@@ -1225,7 +1250,7 @@ function AnalysesPanel({
   } else if (data) {
     content =
       analysis === "verdict" ? (
-        <VerdictView result={results.verdict!} />
+        <VerdictView result={results.verdict!} stale={staleVerdict} />
       ) : analysis === "challenger" ? (
         <ChallengerView result={results.challenges!} dealName={dealName} />
       ) : analysis === "comps" ? (

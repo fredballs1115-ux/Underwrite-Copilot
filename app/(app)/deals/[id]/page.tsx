@@ -35,6 +35,7 @@ import { parseFactRow, type DealFact } from "@/lib/facts";
 import type { ReconcileResult } from "@/lib/reconcile";
 import { DealActions } from "./deal-actions";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
+import { staleAfterFailure } from "@/lib/screen-run";
 import { StageSelect } from "./stage-select";
 import { OffersDueControl } from "../offers-due";
 import { ShareControl, type ShareRow } from "./share-control";
@@ -123,7 +124,7 @@ export default async function DealPage({
         .order("created_at", { ascending: true }),
       supabase
         .from("analysis_jobs")
-        .select("status, step, progress, error")
+        .select("status, step, progress, error, updated_at")
         .eq("deal_id", id)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -228,17 +229,25 @@ export default async function DealPage({
     step: string | null;
     progress: number;
     error: string | null;
+    updated_at?: string | null;
   } | null;
+
+  // A screen that failed midway left a MIXED generation: the results from
+  // the failing step onward still belong to the previous screen. Every
+  // surface below marks them, and the count of finished steps excludes them.
+  const staleResults = [...staleAfterFailure(job)];
 
   const pill = verdict ? VERDICT_PILL[verdict.verdict] : null;
 
   // Retrade watch: once a RE-screen finishes, diff it against the snapshot the
   // pipeline took of the previous run. Hidden while a job is in flight (the
-  // stored results are mid-overwrite and would diff against themselves).
+  // stored results are mid-overwrite and would diff against themselves), and
+  // after a FAILED run (a half-new extraction would diff against the old
+  // snapshot under a verdict that never re-ran).
   const jobActive = job?.status === "queued" || job?.status === "running";
   const priorScreen = (deal.prior_screen as PriorScreen | undefined) ?? null;
   const screenDiff =
-    !jobActive && priorScreen && extraction
+    !jobActive && job?.status !== "error" && priorScreen && extraction
       ? computeScreenDiff(priorScreen, extraction, verdict)
       : null;
 
@@ -939,6 +948,7 @@ export default async function DealPage({
         modelErrorCode={errorCode ?? null}
         job={job}
         results={{ extraction, challenges, comps, reconciliation, market, verdict }}
+        staleResults={staleResults}
         firstSignal={firstSignal}
         supplements={supplements}
         model={model}

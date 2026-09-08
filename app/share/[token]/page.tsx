@@ -9,6 +9,7 @@ import type {
 } from "@/lib/anthropic/types";
 import { inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { keyTermRows } from "@/lib/key-terms";
+import { staleAfterFailure } from "@/lib/screen-run";
 import { SharePlan } from "./plan-facts";
 
 // A range's confidence, in the deal page's colours (RANGE_CONF there).
@@ -101,6 +102,17 @@ export default async function SharePage({
   if (!deal?.verdict) {
     return <Expired reason="The deal behind this link is no longer available." />;
   }
+  // The sender's latest screen may have failed before reaching the verdict:
+  // the call shown then belongs to the previous completed screen — say so,
+  // the same way the sender's own deal page does.
+  const { data: latestJob } = await admin
+    .from("analysis_jobs")
+    .select("status, step")
+    .eq("deal_id", share.deal_id as string)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const verdictStale = staleAfterFailure(latestJob).has("verdict");
 
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const comps = (deal.comps as BrokerCompsResult | null) ?? null;
@@ -161,6 +173,12 @@ export default async function SharePage({
         <p className={`mt-1 text-2xl font-semibold ${vmeta.cls}`}>
           {vmeta.label}
         </p>
+        {verdictStale && (
+          <p className="mt-1 text-xs text-caution">
+            From the previous completed screen — the sender&rsquo;s latest run of this
+            deal did not finish.
+          </p>
+        )}
         {verdict.reason && (
           <p className="mt-2 text-sm leading-relaxed">{verdict.reason}</p>
         )}

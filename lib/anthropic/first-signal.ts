@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
+import { structured } from "./failure";
 import { omDocument, omRequestOptions, type OmSource } from "./om-source";
 import { MODELS } from "./models";
 import { ANALYST_SYSTEM, firstSignalInstruction } from "./prompts";
@@ -31,7 +32,7 @@ export async function readFirstSignal(
 ): Promise<FirstSignal> {
   const client = getAnthropic();
 
-  const response = await client.messages.parse({
+  const out = await structured("The first signal", () => client.messages.parse({
     model: MODELS.extraction,
     max_tokens: 1500,
     system: ANALYST_SYSTEM,
@@ -45,12 +46,7 @@ export async function readFirstSignal(
       },
     ],
     output_config: { format: zodOutputFormat(FirstSignalSchema) },
-  }, omRequestOptions(om));
-
-  const out = response.parsed_output;
-  if (!out) {
-    throw new Error("First signal did not return structured output.");
-  }
+  }, omRequestOptions(om)));
 
   return {
     ...out,

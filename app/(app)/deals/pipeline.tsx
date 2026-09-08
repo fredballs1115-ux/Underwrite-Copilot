@@ -55,8 +55,9 @@ export type DealCard = {
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
   slots: { cap: string | null; price: string | null; yoc: string | null };
-  /** latest analysis-job state, for deals still screening */
-  jobStatus?: "running" | "failed" | null;
+  /** latest analysis-job state: a live run, one that stopped writing
+   *  progress (its process died), or a failure that left the verdict behind */
+  jobStatus?: "running" | "stalled" | "failed" | null;
   /** the deal has an address, so an aerial thumbnail can be attempted */
   hasAddress: boolean;
 };
@@ -93,6 +94,7 @@ const MANDATE_META: Record<
 function statusRank(d: DealCard): number {
   if (d.verdict) return (VERDICT_META[d.verdict]?.rank ?? 0) + 2;
   if (d.jobStatus === "running") return 1;
+  if (d.jobStatus === "stalled") return 0.75;
   if (d.jobStatus === "failed") return 0.5;
   return 0;
 }
@@ -480,13 +482,15 @@ export function Pipeline({
         d.fit ? FIT_META[d.fit].label : "",
         d.score != null ? String(d.score) : "",
         d.mandateVerdict ? MANDATE_META[d.mandateVerdict].label : "",
-        d.verdict
-          ? (VERDICT_META[d.verdict]?.label ?? d.verdict)
-          : d.jobStatus === "running"
-            ? "Screening"
-            : d.jobStatus === "failed"
-              ? "Failed"
-              : "Not screened",
+        d.jobStatus === "failed"
+          ? "Failed"
+          : d.jobStatus === "stalled"
+            ? "Stalled"
+            : d.verdict
+              ? (VERDICT_META[d.verdict]?.label ?? d.verdict)
+              : d.jobStatus === "running"
+                ? "Screening"
+                : "Not screened",
         STAGE_LABEL[normalizeStage(d.stage)],
         d.offersDue ?? "",
         // ISO like the deadline column, so both parse as dates in Excel.
@@ -1283,15 +1287,32 @@ const DealRow = memo(function DealRow({
         )}
       </span>
       <span className="flex w-22 shrink-0 justify-end">
-        {v ? (
+        {/* A failed or stalled run outranks the stored verdict: that verdict
+            was written about the terms as they were before the run the
+            analyst just asked for, and the deal page says so. */}
+        {d.jobStatus === "failed" ? (
+          <span
+            className="rounded-full bg-kill/10 px-2.5 py-1 text-center text-[11px] font-medium leading-tight text-kill"
+            title={
+              v
+                ? "The latest screen failed before it reached the verdict — the previous verdict still shows on the deal page, marked as such"
+                : "The screen failed — open the deal to see why and try again"
+            }
+          >
+            Failed
+          </span>
+        ) : d.jobStatus === "stalled" ? (
+          <span
+            className="rounded-full bg-caution/10 px-2.5 py-1 text-center text-[11px] font-medium leading-tight text-caution"
+            title="The run stopped writing progress — its process was likely interrupted. Open the deal to start it again."
+          >
+            Stalled
+          </span>
+        ) : v ? (
           <span
             className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${v.cls}`}
           >
             {v.label}
-          </span>
-        ) : d.jobStatus === "failed" ? (
-          <span className="rounded-full bg-kill/10 px-2.5 py-1 text-center text-[11px] font-medium leading-tight text-kill">
-            Failed
           </span>
         ) : d.jobStatus === "running" ? (
           <span className="flex items-center gap-1.5 text-[11px] text-muted">

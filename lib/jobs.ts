@@ -1,9 +1,9 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-
 // A job that hasn't been touched in this long is considered dead — a crashed
-// background task must never wedge the deal forever.
-const STALE_MS = 10 * 60 * 1000;
+// background task must never wedge the deal forever. One constant, shared
+// with the deal page's stall banner and the pipeline list's "Stalled" read.
+import { STALE_MS } from "@/lib/screen-run";
 
 /**
  * ANALYSIS_WORKER=1 hands the pipeline to the dedicated worker service: the
@@ -142,6 +142,11 @@ export interface JobClaim {
  * immediately claimable by the worker; work that must NOT be picked up —
  * replace-OM during its upload, and every in-process job type — claims
  * straight to "running" so the worker never sees a claimable row.
+ *
+ * `keepCheckpoints` (worker mode, the plain retry only): a run that FAILED
+ * keeps the steps it finished, so the retry re-runs the failing step and
+ * the ones after it instead of re-reading a 200-page OM five times over.
+ * Never set it for a replace-OM — those checkpoints describe the old file.
  */
 export async function claimJob(
   supabase: SupabaseClient,
@@ -149,14 +154,28 @@ export async function claimJob(
   step: string,
   workerPayload?: WorkerPayload | null,
   claimTo: "queued" | "running" = "queued",
+  opts?: { keepCheckpoints?: boolean },
 ): Promise<JobClaim> {
-  const { data: existing } = await supabase
+  // The payload column exists only from migration 0016 — read it only when
+  // the caller is in worker mode (which already implies the schema is live).
+  // The column list is chosen at runtime; the assertion keeps the query
+  // builder's literal-typed parser out of it.
+  const cols = (
+    workerPayload !== undefined ? "id, status, updated_at, payload" : "id, status, updated_at"
+  ) as "id, status, updated_at";
+  const { data } = await supabase
     .from("analysis_jobs")
-    .select("id, status, updated_at")
+    .select(cols)
     .eq("deal_id", dealId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  const existing = data as {
+    id: string;
+    status: string;
+    updated_at: string;
+    payload?: { completed?: unknown } | null;
+  } | null;
   if (!existing) return { outcome: "none", priorStatus: null };
 
   const priorStatus = existing.status as string;
@@ -164,6 +183,14 @@ export async function claimJob(
   const updated = new Date(existing.updated_at as string).getTime();
   const stale = !isFinite(updated) || Date.now() - updated >= STALE_MS;
   if (live && !stale) return { outcome: "busy", priorStatus };
+
+  const priorCompleted =
+    opts?.keepCheckpoints && priorStatus === "error" && workerPayload
+      ? existing.payload?.completed
+      : undefined;
+  const completed = Array.isArray(priorCompleted)
+    ? priorCompleted.filter((s): s is string => typeof s === "string")
+    : [];
 
   // The WHERE clause re-checks the observed state inside the UPDATE itself,
   // so the decision and the write are one statement — a racing claimant's
@@ -182,7 +209,7 @@ export async function claimJob(
               ? {
                   ...workerPayload,
                   snapshotPrior: priorStatus === "done",
-                  completed: [],
+                  completed,
                 }
               : null,
             attempts: 0,

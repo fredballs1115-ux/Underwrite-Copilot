@@ -3,7 +3,14 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
-import { anyOmRequestOptions, omDocument, omSourceFor, type OmSource } from "./om-source";
+import { structured } from "./failure";
+import {
+  anyOmRequestOptions,
+  omDocument,
+  omSourceFor,
+  releaseOmSource,
+  type OmSource,
+} from "./om-source";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, reconcilerInstruction } from "./prompts";
 import type { ReconciliationResult } from "./types";
@@ -65,17 +72,18 @@ export async function reconcileModel(
 
   const messages: Anthropic.MessageParam[] = [{ role: "user", content }];
 
-  const response = await client.messages.parse({
-    model: MODELS.reasoning,
-    max_tokens: MAX_TOKENS.analysis,
-    system: ANALYST_SYSTEM,
-    messages,
-    output_config: { format: zodOutputFormat(ReconciliationSchema) },
-  }, anyOmRequestOptions(om, modelOm));
-
-  const out = response.parsed_output;
-  if (!out) {
-    throw new Error("Reconciler did not return structured output.");
+  try {
+    return await structured("The reconciler", () =>
+      client.messages.parse({
+        model: MODELS.reasoning,
+        max_tokens: MAX_TOKENS.analysis,
+        system: ANALYST_SYSTEM,
+        messages,
+        output_config: { format: zodOutputFormat(ReconciliationSchema) },
+      }, anyOmRequestOptions(om, modelOm)),
+    );
+  } finally {
+    // The buyer's model rode as a Files-API object for this one call.
+    await releaseOmSource(modelOm);
   }
-  return out;
 }

@@ -123,6 +123,34 @@ describe("DealView — the sample deal renders every section without a runtime e
     });
   }
 
+  it("a screen that failed midway names the results it never reached, in the open", () => {
+    // The ninth review's first finding: a comps-step failure left this run's
+    // extraction beside the previous screen's verdict, shown as "5/5" with
+    // the provider's raw error behind a "Technical details" toggle.
+    const failed = (tab: string, analysis: string | null = null): Props => ({
+      ...sampleProps(tab, analysis),
+      job: {
+        status: "error",
+        step: "comps",
+        progress: 50,
+        error: "The analysis service is overloaded right now — try again in a few minutes.",
+      },
+      staleResults: ["comps", "market", "verdict"],
+    });
+    const html = render(failed("overview"));
+    expect(a11yIssues(html)).toEqual([]);
+    const text = textOf(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toMatch(/overloaded right now/);
+    expect(text).not.toMatch(/Technical details/);
+    expect(text).toMatch(/2\/5/);
+    expect(text).toMatch(/3 of these are from the previous screen/);
+    expect(text).toMatch(/From the previous screen/);
+    expect(textOf(render(failed("analyses", "verdict")))).toMatch(/From the previous screen/);
+    // A clean screen carries no such mark anywhere.
+    expect(textOf(render(sampleProps("overview")))).not.toMatch(/previous screen/);
+  });
+
   it("the overview carries the verdict and the buy-box fit; the financials carry the price", () => {
     const overview = textOf(render(sampleProps("overview")));
     expect(overview).toMatch(/Caution/);

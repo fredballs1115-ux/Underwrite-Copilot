@@ -2,7 +2,8 @@ import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { downloadOmPdf } from "@/lib/storage";
 import { readFirstSignal } from "./first-signal";
-import { omSourceFor, omFromText, type OmSource } from "./om-source";
+import { describeRunFailure, ScreenError } from "./failure";
+import { omSourceFor, omFromText, releaseOmSource, type OmSource } from "./om-source";
 import {
   manualFactSheet,
   firstSignalFromExtraction,
@@ -49,10 +50,45 @@ type JobPatch = {
 
 async function patchJob(dealId: string, patch: JobPatch): Promise<void> {
   const admin = createSupabaseAdminClient();
-  await admin
+  const { data, error } = await admin
     .from("analysis_jobs")
     .update({ ...patch, updated_at: new Date().toISOString() })
-    .eq("deal_id", dealId);
+    .eq("deal_id", dealId)
+    .select("id");
+  if (error) {
+    // A transient write failure never sinks the run — the next boundary
+    // writes again. Loud, though: a silent miss is what hid the case below.
+    console.error(`[pipeline] job update failed for deal ${dealId}: ${error.message}`);
+    return;
+  }
+  // No row at all: the deal was deleted mid-run (its jobs cascade with it).
+  // Every later step would spend tokens on a deal nobody can see — the
+  // throw stops the pipeline at this step boundary.
+  if (!data || data.length === 0) {
+    throw new ScreenError("This deal was deleted while its screen was running.");
+  }
+}
+
+// In-process runs wrote the job row only at step boundaries. A slow step —
+// the SDK retries a 529 twice with backoff inside one call, so one step can
+// run past ten minutes — let the row go stale with the run still alive, and
+// the stall banner's "Start it again" then ran a SECOND pipeline on the same
+// deal (double spend, interleaved results). The worker heartbeats its row;
+// the in-process path now does too. Env-overridable for the test rig.
+function heartbeatMs(): number {
+  const n = Number(process.env.ANALYSIS_HEARTBEAT_MS);
+  return Number.isFinite(n) && n > 0 ? n : 60_000;
+}
+
+/** Keep the job row fresh while a run is alive; returns the stop function. */
+function startHeartbeat(dealId: string): () => void {
+  const timer = setInterval(() => {
+    patchJob(dealId, {}).catch(() => {
+      // a deleted deal stops the run at its next step boundary
+    });
+  }, heartbeatMs());
+  timer.unref?.();
+  return () => clearInterval(timer);
 }
 
 /**
@@ -145,6 +181,10 @@ export async function runAnalysis(
 ): Promise<void> {
   const snapshotPrior = opts?.snapshotPrior ?? true;
   const resume = opts?.resume ?? false;
+  // The OM's transport for this run — released in `finally` when it is a
+  // Files-API object, so a large OM never leaves an orphaned upload behind.
+  let omSource: OmSource | null = null;
+  const stopHeartbeat = startHeartbeat(dealId);
   try {
     const admin = createSupabaseAdminClient();
     const { data: deal, error } = await admin
@@ -179,13 +219,16 @@ export async function runAnalysis(
     const completed = new Set<string>();
     if (resume) {
       try {
-        const { data: jobRow } = await admin
+        const { data: jobRow, error: jobErr } = await admin
           .from("analysis_jobs")
           .select("payload")
           .eq("deal_id", dealId)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
+        // supabase-js reports a failed read in `error`, never by throwing —
+        // an unread payload means "no checkpoints", not an empty payload.
+        if (jobErr) throw jobErr;
         payload = (jobRow?.payload as Record<string, unknown>) ?? {};
         for (const s of (payload.completed as string[]) ?? []) completed.add(s);
       } catch {
@@ -196,9 +239,14 @@ export async function runAnalysis(
       if (!resume) return;
       completed.add(step);
       try {
+        // The handoff contract rides along: a checkpoint written from an
+        // unread payload must still say what kind of job this row is, or a
+        // re-queued attempt fails it as "unrecognized type".
         await admin
           .from("analysis_jobs")
-          .update({ payload: { ...payload, completed: [...completed] } })
+          .update({
+            payload: { ...payload, kind: payload.kind ?? "screen", completed: [...completed] },
+          })
           .eq("deal_id", dealId);
       } catch {
         // checkpointing is an optimization, never a failure
@@ -219,7 +267,7 @@ export async function runAnalysis(
     // Inline for anything the request cap carries; one Files-API upload for
     // larger OMs, which every step then references by id (a resumed run
     // re-uploads — one extra upload, never a stale reference).
-    const omSource = manualExtraction
+    omSource = manualExtraction
       ? needsDoc
         ? omFromText(manualFactSheet(manualExtraction, (deal.name as string) ?? "Deal"))
         : null
@@ -279,9 +327,9 @@ export async function runAnalysis(
         error: null,
       });
       try {
-        // Clear the previous run's signal first so a re-run never shows a stale
-        // headline next to fresh results if the read below fails.
-        await admin.from("deals").update({ first_signal: null }).eq("id", dealId);
+        // The previous run's signal stays until the new one lands: clearing
+        // it first meant a read that failed here took the headline with it,
+        // and the full extraction supersedes the signal moments later anyway.
         const firstSignal = manualExtraction
           ? firstSignalFromExtraction(manualExtraction)
           : await readFirstSignal(om(), assetClass);
@@ -305,6 +353,14 @@ export async function runAnalysis(
         error: null,
       });
       const extraction = await extractTerms(om(), assetClass);
+      // A scan, a password-protected file or an empty deck yields a
+      // schema-valid extraction with no figures at all. Stored, it flowed to
+      // a Caution verdict on a document the product never read — stop here.
+      if (extraction.metrics.length === 0) {
+        throw new ScreenError(
+          "We couldn't read any figures out of this PDF — it may be a scan or password-protected. Try a text-based PDF.",
+        );
+      }
       await admin
         .from("deals")
         .update({ extraction, updated_at: new Date().toISOString() })
@@ -515,10 +571,15 @@ export async function runAnalysis(
     // best-effort by design — the screen itself is already complete).
     await notifyAnalysisReady(admin, dealId);
   } catch (err) {
-    await patchJob(dealId, {
-      status: "error",
-      error: err instanceof Error ? err.message : "Analysis failed.",
+    // One sentence the analyst can act on; the raw failure goes to the log.
+    const failure = describeRunFailure(err);
+    console.error(`[pipeline] screen failed for deal ${dealId}: ${failure.detail}`);
+    await patchJob(dealId, { status: "error", error: failure.message }).catch(() => {
+      // the deal (and its job row) is gone — nothing left to tell
     });
+  } finally {
+    stopHeartbeat();
+    await releaseOmSource(omSource);
   }
 }
 
@@ -532,6 +593,8 @@ export async function runReconciliation(
   dealId: string,
   model: { name: string; buffer: Buffer },
 ): Promise<void> {
+  let omSource: OmSource | null = null;
+  const stopHeartbeat = startHeartbeat(dealId);
   try {
     const admin = createSupabaseAdminClient();
     const { data: deal, error } = await admin
@@ -554,10 +617,11 @@ export async function runReconciliation(
 
     const omPdf = await downloadOmPdf(deal.om_storage_path as string);
     const parsed = await parseModelFile(model.name, model.buffer);
+    omSource = await omSourceFor(omPdf);
     // The reconciler is told the deal's kind, so a buyer's model that carries
     // construction and downtime is compared to the OM on the plan's terms.
     const reconciliation = await reconcileModel(
-      await omSourceFor(omPdf),
+      omSource,
       parsed,
       dealContextFor((deal.extraction as ExtractionResult | null) ?? null),
     );
@@ -578,9 +642,13 @@ export async function runReconciliation(
       error: null,
     });
   } catch (err) {
-    await patchJob(dealId, {
-      status: "error",
-      error: err instanceof Error ? err.message : "Reconciliation failed.",
+    const failure = describeRunFailure(err);
+    console.error(`[pipeline] reconcile failed for deal ${dealId}: ${failure.detail}`);
+    await patchJob(dealId, { status: "error", error: failure.message }).catch(() => {
+      // the deal is gone — nothing left to tell
     });
+  } finally {
+    stopHeartbeat();
+    await releaseOmSource(omSource);
   }
 }

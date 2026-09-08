@@ -12,6 +12,7 @@ import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import type { StructuredAddress } from "@/lib/address";
 import { inferStrategy } from "@/lib/deal-strategy";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
+import { staleAfterFailure } from "@/lib/screen-run";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { buildSensitivityData, type SensitivityData } from "@/lib/underwrite/report-grid";
 import { buildPlanReport, type PlanReport } from "@/lib/plan-sensitivity";
@@ -75,6 +76,21 @@ export async function GET(
   if (!deal.verdict) {
     return Response.redirect(
       new URL(`/deals/${id}?error=reportempty`, req.url),
+      302,
+    );
+  }
+  // Same gate as the memo: a screen that failed before the verdict left
+  // today's terms beside the previous screen's call — not one report.
+  const { data: latestJob } = await supabase
+    .from("analysis_jobs")
+    .select("status, step")
+    .eq("deal_id", id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (staleAfterFailure(latestJob).has("verdict")) {
+    return Response.redirect(
+      new URL(`/deals/${id}?error=reportstale`, req.url),
       302,
     );
   }

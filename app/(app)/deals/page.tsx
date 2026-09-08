@@ -13,6 +13,7 @@ import { inferStrategy } from "@/lib/deal-strategy";
 import { pickSlots } from "@/lib/pipeline-slots";
 import { scoreMandateFit } from "@/lib/mandate";
 import { metroForAddress } from "@/lib/market-match";
+import { listJobStatus, type JobLike } from "@/lib/screen-run";
 
 export const metadata: Metadata = { title: "Pipeline" };
 
@@ -137,13 +138,15 @@ export default async function DealsPage({
     ids.length
       ? supabase
           .from("analysis_jobs")
-          .select("deal_id, status, created_at")
+          // step + updated_at: a failed run's step says which results it
+          // left behind, and a live row that stopped writing reads as stalled.
+          .select("deal_id, status, step, updated_at, created_at")
           .in("deal_id", ids)
           .order("created_at", { ascending: false })
           // Only the newest row per deal is read below — cap the fetch so a
           // long re-screen history can't grow this query without bound.
           .limit(Math.max(100, ids.length * 3))
-      : Promise.resolve({ data: [] as { deal_id: string; status: string }[] }),
+      : Promise.resolve({ data: [] as ({ deal_id: string } & JobLike)[] }),
     teammateIds.length
       ? supabase.from("profiles").select("id, email, full_name").in("id", teammateIds)
       : Promise.resolve({ data: [] as { id: string; email: string | null; full_name: string | null }[] }),
@@ -154,9 +157,9 @@ export default async function DealsPage({
       ? supabase.from("deals").select("id, offers_due").in("id", ids)
       : Promise.resolve({ data: [] as { id: string; offers_due: string | null }[] }),
   ]);
-  const jobByDeal = new Map<string, string>();
-  for (const j of (jobsData ?? []) as { deal_id: string; status: string }[]) {
-    if (!jobByDeal.has(j.deal_id)) jobByDeal.set(j.deal_id, j.status);
+  const jobByDeal = new Map<string, JobLike>();
+  for (const j of (jobsData ?? []) as ({ deal_id: string } & JobLike)[]) {
+    if (!jobByDeal.has(j.deal_id)) jobByDeal.set(j.deal_id, j);
   }
 
   const dueById = new Map<string, string>();
@@ -218,12 +221,10 @@ export default async function DealsPage({
       slots: extraction
         ? pickSlots(extraction, (d.first_signal as FirstSignal | null) ?? null)
         : { cap: null, price: null, yoc: null },
-      jobStatus:
-        job === "queued" || job === "running"
-          ? ("running" as const)
-          : job === "error"
-            ? ("failed" as const)
-            : null,
+      // Running, stalled (its process died mid-screen — a deploy, most
+      // often) or failed with the verdict left behind; a failure that never
+      // touched the verdict leaves the pill alone (lib/screen-run.ts).
+      jobStatus: listJobStatus(job, !!verdict?.verdict),
       // Gate the aerial thumbnail here rather than letting every row fire a
       // request that can only 404: no address, no possible photograph.
       hasAddress: !!(d.address as StructuredAddress | null)?.label?.trim(),

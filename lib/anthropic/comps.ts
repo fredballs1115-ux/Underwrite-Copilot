@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
+import { structured } from "./failure";
 import { omDocument, omRequestOptions, type OmSource } from "./om-source";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, brokerCompsInstruction } from "./prompts";
@@ -36,7 +37,7 @@ export async function scrutinizeComps(
 ): Promise<BrokerCompsResult> {
   const client = getAnthropic();
 
-  const response = await client.messages.parse({
+  const out = await structured("Broker-comp scrutiny", () => client.messages.parse({
     model: MODELS.reasoning,
     max_tokens: MAX_TOKENS.analysis,
     system: ANALYST_SYSTEM,
@@ -52,11 +53,6 @@ export async function scrutinizeComps(
       },
     ],
     output_config: { format: zodOutputFormat(BrokerCompsSchema) },
-  }, omRequestOptions(om));
-
-  const out = response.parsed_output;
-  if (!out) {
-    throw new Error("Broker-comp scrutiny did not return structured output.");
-  }
+  }, omRequestOptions(om)));
   return out;
 }
