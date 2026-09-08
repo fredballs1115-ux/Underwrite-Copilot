@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Sixty-one PRs, #176–#236, each
+estimate, and that's what it should flag." Sixty-two PRs, #176–#237, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -783,6 +783,20 @@ confirmed equal to the main tip after each batch.
   checkpoint written from an unread payload keeps the job's kind; the
   retrade diff never runs over a failed generation; "dismiss without a
   reason" has its banner. 32 new tests.
+- **#237 One web process runs two screens at a time, not four.** The
+  review's one unreproduced finding: in-process analyses start the moment
+  their request returns, a batch upload starts four, and each holds its OM
+  plus a ~27MB base64 request body per model call — 50–80MB apiece on a
+  512MB starter instance, which is how a batch could take the web service
+  (and every viewer on it) down. `lib/anthropic/run-gate.ts` is a small
+  gate: `ANALYSIS_CONCURRENCY` runs (default two) hold an OM at once and the
+  rest wait their turn, their claim heartbeating through the wait so a
+  queued screen never reads as stalled and never invites a second pipeline.
+  Alongside it, a deck past the provider's ~600-page limit stops before any
+  model call with the page count in the message (the byte counter only ever
+  under-counts, so the gate can never fire falsely). Both driven through the
+  real pipeline in the tests: four concurrent screens peak at two, a failing
+  run frees its slot, a 700-page OM never reaches the first read.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

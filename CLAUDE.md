@@ -75,7 +75,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   memo and report routes and the shared screen all read it there — never
   decide "is this result current" anywhere else. In-process runs heartbeat
   the job row; a Files-API copy of an OM is released when its run ends
-  (`releaseOmSource`). `lib/anthropic/pipeline.test.ts` drives the real
+  (`releaseOmSource`); one web process runs at most `ANALYSIS_CONCURRENCY`
+  (default two) screens at once (`lib/anthropic/run-gate.ts` — the claim is
+  taken and heartbeats before the wait), and a deck past ~600 pages stops
+  before any model call. `lib/anthropic/pipeline.test.ts` drives the real
   pipeline against a recording fake database — reproduce a failure there
   before fixing it.
 - DB schema: `supabase/migrations/`
