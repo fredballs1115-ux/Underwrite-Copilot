@@ -56,10 +56,12 @@ function planFigures(
 ): { noi: number; price: number; budget: number } | null {
   if (!plan) return null;
   const noi = plan.stabilizedNoi?.value ?? null;
-  const price = plan.price;
+  // An OM that states an all-in total and no price: the total is the figure
+  // to stress, and there is no price to add to it.
+  const price = plan.price ?? (plan.budget?.isTotal ? 0 : null);
   const budget = plan.budget?.budget ?? null;
   if (noi == null || !(noi > 0)) return null;
-  if (price == null || !(price > 0)) return null;
+  if (price == null || !(price >= 0)) return null;
   if (budget == null || !(budget > 0)) return null;
   if (!Number.isFinite(refCapPct) || !(refCapPct > 0)) return null;
   return { noi, price, budget };

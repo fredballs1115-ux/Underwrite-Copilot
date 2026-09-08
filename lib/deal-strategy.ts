@@ -242,6 +242,9 @@ export interface CapitalBudget {
   budget: number;
   /** the OM stated a total that included the price, and the price was taken out */
   allIn: boolean;
+  /** the OM stated an all-in total but no price, so nothing could be taken
+   *  out: `budget` IS the stated total cost, with the acquisition inside it */
+  isTotal?: boolean;
   label: string;
   page?: string;
 }
@@ -257,11 +260,14 @@ export function capitalBudgetFromMetrics(metrics: MetricLike[], price: number | 
   if (!m) return null;
   const raw = parseMoney(m.value);
   if (raw == null || !(raw > 0)) return null;
-  const allIn = ALL_IN.test(m.label);
-  const budget = allIn && price != null ? raw - price : raw;
+  const statedAllIn = ALL_IN.test(m.label);
+  // An all-in figure with no price to take out of it stands as the total
+  // cost itself — flagged, so no surface calls it "less the price".
+  const allIn = statedAllIn && price != null;
+  const budget = statedAllIn && price != null ? raw - price : raw;
   if (!(budget > 0)) return null;
   if (price != null && budget > price * 10) return null;
-  return { budget, allIn, label: m.label, page: m.page };
+  return { budget, allIn, isTotal: statedAllIn && price == null, label: m.label, page: m.page };
 }
 
 // A ground-up development buys land, and its OM says "land cost" or "site
@@ -308,11 +314,18 @@ export function budgetFromText(text: string | null | undefined, price: number | 
         : 1;
   const raw = n * mult;
   if (raw < 10_000) return null; // "$50/SF" is a rate, not a budget
-  const allIn = ALL_IN.test(text);
-  const budget = allIn && price != null ? raw - price : raw;
+  const statedAllIn = ALL_IN.test(text);
+  const allIn = statedAllIn && price != null;
+  const budget = statedAllIn && price != null ? raw - price : raw;
   if (!(budget > 0)) return null;
   if (price != null && budget > price * 10) return null;
-  return { budget, allIn, label: "stated capital budget" };
+  const isTotal = statedAllIn && price == null;
+  return {
+    budget,
+    allIn,
+    isTotal,
+    label: isTotal ? "stated total project cost" : "stated capital budget",
+  };
 }
 
 const TIMELINE_ROW =
@@ -365,7 +378,10 @@ export function planSummary(
   const budget =
     capitalBudgetFromMetrics(metrics, price) ??
     budgetFromText(extraction.strategy?.capitalBudget, price);
-  const totalCost = price != null && budget ? price + budget.budget : null;
+  // Price plus the works; or, when the OM states an all-in total and no
+  // price, that total itself — a yield on cost needs no split of the two.
+  const totalCost =
+    price != null && budget ? price + budget.budget : budget?.isTotal ? budget.budget : null;
   const yieldOnCost =
     stabilizedNoi && totalCost != null && totalCost > 0 ? stabilizedNoi.value / totalCost : null;
   return {
@@ -527,7 +543,9 @@ function planLine(plan: PlanSummary): string {
   parts.push(plan.price != null ? `price ${money(plan.price)}` : "price not stated");
   parts.push(
     plan.budget
-      ? `${plan.budget.allIn ? "budget " : ""}${money(plan.budget.budget)}${plan.budget.allIn ? ` (${plan.budget.label} less the price)` : ` (${plan.budget.label})`}`
+      ? plan.budget.isTotal
+        ? `${money(plan.budget.budget)} all-in (${plan.budget.label}; the OM states no price, so the acquisition inside it is not separable)`
+        : `${plan.budget.allIn ? "budget " : ""}${money(plan.budget.budget)}${plan.budget.allIn ? ` (${plan.budget.label} less the price)` : ` (${plan.budget.label})`}`
       : "construction / renovation budget not stated in the figures",
   );
   if (plan.totalCost != null) parts.push(`total cost ${money(plan.totalCost)}`);

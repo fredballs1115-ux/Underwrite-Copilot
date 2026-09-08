@@ -24,7 +24,13 @@ export function planFacts(plan: PlanSummary): [string, string][] {
     [plan.priceLabel, plan.price != null ? moneyCompact(plan.price) : "not stated"],
     [
       plan.budget?.allIn ? "Budget (total cost less price)" : "Budget",
-      plan.budget ? moneyCompact(plan.budget.budget) : "not stated",
+      // An all-in total with no price stated: the works are inside it and
+      // cannot be split out — the total cost row carries the figure.
+      plan.budget
+        ? plan.budget.isTotal
+          ? "inside the stated total"
+          : moneyCompact(plan.budget.budget)
+        : "not stated",
     ],
     ["Total cost", plan.totalCost != null ? moneyCompact(plan.totalCost) : "—"],
     [

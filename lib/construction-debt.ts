@@ -30,7 +30,8 @@ export interface TakeOutTerms {
 }
 
 export interface ConstructionDebtInputs {
-  /** land / shell acquisition price */
+  /** land / shell acquisition price — 0 when the OM states an all-in total
+   *  and no price, in which case `budget` is that total */
   price: number;
   /** hard + soft works budget as the OM states it (excludes the price) */
   budget: number;
@@ -122,7 +123,9 @@ export function takeOutCapacity(stabilizedNoi: number, t: TakeOutTerms): TakeOut
  * carry would make the loan finance itself (ltc · r · t · p ≥ 1).
  */
 export function sizeConstructionDebt(inp: ConstructionDebtInputs): ConstructionDebtResult | null {
-  if (!pos(inp.price) || !pos(inp.budget) || !pos(inp.stabilizedNoi)) return null;
+  // The price may be zero (an all-in total with no price stated); the works
+  // and the NOI never are.
+  if (!(Number.isFinite(inp.price) && inp.price >= 0) || !pos(inp.budget) || !pos(inp.stabilizedNoi)) return null;
   if (!pos(inp.worksYears) || !pos(inp.maxLtcPct) || !(inp.ratePct >= 0) || !Number.isFinite(inp.ratePct)) return null;
   const ltc = inp.maxLtcPct / 100;
   const r = inp.ratePct / 100;
