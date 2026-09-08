@@ -664,9 +664,15 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           </View>
           <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 4 }}>
             {str(
-              plan.plan.timeline
-                ? `Timeline as stated: ${plan.plan.timeline}.`
-                : "Timeline to stabilization: not stated.",
+              `${
+                plan.plan.timeline
+                  ? `Timeline as stated: ${plan.plan.timeline}.`
+                  : "Timeline to stabilization: not stated."
+              }${
+                plan.plan.costPerUnit != null && plan.plan.units != null
+                  ? ` Basis: ${fmtCompactUsd(plan.plan.costPerUnit)} per planned unit (${plan.plan.units.toLocaleString("en-US")} units), all-in.`
+                  : ""
+              }`,
             )}
           </Text>
 
