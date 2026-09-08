@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "The rent-roll workbook draws its rollover as bars",
+      "blurb": "The rent-roll export's Rollover tab now carries Excel's own data bars on the space expiring each year and on the leasing capital it takes to re-lease it, so the heavy years read at a glance — and because Excel draws them off the live SUMIFS formulas, they move as you edit the roll. The Total row stays a figure.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-08",
       "title": "The pipeline draws each deal's fit on a phone",
       "blurb": "On a phone or tablet the pipeline row now draws a deal's mandate fit as a small bar in the call's colour — green to pursue, amber to watch, red to pass — instead of spelling it out at the end of a line that a narrow screen cut short; a plan deal's yield on cost on that line is labelled the way the cap column labels it, so the figure is never the part that is cut. Wider screens keep the score column; the bar there is the same one.",
       "href": "/deals"

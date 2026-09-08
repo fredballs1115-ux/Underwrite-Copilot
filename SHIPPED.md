@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Eighty-one PRs, #176–#256, each
+estimate, and that's what it should flag." Eighty-two PRs, #176–#257, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1091,6 +1091,16 @@ confirmed equal to the main tip after each batch.
   column's "yoc" micro-label there so the line fits too. The pipeline
   fixture asserts twelve bars (six scored live deals, twice each) and the
   words once per deal; shot at 390.
+- **#257 Data bars on the rent-roll workbook's Rollover tab.** #251 gave
+  the meeting workbook Excel's own data bars; the rent-roll export's
+  Rollover tab still carried the space expiring each year and the capital
+  to re-lease it as figures alone. Both columns now carry the same
+  conditional-formatting data bar over the year rows — drawn by Excel off
+  the SUMIFS results, so it stays live as the rent roll is edited, with
+  nothing computed into a cell — and the range ends at the last year row,
+  so the Total row draws no bar. The workbook test reads the two rules
+  back (C4:C14 and M4:M14 on the ten-year fixture, min to max) and checks
+  the Total sits on row 15, outside them.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

@@ -561,6 +561,35 @@ function buildRollover(
   }
 
   const last = first + years - 1;
+
+  // Data bars on the two columns a leasing read compares down the schedule —
+  // the space expiring each year and the capital it takes to re-lease it.
+  // Excel draws these itself off the SUMIFS results and keeps them live as
+  // the rent roll is edited: a picture with nothing computed into a cell.
+  // The range ends at the last year row; the total below draws no bar.
+  if (years > 0) {
+    for (const col of ["C", "M"]) {
+      ws.addConditionalFormatting({
+        ref: `${col}${first}:${col}${last}`,
+        rules: [
+          {
+            type: "dataBar",
+            priority: 1,
+            gradient: false,
+            minLength: 0,
+            maxLength: 100,
+            showValue: true,
+            border: false,
+            cfvo: [{ type: "min" }, { type: "max" }],
+            // The bar's colour rides the rule's model even though the typing
+            // omits it (exceljs writes it as the databar's <color>).
+            color: { argb: "FFB5CDC9" },
+          } as unknown as ExcelJS.ConditionalFormattingRule,
+        ],
+      });
+    }
+  }
+
   const totalsRow = last + 1;
   label(ws.getCell(totalsRow, 1), "Total", { bold: true });
   for (const col of [3, 5, 9, 10, 11, 12, 13]) {
