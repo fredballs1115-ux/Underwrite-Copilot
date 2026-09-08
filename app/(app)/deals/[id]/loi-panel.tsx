@@ -77,9 +77,8 @@ export function LoiPanel({
         )}
       </div>
       <p className="mt-0.5 max-w-lg text-xs leading-relaxed text-muted">
-        A one-page, non-binding letter of intent as an editable Word file —
-        prefilled from the screen, yours to mark up. Have counsel review
-        before anything is sent or signed.
+        A one-page, non-binding letter of intent as an editable Word file, prefilled from the
+        screen. Have counsel review before anything is sent.
       </p>
       {plan && (
         <p className="mt-2 max-w-lg text-xs leading-relaxed text-brand">

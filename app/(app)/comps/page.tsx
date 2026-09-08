@@ -144,11 +144,8 @@ export default async function PullCompsPage({
         </section>
       ) : (
         <section className="rounded-xl border border-dashed border-line p-4 text-sm text-muted">
-          Start typing an address above and pick it from the suggestions —
-          picking (rather than free-typing) is what tells the engine the
-          county, so it can route to the right public-records source. Results
-          carry a source link on every row, and an honest sentence (never a
-          blank) when a jurisdiction isn&apos;t covered yet.
+          Type an address above and pick it from the suggestions — the pick
+          tells the engine the county. Every result carries its source.
         </section>
       )}
     </div>

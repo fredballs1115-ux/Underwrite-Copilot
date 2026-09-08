@@ -62,9 +62,7 @@ export default function WhatsNewPage() {
           What&apos;s new
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
-          Every product improvement, newest first — built in the open, shipping
-          daily. The homepage and the app draw from this same list, and the
-          site&apos;s footer names the exact build it&apos;s running.
+          Every product improvement, newest first; the footer names the build the site is running.
         </p>
         {entries.length > 0 && oldest && (
           <p className="mt-2 text-xs font-medium text-brand">

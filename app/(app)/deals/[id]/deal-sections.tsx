@@ -1260,9 +1260,8 @@ export function ReconcileSection({
         {hasResult ? "Reconcile a different model" : "Reconcile your model"}
       </h2>
       <p className="mt-1 text-sm leading-relaxed text-muted">
-        Upload your own underwriting — Excel (.xlsx), CSV, or a PDF / ARGUS
-        export — and we’ll line it up against the OM and surface every gap, from
-        your perspective. This is the part the OM can’t tell you.
+        Upload your own underwriting — Excel, CSV, or a PDF / ARGUS export — and every gap against
+        the OM is lined up from your side.
       </p>
       {error && (
         <p className="mt-3 rounded-lg bg-kill/10 px-3 py-2 text-sm text-kill">

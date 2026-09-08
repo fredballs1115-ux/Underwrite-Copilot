@@ -438,9 +438,8 @@ export function DebtSizer({
         <SubHead>{planDebt ? "Permanent debt sizer — the take-out's lender terms" : "Debt sizer"}</SubHead>
         {planDebt && noi == null && (
           <p className="mt-1 text-xs text-muted">
-            No in-place NOI to size permanent debt on today — the rate, amortization, LTV, DSCR and
-            debt-yield terms here drive the take-out above. Enter a stabilized NOI as Year-1 NOI to
-            size the permanent loan on the finished building directly.
+            No in-place NOI to size permanent debt on; these terms drive the take-out above. Enter a
+            stabilized NOI as Year-1 NOI to size the permanent loan directly.
           </p>
         )}
         <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">

@@ -118,10 +118,8 @@ export default async function DataHealthPage() {
       <header>
         <h1 className="text-xl font-semibold tracking-tight">Data health</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          Every night a verification steward re-checks this site&apos;s data:
-          source links, feed freshness, consistency invariants, and the oldest
-          singly-sourced claims against the live web. Its findings land here —
-          corrections are made in the open in the changelog, never silently.
+          A nightly steward re-checks source links, feed freshness and the oldest singly-sourced
+          claims; corrections land here and in the changelog, never silently.
         </p>
       </header>
 
@@ -227,9 +225,8 @@ export default async function DataHealthPage() {
         <h2 className="text-sm font-semibold">Changelog — corrections in the open</h2>
         {changes.length === 0 ? (
           <p className="mt-1 text-sm text-muted">
-            No corrections yet. When the steward finds a number that changed at
-            the source, it updates the row AND records old → new here with the
-            evidence link — a number on this site never changes silently.
+            No corrections yet — a number that changes at its source is recorded here as old → new,
+            with the evidence.
           </p>
         ) : (
           <ul className="mt-2 space-y-2.5">

@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Sixty-eight PRs, #176–#243, each
+estimate, and that's what it should flag." Sixty-nine PRs, #176–#244, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -933,6 +933,18 @@ confirmed equal to the main tip after each batch.
   1,267 words and three long paragraphs — the two headline notes and one
   the fold's first sentence still runs long on — at 4,581px; the page lint
   reads it clean and every live-verify marker is still on the page.
+- **#244 Twenty-two helper paragraphs across the tool pages, cut to a line
+  each.** A census of the signed-in sources for JSX text runs of twenty-five
+  words or more (`scripts/prose-census.mjs`, kept) found the last essays:
+  the rent-roll page's four (intro, upload note, rollover profiles, the
+  client-data note), the valuations, bridge and submarket intros with their
+  import and scenario notes, the comps page's empty state, the news and
+  data-health intros and the data-health empty state, the analytics empty
+  state, the manual deal form's footnote, the LOI panel's note, the
+  reconciliation panel's note, the "upload your own underwriting" note, the
+  plan-sensitivity grid's caption, the research panel's and the debt
+  sizer's plan-deal notes, and the What's-new intro. Each says one thing
+  now; none of the phrases a test or live-verify looks for was among them.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
