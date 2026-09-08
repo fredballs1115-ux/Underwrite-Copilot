@@ -314,7 +314,8 @@ export function findPriceMetric(metrics: MetricLike[], kind: StrategyKind): Metr
 // figure at all — no NOI, cap rate, occupancy, rent or revenue — is selling
 // land, not an operating asset. Read as a development, so its land price
 // is its price; read as "stabilized" it would have none.
-const INCOME_ROW = /\bnoi\b|net operating income|cap rate|occupan|\brent|\begi\b|revenue|income/i;
+const INCOME_ROW =
+  /\bnoi\b|net operating income|cap rate|occupan|\brent|\begi\b|revenue|income|cash ?flow|\bncf\b|debt yield|dscr|expense|opex|\bleased\b/i;
 
 function isLandOnly(metrics: MetricLike[]): boolean {
   if (!metrics.length) return false;
@@ -389,7 +390,7 @@ export function timelineFromMetrics(metrics: MetricLike[]): string {
 // surface. Whitelisting the shape beats blacklisting adjectives: the next
 // OM's "Units delivered" needs no new word.
 const COUNT_LABEL =
-  /^(?:(?:total|net rentable|rentable|gross|overall)\s+)?(?:(?:number|no\.?|count|#)\s+of\s+)?(?:total\s+)?(?:(?:proposed|planned|existing|current|as[- ]built)\s+)?(?:(?:residential|apartment|apt\.?|rental|multi[- ]?family|dwelling|leasable|rentable|living|guest|hotel|storage|self[- ]storage|student|mobile[- ]home|manufactured[- ]home|mh|rv|senior(?: living)?)\s+)?(?:units?|doors?|keys?|rooms?|beds?|pads?|sites?|home ?sites?|suites?|apartments?|apartment homes?|homes?|lots?|spaces?)(?:\s+(?:count|total|proposed|planned))?$/i;
+  /^(?:(?:total|net rentable|rentable|gross|overall)\s+)?(?:(?:number|no\.?|count|#)\s+(?:of\s+)?)?(?:total\s+)?(?:(?:proposed|planned|existing|current|as[- ]built|approved|entitled|zoned|permitted)\s+)?(?:(?:residential|apartment|apt\.?|rental|multi[- ]?family|dwelling|leasable|rentable|living|guest|hotel|storage|self[- ]storage|student|mobile[- ]home|manufactured[- ]home|mh|rv|senior(?: living)?)\s+)?(?:units?|doors?|keys?|rooms?|guest ?rooms?|beds?|pads?|sites?|home ?sites?|suites?|apartments?|apartment homes?|homes?|lots?|spaces?)(?:\s+(?:count|total|proposed|planned))?$/i;
 // A parenthetical naming a subset — "(Phase I)", "(Building A)", "(of 312)"
 // — keeps the row from being the count; any other ("(proposed)", "(per
 // OM)", "(IL/AL/MC)") is dropped before the shape is read.
@@ -407,6 +408,9 @@ export function isCountLabel(label: string): boolean {
     .trim()
     .replace(/[:.]+$/, "")
     .trim();
+  // "Keys / Rooms", "Units / Keys", "Total Beds / Units": two count nouns
+  // either side of a slash are one count label; "Units / SF" is not.
+  if (s.includes("/")) return s.split("/").every((part) => COUNT_LABEL.test(part.trim()));
   return COUNT_LABEL.test(s);
 }
 
@@ -423,8 +427,12 @@ const COUNT_PREFIX = /^(approx(imately|\.)?|about|circa|c\.|~|≈|±)\s*/i;
  *  not one (a zero is not a count — a blank is null, never zero). Exported
  *  so every surface that needs a count reads it the same way. */
 export function parseCount(value: string): number | null {
-  // "248 (of 312)" is a subset of a count, not the count.
-  for (const p of value.match(/\([^)]*\)/g) ?? []) if (/\bof\b|out of|\//i.test(p)) return null;
+  // "248 (of 312)" is a subset of a count, and "312 units (Phase I)" a
+  // phase's, not the count; "312 units (285 market-rate, 27 affordable)"
+  // is the count with its breakdown.
+  for (const p of value.match(/\([^)]*\)/g) ?? []) {
+    if (/\bof\b|out of|\/|phase|bldg|building|tower|wing|floor/i.test(p)) return null;
+  }
   const s = value
     .replace(/^[a-z][a-z .#]*:\s*/i, "") // "Units: 248"
     .replace(/\([^)]*\)/g, " ")

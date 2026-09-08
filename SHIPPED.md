@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Forty-seven PRs, #176–#222, each
+estimate, and that's what it should flag." Forty-eight PRs, #176–#223, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -454,6 +454,34 @@ confirmed equal to the main tip after each batch.
   from the shared `findGoingInCap` too — the sample's own reader had no
   stabilized / pro forma exclude, and the other two carried near-copies of
   the buy box's.
+- **#223 The readers, read by a third reviewer.** A pass over #219–#221
+  found eight more ways a label could land on the wrong number, three of
+  them mine from #221. The price reader's bare "Asking" took "Asking Rent"
+  ($2,150) as the ask — the buy-box price band failed a sound deal, the
+  comp memory stored a $2k comp and the retrade diff traded on it; the
+  slash spellings "Price / Key", "Price / Door" and "Price / RSF" passed
+  as the whole price on any hotel or office deck that printed them above
+  the ask; and "Loan pricing", "Debt pricing" or a "Pricing date" read as
+  the price. The include now takes "Ask" / "Asking" alone or with price /
+  guidance and "Pricing" as a word; the exclude names rents, rates,
+  yields, spreads, loan / debt / insurance pricing and every per-something
+  spelling. `parseSf` had gone strict enough to return nothing on
+  "250,000 Sq. Ft.", "250,000 s.f.", "±250,000 SF", "250,000 SF+", "1.2
+  million SF" and "250,000 SF on 12.5 acres" — and the Excel model then
+  modelled the deal at its 100,000 SF fallback, which drives opex,
+  reserves and rent per SF. It now reads the figure the square-footage
+  noun follows, in every spelling, and refuses only a pair or a range.
+  Size labels gain NRSF, GSF, USF, "Approx. SF", "Property size" and
+  "Building Size / SF"; a bare "Size" row on a deck that also states
+  acreage or a lot is the land, not the building. Count labels gain "No.
+  Units", "# Units", "Guestrooms", "Keys / Rooms", "Units / Keys" and the
+  approved / entitled / zoned units a land OM states; "312 units (Phase
+  I)" is a phase, not the count. A deck whose only income row is "Cash
+  flow" or "DSCR" beside a land cost is an operating asset, not a
+  development. And two more surfaces join the shared price reader: the
+  LOI prefill (its own reader took "Asking rent") and the pipeline card,
+  which now falls back to the first signal's ask as the deal page does.
+  Seventy-odd new cases.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

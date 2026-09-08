@@ -53,8 +53,9 @@ function pickSlots(extraction: ExtractionResult, signal: FirstSignal | null): {
     // the slot, and the card agrees with the deal page and the buy box.
     cap: findGoingInCap(metrics)?.value ?? null,
     // The shared price reader; on a development with no asking price the
-    // land or site cost is what is being bought.
-    price: findPriceMetric(metrics, strategy.kind)?.value ?? null,
+    // land or site cost is what is being bought. The first signal's ask
+    // fills the slot before the extraction lands, as on the deal page.
+    price: findPriceMetric(metrics, strategy.kind)?.value ?? (signal?.askPrice?.trim() || null),
     yoc: plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,
   };
 }

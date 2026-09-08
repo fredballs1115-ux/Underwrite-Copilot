@@ -301,3 +301,49 @@ describe("assessPlausibility — the basis check divides by the real count", () 
     expect(f.find((x) => x.code === "basis_out_of_band")?.title).toContain("5 units");
   });
 });
+
+describe("the third review's count cases", () => {
+  it("'No. Units', '# Units', 'Guestrooms', 'Keys / Rooms' and a land OM's approved or entitled units all count", () => {
+    for (const label of [
+      "No. Units",
+      "# Units",
+      "Total # Units",
+      "No. of Keys",
+      "Guestrooms",
+      "Guest Rooms",
+      "Keys/Rooms",
+      "Units / Keys",
+      "Total Beds/Units",
+      "Approved units",
+      "Entitled units",
+      "Zoned units",
+      "Permitted units",
+    ]) {
+      expect(unitCountFromMetrics([m(label, "312")]), label).toBe(312);
+    }
+    expect(unitCountFromMetrics([m("Units / SF", "312")])).toBeNull();
+    expect(unitCountFromMetrics([m("Density (units/acre)", "42")])).toBeNull();
+  });
+
+  it("a value whose parenthetical names a phase or a building is that phase's count, not the whole", () => {
+    expect(parseCount("312 units (Phase I)")).toBeNull();
+    expect(parseCount("120 units (Building A)")).toBeNull();
+    expect(parseCount("312 units (285 market-rate, 27 affordable)")).toBe(312);
+  });
+
+  it("a deck whose only income row is a cash flow or a DSCR beside a land cost is an operating asset, not a development", () => {
+    const ex = (metrics: ExtractedMetric[]): ExtractionResult => ({
+      dealName: "Maddox Apartments",
+      assetClass: "multifamily",
+      market: "Dallas, TX",
+      address: "",
+      metrics,
+    });
+    expect(inferStrategy(ex([m("Land cost", "$4,500,000"), m("Cash flow", "$1,250,000")])).kind).toBe("stabilized");
+    expect(inferStrategy(ex([m("Land cost", "$4,500,000"), m("DSCR", "1.35x")])).kind).toBe("stabilized");
+    expect(inferStrategy(ex([m("Land cost", "$4,500,000"), m("Total expenses", "$900,000")])).kind).toBe(
+      "stabilized",
+    );
+    expect(inferStrategy(ex([m("Land price", "$4,500,000"), m("Acres", "12")])).kind).toBe("development");
+  });
+});
