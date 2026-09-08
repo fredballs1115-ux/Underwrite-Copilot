@@ -3,17 +3,17 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#236 merged to main (live build
-sha `edd2119`, #235, confirmed equal to the main tip by live-verify at 07:57
-UTC — every one of the first sixty is live, and the public-page lint #231
-added reads all twelve public pages clean on every run, skip link and
-landmarks included; #236 follows on its deploy).
+**Last updated 2026-09-08**, after PRs #176–#237 merged to main (live build
+sha `68eb5bc`, #236, confirmed equal to the main tip by live-verify at 08:28
+UTC — every one of the first sixty-one is live, and the public-page lint
+#231 added reads all twelve public pages clean on every run, skip link and
+landmarks included; #237 follows on its deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Sixty-one PRs (#176–#236) landed across one review session and the
+Sixty-two PRs (#176–#237) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -276,6 +276,13 @@ deploy (live-verify shows the sha).
   copy on the analysis service is deleted when its run ends. The root cause
   of the stalls — in-process runs die with every deploy — is the standing
   item below: turn the worker on once migration 0016 has run.
+- **Two screens at a time per web process** (#237): a batch upload used to
+  start four pipelines at once, each holding its OM and a ~27MB request body
+  per model call — enough to take a 512MB instance down mid-batch. Now two
+  run and the rest wait their turn (their claim heartbeats through the
+  wait, so a queued screen never reads as stalled); `ANALYSIS_CONCURRENCY`
+  raises it on a bigger instance. A deck past the provider's ~600-page
+  limit stops before any model call, with the page count in the message.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":

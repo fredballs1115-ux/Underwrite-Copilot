@@ -241,7 +241,16 @@ beforeEach(() => {
 afterEach(() => {
   errSpy.mockRestore();
   delete process.env.ANALYSIS_HEARTBEAT_MS;
+  delete process.env.ANALYSIS_CONCURRENCY;
 });
+
+/** A second and third deal beside d1, each with its own queued job row. */
+function addDeals(...ids: string[]) {
+  for (const id of ids) {
+    state.deals[id] = { ...freshState().deals.d1, id, name: `Deal ${id}` };
+    state.jobs.push({ ...freshState().jobs[0], id: `j-${id}`, deal_id: id });
+  }
+}
 
 describe("runAnalysis — the happy path", () => {
   it("runs the six steps in order, writes every result and finishes done", async () => {
@@ -360,6 +369,45 @@ describe("runAnalysis — the run keeps its claim alive and cleans up after itse
     await runAnalysis("d1");
     expect(releaseOmSource).toHaveBeenCalledWith(file);
     expect(job().error).toMatch(/couldn't reach the analysis service/);
+  });
+
+  it("runs at most ANALYSIS_CONCURRENCY screens at once; the rest wait with their claim heartbeating", async () => {
+    process.env.ANALYSIS_CONCURRENCY = "2";
+    addDeals("d2", "d3", "d4");
+    let inFlight = 0;
+    let peak = 0;
+    vi.mocked(extractTerms).mockImplementation(async () => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      await new Promise((r) => setTimeout(r, 25));
+      inFlight--;
+      return EXTRACTION;
+    });
+    await Promise.all(["d1", "d2", "d3", "d4"].map((id) => runAnalysis(id)));
+    expect(peak).toBe(2);
+    for (const j of state.jobs) expect(j.status).toBe("done");
+
+    // One at a time when asked; a run that fails still frees its slot.
+    process.env.ANALYSIS_CONCURRENCY = "1";
+    state = freshState();
+    addDeals("d2");
+    peak = 0;
+    vi.mocked(scrutinizeComps).mockRejectedValueOnce(new Error("fetch failed"));
+    await Promise.all(["d1", "d2"].map((id) => runAnalysis(id)));
+    expect(peak).toBe(1);
+    expect(state.jobs.map((j) => j.status).sort()).toEqual(["done", "error"]);
+  });
+
+  it("an OM past the provider's page cap stops before any model call, with the count in the message", async () => {
+    const { downloadOmPdf } = await import("@/lib/storage");
+    vi.mocked(downloadOmPdf).mockResolvedValueOnce(
+      Buffer.from("%PDF-1.4\n" + "<< /Type /Page >>\n".repeat(700)),
+    );
+    await runAnalysis("d1");
+    expect(job().status).toBe("error");
+    expect(job().error).toMatch(/runs 700 pages/);
+    expect(readFirstSignal).not.toHaveBeenCalled();
+    expect(extractTerms).not.toHaveBeenCalled();
   });
 
   it("a resumed run whose checkpoint read fails still writes checkpoints that carry the job's kind", async () => {

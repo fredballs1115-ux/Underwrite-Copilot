@@ -3,6 +3,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { downloadOmPdf } from "@/lib/storage";
 import { readFirstSignal } from "./first-signal";
 import { describeRunFailure, ScreenError } from "./failure";
+import { RunGate, concurrencyFromEnv } from "./run-gate";
 import { omSourceFor, omFromText, releaseOmSource, type OmSource } from "./om-source";
 import {
   manualFactSheet,
@@ -79,6 +80,18 @@ function heartbeatMs(): number {
   const n = Number(process.env.ANALYSIS_HEARTBEAT_MS);
   return Number.isFinite(n) && n > 0 ? n : 60_000;
 }
+
+// One web process runs at most ANALYSIS_CONCURRENCY screens at a time (see
+// run-gate.ts): a batch upload used to start four pipelines at once, each
+// holding a 20MB OM and its 27MB base64 request body. The claim is taken
+// before the wait and heartbeats through it, so a queued run never reads as
+// stalled and never invites a second pipeline on the same deal.
+const runGate = new RunGate(concurrencyFromEnv);
+
+// The provider reads a PDF of up to about 600 pages in one request; a longer
+// deck came back as a raw 400. The byte counter (lib/pdf.ts) only ever
+// UNDER-counts, so a count past the cap is certain, never a false alarm.
+const MAX_OM_PAGES = 600;
 
 /** Keep the job row fresh while a run is alive; returns the stop function. */
 function startHeartbeat(dealId: string): () => void {
@@ -184,8 +197,10 @@ export async function runAnalysis(
   // The OM's transport for this run — released in `finally` when it is a
   // Files-API object, so a large OM never leaves an orphaned upload behind.
   let omSource: OmSource | null = null;
+  let releaseSlot: (() => void) | null = null;
   const stopHeartbeat = startHeartbeat(dealId);
   try {
+    releaseSlot = await runGate.acquire();
     const admin = createSupabaseAdminClient();
     const { data: deal, error } = await admin
       .from("deals")
@@ -264,6 +279,14 @@ export async function runAnalysis(
       needsDoc && !manual
         ? await downloadOmPdf(deal.om_storage_path as string)
         : null;
+    if (pdf) {
+      const pages = countPdfPages(pdf);
+      if (pages != null && pages > MAX_OM_PAGES) {
+        throw new ScreenError(
+          `This OM runs ${pages.toLocaleString("en-US")} pages — the analysis service reads up to about ${MAX_OM_PAGES} in one pass. Split off the financial sections and upload those.`,
+        );
+      }
+    }
     // Inline for anything the request cap carries; one Files-API upload for
     // larger OMs, which every step then references by id (a resumed run
     // re-uploads — one extra upload, never a stale reference).
@@ -578,6 +601,7 @@ export async function runAnalysis(
       // the deal (and its job row) is gone — nothing left to tell
     });
   } finally {
+    releaseSlot?.();
     stopHeartbeat();
     await releaseOmSource(omSource);
   }
@@ -594,8 +618,10 @@ export async function runReconciliation(
   model: { name: string; buffer: Buffer },
 ): Promise<void> {
   let omSource: OmSource | null = null;
+  let releaseSlot: (() => void) | null = null;
   const stopHeartbeat = startHeartbeat(dealId);
   try {
+    releaseSlot = await runGate.acquire();
     const admin = createSupabaseAdminClient();
     const { data: deal, error } = await admin
       .from("deals")
@@ -648,6 +674,7 @@ export async function runReconciliation(
       // the deal is gone — nothing left to tell
     });
   } finally {
+    releaseSlot?.();
     stopHeartbeat();
     await releaseOmSource(omSource);
   }
