@@ -141,7 +141,10 @@ export default function DemoPage() {
   // Everything below is computed by the SAME functions the logged-in app
   // runs — evaluateBuyBox, scoreMandateFit, deriveUnderwriteInputs — over
   // the sample fixture, so the demo can never drift from the product.
-  const omNoi = pickOmNoi(SAMPLE_DEAL.extraction.metrics)?.noi ?? null;
+  // The kind-aware picker: the sample is a stabilized asset, so its pro
+  // forma figure is the story tested against the T-12.
+  const omPick = pickOmNoi(SAMPLE_DEAL.extraction.metrics, inferStrategy(SAMPLE_DEAL.extraction).kind);
+  const omNoi = omPick?.noi ?? null;
   const derived = deriveUnderwriteInputs(
     SAMPLE_DEAL.extraction,
     SAMPLE_DEAL.name,
@@ -183,7 +186,7 @@ export default function DemoPage() {
       // the app uses, fed from the same extraction metric.
       noiComparison:
         omNoi != null
-          ? compareNoi(omNoi, SAMPLE_DEAL.t12.summary.noi!)
+          ? compareNoi(omNoi, SAMPLE_DEAL.t12.summary.noi!, omPick)
           : null,
     },
     buyBox: {

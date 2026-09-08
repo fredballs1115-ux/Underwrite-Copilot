@@ -23,7 +23,18 @@ export interface ActualsData {
   rentRoll: { asOf: string | null; summary: RentRollSummary } | null;
   t12: { periodEnd: string | null; summary: T12Summary } | null;
   noiComparison: NoiComparison | null;
+  /** On a plan deal: which OM figure the T-12 is held against and why the
+   *  stabilized pro forma is not — or, when the OM states only the finished
+   *  project's NOI, why there is no comparison at all. Null otherwise. */
+  noiNote?: string | null;
 }
+
+/** The OM figure's name on the card, by what it is. */
+const OM_LABEL: Record<NonNullable<NoiComparison["omBasis"]>, string> = {
+  in_place: "OM in-place NOI",
+  year1: "OM Year-1 NOI",
+  stabilized: "OM pro forma NOI",
+};
 
 /**
  * PROPERTY ACTUALS (Feature 1): what the rent roll and T-12 actually say —
@@ -33,7 +44,7 @@ export interface ActualsData {
  * Absent entirely when neither document was provided.
  */
 export function PropertyActuals({ data }: { data: ActualsData }) {
-  const { rentRoll, t12, noiComparison } = data;
+  const { rentRoll, t12, noiComparison, noiNote } = data;
   if (!rentRoll && !t12) return null;
   const rr = rentRoll?.summary;
   const st = t12?.summary;
@@ -48,8 +59,8 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
       {/* Headline: OM assumed NOI vs T-12 actual. */}
       {noiComparison && (
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-line bg-faint/60 p-3">
-          <span className="text-xs text-muted">
-            OM assumed NOI{" "}
+          <span className="text-xs text-muted" title={noiComparison.omLabel ?? undefined}>
+            {noiComparison.omBasis ? OM_LABEL[noiComparison.omBasis] : "OM assumed NOI"}{" "}
             <span className="font-mono font-semibold text-ink">{usd(noiComparison.omNoi)}</span>
           </span>
           <span className="text-xs text-muted">
@@ -70,6 +81,9 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
           </span>
         </div>
       )}
+      {/* A plan deal: which figure the T-12 is held against, and why the
+          stabilized pro forma is not — or why nothing is compared at all. */}
+      {noiNote && <p className="mt-2 text-[11px] leading-relaxed text-muted">{noiNote}</p>}
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         {/* Rent roll */}

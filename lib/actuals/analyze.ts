@@ -5,7 +5,7 @@
 // code and unit-tested against known-answer fixtures. Given the same
 // extraction it always returns the same summary.
 
-import { parseMoney } from "@/lib/criteria";
+import { isPlanDeal, noiFigures, type NoiKind, type StrategyKind } from "@/lib/deal-strategy";
 import type {
   RentRollExtraction,
   RentRollSummary,
@@ -167,25 +167,38 @@ export function summarizeT12(x: T12Extraction): T12Summary {
   };
 }
 
+/** How the OM's figure reads on the actuals card and in the challenger's
+ *  note. */
+export const OM_NOI_BASIS_LABEL: Record<NoiKind, string> = {
+  in_place: "in-place NOI",
+  year1: "Year-1 NOI",
+  stabilized: "pro forma NOI",
+};
+
 /**
- * Pick the OM's assumed-NOI metric out of an extraction — ONE implementation
- * shared by the deal page's actuals card and the pipeline's challenger note,
- * so the two can never disagree. Word-bounded and per-unit-safe: "NOI per
- * unit" and "$/SF" figures are excluded, and \bnoi\b can't match inside
- * "Illinois". Prefers the stabilized / pro-forma figure (the sponsor's story)
- * over an in-place NOI; returns the parsed dollars alongside the metric.
+ * Pick the OM's NOI to hold against the T-12 actual — ONE implementation
+ * shared by the deal page's actuals card, the sample screen and the
+ * pipeline's challenger note, so the three can never disagree. Which figure
+ * depends on the deal's kind. On a stabilized asset the sponsor's stabilized
+ * / pro forma figure is the story to test against what the property
+ * produced. On a plan deal (value-add, lease-up, conversion, development)
+ * that figure describes the FINISHED project — three years and a
+ * construction budget away — and is judged on yield on cost, never against
+ * today's T-12; the OM's in-place or Year-1 figure is the one to test, and
+ * when the OM states none there is nothing to compare. Per-unit / per-SF
+ * figures never qualify, and \bnoi\b cannot match inside "Illinois".
  */
 export function pickOmNoi(
   metrics: { label: string; value: string }[],
-): { label: string; value: string; noi: number } | null {
-  const INC = /net operating income|\bnoi\b/i;
-  const EXC = /\bper\b|\/|psf|unit/i;
-  const eligible = metrics.filter((m) => INC.test(m.label) && !EXC.test(m.label));
-  const m =
-    eligible.find((x) => /stab|pro ?forma|forward/i.test(x.label)) ?? eligible[0];
-  if (!m) return null;
-  const noi = parseMoney(m.value);
-  return noi != null && Number.isFinite(noi) ? { ...m, noi } : null;
+  kind: StrategyKind = "stabilized",
+): { label: string; value: string; noi: number; basis: NoiKind } | null {
+  const figs = noiFigures(metrics);
+  const pick = isPlanDeal(kind)
+    ? (figs.find((f) => f.kind === "in_place") ?? figs.find((f) => f.kind === "year1") ?? null)
+    : (figs.find((f) => f.kind === "stabilized") ?? figs[0] ?? null);
+  if (!pick) return null;
+  const raw = metrics.find((m) => m.label === pick.label);
+  return { label: pick.label, value: raw?.value ?? "", noi: pick.value, basis: pick.kind };
 }
 
 export function severityForNoiDelta(deltaPct: number): ActualsSeverity {
@@ -200,7 +213,14 @@ export function severityForNoiDelta(deltaPct: number): ActualsSeverity {
  * (OM − actual) ÷ |actual|, so positive = the OM runs hot vs the actuals.
  * Severity: >10% red flag, >5% material, else in line.
  */
-export function compareNoi(omNoi: number, t12Noi: number): NoiComparison {
+export function compareNoi(
+  omNoi: number,
+  t12Noi: number,
+  /** which OM figure this is (from pickOmNoi), so the card and the note can
+   *  name it — "in-place NOI" on a plan deal, "pro forma NOI" on a
+   *  stabilized one */
+  om?: { label: string; basis: NoiKind } | null,
+): NoiComparison {
   const deltaPct =
     t12Noi !== 0
       ? (omNoi - t12Noi) / Math.abs(t12Noi)
@@ -210,5 +230,12 @@ export function compareNoi(omNoi: number, t12Noi: number): NoiComparison {
   const severity = severityForNoiDelta(deltaPct);
   const direction =
     Math.abs(deltaPct) <= 0.005 ? "in_line" : omNoi > t12Noi ? "above" : "below";
-  return { omNoi, t12Noi, deltaPct, severity, direction };
+  return {
+    omNoi,
+    t12Noi,
+    deltaPct,
+    severity,
+    direction,
+    ...(om ? { omLabel: om.label, omBasis: om.basis } : {}),
+  };
 }

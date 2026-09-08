@@ -169,6 +169,54 @@ describe("pickOmNoi — the shared OM-NOI selector", () => {
     const m = pickOmNoi([{ label: "Net operating income", value: "$3,000,000" }]);
     expect(m?.noi).toBe(3_000_000);
   });
+  it("names which figure it picked", () => {
+    expect(pickOmNoi([{ label: "Stabilized NOI", value: "$2,400,000" }])?.basis).toBe("stabilized");
+    expect(pickOmNoi([{ label: "NOI (in-place)", value: "$2,000,000" }])?.basis).toBe("in_place");
+    expect(pickOmNoi([{ label: "Net operating income", value: "$3,000,000" }])?.basis).toBe("year1");
+  });
+});
+
+describe("pickOmNoi — a plan deal's stabilized pro forma is never held against the T-12", () => {
+  const CONVERSION = [
+    { label: "Purchase price", value: "$20,000,000" },
+    { label: "NOI (in-place)", value: "$1,200,000" },
+    { label: "NOI (stabilized, pro forma)", value: "$21,000,000" },
+  ];
+
+  it("on a conversion the in-place figure is the one compared", () => {
+    for (const kind of ["conversion", "value_add", "lease_up", "development"] as const) {
+      const m = pickOmNoi(CONVERSION, kind);
+      expect(m?.noi).toBe(1_200_000);
+      expect(m?.basis).toBe("in_place");
+    }
+  });
+
+  it("falls back to a Year-1 figure, and to nothing when the OM states only the finished project's NOI", () => {
+    const yr1 = pickOmNoi(
+      [
+        { label: "NOI (stabilized, pro forma)", value: "$21,000,000" },
+        { label: "Year 1 NOI", value: "$900,000" },
+      ],
+      "conversion",
+    );
+    expect(yr1?.noi).toBe(900_000);
+    expect(yr1?.basis).toBe("year1");
+    expect(
+      pickOmNoi([{ label: "NOI (stabilized, pro forma)", value: "$21,000,000" }], "conversion"),
+    ).toBeNull();
+  });
+
+  it("on a stabilized asset the pro forma story is still the figure tested", () => {
+    expect(pickOmNoi(CONVERSION, "stabilized")?.noi).toBe(21_000_000);
+    expect(pickOmNoi(CONVERSION)?.noi).toBe(21_000_000);
+  });
+
+  it("compareNoi carries the figure's name and basis through to the card", () => {
+    const cmp = compareNoi(1_200_000, 1_150_000, { label: "NOI (in-place)", basis: "in_place" });
+    expect(cmp.omLabel).toBe("NOI (in-place)");
+    expect(cmp.omBasis).toBe("in_place");
+    expect(compareNoi(1_200_000, 1_150_000).omBasis).toBeUndefined();
+  });
 });
 
 describe("compareNoi — OM assumed vs T-12 actual", () => {

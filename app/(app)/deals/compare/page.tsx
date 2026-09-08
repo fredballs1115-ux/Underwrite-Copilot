@@ -11,16 +11,9 @@ import { metroForAddress } from "@/lib/market-match";
 import type { StructuredAddress } from "@/lib/address";
 import { leverageRead } from "@/lib/leverage";
 import { seedBenchmarks } from "@/lib/research-data";
-import { inferStrategy, isPlanDeal, noiFigures } from "@/lib/deal-strategy";
+import { findPriceMetric, inferStrategy, isPlanDeal, noiFigures } from "@/lib/deal-strategy";
 
 export const metadata: Metadata = { title: "Compare deals" };
-
-/** Best-effort pull of a metric string out of the extraction. */
-function fromExtraction(ex: ExtractionResult | null, re: RegExp): string | null {
-  if (!ex) return null;
-  const m = ex.metrics.find((x) => re.test(x.label));
-  return m ? m.value : null;
-}
 
 /** The OM's in-place or Year-1 NOI as stated — never the stabilized pro
  *  forma, which on a plan deal would land in the "Year-1 NOI" row as if the
@@ -90,7 +83,9 @@ function toCol(deal: DealRow, box: BuyBox | null, bench30: number | null): Col {
       !planDeal && r?.goingInCapPct != null && bench30 != null
         ? leverageRead(r.goingInCapPct, bench30)
         : null,
-    price: usd(r?.purchasePrice) ?? fromExtraction(ex, /\bprice\b/i),
+    // The shared price reader — never a per-unit price or a prior trade; a
+    // development's land cost is its price.
+    price: usd(r?.purchasePrice) ?? findPriceMetric(ex?.metrics ?? [], strat.kind)?.value ?? null,
     noi: usd(r?.year1Noi) ?? goingInNoiText(ex),
   };
 }

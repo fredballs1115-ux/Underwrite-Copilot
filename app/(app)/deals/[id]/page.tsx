@@ -45,7 +45,7 @@ import { buildComps, marketMemoryFor } from "@/lib/market-memory";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource, type BuyBoxCheck } from "@/lib/criteria";
 import { scoreMandateFit, type MandateScore, type MandateVerdict } from "@/lib/mandate";
-import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
+import { OM_NOI_BASIS_LABEL, compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import {
   IMPLIED_CAP_CEILING,
   assessPlausibility,
@@ -301,6 +301,18 @@ export default async function DealPage({
   // metric set lives one click away in Financials.
   const metrics = extraction?.metrics ?? [];
 
+  // What kind of deal this is, what its plan says (stabilized NOI, cost,
+  // yield on cost), and whether its headline figures can all be true at
+  // once — pure code over the extraction. On a conversion a $21M stabilized
+  // NOI over a $20M price is the plan and shows as such; on a deal read as
+  // stabilized the same pair is a misread, and is named as such, above
+  // every number built on it. Read first: the actuals check, the summary
+  // bar and every panel below take the kind from here.
+  const strategy = inferStrategy(extraction, firstSignal);
+  const plan = planSummary(extraction, strategy);
+  const plausibility = assessPlausibility(extraction, strategy);
+  const summaryStrategy = strategy.kind === "unknown" ? null : strategy.label;
+
   // Property actuals (Feature 1), deal tasks (Feature 7), and the team
   // roster — four independent reads, one round-trip. All best-effort: the
   // actuals/tasks tables arrived in 0020/0022, and on an older schema the
@@ -341,10 +353,22 @@ export default async function DealPage({
       : Promise.resolve({ data: null }),
   ]);
   const t12Summary = (t12Res.data?.summary as T12Summary | undefined) ?? null;
-  // OM assumed NOI vs the T-12 actual — the shared picker (word-bounded,
-  // per-unit-safe, same one the challenger note uses). Degenerate actual NOI
-  // (0 / non-finite) renders no comparison rather than an infinite delta.
-  const omNoi = pickOmNoi(metrics)?.noi ?? null;
+  // The OM's NOI vs the T-12 actual — the shared picker (word-bounded,
+  // per-unit-safe, same one the challenger note uses), which reads the
+  // deal's kind: on a plan deal the in-place or Year-1 figure is compared
+  // and the stabilized pro forma never is — it describes the finished
+  // project, three years away, and is judged on yield on cost. Degenerate
+  // actual NOI (0 / non-finite) renders no comparison rather than an
+  // infinite delta.
+  const omPick = pickOmNoi(metrics, strategy.kind);
+  const omNoi = omPick?.noi ?? null;
+  const noiNote = isPlanDeal(strategy.kind)
+    ? omPick
+      ? `A ${strategy.label.toLowerCase()}: the T-12 is held against the OM's ${OM_NOI_BASIS_LABEL[omPick.basis]}. The stabilized pro forma describes the finished project and is judged on yield on cost, never against today's actuals.`
+      : t12Summary
+        ? `A ${strategy.label.toLowerCase()}: the OM states only the finished project's NOI, so there is nothing to hold the T-12 against until an in-place figure is stated. The stabilized pro forma is judged on yield on cost.`
+        : null
+    : null;
   const actuals: ActualsData = {
     rentRoll: rrRes.data?.summary
       ? {
@@ -363,8 +387,9 @@ export default async function DealPage({
       t12Summary?.noi != null &&
       Number.isFinite(t12Summary.noi) &&
       t12Summary.noi !== 0
-        ? compareNoi(omNoi, t12Summary.noi)
+        ? compareNoi(omNoi, t12Summary.noi, omPick)
         : null,
+    noiNote,
   };
 
   // Sensitivity playground (Feature 2 of the competitive spec): the deal's
@@ -488,16 +513,6 @@ export default async function DealPage({
     const f = parseFactRow(row);
     if (!(f.field in factsByField)) factsByField[f.field] = f;
   }
-  // What kind of deal this is, what its plan says (stabilized NOI, cost,
-  // yield on cost), and whether its headline figures can all be true at
-  // once — pure code over the extraction. On a conversion a $21M stabilized
-  // NOI over a $20M price is the plan and shows as such; on a deal read as
-  // stabilized the same pair is a misread, and is named as such, above
-  // every number built on it.
-  const strategy = inferStrategy(extraction, firstSignal);
-  const plan = planSummary(extraction, strategy);
-  const plausibility = assessPlausibility(extraction, strategy);
-  const summaryStrategy = strategy.kind === "unknown" ? null : strategy.label;
   // The shared price reader; on a development with no asking price the land
   // or site cost is what is being bought.
   const summaryPrice =

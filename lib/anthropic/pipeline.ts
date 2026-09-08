@@ -19,8 +19,14 @@ import { countPdfPages } from "@/lib/pdf";
 import { buildDealFacts, toFactRows } from "@/lib/facts";
 import { runDocReconciliation } from "./reconcile-facts";
 import { runActualsIngestion } from "./actuals-ingest";
-import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
-import { assessPlausibility, inferStrategy, planSummary, plausibilityNote } from "@/lib/deal-strategy";
+import { OM_NOI_BASIS_LABEL, compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
+import {
+  assessPlausibility,
+  inferStrategy,
+  isPlanDeal,
+  planSummary,
+  plausibilityNote,
+} from "@/lib/deal-strategy";
 import { dealContextFor } from "@/lib/deal-context";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxLines } from "@/lib/criteria";
@@ -379,9 +385,17 @@ export async function runAnalysis(
         const flagged = disc.filter((d) => d.severity !== "minor").slice(0, 6);
         const notes: string[] = [];
 
+        // The deal's kind first: it decides which OM figure the T-12 is held
+        // against and how the plan's figures are read below.
+        const ex = (dr?.extraction as ExtractionResult | null) ?? null;
+        const strategy = inferStrategy(ex);
+
         // Feature 1: the OM-assumed vs T-12-actual NOI gap is the skeptic's
         // first-order fact — a material (>5%) or red-flag (>10%) delta means
-        // the deck's income story isn't what the property produced.
+        // the deck's income story isn't what the property produced. On a
+        // plan deal the figure tested is the OM's in-place or Year-1 NOI;
+        // the stabilized pro forma is the finished project's and is judged
+        // on yield on cost, never against today's actuals.
         try {
           const { data: t12Row } = await admin
             .from("deal_t12_statements")
@@ -396,14 +410,23 @@ export async function runAnalysis(
               ?.metrics ?? [];
           // Same shared picker as the actuals card — the note and the card
           // must reference the same OM figure.
-          const omNoi = pickOmNoi(exMetrics)?.noi ?? null;
-          if (omNoi != null && t12Noi != null && Number.isFinite(t12Noi) && t12Noi !== 0) {
-            const cmp = compareNoi(omNoi, t12Noi);
+          const omPick = pickOmNoi(exMetrics, strategy.kind);
+          const omNoi = omPick?.noi ?? null;
+          const t12Usable = t12Noi != null && Number.isFinite(t12Noi) && t12Noi !== 0;
+          if (omPick && omNoi != null && t12Usable) {
+            const cmp = compareNoi(omNoi, t12Noi, omPick);
             if (cmp.severity !== "in_line") {
               notes.push(
-                `The OM's assumed NOI ($${Math.round(omNoi).toLocaleString("en-US")}) runs ${(Math.abs(cmp.deltaPct) * 100).toFixed(1)}% ${cmp.direction} the T-12 actual ($${Math.round(t12Noi).toLocaleString("en-US")}) — a ${cmp.severity === "red_flag" ? "red-flag" : "material"} gap between the deck's story and what the property produced.`,
+                `The OM's ${OM_NOI_BASIS_LABEL[omPick.basis]} ($${Math.round(omNoi).toLocaleString("en-US")}) runs ${(Math.abs(cmp.deltaPct) * 100).toFixed(1)}% ${cmp.direction} the T-12 actual ($${Math.round(t12Noi).toLocaleString("en-US")}) — a ${cmp.severity === "red_flag" ? "red-flag" : "material"} gap between the deck's story and what the property produced.`,
               );
             }
+          } else if (!omPick && t12Usable && isPlanDeal(strategy.kind)) {
+            // A plan deal whose OM states only the finished project's NOI:
+            // the T-12 describes the building as it stands, and nothing in
+            // the deck claims what it earns today.
+            notes.push(
+              `The T-12 shows the building earns $${Math.round(t12Noi).toLocaleString("en-US")} today, and the OM states only the finished project's NOI — nothing in the deck claims what the asset produces as bought. Ask for the in-place figure; the stabilized pro forma is judged on yield on cost, not against today's actuals.`,
+            );
           }
         } catch {
           // no T-12 stored (or pre-0020 schema) — skip the comparison
@@ -415,8 +438,6 @@ export async function runAnalysis(
         // whether the plan's pro forma is as conservative as the deck says,
         // and grills a misread as a misread, rather than reading either as
         // a 105% cap rate.
-        const ex = (dr?.extraction as ExtractionResult | null) ?? null;
-        const strategy = inferStrategy(ex);
         const plausibility = plausibilityNote(
           assessPlausibility(ex, strategy),
           strategy,
