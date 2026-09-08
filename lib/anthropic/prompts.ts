@@ -144,7 +144,7 @@ If the OM contains no comps at all, say so clearly in the summary and return emp
 export function reconcilerInstruction(context?: string | null): string {
   return `Compare the offering memorandum against the buyer's own underwriting (their ARGUS export or Excel model, provided separately). Find every meaningful discrepancy and explain what it means for the deal.
 
-For each row, give the metric, the OM's value, the buyer's value, and a plain-language description of the gap. Set \`direction\` from the BUYER's perspective: \`unfavorable\` means the buyer's model is worse than the OM claims, \`favorable\` means better, \`neutral\` means immaterial.
+For each row, give the metric, the OM's value, the buyer's value, and the gap. Lead the gap with its figure — the dollar amount, basis points or percentage the two values differ by, as in "$174k below the OM — heavier expense load", "300 bps higher, in line with in-place" or "+4.2% on exit value" — then the reason in a few words; a row where the two agree says "In agreement" and states no figure. Set \`direction\` from the BUYER's perspective: \`unfavorable\` means the buyer's model is worse than the OM claims, \`favorable\` means better, \`neutral\` means immaterial.
 
 If the deal is a plan — a conversion, a development, a lease-up, a heavy value-add — compare the two on the plan's terms: total cost, construction and lease-up timing, the stabilized NOI and the yield on cost. A buyer's model that carries construction and downtime against an OM that shows only the stabilized year is a difference in what is being modelled, not a discrepancy in the figures — say which, and never read the OM's stabilized pro forma as the buyer's year one.
 

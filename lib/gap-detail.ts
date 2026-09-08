@@ -18,9 +18,14 @@ export interface GapFigure {
   unit: GapUnit;
 }
 
-const MONEY = /\$\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?\s*([kKmMbB])?(?![a-zA-Z])/;
+// "$174k", "$1.2M", "$1.2 million", "$450 thousand", "$5MM", "$2bn",
+// "$174,000". A suffix must end at a word boundary, so "$174 mortgage" is
+// $174 and not $174M.
+const MONEY =
+  /\$\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?\s*(k|thousand|mm|mn|m|million|bn|b|billion)?\b/i;
 const BPS = /(\d+(?:\.\d+)?)\s*(?:bps|bp|basis points?)\b/i;
-const PCT = /(\d+(?:\.\d+)?)\s*(?:%|percent(?:age points?)?|pts?\b)/i;
+// "+4.2%", "3 percentage points", "3 pts", "2 pp", "4 per cent".
+const PCT = /(\d+(?:\.\d+)?)\s*(?:%|percent(?:age points?)?|per cent|pts?\b|pp\b)/i;
 
 /** The magnitude a gap line states, or null when it states none. Dollars
  *  win over basis points over percentages when a line carries more than one
@@ -33,9 +38,9 @@ export function gapFigure(text: string | null | undefined): GapFigure | null {
     const whole = m[1].replace(/,/g, "");
     let n = Number(`${whole}${m[2] ? `.${m[2]}` : ""}`);
     const suffix = (m[3] ?? "").toLowerCase();
-    if (suffix === "k") n *= 1_000;
-    else if (suffix === "m") n *= 1_000_000;
-    else if (suffix === "b") n *= 1_000_000_000;
+    if (suffix === "k" || suffix === "thousand") n *= 1_000;
+    else if (suffix === "m" || suffix === "mm" || suffix === "mn" || suffix === "million") n *= 1_000_000;
+    else if (suffix === "b" || suffix === "bn" || suffix === "billion") n *= 1_000_000_000;
     if (Number.isFinite(n) && n > 0) return { value: n, unit: "usd" };
   }
   const b = s.match(BPS);

@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Eighty-nine PRs, #176–#264, each
+estimate, and that's what it should flag." Ninety PRs, #176–#265, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1189,6 +1189,20 @@ confirmed equal to the main tip after each batch.
   reconciler tab is the same component. The deal-view render test asserts
   four bars on the sample (two per layout), one card list and the table
   hidden below `sm`; shot at 390.
+- **#265 The reconciler is asked for each gap's figure, and the reader
+  takes every shape it might get back.** #263 draws a gap only when its
+  text states a magnitude, and the reconciler prompt asked for "a
+  plain-language description of the gap" — so a real screen's rows could
+  read "heavier expense load" and draw nothing while the sample drew. The
+  prompt now leads each gap with its figure — the dollar amount, basis
+  points or percentage the two values differ by, then the reason in a few
+  words; a row in agreement says so and states none — and a prompt test
+  holds the instruction's own three examples up to `gapFigure`, so the
+  prompt can never promise a shape the reader will not draw. The reader
+  itself grew the shapes a model writes when asked for a figure: "$1.2
+  million", "$450 thousand", "$5MM", "$2bn", "2 pp", "per cent" — a suffix
+  counted only when the word ends there, so "$174 mortgage" stays $174.
+  Eight reader tests and the prompt contract.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
