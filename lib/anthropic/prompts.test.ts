@@ -17,6 +17,7 @@ import {
   verdictInstruction,
 } from "@/lib/anthropic/prompts";
 import { gapFigure } from "@/lib/gap-detail";
+import { compFigures } from "@/lib/comp-detail";
 
 // A deal with a plan — conversion, development, lease-up, heavy value-add —
 // is judged on yield on total cost, and its stabilized pro forma is the
@@ -166,6 +167,27 @@ describe("the reconciler's gap lines lead with their figure", () => {
     const units = examples.map((ex) => gapFigure(ex)?.unit ?? null);
     expect(units).toEqual(["usd", "bps", "pct"]);
     expect(gapFigure("In agreement")).toBeNull();
+  });
+});
+
+// The deal page and the report draw a sale comp's basis only when its detail
+// line states one (lib/comp-detail reads a per-unit or per-SF figure and a
+// cap, nothing otherwise), so the comp scrutiny is told what `detail` leads
+// with — and the sale example it holds up must parse through the same
+// reader, while the lease examples carry no basis to draw.
+describe("the comp scrutiny names each comp's detail line", () => {
+  it("asks for the stated basis first, and its sale example is one the comp reader draws", () => {
+    const p = brokerCompsInstruction();
+    expect(p).toContain("`detail` leads with what the OM states of its basis");
+    expect(p).toContain("carries nothing the OM does not state");
+    const sale = p.match(/for a sale comp [^"]*"([^"]+)"/)?.[1];
+    expect(sale).toBeTruthy();
+    const figures = compFigures(sale!);
+    expect(figures.perUnit).toBe(252_000);
+    expect(figures.capPct).toBe(5.4);
+    const lease = (p.match(/for a lease comp [^"]*"([^"]+)" or "([^"]+)"/) ?? []).slice(1);
+    expect(lease).toHaveLength(2);
+    for (const ex of lease) expect(compFigures(ex).perUnit == null, ex).toBe(true);
   });
 });
 

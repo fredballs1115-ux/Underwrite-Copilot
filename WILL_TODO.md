@@ -3,19 +3,19 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#265 merged to main (live build
-sha `a7dfbbd`, #264, confirmed equal to the main tip by live-verify at 18:22
-UTC with its `DEPLOY: LIVE` line — every one of the eighty-nine through
-#264 is live, the homepage serves at 196 KB where it served at 488 KB, the
-public sample memo at 57 KB where it served at 11 KB (the Brewerytown frame
-is in it), and the public-page lint #231 added reads all twelve public pages
-clean on every run; #265 is merged and awaits its proof, #266 follows).
+**Last updated 2026-09-08**, after PRs #176–#266 merged to main (live build
+sha `5c2dd92`, #265, confirmed equal to the main tip by live-verify at 18:27
+UTC with its `DEPLOY: LIVE` line — every one of the ninety through #265 is
+live, the homepage serves at 196 KB where it served at 488 KB, the public
+sample memo at 57 KB where it served at 11 KB (the Brewerytown frame is in
+it), and the public-page lint #231 added reads all twelve public pages
+clean on every run; #266 is merged and awaits its proof, #267 follows).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Ninety-one PRs (#176–#266) landed across one review session and the
+Ninety-two PRs (#176–#267) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -430,6 +430,10 @@ deploy (live-verify shows the sha).
 - **The section counts draw as split bars** (#266): the Risk digest, the
   challenger's tally, each comp table's ratings and the Reconciliation
   header — one bar with a segment per kind, the count words kept beside it.
+- **The comp scrutiny names each comp's detail line** (#267): the prompt
+  and the schema ask for a comp's stated basis first — price per unit or
+  SF and cap, then date and size — and a prompt test holds the example up
+  to the comp reader.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -697,22 +701,22 @@ a route scoped to the share token; the memo and the report got theirs in
    times with a roll-up and per-asset contribution to blended IRR; mostly a
    loop around existing code plus a CSV importer. Named as the next build in
    the LPC plan.
-8. **The comp scrutiny names each comp's detail line.** #260 and #261 draw
-   a sale comp's basis only when its `detail` states one — "$252k/unit",
-   "$410/SF", a cap — and the comps prompt (`lib/anthropic/prompts.ts`)
-   never says what `detail` should carry; the schema
-   (`lib/anthropic/comps.ts`) is a bare string. Ask for it by shape, the
-   way #265 did for the reconciler's gap: a sale comp's detail leads with
-   the price per unit (or per SF, or per key) and the cap rate, then the
-   date and size — "$252k/unit · 5.4% cap · Mar 2026 · 210 units" — and a
-   lease comp's with the rent and the unit type; describe the field in the
-   zod schema too. A prompt test holds the instruction's examples up to
-   `compFigures` (`lib/comp-detail.ts`) so the prompt can never promise a
-   shape the reader will not draw. (The report's pages all say it in
-   pictures now — #250 the memo, #253 the market page, #261 the comps,
+8. **The market check names the shape of its figures.** The deal page's
+   market tab draws each OM figure on its typical range only when the range
+   parses (`parseRange` in `deal-sections.tsx`), and the report's market
+   page the same (`rangeRead`, #253) — and the market prompt
+   (`lib/anthropic/prompts.ts`) asks only for "what the OM says, a typical
+   range", no shape. Ask for them by shape, the way #265 and #267 did for
+   the reconciler's gap and the comp's detail: `omSays` the OM's figure
+   with its unit ("5.45%", "$2,400/mo", "4.0%/yr"), `typicalRange` low to
+   high in the same unit with an en dash ("5.25%–5.75%",
+   "$2,150–$2,450/mo", "2.5%–3.5%"); describe the fields in the zod schema
+   too. A prompt test holds the examples up to `rangeRead` so every example
+   the prompt names is one both pages draw. (The report's pages all say it
+   in pictures now — #250 the memo, #253 the market page, #261 the comps,
    #263 the reconciliation; every table on the deal page stacks into cards
-   on a phone after #262 and #264; #265 made the reconciler state each
-   gap's figure; #266 drew the section counts.)
+   on a phone after #262 and #264; #265 and #267 made the reconciler and
+   the comp scrutiny state their figures; #266 drew the section counts.)
 
 ---
 

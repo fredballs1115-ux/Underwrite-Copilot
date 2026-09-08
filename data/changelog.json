@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "Every comp comes back with its basis stated",
+      "blurb": "The comp scrutiny now leads each comp's detail line with the figures the OM states — a sale comp's price per unit or per foot and its cap rate, then the date and size; a lease comp's rent and unit type — so the basis bars the comps tab and the full report draw appear on every screen, not only the sample. A comp whose terms the OM withholds says so and draws no bar.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-08",
       "title": "Each section's counts draw as a bar",
       "blurb": "On the deal page and the sample screen, the count line at the head of each section — risks by severity, the challenger's findings, each comp table's ratings, the reconciliation's rows for and against you — now draws as a small bar split in the same colours, with the counts still beside it, so the balance of a section reads before the numbers do.",
       "href": "/deals"
