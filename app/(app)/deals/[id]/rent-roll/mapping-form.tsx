@@ -102,6 +102,7 @@ export function MappingForm({
                     <td className="py-2 pr-3">
                       <select
                         name={`col_${f.key}`}
+                        aria-label={`Column for ${f.label}`}
                         defaultValue={selected === undefined ? "-1" : String(selected)}
                         className="w-full rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
                       >
@@ -145,6 +146,7 @@ export function MappingForm({
           </label>
           <input
             name="mappingName"
+            aria-label="Name for the saved mapping"
             placeholder="Name it (e.g. CBRE export)"
             className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
           />

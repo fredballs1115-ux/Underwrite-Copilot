@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Fifty-seven PRs, #176–#232, each
+estimate, and that's what it should flag." Fifty-eight PRs, #176–#233, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -716,6 +716,22 @@ confirmed equal to the main tip after each batch.
   "29machine-evaluable rules" on the homepage — a number and its noun with
   only a margin between them, one word to a screen reader — and six
   siblings; each spells its space now.
+- **#232 A git sha is not a glued word.** live-verify's new page lint went
+  red on its own build stamp ("543ebdb" is digits then letters, the exact
+  shape of a glued word); the lint lets a lowercase hex token of seven or
+  more characters through, and `lib/render-lint.test.ts` pins every
+  must-catch and must-allow case.
+- **#233 Every form control has a name, checked at the source.** The render
+  tests' accessibility lint only reaches the views they can render on a
+  fixture; a Server Component that needs a database row cannot be. A
+  source-level scan (`lib/a11y-source.test.ts`, brace-aware so an arrow
+  handler's `=>` does not end the tag early) walks every page and component
+  for an `<input>`, `<select>` or `<textarea>` with no aria-label, no
+  labelled id and no wrapping label. It found ten: the address combobox,
+  the ask-the-deal question box, the rename field, the section-note box,
+  the new-task field, the rent-roll mapping selects and the mapping name,
+  the leasing-profile select, the submarket select and the team-name
+  field. Each has a name now, and the scan runs in CI.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

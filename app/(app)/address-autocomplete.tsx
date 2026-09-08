@@ -178,6 +178,7 @@ export function AddressAutocomplete({
         name={textName}
         value={text}
         role="combobox"
+        aria-label="Property address"
         aria-expanded={open}
         aria-controls={`${idBase}-list`}
         aria-activedescendant={

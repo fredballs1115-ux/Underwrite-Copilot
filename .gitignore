@@ -144,3 +144,7 @@ vite.config.ts.timestamp-*
 
 # local Playwright QA harness — never ships
 /app/preview-shell/
+
+# Review-agent scratch reproductions (deleted by their author; never shipped)
+*.scratch.test.ts
+*.scratch.ts

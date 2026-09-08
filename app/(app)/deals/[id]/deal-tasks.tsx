@@ -160,6 +160,7 @@ export function DealTasks({
           <input
             type="text"
             name="title"
+            aria-label="New task"
             required
             maxLength={TASK_TITLE_MAX}
             placeholder="e.g. Request trailing-12 financials from the broker"

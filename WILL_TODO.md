@@ -3,17 +3,17 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#232 merged to main (live build
-sha `e72ae78`, #231, confirmed equal to the main tip by live-verify at 07:26
-UTC — every one of the first fifty-six is live, and the public-page lint
-that run added read all twelve public pages clean; #232 follows on its
-deploy).
+**Last updated 2026-09-08**, after PRs #176–#233 merged to main (live build
+sha `4258ee6`, #232, confirmed equal to the main tip by live-verify at 07:31
+UTC — every one of the first fifty-seven is live, and the public-page lint
+#231 added reads all twelve public pages clean on every run; #233 follows
+on its deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Fifty-seven PRs (#176–#232) landed across one review session and the
+Fifty-eight PRs (#176–#233) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -241,6 +241,14 @@ deploy (live-verify shows the sha).
   on every deploy (its first run caught "29machine-evaluable rules" on the
   homepage; #232 taught it that a git sha in the build stamp — "543ebdb" —
   is digits and letters by nature, not a glued word).
+- **Every form control has a name, checked at the source** (#233): a
+  source-level scan of every page and component (`lib/a11y-source.test.ts`)
+  found ten inputs, selects and text areas a screen reader would announce
+  as nothing — the address combobox, the ask-the-deal question box, the
+  rename and new-task fields, the section-note box, the rent-roll mapping
+  selects and mapping name, the leasing-profile and submarket selects, the
+  team-name field. Each is named now, and the scan runs in CI beside the
+  render tests' accessibility lint.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":

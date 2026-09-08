@@ -283,6 +283,7 @@ export default async function RentRollPage({
               {importParam ? <input type="hidden" name="import" value={importParam} /> : null}
               <select
                 name="profile"
+                aria-label="Market leasing profile"
                 defaultValue={profileParam ?? profiles[0]?.id}
                 className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
               >

@@ -118,6 +118,7 @@ export default async function TeamPage({
             <form action={createTeam} className="mt-4 flex max-w-md gap-2">
               <input
                 name="name"
+                aria-label="Team name"
                 required
                 maxLength={80}
                 placeholder="Team name — e.g. Meridian Acquisitions"

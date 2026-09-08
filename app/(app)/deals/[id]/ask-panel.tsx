@@ -128,6 +128,7 @@ export function AskPanel({
             <input type="hidden" name="dealId" value={dealId} />
             <textarea
               name="question"
+              aria-label="Your question about the offering memorandum"
               required
               minLength={5}
               maxLength={300}
