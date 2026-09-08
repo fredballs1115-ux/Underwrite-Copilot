@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Forty-three PRs, #176–#218, each
+estimate, and that's what it should flag." Forty-four PRs, #176–#219, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -371,6 +371,25 @@ confirmed equal to the main tip after each batch.
   deal page and the debt sizer show a development's land cost as its price
   the way the export and the plan strip already did. Thirteen new tests
   across six files.
+- **#219 The actuals check reads the deal's kind.** The Property actuals
+  card held the OM's NOI against the uploaded T-12, and its picker preferred
+  the stabilized / pro forma figure — the sponsor's story, which is the
+  right figure to test on a stabilized asset and the wrong one on a plan
+  deal: on the conversion it would have put the finished building's $21M
+  against the office tower's T-12 and called it a 1,600% red flag, and the
+  challenger note would have said the same. The picker now takes the deal's
+  kind: on a value-add, lease-up, conversion or development the OM's
+  in-place or Year-1 figure is compared, the stabilized pro forma never is
+  (it is judged on yield on cost), and when the OM states only the finished
+  project's NOI there is no comparison at all — the card says so, and the
+  challenger is told the T-12 shows what the building earns today while
+  nothing in the deck claims what it produces as bought, and asks for the
+  in-place figure. The card names the figure it compared ("OM in-place
+  NOI", "OM Year-1 NOI", "OM pro forma NOI") with the OM's own label as the
+  tooltip; the sample screen runs the same picker; and the compare table's
+  price falls back to the shared price reader instead of any label with
+  "price" in it. Nine new tests: the kind-aware picker and the basis on the
+  comparison, plus a render test of the card in all four states.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

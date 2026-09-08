@@ -114,4 +114,10 @@ export interface NoiComparison {
   deltaPct: number;
   severity: ActualsSeverity;
   direction: "above" | "below" | "in_line";
+  /** the OM metric compared, as labelled in the OM */
+  omLabel?: string;
+  /** which OM figure it is: on a plan deal the in-place or Year-1 figure
+   *  (the stabilized pro forma is the plan, never compared to today's
+   *  actuals); on a stabilized asset the sponsor's pro forma story */
+  omBasis?: "in_place" | "year1" | "stabilized";
 }
