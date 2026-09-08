@@ -245,6 +245,20 @@ confirmed equal to the main tip after each batch.
   and yields, and three plan trackers (stabilized NOI, capital budget, yield
   on cost) show a re-screened plan deal's retrade. New tests for both
   modules.
+- **#210 The comp scrutiny, the market check and the reconciler are told
+  what the screen established.** Those three Claude steps read the OM after
+  the extraction with no word of what it found — the challenger and the
+  verdict got the strategy brief, they did not. `lib/deal-context.ts` now
+  holds the shared context (deal type, the stabilized NOI over total cost,
+  the all-in basis per planned unit, the stated timeline), ask-the-deal
+  re-exports it, and the three prompts append it after the document so the
+  cached OM prefix is untouched. The comp scrutiny gains a plan paragraph:
+  sale comps are held against total cost per unit or per SF, never the
+  shell's or the land's price; lease comps against the rents behind the
+  stabilized pro forma. The reconciler is told a model that carries
+  construction against an OM that shows only the stabilized year is a
+  difference in what is modelled, not a discrepancy. Tests on the context
+  builder and the three prompts.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

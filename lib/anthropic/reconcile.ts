@@ -31,6 +31,9 @@ const ReconciliationSchema = z.object({
 export async function reconcileModel(
   om: OmSource,
   model: ParsedModel,
+  /** what the screen established — the deal's kind and, on a plan deal, the
+   *  plan's figures — so the two models are compared on the plan's terms */
+  context?: string | null,
 ): Promise<ReconciliationResult> {
   const client = getAnthropic();
 
@@ -58,7 +61,7 @@ export async function reconcileModel(
     });
   }
 
-  content.push({ type: "text", text: reconcilerInstruction() });
+  content.push({ type: "text", text: reconcilerInstruction(context) });
 
   const messages: Anthropic.MessageParam[] = [{ role: "user", content }];
 

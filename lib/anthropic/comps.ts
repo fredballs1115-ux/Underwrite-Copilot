@@ -28,7 +28,12 @@ const BrokerCompsSchema = z.object({
  * actually supports the subject deal and flags selection bias.
  * Uses the reasoning model (Opus) since this is judgment, not transcription.
  */
-export async function scrutinizeComps(om: OmSource): Promise<BrokerCompsResult> {
+export async function scrutinizeComps(
+  om: OmSource,
+  /** what the screen established — the deal's kind and, on a plan deal, the
+   *  plan's figures — so the comps are held against the right basis */
+  context?: string | null,
+): Promise<BrokerCompsResult> {
   const client = getAnthropic();
 
   const response = await client.messages.parse({
@@ -39,9 +44,10 @@ export async function scrutinizeComps(om: OmSource): Promise<BrokerCompsResult> 
       {
         role: "user",
         content: [
-          // Reads the OM from the prompt cache the extraction step wrote.
+          // Reads the OM from the prompt cache the extraction step wrote; the
+          // context rides after it so the cached prefix stays identical.
           omDocument(om),
-          { type: "text", text: brokerCompsInstruction() },
+          { type: "text", text: brokerCompsInstruction(context) },
         ],
       },
     ],

@@ -21,6 +21,7 @@ import { runDocReconciliation } from "./reconcile-facts";
 import { runActualsIngestion } from "./actuals-ingest";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { assessPlausibility, inferStrategy, planSummary, plausibilityNote } from "@/lib/deal-strategy";
+import { dealContextFor } from "@/lib/deal-context";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxLines } from "@/lib/criteria";
 import { notifyAnalysisReady } from "@/lib/email";
@@ -46,6 +47,23 @@ async function patchJob(dealId: string, patch: JobPatch): Promise<void> {
     .from("analysis_jobs")
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq("deal_id", dealId);
+}
+
+/**
+ * What the screen established about the deal — its kind and, on a plan deal,
+ * the plan's figures — for the steps that read the OM after the extraction.
+ * Best-effort: with no extraction stored, the step runs on the OM alone.
+ */
+async function dealContextFromDb(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  dealId: string,
+): Promise<string | null> {
+  try {
+    const { data } = await admin.from("deals").select("extraction").eq("id", dealId).single();
+    return dealContextFor((data?.extraction as ExtractionResult | null) ?? null);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -433,9 +451,16 @@ export async function runAnalysis(
     // Step 3 — broker-comp scrutiny (reads the comps out of the OM itself).
     // A manual deal has no OM comp set — store the explanatory stub so the
     // comps tab hands over to own-comps / public-web search instead.
+    // The comp scrutiny and the market check are told what the screen
+    // established — the deal's kind and, on a plan deal, the plan's figures —
+    // so a conversion's comps are held against total cost, not the shell.
+    const dealContext =
+      !completed.has("comps") || !completed.has("market")
+        ? await dealContextFromDb(admin, dealId)
+        : null;
     if (!completed.has("comps")) {
       await patchJob(dealId, { status: "running", step: "comps", progress: 50 });
-      const comps = manual ? manualCompsStub() : await scrutinizeComps(om());
+      const comps = manual ? manualCompsStub() : await scrutinizeComps(om(), dealContext);
       await admin
         .from("deals")
         .update({ comps, updated_at: new Date().toISOString() })
@@ -446,7 +471,7 @@ export async function runAnalysis(
     // Step 4 — market plausibility check (rules-of-thumb, no live comps feed)
     if (!completed.has("market")) {
       await patchJob(dealId, { status: "running", step: "market", progress: 70 });
-      const market = await checkMarket(om(), assetClass);
+      const market = await checkMarket(om(), assetClass, dealContext);
       await admin
         .from("deals")
         .update({ market, updated_at: new Date().toISOString() })
@@ -490,7 +515,7 @@ export async function runReconciliation(
     const admin = createSupabaseAdminClient();
     const { data: deal, error } = await admin
       .from("deals")
-      .select("id, om_storage_path")
+      .select("id, om_storage_path, extraction")
       .eq("id", dealId)
       .single();
 
@@ -508,7 +533,13 @@ export async function runReconciliation(
 
     const omPdf = await downloadOmPdf(deal.om_storage_path as string);
     const parsed = await parseModelFile(model.name, model.buffer);
-    const reconciliation = await reconcileModel(await omSourceFor(omPdf), parsed);
+    // The reconciler is told the deal's kind, so a buyer's model that carries
+    // construction and downtime is compared to the OM on the plan's terms.
+    const reconciliation = await reconcileModel(
+      await omSourceFor(omPdf),
+      parsed,
+      dealContextFor((deal.extraction as ExtractionResult | null) ?? null),
+    );
 
     await admin
       .from("deals")

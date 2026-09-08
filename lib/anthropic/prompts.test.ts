@@ -7,10 +7,12 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  brokerCompsInstruction,
   challengerInstruction,
   extractionInstruction,
   firstSignalInstruction,
   marketCheckInstruction,
+  reconcilerInstruction,
   reconciliationInstruction,
   verdictInstruction,
 } from "@/lib/anthropic/prompts";
@@ -67,6 +69,38 @@ describe("plan deals are judged on their own terms", () => {
     }
     expect(p).toContain("NEVER put a stabilized pro forma into year1Gpr");
     expect(p).toContain("never write 0 for a figure that is simply absent");
+  });
+});
+
+// The steps that read the OM after the extraction — the comp scrutiny, the
+// market check, the reconciler — are told what the screen established (the
+// deal's kind, the plan's figures), after the document so the cached prefix
+// is untouched, and the comp scrutiny holds a plan's comps against total
+// cost rather than the shell's price.
+describe("what the screen established reaches the steps that read the OM", () => {
+  const ctx =
+    "Deal type: Conversion — Convert the vacant office building into 320 apartments. The OM's stabilized NOI of $21.0M is the finished project's figure — over $180.0M of total cost it is a 11.7% yield on cost, not today's income and not a cap rate on the price.";
+
+  it("the broker-comp scrutiny holds a plan's comps against total cost, and carries the context last", () => {
+    const bare = brokerCompsInstruction();
+    expect(bare).toContain("IF THE OM DESCRIBES A PLAN");
+    expect(bare).toContain("total cost per unit or per SF");
+    expect(bare).toContain("never against the shell's or the land's price");
+    expect(bare).not.toContain("<deal_context>");
+    const withCtx = brokerCompsInstruction(ctx);
+    expect(withCtx).toContain(`<deal_context>\n${ctx}\n</deal_context>`);
+    expect(withCtx).toMatch(/never overrides what the OM states/);
+    expect(withCtx.indexOf("<deal_context>")).toBeGreaterThan(withCtx.indexOf("no comps at all"));
+  });
+
+  it("the market check and the reconciler carry the same block; a blank context adds nothing", () => {
+    expect(marketCheckInstruction("office", ctx)).toContain(`<deal_context>\n${ctx}\n</deal_context>`);
+    expect(marketCheckInstruction("office", "  ")).toBe(marketCheckInstruction("office"));
+    expect(marketCheckInstruction("office", null)).toBe(marketCheckInstruction("office"));
+    expect(reconcilerInstruction(ctx)).toContain(`<deal_context>\n${ctx}\n</deal_context>`);
+    expect(reconcilerInstruction()).toContain("on the plan's terms");
+    expect(reconcilerInstruction()).toContain("never read the OM's stabilized pro forma as the buyer's year one");
+    expect(reconcilerInstruction()).not.toContain("<deal_context>");
   });
 });
 
