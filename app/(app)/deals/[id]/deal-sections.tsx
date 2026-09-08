@@ -481,7 +481,9 @@ function RiskRow({
       <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${s.dot}`} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium">{risk.title}</span>
+          {/* Two lines rather than an ellipsis: on a phone the title is the
+              whole finding ("Exit cap compression to 5…" said nothing). */}
+          <span className="line-clamp-2 text-sm font-medium">{risk.title}</span>
           <span
             className={`ml-auto shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${s.chip}`}
           >
@@ -1536,12 +1538,14 @@ function FlipStrip({
 
   return (
     <div className="mt-4 max-w-md">
-    <div className="flex items-center gap-0">
+    {/* Three calls in a row; a phone stacks them (the connectors go) so the
+        sponsor's call is never the one cut off at the edge. */}
+    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-0">
       {ordered.map((sc, i) => {
         const call = CALL_META[sc.call] ?? CALL_META.caution;
         return (
-          <div key={sc.scenario} className="flex flex-1 items-center">
-            {i > 0 && <span className="h-px flex-1 bg-line" aria-hidden />}
+          <div key={sc.scenario} className="flex items-center sm:flex-1">
+            {i > 0 && <span className="hidden h-px flex-1 bg-line sm:block" aria-hidden />}
             <span
               className="flex items-center gap-1.5 whitespace-nowrap px-1.5"
               title={sc.note}

@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Sixty-nine PRs, #176–#244, each
+estimate, and that's what it should flag." Seventy PRs, #176–#245, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -945,6 +945,13 @@ confirmed equal to the main tip after each batch.
   plan-sensitivity grid's caption, the research panel's and the debt
   sizer's plan-deal notes, and the What's-new intro. Each says one thing
   now; none of the phrases a test or live-verify looks for was among them.
+- **#245 Three phone-width cuts the screenshots caught.** At 390px the risk
+  digest's titles ended in an ellipsis ("Exit cap compression to 5…" said
+  nothing) — they wrap to two lines now; the verdict's three-call strip ran
+  off the right edge with the sponsor's call the one lost — it stacks on a
+  phone; a deal's name in the pipeline was cut to a word and a half — it
+  wraps to two lines on a phone and truncates only where the columns give it
+  one. Fixture screenshots at 390 for each.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

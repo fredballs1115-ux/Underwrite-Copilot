@@ -14,7 +14,7 @@ follows and awaits the same proof).
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Sixty-nine PRs (#176–#244) landed across one review session and the
+Seventy PRs (#176–#245) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -341,6 +341,9 @@ deploy (live-verify shows the sha).
   repo): rent roll, valuations, bridge, submarkets, comps, news,
   data-health, analytics, the manual deal form, the LOI panel, the
   reconciliation panel, the plan-sensitivity caption, the What's-new intro.
+- **Three phone-width cuts the screenshots caught** (#245): risk titles and
+  deal names wrap to two lines on a phone instead of ending in an ellipsis;
+  the verdict's three-call strip stacks instead of running off the edge.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
