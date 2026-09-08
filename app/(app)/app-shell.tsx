@@ -124,12 +124,8 @@ export function AppShell({
   return (
     <ToastProvider>
     <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} markets={markets} />
-    <a
-      href="#main"
-      className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-brand focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
-    >
-      Skip to content
-    </a>
+    {/* The skip link is the root layout's (app/skip-link.tsx), shared with
+        the public pages; it targets the <main id="main"> below. */}
     <div className="flex min-h-screen bg-canvas">
       {/* Sidebar — desktop */}
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-sidebar text-white md:flex">

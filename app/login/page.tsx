@@ -20,7 +20,7 @@ export default async function LoginPage({
   const { mode, next, deleted, confirmed } = await searchParams;
   return (
     <div className="band-dark flex flex-1 flex-col">
-      <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16">
+      <main id="main" className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16">
         <Link
           href="/"
           className="flex items-center justify-center gap-2.5 transition-opacity hover:opacity-80"
@@ -77,7 +77,7 @@ export default async function LoginPage({
         <p className="mt-3 text-center text-xs leading-relaxed text-white/50">
           First-pass screen, not investment advice.
         </p>
-      </div>
+      </main>
     </div>
   );
 }

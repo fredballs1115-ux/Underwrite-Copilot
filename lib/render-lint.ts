@@ -101,6 +101,11 @@ export function a11yIssues(html: string): string[] {
   const ids = new Map<string, number>();
   for (const m of html.matchAll(/\sid\s*=\s*"([^"]+)"/g)) ids.set(m[1], (ids.get(m[1]) ?? 0) + 1);
   for (const [id, n] of ids) if (n > 1) out.push(`duplicate id "${id}" ×${n}`);
+  // An in-page link must land somewhere: a "Skip to content" that points at
+  // a <main> with no id is a dead first tab stop for a keyboard user.
+  const missing = new Set<string>();
+  for (const m of html.matchAll(/<a\b[^>]*\shref\s*=\s*"#([^"]+)"/gi)) if (!ids.has(m[1])) missing.add(m[1]);
+  for (const id of missing) out.push(`in-page link to a missing id "#${id}"`);
   return out;
 }
 

@@ -44,7 +44,7 @@ const VERDICT_META = {
 
 function Expired({ reason }: { reason: string }) {
   return (
-    <main className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center px-6 text-center">
+    <main id="main" className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center px-6 text-center">
       <p className="text-sm font-semibold tracking-tight">Underwrite Copilot</p>
       <h1 className="mt-4 text-2xl font-semibold tracking-tight">
         This link isn&rsquo;t available
@@ -124,7 +124,7 @@ export default async function SharePage({
   const metrics = keyTermRows(safeExtraction?.metrics ?? [], strategy.kind, 8);
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-10">
+    <main id="main" className="mx-auto max-w-3xl px-6 py-10">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-sm font-semibold tracking-tight">
           Underwrite Copilot
