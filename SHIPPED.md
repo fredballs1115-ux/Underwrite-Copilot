@@ -118,6 +118,14 @@ gated on tsc / eslint / the full suite / a production build.
   it from there — an all-in figure still has the price taken out, a rate or
   a figure ten times the price never lands, and a metric row with a page
   still wins.
+- **#196 Ask-the-deal knows what kind of deal it is.** A question about "the
+  NOI" or "the cap rate" on the conversion used to be answered from the OM
+  alone — correct, and still able to quote a 105% cap as if it were one. The
+  action now hands the answerer what the screen established (deal type, the
+  plan's stabilized NOI over total cost and its yield on cost) so the answer
+  names which figure the OM's number is; the OM stays the only source of
+  answers. The prompt is a pure, tested function. live-verify gains the Sep 8
+  marker ("judged on yield on cost" on /whats-new).
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

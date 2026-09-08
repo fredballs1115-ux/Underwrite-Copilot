@@ -129,6 +129,9 @@ jobs:
           # layer. Present = Render is serving a build that carries them.
           grep -q "strategy is read first" p_whats-new.html && echo "SEP 7 STRATEGY-FIRST (#178): present" || echo "SEP 7 STRATEGY-FIRST (#178): not yet deployed"
           grep -q "News is never empty" p_whats-new.html && echo "SEP 7 NEWS LIVE LAYER (#180): present" || echo "SEP 7 NEWS LIVE LAYER (#180): not yet deployed"
+          # Sep 8: the plan-deal round (#193-#195) — the yield-on-cost grid's
+          # changelog title is its public trace.
+          grep -q "judged on yield on cost" p_whats-new.html && echo "SEP 8 YIELD ON COST (#194): present" || echo "SEP 8 YIELD ON COST (#194): not yet deployed"
           # /market must open for ANONYMOUS visitors (no cookies here): the
           # signed-out chrome says "Get started"; a login redirect would 200
           # on /login and fail the covered-market grep instead.
