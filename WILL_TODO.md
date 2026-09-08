@@ -3,11 +3,12 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#237 merged to main (live build
-sha `da1d184`, #237, confirmed equal to the main tip by live-verify at 08:32
-UTC — every one of the sixty-two is live, and the public-page lint #231
-added reads all twelve public pages clean on every run, skip link and
-landmarks included).
+**Last updated 2026-09-08**, after PRs #176–#238 merged to main (live build
+sha `6c35c3c`, #238, confirmed equal to the main tip by live-verify at 09:06
+UTC — every one of the sixty-three is live, the footer's latest-improvement
+line reads "Password reset works…", and the public-page lint #231 added
+reads all twelve public pages clean on every run, the sign-in page's new
+banner path included).
 
 ---
 
