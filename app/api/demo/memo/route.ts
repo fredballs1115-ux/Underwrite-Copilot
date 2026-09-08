@@ -4,8 +4,16 @@ import { MemoDocument, buildMemoData } from "@/lib/memo/memo-document";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
 import type { DealRow } from "@/lib/deals";
+import { COVER_SIZE, coverFrom } from "@/lib/memo/cover-aerial";
+import { fetchAerialImage } from "@/lib/imagery";
 
 export const runtime = "nodejs";
+
+// The sample is placed at neighbourhood level on purpose (lib/sample-deal:
+// never a street address), so its cover is the USGS frame of Brewerytown
+// itself — a real place, the building invented. Fixed coordinates, no
+// geocode and no deal row to cache on.
+const BREWERYTOWN = { lat: 39.9735, lng: -75.185, precision: "area" as const };
 
 // The memo prints today's date but is otherwise pure fixture, so render it
 // once per day per process and serve the same bytes: this is a public
@@ -39,13 +47,23 @@ function getSampleMemo(dateStr: string): Promise<Buffer> {
     SAMPLE_DEMO_BOX,
   );
 
-  const memo = buildMemoData(deal, dateStr, checks);
-  const element = React.createElement(MemoDocument, {
-    data: memo,
-  }) as unknown as Parameters<typeof renderToBuffer>[0];
+  const render = async () => {
+    // Bounded like the real memo's cover: a slow or failed USGS answer means
+    // a memo without a cover, cached for the day like every other render.
+    const cover = await coverFrom(() =>
+      fetchAerialImage(BREWERYTOWN, COVER_SIZE).then((res) =>
+        res ? { response: res, source: "aerial" as const } : null,
+      ),
+    );
+    const memo = buildMemoData(deal, dateStr, checks, null, null, cover);
+    const element = React.createElement(MemoDocument, {
+      data: memo,
+    }) as unknown as Parameters<typeof renderToBuffer>[0];
+    return renderToBuffer(element);
+  };
   const next = {
     dateStr,
-    pdf: renderToBuffer(element).catch((err) => {
+    pdf: render().catch((err) => {
       // Only clear our own entry — a newer day's render may have replaced it.
       if (cachedRender === next) cachedRender = null;
       throw err;

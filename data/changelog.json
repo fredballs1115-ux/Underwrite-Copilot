@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "The IC memo and the full report open on the building from above",
+      "blurb": "The one-page memo and the full report now carry the property's aerial at the top right of the masthead — the same USGS frame the deal page's Aerial tab shows, credited under the picture — without costing the memo a line. The picture is fetched when the PDF is made and gets a few seconds; if it does not arrive, the memo prints exactly as before. A deal without an address prints as before too. The sample memo on the public site shows Brewerytown.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-08",
       "title": "The screen you share opens on the building from above",
       "blurb": "A share link now shows the property's aerial at the top of the read-only screen — the USGS frame the deal page's Aerial tab shows, credited under the picture — so a partner or lender sees the place before the numbers. The picture is scoped to the link itself: it goes dark the moment the link is revoked or expires, exactly as the page does, and a deal without an address simply shows no frame.",
       "href": "/deals"

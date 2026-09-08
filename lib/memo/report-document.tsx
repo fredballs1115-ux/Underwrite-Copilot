@@ -339,15 +339,16 @@ export function buildReportData(
   branding?: MemoData["branding"],
   plan?: PlanReport | null,
   overrides?: string[] | null,
+  cover?: MemoData["cover"],
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
   return {
     deal,
-    // Page 1 IS the memo, dismissed submarket checks included: the analyst's
-    // own words on an override travel with the report as they do with the
-    // standalone memo.
-    memo: buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides),
+    // Page 1 IS the memo, dismissed submarket checks and the cover aerial
+    // included: the analyst's own words on an override travel with the
+    // report as they do with the standalone memo.
+    memo: buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover),
     // On a plan deal the annual screening model books the budget in year 1
     // and anchors year 1 on in-place income, so its IRR grid is not the
     // plan's return — it once printed a -48% IRR and a -17.9x multiple as

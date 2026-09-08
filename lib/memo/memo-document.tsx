@@ -1,6 +1,7 @@
 import "server-only";
 import {
   Document,
+  Font,
   Page,
   View,
   Text,
@@ -8,6 +9,14 @@ import {
   StyleSheet,
 } from "@react-pdf/renderer";
 import type { DealRow } from "@/lib/deals";
+
+// react-pdf hyphenates by default, and a deal's name is a proper noun: the
+// sample once printed as "The Maddox at Brewery-" / "town" the moment the
+// title column narrowed. A word wraps whole; only a word too long for any
+// column (a URL, a run of digits) is split, in plain twelve-letter pieces.
+Font.registerHyphenationCallback((word) =>
+  word.length <= 24 ? [word] : (word.match(/.{1,12}/g) ?? [word]),
+);
 import type { BuyBoxCheck } from "@/lib/criteria";
 import { pdfSafe } from "./pdf-text";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
@@ -139,7 +148,16 @@ export type MemoData = {
     logoDataUri: string | null;
     footerText: string | null;
   } | null;
+  /** The building from above, on the cover: a JPEG or PNG data URI and its
+   *  credit line (lib/memo/cover-aerial.ts). Null or absent prints the
+   *  cover as it always was. */
+  cover?: MemoCover | null;
 };
+
+export interface MemoCover {
+  dataUri: string;
+  credit: string;
+}
 
 /** Analysis output and user-shaped rows can carry surprises — numbers where
  *  strings are expected, nulls inside arrays, glyphs standard Helvetica can't
@@ -171,6 +189,7 @@ export function buildMemoData(
   buyBoxChecks?: BuyBoxCheck[] | null,
   branding?: MemoData["branding"],
   overrides?: string[] | null,
+  cover?: MemoCover | null,
 ): MemoData {
   const extraction = deal.extraction as ExtractionResult | null;
   const challenges = deal.challenges as ChallengerResult | null;
@@ -331,6 +350,7 @@ export function buildMemoData(
     // The analyst's own words, clamped but never paraphrased.
     overrides: (overrides ?? []).map((o) => clamp(o, 220)).slice(0, 4),
     branding: branding ?? null,
+    cover: cover ?? null,
   };
 }
 
@@ -400,6 +420,21 @@ const s = StyleSheet.create({
     fontFamily: "Helvetica-Bold",
     color: "#ffffff",
   },
+  // The masthead row: everything above the verdict box on the left, the
+  // cover aerial (when there is one) on the right, top-aligned with the
+  // brand line and shorter than the three rows it sits beside.
+  masthead: { flexDirection: "row", alignItems: "flex-start" },
+  // 96 wide leaves the title 414pt: a name of some forty characters still
+  // sits on one line, and the memo's bottom edge — which the sample already
+  // runs to within a few points of the footer — does not move.
+  coverBox: { marginLeft: 12, alignItems: "flex-end" },
+  cover: {
+    width: 96,
+    height: 54,
+    borderRadius: 5,
+    objectFit: "cover",
+  },
+  coverCredit: { fontSize: 5.5, color: C.muted, marginTop: 2 },
 
   verdictBox: {
     marginTop: 10,
@@ -672,6 +707,12 @@ export function MemoPage({ data }: { data: MemoData }) {
   const branded = !!(b && (b.firmName || b.logoDataUri || b.footerText));
   return (
     <Page size="LETTER" style={s.page}>
+        {/* The masthead: brand and date, the rule, the title and its chip —
+            and, when there is one, the cover aerial at the far right spanning
+            all three rows. It borrows the height the masthead already spends,
+            so a memo that fit one page without it still does. */}
+        <View style={s.masthead}>
+          <View style={{ flex: 1 }}>
         <View style={s.header}>
           <View style={s.brandRow}>
             {b?.logoDataUri ? (
@@ -708,6 +749,16 @@ export function MemoPage({ data }: { data: MemoData }) {
               style={[s.titleChipBox, { backgroundColor: data.verdictColor }]}
             >
               <Text style={s.titleChipText}>{data.verdictWord}</Text>
+            </View>
+          ) : null}
+        </View>
+          </View>
+          {data.cover ? (
+            <View style={s.coverBox}>
+              {/* react-pdf's Image has no alt concept (print canvas, not DOM) */}
+              {/* eslint-disable-next-line jsx-a11y/alt-text */}
+              <Image src={data.cover.dataUri} style={s.cover} />
+              <Text style={s.coverCredit}>{pdfSafe(data.cover.credit)}</Text>
             </View>
           ) : null}
         </View>

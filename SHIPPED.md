@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Seventy-three PRs, #176–#248, each
+estimate, and that's what it should flag." Seventy-four PRs, #176–#249, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -996,6 +996,25 @@ confirmed equal to the main tip after each batch.
   resolver and the route against a fake admin client; the render test
   asserts the figure on the sample and its absence on the address-less
   conversion.
+- **#249 The IC memo opens on the building from above.** The memo and the
+  full report fetch the deal's USGS frame at render time
+  (`lib/memo/cover-aerial.ts`, through the same resolver as the deal page's
+  Aerial tab) and print it at the top right of the masthead, credited,
+  spanning the brand line, the rule and the title — the height the masthead
+  already spends, so a memo that fit one page still does (the first cut sat
+  it beside the title and pushed the sample onto a second page; the test
+  caught it). The public sample memo carries the frame of Brewerytown itself
+  at fixed coordinates, no geocode. Bounded: imagery gets four seconds and
+  then the memo prints without it; a deal with no address prints as before.
+  And a guard the exercise found: react-pdf does not throw on a PNG whose
+  zlib stream fails its data check — it hangs the whole render, and the
+  download with it (a hand-typed test fixture did exactly that). The cover
+  fetcher now validates the bytes before embedding — a PNG must carry its
+  signature, inflate cleanly and end in IEND, a JPEG must open and close
+  with its markers — and the test fixture is a PNG built with the real
+  deflate and a real CRC (`lib/memo/test-png.ts`). Ten tests on the fetcher
+  and the guard; the memo render test asserts the image object on page one
+  and the page count.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
