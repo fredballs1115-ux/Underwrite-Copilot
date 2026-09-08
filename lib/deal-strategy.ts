@@ -146,6 +146,9 @@ export function inferStrategy(
   else if (RX.development.test(text)) kind = "development";
   else if (RX.leaseUp.test(text)) kind = "lease_up";
   else if (RX.valueAdd.test(text)) kind = "value_add";
+  // A land sale — a land or site price and no income figure — is a
+  // development, not an operating asset with no price.
+  else if (hasMetrics && isLandOnly(extraction?.metrics ?? [])) kind = "development";
   else if (hasMetrics) kind = "stabilized";
   else return { kind: "unknown", label: STRATEGY_LABEL.unknown, summary: "", source: "none" };
 
@@ -287,14 +290,17 @@ export function capitalBudgetFromMetrics(metrics: MetricLike[], price: number | 
 }
 
 // A ground-up development buys land, and its OM says "land cost" or "site
-// acquisition" where a building's OM says "asking price". Only a development
-// reads that line as the price: on an operating asset a "land value" is an
-// allocation, not what is being bought.
+// acquisition" where a building's OM says "asking price" — as does a land
+// deal that never stated a strategy. That line is the price only when the
+// OM states no asking price at all, and never an appraised land VALUE,
+// which on an operating asset is an allocation, not what is being bought.
 const LAND_PRICE_INCLUDE = /\b(land|site) (cost|price|acquisition|purchase|basis)\b/i;
 const LAND_PRICE_EXCLUDE = /value|\bper\b|\/|psf|acre|\bsf\b/i;
 
 /** The price metric: the asking / purchase price, else — on a development
- *  only — the land or site cost. Null when the OM states neither. */
+ *  only, which a bare land OM now infers — the land or site cost. Null when
+ *  the OM states neither: on an operating asset a land line is an
+ *  allocation inside the basis, never the price. */
 export function findPriceMetric(metrics: MetricLike[], kind: StrategyKind): MetricLike | null {
   return (
     (findMetric(metrics, PRICE_INCLUDE, PRICE_EXCLUDE) as MetricLike | null) ??
@@ -302,6 +308,19 @@ export function findPriceMetric(metrics: MetricLike[], kind: StrategyKind): Metr
       ? (findMetric(metrics, LAND_PRICE_INCLUDE, LAND_PRICE_EXCLUDE) as MetricLike | null)
       : null)
   );
+}
+
+// An OM whose only price is a land or site line and which carries no income
+// figure at all — no NOI, cap rate, occupancy, rent or revenue — is selling
+// land, not an operating asset. Read as a development, so its land price
+// is its price; read as "stabilized" it would have none.
+const INCOME_ROW = /\bnoi\b|net operating income|cap rate|occupan|\brent|\begi\b|revenue|income/i;
+
+function isLandOnly(metrics: MetricLike[]): boolean {
+  if (!metrics.length) return false;
+  if (findMetric(metrics, PRICE_INCLUDE, PRICE_EXCLUDE)) return false;
+  if (!findMetric(metrics, LAND_PRICE_INCLUDE, LAND_PRICE_EXCLUDE)) return false;
+  return !metrics.some((m) => INCOME_ROW.test(m.label));
 }
 
 const MONEY_IN_TEXT = /\$\s?(\d[\d,]*(?:\.\d+)?)\s*(billion|million|thousand|bn|mm|m|k|b)?\b/i;
@@ -357,39 +376,69 @@ export function timelineFromMetrics(metrics: MetricLike[]): string {
     .join("; ");
 }
 
-// The rows that count the building's units — "Units", "Units (proposed)",
-// "Total units", "Number of units", "Unit count", "Residential units",
-// "Apartment units", "Doors", "Keys" — and nothing that merely mentions
-// them: "Unit mix", "Unit sizes", "Unit type", "Units per acre", a price per
-// unit, or a PARTIAL count ("Vacant units", "Affordable units", "Renovated
-// units") that would put a wrong basis on every per-unit surface.
-const UNITS_INCLUDE =
-  /^units?\b|^(total|number of|no\.? of|count of|proposed|planned) (units|doors|keys|apartments)\b|unit count|^(residential|apartment|rental|multifamily|dwelling) units\b|^doors\b|^keys\b/i;
-const UNITS_EXCLUDE =
-  /\bper\b|\/|price|\$|%|\bmix\b|siz|type|area|\bsf\b|density|acre|\brent|value|vacant|occupied|affordable|market[- ]rate|renovated|classic|absorbed|leased|remaining/i;
-// A count is a whole number, on its own or followed by what it counts —
-// "312", "312 units", "312 (proposed)", "approx. 300 apartments". Anything
-// else ("40% studio / 60% 1BR", "650–1,200 SF", "312 / 285,000 SF") is not a
-// count, and reading its first digits as one puts a wrong basis on every
-// per-unit surface.
-const COUNT_WORD = /\b(units?|keys?|doors?|apartments?|apts?|homes?|residences?|beds?|pads?|rooms?|sites?|lots?|spaces?)\b/gi;
-const COUNT_PREFIX = /^(approx(imately|\.)?|about|circa|c\.|~|±)\s*/i;
+// A row COUNTS the units only when its label, read whole, has the shape of
+// a count label: an optional "total" / "number of" / "#" prefix, an
+// optional physical qualifier (residential, apartment, rental, guest,
+// storage, student …), the noun (units, doors, keys, rooms, beds, pads,
+// sites, suites, apartments, homes, lots, spaces) and nothing after it but
+// "count" / "total" / "proposed" / "planned". Everything that merely
+// mentions units — "Unit mix", "Unit sizes", "Units per acre", a price per
+// unit — and every PARTIAL count — "Vacant units", "Affordable units",
+// "Units under renovation", "Units offline", "Units (Phase I)" — is not the
+// count, and reading one as the count puts a wrong basis on every per-unit
+// surface. Whitelisting the shape beats blacklisting adjectives: the next
+// OM's "Units delivered" needs no new word.
+const COUNT_LABEL =
+  /^(?:(?:total|net rentable|rentable|gross|overall)\s+)?(?:(?:number|no\.?|count|#)\s+of\s+)?(?:total\s+)?(?:(?:proposed|planned|existing|current|as[- ]built)\s+)?(?:(?:residential|apartment|apt\.?|rental|multi[- ]?family|dwelling|leasable|rentable|living|guest|hotel|storage|self[- ]storage|student|mobile[- ]home|manufactured[- ]home|mh|rv|senior(?: living)?)\s+)?(?:units?|doors?|keys?|rooms?|beds?|pads?|sites?|home ?sites?|suites?|apartments?|apartment homes?|homes?|lots?|spaces?)(?:\s+(?:count|total|proposed|planned))?$/i;
+// A parenthetical naming a subset — "(Phase I)", "(Building A)", "(of 312)"
+// — keeps the row from being the count; any other ("(proposed)", "(per
+// OM)", "(IL/AL/MC)") is dropped before the shape is read.
+const SUBSET_PAREN = /phase|bldg|building|tower|wing|floor|\bof\b|\d/i;
+
+/** Whether a metric label is the row that counts the units (or keys, beds,
+ *  pads, sites …) — the whole count, never a subset or a row about them. */
+export function isCountLabel(label: string): boolean {
+  let s = label.toLowerCase().trim();
+  for (const p of s.match(/\([^)]*\)/g) ?? []) if (SUBSET_PAREN.test(p)) return false;
+  s = s
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[—–-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[:.]+$/, "")
+    .trim();
+  return COUNT_LABEL.test(s);
+}
+
+// A count is a whole number, on its own or with what it counts — "312",
+// "312 units", "248-unit", "312 (proposed)", "approx. 300 apartments",
+// "248 total". Anything else ("40% studio / 60% 1BR", "650–1,200 SF",
+// "312 / 285,000 SF", "248 (of 312)") is not the whole count, and reading
+// its first digits as one puts a wrong basis on every per-unit surface.
+const COUNT_WORD =
+  /\b(units?|keys?|doors?|apartments?|apts?|homes?|residences?|beds?|pads?|rooms?|sites?|lots?|spaces?|suites?|total)\b/gi;
+const COUNT_PREFIX = /^(approx(imately|\.)?|about|circa|c\.|~|≈|±)\s*/i;
 
 /** A whole-number count from a metric's value, or null when the value is
- *  not one. Exported so every surface that needs a count reads it the same
- *  way. */
+ *  not one (a zero is not a count — a blank is null, never zero). Exported
+ *  so every surface that needs a count reads it the same way. */
 export function parseCount(value: string): number | null {
+  // "248 (of 312)" is a subset of a count, not the count.
+  for (const p of value.match(/\([^)]*\)/g) ?? []) if (/\bof\b|out of|\//i.test(p)) return null;
   const s = value
-    .replace(/\(.*?\)/g, " ")
+    .replace(/^[a-z][a-z .#]*:\s*/i, "") // "Units: 248"
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/(\d)[-–](?=[a-z])/gi, "$1 ") // "248-unit"
     .replace(COUNT_WORD, " ")
     .replace(/\s+/g, " ")
     .trim()
     .replace(COUNT_PREFIX, "")
     .replace(/\+$/, "")
+    .replace(/\.0+$/, "")
     .trim();
   if (!/^(\d{1,3}(,\d{3})+|\d+)$/.test(s)) return null;
   const n = Number(s.replace(/,/g, ""));
-  return Number.isFinite(n) ? n : null;
+  return Number.isFinite(n) && n >= 1 ? n : null;
 }
 
 /** The row that counts the units — the first row that IS a count, so a
@@ -398,7 +447,7 @@ export function parseCount(value: string): number | null {
  *  its page. */
 export function unitCountRow(metrics: MetricLike[]): MetricLike | null {
   for (const m of metrics) {
-    if (!UNITS_INCLUDE.test(m.label) || UNITS_EXCLUDE.test(m.label)) continue;
+    if (!isCountLabel(m.label)) continue;
     const n = parseCount(m.value);
     if (n != null && n >= 1 && n <= 50_000) return m;
   }

@@ -35,7 +35,7 @@ const ERRORS: Record<string, string> = {
 // Fixed metric slots for the pipeline table — every row fills the SAME
 // columns (or shows —), so one header labels them all and values align into
 // scannable columns instead of repeating micro-labels in every row.
-function pickSlots(extraction: ExtractionResult): {
+function pickSlots(extraction: ExtractionResult, signal: FirstSignal | null): {
   cap: string | null;
   price: string | null;
   /** a plan deal's yield on total cost — its answer where a stabilized
@@ -46,7 +46,9 @@ function pickSlots(extraction: ExtractionResult): {
   const find = (inc: RegExp, exc?: RegExp) =>
     metrics.find((m) => inc.test(m.label) && !(exc && exc.test(m.label)))
       ?.value ?? null;
-  const strategy = inferStrategy(extraction);
+  // The same read the deal page makes — extraction plus the first signal —
+  // so a deal never shows a price on one surface and none on the other.
+  const strategy = inferStrategy(extraction, signal);
   const plan = planSummary(extraction, strategy);
   return {
     // The going-in cap only — a stabilized / pro forma cap or a yield on
@@ -235,7 +237,7 @@ export default async function DealsPage({
         null,
       offersDue: dueById.get(d.id) ?? null,
       slots: extraction
-        ? pickSlots(extraction)
+        ? pickSlots(extraction, (d.first_signal as FirstSignal | null) ?? null)
         : { cap: null, price: null, yoc: null },
       jobStatus:
         job === "queued" || job === "running"

@@ -113,10 +113,20 @@ export const METRIC_FIND = {
   // and never a land or site allocation (on a development the land cost is
   // read separately, as the price, by lib/deal-strategy's findPriceMetric).
   price: {
-    inc: /asking price|purchase price|guidance|offering price|sale price|sales price|list price|listing price|contract price|whisper|\bprice\b/i,
-    exc: /unit|\bsf\b|\/|\bper\b|psf|\b(last|prior|previous|historical|original|land|site|reduction)\b/i,
+    inc: /asking price|purchase price|guidance|pricing|^ask(ing)?\b|offering price|offer price|sale price|sales price|list price|listing price|contract price|acquisition (price|cost)|whisper|\bprice\b/i,
+    // Not a per-unit / per-SF / per-key figure, not what the building last
+    // traded for, not a land or site allocation (read separately, as the
+    // price, only when no ask exists), and not a reserve, bid, target or
+    // underwritten figure. "Price / Terms" and "Purchase price per the PSA"
+    // are asks and stay in.
+    exc: /unit|\bsf\b|\/ ?sf|per ?sf|per (square|sq)|psf|\bper (key|bed|room|pad|site|door|acre|lot|suite)s?\b|\b(last|prior|previous|historical|original|land|site|reduction|reserve|bid|strike|target|underwritten|range)\b/i,
   },
-  perUnit: { inc: /per unit|\/unit|price\/unit|unit price/i },
+  // The price over the units — never an NOI, a rent, a cost or an expense
+  // expressed per unit, which would pass a basis ceiling at $2k/unit.
+  perUnit: {
+    inc: /per unit|\/unit|price\/unit|unit price/i,
+    exc: /noi|income|rent\b|rents\b|cost|budget|expense|tax|reserve|revenue|insurance|utilit|payroll|debt|loan|equity|value|\begi\b|replacement|capex|capital|management|repairs?|maintenance|marketing|admin|contract/i,
+  },
   // The going-in cap is today's income against the price. A stabilized, pro
   // forma, forward or at-completion cap — or a yield on cost — describes a
   // plan deal's finished project, and reading it as the going-in cap is how
@@ -636,7 +646,7 @@ export function evaluateBuyBox(
 
   // ---- Price per unit ----------------------------------------------------
   if (box.maxPerUnitK != null) {
-    const metric = findMetric(metrics, METRIC_FIND.perUnit.inc);
+    const metric = findMetric(metrics, METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc);
     const dollars = metric ? parseMoney(metric.value) : null;
     const max = box.maxPerUnitK * 1e3;
     if (dollars == null) {

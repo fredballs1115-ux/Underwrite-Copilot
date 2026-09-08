@@ -1,4 +1,4 @@
-import { findGoingInCap, findMetric, parseMoney, parsePct } from "@/lib/criteria";
+import { METRIC_FIND, findGoingInCap, findMetric, parseMoney, parsePct } from "@/lib/criteria";
 import {
   findPriceMetric,
   inferStrategy,
@@ -82,7 +82,9 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
       // figure, so with no total cost there is no point to plot.
       perUnit = plan.costPerUnit;
     } else {
-      const directPer = findMetric(metrics, /per unit|\/unit|unit price/i);
+      // The shared per-unit reader: the price over the units, never a rent
+      // or an expense per unit.
+      const directPer = findMetric(metrics, METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc);
       if (directPer) perUnit = parseMoney(directPer.value);
       if (perUnit == null && price != null) {
         const units = unitCountFromMetrics(metrics);

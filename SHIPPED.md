@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Forty-four PRs, #176–#219, each
+estimate, and that's what it should flag." Forty-five PRs, #176–#220, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -390,6 +390,32 @@ confirmed equal to the main tip after each batch.
   price falls back to the shared price reader instead of any label with
   "price" in it. Nine new tests: the kind-aware picker and the basis on the
   comparison, plus a render test of the card in all four states.
+- **#220 The count and the price, read the way an OM writes them.** A
+  second review of #217–#218 found the unit-count reader had gone from too
+  loose to too tight: "Total apartment units", "Total number of units",
+  "# of units", "Total rental units" and "Net rentable units" — the
+  commonest labels in a multifamily OM — no longer matched; hotel keys and
+  rooms, student beds, manufactured-housing pads and sites and storage
+  units were dropped; and "Units under renovation" or "Units offline"
+  still read as the count. The reader now whitelists the SHAPE of a count
+  label — an optional total / number-of / # prefix, an optional physical
+  qualifier (residential, apartment, rental, guest, storage, student,
+  RV …), the noun (units, doors, keys, rooms, beds, pads, sites, suites,
+  apartments, homes, lots, spaces) and nothing after it — so every partial
+  count and every row about the units fails without a blacklist word for
+  it, and a value like "248 (of 312)" is refused as a subset. The price
+  reader takes "Pricing", "Asking" and "Acquisition cost", keeps "Price /
+  Terms", and refuses reserve, bid, target, underwritten and range
+  figures; and a bare land OM — a land or site price and no income figure
+  — now infers a development, so the land price is its price where before
+  it read as a stabilized asset with none. The per-unit
+  reader shared by the buy-box basis ceiling, the mandate, the market and
+  comp memories, analytics and the retrade diff gains the exclude the diff
+  alone had — an "Avg rent per unit" of $2,400 no longer passes a
+  $250k/unit ceiling as "$2k/unit, inside" — and the plain NOI tracker
+  never reads an NOI per unit. The pipeline card infers the kind with the
+  first signal, as the deal page does. Eighty-odd new label cases across
+  the reader, buy-box, retrade and market-memory tests.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

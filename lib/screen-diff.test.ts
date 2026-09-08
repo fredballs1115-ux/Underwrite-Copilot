@@ -117,6 +117,26 @@ describe("computeScreenDiff — a plan deal retrades on its plan", () => {
   });
 });
 
+describe("computeScreenDiff — per-unit rows read the price, and the NOI row reads the NOI", () => {
+  it("an insurance or rent per unit is never the 'Price / unit' row", () => {
+    const d = computeScreenDiff(
+      prior([m("Insurance per unit", "$1,100"), m("Price per unit", "$252,000")]),
+      { metrics: [m("Insurance per unit", "$1,450"), m("Price per unit", "$240,000")] },
+      null,
+    )!;
+    const row = d.rows.find((r) => r.label === "Price / unit")!;
+    expect(row.before).toBe("$252,000");
+    expect(row.delta).toBe("−$12k (−4.8%)");
+    expect(row.direction).toBe("better");
+  });
+
+  it("an OM carrying only an NOI per unit adds no NOI row", () => {
+    expect(
+      computeScreenDiff(prior([m("NOI per unit", "$9,800")]), { metrics: [m("NOI per unit", "$9,200")] }, null),
+    ).toBeNull();
+  });
+});
+
 describe("computeScreenDiff — the asking price tracker reads the ask", () => {
   it("never reads what the building last traded for as the price", () => {
     const d = computeScreenDiff(

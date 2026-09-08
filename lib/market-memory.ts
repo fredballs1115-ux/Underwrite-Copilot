@@ -93,7 +93,7 @@ function deriveBasis(
   price: number | null,
 ): { value: number; basis: "unit" | "sf" } | null {
   if (assetClass === "multifamily") {
-    const direct = findMetric(metrics, METRIC_FIND.perUnit.inc);
+    const direct = findMetric(metrics, METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc);
     if (direct) {
       const n = parseMoney(direct.value);
       if (n != null && n > 0) return { value: n, basis: "unit" };

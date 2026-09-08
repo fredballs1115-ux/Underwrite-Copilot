@@ -3,15 +3,15 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#219 merged to main (live build
-sha `ace6ea1`, #217, confirmed equal to the main tip by live-verify at 02:27
-UTC; #218 and #219 follow on the next Render deploys).
+**Last updated 2026-09-08**, after PRs #176–#220 merged to main (live build
+sha `cf98848`, #219, confirmed equal to the main tip by live-verify at 02:41
+UTC; #220 follows on the next Render deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Forty-four PRs (#176–#219) landed across one review session and the
+Forty-five PRs (#176–#220) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -126,6 +126,11 @@ deploy (live-verify shows the sha).
   card and the challenger say there is nothing to compare and ask for the
   in-place figure. On the conversion deal, the Property actuals card no
   longer reads $21M against the office tower's T-12 as a red flag.
+- **The count and the price, read the way an OM writes them** (#220):
+  "Total apartment units", "# of units", keys, rooms, beds, pads and
+  storage units all count again; "Units under renovation" never does;
+  "Pricing" is the price and a reserve or bid figure is not; a land deal
+  keeps its land price; and a rent per unit never passes the basis ceiling.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":
