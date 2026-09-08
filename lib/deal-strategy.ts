@@ -106,7 +106,9 @@ function haystack(
     bits.push(extraction.dealName ?? "");
     bits.push(extraction.buyerNotes ?? "");
     bits.push(extraction.strategy?.summary ?? "");
-    for (const m of extraction.metrics) {
+    // A row saved before the extraction carried metrics has none: read the
+    // words it does have rather than fail on the array it lacks.
+    for (const m of extraction.metrics ?? []) {
       if (IDENTITY_ROW.test(m.label)) continue;
       bits.push(m.label, m.value);
     }
@@ -136,7 +138,7 @@ export function inferStrategy(
     };
   }
   const text = haystack(extraction, signal);
-  const hasMetrics = (extraction?.metrics.length ?? 0) > 0;
+  const hasMetrics = (extraction?.metrics?.length ?? 0) > 0;
   if (!text.trim()) return { kind: "unknown", label: STRATEGY_LABEL.unknown, summary: "", source: "none" };
 
   let kind: StrategyKind;
@@ -223,8 +225,12 @@ const money = (n: number): string =>
       : `$${Math.round(n)}`;
 const pct = (x: number, dp = 1): string => `${(x * 100).toFixed(dp)}%`;
 
-const PRICE_INCLUDE = /asking price|purchase price|guidance|^price\b|offering price/i;
-const PRICE_EXCLUDE = /unit|\bsf\b|\bper\b|\/|psf/i;
+// Every name an OM gives the number being asked: the asking, purchase, list,
+// sale, offering or contract price, the guidance, the whisper. Not a per-unit
+// or per-SF figure, and not what the building last traded for.
+const PRICE_INCLUDE =
+  /asking price|purchase price|guidance|^price\b|offering price|sale price|sales price|list price|listing price|contract price|strike price|whisper/i;
+const PRICE_EXCLUDE = /unit|\bsf\b|\bper\b|\/|psf|\b(last|prior|previous|historical|original)\b/i;
 const CAP_INCLUDE = /going[- ]?in cap|^cap rate|\bcap\b/i;
 // Not the going-in cap: the exit, an expense cap, a rate cap — and on a plan
 // deal the stabilized / pro forma cap or the yield on cost, which describe
@@ -352,17 +358,47 @@ export function timelineFromMetrics(metrics: MetricLike[]): string {
     .join("; ");
 }
 
-const UNITS_INCLUDE = /^units?\b|number of units|unit count/i;
-const UNITS_EXCLUDE = /\bper\b|\/|price|\$/i;
+const UNITS_INCLUDE = /^units?\b|number of units|unit count|total units/i;
+// "Unit mix", "Unit sizes", "Unit type", "Units per acre", a price per unit:
+// rows that start with the word but do not count anything.
+const UNITS_EXCLUDE = /\bper\b|\/|price|\$|%|\bmix\b|siz|type|area|\bsf\b|density|acre/i;
+// A count is a whole number, on its own or followed by what it counts —
+// "312", "312 units", "312 (proposed)", "approx. 300 apartments". Anything
+// else ("40% studio / 60% 1BR", "650–1,200 SF", "312 / 285,000 SF") is not a
+// count, and reading its first digits as one puts a wrong basis on every
+// per-unit surface.
+const COUNT_WORD = /\b(units?|keys?|doors?|apartments?|apts?|homes?|residences?|beds?|pads?|rooms?|sites?|lots?|spaces?)\b/gi;
+const COUNT_PREFIX = /^(approx(imately|\.)?|about|circa|c\.|~|±)\s*/i;
+
+/** A whole-number count from a metric's value, or null when the value is
+ *  not one. Exported so every surface that needs a count reads it the same
+ *  way. */
+export function parseCount(value: string): number | null {
+  const s = value
+    .replace(/\(.*?\)/g, " ")
+    .replace(COUNT_WORD, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(COUNT_PREFIX, "")
+    .replace(/\+$/, "")
+    .trim();
+  if (!/^(\d{1,3}(,\d{3})+|\d+)$/.test(s)) return null;
+  const n = Number(s.replace(/,/g, ""));
+  return Number.isFinite(n) ? n : null;
+}
 
 /** The unit count — on a plan deal the finished product's ("Units
  *  (proposed)") — as a positive number, or null when no row parses. One
  *  reader for the plan summary, analytics and the deal context, so every
- *  per-unit figure divides by the same count. */
+ *  per-unit figure divides by the same count. Reads the first row that IS a
+ *  count: a "Unit mix" row ahead of "Units" never shadows it. */
 export function unitCountFromMetrics(metrics: MetricLike[]): number | null {
-  const m = findMetric(metrics, UNITS_INCLUDE, UNITS_EXCLUDE) as MetricLike | null;
-  const n = m ? parseMoney(m.value) : null;
-  return n != null && n >= 1 && n <= 50_000 ? n : null;
+  for (const m of metrics) {
+    if (!UNITS_INCLUDE.test(m.label) || UNITS_EXCLUDE.test(m.label)) continue;
+    const n = parseCount(m.value);
+    if (n != null && n >= 1 && n <= 50_000) return n;
+  }
+  return null;
 }
 
 /** What the OM says the finished project earns and costs — the figures a
@@ -397,7 +433,7 @@ export function planSummary(
   strategy: DealStrategy = inferStrategy(extraction),
 ): PlanSummary | null {
   if (!extraction || !isPlanDeal(strategy.kind)) return null;
-  const metrics = extraction.metrics;
+  const metrics = extraction.metrics ?? [];
   const priceMetric = findPriceMetric(metrics, strategy.kind);
   const priceRaw = priceMetric ? parseMoney(priceMetric.value) : null;
   const price = priceRaw != null && priceRaw > 0 ? priceRaw : null;
@@ -443,7 +479,7 @@ export function assessPlausibility(
   strategy: DealStrategy = inferStrategy(extraction),
 ): PlausibilityFinding[] {
   if (!extraction) return [];
-  const metrics = extraction.metrics;
+  const metrics = extraction.metrics ?? [];
   const priceMetric = findPriceMetric(metrics, strategy.kind);
   const price = priceMetric ? parseMoney(priceMetric.value) : null;
   if (price == null || !(price > 0)) return [];

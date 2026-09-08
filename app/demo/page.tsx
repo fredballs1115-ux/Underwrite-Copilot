@@ -12,6 +12,7 @@ import { seedBenchmarks } from "@/lib/research-data";
 import { sectorLeaderboard } from "@/lib/sector-leaderboard";
 import { sampleLegal } from "@/lib/sample-legal";
 import { scoreMandateFit } from "@/lib/mandate";
+import { inferStrategy } from "@/lib/deal-strategy";
 import type { ExtractedMetric } from "@/lib/anthropic/types";
 import { DemoSections, type DemoData } from "./sections";
 import { ModelSlideshow } from "./model-slideshow";
@@ -335,6 +336,14 @@ export default function DemoPage() {
             </h2>
             <span className="rounded-full bg-caution/15 px-2.5 py-1 text-[11px] font-medium text-caution">
               Caution
+            </span>
+            {/* The deal's kind, read from the sample's own extraction the way
+                the real deal page reads it — never a hardcoded label. */}
+            <span
+              className="rounded-full bg-brand/10 px-2.5 py-1 text-[11px] font-medium text-brand"
+              title="The deal's kind is read first. A conversion or a development would show its plan here — stabilized NOI, budget, total cost, yield on cost — and be judged on yield on cost, never on a cap rate against the price."
+            >
+              {inferStrategy(SAMPLE_DEAL.extraction).label}
             </span>
           </div>
           <p className="mt-1 text-sm text-muted">

@@ -79,6 +79,9 @@ jobs:
           # constant, so this marker failing while the homepage one passes
           # means the two surfaces have drifted.
           grep -q "Four more tools pick up where it stops" p_demo.html && echo "DEMO DEEP TOOLS BLOCK (Aug 28): present" || echo "DEMO DEEP TOOLS BLOCK: not yet deployed"
+          # The sample's summary bar carries its deal kind, inferred from its
+          # own extraction; the chip's tooltip is the grep.
+          grep -q "kind is read first" p_demo.html && echo "DEMO DEAL TYPE CHIP (Sep 8): present" || echo "DEMO DEAL TYPE CHIP (Sep 8): not yet deployed"
           grep -q "copy citation" p_market.html && echo "/market: copy-citation + FMR ladder present" || echo "/market: citation tools not yet deployed"
           grep -q "By asset type" p_market.html && echo "/market: sector snapshot panel present (Aug 25)" || echo "/market: sector panel not yet deployed"
           # Coverage heat grid: every market x every asset class, with the

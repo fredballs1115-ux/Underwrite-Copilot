@@ -69,6 +69,9 @@ const TRACKED: Tracked[] = [
   {
     label: "Price / unit",
     include: /per unit|\/unit|unit price/i,
+    // The price over the units — never an NOI, a rent, a cost or an expense
+    // expressed per unit.
+    exclude: /noi|income|rent|cost|budget|expense|tax|reserve|revenue|\begi\b/i,
     kind: "money",
     betterWhen: "down",
   },
@@ -94,14 +97,26 @@ const TRACKED: Tracked[] = [
   {
     label: "Stabilized NOI (pro forma)",
     include: /(stabili[sz]ed|pro ?forma)[^a-z]*\bnoi\b|\bnoi\b[^a-z]*\((stabili[sz]ed|pro ?forma)/i,
+    // The headline figure, never its per-unit or per-SF expression.
+    exclude: /\bper\b|\/|unit|psf|\bsf\b/i,
     kind: "money",
     betterWhen: "up",
   },
+  // The all-in figure and the works alone are two different numbers — one
+  // includes the price, the other does not — so they are two trackers. One
+  // tracker over both would pair "Total project cost" before with
+  // "Construction budget" after and read the price as a retrade.
+  {
+    label: "Total project cost",
+    include: /total (project|development) cost|all[- ]?in (cost|basis)/i,
+    exclude: /\bper\b|\/|psf|unit|reserve|annual/i,
+    kind: "money",
+    betterWhen: "down",
+  },
   {
     label: "Capital budget",
-    include:
-      /total (project|development) cost|renovation (budget|cost)|capex budget|capital (budget|plan)|construction (cost|budget)|hard costs?/i,
-    exclude: /\bper\b|\/|psf|unit|reserve|annual/i,
+    include: /renovation (budget|cost)|capex budget|capital (budget|plan)|construction (cost|budget)|hard costs?/i,
+    exclude: /\bper\b|\/|psf|unit|reserve|annual|total (project|development)|all[- ]?in/i,
     kind: "money",
     betterWhen: "down",
   },
