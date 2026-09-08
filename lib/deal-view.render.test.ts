@@ -189,6 +189,26 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(textOf(html)).toMatch(/Bars: each gap scaled to the widest of its kind/);
   });
 
+  it("each section's count line draws as a split bar with the counts beside it", () => {
+    // The reconciliation header: two unfavorable rows and one neutral — one
+    // bar, two segments (two thirds kill, one third muted), the same words
+    // as its tooltip and beside it.
+    const recon = render(sampleProps("analyses", "reconciler"));
+    expect((recon.match(/data-split-bar/g) ?? []).length).toBe(1);
+    expect(recon).toContain('title="2 unfavorable · 1 neutral"');
+    expect(recon).toMatch(/bg-kill" style="width:66\.6+%"/);
+    expect(recon).toMatch(/bg-muted\/40" style="width:33\.3+%"/);
+    expect(recon).toMatch(/text-kill">2 unfavorable<\/span>/);
+    expect(recon).toMatch(/text-muted"> · <\/span>1 neutral<\/span>/);
+    // The comps tab: a bar per comp table (sale and lease).
+    const comps = render(sampleProps("analyses", "comps"));
+    expect((comps.match(/data-split-bar/g) ?? []).length).toBe(2);
+    // The challenger: its severity tally.
+    const challenger = render(sampleProps("analyses", "challenger"));
+    expect((challenger.match(/data-split-bar/g) ?? []).length).toBeGreaterThanOrEqual(1);
+    expect(challenger).toMatch(/title="\d+ high/);
+  });
+
   it("the overview carries the verdict and the buy-box fit; the financials carry the price", () => {
     const overview = textOf(render(sampleProps("overview")));
     expect(overview).toMatch(/Caution/);
