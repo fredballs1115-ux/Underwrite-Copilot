@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "Compare draws each deal's leverage spread from a centre line",
+      "blurb": "The compare page's leverage row — each deal's going-in cap against the freshest 30-year fixed — now draws its spread as a bar from a centre line: to the right in green when the cap clears the rate, to the left in red when it sits below it, thin in amber when the spread is slim. Scaled to the widest spread on the page, muted on a deal the screen rejected, and absent on a plan deal, which is judged on yield on cost instead.",
+      "href": "/deals/compare"
+    },
+    {
+      "date": "2026-09-08",
       "title": "Compare reads on a phone, one deal at a time",
       "blurb": "On a phone the compare page now stacks a card per deal — name, verdict, the screen's reason, the buy-box fit, then every return row with its figure, best mark and spread bar — instead of a side-by-side table that scrolled sideways and showed one deal and a sliver of the next. From a tablet up the table is unchanged.",
       "href": "/deals/compare"

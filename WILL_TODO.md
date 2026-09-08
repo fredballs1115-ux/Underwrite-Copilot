@@ -3,20 +3,19 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#253 merged to main (live build
-sha `52195e4`, #251, confirmed equal to the main tip by live-verify at 16:58
-UTC with its `DEPLOY: LIVE` line — every one of the seventy-six through
-#251 is live, the homepage serves at 196 KB where it served at 488 KB, the
+**Last updated 2026-09-08**, after PRs #176–#254 merged to main (live build
+sha `a407f5f`, #253, confirmed equal to the main tip by live-verify at 17:09
+UTC with its `DEPLOY: LIVE` line — every one of the seventy-eight through
+#253 is live, the homepage serves at 196 KB where it served at 488 KB, the
 public sample memo at 57 KB where it served at 11 KB (the Brewerytown frame
 is in it), and the public-page lint #231 added reads all twelve public pages
-clean on every run; #252 and #253 are merged and await their proof, #254
-follows).
+clean on every run; #254 is merged and awaits its proof, #255 follows).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Seventy-nine PRs (#176–#254) landed across one review session and the
+Eighty PRs (#176–#255) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -387,6 +386,10 @@ deploy (live-verify shows the sha).
 - **The compare page at phone width stacks a card per deal** (#254): name,
   verdict, reason, buy-box fit, then the rows with their figures, best marks
   and spread bars; the table keeps from `sm` up.
+- **The compare page's leverage row draws its signed spread** (#255): a bar
+  from a centre line, right in the pass colour and left in the kill colour,
+  scaled to the row's widest spread; muted on a rejected deal, none on a
+  plan deal.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -663,17 +666,16 @@ a route scoped to the share token; the memo and the report got theirs in
    "+4.2%" or "−$120k" and a comp detail's "$262k/unit"), returning nothing
    when the text is not a figure. Plain `View`s, height-neutral, the same
    fill-count assertion.
-9. **The compare page's leverage row as a signed bar.** Every return row
-   on the compare page draws its spread (#252, #254); the "Leverage vs
-   30-yr" row still says "+190 bps" / "−60 bps" in words and a colour. The
-   figure is signed, so its picture is a bar from a centre line — right in
-   the pass colour, left in the kill colour, thin in the caution one —
-   scaled to the widest spread in the row, with no bar on a plan deal
-   ("judged on yield on cost") or when one deal is compared alone. The
-   `LeverageRead` already carries `spreadBps` and `tone`, so no parser is
-   needed; both layouts share the row stats, so the bar lands in the cards
-   and the table at once. Assert the count in the compare fixture, shoot
-   at 1440 and 390.
+9. **The pipeline row's fit at phone width.** From `lg` up each row draws
+   its mandate score as a 0–100 bar in the call's colour; below `md` the
+   fit is a word at the end of the row's second meta line ("$68.0M · 5.6%
+   cap · Near miss"), which is the part a one-line truncation cuts first —
+   at 390 most rows end in "…". The picture is already drawn for wide
+   screens: show the same bar (no number) under the verdict chip on a
+   phone and drop the fit word from that meta line, so the row reads
+   price · cap and a bar. `DealRow` in `app/(app)/deals/pipeline.tsx`;
+   the pipeline fixture in `lib/views.render.test.ts` already renders at
+   390 — assert the bar count there and shoot.
 
 ---
 
