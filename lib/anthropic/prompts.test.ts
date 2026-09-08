@@ -55,6 +55,27 @@ describe("plan deals are judged on their own terms", () => {
     expect(p).toContain("NEVER label a stabilized pro forma as Year 1");
   });
 
+  // The plan's rows, by the exact labels the readers match (lib/deal-strategy:
+  // BUDGET_INCLUDE, LAND_PRICE_INCLUDE, TIMELINE_ROW; the unit-count readers).
+  it("the extraction asks for the plan's rows by name, for every plan kind", () => {
+    const p = extractionInstruction("multifamily");
+    expect(p).toContain("For a value-add, lease-up, conversion or development");
+    for (const label of [
+      '"Total project cost"',
+      '"Construction budget"',
+      '"Renovation budget"',
+      '"Land cost"',
+      '"Units (proposed)"',
+      '"Construction period"',
+      '"Lease-up period"',
+      '"Stabilized in"',
+    ]) {
+      expect(p).toContain(label);
+    }
+    expect(p).toContain("never an appraised land value");
+    expect(p).toContain("never write 0 for a figure the OM does not state");
+  });
+
   it("the model reconciliation asks for the plan and forbids a stabilized pro forma as year 1 without it", () => {
     const p = reconciliationInstruction();
     for (const field of [

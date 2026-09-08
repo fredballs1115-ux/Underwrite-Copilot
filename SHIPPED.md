@@ -283,6 +283,18 @@ confirmed equal to the main tip after each batch.
   total; the challenger's brief says the acquisition is not separable; the
   Excel note says the same. `lib/plan-total.test.ts` covers the path end
   to end on a land-owned development.
+- **#213 The extraction asks for the plan's rows by name.** Every reader
+  downstream — the budget and land-cost readers, the timeline reader, the
+  unit count behind the all-in basis — matches metric labels, and the
+  extraction had only been asked, on three of the four plan kinds, for "the
+  total project cost, the construction budget, the construction period and
+  the year the plan stabilizes" with no labels. It is now asked, on a
+  value-add, lease-up, conversion or development, for "Total project cost",
+  "Construction budget" / "Renovation budget", "Land cost" on a development
+  (never an appraised land value), "Units (proposed)" / "SF (proposed)",
+  "Construction period", "Lease-up period" and "Stabilized in" — each with
+  its page, never the price restated as a cost line, never a 0 for an
+  absent figure. The prompt test pins every label.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
