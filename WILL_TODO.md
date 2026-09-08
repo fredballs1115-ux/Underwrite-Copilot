@@ -15,7 +15,7 @@ run; #250 follows and awaits the same proof).
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Seventy-five PRs (#176–#250) landed across one review session and the
+Seventy-six PRs (#176–#251) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -374,6 +374,9 @@ deploy (live-verify shows the sha).
   hugs the optimistic end) and each scenario's call has its dot — vector
   shapes, no height added; the footer's band is reserved, so a memo that
   cannot fit one page flows to a second instead of over its own footer.
+- **Data bars in the meeting workbook** (#251): price, cap and yield on cost
+  carry Excel's own data bars, live as the numbers change, over the deal
+  rows only; a plan deal's cap cell stays empty of bar.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -649,13 +652,12 @@ a route scoped to the share token; the memo and the report got theirs in
    signed bar beside its figure, and the comp table's per-unit basis as a
    bar against the subject's. Plain `View`s, height-neutral, the same
    structural assertion.
-9. **Data bars in the meeting workbook.** The pipeline export
-   (`lib/pipeline-workbook.ts`) prints price per unit, cap and yield on cost
-   as numbers; exceljs writes native Excel conditional formatting, and a
-   data bar on those columns is a picture Excel itself draws and keeps live
-   as the numbers change — no chart library, nothing computed into a cell.
-   The workbook test reads cells back; the data-bar rule is a
-   `conditionalFormattings` entry to assert.
+9. **The compare table draws the spread.** `/deals/compare` lists IRR,
+   cap or yield on cost, and the per-unit basis as numbers across the
+   deals; the same 0–100 bar the pipeline's fit column uses, scaled to the
+   row's best figure, would let a meeting read which column leads at a
+   glance (a plan deal's cap cell stays "plan", never a bar). Render on the
+   compare fixture in `lib/views.render.test.ts`, shoot at 1440 and 390.
 
 ---
 

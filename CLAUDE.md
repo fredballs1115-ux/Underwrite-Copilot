@@ -193,3 +193,7 @@ Rules these share with the rest of the codebase:
   formulas so the two are checked against each other in CI (HyperFormula, plus
   a real LibreOffice headless recalculation — which is why
   `.github/workflows/test.yml` installs `libreoffice-calc`).
+- **A picture in a workbook is Excel's own conditional formatting** (the
+  meeting export's data bars, `lib/pipeline-workbook.ts`), never a rendered
+  image: it stays live as the numbers change, and the workbook test reads
+  the rules back from `conditionalFormattings`.

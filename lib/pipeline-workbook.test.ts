@@ -109,6 +109,26 @@ describe("pipeline workbook — the deal's kind is a column", () => {
     expect(row.getCell(9).value).toBe("—");
   });
 
+  it("price, cap and yield on cost carry data bars Excel draws itself, over the deal rows only", async () => {
+    const ws = (await load([STABILIZED, CONVERSION, LEGACY])).getWorksheet("Pipeline")!;
+    const cfs = (
+      ws as unknown as { conditionalFormattings: { ref: string; rules: { type: string; cfvo?: { type: string }[] }[] }[] }
+    ).conditionalFormattings;
+    const bars = cfs.filter((cf) => cf.rules.some((r) => r.type === "dataBar"));
+    // Three deals under one stage band: rows 5 (band) through 8.
+    expect(bars.map((cf) => cf.ref).sort()).toEqual(["G5:G8", "H5:H8", "I5:I8"]);
+    for (const cf of bars) {
+      const rule = cf.rules.find((r) => r.type === "dataBar")!;
+      expect(rule.cfvo?.map((c) => c.type)).toEqual(["min", "max"]);
+    }
+  });
+
+  it("an empty pipeline writes no data-bar rule", async () => {
+    const ws = (await load([])).getWorksheet("Pipeline")!;
+    const cfs = (ws as unknown as { conditionalFormattings: unknown[] }).conditionalFormattings;
+    expect(cfs).toEqual([]);
+  });
+
   it("the summary counts the live plan deals, dead ones excluded", async () => {
     const sum = (
       await load([STABILIZED, CONVERSION, { ...CONVERSION, name: "Dead conversion", stage: "dead" }])

@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Seventy-five PRs, #176–#250, each
+estimate, and that's what it should flag." Seventy-six PRs, #176–#251, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1029,6 +1029,14 @@ confirmed equal to the main tip after each batch.
   the filled shapes in a PDF's content streams; the memo render test asserts
   three fills per range against a render whose ranges do not parse, and that
   a base below its low end sits at the start of the track.
+- **#251 Data bars in the meeting workbook.** The pipeline export's price,
+  cap and yield-on-cost columns carry Excel data bars — conditional
+  formatting Excel draws itself and keeps live as the numbers change, a
+  picture with no chart library and nothing computed into a cell. The rule
+  covers the deal rows only (a stage band, a dash and "n/a — plan" are text
+  and draw no bar, so a plan deal's cap column stays honestly empty); an
+  empty pipeline writes no rule. The workbook test reads the three rules
+  back — their ranges end at the last deal row, their scale runs min to max.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
