@@ -13,7 +13,7 @@ import {
   NOTES_MAX,
   type ManualDealFacts,
 } from "./manual-deal";
-import { evaluateBuyBox, findMetric, METRIC_FIND } from "./criteria";
+import { buildingSfRow, evaluateBuyBox, findMetric, METRIC_FIND } from "./criteria";
 import { scoreMandateFit } from "./mandate";
 import { deriveUnderwriteInputs } from "./underwrite/inputs";
 import { computeUnderwrite } from "./underwrite/engine";
@@ -143,9 +143,7 @@ describe("buildManualExtraction", () => {
     expect(findMetric(metrics, METRIC_FIND.perUnit.inc)?.value).toBe(
       "$312,500/unit",
     );
-    expect(
-      findMetric(metrics, METRIC_FIND.sf.inc, METRIC_FIND.sf.exc)?.value,
-    ).toBe("3,600 SF");
+    expect(buildingSfRow(metrics)?.value).toBe("3,600 SF");
   });
 
   it("notes ride as buyerNotes prose, never a metric — no matcher surface", () => {
@@ -159,9 +157,7 @@ describe("buildManualExtraction", () => {
     expect(
       findMetric(ex.metrics, METRIC_FIND.price.inc, METRIC_FIND.price.exc)?.value,
     ).toBe("$1,250,000");
-    expect(
-      findMetric(ex.metrics, METRIC_FIND.sf.inc, METRIC_FIND.sf.exc)?.value,
-    ).toBe("3,600 SF");
+    expect(buildingSfRow(ex.metrics)?.value).toBe("3,600 SF");
   });
 
   it("feeds the workbook: derive anchors on the typed price and NOI exactly", () => {

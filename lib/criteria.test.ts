@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
+  buildingSfFromMetrics,
   buyBoxCheckSource,
   evaluateBuyBox,
+  parseSf,
   findGoingInCap,
   foldBuyBoxChecks,
   isEmptyBuyBox,
@@ -46,6 +48,22 @@ describe("evaluateBuyBox — reads the expected figures", () => {
     // Only an exit cap present → the going-in check has no figure → unknown.
     const r = evaluateBuyBox("auto", ex([["Exit cap rate", "6.00%"]]), box);
     expect(check(r, "Going-in cap")?.status).toBe("unknown");
+  });
+
+  it("the Size check reads the building, never the land or a unit", () => {
+    const box: BuyBox = { sfMin: 100_000, sfMax: 300_000 };
+    const r = evaluateBuyBox(
+      "auto",
+      ex([
+        ["Land SF", "871,200"],
+        ["Average unit size", "850 SF"],
+        ["Total SF", "200,000 SF"],
+      ]),
+      box,
+    );
+    expect(check(r, "Size")?.status).toBe("pass");
+    const landOnly = evaluateBuyBox("auto", ex([["Land SF", "871,200"]]), box);
+    expect(check(landOnly, "Size")?.status).toBe("unknown");
   });
 
   it("reads square footage but not a per-SF price", () => {
@@ -375,5 +393,101 @@ describe("findGoingInCap — never the finished project's figure", () => {
     const plain = check(evaluateBuyBox("multifamily", ex([["Purchase price", "$20,000,000"]]), box), "Going-in cap")!;
     expect(plain.status).toBe("unknown");
     expect(plain.detail).toMatch(/no parseable cap rate yet/);
+  });
+});
+
+// The building's size is read by the shape of its label, as the unit count
+// is: every name an OM gives the whole building, and never the land, a
+// unit, a component or a partial.
+describe("buildingSfFromMetrics — the building's size, never the land's, a unit's or a component's", () => {
+  it("reads every name an OM gives the size", () => {
+    for (const label of [
+      "SF",
+      "Total SF",
+      "Total SF:",
+      "Building SF",
+      "Building size",
+      "Building size (SF)",
+      "Size (SF)",
+      "Rentable SF",
+      "Net rentable SF",
+      "Rentable square feet",
+      "Net rentable area",
+      "Gross building area",
+      "GBA",
+      "RSF",
+      "Total RSF",
+      "NRA",
+      "GLA",
+      "RBA",
+      "Square footage",
+      "Sq. Ft.",
+      "Total square feet",
+      "Gross SF",
+      "Leasable SF",
+      "Floor area",
+      "Total floor area",
+      "Improvements (SF)",
+      "SF (proposed)",
+      "Proposed SF",
+      "Total building SF",
+      "Rentable area",
+    ]) {
+      expect(buildingSfFromMetrics([{ label, value: "250,000 SF" }]), label).toBe(250_000);
+    }
+  });
+
+  it("never the land, a unit, a component or a partial", () => {
+    for (const label of [
+      "Land SF",
+      "Site SF",
+      "Site area",
+      "Lot size",
+      "Parcel size",
+      "Land area",
+      "Acres",
+      "Average unit size",
+      "Avg SF/unit",
+      "Unit SF",
+      "Retail SF",
+      "Office SF",
+      "Warehouse SF",
+      "Vacant SF",
+      "Available SF",
+      "Leased SF",
+      "Occupied SF",
+      "SF per unit",
+      "Price per SF",
+      "Rent per SF",
+      "Expansion SF",
+      "Total SF (office)",
+      "Total SF (Phase II)",
+    ]) {
+      expect(buildingSfFromMetrics([{ label, value: "250,000 SF" }]), label).toBeNull();
+    }
+    expect(
+      buildingSfFromMetrics([
+        { label: "Land SF", value: "217,800" },
+        { label: "Total SF", value: "250,000" },
+      ]),
+    ).toBe(250_000);
+  });
+
+  it("parseSf reads the shapes a value takes and refuses what is not a building area", () => {
+    expect(parseSf("250,000")).toBe(250_000);
+    expect(parseSf("250,000 SF")).toBe(250_000);
+    expect(parseSf("250k sq ft")).toBe(250_000);
+    expect(parseSf("1.2M SF")).toBe(1_200_000);
+    expect(parseSf("3,600 SF")).toBe(3_600);
+    expect(parseSf("250,000 SF (rentable)")).toBe(250_000);
+    expect(parseSf("approx. 250,000 SF")).toBe(250_000);
+    expect(parseSf("12 acres")).toBeNull();
+    expect(parseSf("248 units")).toBeNull();
+    expect(parseSf("250,000–300,000 SF")).toBeNull();
+    expect(parseSf("$45/SF")).toBeNull();
+    expect(parseSf("50")).toBeNull();
+    // A bare "Size" row whose value is an acreage is a land size, not a building.
+    expect(buildingSfFromMetrics([{ label: "Size", value: "12 acres" }])).toBeNull();
+    expect(buildingSfFromMetrics([{ label: "Size", value: "250,000 SF" }])).toBe(250_000);
   });
 });

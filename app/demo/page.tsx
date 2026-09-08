@@ -6,7 +6,7 @@ import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { FREE_DEALS, DEEP_TOOLS } from "@/lib/marketing-constants";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
-import { evaluateBuyBox, parsePct } from "@/lib/criteria";
+import { buildingSfRow, evaluateBuyBox, parsePct } from "@/lib/criteria";
 import { leverageRead } from "@/lib/leverage";
 import { seedBenchmarks } from "@/lib/research-data";
 import { sectorLeaderboard } from "@/lib/sector-leaderboard";
@@ -215,11 +215,7 @@ export default function DemoPage() {
   const metrics = data.extraction.metrics;
   // The shared price reader, as the deal page uses it.
   const price = findPriceMetric(metrics, inferStrategy(data.extraction).kind)?.value ?? null;
-  const sfValue = findValue(
-    metrics,
-    /\b(total sf|square (foot|feet|footage)|sq\.? ?ft|rentable|nra|gla|building size|\bsf\b)/i,
-    /price|\$|per|\/|psf/i,
-  );
+  const sfValue = buildingSfRow(metrics)?.value ?? null;
   const unitValue = unitCountRow(metrics)?.value ?? null;
   // A bare unit count ("248") reads wrong in a Size slot — say what it counts.
   const size =

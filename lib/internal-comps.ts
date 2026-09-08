@@ -1,4 +1,11 @@
-import { METRIC_FIND, findGoingInCap, findMetric, parseMoney, parsePct } from "@/lib/criteria";
+import {
+  METRIC_FIND,
+  buildingSfFromMetrics,
+  findGoingInCap,
+  findMetric,
+  parseMoney,
+  parsePct,
+} from "@/lib/criteria";
 import {
   findPriceMetric,
   inferStrategy,
@@ -95,13 +102,9 @@ function deriveBasis(
     if (n != null && n > 0) return `${fmtCompact(price / n)}/unit${suffix}`;
     return null;
   }
-  // Office / industrial / retail: dollars per square foot.
-  const sf = findMetric(
-    metrics,
-    /\b(total sf|square (foot|feet|footage)|sq\.? ?ft|rentable|nra|gla|building size|\bsf\b)/i,
-    /price|\$|per|\/|psf/i,
-  );
-  const n = sf ? parseMoney(sf.value) : null; // handles "412,000" and "412k"
+  // Office / industrial / retail: dollars per square foot, over the
+  // building's size — the shared reader, never the land's or a unit's.
+  const n = buildingSfFromMetrics(metrics);
   if (n != null && n > 0) return `$${Math.round(price / n)}/SF${suffix}`;
   return null;
 }

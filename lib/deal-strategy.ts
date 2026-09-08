@@ -25,7 +25,7 @@
  */
 
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { METRIC_FIND, findMetric, parseMoney, parsePct } from "@/lib/criteria";
+import { METRIC_FIND, buildingSfFromMetrics, findMetric, parseMoney, parsePct } from "@/lib/criteria";
 
 export type StrategyKind =
   | "stabilized"
@@ -617,12 +617,7 @@ export function assessPlausibility(
   //    shared count reader: a "Unit mix" or "Vacant units" row read as the
   //    count would manufacture this finding on a sound deal.
   const units = unitCountFromMetrics(metrics);
-  const sfMetric = findMetric(
-    metrics,
-    /rentable|\brsf\b|square f|building size|total sf|gross (building|leasable)|\bgla\b|\bnra\b|\bsf\b/i,
-    /\bper\b|\/|psf|land|acre|unit|\$/i,
-  );
-  const sf = sfMetric ? parseMoney(sfMetric.value) : null;
+  const sf = buildingSfFromMetrics(metrics);
   const cls = (extraction.assetClass ?? "").toLowerCase();
   if (cls === "multifamily" && units != null && units >= 1 && units <= 50_000) {
     const perUnit = price / units;

@@ -20,6 +20,7 @@
 
 import {
   type BuyBox,
+  buildingSfFromMetrics,
   findMetric,
   parseMoney,
   parsePct,
@@ -309,7 +310,8 @@ export function scoreMandateFit(
 
   // ---- Size (banded) ----------------------------------------------------
   if (box.sfMin != null || box.sfMax != null) {
-    const sf = moneyOf(metrics, METRIC_FIND.sf);
+    // The shared size reader: the building, never the land or a unit.
+    const sf = buildingSfFromMetrics(metrics);
     const s = scoreBand(sf, box.sfMin, box.sfMax, WEIGHTS.size);
     const bandText = [
       box.sfMin != null ? `${Math.round(box.sfMin / 1e3)}k SF min` : null,

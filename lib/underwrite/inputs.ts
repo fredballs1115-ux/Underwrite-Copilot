@@ -13,7 +13,7 @@
  * to the OM. Gross rent is grossed up from that NOI at an assumed expense ratio
  * and vacancy — the split is a labelled assumption, the NOI is real.
  */
-import { findMetric, parseMoney, parsePct } from "@/lib/criteria";
+import { buildingSfRow, findMetric, parseMoney, parsePct, parseSf } from "@/lib/criteria";
 import {
   IMPLIED_CAP_CEILING,
   budgetFromText,
@@ -87,9 +87,6 @@ const normalizeClass = (c: string): keyof typeof CLASS_DEFAULTS =>
   (["multifamily", "office", "industrial", "retail"] as const).includes(c as never)
     ? (c as keyof typeof CLASS_DEFAULTS)
     : "auto";
-
-const SF_INCLUDE = /rentable|\brsf\b|square f|building size|total sf|gross (building|leasable)|\bgla\b|\bnra\b|\bsf\b/i;
-const SF_EXCLUDE = /per|\/|psf|land|acre|unit/i;
 
 export function deriveUnderwriteInputs(
   extraction: ExtractionResult | null,
@@ -269,9 +266,10 @@ export function deriveUnderwriteInputs(
   const capitalBudget = budgetRead?.budget ?? 0;
 
   // ── RSF ────────────────────────────────────────────────────────────────
-  // The rent roll's summed SF outranks the OM's stated building size.
-  const sfMetric = findMetric(metrics, SF_INCLUDE, SF_EXCLUDE);
-  const sfParsed = sfMetric ? parseMoney(sfMetric.value) : null; // parseMoney reads plain numbers too
+  // The rent roll's summed SF outranks the OM's stated building size. The
+  // shared size reader: the building, never the land's area or a unit's.
+  const sfMetric = buildingSfRow(metrics);
+  const sfParsed = sfMetric ? parseSf(sfMetric.value) : null;
   const rsf = rrSf ?? (sfParsed && sfParsed > 100 ? Math.round(sfParsed) : 100_000);
   if (rrSf != null) {
     mark("rsf", "extracted", `Rent roll total SF${rrAsOf ? ` (as of ${rrAsOf})` : ""}`);

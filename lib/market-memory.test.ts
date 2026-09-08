@@ -72,6 +72,23 @@ describe("buildComps — the unit count is the row that counts units", () => {
     expect(comps[0].perUnit).toBe(250_000);
   });
 
+  it("on an office deal the $/SF basis is over the building, never the land", () => {
+    const comps = buildComps([
+      deal("d1", {
+        assetClass: "office",
+        market: "Austin, TX",
+        metrics: [
+          ["Purchase price", "$30,000,000"],
+          ["Land SF", "217,800"],
+          ["Average unit size", "850 SF"],
+          ["Total SF", "150,000 SF"],
+        ],
+      }),
+    ]);
+    expect(comps[0].perUnit).toBe(200);
+    expect(comps[0].perUnitBasis).toBe("sf");
+  });
+
   it("a partial count ('Vacant units') is not the count", () => {
     const comps = buildComps([
       deal("d1", { market: "Dallas, TX", metrics: [["Purchase price", "$62,400,000"], ["Vacant units", "12"]] }),
