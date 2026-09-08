@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "Every reconciliation gap comes back with its figure",
+      "blurb": "The reconciler now leads each gap with the figure the two values differ by — a dollar amount, basis points or a percentage — before the reason, so the bars the reconciler tab and the full report draw appear on every screen, not only the sample. The reader behind them also takes the long-hand shapes a figure comes in: \"$1.2 million\", \"$5MM\", \"$2bn\", \"2 pp\".",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-08",
       "title": "The reconciliation reads on a phone, one row at a time",
       "blurb": "On a phone the deal page's reconciler tab now stacks a card per row — the metric and whether the gap runs for or against you, the OM's figure beside your model's, then the gap with its bar — instead of a table that scrolled sideways and left the gap off-screen. From a tablet up the table is unchanged; the sample screen's reconciler tab reads the same way.",
       "href": "/deals"

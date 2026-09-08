@@ -10,11 +10,26 @@ describe("gapFigure — the magnitude a reconciliation gap states", () => {
     expect(gapFigure("$45 per SF lighter")).toEqual({ value: 45, unit: "usd" });
   });
 
+  it("reads the long-hand and the Wall Street suffixes, and never a word that merely starts with one", () => {
+    expect(gapFigure("$1.2 million lighter")).toEqual({ value: 1_200_000, unit: "usd" });
+    expect(gapFigure("$450 thousand below the OM")).toEqual({ value: 450_000, unit: "usd" });
+    expect(gapFigure("$5MM over the OM's budget")).toEqual({ value: 5_000_000, unit: "usd" });
+    expect(gapFigure("$2bn")).toEqual({ value: 2_000_000_000, unit: "usd" });
+    expect(gapFigure("$3 Bn")).toEqual({ value: 3_000_000_000, unit: "usd" });
+    // "m" is a suffix only when the word ends there.
+    expect(gapFigure("$174 mortgage constant higher")).toEqual({ value: 174, unit: "usd" });
+    expect(gapFigure("$40 below, monthly")).toEqual({ value: 40, unit: "usd" });
+  });
+
   it("reads basis points and percentages", () => {
     expect(gapFigure("300 bps higher, in line with in-place")).toEqual({ value: 300, unit: "bps" });
     expect(gapFigure("25 basis points tighter")).toEqual({ value: 25, unit: "bps" });
     expect(gapFigure("+4.2%")).toEqual({ value: 4.2, unit: "pct" });
     expect(gapFigure("about 3 percentage points below")).toEqual({ value: 3, unit: "pct" });
+    expect(gapFigure("2 pp higher")).toEqual({ value: 2, unit: "pct" });
+    expect(gapFigure("4 per cent wider")).toEqual({ value: 4, unit: "pct" });
+    // "pp" and "pts" are units only as whole words.
+    expect(gapFigure("5 ppm")).toBeNull();
   });
 
   it("prefers the dollar figure when a line carries more than one yardstick", () => {

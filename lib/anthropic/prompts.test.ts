@@ -16,6 +16,7 @@ import {
   reconciliationInstruction,
   verdictInstruction,
 } from "@/lib/anthropic/prompts";
+import { gapFigure } from "@/lib/gap-detail";
 
 // A deal with a plan — conversion, development, lease-up, heavy value-add —
 // is judged on yield on total cost, and its stabilized pro forma is the
@@ -145,6 +146,26 @@ describe("what the screen established reaches the steps that read the OM", () =>
     expect(reconcilerInstruction()).toContain("on the plan's terms");
     expect(reconcilerInstruction()).toContain("never read the OM's stabilized pro forma as the buyer's year one");
     expect(reconcilerInstruction()).not.toContain("<deal_context>");
+  });
+});
+
+// The deal page and the report draw a reconciliation gap only when its text
+// states a magnitude (lib/gap-detail reads dollars, basis points or a
+// percentage and nothing otherwise), so the reconciler is told to lead each
+// gap with its figure — and every shape the instruction holds up as an
+// example must parse through the same reader, or the bars would draw on the
+// sample and not on a real screen.
+describe("the reconciler's gap lines lead with their figure", () => {
+  it("asks for the figure first, and each example it names is one the gap reader draws", () => {
+    const p = reconcilerInstruction();
+    expect(p).toContain("Lead the gap with its figure");
+    expect(p).toContain("the dollar amount, basis points or percentage the two values differ by");
+    expect(p).toContain('says "In agreement" and states no figure');
+    const examples = [...p.matchAll(/as in "([^"]+)", "([^"]+)" or "([^"]+)"/g)][0]?.slice(1) ?? [];
+    expect(examples).toHaveLength(3);
+    const units = examples.map((ex) => gapFigure(ex)?.unit ?? null);
+    expect(units).toEqual(["usd", "bps", "pct"]);
+    expect(gapFigure("In agreement")).toBeNull();
   });
 });
 
