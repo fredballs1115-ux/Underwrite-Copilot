@@ -330,6 +330,35 @@ describe("Operating Metrics tab — the ratio ladder ties to the engine", () => 
       0,
     );
   }, 30000);
+
+  it("omits the per-SF yardsticks, with a stated reason, when the building's size is an assumption", async () => {
+    // An OM that states units but no size, and no rent roll: RSF is the
+    // 100,000 placeholder, marked as one — "$680/SF" over it is not the
+    // deal's figure, so the ladder is left out the way the per-unit block
+    // is left out without a unit count.
+    const noSf: ExtractionResult = {
+      ...extraction,
+      metrics: [
+        ...extraction.metrics.filter((m) => !/square feet/i.test(m.label)),
+        { label: "Units", value: "250", flagged: false, page: "p. 4" },
+      ],
+    };
+    const m3 = deriveUnderwriteInputs(noSf, "fallback");
+    expect(m3.sources.rsf?.provenance).toBe("assumption");
+    const { wb: wb3 } = await loadIntoHf(await buildUnderwriteWorkbook(m3));
+    expect(opsLabelRow(wb3, "Price / SF")).toBe(-1);
+    expect(opsLabelRow(wb3, "Year-1 NOI / SF")).toBe(-1);
+    expect(opsLabelRow(wb3, "Price / Unit")).toBeGreaterThan(0);
+    const ws = wb3.getWorksheet("Operating Metrics")!;
+    let note = false;
+    for (let r = 1; r <= ws.rowCount; r++) {
+      if (String(ws.getCell(r, 1).value ?? "").includes("per-SF yardsticks omitted")) note = true;
+    }
+    expect(note).toBe(true);
+    // The base fixture states its size, so its ladder stands (the earlier
+    // test) — extracted, never assumed.
+    expect(model.sources.rsf?.provenance).toBe("extracted");
+  }, 30000);
 });
 
 // ── Plan deals ────────────────────────────────────────────────────────────────

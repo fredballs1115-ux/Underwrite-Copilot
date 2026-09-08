@@ -12,8 +12,10 @@ import {
   noiFigures,
   planSummary,
   plausibilityNote,
+  priceRowIsLand,
   timelineFromMetrics,
 } from "./deal-strategy";
+import { parseMoney } from "./criteria";
 
 const metric = (
   label: string,
@@ -550,5 +552,84 @@ describe("planSummary.priceLabel — what the price figure is", () => {
     )!;
     expect(priced.priceLabel).toBe("Price");
     expect(priced.price).toBe(12_000_000);
+  });
+});
+
+// The seventh review read the derivation layer — the readers' consumers —
+// and verified twelve findings by execution. The budget readers' and the
+// plausibility check's are pinned here.
+describe("the seventh review's budget and plausibility cases", () => {
+  const mm = (label: string, value: string, page = ""): ExtractedMetric => ({ label, value, flagged: false, page });
+  const exx = (metrics: ExtractedMetric[], over: Partial<ExtractionResult> = {}): ExtractionResult =>
+    ({ dealName: "X", assetClass: "multifamily", market: "Dallas, TX", address: "", metrics, ...over }) as ExtractionResult;
+  const dev = { kind: "development", summary: "", capitalBudget: "", timeline: "" } as unknown as ExtractionResult["strategy"];
+
+  it("a per-unit or per-SF rate in the strategy's words is never the budget", () => {
+    for (const t of [
+      "$18,000 per unit",
+      "$25,000/unit interior renovation",
+      "approximately $30,000 per door",
+      "$45,000 per key soft goods refresh",
+      "$12,500 per unit across 312 units",
+      "$85 psf of tenant improvements",
+      "$60 / SF hard costs",
+    ]) {
+      expect(budgetFromText(t, 42_000_000), t).toBeNull();
+    }
+    // A whole budget in the same sentence shape still reads.
+    expect(budgetFromText("$4.3M interior renovation program", 42_000_000)?.budget).toBe(4_300_000);
+    expect(budgetFromText("$160M hard and soft costs", 20_000_000)?.budget).toBe(160_000_000);
+  });
+
+  it("against a land price the works are bounded by the absolute ceiling, not ten times the site", () => {
+    const rows = [mm("Land cost", "$8,000,000"), mm("Construction budget", "$92,000,000")];
+    // The reader, told the price is the land: the budget stands.
+    expect(capitalBudgetFromMetrics(rows, 8_000_000, false)?.budget).toBe(92_000_000);
+    // Told (wrongly) it is the whole asset, the old bound applies.
+    expect(capitalBudgetFromMetrics(rows, 8_000_000, true)).toBeNull();
+    expect(budgetFromText("$92 million construction budget", 8_000_000, false)?.budget).toBe(92_000_000);
+    // A whole-asset price still refuses ten times itself — a misparse.
+    expect(capitalBudgetFromMetrics([mm("Asking price", "$30,000,000"), mm("Construction budget", "$900,000,000")], 30_000_000)).toBeNull();
+    // And nothing clears the absolute ceiling.
+    expect(capitalBudgetFromMetrics([mm("Land cost", "$8,000,000"), mm("Construction budget", "$20,000,000,000")], 8_000_000, false)).toBeNull();
+    // planSummary reads the price row's nature itself, for every land share.
+    for (const [land, budget] of [
+      ["$3,000,000", "$120,000,000"],
+      ["$5,000,000", "$120,000,000"],
+      ["$8,000,000", "$92,000,000"],
+      ["$10,000,000", "$92,000,000"],
+    ]) {
+      const e = exx([mm("Land cost", land), mm("Construction budget", budget), mm("Stabilized NOI", "$11,000,000"), mm("Units (proposed)", "420")], { strategy: dev });
+      const plan = planSummary(e, inferStrategy(e));
+      expect(plan?.budget?.budget, `${land} + ${budget}`).toBe(parseMoney(budget));
+      expect(plan?.totalCost, `${land} + ${budget}`).toBe(parseMoney(land)! + parseMoney(budget)!);
+    }
+    expect(priceRowIsLand(mm("Land cost", "$8,000,000"))).toBe(true);
+    expect(priceRowIsLand(mm("Site acquisition", "$8,000,000"))).toBe(true);
+    expect(priceRowIsLand(mm("Asking price", "$8,000,000"))).toBe(false);
+    expect(priceRowIsLand(null)).toBe(false);
+  });
+
+  it("a plan deal's basis band judges total cost over the planned units — never the land or the shell", () => {
+    // $12k of land per apartment to be built is what a development trades at.
+    const land = exx([mm("Land price", "$5,000,000"), mm("Units (proposed)", "420"), mm("Construction budget", "$90,000,000"), mm("Stabilized NOI", "$9,000,000")], { strategy: dev });
+    expect(assessPlausibility(land).map((f) => f.code)).not.toContain("basis_out_of_band");
+    // $4.44/SF for a dead office shell being converted is what it costs.
+    const shell = exx([mm("Asking price", "$4,000,000"), mm("Building size", "900,000 SF"), mm("Stabilized NOI", "$21,000,000")], {
+      assetClass: "office",
+      strategy: { ...dev, kind: "conversion" } as ExtractionResult["strategy"],
+    });
+    expect(assessPlausibility(shell).map((f) => f.code)).not.toContain("basis_out_of_band");
+    // But an all-in cost no market delivers at is still named — as total cost.
+    const cheap = exx([mm("Land cost", "$1,000,000"), mm("Construction budget", "$4,000,000"), mm("Units (proposed)", "420"), mm("Stabilized NOI", "$5,000,000")], { strategy: dev });
+    const f = assessPlausibility(cheap).find((x) => x.code === "basis_out_of_band")!;
+    expect(f.title).toMatch(/of total cost over 420 units/);
+    expect(f.detail).toMatch(/total cost or the unit count/);
+    // An operating asset is still judged on its price.
+    const op = assessPlausibility(exx([mm("Asking price", "$5,000,000"), mm("Units", "420"), mm("NOI", "$300,000")])).find((x) => x.code === "basis_out_of_band")!;
+    expect(op.title).toMatch(/of price over 420 units/);
+    // A plan deal with no total cost has nothing to judge — no finding.
+    const noCost = exx([mm("Land price", "$5,000,000"), mm("Units (proposed)", "420")], { strategy: dev });
+    expect(assessPlausibility(noCost).map((f) => f.code)).not.toContain("basis_out_of_band");
   });
 });

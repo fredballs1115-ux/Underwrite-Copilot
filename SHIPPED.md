@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Fifty-four PRs, #176–#229, each
+estimate, and that's what it should flag." Fifty-five PRs, #176–#230, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -638,6 +638,42 @@ confirmed equal to the main tip after each batch.
   reconciler's copied gap sentence read "51% year-1 noi" (acronyms keep
   their case). The compare table's "best" badge gets a space so "2.10x
   best" is two words when read aloud or copied.
+- **#230 The derivation layer, read a seventh time — twelve findings, each
+  with a test.** The readers' consumers: what turns the price, the NOI, the
+  budget and the size into the figures a user sees. The public demo's PDF
+  report derived the sample WITHOUT its rent roll and T-12 — the deck's
+  story (5.71% cap, 11.8% IRR, a sensitivity page that cleared the hurdle)
+  beside a demo page running the actuals (5.45%, 9.3%, and did not); one
+  derivation now (`lib/sample-derive.ts`) behind the page, the workbook and
+  the report, with a test that reads all three sources. `budgetFromText`
+  read "$18,000 per unit" as an $18k budget marked "extracted" — a per-unit
+  or per-SF rate in the sentence is a rate, never the spend. The "budget ≤
+  10× price" guard threw away a development's whole construction budget
+  whenever its land was under ~9% of the works (any urban high-rise): the
+  ten-times bound applies only to a whole-asset price now
+  (`priceRowIsLand`); a land price is bounded by an absolute ceiling. The
+  workbook read the budget against its own $10M placeholder price, so an OM
+  stating a $140M total project cost and no ask lost the whole budget — it
+  reads against the stated price only, and no note quotes "98% of price"
+  of a price nobody stated. The plausibility check held a development's
+  land price, or a conversion's shell price, to an operating market's
+  per-unit band and put "most likely misread" into the challenger's brief;
+  on a plan deal it judges total cost over the planned units. The market
+  memory got the plan-deal treatment the comp memory and the analytics
+  already had (all-in basis, no cap, a land-priced development counts).
+  The analytics "$/unit" series is multifamily's only — a hotel's per key
+  and an office's per suite no longer rescale it. The workbook omits its
+  per-SF ladder, with a stated reason, when RSF is the 100,000
+  placeholder, as it already did per unit. The pipeline row applies the
+  export's rule (a plan deal shows yield on cost, never its cap) through
+  one tested `lib/pipeline-slots.ts`, and the CSV gains a Yield on cost
+  column. The model's yield on cost counts the works years' carry in total
+  cost (the IRR already spent it) and the model tab says so. The
+  provenance note for a skipped NOI tells the truth for each case — $0 in
+  place; a plan's finished figure; a figure above any going-in cap —
+  instead of one sentence for all. And the OM's in-place occupancy seeds
+  the vacancy line, marked extracted, instead of a class default printed
+  beside it.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

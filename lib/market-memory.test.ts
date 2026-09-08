@@ -260,3 +260,72 @@ describe("a plan deal's stabilized cap never enters the market read", () => {
     expect(g.cap).not.toBeNull();
   });
 });
+
+describe("buildComps — a plan deal's basis is total cost over the planned units, and it carries no cap", () => {
+  const strategy = (kind: string) => ({ kind, summary: "", capitalBudget: "", timeline: "" });
+  const rows = [
+    {
+      id: "va",
+      name: "va",
+      asset_class: "multifamily",
+      created_at: "2026-01-01T00:00:00.000Z",
+      is_sample: false,
+      verdict: null,
+      extraction: {
+        market: "Dallas, TX",
+        assetClass: "multifamily",
+        strategy: strategy("value_add"),
+        metrics: [
+          { label: "Asking price", value: "$42,000,000" },
+          { label: "Renovation budget", value: "$8,600,000" },
+          { label: "Units", value: "240" },
+          { label: "Going-in cap rate", value: "5.00%" },
+          { label: "Stabilized NOI", value: "$3,400,000" },
+        ],
+      },
+    },
+    {
+      id: "dev",
+      name: "dev",
+      asset_class: "multifamily",
+      created_at: "2026-01-02T00:00:00.000Z",
+      is_sample: false,
+      verdict: null,
+      extraction: {
+        market: "Dallas, TX",
+        assetClass: "multifamily",
+        strategy: strategy("development"),
+        metrics: [
+          { label: "Land cost", value: "$8,000,000" },
+          { label: "Construction budget", value: "$92,000,000" },
+          { label: "Units (proposed)", value: "420" },
+          { label: "Stabilized cap rate", value: "7.0%" },
+          { label: "Stabilized NOI", value: "$11,000,000" },
+        ],
+      },
+    },
+    deal("stab", { market: "Dallas, TX", metrics: [["Going-in cap rate", "5.4%"], ["Purchase price", "$60,000,000"], ["Units", "200"]] }),
+  ];
+  const comps = buildComps(rows);
+
+  it("a value-add's basis is price + budget over the units, all-in, and its 5% cap stays out of the band", () => {
+    const va = comps.find((c) => c.dealId === "va")!;
+    expect(va.perUnit).toBeCloseTo(50_600_000 / 240, 3);
+    expect(va.allIn).toBe(true);
+    expect(va.capPct).toBeNull();
+  });
+
+  it("a development priced at its land is a comp — land + budget over the planned units", () => {
+    const dev = comps.find((c) => c.dealId === "dev")!;
+    expect(dev.perUnit).toBeCloseTo(100_000_000 / 420, 3);
+    expect(dev.allIn).toBe(true);
+    expect(dev.capPct).toBeNull();
+  });
+
+  it("a stabilized sibling reads exactly as before", () => {
+    const s = comps.find((c) => c.dealId === "stab")!;
+    expect(s.perUnit).toBe(300_000);
+    expect(s.allIn).toBe(false);
+    expect(s.capPct).toBe(5.4);
+  });
+});

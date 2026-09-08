@@ -245,10 +245,13 @@ export function ReturnsHeadline({ model }: { model: UnderwritingModel }) {
       {r.yieldOnCostPct != null && (
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat
-            label={r.stabilizedYear ? `Yield on cost (Yr ${r.stabilizedYear})` : "Yield on cost"}
+            label={r.stabilizedYear ? `Yield on cost (Yr ${r.stabilizedYear}, incl. carry)` : "Yield on cost"}
             value={pct(r.yieldOnCostPct)}
           />
-          <Stat label="Total cost" value={usd(r.totalCost)} />
+          <Stat
+            label={r.worksCarry != null && r.worksCarry > 0 ? "Total cost (incl. carry)" : "Total cost"}
+            value={usd(r.totalCost)}
+          />
           <Stat label="Capital budget" value={usd(r.capitalBudget)} />
           <Stat
             label={r.stabilizedYear ? `Stabilized NOI (Yr ${r.stabilizedYear})` : "Stabilized NOI"}

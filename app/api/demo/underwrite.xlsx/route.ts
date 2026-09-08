@@ -1,6 +1,5 @@
-import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { buildUnderwriteWorkbook } from "@/lib/underwrite/workbook";
-import { SAMPLE_DEAL } from "@/lib/sample-deal";
 
 export const runtime = "nodejs";
 
@@ -13,20 +12,8 @@ let cachedBuild: Promise<Buffer> | null = null;
 
 function getSampleWorkbook(): Promise<Buffer> {
   if (!cachedBuild) {
-    const derived = deriveUnderwriteInputs(
-      SAMPLE_DEAL.extraction,
-      SAMPLE_DEAL.name,
-      {
-        rentRoll: {
-          summary: SAMPLE_DEAL.rentRoll.summary,
-          asOf: SAMPLE_DEAL.rentRoll.as_of_date,
-        },
-        t12: {
-          summary: SAMPLE_DEAL.t12.summary,
-          periodEnd: SAMPLE_DEAL.t12.period_end_date,
-        },
-      },
-    );
+    // One derivation with the demo page and the demo report (lib/sample-derive).
+    const derived = sampleDerivedInputs();
     cachedBuild = buildUnderwriteWorkbook(derived).catch((err) => {
       cachedBuild = null;
       throw err;

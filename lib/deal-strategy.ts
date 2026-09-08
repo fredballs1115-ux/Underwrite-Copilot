@@ -283,13 +283,33 @@ export interface CapitalBudget {
   page?: string;
 }
 
+// The most a budget can be and still be a budget. Against a whole-asset
+// price ten times the price is a misparse; against a LAND price it is a
+// Tuesday — an urban high-rise's works run ten to fifty times its site —
+// so a land-priced deal is bounded only by this absolute ceiling.
+const BUDGET_CEILING = 10_000_000_000;
+
+/** Whether a budget can be the plan's cost beside this price. */
+function budgetPlausible(budget: number, price: number | null, priceIsWholeAsset: boolean): boolean {
+  if (!(budget > 0) || budget > BUDGET_CEILING) return false;
+  if (price != null && priceIsWholeAsset && budget > price * 10) return false;
+  return true;
+}
+
 /**
  * The plan's cost from the metrics. A "total project cost" includes the
  * price; a budget line does not. Bounded so a mis-parsed figure never lands
- * here (nothing, or ten times the price, is not a budget) — and never
- * invented: absent is absent.
+ * here (nothing, or ten times a whole-asset price, is not a budget) — and
+ * never invented: absent is absent. On a development the price is the
+ * LAND cost, routinely a tenth of the works or less, so the ten-times
+ * bound applies only when the price is the whole asset's
+ * (`priceIsWholeAsset`, which callers read off the price row's label).
  */
-export function capitalBudgetFromMetrics(metrics: MetricLike[], price: number | null): CapitalBudget | null {
+export function capitalBudgetFromMetrics(
+  metrics: MetricLike[],
+  price: number | null,
+  priceIsWholeAsset = true,
+): CapitalBudget | null {
   const m = findMetric(metrics, BUDGET_INCLUDE, BUDGET_EXCLUDE) as MetricLike | null;
   if (!m) return null;
   const raw = parseMoney(m.value);
@@ -299,9 +319,15 @@ export function capitalBudgetFromMetrics(metrics: MetricLike[], price: number | 
   // cost itself — flagged, so no surface calls it "less the price".
   const allIn = statedAllIn && price != null;
   const budget = statedAllIn && price != null ? raw - price : raw;
-  if (!(budget > 0)) return null;
-  if (price != null && budget > price * 10) return null;
+  if (!budgetPlausible(budget, price, priceIsWholeAsset)) return null;
   return { budget, allIn, isTotal: statedAllIn && price == null, label: m.label, page: m.page };
+}
+
+/** Whether a price row is the land or site — a development's acquisition
+ *  basis, not the whole asset's price. One test for every reader of the
+ *  budget, so they agree on which bound applies. */
+export function priceRowIsLand(priceMetric: MetricLike | null | undefined): boolean {
+  return priceMetric != null && /\b(land|site)\b/i.test(priceMetric.label);
 }
 
 /** The price metric: the asking / purchase price, else — on a development
@@ -385,17 +411,30 @@ function hasPlanCostRows(metrics: MetricLike[]): boolean {
 }
 
 const MONEY_IN_TEXT = /\$\s?(\d[\d,]*(?:\.\d+)?)\s*(billion|million|thousand|bn|mm|m|k|b)?\b/i;
+// A figure quoted per unit, door, key, bed, pad, site, suite, home or
+// square foot is a RATE — "$18,000 per unit", "$25,000/unit interior
+// renovation", "$45 psf" — not the plan's spend. The metric reader refuses
+// such rows by label (BUDGET_EXCLUDE); the text reader has to see it in the
+// sentence.
+const RATE_IN_TEXT =
+  /(?:\bper\b|\/)\s*(?:unit|door|key|room|bed|pad|site|suite|apartment|home|sf|s\.f\.|square\s+(?:foot|feet))|\bpsf\b/i;
 
 /**
  * The budget from the extraction's own words when no metric row carried it:
  * `strategy.capitalBudget` is free text ("$160M hard and soft costs",
  * "approximately $180 million total project cost"). Same rules as the metric
  * reader — an all-in figure has the price taken out, a fragment that cannot
- * be a budget (a per-SF rate, ten times the price) never lands, absent is
- * absent. No page: the text is the OM's summary, not a cited line.
+ * be a budget (a per-unit or per-SF rate, ten times a whole-asset price)
+ * never lands, absent is absent. No page: the text is the OM's summary, not
+ * a cited line.
  */
-export function budgetFromText(text: string | null | undefined, price: number | null): CapitalBudget | null {
+export function budgetFromText(
+  text: string | null | undefined,
+  price: number | null,
+  priceIsWholeAsset = true,
+): CapitalBudget | null {
   if (!text) return null;
+  if (RATE_IN_TEXT.test(text)) return null;
   const m = text.match(MONEY_IN_TEXT);
   if (!m) return null;
   const n = Number(m[1].replace(/,/g, ""));
@@ -413,8 +452,7 @@ export function budgetFromText(text: string | null | undefined, price: number | 
   const statedAllIn = ALL_IN.test(text);
   const allIn = statedAllIn && price != null;
   const budget = statedAllIn && price != null ? raw - price : raw;
-  if (!(budget > 0)) return null;
-  if (price != null && budget > price * 10) return null;
+  if (!budgetPlausible(budget, price, priceIsWholeAsset)) return null;
   const isTotal = statedAllIn && price == null;
   return {
     budget,
@@ -584,10 +622,12 @@ export function planSummary(
   const price = priceRaw != null && priceRaw > 0 ? priceRaw : null;
   const stabilizedNoi = noiFigures(metrics).find((f) => f.kind === "stabilized") ?? null;
   // A metric row with its page first; the strategy's own wording when the
-  // budget appears nowhere else.
+  // budget appears nowhere else. Against a land price the works are bounded
+  // by the absolute ceiling only — a site is a fraction of what is built.
+  const wholeAsset = !priceRowIsLand(priceMetric);
   const budget =
-    capitalBudgetFromMetrics(metrics, price) ??
-    budgetFromText(extraction.strategy?.capitalBudget, price);
+    capitalBudgetFromMetrics(metrics, price, wholeAsset) ??
+    budgetFromText(extraction.strategy?.capitalBudget, price, wholeAsset);
   // Price plus the works; or, when the OM states an all-in total and no
   // price, that total itself — a yield on cost needs no split of the two.
   const totalCost =
@@ -598,7 +638,7 @@ export function planSummary(
   return {
     kind: strategy.kind,
     price,
-    priceLabel: priceMetric && /\b(land|site)\b/i.test(priceMetric.label) ? "Land cost" : "Price",
+    priceLabel: priceRowIsLand(priceMetric) ? "Land cost" : "Price",
     stabilizedNoi,
     budget,
     totalCost,
@@ -697,30 +737,40 @@ export function assessPlausibility(
     }
   }
 
-  // 3. A per-unit or per-SF price outside any US market — a misparse. The
+  // 3. A per-unit or per-SF basis outside any US market — a misparse. The
   //    shared count reader: a "Unit mix" or "Vacant units" row read as the
-  //    count would manufacture this finding on a sound deal.
+  //    count would manufacture this finding on a sound deal. On a plan deal
+  //    the basis is TOTAL COST over the planned units (rule 4): $12k of
+  //    land per apartment to be built, or $4/SF for a dead office shell,
+  //    is exactly what such deals trade at, so the shell's or the site's
+  //    price is never held to an operating market's band.
   const units = unitCountFromMetrics(metrics);
   const sf = buildingSfFromMetrics(metrics);
   const cls = (extraction.assetClass ?? "").toLowerCase();
-  if (cls === "multifamily" && units != null && units >= 1 && units <= 50_000) {
-    const perUnit = price / units;
+  const basisTotal = planDeal ? (planSummary(extraction, strategy)?.totalCost ?? null) : price;
+  const basisNoun = planDeal ? "total cost" : "price";
+  const misread = (other: string) =>
+    planDeal
+      ? `No ${cls} market delivers there. The total cost or the ${other} was most likely misread — check both against their source pages before the all-in basis is used anywhere.`
+      : `No ${cls} market trades there. The price or the ${other} was most likely misread — check both against their source pages before the basis is used anywhere.`;
+  if (basisTotal != null && cls === "multifamily" && units != null && units >= 1 && units <= 50_000) {
+    const perUnit = basisTotal / units;
     if (perUnit < 15_000 || perUnit > 2_500_000) {
       findings.push({
         code: "basis_out_of_band",
         severity: "medium",
-        title: `${money(price)} over ${Math.round(units).toLocaleString("en-US")} units is ${money(perUnit)} per unit`,
-        detail: `No multifamily market trades there. The price or the unit count was most likely misread — check both against their source pages before the basis is used anywhere.`,
+        title: `${money(basisTotal)} of ${basisNoun} over ${Math.round(units).toLocaleString("en-US")} units is ${money(perUnit)} per unit`,
+        detail: misread("unit count"),
       });
     }
-  } else if (cls && cls !== "multifamily" && sf != null && sf > 100) {
-    const perSf = price / sf;
+  } else if (basisTotal != null && cls && cls !== "multifamily" && sf != null && sf > 100) {
+    const perSf = basisTotal / sf;
     if (perSf < 5 || perSf > 3_000) {
       findings.push({
         code: "basis_out_of_band",
         severity: "medium",
-        title: `${money(price)} over ${Math.round(sf).toLocaleString("en-US")} SF is $${perSf < 10 ? perSf.toFixed(2) : Math.round(perSf).toLocaleString("en-US")} per SF`,
-        detail: `Outside any ${cls} market. The price or the building size was most likely misread — check both against their source pages before the basis is used anywhere.`,
+        title: `${money(basisTotal)} of ${basisNoun} over ${Math.round(sf).toLocaleString("en-US")} SF is $${perSf < 10 ? perSf.toFixed(2) : Math.round(perSf).toLocaleString("en-US")} per SF`,
+        detail: misread("building size"),
       });
     }
   }

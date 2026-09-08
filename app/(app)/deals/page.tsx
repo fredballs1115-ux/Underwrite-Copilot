@@ -8,8 +8,9 @@ import { parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { WhatsNewCard } from "./whats-new";
 import { Pipeline, type DealCard } from "./pipeline";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { evaluateBuyBox, findGoingInCap, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
-import { findPriceMetric, inferStrategy, planSummary, signalAskPrice } from "@/lib/deal-strategy";
+import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
+import { inferStrategy } from "@/lib/deal-strategy";
+import { pickSlots } from "@/lib/pipeline-slots";
 import { scoreMandateFit } from "@/lib/mandate";
 import { metroForAddress } from "@/lib/market-match";
 
@@ -34,32 +35,9 @@ const ERRORS: Record<string, string> = {
 
 // Fixed metric slots for the pipeline table — every row fills the SAME
 // columns (or shows —), so one header labels them all and values align into
-// scannable columns instead of repeating micro-labels in every row.
-function pickSlots(extraction: ExtractionResult, signal: FirstSignal | null): {
-  cap: string | null;
-  price: string | null;
-  /** a plan deal's yield on total cost — its answer where a stabilized
-   *  asset shows a cap — null for a stabilized asset or an unstated plan */
-  yoc: string | null;
-} {
-  const metrics = extraction.metrics;
-  // The same read the deal page makes — extraction plus the first signal —
-  // so a deal never shows a price on one surface and none on the other.
-  const strategy = inferStrategy(extraction, signal);
-  const plan = planSummary(extraction, strategy);
-  return {
-    // The going-in cap only — the shared reader, so a stabilized / pro forma
-    // cap or a yield on cost (a plan deal's finished project) never fills
-    // the slot, and the card agrees with the deal page and the buy box.
-    cap: findGoingInCap(metrics)?.value ?? null,
-    // The shared price reader; on a development with no asking price the
-    // land or site cost is what is being bought. The first signal's ask
-    // fills the slot before the extraction lands, as on the deal page —
-    // only when it is a figure, never an "unpriced" or "call for offers".
-    price: findPriceMetric(metrics, strategy.kind)?.value ?? signalAskPrice(signal),
-    yoc: plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,
-  };
-}
+// scannable columns instead of repeating micro-labels in every row. The
+// slots themselves are read in lib/pipeline-slots (pure, tested) by the
+// same rule the meeting .xlsx applies.
 
 export default async function DealsPage({
   searchParams,
