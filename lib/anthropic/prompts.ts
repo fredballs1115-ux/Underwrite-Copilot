@@ -108,26 +108,51 @@ Give 3–6 challenges, most severe first. For each, give a specific, numerate cr
   )}`;
 }
 
+/**
+ * What the screen already established about the deal — its kind and, on a
+ * plan deal, the plan's headline figures (see lib/deal-context) — appended
+ * AFTER the document in every step that reads the OM, so the cached document
+ * prefix stays byte-identical across steps. "" when nothing was established.
+ */
+export function dealContextClause(context?: string | null): string {
+  if (!context?.trim()) return "";
+  return `
+
+What the screen already established about this deal, checked in code against the extracted terms. Read the document in its light — a plan deal's stabilized figures are the finished project's and belong over total cost, never over the price alone — but it never overrides what the OM states.
+
+<deal_context>
+${context.trim()}
+</deal_context>`;
+}
+
 /** Step 3 — Broker-comp scrutiny (the sale & lease comps inside the OM) */
-export function brokerCompsInstruction(): string {
+export function brokerCompsInstruction(context?: string | null): string {
   return `Scrutinize the comparable sales and lease comps included in the attached offering memorandum. These come from the OM itself — do NOT use any outside data source. An OM's comp set is assembled by the sell side to support the asking price — that's the incentive at work, not misconduct — so your job is to extract every comp shown, judge how well each actually supports the subject deal's pricing and rents, and flag selection bias. Describe the incentive, never the party: say "the comp set leans favorable" or "seller assumptions run aggressive," not that anyone cherry-picked or misled.
 
 Extract both sale comps and lease comps if present. For each comp, record \`page\` — the OM page it appears on, as a short string like "p. 31" (empty string if unknown) — then compare it to the subject property and rate it: \`supports\` (genuinely backs the OM's numbers), \`favorable\` (leans the seller's way), or \`stretched\` (doesn't really support the deal). Also identify what's conspicuously missing — recent weaker trades omitted, only the best submarkets shown, or stale comps used because recent ones are unfavorable.
 
-If the OM contains no comps at all, say so clearly in the summary and return empty comp lists. Finish with a one-sentence verdict: does the OM's comp set actually justify the pricing, or is it stretched?`;
+IF THE OM DESCRIBES A PLAN — a conversion, a ground-up development, a lease-up, a heavy value-add — the comps are for the FINISHED product, not the building as bought. Hold sale comps against the subject's total cost per unit or per SF (price plus the full construction or renovation budget), never against the shell's or the land's price; hold lease comps against the rents behind the stabilized pro forma, and say whether they are today's leased rents for finished product of that quality and vintage or the sponsor's hopes. A comp set that shows only finished-product trades with no cost-to-build comparison, or only new-delivery rents, leans favorable by construction.
+
+If the OM contains no comps at all, say so clearly in the summary and return empty comp lists. Finish with a one-sentence verdict: does the OM's comp set actually justify the pricing, or is it stretched?${dealContextClause(
+    context,
+  )}`;
 }
 
 /** Step 4 — Reconciler (OM vs. the buyer's own model) */
-export function reconcilerInstruction(): string {
+export function reconcilerInstruction(context?: string | null): string {
   return `Compare the offering memorandum against the buyer's own underwriting (their ARGUS export or Excel model, provided separately). Find every meaningful discrepancy and explain what it means for the deal.
 
 For each row, give the metric, the OM's value, the buyer's value, and a plain-language description of the gap. Set \`direction\` from the BUYER's perspective: \`unfavorable\` means the buyer's model is worse than the OM claims, \`favorable\` means better, \`neutral\` means immaterial.
 
-Finish with a one-sentence takeaway: does the buyer's model support or undercut the OM's story?`;
+If the deal is a plan — a conversion, a development, a lease-up, a heavy value-add — compare the two on the plan's terms: total cost, construction and lease-up timing, the stabilized NOI and the yield on cost. A buyer's model that carries construction and downtime against an OM that shows only the stabilized year is a difference in what is being modelled, not a discrepancy in the figures — say which, and never read the OM's stabilized pro forma as the buyer's year one.
+
+Finish with a one-sentence takeaway: does the buyer's model support or undercut the OM's story?${dealContextClause(
+    context,
+  )}`;
 }
 
 /** Step 5 — Market plausibility check */
-export function marketCheckInstruction(assetClass: AssetClass): string {
+export function marketCheckInstruction(assetClass: AssetClass, context?: string | null): string {
   return `Sanity-check the offering memorandum's key assumptions against general market norms for the asset class and submarket. ${assetClassClause(
     assetClass,
   )}
@@ -140,7 +165,7 @@ If the OM describes a plan (a conversion, development, lease-up or heavy value-a
 
 Be clear throughout that these are rules-of-thumb, not pulled comps, and must be verified against real market data.${sectorNormsClause(
     assetClass,
-  )}`;
+  )}${dealContextClause(context)}`;
 }
 
 /** Compact sector norms for the market check — the era-calibration each

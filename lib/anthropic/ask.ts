@@ -5,35 +5,11 @@ import { getAnthropic } from "./client";
 import { omDocument, omRequestOptions, omSourceFor } from "./om-source";
 import { MODELS } from "./models";
 import { ANALYST_SYSTEM } from "./prompts";
-import type { ExtractionResult } from "./types";
-import { inferStrategy, planSummary } from "@/lib/deal-strategy";
-
-const compact = (n: number): string =>
-  n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
-
-/**
- * One or two sentences on what the screen established — the deal's strategy
- * and, on a plan deal, the plan's headline figures — so an answer about "the
- * NOI" or "the cap rate" names which figure the OM's number is. Null when the
- * strategy is unknown: nothing established, nothing asserted. (Lives here,
- * not in the server action: a "use server" module may only export actions.)
- */
-export function dealContextFor(extraction: ExtractionResult | null): string | null {
-  const strategy = inferStrategy(extraction);
-  if (strategy.kind === "unknown") return null;
-  const plan = planSummary(extraction, strategy);
-  const lines = [`Deal type: ${strategy.label}${strategy.summary ? ` — ${strategy.summary}` : "."}`];
-  if (plan?.stabilizedNoi) {
-    lines.push(
-      `The OM's stabilized NOI of ${compact(plan.stabilizedNoi.value)} is the finished project's figure${
-        plan.totalCost != null && plan.yieldOnCost != null
-          ? ` — over ${compact(plan.totalCost)} of total cost it is a ${(plan.yieldOnCost * 100).toFixed(1)}% yield on cost`
-          : ""
-      }, not today's income and not a cap rate on the price.`,
-    );
-  }
-  return lines.join(" ");
-}
+// What the screen established about the deal — shared with the broker-comp
+// scrutiny, the market check and the reconciler; re-exported here so the
+// server action keeps its import. (Lives in lib/deal-context, not in the
+// action: a "use server" module may only export actions.)
+export { dealContextFor } from "@/lib/deal-context";
 
 const AskSchema = z.object({
   /** the grounded answer, or an honest "the OM doesn't state this" */

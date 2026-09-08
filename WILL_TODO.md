@@ -3,15 +3,15 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#209 merged to main (live build
-sha `3317969`, #208, confirmed equal to the main tip by live-verify at 01:28
-UTC; #209 follows on the next Render deploy).
+**Last updated 2026-09-08**, after PRs #176–#210 merged to main (live build
+sha `b7a564c`, #209, confirmed equal to the main tip by live-verify at 01:35
+UTC; #210 follows on the next Render deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Thirty-four PRs (#176–#209) landed across one review session and the
+Thirty-five PRs (#176–#210) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -73,6 +73,13 @@ deploy (live-verify shows the sha).
   the since-last-screen diff tracks a plan deal's stabilized NOI, capital
   budget and yield on cost, and never reads a stabilized cap as the going-in
   cap.
+- **The comp scrutiny, the market check and the reconciler are told what the
+  screen established** (#210): deal type, stabilized NOI over total cost,
+  the all-in basis per planned unit, the timeline — appended after the OM so
+  the cached prefix is untouched. A conversion's sale comps are now held
+  against total cost per finished unit, never the shell's price. Takes
+  effect on the next screen of a deal (the stored comps and market checks
+  are not re-run).
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":
