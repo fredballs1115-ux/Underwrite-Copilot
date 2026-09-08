@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Eighty-eight PRs, #176–#263, each
+estimate, and that's what it should flag." Eighty-nine PRs, #176–#264, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1178,6 +1178,17 @@ confirmed equal to the main tip after each batch.
   asserted: the sample's two stated gaps draw six shapes more than a report
   whose rows all agree. Seven reader tests, a deal-view render test on the
   reconciler tab, and the report test.
+- **#264 The reconciliation table at phone width stacks a card per row.**
+  The last table on the deal page that still scrolled sideways on a phone:
+  at 390 the gap column — the direction badge, the figure and #263's bar —
+  sat off-screen to the right of the metric. Below `sm` the Reconciliation
+  now renders a card per row — the metric and its direction badge, the OM's
+  figure and yours side by side, the gap with its bar — and the table takes
+  over from `sm` up; one read per row feeds both layouts and one `GapBar`
+  draws in both, so the two can never disagree. The sample screen's
+  reconciler tab is the same component. The deal-view render test asserts
+  four bars on the sample (two per layout), one card list and the table
+  hidden below `sm`; shot at 390.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
