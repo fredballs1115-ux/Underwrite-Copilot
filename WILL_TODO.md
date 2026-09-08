@@ -3,9 +3,9 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#195 merged to main (live build
-sha `97184aa` confirmed equal to the main tip by live-verify at 23:50 UTC on
-Sep 7; #193–#195 follow on the next Render deploy).
+**Last updated 2026-09-08**, after PRs #176–#196 merged to main (live build
+sha `5f0fe18`, #194, confirmed by live-verify at 00:18 UTC; #195–#196 follow
+on the next Render deploy).
 
 ---
 
@@ -42,7 +42,9 @@ Four PRs landed from one review session; each is live once Render finishes the
   yield on total cost and its spread over the model's exit cap, plus the NOI
   floor and the overrun that erase the spread. The full report carries the
   same page ahead of its IRR grids. A budget that appears only in the OM's
-  own words (no line item) is read from there.
+  own words (no line item) is read from there. Ask-the-deal is told the
+  deal type and the plan's figures (#196), so "what's the cap rate?" on a
+  conversion is answered with which figure the OM's number is.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":

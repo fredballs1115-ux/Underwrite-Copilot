@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
 import { downloadOmPdf } from "@/lib/storage";
-import { askDealQuestion } from "@/lib/anthropic/ask";
+import { askDealQuestion, dealContextFor } from "@/lib/anthropic/ask";
+import type { ExtractionResult } from "@/lib/anthropic/types";
 import { parseDealQa } from "@/lib/deals";
 
 export type AskState =
@@ -62,7 +63,7 @@ export async function askDeal(
 
   const { data: deal, error: readErr } = await supabase
     .from("deals")
-    .select("id, om_storage_path, is_sample, qa")
+    .select("id, om_storage_path, is_sample, qa, extraction")
     .eq("id", dealId)
     .maybeSingle();
   if (readErr) {
@@ -92,7 +93,11 @@ export async function askDeal(
 
   try {
     const pdf = await downloadOmPdf(deal.om_storage_path as string);
-    const result = await askDealQuestion(pdf, question);
+    const result = await askDealQuestion(
+      pdf,
+      question,
+      dealContextFor((deal.extraction as ExtractionResult | null) ?? null),
+    );
     const entry = {
       at: new Date().toISOString(),
       q: question,
