@@ -212,9 +212,15 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                   >
                     {val ?? <span className="text-muted">—</span>}
                     {isBest && (
-                      <span className="ml-1.5 rounded-full bg-brand/10 px-1.5 py-0.5 text-[10px] font-medium uppercase text-brand">
-                        best
-                      </span>
+                      // The space keeps "2.10x best" two words when the
+                      // table is read aloud or copied; the margin does the
+                      // visual work.
+                      <>
+                        {" "}
+                        <span className="ml-1 rounded-full bg-brand/10 px-1.5 py-0.5 text-[10px] font-medium uppercase text-brand">
+                          best
+                        </span>
+                      </>
                     )}
                   </td>
                 );

@@ -269,6 +269,16 @@ const usd = (n: number): string => {
  * Shares are of the signed total, so a component that pushed the OTHER way
  * reads as a negative share rather than silently inflating the others.
  */
+/** A field label as it reads inside a sentence: "Cap rate" → "cap rate",
+ *  while an acronym keeps its case — "Year-1 NOI", "Capex / TI-LC
+ *  deduction" — so the copied line never says "year-1 noi". */
+export function midSentence(label: string): string {
+  return label
+    .split(" ")
+    .map((w) => (/^[A-Z0-9][A-Z0-9-]*$/.test(w) && /[A-Z]/.test(w) ? w : w.toLowerCase()))
+    .join(" ");
+}
+
 export function bridgeSummaryLine(bridge: ValuationBridgeOk): string {
   const gap = Math.abs(bridge.totalDelta);
   if (gap < 1) {
@@ -277,7 +287,7 @@ export function bridgeSummaryLine(bridge: ValuationBridgeOk): string {
   const parts = bridge.components
     .filter((c) => c.share != null && Math.abs(c.share) >= 0.005)
     .sort((x, y) => Math.abs(y.share!) - Math.abs(x.share!))
-    .map((c) => `${Math.round(c.share! * 100)}% ${c.label.toLowerCase()}`);
+    .map((c) => `${Math.round(c.share! * 100)}% ${midSentence(c.label)}`);
   const direction = bridge.totalDelta > 0 ? "above" : "below";
   return `The ${usd(gap)} gap — ${bridge.toLabel} ${direction} ${bridge.fromLabel} — is ${parts.join(
     ", ",

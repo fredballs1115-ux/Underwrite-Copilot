@@ -3,15 +3,15 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#228 merged to main (live build
-sha `25fd26c`, #227, confirmed equal to the main tip by live-verify at 05:40
-UTC — every one of the first fifty-two is live; #228 follows on its deploy).
+**Last updated 2026-09-08**, after PRs #176–#229 merged to main (live build
+sha `a7c2c4f`, #228, confirmed equal to the main tip by live-verify at 06:05
+UTC — every one of the first fifty-three is live; #229 follows on its deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Fifty-three PRs (#176–#228) landed across one review session and the
+Fifty-four PRs (#176–#229) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -198,6 +198,16 @@ deploy (live-verify shows the sha).
   development's land cost. And two new tests catch the compiler's
   glued-text quirk — at the source of every page, and on a full render of
   the deal page's every section.
+- **The signed-in screens, rendered on fixtures and walked at phone width**
+  (#229): the pipeline in every state, the model tab, the compare table,
+  the assumption bridge, the BOV reconciler, the rent-roll dashboard, the
+  analytics charts and the submarket trend now render in the suite and are
+  read for glued words; with `VIEW_SHOTS_DIR` set the same renders become
+  full documents a headless browser opens at 390px. Fixed from that walk:
+  the pipeline header no longer runs past a phone's viewport at the deal
+  limit; a phone shows each deal's price, cap and fit on their own line;
+  the bridge's before / after columns read "$13.7M" and "8.00%" instead of
+  raw inputs; the reconciler's gap sentence keeps "NOI" in capitals.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":

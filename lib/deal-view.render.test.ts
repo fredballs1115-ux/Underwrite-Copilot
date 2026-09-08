@@ -24,6 +24,7 @@ import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { inferStrategy } from "@/lib/deal-strategy";
 import { ToastProvider } from "@/app/(app)/toaster";
 import { DealView } from "@/app/(app)/deals/[id]/deal-view";
+import { dumpView, gluedWords, visibleText as textOf } from "./render-lint";
 
 type Props = Parameters<typeof DealView>[0];
 
@@ -92,31 +93,6 @@ function render(p: Props): string {
   );
 }
 
-/** The visible text of a render, block boundaries kept as newlines. */
-function textOf(html: string): string {
-  return html
-    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/g, " ")
-    .replace(/<(br|\/p|\/li|\/h\d|\/div|\/td|\/th|\/tr|\/section|\/span|\/a|\/button|\/dt|\/dd|\/summary|\/details|\/label)[^>]*>/g, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&")
-    .replace(/&#x27;|&#39;/g, "'")
-    .replace(/&quot;/g, '"')
-    .replace(/&nbsp;/g, " ");
-}
-
-// Units a digit may legitimately touch: "5yr", "30bps", "10k", "250sf".
-const UNIT_SUFFIX = /^(st|nd|rd|th|px|pt|bps|yr|yrs|mo|am|pm|k|m|mm|x|sf|ac|bn|hr|min|sec|kb|mb|gb|ft|in|ml|s)$/i;
-
-/** Glued words a reader would trip on: a digit run into a word ("9real"),
- *  a word doubled ("aboutabout"), a doubled "the the". */
-function gluedWords(text: string): string[] {
-  const out = new Set<string>();
-  for (const m of text.matchAll(/\b(\d+)([a-z]{3,})\b/g)) if (!UNIT_SUFFIX.test(m[2])) out.add(m[0]);
-  for (const m of text.matchAll(/\b([a-z]{3,})\1\b/g)) out.add(m[0]);
-  for (const m of text.matchAll(/\b(a|an|the|of|to|in|on|for|and|or|with|at|by|from)\s+\1\b/gi)) out.add(m[0]);
-  return [...out];
-}
-
 const TABS: Array<[string | null, string | null]> = [
   [null, null],
   ["overview", null],
@@ -135,6 +111,7 @@ describe("DealView — the sample deal renders every section without a runtime e
     it(`renders ${tab ?? "the default section"}${analysis ? ` / ${analysis}` : ""} and reads clean`, () => {
       const html = render(sampleProps(tab, analysis));
       expect(html.length).toBeGreaterThan(2_000);
+      dumpView(`deal-${tab ?? "default"}${analysis ? `-${analysis}` : ""}`, html);
       const text = textOf(html);
       expect(gluedWords(text), `glued words in ${tab}/${analysis}`).toEqual([]);
       // The section nav is the one thing every render carries (the server page

@@ -497,7 +497,9 @@ export function Pipeline({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between gap-3">
+      {/* Wraps on a phone: "Compare" + "Upgrade for more" beside the title
+          otherwise push the page 30px past the viewport at the deal limit. */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Pipeline</h1>
           <p className="mt-1 text-sm text-muted">
@@ -1194,10 +1196,12 @@ const DealRow = memo(function DealRow({
       {d.hasAddress && <DealThumb dealId={d.id} />}
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium">{d.name}</p>
-        <MetaLine
-          className="md:hidden"
-          bits={[dueBit, marketBit, coveredBit, assetBit, priceBit, capBit, fitBit, dateBit, addedByBit]}
-        />
+        {/* A phone gets two lines — where the deal is (the row's coloured
+            edge already says what it is), then what it costs and how it
+            fits — so the price, the cap and the fit are never the part a
+            one-line truncation cuts off. */}
+        <MetaLine className="md:hidden" bits={[dueBit, marketBit, coveredBit, assetBit, addedByBit]} />
+        <MetaLine className="md:hidden" bits={[priceBit, capBit, fitBit, dateBit]} />
         <MetaLine
           className="hidden md:block lg:hidden"
           bits={[dueBit, marketBit, coveredBit, assetBit, fitBit, dateBit, addedByBit]}

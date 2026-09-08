@@ -198,7 +198,9 @@ describe("bridgeSummaryLine", () => {
     const line = bridgeSummaryLine(ok(reconcileValuations(JLL, EASTDIL)));
     expect(line).toMatch(/^The \$6\.5M gap — Eastdil BOV below JLL BOV — is /);
     expect(line).toMatch(/\d+% cap rate/);
-    expect(line).toMatch(/\d+% year-1 noi/);
+    // Acronyms keep their case inside the sentence: never "year-1 noi".
+    expect(line).toMatch(/\d+% year-1 NOI/);
+    expect(line).not.toMatch(/noi\b/);
   });
 });
 
