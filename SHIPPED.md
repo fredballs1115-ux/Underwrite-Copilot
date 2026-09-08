@@ -126,6 +126,15 @@ gated on tsc / eslint / the full suite / a production build.
   names which figure the OM's number is; the OM stays the only source of
   answers. The prompt is a pure, tested function. live-verify gains the Sep 8
   marker ("judged on yield on cost" on /whats-new).
+- **#197 The first signal cannot call a yield on cost a cap.** The 30-second
+  read that lands before extraction has no label to check, and its
+  `goingInCap` is the first number a buyer sees. The prompt now says what
+  that field is (today's income against the asking price) and is not (a
+  stabilized, pro forma or at-completion cap, or a yield on cost — leave it
+  empty and name the figure in the take), and the two places that consume
+  it — the deal header's cap slot and the buy-box check that runs mid-screen
+  — accept it only inside (0.5%, 25%]. Tests on the prompt for every asset
+  class and on the buy-box source for both sides of the guard.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

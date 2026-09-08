@@ -65,7 +65,9 @@ export function firstSignalInstruction(assetClass: AssetClass): string {
 
 These are look-up facts from the OM's summary pages — answer immediately, no deep analysis: the property/deal name, the asset class, the \`market\` (submarket + metro, like "North Dallas, TX"), the asking price exactly as stated (empty string if the OM is unpriced), the size ("312 units" or "182,400 SF"), the going-in cap rate as stated, and the price per unit or per SF as stated. Use an empty string for anything the summary doesn't give — do NOT compute or estimate figures the OM doesn't state.
 
-Then \`take\`: ONE skeptical sentence — what kind of deal this is and the first thing worth checking. The full six-stage screen runs next; this is just the instant signal.`;
+\`goingInCap\` is the cap on TODAY's in-place income against the asking price, and nothing else. A stabilized, pro forma, forward or "at completion" cap, or a yield on cost, is the finished project's figure — on a conversion, development, lease-up or value-add it is not a going-in cap at all: leave \`goingInCap\` empty and name that figure for what it is in \`take\`.
+
+Then \`take\`: ONE skeptical sentence — what kind of deal this is (stabilized, value-add, lease-up, conversion, development) and the first thing worth checking. The full six-stage screen runs next; this is just the instant signal.`;
 }
 
 /** Step 1 — Extraction */

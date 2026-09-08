@@ -383,10 +383,16 @@ export function buyBoxCheckSource(
   ]
     .filter(Boolean)
     .join(" ");
+  // The first signal's cap is a fast read with no label to check. It counts
+  // as the going-in cap only when it can be a cap on the price at all: a
+  // yield on cost or a stabilized pro forma on a plan deal reads as "105%"
+  // here, and a buy-box check on that would be confidently wrong.
+  const signalCapPct = firstSignal ? parsePct(firstSignal.goingInCap) : null;
+  const signalCapPlausible = signalCapPct != null && signalCapPct > 0.5 && signalCapPct <= 25;
   const signalMetrics = firstSignal
     ? [
         { label: "Asking price", value: firstSignal.askPrice },
-        { label: "Going-in cap rate", value: firstSignal.goingInCap },
+        ...(signalCapPlausible ? [{ label: "Going-in cap rate", value: firstSignal.goingInCap }] : []),
         {
           // Broad per-area test: "sf", "psf", "sq ft", "square foot", "/ft"
           // must all count — a per-SF figure misread as per-unit would give
