@@ -191,6 +191,12 @@ confirmed equal to the main tip after each batch.
   with the OM's exact dollars and three years from its timeline, and the
   two-year default (and the note that says so) when the OM states no
   timeline. A runtime error in either panel now fails CI, not a deal page.
+- **#203 The construction panel speaks to the kind of plan.** A value-add or
+  lease-up has income today and is usually bridge debt sized to total cost,
+  refinanced once the plan stabilizes; a conversion or development borrows
+  against cost alone because it has no income yet. The panel's opening
+  sentence now says which, and a render test holds both branches (the
+  value-add fixture seeds 1.5 years from "18 months").
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
