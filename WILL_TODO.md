@@ -3,18 +3,19 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#248 merged to main (live build
-sha `0eeb5da`, #248, confirmed equal to the main tip by live-verify at 16:31
-UTC with its `DEPLOY: LIVE` line — every one of the seventy-three is live,
-the homepage serves at 196 KB where it served at 488 KB, and the public-page
-lint #231 added reads all twelve public pages clean on every run; #249
-follows and awaits the same proof).
+**Last updated 2026-09-08**, after PRs #176–#249 merged to main (live build
+sha `439b713`, #249, confirmed equal to the main tip by live-verify at 16:43
+UTC with its `DEPLOY: LIVE` line — every one of the seventy-four is live,
+the homepage serves at 196 KB where it served at 488 KB, the public sample
+memo at 56 KB where it served at 11 KB (the Brewerytown frame is in it), and
+the public-page lint #231 added reads all twelve public pages clean on every
+run; #250 follows and awaits the same proof).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Seventy-four PRs (#176–#249) landed across one review session and the
+Seventy-five PRs (#176–#250) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -368,6 +369,11 @@ deploy (live-verify shows the sha).
   Found on the way and fixed: react-pdf hangs its whole render on a PNG
   with a bad zlib check, so the cover's bytes are validated before they are
   embedded.
+- **Pictures in the memo, and its footer band reserved** (#250): each range
+  row draws where the base sits (a track and a dot, caution-coloured when it
+  hugs the optimistic end) and each scenario's call has its dot — vector
+  shapes, no height added; the footer's band is reserved, so a memo that
+  cannot fit one page flows to a second instead of over its own footer.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -635,24 +641,21 @@ a route scoped to the share token; the memo and the report got theirs in
    times with a roll-up and per-asset contribution to blended IRR; mostly a
    loop around existing code plus a CSV importer. Named as the next build in
    the LPC plan.
-8. **Pictures in the PDFs.** The memo's ranges table and the report's pages
-   still say in numbers what the deal page and the shared screen now draw:
-   where the base sits between low and high (a bar), the three-scenario call
-   (three dots). react-pdf draws vector shapes from plain `View`s — no
-   images, no fonts, nothing to validate — so the memo can carry the same
-   bar in each range row and the dots in the flip strip at no risk to the
-   one-page contract (a bar is shorter than the text beside it). The render
-   tests read the PDF back as text, so the shapes need a structural
-   assertion (a filled rectangle per range in the content stream).
-9. **The memo reserves its footer band.** The footer is absolutely
-   positioned and the page does not reserve its height, so the sample memo
-   ends within a few points of it and a deal name that wraps to a second
-   line on a dense memo runs its last bullet into the footer text (#249 saw
-   it happen with a wider cover, and sized the cover down instead). The
-   honest fix is a `paddingBottom` that covers the footer plus the room the
-   dense sample needs — a few points found in the section margins — so a
-   memo that cannot fit flows to a second page rather than over its own
-   footer; the one-page test on the sample stays the contract.
+8. **The report's pages say it in pictures too.** #250 gave the memo its
+   bars and dots; the report's later pages still carry their reads as
+   numbers alone: the market check's OM figure could sit on its typical
+   range the way a base sits on its low–high (the same track-and-dot,
+   `pdfFillCountOf` asserting it), the reconciliation's gap could draw as a
+   signed bar beside its figure, and the comp table's per-unit basis as a
+   bar against the subject's. Plain `View`s, height-neutral, the same
+   structural assertion.
+9. **Data bars in the meeting workbook.** The pipeline export
+   (`lib/pipeline-workbook.ts`) prints price per unit, cap and yield on cost
+   as numbers; exceljs writes native Excel conditional formatting, and a
+   data bar on those columns is a picture Excel itself draws and keeps live
+   as the numbers change — no chart library, nothing computed into a cell.
+   The workbook test reads cells back; the data-bar rule is a
+   `conditionalFormattings` entry to assert.
 
 ---
 

@@ -73,7 +73,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   its bytes validated before embedding (`lib/memo/cover-aerial.ts`):
   react-pdf hangs the whole render on a PNG whose zlib check fails rather
   than throwing, so never hand it unverified image bytes; test images come
-  from `lib/memo/test-png.ts`, built with the real deflate and CRC.
+  from `lib/memo/test-png.ts`, built with the real deflate and CRC. A
+  picture the PDF draws from plain Views (the memo's base-position bars, its
+  call dots) is asserted by counting filled shapes — `pdfFillCountOf`
+  beside `pdfTextOf` — against a render without it; the memo reserves its
+  footer band (`paddingBottom`), so a memo that cannot fit one page flows to
+  a second rather than over its footer.
 - The pipeline's failure modes: `lib/anthropic/failure.ts` turns any failure
   into one sentence the analyst can act on (the raw text goes to the server
   log, never the page), and its `structured()` wraps every structured-output

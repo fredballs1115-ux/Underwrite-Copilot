@@ -177,6 +177,24 @@ const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const confidenceOf = (v: unknown): MemoData["ranges"][number]["confidence"] =>
   v === "high" || v === "medium" || v === "low" ? v : "";
 
+/** Pull the first numeric out of a display string ("$1,495" → 1495). */
+function firstNum(sv: string): number | null {
+  const m = sv.replace(/,/g, "").match(/-?\d+(\.\d+)?/);
+  return m ? parseFloat(m[0]) : null;
+}
+
+/** Where the base sits inside low → high, 0..1 — the deal page's positional
+ *  read (a base hugging the sponsor's end is a tell); null when the three
+ *  figures do not parse as one scale. */
+export function basePosition(r: { low: string; base: string; high: string }): number | null {
+  const lo = firstNum(r.low);
+  const hi = firstNum(r.high);
+  const base = firstNum(r.base);
+  return lo != null && hi != null && base != null && hi > lo
+    ? Math.min(1, Math.max(0, (base - lo) / (hi - lo)))
+    : null;
+}
+
 // WinAnsi-only text (standard Helvetica can't encode anything else) \u2014 the
 // full filter lives in pdf-text.ts (universal, unit-tested); re-exported here
 // for the full report and any other document module.
@@ -362,8 +380,14 @@ const CALL_LABEL_GLOBAL: Record<string, string> = {
 };
 
 const s = StyleSheet.create({
+  // The footer is absolutely positioned at 28pt from the foot; the bottom
+  // padding reserves its band (its rule, its line of text) so a memo that
+  // cannot fit flows to a second page instead of over its own footer — the
+  // sample once ended within a few points of it. The margins below were
+  // trimmed to give the reservation back, so the sample still fits one page.
   page: {
-    paddingVertical: 28,
+    paddingTop: 26,
+    paddingBottom: 46,
     paddingHorizontal: 44,
     fontSize: 10,
     fontFamily: "Helvetica",
@@ -394,8 +418,8 @@ const s = StyleSheet.create({
   divider: {
     borderBottomWidth: 2,
     borderBottomColor: C.brand,
-    marginTop: 10,
-    marginBottom: 12,
+    marginTop: 8,
+    marginBottom: 10,
   },
   titleRow: {
     flexDirection: "row",
@@ -437,7 +461,7 @@ const s = StyleSheet.create({
   coverCredit: { fontSize: 5.5, color: C.muted, marginTop: 2 },
 
   verdictBox: {
-    marginTop: 10,
+    marginTop: 9,
     borderWidth: 1,
     borderColor: C.line,
     borderLeftWidth: 4,
@@ -469,7 +493,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     alignItems: "center",
-    marginTop: 8,
+    marginTop: 7,
   },
   buyBoxTitle: {
     fontSize: 7.5,
@@ -492,8 +516,8 @@ const s = StyleSheet.create({
   buyBoxMark: { fontSize: 8, fontFamily: "Helvetica-Bold", marginRight: 3 },
   buyBoxLabel: { fontSize: 8, color: C.ink },
 
-  section: { marginTop: 13 },
-  twoCol: { flexDirection: "row", marginTop: 13, gap: 14 },
+  section: { marginTop: 11 },
+  twoCol: { flexDirection: "row", marginTop: 11, gap: 14 },
   col: { flex: 1 },
   sectionTitleRow: {
     flexDirection: "row",
@@ -576,13 +600,13 @@ const s = StyleSheet.create({
     flexDirection: "row",
     borderBottomWidth: 0.5,
     borderBottomColor: C.line,
-    paddingVertical: 3.5,
+    paddingVertical: 3.25,
     paddingHorizontal: 2,
   },
   rangeRowAlt: { backgroundColor: C.faint },
-  rangeLabel: { width: "24%", fontSize: 8.5, fontFamily: "Helvetica-Bold" },
-  rangeCell: { width: "12%", fontSize: 8.5, textAlign: "right", paddingRight: 6 },
-  rangeConf: { width: "9%", fontSize: 7.5, textAlign: "right" },
+  rangeLabel: { width: "23%", fontSize: 8.5, fontFamily: "Helvetica-Bold" },
+  rangeCell: { width: "10%", fontSize: 8.5, textAlign: "right", paddingRight: 6 },
+  rangeConf: { width: "8%", fontSize: 7.5, textAlign: "right" },
   rangeCellBase: {
     width: "12%",
     fontSize: 8.5,
@@ -593,7 +617,15 @@ const s = StyleSheet.create({
     backgroundColor: "#e8f1ef",
     borderRadius: 3,
   },
-  rangeSource: { width: "31%", fontSize: 7.5, color: C.muted },
+  // Where the base sits inside the range, as the deal page and the shared
+  // screen draw it: a track, the span up to the base, and a dot — in the
+  // caution colour when the base hugs the optimistic end. Plain Views, so
+  // nothing to decode and no height beyond the row's text.
+  rangeBar: { width: "9%", paddingTop: 4, paddingRight: 8 },
+  barTrack: { height: 2.5, borderRadius: 1.25, backgroundColor: C.line, position: "relative" },
+  barFill: { position: "absolute", left: 0, top: 0, height: 2.5, borderRadius: 1.25, backgroundColor: "#b5cdc9" },
+  barDot: { position: "absolute", top: -1.75, width: 6, height: 6, borderRadius: 3 },
+  rangeSource: { width: "28%", fontSize: 7.5, color: C.muted },
   rangeHeadText: {
     fontSize: 7,
     color: C.muted,
@@ -602,7 +634,7 @@ const s = StyleSheet.create({
   },
 
   // The screen: deal-killers as cards + the scenario trio
-  killersRow: { flexDirection: "row", marginTop: 8, gap: 6 },
+  killersRow: { flexDirection: "row", marginTop: 7, gap: 6 },
   killerCard: {
     flex: 1,
     borderWidth: 0.75,
@@ -610,13 +642,15 @@ const s = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: C.brand,
     borderRadius: 5,
-    padding: 6,
+    padding: 5.5,
     backgroundColor: "#fbfcfb",
   },
   killerName: { fontSize: 8.5, fontFamily: "Helvetica-Bold", color: C.brand },
   killerRead: { fontSize: 8, color: C.muted, marginTop: 2 },
   killerRisk: { fontSize: 7.5, color: C.kill, marginTop: 2 },
-  sensBlock: { marginTop: 8 },
+  sensBlock: { marginTop: 7 },
+  sensCallRow: { flexDirection: "row", alignItems: "center", marginTop: 1.5 },
+  sensDot: { width: 5, height: 5, borderRadius: 2.5, marginRight: 3 },
   sensLabel: {
     fontSize: 7,
     color: C.muted,
@@ -820,24 +854,47 @@ export function MemoPage({ data }: { data: MemoData }) {
               <Text style={[s.rangeCell, s.rangeHeadText]}>Low</Text>
               <Text style={[s.rangeCell, s.rangeHeadText]}>Base</Text>
               <Text style={[s.rangeCell, s.rangeHeadText]}>High</Text>
+              <Text style={[s.rangeBar, s.rangeHeadText, { paddingTop: 0 }]}>In range</Text>
               <Text style={[s.rangeSource, s.rangeHeadText]}>Source</Text>
               <Text style={[s.rangeConf, s.rangeHeadText]}>Conf.</Text>
             </View>
-            {data.ranges.map((r, i) => (
-              <View
-                key={i}
-                style={i % 2 === 1 ? [s.rangeRow, s.rangeRowAlt] : s.rangeRow}
-              >
-                <Text style={s.rangeLabel}>{r.label}</Text>
-                <Text style={s.rangeCell}>{r.low}</Text>
-                <Text style={s.rangeCellBase}>{r.base}</Text>
-                <Text style={s.rangeCell}>{r.high}</Text>
-                <Text style={s.rangeSource}>{r.source}</Text>
-                <Text style={[s.rangeConf, { color: RANGE_CONF_COLOR[r.confidence] ?? C.muted }]}>
-                  {r.confidence}
-                </Text>
-              </View>
-            ))}
+            {data.ranges.map((r, i) => {
+              const pos = basePosition(r);
+              // The track is the column less its right padding (9% of the
+              // 524pt row is 47pt); the dot is centred on the base's point.
+              const track = 39;
+              return (
+                <View
+                  key={i}
+                  style={i % 2 === 1 ? [s.rangeRow, s.rangeRowAlt] : s.rangeRow}
+                >
+                  <Text style={s.rangeLabel}>{r.label}</Text>
+                  <Text style={s.rangeCell}>{r.low}</Text>
+                  <Text style={s.rangeCellBase}>{r.base}</Text>
+                  <Text style={s.rangeCell}>{r.high}</Text>
+                  <View style={s.rangeBar}>
+                    {pos != null ? (
+                      <View style={[s.barTrack, { width: track }]}>
+                        <View style={[s.barFill, { width: pos * track }]} />
+                        <View
+                          style={[
+                            s.barDot,
+                            {
+                              left: pos * track - 3,
+                              backgroundColor: pos > 0.7 ? C.caution : C.brand,
+                            },
+                          ]}
+                        />
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={s.rangeSource}>{r.source}</Text>
+                  <Text style={[s.rangeConf, { color: RANGE_CONF_COLOR[r.confidence] ?? C.muted }]}>
+                    {r.confidence}
+                  </Text>
+                </View>
+              );
+            })}
 
             {data.dealKillers.length > 0 && (
               <View style={s.killersRow}>
@@ -862,14 +919,22 @@ export function MemoPage({ data }: { data: MemoData }) {
                   {data.sensitivity.map((sc, i) => (
                     <View key={i} style={s.sensCell}>
                       <Text style={s.sensScenario}>{sc.scenario}</Text>
-                      <Text
-                        style={[
-                          s.sensCall,
-                          { color: CALL_COLOR[sc.call] ?? C.ink },
-                        ]}
-                      >
-                        {sc.call}
-                      </Text>
+                      {/* The call's dot, as the deal page's flip strip and
+                          the shared screen draw it; the word still carries
+                          the meaning on a grayscale print. */}
+                      <View style={s.sensCallRow}>
+                        <View
+                          style={[s.sensDot, { backgroundColor: CALL_COLOR[sc.call] ?? C.ink }]}
+                        />
+                        <Text
+                          style={[
+                            s.sensCall,
+                            { color: CALL_COLOR[sc.call] ?? C.ink, marginTop: 0 },
+                          ]}
+                        >
+                          {sc.call}
+                        </Text>
+                      </View>
                       {sc.note ? <Text style={s.sensNote}>{sc.note}</Text> : null}
                     </View>
                   ))}
