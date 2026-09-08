@@ -120,8 +120,11 @@ describe("ReportDocument (full report)", () => {
       return (buf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length;
     };
     const [withPlan, without] = await Promise.all([render(true), render(false)]);
-    // memo + plan + sensitivity + extracted terms, versus the same minus the plan.
-    expect(withPlan).toBeGreaterThanOrEqual(4);
+    // memo + plan + extracted terms, versus the same minus the plan. The IRR
+    // sensitivity page is omitted on a plan deal (the annual model's IRR is
+    // not the plan's return — the plan page carries its own grid), so the
+    // sensitivity passed in never adds a page here.
+    expect(withPlan).toBeGreaterThanOrEqual(3);
     expect(withPlan).toBe(without + 1);
   }, 45000);
 });

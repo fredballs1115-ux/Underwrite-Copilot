@@ -6,9 +6,12 @@ import { buildReportData, ReportDocument } from "@/lib/memo/report-document";
 import type { MemoData } from "@/lib/memo/memo-document";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { getBrandingForDeal, brandingLogoDataUri } from "@/lib/branding-server";
-import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
+import { buyBoxCheckSource, evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
 import type { DealRow } from "@/lib/deals";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
+import type { StructuredAddress } from "@/lib/address";
+import { inferStrategy } from "@/lib/deal-strategy";
+import { dealOverrideLines } from "@/lib/market/deal-checks";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { buildSensitivityData, type SensitivityData } from "@/lib/underwrite/report-grid";
 import { buildPlanReport, type PlanReport } from "@/lib/plan-sensitivity";
@@ -93,9 +96,18 @@ export async function GET(
     };
     const box = await getBuyBoxForDeal(ownership.user_id, ownership.team_id);
     if (box) {
+      // The deal page's own check source — first signal, structured address
+      // and inferred kind folded in — so page and PDF make the same call.
+      const extraction = (deal.extraction as ExtractionResult | null) ?? null;
+      const firstSignal = (deal.first_signal as FirstSignal | null) ?? null;
       buyBoxChecks = evaluateBuyBox(
         deal.asset_class,
-        (deal.extraction as ExtractionResult) ?? null,
+        buyBoxCheckSource(
+          extraction,
+          firstSignal,
+          (deal.address as StructuredAddress | null) ?? null,
+          inferStrategy(extraction, firstSignal).kind,
+        ),
         box,
       );
       hurdlePct = box.minIrrPct ?? null;
@@ -177,7 +189,15 @@ export async function GET(
   }
 
   try {
-    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan);
+    // Page 1 is the memo, dismissed submarket checks included — the same
+    // lines the standalone memo carries. Best-effort: never throws.
+    const overrides = await dealOverrideLines(
+      supabase,
+      id,
+      deal.name,
+      (deal.extraction as ExtractionResult | null) ?? null,
+    );
+    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides);
     const element = React.createElement(ReportDocument, {
       input,
     }) as unknown as Parameters<typeof renderToBuffer>[0];

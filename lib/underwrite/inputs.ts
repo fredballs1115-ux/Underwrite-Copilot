@@ -68,6 +68,11 @@ export interface WorkbookMeta {
   /** the deal's strategy (stabilized / value-add / conversion …), which
    *  decides what the OM's NOI figures may anchor */
   strategy?: StrategyKind;
+  /** on a plan deal, the OM's stabilized pro forma NOI with its page — the
+   *  finished project's figure, never year 1's; the workbook's Deal Summary
+   *  puts it over total cost as the yield the plan is judged on. Null when
+   *  the OM states none, or on a stabilized asset. */
+  stabilizedNoi?: { value: number; page?: string } | null;
 }
 
 export interface DerivedModel {
@@ -452,6 +457,10 @@ export function deriveUnderwriteInputs(
       rsf,
       units,
       strategy: strategy.kind,
+      stabilizedNoi:
+        isPlanDeal(strategy.kind) && stabilizedFig && stabilizedFig.value > 0
+          ? { value: stabilizedFig.value, page: stabilizedFig.page }
+          : null,
     },
   };
 }

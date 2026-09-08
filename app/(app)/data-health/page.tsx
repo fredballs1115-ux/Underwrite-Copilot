@@ -212,7 +212,7 @@ export default async function DataHealthPage() {
                     {meta.label}
                   </span>
                   <span className="break-all font-mono text-[12px]">{i.subject}</span>
-                  {i.detail && <span className="text-muted"> — {i.detail}</span>}
+                  {i.detail && <span className="text-muted"> — {i.detail}</span>}{" "}
                   <span className="ml-1 text-[11px] text-muted">
                     ({i.detected_at.slice(0, 10)})
                   </span>

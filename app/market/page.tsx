@@ -567,8 +567,8 @@ async function MetroExplorer({ selected }: { selected?: string }) {
           return (
             <div key={region}>
               <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted">
-                {region}
-                <span className="ml-1.5 font-normal normal-case tracking-normal">
+                {region}{" "}
+                <span className="ml-1 font-normal normal-case tracking-normal">
                   · {group.length} metro{group.length === 1 ? "" : "s"}
                 </span>
               </h3>
@@ -784,11 +784,14 @@ async function MetroExplorer({ selected }: { selected?: string }) {
                 <li key={e.address} className="text-sm">
                   <span className="font-medium">{e.address}</span>
                   {typeof e.price === "number" && (
-                    <span className="ml-2 font-mono tabular-nums">
-                      ${e.price.toLocaleString()}
-                    </span>
-                  )}
-                  <span className="ml-2 text-xs text-muted">
+                    <>
+                      {" "}
+                      <span className="ml-1 font-mono tabular-nums">
+                        ${e.price.toLocaleString()}
+                      </span>
+                    </>
+                  )}{" "}
+                  <span className="ml-1 text-xs text-muted">
                     {e.metric} — {e.note}
                   </span>
                 </li>

@@ -1949,8 +1949,8 @@ async function GroundLayerSection() {
                 <p className="mt-2 flex items-center gap-2.5 font-mono text-2xl font-semibold tabular-nums">
                   <span className="beacon shrink-0" aria-hidden />
                   <span>
-                    {num(salesCount)}
-                    <span className="ml-2 font-sans text-sm font-normal text-muted">
+                    {num(salesCount)}{" "}
+                    <span className="ml-1 font-sans text-sm font-normal text-muted">
                       deed-recorded sales ingested — live
                       {propCount > 0 && ` · ${num(propCount)} parcels`}
                     </span>
@@ -1981,8 +1981,11 @@ async function GroundLayerSection() {
                 The laws, as logic
               </p>
               <p className="mt-2 font-mono text-2xl font-semibold tabular-nums">
-                {ruleCount}
-                <span className="ml-2 text-sm font-normal text-muted">
+                {/* The space is real text, not just the span's margin: a screen
+                    reader (and the page lint) read the number and the noun as
+                    one word without it. */}
+                {ruleCount}{" "}
+                <span className="ml-1 text-sm font-normal text-muted">
                   machine-evaluable rules, focused on your markets
                 </span>
               </p>

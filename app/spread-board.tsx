@@ -100,8 +100,8 @@ export function SpreadBoard() {
                   >
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <p className="text-sm font-medium">
-                        {s.metroName}
-                        <span className="ml-2 text-xs text-muted">
+                        {s.metroName}{" "}
+                        <span className="ml-1 text-xs text-muted">
                           {SECTOR_LABEL[s.sector] ?? s.sector} vacancy
                         </span>
                       </p>

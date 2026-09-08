@@ -11,6 +11,12 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
+      # First, before any fetch: the page lint at the end runs from the repo
+      # (scripts/lint-pages.mjs + lib/render-lint.ts), and a checkout into a
+      # workspace that already holds files clears them.
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
       - name: Fetch live homepage
         # Cache-busting query + no-cache request header: the verdict must
         # reflect the ORIGIN's current build, never a stale CDN/SWR copy.
@@ -172,3 +178,21 @@ jobs:
             exit 1
           fi
           echo "VERDICT: LIVE SITE IS CURRENT (origin serves the overnight build) — any 'unchanged' sighting is client-side cache; a refresh after ~10 minutes clears it now that expireTime is capped."
+      # The public pages are rendered from live data, so they only exist as
+      # HTML once fetched — this is the one place their text can be read the
+      # way a visitor's screen reader reads it. Every page fetched above plus
+      # the legal and sign-in pages go through the same lint the render tests
+      # run on the signed-in views (lib/render-lint.ts): a digit glued to a
+      # word, a doubled word, an image with no alt, a nameless button or
+      # link, an unlabelled control, a duplicate id. The homepage once served
+      # "29machine-evaluable rules" for a month with every marker above
+      # green. The allow-list is the changelog entry that quotes the typos
+      # it fixed. Gating: a red run here is a page to fix, not a flaky probe.
+      # (The checkout the script needs is the job's first step: a checkout
+      # into a non-empty workspace clears it, HTML fetched so far included.)
+      - name: Public pages read clean (text + accessibility lint)
+        run: |
+          for path in login privacy security terms; do
+            curl -sS -o "p_$path.html" --max-time 60 "https://underwrite-copilot.onrender.com/$path" || true
+          done
+          node scripts/lint-pages.mjs --allow=aboutabout,9real,29machine body.html p_*.html

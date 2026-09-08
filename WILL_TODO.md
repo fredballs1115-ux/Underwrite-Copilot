@@ -3,15 +3,15 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#230 merged to main (live build
-sha `6e0f0f9`, #229, confirmed equal to the main tip by live-verify at 06:33
-UTC — every one of the first fifty-four is live; #230 follows on its deploy).
+**Last updated 2026-09-08**, after PRs #176–#231 merged to main (live build
+sha `543ebdb`, #230, confirmed equal to the main tip by live-verify at 06:39
+UTC — every one of the first fifty-five is live; #231 follows on its deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Fifty-five PRs (#176–#230) landed across one review session and the
+Fifty-six PRs (#176–#231) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -221,6 +221,23 @@ deploy (live-verify shows the sha).
   model's yield on cost carries the dark years' cost; the note for a
   skipped NOI tells the truth for each case; and an OM's in-place occupancy
   sets the vacancy line.
+- **The documents, read as the recipient reads them** (#231): the eighth
+  review's twelve findings closed with tests, the PDFs now read back as
+  text in the suite. The memo's key terms lead with the price, cap and unit
+  count instead of four flagged pro-forma rows; the report omits the
+  meaningless IRR page on a plan deal (it printed a -48% IRR and a -17.9x
+  multiple as a conversion's base case) and never prints a negative
+  multiple; the Excel Deal Summary's yield on cost is the OM's stabilized
+  NOI over total cost, labelled, with the year-1 cap named for what it is;
+  the verdict brief's ranges carry the plan basis; both PDF routes judge
+  the buy box as the page does; the pass mark prints (it was a "✓" the PDF
+  font cannot encode — every passing chip was empty); page citations print
+  only inside the OM; override lines, range confidence, the plan strip's
+  facts, the all-in "budget" noun and the shared screen's basis badges all
+  match the page. Plus the accessibility lint on every rendered view,
+  compact pipeline prices, and the public-page lint live-verify now runs
+  on every deploy (its first run caught "29machine-evaluable rules" on the
+  homepage).
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":
