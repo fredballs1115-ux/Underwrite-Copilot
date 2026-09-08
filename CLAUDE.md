@@ -120,7 +120,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   long-form argument belongs on `/why`. The signed-in surfaces follow the
   same rule (#241): the pipeline's stage ladder is a funnel with counts, its
   verdict split a bar, a teammate an initials badge, "not screened" an empty
-  ring; a helper sentence under a card says only what the card cannot.
+  ring; a helper sentence under a card says only what the card cannot. A
+  research note on `/market` folds (`Fold` in `app/market/page.tsx`): the
+  first sentence shows, the rest is one click away, and the whole text stays
+  in the HTML for the lints, live-verify and screen readers.
   Before adding a section or a sentence, measure the page (`scratchpad`'s
   shoot script pattern: full-page height, word count, pictures, headings;
   the fixture views via `VIEW_SHOTS_DIR` for signed-in pages) and ask what

@@ -59,6 +59,24 @@ const SECTOR_RANKS: Record<
     ];
   }),
 );
+/** A research note, folded: its first sentence shows, the rest opens on
+ *  demand. The whole text stays in the HTML — the page lint, live-verify and
+ *  a screen reader all still read it — so it is one click away rather than
+ *  on the page at once. A single-sentence note renders as itself. */
+function Fold({ text, className = "" }: { text: string; className?: string }) {
+  const m = /^([\s\S]+?[.!?])\s+([\s\S]+)$/.exec(text);
+  if (!m) return <p className={className}>{text}</p>;
+  return (
+    <details className={className}>
+      <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+        {m[1]}{" "}
+        <span className="text-[11px] font-medium text-brand">more</span>
+      </summary>
+      <p className="mt-1">{m[2]}</p>
+    </details>
+  );
+}
+
 function SectorSnapshotPanel({
   snapshot,
   metroId,
@@ -82,8 +100,7 @@ function SectorSnapshotPanel({
       </p>
       {entries.length === 0 ? (
         <p className="mt-1.5 text-xs text-muted">
-          Sector fundamentals for this metro queue in the next research batch
-          — unscreened, never guessed.
+          Sector fundamentals not yet researched for this metro.
         </p>
       ) : (
         <ul className="mt-2 space-y-2.5">
@@ -149,9 +166,10 @@ function SectorSnapshotPanel({
                   )}
                 </div>
                 {b.note && (
-                  <p className="mt-1 text-[11px] leading-relaxed text-muted">
-                    {b.note}
-                  </p>
+                  <Fold
+                    text={b.note}
+                    className="mt-1 text-[11px] leading-relaxed text-muted"
+                  />
                 )}
               </li>
             );
@@ -263,10 +281,8 @@ export default async function MarketDataPage({
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Your market data</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted">
-            What your own past screens say about the markets you work — going-in
-            caps and basis, grouped by market and asset class. Built only from the
-            deals you&apos;ve screened; private to your account, never shared with
-            your team.
+            Going-in caps and basis from your own screens, by market and asset
+            class. Private to you.
           </p>
         </div>
       ) : (
@@ -278,10 +294,7 @@ export default async function MarketDataPage({
             The covered markets
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted">
-            The research layer behind every screen — rules on file, published
-            FMRs, live benchmarks, and recorded-sales coverage across the
-            covered markets. Sign in and your own screens build a private comp
-            memory on top of it.
+            Rules, FMRs, benchmarks and sales coverage for the covered markets.
           </p>
         </div>
       )}
@@ -445,8 +458,7 @@ async function MidAtlanticTable() {
             {COVERAGE_DISCOVERY.map((p) => p.regionLabel).join(", ")}
           </>
         )}
-        . Every figure above carries its source and as-of date in the research
-        layer; stale rows badge themselves on deal screens.
+        . Every figure carries its source and as-of date.
       </p>
     </section>
   );
@@ -522,7 +534,7 @@ async function MetroExplorer({ selected }: { selected?: string }) {
   const providers = Object.fromEntries(PROVIDERS.map((p) => [p.id, p]));
   const compsLine =
     active.comps_provider === null
-      ? "No live sales feed wired for this metro yet — its bulk public-record sources are documented in ingestion_sources.md and load through the property database."
+      ? "No live sales feed for this metro yet."
       : active.comps_provider === "discovery"
         ? "Recorded-sales comps staged in discovery mode — the health check resolves the endpoints."
         : `Recorded-sales comps LIVE via ${providers[active.comps_provider as string]?.name ?? active.comps_provider}.`;
@@ -552,12 +564,6 @@ async function MetroExplorer({ selected }: { selected?: string }) {
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
       <h2 className="text-sm font-semibold tracking-tight">Metro explorer</h2>
-      <p className="mt-1 text-xs text-muted">
-        Your home region plus the{" "}
-        {metros.filter((m) => (m as { region?: string }).region === "Major US markets").length}{" "}
-        biggest US markets — a deliberately focused list, each area in its own
-        place. Pick a metro for its rules, rents, and data coverage.
-      </p>
       <div className="mt-3 space-y-3">
         {REGION_ORDER.map((region) => {
           const group = metros.filter(
@@ -692,9 +698,10 @@ async function MetroExplorer({ selected }: { selected?: string }) {
               text={`${active.name} — FY2026 2BR fair market rent $${fmr["2br"].toLocaleString()}/mo (${fmr.status ?? "sourced"}${fmr.sources?.[0] ? `; source: ${fmr.sources[0]}` : ""}) · via Underwrite Copilot market brief`}
             />
             {fmr.note && (
-              <p className="mt-1 text-[11px] leading-relaxed text-muted">
-                {fmr.note}
-              </p>
+              <Fold
+                text={fmr.note}
+                className="mt-1 text-[11px] leading-relaxed text-muted"
+              />
             )}
           </div>
         ) : (
@@ -932,11 +939,8 @@ function SectorHeatGrid() {
         </table>
       </div>
       <p className="mt-3 text-[11px] leading-relaxed text-muted">
-        Every filled cell is a sourced figure from a named research house, and
-        a band is shown as a band — where two trackers disagree, the spread
-        rides rather than an average. Dashes are honest gaps: no numeric level
-        cleared the source bar for that market and asset class, and the metro
-        brief says why. County entries carry no retail face by design.
+        Sourced figures; a band is shown as a band; a dash is a recorded gap,
+        explained in the metro brief.
       </p>
     </section>
   );
@@ -1181,7 +1185,7 @@ function SectorExplorer({ selected }: { selected?: string }) {
                 <p className="text-[11px] uppercase tracking-wide text-muted">
                   Supply &amp; demand
                 </p>
-                <p className="mt-1 text-sm leading-relaxed">{supply}</p>
+                <Fold text={supply} className="mt-1 text-sm leading-relaxed" />
               </div>
             )}
             {debt && (
@@ -1189,7 +1193,7 @@ function SectorExplorer({ selected }: { selected?: string }) {
                 <p className="text-[11px] uppercase tracking-wide text-muted">
                   Debt terms
                 </p>
-                <p className="mt-1 text-sm leading-relaxed">{debt}</p>
+                <Fold text={debt} className="mt-1 text-sm leading-relaxed" />
               </div>
             )}
           </div>
@@ -1213,15 +1217,22 @@ function SectorExplorer({ selected }: { selected?: string }) {
               <p className="mt-1.5 text-sm font-medium">{verdict.entry_vehicle}</p>
             )}
             {verdict.reasoning && (
-              <p className="mt-1 text-sm leading-relaxed text-muted">{verdict.reasoning}</p>
+              <Fold
+                text={verdict.reasoning}
+                className="mt-1 text-sm leading-relaxed text-muted"
+              />
             )}
           </div>
         )}
 
         {(doc.gaps?.length ?? 0) > 0 && (
-          <p className="text-[11px] leading-relaxed text-muted">
-            Named gaps: {doc.gaps!.join(" · ")}
-          </p>
+          <details className="text-[11px] leading-relaxed text-muted">
+            <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+              Named gaps · {doc.gaps!.length}{" "}
+              <span className="font-medium text-brand">show</span>
+            </summary>
+            <p className="mt-1">{doc.gaps!.join(" · ")}</p>
+          </details>
         )}
       </div>
     </section>
@@ -1287,8 +1298,7 @@ async function RatesStrip() {
         ))}
       </div>
       <p className="mt-2 text-[11px] text-muted">
-        FRED, pulled daily by the rates cron; the screen&apos;s debt assumptions
-        read these instead of hardcoded numbers.
+        FRED, pulled daily; the screen&apos;s debt assumptions read these.
       </p>
     </section>
   );
@@ -1343,10 +1353,7 @@ async function IntelDigestCard() {
       </div>
       {items.length === 0 ? (
         <p className="mt-2 text-sm text-muted">
-          The weekday intel job hasn&apos;t landed anything notable yet. It
-          watches rent-regulation news for your jurisdictions plus rates, tax,
-          and HUD policy, scores each item for your buy box, and flags likely
-          rule changes as red banners.
+          Nothing notable from the weekday intel job yet.
         </p>
       ) : (
         <ul className="mt-3 space-y-2.5">

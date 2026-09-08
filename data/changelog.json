@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "Market data: the numbers first, the research notes one click away",
+      "blurb": "The Market data page keeps every sourced figure — vacancy by market and asset class, the FMR ladders, the rules in force, the cap-rate tiers and leaderboards — and folds the prose around them: a tracker's note, an FMR's provenance, a sector's supply and debt paragraphs, the small-investor reasoning and the named gaps each show their first sentence, with the rest behind “more”. The text is still on the page for a search or a screen reader; it just isn't all on screen at once.",
+      "href": "/market"
+    },
+    {
+      "date": "2026-09-08",
       "title": "The pipeline and the deal page say it in pictures too",
       "blurb": "The stage ladder is a six-rung funnel with a count on each rung — tap a rung to see only those deals — in place of four empty section headers; the Go / Caution / No-go split is one bar; the free-plan allowance is a meter; a teammate's deal wears their initials; a deal not yet screened shows an empty ring where its verdict will sit; the fit score carries its own 0–100 bar. The setup card, the new-deal form and the empty pipeline each lost their paragraph. On the deal page, the sample's reading guide is three marked steps and one line, and every helper sentence lost its second half.",
       "href": "/deals"

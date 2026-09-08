@@ -217,8 +217,7 @@ export function MarketCompare({ metros }: { metros: CompareMetro[] }) {
             </tbody>
           </table>
           <p className="mt-1 text-[10px] text-muted">
-            Ranges are tracker spreads, shown rather than averaged; an em dash
-            is a recorded gap. Sources and bases in each metro brief.
+            Tracker spreads shown as ranges; a dash is a recorded gap.
           </p>
         </div>
       )}
@@ -228,8 +227,7 @@ export function MarketCompare({ metros }: { metros: CompareMetro[] }) {
           <span className="font-mono font-semibold tabular-nums text-ink">
             {spread >= 0 ? "+" : "−"}${Math.abs(spread).toLocaleString()}/mo
           </span>{" "}
-          ({a.name} vs {b.name}) — HUD FY2026 figures from the same research
-          layer, statuses as chipped.
+          ({a.name} vs {b.name}).
         </p>
       )}
     </section>

@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Sixty-seven PRs, #176–#242, each
+estimate, and that's what it should flag." Sixty-eight PRs, #176–#243, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -918,6 +918,21 @@ confirmed equal to the main tip after each batch.
   `DEPLOY: LIVE` / `DEPLOY: LAGGING` line comparing the live build to the
   main tip, so a deploy that has not landed is a sentence rather than two
   shas to compare by eye.
+- **#243 The Market data page: the numbers first, the research notes one
+  click away.** The public page that measured densest — 1,714 words and
+  thirteen paragraphs over twenty-five words at desktop width — keeps every
+  sourced figure (the vacancy board, the FMR ladders, the rules in force,
+  the cap-rate tiers, the leaderboards) and folds the prose around them: a
+  tracker's note, an FMR's provenance note, a sector's supply and debt
+  paragraphs, the small-investor reasoning and the named gaps each show
+  their first sentence with the rest behind "more" (`Fold`, a `<details>`;
+  the text stays in the HTML, so the page lint, live-verify's greps and a
+  screen reader still read all of it). The two hero lines, the metro
+  explorer's helper, the heat grid's footnote, the compare card's two notes,
+  the rates footnote and the intel empty state each say one thing. Now
+  1,267 words and three long paragraphs — the two headline notes and one
+  the fold's first sentence still runs long on — at 4,581px; the page lint
+  reads it clean and every live-verify marker is still on the page.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
