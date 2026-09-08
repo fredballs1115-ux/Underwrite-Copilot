@@ -3,9 +3,9 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#198 merged to main (live build
+**Last updated 2026-09-08**, after PRs #176–#199 merged to main (live build
 sha `87fdd0c`, #196, confirmed equal to the main tip by live-verify at 00:25
-UTC; #197–#198 follow on the next Render deploy).
+UTC; #197–#199 follow on the next Render deploy).
 
 ---
 
@@ -49,7 +49,9 @@ Four PRs landed from one review session; each is live once Render finishes the
   forma cap into the header or the mid-screen buy-box check, and the
   buy-box check, the mandate score and the market memory (#198) read one
   shared going-in cap that excludes the finished project's figure — a
-  conversion no longer scores "Fit 100" on its stabilized cap.
+  conversion no longer scores "Fit 100" on its stabilized cap. The compare
+  table and the leverage check (#199) say "n/a — plan" and "judged on
+  yield on cost" instead of reading a dark building's year-1 cap.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":

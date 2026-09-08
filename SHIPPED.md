@@ -145,6 +145,16 @@ gated on tsc / eslint / the full suite / a production build.
   on cost everywhere, and on a plan deal the buy-box check says why there
   is no going-in cap to judge — the plan is judged on yield on total cost —
   instead of "no parseable cap rate yet". Tests on all three.
+- **#199 The leverage read and the compare table stop reading a dark
+  building's cap.** A conversion's generated model books dark years first,
+  so its year-1 cap is negative or a default; the compare table showed it as
+  the going-in cap and spread it against the 30-yr fixed. Plan deals now
+  read "n/a — plan" in that row and "judged on yield on cost" in the
+  leverage row (the yield-on-cost row is their answer), and on the deal
+  page a plan deal with no going-in cap gets a leverage note that says why
+  — construction or bridge debt sized to cost, not permanent debt sized to
+  today's income — instead of a silent gap. A value-add with a real
+  in-place cap keeps its leverage check.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
