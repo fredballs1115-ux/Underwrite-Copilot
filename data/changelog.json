@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "Both workbooks draw NOI and cash flow across the years as bars",
+      "blurb": "The model workbook's Cash Flow tab and the rent-roll export's now carry Excel's own data bars across the NOI and levered cash-flow rows, so the growth — or a lease-up's dip — reads at a glance without a chart. Excel draws them off the live formulas, so they move as you change an assumption; the reversion column and the sale proceeds stay figures, so the bars compare year with year.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-08",
       "title": "The rent-roll workbook draws its rollover as bars",
       "blurb": "The rent-roll export's Rollover tab now carries Excel's own data bars on the space expiring each year and on the leasing capital it takes to re-lease it, so the heavy years read at a glance — and because Excel draws them off the live SUMIFS formulas, they move as you edit the roll. The Total row stays a figure.",
       "href": "/deals"

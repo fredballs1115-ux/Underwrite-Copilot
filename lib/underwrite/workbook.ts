@@ -535,6 +535,33 @@ function buildCashFlow(ws: ExcelJS.Worksheet, inp: UnderwriteInputs, holdYears: 
     }
   });
 
+  // Data bars across the two rows a reader follows year by year — NOI and
+  // levered cash flow — over the operating years only: the forward year is
+  // the reversion's input, not a year owned, and the sale proceeds sit on
+  // their own vector row, so the bar compares like with like. Excel draws
+  // these off the formulas and keeps them live; nothing is computed into a
+  // cell.
+  for (const key of ["noi", "levcf"]) {
+    ws.addConditionalFormatting({
+      ref: `${cellA1(rows[key], firstOpCol)}:${cellA1(rows[key], lastOpCol)}`,
+      rules: [
+        {
+          type: "dataBar",
+          priority: 1,
+          gradient: false,
+          minLength: 0,
+          maxLength: 100,
+          showValue: true,
+          border: false,
+          cfvo: [{ type: "min" }, { type: "max" }],
+          // The bar's colour rides the rule's model even though the typing
+          // omits it (exceljs writes it as the databar's <color>).
+          color: { argb: "FFB5CDC9" },
+        } as unknown as ExcelJS.ConditionalFormattingRule,
+      ],
+    });
+  }
+
   return { firstOpCol, lastOpCol, fwdCol, y0Col, rows };
 }
 
