@@ -8,7 +8,7 @@
 // teammate's, never another account's); this module just shapes and groups
 // them. Pure + unit-tested.
 
-import { findMetric, parseMoney, parsePct, METRIC_FIND } from "@/lib/criteria";
+import { findGoingInCap, findMetric, parseMoney, parsePct, METRIC_FIND } from "@/lib/criteria";
 
 export interface MarketComp {
   dealId: string;
@@ -128,9 +128,9 @@ export function buildComps(rows: DealRowLike[]): MarketComp[] {
     const assetClass = effectiveClass(row.asset_class, extraction);
     if (!assetClass) continue;
 
-    const cap =
-      findMetric(metrics, METRIC_FIND.goingInCap.inc) ??
-      findMetric(metrics, METRIC_FIND.capRate.inc, METRIC_FIND.capRate.exc);
+    // The shared going-in reader: a plan deal's stabilized / pro forma cap
+    // never averages into what the account "usually sees" in a market.
+    const cap = findGoingInCap(metrics);
     const rawCap = cap ? parsePct(cap.value) : null;
     // Drop physically implausible caps (a mis-extraction like -5% or 300%) —
     // not fabrication, just refusing to average garbage into the market read.

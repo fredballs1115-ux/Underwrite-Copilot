@@ -3,9 +3,9 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#197 merged to main (live build
+**Last updated 2026-09-08**, after PRs #176–#198 merged to main (live build
 sha `87fdd0c`, #196, confirmed equal to the main tip by live-verify at 00:25
-UTC; #197 follows on the next Render deploy).
+UTC; #197–#198 follow on the next Render deploy).
 
 ---
 
@@ -46,7 +46,10 @@ Four PRs landed from one review session; each is live once Render finishes the
   deal type and the plan's figures (#196), so "what's the cap rate?" on a
   conversion is answered with which figure the OM's number is. The first
   signal's cap slot (#197) can no longer carry a yield on cost or a pro
-  forma cap into the header or the mid-screen buy-box check.
+  forma cap into the header or the mid-screen buy-box check, and the
+  buy-box check, the mandate score and the market memory (#198) read one
+  shared going-in cap that excludes the finished project's figure — a
+  conversion no longer scores "Fit 100" on its stabilized cap.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":

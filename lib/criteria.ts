@@ -112,13 +112,47 @@ export const METRIC_FIND = {
     exc: /unit|\/sf|per sf|per unit|psf/i,
   },
   perUnit: { inc: /per unit|\/unit|price\/unit|unit price/i },
-  goingInCap: { inc: /going[- ]?in cap/i },
-  capRate: { inc: /\bcap rate\b/i, exc: /exit|terminal|reversion/i },
+  // The going-in cap is today's income against the price. A stabilized, pro
+  // forma, forward or at-completion cap — or a yield on cost — describes a
+  // plan deal's finished project, and reading it as the going-in cap is how
+  // a conversion "cleared" a 6% floor at 11.7%.
+  goingInCap: {
+    inc: /going[- ]?in cap/i,
+    exc: /stabili[sz]|pro ?forma|forward|projected|at completion|yield/i,
+  },
+  capRate: {
+    inc: /\bcap rate\b/i,
+    exc: /exit|terminal|reversion|residual|stabili[sz]|pro ?forma|forward|projected|at completion|yield/i,
+  },
   irr: { inc: /\birr\b/i },
   // Cash-on-cash isn't a required extraction field, so it's often absent —
   // when it is, the score reports the CoC dimension "unknown", never a pass.
   coc: { inc: /cash[- ]?on[- ]?cash|cash[- ]?on[- ]?equity|cash yield|\bcoc\b/i },
 } as const;
+
+/**
+ * THE going-in cap metric, or null: the labelled going-in figure first, else
+ * a plain cap rate that is not the exit cap and not the finished project's
+ * stabilized / pro forma figure. One implementation for the buy-box check,
+ * the mandate score and the market memory, so no surface can drift back to
+ * reading a plan deal's yield on cost as the cap on the price.
+ */
+export function findGoingInCap(metrics: MetricLike[]): MetricLike | null {
+  return (
+    findMetric(metrics, METRIC_FIND.goingInCap.inc, METRIC_FIND.goingInCap.exc) ??
+    findMetric(metrics, METRIC_FIND.capRate.inc, METRIC_FIND.capRate.exc)
+  );
+}
+
+/** A deal with a plan has no going-in cap to check — "value-add", "lease-up",
+ *  "conversion" or "development" from the extraction's strategy; null for a
+ *  stabilized asset, an unknown strategy or an extraction saved before the
+ *  field existed. */
+export function planKindLabel(extraction: ExtractionLike | null): string | null {
+  const kind = extraction?.strategy?.kind;
+  if (!kind || kind === "stabilized" || kind === "unknown") return null;
+  return kind.replace(/_/g, "-");
+}
 
 export function isEmptyBuyBox(box: BuyBox | null | undefined): boolean {
   if (!box) return true;
@@ -271,6 +305,9 @@ interface ExtractionLike {
   market?: string;
   address?: string;
   metrics: MetricLike[];
+  /** the deal's strategy as the extraction read it; a plan deal (value-add,
+   *  lease-up, conversion, development) has no going-in cap to check */
+  strategy?: { kind?: string } | null;
 }
 
 export function findMetric(
@@ -624,15 +661,16 @@ export function evaluateBuyBox(
 
   // ---- Going-in cap ------------------------------------------------------
   if (box.minCapPct != null) {
-    const metric =
-      findMetric(metrics, METRIC_FIND.goingInCap.inc) ??
-      findMetric(metrics, METRIC_FIND.capRate.inc, METRIC_FIND.capRate.exc);
+    const metric = findGoingInCap(metrics);
     const pct = metric ? parsePct(metric.value) : null;
+    const planKind = planKindLabel(extraction);
     if (pct == null) {
       checks.push({
         label: "Going-in cap",
         status: "unknown",
-        detail: `Mandate wants ≥${box.minCapPct}% going-in; no parseable cap rate yet.`,
+        detail: planKind
+          ? `Mandate wants ≥${box.minCapPct}% going-in, but a ${planKind} deal has no going-in cap — its stabilized figure is the finished project's, judged on yield on total cost, not on a cap against the price.`
+          : `Mandate wants ≥${box.minCapPct}% going-in; no parseable cap rate yet.`,
       });
     } else if (pct >= box.minCapPct) {
       checks.push({
