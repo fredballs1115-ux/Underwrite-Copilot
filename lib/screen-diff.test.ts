@@ -169,4 +169,24 @@ describe("computeScreenDiff — the Occupancy row is today's occupancy", () => {
     expect(d.rows[0].delta).toBe("+3.00pt");
     expect(d.rows[0].direction).toBe("better");
   });
+
+  it("an occupancy cost or growth never pairs as the Occupancy row; a T-12 average does", () => {
+    expect(
+      computeScreenDiff(
+        prior([m("Occupancy cost ratio", "12%")]),
+        { metrics: [m("Occupancy cost ratio", "13%")] },
+        null,
+      ),
+    ).toBeNull();
+    expect(
+      computeScreenDiff(prior([m("Occupancy growth", "2%")]), { metrics: [m("Occupancy growth", "3%")] }, null),
+    ).toBeNull();
+    const d = computeScreenDiff(
+      prior([m("T-12 average occupancy", "91%")]),
+      { metrics: [m("T-12 average occupancy", "93%")] },
+      null,
+    )!;
+    expect(d.rows.map((r) => r.label)).toEqual(["Occupancy"]);
+    expect(d.rows[0].delta).toBe("+2.00pt");
+  });
 });

@@ -3,15 +3,15 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#224 merged to main (live build
-sha `47ca288`, #222, confirmed equal to the main tip by live-verify at 03:02
-UTC; #223 and #224 follow on the next Render deploys).
+**Last updated 2026-09-08**, after PRs #176–#225 merged to main (live build
+sha `2a200db`, #223, confirmed equal to the main tip by live-verify at 03:09
+UTC; #224 and #225 follow on the next Render deploys).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Forty-nine PRs (#176–#224) landed across one review session and the
+Fifty PRs (#176–#225) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -152,6 +152,16 @@ deploy (live-verify shows the sha).
   "Going-in cap rate" by name, with the per-unit, subset, land, stabilized
   and prior-trade figures under their own labels, so the readers' first
   choice is what the OM's rows are called.
+- **The readers, read a fourth time** (#225): an occupancy cost or growth
+  is never the occupancy and a row with no percentage never shadows it; a
+  value naming two square footages is neither; a bare "Size" beside a
+  stated lot is the land's only when the two figures agree; a bare
+  "Asking:" and a "Total consideration" read, an "Exit price" and a "Sale
+  price (2019)" never do; a land cost beside a WALT, a tenant count or a
+  T-12 is an operating asset; "(2 buildings)" is a breakdown and
+  "(Building A)" a subset; the LOI prefills the first price that is a
+  figure; and the first signal's ask fills a price slot only when it is
+  one, never an "Unpriced".
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":

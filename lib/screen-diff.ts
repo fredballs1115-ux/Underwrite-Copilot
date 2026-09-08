@@ -137,7 +137,7 @@ const TRACKED: Tracked[] = [
     // Today's occupancy — never the stabilized / pro forma / target figure,
     // a break-even or a market average.
     exclude:
-      /economic|stabili[sz]|pro ?forma|projected|forward|target|underwritten|year ?\d|\byr ?\d|at (completion|stabili[sz]ation)|pre-?leas|break-?even|market|submarket|average|avg\b/i,
+      /economic|stabili[sz]|pro ?forma|projected|forward|target|underwritten|year ?\d|\byr ?\d|at (completion|stabili[sz]ation)|pre-?leas|break-?even|market|submarket|comp|cost|growth|\bratio\b/i,
     kind: "pct",
     betterWhen: "up",
   },

@@ -9,7 +9,7 @@ import { WhatsNewCard } from "./whats-new";
 import { Pipeline, type DealCard } from "./pipeline";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, findGoingInCap, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
-import { findPriceMetric, inferStrategy, planSummary } from "@/lib/deal-strategy";
+import { findPriceMetric, inferStrategy, planSummary, signalAskPrice } from "@/lib/deal-strategy";
 import { scoreMandateFit } from "@/lib/mandate";
 import { metroForAddress } from "@/lib/market-match";
 
@@ -54,8 +54,9 @@ function pickSlots(extraction: ExtractionResult, signal: FirstSignal | null): {
     cap: findGoingInCap(metrics)?.value ?? null,
     // The shared price reader; on a development with no asking price the
     // land or site cost is what is being bought. The first signal's ask
-    // fills the slot before the extraction lands, as on the deal page.
-    price: findPriceMetric(metrics, strategy.kind)?.value ?? (signal?.askPrice?.trim() || null),
+    // fills the slot before the extraction lands, as on the deal page —
+    // only when it is a figure, never an "unpriced" or "call for offers".
+    price: findPriceMetric(metrics, strategy.kind)?.value ?? signalAskPrice(signal),
     yoc: plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,
   };
 }

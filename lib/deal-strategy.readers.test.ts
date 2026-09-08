@@ -8,9 +8,11 @@ import type { ExtractedMetric, ExtractionResult } from "@/lib/anthropic/types";
 import {
   assessPlausibility,
   findPriceMetric,
+  findPricedMetric,
   inferStrategy,
   parseCount,
   planSummary,
+  signalAskPrice,
   unitCountFromMetrics,
   unitCountRow,
 } from "./deal-strategy";
@@ -345,5 +347,69 @@ describe("the third review's count cases", () => {
       "stabilized",
     );
     expect(inferStrategy(ex([m("Land price", "$4,500,000"), m("Acres", "12")])).kind).toBe("development");
+  });
+});
+
+describe("the fourth review's cases", () => {
+  const ex = (metrics: ExtractedMetric[]): ExtractionResult => ({
+    dealName: "Maddox Apartments",
+    assetClass: "multifamily",
+    market: "Dallas, TX",
+    address: "",
+    metrics,
+  });
+
+  it("a deck with a land cost and a tenancy row — WALT, tenants, vacancy, a T-12 — is an operating asset, not land", () => {
+    for (const row of [
+      m("WALT", "6.2 years"),
+      m("Tenants", "14"),
+      m("Vacancy", "8%"),
+      m("T-12 Operating Statement", "Attached"),
+      m("Lease expirations (2027)", "22%"),
+      m("Reimbursements", "$410,000"),
+      m("TTM revenue", "$5,100,000"),
+    ]) {
+      expect(inferStrategy(ex([m("Land cost", "$4,500,000"), row])).kind, row.label).toBe("stabilized");
+    }
+    expect(inferStrategy(ex([m("Land price", "$4,500,000"), m("Acres", "12"), m("Zoning", "MF-3")])).kind).toBe(
+      "development",
+    );
+  });
+
+  it("a parenthetical that opens with a count is a breakdown; one that names a building or a phase is a subset", () => {
+    expect(parseCount("312 units (2 buildings)")).toBe(312);
+    expect(parseCount("312 units (3 phases)")).toBe(312);
+    expect(parseCount("312 (2 towers)")).toBe(312);
+    expect(parseCount("120 units (Building A)")).toBeNull();
+    expect(parseCount("120 units (Phase I of III)")).toBeNull();
+    expect(parseCount("120 units (Tower B)")).toBeNull();
+    expect(unitCountFromMetrics([m("Units", "312 units (2 buildings)")])).toBe(312);
+  });
+
+  it("the LOI prefill takes the first price row whose value is a figure, else the shared reader's row", () => {
+    expect(
+      findPricedMetric([m("Asking price", "Call for pricing"), m("Purchase price", "$42,000,000")], "stabilized")
+        ?.value,
+    ).toBe("$42,000,000");
+    expect(findPricedMetric([m("Asking price", "Unpriced")], "stabilized")?.value).toBe("Unpriced");
+    expect(findPricedMetric([m("Asking rent", "$2,150"), m("Land cost", "$4,500,000")], "development")?.value).toBe(
+      "$4,500,000",
+    );
+    expect(findPricedMetric([m("Price / unit", "$135,000"), m("Asking price", "$42,000,000")], "stabilized")?.value).toBe(
+      "$42,000,000",
+    );
+    expect(findPricedMetric([m("Asking price", "$42.5M")], "stabilized")?.value).toBe("$42.5M");
+    expect(findPricedMetric([m("NOI", "$3,000,000")], "stabilized")).toBeNull();
+  });
+
+  it("the first signal's ask fills a price slot only when it is a figure", () => {
+    expect(signalAskPrice({ askPrice: "$20,000,000" })).toBe("$20,000,000");
+    expect(signalAskPrice({ askPrice: " $42.5M " })).toBe("$42.5M");
+    for (const ask of ["Unpriced", "Call for offers", "TBD", "Not stated", "—", "", "   "]) {
+      expect(signalAskPrice({ askPrice: ask }), ask).toBeNull();
+    }
+    expect(signalAskPrice({ askPrice: null })).toBeNull();
+    expect(signalAskPrice(null)).toBeNull();
+    expect(signalAskPrice(undefined)).toBeNull();
   });
 });
