@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Ninety-one PRs, #176–#266, each
+estimate, and that's what it should flag." Ninety-two PRs, #176–#267, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1215,6 +1215,19 @@ confirmed equal to the main tip after each batch.
   same components. The deal-view render test asserts the reconciliation's
   bar (two segments, two thirds kill), a bar per comp table and the
   challenger's tally; shot at 1440.
+- **#267 The comp scrutiny names each comp's detail line.** #260 and #261
+  draw a sale comp's basis only when its `detail` states one, and the
+  comps prompt never said what `detail` should carry — the schema was a
+  bare string — so the bars drew on the sample and depended on luck on a
+  real screen. The prompt now asks for the stated basis first — a sale
+  comp's price per unit (or per SF, or per key) and cap rate, then the
+  date and size, "$252k/unit · 5.4% cap · Mar 2026 · 210 units"; a lease
+  comp's rent and unit type or space — and nothing the OM does not state;
+  the zod field carries the same description, so the model sees it twice.
+  A prompt test holds the instruction's sale example up to `compFigures`
+  ($252k a unit, a 5.4% cap) and checks the lease examples carry no basis
+  to draw, so the prompt can never promise a shape the reader will not
+  draw.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

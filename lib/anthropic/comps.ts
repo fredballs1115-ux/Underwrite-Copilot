@@ -10,7 +10,13 @@ import type { BrokerCompsResult } from "./types";
 
 const CompSchema = z.object({
   name: z.string(),
-  detail: z.string(),
+  // The deal page and the report draw a sale comp's basis from this line
+  // (lib/comp-detail), so it leads with the figures the OM states.
+  detail: z
+    .string()
+    .describe(
+      "What the OM states of the comp's basis, figures first: for a sale comp the price per unit (or per SF, or per key) and the cap rate, then the date and size; for a lease comp the rent and the unit type or space. Nothing the OM does not state.",
+    ),
   support: z.enum(["supports", "favorable", "stretched"]),
   note: z.string(),
   page: z.string(),
