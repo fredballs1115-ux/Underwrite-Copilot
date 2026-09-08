@@ -31,7 +31,7 @@ export function SharePlan({
       {strategy.summary && (
         <p className="mt-1 text-sm leading-relaxed text-muted">{strategy.summary}</p>
       )}
-      <dl className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-5">
+      <dl className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {planFacts(plan).map(([label, value]) => (
           <div key={label}>
             <dt className="text-xs uppercase tracking-wider text-muted">{label}</dt>

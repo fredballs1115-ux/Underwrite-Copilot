@@ -3,15 +3,15 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#213 merged to main (live build
-sha `7a92bf2`, #211, confirmed equal to the main tip by live-verify at 01:48
-UTC; #212–#213 follow on the next Render deploy).
+**Last updated 2026-09-08**, after PRs #176–#214 merged to main (live build
+sha `86879b2`, #213, confirmed equal to the main tip by live-verify at 01:57
+UTC; #214 follows on the next Render deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Thirty-eight PRs (#176–#213) landed across one review session and the
+Thirty-nine PRs (#176–#214) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -95,6 +95,9 @@ deploy (live-verify shows the sha).
   (proposed), Construction period, Lease-up period, Stabilized in — the
   labels every reader matches. Takes effect on the next screen of a plan
   deal, which is one more reason to re-screen the conversion.
+- **The plan strip shows the all-in basis per planned unit** (#214) — total
+  cost over the finished unit count, on the deal page and the shared
+  screen, from the same reader analytics and the prompt context use.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":

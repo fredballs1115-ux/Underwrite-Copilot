@@ -1,15 +1,8 @@
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { findMetric } from "@/lib/criteria";
 import { inferStrategy, planSummary } from "@/lib/deal-strategy";
 
 const compact = (n: number): string =>
   n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
-
-function unitCount(metrics: { label: string; value: string }[]): number | null {
-  const units = findMetric(metrics, /^units?\b|number of units|unit count/i, /per|\/|price|\$/i);
-  const n = units ? Number(units.value.replace(/[,\s]/g, "")) : NaN;
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
 
 /**
  * What the screen established about the deal, in two to four sentences, for
@@ -36,18 +29,15 @@ export function dealContextFor(extraction: ExtractionResult | null): string | nu
       }, not today's income and not a cap rate on the price.`,
     );
   }
-  if (plan?.totalCost != null) {
+  if (plan?.costPerUnit != null && plan.units != null) {
     // The basis a comp or a per-unit norm is held against on a plan deal:
     // what a finished unit costs all-in — never the shell's or the land's
     // price over apartments that do not exist yet.
-    const units = unitCount(extraction?.metrics ?? []);
-    if (units != null) {
-      lines.push(
-        `Total cost is ${compact(plan.totalCost / units)} per planned unit (${units.toLocaleString("en-US")} units) — the basis to hold sale comps and per-unit norms against, never the ${
-          plan.kind === "development" ? "land" : "shell's"
-        } price.`,
-      );
-    }
+    lines.push(
+      `Total cost is ${compact(plan.costPerUnit)} per planned unit (${plan.units.toLocaleString("en-US")} units) — the basis to hold sale comps and per-unit norms against, never the ${
+        plan.kind === "development" ? "land" : "shell's"
+      } price.`,
+    );
   }
   if (plan?.timeline) lines.push(`Timeline as stated: ${plan.timeline.replace(/\.\s*$/, "")}.`);
   return lines.join(" ");

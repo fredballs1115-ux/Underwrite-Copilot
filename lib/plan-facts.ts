@@ -9,11 +9,12 @@ export const moneyCompact = (n: number): string =>
       : `$${Math.round(n)}`;
 
 /**
- * The five facts a plan is judged on, as label/value pairs — identical on
- * every surface that shows them (the deal page's plan strip, the shared
- * screen a partner or lender opens). A blank is "not stated" for a figure
- * the OM should have carried and "—" for one that is only derived from
- * others; never zero.
+ * The facts a plan is judged on, as label/value pairs — identical on every
+ * surface that shows them (the deal page's plan strip, the shared screen a
+ * partner or lender opens): the five figures, plus the all-in basis per
+ * planned unit when the OM states the unit count. A blank is "not stated"
+ * for a figure the OM should have carried and "—" for one that is only
+ * derived from others; never zero.
  */
 export function planFacts(plan: PlanSummary): [string, string][] {
   return [
@@ -37,5 +38,10 @@ export function planFacts(plan: PlanSummary): [string, string][] {
       "Yield on cost",
       plan.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : "—",
     ],
+    // The basis a comp is held against on a plan deal — what a finished
+    // unit costs all-in. Only when the OM states the planned unit count.
+    ...(plan.costPerUnit != null
+      ? [["Basis per unit (all-in)", moneyCompact(plan.costPerUnit)] as [string, string]]
+      : []),
   ];
 }

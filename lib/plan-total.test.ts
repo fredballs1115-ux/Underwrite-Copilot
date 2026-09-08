@@ -71,6 +71,9 @@ describe("a stated total cost with no price is still a total cost", () => {
     expect(plan.price).toBeNull();
     expect(plan.totalCost).toBe(60_000_000);
     expect(plan.yieldOnCost).toBeCloseTo(0.075, 9);
+    // The basis a comp is held against: all-in cost over the planned units.
+    expect(plan.units).toBe(240);
+    expect(plan.costPerUnit).toBe(250_000);
   });
 
   it("the grid and the breakevens stress that total, with nothing to add to it", () => {
@@ -91,6 +94,12 @@ describe("a stated total cost with no price is still a total cost", () => {
     expect(facts["Total cost"]).toBe("$60.0M");
     expect(facts["Yield on cost"]).toBe("7.5%");
     expect(facts["Price"]).toBe("not stated");
+    expect(facts["Basis per unit (all-in)"]).toBe("$250k");
+    // No unit count, no basis row — never a guess.
+    const noUnits = planFacts(
+      planSummary({ ...OWNED_LAND, metrics: OWNED_LAND.metrics.filter((x) => !/^units/i.test(x.label)) })!,
+    );
+    expect(noUnits.map(([label]) => label)).not.toContain("Basis per unit (all-in)");
   });
 
   it("the challenger's brief says the acquisition is not separable, and never 'less the price'", () => {

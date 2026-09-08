@@ -295,6 +295,16 @@ confirmed equal to the main tip after each batch.
   "Construction period", "Lease-up period" and "Stabilized in" — each with
   its page, never the price restated as a cost line, never a 0 for an
   absent figure. The prompt test pins every label.
+- **#214 The plan strip shows the all-in basis per planned unit.** The one
+  number a conversion buyer holds comps against — total cost over the
+  finished unit count — lived only inside the comp memory, analytics and
+  the prompt context, each with its own copy of the unit-count reader. One
+  exported reader (`unitCountFromMetrics`) now sits behind the plan
+  summary's new `units` and `costPerUnit`, and the plan facts add "Basis
+  per unit (all-in)" when the OM states the count — on the deal page's
+  strip and on the shared screen. Analytics and the deal context read the
+  same fields. Tests in `lib/plan-total.test.ts` ($250k on 240 planned
+  units; no count, no row).
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
