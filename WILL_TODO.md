@@ -4,10 +4,10 @@ Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
 **Last updated 2026-09-08**, after PRs #176–#237 merged to main (live build
-sha `68eb5bc`, #236, confirmed equal to the main tip by live-verify at 08:28
-UTC — every one of the first sixty-one is live, and the public-page lint
-#231 added reads all twelve public pages clean on every run, skip link and
-landmarks included; #237 follows on its deploy).
+sha `da1d184`, #237, confirmed equal to the main tip by live-verify at 08:32
+UTC — every one of the sixty-two is live, and the public-page lint #231
+added reads all twelve public pages clean on every run, skip link and
+landmarks included).
 
 ---
 
