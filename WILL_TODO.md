@@ -3,15 +3,17 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#231 merged to main (live build
-sha `543ebdb`, #230, confirmed equal to the main tip by live-verify at 06:39
-UTC — every one of the first fifty-five is live; #231 follows on its deploy).
+**Last updated 2026-09-08**, after PRs #176–#232 merged to main (live build
+sha `e72ae78`, #231, confirmed equal to the main tip by live-verify at 07:26
+UTC — every one of the first fifty-six is live, and the public-page lint
+that run added read all twelve public pages clean; #232 follows on its
+deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Fifty-six PRs (#176–#231) landed across one review session and the
+Fifty-seven PRs (#176–#232) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -237,7 +239,8 @@ deploy (live-verify shows the sha).
   match the page. Plus the accessibility lint on every rendered view,
   compact pipeline prices, and the public-page lint live-verify now runs
   on every deploy (its first run caught "29machine-evaluable rules" on the
-  homepage).
+  homepage; #232 taught it that a git sha in the build stamp — "543ebdb" —
+  is digits and letters by nature, not a glued word).
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":
