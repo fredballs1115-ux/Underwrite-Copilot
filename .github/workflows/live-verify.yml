@@ -133,6 +133,11 @@ jobs:
           # Sep 8: the plan-deal round (#193-#195) — the yield-on-cost grid's
           # changelog title is its public trace.
           grep -q "judged on yield on cost" p_whats-new.html && echo "SEP 8 YIELD ON COST (#194): present" || echo "SEP 8 YIELD ON COST (#194): not yet deployed"
+          # Sep 8, later: the portfolio round (#208) — analytics, the meeting
+          # export and the shared screen read the deal's kind. Its changelog
+          # title is the public trace (no apostrophe in the grep: React
+          # escapes one in the HTML).
+          grep -q "knows the deal" p_whats-new.html && echo "SEP 8 PORTFOLIO KIND (#208): present" || echo "SEP 8 PORTFOLIO KIND (#208): not yet deployed"
           # /market must open for ANONYMOUS visitors (no cookies here): the
           # signed-out chrome says "Get started"; a login redirect would 200
           # on /login and fail the covered-market grep instead.

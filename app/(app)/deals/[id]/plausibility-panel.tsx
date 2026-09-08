@@ -1,11 +1,5 @@
 import type { DealStrategy, PlanSummary, PlausibilityFinding } from "@/lib/deal-strategy";
-
-const money = (n: number): string =>
-  Math.abs(n) >= 1e6
-    ? `$${(n / 1e6).toFixed(1)}M`
-    : Math.abs(n) >= 1e3
-      ? `$${Math.round(n / 1e3)}k`
-      : `$${Math.round(n)}`;
+import { planFacts } from "@/lib/plan-facts";
 
 /**
  * The plan, as the OM states it, for a deal that is not a stabilized asset:
@@ -23,16 +17,8 @@ export function PlanStrip({
   plan: PlanSummary | null;
 }) {
   if (!plan) return null;
-  const cells: [string, string][] = [
-    ["Stabilized NOI", plan.stabilizedNoi ? money(plan.stabilizedNoi.value) : "not stated"],
-    [plan.priceLabel, plan.price != null ? money(plan.price) : "not stated"],
-    [
-      plan.budget?.allIn ? "Budget (total cost less price)" : "Budget",
-      plan.budget ? money(plan.budget.budget) : "not stated",
-    ],
-    ["Total cost", plan.totalCost != null ? money(plan.totalCost) : "—"],
-    ["Yield on cost", plan.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : "—"],
-  ];
+  // The same five facts the shared screen shows — one source for both.
+  const cells = planFacts(plan);
   return (
     <section
       aria-label="The plan"

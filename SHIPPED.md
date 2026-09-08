@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Twenty-six PRs, #176–#201, each
+estimate, and that's what it should flag." Thirty-three PRs, #176–#208, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -222,6 +222,18 @@ confirmed equal to the main tip after each batch.
   been collecting the Sep 8 follow-through sentence by sentence; they now live
   in the Sep 8 "judged on yield on cost" entry, and the Sep 7 entry points to
   it. Same facts, right day.
+- **#208 Every portfolio view knows the deal's kind.** Analytics counted a
+  conversion's stabilized cap as a going-in cap; the meeting .xlsx read cap
+  and price with its own regexes and had no deal-type column; the read-only
+  share link showed a plan deal's $21M stabilized NOI beside its $20M price
+  with nothing saying why. Every row is now read for its kind first: analytics
+  plots a plan deal's yield on cost and never a cap (its $/unit is total cost
+  over the planned units, never the shell's price); the export gains Deal
+  type and Yield on cost columns, a plan deal's cap cell reads "n/a — plan",
+  and the summary counts live plan deals; the shared screen names the kind
+  and carries the plan's five facts from the same `planFacts()` the deal
+  page's strip uses. Tests read the .xlsx back cell by cell and render the
+  shared block against the plan strip.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
