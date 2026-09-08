@@ -3,19 +3,19 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#256 merged to main (live build
+**Last updated 2026-09-08**, after PRs #176–#257 merged to main (live build
 sha `e7c5317`, #255, confirmed equal to the main tip by live-verify at 17:22
 UTC with its `DEPLOY: LIVE` line — every one of the eighty through #255 is
 live, the homepage serves at 196 KB where it served at 488 KB, the public
 sample memo at 57 KB where it served at 11 KB (the Brewerytown frame is in
 it), and the public-page lint #231 added reads all twelve public pages clean
-on every run; #256 is merged and awaits its proof, #257 follows).
+on every run; #256 and #257 are merged and await their proof, #258 follows).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Eighty-two PRs (#176–#257) landed across one review session and the
+Eighty-three PRs (#176–#258) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -397,6 +397,9 @@ deploy (live-verify shows the sha).
   expiring each year and the capital to re-lease it carry Excel's own data
   bars over the year rows, live as the roll is edited; the Total row draws
   none.
+- **Data bars across the Cash Flow tabs' NOI and levered cash flow** (#258):
+  both workbooks draw the two rows across the operating years, live off
+  the formulas; the reversion column and the sale vectors stay figures.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -673,18 +676,18 @@ a route scoped to the share token; the memo and the report got theirs in
    "+4.2%" or "−$120k" and a comp detail's "$262k/unit"), returning nothing
    when the text is not a figure. Plain `View`s, height-neutral, the same
    fill-count assertion.
-9. **Data bars across the Cash Flow tabs' NOI and levered cash-flow rows.**
-   #251 and #257 put Excel's own data bars down a column; the two Cash
-   Flow tabs (the model workbook's, `lib/underwrite/workbook.ts`, and the
-   rent-roll workbook's, `lib/export/workbook.ts`) still carry NOI and
-   levered cash flow across the years as figures alone. The same rule
-   across a row — `cf.rows.noi` / `cf.rows.levcf` from `firstOpCol` to
-   `lastOpCol` in the model, rows 18 / 28 over the year columns in the
-   rent-roll export — reads the growth (or the lease-up dip) at a glance
-   and stays live because Excel draws it. The sale-year column is cash flow
-   alone, never the sale proceeds row, so the bar compares like with like.
-   Read the rules back in `lib/underwrite/workbook.test.ts` and
-   `lib/export/workbook.test.ts`.
+9. **The rent-roll page's mark-to-market rows as bars.** The Mark to market
+   table (`app/(app)/deals/[id]/rent-roll/dashboard.tsx`) lists each
+   lease's in-place rent, market rent and the gap as six figures a row, and
+   at 390 it scrolls sideways inside its card (`min-w-[520px]`). Both rents
+   are numbers already, so the picture needs no parser: a bar per row of
+   in-place as a share of market (capped at the track), in the pass colour
+   when the lease is below market (upside) and the kill colour when it is
+   above (roll-down risk), beside the gap figure; a lease with no market
+   rent priced draws none. Below `sm` the row could stack — tenant, the
+   bar, the gap — the way the compare cards do. Render it in
+   `lib/views.render.test.ts` (the rent-roll fixtures already carry
+   priced leases) and shoot at 390.
 
 ---
 

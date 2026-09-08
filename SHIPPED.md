@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Eighty-two PRs, #176–#257, each
+estimate, and that's what it should flag." Eighty-three PRs, #176–#258, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1101,6 +1101,18 @@ confirmed equal to the main tip after each batch.
   so the Total row draws no bar. The workbook test reads the two rules
   back (C4:C14 and M4:M14 on the ten-year fixture, min to max) and checks
   the Total sits on row 15, outside them.
+- **#258 Data bars across the Cash Flow tabs' NOI and levered cash flow.**
+  #251 and #257 put Excel's own data bars down a column; the two Cash Flow
+  tabs — the model workbook's and the rent-roll export's — still carried
+  NOI and levered cash flow across the years as figures alone. Both rows
+  now carry the same data bar across the operating years, so the growth
+  (or a lease-up's dip) reads at a glance and stays live because Excel
+  draws it off the formulas. The forward / reversion column is the sale's
+  input, not a year owned, and the sale proceeds sit on the vector rows,
+  so neither is in the range — the bar compares like with like. Each
+  workbook test reads its two rules back: C..(C + hold − 1) on the rows
+  the labels name in the model, C18:L18 and C28:L28 in the ten-year
+  rent-roll fixture.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

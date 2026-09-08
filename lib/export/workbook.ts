@@ -900,6 +900,32 @@ function buildCashFlow(
     styleFormula(l, FMT.usd);
   }
 
+  // Data bars across NOI and levered cash flow over the operating years —
+  // the lease-up dip and the growth after it read at a glance. The reversion
+  // column is the sale's input, not a year owned, and the sale proceeds sit
+  // on the vector rows, so neither is in the range. Excel draws these off
+  // the formulas and keeps them live.
+  for (const row of [CF.noi, CF.leveredCf]) {
+    ws.addConditionalFormatting({
+      ref: `${colLetter(firstYearCol)}${row}:${lastCol}${row}`,
+      rules: [
+        {
+          type: "dataBar",
+          priority: 1,
+          gradient: false,
+          minLength: 0,
+          maxLength: 100,
+          showValue: true,
+          border: false,
+          cfvo: [{ type: "min" }, { type: "max" }],
+          // The bar's colour rides the rule's model even though the typing
+          // omits it (exceljs writes it as the databar's <color>).
+          color: { argb: "FFB5CDC9" },
+        } as unknown as ExcelJS.ConditionalFormattingRule,
+      ],
+    });
+  }
+
   sectionHeader(ws, 41, "Returns", 1, reversionCol);
   single(
     CF.unleveredIrr,

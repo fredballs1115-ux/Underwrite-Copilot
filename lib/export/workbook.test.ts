@@ -137,6 +137,19 @@ describe("buildRentRollWorkbook — structure", () => {
     expect(ws.getCell(15, 1).value).toBe("Total");
   });
 
+  it("the Cash Flow tab's NOI and levered cash-flow rows carry data bars over the operating years only", async () => {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buffer as unknown as ArrayBuffer);
+    const ws = wb.getWorksheet("Cash Flow")!;
+    const cfs = (
+      ws as unknown as { conditionalFormattings: { ref: string; rules: { type: string }[] }[] }
+    ).conditionalFormattings;
+    const bars = cfs.filter((cf) => cf.rules.some((r) => r.type === "dataBar"));
+    // Years 1–10 sit in C..L; the reversion column (M) and the return
+    // vectors (rows 39–40, which carry the sale) draw no bar.
+    expect(bars.map((cf) => cf.ref).sort()).toEqual([`C${CF_ROW.noi}:L${CF_ROW.noi}`, `C${CF_ROW.leveredCf}:L${CF_ROW.leveredCf}`].sort());
+  });
+
   it("never writes a computed value where a formula belongs", async () => {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(buffer as unknown as ArrayBuffer);

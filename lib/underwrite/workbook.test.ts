@@ -108,6 +108,32 @@ describe("generated workbook — live formulas via HyperFormula", () => {
     expect(named(hf, "CheckSU")).toBe(true);
   });
 
+  it("the Cash Flow tab's NOI and levered cash-flow rows carry data bars over the operating years only", () => {
+    const ws = wb.getWorksheet("Cash Flow")!;
+    const rowOf = (text: string) => {
+      let found = 0;
+      ws.eachRow((row, n) => {
+        if (row.getCell(1).value === text) found = n;
+      });
+      return found;
+    };
+    const noi = rowOf("Net Operating Income");
+    const levcf = rowOf("Levered Cash Flow");
+    expect(noi).toBeGreaterThan(0);
+    expect(levcf).toBeGreaterThan(noi);
+    // Operating years sit in C..(C + hold − 1); the forward column and the
+    // investment vectors (which carry the sale) draw no bar.
+    const lastOp = String.fromCharCode(64 + 3 + engine.holdYears - 1);
+    const cfs = (
+      ws as unknown as { conditionalFormattings: { ref: string; rules: { type: string; cfvo?: { type: string }[] }[] }[] }
+    ).conditionalFormattings;
+    const bars = cfs.filter((cf) => cf.rules.some((r) => r.type === "dataBar"));
+    expect(bars.map((cf) => cf.ref).sort()).toEqual([`C${noi}:${lastOp}${noi}`, `C${levcf}:${lastOp}${levcf}`].sort());
+    for (const cf of bars) {
+      expect(cf.rules.find((r) => r.type === "dataBar")!.cfvo?.map((c) => c.type)).toEqual(["min", "max"]);
+    }
+  });
+
   it("Levered IRR matches the engine within rounding", () => {
     const irr = Number(named(hf, "LeveredIRR"));
     expect(irr).toBeCloseTo(engine.returns.leveredIrrPct!, 3);
