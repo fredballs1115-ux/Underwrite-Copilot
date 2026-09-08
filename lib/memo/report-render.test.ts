@@ -86,7 +86,27 @@ describe("ReportDocument (full report)", () => {
       }) as unknown as Parameters<typeof renderToBuffer>[0],
     );
     expect(pdfFillCountOf(buf) - pdfFillCountOf(plain)).toBe(checksCount * 3);
-  }, 45000);
+
+    // The comp page draws each sale comp's stated basis on one track with
+    // the subject's tick — a track, the fill and the tick, three fills a
+    // comp — so the same report with comps that state no basis draws nine
+    // fewer shapes. The lease comp ("$2,520/mo") states none either way.
+    const saleCount = SAMPLE_DEAL.comps.saleComps.length;
+    expect(saleCount).toBe(3);
+    const noBasis = {
+      ...deal,
+      comps: {
+        ...SAMPLE_DEAL.comps,
+        saleComps: SAMPLE_DEAL.comps.saleComps.map((c) => ({ ...c, detail: "traded, terms withheld" })),
+      },
+    } as unknown as DealRow;
+    const bare = await renderToBuffer(
+      React.createElement(ReportDocument, {
+        input: buildReportData(noBasis, "August 24, 2026", checks, sensitivity),
+      }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    expect(pdfFillCountOf(buf) - pdfFillCountOf(bare)).toBe(saleCount * 3);
+  }, 90000);
 
   it("reads the OM's figure onto its typical range", () => {
     // The sample's three checks: at the low end, past the high end, inside.

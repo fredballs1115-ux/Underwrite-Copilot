@@ -40,6 +40,7 @@ import {
 } from "@/lib/plan-sensitivity";
 import { planFacts } from "@/lib/plan-facts";
 import { inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
+import { basisScale, fmtBasis, subjectBasis } from "@/lib/comp-detail";
 import { parsePageNumber } from "@/lib/facts";
 
 const C = {
@@ -632,6 +633,17 @@ export function ReportDocument({ input }: { input: ReportInput }) {
     BrokerCompsResult["leaseComps"]
   >;
   const redFlags = list(comps?.redFlags).map(str);
+  // Each sale comp's stated basis on one track with the subject's own as a
+  // tick — lib/comp-detail, the reader behind the deal page's comps table,
+  // so the report and the page never disagree on a comp. Drawn as plain
+  // Views under the detail text; a comp that states no basis draws none.
+  const compScale = basisScale(
+    saleComps,
+    subjectBasis(
+      metrics.map((m) => ({ label: str(m?.label), value: str(m?.value) })),
+      inferStrategy(extraction).kind,
+    ),
+  );
   const checks = list(market?.checks) as NonNullable<MarketResult["checks"]>;
   const rows = list(reconciliation?.rows) as NonNullable<
     ReconciliationResult["rows"]
@@ -969,16 +981,57 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             .map((g) => (
               <View key={g.label} style={{ marginBottom: 10 }}>
                 <Text style={[s.headText, { marginBottom: 4 }]}>{g.label}</Text>
-                {g.items.map((cp, i) => (
+                {g.items.map((cp, i) => {
+                  // Sale comps only: the basis bar and the subject's tick.
+                  const scale = g.label === "Sale comps" ? compScale : null;
+                  const share = scale?.shares[i] ?? null;
+                  const track = 60;
+                  return (
                   <View key={i} style={i % 2 === 1 ? [s.row, s.rowAlt] : s.row} wrap={false}>
                     <Text
                       style={{ width: "26%", fontSize: 8.5, fontFamily: "Helvetica-Bold" }}
                     >
                       {str(cp?.name)}
                     </Text>
-                    <Text style={{ width: "30%", fontSize: 8.5 }}>
-                      {str(cp?.detail)}
-                    </Text>
+                    <View style={{ width: "30%", paddingRight: 6 }}>
+                      <Text style={{ fontSize: 8.5 }}>{str(cp?.detail)}</Text>
+                      {scale && share != null ? (
+                        <View
+                          style={{
+                            marginTop: 2.5,
+                            width: track,
+                            height: 2.5,
+                            borderRadius: 1.25,
+                            backgroundColor: C.line,
+                            position: "relative",
+                          }}
+                        >
+                          <View
+                            style={{
+                              position: "absolute",
+                              left: 0,
+                              top: 0,
+                              height: 2.5,
+                              borderRadius: 1.25,
+                              width: share * track,
+                              backgroundColor: "#b5cdc9",
+                            }}
+                          />
+                          {scale.subjectShare != null ? (
+                            <View
+                              style={{
+                                position: "absolute",
+                                top: -1.5,
+                                left: scale.subjectShare * track - 0.5,
+                                width: 1,
+                                height: 5.5,
+                                backgroundColor: C.ink,
+                              }}
+                            />
+                          ) : null}
+                        </View>
+                      ) : null}
+                    </View>
                     <View style={{ width: "14%", paddingRight: 3 }}>
                       <RateChip
                         word={str(cp?.support)}
@@ -992,7 +1045,15 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                       {citedPage(cp?.page, totalPages)}
                     </Text>
                   </View>
-                ))}
+                  );
+                })}
+                {g.label === "Sale comps" && compScale ? (
+                  <Text style={{ fontSize: 6.5, color: C.muted, marginTop: 3 }}>
+                    {compScale.subjectValue != null
+                      ? `Bars: each comp's basis per ${compScale.unit === "unit" ? "unit" : "SF"}; the tick is the subject at ${fmtBasis(compScale.subjectValue, compScale.unit)}.`
+                      : `Bars: each comp's basis per ${compScale.unit === "unit" ? "unit" : "SF"}, scaled to the widest in the set.`}
+                  </Text>
+                ) : null}
               </View>
             ))}
           {redFlags.length > 0 && (

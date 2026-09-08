@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Eighty-five PRs, #176–#260, each
+estimate, and that's what it should flag." Eighty-six PRs, #176–#261, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1142,6 +1142,16 @@ confirmed equal to the main tip after each batch.
   lease comps draw none. The demo's comps tab gets the same. Eleven reader
   cases; the deal-view render test asserts three bars, three ticks and the
   legend on the sample.
+- **#261 The report's comp page draws the same bars.** The full report's
+  Comp scrutiny page printed each comp's detail line alone; it now draws
+  each sale comp's stated basis under the line as a track, the comp's fill
+  and a 1pt tick where the subject's own basis sits — the same
+  `basisScale` the deal page's table uses, so the two never disagree on a
+  comp — with a one-line legend under the set. Plain Views, the memo's
+  way; a comp that states no basis draws none, lease comps draw none. The
+  report render test asserts the fill-count delta: the sample's three
+  sale comps draw nine more shapes than the same report with comps that
+  state no basis.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

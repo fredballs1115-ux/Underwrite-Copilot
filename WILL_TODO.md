@@ -3,19 +3,19 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#259 merged to main (live build
-sha `6d07675`, #258, confirmed equal to the main tip by live-verify at 17:37
-UTC with its `DEPLOY: LIVE` line — every one of the eighty-three through
-#258 is live, the homepage serves at 196 KB where it served at 488 KB, the
+**Last updated 2026-09-08**, after PRs #176–#260 merged to main (live build
+sha `73df402`, #259, confirmed equal to the main tip by live-verify at 17:43
+UTC with its `DEPLOY: LIVE` line — every one of the eighty-four through
+#259 is live, the homepage serves at 196 KB where it served at 488 KB, the
 public sample memo at 57 KB where it served at 11 KB (the Brewerytown frame
 is in it), and the public-page lint #231 added reads all twelve public pages
-clean on every run; #259 is merged and awaits its proof, #260 follows).
+clean on every run; #260 is merged and awaits its proof, #261 follows).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Eighty-five PRs (#176–#260) landed across one review session and the
+Eighty-six PRs (#176–#261) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -408,6 +408,9 @@ deploy (live-verify shows the sha).
   the subject** (#260): `lib/comp-detail.ts` reads a stated per-unit /
   per-SF basis and cap out of a comp's line and nothing otherwise; each
   sale comp's basis is a bar under its detail with the subject's as a tick.
+- **The report's comp page draws the same bars** (#261): each sale comp's
+  basis as a track, fill and subject tick under its detail line, from the
+  same reader, with the fill count asserted.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -683,19 +686,19 @@ a route scoped to the share token; the memo and the report got theirs in
    the subject's — both need a parser as honest as `rangeRead` (a gap like
    "+4.2%" or "−$120k" and a comp detail's "$262k/unit"), returning nothing
    when the text is not a figure. Plain `View`s, height-neutral, the same
-   fill-count assertion. Item 9 names the comp half's reader and puts it
-   behind the web comps table too.
-9. **The report's comp page draws the same bars.** #260 gave the deal
-   page's sale-comps table each comp's basis as a bar against the subject's
-   tick, read by `lib/comp-detail.ts`; the report's Comp scrutiny page
-   (`lib/memo/report-document.tsx`, the row per comp) still prints the
-   detail line alone. The same `basisScale` over the sale comps and the
-   subject's basis, drawn as plain `View`s under the detail text — a track,
-   the comp's fill, a 1pt tick for the subject — height-neutral like the
-   memo's bars, with the fill-count assertion in
-   `lib/memo/report-render.test.ts` (three comps on the sample → the delta
-   against a comp set that states no basis). That closes item 8's comp
-   half; the reconciliation gap's signed bar remains its other half.
+   fill-count assertion. #260 and #261 did the comp half (the reader is
+   `lib/comp-detail.ts`, behind the web table and the report page); the
+   reconciliation gap's signed bar is what remains here.
+9. **The comps table at phone width.** The deal page's sale-comps table
+   (`CompTable` in `app/(app)/deals/[id]/deal-sections.tsx`) keeps
+   `min-w-[34rem]`, so at 390 it scrolls sideways inside its card and the
+   new basis bars sit off-screen to the right of the name column. The
+   compare page (#254), the rent roll (#259) and the shared screen (#247)
+   each stack a card per row below `sm`; the comps table can do the same
+   — name and rating pill, the note, the detail line with its bar — and
+   keep the table from `sm` up. Render both in
+   `lib/deal-view.render.test.ts` (the comps tab already renders), shoot
+   at 390.
 
 ---
 
