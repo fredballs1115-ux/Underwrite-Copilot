@@ -234,11 +234,16 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     expect(text).toContain("11.7%");
     // Every figure in the return rows draws its spread bar: three IRRs,
     // three multiples, two cash-on-cash, two caps (the conversion's cap
-    // cell draws none), one yield on cost. The rejected deal's bar is the
-    // longest in the IRR row but muted, and it carries no "best" pill.
-    expect((html.match(/data-spread-bar/g) ?? []).length).toBe(11);
+    // cell draws none), one yield on cost — once in the table and once in
+    // the phone cards (one layout shows at a time). The rejected deal's bar
+    // is the longest in the IRR row but muted, and it carries no "best" pill.
+    expect((html.match(/data-spread-bar/g) ?? []).length).toBe(22);
     expect(html).toContain("bg-muted/50");
-    expect((html.match(/>best</g) ?? []).length).toBe(2);
+    expect((html.match(/>best</g) ?? []).length).toBe(4);
+    // The phone layout: a card per deal, the table hidden below `sm`.
+    expect(html).toContain('aria-label="Deals compared"');
+    expect((html.match(/<li /g) ?? []).length).toBe(COLS.length);
+    expect(html).toMatch(/class="hidden overflow-x-auto[^"]*sm:block"/);
     // One deal alone has no spread to draw.
     const single = renderToStaticMarkup(React.createElement(CompareTable, { cols: [COLS[0]] }));
     expect(single).not.toContain("data-spread-bar");
