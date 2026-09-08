@@ -53,6 +53,7 @@ import {
   inferStrategy,
   isPlanDeal,
   planSummary,
+  signalAskPrice,
   unitCountRow,
 } from "@/lib/deal-strategy";
 import { PlanStrip, PlausibilityPanel } from "./plausibility-panel";
@@ -514,9 +515,10 @@ export default async function DealPage({
     if (!(f.field in factsByField)) factsByField[f.field] = f;
   }
   // The shared price reader; on a development with no asking price the land
-  // or site cost is what is being bought.
-  const summaryPrice =
-    findPriceMetric(metrics, strategy.kind)?.value ?? (firstSignal?.askPrice.trim() || null);
+  // or site cost is what is being bought. Before the extraction lands the
+  // first signal's ask fills the slot — only when it is a figure, never an
+  // "unpriced" or a "call for offers" printed where a price goes.
+  const summaryPrice = findPriceMetric(metrics, strategy.kind)?.value ?? signalAskPrice(firstSignal);
   // The shared size reader: the building's row, never the land's or a
   // unit's.
   const sizeSf = buildingSfRow(metrics)?.value ?? null;

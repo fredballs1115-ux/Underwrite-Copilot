@@ -115,14 +115,14 @@ export const METRIC_FIND = {
     // rent", "Asking cap rate" or "Asking yield". "Pricing" as a word — never
     // "Repricing", and the exclude keeps loan / debt / insurance pricing and
     // a pricing date out.
-    inc: /asking price|purchase price|guidance|\bpricing\b|^ask(ing)?$|^ask(ing)?\s+(price|guidance)\b|offering price|offer price|sale price|sales price|list price|listing price|contract price|acquisition (price|cost)|whisper|\bprice\b/i,
+    inc: /asking price|purchase price|guidance|\bpricing\b|^ask(ing)?(?=\s*($|[:—–(-]))|^ask(ing)?\s+(price|guidance)\b|offering price|offer price|sale price|sales price|list price|listing price|contract price|acquisition (price|cost)|total consideration|whisper|\bprice\b/i,
     // Not a per-unit / per-SF / per-key figure in either spelling ("per
     // key", "/ Key", "/ RSF"), not a rent, a rate or a yield, not what the
     // building last traded for, not a land or site allocation (read
     // separately, as the price, only when no ask exists), and not a
     // reserve, bid, target or underwritten figure. "Price / Terms" and
     // "Purchase price per the PSA" are asks and stay in.
-    exc: /unit|\bsf\b|\/ ?sf|per ?sf|per (square|sq)|psf|\bper (key|bed|room|pad|site|door|acre|lot|suite|stall|space)s?\b|\/\s*(key|bed|room|pad|door|acre|lot|suite|stall|space|r?sf|nrsf|gsf|gla|nra|gba|nla)s?\b|\brent|yield|\bcap\b|\brate\b|spread|loan|debt|insurance|\bdate\b|\b(last|prior|previous|historical|original|land|site|reduction|reserve|bid|strike|target|underwritten|range)\b/i,
+    exc: /unit|\bsf\b|\/ ?sf|per ?sf|per (square|sq)|psf|\bper (key|bed|room|pad|site|door|acre|lot|suite|stall|space)s?\b|\/\s*(key|bed|room|pad|door|acre|lot|suite|stall|space|r?sf|nrsf|gsf|gla|nra|gba|nla)s?\b|\brent|yield|\bcap\b|\brate\b|spread|loan|debt|insurance|\bdate\b|exit|reversion|terminal|\(\s*(19|20)\d\d|\b(last|prior|previous|historical|original|land|site|reduction|reserve|bid|strike|target|underwritten|range)\b/i,
   },
   // The price over the units — never an NOI, a rent, a cost or an expense
   // expressed per unit, which would pass a basis ceiling at $2k/unit.
@@ -409,7 +409,11 @@ export function parseSf(value: string): number | null {
   const v = value.replace(/\([^)]*\)/g, " ").trim();
   // A pair or a range is two figures, not one.
   if (/\/|–|—|\bto\b|\d\s*-\s*\d/.test(v)) return null;
-  const withNoun = v.match(SF_FIGURE);
+  // Two square footages in one value — "40,000 SF office and 210,000 SF
+  // warehouse" — are components, and neither is the building.
+  const figures = [...v.matchAll(new RegExp(SF_FIGURE.source, "gi"))];
+  if (figures.length > 1) return null;
+  const withNoun = figures[0] ?? null;
   let n: number | null;
   if (withNoun) {
     n = sfNumber(withNoun[1], withNoun[2]);
@@ -433,13 +437,37 @@ export function parseSf(value: string): number | null {
  *  shadows it — or null. For surfaces that show the OM's own wording or
  *  cite its page. */
 export function buildingSfRow(metrics: MetricLike[]): MetricLike | null {
-  // A deck that states acreage, a lot or a parcel is (or includes) land: a
-  // bare "Size" row there is the land's, not a building's.
-  const statesLand = metrics.some((m) => /\b(land|lot|site|parcel|acre)/i.test(m.label));
+  // A bare "Size" row on a deck that also states the lot — as an acreage
+  // ("Acres: 12.5", "Site: 12.5 acres") or in square feet ("Lot size:
+  // 544,500 SF") — is the land's when the two agree: 12.5 acres is 544,500
+  // SF, so "Size: 545,000 SF" beside "Acres: 12.5" is the lot. Beside "Land
+  // area: 4.2 acres", a "Total area: 285,000 SF" is still the building.
+  const lotSf: number[] = [];
+  for (const m of metrics) {
+    if (!/acre|\bland\b|\blot\b|\bsite\b|\bparcel\b/i.test(m.label)) continue;
+    const withUnit = m.value.match(/(\d[\d,]*(?:\.\d+)?)\s*(?:acres?|\bac\b)/i);
+    // Under an "Acres" label the bare figure is the acreage.
+    const bare = /acre/i.test(m.label)
+      ? m.value
+          .replace(/\([^)]*\)/g, " ")
+          .trim()
+          .match(/^(?:±|~|≈|approx\.?)?\s*(\d[\d,]*(?:\.\d+)?)\s*(?:\+|±)?$/i)
+      : null;
+    const hit = withUnit ?? bare;
+    const acres = hit ? Number(hit[1].replace(/,/g, "")) : NaN;
+    if (Number.isFinite(acres) && acres > 0) lotSf.push(acres * 43_560);
+    else if (!hit) {
+      const sf = parseSf(m.value);
+      if (sf != null) lotSf.push(sf);
+    }
+  }
+  const isLotSize = (sf: number) => lotSf.some((l) => Math.abs(sf - l) / l < 0.05);
   for (const m of metrics) {
     if (!isSizeLabel(m.label)) continue;
-    if (BARE_SIZE_LABEL.test(m.label.trim()) && (statesLand || !SF_NOUN.test(m.value))) continue;
-    if (parseSf(m.value) != null) return m;
+    const sf = parseSf(m.value);
+    if (sf == null) continue;
+    if (BARE_SIZE_LABEL.test(m.label.trim()) && (!SF_NOUN.test(m.value) || isLotSize(sf))) continue;
+    return m;
   }
   return null;
 }
@@ -463,15 +491,23 @@ export function buildingSfFromMetrics(metrics: MetricLike[]): number | null {
 // must read 42%; one that states only the stabilized figure states no
 // occupancy today.
 const OCC_INCLUDE = /occupancy|occupied|\bleased\b/i;
+// Not a projection, a break-even, a market or comp average, a
+// development's pre-leasing — and not a retail tenant's occupancy COST
+// (a share of sales) or an occupancy growth rate. A T-12 average IS
+// today's occupancy.
 const OCC_EXCLUDE =
-  /economic|physical vacancy|stabili[sz]|pro ?forma|projected|forward|target|underwritten|year ?\d|\byr ?\d|\by\d\b|at (completion|stabili[sz]ation)|pre-?leas|break-?even|market|submarket|comp|average|avg\b|history|historical/i;
+  /economic|physical vacancy|stabili[sz]|pro ?forma|projected|forward|target|underwritten|year ?\d|\byr ?\d|\by\d\b|at (completion|stabili[sz]ation)|pre-?leas|break-?even|market|submarket|comp|(market|submarket|comp\w*)\s+(average|avg)|cost|growth|\bratio\b/i;
 const OCC_IN_PLACE = /current|in[- ]?place|physical|actual|as of|t-?12|ttm|trailing|existing|today|in place/i;
 
 /** The metric row stating today's occupancy: an explicitly in-place row
- *  first, else a plain occupancy row that carries no forward word; null
- *  when the OM states only the finished project's figure. */
+ *  first, else a plain occupancy row that carries no forward word — and
+ *  only a row whose value IS a percentage, so a "Leased SF" or "Occupied
+ *  units" row never shadows it. Null when the OM states only the finished
+ *  project's figure. */
 export function occupancyRow(metrics: MetricLike[]): MetricLike | null {
-  const eligible = metrics.filter((m) => OCC_INCLUDE.test(m.label) && !OCC_EXCLUDE.test(m.label));
+  const eligible = metrics.filter(
+    (m) => OCC_INCLUDE.test(m.label) && !OCC_EXCLUDE.test(m.label) && parsePct(m.value) != null,
+  );
   return eligible.find((m) => OCC_IN_PLACE.test(m.label)) ?? eligible[0] ?? null;
 }
 

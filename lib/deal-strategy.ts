@@ -310,12 +310,37 @@ export function findPriceMetric(metrics: MetricLike[], kind: StrategyKind): Metr
   );
 }
 
+/** The price row a figure is wanted from — the LOI's prefill: among the
+ *  price rows the first whose value IS a figure ("Asking price: call for
+ *  pricing" above "Purchase price: $42,000,000" gives the $42M), else the
+ *  shared reader's row, so the letter and the deal page never name two
+ *  different rows as the price. */
+export function findPricedMetric(metrics: MetricLike[], kind: StrategyKind): MetricLike | null {
+  const isFigure = (v: string) => {
+    const n = parseMoney(v);
+    return n != null && n >= 10_000;
+  };
+  return (
+    metrics.find((x) => PRICE_INCLUDE.test(x.label) && !PRICE_EXCLUDE.test(x.label) && isFigure(x.value)) ??
+    findPriceMetric(metrics, kind)
+  );
+}
+
+/** The first signal's ask, for the price slot before the extraction lands:
+ *  the string as the model wrote it when it is a figure, null when it is a
+ *  word — "Unpriced", "Call for offers", "TBD" — that no surface should
+ *  print where a price goes. */
+export function signalAskPrice(signal: { askPrice?: string | null } | null | undefined): string | null {
+  const ask = signal?.askPrice?.trim();
+  return ask && parseMoney(ask) != null ? ask : null;
+}
+
 // An OM whose only price is a land or site line and which carries no income
 // figure at all — no NOI, cap rate, occupancy, rent or revenue — is selling
 // land, not an operating asset. Read as a development, so its land price
 // is its price; read as "stabilized" it would have none.
 const INCOME_ROW =
-  /\bnoi\b|net operating income|cap rate|occupan|\brent|\begi\b|revenue|income|cash ?flow|\bncf\b|debt yield|dscr|expense|opex|\bleased\b/i;
+  /\bnoi\b|net operating income|cap rate|occupan|\brent|\begi\b|revenue|income|cash ?flow|\bncf\b|debt yield|dscr|expense|opex|\bleased\b|tenan|\bwalt\b|lease expir|vacan|reimburs|\bt-?12\b|\bttm\b|trailing|operating statement|\bcam\b/i;
 
 function isLandOnly(metrics: MetricLike[]): boolean {
   if (!metrics.length) return false;
@@ -427,10 +452,13 @@ const COUNT_PREFIX = /^(approx(imately|\.)?|about|circa|c\.|~|≈|±)\s*/i;
  *  not one (a zero is not a count — a blank is null, never zero). Exported
  *  so every surface that needs a count reads it the same way. */
 export function parseCount(value: string): number | null {
-  // "248 (of 312)" is a subset of a count, and "312 units (Phase I)" a
-  // phase's, not the count; "312 units (285 market-rate, 27 affordable)"
-  // is the count with its breakdown.
+  // "248 (of 312)" is a subset of a count, and "312 units (Phase I)" or
+  // "120 units (Building A)" a part's, not the count; "312 units (285
+  // market-rate, 27 affordable)" and "312 units (2 buildings)" — a
+  // parenthetical that opens with a figure — are the count with its
+  // breakdown.
   for (const p of value.match(/\([^)]*\)/g) ?? []) {
+    if (/^\(\s*\d/.test(p)) continue;
     if (/\bof\b|out of|\/|phase|bldg|building|tower|wing|floor/i.test(p)) return null;
   }
   const s = value

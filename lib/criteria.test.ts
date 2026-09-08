@@ -653,3 +653,111 @@ describe("parseSf — the shapes the third review found blank, and the sizes it 
     ).toBe(250_000);
   });
 });
+
+// The fourth review's cases: an occupancy COST or GROWTH is not an
+// occupancy, a row without a percentage never shadows the one with it, a
+// T-12 average is today's figure; a value naming two sizes is neither; a
+// bare "Asking:" and a total consideration read, an exit price and a prior
+// year's sale never do; a bare "Size" beside a stated lot is the land's
+// only when the two figures agree.
+describe("the fourth review's occupancy, size and price cases", () => {
+  it("an occupancy cost or growth rate is never the occupancy, and a row with no percentage never shadows it", () => {
+    expect(occupancyPctFromMetrics([{ label: "Occupancy cost ratio", value: "12%" }])).toBeNull();
+    expect(occupancyPctFromMetrics([{ label: "Occupancy cost", value: "12.5%" }])).toBeNull();
+    expect(occupancyPctFromMetrics([{ label: "Occupancy growth", value: "2%" }])).toBeNull();
+    expect(
+      occupancyPctFromMetrics([
+        { label: "Leased SF", value: "240,000" },
+        { label: "Occupancy", value: "92%" },
+      ]),
+    ).toBe(92);
+    expect(
+      occupancyPctFromMetrics([
+        { label: "Occupied units", value: "288" },
+        { label: "Occupancy", value: "92%" },
+      ]),
+    ).toBe(92);
+    expect(occupancyPctFromMetrics([{ label: "T-12 Average Occupancy", value: "91%" }])).toBe(91);
+    expect(occupancyPctFromMetrics([{ label: "Occupancy (as of 8/1/2026)", value: "89.5%" }])).toBe(89.5);
+    expect(
+      occupancyPctFromMetrics([
+        { label: "Occupancy", value: "95% (stabilized)" },
+        { label: "Current occupancy", value: "42%" },
+      ]),
+    ).toBe(42);
+  });
+
+  it("a value naming two square footages is neither of them", () => {
+    expect(parseSf("40,000 SF office and 210,000 SF warehouse")).toBeNull();
+    expect(parseSf("Bldg A 120,000 SF, Bldg B 130,000 SF")).toBeNull();
+    expect(parseSf("250,000 SF (2 buildings)")).toBe(250_000);
+    expect(
+      buildingSfFromMetrics([
+        { label: "Total SF", value: "40,000 SF office and 210,000 SF warehouse" },
+        { label: "Building SF", value: "250,000 SF" },
+      ]),
+    ).toBe(250_000);
+  });
+
+  it("a bare 'Asking:' or 'Ask —' and a total consideration read; an exit price or a prior year's sale never does", () => {
+    const price = (label: string) =>
+      findMetric([{ label, value: "$42,000,000" }], METRIC_FIND.price.inc, METRIC_FIND.price.exc);
+    for (const label of ["Asking:", "Ask —", "Ask -", "Asking (unpriced)", "Total consideration", "Purchase Price:"]) {
+      expect(price(label)?.label, label).toBe(label);
+    }
+    for (const label of [
+      "Exit price",
+      "Sale price (2019)",
+      "Sale Price (2021)",
+      "Last sale price",
+      "Price range",
+      "Strike price",
+      "Target price",
+      "Reserve price",
+      "Underwritten price",
+    ]) {
+      expect(price(label), label).toBeNull();
+    }
+  });
+
+  it("a bare 'Size' or 'Total Area' beside a stated lot is the land's only when the two figures agree", () => {
+    expect(
+      buildingSfFromMetrics([
+        { label: "Total Area", value: "285,000 SF" },
+        { label: "Land area", value: "4.2 acres" },
+      ]),
+    ).toBe(285_000);
+    expect(
+      buildingSfFromMetrics([
+        { label: "Size", value: "545,000 SF" },
+        { label: "Acres", value: "12.5" },
+      ]),
+    ).toBeNull();
+    expect(
+      buildingSfFromMetrics([
+        { label: "Size", value: "250,000 SF" },
+        { label: "Lot size", value: "1.2 acres" },
+      ]),
+    ).toBe(250_000);
+    expect(
+      buildingSfFromMetrics([
+        { label: "Size", value: "52,272 SF" },
+        { label: "Lot size", value: "1.2 acres" },
+      ]),
+    ).toBeNull();
+    expect(
+      buildingSfFromMetrics([
+        { label: "Size", value: "545,000 SF" },
+        { label: "Lot size", value: "545,000 SF" },
+      ]),
+    ).toBeNull();
+    // A label that names the building is the building even when the lot is
+    // the same size — only a bare label is ambiguous.
+    expect(
+      buildingSfFromMetrics([
+        { label: "Total SF", value: "545,000" },
+        { label: "Acres", value: "12.5" },
+      ]),
+    ).toBe(545_000);
+  });
+});

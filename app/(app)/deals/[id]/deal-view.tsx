@@ -56,7 +56,7 @@ import { SinceLastScreen } from "./since-last-screen";
 import { ReplaceOm } from "./replace-om";
 import { ManualDealForm } from "../manual-deal-form";
 import { factsFromExtraction, type ManualDealFacts } from "@/lib/manual-deal";
-import { findPriceMetric, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
+import { findPricedMetric, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { useToast } from "../../toaster";
 import type { UnderwritingModel } from "@/lib/model/types";
 import type { DealDocument } from "@/lib/documents";
@@ -220,11 +220,14 @@ const RECONCILE_ERROR_CODES = new Set(["modelfile", "modeltype", "modelsize"]);
 
 /** The extraction's asking-price string, for the LOI prefill ("" unknown). */
 function askingPriceValue(extraction: ExtractionResult | null): string {
-  // The shared price reader — the same row the deal page's summary bar, the
-  // buy box and the pipeline card show — so the letter never prefills an
-  // "Asking rent", a price per key or a prior trade. On a development with
-  // no asking price it is the land or site cost, the land being bought.
-  return findPriceMetric(extraction?.metrics ?? [], inferStrategy(extraction).kind)?.value ?? "";
+  // The shared price reader — the same rows the deal page's summary bar,
+  // the buy box and the pipeline card read — so the letter never prefills
+  // an "Asking rent", a price per key or a prior trade. Among the price
+  // rows the first whose value is a figure wins ("Asking price: call for
+  // pricing" above "Purchase price: $42,000,000" prefills $42M); on a
+  // development with no asking price it is the land or site cost, the land
+  // being bought.
+  return findPricedMetric(extraction?.metrics ?? [], inferStrategy(extraction).kind)?.value ?? "";
 }
 
 /** The deal's plan for the LOI draft — its clauses follow the kind. */

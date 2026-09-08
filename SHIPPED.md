@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Forty-nine PRs, #176–#224, each
+estimate, and that's what it should flag." Fifty PRs, #176–#225, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -497,6 +497,32 @@ confirmed equal to the main tip after each batch.
   new screen lands on the readers' first-choice labels; the readers keep
   covering the OMs already screened. The prompt test locks the labels and
   the look-alikes.
+- **#225 The readers, read a fourth time.** A fourth adversarial review of
+  the reader diff found twelve more ways an OM's wording could land a
+  wrong figure on a surface, and each is closed with a test. Occupancy: an
+  "Occupancy cost ratio" or "Occupancy growth" is never the occupancy; a
+  row with no percentage ("Leased SF: 240,000", "Occupied units: 288")
+  never shadows the "Occupancy: 92%" below it; a "T-12 average occupancy"
+  reads as today's figure. Size: a value naming two square footages
+  ("40,000 SF office and 210,000 SF warehouse") is neither of them; a bare
+  "Size" or "Total area" beside a stated lot — an acreage under an "Acres"
+  label, "12.5 acres" in a value, or a lot size in square feet — is the
+  land's only when the two figures agree within 5%, so "Total area:
+  285,000 SF" beside "Land area: 4.2 acres" is still the building. Price:
+  a bare "Asking:" or "Ask —" and a "Total consideration" read; an "Exit
+  price" and a "Sale price (2019)" never do. Strategy: a deck whose only
+  price is a land cost but which states a WALT, a tenant count, a vacancy,
+  reimbursements or a T-12 is an operating asset, never a land deal. Count:
+  a parenthetical that opens with a figure ("312 units (2 buildings)") is
+  the count with its breakdown; one naming a building or a phase
+  ("(Building A)", "(Phase I of III)") is a subset and never the whole. The
+  LOI prefills the first price row whose value is a figure, so "Asking
+  price: call for pricing" above "Purchase price: $42,000,000" prefills
+  the $42M; and the first signal's ask fills the deal page's and the
+  pipeline card's price slot only when it is a figure, never an
+  "Unpriced" or a "Call for offers" printed where a price goes. Both live
+  in `lib/deal-strategy` (`findPricedMetric`, `signalAskPrice`) with the
+  other readers, tested.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
