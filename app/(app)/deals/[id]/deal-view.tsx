@@ -57,6 +57,7 @@ import { SinceLastScreen } from "./since-last-screen";
 import { ReplaceOm } from "./replace-om";
 import { ManualDealForm } from "../manual-deal-form";
 import { factsFromExtraction, type ManualDealFacts } from "@/lib/manual-deal";
+import { findPriceMetric, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { useToast } from "../../toaster";
 import type { UnderwritingModel } from "@/lib/model/types";
 import type { DealDocument } from "@/lib/documents";
@@ -233,7 +234,18 @@ function askingPriceValue(extraction: ExtractionResult | null): string {
       x.value.trim(),
   );
   const parsed = candidates.find((x) => parseUsd(x.value) !== null);
-  return (parsed ?? candidates[0])?.value ?? "";
+  const own = (parsed ?? candidates[0])?.value ?? "";
+  if (own) return own;
+  // A ground-up development's OM states a land or site cost where a
+  // building's states an asking price — the shared reader takes it, on a
+  // development only, so the letter's price is the land being bought.
+  return findPriceMetric(extraction?.metrics ?? [], inferStrategy(extraction).kind)?.value ?? "";
+}
+
+/** The deal's plan for the LOI draft — its clauses follow the kind. */
+function loiPlan(extraction: ExtractionResult | null): { kind: string; label: string } | null {
+  const s = inferStrategy(extraction);
+  return isPlanDeal(s.kind) ? { kind: s.kind, label: s.label } : null;
 }
 
 function isActive(status: string | undefined): boolean {
@@ -807,6 +819,7 @@ export function DealView({
                 dealId={dealId}
                 askingPrice={askingPriceValue(results.extraction)}
                 isPro={isPro}
+                plan={loiPlan(results.extraction)}
               />
             )}
           </div>

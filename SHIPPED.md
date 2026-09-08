@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Thirty-three PRs, #176–#208, each
+estimate, and that's what it should flag." Thirty-six PRs, #176–#211, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -259,6 +259,18 @@ confirmed equal to the main tip after each batch.
   construction against an OM that shows only the stabilized year is a
   difference in what is modelled, not a discrepancy. Tests on the context
   builder and the three prompts.
+- **#211 The LOI draft follows the deal's kind.** The letter was one
+  template for every deal. A plan deal's diligence clause now names the
+  work — structural, environmental, zoning and construction-cost
+  investigations for the intended conversion, development, renovation
+  program or lease-up — and a conversion or a development carries an
+  "Entitlements and Approvals" contingency (zoning approvals, entitlements,
+  permits and consents, at Buyer's cost, Seller to cooperate), with the
+  clauses renumbered around it. The panel says what the draft carries, and a
+  development's land cost prefills the offer price where the OM states no
+  asking price. `lib/loi.test.ts` unzips the .docx and reads the clauses
+  back for a stabilized asset, a conversion, a development, a value-add and
+  a lease-up.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

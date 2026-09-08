@@ -3,15 +3,15 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#210 merged to main (live build
-sha `b7a564c`, #209, confirmed equal to the main tip by live-verify at 01:35
-UTC; #210 follows on the next Render deploy).
+**Last updated 2026-09-08**, after PRs #176–#211 merged to main (live build
+sha `1fe9df3`, #210, confirmed equal to the main tip by live-verify at 01:41
+UTC; #211 follows on the next Render deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Thirty-five PRs (#176–#210) landed across one review session and the
+Thirty-six PRs (#176–#211) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -80,6 +80,11 @@ deploy (live-verify shows the sha).
   against total cost per finished unit, never the shell's price. Takes
   effect on the next screen of a deal (the stored comps and market checks
   are not re-run).
+- **The LOI draft follows the deal's kind** (#211). A plan deal's diligence
+  clause names the structural, environmental, zoning and construction-cost
+  work; a conversion or a development carries an "Entitlements and
+  Approvals" contingency; a development's land cost prefills the offer
+  price.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":
@@ -107,7 +112,9 @@ also linked from `/data-health` under "Service probes":
    Deal type, "n/a — plan" under Cap rate and 11.7% under Yield on cost, and
    `/analytics` no longer plots it as a cap point. On any other multifamily
    deal's page, "From your pipeline" lists it as *Conversion* with 11.7% yoc
-   and $294k/unit all-in (#209).
+   and $294k/unit all-in (#209). On its Documents tab, the LOI panel says
+   the draft carries an entitlements contingency, and the downloaded letter
+   has clause 5, "Entitlements and Approvals", with Closing at 6 (#211).
 2. **Hit `/api/imagery/health` signed in.** A new `geocoder` key leads the
    JSON: it should read `ok: true`, `source: "census"`, `precision: "street"`,
    a few tens of metres off. Paste it back if anything else shows.
