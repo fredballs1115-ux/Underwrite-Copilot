@@ -3,17 +3,17 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#234 merged to main (live build
-sha `e934a83`, #233, confirmed equal to the main tip by live-verify at 07:40
-UTC — every one of the first fifty-eight is live, and the public-page lint
-#231 added reads all twelve public pages clean on every run; #234 follows
-on its deploy).
+**Last updated 2026-09-08**, after PRs #176–#235 merged to main (live build
+sha `562f802`, #234, confirmed equal to the main tip by live-verify at 07:50
+UTC — every one of the first fifty-nine is live, and the public-page lint
+#231 added reads all twelve public pages clean on every run, skip link and
+landmarks included; #235 follows on its deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Fifty-nine PRs (#176–#234) landed across one review session and the
+Sixty PRs (#176–#235) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -255,6 +255,11 @@ deploy (live-verify shows the sha).
   public page's main content carries the `id="main"` it targets. The
   accessibility lint fails an in-page link whose target is missing, so
   the skip link can never point at nothing.
+- **Every caption clears the contrast floor** (#235): the palette's core
+  text pairs were computed against WCAG's 4.5:1 and pass; the faintest
+  captions on the homepage's dark bands (35–45% white, 3.3–4.1:1) and four
+  notes in 70–80% muted did not. They sit at 55–60% white and solid muted
+  now (5.2–5.9:1); the hierarchy reads the same.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":

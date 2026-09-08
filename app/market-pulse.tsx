@@ -156,7 +156,7 @@ export function MarketPulseBoard() {
             The board — {TILES.length} jurisdiction tiles across{" "}
             {MARKET_COUNT} covered markets, live from the research layer
           </h2>
-          <p className="text-xs text-white/45">
+          <p className="text-xs text-white/60">
             every tile rotates its office / industrial / multifamily / retail
             read ·{" "}
             <span className="text-white/60">{SECTOR_FIGURES}</span> sourced
@@ -209,7 +209,7 @@ export function MarketPulseBoard() {
                   sector reads queued
                 </p>
               )}
-              <p className="mt-1 text-[10px] text-white/40">
+              <p className="mt-1 text-[10px] text-white/55">
                 {t.ruleCount} rule{t.ruleCount === 1 ? "" : "s"} on file
               </p>
             </Link>
@@ -218,10 +218,10 @@ export function MarketPulseBoard() {
         {SECTOR_LENS.length > 0 && (
           <div className="mt-5">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-white/40">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-white/55">
                 The sector lens — tightest on file per asset class
               </p>
-              <p className="text-[10px] text-white/35">
+              <p className="text-[10px] text-white/55">
                 each opens the full ranking
               </p>
             </div>
@@ -236,7 +236,7 @@ export function MarketPulseBoard() {
                     <p className="text-[9px] font-semibold uppercase tracking-wider text-accent/80">
                       {s.label}
                     </p>
-                    <p className="text-[9px] text-white/40 group-hover:text-white/60">
+                    <p className="text-[9px] text-white/55 group-hover:text-white/60">
                       {s.count} ranked →
                     </p>
                   </div>
@@ -245,7 +245,7 @@ export function MarketPulseBoard() {
                   </p>
                   <p className="font-mono text-[13px] font-semibold tabular-nums text-white">
                     {s.band}
-                    <span className="ml-1 text-[10px] font-normal text-white/45">
+                    <span className="ml-1 text-[10px] font-normal text-white/60">
                       vac
                     </span>
                   </p>
@@ -256,7 +256,7 @@ export function MarketPulseBoard() {
         )}
         {(FOUND_PRIMARY.length > 0 || HAS_FRED) && (
           <div className="mt-5 flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-white/55">
               Primary documents on file:
             </span>
             {FOUND_PRIMARY.map((k) => (
@@ -274,7 +274,7 @@ export function MarketPulseBoard() {
             )}
           </div>
         )}
-        <p className="mt-4 text-[11px] text-white/40">
+        <p className="mt-4 text-[11px] text-white/55">
           Office, industrial, multifamily, and retail reads from named research
           houses — vacancy, asking rents, and cap bands, spreads shown when
           trackers diverge, gaps recorded rather than guessed. Dots mark each

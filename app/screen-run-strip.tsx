@@ -33,7 +33,7 @@ export function ScreenRunStrip() {
     >
       <div className="mx-auto max-w-6xl px-6 py-10">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <p className="text-xs font-medium uppercase tracking-wider text-white/40">
+          <p className="text-xs font-medium uppercase tracking-wider text-white/55">
             The screen, running — a live trace of the six stages on the sample
             deal
           </p>
@@ -60,7 +60,7 @@ export function ScreenRunStrip() {
               style={{ "--i": i } as React.CSSProperties}
               className="screenrun-line flex flex-wrap gap-x-2 py-0.5"
             >
-              <span className="text-white/35">▸</span>
+              <span className="text-white/55">▸</span>
               <span className="w-20 shrink-0 text-accent">{stage}</span>
               <span className="text-white/75">
                 {detail}

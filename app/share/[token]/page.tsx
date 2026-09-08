@@ -224,7 +224,7 @@ export default async function SharePage({
                       <td className="py-2 pr-3 text-right tabular-nums">{r.high}</td>
                       <td className="py-2 text-xs text-muted">
                         {r.source}
-                        {r.basis && <p className="mt-0.5 text-[11px] text-muted/80">{r.basis}</p>}
+                        {r.basis && <p className="mt-0.5 text-[11px] text-muted">{r.basis}</p>}
                       </td>
                     </tr>
                   );

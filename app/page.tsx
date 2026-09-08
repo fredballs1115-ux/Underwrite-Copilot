@@ -462,7 +462,7 @@ export default function Home() {
                   Go / Caution / No-go in {FULL_SCREEN_CLAIM}. First {FREE_DEALS} deals free · no
                   card.
                 </p>
-                <p className="mt-4 max-w-xl font-mono text-[11px] uppercase tracking-wider text-white/40">
+                <p className="mt-4 max-w-xl font-mono text-[11px] uppercase tracking-wider text-white/55">
                   price/door · going-in cap (T-12) · untrended YoC · DSCR ·
                   debt yield · loss-to-lease
                 </p>
@@ -483,7 +483,7 @@ export default function Home() {
                 </p>
                 {/* The mini summary bar above shows the artifact buttons —
                     these are the REAL public sample files behind them. */}
-                <p className="mt-1.5 text-center text-[11px] text-white/45">
+                <p className="mt-1.5 text-center text-[11px] text-white/60">
                   Or hold its artifacts:{" "}
                   <a
                     href="/api/demo/memo"
@@ -508,7 +508,7 @@ export default function Home() {
                 </p>
                 {/* Baby legal note — the deal page's Regulation panel in one
                     line, derived from the same rules engine. */}
-                <p className="mt-1.5 text-center text-[11px] leading-relaxed text-white/40">
+                <p className="mt-1.5 text-center text-[11px] leading-relaxed text-white/55">
                   Legal screen: {LEGAL.screenedCount} rule
                   {LEGAL.screenedCount === 1 ? "" : "s"} on file for{" "}
                   {LEGAL.jurisdiction} —{" "}
@@ -2171,7 +2171,7 @@ function HeroNowScreening() {
         {picks.map(([name]) => name).join(", ")}.
       </span>
       <div aria-hidden className="flex items-baseline gap-2">
-        <span className="shrink-0 text-white/40">Now screening:</span>
+        <span className="shrink-0 text-white/55">Now screening:</span>
         <span className="relative block min-w-0 flex-1">
           {picks.map(([name, fact], i) => (
             <span
@@ -2325,7 +2325,7 @@ function ResearchTicker() {
 
   return (
     <div className="band-dark overflow-hidden border-t border-white/10 py-3 text-white">
-      <p className="mb-1.5 text-center text-[11px] font-medium uppercase tracking-wider text-white/40">
+      <p className="mb-1.5 text-center text-[11px] font-medium uppercase tracking-wider text-white/55">
         Live from the research layer — sourced, dated, statute-linked · tap any
         figure for its market
       </p>

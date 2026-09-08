@@ -84,7 +84,7 @@ export default function WhatsNewPage() {
                   <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">
                     {fmt(date)}
                   </h2>
-                  <span className="text-[11px] text-muted/70">
+                  <span className="text-[11px] text-muted">
                     {dayEntries.length} improvement
                     {dayEntries.length === 1 ? "" : "s"}
                   </span>
