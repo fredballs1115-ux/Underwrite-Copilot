@@ -16,7 +16,13 @@
  * see and change. Pure — no I/O, no LLM, no defaults invented for a figure
  * the OM did not state (a missing budget or NOI yields null, never a grid).
  */
-import type { PlanSummary } from "./deal-strategy";
+import type { ExtractionResult } from "@/lib/anthropic/types";
+import {
+  inferStrategy,
+  planSummary,
+  type PlanSummary,
+  type StrategyKind,
+} from "./deal-strategy";
 
 /** stabilized NOI against the OM's pro forma, down the rows */
 export const NOI_STOPS: readonly number[] = [-0.2, -0.1, 0, 0.1, 0.2];
@@ -135,5 +141,68 @@ export function planBreakevens(plan: PlanSummary | null, refCapPct: number): Pla
     noiAtRefCap,
     noiCushion,
     overrunToRefCap: overrun > 0 ? overrun : null,
+  };
+}
+
+/** Print-soft fills by spread band — the same palette as the IRR heat grids,
+ *  so a reader who has learned one grid can read the other. */
+export const SPREAD_BG: Record<SpreadBucket, string> = {
+  wide: "#7cc4a4",
+  adequate: "#a6d9c0",
+  thin: "#fae5bd",
+  none: "#f3c69b",
+  negative: "#e69a8d",
+};
+
+export interface RefCapInput {
+  /** decimal */
+  pct: number;
+  /** where the model's exit-cap assumption came from */
+  provenance: "extracted" | "derived" | "assumption";
+}
+
+/** One phrase, shared by the deal page and the report, on what the reference
+ *  cap is — so the spread is always measured against a number the reader can
+ *  see and change. */
+export function refCapNote(provenance: RefCapInput["provenance"]): string {
+  return provenance === "derived"
+    ? "the OM's going-in cap, which the model also exits at"
+    : provenance === "extracted"
+      ? "the OM's stated cap"
+      : "the model's exit-cap default — set your own view in the model";
+}
+
+/** Everything the report's plan page needs, resolved once: the strategy, the
+ *  plan as the OM states it, the stressed grid and the two breakevens. Null
+ *  for a stabilized asset or when the OM did not state the figures. */
+export interface PlanReport {
+  kind: StrategyKind;
+  label: string;
+  /** the plan in the OM's own words ("" when none was stated or inferred) */
+  summary: string;
+  plan: PlanSummary;
+  grid: YocGrid;
+  breakevens: PlanBreakevens;
+  refCap: RefCapInput;
+}
+
+export function buildPlanReport(
+  extraction: ExtractionResult | null,
+  refCap: RefCapInput | null,
+): PlanReport | null {
+  if (!extraction || !refCap) return null;
+  const strategy = inferStrategy(extraction);
+  const plan = planSummary(extraction, strategy);
+  const grid = buildYieldOnCostGrid(plan, refCap.pct);
+  const breakevens = planBreakevens(plan, refCap.pct);
+  if (!plan || !grid || !breakevens) return null;
+  return {
+    kind: strategy.kind,
+    label: strategy.label,
+    summary: strategy.summary,
+    plan,
+    grid,
+    breakevens,
+    refCap,
   };
 }

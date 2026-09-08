@@ -3,6 +3,7 @@ import type { ExtractionResult, ExtractedMetric } from "@/lib/anthropic/types";
 import {
   IMPLIED_CAP_CEILING,
   assessPlausibility,
+  budgetFromText,
   capitalBudgetFromMetrics,
   classifyNoi,
   inferStrategy,
@@ -402,5 +403,61 @@ describe("plausibilityNote", () => {
     expect(note).toMatch(/THE PLAN AS THE OM STATES IT/);
     expect(note).toMatch(/FIGURES THAT DO NOT TIE/);
     expect(note).toMatch(/label/);
+  });
+});
+
+describe("budgetFromText — the budget from the strategy's own words", () => {
+  it("reads a stated budget with a unit suffix or word", () => {
+    expect(budgetFromText("$160M hard and soft costs", 20_000_000)).toMatchObject({
+      budget: 160_000_000,
+      allIn: false,
+      label: "stated capital budget",
+    });
+    expect(budgetFromText("approximately $160 million, hard and soft", 20_000_000)?.budget).toBe(160_000_000);
+    expect(budgetFromText("$1.2bn of works", 200_000_000)?.budget).toBe(1_200_000_000);
+    expect(budgetFromText("$450,000 renovation", 3_000_000)?.budget).toBe(450_000);
+  });
+
+  it("takes the price out of an all-in figure, and never invents one", () => {
+    expect(budgetFromText("$180 million total project cost", 20_000_000)).toMatchObject({
+      budget: 160_000_000,
+      allIn: true,
+    });
+    expect(budgetFromText("", 20_000_000)).toBeNull();
+    expect(budgetFromText(null, 20_000_000)).toBeNull();
+    expect(budgetFromText("to be determined", 20_000_000)).toBeNull();
+    // A rate is not a budget; ten times the price is not a budget either.
+    expect(budgetFromText("$50/SF for the lobby", 20_000_000)).toBeNull();
+    expect(budgetFromText("$900M", 20_000_000)).toBeNull();
+    // An all-in figure at or below the price is no budget at all.
+    expect(budgetFromText("$20M all-in basis", 20_000_000)).toBeNull();
+  });
+
+  it("planSummary falls back to the strategy text when no metric row carries the budget", () => {
+    const noBudgetRow = ex(
+      [
+        metric("Asking price", "$20,000,000", { basis: "na", page: "p. 3" }),
+        metric("Stabilized NOI (pro forma)", "$21,000,000", { basis: "pro_forma", page: "p. 41" }),
+      ],
+      {
+        dealName: "1200 K Street — Office-to-Residential Conversion",
+        strategy: {
+          kind: "conversion",
+          summary: "Convert the vacant office building into 320 apartments.",
+          capitalBudget: "$160M hard and soft costs",
+          timeline: "24 months of works",
+        },
+      },
+    );
+    const plan = planSummary(noBudgetRow)!;
+    expect(plan.budget).toMatchObject({ budget: 160_000_000, allIn: false });
+    expect(plan.budget?.page).toBeUndefined();
+    expect(plan.totalCost).toBe(180_000_000);
+    expect(plan.yieldOnCost).toBeCloseTo(21 / 180, 9);
+    // The metric row still wins when both exist — it carries a page.
+    const both = ex([...noBudgetRow.metrics, metric("Renovation budget", "$150,000,000", { page: "p. 44" })], {
+      strategy: noBudgetRow.strategy,
+    });
+    expect(planSummary(both)!.budget).toMatchObject({ budget: 150_000_000, page: "p. 44" });
   });
 });

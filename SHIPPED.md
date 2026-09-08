@@ -106,6 +106,18 @@ gated on tsc / eslint / the full suite / a production build.
   development-spread band; two exact sentences name the NOI floor and the
   overrun that erases the spread ($10.8M and +106% on the conversion). Pure
   module, ten tests; no stated budget or stabilized NOI means no grid.
+- **#195 The plan page in the full report, and the budget from the OM's own
+  words.** The multi-page report gains "The plan, stressed" ahead of the IRR
+  grids on any plan deal — the plan's five figures and timeline, the same
+  yield-on-cost grid in the report's heat-grid geometry, the two breakeven
+  sentences, the spread legend and the reference cap's provenance; the
+  render test proves the conversion gets exactly one page more than the
+  same deal without it. And when the OM's budget appears only in the
+  strategy's text ("approximately $160 million, hard and soft") rather than
+  as a line item, the plan strip, the grid and the Excel capital line read
+  it from there — an all-in figure still has the price taken out, a rate or
+  a figure ten times the price never lands, and a metric row with a page
+  still wins.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

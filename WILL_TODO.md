@@ -3,9 +3,9 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#194 merged to main (live build
+**Last updated 2026-09-08**, after PRs #176–#195 merged to main (live build
 sha `97184aa` confirmed equal to the main tip by live-verify at 23:50 UTC on
-Sep 7; #193–#194 follow on the next Render deploy).
+Sep 7; #193–#195 follow on the next Render deploy).
 
 ---
 
@@ -37,10 +37,12 @@ Four PRs landed from one review session; each is live once Render finishes the
   Summary and Assumptions tabs, and the capital line carries the OM page its
   budget came from; the submarket supply warning tells a plan deal it
   delivers into the pipeline it is being warned about.
-- **Yield on cost, stressed** (#194): under the plan strip, a 5×5 grid of
-  stabilized NOI under the pro forma × budget over the OM's, each cell the
+- **Yield on cost, stressed** (#194, #195): under the plan strip, a 5×5 grid
+  of stabilized NOI under the pro forma × budget over the OM's, each cell the
   yield on total cost and its spread over the model's exit cap, plus the NOI
-  floor and the overrun that erase the spread.
+  floor and the overrun that erase the spread. The full report carries the
+  same page ahead of its IRR grids. A budget that appears only in the OM's
+  own words (no line item) is read from there.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":

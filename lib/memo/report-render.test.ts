@@ -12,6 +12,7 @@ import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { buildSensitivityData } from "@/lib/underwrite/report-grid";
+import { buildPlanReport } from "@/lib/plan-sensitivity";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
@@ -66,4 +67,61 @@ describe("ReportDocument (full report)", () => {
     expect(pages.length).toBeGreaterThanOrEqual(7);
     expect(pages.length).toBeLessThanOrEqual(14);
   }, 30000);
+  it("renders a conversion with the plan page — yield on cost, stressed — and one more page than without it", async () => {
+    const extraction: ExtractionResult = {
+      dealName: "1200 K Street — Office-to-Residential Conversion",
+      assetClass: "multifamily",
+      market: "Washington, DC",
+      address: "1200 K St NW, Washington, DC",
+      strategy: {
+        kind: "conversion",
+        summary: "Convert a vacant 300,000 SF office building into 320 apartments.",
+        capitalBudget: "$160M hard and soft costs",
+        timeline: "24 months of construction, 12 months of lease-up",
+      },
+      metrics: [
+        { label: "Purchase price", value: "$20,000,000", flagged: false, page: "p. 3" },
+        { label: "NOI (stabilized, pro forma)", value: "$21,000,000", flagged: false, page: "p. 12" },
+        { label: "Total project cost", value: "$180,000,000", flagged: false, page: "p. 14" },
+        { label: "Rentable square feet", value: "300,000", flagged: false, page: "p. 4" },
+      ],
+    };
+    const deal = {
+      name: extraction.dealName,
+      asset_class: "multifamily",
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+
+    const derived = deriveUnderwriteInputs(extraction, extraction.dealName!);
+    const refCap = {
+      pct: derived.inputs.exitCapPct,
+      provenance: derived.sources.exitCapPct?.provenance ?? ("assumption" as const),
+    };
+    const plan = buildPlanReport(extraction, refCap);
+    expect(plan).not.toBeNull();
+    expect(plan!.label).toBe("Conversion");
+    expect(plan!.grid.cells[plan!.grid.baseRow][plan!.grid.baseCol].yieldOnCost).toBeCloseTo(21 / 180, 6);
+    // No going-in cap in this OM: the reference cap is the screening default.
+    expect(refCap.provenance).toBe("assumption");
+    expect(plan!.breakevens.overrunToRefCap).not.toBeNull();
+
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const render = async (withPlan: boolean) => {
+      const input = buildReportData(deal, "September 8, 2026", [], sensitivity, undefined, withPlan ? plan : null);
+      const element = React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0];
+      const buf = await renderToBuffer(element);
+      expect(buf.subarray(0, 5).toString()).toBe("%PDF-");
+      return (buf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length;
+    };
+    const [withPlan, without] = await Promise.all([render(true), render(false)]);
+    // memo + plan + sensitivity + extracted terms, versus the same minus the plan.
+    expect(withPlan).toBeGreaterThanOrEqual(4);
+    expect(withPlan).toBe(without + 1);
+  }, 45000);
 });

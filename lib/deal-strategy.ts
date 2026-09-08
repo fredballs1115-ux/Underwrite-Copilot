@@ -264,6 +264,39 @@ export function capitalBudgetFromMetrics(metrics: MetricLike[], price: number | 
   return { budget, allIn, label: m.label, page: m.page };
 }
 
+const MONEY_IN_TEXT = /\$\s?(\d[\d,]*(?:\.\d+)?)\s*(billion|million|thousand|bn|mm|m|k|b)?\b/i;
+
+/**
+ * The budget from the extraction's own words when no metric row carried it:
+ * `strategy.capitalBudget` is free text ("$160M hard and soft costs",
+ * "approximately $180 million total project cost"). Same rules as the metric
+ * reader — an all-in figure has the price taken out, a fragment that cannot
+ * be a budget (a per-SF rate, ten times the price) never lands, absent is
+ * absent. No page: the text is the OM's summary, not a cited line.
+ */
+export function budgetFromText(text: string | null | undefined, price: number | null): CapitalBudget | null {
+  if (!text) return null;
+  const m = text.match(MONEY_IN_TEXT);
+  if (!m) return null;
+  const n = Number(m[1].replace(/,/g, ""));
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const unit = (m[2] ?? "").toLowerCase();
+  const mult = unit.startsWith("b")
+    ? 1e9
+    : unit.startsWith("m")
+      ? 1e6
+      : unit === "k" || unit === "thousand"
+        ? 1e3
+        : 1;
+  const raw = n * mult;
+  if (raw < 10_000) return null; // "$50/SF" is a rate, not a budget
+  const allIn = ALL_IN.test(text);
+  const budget = allIn && price != null ? raw - price : raw;
+  if (!(budget > 0)) return null;
+  if (price != null && budget > price * 10) return null;
+  return { budget, allIn, label: "stated capital budget" };
+}
+
 /** What the OM says the finished project earns and costs — the figures a
  *  plan is judged on, for the deal page and for the challenger's brief. */
 export interface PlanSummary {
@@ -293,7 +326,11 @@ export function planSummary(
   const priceRaw = priceMetric ? parseMoney(priceMetric.value) : null;
   const price = priceRaw != null && priceRaw > 0 ? priceRaw : null;
   const stabilizedNoi = noiFigures(metrics).find((f) => f.kind === "stabilized") ?? null;
-  const budget = capitalBudgetFromMetrics(metrics, price);
+  // A metric row with its page first; the strategy's own wording when the
+  // budget appears nowhere else.
+  const budget =
+    capitalBudgetFromMetrics(metrics, price) ??
+    budgetFromText(extraction.strategy?.capitalBudget, price);
   const totalCost = price != null && budget ? price + budget.budget : null;
   const yieldOnCost =
     stabilizedNoi && totalCost != null && totalCost > 0 ? stabilizedNoi.value / totalCost : null;

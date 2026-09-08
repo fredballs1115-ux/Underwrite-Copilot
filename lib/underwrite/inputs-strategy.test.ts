@@ -220,3 +220,35 @@ describe("deriveUnderwriteInputs — capital budget guards", () => {
     expect(sources.capitalImprovementsYr1?.note).toMatch(/enter the construction \/ renovation cost/);
   });
 });
+
+describe("deriveUnderwriteInputs — the budget from the strategy's own words", () => {
+  it("books a budget that appears only in the extraction's strategy text, and says so", () => {
+    const textOnly = ex(
+      CONVERSION.metrics.filter((m) => !/project cost/i.test(m.label)),
+      {
+        dealName: CONVERSION.dealName,
+        strategy: {
+          kind: "conversion",
+          summary: "Convert the vacant office building into 612 apartments.",
+          capitalBudget: "approximately $160 million, hard and soft",
+          timeline: "30 months of construction",
+        },
+      },
+    );
+    const { inputs, sources } = deriveUnderwriteInputs(textOnly, "fallback");
+    expect(inputs.capitalImprovementsYr1).toBe(160_000_000);
+    expect(sources.capitalImprovementsYr1?.provenance).toBe("extracted");
+    expect(sources.capitalImprovementsYr1?.page).toBeUndefined();
+    expect(sources.capitalImprovementsYr1?.note).toMatch(/^stated capital budget — spent in year 1/);
+  });
+
+  it("still prefers a metric row with a page over the text", () => {
+    const both = ex(CONVERSION.metrics, {
+      dealName: CONVERSION.dealName,
+      strategy: { kind: "conversion", summary: "", capitalBudget: "$150M", timeline: "" },
+    });
+    const { inputs, sources } = deriveUnderwriteInputs(both, "fallback");
+    expect(inputs.capitalImprovementsYr1).toBe(160_000_000);
+    expect(sources.capitalImprovementsYr1?.page).toBe("p. 44");
+  });
+});
