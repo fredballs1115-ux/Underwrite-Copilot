@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
 import { downloadOmPdf } from "@/lib/storage";
 import { askDealQuestion, dealContextFor } from "@/lib/anthropic/ask";
+import { ScreenError } from "@/lib/anthropic/failure";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { parseDealQa } from "@/lib/deals";
 
@@ -120,8 +121,12 @@ export async function askDeal(
     }
   } catch (err) {
     console.error(`ask-the-deal failed for ${dealId}:`, err);
+    // A cut-off or declined answer names itself; anything else stays generic.
     return {
-      error: "The answer didn’t come back — nothing was saved. Please try again.",
+      error:
+        err instanceof ScreenError
+          ? `${err.message} Nothing was saved.`
+          : "The answer didn’t come back — nothing was saved. Please try again.",
       ...keep,
     };
   }

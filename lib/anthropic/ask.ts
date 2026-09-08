@@ -2,7 +2,8 @@ import "server-only";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
-import { omDocument, omRequestOptions, omSourceFor } from "./om-source";
+import { structured } from "./failure";
+import { omDocument, omRequestOptions, omSourceFor, releaseOmSource } from "./om-source";
 import { MODELS } from "./models";
 import { ANALYST_SYSTEM } from "./prompts";
 // What the screen established about the deal — shared with the broker-comp
@@ -71,24 +72,26 @@ export async function askDealQuestion(
   // Oversized OMs ride as a Files-API reference (same prefix the pipeline
   // caches); everything else keeps the inline path.
   const om = await omSourceFor(pdf);
-
-  const response = await client.messages.parse({
-    model: MODELS.reasoning,
-    max_tokens: 2500,
-    system: ANALYST_SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content: [
-          omDocument(om),
-          { type: "text", text: askInstruction(question, context) },
+  try {
+    return await structured("The answer", () =>
+      client.messages.parse({
+        model: MODELS.reasoning,
+        max_tokens: 2500,
+        system: ANALYST_SYSTEM,
+        messages: [
+          {
+            role: "user",
+            content: [
+              omDocument(om),
+              { type: "text", text: askInstruction(question, context) },
+            ],
+          },
         ],
-      },
-    ],
-    output_config: { format: zodOutputFormat(AskSchema) },
-  }, omRequestOptions(om));
-
-  const out = response.parsed_output;
-  if (!out) throw new Error("The answer did not come back structured.");
-  return out;
+        output_config: { format: zodOutputFormat(AskSchema) },
+      }, omRequestOptions(om)),
+    );
+  } finally {
+    // The Files-API copy of a large OM lives only for this one question.
+    await releaseOmSource(om);
+  }
 }

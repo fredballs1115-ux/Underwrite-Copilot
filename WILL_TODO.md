@@ -3,17 +3,17 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#235 merged to main (live build
-sha `562f802`, #234, confirmed equal to the main tip by live-verify at 07:50
-UTC — every one of the first fifty-nine is live, and the public-page lint
-#231 added reads all twelve public pages clean on every run, skip link and
-landmarks included; #235 follows on its deploy).
+**Last updated 2026-09-08**, after PRs #176–#236 merged to main (live build
+sha `edd2119`, #235, confirmed equal to the main tip by live-verify at 07:57
+UTC — every one of the first sixty is live, and the public-page lint #231
+added reads all twelve public pages clean on every run, skip link and
+landmarks included; #236 follows on its deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Sixty PRs (#176–#235) landed across one review session and the
+Sixty-one PRs (#176–#236) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -260,6 +260,22 @@ deploy (live-verify shows the sha).
   captions on the homepage's dark bands (35–45% white, 3.3–4.1:1) and four
   notes in 70–80% muted did not. They sit at 55–60% white and solid muted
   now (5.2–5.9:1); the hierarchy reads the same.
+- **The screening pipeline's failure modes** (#236): the ninth review drove
+  the real pipeline against a fake database and reproduced fourteen ways a
+  run goes wrong before fixing them. A screen that fails midway now says
+  which results it never reached — "From the previous screen" on the
+  verdict, a progress count that excludes them, "Failed" over the stored
+  verdict on the pipeline list, the memo and report refusing until the
+  screen is re-run, the same note on a shared screen. The run heartbeats
+  between steps (a slow step no longer lets "Start it again" run a second
+  pipeline on the same deal), a run whose process died reads "Stalled" on
+  the list instead of "Screening…" forever, every failure is one sentence
+  you can act on with the provider's raw text kept for the server log, an
+  unreadable PDF stops before a verdict, a deal deleted mid-run stops the
+  run, a session that expires mid-screen says so, and a large OM's temporary
+  copy on the analysis service is deleted when its run ends. The root cause
+  of the stalls — in-process runs die with every deploy — is the standing
+  item below: turn the worker on once migration 0016 has run.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":

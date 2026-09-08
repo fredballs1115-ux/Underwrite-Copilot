@@ -822,11 +822,15 @@ export async function rerunAnalysis(formData: FormData) {
   // mode the claim also writes the run payload; the worker takes it from here.
   const workerMode =
     analysisWorkerEnabled() && (await workerSchemaReady(supabase));
+  // A retry of a FAILED worker run keeps the steps that finished (the same
+  // OM, the same checkpoints): the failing step and the ones after it re-run.
   const claim = await claimJob(
     supabase,
     dealId,
     "signal",
     workerMode ? { kind: "screen" } : undefined,
+    "queued",
+    { keepCheckpoints: true },
   );
   if (claim.outcome === "busy") {
     redirect(`/deals/${dealId}?error=busy`);

@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
+import { structured } from "./failure";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM } from "./prompts";
 import { omDocument, omRequestOptions, type OmSource } from "./om-source";
@@ -92,7 +93,7 @@ Finish with take: ONE skeptical sentence naming the single assumption this opini
 export async function extractBov(source: OmSource): Promise<BovExtraction> {
   const client = getAnthropic();
 
-  const response = await client.messages.parse(
+  const out = await structured("BOV extraction", () => client.messages.parse(
     {
       model: MODELS.extraction,
       max_tokens: MAX_TOKENS.extraction,
@@ -106,10 +107,7 @@ export async function extractBov(source: OmSource): Promise<BovExtraction> {
       output_config: { format: zodOutputFormat(BovSchema) },
     },
     omRequestOptions(source),
-  );
-
-  const out = response.parsed_output;
-  if (!out) throw new Error("BOV extraction did not return structured output.");
+  ));
 
   const clean = (f: BovField): BovField => ({
     value: f.value != null && Number.isFinite(f.value) ? f.value : null,

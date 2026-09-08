@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
+import { structured } from "./failure";
 import { omDocument, omRequestOptions, type OmSource } from "./om-source";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, marketCheckInstruction } from "./prompts";
@@ -36,7 +37,7 @@ export async function checkMarket(
 ): Promise<MarketResult> {
   const client = getAnthropic();
 
-  const response = await client.messages.parse({
+  const out = await structured("The market check", () => client.messages.parse({
     model: MODELS.reasoning,
     max_tokens: MAX_TOKENS.analysis,
     system: ANALYST_SYSTEM,
@@ -52,11 +53,6 @@ export async function checkMarket(
       },
     ],
     output_config: { format: zodOutputFormat(MarketSchema) },
-  }, omRequestOptions(om));
-
-  const out = response.parsed_output;
-  if (!out) {
-    throw new Error("Market check did not return structured output.");
-  }
+  }, omRequestOptions(om)));
   return out;
 }

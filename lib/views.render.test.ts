@@ -83,12 +83,16 @@ const CARDS: DealCard[] = [
   card({ id: "h", name: "Sample — The Maddox at Brewerytown", verdict: "caution", stage: "screening", fit: "near", score: 71, mandateVerdict: "WATCH", slots: { cap: "5.6%", price: "$68,000,000", yoc: null }, market: "Brewerytown, Philadelphia, PA", coveredMarket: "Philadelphia" }),
   card({ id: "i", name: "Lakewood Self Storage", assetClass: "self_storage", verdict: "pass", stage: "closed", fit: null, slots: { cap: "6.4%", price: "$9,800,000", yoc: null }, market: "Lakewood, CO", coveredMarket: null }),
   card({ id: "j", name: "Unpriced land — Route 1 parcel", verdict: "caution", stage: "screening", fit: null, slots: { cap: null, price: null, yoc: null }, market: "Laurel, MD", coveredMarket: "Baltimore" }),
+  // A run whose process died mid-screen, and a re-screen that failed before
+  // its verdict — the stored verdict must not read as the current call.
+  card({ id: "k", name: "Arlington Flex Park", assetClass: "industrial", stage: "screening", jobStatus: "stalled", slots: { cap: null, price: "$9,100,000", yoc: null }, market: "Arlington, TX", coveredMarket: "Dallas–Fort Worth", hasAddress: false }),
+  card({ id: "l", name: "Elm Street Lofts", verdict: "pass", stage: "underwriting", jobStatus: "failed", fit: "fits", score: 84, mandateVerdict: "PURSUE", slots: { cap: "6.0%", price: "$14,000,000", yoc: null }, market: "Dallas, TX", coveredMarket: "Dallas–Fort Worth" }),
 ];
 
 const BILLING = { isPro: false, canCreateDeal: true, dealCount: 9, dealLimit: 25 };
 
 describe("Pipeline — every card shape renders and reads clean", () => {
-  it("renders the pipeline with ten deals in every state", () => {
+  it("renders the pipeline with twelve deals in every state", () => {
     const html = render(
       React.createElement(Pipeline, {
         deals: CARDS,
@@ -114,6 +118,11 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(text).toContain("11.7%");
     expect(text).toContain("5.6%");
     expect(text).toContain("Jordan Lee");
+    // The stalled run and the failed re-screen each say so in the status
+    // column; the failed one's stored "Go" does not stand in for the call.
+    expect(text).toContain("Stalled");
+    expect(text).toContain("Failed");
+    expect(text).not.toMatch(/Elm Street Lofts[^]*?\bGo\b[^]*?Arlington Flex Park|Elm Street Lofts[\s\S]{0,400}\bGo\b/);
   });
 
   it("renders the empty pipeline with the getting-started state, and the at-limit notice", () => {

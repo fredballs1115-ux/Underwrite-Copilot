@@ -335,10 +335,13 @@ export function OverviewView({
   results,
   active,
   onNavigate,
+  stale = [],
 }: {
   results: Results;
   active: boolean;
   onNavigate: (tab: string) => void;
+  /** results the latest (failed) screen never reached — the previous screen's */
+  stale?: ReadonlyArray<keyof Results>;
 }) {
   const risks = deriveRisks(results);
   const counts = { high: 0, medium: 0, low: 0 };
@@ -351,7 +354,12 @@ export function OverviewView({
     { key: "market", label: "Market" },
     { key: "verdict", label: "Verdict" },
   ];
-  const done = steps.filter((s) => results[s.key] != null).length;
+  // A failed screen counts only what it reached: a result the previous
+  // screen wrote is present, but it is not this screen's — "5/5" over a
+  // mixed generation was the finding this line closes.
+  const staleSet = new Set<keyof Results>(stale);
+  const done = steps.filter((s) => results[s.key] != null && !staleSet.has(s.key)).length;
+  const staleCount = steps.filter((s) => results[s.key] != null && staleSet.has(s.key)).length;
   const hasModel = results.reconciliation != null;
 
   return (
@@ -360,6 +368,7 @@ export function OverviewView({
         <VerdictHero
           result={results.verdict}
           compact
+          stale={staleSet.has("verdict")}
           onMore={() => onNavigate("verdict")}
         />
       ) : (
@@ -392,12 +401,23 @@ export function OverviewView({
             {steps.map((s) => (
               <div
                 key={s.key}
+                title={staleSet.has(s.key) && results[s.key] != null ? `${s.label}: from the previous screen` : s.label}
                 className={`h-1.5 flex-1 rounded-full ${
-                  results[s.key] != null ? "bg-brand" : "bg-line"
+                  results[s.key] == null
+                    ? "bg-line"
+                    : staleSet.has(s.key)
+                      ? "bg-caution/50"
+                      : "bg-brand"
                 }`}
               />
             ))}
           </div>
+          {staleCount > 0 && (
+            <p className="mt-2 text-xs leading-relaxed text-caution">
+              {staleCount} of these are from the previous screen — the latest run failed before
+              reaching them. Run it again to bring them up to date.
+            </p>
+          )}
         </div>
       ) : (
         <p className="px-1 text-xs text-muted">
@@ -592,7 +612,7 @@ export function ChallengerView({
   result: ChallengerResult;
   dealName?: string;
 }) {
-  const ordered = [...result.challenges].sort(
+  const ordered = [...(result.challenges ?? [])].sort(
     (a, b) => SEV[a.severity].rank - SEV[b.severity].rank,
   );
   return (
@@ -601,7 +621,7 @@ export function ChallengerView({
         title="Assumption challenger"
         aside={
           <div className="flex items-center gap-3">
-            <SeverityTally challenges={result.challenges} />
+            <SeverityTally challenges={ordered} />
             {ordered.some((c) => c.question) && (
               <CopyAllQuestions challenges={ordered} dealName={dealName} />
             )}
@@ -814,7 +834,13 @@ export function BrokerComps({
   /** subject location for the comps map (Feature 4); null hides the map */
   mapContext?: { subjectLabel: string; market: string; omUrl: string | null } | null;
 }) {
-  const hasComps = result.saleComps.length > 0 || result.leaseComps.length > 0;
+  // Guarded once here: a legacy row with a null list must not take the
+  // whole tab down (the schema forces arrays on every write the app makes).
+  // (memoized: the map's own memo below keys on this array's identity)
+  const saleComps = useMemo(() => result.saleComps ?? [], [result.saleComps]);
+  const leaseComps = result.leaseComps ?? [];
+  const redFlags = result.redFlags ?? [];
+  const hasComps = saleComps.length > 0 || leaseComps.length > 0;
 
   // The map plots SALE comps (the OM's) beside the public-web candidates —
   // one pin set per source, colored apart. Each comp carries a geocode query
@@ -826,7 +852,7 @@ export function BrokerComps({
     () =>
       mapContext
         ? [
-            ...result.saleComps.map((c, i): MapComp => {
+            ...saleComps.map((c, i): MapComp => {
               const pageNum = c.page?.match(/\d+/)?.[0];
               return {
                 id: `om-${i}`,
@@ -854,7 +880,7 @@ export function BrokerComps({
             })),
           ]
         : [],
-    [mapContext, result.saleComps, compSearch],
+    [mapContext, saleComps, compSearch],
   );
 
   return (
@@ -868,7 +894,7 @@ export function BrokerComps({
           comps={mapComps}
         />
       )}
-      {result.redFlags.length > 0 && (
+      {redFlags.length > 0 && (
         <div className="rounded-xl border border-line border-l-4 border-l-kill bg-surface p-4 shadow-sm">
           <div className="flex items-center gap-2 text-kill">
             <IconFlag className="h-4 w-4" />
@@ -877,7 +903,7 @@ export function BrokerComps({
             </p>
           </div>
           <ul className="mt-2.5 space-y-1.5">
-            {result.redFlags.map((f, i) => (
+            {redFlags.map((f, i) => (
               <li
                 key={i}
                 className="flex gap-2 text-sm leading-relaxed text-muted"
@@ -889,11 +915,11 @@ export function BrokerComps({
           </ul>
         </div>
       )}
-      {result.saleComps.length > 0 && (
-        <CompTable title="Sale comps" comps={result.saleComps} />
+      {saleComps.length > 0 && (
+        <CompTable title="Sale comps" comps={saleComps} />
       )}
-      {result.leaseComps.length > 0 && (
-        <CompTable title="Lease comps" comps={result.leaseComps} />
+      {leaseComps.length > 0 && (
+        <CompTable title="Lease comps" comps={leaseComps} />
       )}
       {!hasComps && (
         <div className="rounded-xl border border-line bg-surface p-5 shadow-sm">
@@ -1140,14 +1166,15 @@ const DIR = {
 } as const;
 
 export function Reconciliation({ result }: { result: ReconciliationResult }) {
+  const rows = result.rows ?? [];
   const counts = { unfavorable: 0, favorable: 0, neutral: 0 };
-  for (const r of result.rows) counts[r.direction] = (counts[r.direction] ?? 0) + 1;
+  for (const r of rows) counts[r.direction] = (counts[r.direction] ?? 0) + 1;
   return (
     <section className="space-y-4">
       <SectionHeader
         title="Reconciliation — your model vs. the OM"
         aside={
-          result.rows.length > 0 ? (
+          rows.length > 0 ? (
             <p className="text-[11px] font-medium">
               {counts.unfavorable > 0 && (
                 <span className="text-kill">{counts.unfavorable} unfavorable</span>
@@ -1184,7 +1211,7 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
             </tr>
           </thead>
           <tbody>
-            {result.rows.map((r, i) => {
+            {rows.map((r, i) => {
               const d = DIR[r.direction] ?? DIR.neutral;
               return (
                 <tr
@@ -1282,7 +1309,7 @@ const TONE = {
 export function MarketCheck({ result }: { result: MarketResult }) {
   // Aggressive first — that's where the risk is.
   const order = { aggressive: 0, conservative: 1, "in-line": 2 } as const;
-  const ordered = [...result.checks].sort(
+  const ordered = [...(result.checks ?? [])].sort(
     (a, b) => order[a.assessment] - order[b.assessment],
   );
   return (
@@ -1542,13 +1569,19 @@ function FlipStrip({
 function VerdictHero({
   result,
   compact = false,
+  stale = false,
   onMore,
 }: {
   result: VerdictResult;
   compact?: boolean;
+  /** the latest screen failed before re-running the verdict — this call was
+   *  written about the terms as they were before that run */
+  stale?: boolean;
   onMore?: () => void;
 }) {
   const v = VERDICT[result.verdict] ?? VERDICT.caution;
+  const topRisks = result.topRisks ?? [];
+  const nextSteps = result.nextSteps ?? [];
   return (
     <section
       className={`overflow-hidden rounded-2xl border border-line border-l-4 bg-surface shadow-sm ${v.rail}`}
@@ -1557,6 +1590,17 @@ function VerdictHero({
         <span className="text-xs font-medium uppercase tracking-wider text-muted">
           Verdict
         </span>
+        {stale && (
+          <>
+            {" "}
+            <span
+              className="ml-2 rounded-full bg-caution/10 px-2 py-px text-[11px] font-medium text-caution"
+              title="The latest screen failed before it reached the verdict. This call was written about the terms as they stood before that run — run the screen again to refresh it."
+            >
+              From the previous screen
+            </span>
+          </>
+        )}
         <div className="mt-3 flex items-center gap-3">
           <span
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${v.iconBg}`}
@@ -1588,14 +1632,14 @@ function VerdictHero({
         )}
       </div>
       {!compact &&
-        (result.topRisks.length > 0 || result.nextSteps.length > 0) && (
+        (topRisks.length > 0 || nextSteps.length > 0) && (
           <div className="grid gap-px bg-line sm:grid-cols-2">
             <div className="bg-surface p-5">
               <p className="text-xs font-medium uppercase tracking-wider text-muted">
                 Top risks
               </p>
               <ul className="mt-3 space-y-2">
-                {result.topRisks.map((r, i) => (
+                {topRisks.map((r, i) => (
                   <li key={i} className="flex gap-2.5 text-sm leading-relaxed">
                     <span
                       aria-hidden
@@ -1611,7 +1655,7 @@ function VerdictHero({
                 Next steps
               </p>
               <ul className="mt-3 space-y-2">
-                {result.nextSteps.map((n, i) => (
+                {nextSteps.map((n, i) => (
                   <li key={i} className="flex gap-2.5 text-sm leading-relaxed">
                     <span aria-hidden className="mt-0.5 shrink-0 text-brand">
                       <IconArrowRight className="h-3.5 w-3.5" />
@@ -1627,10 +1671,17 @@ function VerdictHero({
   );
 }
 
-export function VerdictView({ result }: { result: VerdictResult }) {
+export function VerdictView({
+  result,
+  stale = false,
+}: {
+  result: VerdictResult;
+  /** the latest screen failed before re-running the verdict */
+  stale?: boolean;
+}) {
   return (
     <div className="flex flex-col gap-6">
-      <VerdictHero result={result} />
+      <VerdictHero result={result} stale={stale} />
       {result.screen && <ScreeningRanges screen={result.screen} />}
     </div>
   );
@@ -1651,7 +1702,8 @@ const LEVER_META: Record<
 const LEVER_ORDER: DealKiller["lever"][] = ["basis", "exit", "debt"];
 
 function ScreeningRanges({ screen }: { screen: ScreenResult }) {
-  const killers = [...screen.dealKillers].sort(
+  const ranges = screen.ranges ?? [];
+  const killers = [...(screen.dealKillers ?? [])].sort(
     (a, b) => LEVER_ORDER.indexOf(a.lever) - LEVER_ORDER.indexOf(b.lever),
   );
   return (
@@ -1664,9 +1716,9 @@ function ScreeningRanges({ screen }: { screen: ScreenResult }) {
         </p>
       </div>
 
-      {screen.ranges.length > 0 && (
+      {ranges.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2">
-          {screen.ranges.map((r, i) => (
+          {ranges.map((r, i) => (
             <RangeCard key={i} r={r} />
           ))}
         </div>

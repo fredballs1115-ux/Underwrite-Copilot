@@ -50,6 +50,22 @@ export async function omSourceFor(pdf: Buffer, filename = "om.pdf"): Promise<OmS
 }
 
 /**
+ * Delete the Files-API copy of an OM once its run is over. Uploads are per
+ * run (the pipeline, one Ask, one reconcile) and nothing else ever removed
+ * them, so a 25MB deck asked twenty-five questions left twenty-five copies on
+ * the account. Best-effort: a failed delete is logged, never surfaced — the
+ * work the upload served is already done. Inline and text sources are no-ops.
+ */
+export async function releaseOmSource(om: OmSource | null | undefined): Promise<void> {
+  if (!om || om.kind !== "file") return;
+  try {
+    await getAnthropic().beta.files.delete(om.fileId, { betas: ["files-api-2025-04-14"] });
+  } catch (err) {
+    console.error(`[anthropic] Files delete failed for ${om.fileId}`, err);
+  }
+}
+
+/**
  * The document content block for a step's message, from either source.
  * `cache` marks the block for prompt caching (the OM is the shared prefix
  * every pipeline step re-reads) — it applies to both transports.

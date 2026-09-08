@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
+import { structured } from "./failure";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, extractionInstruction } from "./prompts";
 import { omDocument, omRequestOptions, type OmSource } from "./om-source";
@@ -53,7 +54,7 @@ export async function extractTerms(
 ): Promise<ExtractionResult> {
   const client = getAnthropic();
 
-  const response = await client.messages.parse({
+  const out = await structured("Extraction", () => client.messages.parse({
     model: MODELS.extraction,
     max_tokens: MAX_TOKENS.extraction,
     system: ANALYST_SYSTEM,
@@ -72,12 +73,7 @@ export async function extractTerms(
       },
     ],
     output_config: { format: zodOutputFormat(ExtractionSchema) },
-  }, omRequestOptions(om));
-
-  const out = response.parsed_output;
-  if (!out) {
-    throw new Error("Extraction did not return structured output.");
-  }
+  }, omRequestOptions(om)));
 
   return {
     dealName: out.dealName.trim() ? out.dealName.trim() : null,

@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
+import { structured } from "./failure";
 import { omDocument, omRequestOptions, type OmSource } from "./om-source";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, challengerInstruction } from "./prompts";
@@ -38,7 +39,7 @@ export async function challengeAssumptions(
       ? `\n\n${reconNote.trim()} Where a figure the OM relies on is contradicted by the rent roll or T-12, treat that as a first-order challenge and put the exact discrepancy to the broker.`
       : "");
 
-  const response = await client.messages.parse({
+  const out = await structured("The challenger", () => client.messages.parse({
     model: MODELS.reasoning,
     max_tokens: MAX_TOKENS.analysis,
     system: ANALYST_SYSTEM,
@@ -53,11 +54,6 @@ export async function challengeAssumptions(
       },
     ],
     output_config: { format: zodOutputFormat(ChallengerSchema) },
-  }, omRequestOptions(om));
-
-  const out = response.parsed_output;
-  if (!out) {
-    throw new Error("Challenger did not return structured output.");
-  }
+  }, omRequestOptions(om)));
   return out;
 }

@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Sixty PRs, #176–#235, each
+estimate, and that's what it should flag." Sixty-one PRs, #176–#236, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -752,6 +752,37 @@ confirmed equal to the main tip after each batch.
   in 70–80% muted (3.0–3.6:1). The faint tiers now sit at 55–60% white
   (5.2–5.9:1) and the notes in solid muted (5.5:1); the hierarchy reads
   the same, the text is legible to more people.
+- **#236 The screening pipeline's failure modes, read by a ninth reviewer.**
+  Fourteen findings, each reproduced by driving the real pipeline against a
+  recording fake of the database before the fix. A screen that failed at the
+  comps step left this run's extraction beside the previous screen's comps,
+  market and verdict, counted "Screened · 5/5", and exported as a memo; the
+  job row's failing step now says which results the run never reached
+  (`lib/screen-run.ts`), and every surface reads it — "From the previous
+  screen" on the verdict, a progress count that excludes them, "Failed" over
+  the stored verdict on the pipeline list, the memo and the report refusing
+  until the screen is re-run, the same note on a shared screen. In-process
+  runs never heartbeated, so one slow step (the SDK retries a 529 twice
+  inside a call) went stale at ten minutes and "Start it again" ran a second
+  pipeline on the same deal — twelve model calls and interleaved results for
+  one screen; the run heartbeats every minute now. A run whose process died
+  in a deploy showed "Screening…" on the list forever; it reads "Stalled".
+  The provider's and the operator's own words ("authentication_error:
+  invalid x-api-key", "add it to .env.local") sat under a "Technical
+  details" toggle; every failure is now one sentence the analyst can act on
+  (`lib/anthropic/failure.ts`) with the raw text in the server log, and a
+  cut-off answer, a refusal or unreadable JSON is named as such at all
+  thirteen structured-output calls. A scan or a password-protected PDF stops
+  before a Caution verdict on a document never read; a deal deleted mid-run
+  stops the pipeline at the next step boundary instead of paying for every
+  remaining step; a large OM's Files-API copy is deleted when its run,
+  question or reconcile ends (nothing ever deleted them — twenty-five asks
+  left twenty-five copies); the previous first signal survives a failed read;
+  the poller says "you were signed out" instead of freezing the rail; a
+  worker retry after a failed run keeps the steps that finished; a
+  checkpoint written from an unread payload keeps the job's kind; the
+  retrade diff never runs over a failed generation; "dismiss without a
+  reason" has its banner. 32 new tests.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

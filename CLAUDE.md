@@ -65,6 +65,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   (memo and shared screen): the deal-defining rows first, then the flagged
   ones. Standard Helvetica is WinAnsi-only (`lib/memo/pdf-text.ts`): no "✓",
   no arrows.
+- The pipeline's failure modes: `lib/anthropic/failure.ts` turns any failure
+  into one sentence the analyst can act on (the raw text goes to the server
+  log, never the page), and its `structured()` wraps every structured-output
+  call so a cut-off, a refusal or unreadable JSON is named. `lib/screen-run.ts`
+  reads the job row: a failed run's step says which stored results still
+  belong to the previous screen (`staleAfterFailure`), and the pipeline list's
+  Running / Stalled / Failed (`listJobStatus`); the deal page, the list, the
+  memo and report routes and the shared screen all read it there — never
+  decide "is this result current" anywhere else. In-process runs heartbeat
+  the job row; a Files-API copy of an OM is released when its run ends
+  (`releaseOmSource`). `lib/anthropic/pipeline.test.ts` drives the real
+  pipeline against a recording fake database — reproduce a failure there
+  before fixing it.
 - DB schema: `supabase/migrations/`
 
 ## Conventions
