@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "The full report draws each sale comp against the deal's basis",
+      "blurb": "The report's Comp scrutiny page now draws each sale comp's stated basis as a bar under its detail line, with a tick where the deal's own price per unit sits — the same picture the deal page's comps tab draws, from the same reader, so the two never disagree on a comp. A comp whose line states no basis keeps its place with no bar.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-08",
       "title": "Sale comps draw their basis against the deal's own",
       "blurb": "On the deal page's comps tab, each sale comp the OM presented now draws its stated basis — $252k a unit, $410 a foot — as a bar under its detail line, with a tick where the deal's own asking price per unit sits, so which comps trade above the deal and which below reads before the figures do. Only what the comp's line states is drawn; a comp with no stated basis keeps its place with no bar, and a conversion or a development, judged on all-in cost, gets no tick.",
       "href": "/deals"
