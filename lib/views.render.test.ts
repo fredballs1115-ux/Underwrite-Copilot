@@ -240,6 +240,13 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     expect((html.match(/data-spread-bar/g) ?? []).length).toBe(22);
     expect(html).toContain("bg-muted/50");
     expect((html.match(/>best</g) ?? []).length).toBe(4);
+    // The leverage row's spread is signed, so its bar runs from a centre
+    // line: the Maddox's −60 bps to the left, scaled to the Tysons' +190
+    // (the row's widest), the Tysons' the full half to the right — once per
+    // layout; the two plan deals, judged on yield on cost, draw none.
+    expect((html.match(/data-signed-bar/g) ?? []).length).toBe(4);
+    expect((html.match(/right:50%;width:16%/g) ?? []).length).toBe(2);
+    expect((html.match(/left:50%;width:50%/g) ?? []).length).toBe(2);
     // The phone layout: a card per deal, the table hidden below `sm`.
     expect(html).toContain('aria-label="Deals compared"');
     expect((html.match(/<li /g) ?? []).length).toBe(COLS.length);
@@ -247,6 +254,7 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     // One deal alone has no spread to draw.
     const single = renderToStaticMarkup(React.createElement(CompareTable, { cols: [COLS[0]] }));
     expect(single).not.toContain("data-spread-bar");
+    expect(single).not.toContain("data-signed-bar");
   });
 });
 

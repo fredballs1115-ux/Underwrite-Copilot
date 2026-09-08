@@ -68,6 +68,38 @@ function SpreadBar({ share, rejected, best }: { share: number; rejected: boolean
   );
 }
 
+/** A signed figure's picture: a bar from a centre line — right in the pass
+ *  colour, left in the kill colour, a thin spread in the caution one — scaled
+ *  to the row's widest spread. Muted on a rejected deal, like SpreadBar. */
+function SignedBar({
+  share,
+  tone,
+  rejected,
+}: {
+  share: number;
+  tone: LeverageRead["tone"];
+  rejected: boolean;
+}) {
+  const half = Math.round(Math.abs(share) * 50);
+  return (
+    <span aria-hidden data-signed-bar className="relative mt-1.5 block h-1 w-16 rounded-full bg-faint">
+      <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-muted/40" />
+      <span
+        className={`absolute inset-y-0 rounded-full ${
+          rejected
+            ? "bg-muted/50"
+            : tone === "negative"
+              ? "bg-kill"
+              : tone === "thin"
+                ? "bg-caution"
+                : "bg-pass"
+        }`}
+        style={share < 0 ? { right: "50%", width: `${half}%` } : { left: "50%", width: `${half}%` }}
+      />
+    </span>
+  );
+}
+
 const BEST_PILL = (
   <>
     {/* The space keeps "2.10x best" two words when the table is read aloud
@@ -97,6 +129,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
      *  the pipeline's fit column draws, scaled to the row's largest figure so
      *  a meeting reads which column leads at a glance */
     num?: (c: Col) => number | null;
+    /** the figure is signed (a spread over a benchmark): its bar runs from a
+     *  centre line, scaled to the row's widest spread either way */
+    signed?: boolean;
   }[] = [
     { label: "Market", get: (c) => c.market },
     { label: "Covered market", get: (c) => c.coveredMarket ?? "—" },
@@ -152,25 +187,41 @@ export function CompareTable({ cols }: { cols: Col[] }) {
               ? "text-pass"
               : "",
       mono: true,
+      // The spread is signed, so its picture is a bar from a centre line in
+      // the read's colour; a plan deal has no cap to spread, so no bar.
+      num: (c) => (c.planDeal || !c.leverage ? null : c.leverage.spreadBps),
+      signed: true,
     },
     { label: "Purchase price", get: (c) => c.price, mono: true },
     { label: "Year-1 NOI", get: (c) => c.noi, mono: true },
   ];
 
   // Each row's spread, once, for both layouts: every figure against the
-  // row's largest, rejected deals included (the proportions must be honest)
-  // but drawn muted — the "best" pill still never lands on one. One column
-  // is no spread, so no bars.
+  // row's largest (the widest either way on a signed row), rejected deals
+  // included (the proportions must be honest) but drawn muted — the "best"
+  // pill still never lands on one. One column is no spread, so no bars.
   const rowStats = metricRows.map((mr) => {
     const nums = cols.map((c) => mr.num?.(c) ?? null);
-    const rowMax = Math.max(...nums.map((n) => (n != null && n > 0 ? n : 0)));
+    const rowMax = Math.max(0, ...nums.map((n) => (n == null ? 0 : mr.signed ? Math.abs(n) : n)));
     const drawBars = cols.length > 1 && rowMax > 0;
     return { nums, rowMax, drawBars };
   });
   const shareOf = (row: number, col: number): number | null => {
     const { nums, rowMax, drawBars } = rowStats[row];
     const n = nums[col];
-    return drawBars && n != null ? Math.min(1, Math.max(0, n / rowMax)) : null;
+    if (!drawBars || n == null) return null;
+    const share = n / rowMax;
+    return metricRows[row].signed ? Math.max(-1, Math.min(1, share)) : Math.min(1, Math.max(0, share));
+  };
+  const barFor = (mr: (typeof metricRows)[number], c: Col, ri: number, ci: number, isBest: boolean) => {
+    const share = shareOf(ri, ci);
+    if (share == null) return null;
+    const rejected = c.verdict === "pass_on";
+    return mr.signed ? (
+      <SignedBar share={share} tone={c.leverage?.tone ?? "positive"} rejected={rejected} />
+    ) : (
+      <SpreadBar share={share} rejected={rejected} best={isBest} />
+    );
   };
 
   return (
@@ -206,7 +257,6 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                 {metricRows.map((mr, ri) => {
                   const val = mr.get(c);
                   const isBest = (mr.best?.(c) ?? false) && cols.length > 1;
-                  const share = shareOf(ri, ci);
                   return (
                     <div key={mr.label} className="min-w-0">
                       <dt className="text-[10px] uppercase tracking-wide text-muted">{mr.label}</dt>
@@ -217,9 +267,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                       >
                         {val ?? <span className="text-muted">—</span>}
                         {isBest && BEST_PILL}
-                        {share != null && (
-                          <SpreadBar share={share} rejected={c.verdict === "pass_on"} best={isBest} />
-                        )}
+                        {barFor(mr, c, ri, ci, isBest)}
                       </dd>
                     </div>
                   );
@@ -321,7 +369,6 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                 {cols.map((c, ci) => {
                   const val = mr.get(c);
                   const isBest = (mr.best?.(c) ?? false) && cols.length > 1;
-                  const share = shareOf(ri, ci);
                   return (
                     <td
                       key={c.id}
@@ -331,9 +378,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                     >
                       {val ?? <span className="text-muted">—</span>}
                       {isBest && BEST_PILL}
-                      {share != null && (
-                        <SpreadBar share={share} rejected={c.verdict === "pass_on"} best={isBest} />
-                      )}
+                      {barFor(mr, c, ri, ci, isBest)}
                     </td>
                   );
                 })}

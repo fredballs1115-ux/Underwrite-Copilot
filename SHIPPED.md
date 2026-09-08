@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Seventy-nine PRs, #176–#254, each
+estimate, and that's what it should flag." Eighty PRs, #176–#255, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1066,6 +1066,18 @@ confirmed equal to the main tip after each batch.
   never disagree. The compare fixture asserts twenty-two bars (eleven per
   layout), four "best" pills, a card per deal and the table hidden below
   `sm`; shot at 390.
+- **#255 The compare page's leverage row draws its signed spread.** Every
+  other return row drew its spread in #252 and #254; "Leverage vs 30-yr"
+  still said "+190 bps" / "−60 bps" in words and a colour. The figure is
+  signed, so its picture is a bar from a centre line — right in the pass
+  colour, left in the kill colour, a thin spread in the caution one — scaled
+  to the widest spread in the row either way, muted on a rejected deal, and
+  absent on a plan deal (judged on yield on cost) or when one deal is
+  compared alone. The row stats both layouts share take the absolute value
+  on a signed row, so the cards and the table draw the same bar. The compare
+  fixture asserts four signed bars (two per layout), the Maddox's −60 bps at
+  16% of the half-track to the left against the Tysons' +190 at the full
+  half to the right, and none for a single column; shot at 1440 and 390.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
