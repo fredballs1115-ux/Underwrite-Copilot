@@ -151,6 +151,18 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(textOf(render(sampleProps("overview")))).not.toMatch(/previous screen/);
   });
 
+  it("the comps tab draws each sale comp's basis against the subject's", () => {
+    const html = render(sampleProps("analyses", "comps"));
+    // Three sale comps state a per-unit basis ($252k, $298k, $261k) and each
+    // draws a bar with the subject's tick ($68M over 248 units, $274k); the
+    // lease comp ("$2,520/mo · 2BR") states no basis and draws none.
+    expect((html.match(/data-comp-bar/g) ?? []).length).toBe(3);
+    expect((html.match(/data-comp-subject/g) ?? []).length).toBe(3);
+    const text = textOf(html);
+    expect(text).toMatch(/the tick is the subject at \$274k\/unit/);
+    expect(text).toMatch(/\$252k\/unit against the subject's \$274k\/unit/);
+  });
+
   it("the overview carries the verdict and the buy-box fit; the financials carry the price", () => {
     const overview = textOf(render(sampleProps("overview")));
     expect(overview).toMatch(/Caution/);

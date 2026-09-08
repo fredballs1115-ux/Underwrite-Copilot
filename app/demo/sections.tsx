@@ -21,6 +21,8 @@ import {
 } from "../(app)/deals/[id]/sensitivity-playground";
 import { DebtSizer } from "../(app)/deals/[id]/debt-sizer";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
+import { subjectBasis } from "@/lib/comp-detail";
+import { inferStrategy } from "@/lib/deal-strategy";
 import type {
   ExtractionResult,
   ChallengerResult,
@@ -141,6 +143,7 @@ export function DemoSections({ data }: { data: DemoData }) {
             active={false}
             isPro={false}
             publicDemo
+            subject={subjectBasis(data.extraction.metrics, inferStrategy(data.extraction).kind)}
           />
         )}
         {tab === "market" && <MarketCheck result={data.market} />}

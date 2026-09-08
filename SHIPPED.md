@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Eighty-four PRs, #176–#259, each
+estimate, and that's what it should flag." Eighty-five PRs, #176–#260, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1126,6 +1126,22 @@ confirmed equal to the main tip after each batch.
   both layouts. The clean-roll fixture asserts a bar per priced lease in
   each layout, the card list, the coloured fill and the table hidden below
   `sm`; shot at 390.
+- **#260 One comp-detail reader, and the comps table draws each sale comp
+  against the subject.** A broker comp's figures arrive as one line of text
+  ("$252k/unit · 5.6% cap · Q3'25"), so nothing could draw them.
+  `lib/comp-detail.ts` reads a per-unit or per-SF basis and a cap out of
+  that line when the text states one — "$252k/unit", "$252,000 per door",
+  "$410/SF", "$410 psf", "5.6% cap", "cap rate 5.60%" — and nothing
+  otherwise: a monthly rent, a bare price, a growth rate wearing a
+  percentage all read as no figure, the same honesty as `rangeRead`. The
+  subject's own basis comes from the shared price, unit-count and
+  building-size readers (a conversion or a development, judged on all-in
+  cost, gets none), and `basisScale` puts every comp and the subject on one
+  track. The deal page's sale-comps table draws each comp's basis as a bar
+  under its detail with the subject as a tick, a one-line legend beneath;
+  lease comps draw none. The demo's comps tab gets the same. Eleven reader
+  cases; the deal-view render test asserts three bars, three ticks and the
+  legend on the sample.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

@@ -58,6 +58,7 @@ import { ReplaceOm } from "./replace-om";
 import { ManualDealForm } from "../manual-deal-form";
 import { factsFromExtraction, type ManualDealFacts } from "@/lib/manual-deal";
 import { findPricedMetric, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
+import { subjectBasis, type SubjectBasis } from "@/lib/comp-detail";
 import type { ResultKey } from "@/lib/screen-run";
 import { useToast } from "../../toaster";
 import type { UnderwritingModel } from "@/lib/model/types";
@@ -799,6 +800,10 @@ export function DealView({
             internalComps={internalComps}
             omUrl={omUrl}
             staleVerdict={staleResults.includes("verdict")}
+            compSubject={subjectBasis(
+              results.extraction?.metrics ?? [],
+              inferStrategy(results.extraction, firstSignal).kind,
+            )}
           />
         )}
 
@@ -1168,6 +1173,7 @@ function AnalysesPanel({
   internalComps,
   omUrl,
   staleVerdict = false,
+  compSubject = null,
 }: {
   analysis: AnalysisKey;
   onSelect: (key: AnalysisKey) => void;
@@ -1186,6 +1192,9 @@ function AnalysesPanel({
   omUrl: string | null;
   /** the latest screen failed before re-running the verdict */
   staleVerdict?: boolean;
+  /** the subject's own basis, read where the first signal is in scope, so
+   *  the comps table's tick and the deal header agree on the deal's kind */
+  compSubject?: SubjectBasis | null;
 }) {
   const STEP_FOR: Record<AnalysisKey, string> = {
     verdict: "verdict",
@@ -1249,6 +1258,7 @@ function AnalysesPanel({
           compSearch={compSearch}
           active={active}
           isPro={isPro}
+          subject={compSubject}
           mapContext={{
             subjectLabel:
               results.extraction?.address || results.extraction?.market || "",

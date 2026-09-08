@@ -39,6 +39,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   a cap). The sample deal's ONE derivation for the demo page, the demo workbook
   and the demo report: `lib/sample-derive.ts` (actuals included — never call
   `deriveUnderwriteInputs` on the sample directly).
+- A broker comp's figures: `lib/comp-detail.ts` reads a stated per-unit /
+  per-SF basis and cap out of the comp's one detail line (`compFigures`), the
+  subject's own basis from the shared readers (`subjectBasis` — none for a
+  conversion or a development), and puts the set on one track
+  (`basisScale`). It reads only what the text states; nothing is inferred.
+  Every surface that draws a comp against the subject goes through it.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`

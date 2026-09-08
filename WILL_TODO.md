@@ -3,19 +3,19 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#258 merged to main (live build
-sha `e7c5317`, #255, confirmed equal to the main tip by live-verify at 17:22
-UTC with its `DEPLOY: LIVE` line — every one of the eighty through #255 is
-live, the homepage serves at 196 KB where it served at 488 KB, the public
-sample memo at 57 KB where it served at 11 KB (the Brewerytown frame is in
-it), and the public-page lint #231 added reads all twelve public pages clean
-on every run; #256–#258 are merged and await their proof, #259 follows).
+**Last updated 2026-09-08**, after PRs #176–#259 merged to main (live build
+sha `6d07675`, #258, confirmed equal to the main tip by live-verify at 17:37
+UTC with its `DEPLOY: LIVE` line — every one of the eighty-three through
+#258 is live, the homepage serves at 196 KB where it served at 488 KB, the
+public sample memo at 57 KB where it served at 11 KB (the Brewerytown frame
+is in it), and the public-page lint #231 added reads all twelve public pages
+clean on every run; #259 is merged and awaits its proof, #260 follows).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Eighty-four PRs (#176–#259) landed across one review session and the
+Eighty-five PRs (#176–#260) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -404,6 +404,10 @@ deploy (live-verify shows the sha).
   a centre line per lease — pass to the right when it sits below market,
   kill to the left when above — and a card per lease below `sm` in place
   of the sideways-scrolling table.
+- **One comp-detail reader; the comps table draws each sale comp against
+  the subject** (#260): `lib/comp-detail.ts` reads a stated per-unit /
+  per-SF basis and cap out of a comp's line and nothing otherwise; each
+  sale comp's basis is a bar under its detail with the subject's as a tick.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -681,19 +685,17 @@ a route scoped to the share token; the memo and the report got theirs in
    when the text is not a figure. Plain `View`s, height-neutral, the same
    fill-count assertion. Item 9 names the comp half's reader and puts it
    behind the web comps table too.
-9. **One comp-detail reader behind the comps table and the report's comp
-   page.** A broker comp's figures arrive as one line of text
-   (`BrokerComp.detail`: "$262k/unit · 5.4% cap · Mar 2026"), so neither
-   the deal page's comps table (`app/(app)/deals/[id]/comps-map.tsx`) nor
-   the report's comp page can draw them. A pure `lib/comp-detail.ts` that
-   reads a per-unit or per-SF basis and a cap out of that line when the
-   text states one — "$262k/unit", "$262,000 / unit", "$410/SF",
-   "5.4% cap" — and returns nothing otherwise (the same honesty as
-   `rangeRead`), then each comp's basis drawn as a bar against the
-   subject's own (the shared price and unit readers give the subject's)
-   in both places: the web table under the detail, the report as a plain
-   `View` with the fill-count assertion. This is item 8's comp half with
-   its parser named; the reconciliation gap keeps its own reader there.
+9. **The report's comp page draws the same bars.** #260 gave the deal
+   page's sale-comps table each comp's basis as a bar against the subject's
+   tick, read by `lib/comp-detail.ts`; the report's Comp scrutiny page
+   (`lib/memo/report-document.tsx`, the row per comp) still prints the
+   detail line alone. The same `basisScale` over the sale comps and the
+   subject's basis, drawn as plain `View`s under the detail text — a track,
+   the comp's fill, a 1pt tick for the subject — height-neutral like the
+   memo's bars, with the fill-count assertion in
+   `lib/memo/report-render.test.ts` (three comps on the sample → the delta
+   against a comp set that states no basis). That closes item 8's comp
+   half; the reconciliation gap's signed bar remains its other half.
 
 ---
 
