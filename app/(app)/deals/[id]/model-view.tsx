@@ -970,6 +970,7 @@ function DocumentsPanel({
         <select
           name="kind"
           defaultValue="rent_roll"
+          aria-label="Document type"
           className="rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
         >
           {DOC_KINDS.map((k) => (

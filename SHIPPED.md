@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Fifty-five PRs, #176–#230, each
+estimate, and that's what it should flag." Fifty-six PRs, #176–#231, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -674,6 +674,48 @@ confirmed equal to the main tip after each batch.
   instead of one sentence for all. And the OM's in-place occupancy seeds
   the vacancy line, marked extracted, instead of a class default printed
   beside it.
+- **#231 The documents, read as the recipient reads them — the eighth
+  review's twelve findings, each with a test.** The memo, the full report,
+  the shared screen and the workbook, read the way the person on the other
+  end reads them: the PDFs are rendered and their text read back in the
+  suite now (`lib/memo/pdf-text-of.ts`), not counted by page. The memo's
+  "Key terms" sorted flagged rows first and cut at four, so the public
+  sample memo opened on four pro-forma figures and never stated the asking
+  price, the going-in cap or the unit count — one reader
+  (`lib/key-terms.ts`) leads the memo and the shared screen with the
+  deal-defining rows. The report's sensitivity page printed a -48% IRR and
+  a -17.9x "equity multiple" as a conversion's base case: the annual model
+  books the budget in year 1, so on a plan deal the IRR page is omitted and
+  the plan page says why; a multiple at or below zero is a dash anywhere.
+  The Excel Deal Summary's "Stabilized Yield (on cost)" was year-1 NOI over
+  uses that left the $160M budget out (5.91% where every other surface
+  says 11.7%): a plan deal's block reads "Cap on Yr-1 Income (as
+  modelled)" and "Yield on Cost (OM stabilized NOI / total cost)" over a
+  stabilized-NOI input cell with its page and a live total-cost cell. The
+  verdict prompt's ranges bullet gains the plan carve-out (total cost per
+  unit, never the shell's price) its deal-killers bullet already had. The
+  memo and report routes judge the buy box from the deal page's own check
+  source (first signal, structured address, inferred kind), so a chip the
+  page calls "in territory" is never "unknown" on the PDF. The buy-box
+  pass mark was a "✓" standard Helvetica cannot encode — every passing
+  chip printed empty; it is a WinAnsi "+" now, and a test runs each mark
+  through the PDF text filter. The report printed citations the app
+  refuses to show ("p. 412" on a 40-page OM): a page prints only inside
+  the OM's count. The report's memo page dropped the override lines the
+  standalone memo carries; the memo's range table dropped the model's
+  confidence; the report's plan strip was a second implementation of
+  `lib/plan-facts.ts` that disagreed on wording and format ($21M vs
+  $21.0M); an all-in-only plan called its total cost "the budget"; the
+  shared screen's key terms carried no in-place / pro-forma badge. All
+  fixed. Also in this PR: the accessibility floor (`a11yIssues` in
+  `lib/render-lint.ts`) on every rendered view — six unlabeled pipeline
+  filters, the decision-note textarea, the file input and the
+  document-type select gained names; the pipeline's price column reads
+  "$68.0M" instead of "$68,000,…"; and `scripts/lint-pages.mjs`, run by
+  live-verify over the public pages on every deploy, which found
+  "29machine-evaluable rules" on the homepage — a number and its noun with
+  only a margin between them, one word to a screen reader — and six
+  siblings; each spells its space now.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

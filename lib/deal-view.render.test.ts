@@ -24,7 +24,7 @@ import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { inferStrategy } from "@/lib/deal-strategy";
 import { ToastProvider } from "@/app/(app)/toaster";
 import { DealView } from "@/app/(app)/deals/[id]/deal-view";
-import { dumpView, gluedWords, visibleText as textOf } from "./render-lint";
+import { a11yIssues, dumpView, gluedWords, visibleText as textOf } from "./render-lint";
 
 type Props = Parameters<typeof DealView>[0];
 
@@ -112,6 +112,7 @@ describe("DealView — the sample deal renders every section without a runtime e
       const html = render(sampleProps(tab, analysis));
       expect(html.length).toBeGreaterThan(2_000);
       dumpView(`deal-${tab ?? "default"}${analysis ? `-${analysis}` : ""}`, html);
+      expect(a11yIssues(html), `a11y ${tab}/${analysis}`).toEqual([]);
       const text = textOf(html);
       expect(gluedWords(text), `glued words in ${tab}/${analysis}`).toEqual([]);
       // The section nav is the one thing every render carries (the server page

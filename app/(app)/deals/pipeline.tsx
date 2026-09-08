@@ -65,6 +65,16 @@ export type DealCard = {
  *  Every column is sortable from its header. */
 type SortKey = "name" | "asset" | "price" | "cap" | "fit" | "status" | "added";
 
+/** The price as a table wants it — "$68.0M", "$950k" — with the OM's own
+ *  figure kept for the tooltip and the CSV. A column eighty pixels wide
+ *  showed every deal as "$68,000,…" before; the raw string stays when it
+ *  is not a figure at all ("Call for offers"). */
+function compactPrice(raw: string): string {
+  const n = parseMoney(raw);
+  if (n == null || !(n > 0)) return raw;
+  return n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
+}
+
 const FIT_META: Record<NonNullable<DealCard["fit"]>, { label: string; cls: string; rank: number }> = {
   outside: { label: "Outside", cls: "text-kill", rank: 0 },
   near: { label: "Near", cls: "text-caution", rank: 1 },
@@ -708,6 +718,7 @@ export function Pipeline({
             />
           </div>
           <FilterSelect
+            label="Filter by verdict"
             value={verdict}
             onChange={setVerdict}
             options={[
@@ -719,6 +730,7 @@ export function Pipeline({
             ]}
           />
           <FilterSelect
+            label="Filter by stage"
             value={stage}
             onChange={setStage}
             options={[
@@ -728,6 +740,7 @@ export function Pipeline({
           />
           {assets.length > 1 && (
             <FilterSelect
+              label="Filter by asset class"
               value={asset}
               onChange={setAsset}
               options={[
@@ -738,6 +751,7 @@ export function Pipeline({
           )}
           {markets.length > 1 && (
             <FilterSelect
+              label="Filter by market"
               value={market}
               onChange={setMarket}
               options={[
@@ -748,6 +762,7 @@ export function Pipeline({
           )}
           {hasScores && (
             <FilterSelect
+              label="Filter by mandate fit"
               value={mfit}
               onChange={setMfit}
               options={[
@@ -774,6 +789,7 @@ export function Pipeline({
           )}
           {/* Below md the column headers are hidden, so sorting lives here. */}
           <FilterSelect
+            label="Sort deals"
             value={`${sortKey}:${sortDir}`}
             onChange={(v) => {
               const [k, dir] = v.split(":") as [SortKey, "asc" | "desc"];
@@ -910,7 +926,7 @@ export function Pipeline({
               <div className="min-w-0 flex-1">
                 <SortHead label="Deal" k="name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
               </div>
-              <SortHead label="Asset" k="asset" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="hidden w-20 lg:flex" />
+              <SortHead label="Asset" k="asset" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="hidden w-24 lg:flex" />
               <SortHead label="Price" k="price" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="w-20" right />
               <SortHead label="Cap" k="cap" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="w-12" right />
               <SortHead label="Fit" k="fit" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="hidden w-16 lg:flex" right />
@@ -1135,7 +1151,9 @@ const DealRow = memo(function DealRow({
     </span>
   ) : null;
   const priceBit = d.slots.price ? (
-    <span className="font-mono tabular-nums">{d.slots.price}</span>
+    <span className="font-mono tabular-nums" title={d.slots.price}>
+      {compactPrice(d.slots.price)}
+    </span>
   ) : null;
   // A plan deal has no going-in cap; its yield on total cost is the figure
   // that answers the same question, so it takes the slot — labelled.
@@ -1219,7 +1237,7 @@ const DealRow = memo(function DealRow({
         />
       </div>
       {/* Column cells — widths, order, and gaps mirror the header row. */}
-      <span className="hidden w-20 shrink-0 items-center gap-1.5 truncate text-sm capitalize text-muted lg:flex">
+      <span className="hidden w-24 shrink-0 items-center gap-1.5 truncate text-sm capitalize text-muted lg:flex">
         {d.assetClass ? (
           <>
             <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${asset.dot}`} />
@@ -1229,8 +1247,11 @@ const DealRow = memo(function DealRow({
           <span className="text-line">—</span>
         )}
       </span>
-      <span className="hidden w-20 shrink-0 truncate text-right font-mono text-sm tabular-nums md:block">
-        {d.slots.price ?? <span className="text-line">—</span>}
+      <span
+        className="hidden w-20 shrink-0 truncate text-right font-mono text-sm tabular-nums md:block"
+        title={d.slots.price ?? undefined}
+      >
+        {d.slots.price ? compactPrice(d.slots.price) : <span className="text-line">—</span>}
       </span>
       <span className="hidden w-12 shrink-0 text-right font-mono text-sm tabular-nums md:block">
         {d.slots.cap ??
@@ -1515,15 +1536,20 @@ function FilterSelect({
   onChange,
   options,
   className = "",
+  label,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: [string, string][];
   className?: string;
+  /** the accessible name — a select with no label is announced as nothing
+   *  but its value ("All verdicts") to a screen reader */
+  label: string;
 }) {
   return (
     <select
       value={value}
+      aria-label={label}
       onChange={(e) => onChange(e.target.value)}
       style={{
         backgroundImage:

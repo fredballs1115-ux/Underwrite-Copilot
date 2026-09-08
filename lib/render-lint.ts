@@ -39,8 +39,64 @@ export function gluedWords(text: string): string[] {
   const out = new Set<string>();
   for (const m of text.matchAll(/\b(\d+)([a-z]{3,})\b/g)) if (!UNIT_SUFFIX.test(m[2])) out.add(m[0]);
   for (const m of text.matchAll(/\b([a-z]{3,})\1\b/g)) out.add(m[0]);
-  for (const m of text.matchAll(/\b(a|an|the|of|to|in|on|for|and|or|with|at|by|from|is|it)\s+\1\b/gi)) out.add(m[0]);
+  // "From verdict to to-do list" is fine: the doubled word must not be the
+  // start of a hyphenated one.
+  for (const m of text.matchAll(/\b(a|an|the|of|to|in|on|for|and|or|with|at|by|from|is|it)\s+\1\b(?!-)/gi)) out.add(m[0]);
   return [...out];
+}
+
+const attr = (tag: string, name: string): string | null => {
+  const m = tag.match(new RegExp(`\\s${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, "i"));
+  return m ? (m[2] ?? m[3] ?? m[4] ?? "") : null;
+};
+const hasAttr = (tag: string, name: string): boolean => new RegExp(`\\s${name}(\\s|=|>|/)`, "i").test(tag);
+const innerText = (html: string): string => html.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim();
+
+/**
+ * The accessibility faults a static render can show: an image with no alt,
+ * a button or link a screen reader would announce as nothing, a form control
+ * with no label, an id used twice. Not a substitute for an audit with a real
+ * assistive tool — the cheap, deterministic floor under one, run on every
+ * render the suite makes.
+ */
+export function a11yIssues(html: string): string[] {
+  const out: string[] = [];
+  for (const m of html.matchAll(/<img\b[^>]*>/gi)) {
+    if (!hasAttr(m[0], "alt")) out.push(`img without alt: ${m[0].slice(0, 80)}`);
+  }
+  const named = (tag: string) =>
+    (attr(tag, "aria-label") ?? "").trim() || (attr(tag, "aria-labelledby") ?? "").trim() || (attr(tag, "title") ?? "").trim();
+  for (const m of html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/gi)) {
+    const open = `<button${m[1]}>`;
+    if (!innerText(m[2]) && !named(open) && !/<img\b[^>]*\salt\s*=\s*"[^"]+"/i.test(m[2])) {
+      out.push(`button with no accessible name: ${open.slice(0, 90)}`);
+    }
+  }
+  for (const m of html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
+    const open = `<a${m[1]}>`;
+    if (hasAttr(open, "href") && !innerText(m[2]) && !named(open) && !/<img\b[^>]*\salt\s*=\s*"[^"]+"/i.test(m[2])) {
+      out.push(`link with no accessible name: ${open.slice(0, 90)}`);
+    }
+  }
+  const labelFor = new Set([...html.matchAll(/<label\b[^>]*\sfor\s*=\s*"([^"]+)"/gi)].map((m) => m[1]));
+  for (const m of html.matchAll(/<(input|select|textarea)\b[^>]*>/gi)) {
+    const tag = m[0];
+    const type = (attr(tag, "type") ?? "").toLowerCase();
+    if (type === "hidden" || type === "submit" || type === "button" || type === "checkbox" || type === "radio") continue;
+    const id = attr(tag, "id");
+    const wrapped = false; // a <label> wrapping the control is checked below
+    if (named(tag) || (id && labelFor.has(id)) || wrapped) continue;
+    // A control inside a <label>…</label> is labelled by its text.
+    const idx = m.index ?? 0;
+    const before = html.lastIndexOf("<label", idx);
+    const closeBefore = html.lastIndexOf("</label>", idx);
+    if (before !== -1 && before > closeBefore) continue;
+    out.push(`${m[1]} with no label: ${tag.slice(0, 90)}`);
+  }
+  const ids = new Map<string, number>();
+  for (const m of html.matchAll(/\sid\s*=\s*"([^"]+)"/g)) ids.set(m[1], (ids.get(m[1]) ?? 0) + 1);
+  for (const [id, n] of ids) if (n > 1) out.push(`duplicate id "${id}" ×${n}`);
+  return out;
 }
 
 /**

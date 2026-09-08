@@ -91,6 +91,7 @@ export function DecisionLog({
             required
             maxLength={500}
             rows={2}
+            aria-label="New decision note"
             placeholder="e.g. Passed at $68M — revisit if they come back under $63M."
             className="min-w-0 flex-1 resize-y rounded-lg border border-line bg-surface px-3 py-2 text-sm placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-brand/30"
           />

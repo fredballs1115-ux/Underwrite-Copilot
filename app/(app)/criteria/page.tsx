@@ -155,8 +155,8 @@ export default async function CriteriaPage({
                       key={b.id}
                       className="rounded-lg border border-brand bg-brand/5 px-3 py-1.5 text-sm font-medium text-brand"
                     >
-                      {b.name}
-                      <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wide">
+                      {b.name}{" "}
+                      <span className="ml-1 text-[10px] font-semibold uppercase tracking-wide">
                         active
                       </span>
                     </span>

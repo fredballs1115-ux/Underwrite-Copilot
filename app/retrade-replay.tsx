@@ -65,8 +65,8 @@ export function RetradeReplay() {
                 Deck v2 · reissued
               </p>
               <p className="mt-0.5 font-mono text-xl font-semibold tabular-nums text-ink">
-                {NEW_M != null ? `$${NEW_M.toFixed(1)}M` : "lower ask"}
-                <span className="ml-2 rounded bg-pass/10 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-pass">
+                {NEW_M != null ? `$${NEW_M.toFixed(1)}M` : "lower ask"}{" "}
+                <span className="ml-1 rounded bg-pass/10 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-pass">
                   {SAMPLE_RETRADE_DELTA}
                 </span>
               </p>

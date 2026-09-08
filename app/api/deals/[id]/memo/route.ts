@@ -9,9 +9,11 @@ import {
 } from "@/lib/memo/memo-document";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { getBrandingForDeal, brandingLogoDataUri } from "@/lib/branding-server";
-import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
+import { buyBoxCheckSource, evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
 import type { DealRow } from "@/lib/deals";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
+import type { StructuredAddress } from "@/lib/address";
+import { inferStrategy } from "@/lib/deal-strategy";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
 
 // PDF generation needs the Node runtime (not edge).
@@ -88,9 +90,20 @@ export async function GET(
     };
     const box = await getBuyBoxForDeal(ownership.user_id, ownership.team_id);
     if (box) {
+      // The same source the deal page judges: the extraction widened with the
+      // first signal and the deal's structured address, and the deal's kind
+      // as the page infers it — so a criterion the page calls "in territory"
+      // is never "unknown" on the PDF.
+      const extraction = (deal.extraction as ExtractionResult | null) ?? null;
+      const firstSignal = (deal.first_signal as FirstSignal | null) ?? null;
       buyBoxChecks = evaluateBuyBox(
         deal.asset_class,
-        (deal.extraction as ExtractionResult) ?? null,
+        buyBoxCheckSource(
+          extraction,
+          firstSignal,
+          (deal.address as StructuredAddress | null) ?? null,
+          inferStrategy(extraction, firstSignal).kind,
+        ),
         box,
       );
     }

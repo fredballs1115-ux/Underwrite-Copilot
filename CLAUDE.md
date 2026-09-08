@@ -34,6 +34,30 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   `lib/deal-context.ts` (what the screen established, handed to every Claude
   step that reads the OM after the extraction). Read the deal's kind first —
   a plan deal has no going-in cap; its stabilized figures belong over total cost.
+- The pipeline row's price / cap / yield-on-cost slots: `lib/pipeline-slots.ts`
+  (the same rule as the meeting .xlsx — a plan deal shows yield on cost, never
+  a cap). The sample deal's ONE derivation for the demo page, the demo workbook
+  and the demo report: `lib/sample-derive.ts` (actuals included — never call
+  `deriveUnderwriteInputs` on the sample directly).
+- Render smoke tests: `lib/deal-view.render.test.ts` and
+  `lib/views.render.test.ts` render the signed-in views on fixtures and lint
+  the visible text with `lib/render-lint.ts` (a digit glued to a word, a word
+  doubled; `a11yIssues`: an image with no alt, a nameless button or link, an
+  unlabelled control, a duplicate id). With `VIEW_SHOTS_DIR` set they also
+  write each view as a full document with the built stylesheet linked, so
+  headless Chromium can open it at 390px — the visual half, run by hand.
+  `lib/jsx-whitespace.test.ts` scans every page's source for the JSX shape
+  the compiler glues (a leading space after `}` or `>`, a line break, an
+  entity); the fix is an explicit `{" "}`. A number followed only by a
+  margin-spaced `<span>` is one word to a screen reader — spell the space.
+  The public pages get the same lint after every deploy:
+  `scripts/lint-pages.mjs` over the HTML live-verify fetches.
+- The documents: the memo and report PDFs are read back as text in their
+  tests (`lib/memo/pdf-text-of.ts`, test tooling) — assert on what the page
+  says, not on its page count. `lib/key-terms.ts` orders a "Key terms" block
+  (memo and shared screen): the deal-defining rows first, then the flagged
+  ones. Standard Helvetica is WinAnsi-only (`lib/memo/pdf-text.ts`): no "✓",
+  no arrows.
 - DB schema: `supabase/migrations/`
 
 ## Conventions

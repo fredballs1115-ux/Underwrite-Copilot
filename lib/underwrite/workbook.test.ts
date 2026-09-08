@@ -450,6 +450,43 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
     expect(planEngine.cashFlow[0].capitalImprovements).toBe(160_000_000);
   });
 
+  it("the Deal Summary's return block names the year-1 cap for what it is and puts the OM's stabilized NOI over total cost", () => {
+    // The eighth review: "Stabilized Yield (on cost)" was year-1 NOI over
+    // uses that left the $160M budget out — 5.91% where every other surface
+    // says 11.7%. On a plan deal the block now reads the OM's stabilized
+    // figure over uses plus the capital plan, and the year-1 cap says it is
+    // the cap on modelled year-1 income.
+    const summary = wb.getWorksheet("Deal Summary")!;
+    expect(() => findRow(summary, 4, "Going-In Cap")).toThrow();
+    expect(() => findRow(summary, 4, "Stabilized Yield (on cost)")).toThrow();
+    findRow(summary, 4, "Cap on Yr-1 Income (as modelled)");
+    findRow(summary, 4, "Yield on Cost (OM stabilized NOI / total cost)");
+    const noiRow = findRow(summary, 1, "OM Stabilized NOI (pro forma)");
+    expect(summary.getCell(noiRow, 2).value).toBe(21_000_000);
+    expect(String(summary.getCell(noiRow, 3).value)).toBe("OM p. 12");
+    expect(summary.getCell(noiRow, 4).value).toBe("Total Cost (uses + capital plan)");
+    expect(Number(named(hf, "StabilizedNOI"))).toBe(21_000_000);
+    const totalCost = Number(named(hf, "TotalCost"));
+    expect(totalCost).toBeCloseTo(planEngine.sourcesUses.totalUses + 160_000_000, 0);
+    expect(Number(named(hf, "YieldOnCost"))).toBeCloseTo(21_000_000 / totalCost, 6);
+    // Live: the yield reads through the named cells, not a pasted number.
+    const yocRow = findRow(summary, 4, "Yield on Cost (OM stabilized NOI / total cost)");
+    expect(String((summary.getCell(yocRow, 5).value as { formula?: string }).formula)).toMatch(/StabilizedNOI\/TotalCost/);
+  });
+
+  it("a plan deal whose OM states no stabilized NOI says so, and the yield cell reads n/a rather than erroring", async () => {
+    const noNoi = deriveUnderwriteInputs(
+      { ...conversion, metrics: conversion.metrics.filter((m) => !/NOI/.test(m.label)) },
+      "fallback",
+    );
+    expect(noNoi.meta.stabilizedNoi).toBeNull();
+    const { hf: h, wb: w } = await loadIntoHf(await buildUnderwriteWorkbook(noNoi));
+    const summary = w.getWorksheet("Deal Summary")!;
+    const noiRow = findRow(summary, 1, "OM Stabilized NOI (pro forma)");
+    expect(summary.getCell(noiRow, 2).value).toBe("not stated");
+    expect(named(h, "YieldOnCost")).toBe("n/a");
+  }, 30000);
+
   it("a stabilized deal gets no plan wording (the row is absent, not blank)", async () => {
     const stabilized = deriveUnderwriteInputs(
       { ...extraction, strategy: { kind: "stabilized", summary: "", capitalBudget: "", timeline: "" } },

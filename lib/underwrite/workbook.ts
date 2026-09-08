@@ -607,12 +607,37 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   // Deal type, and on a plan deal the budget the returns have to pay for —
   // a live link to the Assumptions cell, so flexing it flows through.
   const dealKind = meta.strategy ?? "unknown";
+  const planDeal = dealKind !== "unknown" && isPlanDeal(dealKind);
   if (dealKind !== "unknown") {
     r++;
     label(ws.getCell(r, 1), "Deal Type"); label(ws.getCell(r, 2), STRATEGY_LABEL[dealKind], { color: GREEN });
-    if (isPlanDeal(dealKind)) {
+    if (planDeal) {
       label(ws.getCell(r, 4), "Capital Budget (yr 1)");
       ws.getCell(r, 5).value = { formula: "CapImprovements" } as ExcelJS.CellFormulaValue; styleLink(ws.getCell(r, 5), FMT.usd);
+      // The plan's own yardstick, as an input beside the budget: the OM's
+      // stabilized pro forma NOI (the finished project's figure, never year
+      // 1's) and the total cost it sits over — uses plus the capital plan.
+      // The return block below reads both; the year-1 cap stays labelled as
+      // the cap on modelled year-1 income, which on a plan deal it is.
+      r++;
+      label(ws.getCell(r, 1), "OM Stabilized NOI (pro forma)");
+      const noiCell = ws.getCell(r, 2);
+      if (meta.stabilizedNoi) {
+        noiCell.value = meta.stabilizedNoi.value;
+        noiCell.numFmt = FMT.usd;
+        noiCell.font = { name: ARIAL, size: 10, color: GREEN };
+        noiCell.alignment = { horizontal: "right" };
+        label(ws.getCell(r, 3), meta.stabilizedNoi.page ? `OM ${meta.stabilizedNoi.page}` : "OM", { color: MUTED, size: 9 });
+      } else {
+        // A blank is null, never zero: the OM stated no stabilized figure.
+        label(noiCell, "not stated", { color: MUTED });
+      }
+      noiCell.name = "StabilizedNOI";
+      label(ws.getCell(r, 4), "Total Cost (uses + capital plan)");
+      const tcCell = ws.getCell(r, 5);
+      tcCell.value = { formula: "TotalUses+CapImprovements" } as ExcelJS.CellFormulaValue;
+      tcCell.name = "TotalCost";
+      styleFormula(tcCell, FMT.usd);
     }
   }
   r += 2;
@@ -704,8 +729,23 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     styleFormula(c, fmt);
     rr++;
   };
-  ret("Going-In Cap", `IF(PurchasePrice=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
-  ret("Stabilized Yield (on cost)", `IF(TotalUses=0,"n/a",${noiY1}/TotalUses)`, FMT.pct2);
+  if (planDeal) {
+    // A plan deal has no going-in cap: year-1 income here is in-place or
+    // assumed, so the cell says what it is. The yield the plan is judged on
+    // is the OM's stabilized NOI over total cost (uses + the capital plan) —
+    // the same figure the deal page, the memo and the report print — never
+    // year-1 NOI over uses that leave the budget out.
+    ret("Cap on Yr-1 Income (as modelled)", `IF(PurchasePrice=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
+    ret(
+      "Yield on Cost (OM stabilized NOI / total cost)",
+      `IF(OR(NOT(ISNUMBER(StabilizedNOI)),TotalCost=0),"n/a",StabilizedNOI/TotalCost)`,
+      FMT.pct2,
+      "YieldOnCost",
+    );
+  } else {
+    ret("Going-In Cap", `IF(PurchasePrice=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
+    ret("Stabilized Yield (on cost)", `IF(TotalUses=0,"n/a",${noiY1}/TotalUses)`, FMT.pct2);
+  }
   ret("Unlevered IRR", `IFERROR(IRR(${unlevRange}),"check inputs")`, FMT.pct1);
   ret("Levered IRR", `IFERROR(IRR(${levRange}),"check inputs")`, FMT.pct1, "LeveredIRR");
   ret("Unlevered Equity Multiple", `IF((PurchasePrice+ClosingCostsTotal+AcqFee)=0,"n/a",(SUM(${unlevOps}))/(PurchasePrice+ClosingCostsTotal+AcqFee))`, FMT.mult);

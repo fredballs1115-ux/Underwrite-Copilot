@@ -19,6 +19,7 @@ import type {
   VerdictResult,
 } from "@/lib/anthropic/types";
 import { inferStrategy, planSummary } from "@/lib/deal-strategy";
+import { keyTermRows } from "@/lib/key-terms";
 
 const C = {
   brand: "#114e54",
@@ -42,6 +43,12 @@ const CALL_COLOR: Record<string, string> = {
   Caution: C.caution,
   "No-go": C.kill,
 };
+// A range's confidence, in the deal page's colours (RANGE_CONF there).
+const RANGE_CONF_COLOR: Record<string, string> = {
+  high: C.pass,
+  medium: C.caution,
+  low: C.kill,
+};
 // Light tints for banner backgrounds — react-pdf has no alpha compositing
 // against the page, so the tints are precomputed solids.
 const VERDICT_TINT: Record<string, string> = {
@@ -49,11 +56,16 @@ const VERDICT_TINT: Record<string, string> = {
   Caution: "#f8f0e3",
   "No-go": "#f9eae8",
 };
-const STATUS_CHIP: Record<
+// The marks are WinAnsi glyphs on purpose: standard Helvetica has no check
+// mark, and a "✓" here once encoded to an undefined byte, so every passing
+// criterion printed as an empty chip (the tints are indistinguishable in
+// grayscale). pdf-text.ts holds the rule; the test asserts each mark
+// survives it.
+export const STATUS_CHIP: Record<
   "pass" | "near" | "miss" | "unknown",
   { color: string; bg: string; mark: string }
 > = {
-  pass: { color: C.pass, bg: "#e9f4ef", mark: "✓" },
+  pass: { color: C.pass, bg: "#e9f4ef", mark: "+" },
   near: { color: C.caution, bg: "#f8f0e3", mark: "±" },
   miss: { color: C.kill, bg: "#f9eae8", mark: "×" },
   unknown: { color: C.muted, bg: C.faint, mark: "—" },
@@ -97,7 +109,16 @@ export type MemoData = {
   challenges: { severity: string; assumption: string; challenge: string }[];
   flags: { label: string; text: string }[];
   // The pre-model screen — ranges, deal-killers, and where the call flips.
-  ranges: { label: string; low: string; base: string; high: string; source: string }[];
+  // Each range keeps the confidence the model gave it: a low-confidence
+  // range and a high-confidence one must not read alike on the page.
+  ranges: {
+    label: string;
+    low: string;
+    base: string;
+    high: string;
+    source: string;
+    confidence: "high" | "medium" | "low" | "";
+  }[];
   dealKillers: { label: string; read: string; risk: string }[];
   sensitivity: { scenario: string; call: string; note: string }[];
   nextSteps: string[];
@@ -134,6 +155,10 @@ const clamp = (v: unknown, n: number) => {
 
 const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
+/** A range's confidence as the model gave it, or "" for anything else. */
+const confidenceOf = (v: unknown): MemoData["ranges"][number]["confidence"] =>
+  v === "high" || v === "medium" || v === "low" ? v : "";
+
 // WinAnsi-only text (standard Helvetica can't encode anything else) \u2014 the
 // full filter lives in pdf-text.ts (universal, unit-tested); re-exported here
 // for the full report and any other document module.
@@ -168,14 +193,13 @@ export function buildMemoData(
     : null;
 
   const metrics = list(extraction?.metrics) as ExtractionResult["metrics"];
-  const ordered = [
-    ...metrics.filter((m) => m?.flagged),
-    ...metrics.filter((m) => !m?.flagged),
-  ];
-  const keyTerms = ordered.slice(0, 8).map((m) => ({
-    label: str(m?.label),
-    value: str(m?.value),
-    flagged: !!m?.flagged,
+  // The deal-defining rows first (price, cap or the plan's figures, units),
+  // then the flagged ones — so the block never opens on four speculative
+  // pro-forma figures and omits the asking price (lib/key-terms.ts).
+  const keyTerms = keyTermRows(metrics, inferStrategy(extraction ?? null).kind, 8).map((m) => ({
+    label: str(m.label),
+    value: str(m.value),
+    flagged: !!m.flagged,
   }));
 
   const ch = (list(challenges?.challenges) as ChallengerResult["challenges"])
@@ -223,7 +247,8 @@ export function buildMemoData(
       low: str(r?.low),
       base: str(r?.base),
       high: str(r?.high),
-      source: clamp(r?.source, 62),
+      source: clamp(r?.source, 56),
+      confidence: confidenceOf(r?.confidence),
     }));
   const dealKillers = (
     list(screen?.dealKillers) as NonNullable<typeof screen>["dealKillers"]
@@ -520,10 +545,11 @@ const s = StyleSheet.create({
     paddingHorizontal: 2,
   },
   rangeRowAlt: { backgroundColor: C.faint },
-  rangeLabel: { width: "26%", fontSize: 8.5, fontFamily: "Helvetica-Bold" },
-  rangeCell: { width: "13%", fontSize: 8.5, textAlign: "right", paddingRight: 6 },
+  rangeLabel: { width: "24%", fontSize: 8.5, fontFamily: "Helvetica-Bold" },
+  rangeCell: { width: "12%", fontSize: 8.5, textAlign: "right", paddingRight: 6 },
+  rangeConf: { width: "9%", fontSize: 7.5, textAlign: "right" },
   rangeCellBase: {
-    width: "13%",
+    width: "12%",
     fontSize: 8.5,
     textAlign: "right",
     paddingRight: 6,
@@ -532,7 +558,7 @@ const s = StyleSheet.create({
     backgroundColor: "#e8f1ef",
     borderRadius: 3,
   },
-  rangeSource: { width: "35%", fontSize: 7.5, color: C.muted },
+  rangeSource: { width: "31%", fontSize: 7.5, color: C.muted },
   rangeHeadText: {
     fontSize: 7,
     color: C.muted,
@@ -744,6 +770,7 @@ export function MemoPage({ data }: { data: MemoData }) {
               <Text style={[s.rangeCell, s.rangeHeadText]}>Base</Text>
               <Text style={[s.rangeCell, s.rangeHeadText]}>High</Text>
               <Text style={[s.rangeSource, s.rangeHeadText]}>Source</Text>
+              <Text style={[s.rangeConf, s.rangeHeadText]}>Conf.</Text>
             </View>
             {data.ranges.map((r, i) => (
               <View
@@ -755,6 +782,9 @@ export function MemoPage({ data }: { data: MemoData }) {
                 <Text style={s.rangeCellBase}>{r.base}</Text>
                 <Text style={s.rangeCell}>{r.high}</Text>
                 <Text style={s.rangeSource}>{r.source}</Text>
+                <Text style={[s.rangeConf, { color: RANGE_CONF_COLOR[r.confidence] ?? C.muted }]}>
+                  {r.confidence}
+                </Text>
               </View>
             ))}
 

@@ -27,6 +27,7 @@ export function FileField({
         name={name}
         accept={accept}
         required
+        aria-label={buttonLabel}
         className="sr-only"
         onChange={(e) => {
           const f = e.currentTarget.files?.[0] ?? null;

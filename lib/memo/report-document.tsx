@@ -28,6 +28,9 @@ import {
   type SpreadBucket,
   type YocGrid,
 } from "@/lib/plan-sensitivity";
+import { planFacts } from "@/lib/plan-facts";
+import { inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
+import { parsePageNumber } from "@/lib/facts";
 
 const C = {
   brand: "#114e54",
@@ -321,6 +324,10 @@ export interface ReportInput {
    *  NOI shortfall and budget overrun; null for a stabilized asset or when
    *  the OM did not state a budget and a stabilized NOI */
   plan?: PlanReport | null;
+  /** the OM's real page count, from the extraction — a citation prints only
+   *  when it falls inside it (lib/facts.ts: never an unvalidated page);
+   *  null when the count is unknown, and then no page prints */
+  totalPages: number | null;
 }
 
 /** Everything the deal screen produced, shaped for the multi-page report. */
@@ -331,17 +338,43 @@ export function buildReportData(
   sensitivity?: SensitivityData | null,
   branding?: MemoData["branding"],
   plan?: PlanReport | null,
+  overrides?: string[] | null,
 ): ReportInput {
+  const extraction = (deal.extraction as ExtractionResult | null) ?? null;
+  const pages = extraction?.totalPages;
   return {
     deal,
-    memo: buildMemoData(deal, dateStr, buyBoxChecks, branding),
-    sensitivity: sensitivity ?? null,
+    // Page 1 IS the memo, dismissed submarket checks included: the analyst's
+    // own words on an override travel with the report as they do with the
+    // standalone memo.
+    memo: buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides),
+    // On a plan deal the annual screening model books the budget in year 1
+    // and anchors year 1 on in-place income, so its IRR grid is not the
+    // plan's return — it once printed a -48% IRR and a -17.9x multiple as
+    // the base case. The plan page carries the sensitivity such a deal is
+    // judged on; the IRR page is omitted rather than caveated.
+    sensitivity: isPlanDeal(inferStrategy(extraction).kind) ? null : (sensitivity ?? null),
     plan: plan ?? null,
+    totalPages: typeof pages === "number" && Number.isFinite(pages) && pages > 0 ? Math.round(pages) : null,
   };
+}
+
+/** A metric's page for the page column — the citation as extracted when it
+ *  parses and falls inside the document, a dash otherwise. The deal page
+ *  shows the same rows as "source not located"; the report must not show
+ *  more than the app does. */
+export function citedPage(page: unknown, totalPages: number | null): string {
+  const n = parsePageNumber(typeof page === "string" ? page : null);
+  return n != null && totalPages != null && n <= totalPages ? str(page) : "—";
 }
 
 const fmtPct = (d: number, dp = 1): string => `${(d * 100).toFixed(dp)}%`;
 const fmtDelta = (d: number): string => `${d > 0 ? "+" : ""}${Math.round(d * 100)}%`;
+/** What the overrun axis and sentence call the figure they stress. When the
+ *  OM stated only an all-in total and no price, the "budget" IS that total
+ *  with the acquisition inside it — the strip above declines to call it a
+ *  budget, so the sentence must not either. */
+const budgetNoun = (plan: PlanReport): string => (plan.plan.budget?.isTotal ? "Total cost" : "The budget");
 const SPREAD_ORDER: SpreadBucket[] = ["wide", "adequate", "thin", "none", "negative"];
 
 /**
@@ -350,7 +383,7 @@ const SPREAD_ORDER: SpreadBucket[] = ["wide", "adequate", "thin", "none", "negat
  * geometry as HeatGrid so the two pages read alike; the fills are the
  * development-spread bands, not the IRR hurdle.
  */
-function YocGridPdf({ grid }: { grid: YocGrid }) {
+function YocGridPdf({ grid, axis }: { grid: YocGrid; axis: string }) {
   const rowLabelWidth = "17%";
   const colW = `${(100 - parseFloat(rowLabelWidth)) / grid.budgetCols.length}%`;
   const axisText = { fontSize: 6.5, letterSpacing: 0.6, color: C.muted } as const;
@@ -359,7 +392,7 @@ function YocGridPdf({ grid }: { grid: YocGrid }) {
       <View style={{ flexDirection: "row" }}>
         <Text style={{ width: rowLabelWidth }} />
         <Text style={{ ...axisText, width: `${100 - parseFloat(rowLabelWidth)}%`, textAlign: "center", paddingBottom: 2 }}>
-          BUDGET, AGAINST THE OM&apos;S (TOTAL COST BENEATH)
+          {str(axis)}
         </Text>
       </View>
       <View
@@ -565,6 +598,9 @@ function HeatGrid({
 
 export function ReportDocument({ input }: { input: ReportInput }) {
   const { deal, memo, sensitivity, plan } = input;
+  // Older callers built the input by hand without a page count: then no
+  // citation validates, and none prints (the rule in lib/facts.ts).
+  const totalPages = input.totalPages ?? null;
   const dealName = memo.name;
   const extraction = deal.extraction as ExtractionResult | null;
   const challenges = deal.challenges as ChallengerResult | null;
@@ -638,24 +674,12 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               borderColor: C.line,
             }}
           >
-            {(
-              [
-                ["STABILIZED NOI", plan.plan.stabilizedNoi ? fmtCompactUsd(plan.plan.stabilizedNoi.value) : "not stated"],
-                [plan.plan.priceLabel.toUpperCase(), plan.plan.price != null ? fmtCompactUsd(plan.plan.price) : "not stated"],
-                [
-                  plan.plan.budget?.allIn ? "BUDGET (LESS PRICE)" : "BUDGET",
-                  plan.plan.budget
-                    ? plan.plan.budget.isTotal
-                      ? "in the total"
-                      : fmtCompactUsd(plan.plan.budget.budget)
-                    : "not stated",
-                ],
-                ["TOTAL COST", plan.plan.totalCost != null ? fmtCompactUsd(plan.plan.totalCost) : "-"],
-                ["YIELD ON COST", plan.plan.yieldOnCost != null ? fmtPct(plan.plan.yieldOnCost) : "-"],
-              ] as [string, string][]
-            ).map(([label, value]) => (
-              <View key={label} style={{ width: "20%" }}>
-                <Text style={{ fontSize: 6.5, letterSpacing: 0.6, color: C.muted }}>{label}</Text>
+            {/* The same reader as the deal page's plan strip and the shared
+                screen (lib/plan-facts.ts) — one set of labels, one money
+                format, one blank rule — so the three never disagree. */}
+            {planFacts(plan.plan).map(([label, value], _i, all) => (
+              <View key={label} style={{ width: `${100 / all.length}%` }}>
+                <Text style={{ fontSize: 6.5, letterSpacing: 0.6, color: C.muted }}>{str(label).toUpperCase()}</Text>
                 <Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold", color: C.brand, marginTop: 1 }}>
                   {str(value)}
                 </Text>
@@ -670,7 +694,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                   : "Timeline to stabilization: not stated."
               }${
                 plan.plan.costPerUnit != null && plan.plan.units != null
-                  ? ` Basis: ${fmtCompactUsd(plan.plan.costPerUnit)} per planned unit (${plan.plan.units.toLocaleString("en-US")} units), all-in.`
+                  ? ` The all-in basis is total cost over the ${plan.plan.units.toLocaleString("en-US")} planned units.`
                   : ""
               }`,
             )}
@@ -685,7 +709,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               )} reference cap in basis points. The ink-bordered cell is the OM's own case. A pro forma that keeps its spread with NOI 20% short and the budget 30% over is conservative; one that needs its own base case is not.`,
             )}
           </Text>
-          <YocGridPdf grid={plan.grid} />
+          <YocGridPdf
+            grid={plan.grid}
+            axis={`${budgetNoun(plan).toUpperCase()}, AGAINST THE OM'S (TOTAL COST BENEATH)`}
+          />
           <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
             {str(
               plan.breakevens.noiCushion > 0
@@ -704,7 +731,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           <Text style={{ fontSize: 8, color: C.ink, marginTop: 3, fontFamily: "Helvetica-Oblique" }}>
             {str(
               plan.breakevens.overrunToRefCap != null
-                ? `The budget would have to run ${fmtPct(plan.breakevens.overrunToRefCap, 0)} over - ${fmtCompactUsd(
+                ? `${budgetNoun(plan)} would have to run ${fmtPct(plan.breakevens.overrunToRefCap, 0)} over - ${fmtCompactUsd(
                     plan.plan.budget!.budget * (1 + plan.breakevens.overrunToRefCap),
                   )} against ${fmtCompactUsd(plan.plan.budget!.budget)} - before the yield fell to the reference cap.`
                 : "Any overrun deepens a yield that already sits below the cap.",
@@ -733,7 +760,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             {str(
               `Reference cap: ${fmtPct(plan.refCap.pct, 2)} - ${refCapNote(
                 plan.refCap.provenance,
-              )}. Figures are the OM's as extracted; the challenger's page tests whether the stabilized NOI is as conservative as the deck presents it.`,
+              )}. Figures are the OM's as extracted; the challenger's page tests whether the stabilized NOI is as conservative as the deck presents it. The IRR sensitivity page is omitted on a plan deal: the annual screening model books the budget in year 1 and anchors year 1 on in-place income, so its IRR grid is not the plan's return - this grid is.`,
             )}
           </Text>
         </PageChrome>
@@ -866,7 +893,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                 {BASIS_LABEL[str(m?.basis)] ?? "—"}
               </Text>
               <Text style={{ width: "12%", fontSize: 8, color: C.muted }}>
-                {str(m?.page)}
+                {citedPage(m?.page, totalPages)}
               </Text>
               <View style={{ width: "14%" }}>
                 {m?.flagged ? <RateChip word="verify" color={C.caution} /> : null}
@@ -951,7 +978,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                       {str(cp?.note)}
                     </Text>
                     <Text style={{ width: "8%", fontSize: 7.5, color: C.muted }}>
-                      {str(cp?.page)}
+                      {citedPage(cp?.page, totalPages)}
                     </Text>
                   </View>
                 ))}

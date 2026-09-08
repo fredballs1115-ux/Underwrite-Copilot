@@ -8,7 +8,15 @@ import type {
   VerdictResult,
 } from "@/lib/anthropic/types";
 import { inferStrategy, planSummary } from "@/lib/deal-strategy";
+import { keyTermRows } from "@/lib/key-terms";
 import { SharePlan } from "./plan-facts";
+
+// A range's confidence, in the deal page's colours (RANGE_CONF there).
+const RANGE_CONF: Record<string, { label: string; cls: string }> = {
+  high: { label: "High", cls: "bg-pass/10 text-pass" },
+  medium: { label: "Med", cls: "bg-caution/10 text-caution" },
+  low: { label: "Low", cls: "bg-kill/10 text-kill" },
+};
 
 // Every render checks expiry/revocation against the database.
 export const dynamic = "force-dynamic";
@@ -104,7 +112,6 @@ export default async function SharePage({
     border: "border-line",
   };
 
-  const metrics = (extraction?.metrics ?? []).slice(0, 8);
   const screen = verdict.screen;
   // The deal's kind first — a partner reading "$21M stabilized NOI" beside a
   // $20M price needs to know it is a conversion's finished-project figure.
@@ -113,6 +120,8 @@ export default async function SharePage({
     : null;
   const strategy = inferStrategy(safeExtraction);
   const plan = planSummary(safeExtraction, strategy);
+  // The deal-defining rows first, as the memo orders them (lib/key-terms.ts).
+  const metrics = keyTermRows(safeExtraction?.metrics ?? [], strategy.kind, 8);
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-10">
@@ -188,17 +197,38 @@ export default async function SharePage({
                 </tr>
               </thead>
               <tbody>
-                {screen.ranges.slice(0, 6).map((r, i) => (
-                  <tr key={i} className="border-b border-line/60">
-                    <td className="py-2 pr-3 font-medium">{r.label}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{r.low}</td>
-                    <td className="py-2 pr-3 text-right font-semibold tabular-nums text-brand">
-                      {r.base}
-                    </td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{r.high}</td>
-                    <td className="py-2 text-xs text-muted">{r.source}</td>
-                  </tr>
-                ))}
+                {screen.ranges.slice(0, 6).map((r, i) => {
+                  // The honesty markers the deal page shows on every range
+                  // card: the model's confidence, and what drives the spread.
+                  const conf = RANGE_CONF[r.confidence];
+                  return (
+                    <tr key={i} className="border-b border-line/60 align-top">
+                      <td className="py-2 pr-3 font-medium">
+                        {r.label}
+                        {conf && (
+                          <>
+                            {" "}
+                            <span
+                              className={`ml-1 inline-block rounded-full px-1.5 py-px align-middle text-[10px] font-medium uppercase ${conf.cls}`}
+                              title={`${conf.label} confidence`}
+                            >
+                              {conf.label}
+                            </span>
+                          </>
+                        )}
+                      </td>
+                      <td className="py-2 pr-3 text-right tabular-nums">{r.low}</td>
+                      <td className="py-2 pr-3 text-right font-semibold tabular-nums text-brand">
+                        {r.base}
+                      </td>
+                      <td className="py-2 pr-3 text-right tabular-nums">{r.high}</td>
+                      <td className="py-2 text-xs text-muted">
+                        {r.source}
+                        {r.basis && <p className="mt-0.5 text-[11px] text-muted/80">{r.basis}</p>}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -227,8 +257,21 @@ export default async function SharePage({
           <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
             {metrics.map((m, i) => (
               <div key={i}>
-                <p className="text-xs uppercase tracking-wider text-muted">
-                  {m.label}
+                <p className="flex items-center gap-1 text-xs uppercase tracking-wider text-muted">
+                  <span className="truncate">{m.label}</span>
+                  {/* The same badge the deal page puts on every metric card:
+                      a bare "NOI" or "Cap rate" label says nothing about
+                      whether the figure is today's or the sponsor's story. */}
+                  {m.basis === "pro_forma" && (
+                    <span className="shrink-0 rounded bg-caution/10 px-1 py-px text-[9px] font-semibold normal-case tracking-normal text-caution">
+                      pro forma
+                    </span>
+                  )}
+                  {m.basis === "in_place" && (
+                    <span className="shrink-0 rounded bg-pass/10 px-1 py-px text-[9px] font-semibold normal-case tracking-normal text-pass">
+                      in place
+                    </span>
+                  )}
                 </p>
                 <p className="mt-0.5 font-semibold tabular-nums">{m.value}</p>
                 {m.flagged && (

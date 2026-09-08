@@ -5,7 +5,9 @@
 // yield on cost, a development priced at its land, an office deal, a deal
 // still screening, a failed job, a dead deal, a teammate's deal — and the
 // visible text is read for a runtime error, a sentence glued to a number, a
-// word doubled. Same components, same props the server pages hand them.
+// word doubled; the markup for an image with no alt, a button or link with
+// no accessible name, a form control with no label, an id used twice. Same
+// components, same props the server pages hand them.
 import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -46,7 +48,7 @@ import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table"
 import { ToastProvider } from "@/app/(app)/toaster";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { leverageRead } from "@/lib/leverage";
-import { dumpView, gluedWords, visibleText } from "./render-lint";
+import { a11yIssues, dumpView, gluedWords, visibleText } from "./render-lint";
 
 function render(node: React.ReactElement): string {
   return renderToStaticMarkup(React.createElement(ToastProvider, null, node));
@@ -98,6 +100,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     );
     expect(html.length).toBeGreaterThan(5_000);
     dumpView("pipeline", html);
+    expect(a11yIssues(html), "a11y pipeline").toEqual([]);
     const text = visibleText(html);
     expect(gluedWords(text)).toEqual([]);
     // Every live deal is on the page under its own name; the dead one is
@@ -124,6 +127,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
         }),
       );
     dumpView("pipeline-empty", emptyHtml);
+    expect(a11yIssues(emptyHtml), "a11y pipeline-empty").toEqual([]);
     const empty = visibleText(emptyHtml);
     expect(gluedWords(empty)).toEqual([]);
     expect(empty.length).toBeGreaterThan(200);
@@ -137,6 +141,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
         }),
       );
     dumpView("pipeline-at-limit", atLimitHtml);
+    expect(a11yIssues(atLimitHtml), "a11y pipeline-at-limit").toEqual([]);
     const atLimit = visibleText(atLimitHtml);
     expect(gluedWords(atLimit)).toEqual([]);
     expect(atLimit).toContain("Could not read that PDF");
@@ -157,6 +162,7 @@ describe("ModelView — the sample model renders every panel", () => {
     );
     expect(html.length).toBeGreaterThan(5_000);
     dumpView("model", html);
+    expect(a11yIssues(html), "a11y model").toEqual([]);
     const text = visibleText(html);
     expect(gluedWords(text)).toEqual([]);
     expect(text).toMatch(/IRR/);
@@ -204,6 +210,7 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
   it("renders four columns and reads clean", () => {
     const html = renderToStaticMarkup(React.createElement(CompareTable, { cols: COLS }));
     dumpView("compare", html);
+    expect(a11yIssues(html), "a11y compare").toEqual([]);
     const text = visibleText(html);
     expect(gluedWords(text)).toEqual([]);
     for (const c of COLS) expect(text, c.name).toContain(c.name);
@@ -280,6 +287,7 @@ describe("BridgeView — an IRR move attributed to its drivers renders and reads
       }),
     );
     dumpView("bridge", html);
+    expect(a11yIssues(html), "a11y bridge").toEqual([]);
     const text = visibleText(html);
     expect(gluedWords(text)).toEqual([]);
     expect(text).toMatch(/bps/);
@@ -374,6 +382,7 @@ describe("ValuationsView — two BOVs, the gap decomposed, renders and reads cle
       }),
     );
     dumpView("valuations", html);
+    expect(a11yIssues(html), "a11y valuations").toEqual([]);
     const text = visibleText(html);
     expect(gluedWords(text)).toEqual([]);
     expect(text).toContain("JLL BOV");
@@ -441,6 +450,7 @@ describe("RentRollDashboard — a parsed rent roll renders every panel", () => {
         }),
       );
     dumpView(`rent-roll-${csv === CLEAN_CSV ? "clean" : "issues"}`, html);
+    expect(a11yIssues(html), "a11y rent roll").toEqual([]);
     return visibleText(html);
   };
 
@@ -497,6 +507,7 @@ describe("Analytics charts — timeline, verdict mix and stage funnel render and
         }),
       );
     dumpView("analytics-charts", html);
+    expect(a11yIssues(html), "a11y analytics-charts").toEqual([]);
     const text = visibleText(html);
     expect(gluedWords(text)).toEqual([]);
     expect(text).toContain("Screening");
@@ -541,6 +552,7 @@ describe("DualAxisTrend — a submarket's vacancy bars and rent line render", ()
       }),
     );
     dumpView("submarket-trend", html);
+    expect(a11yIssues(html), "a11y submarket-trend").toEqual([]);
     const text = visibleText(html);
     expect(gluedWords(text)).toEqual([]);
     expect(html).toContain("<svg");
