@@ -47,7 +47,7 @@ export default function RouteError({
           .
         </p>
         {error.digest && (
-          <p className="mt-2 font-mono text-xs text-muted/70">
+          <p className="mt-2 font-mono text-xs text-muted">
             Error ID: {error.digest}
           </p>
         )}

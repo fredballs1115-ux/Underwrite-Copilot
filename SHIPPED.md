@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Fifty-nine PRs, #176–#234, each
+estimate, and that's what it should flag." Sixty PRs, #176–#235, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -742,6 +742,16 @@ confirmed equal to the main tip after each batch.
   gained the rule that makes it stick: an in-page link whose target id
   is missing fails the render tests and the public-page lint, so a skip
   link can never point at nothing again.
+- **#235 Every caption clears the contrast floor.** The palette's core
+  pairs were computed against WCAG's 4.5:1 for text: ink, muted, brand and
+  the three verdict colours all clear it on every background, and white on
+  every button colour does too. What did not: the faintest captions on the
+  homepage's dark bands (35–45% white on the deep teal, 3.3–4.1:1 — the
+  "Now screening" label, the stress bench's captions and definitions, the
+  pulse board's footnotes, the ⌘K hint) and four solid-background notes set
+  in 70–80% muted (3.0–3.6:1). The faint tiers now sit at 55–60% white
+  (5.2–5.9:1) and the notes in solid muted (5.5:1); the hierarchy reads
+  the same, the text is legible to more people.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

@@ -156,7 +156,7 @@ export function AppShell({
               <path d="m21 21-4.3-4.3" />
             </svg>
             Jump to…
-            <kbd className="ml-auto rounded border border-white/15 px-1.5 py-0.5 text-[10px] text-white/45">
+            <kbd className="ml-auto rounded border border-white/15 px-1.5 py-0.5 text-[10px] text-white/60">
               ⌘K
             </kbd>
           </button>

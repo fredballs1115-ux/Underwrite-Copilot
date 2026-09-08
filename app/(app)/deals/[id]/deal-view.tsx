@@ -628,7 +628,7 @@ export function DealView({
               <summary className="cursor-pointer text-xs font-medium text-muted hover:text-ink">
                 Technical details
               </summary>
-              <p className="mt-1 break-words font-mono text-[11px] text-muted/80">
+              <p className="mt-1 break-words font-mono text-[11px] text-muted">
                 {job.error}
               </p>
             </details>

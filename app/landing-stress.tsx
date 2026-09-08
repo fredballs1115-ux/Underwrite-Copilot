@@ -50,7 +50,7 @@ function Lever({
         <span className="font-mono tabular-nums text-accent">
           {value.toFixed(2)}
           {unit}
-          <span className="text-white/40">
+          <span className="text-white/55">
             {" "}
             · base {base.toFixed(2)}
             {unit}
@@ -195,7 +195,7 @@ export function StressBench() {
             onChange={setVacancy}
           />
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs leading-relaxed text-white/45">
+            <p className="text-xs leading-relaxed text-white/60">
               A stated exit value is a snapshot, not a movie — drag the cap
               and watch the movie.
             </p>
@@ -214,7 +214,7 @@ export function StressBench() {
         <div className="min-w-[15rem]">
           <div aria-hidden className={tone}>
             <IrrGauge irr={r.leveredIrrPct} baseIrr={base.leveredIrrPct} />
-            <p className="mt-1 text-center text-[10px] text-white/40">
+            <p className="mt-1 text-center text-[10px] text-white/55">
               tick = the demo mandate&apos;s{" "}
               {GAUGE_HURDLE != null ? `${GAUGE_HURDLE}%` : ""} IRR target · dot
               = broker&apos;s base
@@ -222,7 +222,7 @@ export function StressBench() {
           </div>
           <dl className="mt-4 grid grid-cols-2 content-start gap-x-10 gap-y-5">
           <div className="col-span-2 sm:col-span-1 lg:col-span-2">
-            <dt className="text-[11px] font-medium uppercase tracking-wider text-white/45">
+            <dt className="text-[11px] font-medium uppercase tracking-wider text-white/60">
               Levered IRR
             </dt>
             <dd
@@ -240,7 +240,7 @@ export function StressBench() {
             </dd>
           </div>
           <div>
-            <dt className="text-[11px] font-medium uppercase tracking-wider text-white/45">
+            <dt className="text-[11px] font-medium uppercase tracking-wider text-white/60">
               Equity multiple
             </dt>
             <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
@@ -248,7 +248,7 @@ export function StressBench() {
             </dd>
           </div>
           <div>
-            <dt className="text-[11px] font-medium uppercase tracking-wider text-white/45">
+            <dt className="text-[11px] font-medium uppercase tracking-wider text-white/60">
               Cash-on-cash (Yr 1)
             </dt>
             <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
@@ -256,7 +256,7 @@ export function StressBench() {
             </dd>
           </div>
           <div>
-            <dt className="text-[11px] font-medium uppercase tracking-wider text-white/45">
+            <dt className="text-[11px] font-medium uppercase tracking-wider text-white/60">
               Exit value
             </dt>
             <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
@@ -264,7 +264,7 @@ export function StressBench() {
             </dd>
           </div>
           <div>
-            <dt className="text-[11px] font-medium uppercase tracking-wider text-white/45">
+            <dt className="text-[11px] font-medium uppercase tracking-wider text-white/60">
               Year-1 NOI
             </dt>
             <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
@@ -274,7 +274,7 @@ export function StressBench() {
           </dl>
         </div>
       </div>
-      <p className="mt-3 text-center text-[11px] leading-relaxed text-white/45">
+      <p className="mt-3 text-center text-[11px] leading-relaxed text-white/60">
         Illustrative sample deal ({BASE.units} units, {fmtM(BASE.purchasePrice)}
         ) — not a real listing. Same deterministic <code>computeModel</code>{" "}
         that prices every real screen and builds the Excel workbook.
