@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Eighty-six PRs, #176–#261, each
+estimate, and that's what it should flag." Eighty-seven PRs, #176–#262, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1152,6 +1152,15 @@ confirmed equal to the main tip after each batch.
   report render test asserts the fill-count delta: the sample's three
   sale comps draw nine more shapes than the same report with comps that
   state no basis.
+- **#262 The comps table at phone width stacks a card per comp.** #260's
+  basis bars sat in a table that kept `min-w-[34rem]`, so at 390 they were
+  off-screen to the right of the name column. Below `sm` each comp table
+  now renders a card per comp — name and rating pill, the note, the detail
+  line with its bar and the subject's tick — and the table takes over from
+  `sm` up; one `CompBasisBar` draws the bar in both, so the two can never
+  disagree. The deal-view render test asserts six bars and six ticks on
+  the sample (three per layout), a card list per table and the table
+  hidden below `sm`; shot at 390.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
