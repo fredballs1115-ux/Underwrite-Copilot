@@ -3,19 +3,19 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#264 merged to main (live build
-sha `282c718`, #263, confirmed equal to the main tip by live-verify at 18:16
-UTC with its `DEPLOY: LIVE` line — every one of the eighty-eight through
-#263 is live, the homepage serves at 196 KB where it served at 488 KB, the
+**Last updated 2026-09-08**, after PRs #176–#265 merged to main (live build
+sha `a7dfbbd`, #264, confirmed equal to the main tip by live-verify at 18:22
+UTC with its `DEPLOY: LIVE` line — every one of the eighty-nine through
+#264 is live, the homepage serves at 196 KB where it served at 488 KB, the
 public sample memo at 57 KB where it served at 11 KB (the Brewerytown frame
 is in it), and the public-page lint #231 added reads all twelve public pages
-clean on every run; #264 is merged and awaits its proof, #265 follows).
+clean on every run; #265 is merged and awaits its proof, #266 follows).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Ninety PRs (#176–#265) landed across one review session and the
+Ninety-one PRs (#176–#266) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -427,6 +427,9 @@ deploy (live-verify shows the sha).
   prompt leads each gap with its dollar, basis-point or percent figure and a
   prompt test holds its examples up to the gap reader; the reader takes
   "$1.2 million", "$5MM", "$2bn", "2 pp" and "per cent" too.
+- **The section counts draw as split bars** (#266): the Risk digest, the
+  challenger's tally, each comp table's ratings and the Reconciliation
+  header — one bar with a segment per kind, the count words kept beside it.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -694,20 +697,22 @@ a route scoped to the share token; the memo and the report got theirs in
    times with a roll-up and per-asset contribution to blended IRR; mostly a
    loop around existing code plus a CSV importer. Named as the next build in
    the LPC plan.
-8. **The section counts draw as split bars.** The Reconciliation header
-   says "2 unfavorable · 1 neutral", each comp table's says "1 stretched ·
-   1 leans · 1 support" — the same dotted count words the pipeline replaced
-   with its verdict-split bar in #241. One small `SplitBar` (segments in
-   the kill / caution / pass / muted colours, the counts as its `title` and
-   as sr-only words) in place of each count line in `deal-sections.tsx`,
-   the numbers kept as the accessible text; assert the segment count on the
-   sample in the deal-view render test and shoot at 1440 / 390. Measure the
-   challenger's header first — its severity counts may already be pills.
-   (The report's pages all say it in pictures now — #250 the memo, #253 the
-   market page, #261 the comps, #263 the reconciliation — every table on
-   the deal page stacks into cards on a phone after #262 and #264, and
-   #265 made the reconciler state each gap's figure so those bars draw on
-   real screens.)
+8. **The comp scrutiny names each comp's detail line.** #260 and #261 draw
+   a sale comp's basis only when its `detail` states one — "$252k/unit",
+   "$410/SF", a cap — and the comps prompt (`lib/anthropic/prompts.ts`)
+   never says what `detail` should carry; the schema
+   (`lib/anthropic/comps.ts`) is a bare string. Ask for it by shape, the
+   way #265 did for the reconciler's gap: a sale comp's detail leads with
+   the price per unit (or per SF, or per key) and the cap rate, then the
+   date and size — "$252k/unit · 5.4% cap · Mar 2026 · 210 units" — and a
+   lease comp's with the rent and the unit type; describe the field in the
+   zod schema too. A prompt test holds the instruction's examples up to
+   `compFigures` (`lib/comp-detail.ts`) so the prompt can never promise a
+   shape the reader will not draw. (The report's pages all say it in
+   pictures now — #250 the memo, #253 the market page, #261 the comps,
+   #263 the reconciliation; every table on the deal page stacks into cards
+   on a phone after #262 and #264; #265 made the reconciler state each
+   gap's figure; #266 drew the section counts.)
 
 ---
 

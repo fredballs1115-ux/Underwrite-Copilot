@@ -159,6 +159,44 @@ function SectionHeader({ title, aside }: { title: string; aside?: ReactNode }) {
   );
 }
 
+/** A count line as a picture — one bar, a segment per kind in its colour,
+ *  the counts kept beside it in the same colours (they are the accessible
+ *  text; the bar is decoration with the counts as its tooltip). The same
+ *  shape as the pipeline's verdict split (#241). Nothing when every count
+ *  is zero. */
+function SplitBar({
+  parts,
+}: {
+  parts: { n: number; label: string; bar: string; text: string }[];
+}) {
+  const shown = parts.filter((p) => p.n > 0);
+  const total = shown.reduce((sum, p) => sum + p.n, 0);
+  if (total === 0) return null;
+  const words = shown.map((p) => `${p.n} ${p.label}`).join(" · ");
+  return (
+    <div className="flex items-center gap-2 text-[11px] font-medium">
+      <span
+        aria-hidden
+        data-split-bar
+        title={words}
+        className="flex h-1.5 w-16 shrink-0 gap-px overflow-hidden rounded-full bg-faint"
+      >
+        {shown.map((p) => (
+          <span key={p.label} className={p.bar} style={{ width: `${(p.n / total) * 100}%` }} />
+        ))}
+      </span>
+      <span className="whitespace-nowrap">
+        {shown.map((p, i) => (
+          <span key={p.label} className={p.text}>
+            {i > 0 && <span className="text-muted"> · </span>}
+            {p.n} {p.label}
+          </span>
+        ))}
+      </span>
+    </div>
+  );
+}
+
 function Callout({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
   return (
     <div className="flex gap-3 rounded-xl border border-line border-l-[3px] border-l-brand bg-faint/70 p-4">
@@ -434,13 +472,13 @@ export function OverviewView({
           title="Risk digest"
           aside={
             risks.length > 0 ? (
-              <div className="flex items-center gap-2 text-xs font-medium">
-                {counts.high > 0 && <span className="text-kill">{counts.high} high</span>}
-                {counts.medium > 0 && (
-                  <span className="text-caution">{counts.medium} med</span>
-                )}
-                {counts.low > 0 && <span className="text-brand">{counts.low} low</span>}
-              </div>
+              <SplitBar
+                parts={[
+                  { n: counts.high, label: "high", bar: "bg-kill", text: "text-kill" },
+                  { n: counts.medium, label: "med", bar: "bg-caution", text: "text-caution" },
+                  { n: counts.low, label: "low", bar: "bg-brand", text: "text-brand" },
+                ]}
+              />
             ) : undefined
           }
         />
@@ -659,20 +697,14 @@ export function ChallengerView({
 function SeverityTally({ challenges }: { challenges: Challenge[] }) {
   const counts = { high: 0, medium: 0, low: 0 };
   for (const c of challenges) counts[c.severity] = (counts[c.severity] ?? 0) + 1;
-  const parts: { n: number; label: string; cls: string }[] = [];
-  if (counts.high) parts.push({ n: counts.high, label: "high", cls: "text-kill" });
-  if (counts.medium)
-    parts.push({ n: counts.medium, label: "med", cls: "text-caution" });
-  if (counts.low) parts.push({ n: counts.low, label: "low", cls: "text-brand" });
-  if (parts.length === 0) return null;
   return (
-    <div className="flex items-center gap-2 text-xs font-medium">
-      {parts.map((p, i) => (
-        <span key={i} className={p.cls}>
-          {p.n} {p.label}
-        </span>
-      ))}
-    </div>
+    <SplitBar
+      parts={[
+        { n: counts.high, label: "high", bar: "bg-kill", text: "text-kill" },
+        { n: counts.medium, label: "med", bar: "bg-caution", text: "text-caution" },
+        { n: counts.low, label: "low", bar: "bg-brand", text: "text-brand" },
+      ]}
+    />
   );
 }
 
@@ -1132,22 +1164,13 @@ function CompTable({
         <h3 className="text-xs font-medium uppercase tracking-wide text-muted">
           {title}
         </h3>
-        <p className="text-[11px] font-medium">
-          {counts.stretched > 0 && (
-            <span className="text-kill">{counts.stretched} stretched</span>
-          )}
-          {counts.stretched > 0 && counts.favorable > 0 && (
-            <span className="text-muted"> · </span>
-          )}
-          {counts.favorable > 0 && (
-            <span className="text-caution">{counts.favorable} leans</span>
-          )}
-          {(counts.stretched > 0 || counts.favorable > 0) &&
-            counts.supports > 0 && <span className="text-muted"> · </span>}
-          {counts.supports > 0 && (
-            <span className="text-pass">{counts.supports} support</span>
-          )}
-        </p>
+        <SplitBar
+          parts={[
+            { n: counts.stretched, label: "stretched", bar: "bg-kill", text: "text-kill" },
+            { n: counts.favorable, label: "leans", bar: "bg-caution", text: "text-caution" },
+            { n: counts.supports, label: "support", bar: "bg-pass", text: "text-pass" },
+          ]}
+        />
       </div>
       {/* Phone: a card per comp — name and rating, the note, the detail with
           its bar — so a phone reads a whole comp instead of a table it
@@ -1301,22 +1324,13 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
         title="Reconciliation — your model vs. the OM"
         aside={
           rows.length > 0 ? (
-            <p className="text-[11px] font-medium">
-              {counts.unfavorable > 0 && (
-                <span className="text-kill">{counts.unfavorable} unfavorable</span>
-              )}
-              {counts.unfavorable > 0 && counts.favorable > 0 && (
-                <span className="text-muted"> · </span>
-              )}
-              {counts.favorable > 0 && (
-                <span className="text-pass">{counts.favorable} favorable</span>
-              )}
-              {(counts.unfavorable > 0 || counts.favorable > 0) &&
-                counts.neutral > 0 && <span className="text-muted"> · </span>}
-              {counts.neutral > 0 && (
-                <span className="text-muted">{counts.neutral} neutral</span>
-              )}
-            </p>
+            <SplitBar
+              parts={[
+                { n: counts.unfavorable, label: "unfavorable", bar: "bg-kill", text: "text-kill" },
+                { n: counts.favorable, label: "favorable", bar: "bg-pass", text: "text-pass" },
+                { n: counts.neutral, label: "neutral", bar: "bg-muted/40", text: "text-muted" },
+              ]}
+            />
           ) : undefined
         }
       />

@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Ninety PRs, #176–#265, each
+estimate, and that's what it should flag." Ninety-one PRs, #176–#266, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1203,6 +1203,18 @@ confirmed equal to the main tip after each batch.
   million", "$450 thousand", "$5MM", "$2bn", "2 pp", "per cent" — a suffix
   counted only when the word ends there, so "$174 mortgage" stays $174.
   Eight reader tests and the prompt contract.
+- **#266 The section counts draw as split bars.** The Risk digest said "4
+  high · 6 med · 1 low", the challenger "2 high · 1 med", each comp table
+  "1 stretched · 1 leans · 1 support", the Reconciliation "2 unfavorable ·
+  1 neutral" — the same dotted count words the pipeline replaced with its
+  verdict-split bar in #241. One `SplitBar` now draws each: a bar with a
+  segment per kind in its colour, the same count words beside it in the
+  same colours (they stay the accessible text; the bar is decoration with
+  the counts as its tooltip). Four call sites, the four hand-rolled
+  separator chains they replaced gone; the sample screen's tabs are the
+  same components. The deal-view render test asserts the reconciliation's
+  bar (two segments, two thirds kill), a bar per comp table and the
+  challenger's tally; shot at 1440.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
