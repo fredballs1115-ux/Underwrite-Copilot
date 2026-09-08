@@ -341,6 +341,19 @@ export function timelineFromMetrics(metrics: MetricLike[]): string {
     .join("; ");
 }
 
+const UNITS_INCLUDE = /^units?\b|number of units|unit count/i;
+const UNITS_EXCLUDE = /\bper\b|\/|price|\$/i;
+
+/** The unit count — on a plan deal the finished product's ("Units
+ *  (proposed)") — as a positive number, or null when no row parses. One
+ *  reader for the plan summary, analytics and the deal context, so every
+ *  per-unit figure divides by the same count. */
+export function unitCountFromMetrics(metrics: MetricLike[]): number | null {
+  const m = findMetric(metrics, UNITS_INCLUDE, UNITS_EXCLUDE) as MetricLike | null;
+  const n = m ? parseMoney(m.value) : null;
+  return n != null && n >= 1 && n <= 50_000 ? n : null;
+}
+
 /** What the OM says the finished project earns and costs — the figures a
  *  plan is judged on, for the deal page and for the challenger's brief. */
 export interface PlanSummary {
@@ -356,6 +369,11 @@ export interface PlanSummary {
   totalCost: number | null;
   /** stabilized NOI ÷ total cost, decimal, when both are known */
   yieldOnCost: number | null;
+  /** the finished product's unit count, when the OM states one */
+  units: number | null;
+  /** total cost over the planned units — the basis a comp or a per-unit
+   *  norm is held against on a plan deal; null when either is unknown */
+  costPerUnit: number | null;
   /** construction / downtime / lease-up timing as the OM states it ("" if none) */
   timeline: string;
   /** the budget as the OM words it ("" if none) */
@@ -384,6 +402,7 @@ export function planSummary(
     price != null && budget ? price + budget.budget : budget?.isTotal ? budget.budget : null;
   const yieldOnCost =
     stabilizedNoi && totalCost != null && totalCost > 0 ? stabilizedNoi.value / totalCost : null;
+  const units = unitCountFromMetrics(metrics);
   return {
     kind: strategy.kind,
     price,
@@ -392,6 +411,8 @@ export function planSummary(
     budget,
     totalCost,
     yieldOnCost,
+    units,
+    costPerUnit: totalCost != null && units != null ? totalCost / units : null,
     // The strategy's own words first; else the metric rows the extraction
     // was asked to capture on a plan deal (construction period, lease-up,
     // the year the plan stabilizes), joined as "label: value".

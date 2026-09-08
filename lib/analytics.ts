@@ -3,9 +3,10 @@ import {
   findPriceMetric,
   inferStrategy,
   planSummary,
+  unitCountFromMetrics,
   type StrategyKind,
 } from "@/lib/deal-strategy";
-import type { ExtractedMetric, ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult } from "@/lib/anthropic/types";
 import { normalizeStage, type Stage } from "@/lib/stages";
 
 /**
@@ -52,16 +53,6 @@ export interface AnalyticsRow {
   extraction: unknown;
 }
 
-function unitCount(metrics: ExtractedMetric[]): number | null {
-  const units = findMetric(
-    metrics,
-    /^units?\b|number of units|unit count/i,
-    /per|\/|price|\$/i,
-  );
-  const n = units ? Number(units.value.replace(/[,\s]/g, "")) : NaN;
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
-
 export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
   const out: AnalyticsDeal[] = [];
   for (const r of rows) {
@@ -89,13 +80,12 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
       // Basis per planned unit: what a finished unit costs all-in. The
       // shell's price over units still to be built is not a comparable
       // figure, so with no total cost there is no point to plot.
-      const units = unitCount(metrics);
-      if (plan.totalCost != null && units != null) perUnit = plan.totalCost / units;
+      perUnit = plan.costPerUnit;
     } else {
       const directPer = findMetric(metrics, /per unit|\/unit|unit price/i);
       if (directPer) perUnit = parseMoney(directPer.value);
       if (perUnit == null && price != null) {
-        const units = unitCount(metrics);
+        const units = unitCountFromMetrics(metrics);
         if (units != null) perUnit = price / units;
       }
     }
