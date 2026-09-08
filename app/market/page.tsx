@@ -138,6 +138,7 @@ function SectorSnapshotPanel({
                   {metroId && SECTOR_RANKS[sector]?.[metroId] && (
                     <Link
                       href={`/market?sector=${sector}`}
+                      prefetch={false}
                       title={`rank among covered-market ${SECTOR_LABEL[sector] ?? sector} vacancy reads, tightest first`}
                       className="rounded-full border border-line px-1.5 py-px text-[10px] font-medium text-muted transition-colors hover:border-brand hover:text-brand"
                     >
@@ -583,6 +584,7 @@ async function MetroExplorer({ selected }: { selected?: string }) {
                   <Link
                     key={m.id}
                     href={`/market?metro=${m.id}`}
+                    prefetch={false}
                     className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                       m.id === active.id
                         ? "border-brand bg-brand text-white"
@@ -877,6 +879,7 @@ function SectorHeatGrid() {
                 <th key={s} className="py-1.5 pr-3 text-center font-medium">
                   <Link
                     href={`/market?sector=${s}`}
+                    prefetch={false}
                     className="transition-colors hover:text-brand"
                   >
                     {SECTOR_LABEL[s]} %
@@ -903,6 +906,7 @@ function SectorHeatGrid() {
                       <td className="py-1.5 pr-3">
                         <Link
                           href={`/market?metro=${m.id}`}
+                          prefetch={false}
                           className="text-xs font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
                         >
                           {m.name}
@@ -995,6 +999,7 @@ function SectorLeaderboard({ sector }: { sector: string }) {
                   <td className="py-1.5 pr-3">
                     <Link
                       href={`/market?metro=${r.id}`}
+                      prefetch={false}
                       className="text-xs font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
                     >
                       {r.name}
@@ -1093,6 +1098,7 @@ function SectorExplorer({ selected }: { selected?: string }) {
           <Link
             key={x.id}
             href={`/market?sector=${x.id}`}
+            prefetch={false}
             className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
               x.id === active.id
                 ? "border-brand bg-brand text-white"
