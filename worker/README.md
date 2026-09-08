@@ -15,6 +15,10 @@ deploy interrupted whatever screens were in flight**. This worker fixes that:
   **resumes after the last completed step** — a deploy costs seconds of delay,
   not a restarted screen.
 - A job interrupted 3 times stops retrying and fails with an honest message.
+- A run that FAILED (a provider error, an unreadable answer) keeps the steps
+  it finished: "Try again" on the deal page re-runs the failing step and the
+  ones after it, never the whole pipeline. A replaced OM always starts over —
+  those checkpoints described the old file.
 - While the worker is alive it heartbeats the running row and every queued
   worker job, so a backlog never looks "stalled" to the deal page. If the
   worker actually dies, the rows go stale and the existing 10-minute stall
@@ -63,6 +67,11 @@ in-process until the migration lands.
 Screens run in-process again immediately. The worker keeps polling but only
 claims worker-payload jobs — new in-process screens are invisible to it — so
 you can suspend or delete it whenever convenient.
+
+While screens run in-process, the web service heartbeats each run's job row
+itself (a slow step no longer reads as stalled) and runs at most
+`ANALYSIS_CONCURRENCY` screens at once (default two — see `.env.example`);
+the rest of a batch waits its turn with its claim held.
 
 > Do not set `ANALYSIS_WORKER=1` before the worker is live — jobs would sit
 > queued with nobody to run them (the deal page would show them stalled after

@@ -73,6 +73,11 @@ services:
       # Unset/empty = analyses run in-process exactly as before.
       # - key: ANALYSIS_WORKER
       #   value: "1"
+      # In-process only: how many screens this one web process runs at once
+      # (each holds its OM plus a ~27MB request body per model call). The
+      # default of two fits the starter instance; raise it with the plan.
+      # - key: ANALYSIS_CONCURRENCY
+      #   value: "2"
 
   # ── The dedicated analysis worker (Phase 2 — built) ────────────────────────
   # Runs the OM screens so web deploys never interrupt them: the web app
