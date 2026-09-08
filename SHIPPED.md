@@ -218,6 +218,10 @@ confirmed equal to the main tip after each batch.
   where the figure is read, and both surfaces print it — a development's
   strip reads Stabilized NOI · Land cost · Budget · Total cost · Yield on
   cost; a development with a stated asking price keeps "Price".
+- **#207 Changelog tidy.** The public Sep 7 "strategy is read first" entry had
+  been collecting the Sep 8 follow-through sentence by sentence; they now live
+  in the Sep 8 "judged on yield on cost" entry, and the Sep 7 entry points to
+  it. Same facts, right day.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
