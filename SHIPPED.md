@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Seventy-seven PRs, #176–#252, each
+estimate, and that's what it should flag." Seventy-eight PRs, #176–#253, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1046,6 +1046,16 @@ confirmed equal to the main tip after each batch.
   no bar, as it shows no cap; one deal alone has no spread and draws none.
   The compare fixture asserts eleven bars, the muted one, two "best" pills
   and none for a single column; shot at 1440 and 390.
+- **#253 The report's market page draws the OM on its range.** The Market
+  plausibility table gains an "On range" column: the OM's figure placed on
+  the typical range the way the memo places a base between its low and high
+  — a track, the span to the figure, a dot in the read's colour (kill for
+  aggressive, pass for conservative) — with a figure past either end sitting
+  at that end while the Read chip says which way. `rangeRead` parses
+  "5.25–5.75%", "$1,200–$1,400" and "50 to 60%", and gives nothing for a
+  range that is not one, so the row prints as before. Plain Views, no height
+  added; the report render test asserts three fills a check against the same
+  report with ranges that do not parse, and the parser's cases.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

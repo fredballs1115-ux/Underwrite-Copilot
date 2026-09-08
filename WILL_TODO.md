@@ -3,19 +3,20 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#249 merged to main (live build
-sha `439b713`, #249, confirmed equal to the main tip by live-verify at 16:43
-UTC with its `DEPLOY: LIVE` line — every one of the seventy-four is live,
-the homepage serves at 196 KB where it served at 488 KB, the public sample
-memo at 56 KB where it served at 11 KB (the Brewerytown frame is in it), and
-the public-page lint #231 added reads all twelve public pages clean on every
-run; #250 follows and awaits the same proof).
+**Last updated 2026-09-08**, after PRs #176–#251 merged to main (live build
+sha `61e9111`, #250, confirmed equal to the main tip by live-verify at 16:53
+UTC with its `DEPLOY: LIVE` line — every one of the seventy-five through
+#250 is live, the homepage serves at 196 KB where it served at 488 KB, the
+public sample memo at 57 KB where it served at 11 KB (the Brewerytown frame
+is in it), and the public-page lint #231 added reads all twelve public pages
+clean on every run; #251 is merged and awaits its proof, #252 and #253
+follow).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Seventy-seven PRs (#176–#252) landed across one review session and the
+Seventy-eight PRs (#176–#253) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -380,6 +381,9 @@ deploy (live-verify shows the sha).
 - **The compare table draws the spread** (#252): a bar under every return
   figure, scaled to the row's best, muted on a rejected deal; none on a
   plan deal's cap or when one deal is compared alone.
+- **The report's market page draws the OM on its range** (#253): each
+  market check places the OM's figure on the typical range as a track and a
+  dot in the read's colour; a range that does not parse prints as before.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -647,14 +651,15 @@ a route scoped to the share token; the memo and the report got theirs in
    times with a roll-up and per-asset contribution to blended IRR; mostly a
    loop around existing code plus a CSV importer. Named as the next build in
    the LPC plan.
-8. **The report's pages say it in pictures too.** #250 gave the memo its
-   bars and dots; the report's later pages still carry their reads as
-   numbers alone: the market check's OM figure could sit on its typical
-   range the way a base sits on its low–high (the same track-and-dot,
-   `pdfFillCountOf` asserting it), the reconciliation's gap could draw as a
-   signed bar beside its figure, and the comp table's per-unit basis as a
-   bar against the subject's. Plain `View`s, height-neutral, the same
-   structural assertion.
+8. **The report's remaining pages say it in pictures too.** #250 gave the
+   memo its bars and dots and #253 the market page its OM-on-range dots;
+   two pages still carry their reads as numbers alone: the reconciliation's
+   gap could draw as a signed bar beside its figure (the direction is
+   already a colour), and the comp table's per-unit basis as a bar against
+   the subject's — both need a parser as honest as `rangeRead` (a gap like
+   "+4.2%" or "−$120k" and a comp detail's "$262k/unit"), returning nothing
+   when the text is not a figure. Plain `View`s, height-neutral, the same
+   fill-count assertion.
 9. **The compare table at phone width.** At 390 the table scrolls sideways
    inside its card (`min-w-[36rem]`), so a phone reads one deal's column
    and a sliver of the next. The shared screen's ranges got a stacked card
