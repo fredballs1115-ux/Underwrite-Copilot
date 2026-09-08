@@ -122,13 +122,20 @@ export const METRIC_FIND = {
     // separately, as the price, only when no ask exists), and not a
     // reserve, bid, target or underwritten figure. "Price / Terms" and
     // "Purchase price per the PSA" are asks and stay in.
-    exc: /unit|\bsf\b|\/ ?sf|per ?sf|per (square|sq)|psf|\bper (key|bed|room|pad|site|door|acre|lot|suite|stall|space)s?\b|\/\s*(key|bed|room|pad|door|acre|lot|suite|stall|space|r?sf|nrsf|gsf|gla|nra|gba|nla)s?\b|\brent|yield|\bcap\b|\brate\b|spread|loan|debt|insurance|\bdate\b|exit|reversion|terminal|\(\s*(19|20)\d\d|\b(last|prior|previous|historical|original|land|site|reduction|reserve|bid|strike|target|underwritten|range)\b/i,
+    // "per <anything>" is a per-something figure — home, apartment, bay,
+    // berth, parking space, whatever noun the OM picks — except "per the
+    // PSA" / "per OM" / "per broker", which say where the ask came from.
+    // A projected, residual, disposition or pro forma sale price and a
+    // prior year's sale ("2019 sale price", "Year 5 sale price") are not
+    // the ask either.
+    exc: /unit|\bsf\b|\/ ?sf|per ?sf|per (square|sq)|psf|\bper\s+(?!(?:the|om|broker|seller|sponsor|offering|agent|marketing|guidance|psa|contract|loi)\b)|\/\s*(key|bed|room|pad|door|acre|lot|suite|stall|space|home|apartment|apt|bay|berth|slip|r?sf|nrsf|gsf|gla|nra|gba|nla)s?\b|\brent|yield|\bcap\b|\brate\b|spread|loan|debt|insurance|\bdate\b|exit|reversion|terminal|residual|disposition|projected|forward|pro ?forma|stabili[sz]|\(\s*(19|20)\d\d|\b(19|20)\d\d\b|\b(year|yr)\s?\d|\b(last|prior|previous|historical|original|land|site|reduction|reserve|bid|strike|target|underwritten|range)\b/i,
   },
-  // The price over the units — never an NOI, a rent, a cost or an expense
-  // expressed per unit, which would pass a basis ceiling at $2k/unit.
+  // The price over the units — never an NOI, a rent, a cost, an expense or
+  // a spend expressed per unit, which would pass a basis ceiling at
+  // $2k/unit. "Price / Unit" with the spaced slash is the same row.
   perUnit: {
-    inc: /per unit|\/unit|price\/unit|unit price/i,
-    exc: /noi|income|rent\b|rents\b|cost|budget|expense|tax|reserve|revenue|insurance|utilit|payroll|debt|loan|equity|value|\begi\b|replacement|capex|capital|management|repairs?|maintenance|marketing|admin|contract/i,
+    inc: /per\s*unit|\/\s*unit|unit price/i,
+    exc: /noi|income|rent\b|rents\b|cost|budget|expense|tax|reserve|revenue|insurance|utilit|payroll|debt|loan|equity|value|\begi\b|replacement|capex|capital|management|repairs?|maintenance|marketing|admin|contract|\bopex\b|operating|concession|turnover|\br ?& ?m\b|renovation|spend|fees?\b|\bg ?& ?a\b|payment|deposit/i,
   },
   // The going-in cap is today's income against the price. A stabilized, pro
   // forma, forward or at-completion cap — or a yield on cost — describes a
@@ -140,13 +147,41 @@ export const METRIC_FIND = {
   },
   capRate: {
     inc: /\bcap rate\b/i,
-    exc: /exit|terminal|reversion|residual|stabili[sz]|pro ?forma|forward|projected|at completion|yield/i,
+    // A Year-2+ cap or a cap on cost is a projection, not today's income
+    // against the price (a Year-1 cap is the going-in figure by another
+    // name, so the year guard starts at 2 — as classifyNoi's does).
+    exc: /exit|terminal|reversion|residual|stabili[sz]|pro ?forma|forward|projected|at completion|yield|on cost|year ?[2-9]|\byr ?[2-9]\b|\by[2-9]\b/i,
   },
   irr: { inc: /\birr\b/i },
   // Cash-on-cash isn't a required extraction field, so it's often absent —
   // when it is, the score reports the CoC dimension "unknown", never a pass.
   coc: { inc: /cash[- ]?on[- ]?cash|cash[- ]?on[- ]?equity|cash yield|\bcoc\b/i },
+  // A ground-up development buys land, and its OM says "land cost" or
+  // "site acquisition" where a building's OM says "asking price". That
+  // line is the price only on a development, and never an appraised land
+  // VALUE — on an operating asset an allocation, not what is being bought.
+  landPrice: {
+    inc: /\b(land|site) (cost|price|acquisition|purchase|basis)\b/i,
+    exc: /value|\bper\b|\/|psf|acre|\bsf\b/i,
+  },
 } as const;
+
+/**
+ * THE row that states the price: the ask under any of its names, else — on
+ * a development only — the land or site cost, which is what is being
+ * bought. Null when the OM states neither. One implementation for the
+ * buy-box price band, the mandate ceiling and every surface's price slot
+ * (lib/deal-strategy's findPriceMetric delegates here), so the band judges
+ * the same row the page prints.
+ */
+export function findPriceRow(metrics: MetricLike[], kind?: string | null): MetricLike | null {
+  return (
+    findMetric(metrics, METRIC_FIND.price.inc, METRIC_FIND.price.exc) ??
+    (kind === "development"
+      ? findMetric(metrics, METRIC_FIND.landPrice.inc, METRIC_FIND.landPrice.exc)
+      : null)
+  );
+}
 
 /**
  * THE going-in cap metric, or null: the labelled going-in figure first, else
@@ -279,18 +314,32 @@ export function serializeBuyBoxStore(store: BuyBoxStore): BuyBox | Record<string
   };
 }
 
-/** "$70.7M" / "$70,700,000" / "285k" / "1.2 mm" → dollars (or plain number), or null. */
+/** "$70.7M" / "$70,700,000" / "285k" / "1.2 mm" → dollars (or plain
+ *  number), or null. Reads the approximations an OM writes — "±$42M",
+ *  "~$42M", "approx. $42,000,000", "circa $42M", "USD 42,000,000" — as
+ *  parseSf and parseCount do, and a negative in either spelling,
+ *  "-$250,000" or "($250,000)": a lease-up's in-place NOI can be below
+ *  zero, and a figure that parses as nothing would vanish from the screen. */
 export function parseMoney(raw: string): number | null {
-  const s = raw.replace(/[,$\s]/g, "").toLowerCase();
+  let s = raw.trim().replace(/^(?:±|\+\/-|~|≈|approx(?:imately|\.)?|about|circa|c\.|usd|us\$)\s*/i, "");
+  let sign = 1;
+  const wrapped = s.match(/^\(\s*([^()]*?)\s*\)$/);
+  if (wrapped) {
+    s = wrapped[1];
+    sign = -1;
+  }
+  if (/^[-−–]/.test(s)) {
+    s = s.replace(/^[-−–]\s*/, "");
+    sign = -1;
+  }
+  s = s.replace(/[,$\s]/g, "").toLowerCase();
   const m = s.match(/^\$?(\d+(?:\.\d+)?)(mm|m|k|b)?/);
   if (!m) return null;
   const n = Number(m[1]);
   if (!Number.isFinite(n)) return null;
   const suffix = m[2];
-  if (suffix === "b") return n * 1e9;
-  if (suffix === "m" || suffix === "mm") return n * 1e6;
-  if (suffix === "k") return n * 1e3;
-  return n;
+  const mult = suffix === "b" ? 1e9 : suffix === "m" || suffix === "mm" ? 1e6 : suffix === "k" ? 1e3 : 1;
+  return sign * n * mult;
 }
 
 /** "5.25%" / "5.25 %" → 5.25, or null. */
@@ -364,19 +413,27 @@ const SIZE_SUBSET_PAREN =
 /** Whether a metric label is the row that states the building's size —
  *  the whole building, never the land, a unit, a component or a partial. */
 export function isSizeLabel(label: string): boolean {
-  let s = label.toLowerCase().trim();
-  for (const p of s.match(/\([^)]*\)/g) ?? []) if (SIZE_SUBSET_PAREN.test(p)) return false;
-  s = s
+  for (const p of label.toLowerCase().match(/\([^)]*\)/g) ?? []) if (SIZE_SUBSET_PAREN.test(p)) return false;
+  const s = sizeLabelCore(label);
+  // "Building Size / SF": two size nouns either side of a slash are still
+  // one size label; "Units / SF" or "Price / SF" are not.
+  if (s.includes("/")) return s.split("/").every((part) => SIZE_LABEL.test(part.trim()));
+  return SIZE_LABEL.test(s);
+}
+
+/** A size label with its parentheticals, dashes and trailing punctuation
+ *  removed — the form the shape test AND the bare-label test read, so
+ *  "Size:" and "Size (SF)" are as bare as "Size". */
+function sizeLabelCore(label: string): string {
+  return label
+    .toLowerCase()
+    .trim()
     .replace(/\([^)]*\)/g, " ")
     .replace(/[—–-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .replace(/[:.]+$/, "")
     .trim();
-  // "Building Size / SF": two size nouns either side of a slash are still
-  // one size label; "Units / SF" or "Price / SF" are not.
-  if (s.includes("/")) return s.split("/").every((part) => SIZE_LABEL.test(part.trim()));
-  return SIZE_LABEL.test(s);
 }
 
 // A bare "Size" / "Area" / "Property size" label says nothing about WHAT is
@@ -466,7 +523,7 @@ export function buildingSfRow(metrics: MetricLike[]): MetricLike | null {
     if (!isSizeLabel(m.label)) continue;
     const sf = parseSf(m.value);
     if (sf == null) continue;
-    if (BARE_SIZE_LABEL.test(m.label.trim()) && (!SF_NOUN.test(m.value) || isLotSize(sf))) continue;
+    if (BARE_SIZE_LABEL.test(sizeLabelCore(m.label)) && (!SF_NOUN.test(m.value) || isLotSize(sf))) continue;
     return m;
   }
   return null;
@@ -498,15 +555,25 @@ const OCC_INCLUDE = /occupancy|occupied|\bleased\b/i;
 const OCC_EXCLUDE =
   /economic|physical vacancy|stabili[sz]|pro ?forma|projected|forward|target|underwritten|year ?\d|\byr ?\d|\by\d\b|at (completion|stabili[sz]ation)|pre-?leas|break-?even|market|submarket|comp|(market|submarket|comp\w*)\s+(average|avg)|cost|growth|\bratio\b/i;
 const OCC_IN_PLACE = /current|in[- ]?place|physical|actual|as of|t-?12|ttm|trailing|existing|today|in place/i;
+// The VALUE can carry the projection too — "95% (stabilized)", "95% at
+// stabilization", "95% pro forma" — and such a row states no occupancy
+// today. (An "88% physical / 84% economic" value is today's: the first
+// figure reads.)
+const OCC_VALUE_EXCLUDE =
+  /stabili[sz]|pro ?forma|projected|(at|upon) (completion|stabili[sz]ation)|target|underwritten|pre-?leas/i;
 
 /** The metric row stating today's occupancy: an explicitly in-place row
- *  first, else a plain occupancy row that carries no forward word — and
- *  only a row whose value IS a percentage, so a "Leased SF" or "Occupied
- *  units" row never shadows it. Null when the OM states only the finished
- *  project's figure. */
+ *  first, else a plain occupancy row that carries no forward word in its
+ *  label or its value — and only a row whose value IS a percentage, so a
+ *  "Leased SF" or "Occupied units" row never shadows it. Null when the OM
+ *  states only the finished project's figure. */
 export function occupancyRow(metrics: MetricLike[]): MetricLike | null {
   const eligible = metrics.filter(
-    (m) => OCC_INCLUDE.test(m.label) && !OCC_EXCLUDE.test(m.label) && parsePct(m.value) != null,
+    (m) =>
+      OCC_INCLUDE.test(m.label) &&
+      !OCC_EXCLUDE.test(m.label) &&
+      !OCC_VALUE_EXCLUDE.test(m.value) &&
+      parsePct(m.value) != null,
   );
   return eligible.find((m) => OCC_IN_PLACE.test(m.label)) ?? eligible[0] ?? null;
 }
@@ -607,6 +674,11 @@ export function buyBoxCheckSource(
   extraction: ExtractionLike | null,
   firstSignal: SignalLike | null,
   dealAddress: AddressLike | null,
+  /** the deal's kind as the page inferred it (extraction + first signal),
+   *  when the caller has it — so a bare land OM the extraction called
+   *  "unknown" still judges its land cost as the price and a plan deal
+   *  keeps its "no going-in cap" reading */
+  strategyKind?: string | null,
 ): ExtractionLike | null {
   const addressHaystack = [
     extraction?.address,
@@ -643,6 +715,10 @@ export function buyBoxCheckSource(
     market: extraction?.market ?? firstSignal?.market ?? "",
     address: addressHaystack,
     metrics: extraction?.metrics ?? signalMetrics,
+    // The kind rides along: without it the buy box loses the plan deal's
+    // cap reading and the development's land price on the very page that
+    // shows them.
+    strategy: strategyKind ? { kind: strategyKind } : (extraction?.strategy ?? null),
   };
 }
 
@@ -783,12 +859,12 @@ export function evaluateBuyBox(
   // ---- Price band --------------------------------------------------------
   const band = priceBand(box);
   if (band.min != null || band.max != null) {
-    const metric = findMetric(
-      metrics,
-      METRIC_FIND.price.inc,
-      METRIC_FIND.price.exc,
-    );
+    // The shared price row — on a development the land cost, the same row
+    // the deal page and the pipeline print — so the band never says
+    // "no asking price" beside a printed one.
+    const metric = findPriceRow(metrics, extraction?.strategy?.kind);
     const dollars = metric ? parseMoney(metric.value) : null;
+    const noun = metric && /\b(land|site)\b/i.test(metric.label) ? "land cost" : "ask";
     const bandText = [
       band.min != null ? `${fmtM(band.min)} min` : null,
       band.max != null ? `${fmtM(band.max)} max` : null,
@@ -808,7 +884,7 @@ export function evaluateBuyBox(
         checks.push({
           label: "Price",
           status: "pass",
-          detail: `Mandate is ${bandText} — the ask is ${fmtM(dollars)}. Inside the band.`,
+          detail: `Mandate is ${bandText} — the ${noun} is ${fmtM(dollars)}. Inside the band.`,
         });
       } else {
         const bound = belowMin ? band.min! : band.max!;
@@ -818,8 +894,8 @@ export function evaluateBuyBox(
           label: "Price",
           status: near ? "near" : "miss",
           detail: near
-            ? `Mandate is ${bandText} — the ask is ${fmtM(dollars)}, ${Math.round(off * 100)}% ${belowMin ? "under" : "over"}. Close enough to price; a retrade could land it inside.`
-            : `Mandate is ${bandText} — the ask is ${fmtM(dollars)}. ${belowMin ? "Below" : "Beyond"} the mandate.`,
+            ? `Mandate is ${bandText} — the ${noun} is ${fmtM(dollars)}, ${Math.round(off * 100)}% ${belowMin ? "under" : "over"}. Close enough to price; a retrade could land it inside.`
+            : `Mandate is ${bandText} — the ${noun} is ${fmtM(dollars)}. ${belowMin ? "Below" : "Beyond"} the mandate.`,
         });
       }
     }

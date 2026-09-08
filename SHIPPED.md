@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Fifty-one PRs, #176–#226, each
+estimate, and that's what it should flag." Fifty-two PRs, #176–#227, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -545,6 +545,42 @@ confirmed equal to the main tip after each batch.
   screen of blank space under the compact Returns slide) — inactive slides
   are display:none there and autoplay is off, so nothing reflows under the
   reader's thumb. The excerpt helper is tested.
+- **#227 The readers, read a fifth time — on the whole code.** The four
+  earlier reviews read diffs; this one read the reader layer as it stands
+  and every call site, verified sixteen findings by execution, and each is
+  closed with a test. The worst: a hard basis dealbreaker cleared on an
+  "Opex per unit" row while the $252k/unit price sat beside it — the
+  per-unit exclude now refuses opex, R&M, concessions, renovation spend,
+  fees and deposits, and "Price / Unit" with the spaced slash reads at
+  last. "Price per home / apartment / bay / berth / parking space" — any
+  "per <noun>" — is never the ask ("per the PSA" and "per OM" still are);
+  a projected, residual, disposition, forward or pro forma sale price and
+  a prior year's sale ("2019 sale price", "Year 5 sale price") are never
+  the ask, so a $58M Year-5 exit no longer fails a $50M mandate beside a
+  $42M asking price. "Size:" and "Size (SF)" are as bare as "Size", so
+  they defer to the acreage the same way. A Year-2+ cap rate or a cap on
+  cost is never the going-in cap (a Year-1 cap still is). An occupancy
+  whose VALUE says stabilized, pro forma or target states no occupancy
+  today, while "88% physical / 84% economic" reads 88. A deck that names
+  its plan's rows — a construction budget, a total project cost, proposed
+  units beside a stabilized pro forma — but no strategy and no income in
+  place is a development, so its land cost is its price and the plan
+  strip fills; an operating asset with a historical construction cost
+  beside its NOI keeps its kind. "NOI at stabilization" is the retrade
+  diff's plan row, never today's. The workbook reads the cap through the
+  shared `findGoingInCap`, so a residual cap never backs a price out.
+  `parseMoney` reads "±$42M", "~$42M", "approx.", "circa", "USD" and a
+  negative in either spelling. "312 residential units" and "150 guest
+  rooms" count; a footnote marker ("Units*", "Units (1)", "312¹") never
+  blanks a count. The buy-box source carries the deal's kind — the page's
+  inferred kind first — so the deal page keeps a conversion's "no
+  going-in cap" reading, and the buy box's price band and the mandate's
+  price ceiling judge a development's land cost through one
+  `findPriceRow` in `lib/criteria` (the strategy module's
+  `findPriceMetric` now delegates to it). The comp memory reads the asset
+  class before any per-unit row, so an office sibling never gets a $/unit
+  basis. And the LOI infers the kind with the first signal, exactly as
+  the page does, so the letter and the page never name two prices.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

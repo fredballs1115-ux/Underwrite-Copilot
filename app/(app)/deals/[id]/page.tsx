@@ -286,7 +286,15 @@ export default async function DealPage({
   const dealAddress =
     (deal.address as import("@/lib/address").StructuredAddress | undefined) ??
     null;
-  const checkSource = buyBoxCheckSource(extraction, firstSignal, dealAddress);
+  // The kind rides along as the page infers it (extraction + first signal),
+  // so the buy box judges a development's land cost and keeps a plan
+  // deal's "no going-in cap" reading — the same read the summary bar makes.
+  const checkSource = buyBoxCheckSource(
+    extraction,
+    firstSignal,
+    dealAddress,
+    inferStrategy(extraction, firstSignal).kind,
+  );
   const buyBoxChecks: BuyBoxCheck[] = buyBox
     ? evaluateBuyBox(deal.asset_class, checkSource, buyBox)
     : [];
@@ -931,6 +939,7 @@ export default async function DealPage({
         modelErrorCode={errorCode ?? null}
         job={job}
         results={{ extraction, challenges, comps, reconciliation, market, verdict }}
+        firstSignal={firstSignal}
         supplements={supplements}
         model={model}
         documents={documents}

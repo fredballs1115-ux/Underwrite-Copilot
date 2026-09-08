@@ -7,6 +7,7 @@ import {
   parseSf,
   findGoingInCap,
   findMetric,
+  findPriceRow,
   METRIC_FIND,
   foldBuyBoxChecks,
   isEmptyBuyBox,
@@ -759,5 +760,151 @@ describe("the fourth review's occupancy, size and price cases", () => {
         { label: "Acres", value: "12.5" },
       ]),
     ).toBe(545_000);
+  });
+});
+
+// The fifth review's cases — a whole-reader pass on the current code.
+describe("the fifth review's price, per-unit, cap, size, occupancy and money cases", () => {
+  const price = (label: string) => findPriceRow([{ label, value: "$42,000,000" }]);
+
+  it("a price per anything is never the ask; a price per the PSA or per OM still is", () => {
+    for (const label of [
+      "Price per home",
+      "Price per apartment",
+      "Price per bay",
+      "Price per berth",
+      "Price / home",
+      "Price / apt",
+      "Price per parking space",
+      "Asking price per key",
+    ]) {
+      expect(price(label), label).toBeNull();
+    }
+    for (const label of ["Purchase price per the PSA", "Asking price (per OM)", "Price per broker guidance"]) {
+      expect(price(label)?.label, label).toBe(label);
+    }
+  });
+
+  it("a projected, residual, disposition, forward, pro forma or prior-year sale price is never the ask", () => {
+    for (const label of [
+      "Projected sale price (Year 5)",
+      "Projected sale price",
+      "Residual sale price",
+      "Disposition price",
+      "Pro forma sale price",
+      "Forward sale price",
+      "Year 5 sale price",
+      "2019 sale price",
+      "Sale price, 2019",
+      "Sale price 2019",
+      "Price at stabilization",
+    ]) {
+      expect(price(label), label).toBeNull();
+    }
+    expect(
+      findPriceRow([
+        { label: "Projected sale price (Year 5)", value: "$58,000,000" },
+        { label: "Asking price", value: "$42,000,000" },
+      ])?.value,
+    ).toBe("$42,000,000");
+  });
+
+  it("the land cost is the price row on a development only, and the buy box's band judges it", () => {
+    const land = [
+      { label: "Land cost", value: "$4,000,000" },
+      { label: "Acres", value: "12" },
+      { label: "Zoning", value: "MF-2" },
+    ];
+    expect(findPriceRow(land, "development")?.value).toBe("$4,000,000");
+    expect(findPriceRow(land, "stabilized")).toBeNull();
+    expect(findPriceRow(land)).toBeNull();
+    const dev = { assetClass: "multifamily", market: "", address: "", metrics: land, strategy: { kind: "development" } };
+    const inside = check(evaluateBuyBox("multifamily", dev, { priceMinM: 1, priceMaxM: 10 }), "Price")!;
+    expect(inside.status).toBe("pass");
+    expect(inside.detail).toContain("the land cost is $4.0M");
+    const beyond = check(evaluateBuyBox("multifamily", dev, { priceMaxM: 3 }), "Price")!;
+    expect(beyond.status).toBe("miss");
+    // On an operating asset the same land line is an allocation, not a price.
+    const op = { ...dev, strategy: { kind: "stabilized" } };
+    expect(check(evaluateBuyBox("multifamily", op, { priceMaxM: 3 }), "Price")?.status).toBe("unknown");
+  });
+
+  it("the buy-box source carries the deal's kind, the page's inferred kind first", () => {
+    const extraction = {
+      assetClass: "multifamily",
+      market: "",
+      address: "",
+      metrics: [{ label: "Purchase price", value: "$20,000,000" }],
+      strategy: { kind: "conversion" },
+    };
+    expect(buyBoxCheckSource(extraction, null, null)?.strategy?.kind).toBe("conversion");
+    expect(buyBoxCheckSource(extraction, null, null, "development")?.strategy?.kind).toBe("development");
+    expect(buyBoxCheckSource({ ...extraction, strategy: null }, null, null)?.strategy).toBeNull();
+  });
+
+  it("an opex, R&M, concession or renovation spend per unit never clears a basis ceiling", () => {
+    const box: BuyBox = { maxPerUnitK: 100 };
+    for (const label of ["Opex per unit", "R&M per unit", "Concessions per unit", "Renovation spend per unit", "Management fee per unit", "Deposit per unit"]) {
+      const r = check(evaluateBuyBox("multifamily", ex([[label, "$4,800"], ["Price per unit", "$252,000"]]), box), "Basis / unit")!;
+      expect(r.status, label).toBe("miss");
+    }
+  });
+
+  it("'Price / Unit' with the spaced slash and '$ / Unit' are the per-unit price", () => {
+    const box: BuyBox = { maxPerUnitK: 100 };
+    for (const label of ["Price / Unit", "Price / unit", "$ / Unit", "Price/unit", "Price per unit"]) {
+      expect(check(evaluateBuyBox("multifamily", ex([[label, "$252,000"]]), box), "Basis / unit")?.status, label).toBe("miss");
+    }
+    for (const label of ["Avg rent per unit", "Insurance per unit", "NOI per unit", "Units per acre", "Total units", "Unit mix"]) {
+      expect(findMetric([{ label, value: "$252,000" }], METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc), label).toBeNull();
+    }
+  });
+
+  it("a Year-2+ cap rate or a cap on cost is never the going-in cap; a Year-1 cap still is", () => {
+    for (const label of ["Cap rate (Year 3)", "Year 3 cap rate", "Yr 3 cap rate", "Cap rate — Year 5", "Cap rate on cost"]) {
+      expect(findGoingInCap([{ label, value: "7.50%" }]), label).toBeNull();
+    }
+    expect(findGoingInCap([{ label: "Year 1 cap rate", value: "5.50%" }])?.value).toBe("5.50%");
+    expect(findGoingInCap([{ label: "Cap rate", value: "5.50%" }])?.value).toBe("5.50%");
+  });
+
+  it("a bare 'Size:' or 'Size (SF)' beside the acreage is the lot, exactly as a bare 'Size' is", () => {
+    for (const label of ["Size:", "Size (SF)", "Property Size:", "Total Area:"]) {
+      expect(
+        buildingSfFromMetrics([
+          { label, value: "545,000 SF" },
+          { label: "Acres", value: "12.5" },
+        ]),
+        label,
+      ).toBeNull();
+    }
+    expect(buildingSfFromMetrics([{ label: "Size:", value: "250,000" }])).toBeNull();
+    expect(buildingSfFromMetrics([{ label: "Building size:", value: "545,000 SF" }, { label: "Acres", value: "12.5" }])).toBe(545_000);
+  });
+
+  it("an occupancy whose VALUE says stabilized is not today's; a physical / economic pair reads the first figure", () => {
+    for (const value of ["95% (stabilized)", "95% at stabilization", "95% pro forma", "95% target"]) {
+      expect(occupancyPctFromMetrics([{ label: "Occupancy", value }]), value).toBeNull();
+    }
+    expect(occupancyPctFromMetrics([{ label: "Occupancy", value: "88% physical / 84% economic" }])).toBe(88);
+    expect(occupancyPctFromMetrics([{ label: "Occupancy", value: "92% (as of 8/1/2026)" }])).toBe(92);
+  });
+
+  it("parseMoney reads the approximations and negatives an OM writes", () => {
+    expect(parseMoney("±$42,000,000")).toBe(42_000_000);
+    expect(parseMoney("~$42M")).toBe(42_000_000);
+    expect(parseMoney("≈ $42,000,000")).toBe(42_000_000);
+    expect(parseMoney("approximately $42,000,000")).toBe(42_000_000);
+    expect(parseMoney("Approx. $42,000,000")).toBe(42_000_000);
+    expect(parseMoney("circa $42M")).toBe(42_000_000);
+    expect(parseMoney("USD 42,000,000")).toBe(42_000_000);
+    expect(parseMoney("US$42M")).toBe(42_000_000);
+    expect(parseMoney("-$250,000")).toBe(-250_000);
+    expect(parseMoney("($250,000)")).toBe(-250_000);
+    expect(parseMoney("−$1.2M")).toBe(-1_200_000);
+    expect(parseMoney("$42,000,000 ($135k/unit)")).toBe(42_000_000);
+    expect(parseMoney("(see p. 14)")).toBeNull();
+    expect(parseMoney("Call for offers")).toBeNull();
+    expect(parseMoney("$0")).toBe(0);
   });
 });

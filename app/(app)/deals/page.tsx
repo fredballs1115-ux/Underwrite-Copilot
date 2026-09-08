@@ -204,6 +204,9 @@ export default async function DealsPage({
           extraction,
           (d.first_signal as FirstSignal | null) ?? null,
           (d.address as StructuredAddress | null) ?? null,
+          // The kind as the card infers it, so the fit chip judges a
+          // development's land cost — the price the card prints.
+          inferStrategy(extraction, (d.first_signal as FirstSignal | null) ?? null).kind,
         )
       : null;
     const mandate =

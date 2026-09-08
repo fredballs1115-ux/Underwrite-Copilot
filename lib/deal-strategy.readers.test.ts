@@ -402,6 +402,50 @@ describe("the fourth review's cases", () => {
     expect(findPricedMetric([m("NOI", "$3,000,000")], "stabilized")).toBeNull();
   });
 
+  it("a deck that names its plan's rows but no strategy and no income in place is a development", () => {
+    // The extraction answered "unknown" (or a legacy row has no strategy);
+    // the rows are the plan's own — and the stabilized NOI the prompt asks
+    // for is the finished project's, not income today.
+    const dev = ex([
+      m("Land cost", "$8,000,000"),
+      m("Construction budget", "$62,000,000"),
+      m("Units (proposed)", "240"),
+      m("NOI (stabilized, pro forma)", "$5,600,000"),
+      m("Construction period", "24 months"),
+    ]);
+    expect(inferStrategy(dev).kind).toBe("development");
+    expect(findPriceMetric(dev.metrics, inferStrategy(dev).kind)?.value).toBe("$8,000,000");
+    expect(planSummary(dev, inferStrategy(dev))?.price).toBe(8_000_000);
+    const noLand = ex([m("Total project cost", "$70,000,000"), m("Stabilized NOI", "$5,600,000"), m("Units (proposed)", "240")]);
+    expect(inferStrategy(noLand).kind).toBe("development");
+    // An operating asset that lists a historical construction cost beside
+    // its NOI keeps its kind: that NOI is today's.
+    const op = ex([m("Asking price", "$42,000,000"), m("NOI", "$3,000,000"), m("Construction cost (2019)", "$45,000,000"), m("Units", "248")]);
+    expect(inferStrategy(op).kind).toBe("stabilized");
+    // A value-add with a construction budget names itself and stays one.
+    const va = ex([m("Asking price", "$42,000,000"), m("T-12 NOI", "$2,400,000"), m("Construction budget", "$4,500,000"), m("Value-add renovation program", "Interior upgrades")]);
+    expect(inferStrategy(va).kind).toBe("value_add");
+    // A land-only deck still reads development; a stabilized deck with a
+    // market rent row and a plan row but in-place NOI stays stabilized.
+    expect(inferStrategy(ex([m("Land price", "$4,500,000"), m("Acres", "12")])).kind).toBe("development");
+    expect(inferStrategy(ex([m("Asking price", "$42,000,000"), m("In-place NOI", "$3,000,000"), m("Hard costs", "$1,000,000")])).kind).toBe("stabilized");
+  });
+
+  it("a count value that repeats the label's qualifier still counts; a footnote marker never blanks it", () => {
+    for (const value of ["312 residential units", "312 rental units", "312 dwelling units", "312 multi-family units"]) {
+      expect(unitCountFromMetrics([m("Units", value)]), value).toBe(312);
+    }
+    expect(unitCountFromMetrics([m("Rooms", "150 guest rooms")])).toBe(150);
+    expect(unitCountFromMetrics([m("Units*", "312")])).toBe(312);
+    expect(unitCountFromMetrics([m("Units¹", "312")])).toBe(312);
+    expect(unitCountFromMetrics([m("Units (1)", "312")])).toBe(312);
+    expect(unitCountFromMetrics([m("Units", "312*")])).toBe(312);
+    expect(unitCountFromMetrics([m("Units (Phase 1)", "312")])).toBeNull();
+    for (const bad of ["40% studio / 60% 1BR", "650–1,200 SF", "$312,000", "1.5", "TBD", ""]) {
+      expect(parseCount(bad), bad).toBeNull();
+    }
+  });
+
   it("the first signal's ask fills a price slot only when it is a figure", () => {
     expect(signalAskPrice({ askPrice: "$20,000,000" })).toBe("$20,000,000");
     expect(signalAskPrice({ askPrice: " $42.5M " })).toBe("$42.5M");

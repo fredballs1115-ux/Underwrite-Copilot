@@ -86,22 +86,26 @@ function deriveBasis(
    *  (whose basis is unknowable there) and say so in the label */
   allIn = false,
 ): string | null {
-  if (!allIn) {
-    // The shared per-unit reader: the price over the units, never a rent
-    // or an expense per unit.
-    const direct = findMetric(metrics, METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc);
-    if (direct) return direct.value;
-  }
   const suffix = allIn ? " all-in" : "";
 
-  if (price == null) return null;
+  // The branch on asset class comes FIRST, as in lib/market-memory: a stray
+  // "per unit" row on an office deal must never flip its $/SF column to a
+  // unit basis.
   if (assetClass === "multifamily") {
+    if (!allIn) {
+      // The shared per-unit reader: the price over the units, never a rent
+      // or an expense per unit.
+      const direct = findMetric(metrics, METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc);
+      if (direct) return direct.value;
+    }
+    if (price == null) return null;
     // The shared count reader: "312 units" parses, a "Unit mix" row ahead
     // of "Units" never shadows it.
     const n = unitCountFromMetrics(metrics);
     if (n != null && n > 0) return `${fmtCompact(price / n)}/unit${suffix}`;
     return null;
   }
+  if (price == null) return null;
   // Office / industrial / retail: dollars per square foot, over the
   // building's size — the shared reader, never the land's or a unit's.
   const n = buildingSfFromMetrics(metrics);

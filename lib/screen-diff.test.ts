@@ -170,6 +170,21 @@ describe("computeScreenDiff — the Occupancy row is today's occupancy", () => {
     expect(d.rows[0].direction).toBe("better");
   });
 
+  it("an 'NOI at stabilization' is the plan's NOI row, never today's", () => {
+    const d = computeScreenDiff(
+      prior([m("NOI at stabilization", "$5,600,000")]),
+      { metrics: [m("NOI at stabilization", "$6,300,000")] },
+      null,
+    )!;
+    expect(d.rows.map((r) => r.label)).toEqual(["Stabilized NOI (pro forma)"]);
+    expect(d.rows[0].delta).toBe("+$700k (+12.5%)");
+    expect(
+      computeScreenDiff(prior([m("NOI at completion", "$5,600,000")]), { metrics: [m("NOI at completion", "$6,300,000")] }, null)!.rows.map(
+        (r) => r.label,
+      ),
+    ).toEqual(["Stabilized NOI (pro forma)"]);
+  });
+
   it("an occupancy cost or growth never pairs as the Occupancy row; a T-12 average does", () => {
     expect(
       computeScreenDiff(

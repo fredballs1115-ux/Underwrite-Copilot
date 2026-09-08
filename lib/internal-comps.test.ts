@@ -105,6 +105,32 @@ describe("deriveInternalComps — the sibling's kind is read first", () => {
   });
 });
 
+describe("deriveInternalComps — the basis follows the asset class before any per-unit row", () => {
+  it("an office sibling with a stray 'Price per unit' row keeps its $/SF basis", () => {
+    const [c] = deriveInternalComps("current", "office", { assetClass: "office" }, [
+      sib("s1", "Tower", "office", {
+        dealName: "Tower",
+        assetClass: "office",
+        market: "Washington, DC",
+        metrics: [m("Asking price", "$60,000,000"), m("Price per unit", "$500,000"), m("Total SF", "200,000 SF")],
+      }),
+    ]);
+    expect(c.basisLabel).toBe("$300/SF");
+  });
+
+  it("a multifamily sibling's own per-unit row still wins over the derived figure", () => {
+    const [c] = deriveInternalComps("current", "multifamily", { assetClass: "multifamily" }, [
+      sib("s1", "Maddox", "multifamily", {
+        dealName: "Maddox",
+        assetClass: "multifamily",
+        market: "Dallas, TX",
+        metrics: [m("Asking price", "$50,000,000"), m("Price per unit", "$201,613"), m("Units", "248")],
+      }),
+    ]);
+    expect(c.basisLabel).toBe("$201,613");
+  });
+});
+
 describe("deriveInternalComps — what never becomes a comp figure", () => {
   it("a pro forma cap on an operating asset is not a comp cap (the row still qualifies on price)", () => {
     const [c] = deriveInternalComps("x", "multifamily", null, [

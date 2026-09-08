@@ -25,7 +25,14 @@
  */
 
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { METRIC_FIND, buildingSfFromMetrics, findMetric, parseMoney, parsePct } from "@/lib/criteria";
+import {
+  METRIC_FIND,
+  buildingSfFromMetrics,
+  findMetric,
+  findPriceRow,
+  parseMoney,
+  parsePct,
+} from "@/lib/criteria";
 
 export type StrategyKind =
   | "stabilized"
@@ -146,6 +153,11 @@ export function inferStrategy(
   else if (RX.development.test(text)) kind = "development";
   else if (RX.leaseUp.test(text)) kind = "lease_up";
   else if (RX.valueAdd.test(text)) kind = "value_add";
+  // The plan's rows with no income for the building as it stands — a
+  // construction budget, a total project cost, proposed units beside a
+  // stabilized pro forma — are a development the deck never named.
+  else if (hasMetrics && hasPlanCostRows(extraction?.metrics ?? []) && !hasTodayIncome(extraction?.metrics ?? []))
+    kind = "development";
   // A land sale — a land or site price and no income figure — is a
   // development, not an operating asset with no price.
   else if (hasMetrics && isLandOnly(extraction?.metrics ?? [])) kind = "development";
@@ -289,25 +301,14 @@ export function capitalBudgetFromMetrics(metrics: MetricLike[], price: number | 
   return { budget, allIn, isTotal: statedAllIn && price == null, label: m.label, page: m.page };
 }
 
-// A ground-up development buys land, and its OM says "land cost" or "site
-// acquisition" where a building's OM says "asking price" — as does a land
-// deal that never stated a strategy. That line is the price only when the
-// OM states no asking price at all, and never an appraised land VALUE,
-// which on an operating asset is an allocation, not what is being bought.
-const LAND_PRICE_INCLUDE = /\b(land|site) (cost|price|acquisition|purchase|basis)\b/i;
-const LAND_PRICE_EXCLUDE = /value|\bper\b|\/|psf|acre|\bsf\b/i;
-
 /** The price metric: the asking / purchase price, else — on a development
  *  only, which a bare land OM now infers — the land or site cost. Null when
  *  the OM states neither: on an operating asset a land line is an
- *  allocation inside the basis, never the price. */
+ *  allocation inside the basis, never the price. One reader with the buy
+ *  box's price band and the mandate ceiling (lib/criteria's findPriceRow),
+ *  so the band judges the row the page prints. */
 export function findPriceMetric(metrics: MetricLike[], kind: StrategyKind): MetricLike | null {
-  return (
-    (findMetric(metrics, PRICE_INCLUDE, PRICE_EXCLUDE) as MetricLike | null) ??
-    (kind === "development"
-      ? (findMetric(metrics, LAND_PRICE_INCLUDE, LAND_PRICE_EXCLUDE) as MetricLike | null)
-      : null)
-  );
+  return findPriceRow(metrics, kind) as MetricLike | null;
 }
 
 /** The price row a figure is wanted from — the LOI's prefill: among the
@@ -345,8 +346,32 @@ const INCOME_ROW =
 function isLandOnly(metrics: MetricLike[]): boolean {
   if (!metrics.length) return false;
   if (findMetric(metrics, PRICE_INCLUDE, PRICE_EXCLUDE)) return false;
-  if (!findMetric(metrics, LAND_PRICE_INCLUDE, LAND_PRICE_EXCLUDE)) return false;
+  if (!findMetric(metrics, METRIC_FIND.landPrice.inc, METRIC_FIND.landPrice.exc)) return false;
   return !metrics.some((m) => INCOME_ROW.test(m.label));
+}
+
+// The plan's own rows — a construction budget or period, a total project
+// cost, proposed units. On a deck that states no plan words at all (the
+// extraction answered "unknown", or a legacy row has no strategy) and no
+// income for the building as it stands, they are a development: its
+// stabilized pro forma is the finished project's, and the land line is its
+// price. A value-add or lease-up names itself and wins above; an operating
+// asset that lists a historical construction cost beside its NOI keeps its
+// kind, because that NOI is today's.
+const PLAN_COST_ROW =
+  /total (project|development) cost|construction (budget|cost|period|schedule|start|loan)|hard costs?|soft costs?|\b(proposed|planned) units\b|units? \((?:proposed|planned)\)/i;
+// An income row that describes the building as it stands, not the plan:
+// anything INCOME_ROW matches that is not stabilized / pro forma /
+// projected / a later year, and not a market or asking rent.
+const FORWARD_ROW =
+  /stabili[sz]|pro ?forma|projected|forward|(at|upon) (completion|stabili[sz]ation)|\b(year|yr) ?\d|\by\d\b|underwritten|market rent|asking rent|rent (assumption|target|premium)/i;
+
+function hasTodayIncome(metrics: MetricLike[]): boolean {
+  return metrics.some((m) => INCOME_ROW.test(m.label) && !FORWARD_ROW.test(m.label));
+}
+
+function hasPlanCostRows(metrics: MetricLike[]): boolean {
+  return metrics.some((m) => PLAN_COST_ROW.test(m.label));
 }
 
 const MONEY_IN_TEXT = /\$\s?(\d[\d,]*(?:\.\d+)?)\s*(billion|million|thousand|bn|mm|m|k|b)?\b/i;
@@ -424,8 +449,11 @@ const SUBSET_PAREN = /phase|bldg|building|tower|wing|floor|\bof\b|\d/i;
 /** Whether a metric label is the row that counts the units (or keys, beds,
  *  pads, sites …) — the whole count, never a subset or a row about them. */
 export function isCountLabel(label: string): boolean {
-  let s = label.toLowerCase().trim();
-  for (const p of s.match(/\([^)]*\)/g) ?? []) if (SUBSET_PAREN.test(p)) return false;
+  let s = label.toLowerCase().replace(FOOTNOTE_MARK, "").trim();
+  for (const p of s.match(/\([^)]*\)/g) ?? []) {
+    if (FOOTNOTE_PAREN.test(p)) continue; // "Units (1)" — a footnote, not a subset
+    if (SUBSET_PAREN.test(p)) return false;
+  }
   s = s
     .replace(/\([^)]*\)/g, " ")
     .replace(/[—–-]+/g, " ")
@@ -444,8 +472,15 @@ export function isCountLabel(label: string): boolean {
 // "248 total". Anything else ("40% studio / 60% 1BR", "650–1,200 SF",
 // "312 / 285,000 SF", "248 (of 312)") is not the whole count, and reading
 // its first digits as one puts a wrong basis on every per-unit surface.
+// The value can repeat the label's own qualifier — "312 residential units",
+// "150 guest rooms", "240 rental units" — so the qualifiers COUNT_LABEL
+// admits are stripped here too.
 const COUNT_WORD =
-  /\b(units?|keys?|doors?|apartments?|apts?|homes?|residences?|beds?|pads?|rooms?|sites?|lots?|spaces?|suites?|total)\b/gi;
+  /\b(units?|keys?|doors?|apartments?|apts?\.?|homes?|residences?|beds?|pads?|rooms?|sites?|lots?|spaces?|suites?|total|residential|rental|multi[- ]?family|dwelling|leasable|rentable|living|guest|hotel|storage|self[- ]storage|student|senior|manufactured|mobile[- ]home|mh|rv)\b/gi;
+// A footnote marker on a label or a value — "Units*", "312¹", "Units (1)"
+// — is not part of the count.
+const FOOTNOTE_MARK = /[*†‡¹²³⁴]+/g;
+const FOOTNOTE_PAREN = /^\(\s*\d{1,2}\s*\)$/;
 const COUNT_PREFIX = /^(approx(imately|\.)?|about|circa|c\.|~|≈|±)\s*/i;
 
 /** A whole-number count from a metric's value, or null when the value is
@@ -462,6 +497,7 @@ export function parseCount(value: string): number | null {
     if (/\bof\b|out of|\/|phase|bldg|building|tower|wing|floor/i.test(p)) return null;
   }
   const s = value
+    .replace(FOOTNOTE_MARK, " ") // "312*", "312¹"
     .replace(/^[a-z][a-z .#]*:\s*/i, "") // "Units: 248"
     .replace(/\([^)]*\)/g, " ")
     .replace(/(\d)[-–](?=[a-z])/gi, "$1 ") // "248-unit"

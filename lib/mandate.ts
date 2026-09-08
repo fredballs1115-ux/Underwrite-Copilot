@@ -22,6 +22,7 @@ import {
   type BuyBox,
   buildingSfFromMetrics,
   findMetric,
+  findPriceRow,
   parseMoney,
   parsePct,
   findGoingInCap,
@@ -95,6 +96,8 @@ interface ExtractionLike {
   market?: string;
   address?: string;
   metrics: MetricLike[];
+  /** the deal's kind, when known — a development's price is its land cost */
+  strategy?: { kind?: string } | null;
 }
 
 type Pattern = { readonly inc: RegExp; readonly exc?: RegExp };
@@ -219,9 +222,11 @@ function evalDealbreakers(
     else tripped.push("location outside every target market");
   }
 
-  // Hard purchase-price ceiling.
+  // Hard purchase-price ceiling — the shared price row, so a development's
+  // land cost is judged, the same row the page prints.
   if (db.maxPriceM != null) {
-    const price = moneyOf(metrics, METRIC_FIND.price);
+    const priceRow = findPriceRow(metrics, extraction?.strategy?.kind);
+    const price = priceRow ? parseMoney(priceRow.value) : null;
     const ceiling = db.maxPriceM * 1e6;
     if (price == null) unknown.push("price");
     else if (price <= ceiling) clear.push("price");
