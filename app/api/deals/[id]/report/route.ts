@@ -11,6 +11,7 @@ import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { buildSensitivityData, type SensitivityData } from "@/lib/underwrite/report-grid";
+import { buildPlanReport, type PlanReport } from "@/lib/plan-sensitivity";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 
 export const runtime = "nodejs";
@@ -108,6 +109,9 @@ export async function GET(
   // growth and price × exit cap. Best-effort: any failure (pre-0020 schema,
   // degenerate extraction) just omits the section, never sinks the report.
   let sensitivity: SensitivityData | null = null;
+  // The plan page (conversion / development / lease-up / value-add): yield on
+  // total cost stressed, against the same derived model's exit cap.
+  let plan: PlanReport | null = null;
   try {
     const extraction = (deal.extraction as ExtractionResult | null) ?? null;
     if (extraction) {
@@ -142,10 +146,15 @@ export async function GET(
           : null,
       });
       sensitivity = buildSensitivityData(derived.inputs, hurdlePct);
+      plan = buildPlanReport(extraction, {
+        pct: derived.inputs.exitCapPct,
+        provenance: derived.sources.exitCapPct?.provenance ?? "assumption",
+      });
     }
   } catch (err) {
     console.error(`report heatmap build failed for ${id}:`, err);
     sensitivity = null;
+    plan = null;
   }
 
   // Custom firm branding (Feature 6) — best-effort, mirrors the memo route.
@@ -168,7 +177,7 @@ export async function GET(
   }
 
   try {
-    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding);
+    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan);
     const element = React.createElement(ReportDocument, {
       input,
     }) as unknown as Parameters<typeof renderToBuffer>[0];

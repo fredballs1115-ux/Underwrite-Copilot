@@ -3,7 +3,9 @@ import {
   SPREAD_LABEL,
   buildYieldOnCostGrid,
   planBreakevens,
+  refCapNote,
   spreadBucket,
+  type RefCapInput,
   type SpreadBucket,
 } from "@/lib/plan-sensitivity";
 
@@ -29,11 +31,7 @@ const BUCKET_CLS: Record<SpreadBucket, string> = {
 };
 const LEGEND: SpreadBucket[] = ["wide", "adequate", "thin", "none", "negative"];
 
-export interface RefCap {
-  /** decimal */
-  pct: number;
-  provenance: "extracted" | "derived" | "assumption";
-}
+export type RefCap = RefCapInput;
 
 /**
  * Yield on total cost, stressed. The sensitivity a plan deal is judged on:
@@ -55,12 +53,7 @@ export function PlanSensitivity({
   if (!grid || !be) return null;
   const noi = plan.stabilizedNoi!.value;
   const budget = plan.budget!.budget;
-  const refNote =
-    refCap.provenance === "derived"
-      ? "the OM's going-in cap, which the model also exits at"
-      : refCap.provenance === "extracted"
-        ? "the OM's stated cap"
-        : "the model's exit-cap default — set your own view in the model";
+  const refNote = refCapNote(refCap.provenance);
 
   return (
     <section

@@ -19,6 +19,15 @@ import {
   type SensitivityData,
   type HeatCell,
 } from "@/lib/underwrite/report-grid";
+import {
+  SPREAD_BG,
+  SPREAD_LABEL,
+  refCapNote,
+  spreadBucket,
+  type PlanReport,
+  type SpreadBucket,
+  type YocGrid,
+} from "@/lib/plan-sensitivity";
 
 const C = {
   brand: "#114e54",
@@ -307,6 +316,11 @@ export interface ReportInput {
    *  color scale, the takeaway, and the max bid; null when the deal has no
    *  extraction to derive a model from */
   sensitivity?: SensitivityData | null;
+  /** the plan page for a conversion / development / lease-up / value-add:
+   *  the plan as the OM states it and yield on total cost stressed across
+   *  NOI shortfall and budget overrun; null for a stabilized asset or when
+   *  the OM did not state a budget and a stabilized NOI */
+  plan?: PlanReport | null;
 }
 
 /** Everything the deal screen produced, shaped for the multi-page report. */
@@ -316,12 +330,92 @@ export function buildReportData(
   buyBoxChecks?: BuyBoxCheck[] | null,
   sensitivity?: SensitivityData | null,
   branding?: MemoData["branding"],
+  plan?: PlanReport | null,
 ): ReportInput {
   return {
     deal,
     memo: buildMemoData(deal, dateStr, buyBoxChecks, branding),
     sensitivity: sensitivity ?? null,
+    plan: plan ?? null,
   };
+}
+
+const fmtPct = (d: number, dp = 1): string => `${(d * 100).toFixed(dp)}%`;
+const fmtDelta = (d: number): string => `${d > 0 ? "+" : ""}${Math.round(d * 100)}%`;
+const SPREAD_ORDER: SpreadBucket[] = ["wide", "adequate", "thin", "none", "negative"];
+
+/**
+ * The plan's grid: yield on total cost (bold) and its spread over the
+ * reference cap, stabilized NOI down the rows and budget across. Same
+ * geometry as HeatGrid so the two pages read alike; the fills are the
+ * development-spread bands, not the IRR hurdle.
+ */
+function YocGridPdf({ grid }: { grid: YocGrid }) {
+  const rowLabelWidth = "17%";
+  const colW = `${(100 - parseFloat(rowLabelWidth)) / grid.budgetCols.length}%`;
+  const axisText = { fontSize: 6.5, letterSpacing: 0.6, color: C.muted } as const;
+  return (
+    <View style={{ marginTop: 6 }}>
+      <View style={{ flexDirection: "row" }}>
+        <Text style={{ width: rowLabelWidth }} />
+        <Text style={{ ...axisText, width: `${100 - parseFloat(rowLabelWidth)}%`, textAlign: "center", paddingBottom: 2 }}>
+          BUDGET, AGAINST THE OM&apos;S (TOTAL COST BENEATH)
+        </Text>
+      </View>
+      <View
+        style={{
+          flexDirection: "row",
+          borderBottomWidth: 0.7,
+          borderBottomColor: C.line,
+          paddingBottom: 2.5,
+          marginBottom: 1,
+        }}
+      >
+        <Text style={{ ...axisText, width: rowLabelWidth, paddingRight: 4 }}>STABILIZED NOI</Text>
+        {grid.budgetCols.map((c, i) => (
+          <View key={i} style={{ width: colW, alignItems: "center" }}>
+            <Text style={{ fontSize: 8, fontFamily: i === grid.baseCol ? "Helvetica-Bold" : "Helvetica", color: C.ink }}>
+              {c.delta === 0 ? "OM budget" : fmtDelta(c.delta)}
+            </Text>
+            <Text style={{ fontSize: 6.5, color: C.muted }}>{fmtCompactUsd(c.totalCost)}</Text>
+          </View>
+        ))}
+      </View>
+      {grid.cells.map((row, r) => (
+        <View key={r} style={{ flexDirection: "row", alignItems: "stretch" }} wrap={false}>
+          <View style={{ width: rowLabelWidth, justifyContent: "center", paddingRight: 4 }}>
+            <Text style={{ fontSize: 8, fontFamily: r === grid.baseRow ? "Helvetica-Bold" : "Helvetica", color: C.ink }}>
+              {grid.noiRows[r].delta === 0 ? "OM NOI" : fmtDelta(grid.noiRows[r].delta)}
+            </Text>
+            <Text style={{ fontSize: 6.5, color: C.muted }}>{fmtCompactUsd(grid.noiRows[r].noi)}</Text>
+          </View>
+          {row.map((cell, c) => {
+            const isBase = r === grid.baseRow && c === grid.baseCol;
+            return (
+              <View
+                key={c}
+                style={{
+                  width: colW,
+                  paddingVertical: 4,
+                  backgroundColor: SPREAD_BG[spreadBucket(cell.spreadBps)],
+                  borderWidth: isBase ? 1.6 : 1,
+                  borderColor: isBase ? C.ink : "#ffffff",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ fontSize: 8.5, fontFamily: "Helvetica-Bold", color: C.ink }}>
+                  {fmtPct(cell.yieldOnCost)}
+                </Text>
+                <Text style={{ fontSize: 6.5, color: C.muted, marginTop: 1 }}>
+                  {`${cell.spreadBps >= 0 ? "+" : ""}${cell.spreadBps} bps`}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
 }
 
 /**
@@ -470,7 +564,7 @@ function HeatGrid({
 }
 
 export function ReportDocument({ input }: { input: ReportInput }) {
-  const { deal, memo, sensitivity } = input;
+  const { deal, memo, sensitivity, plan } = input;
   const dealName = memo.name;
   const extraction = deal.extraction as ExtractionResult | null;
   const challenges = deal.challenges as ChallengerResult | null;
@@ -521,6 +615,116 @@ export function ReportDocument({ input }: { input: ReportInput }) {
     >
       {/* Page 1: the one-page memo, unchanged — the executive read. */}
       <MemoPage data={memo} />
+
+      {/* The plan page, before the IRR grids, on a deal that is not a
+          stabilized asset: the plan as the OM states it, then yield on total
+          cost stressed across NOI shortfall and budget overrun — the
+          sensitivity such a deal is actually judged on. */}
+      {plan && (
+        <PageChrome
+          title="The plan, stressed"
+          count={plan.label}
+          dealName={dealName}
+          branding={memo.branding}
+        >
+          {plan.summary ? <Text style={s.sub}>{str(plan.summary)}</Text> : null}
+          <View
+            style={{
+              flexDirection: "row",
+              marginTop: 4,
+              paddingVertical: 6,
+              borderTopWidth: 0.7,
+              borderBottomWidth: 0.7,
+              borderColor: C.line,
+            }}
+          >
+            {(
+              [
+                ["STABILIZED NOI", plan.plan.stabilizedNoi ? fmtCompactUsd(plan.plan.stabilizedNoi.value) : "not stated"],
+                ["PRICE", plan.plan.price != null ? fmtCompactUsd(plan.plan.price) : "not stated"],
+                [plan.plan.budget?.allIn ? "BUDGET (LESS PRICE)" : "BUDGET", plan.plan.budget ? fmtCompactUsd(plan.plan.budget.budget) : "not stated"],
+                ["TOTAL COST", plan.plan.totalCost != null ? fmtCompactUsd(plan.plan.totalCost) : "-"],
+                ["YIELD ON COST", plan.plan.yieldOnCost != null ? fmtPct(plan.plan.yieldOnCost) : "-"],
+              ] as [string, string][]
+            ).map(([label, value]) => (
+              <View key={label} style={{ width: "20%" }}>
+                <Text style={{ fontSize: 6.5, letterSpacing: 0.6, color: C.muted }}>{label}</Text>
+                <Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold", color: C.brand, marginTop: 1 }}>
+                  {str(value)}
+                </Text>
+              </View>
+            ))}
+          </View>
+          <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 4 }}>
+            {str(
+              plan.plan.timeline
+                ? `Timeline as stated: ${plan.plan.timeline}.`
+                : "Timeline to stabilization: not stated.",
+            )}
+          </Text>
+
+          <TitleRow title="Yield on cost, stressed" marginTop={14} />
+          <Text style={s.sub}>
+            {str(
+              `The plan is judged on the spread between the finished project's yield on total cost and the cap rate that product trades at once it is done - not on a cap rate against the price. Stabilized NOI under the pro forma runs down the rows, budget over the OM's across; each cell is the yield on total cost (bold) and its spread over the ${fmtPct(
+                plan.refCap.pct,
+                2,
+              )} reference cap in basis points. The ink-bordered cell is the OM's own case. A pro forma that keeps its spread with NOI 20% short and the budget 30% over is conservative; one that needs its own base case is not.`,
+            )}
+          </Text>
+          <YocGridPdf grid={plan.grid} />
+          <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
+            {str(
+              plan.breakevens.noiCushion > 0
+                ? `Stabilized NOI can come in ${fmtPct(plan.breakevens.noiCushion)} under the OM's ${fmtCompactUsd(
+                    plan.plan.stabilizedNoi!.value,
+                  )} - down to ${fmtCompactUsd(plan.breakevens.noiAtRefCap)} - before the yield on cost falls to the ${fmtPct(
+                    plan.refCap.pct,
+                    2,
+                  )} reference cap.`
+                : `The OM's ${fmtCompactUsd(plan.plan.stabilizedNoi!.value)} stabilized NOI already yields less than the ${fmtPct(
+                    plan.refCap.pct,
+                    2,
+                  )} reference cap on ${fmtCompactUsd(plan.plan.totalCost ?? 0)} of total cost - the plan is under water before any stress.`,
+            )}
+          </Text>
+          <Text style={{ fontSize: 8, color: C.ink, marginTop: 3, fontFamily: "Helvetica-Oblique" }}>
+            {str(
+              plan.breakevens.overrunToRefCap != null
+                ? `The budget would have to run ${fmtPct(plan.breakevens.overrunToRefCap, 0)} over - ${fmtCompactUsd(
+                    plan.plan.budget!.budget * (1 + plan.breakevens.overrunToRefCap),
+                  )} against ${fmtCompactUsd(plan.plan.budget!.budget)} - before the yield fell to the reference cap.`
+                : "Any overrun deepens a yield that already sits below the cap.",
+            )}
+          </Text>
+
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 9 }}>
+            {SPREAD_ORDER.map((b) => (
+              <View key={b} style={{ flexDirection: "row", alignItems: "center", gap: 3.5 }}>
+                <View
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: 2,
+                    backgroundColor: SPREAD_BG[b],
+                    borderWidth: 0.5,
+                    borderColor: C.line,
+                  }}
+                />
+                <Text style={{ fontSize: 7.5, color: C.muted }}>{str(SPREAD_LABEL[b])}</Text>
+              </View>
+            ))}
+          </View>
+
+          <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 10 }}>
+            {str(
+              `Reference cap: ${fmtPct(plan.refCap.pct, 2)} - ${refCapNote(
+                plan.refCap.provenance,
+              )}. Figures are the OM's as extracted; the challenger's page tests whether the stabilized NOI is as conservative as the deck presents it.`,
+            )}
+          </Text>
+        </PageChrome>
+      )}
 
       {/* Sensitivity page (Feature 5): where the deal thrives, where it
           breaks — two grids from the same engine as the workbook and the

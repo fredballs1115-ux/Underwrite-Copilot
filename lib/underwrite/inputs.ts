@@ -16,6 +16,7 @@
 import { findMetric, parseMoney, parsePct } from "@/lib/criteria";
 import {
   IMPLIED_CAP_CEILING,
+  budgetFromText,
   capitalBudgetFromMetrics,
   inferStrategy,
   noiFigures,
@@ -254,7 +255,9 @@ export function deriveUnderwriteInputs(
   // for it. Shared reader with the deal page and the challenger's brief
   // (lib/deal-strategy): a "total project cost" includes the price, a budget
   // line does not, a mis-parsed figure never lands, absent is absent.
-  const budgetRead = capitalBudgetFromMetrics(metrics, price);
+  const budgetRead =
+    capitalBudgetFromMetrics(metrics, price) ??
+    budgetFromText(extraction?.strategy?.capitalBudget, price);
   const capitalBudget = budgetRead?.budget ?? 0;
 
   // ── RSF ────────────────────────────────────────────────────────────────

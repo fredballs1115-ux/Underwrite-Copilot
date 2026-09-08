@@ -5,6 +5,7 @@ import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { buildSensitivityData } from "@/lib/underwrite/report-grid";
+import { buildPlanReport } from "@/lib/plan-sensitivity";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
@@ -51,8 +52,14 @@ function getSampleReport(dateStr: string): Promise<Buffer> {
     derived.inputs,
     SAMPLE_DEMO_BOX.minIrrPct ?? null,
   );
+  // Null for the stabilized sample — the plan page only exists on a deal
+  // with a plan — but the same call the real route makes.
+  const plan = buildPlanReport(SAMPLE_DEAL.extraction as ExtractionResult, {
+    pct: derived.inputs.exitCapPct,
+    provenance: derived.sources.exitCapPct?.provenance ?? "assumption",
+  });
 
-  const input = buildReportData(deal, dateStr, checks, sensitivity);
+  const input = buildReportData(deal, dateStr, checks, sensitivity, undefined, plan);
   const element = React.createElement(ReportDocument, {
     input,
   }) as unknown as Parameters<typeof renderToBuffer>[0];

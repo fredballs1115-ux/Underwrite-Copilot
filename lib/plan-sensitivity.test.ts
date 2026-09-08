@@ -70,8 +70,14 @@ describe("buildYieldOnCostGrid", () => {
   });
 
   it("is null when the OM did not state a budget, an NOI or a price — a blank is never a grid", () => {
+    // No budget row AND no budget in the strategy's own words (the text is a
+    // fallback the plan summary reads when no metric row carries it).
     const noBudget = planSummary(
-      { ...CONVERSION, metrics: CONVERSION.metrics.filter((m) => !/project cost/i.test(m.label)) },
+      {
+        ...CONVERSION,
+        strategy: { ...CONVERSION.strategy!, capitalBudget: "" },
+        metrics: CONVERSION.metrics.filter((m) => !/project cost/i.test(m.label)),
+      },
       inferStrategy(CONVERSION),
     );
     expect(noBudget?.budget ?? null).toBeNull();
