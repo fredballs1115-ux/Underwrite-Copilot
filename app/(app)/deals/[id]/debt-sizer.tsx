@@ -393,12 +393,11 @@ export function DebtSizer({
       </summary>
       <div className="border-t border-line p-5">
         <p className="text-sm text-muted">
-          Pure math on the figures below, no AI.{" "}
           {seed.seededFrom === "model"
-            ? "Seeded from your generated model."
+            ? "No AI here — seeded from your model."
             : seed.seededFrom === "extraction"
-              ? "Seeded from the OM extraction."
-              : "Enter the deal's figures."}
+              ? "No AI here — seeded from the OM extraction."
+              : "No AI here — enter the deal's figures."}
         </p>
 
         {omTerms.length > 0 && (

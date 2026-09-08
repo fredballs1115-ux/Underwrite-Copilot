@@ -13,7 +13,7 @@ added reads all twelve public pages clean on every run).
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Sixty-five PRs (#176–#240) landed across one review session and the
+Sixty-six PRs (#176–#241) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -312,7 +312,16 @@ deploy (live-verify shows the sha).
   six-icon stage rail, the verdict tabs, the live stress bench, the aerial
   gallery, four artifact tiles, an eight-icon feature grid, pricing, FAQ —
   1,295 words at 8,004px. The sample screen lost its paragraphs the same
-  way. The pipeline and the deal page are next (below, "Claude's moves").
+  way.
+- **The pipeline and the deal page, cut the same way** (#241). The stage
+  ladder is a six-rung funnel with a count on each rung (each rung a
+  one-tap filter) instead of four empty section headers; the verdict split
+  is one bar; the free allowance is a meter; one filter select fewer; icon
+  exports; initials for a teammate's deals; an empty ring for "not
+  screened"; a 0–100 bar under the fit score; the setup card, the new-deal
+  form and the empty state lost their paragraphs. The sample deal's reading
+  guide is three icon steps and one line; the deal page's helper sentences
+  each lost their second half.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":
@@ -574,12 +583,13 @@ Not yet covered by imagery, in rough value order:
    times with a roll-up and per-asset contribution to blended IRR; mostly a
    loop around existing code plus a CSV importer. Named as the next build in
    the LPC plan.
-8. **The pipeline and the deal page get the same cut as the homepage** (#240):
-   words to pictures — status chips, meters and icons where a sentence was;
-   one idea per block; the getting-started prose and the meta lines trimmed to
-   what a glance needs. Screenshot-verified at 1440 and 390 through the fixture
-   views (`VIEW_SHOTS_DIR`, with the built stylesheet injected), render tests
-   kept green.
+8. **The rest of the signed-in surfaces get the homepage's cut** (#240, #241
+   did the pipeline and the deal overview): the Financials tab's model
+   blocks (the "Add more to the model" rows, the reconciliation summary),
+   the Buy box page, the Market data pages and the account pages — words to
+   pictures, one idea per block. Screenshot-verified at 1440 and 390 through
+   the fixture views (`VIEW_SHOTS_DIR`, with the built stylesheet injected),
+   render tests kept green.
 
 ---
 

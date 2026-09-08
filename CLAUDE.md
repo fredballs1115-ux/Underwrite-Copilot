@@ -117,9 +117,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   thing itself (the sample deal card, the six-icon stage rail, the verdict
   tabs, the live stress bench, the aerial gallery, the artifact tiles, an
   icon grid). No paragraph runs past a line there or on `/demo`; the
-  long-form argument belongs on `/why`. Before adding a section to `/`,
-  measure it (`scratchpad`'s shoot script pattern: full-page height, word
-  count, pictures, headings) and ask what picture replaces the words.
+  long-form argument belongs on `/why`. The signed-in surfaces follow the
+  same rule (#241): the pipeline's stage ladder is a funnel with counts, its
+  verdict split a bar, a teammate an initials badge, "not screened" an empty
+  ring; a helper sentence under a card says only what the card cannot.
+  Before adding a section or a sentence, measure the page (`scratchpad`'s
+  shoot script pattern: full-page height, word count, pictures, headings;
+  the fixture views via `VIEW_SHOTS_DIR` for signed-in pages) and ask what
+  picture replaces the words.
   live-verify gates on the hero headline and the build-sha stamp only, so a
   redesign never has to preserve copy to stay green.
 - Anything that touches a secret (Anthropic key, Supabase service-role key) is server-only.

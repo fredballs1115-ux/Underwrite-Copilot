@@ -70,8 +70,7 @@ export function AskPanel({
         )}
       </div>
       <p className="mt-0.5 text-xs text-muted">
-        Answers come from the OM itself, with page citations — &ldquo;the OM
-        doesn&rsquo;t state it&rdquo; is a real answer here. Allow ~20 seconds.
+        Answers cite the OM&rsquo;s pages; allow ~20 seconds.
       </p>
 
       {qa.length > 0 && (

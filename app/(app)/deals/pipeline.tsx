@@ -154,6 +154,25 @@ const ASSET_META: Record<string, { dot: string; rail: string }> = {
 const OTHER_ASSET = { dot: "bg-asset-other", rail: "border-l-asset-other" };
 const assetMeta = (cls: string) => ASSET_META[cls.toLowerCase()] ?? OTHER_ASSET;
 
+/** The ladder's steps at funnel width — the group headers keep the full
+ *  labels; the funnel has room for one word each. */
+const SHORT_STAGE: Record<Stage, string> = {
+  screening: "Screening",
+  tracking: "Tracking",
+  active_pursuit: "Pursuit",
+  loi_submitted: "LOI",
+  under_contract: "Contract",
+  closed: "Closed",
+  dead: "Dead",
+};
+
+/** "Jordan Lee" → "JL"; an email → its first letter. */
+function initials(name: string): string {
+  const parts = name.split(/[\s._-]+/).filter(Boolean);
+  const letters = parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : name.slice(0, 1);
+  return letters.toUpperCase();
+}
+
 // One cached formatter — constructing Intl.DateTimeFormat per call costs
 // ~50ms per full-list render at 500 rows. Pinned to UTC so the server and
 // client render the same string (no hydration mismatch from timezones).
@@ -431,12 +450,18 @@ export function Pipeline({
   }
 
   const verdictCounts = useMemo(() => {
-    const c = { pass: 0, caution: 0, pass_on: 0, screening: 0, pursuing: 0 };
+    const c = { pass: 0, caution: 0, pass_on: 0, screening: 0 };
     for (const d of deals) {
       if (d.verdict && d.verdict in c) c[d.verdict as keyof typeof c]++;
       else if (!d.verdict) c.screening++;
-      if (normalizeStage(d.stage) === "active_pursuit") c.pursuing++;
     }
+    return c;
+  }, [deals]);
+  // Every deal's rung on the ladder — the funnel's counts (dead deals have
+  // their own toggle; the funnel leaves them out).
+  const stageCounts = useMemo(() => {
+    const c = Object.fromEntries(STAGES.map((s) => [s, 0])) as Record<Stage, number>;
+    for (const d of deals) c[normalizeStage(d.stage)]++;
     return c;
   }, [deals]);
 
@@ -455,10 +480,6 @@ export function Pipeline({
     asset !== "all" ||
     market !== "all" ||
     mfit !== "all";
-  // Empty stage sections render (collapsed) on the clean view, but hide while
-  // filters narrow the list — a run of "(0)" headers under a filter is noise.
-  const hideEmptySections = filtersActive;
-
   // Export the current (filtered) view as a CSV — opens in Excel/Sheets.
   function exportCsv() {
     // Neutralize formula-leading cells (=, +, -, @) — deal names and OM-derived
@@ -519,26 +540,39 @@ export function Pipeline({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Pipeline</h1>
-          <p className="mt-1 text-sm text-muted">
-            {deals.length} {deals.length === 1 ? "deal" : "deals"} in your pipeline
-            {showUsage && (
-              <>
-                {" · "}
+          {(deals.length > 0 || showUsage) && (
+            <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+              {deals.length > 0 && (
+                <span>
+                  {deals.length} {deals.length === 1 ? "deal" : "deals"}
+                </span>
+              )}
+              {showUsage && (
+                // The free allowance as a meter with the number, not a sentence.
                 <Link
                   href="/billing"
-                  className={`font-medium underline-offset-2 hover:underline ${
+                  title={`${billing!.dealCount} of ${billing!.dealLimit} free deals used`}
+                  className={`inline-flex items-center gap-1.5 font-medium underline-offset-2 hover:underline ${
                     atLimit ? "text-caution" : ""
                   }`}
                 >
+                  <span
+                    aria-hidden
+                    className="h-1.5 w-12 overflow-hidden rounded-full bg-faint ring-1 ring-inset ring-line"
+                  >
+                    <span
+                      className={`block h-full rounded-full ${atLimit ? "bg-caution" : "bg-brand/70"}`}
+                      style={{
+                        width: `${Math.min(100, Math.round((billing!.dealCount / Math.max(1, billing!.dealLimit)) * 100))}%`,
+                      }}
+                    />
+                  </span>
                   {Math.max(0, billing!.dealLimit - billing!.dealCount)} free{" "}
-                  {billing!.dealLimit - billing!.dealCount === 1
-                    ? "deal"
-                    : "deals"}{" "}
-                  left
+                  {billing!.dealLimit - billing!.dealCount === 1 ? "deal" : "deals"} left
                 </Link>
-              </>
-            )}
-          </p>
+              )}
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {deals.length >= 2 && (
@@ -593,66 +627,13 @@ export function Pipeline({
         />
       )}
 
-      {/* The one number a pipeline exists to answer: how do the calls split?
-          Each chip is also a one-tap filter. */}
+      {/* The pipeline in one picture: the ladder with a count on each rung
+          (each a one-tap stage filter) and the calls' split as one bar with
+          its chips (each a one-tap verdict filter). */}
       {deals.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          {(
-            [
-              ["pass", verdictCounts.pass],
-              ["caution", verdictCounts.caution],
-              ["pass_on", verdictCounts.pass_on],
-            ] as const
-          )
-            .filter(([, n]) => n > 0)
-            .map(([key, n]) => {
-              const meta = VERDICT_META[key];
-              const on = verdict === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => setVerdict(on ? "all" : key)}
-                  className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${meta.cls} ${
-                    on ? "ring-2 ring-current" : "hover:opacity-80"
-                  }`}
-                >
-                  {n} {meta.label}
-                </button>
-              );
-            })}
-          {verdictCounts.screening > 0 && (
-            <button
-              type="button"
-              aria-pressed={verdict === "screening"}
-              onClick={() =>
-                setVerdict(verdict === "screening" ? "all" : "screening")
-              }
-              className={`rounded-full bg-faint px-3 py-1 text-xs font-semibold text-muted transition-all ${
-                verdict === "screening" ? "ring-2 ring-current" : "hover:opacity-80"
-              }`}
-            >
-              {verdictCounts.screening} No verdict
-            </button>
-          )}
-          {/* The funnel's business end — deals you're actively chasing. */}
-          {verdictCounts.pursuing > 0 && (
-            <button
-              type="button"
-              aria-pressed={stage === "active_pursuit"}
-              onClick={() =>
-                setStage(stage === "active_pursuit" ? "all" : "active_pursuit")
-              }
-              className={`rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand transition-all ${
-                stage === "active_pursuit"
-                  ? "ring-2 ring-current"
-                  : "hover:opacity-80"
-              }`}
-            >
-              {verdictCounts.pursuing} In pursuit
-            </button>
-          )}
+        <div className="flex flex-col gap-4 rounded-2xl border border-line bg-surface px-4 py-3 shadow-card lg:flex-row lg:items-center lg:gap-8">
+          <StageFunnel counts={stageCounts} active={stage} onPick={setStage} />
+          <VerdictSplit counts={verdictCounts} active={verdict} onPick={setVerdict} />
         </div>
       )}
 
@@ -721,18 +702,9 @@ export function Pipeline({
               className="w-48 rounded-lg border border-line bg-surface py-1.5 pl-9 pr-3 text-sm shadow-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
             />
           </div>
-          <FilterSelect
-            label="Filter by verdict"
-            value={verdict}
-            onChange={setVerdict}
-            options={[
-              ["all", "All verdicts"],
-              ["pass", "Go"],
-              ["caution", "Caution"],
-              ["pass_on", "No-go"],
-              ["screening", "No verdict yet"],
-            ]}
-          />
+          {/* The verdict filter is the split's chips above; the stage filter
+              is the funnel's rungs — this select is the keyboard-and-phone
+              route to the same thing. */}
           <FilterSelect
             label="Filter by stage"
             value={stage}
@@ -820,16 +792,18 @@ export function Pipeline({
                 ? "Nothing to export — clear the filters first"
                 : "Download the current view as a CSV"
             }
-            className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-faint disabled:cursor-not-allowed disabled:opacity-50 md:ml-auto"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-faint disabled:cursor-not-allowed disabled:opacity-50 md:ml-auto"
           >
-            Export CSV
+            <DownloadIcon />
+            CSV
           </button>
           <a
             href="/api/pipeline/export"
-            title="The whole pipeline as a formatted Excel workbook — stage-grouped with verdict and buy-box markers, plus a summary sheet. Built for pipeline meetings."
-            className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-faint"
+            title="The whole pipeline as an Excel workbook — stage-grouped, with verdict and buy-box markers and a summary sheet, for the pipeline meeting"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-faint"
           >
-            Meeting workbook
+            <SheetIcon />
+            Excel
           </a>
         </div>
       )}
@@ -841,9 +815,7 @@ export function Pipeline({
             Start your pipeline
           </p>
           <p className="mx-auto mt-1 max-w-md text-sm text-muted">
-            Upload an offering memorandum — or just type the deal’s facts — to
-            screen your first deal. Or explore a fully-worked sample to see the
-            whole thing first.
+            Upload an OM or type the deal’s facts. Or open the worked sample first.
           </p>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
             {atLimit ? (
@@ -871,15 +843,13 @@ export function Pipeline({
               </PendingButton>
             </form>
           </div>
-          <p className="mt-3 text-xs text-muted">
-            Not sure where to hunt?{" "}
+          <p className="mt-3 text-xs">
             <Link
               href="/market"
               className="font-medium text-brand hover:text-brand-strong"
             >
-              Browse the covered markets
-            </Link>{" "}
-            — rules, rents, and recorded-sales coverage per metro.
+              Browse the covered markets →
+            </Link>
           </p>
         </div>
       ) : filtered.length === 0 ? (
@@ -947,10 +917,10 @@ export function Pipeline({
             <div className="space-y-4">
               {STAGES.map((s) => {
                 const sectionDeals = groups.get(s) ?? [];
-                // Dead lives behind its toggle; empty sections hide while
-                // filters narrow, otherwise render collapsed.
+                // Dead lives behind its toggle; an empty rung is the funnel's
+                // to show — no header with a zero in it here.
                 if (s === "dead" && !showDead && stage !== "dead") return null;
-                if (sectionDeals.length === 0 && hideEmptySections) return null;
+                if (sectionDeals.length === 0) return null;
                 const open = isOpen(s) && sectionDeals.length > 0;
                 return (
                   <section key={s}>
@@ -1008,6 +978,186 @@ export function Pipeline({
         </>
       )}
     </div>
+  );
+}
+
+/** The ladder as one picture: a rung per live stage with its count, each a
+ *  one-tap stage filter. An empty rung is hollow — it used to be a collapsed
+ *  section header with a zero in it. Dead deals sit behind their own toggle. */
+function StageFunnel({
+  counts,
+  active,
+  onPick,
+}: {
+  counts: Record<Stage, number>;
+  active: string;
+  onPick: (s: Stage | "all") => void;
+}) {
+  const live = STAGES.filter((s) => s !== "dead");
+  return (
+    <ol
+      className="stage-funnel relative flex min-w-0 flex-1 items-start"
+      aria-label="Deals by stage"
+    >
+      {live.map((s, i) => {
+        const n = counts[s] ?? 0;
+        const on = active === s;
+        const lit = n > 0 || on;
+        return (
+          // On a phone the populated rungs take twice the width of the hollow
+          // ones and the hollow ones drop their label, so six rungs fit.
+          <li
+            key={s}
+            className={`relative min-w-0 ${lit ? "flex-[2] sm:flex-1" : "flex-1"}`}
+          >
+            {/* the rail, drawn as each rung's two halves so it meets the
+                neighbours' centres whatever the rungs' widths; the rung's
+                own background covers the joint */}
+            {i > 0 && (
+              <span aria-hidden className="absolute left-0 right-1/2 top-4 h-px bg-line" />
+            )}
+            {i < live.length - 1 && (
+              <span aria-hidden className="absolute left-1/2 right-0 top-4 h-px bg-line" />
+            )}
+            <button
+              type="button"
+              aria-pressed={on}
+              disabled={n === 0 && !on}
+              onClick={() => onPick(on ? "all" : s)}
+              title={`${STAGE_LABEL[s]} · ${n} ${n === 1 ? "deal" : "deals"}`}
+              className="flex w-full flex-col items-center gap-1.5 rounded-lg px-0.5 py-1 text-center transition-colors enabled:hover:bg-faint disabled:cursor-default"
+            >
+              <span
+                aria-hidden
+                className={`flex h-6 w-6 items-center justify-center rounded-full font-mono text-[11px] font-semibold tabular-nums ring-2 transition-colors ${
+                  on
+                    ? "bg-brand text-white ring-brand"
+                    : n > 0
+                      ? "bg-brand/10 text-brand ring-brand/40"
+                      : "bg-surface ring-line"
+                }`}
+              >
+                {n > 0 ? n : ""}
+              </span>
+              {/* Six rungs share a phone's width: the label shrinks there
+                  rather than truncating; the full name is the tooltip. */}
+              <span
+                className={`w-full truncate text-[9px] font-medium uppercase sm:text-[10px] sm:tracking-wide ${
+                  lit ? "text-ink" : "hidden text-muted sm:block"
+                }`}
+              >
+                {SHORT_STAGE[s]}
+              </span>
+              <span className="sr-only">
+                {n} {n === 1 ? "deal" : "deals"}
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** How the calls split, drawn: one bar, a segment per verdict in its colour,
+ *  and the same counts as chips beneath — each chip a one-tap verdict filter. */
+function VerdictSplit({
+  counts,
+  active,
+  onPick,
+}: {
+  counts: { pass: number; caution: number; pass_on: number; screening: number };
+  active: string;
+  onPick: (v: string) => void;
+}) {
+  const parts = (
+    [
+      ["pass", counts.pass, "bg-pass"],
+      ["caution", counts.caution, "bg-caution"],
+      ["pass_on", counts.pass_on, "bg-kill"],
+      ["screening", counts.screening, "bg-muted/40"],
+    ] as const
+  ).filter(([, n]) => n > 0);
+  const total = parts.reduce((sum, [, n]) => sum + n, 0);
+  if (total === 0) return null;
+  const label = (key: string) =>
+    key === "screening" ? "No verdict" : VERDICT_META[key].label;
+  return (
+    <div className="verdict-split lg:w-72 lg:shrink-0">
+      <div
+        role="img"
+        aria-label={parts.map(([key, n]) => `${n} ${label(key)}`).join(", ")}
+        className="flex h-2 gap-px overflow-hidden rounded-full bg-faint"
+      >
+        {parts.map(([key, n, bar]) => (
+          <span
+            key={key}
+            className={`${bar} transition-opacity ${
+              active === "all" || active === key ? "" : "opacity-25"
+            }`}
+            style={{ width: `${(n / total) * 100}%` }}
+          />
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {parts.map(([key, n]) => {
+          const on = active === key;
+          const cls =
+            key === "screening" ? "bg-faint text-muted" : VERDICT_META[key].cls;
+          return (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onPick(on ? "all" : key)}
+              className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-all ${cls} ${
+                on ? "ring-2 ring-current" : "hover:opacity-80"
+              }`}
+            >
+              {n} {label(key)}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-3.5 w-3.5 text-muted"
+      aria-hidden
+    >
+      <path d="M12 3v12" />
+      <path d="m7 10 5 5 5-5" />
+      <path d="M5 21h14" />
+    </svg>
+  );
+}
+
+function SheetIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-3.5 w-3.5 text-muted"
+      aria-hidden
+    >
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 10h18" />
+      <path d="M9 4v16" />
+    </svg>
   );
 }
 
@@ -1190,7 +1340,19 @@ const DealRow = memo(function DealRow({
     <span className="font-mono tabular-nums">{fmtDate(d.createdAt)}</span>
   );
   const dueBit = d.offersDue ? <OffersDueBit iso={d.offersDue} /> : null;
-  const addedByBit = d.addedBy ? `added by ${d.addedBy}` : null;
+  // A teammate's deal wears their initials; the name is the tooltip and
+  // what a screen reader says.
+  const addedByBit = d.addedBy ? (
+    <span className="inline-flex items-center align-middle" title={`Added by ${d.addedBy}`}>
+      <span
+        aria-hidden
+        className="flex h-4 w-4 items-center justify-center rounded-full bg-brand/10 text-[9px] font-semibold text-brand"
+      >
+        {initials(d.addedBy)}
+      </span>
+      <span className="sr-only">added by {d.addedBy}</span>
+    </span>
+  ) : null;
 
   const inner = (
     <>
@@ -1226,7 +1388,7 @@ const DealRow = memo(function DealRow({
             fits — so the price, the cap and the fit are never the part a
             one-line truncation cuts off. */}
         <MetaLine className="md:hidden" bits={[dueBit, marketBit, coveredBit, assetBit, addedByBit]} />
-        <MetaLine className="md:hidden" bits={[priceBit, capBit, fitBit, dateBit]} />
+        <MetaLine className="md:hidden" bits={[priceBit, capBit, fitBit]} />
         <MetaLine
           className="hidden md:block lg:hidden"
           bits={[dueBit, marketBit, coveredBit, assetBit, fitBit, dateBit, addedByBit]}
@@ -1268,10 +1430,11 @@ const DealRow = memo(function DealRow({
             <span className="text-line">—</span>
           ))}
       </span>
-      <span className="hidden w-16 shrink-0 text-right text-xs font-semibold lg:block">
+      <span className="hidden w-16 shrink-0 flex-col items-end text-right text-xs font-semibold lg:flex">
         {d.score != null && d.mandateVerdict ? (
+          // The score, and the score drawn: a 0–100 bar in the call's colour.
           <span
-            className={`tabular-nums ${d.fit === "outside" ? "text-kill" : MANDATE_META[d.mandateVerdict].cls}`}
+            className={`flex flex-col items-end gap-1 tabular-nums ${d.fit === "outside" ? "text-kill" : MANDATE_META[d.mandateVerdict].cls}`}
             title={
               d.fit === "outside"
                 ? `${d.score} / 100 mandate fit, but outside the box on a criterion the score doesn't weigh (e.g. price)`
@@ -1279,6 +1442,12 @@ const DealRow = memo(function DealRow({
             }
           >
             {d.score}
+            <span aria-hidden className="h-1 w-10 overflow-hidden rounded-full bg-faint">
+              <span
+                className="block h-full rounded-full bg-current"
+                style={{ width: `${Math.max(0, Math.min(100, d.score))}%` }}
+              />
+            </span>
           </span>
         ) : d.fit ? (
           <span className={FIT_META[d.fit].cls}>{FIT_META[d.fit].label}</span>
@@ -1320,7 +1489,17 @@ const DealRow = memo(function DealRow({
             Screening…
           </span>
         ) : (
-          <span className="text-[11px] text-muted">Not screened</span>
+          // Nothing has run yet: an empty ring where the verdict pill will sit.
+          <span
+            className="inline-flex h-6 items-center"
+            title="Not screened yet — open the deal to run the screen"
+          >
+            <span
+              aria-hidden
+              className="h-2.5 w-2.5 rounded-full border-[1.5px] border-dashed border-muted/70"
+            />
+            <span className="sr-only">Not screened</span>
+          </span>
         )}
       </span>
       <span className="hidden w-24 shrink-0 whitespace-nowrap text-right font-mono text-xs tabular-nums text-muted xl:block">
@@ -1415,7 +1594,7 @@ function GettingStarted({
   }[] = [
     {
       key: "buybox",
-      label: "Set your buy box — every screen gets judged against it",
+      label: "Set your buy box",
       done: state.hasBuyBox,
       action: (
         <Link
@@ -1428,7 +1607,7 @@ function GettingStarted({
     },
     {
       key: "sample",
-      label: "Explore the sample deal — every tab, no upload needed",
+      label: "Open the sample deal",
       done: !!state.sampleId,
       // Both states route through the ACTION (it redirects into an existing
       // sample after topping up anything the fixture gained since — a plain
@@ -1446,7 +1625,7 @@ function GettingStarted({
     },
     {
       key: "screen",
-      label: "Screen your first OM — verdict in a few minutes",
+      label: "Screen your first OM",
       done: state.hasRealDeal,
       action: atLimit ? (
         <Link
@@ -1483,12 +1662,20 @@ function GettingStarted({
     <section className="animate-rise rounded-2xl border border-brand/20 bg-brand/[0.03] p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold tracking-tight">
-            Get set up ({steps.length - remaining.length}/{steps.length})
-          </h2>
-          <p className="mt-0.5 text-xs text-muted">
-            Three steps and the copilot is working the way it should.
-          </p>
+          <h2 className="text-sm font-semibold tracking-tight">Get set up</h2>
+          {/* Progress as segments, one per step. */}
+          <div
+            className="mt-1.5 flex items-center gap-1"
+            role="img"
+            aria-label={`${steps.length - remaining.length} of ${steps.length} steps done`}
+          >
+            {steps.map((s) => (
+              <span
+                key={s.key}
+                className={`h-1.5 w-8 rounded-full ${s.done ? "bg-pass" : "bg-line"}`}
+              />
+            ))}
+          </div>
         </div>
         <button
           type="button"
@@ -1538,16 +1725,6 @@ function GettingStarted({
           </li>
         ))}
       </ul>
-      <p className="mt-3 text-xs text-muted">
-        While you&apos;re here:{" "}
-        <Link
-          href="/market"
-          className="font-medium text-brand hover:text-brand-strong"
-        >
-          browse the covered markets
-        </Link>{" "}
-        — rules, rents, and data coverage for each metro you buy in.
-      </p>
     </section>
   );
 }
@@ -1726,11 +1903,12 @@ function NewDealForm({
           ))}
         </div>
       </div>
-      <p className="mt-1 text-sm text-muted">
-        {mode === "upload"
-          ? "Upload the offering memorandum (PDF). We’ll extract the key terms and flag what to verify against the source."
-          : "No OM? Type what you know — from the listing, a broker call, your notes. The screen runs on your numbers, and you can attach the OM later."}
-      </p>
+      {/* The upload mode needs no sentence — the drop zone says what it takes. */}
+      {mode === "manual" && (
+        <p className="mt-1 text-sm text-muted">
+          No OM? Type what you know; attach the OM later.
+        </p>
+      )}
       {mode === "manual" && (
         <div className="mt-4">
           <ManualDealForm mode="create" initialAddress={prefill ?? null} />
@@ -1833,10 +2011,6 @@ function NewDealForm({
             placeholder="Property address (optional) — start typing for suggestions"
             className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
           />
-          <p className="mt-1 text-xs text-muted">
-            Picking a suggestion fills street, city, state, ZIP, and county —
-            and your buy-box location check applies from the moment you upload.
-          </p>
         </div>
         <FileDrop
           name="om"

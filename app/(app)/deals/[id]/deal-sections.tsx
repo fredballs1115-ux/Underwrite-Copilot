@@ -1524,14 +1524,16 @@ function FlipStrip({
     const c = CALL_META[cons.call]?.label ?? cons.call;
     const b = CALL_META[base.call]?.label ?? base.call;
     const s = CALL_META[sponsor.call]?.label ?? sponsor.call;
+    // The strip above already shows the three calls; this line says only
+    // what the picture cannot — whether the call survives the soft numbers.
     if (cons.call === base.call && base.call === sponsor.call) {
-      flipLine = `Holds at ${b} across the whole range — conservative through sponsor.`;
+      flipLine = `Holds at ${b} across the range.`;
     } else if (cons.call !== base.call && base.call !== sponsor.call) {
-      flipLine = `Reads ${c} / ${b} / ${s} across the range — the call lives on which end of the ranges you believe.`;
+      flipLine = "The call depends on whose numbers you believe.";
     } else if (cons.call !== base.call) {
-      flipLine = `Doesn't survive the conservative end — drops to ${c} when the soft numbers hit.`;
+      flipLine = `Drops to ${c} at the conservative end.`;
     } else {
-      flipLine = `Holds at ${b} through your base case; only the sponsor's own numbers read ${s}.`;
+      flipLine = `Holds at ${b}; only the sponsor's numbers read ${s}.`;
     }
   }
 

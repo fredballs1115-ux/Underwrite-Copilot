@@ -112,13 +112,7 @@ function InputsNeeded({ documents }: { documents: DealDocument[] }) {
       <h2 className="text-sm font-semibold tracking-tight">
         Add more to the model
       </h2>
-      <p className="mt-1 text-sm leading-relaxed text-muted">
-        The model is built around whatever you upload — that&apos;s usually
-        exactly the deal you mean. None of these are required, but adding them
-        makes the model fuller and sharpens the reconciliation. Drop in any of
-        them anytime.
-      </p>
-      <ul className="mt-4 space-y-3">
+      <ul className="mt-3 space-y-3">
         {MODEL_INPUTS.map((inp) => {
           const ok = have.has(inp.kind);
           return (
@@ -170,8 +164,8 @@ function FirstDraftBanner() {
     <div className="rounded-xl border border-line border-l-4 border-l-caution bg-caution/5 px-4 py-3">
       <p className="text-sm font-medium">First-draft model — verify before relying on it</p>
       <p className="mt-0.5 text-xs leading-relaxed text-muted">
-        Every number traces to a source document. Conflicts between sources are
-        listed below and flagged in the Excel’s Conflicts sheet.
+        Every number traces to a source; conflicts are listed below and on the
+        Excel’s Conflicts sheet.
       </p>
     </div>
   );

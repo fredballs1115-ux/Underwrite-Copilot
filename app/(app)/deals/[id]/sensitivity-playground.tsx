@@ -193,10 +193,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         <h2 className="text-sm font-semibold tracking-tight">
           Sensitivity playground
         </h2>
-        <p className="text-xs text-muted">
-          Recomputed from the underwriting model as you type or drag — no
-          re-screen.
-        </p>
+        <p className="text-xs text-muted">Live — no re-screen.</p>
       </div>
 
       <PriceCapControls
@@ -380,8 +377,8 @@ function PriceCapControls({
         <span className="text-xs font-semibold tracking-tight">Your price</span>
         <span className="text-[11px] text-muted">
           {planDeal
-            ? "type a price or a cap — the cap here is year-1 income as modelled, not the plan's stabilized pro forma; the plan is judged on yield on cost"
-            : "type a price or a going-in cap — the whole model reprices"}
+            ? "type a price or a cap — year-1 income as modelled, not the plan's stabilized pro forma"
+            : "type a price or a going-in cap"}
         </span>
       </div>
       <div className="mt-2 grid gap-3 sm:grid-cols-3">
