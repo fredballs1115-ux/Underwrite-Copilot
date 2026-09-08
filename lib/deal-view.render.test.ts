@@ -174,12 +174,18 @@ describe("DealView — the sample deal renders every section without a runtime e
     // and "300 bps higher", both unfavorable and each the widest of its own
     // unit — so two bars draw, each filling the left half in the kill
     // colour; "In agreement" (neutral) draws none. Dollars and basis points
-    // are scaled apart, so both fill their whole half.
-    expect((html.match(/data-gap-bar/g) ?? []).length).toBe(2);
-    expect((html.match(/bg-kill" style="right:50%;width:50%"/g) ?? []).length).toBe(2);
+    // are scaled apart, so both fill their whole half. Each bar draws once
+    // in the phone card and once in the table (one layout shows at a time).
+    expect((html.match(/data-gap-bar/g) ?? []).length).toBe(4);
+    expect((html.match(/bg-kill" style="right:50%;width:50%"/g) ?? []).length).toBe(4);
     expect(html).not.toMatch(/bg-pass" style="left:50%/);
     expect(html).toContain("100% of the widest dollar gap in the table");
     expect(html).toContain("100% of the widest basis-point gap in the table");
+    // The phone gets a card per row — metric and direction, the two figures
+    // side by side, the gap and its bar — and the table hides below `sm`.
+    expect((html.match(/aria-label="Reconciliation as cards"/g) ?? []).length).toBe(1);
+    expect(html).toMatch(/class="hidden overflow-x-auto[^"]*sm:block"/);
+    expect((html.match(/>OM says</g) ?? []).length).toBe(4); // 3 cards + the table head
     expect(textOf(html)).toMatch(/Bars: each gap scaled to the widest of its kind/);
   });
 

@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "The reconciliation reads on a phone, one row at a time",
+      "blurb": "On a phone the deal page's reconciler tab now stacks a card per row — the metric and whether the gap runs for or against you, the OM's figure beside your model's, then the gap with its bar — instead of a table that scrolled sideways and left the gap off-screen. From a tablet up the table is unchanged; the sample screen's reconciler tab reads the same way.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-08",
       "title": "The reconciliation draws each gap from a centre line",
       "blurb": "On the deal page's reconciler tab and the full report's reconciliation page, each row where your model and the OM disagree now draws its gap as a bar — red to the left when the gap runs against you, green to the right when it runs your way — scaled to the widest gap of its kind, dollars and basis points kept apart, so the rows that matter read before the figures do. A row in agreement, or one whose gap states no figure, keeps its words and draws no bar.",
       "href": "/deals"

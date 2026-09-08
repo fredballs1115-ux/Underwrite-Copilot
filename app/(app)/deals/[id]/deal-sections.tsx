@@ -1283,6 +1283,16 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
   const rows = result.rows ?? [];
   const scale = gapScale(rows);
   const drawn = scale.shares.some((s) => s !== null);
+  // One read per row for both layouts, so the card and the table can never
+  // disagree on a row's direction or its bar.
+  const view = rows.map((r, i) => ({
+    r,
+    d: DIR[r.direction] ?? DIR.neutral,
+    share: scale.shares[i] ?? null,
+    unit: scale.units[i] ?? null,
+  }));
+  const legend =
+    "Bars: each gap scaled to the widest of its kind; favorable right, unfavorable left.";
   const counts = { unfavorable: 0, favorable: 0, neutral: 0 };
   for (const r of rows) counts[r.direction] = (counts[r.direction] ?? 0) + 1;
   return (
@@ -1316,7 +1326,41 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
           <span className="text-muted">{result.takeaway}</span>
         </Callout>
       )}
-      <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+      {/* Phone: a card per row — the metric and its direction, the OM's
+          figure and yours side by side, the gap with its bar — so a phone
+          reads a whole row instead of a table it scrolls sideways. From `sm`
+          up the table takes over. */}
+      <div className="sm:hidden">
+        <ul className="grid gap-2" aria-label="Reconciliation as cards">
+          {view.map(({ r, d, share, unit }, i) => (
+            <li key={i} className="rounded-xl border border-line bg-surface p-3 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <p className="min-w-0 break-words text-sm font-medium">{r.metric}</p>
+                <span
+                  className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${d.badge}`}
+                >
+                  <d.Icon className="h-3 w-3" />
+                  {d.label}
+                </span>
+              </div>
+              <dl className="mt-2 grid grid-cols-2 gap-3">
+                <div>
+                  <dt className="text-[10px] uppercase tracking-wide text-muted">OM says</dt>
+                  <dd className="font-mono text-sm tabular-nums text-muted">{r.omValue}</dd>
+                </div>
+                <div>
+                  <dt className="text-[10px] uppercase tracking-wide text-muted">Your model</dt>
+                  <dd className="font-mono text-sm font-medium tabular-nums text-ink">{r.myValue}</dd>
+                </div>
+              </dl>
+              {r.gap && <p className="mt-2 text-sm text-ink">{r.gap}</p>}
+              {share !== null && unit && <GapBar share={share} unit={unit} />}
+            </li>
+          ))}
+        </ul>
+        {drawn && <p className="mt-1.5 text-[11px] text-muted">{legend}</p>}
+      </div>
+      <div className="hidden overflow-x-auto rounded-xl border border-line bg-surface shadow-sm sm:block">
         <table className="w-full min-w-[36rem] text-sm">
           <thead>
             <tr className="border-b border-line text-left text-[10px] uppercase tracking-wide text-muted">
@@ -1327,10 +1371,7 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => {
-              const d = DIR[r.direction] ?? DIR.neutral;
-              const share = scale.shares[i] ?? null;
-              const unit = scale.units[i] ?? null;
+            {view.map(({ r, d, share, unit }, i) => {
               return (
                 <tr
                   key={i}
@@ -1358,11 +1399,7 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
             })}
           </tbody>
         </table>
-        {drawn && (
-          <p className="border-t border-line px-4 py-2 text-[11px] text-muted">
-            Bars: each gap scaled to the widest of its kind; favorable right, unfavorable left.
-          </p>
-        )}
+        {drawn && <p className="border-t border-line px-4 py-2 text-[11px] text-muted">{legend}</p>}
       </div>
     </section>
   );

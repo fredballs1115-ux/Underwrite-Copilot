@@ -3,19 +3,19 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#262 merged to main (live build
+**Last updated 2026-09-08**, after PRs #176–#263 merged to main (live build
 sha `e533e8c`, #262, confirmed equal to the main tip by live-verify at 18:04
 UTC with its `DEPLOY: LIVE` line — every one of the eighty-seven through
 #262 is live, the homepage serves at 196 KB where it served at 488 KB, the
 public sample memo at 57 KB where it served at 11 KB (the Brewerytown frame
 is in it), and the public-page lint #231 added reads all twelve public pages
-clean on every run; #263 follows).
+clean on every run; #263 is merged and awaits its proof, #264 follows).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Eighty-eight PRs (#176–#263) landed across one review session and the
+Eighty-nine PRs (#176–#264) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -420,6 +420,9 @@ deploy (live-verify shows the sha).
   widest of its own unit and signed by the row's stated direction — under
   the gap figure on the deal page and on the report's reconciliation page,
   fill count asserted.
+- **The reconciliation table at phone width stacks a card per row** (#264):
+  the metric and its direction, the two figures side by side, the gap with
+  its bar; the table keeps from `sm` up.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -687,17 +690,20 @@ a route scoped to the share token; the memo and the report got theirs in
    times with a roll-up and per-asset contribution to blended IRR; mostly a
    loop around existing code plus a CSV importer. Named as the next build in
    the LPC plan.
-8. **The reconciliation table at phone width stacks a card per row.** The
-   last table on the deal page that still scrolls sideways on a phone: the
-   Reconciliation table keeps `min-w-[36rem]`, so at 390 the gap column —
-   the direction badge, the figure and now #263's bar — sits off-screen to
-   the right of the metric. The same shape #254 (compare), #259 (rent
-   roll) and #262 (comps) took: below `sm` a card per row — the metric,
-   the OM's figure and yours side by side, the direction badge, the gap
-   with its bar — and the table from `sm` up, one `GapBar` drawing in
-   both; assert both layouts in the deal-view render test and shoot at
-   390. (The report's pages all say it in pictures now: #250 the memo,
-   #253 the market page, #261 the comps, #263 the reconciliation.)
+8. **The reconciler's gap lines lead with their figure.** #263 draws a
+   reconciliation gap only when its text states a magnitude — "$174k below
+   the OM", "300 bps higher" — and the reconciler prompt
+   (`lib/anthropic/prompts.ts`) asks only for "a plain-language description
+   of the gap", so a real screen's rows may read "heavier expense load" and
+   draw no bar. Ask for the figure first — the dollar amount, basis points
+   or percentage the two values differ by, then the reason in a few words —
+   the way #224 named the extraction's headline labels so new screens hit
+   the shared readers deterministically; the sample's rows already have
+   this shape. A prompt test asserting the instruction, and a `gapFigure`
+   case for each shape the instruction names. (The report's pages all say
+   it in pictures now — #250 the memo, #253 the market page, #261 the
+   comps, #263 the reconciliation — and every table on the deal page
+   stacks into cards on a phone after #262 and #264.)
 
 ---
 
