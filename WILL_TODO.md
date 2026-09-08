@@ -3,18 +3,18 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#245 merged to main (live build
-sha `bb2760f`, #245, confirmed equal to the main tip by live-verify at 15:47
-UTC with its `DEPLOY: LIVE` line — every one of the seventy is live, the
-homepage serves at 197 KB where it served at 488 KB, and the public-page
-lint #231 added reads all twelve public pages clean on every run; #246
+**Last updated 2026-09-08**, after PRs #176–#246 merged to main (live build
+sha `72c0c12`, #246, confirmed equal to the main tip by live-verify at 15:59
+UTC with its `DEPLOY: LIVE` line — every one of the seventy-one is live, the
+homepage serves at 196 KB where it served at 488 KB, and the public-page
+lint #231 added reads all twelve public pages clean on every run; #247
 follows and awaits the same proof).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Seventy-one PRs (#176–#246) landed across one review session and the
+Seventy-two PRs (#176–#247) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -348,6 +348,14 @@ deploy (live-verify shows the sha).
   or hydration errors at either width; the Market data page's forty-odd
   link prefetches on load are eight; an aerial tile that 404s hides its
   image instead of showing a broken-image glyph.
+- **The shared screen, rendered on fixtures and said in pictures** (#247):
+  the page a partner or lender opens from your share link is a loader and a
+  pure view now, drawn on the sample deal, a conversion and its expired
+  state in the render tests and walked at 1440 and 390. The verdict wears
+  the deal page's mark, the call across the range is three dots, every range
+  is a card with its Low / Base / High strip and base-position bar (the
+  table scrolled sideways on a phone), the comp and market reads fold to a
+  sentence, and a key term's label wraps instead of trailing off.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -616,13 +624,14 @@ Not yet covered by imagery, in rough value order:
    times with a roll-up and per-asset contribution to blended IRR; mostly a
    loop around existing code plus a CSV importer. Named as the next build in
    the LPC plan.
-8. **The shared screen gets a fixture render.** `app/share/[token]/page.tsx`
-   reads the database inline, so it is the one signed-out surface the render
-   tests and the phone walk cannot reach (only its plan block, `SharePlan`,
-   has a fixture). Split it into a loader and a pure view, render the view on
-   the deal fixtures in `lib/views.render.test.ts`, and give it the same
-   words-to-pictures pass (#240–#245 did every other surface; the census in
-   `scripts/prose-census.mjs` lists what is left) at 1440 and 390.
+8. **The shared screen shows the building from above.** `/share/[token]` is
+   the one surface still without imagery (#247 gave it its fixture render
+   and its pictures; the aerial is what is left): the deal page's aerial
+   route needs a signed-in session. A token-scoped route
+   (`/api/share/[token]/aerial`) that runs the same expiry, revocation and
+   sender-access checks as the page, then proxies the deal's aerial, would
+   put the building at the top of the screen a lender opens — the imagery
+   notes above list it first.
 
 ---
 
