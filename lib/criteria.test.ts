@@ -6,6 +6,8 @@ import {
   occupancyPctFromMetrics,
   parseSf,
   findGoingInCap,
+  findMetric,
+  METRIC_FIND,
   foldBuyBoxChecks,
   isEmptyBuyBox,
   buyBoxLines,
@@ -532,5 +534,122 @@ describe("occupancyPctFromMetrics — today's occupancy, never the sponsor's sta
     ]) {
       expect(occupancyPctFromMetrics([{ label, value: "95%" }]), label).toBeNull();
     }
+  });
+});
+
+// The third review's cases: a label that carries "asking", "pricing" or a
+// slash is not the price unless it names the ask; a value that carries a
+// square-footage noun in any spelling is a size.
+describe("METRIC_FIND.price — rents, rates, per-key figures and loan pricing are never the price", () => {
+  const price = (label: string) =>
+    findMetric([{ label, value: "$2,150" }], METRIC_FIND.price.inc, METRIC_FIND.price.exc);
+
+  it("refuses an asking rent or rate, a price per key in either spelling, and loan / debt / insurance pricing", () => {
+    for (const label of [
+      "Asking Rent",
+      "Asking Cap Rate",
+      "Asking Yield",
+      "Asking rate",
+      "Price / Key",
+      "Price/Door",
+      "Asking Price / Key",
+      "List Price / Key",
+      "Whisper Price / Key",
+      "Price / RSF",
+      "Price / GLA",
+      "Price / NRSF",
+      "Price / Acre",
+      "Price Per Door",
+      "Loan Pricing",
+      "Debt Pricing",
+      "Insurance Pricing",
+      "Repricing Risk",
+      "Pricing (Spread)",
+      "Pricing Date",
+      "Original List Price",
+      "Offers Due",
+      "Bid Deadline",
+    ]) {
+      expect(price(label), label).toBeNull();
+    }
+  });
+
+  it("still reads the ask under every name an OM gives it", () => {
+    for (const label of [
+      "Ask",
+      "Asking",
+      "Asking price",
+      "Asking Price (Reduced)",
+      "Pricing",
+      "Pricing Guidance",
+      "Guidance Pricing",
+      "Price / Terms",
+      "Purchase Price / Terms",
+      "Purchase price per the PSA",
+      "Whisper",
+      "Sale price",
+      "List price",
+      "Offer price",
+      "Acquisition cost",
+      "Price",
+    ]) {
+      expect(price(label)?.label, label).toBe(label);
+    }
+  });
+});
+
+describe("parseSf — the shapes the third review found blank, and the sizes it found skipped", () => {
+  it("reads the figure the square-footage noun follows, in every spelling", () => {
+    expect(parseSf("250,000 Sq. Ft.")).toBe(250_000);
+    expect(parseSf("250,000 s.f.")).toBe(250_000);
+    expect(parseSf("±250,000 SF")).toBe(250_000);
+    expect(parseSf("250,000 SF+")).toBe(250_000);
+    expect(parseSf("250,000 SF total")).toBe(250_000);
+    expect(parseSf("1.2 million SF")).toBe(1_200_000);
+    expect(parseSf("250,000 SF on 12.5 acres")).toBe(250_000);
+    expect(parseSf("250,000 SF; 6.2 AC site")).toBe(250_000);
+    expect(parseSf("2 buildings totaling 250,000 SF")).toBe(250_000);
+    expect(parseSf("Approximately 250,000 rentable SF")).toBe(250_000);
+    expect(parseSf("250,000 NRSF")).toBe(250_000);
+    expect(parseSf("250K")).toBe(250_000);
+    expect(parseSf("0.25M")).toBe(250_000);
+    expect(parseSf("250,000 / 12,000 SF")).toBeNull();
+    expect(parseSf("250,000 - 300,000 SF")).toBeNull();
+  });
+
+  it("reads NRSF, GSF, an approximate or ± label, a property size and 'Building Size / SF'", () => {
+    for (const label of [
+      "NRSF",
+      "Total NRSF",
+      "GSF",
+      "Building GSF",
+      "USF",
+      "Approx. SF",
+      "± SF",
+      "Building Size / SF",
+      "Property Size",
+      "Asset Size",
+      "Size",
+    ]) {
+      expect(buildingSfFromMetrics([{ label, value: "250,000 SF" }]), label).toBe(250_000);
+    }
+    expect(buildingSfFromMetrics([{ label: "Units / SF", value: "250,000 SF" }])).toBeNull();
+  });
+
+  it("a bare 'Size' row is the land's on a deck that states acreage or a lot, and needs a square-footage noun elsewhere", () => {
+    expect(
+      buildingSfFromMetrics([
+        { label: "Size", value: "545,000 SF" },
+        { label: "Acres", value: "12.5" },
+        { label: "Zoning", value: "C-2" },
+      ]),
+    ).toBeNull();
+    expect(buildingSfFromMetrics([{ label: "Size", value: "250,000" }])).toBeNull();
+    expect(
+      buildingSfFromMetrics([
+        { label: "Size", value: "250,000 SF" },
+        { label: "Asking price", value: "$50,000,000" },
+      ]),
+    ).toBe(250_000);
   });
 });

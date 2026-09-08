@@ -35,7 +35,6 @@ import type { ReconcileResult } from "@/lib/reconcile";
 import { LoiPanel } from "./loi-panel";
 import type { DealNote, AskEntry } from "@/lib/deals";
 import type { DealFact } from "@/lib/facts";
-import { parseUsd } from "@/lib/money";
 import type { ScreenDiff } from "@/lib/screen-diff";
 import {
   OverviewView,
@@ -221,24 +220,10 @@ const RECONCILE_ERROR_CODES = new Set(["modelfile", "modeltype", "modelsize"]);
 
 /** The extraction's asking-price string, for the LOI prefill ("" unknown). */
 function askingPriceValue(extraction: ExtractionResult | null): string {
-  // Extractions routinely carry "Asking price / unit", "Purchase price per
-  // SF", and "Asking cap rate" alongside the whole-asset figure — labels the
-  // bare /asking/ test also matches. Exclude them, then prefer the first
-  // candidate that parses as a plausible whole-asset price so one odd label
-  // can't blank (or worse, shrink) the prefill.
-  const exclude = /unit|\/ ?sf\b|per sf|psf|\bcap\b|rate|%/i;
-  const candidates = (extraction?.metrics ?? []).filter(
-    (x) =>
-      /asking|purchase\s+price|^price$/i.test(x.label) &&
-      !exclude.test(x.label) &&
-      x.value.trim(),
-  );
-  const parsed = candidates.find((x) => parseUsd(x.value) !== null);
-  const own = (parsed ?? candidates[0])?.value ?? "";
-  if (own) return own;
-  // A ground-up development's OM states a land or site cost where a
-  // building's states an asking price — the shared reader takes it, on a
-  // development only, so the letter's price is the land being bought.
+  // The shared price reader — the same row the deal page's summary bar, the
+  // buy box and the pipeline card show — so the letter never prefills an
+  // "Asking rent", a price per key or a prior trade. On a development with
+  // no asking price it is the land or site cost, the land being bought.
   return findPriceMetric(extraction?.metrics ?? [], inferStrategy(extraction).kind)?.value ?? "";
 }
 

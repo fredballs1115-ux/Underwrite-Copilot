@@ -111,13 +111,18 @@ export const METRIC_FIND = {
   // and never a land or site allocation (on a development the land cost is
   // read separately, as the price, by lib/deal-strategy's findPriceMetric).
   price: {
-    inc: /asking price|purchase price|guidance|pricing|^ask(ing)?\b|offering price|offer price|sale price|sales price|list price|listing price|contract price|acquisition (price|cost)|whisper|\bprice\b/i,
-    // Not a per-unit / per-SF / per-key figure, not what the building last
-    // traded for, not a land or site allocation (read separately, as the
-    // price, only when no ask exists), and not a reserve, bid, target or
-    // underwritten figure. "Price / Terms" and "Purchase price per the PSA"
-    // are asks and stay in.
-    exc: /unit|\bsf\b|\/ ?sf|per ?sf|per (square|sq)|psf|\bper (key|bed|room|pad|site|door|acre|lot|suite)s?\b|\b(last|prior|previous|historical|original|land|site|reduction|reserve|bid|strike|target|underwritten|range)\b/i,
+    // "Ask" / "Asking" alone, or with "price" / "guidance" — never "Asking
+    // rent", "Asking cap rate" or "Asking yield". "Pricing" as a word — never
+    // "Repricing", and the exclude keeps loan / debt / insurance pricing and
+    // a pricing date out.
+    inc: /asking price|purchase price|guidance|\bpricing\b|^ask(ing)?$|^ask(ing)?\s+(price|guidance)\b|offering price|offer price|sale price|sales price|list price|listing price|contract price|acquisition (price|cost)|whisper|\bprice\b/i,
+    // Not a per-unit / per-SF / per-key figure in either spelling ("per
+    // key", "/ Key", "/ RSF"), not a rent, a rate or a yield, not what the
+    // building last traded for, not a land or site allocation (read
+    // separately, as the price, only when no ask exists), and not a
+    // reserve, bid, target or underwritten figure. "Price / Terms" and
+    // "Purchase price per the PSA" are asks and stay in.
+    exc: /unit|\bsf\b|\/ ?sf|per ?sf|per (square|sq)|psf|\bper (key|bed|room|pad|site|door|acre|lot|suite|stall|space)s?\b|\/\s*(key|bed|room|pad|door|acre|lot|suite|stall|space|r?sf|nrsf|gsf|gla|nra|gba|nla)s?\b|\brent|yield|\bcap\b|\brate\b|spread|loan|debt|insurance|\bdate\b|\b(last|prior|previous|historical|original|land|site|reduction|reserve|bid|strike|target|underwritten|range)\b/i,
   },
   // The price over the units — never an NOI, a rent, a cost or an expense
   // expressed per unit, which would pass a basis ceiling at $2k/unit.
@@ -348,7 +353,7 @@ export function findMetric(
 // building puts a wrong size on the buy-box check, the mandate score and
 // every $/SF basis. One reader for all of them, as for the unit count.
 const SIZE_LABEL =
-  /^(?:(?:total|net|gross|rentable|leasable|building|overall|proposed|planned|existing|current|as[- ]built)\s+)*(?:sf|s\.f|sq\.? ?ft|sqft|square (?:feet|foot|footage)|rsf|nra|gla|rba|gba|nla|area|size|floor area|improvements?)(?:\s+(?:sf|s\.f|sq\.? ?ft|sqft|square (?:feet|footage)|area|size))?(?:\s+(?:total|rentable|gross|net|leasable|proposed|planned))?$/i;
+  /^(?:(?:total|net|gross|rentable|leasable|building|property|asset|overall|proposed|planned|existing|current|as[- ]built|approx\.?|approximate|±)\s+)*(?:sf|s\.f|sq\.? ?ft|sqft|square (?:feet|foot|footage)|rsf|nrsf|gsf|usf|nra|gla|rba|gba|nla|area|size|floor area|improvements?)(?:\s+(?:sf|s\.f|sq\.? ?ft|sqft|square (?:feet|footage)|area|size))?(?:\s+(?:total|rentable|gross|net|leasable|proposed|planned))?$/i;
 // A parenthetical naming a subset or another thing entirely — "(office)",
 // "(Phase II)", "(land)", "(2 buildings)" — keeps the row from being the
 // building's size; any other ("(SF)", "(rentable)", "(proposed)") is
@@ -368,24 +373,58 @@ export function isSizeLabel(label: string): boolean {
     .trim()
     .replace(/[:.]+$/, "")
     .trim();
+  // "Building Size / SF": two size nouns either side of a slash are still
+  // one size label; "Units / SF" or "Price / SF" are not.
+  if (s.includes("/")) return s.split("/").every((part) => SIZE_LABEL.test(part.trim()));
   return SIZE_LABEL.test(s);
 }
 
-/** Square feet from a metric's value — "250,000", "250,000 SF", "250k sq
- *  ft", "1.2M SF", "250,000 SF (rentable)" — or null when the value is not
- *  a building area: an acreage, a unit count, a rate, a range, or too small
- *  to be a building. */
+// A bare "Size" / "Area" / "Property size" label says nothing about WHAT is
+// measured — on a land OM "Size: 545,000 SF" is the lot — so its value must
+// carry a square-footage noun to count as the building.
+const BARE_SIZE_LABEL = /^(?:(?:total|property|asset|overall)\s+)*(?:area|size)$/i;
+
+const SF_NOUN = /\b(?:rsf|nrsf|gsf|usf|nra|gla|rba|gba|nla|sf|s\.?f\.?|sq\.?\s?ft\.?|sqft|square\s+(?:feet|foot|footage))(?![a-z])/i;
+// The number the square footage follows: "250,000 SF", "±250,000 SF",
+// "1.2 million SF", "250,000 Sq. Ft.", "250k sq ft", "250,000 SF+".
+const SF_FIGURE =
+  /(?:±|\+\/-|approx(?:imately|\.)?|about|~|≈|c\.)?\s*(\d[\d,]*(?:\.\d+)?)\s*(k|mm|m|million|thousand)?\s*(?:\+|±)?(?:\s+(?:net\s+)?(?:rentable|gross|leasable|usable|total|building))?\s*(?:rsf|nrsf|gsf|usf|nra|gla|rba|gba|nla|sf|s\.?f\.?|sq\.?\s?ft\.?|sqft|square\s+(?:feet|foot|footage))(?![a-z])/i;
+
+function sfNumber(n: string, unit: string | undefined): number | null {
+  const base = Number(n.replace(/,/g, ""));
+  if (!Number.isFinite(base)) return null;
+  const u = (unit ?? "").toLowerCase();
+  const mult = u === "k" || u === "thousand" ? 1e3 : u === "m" || u === "mm" || u === "million" ? 1e6 : 1;
+  return base * mult;
+}
+
+/** Square feet from a metric's value — "250,000", "250,000 SF", "250,000
+ *  Sq. Ft.", "±250,000 SF", "250k sq ft", "1.2 million SF", "250,000 SF
+ *  (rentable)", "250,000 SF on 12.5 acres" (the figure the SF noun
+ *  follows) — or null when the value is not one building area: a ratio or
+ *  a range ("250,000 / 12,000 SF", "250,000–300,000 SF"), a rate, an
+ *  acreage or a unit count with no square footage, or too small to be a
+ *  building. */
 export function parseSf(value: string): number | null {
-  if (/acre|\bac\b|unit|%|\$|\/|\bper\b|–|—|\bto\b/i.test(value)) return null;
-  const s = value
-    .replace(/\([^)]*\)/g, " ")
-    .replace(/\b(rsf|nra|gla|rba|gba|nla|sf|s\.f\.?|sq\.? ?ft\.?|sqft|square (feet|foot|footage))\b/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/^(approx(imately|\.)?|about|~|≈)\s*/i, "")
-    .trim();
-  if (!/^\d[\d,]*(\.\d+)?\s*(k|m|mm)?$/i.test(s)) return null;
-  const n = parseMoney(s);
+  const v = value.replace(/\([^)]*\)/g, " ").trim();
+  // A pair or a range is two figures, not one.
+  if (/\/|–|—|\bto\b|\d\s*-\s*\d/.test(v)) return null;
+  const withNoun = v.match(SF_FIGURE);
+  let n: number | null;
+  if (withNoun) {
+    n = sfNumber(withNoun[1], withNoun[2]);
+  } else {
+    // No square-footage noun: only a bare figure counts, and never one that
+    // names another unit.
+    if (/acre|\bac\b|unit|key|bed|room|%|\$|\bper\b/i.test(v)) return null;
+    const bare = v
+      .replace(/^(?:±|\+\/-|approx(?:imately|\.)?|about|~|≈|c\.)\s*/i, "")
+      .replace(/\s*(?:\+|±|total|gross|net)$/i, "")
+      .trim()
+      .match(/^(\d[\d,]*(?:\.\d+)?)\s*(k|mm|m|million|thousand)?$/i);
+    if (!bare) return null;
+    n = sfNumber(bare[1], bare[2]);
+  }
   return n != null && n >= 100 ? n : null;
 }
 
@@ -394,8 +433,12 @@ export function parseSf(value: string): number | null {
  *  shadows it — or null. For surfaces that show the OM's own wording or
  *  cite its page. */
 export function buildingSfRow(metrics: MetricLike[]): MetricLike | null {
+  // A deck that states acreage, a lot or a parcel is (or includes) land: a
+  // bare "Size" row there is the land's, not a building's.
+  const statesLand = metrics.some((m) => /\b(land|lot|site|parcel|acre)/i.test(m.label));
   for (const m of metrics) {
     if (!isSizeLabel(m.label)) continue;
+    if (BARE_SIZE_LABEL.test(m.label.trim()) && (statesLand || !SF_NOUN.test(m.value))) continue;
     if (parseSf(m.value) != null) return m;
   }
   return null;
