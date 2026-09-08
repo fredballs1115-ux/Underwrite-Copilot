@@ -232,6 +232,16 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     // dark building's cap; the rejected deal's 22% IRR is never crowned.
     expect(text).toMatch(/n\/a|plan/);
     expect(text).toContain("11.7%");
+    // Every figure in the return rows draws its spread bar: three IRRs,
+    // three multiples, two cash-on-cash, two caps (the conversion's cap
+    // cell draws none), one yield on cost. The rejected deal's bar is the
+    // longest in the IRR row but muted, and it carries no "best" pill.
+    expect((html.match(/data-spread-bar/g) ?? []).length).toBe(11);
+    expect(html).toContain("bg-muted/50");
+    expect((html.match(/>best</g) ?? []).length).toBe(2);
+    // One deal alone has no spread to draw.
+    const single = renderToStaticMarkup(React.createElement(CompareTable, { cols: [COLS[0]] }));
+    expect(single).not.toContain("data-spread-bar");
   });
 });
 

@@ -66,6 +66,10 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     mono?: boolean;
     /** optional per-cell tone class (e.g. the leverage row's traffic light) */
     cls?: (c: Col) => string;
+    /** the figure as a number, for the row's spread bar — the same 0–100 bar
+     *  the pipeline's fit column draws, scaled to the row's largest figure so
+     *  a meeting reads which column leads at a glance */
+    num?: (c: Col) => number | null;
   }[] = [
     { label: "Market", get: (c) => c.market },
     { label: "Covered market", get: (c) => c.coveredMarket ?? "—" },
@@ -81,21 +85,28 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       get: (c) => pct(c.irr),
       best: (c) => c.verdict !== "pass_on" && c.irr != null && c.irr === bestIrr,
       mono: true,
+      num: (c) => c.irr,
     },
     {
       label: "Equity multiple",
       get: (c) => mult(c.em),
       best: (c) => c.verdict !== "pass_on" && c.em != null && c.em === bestEm,
       mono: true,
+      num: (c) => c.em,
     },
-    { label: "Cash-on-cash (Yr 1)", get: (c) => pct(c.coc), mono: true },
+    { label: "Cash-on-cash (Yr 1)", get: (c) => pct(c.coc), mono: true, num: (c) => c.coc },
     // A plan deal's year-1 cap is a dark building's (negative, or a default)
     // — not a figure to compare on. Say so; the yield on cost row below is
-    // its answer.
-    { label: "Going-in cap", get: (c) => (c.planDeal ? "n/a — plan" : pct(c.cap)), mono: true },
+    // its answer. Its cell draws no bar either.
+    {
+      label: "Going-in cap",
+      get: (c) => (c.planDeal ? "n/a — plan" : pct(c.cap)),
+      mono: true,
+      num: (c) => (c.planDeal ? null : c.cap),
+    },
     // The plan's yardstick: stabilized NOI over everything it cost to get
     // there. Blank for a stabilized asset — its going-in cap is the answer.
-    { label: "Yield on cost (stabilized)", get: (c) => pct(c.yoc), mono: true },
+    { label: "Yield on cost (stabilized)", get: (c) => pct(c.yoc), mono: true, num: (c) => c.yoc },
     {
       label: "Leverage vs 30-yr",
       // Signed spread only — the full sentence lives on each deal's page.
@@ -195,38 +206,67 @@ export function CompareTable({ cols }: { cols: Col[] }) {
               ))}
             </tr>
           )}
-          {metricRows.map((mr) => (
-            <tr key={mr.label} className="border-b border-line last:border-0">
-              <td className="sticky left-0 z-10 whitespace-nowrap bg-surface px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted">
-                {mr.label}
-              </td>
-              {cols.map((c) => {
-                const val = mr.get(c);
-                const isBest = (mr.best?.(c) ?? false) && cols.length > 1;
-                return (
-                  <td
-                    key={c.id}
-                    className={`border-l border-line px-4 py-3 ${
-                      mr.mono ? "font-mono tabular-nums" : ""
-                    } ${isBest ? "font-semibold text-brand" : mr.cls?.(c) || "text-ink"}`}
-                  >
-                    {val ?? <span className="text-muted">—</span>}
-                    {isBest && (
-                      // The space keeps "2.10x best" two words when the
-                      // table is read aloud or copied; the margin does the
-                      // visual work.
-                      <>
-                        {" "}
-                        <span className="ml-1 rounded-full bg-brand/10 px-1.5 py-0.5 text-[10px] font-medium uppercase text-brand">
-                          best
+          {metricRows.map((mr) => {
+            // The row's spread: every figure as a bar against the row's
+            // largest, rejected deals included (the proportions must be
+            // honest) but drawn muted — the "best" pill still never lands on
+            // one. One column is no spread, so no bars.
+            const nums = cols.map((c) => mr.num?.(c) ?? null);
+            const rowMax = Math.max(...nums.map((n) => (n != null && n > 0 ? n : 0)));
+            const drawBars = cols.length > 1 && rowMax > 0;
+            return (
+              <tr key={mr.label} className="border-b border-line last:border-0">
+                <td className="sticky left-0 z-10 whitespace-nowrap bg-surface px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted">
+                  {mr.label}
+                </td>
+                {cols.map((c, i) => {
+                  const val = mr.get(c);
+                  const isBest = (mr.best?.(c) ?? false) && cols.length > 1;
+                  const n = nums[i];
+                  const share = drawBars && n != null ? Math.min(1, Math.max(0, n / rowMax)) : null;
+                  return (
+                    <td
+                      key={c.id}
+                      className={`border-l border-line px-4 py-3 ${
+                        mr.mono ? "font-mono tabular-nums" : ""
+                      } ${isBest ? "font-semibold text-brand" : mr.cls?.(c) || "text-ink"}`}
+                    >
+                      {val ?? <span className="text-muted">—</span>}
+                      {isBest && (
+                        // The space keeps "2.10x best" two words when the
+                        // table is read aloud or copied; the margin does the
+                        // visual work.
+                        <>
+                          {" "}
+                          <span className="ml-1 rounded-full bg-brand/10 px-1.5 py-0.5 text-[10px] font-medium uppercase text-brand">
+                            best
+                          </span>
+                        </>
+                      )}
+                      {share != null && (
+                        <span
+                          aria-hidden
+                          data-spread-bar
+                          className="mt-1.5 block h-1 w-16 rounded-full bg-faint"
+                        >
+                          <span
+                            className={`block h-full rounded-full ${
+                              c.verdict === "pass_on"
+                                ? "bg-muted/50"
+                                : isBest
+                                  ? "bg-brand"
+                                  : "bg-brand/40"
+                            }`}
+                            style={{ width: `${Math.round(share * 100)}%` }}
+                          />
                         </span>
-                      </>
-                    )}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

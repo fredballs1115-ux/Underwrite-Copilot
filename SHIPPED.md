@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Seventy-six PRs, #176–#251, each
+estimate, and that's what it should flag." Seventy-seven PRs, #176–#252, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1037,6 +1037,15 @@ confirmed equal to the main tip after each batch.
   and draw no bar, so a plan deal's cap column stays honestly empty); an
   empty pipeline writes no rule. The workbook test reads the three rules
   back — their ranges end at the last deal row, their scale runs min to max.
+- **#252 The compare table draws the spread.** Under each IRR, equity
+  multiple, cash-on-cash, going-in cap and yield-on-cost figure sits the
+  same 0–100 bar the pipeline's fit column draws, scaled to the row's
+  largest figure, so a meeting reads which column leads at a glance. A
+  rejected deal's bar is drawn (the proportions must be honest) but muted,
+  and the "best" pill still never lands on it; a plan deal's cap cell draws
+  no bar, as it shows no cap; one deal alone has no spread and draws none.
+  The compare fixture asserts eleven bars, the muted one, two "best" pills
+  and none for a single column; shot at 1440 and 390.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

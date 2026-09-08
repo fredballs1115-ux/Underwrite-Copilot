@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "Compare draws the spread between your deals",
+      "blurb": "On the compare page, every return figure — levered IRR, equity multiple, cash-on-cash, going-in cap, yield on cost — now carries a small bar scaled to the best figure in its row, so which deal leads reads at a glance. A rejected deal's bar is drawn muted and never gets the best mark; a plan deal's cap cell, which is judged on yield on cost instead, draws none.",
+      "href": "/deals/compare"
+    },
+    {
+      "date": "2026-09-08",
       "title": "The meeting workbook draws its price, cap and yield columns as bars",
       "blurb": "The pipeline export's price, cap-rate and yield-on-cost columns now carry Excel's own data bars, so a meeting reads the spread across deals at a glance — and the bars stay live as anyone edits the numbers, because Excel draws them, not the export. A plan deal's cap cell, which says n/a — plan, draws no bar.",
       "href": "/deals"
