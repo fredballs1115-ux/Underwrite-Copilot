@@ -480,10 +480,11 @@ describe("RentRollDashboard — a parsed rent roll renders every panel", () => {
     const analytics = analyzeRentRoll(leases, { asOf: "2026-01-01", nra: null });
     const schedule = rolloverSchedule(leases, { nra: null });
     const rent = profile.marketRentPsf;
+    const mtm = markToMarket(leases, { default: rent, NNN: rent, MG: rent, FSG: rent });
     const html = render(
         React.createElement(RentRollDashboard, {
           analytics,
-          mtm: markToMarket(leases, { default: rent, NNN: rent, MG: rent, FSG: rent }),
+          mtm,
           cost: rolloverCostForecast(schedule, profile),
           leaseUp: leaseUpCurve({
             vacantSf: schedule.vacantSf,
@@ -497,18 +498,26 @@ describe("RentRollDashboard — a parsed rent roll renders every panel", () => {
       );
     dumpView(`rent-roll-${csv === CLEAN_CSV ? "clean" : "issues"}`, html);
     expect(a11yIssues(html), "a11y rent roll").toEqual([]);
-    return visibleText(html);
+    return { text: visibleText(html), html, priced: Math.min(25, mtm.rows.length) };
   };
 
   it("the clean roll: WALT, rollover, mark-to-market, lease-up", () => {
-    const text = renderRoll(CLEAN_CSV);
+    const { text, html, priced } = renderRoll(CLEAN_CSV);
     expect(gluedWords(text)).toEqual([]);
     expect(text).toMatch(/WALT/i);
     expect(text).toMatch(/rollover/i);
+    // Every priced lease draws its rent against market as a bar from a
+    // centre line — once in the table, once in the phone card (one layout
+    // shows at a time) — and the phone gets a card per lease.
+    expect(priced).toBeGreaterThan(0);
+    expect((html.match(/data-mtm-bar/g) ?? []).length).toBe(priced * 2);
+    expect(html).toContain('aria-label="Leases marked to market"');
+    expect(html).toMatch(/data-mtm-bar[\s\S]{0,400}?(bg-pass|bg-kill)/);
+    expect(html).toMatch(/class="mt-3 hidden overflow-x-auto sm:block"/);
   });
 
   it("a roll with missing expiries names what the import found", () => {
-    const text = renderRoll(MISSING_EXPIRIES_CSV);
+    const { text } = renderRoll(MISSING_EXPIRIES_CSV);
     expect(gluedWords(text)).toEqual([]);
     expect(text).toContain("What the import found in rent-roll.csv");
   });

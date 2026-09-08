@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Eighty-three PRs, #176–#258, each
+estimate, and that's what it should flag." Eighty-four PRs, #176–#259, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1113,6 +1113,19 @@ confirmed equal to the main tip after each batch.
   workbook test reads its two rules back: C..(C + hold − 1) on the rows
   the labels name in the model, C18:L18 and C28:L28 in the ten-year
   rent-roll fixture.
+- **#259 The rent-roll page draws each lease against market.** The Mark to
+  market table listed each lease's in-place rent, market rent and the gap
+  as six figures a row, and at 390 it scrolled sideways inside its card.
+  Each row now draws the gap as a bar from a centre line — right in the
+  pass colour when the lease sits below market (room to roll up), left in
+  the kill colour when it sits above (roll-down risk) — as a share of its
+  market rent, scaled to the widest gap on the page so the leases compare
+  with each other; a market rent of nothing draws none. Below `sm` the
+  table gives way to a card per lease: tenant and gap, the bar, then the
+  two rents, the annual gap and the size. The share is computed once for
+  both layouts. The clean-roll fixture asserts a bar per priced lease in
+  each layout, the card list, the coloured fill and the table hidden below
+  `sm`; shot at 390.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

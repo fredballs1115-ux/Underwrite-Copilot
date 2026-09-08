@@ -28,6 +28,23 @@ function Stat({ label, value, note }: { label: string; value: string; note?: str
   );
 }
 
+/** A lease's rent against market as a bar from a centre line: right in the
+ *  pass colour when it sits below market (room to roll up), left in the kill
+ *  colour when it sits above (roll-down risk), scaled to the widest gap on
+ *  the page so the leases compare with each other. */
+function MtmBar({ share, className }: { share: number; className?: string }) {
+  const half = Math.round(Math.abs(share) * 50);
+  return (
+    <span aria-hidden data-mtm-bar className={`relative block h-1 rounded-full bg-faint ${className ?? ""}`}>
+      <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-muted/40" />
+      <span
+        className={`absolute inset-y-0 rounded-full ${share < 0 ? "bg-kill" : "bg-pass"}`}
+        style={share < 0 ? { right: "50%", width: `${half}%` } : { left: "50%", width: `${half}%` }}
+      />
+    </span>
+  );
+}
+
 /** Stacked bars: SF expiring per year, with the rent expiring overlaid. */
 function RolloverChart({
   analytics,
@@ -111,6 +128,19 @@ export function RentRollDashboard({
 }) {
   const errors = issues.filter((i) => i.severity === "error");
   const warnings = issues.filter((i) => i.severity === "warning");
+
+  // Mark to market, once for both layouts: each lease's gap as a share of
+  // its market rent, scaled to the widest on the page. A market rent of
+  // nothing has no gap to draw.
+  const mtmRows = mtm.rows.slice(0, 25);
+  const widestGap = Math.max(
+    0,
+    ...mtmRows.map((r) => (r.marketPsf > 0 ? Math.abs(r.gapPsf) / r.marketPsf : 0)),
+  );
+  const mtmShare = (r: MarkToMarket["rows"][number]): number | null =>
+    widestGap > 0 && r.marketPsf > 0
+      ? Math.max(-1, Math.min(1, r.gapPsf / r.marketPsf / widestGap))
+      : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -249,7 +279,32 @@ export function RentRollDashboard({
             {mtm.unpricedLeases ? ` · ${mtm.unpricedLeases} lease(s) not priced` : ""}
           </p>
         </div>
-        <div className="mt-3 overflow-x-auto">
+        {/* Phone: a card per lease — tenant and gap, the bar, then the two
+            rents — so a phone reads the whole lease instead of a table it
+            scrolls sideways. From `sm` up the table takes over. */}
+        <ul className="mt-3 grid gap-2 sm:hidden" aria-label="Leases marked to market">
+          {mtmRows.map((r) => {
+            const share = mtmShare(r);
+            return (
+              <li key={r.sourceRow} className="rounded-lg border border-line px-3 py-2">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="min-w-0 truncate text-sm text-ink">
+                    {r.tenant || "—"}
+                    {r.suite ? <span className="ml-1 text-xs text-muted">{r.suite}</span> : null}
+                  </span>
+                  <span className={`shrink-0 font-mono text-sm ${r.gapPsf >= 0 ? "text-pass" : "text-kill"}`}>
+                    {psf(r.gapPsf)}
+                  </span>
+                </div>
+                {share != null ? <MtmBar share={share} className="mt-1.5" /> : null}
+                <p className="mt-1 text-[11px] text-muted">
+                  {psf(r.inPlacePsf)} in place · {psf(r.marketPsf)} market · {usd(r.gapAnnual)} / yr · {sf(r.sf)}
+                </p>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="mt-3 hidden overflow-x-auto sm:block">
           <table className="w-full min-w-[520px] text-sm">
             <thead>
               <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-muted">
@@ -262,24 +317,28 @@ export function RentRollDashboard({
               </tr>
             </thead>
             <tbody>
-              {mtm.rows.slice(0, 25).map((r) => (
-                <tr key={r.sourceRow} className="border-b border-line last:border-b-0">
-                  <td className="py-2 pr-3 text-ink">
-                    {r.tenant || "—"}
-                    {r.suite ? <span className="ml-1 text-xs text-muted">{r.suite}</span> : null}
-                  </td>
-                  <td className="py-2 pr-3 text-right font-mono text-muted">{sf(r.sf)}</td>
-                  <td className="py-2 pr-3 text-right font-mono text-muted">{psf(r.inPlacePsf)}</td>
-                  <td className="py-2 pr-3 text-right font-mono text-muted">{psf(r.marketPsf)}</td>
-                  <td
-                    className="py-2 pr-3 text-right font-mono"
-                    style={{ color: r.gapPsf >= 0 ? "var(--color-pass)" : "var(--color-kill)" }}
-                  >
-                    {psf(r.gapPsf)}
-                  </td>
-                  <td className="py-2 text-right font-mono text-muted">{usd(r.gapAnnual)}</td>
-                </tr>
-              ))}
+              {mtmRows.map((r) => {
+                const share = mtmShare(r);
+                return (
+                  <tr key={r.sourceRow} className="border-b border-line last:border-b-0">
+                    <td className="py-2 pr-3 text-ink">
+                      {r.tenant || "—"}
+                      {r.suite ? <span className="ml-1 text-xs text-muted">{r.suite}</span> : null}
+                    </td>
+                    <td className="py-2 pr-3 text-right font-mono text-muted">{sf(r.sf)}</td>
+                    <td className="py-2 pr-3 text-right font-mono text-muted">{psf(r.inPlacePsf)}</td>
+                    <td className="py-2 pr-3 text-right font-mono text-muted">{psf(r.marketPsf)}</td>
+                    <td
+                      className="py-2 pr-3 text-right font-mono"
+                      style={{ color: r.gapPsf >= 0 ? "var(--color-pass)" : "var(--color-kill)" }}
+                    >
+                      {psf(r.gapPsf)}
+                      {share != null ? <MtmBar share={share} className="ml-auto mt-1 w-16" /> : null}
+                    </td>
+                    <td className="py-2 text-right font-mono text-muted">{usd(r.gapAnnual)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

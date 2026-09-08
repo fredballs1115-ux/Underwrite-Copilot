@@ -3,19 +3,19 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#257 merged to main (live build
+**Last updated 2026-09-08**, after PRs #176–#258 merged to main (live build
 sha `e7c5317`, #255, confirmed equal to the main tip by live-verify at 17:22
 UTC with its `DEPLOY: LIVE` line — every one of the eighty through #255 is
 live, the homepage serves at 196 KB where it served at 488 KB, the public
 sample memo at 57 KB where it served at 11 KB (the Brewerytown frame is in
 it), and the public-page lint #231 added reads all twelve public pages clean
-on every run; #256 and #257 are merged and await their proof, #258 follows).
+on every run; #256–#258 are merged and await their proof, #259 follows).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Eighty-three PRs (#176–#258) landed across one review session and the
+Eighty-four PRs (#176–#259) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -400,6 +400,10 @@ deploy (live-verify shows the sha).
 - **Data bars across the Cash Flow tabs' NOI and levered cash flow** (#258):
   both workbooks draw the two rows across the operating years, live off
   the formulas; the reversion column and the sale vectors stay figures.
+- **The rent-roll page draws each lease against market** (#259): a bar from
+  a centre line per lease — pass to the right when it sits below market,
+  kill to the left when above — and a card per lease below `sm` in place
+  of the sideways-scrolling table.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -675,19 +679,21 @@ a route scoped to the share token; the memo and the report got theirs in
    the subject's — both need a parser as honest as `rangeRead` (a gap like
    "+4.2%" or "−$120k" and a comp detail's "$262k/unit"), returning nothing
    when the text is not a figure. Plain `View`s, height-neutral, the same
-   fill-count assertion.
-9. **The rent-roll page's mark-to-market rows as bars.** The Mark to market
-   table (`app/(app)/deals/[id]/rent-roll/dashboard.tsx`) lists each
-   lease's in-place rent, market rent and the gap as six figures a row, and
-   at 390 it scrolls sideways inside its card (`min-w-[520px]`). Both rents
-   are numbers already, so the picture needs no parser: a bar per row of
-   in-place as a share of market (capped at the track), in the pass colour
-   when the lease is below market (upside) and the kill colour when it is
-   above (roll-down risk), beside the gap figure; a lease with no market
-   rent priced draws none. Below `sm` the row could stack — tenant, the
-   bar, the gap — the way the compare cards do. Render it in
-   `lib/views.render.test.ts` (the rent-roll fixtures already carry
-   priced leases) and shoot at 390.
+   fill-count assertion. Item 9 names the comp half's reader and puts it
+   behind the web comps table too.
+9. **One comp-detail reader behind the comps table and the report's comp
+   page.** A broker comp's figures arrive as one line of text
+   (`BrokerComp.detail`: "$262k/unit · 5.4% cap · Mar 2026"), so neither
+   the deal page's comps table (`app/(app)/deals/[id]/comps-map.tsx`) nor
+   the report's comp page can draw them. A pure `lib/comp-detail.ts` that
+   reads a per-unit or per-SF basis and a cap out of that line when the
+   text states one — "$262k/unit", "$262,000 / unit", "$410/SF",
+   "5.4% cap" — and returns nothing otherwise (the same honesty as
+   `rangeRead`), then each comp's basis drawn as a bar against the
+   subject's own (the shared price and unit readers give the subject's)
+   in both places: the web table under the detail, the report as a plain
+   `View` with the fill-count assertion. This is item 8's comp half with
+   its parser named; the reconciliation gap keeps its own reader there.
 
 ---
 
