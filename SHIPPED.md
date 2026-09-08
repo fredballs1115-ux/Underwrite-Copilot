@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Fifty-two PRs, #176–#227, each
+estimate, and that's what it should flag." Fifty-three PRs, #176–#228, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -581,6 +581,41 @@ confirmed equal to the main tip after each batch.
   class before any per-unit row, so an office sibling never gets a $/unit
   basis. And the LOI infers the kind with the first signal, exactly as
   the page does, so the letter and the page never name two prices.
+- **#228 The readers, read a sixth time — plus a guard for the compiler's
+  glued text.** Twelve verified findings, each closed with a test. The
+  worst three: any "X per unit" ratio row — "Avg SF / unit", "Parking
+  spaces per unit", "Beds per unit" — was the price per unit, so a basis
+  ceiling and a hard dealbreaker both cleared at $912/unit while the
+  $252k/unit price sat beside it (the per-unit reader now reads the SHAPE:
+  price / basis / $ per unit, door, key, pad, bed or site, and "Unit
+  price"); a "Year 1 NOI" row counted as "not income today", so a
+  2024-built asset listing its construction cost flipped to Development
+  with an $80M "total cost" (one shared `LATER_YEAR` guard — Year 2+,
+  "Yr. 3", "Year 10" — now sits behind the cap reader, the NOI classifier
+  and the strategy inference); and the cap reader's year guard missed "Cap
+  Rate (Yr. 3)", "Year 10" and "Cap rate (2028)", so a 7.5% Year-3 cap
+  cleared a 5.5% floor (it reads "Capitalization rate" now, too). "Size
+  (SF): 250,000" is a building size again (a regression from #227's
+  bare-label change: the label's own noun now satisfies the test); the
+  plausibility check reads the cap through the shared reader, so a
+  residual or on-cost cap manufactures no "figures don't tie" finding; the
+  compare page, the pipeline export and the analysis-ready email judge the
+  buy box through `buyBoxCheckSource` with the inferred kind, as the deal
+  page does, so a development's land cost is the price on every surface;
+  an ask dated this year — "Revised asking price (March 2026)" — reads,
+  while a past year in the label, or a sale word beside any year, is still
+  a prior trade (`pastYearSource`, built once from today's year); "94%
+  (Target: 95%)" reads 94 (the forward word must qualify the figure, not
+  sit in a second one); on a development an ask row with no figure yields
+  to the land cost; an inferred plan deal's reading line prints once in
+  the brief; and the price band's unknown branch names the land cost.
+  Plus two new render-level guards: `lib/jsx-whitespace.test.ts` scans
+  every `.tsx` under `app/` and `lib/` for the shape the compiler glues (a
+  text node opening with a space after `}` or `>`, spanning a line break,
+  carrying an entity — verified against the bundled compiler), and
+  `lib/deal-view.render.test.ts` renders every section of the deal page on
+  the sample deal and reads the text for a digit run into a word, a word
+  doubled, or "the the".
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

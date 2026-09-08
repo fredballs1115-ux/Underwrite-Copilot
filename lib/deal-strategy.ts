@@ -26,8 +26,10 @@
 
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import {
+  LATER_YEAR,
   METRIC_FIND,
   buildingSfFromMetrics,
+  findGoingInCap,
   findMetric,
   findPriceRow,
   parseMoney,
@@ -186,8 +188,14 @@ export interface NoiFigure {
 const NOI_INCLUDE = /net operating income|\bnoi\b/i;
 // Per-unit / per-SF figures, margins and growth rates are not the NOI.
 const NOI_EXCLUDE = /\bper\b|\/|psf|unit|margin|growth|debt|yield|multiple/i;
-const NOI_STABILIZED =
-  /stabili[sz]|pro ?forma|forward|projected|post[- ]?(conversion|renovation|reno|construction|completion)|at (completion|stabilization)|untrended|year ?[2-9]|\byr ?[2-9]\b|\by[2-9]\b/i;
+// A later year of the hold ("Year 2", "Yr. 3", "Year 10") is the shared
+// LATER_YEAR guard, so this classifier, the cap reader and the strategy
+// inference agree on which year is still today's.
+const NOI_STABILIZED = new RegExp(
+  String.raw`stabili[sz]|pro ?forma|forward|projected|post[- ]?(conversion|renovation|reno|construction|completion)|at (completion|stabilization)|untrended|` +
+    LATER_YEAR.source,
+  "i",
+);
 const NOI_IN_PLACE = /t-?12|ttm|trailing|in[- ]?place|current|actual|historical|as[- ]is|run[- ]rate/i;
 
 /** Which NOI a metric is — or null when it is not an NOI figure at all. */
@@ -245,11 +253,6 @@ const pct = (x: number, dp = 1): string => `${(x * 100).toFixed(dp)}%`;
 // reads a different row as "the price" than the next one.
 const PRICE_INCLUDE = METRIC_FIND.price.inc;
 const PRICE_EXCLUDE = METRIC_FIND.price.exc;
-const CAP_INCLUDE = /going[- ]?in cap|^cap rate|\bcap\b/i;
-// Not the going-in cap: the exit, an expense cap, a rate cap — and on a plan
-// deal the stabilized / pro forma cap or the yield on cost, which describe
-// the finished project, not the price being paid today.
-const CAP_EXCLUDE = /exit|reversion|terminal|expense|capex|capital|rate cap|stabili[sz]|pro ?forma|forward|projected|yield/i;
 
 const NON_STABILIZED: ReadonlySet<StrategyKind> = new Set([
   "value_add",
@@ -362,9 +365,16 @@ const PLAN_COST_ROW =
   /total (project|development) cost|construction (budget|cost|period|schedule|start|loan)|hard costs?|soft costs?|\b(proposed|planned) units\b|units? \((?:proposed|planned)\)/i;
 // An income row that describes the building as it stands, not the plan:
 // anything INCOME_ROW matches that is not stabilized / pro forma /
-// projected / a later year, and not a market or asking rent.
-const FORWARD_ROW =
-  /stabili[sz]|pro ?forma|projected|forward|(at|upon) (completion|stabili[sz]ation)|\b(year|yr) ?\d|\by\d\b|underwritten|market rent|asking rent|rent (assumption|target|premium)/i;
+// projected / a LATER year, and not a market or asking rent. A Year-1 NOI
+// is income for the building as bought — the going-in figure by another
+// name — so a 2024-built asset listing its construction cost beside "Year
+// 1 NOI" stays an operating asset (the year guard starts at 2, as the cap
+// reader's and classifyNoi's do).
+const FORWARD_ROW = new RegExp(
+  String.raw`stabili[sz]|pro ?forma|projected|forward|(at|upon) (completion|stabili[sz]ation)|underwritten|market rent|asking rent|rent (assumption|target|premium)|` +
+    LATER_YEAR.source,
+  "i",
+);
 
 function hasTodayIncome(metrics: MetricLike[]): boolean {
   return metrics.some((m) => INCOME_ROW.test(m.label) && !FORWARD_ROW.test(m.label));
@@ -665,8 +675,10 @@ export function assessPlausibility(
     });
   }
 
-  // 2. A stated going-in cap that disagrees with NOI ÷ price.
-  const capMetric = findMetric(metrics, CAP_INCLUDE, CAP_EXCLUDE);
+  // 2. A stated going-in cap that disagrees with NOI ÷ price — read through
+  //    the one cap reader every other surface uses, so a residual, Year-3 or
+  //    on-cost cap that no surface shows can't manufacture a finding here.
+  const capMetric = findGoingInCap(metrics);
   const capPctRaw = capMetric ? parsePct(capMetric.value) : null;
   const statedCap =
     capPctRaw != null && capPctRaw / 100 > 0.005 && capPctRaw / 100 <= IMPLIED_CAP_CEILING
@@ -766,9 +778,10 @@ export function plausibilityNote(
 ): string {
   const bits: string[] = [];
   if (isPlanDeal(strategy.kind)) {
-    bits.push(
-      `DEAL STRATEGY: ${strategy.label}${strategy.summary ? ` — ${strategy.summary}` : ""} ${STRATEGY_READING[strategy.kind]}`,
-    );
+    // An inferred plan deal's summary IS the reading line; print it once.
+    const reading = STRATEGY_READING[strategy.kind];
+    const summary = strategy.summary && strategy.summary !== reading ? ` — ${strategy.summary}` : "";
+    bits.push(`DEAL STRATEGY: ${strategy.label}${summary} ${reading}`);
     if (plan) bits.push(`THE PLAN AS THE OM STATES IT: ${planLine(plan)}.`);
     bits.push(
       "The stabilized NOI is the sponsor's post-completion pro forma — not a misread and not today's income, and it is expected to sit far above the acquisition price. Test whether it is as conservative as the deck presents it: the rents and occupancy behind it against today's market, the operating ratio, the construction or renovation budget and schedule against comparable projects, the carry and the income (if any) through the works, and the yield on total cost against the exit cap and against the cost of construction debt. Judge the plan on yield on cost, downtime and execution risk — never on a going-in cap on the acquisition price.",

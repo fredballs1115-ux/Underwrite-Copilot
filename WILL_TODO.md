@@ -3,15 +3,15 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#227 merged to main (live build
-sha `2c61b56`, #226, confirmed equal to the main tip by live-verify at 05:01
-UTC; #227 follows on the next Render deploy).
+**Last updated 2026-09-08**, after PRs #176–#228 merged to main (live build
+sha `25fd26c`, #227, confirmed equal to the main tip by live-verify at 05:40
+UTC — every one of the first fifty-two is live; #228 follows on its deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Fifty-two PRs (#176–#227) landed across one review session and the
+Fifty-three PRs (#176–#228) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -184,6 +184,20 @@ deploy (live-verify shows the sha).
   ceiling read through the shared readers; parseMoney reads ±, ~, approx.,
   circa, USD and negatives; "312 residential units" and a footnoted count
   read; and the LOI infers the kind with the first signal as the page does.
+- **The readers, read a sixth time, and a guard for glued text** (#228):
+  twelve verified findings closed with tests. "Avg SF / unit" or "Beds per
+  unit" is never the price per unit (the per-unit reader reads the shape:
+  price / basis / $ per unit, door, key, pad, bed or site); a Year-1 NOI is
+  income today, so a new build listing its construction cost stays an
+  operating asset; "Cap Rate (Yr. 3)", "Year 10" and "Cap rate (2028)" are
+  projections and "Capitalization rate" reads; "Size (SF): 250,000" is a
+  size again; the plausibility check, the compare page, the pipeline export
+  and the analysis email read through the shared readers and the inferred
+  kind; an ask dated this year reads while a past year is a prior trade;
+  "94% (Target: 95%)" reads 94; an unpriced ask row yields to a
+  development's land cost. And two new tests catch the compiler's
+  glued-text quirk — at the source of every page, and on a full render of
+  the deal page's every section.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":

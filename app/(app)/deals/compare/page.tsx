@@ -5,10 +5,11 @@ import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult, VerdictResult } from "@/lib/anthropic/types";
 import type { UnderwritingModel } from "@/lib/model/types";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { evaluateBuyBox, type BuyBox } from "@/lib/criteria";
+import { buyBoxCheckSource, evaluateBuyBox, type BuyBox } from "@/lib/criteria";
 import { CompareTable, usd, type Col } from "./compare-table";
 import { metroForAddress } from "@/lib/market-match";
 import type { StructuredAddress } from "@/lib/address";
+import type { FirstSignal } from "@/lib/anthropic/types";
 import { leverageRead } from "@/lib/leverage";
 import { seedBenchmarks } from "@/lib/research-data";
 import { findPriceMetric, inferStrategy, isPlanDeal, noiFigures } from "@/lib/deal-strategy";
@@ -30,12 +31,24 @@ function toCol(deal: DealRow, box: BuyBox | null, bench30: number | null): Col {
   const verdict = (deal.verdict as VerdictResult | null) ?? null;
   const model = (deal.model as UnderwritingModel | null) ?? null;
   const r = model?.returns;
+  const signal = ((deal as { first_signal?: unknown }).first_signal as FirstSignal | null) ?? null;
+  const address =
+    ((deal as { address?: unknown }).address as StructuredAddress | null) ?? null;
 
-  // Mandate fit — same engine and grading as the pipeline and deal page.
+  // A plan deal's generated model books dark years first, so its year-1 cap
+  // is negative or a default — not a figure to compare on, and not one to
+  // spread against debt. The yield-on-cost row is its answer.
+  const strat = inferStrategy(ex, signal);
+  const planDeal = isPlanDeal(strat.kind);
+
+  // Mandate fit — same engine, the same inputs and the same inferred kind
+  // as the pipeline and deal page, so a development's land cost is judged
+  // by the fit call printed beside it.
   let fit: Col["fit"] = null;
   let fitNote: string | null = null;
-  if (box && ex) {
-    const checks = evaluateBuyBox(deal.asset_class, ex, box);
+  const checkSource = box ? buyBoxCheckSource(ex, signal, address, strat.kind) : null;
+  if (box && checkSource) {
+    const checks = evaluateBuyBox(deal.asset_class, checkSource, box);
     const misses = checks.filter((c) => c.status === "miss");
     const nears = checks.filter((c) => c.status === "near");
     if (misses.length) {
@@ -49,22 +62,13 @@ function toCol(deal: DealRow, box: BuyBox | null, bench30: number | null): Col {
     }
   }
 
-  // A plan deal's generated model books dark years first, so its year-1 cap
-  // is negative or a default — not a figure to compare on, and not one to
-  // spread against debt. The yield-on-cost row is its answer.
-  const strat = inferStrategy(ex);
-  const planDeal = isPlanDeal(strat.kind);
-
   return {
     id: deal.id,
     name: deal.name,
     assetClass: deal.asset_class,
     market: ex?.market || "—",
     // Same matcher the pipeline and deal page use — all three surfaces agree.
-    coveredMarket:
-      metroForAddress(
-        ((deal as { address?: unknown }).address as StructuredAddress | null) ?? {},
-      )?.name ?? null,
+    coveredMarket: metroForAddress(address ?? {})?.name ?? null,
     verdict: verdict?.verdict ?? null,
     reason: verdict?.reason ?? null,
     hasModel: model != null,

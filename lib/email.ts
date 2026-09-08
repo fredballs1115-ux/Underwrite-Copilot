@@ -1,8 +1,9 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { analysisReadyEmail } from "@/lib/email-template";
-import { evaluateBuyBox } from "@/lib/criteria";
+import { buyBoxCheckSource, evaluateBuyBox } from "@/lib/criteria";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
+import { inferStrategy } from "@/lib/deal-strategy";
 import type { ExtractionResult, VerdictResult } from "@/lib/anthropic/types";
 
 /**
@@ -119,11 +120,13 @@ export async function notifyAnalysisReady(
         (deal.team_id as string) ?? null,
       );
       if (box) {
-        const checks = evaluateBuyBox(
-          (deal.asset_class as string) ?? "auto",
-          (deal.extraction as ExtractionResult) ?? null,
-          box,
-        );
+        // The same source and the same inferred kind the deal header judges,
+        // so the email's chip never disagrees with the page it links to.
+        const extraction = (deal.extraction as ExtractionResult) ?? null;
+        const source = buyBoxCheckSource(extraction, null, null, inferStrategy(extraction).kind);
+        const checks = source
+          ? evaluateBuyBox((deal.asset_class as string) ?? "auto", source, box)
+          : [];
         buyBoxLabel = checks.some((c) => c.status === "miss")
           ? "Outside buy box"
           : checks.some((c) => c.status === "near")
