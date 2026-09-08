@@ -3,19 +3,19 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#260 merged to main (live build
-sha `73df402`, #259, confirmed equal to the main tip by live-verify at 17:43
-UTC with its `DEPLOY: LIVE` line — every one of the eighty-four through
-#259 is live, the homepage serves at 196 KB where it served at 488 KB, the
+**Last updated 2026-09-08**, after PRs #176–#261 merged to main (live build
+sha `d87fade`, #260, confirmed equal to the main tip by live-verify at 17:50
+UTC with its `DEPLOY: LIVE` line — every one of the eighty-five through
+#260 is live, the homepage serves at 196 KB where it served at 488 KB, the
 public sample memo at 57 KB where it served at 11 KB (the Brewerytown frame
 is in it), and the public-page lint #231 added reads all twelve public pages
-clean on every run; #260 is merged and awaits its proof, #261 follows).
+clean on every run; #261 is merged and awaits its proof, #262 follows).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Eighty-six PRs (#176–#261) landed across one review session and the
+Eighty-seven PRs (#176–#262) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -411,6 +411,9 @@ deploy (live-verify shows the sha).
 - **The report's comp page draws the same bars** (#261): each sale comp's
   basis as a track, fill and subject tick under its detail line, from the
   same reader, with the fill count asserted.
+- **The comps table at phone width stacks a card per comp** (#262): name
+  and rating, note, the detail with its basis bar; the table keeps from
+  `sm` up.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -689,16 +692,19 @@ a route scoped to the share token; the memo and the report got theirs in
    fill-count assertion. #260 and #261 did the comp half (the reader is
    `lib/comp-detail.ts`, behind the web table and the report page); the
    reconciliation gap's signed bar is what remains here.
-9. **The comps table at phone width.** The deal page's sale-comps table
-   (`CompTable` in `app/(app)/deals/[id]/deal-sections.tsx`) keeps
-   `min-w-[34rem]`, so at 390 it scrolls sideways inside its card and the
-   new basis bars sit off-screen to the right of the name column. The
-   compare page (#254), the rent roll (#259) and the shared screen (#247)
-   each stack a card per row below `sm`; the comps table can do the same
-   — name and rating pill, the note, the detail line with its bar — and
-   keep the table from `sm` up. Render both in
-   `lib/deal-view.render.test.ts` (the comps tab already renders), shoot
-   at 390.
+9. **The reconciliation's gap as a signed bar, on the page and in the
+   report.** The last of item 8: each reconciliation row (`ReconRow` —
+   omValue, myValue, gap, direction) carries its gap as text ("+4.2%",
+   "−$120k", "12 bps"), coloured by direction. A pure reader
+   (`lib/gap-detail.ts`, beside `lib/comp-detail.ts`) that reads a signed
+   percent or dollar gap out of that text and nothing otherwise, then a
+   bar from a centre line — favorable to the right in the pass colour,
+   unfavorable to the left in the kill colour, the direction the row
+   already states — scaled to the widest gap of the same unit in the
+   table, drawn under the gap figure in the deal page's Reconciliation
+   table (`deal-sections.tsx`) and on the report's reconciliation page as
+   plain Views with the fill-count assertion. Percent and dollar gaps are
+   different yardsticks: scale each unit to its own widest, never mix.
 
 ---
 

@@ -14,7 +14,7 @@ import { SourceChip } from "./source-chip";
 import { CompsMap, type MapComp } from "./comps-map";
 import { geocodeCandidates } from "@/lib/geo";
 import { safeHttpUrl } from "@/lib/safe-url";
-import { basisScale, fmtBasis, type SubjectBasis } from "@/lib/comp-detail";
+import { basisScale, fmtBasis, type BasisScale, type SubjectBasis } from "@/lib/comp-detail";
 import type { DealFact } from "@/lib/facts";
 import { FileDrop } from "../../file-drop";
 import { FileField } from "../../file-field";
@@ -1069,6 +1069,37 @@ function PublicWebComps({
   );
 }
 
+/** A comp's stated basis on the set's track with the subject's tick — the
+ *  same picture in the table cell and the phone card. The words a screen
+ *  reader gets are in the span; the tooltip repeats them for a pointer. */
+function CompBasisBar({ scale, index }: { scale: BasisScale; index: number }) {
+  const share = scale.shares[index];
+  if (share == null) return null;
+  const own = fmtBasis(share * scale.max, scale.unit);
+  const words =
+    scale.subjectValue != null
+      ? `${own} against the subject's ${fmtBasis(scale.subjectValue, scale.unit)}`
+      : `${own}, scaled to the widest in the set`;
+  return (
+    <span data-comp-bar className="relative mt-1.5 block h-1 w-24 rounded-full bg-faint" title={words}>
+      <span
+        aria-hidden
+        className="absolute inset-y-0 left-0 rounded-full bg-brand/40"
+        style={{ width: `${Math.round(share * 100)}%` }}
+      />
+      {scale.subjectShare != null && (
+        <span
+          aria-hidden
+          data-comp-subject
+          className="absolute -inset-y-0.5 w-0.5 rounded-full bg-ink"
+          style={{ left: `calc(${Math.round(scale.subjectShare * 100)}% - 1px)` }}
+        />
+      )}
+      <span className="sr-only">{words}</span>
+    </span>
+  );
+}
+
 function CompTable({
   title,
   comps,
@@ -1117,7 +1148,32 @@ function CompTable({
           )}
         </p>
       </div>
-      <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+      {/* Phone: a card per comp — name and rating, the note, the detail with
+          its bar — so a phone reads a whole comp instead of a table it
+          scrolls sideways. From `sm` up the table takes over. */}
+      <ul className="grid gap-2 sm:hidden" aria-label={`${title} as cards`}>
+        {shown.map((c, i) => {
+          const r = COMP_RATING[c.support] ?? COMP_RATING.favorable;
+          return (
+            <li key={i} className="rounded-xl border border-line bg-surface p-3 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <p className="min-w-0 break-words text-sm font-medium">{c.name}</p>
+                <span
+                  className={`inline-flex shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${r.badge}`}
+                >
+                  {r.label}
+                </span>
+              </div>
+              {c.note && <p className="mt-1 text-xs leading-relaxed text-muted">{c.note}</p>}
+              <p className="mt-1.5 break-words font-mono text-xs leading-relaxed tabular-nums text-muted">
+                {c.detail}
+                {scale && <CompBasisBar scale={scale} index={i} />}
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="hidden overflow-x-auto rounded-xl border border-line bg-surface shadow-sm sm:block">
         <table className="w-full min-w-[34rem] text-sm">
           <thead>
             <tr className="border-b border-line text-left text-[10px] uppercase tracking-wide text-muted">
@@ -1144,36 +1200,7 @@ function CompTable({
                   </td>
                   <td className="min-w-[9rem] max-w-[16rem] break-words px-4 py-3 font-mono text-xs leading-relaxed tabular-nums text-muted">
                     {c.detail}
-                    {scale && scale.shares[i] != null && (
-                      <span
-                        data-comp-bar
-                        className="relative mt-1.5 block h-1 w-24 rounded-full bg-faint"
-                        title={
-                          scale.subjectValue != null
-                            ? `Basis ${fmtBasis(scale.shares[i]! * scale.max, scale.unit)}; the tick is the subject at ${fmtBasis(scale.subjectValue, scale.unit)}`
-                            : `Basis ${fmtBasis(scale.shares[i]! * scale.max, scale.unit)}, scaled to the widest in the set`
-                        }
-                      >
-                        <span
-                          aria-hidden
-                          className="absolute inset-y-0 left-0 rounded-full bg-brand/40"
-                          style={{ width: `${Math.round(scale.shares[i]! * 100)}%` }}
-                        />
-                        {scale.subjectShare != null && (
-                          <span
-                            aria-hidden
-                            data-comp-subject
-                            className="absolute -inset-y-0.5 w-0.5 rounded-full bg-ink"
-                            style={{ left: `calc(${Math.round(scale.subjectShare * 100)}% - 1px)` }}
-                          />
-                        )}
-                        <span className="sr-only">
-                          {scale.subjectValue != null
-                            ? `${fmtBasis(scale.shares[i]! * scale.max, scale.unit)} against the subject's ${fmtBasis(scale.subjectValue, scale.unit)}`
-                            : fmtBasis(scale.shares[i]! * scale.max, scale.unit)}
-                        </span>
-                      </span>
-                    )}
+                    {scale && <CompBasisBar scale={scale} index={i} />}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <span

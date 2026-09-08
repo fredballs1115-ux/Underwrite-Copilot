@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "Comps read on a phone, one comp at a time",
+      "blurb": "On a phone the deal page's comps tab now stacks a card per comp — name and rating, the note, the detail line with its basis bar and the deal's tick — instead of a table that scrolled sideways and left the bars off-screen. From a tablet up the table is unchanged.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-08",
       "title": "The full report draws each sale comp against the deal's basis",
       "blurb": "The report's Comp scrutiny page now draws each sale comp's stated basis as a bar under its detail line, with a tick where the deal's own price per unit sits — the same picture the deal page's comps tab draws, from the same reader, so the two never disagree on a comp. A comp whose line states no basis keeps its place with no bar.",
       "href": "/deals"

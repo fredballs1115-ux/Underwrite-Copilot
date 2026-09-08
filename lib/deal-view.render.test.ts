@@ -154,10 +154,15 @@ describe("DealView — the sample deal renders every section without a runtime e
   it("the comps tab draws each sale comp's basis against the subject's", () => {
     const html = render(sampleProps("analyses", "comps"));
     // Three sale comps state a per-unit basis ($252k, $298k, $261k) and each
-    // draws a bar with the subject's tick ($68M over 248 units, $274k); the
-    // lease comp ("$2,520/mo · 2BR") states no basis and draws none.
-    expect((html.match(/data-comp-bar/g) ?? []).length).toBe(3);
-    expect((html.match(/data-comp-subject/g) ?? []).length).toBe(3);
+    // draws a bar with the subject's tick ($68M over 248 units, $274k) —
+    // once in the table and once in the phone card (one layout shows at a
+    // time); the lease comp ("$2,520/mo · 2BR") states no basis and draws
+    // none. The phone gets a card per comp, the table hides below `sm`.
+    expect((html.match(/data-comp-bar/g) ?? []).length).toBe(6);
+    expect((html.match(/data-comp-subject/g) ?? []).length).toBe(6);
+    expect(html).toContain('aria-label="Sale comps as cards"');
+    expect(html).toContain('aria-label="Lease comps as cards"');
+    expect(html).toMatch(/class="hidden overflow-x-auto[^"]*sm:block"/);
     const text = textOf(html);
     expect(text).toMatch(/the tick is the subject at \$274k\/unit/);
     expect(text).toMatch(/\$252k\/unit against the subject's \$274k\/unit/);
