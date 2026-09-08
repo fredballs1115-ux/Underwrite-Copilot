@@ -13,12 +13,16 @@ export function LoiPanel({
   dealId,
   askingPrice,
   isPro,
+  plan = null,
 }: {
   dealId: string;
-  /** the extraction's asking-price string, "" when unknown */
+  /** the extraction's asking-price string — a development's land cost — "" when unknown */
   askingPrice: string;
   isPro: boolean;
+  /** the deal's plan, when it has one — the draft's clauses follow it */
+  plan?: { kind: string; label: string } | null;
 }) {
+  const needsEntitlements = plan?.kind === "conversion" || plan?.kind === "development";
   const prefill = parseUsd(askingPrice);
   const [buyer, setBuyer] = useState("");
   const [price, setPrice] = useState(prefill ? String(prefill) : "");
@@ -77,6 +81,17 @@ export function LoiPanel({
         prefilled from the screen, yours to mark up. Have counsel review
         before anything is sent or signed.
       </p>
+      {plan && (
+        <p className="mt-2 max-w-lg text-xs leading-relaxed text-brand">
+          This deal is a {plan.label.toLowerCase()}: the draft&rsquo;s diligence
+          clause covers structural, environmental, zoning and construction-cost
+          work for the plan
+          {needsEntitlements
+            ? ", and it carries an entitlements contingency — the approvals a change of use or a ground-up build closes on"
+            : ""}
+          .
+        </p>
+      )}
 
       {!isPro ? (
         <p className="mt-3 text-sm text-muted">

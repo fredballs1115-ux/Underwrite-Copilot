@@ -6,8 +6,27 @@ import {
   Paragraph,
   TextRun,
 } from "docx";
+import type { StrategyKind } from "@/lib/deal-strategy";
+
+/** The work a plan deal's diligence must cover, in the letter's own words. */
+const PLAN_WORK: Record<StrategyKind, string | null> = {
+  conversion: "conversion of the Property",
+  development: "development of the Property",
+  value_add: "renovation program for the Property",
+  lease_up: "lease-up of the Property",
+  stabilized: null,
+  unknown: null,
+};
+
+/** A change of use or a ground-up build closes on approvals the seller does
+ *  not control — the letter says so. A renovation or a lease-up does not. */
+const NEEDS_ENTITLEMENTS = new Set<StrategyKind>(["conversion", "development"]);
 
 export interface LoiParams {
+  /** the deal's plan, when it has one: a conversion or a development gets an
+   *  entitlements contingency and a diligence clause that names the work; a
+   *  value-add or a lease-up names the work only. Null on a stabilized asset. */
+  plan?: { kind: StrategyKind; label: string } | null;
   buyerName: string;
   propertyName: string;
   propertyAddress: string;
@@ -83,6 +102,42 @@ export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
       ? `Buyer’s obligation to close shall be contingent upon Buyer obtaining debt financing of up to ${p.ltvPct}% of the Purchase Price on market terms. Buyer shall apply for such financing promptly and pursue it diligently.`
       : `This offer is not contingent on financing.`;
 
+  // A plan deal's diligence covers the work itself — and a change of use or
+  // a ground-up build closes on approvals the seller does not control.
+  const work = p.plan ? PLAN_WORK[p.plan.kind] : null;
+  const diligence = `${p.ddDays} days from execution of the PSA, during which Buyer and its consultants shall have reasonable access to the Property and to Seller’s books, records, leases, contracts, and reports relating to the Property${
+    work
+      ? `, including for structural, environmental, zoning and construction-cost investigations in connection with Buyer’s intended ${work}`
+      : ""
+  }, and during which Buyer may terminate for any reason or no reason with a full return of the Deposit.`;
+  const entitlements =
+    work && p.plan && NEEDS_ENTITLEMENTS.has(p.plan.kind)
+      ? `Buyer’s obligation to close shall be contingent upon Buyer obtaining, at Buyer’s cost and in form and substance satisfactory to Buyer, all zoning approvals, entitlements, permits and other governmental consents necessary for Buyer’s intended ${work}. Seller shall reasonably cooperate with Buyer’s applications, and the parties shall agree in the PSA on any extension of the Due Diligence Period or the Closing required to pursue them.`
+      : null;
+
+  // Numbered in order, so an added clause renumbers the ones after it.
+  const sections: [string, string][] = [
+    [
+      "Purchase Price",
+      `${p.price}, payable in cash at closing, subject to customary prorations and adjustments.`,
+    ],
+    [
+      "Earnest Money Deposit",
+      `${p.deposit}, to be deposited with a mutually acceptable escrow agent within three (3) business days after execution of a purchase and sale agreement (the “PSA”), applicable to the Purchase Price at closing.`,
+    ],
+    ["Due Diligence Period", diligence],
+    ["Financing", financing],
+    ...(entitlements ? [["Entitlements and Approvals", entitlements] as [string, string]] : []),
+    [
+      "Closing",
+      `Closing shall occur within ${p.closeDays} days after expiration of the Due Diligence Period, subject to customary closing conditions.`,
+    ],
+    [
+      "Purchase and Sale Agreement",
+      `The parties shall negotiate in good faith toward execution of a mutually acceptable PSA reflecting these terms. This letter shall remain open for acceptance for ${p.openDays} days from the date above.`,
+    ],
+  ];
+
   const children: Paragraph[] = [
     // Firm letterhead (Feature 6 branding) — above the title, small caps
     // tracking, only when the account set a firm name.
@@ -137,32 +192,7 @@ export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
     para(
       `${p.buyerName} (“Buyer”) is pleased to submit this non-binding letter of intent to acquire the above-referenced property (the “Property”) from its owner (“Seller”) on the principal terms set out below.`,
     ),
-    ...numbered(
-      1,
-      "Purchase Price",
-      `${p.price}, payable in cash at closing, subject to customary prorations and adjustments.`,
-    ),
-    ...numbered(
-      2,
-      "Earnest Money Deposit",
-      `${p.deposit}, to be deposited with a mutually acceptable escrow agent within three (3) business days after execution of a purchase and sale agreement (the “PSA”), applicable to the Purchase Price at closing.`,
-    ),
-    ...numbered(
-      3,
-      "Due Diligence Period",
-      `${p.ddDays} days from execution of the PSA, during which Buyer and its consultants shall have reasonable access to the Property and to Seller’s books, records, leases, contracts, and reports relating to the Property, and during which Buyer may terminate for any reason or no reason with a full return of the Deposit.`,
-    ),
-    ...numbered(4, "Financing", financing),
-    ...numbered(
-      5,
-      "Closing",
-      `Closing shall occur within ${p.closeDays} days after expiration of the Due Diligence Period, subject to customary closing conditions.`,
-    ),
-    ...numbered(
-      6,
-      "Purchase and Sale Agreement",
-      `The parties shall negotiate in good faith toward execution of a mutually acceptable PSA reflecting these terms. This letter shall remain open for acceptance for ${p.openDays} days from the date above.`,
-    ),
+    ...sections.flatMap(([title, body], i) => numbered(i + 1, title, body)),
     para(
       "NON-BINDING: This letter is an expression of mutual interest only. Except for this paragraph, no provision of this letter creates any legally binding obligation on either party, and no such obligation shall arise unless and until a definitive PSA is executed and delivered by both parties. Either party may discontinue discussions at any time for any reason.",
       { bold: true, before: 280 },
