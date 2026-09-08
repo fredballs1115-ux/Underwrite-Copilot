@@ -333,6 +333,9 @@ export function timelineFromMetrics(metrics: MetricLike[]): string {
 export interface PlanSummary {
   kind: StrategyKind;
   price: number | null;
+  /** what the price figure is: the asking / purchase price, or on a ground-up
+   *  development the land or site cost */
+  priceLabel: "Price" | "Land cost";
   /** the stabilized pro forma NOI, when the OM states one */
   stabilizedNoi: NoiFigure | null;
   budget: CapitalBudget | null;
@@ -368,6 +371,7 @@ export function planSummary(
   return {
     kind: strategy.kind,
     price,
+    priceLabel: priceMetric && /\b(land|site)\b/i.test(priceMetric.label) ? "Land cost" : "Price",
     stabilizedNoi,
     budget,
     totalCost,

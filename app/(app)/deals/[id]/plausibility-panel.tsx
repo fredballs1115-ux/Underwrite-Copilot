@@ -25,7 +25,7 @@ export function PlanStrip({
   if (!plan) return null;
   const cells: [string, string][] = [
     ["Stabilized NOI", plan.stabilizedNoi ? money(plan.stabilizedNoi.value) : "not stated"],
-    ["Price", plan.price != null ? money(plan.price) : "not stated"],
+    [plan.priceLabel, plan.price != null ? money(plan.price) : "not stated"],
     [
       plan.budget?.allIn ? "Budget (total cost less price)" : "Budget",
       plan.budget ? money(plan.budget.budget) : "not stated",

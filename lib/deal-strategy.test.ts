@@ -519,3 +519,34 @@ describe("findPriceMetric — a development buys land", () => {
     expect(findPriceMetric([metric("Land value", "$9,500,000")], "development")).toBeNull();
   });
 });
+
+describe("planSummary.priceLabel — what the price figure is", () => {
+  it("says Land cost on a development bought as land, Price everywhere else", () => {
+    const dev = planSummary(
+      ex(
+        [
+          metric("Land cost", "$8,000,000", { page: "p. 2" }),
+          metric("Total development cost", "$60,000,000"),
+          metric("Stabilized NOI (pro forma)", "$4,500,000"),
+        ],
+        { dealName: "Ground-up development — 240 units" },
+      ),
+    )!;
+    expect(dev.priceLabel).toBe("Land cost");
+    expect(planSummary(CONVERSION)!.priceLabel).toBe("Price");
+    // A development with a stated asking price is priced, not land-costed.
+    const priced = planSummary(
+      ex(
+        [
+          metric("Asking price", "$12,000,000"),
+          metric("Land cost", "$8,000,000"),
+          metric("Total development cost", "$60,000,000"),
+          metric("Stabilized NOI (pro forma)", "$4,500,000"),
+        ],
+        { dealName: "Ground-up development — 240 units" },
+      ),
+    )!;
+    expect(priced.priceLabel).toBe("Price");
+    expect(priced.price).toBe(12_000_000);
+  });
+});
