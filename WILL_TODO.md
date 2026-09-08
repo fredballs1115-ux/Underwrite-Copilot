@@ -3,17 +3,18 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#239 merged to main (live build
-sha `fab27ec`, #239, confirmed equal to the main tip by live-verify at 14:34
-UTC — every one of the sixty-four is live, the footer's latest-improvement
-line reads "Your files are yours alone…", and the public-page lint #231
-added reads all twelve public pages clean on every run).
+**Last updated 2026-09-08**, after PRs #176–#241 merged to main (live build
+sha `b36628a`, #241, confirmed equal to the main tip by live-verify at 15:19
+UTC — every one of the sixty-six is live, the homepage serves at 197 KB
+where it served at 488 KB, and the public-page lint #231 added reads all
+twelve public pages clean on every run; #242 and #243 followed and await
+the same proof).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Sixty-seven PRs (#176–#242) landed across one review session and the
+Sixty-eight PRs (#176–#243) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -328,17 +329,19 @@ deploy (live-verify shows the sha).
   the bridge's method line and the valuations legend are half their length.
   live-verify prints a `DEPLOY: LIVE` / `LAGGING` line so a deploy that has
   not landed reads as a sentence.
+- **The Market data page, numbers first** (#243). The densest public page
+  (1,714 words, thirteen long paragraphs) keeps every sourced figure and
+  folds the notes around them — first sentence visible, the rest behind
+  "more", the whole text still in the HTML for the lints and the greps.
+  1,267 words and three long paragraphs now; the research depth you asked
+  for is one click away rather than gone.
 
-**First, the deploy itself.** At 15:09 UTC live-verify still read the live
-build as `fab27ec` (#239) while main was `b36628a` (#241) — eighteen minutes
-after #240 merged, when every earlier deploy today landed in about four. Open
-dashboard.render.com → underwrite-copilot-web → Events. A failed build there
-wants its log read (the production build passes locally at `47f4f2d`,
-`bef4cf6` and `b36628a`, so the likely cause is the starter instance running
-out of memory mid-build — a retry usually lands); a deploy stuck "in
-progress" wants a Manual Deploy of main. live-verify now prints one
-`DEPLOY: LIVE` / `DEPLOY: LAGGING` line (#242), so the next dispatched run
-says which it is without comparing shas.
+**The deploy that lagged landed.** live-verify read the live build as
+`fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
+`b36628a` (#241) at 15:19 — Render took about twenty-eight minutes over the
+#240 build where every earlier deploy today took four. Nothing to do unless
+it recurs; the `DEPLOY: LIVE` / `DEPLOY: LAGGING` line (#242) now says which
+it is on every run.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":
