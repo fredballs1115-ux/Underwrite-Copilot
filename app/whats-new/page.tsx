@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
 import { MarketsMarquee } from "@/app/markets-marquee";
-import { changelogEntries } from "@/lib/changelog";
+import { LONG_NOTE, blurbExcerpt, changelogEntries } from "@/lib/changelog";
 
 // ISR, five-minute window — same freshness cap as the homepage, so a new
 // changelog entry shows here within minutes of deploying.
@@ -108,9 +108,29 @@ export default function WhatsNewPage() {
                           See it live →
                         </Link>
                       </div>
-                      <p className="mt-1 text-sm leading-relaxed text-muted">
-                        {e.blurb}
-                      </p>
+                      {e.blurb.length > LONG_NOTE ? (
+                        // A long note folds behind its opening — native
+                        // <details>, so it works with no script — and the
+                        // full note is one tap away.
+                        <details className="group mt-1">
+                          <summary className="cursor-pointer list-none text-sm leading-relaxed text-muted [&::-webkit-details-marker]:hidden">
+                            <span className="group-open:hidden">
+                              {blurbExcerpt(e.blurb)}{" "}
+                              <span className="font-medium text-brand underline-offset-2 hover:underline">
+                                Read the full note
+                              </span>
+                            </span>
+                            <span className="hidden font-medium text-brand underline-offset-2 hover:underline group-open:inline">
+                              Fold the note
+                            </span>
+                          </summary>
+                          <p className="mt-2 text-sm leading-relaxed text-muted">{e.blurb}</p>
+                        </details>
+                      ) : (
+                        <p className="mt-1 text-sm leading-relaxed text-muted">
+                          {e.blurb}
+                        </p>
+                      )}
                     </li>
                   ))}
                 </ul>

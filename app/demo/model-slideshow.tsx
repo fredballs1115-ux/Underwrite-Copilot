@@ -72,10 +72,16 @@ export function ModelSlideshow({ model }: { model: UnderwritingModel }) {
   const [auto, setAuto] = useState(true);
 
   // Under reduced motion nothing ever plays — reflect that in the control
-  // instead of showing a pause button for a stopped show.
+  // instead of showing a pause button for a stopped show. On a phone the
+  // section is only as tall as the slide showing (see the grid below), so
+  // autoplay would reflow the page under the reader's thumb: there the
+  // reader steps through by hand.
   useEffect(() => {
     const raf = requestAnimationFrame(() => {
-      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      if (
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+        window.matchMedia("(max-width: 639px)").matches
+      ) {
         setAuto(false);
       }
     });
@@ -85,6 +91,7 @@ export function ModelSlideshow({ model }: { model: UnderwritingModel }) {
   useEffect(() => {
     if (!auto) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (window.matchMedia("(max-width: 639px)").matches) return;
     const t = setInterval(() => {
       if (!document.hidden) setIndex((v) => (v + 1) % slides.length);
     }, SLIDE_MS);
@@ -181,9 +188,12 @@ export function ModelSlideshow({ model }: { model: UnderwritingModel }) {
         ))}
       </div>
 
-      {/* Every slide stays mounted in the same grid cell, so the section is
-          always as tall as the TALLEST slide — autoplay never reflows the
-          page under the reader. Only the active one is visible. */}
+      {/* From the sm breakpoint up every slide stays mounted in the same grid
+          cell, so the section is always as tall as the TALLEST slide and
+          autoplay never reflows the page under the reader. On a phone that
+          reservation is a screen of blank space under the compact Returns
+          slide (the cash-flow table is the tall one), so there the inactive
+          slides are display:none and autoplay is off. */}
       <div className="mt-4 grid grid-cols-[minmax(0,1fr)]">
         {slides.map((s, i) => (
           <div
@@ -192,7 +202,7 @@ export function ModelSlideshow({ model }: { model: UnderwritingModel }) {
             aria-label={s.label}
             aria-hidden={i !== index}
             className={`col-start-1 row-start-1 min-w-0 ${
-              i === index ? "animate-fade" : "invisible pointer-events-none"
+              i === index ? "animate-fade" : "hidden pointer-events-none sm:invisible sm:block"
             }`}
           >
             <p className="mb-3 text-sm leading-relaxed text-muted">{s.blurb}</p>

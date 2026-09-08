@@ -16,7 +16,7 @@ export function SampleGuide() {
           your mandate.
         </li>
         <li>
-          <span className="font-medium text-ink">2 · Financials.</span> Every
+          <span className="font-medium text-ink">2 · Financials.</span>{" "}Every
           extracted term with its source page, then FINANCING &amp; CAPITAL —
           debt sizing, rate sensitivity, the capital plan — and the Excel
           model.

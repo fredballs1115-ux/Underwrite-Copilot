@@ -162,7 +162,7 @@ export function ConstructionDebtPanel({
             {plan.yieldOnCost != null && (
               <>
                 {" "}
-                against the OM&apos;s {pct(plan.yieldOnCost)} on price plus works alone — the reserve is
+                against the OM&apos;s {pct(plan.yieldOnCost)}{" "}on price plus works alone — the reserve is
                 a real cost of the plan and the OM&apos;s figure leaves it out.
               </>
             )}{" "}

@@ -26,3 +26,22 @@ export function changelogEntries(limit = 6): ChangelogEntry[] {
 export function latestChange(): ChangelogEntry | null {
   return changelogEntries(1)[0] ?? null;
 }
+
+/** A note longer than this reads as a wall of text on a phone; /whats-new
+ *  folds it behind its opening. */
+export const LONG_NOTE = 600;
+
+/** The opening of a note — whole sentences up to about `max` characters,
+ *  ending with an ellipsis when the note goes on — for a card or a folded
+ *  entry. A short note comes back whole. */
+export function blurbExcerpt(blurb: string, max = 320): string {
+  const s = blurb.trim();
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max);
+  const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("; "), cut.lastIndexOf(": "));
+  // A sentence boundary in the back half of the window keeps whole
+  // sentences; otherwise break at the last word.
+  if (end >= max * 0.4) return cut.slice(0, end + 1).trimEnd() + " …";
+  const word = cut.lastIndexOf(" ");
+  return (word > 0 ? cut.slice(0, word) : cut).replace(/[,;:—–-]+$/, "") + " …";
+}

@@ -183,7 +183,7 @@ export default async function ComparePage({
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Compare</h1>
         <p className="mt-1 text-sm text-muted">
-          {cols.length} deals side by side. Returns come from each deal&apos;s
+          {cols.length}{" "}deals side by side. Returns come from each deal&apos;s
           generated model where present.
         </p>
       </div>

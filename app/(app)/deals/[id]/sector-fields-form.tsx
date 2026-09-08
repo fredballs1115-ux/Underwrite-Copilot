@@ -29,7 +29,7 @@ export function SectorFieldsForm({
       <summary className="cursor-pointer text-sm font-semibold">
         Sector facts
         <span className="ml-2 text-[11px] font-normal text-muted">
-          {filled}/{defs.length} answered — these settle the regulation panel&apos;s open
+          {filled}/{defs.length}{" "}answered — these settle the regulation panel&apos;s open
           questions
         </span>
       </summary>

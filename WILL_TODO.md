@@ -3,15 +3,15 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#225 merged to main (live build
-sha `2a200db`, #223, confirmed equal to the main tip by live-verify at 03:09
-UTC; #224 and #225 follow on the next Render deploys).
+**Last updated 2026-09-08**, after PRs #176–#226 merged to main (live build
+sha `cd87ff9`, #225, confirmed equal to the main tip by live-verify at 03:48
+UTC; #226 follows on the next Render deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Fifty PRs (#176–#225) landed across one review session and the
+Fifty-one PRs (#176–#226) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -162,6 +162,15 @@ deploy (live-verify shows the sha).
   "(Building A)" a subset; the LOI prefills the first price that is a
   figure; and the first signal's ask fills a price slot only when it is
   one, never an "Unpriced".
+- **The public pages, walked as a visitor** (#226): every public page
+  crawled, measured and screenshotted at phone and desktop widths from a
+  local production build. Fixed: the covered-markets page ran edge to edge
+  when signed out; three glued words on the homepage ("aboutabout",
+  "9real", "Seattlepipelines") and five more sites across the app with the
+  same compiler quirk; the homepage's shipped cards and /whats-new fold a
+  long note instead of printing a page of it; a doubled period on a rule
+  effect; and a screen of blank space in the demo's model slideshow on a
+  phone.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":

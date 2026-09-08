@@ -311,7 +311,7 @@ export function ValuationsView({
         A number with a page reference was read off that page — hover for the quote, click to open
         the document. <span className="font-medium text-caution">der</span> marks a cap rate backed
         out of a stated value and NOI rather than stated. A dash means the source is silent; nothing
-        is filled in for it. The IRR row runs each price through <em>your</em> model — the
+        is filled in for it. The IRR row runs each price through <em>your</em>{" "}model — the
         superscript counts assumptions borrowed from it because the source didn&apos;t state them.
       </p>
 
