@@ -297,6 +297,19 @@ export function budgetFromText(text: string | null | undefined, price: number | 
   return { budget, allIn, label: "stated capital budget" };
 }
 
+const TIMELINE_ROW =
+  /construction (period|timeline|duration|schedule|start|completion)|(lease|rent)[- ]?up (period|duration|timeline)|(months|years) to (stabili[sz]|complet)|stabili[sz](ation|ed)? (year|date|in|by)|delivery (date|year)|completion (date|year)/i;
+
+/** The plan's timing from metric rows, when the strategy text states none:
+ *  "Construction period: 30 months; Stabilized in: year 4". "" when no row
+ *  speaks to timing — never a guess. */
+export function timelineFromMetrics(metrics: MetricLike[]): string {
+  return metrics
+    .filter((m) => TIMELINE_ROW.test(m.label) && m.value.trim() && !/^(—|-|n\/?a)$/i.test(m.value.trim()))
+    .map((m) => `${m.label.trim()}: ${m.value.trim()}`)
+    .join("; ");
+}
+
 /** What the OM says the finished project earns and costs — the figures a
  *  plan is judged on, for the deal page and for the challenger's brief. */
 export interface PlanSummary {
@@ -341,7 +354,10 @@ export function planSummary(
     budget,
     totalCost,
     yieldOnCost,
-    timeline: extraction.strategy?.timeline?.trim() ?? "",
+    // The strategy's own words first; else the metric rows the extraction
+    // was asked to capture on a plan deal (construction period, lease-up,
+    // the year the plan stabilizes), joined as "label: value".
+    timeline: extraction.strategy?.timeline?.trim() || timelineFromMetrics(metrics),
     capitalBudgetText: extraction.strategy?.capitalBudget?.trim() ?? "",
   };
 }

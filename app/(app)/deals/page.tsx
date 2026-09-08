@@ -3,12 +3,13 @@ import Link from "next/link";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { getBilling } from "@/lib/billing";
 import { type DealRow } from "@/lib/deals";
-import type { ExtractionResult, ExtractedMetric, FirstSignal } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { WhatsNewCard } from "./whats-new";
 import { Pipeline, type DealCard } from "./pipeline";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
+import { planSummary } from "@/lib/deal-strategy";
 import { scoreMandateFit } from "@/lib/mandate";
 import { metroForAddress } from "@/lib/market-match";
 
@@ -34,13 +35,18 @@ const ERRORS: Record<string, string> = {
 // Fixed metric slots for the pipeline table — every row fills the SAME
 // columns (or shows —), so one header labels them all and values align into
 // scannable columns instead of repeating micro-labels in every row.
-function pickSlots(metrics: ExtractedMetric[]): {
+function pickSlots(extraction: ExtractionResult): {
   cap: string | null;
   price: string | null;
+  /** a plan deal's yield on total cost — its answer where a stabilized
+   *  asset shows a cap — null for a stabilized asset or an unstated plan */
+  yoc: string | null;
 } {
+  const metrics = extraction.metrics;
   const find = (inc: RegExp, exc?: RegExp) =>
     metrics.find((m) => inc.test(m.label) && !(exc && exc.test(m.label)))
       ?.value ?? null;
+  const plan = planSummary(extraction);
   return {
     // The going-in cap only — a stabilized / pro forma cap or a yield on
     // cost describes a plan deal's finished project, not the price paid.
@@ -48,6 +54,7 @@ function pickSlots(metrics: ExtractedMetric[]): {
       find(/going[- ]?in cap/i, /stabili[sz]|pro ?forma|forward|projected/i) ??
       find(/\bcap rate\b/i, /exit|terminal|reversion|stabili[sz]|pro ?forma|forward|projected|yield/i),
     price: find(/purchase price|asking price|\bprice\b/i, /unit|\/sf|per sf|per unit|psf/i),
+    yoc: plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,
   };
 }
 
@@ -225,8 +232,8 @@ export default async function DealsPage({
         null,
       offersDue: dueById.get(d.id) ?? null,
       slots: extraction
-        ? pickSlots(extraction.metrics)
-        : { cap: null, price: null },
+        ? pickSlots(extraction)
+        : { cap: null, price: null, yoc: null },
       jobStatus:
         job === "queued" || job === "running"
           ? ("running" as const)
