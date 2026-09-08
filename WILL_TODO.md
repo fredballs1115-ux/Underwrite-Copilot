@@ -3,15 +3,15 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#207 merged to main (live build
-sha `69651c2`, #205, confirmed equal to the main tip by live-verify at 01:03
-UTC; #206–#207 follow on the next Render deploy).
+**Last updated 2026-09-08**, after PRs #176–#208 merged to main (live build
+sha `522cbbf`, #207, confirmed equal to the main tip by live-verify at 01:09
+UTC; #208 follows on the next Render deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Twenty-seven PRs (#176–#202) landed across one review session and the
+Thirty-three PRs (#176–#208) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -59,6 +59,14 @@ deploy (live-verify shows the sha).
   refinance or headroom between the two, equity as a share of cost, and
   yield on cost with the carry included. The pipeline's Cap column shows a
   plan deal's yield on cost, labelled, instead of a dash (#201).
+- **Every portfolio view knows the deal's kind** (#208). Analytics no longer
+  counts a conversion's stabilized cap as a going-in cap — a plan deal
+  carries its yield on cost, the cap tile and chart say how many plan deals
+  sit outside the cap series, and its $/unit is total cost over the planned
+  units. The pipeline's meeting .xlsx gains Deal type and Yield on cost
+  columns (a plan deal's cap cell reads "n/a — plan"; the summary counts live
+  plan deals). The read-only share link names the kind and carries the plan's
+  five facts above the key terms, from the same source as the deal page.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":
@@ -79,7 +87,12 @@ also linked from `/data-health` under "Service probes":
    Then **re-screen it** (the stated strategy, the timeline and the three NOI
    labels arrive with the next screen, and the challenger gets the plan
    brief) and **regenerate its model** — the model tab should show Yield on
-   cost (Yr N) and a dark year 1, not a 105% cap.
+   cost (Yr N) and a dark year 1, not a 105% cap. Two more places to glance
+   at (#208): **Share** it and open the link signed out — the subtitle ends
+   "· Conversion" and a teal "The plan" block sits above the key terms; and
+   **Export** the pipeline from `/deals` — the row shows *Conversion* under
+   Deal type, "n/a — plan" under Cap rate and 11.7% under Yield on cost, and
+   `/analytics` no longer plots it as a cap point.
 2. **Hit `/api/imagery/health` signed in.** A new `geocoder` key leads the
    JSON: it should read `ok: true`, `source: "census"`, `precision: "street"`,
    a few tens of metres off. Paste it back if anything else shows.
