@@ -3,18 +3,18 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#243 merged to main (live build
-sha `5fd662a`, #243, confirmed equal to the main tip by live-verify at 15:31
-UTC with its new `DEPLOY: LIVE` line — every one of the sixty-eight is live,
-the homepage serves at 197 KB where it served at 488 KB, and the public-page
-lint #231 added reads all twelve public pages clean on every run; #244
+**Last updated 2026-09-08**, after PRs #176–#245 merged to main (live build
+sha `bb2760f`, #245, confirmed equal to the main tip by live-verify at 15:47
+UTC with its `DEPLOY: LIVE` line — every one of the seventy is live, the
+homepage serves at 197 KB where it served at 488 KB, and the public-page
+lint #231 added reads all twelve public pages clean on every run; #246
 follows and awaits the same proof).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Seventy PRs (#176–#245) landed across one review session and the
+Seventy-one PRs (#176–#246) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -344,6 +344,10 @@ deploy (live-verify shows the sha).
 - **Three phone-width cuts the screenshots caught** (#245): risk titles and
   deal names wrap to two lines on a phone instead of ending in an ellipsis;
   the verdict's three-call strip stacks instead of running off the edge.
+- **A browser-runtime check of the public pages** (#246): no console, page
+  or hydration errors at either width; the Market data page's forty-odd
+  link prefetches on load are eight; an aerial tile that 404s hides its
+  image instead of showing a broken-image glyph.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -612,13 +616,13 @@ Not yet covered by imagery, in rough value order:
    times with a roll-up and per-asset contribution to blended IRR; mostly a
    loop around existing code plus a CSV importer. Named as the next build in
    the LPC plan.
-8. **The rest of the signed-in surfaces get the homepage's cut** (#240, #241
-   did the pipeline and the deal overview): the Financials tab's model
-   blocks (the "Add more to the model" rows, the reconciliation summary),
-   the Buy box page, the Market data pages and the account pages — words to
-   pictures, one idea per block. Screenshot-verified at 1440 and 390 through
-   the fixture views (`VIEW_SHOTS_DIR`, with the built stylesheet injected),
-   render tests kept green.
+8. **The shared screen gets a fixture render.** `app/share/[token]/page.tsx`
+   reads the database inline, so it is the one signed-out surface the render
+   tests and the phone walk cannot reach (only its plan block, `SharePlan`,
+   has a fixture). Split it into a loader and a pure view, render the view on
+   the deal fixtures in `lib/views.render.test.ts`, and give it the same
+   words-to-pictures pass (#240–#245 did every other surface; the census in
+   `scripts/prose-census.mjs` lists what is left) at 1440 and 390.
 
 ---
 

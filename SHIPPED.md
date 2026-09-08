@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Seventy PRs, #176–#245, each
+estimate, and that's what it should flag." Seventy-one PRs, #176–#246, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -952,6 +952,18 @@ confirmed equal to the main tip after each batch.
   phone; a deal's name in the pipeline was cut to a word and a half — it
   wraps to two lines on a phone and truncates only where the columns give it
   one. Fixture screenshots at 390 for each.
+- **#246 A browser-runtime check of the public pages, and its two fixes.**
+  Headless Chromium walked every public page at 1440 and 390 collecting
+  console errors, page errors, failed requests and hydration warnings, and
+  clicking through the sample screen's tabs and the stress bench's sliders:
+  none. Two things it measured were worth fixing. The Market data page's
+  seventy-odd same-page filter links (metro chips, sector chips, the heat
+  grid, the leaderboards, the rank chips) each prefetched their route on
+  load — about forty requests before the reader touched anything; they
+  prefetch on hover now, and the page loads with eight. And a gallery tile
+  whose aerial answered 404 would have painted the browser's broken-image
+  glyph over the market's name; the image now removes itself (`AerialImg`,
+  the rule `DealThumb` already applied) and the label carries on.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

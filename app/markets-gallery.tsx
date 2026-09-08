@@ -2,6 +2,7 @@ import Link from "next/link";
 import metrosSeed from "@/data/research/metros.json";
 import { METRO_VIEWS } from "@/lib/metro-imagery";
 import { MARKET_COUNT, metroFact } from "./markets-marquee";
+import { AerialImg } from "./aerial-img";
 
 // Server-component module only: it pulls a research seed JSON, which must
 // never ride into a client bundle.
@@ -56,16 +57,11 @@ export function MarketsGallery() {
               href={`/market?metro=${m.id}`}
               className="group relative block overflow-hidden rounded-xl border border-line outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element -- a
-                  proxied route that sets its own immutable cache headers;
-                  next/image would add a second cache layer over it */}
-              <img
+              <AerialImg
                 src={`/api/imagery/metro/${m.id}?w=480&h=360`}
                 alt={`Aerial view of ${m.place}`}
                 width={480}
                 height={360}
-                loading="lazy"
-                decoding="async"
                 className="aspect-[4/3] w-full bg-faint object-cover transition-transform duration-300 group-hover:scale-105"
               />
               {/* The scrim is what keeps the label legible over a photograph
