@@ -11,7 +11,7 @@ import { metroForAddress } from "@/lib/market-match";
 import type { StructuredAddress } from "@/lib/address";
 import { leverageRead } from "@/lib/leverage";
 import { seedBenchmarks } from "@/lib/research-data";
-import { inferStrategy, noiFigures } from "@/lib/deal-strategy";
+import { inferStrategy, isPlanDeal, noiFigures } from "@/lib/deal-strategy";
 
 export const metadata: Metadata = { title: "Compare deals" };
 
@@ -56,6 +56,12 @@ function toCol(deal: DealRow, box: BuyBox | null, bench30: number | null): Col {
     }
   }
 
+  // A plan deal's generated model books dark years first, so its year-1 cap
+  // is negative or a default — not a figure to compare on, and not one to
+  // spread against debt. The yield-on-cost row is its answer.
+  const strat = inferStrategy(ex);
+  const planDeal = isPlanDeal(strat.kind);
+
   return {
     id: deal.id,
     name: deal.name,
@@ -71,19 +77,17 @@ function toCol(deal: DealRow, box: BuyBox | null, bench30: number | null): Col {
     hasModel: model != null,
     fit,
     fitNote,
-    strategy: (() => {
-      const s = inferStrategy(ex);
-      return s.kind === "unknown" ? null : s.label;
-    })(),
+    strategy: strat.kind === "unknown" ? null : strat.label,
+    planDeal,
     irr: r?.leveredIrrPct ?? null,
     em: r?.equityMultiple ?? null,
     coc: r?.cashOnCashPct ?? null,
-    cap: r?.goingInCapPct ?? null,
+    cap: planDeal ? null : (r?.goingInCapPct ?? null),
     yoc: r?.yieldOnCostPct ?? null,
     // Same arithmetic as the deal page's leverage check, run on the SAME cap
     // this table shows one row above — never a differently-sourced number.
     leverage:
-      r?.goingInCapPct != null && bench30 != null
+      !planDeal && r?.goingInCapPct != null && bench30 != null
         ? leverageRead(r.goingInCapPct, bench30)
         : null,
     price: usd(r?.purchasePrice) ?? fromExtraction(ex, /\bprice\b/i),

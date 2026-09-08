@@ -176,12 +176,17 @@ export async function ResearchPanel({
   yearBuilt,
   sectorFields,
   assetClass,
+  planLabel,
 }: {
   address: StructuredAddress | null;
   sizeText?: string | null;
   priceText?: string | null;
   /** the deal's going-in cap as displayed (e.g. "5.8%") — for the leverage check */
   capText?: string | null;
+  /** the strategy label when the deal is a plan (Conversion, Development …):
+   *  with no going-in cap to spread against debt, the leverage check says
+   *  why instead of going silent */
+  planLabel?: string | null;
   /** parsed from the deal's extraction metrics (manual entry or OM) */
   yearBuilt?: number | null;
   sectorFields?: Record<string, string | number | boolean> | null;
@@ -366,6 +371,26 @@ export async function ResearchPanel({
             {bench30.source}, as of {bench30.asOf}). The benchmark is an
             owner-occupier rate; investor debt usually prices above it, so a
             thin spread here is thinner in practice.
+          </p>
+        </div>
+      )}
+      {/* A plan deal with no going-in cap: a dark building has nothing to
+          spread against debt yet. Say so rather than leaving a gap. */}
+      {capPct == null && planLabel && (
+        <div className="mt-3 rounded-lg border border-line bg-faint/60 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold">Leverage check</p>
+            <span className="rounded-full bg-faint px-2 py-0.5 text-[11px] font-medium text-muted">
+              n/a on a {planLabel.toLowerCase()}
+            </span>
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-muted">
+            No going-in cap to spread against debt: the building earns little or
+            nothing until the works are done. The plan is judged on yield on
+            total cost against the cap the finished product trades at — the
+            &ldquo;Yield on cost, stressed&rdquo; grid under the plan strip —
+            and its debt is construction or bridge debt sized to cost, not
+            permanent debt sized to today&apos;s income.
           </p>
         </div>
       )}

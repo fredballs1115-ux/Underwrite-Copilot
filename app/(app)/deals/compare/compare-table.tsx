@@ -29,6 +29,10 @@ export type Col = {
   fitNote: string | null;
   /** the deal's strategy label (Stabilized / Value-add / Conversion …), null when unknown */
   strategy: string | null;
+  /** a deal with a plan (value-add, lease-up, conversion, development): its
+   *  going-in cap and leverage read are not applicable — the plan is judged
+   *  on yield on total cost */
+  planDeal: boolean;
   irr: number | null;
   em: number | null;
   coc: number | null;
@@ -85,7 +89,10 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       mono: true,
     },
     { label: "Cash-on-cash (Yr 1)", get: (c) => pct(c.coc), mono: true },
-    { label: "Going-in cap", get: (c) => pct(c.cap), mono: true },
+    // A plan deal's year-1 cap is a dark building's (negative, or a default)
+    // — not a figure to compare on. Say so; the yield on cost row below is
+    // its answer.
+    { label: "Going-in cap", get: (c) => (c.planDeal ? "n/a — plan" : pct(c.cap)), mono: true },
     // The plan's yardstick: stabilized NOI over everything it cost to get
     // there. Blank for a stabilized asset — its going-in cap is the answer.
     { label: "Yield on cost (stabilized)", get: (c) => pct(c.yoc), mono: true },
@@ -93,9 +100,11 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       label: "Leverage vs 30-yr",
       // Signed spread only — the full sentence lives on each deal's page.
       get: (c) =>
-        c.leverage
-          ? `${c.leverage.spreadBps > 0 ? "+" : ""}${c.leverage.spreadBps} bps`
-          : null,
+        c.planDeal
+          ? "judged on yield on cost"
+          : c.leverage
+            ? `${c.leverage.spreadBps > 0 ? "+" : ""}${c.leverage.spreadBps} bps`
+            : null,
       cls: (c) =>
         c.leverage?.tone === "negative"
           ? "text-kill"

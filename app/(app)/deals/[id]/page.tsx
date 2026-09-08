@@ -50,6 +50,7 @@ import {
   IMPLIED_CAP_CEILING,
   assessPlausibility,
   inferStrategy,
+  isPlanDeal,
   planSummary,
 } from "@/lib/deal-strategy";
 import { PlanStrip, PlausibilityPanel } from "./plausibility-panel";
@@ -977,6 +978,7 @@ export default async function DealPage({
           sizeText={summarySize}
           priceText={summaryPrice}
           capText={summaryCap}
+          planLabel={isPlanDeal(strategy.kind) ? strategy.label : null}
           yearBuilt={summaryYearBuilt}
           sectorFields={
             ((deal as { sector_fields?: SectorFieldValues | null }).sector_fields) ?? null
