@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
-import { MarketsMarquee } from "@/app/markets-marquee";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { FREE_DEALS, DEEP_TOOLS } from "@/lib/marketing-constants";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
@@ -57,8 +56,7 @@ function LegalPanel() {
           Regulation &amp; benchmarks
         </h2>
         <span className="text-[11px] text-muted">
-          assumes a natural-person buyer with no other units here — the same
-          default the deal page declares
+          assumes a natural-person buyer with no other units here
         </span>
       </div>
       {legal.metroName && (
@@ -71,12 +69,10 @@ function LegalPanel() {
         </Link>
       )}
       <p className="mt-3 text-sm text-muted">
-        Screened: {legal.screenedCount} rule
-        {legal.screenedCount === 1 ? "" : "s"} on file for {legal.jurisdiction}{" "}
-        —{" "}
+        {legal.screenedCount} rule{legal.screenedCount === 1 ? "" : "s"} on file for {legal.jurisdiction} ·{" "}
         {legal.triggeredCount === 0
-          ? "none triggered by this deal's facts. Rules that key off events (an eviction filing, a vacancy registration) stay dormant until those events."
-          : `${legal.triggeredCount} triggered by this deal's facts.`}
+          ? "none triggered by this deal's facts"
+          : `${legal.triggeredCount} triggered by this deal's facts`}
       </p>
       <ul className="mt-3 space-y-3">
         {legal.rules.map((r) => (
@@ -291,11 +287,8 @@ export default function DemoPage() {
             Illustrative sample
           </span>
         </div>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-          This is the product surface on an invented deal — every section
-          below is exactly what a screen looks like, from the verdict down to
-          the live stress panel. Not a real listing, and not investment
-          advice. Your own deals run from a real OM.
+        <p className="mt-2 max-w-2xl text-sm text-muted">
+          The product, on an invented deal — not a real listing, not investment advice.
         </p>
 
         {/* Summary bar — mirrors the in-app deal page. */}
@@ -361,9 +354,7 @@ export default function DemoPage() {
               Take the deliverables with you
             </h2>
             <p className="mt-1 max-w-md text-sm text-muted">
-              The one-page IC memo, the full multi-page report behind it, and
-              the live-formula Excel model this screen produced — the same
-              files a signed-in analyst exports.
+              The same files a signed-in analyst exports from this screen.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -404,21 +395,11 @@ export default function DemoPage() {
           <h2 className="mt-2 text-xl font-semibold tracking-tight">
             This sample is the triage. Four more tools pick up where it stops.
           </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-            Everything above is the six-stage screen. Once a deal survives it,
-            these are the pages you actually work in — each one live in the app
-            on your own deals.
-          </p>
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <div className="mt-5 grid gap-3 sm:grid-cols-4">
             {DEEP_TOOLS.map((t) => (
-              <div key={t.title} className="rounded-xl border border-line bg-surface p-4">
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h3 className="text-sm font-semibold">{t.title}</h3>
-                  <span className="text-[11px] uppercase tracking-wide text-muted">
-                    {t.where}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm leading-relaxed text-muted">{t.blurb}</p>
+              <div key={t.title} className="rounded-xl border border-line bg-surface p-4" title={t.blurb}>
+                <h3 className="text-sm font-semibold leading-snug">{t.title}</h3>
+                <p className="mt-1.5 text-[11px] uppercase tracking-wide text-muted">{t.where}</p>
               </div>
             ))}
           </div>
@@ -429,10 +410,8 @@ export default function DemoPage() {
           <h2 className="text-xl font-semibold tracking-tight text-white">
             Run this screen on your own OM
           </h2>
-          <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-white/70">
-            Upload an offering memorandum and get the same six-stage read —
-            sourced ranges, challenged assumptions, and a verdict that shows
-            its work. First {FREE_DEALS} deals free, no card.
+          <p className="mx-auto mt-2 max-w-md text-sm text-white/70">
+            First {FREE_DEALS} deals free · no card.
           </p>
           <Link
             href="/login?mode=signup"
@@ -442,10 +421,6 @@ export default function DemoPage() {
           </Link>
         </div>
       </main>
-
-      {/* Same live band as the homepage — leads into the research-layer
-          section below: these are the markets that layer covers. */}
-      <MarketsMarquee />
 
       {/* The research layer — real rules + real data behind the sample's
           jurisdiction (site-polish 2). Everything here is genuine: the rule
@@ -457,7 +432,7 @@ export default function DemoPage() {
             Behind this screen
           </p>
           <h2 className="mt-2 text-xl font-semibold tracking-tight">
-            The sample sits in a real submarket — and the rules are real too.
+            A real submarket, real rules.
           </h2>
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <div className="rounded-xl border border-line bg-surface p-4">
@@ -473,10 +448,7 @@ export default function DemoPage() {
                 </span>
               </div>
               <p className="mt-2 text-sm leading-relaxed">
-                Philadelphia Code § 9-811: before any eviction step, a landlord
-                must enroll in the city&apos;s Eviction Diversion Program and
-                participate in good faith for at least 30 days before filing.
-                The screen prices that turnover delay in.
+                Philadelphia Code § 9-811: 30 days in the Eviction Diversion Program before any filing. The screen prices that delay in.
               </p>
               <a
                 href="https://codelibrary.amlegal.com/codes/philadelphia/latest/philadelphia_pa/0-0-0-278160"
@@ -491,18 +463,18 @@ export default function DemoPage() {
               <p className="text-[11px] uppercase tracking-wide text-muted">
                 Real benchmarks for this submarket
               </p>
-              <p className="mt-2 text-sm leading-relaxed">
-                Philadelphia MSA FY2026 fair market rent:{" "}
-                <span className="font-mono font-semibold tabular-nums">$1,810/mo</span>{" "}
-                (2BR) · metro 2–4 unit median{" "}
-                <span className="font-mono font-semibold tabular-nums">$363,500</span>{" "}
-                (+6.9% YoY, May 2026) · recorded-sales comps pull automatically
-                from the city&apos;s own OPA records the moment a deal has an
-                address.
-              </p>
+              <dl className="mt-2 grid grid-cols-2 gap-3">
+                <div>
+                  <dt className="text-[11px] text-muted">FY2026 2BR fair market rent</dt>
+                  <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums">$1,810/mo</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] text-muted">2–4 unit median · +6.9% YoY</dt>
+                  <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums">$363,500</dd>
+                </div>
+              </dl>
               <p className="mt-2 text-[11px] text-muted">
-                Signed-in sample screens run the live pull — real recorded
-                sales around Brewerytown, source-linked row by row.
+                Signed in, recorded sales around Brewerytown pull from the city&apos;s OPA records, source-linked.
               </p>
               {(phillySectors.office || phillySectors.multifamily) && (
                 <p className="mt-2 border-t border-line/60 pt-2 text-[11px] leading-relaxed text-muted">
@@ -594,16 +566,10 @@ export default function DemoPage() {
                 <span className="font-mono font-semibold tabular-nums">
                   {pmmsRow.low}%
                 </span>{" "}
-                30-yr fixed (as of {pmmsRow.as_of}). Every real deal gets this
-                same arithmetic on its deal page, refreshed against the latest
-                FRED pull.
+                30-yr fixed (FRED, {pmmsRow.as_of}).
               </p>
             </div>
           )}
-          <p className="mt-4 text-xs text-muted">
-            The deal above is illustrative; this panel is not — the rules,
-            rents, and records are the product&apos;s actual research layer.
-          </p>
         </div>
       </section>
 

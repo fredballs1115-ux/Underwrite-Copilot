@@ -3,18 +3,17 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#238 merged to main (live build
-sha `6c35c3c`, #238, confirmed equal to the main tip by live-verify at 09:06
-UTC — every one of the sixty-three is live, the footer's latest-improvement
-line reads "Password reset works…", and the public-page lint #231 added
-reads all twelve public pages clean on every run, the sign-in page's new
-banner path included).
+**Last updated 2026-09-08**, after PRs #176–#239 merged to main (live build
+sha `fab27ec`, #239, confirmed equal to the main tip by live-verify at 14:34
+UTC — every one of the sixty-four is live, the footer's latest-improvement
+line reads "Your files are yours alone…", and the public-page lint #231
+added reads all twelve public pages clean on every run).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Sixty-four PRs (#176–#239) landed across one review session and the
+Sixty-five PRs (#176–#240) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -305,6 +304,15 @@ deploy (live-verify shows the sha).
   alert banner can be dismissed but not rewritten by users; a departed
   teammate's share links die with their seat. **Migration 0034 asserts the
   same shapes at the row and pins the alerts grant — run it** (below).
+- **The homepage and the sample screen, cut to pictures** (#240). Your
+  note that the homescreen was "too jumbled… words that can be a picture
+  should always be a picture": the homepage went from 21 blocks, 6,474
+  words and 15,557px tall to one idea per section — a one-sentence hero
+  beside the sample deal card, two-word stats, the spread drawn, a
+  six-icon stage rail, the verdict tabs, the live stress bench, the aerial
+  gallery, four artifact tiles, an eight-icon feature grid, pricing, FAQ —
+  1,295 words at 8,004px. The sample screen lost its paragraphs the same
+  way. The pipeline and the deal page are next (below, "Claude's moves").
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":
@@ -566,6 +574,12 @@ Not yet covered by imagery, in rough value order:
    times with a roll-up and per-asset contribution to blended IRR; mostly a
    loop around existing code plus a CSV importer. Named as the next build in
    the LPC plan.
+8. **The pipeline and the deal page get the same cut as the homepage** (#240):
+   words to pictures — status chips, meters and icons where a sentence was;
+   one idea per block; the getting-started prose and the meta lines trimmed to
+   what a glance needs. Screenshot-verified at 1440 and 390 through the fixture
+   views (`VIEW_SHOTS_DIR`, with the built stylesheet injected), render tests
+   kept green.
 
 ---
 

@@ -3,9 +3,6 @@ import type { ReactNode } from "react";
 import { LogoMark } from "./logo";
 import { Reveal, CountUp, DemoTabs } from "./landing-interactive";
 import { ScreenRunStrip } from "./screen-run-strip";
-import { MarketPulseBoard } from "./market-pulse";
-import { RetradeReplay } from "./retrade-replay";
-import { SpreadBoard } from "./spread-board";
 import { ScrollProgress } from "./scroll-progress";
 import type { Metadata } from "next";
 import {
@@ -13,19 +10,14 @@ import {
   SPREAD_HIGH_IRR_PCT,
   SPREAD_BPS,
   FIRST_READ_CLAIM,
-  FULL_SCREEN_CLAIM,
   ANALYSIS_STAGES,
   DEAL_KILLERS,
-  SLIDER_SWEEP_BPS,
   COMPS_JURISDICTIONS,
   PRICE_PRO_MONTHLY,
   PRICE_TEAM_BASE_MONTHLY,
   PRICE_TEAM_MEMBER_MONTHLY,
   FREE_DEALS,
-  SAMPLE_RETRADE_DELTA,
-  SAMPLE_RECONCILE_ROWS,
   SAMPLE_COMP_PREMIUM_LINE,
-  DEEP_TOOLS,
 } from "@/lib/marketing-constants";
 // The Excel-preview rows are COMPUTED from the live engine on the sample
 // model at render time — hardcoded copies of these figures are exactly what
@@ -33,14 +25,12 @@ import {
 import { computeModel } from "@/lib/model/compute";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { sampleLegal } from "@/lib/sample-legal";
-import { seedBenchmarks, seedRules } from "@/lib/research-data";
+import { seedRules } from "@/lib/research-data";
 import { hoursSince } from "@/lib/research";
-import { RegulationPlayground, SCENARIO_COUNT } from "./landing-regulation";
-import { changelogEntries, latestChange } from "@/lib/changelog";
+import { latestChange } from "@/lib/changelog";
 import { StressBench } from "./landing-stress";
-import { COVERAGE_LIVE, COVERAGE_DISCOVERY } from "@/lib/public-comps/core";
 import metrosSeed from "@/data/research/metros.json";
-import { MarketsMarquee, MARKET_COUNT, metroFact } from "./markets-marquee";
+import { MARKET_COUNT } from "./markets-marquee";
 import { MarketsGallery } from "./markets-gallery";
 
 // The research layer's scale, DERIVED from the same seeds the app evaluates
@@ -49,7 +39,7 @@ import { MarketsGallery } from "./markets-gallery";
 // into client bundles via marketing-constants.)
 const RULE_COUNT = seedRules().length;
 // The sample deal's legal read through the REAL rules engine — feeds the
-// walkthrough widget's Regulation block and the hero's baby legal note.
+// walkthrough widget's Regulation block.
 const LEGAL = sampleLegal();
 const WIRED_MARKETS = (metrosSeed.metros ?? [])
   .filter((m) => (m as { ingest_market?: string }).ingest_market)
@@ -67,61 +57,31 @@ const MAJOR_MARKET_COUNT = MAJOR_MARKETS.length;
 // the canonical is declared per page so subpages never collapse to /.
 export const metadata: Metadata = { alternates: { canonical: "/" } };
 
-// ISR, five-minute window: the proof strip quotes live DB stats, and paired
-// with next.config's expireTime this bounds cache staleness (browser SWR
-// included) to ~10 minutes — an hour of "the site didn't change" confusion
-// during ship loops proved too long.
+// ISR, five-minute window: the footer quotes the live steward stamp, and
+// paired with next.config's expireTime this bounds cache staleness (browser
+// SWR included) to ~10 minutes.
 export const revalidate = 300;
 
 // Landing page — a React Server Component (zero client JS, no secrets).
-// The pitch is consistency: one method on every deal, with the work shown.
+//
+// The rule of this page, per the operator: words that can be a picture are a
+// picture. Every section is one idea — an eyebrow, a headline of a few words,
+// and the thing itself (the sample deal card, the six-stage rail, the
+// verdict tabs, the live stress bench, the aerial gallery, the artifacts).
+// No paragraph runs past a line; the long-form argument lives on /why.
 // (Never claim "same answer every run" — LLM stages vary run to run, and the
 // retrade diff would happily display that contradiction to a skeptic.)
 
-// The actual six-stage pipeline every OM runs through — not slogans.
-const SCREEN = [
-  {
-    n: 1,
-    title: "Extract the deal",
-    body: "Terms, unit economics, and every broker assumption pulled off the OM as ranges — each one page-cited, never a lone hero number.",
-  },
-  {
-    n: 2,
-    title: "Challenge the assumptions",
-    body: "Grilled in the order deals die: basis, exit, debt. The three deal-killers get stressed before anything else does.",
-  },
-  {
-    n: 3,
-    title: "Scrutinize the comps",
-    body: "Every comp in the deck ranked for how hard it actually supports the price — stretched, leaning, or genuine support.",
-  },
-  {
-    n: 4,
-    title: "Reconcile against your model",
-    body: "Optional, whenever you're ready: upload your own numbers and see every gap. Conflicts resolve openly — actuals beat pro forma, never silently merged.",
-  },
-  {
-    n: 5,
-    title: "Check the market",
-    body: "Every assumption graded against typical ranges for the asset class — in-line, aggressive, or conservative — and labeled as rules-of-thumb to verify, never dressed up as pulled comps.",
-  },
-  {
-    n: 6,
-    title: "Get the verdict",
-    body: "Go / Caution / No-go with the reasons attached — and where the call flips across the ranges, so you see the honest edges.",
-  },
-];
-
-function PillarIcon({ children }: { children: ReactNode }) {
+function Icon({ children, className = "h-5 w-5" }: { children: ReactNode; className?: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={2}
+      strokeWidth={1.8}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="h-5 w-5"
+      className={className}
       aria-hidden
     >
       {children}
@@ -129,53 +89,157 @@ function PillarIcon({ children }: { children: ReactNode }) {
   );
 }
 
-const PILLARS = [
+// The actual six-stage pipeline every OM runs through — a word or two each;
+// the trace band under the rail shows what each stage produces.
+const STAGES: { title: string; icon: ReactNode }[] = [
   {
-    title: "Deterministic math",
-    body: "The cash-flow and return math is real code, not a language model guessing. Same inputs, same output, every run.",
+    title: "Extract",
     icon: (
-      <PillarIcon>
-        <rect x="4" y="2" width="16" height="20" rx="2" />
-        <path d="M8 6h8" />
-        <path d="M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h.01M12 19h.01M16 19h.01" />
-      </PillarIcon>
+      <Icon>
+        <path d="M6 2h9l5 5v15H6z" />
+        <path d="M14 2v6h6" />
+        <path d="M9 13h6M9 17h6" />
+      </Icon>
     ),
   },
   {
-    title: "Sourced ranges",
-    body: "Every assumption is a range tied to where it came from — a comp, a market norm, or the OM page — never a lone hero number.",
+    title: "Challenge",
     icon: (
-      <PillarIcon>
-        <path d="M4 8h10" />
-        <circle cx="17" cy="8" r="2.5" />
-        <path d="M20 16H10" />
-        <circle cx="7" cy="16" r="2.5" />
-      </PillarIcon>
+      <Icon>
+        <circle cx="12" cy="12" r="9" />
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 3v2M12 19v2M3 12h2M19 12h2" />
+      </Icon>
     ),
   },
   {
-    title: "One rubric, every deal",
-    body: "Every OM runs the same gauntlet in the same order, and the verdict shows its work. Your rigor stops depending on who opened the model that day.",
+    title: "Comps",
     icon: (
-      <PillarIcon>
-        <path d="M3 12a9 9 0 0 1 15.6-6.2L21 8" />
-        <path d="M21 3v5h-5" />
-        <path d="M21 12a9 9 0 0 1-15.6 6.2L3 16" />
-        <path d="M3 21v-5h5" />
-      </PillarIcon>
+      <Icon>
+        <path d="M4 20v-9M10 20V5M16 20v-6M2 20h20" />
+      </Icon>
+    ),
+  },
+  {
+    title: "Reconcile",
+    icon: (
+      <Icon>
+        <path d="M12 4v16M5 20h14M6 8h12" />
+        <path d="m6 8-3 6h6zM18 8l-3 6h6z" />
+      </Icon>
+    ),
+  },
+  {
+    title: "Market",
+    icon: (
+      <Icon>
+        <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" />
+        <circle cx="12" cy="10" r="2.5" />
+      </Icon>
+    ),
+  },
+  {
+    title: "Verdict",
+    icon: (
+      <Icon>
+        <circle cx="12" cy="12" r="9" />
+        <path d="m8.5 12 2.5 2.5 4.5-5" />
+      </Icon>
+    ),
+  },
+];
+
+// Everything else the product does, as an icon and a few words. Each tile
+// opens the surface that shows it working.
+const FEATURES: { label: string; href: string; icon: ReactNode }[] = [
+  {
+    label: "OM + rent roll + T-12, one model",
+    href: "/demo",
+    icon: (
+      <Icon>
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <path d="M3 10h18M9 4v16" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Drag the levers, watch it break",
+    href: "#stress",
+    icon: (
+      <Icon>
+        <path d="M4 8h9M19 8h1M4 16h3M13 16h7" />
+        <circle cx="16" cy="8" r="2.5" />
+        <circle cx="10" cy="16" r="2.5" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Your buy box, scored 0–100",
+    href: "/demo",
+    icon: (
+      <Icon>
+        <rect x="3" y="3" width="18" height="18" rx="3" />
+        <path d="m8 12 3 3 5-6" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Comps from county records",
+    href: "/market",
+    icon: (
+      <Icon>
+        <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z" />
+        <path d="M9 10h6" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Financing, sized to the constraint",
+    href: "/demo",
+    icon: (
+      <Icon>
+        <path d="m3 10 9-6 9 6" />
+        <path d="M5 10v9M10 10v9M14 10v9M19 10v9M3 19h18" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Verdict → assigned tasks",
+    href: "/demo",
+    icon: (
+      <Icon>
+        <path d="M10 6h11M10 12h11M10 18h11" />
+        <path d="m3 6 1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Rent control, checked at the address",
+    href: "/market",
+    icon: (
+      <Icon>
+        <path d="m14 4 6 6M4 20l7-7M10 14l4 4" />
+        <path d="m12 6 6 6-2 2-6-6z" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Every number carries its source",
+    href: "/market",
+    icon: (
+      <Icon>
+        <path d="M6 2h12v20l-3-2-3 2-3-2-3 2z" />
+        <path d="M9 8h6M9 12h6" />
+      </Icon>
     ),
   },
 ];
 
 const STATS: { value: number; suffix: string; label: string }[] = [
-  { value: ANALYSIS_STAGES, suffix: "", label: "analysis stages on every OM" },
+  { value: ANALYSIS_STAGES, suffix: "", label: "analysis stages" },
   { value: DEAL_KILLERS, suffix: "", label: "deal-killers stressed first" },
-  {
-    value: MARKET_COUNT,
-    suffix: "",
-    label: "covered markets — the Mid-Atlantic + the biggest US metros, building-by-building",
-  },
-  { value: 0, suffix: "", label: "black-box numbers — every figure carries its source" },
+  { value: MARKET_COUNT, suffix: "", label: "covered markets" },
+  { value: 0, suffix: "", label: "black-box numbers" },
 ];
 
 // Live-engine rows for the Excel-preview tile: the sample model recomputed
@@ -223,6 +287,10 @@ const FAQ: { q: string; a: string }[] = [
   {
     q: "Which markets does it cover?",
     a: `${MARKET_COUNT} markets, deliberately: the DMV core (DC, Prince George's, Montgomery County, Northern Virginia), Baltimore, Richmond, Hampton Roads, Philadelphia (incl. Wilmington), Newark/Jersey City — and the ${MAJOR_MARKET_COUNT} biggest US metros: ${MAJOR_MARKETS.map((m) => m.name).join(", ")}. Each carries its rent rules (${RULE_COUNT} statute-linked, machine-evaluated at every address), market notes, and data coverage with sources. Outside those markets the screener says "unscreened — not unregulated" and stops; it never guesses. Recorded-sales comps run via county APIs in ${COMPS_JURISDICTIONS}, extended by the bulk property database (${WIRED_MARKETS.join(", ")} wired).`,
+  },
+  {
+    q: "Why not just ask ChatGPT?",
+    a: "Underwriting is a precision problem, not a language problem. A 10% drift reads perfectly fine in a sentence while it quietly kills the deal — so the cash-flow and return math here is deterministic code, every assumption is a sourced range, and every OM runs the same six stages in the same order. The AI reads documents; it never does the arithmetic.",
   },
   {
     q: "Are my documents private?",
@@ -278,6 +346,28 @@ const JSON_LD = {
     },
   ],
 };
+
+/** One section's header: an eyebrow and a headline of a few words. */
+function SectionHead({
+  eyebrow,
+  title,
+  dark = false,
+}: {
+  eyebrow: string;
+  title: string;
+  dark?: boolean;
+}) {
+  return (
+    <div>
+      <p
+        className={`text-xs font-medium uppercase tracking-wider ${dark ? "text-accent/90" : "text-muted"}`}
+      >
+        {eyebrow}
+      </p>
+      <h2 className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h2>
+    </div>
+  );
+}
 
 export default function Home() {
   return (
@@ -429,19 +519,8 @@ export default function Home() {
                     </svg>
                   </span>
                 </h1>
-                <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/70 max-sm:hidden">
-                  Small shops see 10–15 OMs a week, spend 20–45 minutes on each
-                  manual screen, and fully model one in ten. Copilot screens
-                  the deal tonight: every figure extracted with its page cite,
-                  broker comps stress-ranked, recorded sales pulled from the
-                  county record, the rent-control call made at the address —
-                  and a verdict scored 0–100 against your buy box before the
-                  weekend starts.
-                </p>
-                <p className="mt-6 text-lg leading-relaxed text-white/70 sm:hidden">
-                  10–15 OMs a week, 20–45 minutes each, one in ten modeled.
-                  Copilot screens tonight: page-cited extraction, recorded
-                  county sales, the rent-control call, a scored verdict.
+                <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/70">
+                  Upload the OM. Every figure sourced, the three deal-killers stressed, a Go / Caution / No-go — in minutes.
                 </p>
                 <div className="mt-8 flex flex-wrap items-center gap-3">
                   <Link
@@ -451,83 +530,31 @@ export default function Home() {
                     Get started free
                   </Link>
                   <Link
-                    href="#screen"
+                    href="/demo"
                     className="rounded-lg border border-white/25 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/10"
                   >
-                    See how it works
+                    See a full screen
                   </Link>
                 </div>
-                <p className="mt-5 max-w-xl text-sm leading-relaxed text-white/55">
-                  Upload an OM → sourced ranges, the three deal-killers, and a
-                  Go / Caution / No-go in {FULL_SCREEN_CLAIM}. First {FREE_DEALS} deals free · no
-                  card.
-                </p>
-                <p className="mt-4 max-w-xl font-mono text-[11px] uppercase tracking-wider text-white/55">
-                  price/door · going-in cap (T-12) · untrended YoC · DSCR ·
-                  debt yield · loss-to-lease
-                </p>
-                <HeroNowScreening />
+                <p className="mt-4 text-xs text-white/55">First {FREE_DEALS} deals free · no card</p>
               </div>
 
               {/* Product preview */}
               <div>
                 <DealPreview />
                 <p className="mt-4 text-center text-[11px] text-white/55">
-                  Illustrative sample deal — not a real listing.{" "}
+                  Illustrative sample deal ·{" "}
                   <Link
                     href="/demo"
                     className="font-medium text-white/70 underline-offset-2 hover:text-white hover:underline"
                   >
-                    Browse the full sample screen →
-                  </Link>
-                </p>
-                {/* The mini summary bar above shows the artifact buttons —
-                    these are the REAL public sample files behind them. */}
-                <p className="mt-1.5 text-center text-[11px] text-white/60">
-                  Or hold its artifacts:{" "}
-                  <a
-                    href="/api/demo/memo"
-                    className="text-white/65 underline-offset-2 hover:text-white hover:underline"
-                  >
-                    IC memo
-                  </a>
-                  {" · "}
-                  <a
-                    href="/api/demo/report"
-                    className="text-white/65 underline-offset-2 hover:text-white hover:underline"
-                  >
-                    full report
-                  </a>
-                  {" · "}
-                  <a
-                    href="/api/demo/underwrite.xlsx"
-                    className="text-white/65 underline-offset-2 hover:text-white hover:underline"
-                  >
-                    Excel model
-                  </a>
-                </p>
-                {/* Baby legal note — the deal page's Regulation panel in one
-                    line, derived from the same rules engine. */}
-                <p className="mt-1.5 text-center text-[11px] leading-relaxed text-white/55">
-                  Legal screen: {LEGAL.screenedCount} rule
-                  {LEGAL.screenedCount === 1 ? "" : "s"} on file for{" "}
-                  {LEGAL.jurisdiction} —{" "}
-                  {LEGAL.triggeredCount === 0
-                    ? "none triggered by this deal's facts"
-                    : `${LEGAL.triggeredCount} triggered`}
-                  {LEGAL.stateFact ? <> · {LEGAL.stateFact.replace(/\.$/, "")}</> : null}
-                  {" · "}
-                  <Link
-                    href={LEGAL.metroId ? `/market?metro=${LEGAL.metroId}` : "/market"}
-                    className="text-white/60 underline-offset-2 hover:text-white hover:underline"
-                  >
-                    market brief →
+                    open the whole screen →
                   </Link>
                 </p>
               </div>
             </div>
 
-            {/* Stat strip — the screen, quantified. */}
+            {/* Stat strip — the screen, quantified, two words each. */}
             <dl className="mt-16 grid grid-cols-2 gap-x-6 gap-y-8 border-t border-white/10 pt-8 sm:grid-cols-4">
               {STATS.map((st) => (
                 <div key={st.label}>
@@ -535,158 +562,95 @@ export default function Home() {
                   <dd className="font-mono text-3xl font-semibold tabular-nums text-accent">
                     <CountUp value={st.value} suffix={st.suffix} />
                   </dd>
-                  <dd className="mt-1 text-xs leading-relaxed text-white/60">
-                    {st.label}
-                  </dd>
+                  <dd className="mt-1 text-xs text-white/60">{st.label}</dd>
                 </div>
               ))}
             </dl>
           </div>
         </section>
 
-        <ResearchTicker />
-        <LiveProofStrip />
-        {/* Eye-catcher: the market pulse board — the whole covered map as a
-            breathing tile wall, every figure real, every tile a door. */}
-        <MarketPulseBoard />
-
-        {/* The problem */}
+        {/* The problem, drawn: two analysts, one deal, the spread between
+            them. Both ends are neutral on purpose — the spread is the problem. */}
         <section id="problem" className="scroll-mt-16">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted">
-              The hidden risk
-            </p>
-            <h2 className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">
-              Your best analyst is also your single point of failure.
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
-              Nobody&apos;s lying. They just pulled different numbers and called
-              it judgment. That&apos;s not analysis — it&apos;s a coin flip with
-              a spreadsheet attached, and it means your underwriting quality is
-              whoever happened to open the model that day.
-            </p>
-
-            {/* The spread, drawn instead of described. Both ends are neutral
-                on purpose: neither analyst is "right" — the spread is the
-                problem. */}
+            <SectionHead eyebrow="The problem" title={`Same deal, same data room, ${SPREAD_BPS} bps apart.`} />
             <Reveal>
-            <div className="shadow-card mt-8 rounded-2xl border border-line bg-surface p-6">
-              <div className="flex items-end justify-between gap-4">
-                <div>
-                  <p className="font-mono text-2xl font-semibold tabular-nums sm:text-3xl">
-                    {SPREAD_LOW_IRR_PCT}%
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted">
-                    Analyst B · IRR · &ldquo;pass&rdquo;
-                  </p>
+              <div className="shadow-card mt-8 rounded-2xl border border-line bg-surface p-6">
+                <div className="flex items-end justify-between gap-4">
+                  <div>
+                    <p className="font-mono text-2xl font-semibold tabular-nums sm:text-3xl">
+                      {SPREAD_LOW_IRR_PCT}%
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted">
+                      Analyst B · IRR · &ldquo;pass&rdquo;
+                    </p>
+                  </div>
+                  <span className="mb-1 hidden rounded-full bg-caution/10 px-3 py-1 text-xs font-semibold text-caution sm:block">
+                    {SPREAD_BPS} bps apart
+                  </span>
+                  <div className="text-right">
+                    <p className="font-mono text-2xl font-semibold tabular-nums sm:text-3xl">
+                      {SPREAD_HIGH_IRR_PCT}%
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted">
+                      Analyst A · IRR · &ldquo;buy&rdquo;
+                    </p>
+                  </div>
                 </div>
-                <span className="mb-1 hidden rounded-full bg-caution/10 px-3 py-1 text-xs font-semibold text-caution sm:block">
-                  {SPREAD_BPS} bps apart
-                </span>
-                <div className="text-right">
-                  <p className="font-mono text-2xl font-semibold tabular-nums sm:text-3xl">
-                    {SPREAD_HIGH_IRR_PCT}%
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted">
-                    Analyst A · IRR · &ldquo;buy&rdquo;
-                  </p>
+                <div className="relative mt-4 h-2 rounded-full bg-faint">
+                  <span
+                    className="absolute inset-y-0 left-[10%] right-[10%] rounded-full bg-caution/25"
+                    aria-hidden
+                  />
+                  <span
+                    className="spread-dot-l absolute left-[10%] top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-surface bg-ink/80 shadow"
+                    aria-hidden
+                  />
+                  <span
+                    className="spread-dot-r absolute left-[90%] top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-surface bg-ink/80 shadow"
+                    aria-hidden
+                  />
                 </div>
-              </div>
-              <div className="relative mt-4 h-2 rounded-full bg-faint">
-                <span
-                  className="absolute inset-y-0 left-[10%] right-[10%] rounded-full bg-caution/25"
-                  aria-hidden
-                />
-                <span
-                  className="spread-dot-l absolute left-[10%] top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-surface bg-ink/80 shadow"
-                  aria-hidden
-                />
-                <span
-                  className="spread-dot-r absolute left-[90%] top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-surface bg-ink/80 shadow"
-                  aria-hidden
-                />
-              </div>
-              <p className="mt-3 text-center text-xs text-muted">
-                Same deal. Same afternoon. Same data room.
-              </p>
-            </div>
-
-            </Reveal>
-            <Reveal delay={60}>
-              <div className="mt-4 rounded-2xl border border-line bg-surface p-5 shadow-card">
-                <p className="text-xs font-medium uppercase tracking-wider text-muted">
-                  Four instant disqualifiers the screen stresses first
+                <p className="mt-3 text-center text-xs text-muted">
+                  Same deal. Same afternoon. Same data room. One method fixes that.
                 </p>
-                <ul className="mt-3 grid gap-x-8 gap-y-2 text-sm leading-relaxed text-muted sm:grid-cols-2">
-                  {(
-                    [
-                      "Property taxes not reset to the sale price",
-                      "OpEx ratio under ~30% of gross potential rent",
-                      "Aggressive loss-to-lease and concession burn-off",
-                      "Insurance still at the seller\u2019s legacy premium",
-                    ] as const
-                  ).map((d) => (
-                    <li key={d} className="flex gap-2.5">
-                      <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-kill/70" />
-                      <span>{d}</span>
-                    </li>
-                  ))}
-                </ul>
               </div>
             </Reveal>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-xl border border-line bg-surface p-5 shadow-card">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Analyst B</span>
-                  <span className="rounded-full bg-kill/10 px-2.5 py-1 text-xs font-medium text-kill">
-                    Pass · {SPREAD_LOW_IRR_PCT}% IRR
-                  </span>
-                </div>
-                <p className="mt-2 text-sm leading-relaxed text-muted">
-                  Conservative rents, flat exit, a real expense load.
-                </p>
-              </div>
-              <div className="rounded-xl border border-line bg-surface p-5 shadow-card">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Analyst A</span>
-                  <span className="rounded-full bg-pass/10 px-2.5 py-1 text-xs font-medium text-pass">
-                    Buy · {SPREAD_HIGH_IRR_PCT}% IRR
-                  </span>
-                </div>
-                <p className="mt-2 text-sm leading-relaxed text-muted">
-                  Held the broker&apos;s rents, trended the exit cap down,
-                  underweighted expenses.
-                </p>
-              </div>
-            </div>
           </div>
         </section>
 
-        {/* The spread board — even the professional trackers disagree; the
-            three widest real divergences from the research file, drawn as
-            ranges. Data-derived, links into the metro briefs. */}
-        <SpreadBoard />
+        {/* The six-stage screen — a rail of icons, then the trace of it running. */}
+        <section id="screen" className="scroll-mt-16 border-t border-line bg-faint">
+          <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
+            <SectionHead eyebrow="How it works" title="Six stages, same order, every OM." />
+            <Reveal delay={60}>
+              <ol className="stage-rail mt-8 grid grid-cols-3 gap-3 sm:grid-cols-6">
+                {STAGES.map((s, i) => (
+                  <li
+                    key={s.title}
+                    style={{ "--i": i } as React.CSSProperties}
+                    className="hover-lift stage-cycle relative flex flex-col items-center gap-3 rounded-xl border border-line bg-surface px-3 py-5 text-center shadow-card"
+                  >
+                    <span className="absolute left-2.5 top-2 font-mono text-[11px] tabular-nums text-muted">
+                      {i + 1}
+                    </span>
+                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                      {s.icon}
+                    </span>
+                    <span className="text-sm font-medium">{s.title}</span>
+                  </li>
+                ))}
+              </ol>
+            </Reveal>
+          </div>
+        </section>
+        <ScreenRunStrip />
 
-        {/* Inside the screen — interactive walkthrough on sample data */}
-        <section className="border-y border-line bg-faint">
-          {/* grid-cols-1 matters: the implicit mobile track is `auto`, which
-              cannot shrink below the walkthrough card's intrinsic tab-strip
-              width and forces the page wider than small phones. Tailwind's
-              track values are minmax(0,1fr), so the explicit column shrinks. */}
-          <div className="mx-auto grid max-w-6xl grid-cols-1 items-start gap-10 px-6 py-16 sm:py-20 lg:grid-cols-2">
+        {/* Inside the screen — the deal page's own sections, in miniature. */}
+        <section className="border-b border-line">
+          <div className="mx-auto grid max-w-6xl grid-cols-1 items-start gap-10 px-6 py-16 sm:py-20 lg:grid-cols-[1fr_1.4fr]">
             <Reveal>
-              <p className="text-xs font-medium uppercase tracking-wider text-muted">
-                Inside the screen
-              </p>
-              <h2 className="mt-2 max-w-md text-2xl font-semibold tracking-tight sm:text-3xl">
-                Click through what the verdict is built on.
-              </h2>
-              <p className="mt-3 max-w-md text-sm leading-relaxed text-muted">
-                The tabs below are the deal page&apos;s own five sections —
-                Overview, Financials, Buy box, Analyses, Documents — with the
-                same chips, figures, and analysis names the product renders.
-                Shown here in miniature, on illustrative sample data.
-              </p>
+              <SectionHead eyebrow="The verdict" title="Click through what it's built on." />
               <Link
                 href="/login?mode=signup"
                 className="mt-6 inline-flex rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
@@ -700,88 +664,11 @@ export default function Home() {
           </div>
         </section>
 
-        {/* The six-stage screen */}
-        {/* Eye-catcher: the retrade story on a 12s loop — price struck,
-            deck reissued, verdict stamps over to Go. */}
-        <RetradeReplay />
-
-        <section id="screen" className="scroll-mt-16">
-          <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted">
-              The six-stage screen
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
-              Our proof is public: a fully worked screen.
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
-              A first read — headline numbers and buy-box fit — lands in{" "}
-              {FIRST_READ_CLAIM}, while the six deeper stages keep working. And
-              the grilling speaks each asset type&apos;s language: office deals
-              get pressed on lease rollover and today&apos;s TI packages,
-              industrial on clear height and mark-to-market claims, retail on
-              co-tenancy — multifamily&apos;s playbook was the foundation.
-            </p>
-            <Reveal delay={60}>
-            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {SCREEN.map((s) => (
-                <div
-                  key={s.n}
-                  style={{ "--i": s.n - 1 } as React.CSSProperties}
-                  className="hover-lift stage-cycle relative overflow-hidden rounded-xl border border-line bg-surface p-5 shadow-card hover:border-brand/30"
-                >
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute -top-3 right-2 font-mono text-[64px] font-bold leading-none text-brand/15"
-                  >
-                    {s.n}
-                  </span>
-                  <h3 className="border-b border-brand/10 pb-2.5 pr-12 font-medium">
-                    {s.title}
-                  </h3>
-                  <p className="mt-2.5 text-sm leading-relaxed text-muted">
-                    {s.body}
-                  </p>
-                </div>
-              ))}
-            </div>
-            </Reveal>
-            {/* Put the screen to work — full-width row under the grid. */}
-            <Link
-              href="/login?mode=signup"
-              className="hover-lift group mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-sidebar px-5 py-4 text-white shadow-card"
-            >
-              <p className="text-sm leading-relaxed text-white/70">
-                <span className="font-semibold text-white">
-                  Watch it run on your own deal.
-                </span>{" "}
-                Upload an OM and the whole screen — ranges, deal-killers,
-                verdict — comes back in {FULL_SCREEN_CLAIM}.
-              </p>
-              <p className="text-sm font-semibold text-accent transition-transform group-hover:translate-x-0.5">
-                Screen a deal free →
-              </p>
-            </Link>
-          </div>
-        </section>
-
-        {/* Break it yourself — the deterministic engine, interactive, in the
-            reader's browser. The "drag the levers, watch it break" tile as a
-            live demonstration instead of a promise. */}
+        {/* Break it yourself — the deterministic engine, live in the browser. */}
         <section id="stress" className="band-dark scroll-mt-16 text-white">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <Reveal>
-              <p className="text-xs font-medium uppercase tracking-wider text-accent/90">
-                Try the engine
-              </p>
-              <h2 className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">
-                Break it yourself — the return math, live in your browser.
-              </h2>
-              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/65">
-                Worst case first: drag the exit cap away from the broker&apos;s
-                base and watch the return decay. Every tick recomputes through
-                the same deterministic engine the product ships — real code,
-                no AI in this box, no server round-trip.
-              </p>
+              <SectionHead eyebrow="Try the engine" title="Break it yourself." dark />
             </Reveal>
             <Reveal delay={80}>
               <div className="mt-8">
@@ -791,349 +678,91 @@ export default function Home() {
           </div>
         </section>
 
-        {/* The toolkit — concrete feature callouts, all shipping today. */}
-        <section id="toolkit" className="scroll-mt-16">
-          <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-            <Reveal>
-              <p className="text-xs font-medium uppercase tracking-wider text-muted">
-                The toolkit
-              </p>
-              <h2 className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">
-                Built around the numbers that decide deals.
-              </h2>
-            </Reveal>
-            <Reveal delay={80}>
-              <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {(
-                  [
-                    [
-                      "OM + rent roll + T-12, one model",
-                      "Upload the actuals and the screen re-anchors itself — in-place occupancy, WALT, actual NOI — and flags where the OM's pro forma drifts from the trailing twelve.",
-                    ],
-                    [
-                      "Drag the levers, watch it break",
-                      `Exit cap across ±${SLIDER_SWEEP_BPS}bps, rent growth, vacancy — IRR, equity multiple, DSCR, and your mandate fit recompute on every tick of the slider. No re-screen, no waiting.`,
-                    ],
-                    [
-                      "Your buy box, scored 0–100",
-                      "Every deal reads PURSUE / WATCH / PASS against your mandate — cap floor, return targets, geographies, hard dealbreakers — from the first signal onward.",
-                    ],
-                    [
-                      "Comps that pull themselves",
-                      `Give a deal an address and recorded sales appear from government records — ${COMPS_JURISDICTIONS} today — with the median, the range, and where your price sits against them. Public records, never a licensed feed.`,
-                    ],
-                    [
-                      "Financing & capital, sized",
-                      "Max loan under LTV / DSCR / debt-yield with the binding constraint flagged — plus payments, rate moves, breakeven occupancy, and the capital plan.",
-                    ],
-                    [
-                      "From verdict to to-do list",
-                      "One click turns the verdict's next steps into assigned tasks with due dates — then the memo exports under your own firm's name and logo (Pro).",
-                    ],
-                    [
-                      "Rent control, checked at the address",
-                      "DC's exemptions, PG County's cap, Philadelphia's eviction diversion — the rules engine reads the deal's address and answers Exempt, Applies, or names the open question, statute linked.",
-                    ],
-                    [
-                      "Rates that refresh themselves",
-                      "The 10-Year, SOFR, the 30-year survey, and CRE delinquency land daily from FRED; a weekday intel sweep scores the news against your criteria and raises a red banner when a rent law moves.",
-                    ],
-                    [
-                      "Market data with receipts",
-                      "Every research-sourced figure is clickable — its source, its as-of date, and whether it's verified or merely sourced. Stale data wears a badge instead of hiding.",
-                    ],
-                  ] as const
-                ).map(([title, body]) => (
-                  <div
-                    key={title}
-                    className="hover-lift rounded-xl border border-line bg-surface p-5 shadow-card hover:border-brand/30"
-                  >
-                    <h3 className="border-b border-brand/10 pb-2.5 font-medium">
-                      {title}
-                    </h3>
-                    <p className="mt-2.5 text-sm leading-relaxed text-muted">
-                      {body}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </Reveal>
-            {/* The four deeper tools that run past the six-stage screen.
-                Rendered from DEEP_TOOLS so this grid and the sample screen's
-                equivalent block can never describe the product differently. */}
-            <Reveal delay={100}>
-              <div className="mt-10">
-                <h3 className="text-sm font-semibold tracking-tight">
-                  And when a screen turns into real work
-                </h3>
-                <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">
-                  The six stages triage a deal. These four are what you reach for
-                  once it survives triage — each one a page under the deal.
-                </p>
-                <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                  {DEEP_TOOLS.map((t) => (
-                    <div
-                      key={t.title}
-                      className="hover-lift rounded-xl border border-line bg-surface p-5 shadow-card hover:border-brand/30"
-                    >
-                      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-brand/10 pb-2.5">
-                        <h4 className="font-medium">{t.title}</h4>
-                        <span className="text-[11px] uppercase tracking-wide text-muted">
-                          {t.where}
-                        </span>
-                      </div>
-                      <p className="mt-2.5 text-sm leading-relaxed text-muted">
-                        {t.blurb}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </Reveal>
-
-            {/* The workflow around the analysis — every item real and live,
-                pulled from the product audit, one line each. */}
-            <Reveal delay={120}>
-              <div className="mt-10 rounded-2xl border border-line bg-faint/60 p-6">
-                <h3 className="text-sm font-semibold tracking-tight">
-                  And the workflow around it
-                </h3>
-                <ul className="mt-4 grid gap-x-8 gap-y-2.5 text-sm leading-relaxed text-muted sm:grid-cols-2">
-                  {(
-                    [
-                      [
-                        "First signal in seconds",
-                        "headline numbers and buy-box fit land while the six deeper stages keep working",
-                      ],
-                      [
-                        "Click any number, open the page",
-                        "every extracted figure carries its OM page — click through and verify at the source",
-                      ],
-                      [
-                        "Ask the deal",
-                        "question the OM in plain English; answers cite the pages they came from",
-                      ],
-                      [
-                        "LOI draft in one click",
-                        "a conservative non-binding letter (.docx) prefilled from the screen's figures",
-                      ],
-                      [
-                        "A pipeline, not a folder",
-                        "stages, offer deadlines, search, side-by-side compare, and meeting-ready Excel/CSV exports",
-                      ],
-                      [
-                        "Your own market memory",
-                        "cap-rate and basis ranges built from your past screens — private to your account",
-                      ],
-                      [
-                        "Share a read-only link",
-                        "send a partner the screen without an account; links expire and can be revoked",
-                      ],
-                      [
-                        "Retrade watch",
-                        "broker reissues the deck? Replace the OM and see exactly what moved since last screen",
-                      ],
-                    ] as const
-                  ).map(([title, body]) => (
-                    <li key={title} className="flex gap-2.5">
-                      <span
-                        aria-hidden
-                        className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand"
-                      />
-                      <span>
-                        <span className="font-medium text-ink">{title}</span>{" "}
-                        — {body}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </Reveal>
-            <p className="mt-4 text-center text-xs text-muted">
-              Every tile above is live in the product today —{" "}
-              <Link
-                href="/demo"
-                className="font-medium text-brand underline-offset-2 hover:underline"
-              >
-                see the screen itself on the sample deal →
-              </Link>
-            </p>
-          </div>
-        </section>
-
-        {/* The screen, running — a looping trace of the six stages. */}
-        <ScreenRunStrip />
-
-        {/* The rules engine, live — the differentiator, demonstrated. */}
-        <section id="rules" className="scroll-mt-16">
-          <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-            <Reveal>
-              <p className="text-xs font-medium uppercase tracking-wider text-muted">
-                Try it right here
-              </p>
-              <h2 className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">
-                The rent-control engine, running live on this page.
-              </h2>
-              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
-                {SCENARIO_COUNT}{" "}real scenarios, one click apart — DC to
-                Brooklyn to LA to Chicago. Watch entity title flip a DC
-                rowhouse from exempt to rent-stabilized, two regimes split on
-                one 1930 Brooklyn eight-unit, and Montgomery County&apos;s
-                rolling age exemption clear a 2019 build — with the engine
-                naming the exact fact that would settle each open question.
-              </p>
-            </Reveal>
-            <Reveal delay={80}>
-              <div className="mt-8">
-                <RegulationPlayground />
-              </div>
-            </Reveal>
-            <Reveal delay={120}>
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs">
-                <span className="mr-1 text-muted">Recorded-sales comps:</span>
-                {COVERAGE_LIVE.map((p) => (
-                  <span
-                    key={p.id}
-                    className="rounded-full bg-brand px-2.5 py-1 font-medium text-white"
-                  >
-                    {p.regionLabel}
-                  </span>
-                ))}
-                {COVERAGE_DISCOVERY.map((p) => (
-                  <span
-                    key={p.id}
-                    className="rounded-full border border-dashed border-line px-2.5 py-1 text-muted"
-                    title="being wired — endpoint resolving"
-                  >
-                    {p.regionLabel}
-                  </span>
-                ))}
-              </div>
-            </Reveal>
-            <Reveal delay={140}>
-              <p className="mt-3 text-center text-xs text-muted">
-                Coverage is deliberately focused: {MARKET_COUNT} markets — the
-                whole Mid-Atlantic plus the {MAJOR_MARKET_COUNT} biggest US
-                metros — with {RULE_COUNT} statute-linked rules and the
-                property database ({WIRED_MARKETS.join(", ")}{" "}pipelines
-                wired). Outside those markets the screener says
-                &ldquo;unscreened&rdquo; — it never guesses.
-              </p>
-            </Reveal>
-          </div>
-        </section>
-
-        {/* Second across-the-screen band: every covered market with a real
-            fact, scrolling the other way from the price ticker. */}
-        <MarketsMarquee />
-
-        {/* The same markets, photographed. The page was entirely drawn — icons,
-            CSS bands and text — which is a strange look for a product about
-            real buildings. These are real aerial frames of the actual
-            downtowns, and each one links where the marquee entry does. */}
+        {/* The covered markets, photographed. */}
         <MarketsGallery />
 
-        {/* The ground layer — the data floor under every screen: property DB,
-            laws-on-the-building, scored news, and the steward policing it. */}
-        <GroundLayerSection />
-
-        {/* The artifacts — a bento of what you actually walk away with. */}
+        {/* The artifacts — what you actually walk away with, shown. */}
         <section className="border-y border-line bg-faint">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
             <Reveal>
-              <p className="text-xs font-medium uppercase tracking-wider text-muted">
-                The artifacts
-              </p>
-              <h2 className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">
-                What you walk away with.
-              </h2>
+              <SectionHead eyebrow="The artifacts" title="What you walk away with." />
             </Reveal>
             <Reveal delay={80}>
               <div className="mt-8 grid gap-4 lg:grid-cols-3">
                 {/* Excel model — the flagship tile */}
                 <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card lg:col-span-2">
                   <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-sm font-semibold">
-                      The Excel model, alive
-                    </h3>
+                    <h3 className="text-sm font-semibold">Excel model, live formulas</h3>
                     <span className="rounded-full bg-faint px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
                       Sample
                     </span>
                   </div>
-                  <p className="mt-1 max-w-md text-xs leading-relaxed text-muted">
-                    Not a static report — seven tabs of live formulas: annual
-                    and monthly cash flow, a full debt schedule, and IRR
-                    sensitivity matrices. Edit the tinted inputs and the whole
-                    book recalculates.
-                  </p>
-                  <div className="mt-auto pt-4">
-                  <div className="overflow-hidden rounded-lg border border-line font-mono text-[11px]">
-                    <div className="grid grid-cols-4 border-b border-line bg-faint px-3 py-1.5 text-[9px] font-semibold uppercase tracking-wide text-muted">
-                      <span className="col-span-2">Input</span>
-                      <span className="text-right">Value</span>
-                      <span className="text-right">Effect</span>
-                    </div>
-                    {XLSX_PREVIEW_ROWS.map(([k, v, e], i) => (
-                      <div
-                        key={k}
-                        className={`grid grid-cols-4 px-3 py-1.5 ${i >= 2 ? "bg-caution/5" : "bg-surface"}`}
-                      >
-                        <span className="col-span-2 text-muted">{k}</span>
-                        <span
-                          className={`text-right tabular-nums ${i !== 0 ? "bg-caution/10 px-1" : ""}`}
-                        >
-                          {v}
-                        </span>
-                        <span className="text-right tabular-nums">{e}</span>
+                  <div className="mt-4">
+                    <div className="overflow-hidden rounded-lg border border-line font-mono text-[11px]">
+                      <div className="grid grid-cols-4 border-b border-line bg-faint px-3 py-1.5 text-[9px] font-semibold uppercase tracking-wide text-muted">
+                        <span className="col-span-2">Input</span>
+                        <span className="text-right">Value</span>
+                        <span className="text-right">Effect</span>
                       </div>
-                    ))}
+                      {XLSX_PREVIEW_ROWS.map(([k, v, e], i) => (
+                        <div
+                          key={k}
+                          className={`grid grid-cols-4 px-3 py-1.5 ${i >= 2 ? "bg-caution/5" : "bg-surface"}`}
+                        >
+                          <span className="col-span-2 text-muted">{k}</span>
+                          <span
+                            className={`text-right tabular-nums ${i !== 0 ? "bg-caution/10 px-1" : ""}`}
+                          >
+                            {v}
+                          </span>
+                          <span className="text-right tabular-nums">{e}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  </div>
+                  <a
+                    href="/api/demo/underwrite.xlsx"
+                    className="mt-3 inline-block text-[11px] font-medium text-brand underline-offset-2 hover:underline"
+                  >
+                    Download the sample workbook →
+                  </a>
                 </div>
 
                 {/* Memo */}
                 <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
                   <h3 className="text-sm font-semibold">One-page IC memo</h3>
-                  <p className="mt-1 text-xs leading-relaxed text-muted">
-                    The verdict, the ranges, the deal-killers, and next steps —
-                    exactly one page, ready to forward.
-                  </p>
-                  <div className="mt-auto pt-4">
-                  <div className="rounded-lg border border-line bg-paper p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="h-2 w-20 rounded bg-ink/70" />
-                      <span className="rounded-full bg-caution/10 px-2 py-0.5 text-[9px] font-semibold text-caution">
-                        Caution
-                      </span>
-                    </div>
-                    <div className="mt-2.5 space-y-1.5">
-                      <div className="h-1.5 w-full rounded bg-line" />
-                      <div className="h-1.5 w-5/6 rounded bg-line" />
-                      <div className="h-1.5 w-full rounded bg-line" />
-                      <div className="h-1.5 w-2/3 rounded bg-line" />
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-1.5">
-                      <div className="h-8 rounded bg-faint" />
-                      <div className="h-8 rounded bg-faint" />
+                  <div className="mt-4 flex-1">
+                    <div className="rounded-lg border border-line bg-paper p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="h-2 w-20 rounded bg-ink/70" />
+                        <span className="rounded-full bg-caution/10 px-2 py-0.5 text-[9px] font-semibold text-caution">
+                          Caution
+                        </span>
+                      </div>
+                      <div className="mt-2.5 space-y-1.5">
+                        <div className="h-1.5 w-full rounded bg-line" />
+                        <div className="h-1.5 w-5/6 rounded bg-line" />
+                        <div className="h-1.5 w-full rounded bg-line" />
+                        <div className="h-1.5 w-2/3 rounded bg-line" />
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-1.5">
+                        <div className="h-8 rounded bg-faint" />
+                        <div className="h-8 rounded bg-faint" />
+                      </div>
                     </div>
                   </div>
                   <a
                     href="/api/demo/memo"
                     className="mt-3 inline-block text-[11px] font-medium text-brand underline-offset-2 hover:underline"
                   >
-                    Download the sample memo (PDF) →
+                    Download the sample memo →
                   </a>
-                  </div>
                 </div>
 
                 {/* Comps */}
                 <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
                   <h3 className="text-sm font-semibold">Comps, graded</h3>
-                  <p className="mt-1 text-xs leading-relaxed text-muted">
-                    The broker&apos;s comps ranked by how hard they support the
-                    price — plus a public-web search when the deck has none.
-                  </p>
-                  <div className="mt-auto space-y-1.5 pt-4 text-[10px]">
+                  <div className="mt-4 space-y-1.5 text-[10px]">
                     {[
                       ["The Brixton", "Supports", "text-pass bg-pass/10"],
                       ["Parkside", "Leans favorable", "text-caution bg-caution/10"],
@@ -1152,90 +781,10 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Reconcile */}
-                <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
-                  <h3 className="text-sm font-semibold">
-                    Your model vs the OM
-                  </h3>
-                  <p className="mt-1 text-xs leading-relaxed text-muted">
-                    Upload your own underwriting and every gap gets called —
-                    favorable, unfavorable, or noise.
-                  </p>
-                  <div className="mt-auto space-y-1.5 pt-4 font-mono text-[10px]">
-                    {SAMPLE_RECONCILE_ROWS.map(([k, v, d]) => (
-                      <div
-                        key={k}
-                        className="flex items-center justify-between gap-2 rounded-md border border-line px-2.5 py-1.5"
-                      >
-                        <span className="text-muted">{k}</span>
-                        <span className="truncate text-muted">{v}</span>
-                        <span className="font-semibold text-caution">{d}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Team */}
-                <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
-                  <h3 className="text-sm font-semibold">One team, one pipeline</h3>
-                  <p className="mt-1 text-xs leading-relaxed text-muted">
-                    Invite your team with a link — everyone screens into the
-                    same pipeline, with the same verdicts. {PRICE_TEAM_MEMBER_MONTHLY} per added
-                    member.
-                  </p>
-                  <div className="mt-auto flex items-center gap-3 pt-4">
-                    <div className="flex -space-x-2">
-                      {["A", "M", "J"].map((c, i) => (
-                        <span
-                          key={i}
-                          className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-surface bg-brand/10 text-xs font-semibold text-brand"
-                        >
-                          {c}
-                        </span>
-                      ))}
-                    </div>
-                    <span className="text-[10px] leading-tight text-muted">
-                      same deals ·<br />
-                      same screen
-                    </span>
-                  </div>
-                </div>
-
-                {/* Retrade watch */}
-                <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
-                  <h3 className="text-sm font-semibold">Built for the retrade</h3>
-                  <p className="mt-1 text-xs leading-relaxed text-muted">
-                    Broker cut the price and reissued the deck? Replace the OM,
-                    re-screen, and see exactly what moved — and whether the
-                    verdict flips.
-                  </p>
-                  <div className="mt-auto space-y-1.5 pt-4">
-                    <div className="flex items-center gap-1.5 text-[10px] font-semibold">
-                      <span className="rounded-full bg-caution/10 px-2 py-0.5 text-caution">
-                        Caution
-                      </span>
-                      <span aria-hidden className="text-muted">→</span>
-                      <span className="rounded-full bg-pass/10 px-2 py-0.5 text-pass">
-                        Go
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between rounded-md border border-pass/25 bg-pass/[0.04] px-2.5 py-1.5 font-mono text-[10px]">
-                      <span className="text-muted">Asking price</span>
-                      <span className="font-semibold text-pass">{SAMPLE_RETRADE_DELTA}</span>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Buy box */}
                 <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card lg:col-span-2">
-                  <h3 className="text-sm font-semibold">Your buy box, enforced</h3>
-                  <p className="mt-1 max-w-md text-xs leading-relaxed text-muted">
-                    Set your criteria once — asset classes, markets, max price,
-                    minimum cap and IRR. Every screen is checked against them in
-                    code, off-box deals get flagged within the first read, and
-                    the verdict judges the fit out loud.
-                  </p>
-                  <div className="mt-auto flex flex-wrap gap-1.5 pt-4 text-[10px] font-medium">
+                  <h3 className="text-sm font-semibold">Your buy box, checked in code</h3>
+                  <div className="mt-4 flex flex-wrap gap-1.5 text-[10px] font-medium">
                     {(
                       [
                         ["✓", "Market", "text-pass border-line"],
@@ -1252,10 +801,6 @@ export default function Home() {
                         <span className="text-ink">{label}</span>
                       </span>
                     ))}
-                    <span className="ml-1 self-center text-muted">
-                      …a deal can be well-underwritten and still be outside the
-                      box. It says so.
-                    </span>
                   </div>
                 </div>
               </div>
@@ -1263,48 +808,37 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Precision, not language — the differentiator gets the dark band. */}
-        <section className="band-dark text-white">
+        {/* Everything else, as icons. */}
+        <section id="toolkit" className="scroll-mt-16">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-            <p className="text-xs font-medium uppercase tracking-wider text-accent/90">
-              Why not just ChatGPT?
-            </p>
-            <h2 className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">
-              Underwriting is a precision problem, not a language problem.
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/65">
-              Raw LLMs give answers that look right. But a 10% drift reads
-              perfectly fine in a sentence while it quietly kills the deal. So we
-              put a deterministic workflow on top of the AI — one that shows its
-              work.
-            </p>
-            <Reveal delay={60}>
-            <div className="mt-10 grid gap-8 sm:grid-cols-3">
-              {PILLARS.map((p) => (
-                <div key={p.title}>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/12 text-accent ring-1 ring-white/20">
-                    {p.icon}
-                  </div>
-                  <h3 className="mt-4 font-medium">{p.title}</h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-white/65">
-                    {p.body}
-                  </p>
-                </div>
-              ))}
-            </div>
+            <Reveal>
+              <SectionHead eyebrow="Also in the box" title="Everything else, at a glance." />
+            </Reveal>
+            <Reveal delay={80}>
+              <ul className="feature-grid mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {FEATURES.map((f) => (
+                  <li key={f.label}>
+                    <Link
+                      href={f.href}
+                      className="hover-lift flex h-full flex-col items-start gap-3 rounded-xl border border-line bg-surface p-4 shadow-card transition-colors hover:border-brand/30"
+                    >
+                      <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand/10 text-brand">
+                        {f.icon}
+                      </span>
+                      <span className="text-sm font-medium leading-snug">{f.label}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             </Reveal>
           </div>
         </section>
 
         {/* Pricing */}
-        <section id="pricing" className="scroll-mt-16 mx-auto max-w-6xl px-6 py-16 sm:py-20">
+        <section id="pricing" className="scroll-mt-16 border-t border-line">
+          <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
           <Reveal>
-            <p className="text-xs font-medium uppercase tracking-wider text-muted">
-              Pricing
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
-              Start free. Upgrade when the screen earns it.
-            </h2>
+            <SectionHead eyebrow="Pricing" title="Start free. Upgrade when the screen earns it." />
           </Reveal>
           <Reveal delay={80}>
             <div className="mt-8 grid gap-5 md:grid-cols-3">
@@ -1314,9 +848,7 @@ export default function Home() {
                 <p className="mt-2 flex items-baseline gap-1">
                   <span className="text-4xl font-semibold tracking-tight">$0</span>
                 </p>
-                <p className="mt-1 text-sm text-muted">
-                  The full screen, on your next {FREE_DEALS} deals.
-                </p>
+                <p className="mt-1 text-sm text-muted">The full screen on your next {FREE_DEALS} deals.</p>
                 <ul className="mt-5 flex-1 space-y-2.5">
                   {FREE_FEATURES.map((f) => (
                     <li key={f} className="flex items-start gap-2.5 text-sm">
@@ -1345,9 +877,7 @@ export default function Home() {
                   <span className="text-4xl font-semibold tracking-tight">{PRICE_PRO_MONTHLY}</span>
                   <span className="text-sm text-muted">/month</span>
                 </p>
-                <p className="mt-1 text-sm text-muted">
-                  Unlimited screening, plus the artifacts you hand to your IC.
-                </p>
+                <p className="mt-1 text-sm text-muted">Unlimited screens, plus the exports for your IC.</p>
                 <ul className="mt-5 flex-1 space-y-2.5">
                   {PRO_FEATURES.map((f) => (
                     <li key={f} className="flex items-start gap-2.5 text-sm">
@@ -1364,9 +894,7 @@ export default function Home() {
                 >
                   Start with Pro
                 </Link>
-                <p className="mt-2.5 text-center text-xs text-muted">
-                  Cancel anytime — your deals and exports stay yours.
-                </p>
+                <p className="mt-2.5 text-center text-xs text-muted">Cancel anytime — your deals and exports stay yours.</p>
               </div>
 
               {/* Team */}
@@ -1377,8 +905,7 @@ export default function Home() {
                   <span className="text-sm text-muted">/month</span>
                 </p>
                 <p className="mt-1 text-sm text-muted">
-                  Includes the owner, + {PRICE_TEAM_MEMBER_MONTHLY}/month per added member. One
-                  shared pipeline for the whole shop.
+                  Includes the owner, + {PRICE_TEAM_MEMBER_MONTHLY}/month per added member.
                 </p>
                 <ul className="mt-5 flex-1 space-y-2.5">
                   {[
@@ -1406,20 +933,15 @@ export default function Home() {
             </div>
           </Reveal>
           <p className="mt-5 text-center text-xs text-muted">
-            Billed monthly through Stripe · cancel anytime · no card required
-            for Free.
+            Billed monthly through Stripe · cancel anytime · no card required for Free.
           </p>
+          </div>
         </section>
 
         {/* FAQ */}
         <section id="faq" className="scroll-mt-16 border-y border-line bg-faint">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted">
-              FAQ
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
-              The questions we&apos;d ask too.
-            </h2>
+            <SectionHead eyebrow="FAQ" title="The questions we'd ask too." />
             <div className="mx-auto mt-8 max-w-3xl divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
               {FAQ.map((f, i) => (
                 <details key={f.q} className="group">
@@ -1459,10 +981,6 @@ export default function Home() {
             <h2 className="mx-auto mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
               Every deal gets your sharpest screen.
             </h2>
-            <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-white/65 sm:text-base">
-              Make every analyst underwrite like your sharpest principal — the
-              same rigor on every deal, no matter who&apos;s tired.
-            </p>
             <div className="mt-8 flex justify-center">
               <Link
                 href="/login?mode=signup"
@@ -1513,13 +1031,18 @@ export default function Home() {
                 </Link>
               </li>
               <li>
-                <a href="#pricing" className="text-muted transition-colors hover:text-ink">
-                  Pricing
-                </a>
+                <Link href="/market" className="text-muted transition-colors hover:text-ink">
+                  Market data
+                </Link>
               </li>
               <li>
-                <a href="#faq" className="text-muted transition-colors hover:text-ink">
-                  FAQ
+                <Link href="/whats-new" className="text-muted transition-colors hover:text-ink">
+                  What&apos;s new
+                </Link>
+              </li>
+              <li>
+                <a href="#pricing" className="text-muted transition-colors hover:text-ink">
+                  Pricing
                 </a>
               </li>
               <li>
@@ -1560,7 +1083,6 @@ export default function Home() {
             </ul>
           </nav>
         </div>
-        <ShippedThisWeek />
         <div className="border-t border-line">
           <FooterTrustLine />
         </div>
@@ -1570,7 +1092,7 @@ export default function Home() {
 }
 
 /** A faithful miniature of the REAL deal page's summary bar — name + verdict
- *  + buy-box chips, the address line, exactly three figures, and the artifact
+ *  + buy-box chips, the address line, exactly four figures, and the artifact
  *  row (IC memo / Full report / Underwrite model), plus the top deal-killer.
  *  Figures derive from the sample fixture through the live engine, so this
  *  card can never drift from what the product actually renders. */
@@ -1660,130 +1182,6 @@ function DealPreview() {
   );
 }
 
-// ── Live proof strip (site-polish) ───────────────────────────────────────────
-// Real numbers from the research layer, QUERIED at render time — the rates
-// table and benchmark/rule counts come from the database when it's reachable
-// (service client, read-only), and from the checked-in research seeds
-// otherwise. Nothing here is typed-in marketing copy; if a value is missing
-// it simply doesn't render.
-async function LiveProofStrip() {
-  let pmms: { value: number; asOf: string } | null = null;
-  const seedBench = seedBenchmarks();
-  let benchCount = seedBench.length;
-  // Derived, never typed: the sector spread and FMR coverage move whenever
-  // the research seeds do — a hardcoded "14 sectors" drifted to fiction once.
-  const sectorCount = new Set(seedBench.map((b) => b.sector)).size;
-  const fmrMetroCount = new Set(
-    seedBench.filter((b) => b.metric === "hud_fmr_fy2026_2br").map((b) => b.metro)
-  ).size;
-  const ruleCount = seedRules().length;
-  let salesCount = 0;
-  let storyTitle: string | null = null;
-  try {
-    const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
-    const admin = createSupabaseAdminClient();
-    const [{ data: rate }, bench, sales, { data: s }] = await Promise.all([
-      admin
-        .from("rates")
-        .select("value, obs_date")
-        .eq("series_id", "MORTGAGE30US")
-        .order("obs_date", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      admin.from("benchmarks").select("id", { count: "exact", head: true }),
-      admin.from("recorded_sales").select("id", { count: "exact", head: true }),
-      admin
-        .from("market_intel_items")
-        .select("title")
-        .gte("relevance", 6)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-    ]);
-    if (rate) pmms = { value: Number(rate.value), asOf: String(rate.obs_date) };
-    if (bench.count) benchCount = Math.max(benchCount, bench.count);
-    // ruleCount stays the checked-in seed truth (see GroundLayerSection).
-    salesCount = sales.count ?? 0;
-    storyTitle = (s?.title as string | null) ?? null;
-  } catch {
-    // no env / tables — seeds carry the strip
-  }
-  if (!pmms) {
-    const seed = seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed");
-    if (seed?.low != null) pmms = { value: seed.low, asOf: seed.as_of };
-  }
-  const fmtDate = (iso: string) =>
-    new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      timeZone: "UTC",
-    });
-  const items = [
-    pmms && (
-      <>
-        30-yr fixed{" "}
-        <span className="font-mono font-semibold tabular-nums">{pmms.value}%</span>{" "}
-        <span className="text-muted">({fmtDate(pmms.asOf)}, FRED)</span>
-      </>
-    ),
-    <>
-      <span className="font-mono font-semibold tabular-nums">{benchCount}</span>{" "}
-      sourced benchmarks across{" "}
-      <span className="font-mono font-semibold tabular-nums">{sectorCount}</span>{" "}
-      sectors
-    </>,
-    fmrMetroCount > 0 && (
-      <>
-        FY2026 2BR fair-market rents on file for{" "}
-        <span className="font-mono font-semibold tabular-nums">{fmrMetroCount}</span>{" "}
-        covered-market entries
-      </>
-    ),
-    <>
-      <span className="font-mono font-semibold tabular-nums">{ruleCount}</span>{" "}
-      rent-control &amp; TOPA rules on file — every number carries its source
-    </>,
-    salesCount > 0 && (
-      <>
-        <span className="font-mono font-semibold tabular-nums">
-          {salesCount.toLocaleString("en-US")}
-        </span>{" "}
-        deed-recorded sales in the comps database
-      </>
-    ),
-    storyTitle && (
-      <>
-        top story by relevance:{" "}
-        <span className="font-semibold">“{storyTitle}”</span>
-      </>
-    ),
-    // Same checked-in changelog the app's What's-new card renders — the
-    // freshest visible proof that the product ships daily.
-    (() => {
-      const latest = latestChange();
-      return latest ? (
-        <>
-          shipped {fmtDate(latest.date)}:{" "}
-          <span className="font-semibold">{latest.title}</span>
-        </>
-      ) : null;
-    })(),
-  ].filter(Boolean);
-
-  return (
-    <div className="border-b border-line bg-faint/70">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-8 gap-y-1.5 px-6 py-3 text-sm">
-        {items.map((it, i) => (
-          <span key={i} className="inline-flex items-center gap-2">
-            <span aria-hidden className="beacon scale-75" />
-            {it}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ── Footer trust line ────────────────────────────────────────────────────────
 // "page rendered" catches stale deploys; "data last verified" is the nightly
 // steward's public heartbeat. No steward run yet → the claim simply doesn't
@@ -1855,489 +1253,5 @@ async function FooterTrustLine() {
       )}
       . A first-pass screen, not investment advice.
     </p>
-  );
-}
-
-// ── The ground layer (national expansion) ────────────────────────────────────
-// Four live-stat cards for the data floor: the ingested property database +
-// Pull Comps, laws attached to the building, the scored news feed, and the
-// nightly steward.
-// Every number is a live DB count or a code-derived fact; anything the DB
-// can't attest yet renders an honest not-yet state instead of a placeholder.
-interface StoryHead {
-  title: string;
-  source: string | null;
-  relevance: number | null;
-}
-
-async function GroundLayerSection() {
-  let salesCount = 0;
-  let propCount = 0;
-  const ruleCount = seedRules().length;
-  let storyCount = 0;
-  let topStory: StoryHead | null = null;
-  let stewardAt: string | null = null;
-  let correctionCount = 0;
-  try {
-    const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
-    const admin = createSupabaseAdminClient();
-    const [sales, props, stories, { data: s }, { data: run }, changes] =
-      await Promise.all([
-        admin.from("recorded_sales").select("id", { count: "exact", head: true }),
-        admin.from("properties").select("id", { count: "exact", head: true }),
-        admin.from("market_intel_items").select("url", { count: "exact", head: true }),
-        admin
-          .from("market_intel_items")
-          .select("title, source, relevance")
-          .gte("relevance", 6)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        admin
-          .from("steward_runs")
-          .select("finished_at, started_at")
-          .not("finished_at", "is", null)
-          .order("started_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        admin.from("data_changelog").select("id", { count: "exact", head: true }),
-      ]);
-    salesCount = sales.count ?? 0;
-    propCount = props.count ?? 0;
-    // ruleCount stays the checked-in seed truth: a database seeded before
-    // the 15-market cut (0029 not yet run) must not resurrect the old count.
-    storyCount = stories.count ?? 0;
-    topStory = (s as StoryHead | null) ?? null;
-    stewardAt = (run?.finished_at as string | null) ?? null;
-    correctionCount = changes.count ?? 0;
-  } catch {
-    // no env / tables — the not-yet states below stay honest
-  }
-  const num = (n: number) => n.toLocaleString("en-US");
-  const fmtD = (iso: string) =>
-    new Date(iso).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      timeZone: "UTC",
-    });
-
-  return (
-    <section id="ground" className="scroll-mt-16 border-y border-line bg-faint">
-      <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-        <Reveal>
-          <p className="text-xs font-medium uppercase tracking-wider text-muted">
-            The ground layer
-          </p>
-          <h2 className="mt-2 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl">
-            It doesn&apos;t just read the broker&apos;s numbers. It stands on
-            its own.
-          </h2>
-          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
-            Under every screen sits a data floor the broker didn&apos;t write:
-            government parcel and deed records, landlord law encoded as logic
-            on each building, the news scored for relevance to your mandate — and a
-            nightly steward that re-verifies all of it while you sleep.
-          </p>
-        </Reveal>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2">
-          <Reveal>
-            <div className="shadow-card h-full rounded-2xl border border-line bg-surface p-5">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted">
-                Pull comps on any address
-              </p>
-              {salesCount > 0 ? (
-                <p className="mt-2 flex items-center gap-2.5 font-mono text-2xl font-semibold tabular-nums">
-                  <span className="beacon shrink-0" aria-hidden />
-                  <span>
-                    {num(salesCount)}{" "}
-                    <span className="ml-1 font-sans text-sm font-normal text-muted">
-                      deed-recorded sales ingested — live
-                      {propCount > 0 && ` · ${num(propCount)} parcels`}
-                    </span>
-                  </span>
-                </p>
-              ) : (
-                <p className="mt-2 text-sm leading-relaxed">
-                  <span className="font-semibold">
-                    Bulk county deed records, loading market by market
-                  </span>{" "}
-                  <span className="text-muted">— Philadelphia is wired first.</span>
-                </p>
-              )}
-              <p className="mt-2 text-sm leading-relaxed text-muted">
-                Type an address, get the recorded sales around it — from
-                government deed records, with a source link on every row.
-                Live county APIs already cover {COMPS_JURISDICTIONS}; the
-                property database extends it nationally, with{" "}
-                {WIRED_MARKETS.join(", ")} pipelines wired. Single-family is
-                excluded by design, and the screener runs the same pull
-                against every deal automatically.
-              </p>
-            </div>
-          </Reveal>
-          <Reveal delay={40}>
-            <div className="shadow-card h-full rounded-2xl border border-line bg-surface p-5">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted">
-                The laws, as logic
-              </p>
-              <p className="mt-2 font-mono text-2xl font-semibold tabular-nums">
-                {/* The space is real text, not just the span's margin: a screen
-                    reader (and the page lint) read the number and the noun as
-                    one word without it. */}
-                {ruleCount}{" "}
-                <span className="ml-1 text-sm font-normal text-muted">
-                  machine-evaluable rules, focused on your markets
-                </span>
-              </p>
-              <p className="mt-2 text-sm leading-relaxed text-muted">
-                Rent control, TOPA, licensing, deposits, eviction — encoded as
-                conditions with their exemption paths, statutory quotes, and
-                sources, attached to the building: every deal&apos;s address
-                gets the rules that touch it evaluated automatically. A rule
-                that looks like it changed hits the news feed and a red
-                banner the same morning.
-              </p>
-            </div>
-          </Reveal>
-          <Reveal delay={80}>
-            <div className="shadow-card h-full rounded-2xl border border-line bg-surface p-5">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted">
-                The news, scored for you
-              </p>
-              {topStory ? (
-                <p className="mt-2 text-sm leading-relaxed">
-                  <span className="font-semibold">“{topStory.title}”</span>{" "}
-                  <span className="text-muted">
-                    — relevance {topStory.relevance}/10
-                    {topStory.source ? ` (${topStory.source})` : ""}
-                    {storyCount > 0 && ` · ${num(storyCount)} stories tracked`}
-                  </span>
-                </p>
-              ) : (
-                <p className="mt-2 text-sm leading-relaxed">
-                  <span className="font-semibold">
-                    Every weekday&apos;s stories, scored 0–10 for relevance to your mandate.
-                  </span>
-                </p>
-              )}
-              <p className="mt-2 text-sm leading-relaxed text-muted">
-                A morning sweep gathers the news that touches your markets,
-                rates, tax, and regulation, scores each story for how much it
-                matters to you, and links every headline straight to its
-                source — with law changes red-bannered the same day.
-              </p>
-            </div>
-          </Reveal>
-          <Reveal delay={120}>
-            <div className="shadow-card h-full rounded-2xl border border-line bg-surface p-5">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted">
-                A steward that never sleeps
-              </p>
-              {stewardAt ? (
-                <p className="mt-2 flex items-center gap-2 text-sm leading-relaxed">
-                  <span className="beacon shrink-0" aria-hidden />
-                  <span>
-                    <span className="font-semibold">
-                      Data last verified {fmtD(stewardAt)}
-                    </span>{" "}
-                    <span className="text-muted">
-                      {correctionCount > 0 &&
-                        `· ${num(correctionCount)} corrections logged in the open`}
-                    </span>
-                  </span>
-                </p>
-              ) : (
-                <p className="mt-2 text-sm leading-relaxed">
-                  <span className="font-semibold">
-                    Nightly re-verification, with a public changelog.
-                  </span>
-                </p>
-              )}
-              <p className="mt-2 text-sm leading-relaxed text-muted">
-                Every night it re-checks source links, feed freshness, and the
-                oldest singly-sourced claims against the live web. A number
-                that changed at the source gets corrected in the open —
-                old, new, reason, evidence — never silently. If the steward
-                itself stops, the site says so within 48 hours.
-              </p>
-            </div>
-          </Reveal>
-        </div>
-        <Reveal delay={140}>
-          <p className="mt-6 text-center text-sm text-muted">
-            All of it is already wired into the{" "}
-            <Link
-              href="/demo"
-              className="font-medium text-brand underline decoration-dotted underline-offset-2"
-            >
-              fully worked sample screen
-            </Link>
-            {" — "}including the recorded-sales read on the sample&apos;s own
-            submarket.
-          </p>
-        </Reveal>
-      </div>
-    </section>
-  );
-}
-
-// ── Research ticker (site-polish 2) ──────────────────────────────────────────
-// A slow marquee of REAL figures from the research layer — the same seeds the
-// market page renders with provenance. Content duplicated once for a seamless
-// CSS loop; hover pauses; reduced-motion gets a static row.
-/** The three newest shipped improvements, visible on the public page — the
- *  same checked-in changelog the app renders, so the homepage's freshness
- *  story can never outrun the product. */
-function ShippedThisWeek() {
-  const entries = changelogEntries(3);
-  if (entries.length === 0) return null;
-  const fmt = (iso: string) =>
-    new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      timeZone: "UTC",
-    });
-  return (
-    <div className="border-t border-line bg-faint/60">
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-sm font-semibold tracking-tight">
-            Built in the open — shipping daily
-          </h2>
-          <Link
-            href="/whats-new"
-            className="text-xs font-medium text-brand hover:text-brand-strong"
-          >
-            Full log →
-          </Link>
-        </div>
-        {/* The card shows the note's opening, not the note: a long entry
-            (the plan-deal round runs to a page) would be a wall of text on
-            a phone. The full note is one tap away on /whats-new. */}
-        <ul className="mt-3 grid gap-3 sm:grid-cols-3">
-          {entries.map((e) => (
-            <li key={`${e.date}|${e.title}`} className="rounded-xl border border-line bg-surface p-3.5">
-              <p className="text-sm font-medium leading-snug">{e.title}</p>
-              <p className="mt-1 line-clamp-4 text-xs leading-relaxed text-muted">{e.blurb}</p>
-              <p className="mt-1.5 flex items-baseline justify-between gap-2 text-[11px] text-muted">
-                <span>{fmt(e.date)}</span>
-                <Link href="/whats-new" className="font-medium text-brand hover:text-brand-strong">
-                  Read the note →
-                </Link>
-              </p>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-}
-
-/** The covered markets as a marquee — every entry from metros.json with a
- *  REAL per-market fact (sourced FY2026 2BR FMR when we have one, else the
- *  count of statute-linked rules on file). Scrolls opposite the price
- *  ticker; pauses on hover; still under prefers-reduced-motion. */
-/** Hero rotator — one covered market at a time, 4.5s each, facts from the
- *  same seed the marquee reads. The animated stack is aria-hidden (it
- *  repeats the marquee's content); screen readers get one static sentence.
- *  The keyframes in globals.css assume EXACTLY 6 items — render 6 or none. */
-function HeroNowScreening() {
-  const withFacts = (metrosSeed.metros ?? [])
-    .map((m) => {
-      return metroFact(m) !== null ? m : null;
-    })
-    .filter((m): m is NonNullable<typeof m> => m !== null);
-  // Stride across the seed's region ordering so the six picks span the
-  // coverage map instead of clustering in the DMV block at the top; the
-  // pick slot drives which sector leads, so six slots never read as an
-  // all-office wall even when the stride lands on same-shaped metros.
-  const step = Math.floor(withFacts.length / 6);
-  const picks =
-    step >= 1
-      ? Array.from({ length: 6 }, (_, i) => {
-          const m = withFacts[i * step];
-          if (m === undefined) return undefined;
-          const fact = metroFact(m, i);
-          return fact
-            ? ([(m as { name: string }).name, fact] as const)
-            : undefined;
-        }).filter((x): x is readonly [string, string] => x !== undefined)
-      : [];
-  if (picks.length !== 6) return null;
-  return (
-    <div className="mt-3 max-w-xl font-mono text-[11px] uppercase tracking-wider">
-      <span className="sr-only">
-        Now screening the {MARKET_COUNT} covered markets, including{" "}
-        {picks.map(([name]) => name).join(", ")}.
-      </span>
-      <div aria-hidden className="flex items-baseline gap-2">
-        <span className="shrink-0 text-white/55">Now screening:</span>
-        <span className="relative block min-w-0 flex-1">
-          {picks.map(([name, fact], i) => (
-            <span
-              key={name}
-              className={`hero-rotator-item block truncate ${i === 0 ? "" : "absolute inset-0"}`}
-              style={{ animationDelay: `${i * 4.5}s` }}
-            >
-              <span className="text-accent">{name}</span>
-              <span className="text-white/55"> · {fact}</span>
-            </span>
-          ))}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function ResearchTicker() {
-  const bench = seedBenchmarks();
-  const pick = (metro: string, metric: string) =>
-    bench.find((b) => b.metro === metro && b.metric === metric)?.low ?? null;
-  const money = (n: number | null) =>
-    n === null ? null : n >= 10000 ? `$${Math.round(n / 1000)}k` : `$${n.toLocaleString()}`;
-  // Each candidate renders only when its number actually exists — a missing
-  // seed drops the item rather than showing "—" or "$0".
-  const pmmsVal = pick("", "pmms_30y_fixed");
-  // One FMR item per covered market that has a sourced FY2026 figure —
-  // derived from the SAME seed rows the market briefs and deal benchmarks
-  // render, never typed here. The DC HMFA figure backs four jurisdiction
-  // entries (DC, PG, MoCo, NoVA); it rides once, labeled for the metro,
-  // instead of four times at the same dollar. A metro without a verified
-  // figure (Seattle today) simply doesn't ride — a gap is a gap.
-  const DC_HMFA_SIBLINGS = new Set(["pg_county", "montgomery_county", "nova"]);
-  const fmrItems = (metrosSeed.metros ?? [])
-    .filter((m) => !DC_HMFA_SIBLINGS.has(m.id))
-    .map((m) => {
-      // DC's benchmark row generates from multifamily.json under the label
-      // "Washington DC area" (the metros.json generator skips id "dc") — the
-      // seed name alone would silently drop the DC item from the ticker.
-      const rowMetro =
-        m.id === "dc" ? "Washington DC area" : (m as { name: string }).name;
-      const v = pick(rowMetro, "hud_fmr_fy2026_2br");
-      if (v === null) return null;
-      const label =
-        m.id === "dc" ? "DC metro (incl. PG · MoCo · NoVA)" : (m as { name: string }).name;
-      return [
-        `${label} FY2026 2BR FMR`,
-        `$${v.toLocaleString()}/mo`,
-        `/market?metro=${m.id}`,
-      ] as readonly [string, string, string];
-    })
-    .filter((x): x is readonly [string, string, string] => x !== null);
-  // A handful of sector reads ride the ticker too — the pick list is fixed,
-  // but every figure derives from the snapshot blocks: if a number changes
-  // the ticker follows, and a metro gone null simply drops its item.
-  const sectorItems = (
-    [
-      ["san_francisco", "office", "SF office vacancy"],
-      ["dallas", "office", "DFW office vacancy"],
-      ["nova", "office", "NoVA office vacancy"],
-      ["chicago", "industrial", "Chicago industrial"],
-      ["miami", "industrial", "Miami industrial"],
-      ["los_angeles", "multifamily", "LA multifamily vacancy"],
-    ] as const
-  )
-    .map(([id, sector, label]) => {
-      const m = (metrosSeed.metros ?? []).find((x) => x.id === id);
-      const blk = (
-        m as {
-          sector_snapshot?: Record<
-            string,
-            {
-              vacancy_pct?: number | null;
-              vacancy_pct_low?: number | null;
-              vacancy_pct_high?: number | null;
-              asking_rent_psf?: number | null;
-            }
-          > | null;
-        }
-      )?.sector_snapshot?.[sector];
-      if (!blk) return null;
-      const lo = blk.vacancy_pct ?? blk.vacancy_pct_low;
-      const hi = blk.vacancy_pct ?? blk.vacancy_pct_high ?? lo;
-      const bits: string[] = [];
-      if (typeof lo === "number")
-        bits.push(lo === hi ? `${lo}%` : `${lo}–${hi}%`);
-      if (typeof blk.asking_rent_psf === "number")
-        bits.push(`$${blk.asking_rent_psf.toFixed(2)}/SF`);
-      if (bits.length === 0) return null;
-      return [label, bits.join(" · "), `/market?metro=${id}`] as readonly [
-        string,
-        string,
-        string,
-      ];
-    })
-    .filter((x): x is readonly [string, string, string] => x !== null);
-  const phillyMed = money(pick("Philadelphia, PA", "median_sale_price_2_4_unit"));
-  // YoY comes from the SAME seed row as the median — never typed beside it.
-  const phillyYoY = bench
-    .find((b) => b.metro === "Philadelphia, PA" && b.metric === "median_sale_price_2_4_unit")
-    ?.note?.match(/YoY ([+\-]?[\d.]+%)/)?.[1];
-  // [label, value, destination] — every item is a real link into the surface
-  // that backs the number (a metro's brief, or the market page's rates and
-  // coverage strips), mirroring the marquee: navigation, not decoration.
-  const items = (
-    [
-      pmmsVal !== null && ["30-yr fixed", `${pmmsVal}% · FRED`, "/market"],
-      // In-scope items only — the 15 covered markets are the whole story.
-      phillyMed && [
-        "Philadelphia 2–4 unit median",
-        phillyYoY ? `${phillyMed} · ${phillyYoY} YoY` : phillyMed,
-        "/market?metro=philadelphia",
-      ],
-      ...fmrItems,
-      ...sectorItems,
-      ["MoCo rent cap", "CPI+3% · max 6%", "/market?metro=montgomery_county"],
-      ["Chicago owner-occupied ≤6 units", "RLTO exempt", "/market?metro=chicago"],
-      ["NY Good Cause", "≤10-unit landlords exempt", "/market?metro=nyc"],
-      ["DC ≤4-unit natural-person exemption", "verified vs statute", "/market?metro=dc"],
-      ["PG County cap", "lesser of 6% or CPI+3%", "/market?metro=pg_county"],
-      ["Jersey City 1–4 unit stock", "rent-control exempt, any owner", "/market?metro=newark_jc"],
-      ["NYC 2–4 unit product", "outside rent stabilization", "/market?metro=nyc"],
-      ["WA statewide cap 2026", "9.683% (HB 1217)", "/market?metro=seattle"],
-      ["LA RSO from Jul 2026", "90% of CPI · 1–4%", "/market?metro=los_angeles"],
-      ["SF pre-1979 stock", "Rent Board caps + just cause", "/market?metro=san_francisco"],
-      [`${RULE_COUNT} landlord-law rules`, "statute-linked · your markets first", "/market"],
-      ["Recorded-sales comps", COMPS_JURISDICTIONS, "/market"],
-    ] as const
-  ).filter((it): it is [string, string, string] => Array.isArray(it) && !!it[1]);
-
-  const row = (hidden: boolean) => (
-    <div
-      aria-hidden={hidden || undefined}
-      className="flex shrink-0 items-center gap-10 pr-10"
-    >
-      {items.map(([k, v, href]) => (
-        <Link
-          key={String(k)}
-          href={href}
-          tabIndex={hidden ? -1 : undefined}
-          className="group inline-flex items-baseline gap-2 whitespace-nowrap text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-        >
-          <span className="text-white/55 underline-offset-2 group-hover:text-white/80 group-hover:underline">
-            {k}
-          </span>
-          <span className="font-mono font-semibold tabular-nums text-accent">{v}</span>
-        </Link>
-      ))}
-    </div>
-  );
-
-  return (
-    <div className="band-dark overflow-hidden border-t border-white/10 py-3 text-white">
-      <p className="mb-1.5 text-center text-[11px] font-medium uppercase tracking-wider text-white/55">
-        Live from the research layer — sourced, dated, statute-linked · tap any
-        figure for its market
-      </p>
-      {/* Duration scales with item count (~3s each) so adding markets never
-          speeds the scroll — the CSS class alone assumes a fixed row. */}
-      <div
-        className="ticker-track flex w-max"
-        style={{ animationDuration: `${Math.max(40, items.length * 3)}s` }}
-      >
-        {row(false)}
-        {row(true)}
-      </div>
-    </div>
   );
 }

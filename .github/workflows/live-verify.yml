@@ -30,29 +30,23 @@ jobs:
       - name: Check for current-build markers
         run: |
           echo "== MARKER CHECKS =="
-          grep -c "Stop underwriting like a" body.html && echo "HERO: CURRENT (coin-flip headline restored per request)" || echo "HERO: OLD OR MISSING"
+          # The Sep 8 simplification (#240) cut the homepage to one idea per
+          # section — the markers below are the pieces that still exist. The
+          # decisive freshness evidence is the build sha stamp, not any copy.
+          grep -c "Stop underwriting like a" body.html && echo "HERO: CURRENT (coin-flip headline)" || echo "HERO: OLD OR MISSING"
           grep -c "The OM lands Thursday" body.html && echo "SUPERSEDED HERO STILL PRESENT" || true
           grep -o "page rendered[^<]*" body.html || echo "no render stamp found"
-          grep -c "ticker-track" body.html && echo "TICKER: present" || echo "TICKER: missing"
-          grep -c "The ground layer" body.html && echo "GROUND LAYER (national expansion): present" || echo "GROUND LAYER: missing"
           grep -o "data last verified[^<]*" body.html && echo "STEWARD MARKER: present" || echo "STEWARD MARKER: absent (no steward run yet — expected until the nightly cron lands)"
-          grep -c "Silver Spring fourplex" body.html && echo "OVERNIGHT PLAYGROUND (Aug 22): present" || echo "OVERNIGHT PLAYGROUND: MISSING — serving a pre-Aug-22-overnight build"
-          grep -c "rolling age exemption" body.html && echo "OVERNIGHT COPY (Aug 22): present" || echo "OVERNIGHT COPY: MISSING"
-          grep -c "ticker-track-reverse" body.html && echo "MARKETS MARQUEE (Aug 23): present" || echo "MARKETS MARQUEE: not yet deployed"
-          grep -c "Built in the open" body.html && echo "SHIPPED BLOCK (Aug 23): present" || echo "SHIPPED BLOCK: not yet deployed"
-          grep -c "hero-rotator-item" body.html && echo "HERO ROTATOR (Aug 23): present" || echo "HERO ROTATOR: not yet deployed"
-          grep -c "Break it yourself" body.html && echo "STRESS BENCH (Aug 24): present" || echo "STRESS BENCH: not yet deployed"
-          grep -c "Or hold its artifacts" body.html && echo "ARTIFACT LINKS (Aug 24): present" || echo "ARTIFACT LINKS: not yet deployed"
-          grep -c "Legal screen:" body.html && echo "LEGAL BABY NOTE (Aug 24): present" || echo "LEGAL BABY NOTE: not yet deployed"
-          grep -c "pulse-tile" body.html && echo "MARKET PULSE BOARD (Aug 24): present" || echo "MARKET PULSE BOARD: not yet deployed"
-          grep -c "irr-gauge" body.html && echo "IRR GAUGE (Aug 24): present" || echo "IRR GAUGE: not yet deployed"
-          grep -c "stamp-in" body.html && echo "VERDICT STAMP (Aug 24): present" || echo "VERDICT STAMP: not yet deployed"
-          grep -c "rt-strike" body.html && echo "RETRADE REPLAY (Aug 25): present" || echo "RETRADE REPLAY: not yet deployed"
-          grep -c "scroll-progress" body.html && echo "SCROLL PROGRESS (Aug 25): present" || echo "SCROLL PROGRESS: not yet deployed"
-          grep -c "Primary documents on file" body.html && echo "PRIMARY SOURCES STRIP (Aug 25): present" || echo "PRIMARY SOURCES STRIP: not yet deployed"
-          grep -c "when a screen turns into real work" body.html && echo "DEEP TOOLS GRID (Aug 28, phases 1-4): present" || echo "DEEP TOOLS GRID: not yet deployed"
-          grep -c "Which assumption moved the IRR" body.html && echo "ASSUMPTION BRIDGE COPY (Aug 28): present" || echo "ASSUMPTION BRIDGE COPY: not yet deployed"
-          grep -c "checked against the submarket" body.html && echo "SUBMARKET SUPPLY COPY (Aug 28): present" || echo "SUBMARKET SUPPLY COPY: not yet deployed"
+          grep -c "stage-rail" body.html && echo "SIX-STAGE RAIL (Sep 8, #240): present" || echo "SIX-STAGE RAIL (Sep 8, #240): not yet deployed"
+          grep -c "feature-grid" body.html && echo "FEATURE ICON GRID (Sep 8, #240): present" || echo "FEATURE ICON GRID (Sep 8, #240): not yet deployed"
+          grep -c "screenrun-line" body.html && echo "SCREEN-RUN TRACE: present" || echo "SCREEN-RUN TRACE: missing"
+          grep -c "Break it yourself" body.html && echo "STRESS BENCH: present" || echo "STRESS BENCH: missing"
+          grep -c "irr-gauge" body.html && echo "IRR GAUGE: present" || echo "IRR GAUGE: missing"
+          grep -c "stamp-in" body.html && echo "VERDICT STAMP: present" || echo "VERDICT STAMP: missing"
+          grep -c "scroll-progress" body.html && echo "SCROLL PROGRESS: present" || echo "SCROLL PROGRESS: missing"
+          grep -c "Aerial view of" body.html && echo "MARKETS GALLERY (aerials): present" || echo "MARKETS GALLERY: missing"
+          grep -c "The ground layer" body.html && echo "GROUND LAYER TEXT: STILL PRESENT (pre-#240 build)" || echo "GROUND LAYER TEXT: gone (correct after #240)"
+          grep -c "pulse-tile" body.html && echo "MARKET PULSE BOARD: STILL PRESENT (pre-#240 build)" || echo "MARKET PULSE BOARD: gone (correct after #240)"
           grep -o 'name="uc-build" content="[0-9a-f]*"' body.html | head -1 && echo "SELF-HEAL SENTINEL: armed (stale browser copies reload themselves)" || echo "SELF-HEAL SENTINEL: not yet deployed"
           live=$(grep -o 'commit/[0-9a-f]\{7\}' body.html | head -1 | cut -d/ -f2)
           echo "LIVE BUILD SHA: ${live:-not stamped yet} · this run's main tip: ${GITHUB_SHA:0:7}"
@@ -68,7 +62,7 @@ jobs:
             echo "== $host =="
             code=$(curl -sS -o alt.html -w "%{http_code}" --max-time 30 -H "Cache-Control: no-cache" "https://$host/?probe=${GITHUB_RUN_ID}" || echo "FETCH-FAILED")
             echo "HTTP $code · $(wc -c < alt.html 2>/dev/null || echo 0) bytes"
-            grep -q "Silver Spring fourplex" alt.html && echo "  serves the CURRENT build" || echo "  does NOT serve the current build"
+            grep -q 'name="uc-build"' alt.html && echo "  serves a build with the self-heal sentinel: $(grep -o 'name="uc-build" content="[0-9a-f]*"' alt.html | head -1)" || echo "  does NOT serve the current build"
             grep -o "latest improvement:[^<]*" alt.html | head -1 || true
             rm -f alt.html
           done
@@ -94,19 +88,11 @@ jobs:
           # within-column shading rule stated in the header.
           grep -q "so office compares to office" p_market.html && echo "COVERAGE HEAT GRID (Aug 25): present" || echo "COVERAGE HEAT GRID (Aug 25): not yet deployed"
           grep -q "Asset-type read" p_market.html && echo "/market: compare sector table present (Aug 25)" || echo "/market: compare sector table not yet deployed"
-          grep -q "The trackers disagree too" body.html && echo "SPREAD BOARD (Aug 25): present" || echo "SPREAD BOARD (Aug 25): not yet deployed"
-          grep -q "DFW office vacancy" body.html && echo "TICKER SECTOR ITEMS (Aug 25): present" || echo "TICKER SECTOR ITEMS (Aug 25): not yet deployed"
-          grep -q "pulse-face" body.html && echo "PULSE TILES ROTATE ASSET CLASSES (Aug 25): present" || echo "PULSE TILES ROTATE ASSET CLASSES (Aug 25): not yet deployed"
-          # The marquee/hero fact strings lead with a sector read and end in the
-          # rules count — a combination only the sector-led metroFact produces.
-          grep -qE "% vac[^<]*rules? on file" body.html && echo "MARQUEE AND HERO SPEAK ASSET CLASSES (Aug 25): present" || echo "MARQUEE AND HERO SPEAK ASSET CLASSES (Aug 25): not yet deployed"
           grep -q "grid grid-cols-1 items-center gap-12" body.html && echo "MOBILE HERO GRID FIX (Aug 25): present" || echo "MOBILE HERO GRID FIX (Aug 25): not yet deployed"
-          # The board's sector-lens strip: tightest market per asset class,
-          # each chip opening the full /market?sector= ranking.
-          grep -q "tightest on file" body.html && echo "SECTOR LENS STRIP (Aug 25): present" || echo "SECTOR LENS STRIP (Aug 25): not yet deployed"
-          # Scope consistency: the board counts jurisdiction TILES, not
-          # markets — "18 covered markets" contradicted the 15-market scope.
-          grep -q "jurisdiction tiles across" body.html && echo "SCOPE WORDING FIX (Aug 26): present" || echo "SCOPE WORDING FIX (Aug 26): not yet deployed"
+          # The gallery tiles carry the sector-led metro facts (the marquee
+          # left the homepage in #240; the fact strings ride the aerials now).
+          grep -qE "% vac[^<]*rules? on file" body.html && echo "GALLERY FACTS SPEAK ASSET CLASSES: present" || echo "GALLERY FACTS SPEAK ASSET CLASSES: not present"
+          # Scope consistency: "18 covered markets" contradicted the 15-market scope.
           grep -q "18 covered markets" body.html && echo "SCOPE CONTRADICTION: REGRESSED (18 covered markets is back)" || echo "SCOPE CONTRADICTION: absent (correct)"
           # Full-coverage spot check: Dallas's brief must carry its encoded
           # industrial note — proves the batch-2-5 metros serve, not just batch 1.
@@ -164,20 +150,20 @@ jobs:
             && echo "/api/demo/report: serves a real PDF ($(wc -c < report.pdf) bytes)" \
             || echo "/api/demo/report: not serving PDF bytes (pre-#126 build, or report render failing)"
       - name: Verdict
-        # Three tiers: the standing markers prove the site is up and on the
-        # right lineage; the OVERNIGHT marker proves the build is from the
-        # Aug-22 overnight run or later — the standing markers alone cannot
-        # tell a fresh build from a stale one.
+        # Two tiers: the hero headline proves the site is up and on the right
+        # lineage; the build-sha stamp (the uc-build sentinel, printed above
+        # beside this run's main tip) is what tells a fresh build from a stale
+        # one — no copy marker can, since copy is exactly what changes.
         run: |
-          if ! grep -q "Stop underwriting like a" body.html || ! grep -q "The ground layer" body.html; then
+          if ! grep -q "Stop underwriting like a" body.html; then
             echo "VERDICT: LIVE SITE IS SERVING AN OLD BUILD — Render is not deploying main. Check dashboard.render.com → underwrite-copilot-web → Events for failed deploys (likely build OOM on the starter instance) or auto-deploy toggled off."
             exit 1
           fi
-          if ! grep -q "Silver Spring fourplex" body.html; then
-            echo "VERDICT: SITE UP but serving a build OLDER than the Aug-22 overnight run — Render likely stopped picking up pushes partway through. Check Render → Events."
+          if ! grep -q 'name="uc-build"' body.html; then
+            echo "VERDICT: SITE UP but serving a build without the build stamp (pre-Aug-25) — Render likely stopped picking up pushes partway through. Check Render → Events."
             exit 1
           fi
-          echo "VERDICT: LIVE SITE IS CURRENT (origin serves the overnight build) — any 'unchanged' sighting is client-side cache; a refresh after ~10 minutes clears it now that expireTime is capped."
+          echo "VERDICT: LIVE SITE IS CURRENT — compare LIVE BUILD SHA to this run's main tip above; any 'unchanged' sighting is client-side cache, and a refresh after ~10 minutes clears it now that expireTime is capped."
       # The public pages are rendered from live data, so they only exist as
       # HTML once fetched — this is the one place their text can be read the
       # way a visitor's screen reader reads it. Every page fetched above plus
