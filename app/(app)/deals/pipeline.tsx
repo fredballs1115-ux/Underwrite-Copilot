@@ -54,7 +54,7 @@ export type DealCard = {
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
-  slots: { cap: string | null; price: string | null };
+  slots: { cap: string | null; price: string | null; yoc: string | null };
   /** latest analysis-job state, for deals still screening */
   jobStatus?: "running" | "failed" | null;
   /** the deal has an address, so an aerial thumbnail can be attempted */
@@ -1132,9 +1132,15 @@ const DealRow = memo(function DealRow({
   const priceBit = d.slots.price ? (
     <span className="font-mono tabular-nums">{d.slots.price}</span>
   ) : null;
+  // A plan deal has no going-in cap; its yield on total cost is the figure
+  // that answers the same question, so it takes the slot — labelled.
   const capBit = d.slots.cap ? (
     <>
       <span className="font-mono tabular-nums">{d.slots.cap}</span> cap
+    </>
+  ) : d.slots.yoc ? (
+    <>
+      <span className="font-mono tabular-nums">{d.slots.yoc}</span> yield on cost
     </>
   ) : null;
   const fitBit =
@@ -1220,7 +1226,15 @@ const DealRow = memo(function DealRow({
         {d.slots.price ?? <span className="text-line">—</span>}
       </span>
       <span className="hidden w-12 shrink-0 text-right font-mono text-sm tabular-nums md:block">
-        {d.slots.cap ?? <span className="text-line">—</span>}
+        {d.slots.cap ??
+          (d.slots.yoc ? (
+            <span title="Yield on total cost — a plan deal has no going-in cap" className="text-brand">
+              {d.slots.yoc}
+              <span className="ml-0.5 text-[9px] font-sans font-medium uppercase">yoc</span>
+            </span>
+          ) : (
+            <span className="text-line">—</span>
+          ))}
       </span>
       <span className="hidden w-16 shrink-0 text-right text-xs font-semibold lg:block">
         {d.score != null && d.mandateVerdict ? (

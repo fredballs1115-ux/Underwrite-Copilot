@@ -170,6 +170,15 @@ gated on tsc / eslint / the full suite / a production build.
   months of lease-up" reads as three years), and from the permanent sizer's
   own lender terms so one set of assumptions drives both. Pure module
   (`lib/construction-debt.ts`), ten tests.
+- **#201 The pipeline shows a plan deal's yield on cost where its cap would
+  be.** A conversion's row read "—" in the Cap column, which is correct and
+  useless; it now reads "11.7% YOC" in the brand colour with the reason on
+  hover, and the compact row says "11.7% yield on cost". Sorting by cap is
+  unchanged (a plan deal still has none). And the plan's timeline falls back
+  to the metric rows the extraction is asked to capture — "Construction
+  period: 30 months; Stabilized in: year 4" — when the strategy text states
+  none, so the construction sizer's years-to-take-out seeds from the OM
+  rather than a default. Tests on the row reader and the fallback order.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

@@ -11,6 +11,7 @@ import {
   noiFigures,
   planSummary,
   plausibilityNote,
+  timelineFromMetrics,
 } from "./deal-strategy";
 
 const metric = (
@@ -459,5 +460,30 @@ describe("budgetFromText — the budget from the strategy's own words", () => {
       strategy: noBudgetRow.strategy,
     });
     expect(planSummary(both)!.budget).toMatchObject({ budget: 150_000_000, page: "p. 44" });
+  });
+});
+
+describe("timelineFromMetrics — the plan's timing from metric rows", () => {
+  it("joins the rows that speak to timing and ignores blanks", () => {
+    const t = timelineFromMetrics([
+      metric("Construction period", "30 months"),
+      metric("Stabilized in", "year 4"),
+      metric("Lease-up period", "—"),
+      metric("Asking price", "$20M"),
+    ]);
+    expect(t).toBe("Construction period: 30 months; Stabilized in: year 4");
+    expect(timelineFromMetrics([metric("Asking price", "$20M")])).toBe("");
+  });
+
+  it("planSummary uses the strategy's words first and the rows only when they are blank", () => {
+    const rowsOnly = planSummary(CONVERSION)!; // CONVERSION carries "Construction period: 30 months"
+    expect(rowsOnly.timeline).toBe("Construction period: 30 months");
+    const stated = planSummary(
+      ex(CONVERSION.metrics, {
+        dealName: CONVERSION.dealName,
+        strategy: { kind: "conversion", summary: "", capitalBudget: "", timeline: "24 months of works, 12 of lease-up" },
+      }),
+    )!;
+    expect(stated.timeline).toBe("24 months of works, 12 of lease-up");
   });
 });
