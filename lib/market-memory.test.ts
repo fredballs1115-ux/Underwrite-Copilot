@@ -42,6 +42,30 @@ describe("median", () => {
   it("even count → mean of middles", () => expect(median([1, 2, 3, 4])).toBe(2.5));
 });
 
+describe("buildComps — the unit count is the row that counts units", () => {
+  it("a 'Unit mix' row ahead of 'Units' never shadows the count, and '312 units' parses", () => {
+    const comps = buildComps([
+      deal("d1", {
+        market: "Dallas, TX",
+        metrics: [
+          ["Purchase price", "$62,400,000"],
+          ["Unit mix", "40% studio / 60% 1BR"],
+          ["Units", "312 units"],
+        ],
+      }),
+    ]);
+    expect(comps[0].perUnit).toBe(200_000);
+    expect(comps[0].perUnitBasis).toBe("unit");
+  });
+
+  it("a partial count ('Vacant units') is not the count", () => {
+    const comps = buildComps([
+      deal("d1", { market: "Dallas, TX", metrics: [["Purchase price", "$62,400,000"], ["Vacant units", "12"]] }),
+    ]);
+    expect(comps.find((c) => c.perUnit != null)).toBeUndefined();
+  });
+});
+
 describe("buildComps", () => {
   const rows = [
     deal("d1", {

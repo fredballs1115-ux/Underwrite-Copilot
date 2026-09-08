@@ -2,7 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { findMetric, parseMoney } from "@/lib/criteria";
-import { IMPLIED_CAP_CEILING, inferStrategy, isPlanDeal, noiFigures, planSummary } from "@/lib/deal-strategy";
+import {
+  IMPLIED_CAP_CEILING,
+  findPriceMetric,
+  inferStrategy,
+  isPlanDeal,
+  noiFigures,
+  planSummary,
+} from "@/lib/deal-strategy";
 import { ConstructionDebtPanel } from "./construction-debt-panel";
 import type { UnderwritingModel } from "@/lib/model/types";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
@@ -156,11 +163,8 @@ function deriveSeed(
     };
   }
   const metrics = extraction?.metrics ?? [];
-  const priceMetric = findMetric(
-    metrics,
-    /purchase price|asking price|\bprice\b/i,
-    /unit|\/sf|per sf|per unit|psf/i,
-  );
+  // The shared price reader; a development's land cost is its price.
+  const priceMetric = findPriceMetric(metrics, inferStrategy(extraction).kind);
   const price = priceMetric ? parseMoney(priceMetric.value) : null;
   // The in-place or Year-1 NOI, never the stabilized pro forma.
   const figs = noiFigures(metrics);

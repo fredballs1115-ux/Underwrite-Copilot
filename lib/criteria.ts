@@ -107,9 +107,14 @@ export const METRIC_FIND = {
     inc: /\b(total sf|square (foot|feet|footage)|sq\.? ?ft|rentable|nra|gla|building size|\bsf\b)/i,
     exc: /price|\$|per|\/|psf/i,
   },
+  // Every name an OM gives the number being asked — asking, purchase, list,
+  // sale, offering, contract price, the guidance, the whisper — never a
+  // per-unit or per-SF figure, never what the building last traded for,
+  // and never a land or site allocation (on a development the land cost is
+  // read separately, as the price, by lib/deal-strategy's findPriceMetric).
   price: {
-    inc: /purchase price|asking price|\bprice\b/i,
-    exc: /unit|\/sf|per sf|per unit|psf/i,
+    inc: /asking price|purchase price|guidance|offering price|sale price|sales price|list price|listing price|contract price|whisper|\bprice\b/i,
+    exc: /unit|\bsf\b|\/|\bper\b|psf|\b(last|prior|previous|historical|original|land|site|reduction)\b/i,
   },
   perUnit: { inc: /per unit|\/unit|price\/unit|unit price/i },
   // The going-in cap is today's income against the price. A stabilized, pro

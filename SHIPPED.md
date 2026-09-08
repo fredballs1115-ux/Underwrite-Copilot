@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Forty-two PRs, #176–#217, each
+estimate, and that's what it should flag." Forty-three PRs, #176–#218, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -350,6 +350,27 @@ confirmed equal to the main tip after each batch.
   inference (the LOI route returned a 500 on one). The sample screen's
   summary bar shows the deal's kind, read from its own extraction, with a
   live-verify marker. Twenty-one new tests across three files.
+- **#218 One count and one price behind every surface.** #217 fixed the
+  two shared readers; this closes the class. Six more places read the unit
+  count with a regex of their own — the market memory and the comp memory
+  (a "Unit mix" row ahead of "Units" lost the basis, and "312 units" never
+  parsed), the plausibility check and the Excel inputs (a "Vacant units:
+  12" row read as the count put $50M over twelve units — a false "no market
+  trades there" finding, and a workbook whose per-unit yardsticks divided
+  by twelve), and the deal page's and sample screen's Size slot. All six
+  now go through `unitCountFromMetrics` / `unitCountRow`, whose include is
+  every name an OM gives the count (Units, Total units, Number of units,
+  Residential or Apartment units, Doors, Keys, Proposed units) and whose
+  exclude is every partial count (vacant, occupied, affordable,
+  market-rate, renovated, absorbed, leased). And six more places read the
+  price with a bare `\bprice\b` — the buy-box price band and the mandate's
+  price ceiling, the pipeline row, the deal page's summary, the debt
+  sizer's seed and the sample screen — so a "Last sale price" ahead of the
+  ask was the price on all of them. One include and one exclude now live in
+  `METRIC_FIND.price`, `findPriceMetric` reads them, and the pipeline, the
+  deal page and the debt sizer show a development's land cost as its price
+  the way the export and the plan strip already did. Thirteen new tests
+  across six files.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

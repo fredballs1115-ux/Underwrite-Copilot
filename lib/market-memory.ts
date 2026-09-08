@@ -9,6 +9,7 @@
 // them. Pure + unit-tested.
 
 import { findGoingInCap, findMetric, parseMoney, parsePct, METRIC_FIND } from "@/lib/criteria";
+import { unitCountFromMetrics } from "@/lib/deal-strategy";
 
 export interface MarketComp {
   dealId: string;
@@ -98,9 +99,10 @@ function deriveBasis(
       if (n != null && n > 0) return { value: n, basis: "unit" };
     }
     if (price == null) return null;
-    const units = findMetric(metrics, /^units?\b|number of units|unit count/i, /per|\/|price|\$/i);
-    const n = units ? Number(units.value.replace(/[,\s]/g, "")) : NaN;
-    if (Number.isFinite(n) && n > 0) return { value: price / n, basis: "unit" };
+    // The shared count reader: "312 units" parses, a "Unit mix" row ahead
+    // of "Units" never shadows it.
+    const n = unitCountFromMetrics(metrics);
+    if (n != null && n > 0) return { value: price / n, basis: "unit" };
     return null;
   }
   // Office / industrial / retail are priced per SF — never per unit.

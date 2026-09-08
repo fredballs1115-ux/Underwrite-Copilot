@@ -116,3 +116,17 @@ describe("computeScreenDiff — a plan deal retrades on its plan", () => {
     expect(d.allFlat).toBe(true);
   });
 });
+
+describe("computeScreenDiff — the asking price tracker reads the ask", () => {
+  it("never reads what the building last traded for as the price", () => {
+    const d = computeScreenDiff(
+      prior([m("Last sale price (2019)", "$30,000,000"), m("Asking price", "$42,000,000")]),
+      { metrics: [m("Last sale price (2019)", "$30,000,000"), m("Asking price", "$40,000,000")] },
+      null,
+    )!;
+    const row = d.rows.find((r) => r.label === "Asking price")!;
+    expect(row.before).toBe("$42,000,000");
+    expect(row.delta).toBe("−$2.0M (−4.8%)");
+    expect(row.direction).toBe("better");
+  });
+});

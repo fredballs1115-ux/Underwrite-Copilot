@@ -4,7 +4,7 @@
 // (Universal module: used by the deal page; snapshots are written by the
 // pipeline into deals.prior_screen — see migration 0010.)
 
-import { parseMoney, parsePct } from "./criteria";
+import { METRIC_FIND, parseMoney, parsePct } from "./criteria";
 
 interface MetricLike {
   label: string;
@@ -61,8 +61,10 @@ interface Tracked {
 const TRACKED: Tracked[] = [
   {
     label: "Asking price",
-    include: /purchase price|asking price|\bprice\b/i,
-    exclude: /unit|\/sf|per sf|per unit|psf/i,
+    // The shared price reader: every name an OM gives the ask, never a
+    // per-unit figure and never what the building last traded for.
+    include: METRIC_FIND.price.inc,
+    exclude: METRIC_FIND.price.exc,
     kind: "money",
     betterWhen: "down",
   },

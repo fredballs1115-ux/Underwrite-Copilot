@@ -61,6 +61,21 @@ describe("evaluateBuyBox — reads the expected figures", () => {
     expect(check(r, "Size")?.status).toBe("pass");
   });
 
+  it("reads a sale price as the price, never what the building last traded for", () => {
+    const box: BuyBox = { priceMaxM: 100 };
+    const sale = evaluateBuyBox(
+      "auto",
+      ex([
+        ["Last sale price (2019)", "$140,000,000"],
+        ["Sale price", "$80,000,000"],
+      ]),
+      box,
+    );
+    expect(check(sale, "Price")?.status).toBe("pass");
+    const onlyLast = evaluateBuyBox("auto", ex([["Last sale price (2019)", "$140,000,000"]]), box);
+    expect(check(onlyLast, "Price")?.status).toBe("unknown");
+  });
+
   it("reads the asking price but not the per-unit price", () => {
     const box: BuyBox = { priceMaxM: 100 };
     const r = evaluateBuyBox(

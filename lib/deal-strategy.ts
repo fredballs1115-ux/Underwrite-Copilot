@@ -25,7 +25,7 @@
  */
 
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { findMetric, parseMoney, parsePct } from "@/lib/criteria";
+import { METRIC_FIND, findMetric, parseMoney, parsePct } from "@/lib/criteria";
 
 export type StrategyKind =
   | "stabilized"
@@ -225,12 +225,11 @@ const money = (n: number): string =>
       : `$${Math.round(n)}`;
 const pct = (x: number, dp = 1): string => `${(x * 100).toFixed(dp)}%`;
 
-// Every name an OM gives the number being asked: the asking, purchase, list,
-// sale, offering or contract price, the guidance, the whisper. Not a per-unit
-// or per-SF figure, and not what the building last traded for.
-const PRICE_INCLUDE =
-  /asking price|purchase price|guidance|^price\b|offering price|sale price|sales price|list price|listing price|contract price|strike price|whisper/i;
-const PRICE_EXCLUDE = /unit|\bsf\b|\bper\b|\/|psf|\b(last|prior|previous|historical|original)\b/i;
+// The one price reader — shared with the buy-box check, the mandate score
+// and every summary slot through lib/criteria's METRIC_FIND, so no surface
+// reads a different row as "the price" than the next one.
+const PRICE_INCLUDE = METRIC_FIND.price.inc;
+const PRICE_EXCLUDE = METRIC_FIND.price.exc;
 const CAP_INCLUDE = /going[- ]?in cap|^cap rate|\bcap\b/i;
 // Not the going-in cap: the exit, an expense cap, a rate cap — and on a plan
 // deal the stabilized / pro forma cap or the yield on cost, which describe
@@ -358,10 +357,16 @@ export function timelineFromMetrics(metrics: MetricLike[]): string {
     .join("; ");
 }
 
-const UNITS_INCLUDE = /^units?\b|number of units|unit count|total units/i;
-// "Unit mix", "Unit sizes", "Unit type", "Units per acre", a price per unit:
-// rows that start with the word but do not count anything.
-const UNITS_EXCLUDE = /\bper\b|\/|price|\$|%|\bmix\b|siz|type|area|\bsf\b|density|acre/i;
+// The rows that count the building's units — "Units", "Units (proposed)",
+// "Total units", "Number of units", "Unit count", "Residential units",
+// "Apartment units", "Doors", "Keys" — and nothing that merely mentions
+// them: "Unit mix", "Unit sizes", "Unit type", "Units per acre", a price per
+// unit, or a PARTIAL count ("Vacant units", "Affordable units", "Renovated
+// units") that would put a wrong basis on every per-unit surface.
+const UNITS_INCLUDE =
+  /^units?\b|^(total|number of|no\.? of|count of|proposed|planned) (units|doors|keys|apartments)\b|unit count|^(residential|apartment|rental|multifamily|dwelling) units\b|^doors\b|^keys\b/i;
+const UNITS_EXCLUDE =
+  /\bper\b|\/|price|\$|%|\bmix\b|siz|type|area|\bsf\b|density|acre|\brent|value|vacant|occupied|affordable|market[- ]rate|renovated|classic|absorbed|leased|remaining/i;
 // A count is a whole number, on its own or followed by what it counts —
 // "312", "312 units", "312 (proposed)", "approx. 300 apartments". Anything
 // else ("40% studio / 60% 1BR", "650–1,200 SF", "312 / 285,000 SF") is not a
@@ -387,18 +392,27 @@ export function parseCount(value: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** The unit count — on a plan deal the finished product's ("Units
- *  (proposed)") — as a positive number, or null when no row parses. One
- *  reader for the plan summary, analytics and the deal context, so every
- *  per-unit figure divides by the same count. Reads the first row that IS a
- *  count: a "Unit mix" row ahead of "Units" never shadows it. */
-export function unitCountFromMetrics(metrics: MetricLike[]): number | null {
+/** The row that counts the units — the first row that IS a count, so a
+ *  "Unit mix" row ahead of "Units" never shadows it — or null. For surfaces
+ *  that show the OM's own wording ("248 units", "612 (proposed)") or cite
+ *  its page. */
+export function unitCountRow(metrics: MetricLike[]): MetricLike | null {
   for (const m of metrics) {
     if (!UNITS_INCLUDE.test(m.label) || UNITS_EXCLUDE.test(m.label)) continue;
     const n = parseCount(m.value);
-    if (n != null && n >= 1 && n <= 50_000) return n;
+    if (n != null && n >= 1 && n <= 50_000) return m;
   }
   return null;
+}
+
+/** The unit count — on a plan deal the finished product's ("Units
+ *  (proposed)") — as a positive number, or null when no row parses. One
+ *  reader for the plan summary, analytics, the deal context, the comp and
+ *  market memories, the plausibility check and the Excel model, so every
+ *  per-unit figure divides by the same count. */
+export function unitCountFromMetrics(metrics: MetricLike[]): number | null {
+  const row = unitCountRow(metrics);
+  return row ? parseCount(row.value) : null;
 }
 
 /** What the OM says the finished project earns and costs — the figures a
@@ -550,9 +564,10 @@ export function assessPlausibility(
     }
   }
 
-  // 3. A per-unit or per-SF price outside any US market — a misparse.
-  const unitsMetric = findMetric(metrics, /\bunits?\b|\bdoors?\b|unit count/i, /\bper\b|\/|price|rent|psf|value|\$/i);
-  const units = unitsMetric ? parseMoney(unitsMetric.value) : null;
+  // 3. A per-unit or per-SF price outside any US market — a misparse. The
+  //    shared count reader: a "Unit mix" or "Vacant units" row read as the
+  //    count would manufacture this finding on a sound deal.
+  const units = unitCountFromMetrics(metrics);
   const sfMetric = findMetric(
     metrics,
     /rentable|\brsf\b|square f|building size|total sf|gross (building|leasable)|\bgla\b|\bnra\b|\bsf\b/i,

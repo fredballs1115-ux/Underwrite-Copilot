@@ -49,6 +49,23 @@ const CONVERSION = {
   ],
 };
 
+describe("deriveInternalComps — the unit count is the row that counts units", () => {
+  it("a 'Unit mix' row ahead of 'Units' never shadows the basis, and '248 units' parses", () => {
+    const comps = deriveInternalComps("current", "multifamily", { assetClass: "multifamily" }, [
+      sib("a", "Maddox", "multifamily", {
+        ...STABILIZED,
+        metrics: [
+          m("Asking price", "$50,000,000"),
+          m("Going-in cap rate", "5.70%"),
+          m("Unit mix", "40% studio / 60% 1BR"),
+          m("Units", "248 units"),
+        ],
+      }),
+    ]);
+    expect(comps[0].basisLabel).toBe("$202k/unit");
+  });
+});
+
 describe("deriveInternalComps — the sibling's kind is read first", () => {
   const comps = deriveInternalComps("current", "multifamily", { assetClass: "multifamily" }, [
     sib("current", "This deal", "multifamily", STABILIZED),
