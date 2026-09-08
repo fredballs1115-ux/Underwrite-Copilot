@@ -17,6 +17,8 @@ import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { buildSensitivityData, type SensitivityData } from "@/lib/underwrite/report-grid";
 import { buildPlanReport, type PlanReport } from "@/lib/plan-sensitivity";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
+import { coverAerialFor } from "@/lib/memo/cover-aerial";
+import type { DealVisualCache } from "@/lib/deal-location";
 
 export const runtime = "nodejs";
 
@@ -216,7 +218,15 @@ export async function GET(
       deal.name,
       (deal.extraction as ExtractionResult | null) ?? null,
     );
-    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides);
+    // The cover aerial, as the standalone memo carries it (bounded; never
+    // holds the report up).
+    const cover = await coverAerialFor(
+      supabase,
+      id,
+      (deal.address as StructuredAddress | null) ?? null,
+      ((deal as unknown as { photo?: DealVisualCache | null }).photo ?? null),
+    );
+    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover);
     const element = React.createElement(ReportDocument, {
       input,
     }) as unknown as Parameters<typeof renderToBuffer>[0];

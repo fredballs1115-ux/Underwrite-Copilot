@@ -16,6 +16,8 @@ import type { StructuredAddress } from "@/lib/address";
 import { inferStrategy } from "@/lib/deal-strategy";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
 import { staleAfterFailure } from "@/lib/screen-run";
+import { coverAerialFor } from "@/lib/memo/cover-aerial";
+import type { DealVisualCache } from "@/lib/deal-location";
 
 // PDF generation needs the Node runtime (not edge).
 export const runtime = "nodejs";
@@ -163,7 +165,16 @@ export async function GET(
       deal.name,
       (deal.extraction as ExtractionResult | null) ?? null,
     );
-    const memo = buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides);
+    // The building from above, on the cover — the same USGS frame the deal
+    // page's Aerial tab shows, through the same resolver. Bounded to a few
+    // seconds: the memo never waits on imagery, it just prints without it.
+    const cover = await coverAerialFor(
+      supabase,
+      id,
+      (deal.address as StructuredAddress | null) ?? null,
+      ((deal as unknown as { photo?: DealVisualCache | null }).photo ?? null),
+    );
+    const memo = buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover);
     // MemoDocument renders a <Document>; cast to the element type renderToBuffer
     // expects (it's typed for a Document element, not a wrapping component).
     const element = React.createElement(MemoDocument, {

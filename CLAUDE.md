@@ -69,7 +69,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   says, not on its page count. `lib/key-terms.ts` orders a "Key terms" block
   (memo and shared screen): the deal-defining rows first, then the flagged
   ones. Standard Helvetica is WinAnsi-only (`lib/memo/pdf-text.ts`): no "✓",
-  no arrows.
+  no arrows. The memo's cover aerial is fetched at render time, bounded, and
+  its bytes validated before embedding (`lib/memo/cover-aerial.ts`):
+  react-pdf hangs the whole render on a PNG whose zlib check fails rather
+  than throwing, so never hand it unverified image bytes; test images come
+  from `lib/memo/test-png.ts`, built with the real deflate and CRC.
 - The pipeline's failure modes: `lib/anthropic/failure.ts` turns any failure
   into one sentence the analyst can act on (the raw text goes to the server
   log, never the page), and its `structured()` wraps every structured-output
