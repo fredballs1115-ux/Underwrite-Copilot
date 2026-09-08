@@ -103,10 +103,8 @@ export const NEAR_IRR_PT = 1.0; // IRR / CoC: within 1pt of the target
  * than the chip says it checked. One definition, both consumers.
  */
 export const METRIC_FIND = {
-  sf: {
-    inc: /\b(total sf|square (foot|feet|footage)|sq\.? ?ft|rentable|nra|gla|building size|\bsf\b)/i,
-    exc: /price|\$|per|\/|psf/i,
-  },
+  // The building's size is read by shape, not by pattern: see
+  // buildingSfFromMetrics below.
   // Every name an OM gives the number being asked — asking, purchase, list,
   // sale, offering, contract price, the guidance, the whisper — never a
   // per-unit or per-SF figure, never what the building last traded for,
@@ -337,6 +335,81 @@ export function findMetric(
   );
 }
 
+// ── The building's size ──────────────────────────────────────────────────
+//
+// A row IS the building's size only when its label, read whole, has the
+// shape of a size label: optional prefixes (total, net, gross, rentable,
+// leasable, building, proposed, planned …), the noun (SF, sq ft, square
+// feet / footage, RSF, NRA, GLA, RBA, GBA, NLA, area, size, floor area,
+// improvements) and nothing after it. Everything else that carries "SF" —
+// a land, site or lot area, an average unit size, a component ("Retail
+// SF", "Office SF" in a mixed-use deck), a partial ("Vacant SF", "Leased
+// SF"), a rate per SF — is not the building, and reading one as the
+// building puts a wrong size on the buy-box check, the mandate score and
+// every $/SF basis. One reader for all of them, as for the unit count.
+const SIZE_LABEL =
+  /^(?:(?:total|net|gross|rentable|leasable|building|overall|proposed|planned|existing|current|as[- ]built)\s+)*(?:sf|s\.f|sq\.? ?ft|sqft|square (?:feet|foot|footage)|rsf|nra|gla|rba|gba|nla|area|size|floor area|improvements?)(?:\s+(?:sf|s\.f|sq\.? ?ft|sqft|square (?:feet|footage)|area|size))?(?:\s+(?:total|rentable|gross|net|leasable|proposed|planned))?$/i;
+// A parenthetical naming a subset or another thing entirely — "(office)",
+// "(Phase II)", "(land)", "(2 buildings)" — keeps the row from being the
+// building's size; any other ("(SF)", "(rentable)", "(proposed)") is
+// dropped before the shape is read.
+const SIZE_SUBSET_PAREN =
+  /land|site|lot|parcel|acre|retail|office|industrial|residential|warehouse|phase|bldg|building|tower|floor|wing|unit|\bof\b|\d/i;
+
+/** Whether a metric label is the row that states the building's size —
+ *  the whole building, never the land, a unit, a component or a partial. */
+export function isSizeLabel(label: string): boolean {
+  let s = label.toLowerCase().trim();
+  for (const p of s.match(/\([^)]*\)/g) ?? []) if (SIZE_SUBSET_PAREN.test(p)) return false;
+  s = s
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[—–-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[:.]+$/, "")
+    .trim();
+  return SIZE_LABEL.test(s);
+}
+
+/** Square feet from a metric's value — "250,000", "250,000 SF", "250k sq
+ *  ft", "1.2M SF", "250,000 SF (rentable)" — or null when the value is not
+ *  a building area: an acreage, a unit count, a rate, a range, or too small
+ *  to be a building. */
+export function parseSf(value: string): number | null {
+  if (/acre|\bac\b|unit|%|\$|\/|\bper\b|–|—|\bto\b/i.test(value)) return null;
+  const s = value
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\b(rsf|nra|gla|rba|gba|nla|sf|s\.f\.?|sq\.? ?ft\.?|sqft|square (feet|foot|footage))\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^(approx(imately|\.)?|about|~|≈)\s*/i, "")
+    .trim();
+  if (!/^\d[\d,]*(\.\d+)?\s*(k|m|mm)?$/i.test(s)) return null;
+  const n = parseMoney(s);
+  return n != null && n >= 100 ? n : null;
+}
+
+/** The row that states the building's size — the first row that IS one,
+ *  so a "Land SF" or "Average unit size" row ahead of "Total SF" never
+ *  shadows it — or null. For surfaces that show the OM's own wording or
+ *  cite its page. */
+export function buildingSfRow(metrics: MetricLike[]): MetricLike | null {
+  for (const m of metrics) {
+    if (!isSizeLabel(m.label)) continue;
+    if (parseSf(m.value) != null) return m;
+  }
+  return null;
+}
+
+/** The building's size in square feet, or null when the OM states none.
+ *  One reader for the buy-box check, the mandate score, the market and
+ *  comp memories, the plausibility check, the Excel inputs and the deal
+ *  page's Size slot, so every $/SF figure divides by the same area. */
+export function buildingSfFromMetrics(metrics: MetricLike[]): number | null {
+  const row = buildingSfRow(metrics);
+  return row ? parseSf(row.value) : null;
+}
+
 /** The effective price band, folding the legacy max-only field in. */
 export function priceBand(box: BuyBox): { min?: number; max?: number } {
   return {
@@ -561,8 +634,8 @@ export function evaluateBuyBox(
 
   // ---- Size (SF) ---------------------------------------------------------
   if (box.sfMin != null || box.sfMax != null) {
-    const metric = findMetric(metrics, METRIC_FIND.sf.inc, METRIC_FIND.sf.exc);
-    const sf = metric ? parseMoney(metric.value) : null;
+    // The shared size reader: the building, never the land or a unit.
+    const sf = buildingSfFromMetrics(metrics);
     const bandText = [
       box.sfMin != null ? `${fmtSf(box.sfMin)} min` : null,
       box.sfMax != null ? `${fmtSf(box.sfMax)} max` : null,

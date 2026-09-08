@@ -11,7 +11,7 @@ import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import { SiteFlagsCard } from "./site-flags-card";
 import { PublicRecordCard } from "./public-record-card";
-import { parseMoney } from "@/lib/criteria";
+import { buildingSfRow, parseMoney } from "@/lib/criteria";
 import { after } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { signedSupplementUrl } from "@/lib/storage";
@@ -517,11 +517,9 @@ export default async function DealPage({
   // or site cost is what is being bought.
   const summaryPrice =
     findPriceMetric(metrics, strategy.kind)?.value ?? (firstSignal?.askPrice.trim() || null);
-  const sizeSf = findValue(
-    metrics,
-    /\b(total sf|square (foot|feet|footage)|sq\.? ?ft|rentable|nra|gla|building size|\bsf\b)/i,
-    /price|\$|per|\/|psf/i,
-  );
+  // The shared size reader: the building's row, never the land's or a
+  // unit's.
+  const sizeSf = buildingSfRow(metrics)?.value ?? null;
   // The shared count reader: the row that counts the units, never a "Unit
   // mix" row ahead of it.
   const sizeUnits = unitCountRow(metrics)?.value ?? null;

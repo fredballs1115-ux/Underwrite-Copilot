@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Forty-five PRs, #176–#220, each
+estimate, and that's what it should flag." Forty-six PRs, #176–#221, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -416,6 +416,26 @@ confirmed equal to the main tip after each batch.
   never reads an NOI per unit. The pipeline card infers the kind with the
   first signal, as the deal page does. Eighty-odd new label cases across
   the reader, buy-box, retrade and market-memory tests.
+- **#221 The building's size, read the way an OM writes it.** The same
+  class as the unit count, one row down. The buy-box Size check, the
+  mandate's size score and the $/SF basis in the market and comp memories
+  read the building's square footage with a pattern whose exclude named
+  only price / per / psf — so a "Land SF" of 871,200, an "Average unit
+  size" of 850 SF, a "Retail SF" component or a "Vacant SF" row, whichever
+  came first, was the building: a size check passed or failed on the lot,
+  and an office comp's $/SF divided by the site. The Excel inputs, the
+  plausibility check and the deal page's Size slot each had a reader of
+  their own, each with a different gap. One reader now, in `lib/criteria`
+  beside the price and per-unit patterns: `isSizeLabel` whitelists the
+  shape of a size label (total / net / gross / rentable / leasable /
+  building prefixes; the noun — SF, sq ft, square feet, RSF, NRA, GLA, RBA,
+  GBA, area, size, floor area, improvements — and nothing after it),
+  `parseSf` reads "250,000 SF", "250k sq ft" and "1.2M SF" and refuses
+  acreages, unit counts, rates and ranges, and `buildingSfFromMetrics` /
+  `buildingSfRow` sit behind all seven surfaces. Land, site, lot, parcel,
+  unit, component ("Retail SF", "Total SF (office)"), partial ("Vacant SF",
+  "Leased SF") and phase rows never pass. Fifty-odd label and value cases
+  in the buy-box and market-memory tests.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

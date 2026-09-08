@@ -3,15 +3,15 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#220 merged to main (live build
-sha `cf98848`, #219, confirmed equal to the main tip by live-verify at 02:41
-UTC; #220 follows on the next Render deploy).
+**Last updated 2026-09-08**, after PRs #176–#221 merged to main (live build
+sha `a9f3d10`, #220, confirmed equal to the main tip by live-verify at 02:50
+UTC; #221 follows on the next Render deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Forty-five PRs (#176–#220) landed across one review session and the
+Forty-six PRs (#176–#221) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -131,6 +131,12 @@ deploy (live-verify shows the sha).
   storage units all count again; "Units under renovation" never does;
   "Pricing" is the price and a reserve or bid figure is not; a land deal
   keeps its land price; and a rent per unit never passes the basis ceiling.
+- **The building's size, read the way an OM writes it** (#221): the
+  buy-box Size check, the mandate's size score, the $/SF basis in the
+  memories, the Excel model and the deal page's Size slot all read the
+  building's square footage through one reader — a "Land SF", an average
+  unit size, a "Retail SF" component or a "Vacant SF" row is never the
+  building.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":

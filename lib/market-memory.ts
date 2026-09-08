@@ -8,7 +8,14 @@
 // teammate's, never another account's); this module just shapes and groups
 // them. Pure + unit-tested.
 
-import { findGoingInCap, findMetric, parseMoney, parsePct, METRIC_FIND } from "@/lib/criteria";
+import {
+  buildingSfFromMetrics,
+  findGoingInCap,
+  findMetric,
+  parseMoney,
+  parsePct,
+  METRIC_FIND,
+} from "@/lib/criteria";
 import { unitCountFromMetrics } from "@/lib/deal-strategy";
 
 export interface MarketComp {
@@ -107,8 +114,8 @@ function deriveBasis(
   }
   // Office / industrial / retail are priced per SF — never per unit.
   if (price == null) return null;
-  const sf = findMetric(metrics, METRIC_FIND.sf.inc, METRIC_FIND.sf.exc);
-  const n = sf ? parseMoney(sf.value) : null;
+  // The shared size reader: the building, never the land or a unit.
+  const n = buildingSfFromMetrics(metrics);
   if (n != null && n > 0) return { value: price / n, basis: "sf" };
   return null;
 }
