@@ -27,6 +27,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
 - Prompts (the analytical heart): `lib/anthropic/prompts.ts`
 - Output shapes / the shared contract: `lib/anthropic/types.ts`
 - Model selection / cost levers: `lib/anthropic/models.ts`
+- The deal's kind and the plan (pure, LLM-free): `lib/deal-strategy.ts` (strategy,
+  plan summary, plausibility, the shared price / cap / budget / unit readers),
+  `lib/plan-sensitivity.ts` (yield on cost, stressed), `lib/construction-debt.ts`,
+  `lib/plan-facts.ts` (the plan's facts, one source for every surface), and
+  `lib/deal-context.ts` (what the screen established, handed to every Claude
+  step that reads the OM after the extraction). Read the deal's kind first —
+  a plan deal has no going-in cap; its stabilized figures belong over total cost.
 - DB schema: `supabase/migrations/`
 
 ## Conventions
