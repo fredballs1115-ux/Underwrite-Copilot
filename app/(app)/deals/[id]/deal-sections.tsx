@@ -1973,6 +1973,7 @@ export function AddData({ dealId, tab }: { dealId: string; tab: string }) {
             <input type="hidden" name="tab" value={tab} />
             <textarea
               name="text"
+              aria-label="Note for this section"
               required
               rows={2}
               placeholder="Add a note, a correction, or a figure the analysis missed…"

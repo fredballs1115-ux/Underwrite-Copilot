@@ -89,6 +89,7 @@ export function DealActions({
                 <input type="hidden" name="dealId" value={dealId} />
                 <input
                   name="name"
+                  aria-label="New deal name"
                   defaultValue={dealName}
                   required
                   autoFocus

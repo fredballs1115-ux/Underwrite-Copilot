@@ -32,6 +32,7 @@ export function SubmarketCard({
       <input type="hidden" name="dealId" value={dealId} />
       <select
         name="submarketId"
+        aria-label="Submarket"
         defaultValue={view?.submarket.id ?? ""}
         className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
       >
