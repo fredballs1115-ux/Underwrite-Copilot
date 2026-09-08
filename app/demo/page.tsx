@@ -5,7 +5,7 @@ import { MarketsMarquee } from "@/app/markets-marquee";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { FREE_DEALS, DEEP_TOOLS } from "@/lib/marketing-constants";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
-import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { buildingSfRow, evaluateBuyBox, findGoingInCap, parsePct } from "@/lib/criteria";
 import { leverageRead } from "@/lib/leverage";
 import { seedBenchmarks } from "@/lib/research-data";
@@ -131,20 +131,9 @@ export default function DemoPage() {
   // forma figure is the story tested against the T-12.
   const omPick = pickOmNoi(SAMPLE_DEAL.extraction.metrics, inferStrategy(SAMPLE_DEAL.extraction).kind);
   const omNoi = omPick?.noi ?? null;
-  const derived = deriveUnderwriteInputs(
-    SAMPLE_DEAL.extraction,
-    SAMPLE_DEAL.name,
-    {
-      rentRoll: {
-        summary: SAMPLE_DEAL.rentRoll.summary,
-        asOf: SAMPLE_DEAL.rentRoll.as_of_date,
-      },
-      t12: {
-        summary: SAMPLE_DEAL.t12.summary,
-        periodEnd: SAMPLE_DEAL.t12.period_end_date,
-      },
-    },
-  );
+  // One derivation with the demo workbook and the demo report
+  // (lib/sample-derive): actuals included, so the three never disagree.
+  const derived = sampleDerivedInputs();
   const checkSource = {
     assetClass: SAMPLE_DEAL.extraction.assetClass,
     market: SAMPLE_DEAL.extraction.market,

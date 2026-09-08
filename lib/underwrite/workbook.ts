@@ -1090,20 +1090,33 @@ function buildOperatingMetrics(
     );
     r++;
   }
-  twoCol("Price / SF", "PurchasePrice/RSF", FMT.psf, (zebra = !zebra));
-  twoCol(
-    "All-in Basis / SF (price + capital plan)",
-    "(PurchasePrice+CapImprovements)/RSF",
-    FMT.psf,
-    (zebra = !zebra),
-  );
-  twoCol("Year-1 NOI / SF", `${at("noi", 0)}/RSF`, FMT.psf, (zebra = !zebra));
-  twoCol(
-    "Year-1 Rent / SF / Year",
-    `${at("rent", 0)}/RSF`,
-    FMT.psf,
-    (zebra = !zebra),
-  );
+  // The per-SF ladder gets the same honesty as the per-unit block: when the
+  // building's size is an assumed placeholder (no OM size, no rent roll)
+  // the yardsticks are omitted with a stated reason, never printed as if
+  // "$680/SF" were the deal's figure.
+  if (model.sources.rsf?.provenance !== "assumption") {
+    twoCol("Price / SF", "PurchasePrice/RSF", FMT.psf, (zebra = !zebra));
+    twoCol(
+      "All-in Basis / SF (price + capital plan)",
+      "(PurchasePrice+CapImprovements)/RSF",
+      FMT.psf,
+      (zebra = !zebra),
+    );
+    twoCol("Year-1 NOI / SF", `${at("noi", 0)}/RSF`, FMT.psf, (zebra = !zebra));
+    twoCol(
+      "Year-1 Rent / SF / Year",
+      `${at("rent", 0)}/RSF`,
+      FMT.psf,
+      (zebra = !zebra),
+    );
+  } else {
+    label(
+      ws.getCell(r, 1),
+      "Building size not stated in the OM or rent roll — per-SF yardsticks omitted rather than guessed (enter RSF on Assumptions to add them).",
+      { color: MUTED, size: 9 },
+    );
+    r++;
+  }
   bottomBorder(ws, r - 1, 1, 2);
 }
 

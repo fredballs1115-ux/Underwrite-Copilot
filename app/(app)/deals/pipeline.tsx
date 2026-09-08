@@ -455,7 +455,9 @@ export function Pipeline({
       const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
       return `"${safe.replaceAll('"', '""')}"`;
     };
-    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "Cap rate", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Added", "Added by"];
+    // A plan deal's cap cell is empty and its yield on cost sits in its own
+    // column — the same two columns the meeting .xlsx carries.
+    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Added", "Added by"];
     const lines = filtered.map((d) =>
       [
         d.name,
@@ -464,6 +466,7 @@ export function Pipeline({
         d.coveredMarket ?? "",
         d.slots.price ?? "",
         d.slots.cap ?? "",
+        d.slots.yoc ?? "",
         d.fit ? FIT_META[d.fit].label : "",
         d.score != null ? String(d.score) : "",
         d.mandateVerdict ? MANDATE_META[d.mandateVerdict].label : "",

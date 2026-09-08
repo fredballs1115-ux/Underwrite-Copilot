@@ -273,3 +273,57 @@ describe("deriveUnderwriteInputs — a development's price is its land cost", ()
     expect(inputs.capitalImprovementsYr1).toBe(52_000_000);
   });
 });
+
+describe("the seventh review's derivation cases", () => {
+  const dev = { kind: "development", summary: "", capitalBudget: "", timeline: "" } as unknown as ExtractionResult["strategy"];
+
+  it("a stated total project cost with no price is the workbook's capital budget — never thrown out against the placeholder", () => {
+    const { inputs, sources } = deriveUnderwriteInputs(
+      ex([metric("Total project cost", "$140,000,000", { page: "p. 9" }), metric("Stabilized NOI", "$9,800,000"), metric("Units (proposed)", "420")], {
+        strategy: dev,
+      }),
+      "fallback",
+    );
+    expect(sources.purchasePrice?.provenance).toBe("assumption");
+    expect(inputs.capitalImprovementsYr1).toBe(140_000_000);
+    expect(sources.capitalImprovementsYr1?.provenance).toBe("extracted");
+    // No note quotes a percentage of a price the OM never stated.
+    expect(sources.inPlaceRentAnnual?.note ?? "").not.toMatch(/% of price/);
+    expect(sources.inPlaceRentAnnual?.note ?? "").toMatch(/finished project/);
+  });
+
+  it("the provenance note tells the truth about why a stated NOI was not the anchor", () => {
+    const zero = deriveUnderwriteInputs(ex([metric("Asking price", "$42,000,000"), metric("In-place NOI", "$0"), metric("Units", "240")]), "fallback");
+    expect(zero.sources.inPlaceRentAnnual?.note).toMatch(/no income in place to anchor year 1 on/);
+    expect(zero.sources.inPlaceRentAnnual?.note).not.toMatch(/finished project/);
+    const high = deriveUnderwriteInputs(ex([metric("Asking price", "$42,000,000"), metric("NOI", "$16,800,000"), metric("Units", "240")]), "fallback");
+    expect(high.sources.inPlaceRentAnnual?.note).toMatch(/is 40% of price — above any going-in cap on this price/);
+    const plan = deriveUnderwriteInputs(
+      ex([metric("Asking price", "$20,000,000"), metric("Stabilized NOI (pro forma)", "$21,000,000")], {
+        strategy: { ...dev, kind: "conversion" } as ExtractionResult["strategy"],
+      }),
+      "fallback",
+    );
+    expect(plan.sources.inPlaceRentAnnual?.note).toMatch(/is 105% of price — the finished project's stabilized figure on a conversion deal/);
+  });
+
+  it("the OM's in-place occupancy seeds the vacancy line, marked extracted, and a rent roll still outranks it", () => {
+    const leaseUp = ex(
+      [metric("Asking price", "$30,000,000"), metric("In-place NOI", "$400,000"), metric("Occupancy", "18%", { page: "p. 9" }), metric("Stabilized occupancy", "95%"), metric("Total SF", "200,000 SF")],
+      { assetClass: "office", strategy: { ...dev, kind: "lease_up" } as ExtractionResult["strategy"] },
+    );
+    const d = deriveUnderwriteInputs(leaseUp, "fallback");
+    expect(d.inputs.vacancyPct).toBeCloseTo(0.82, 6);
+    expect(d.sources.vacancyPct?.provenance).toBe("extracted");
+    expect(d.sources.vacancyPct?.note).toMatch(/OM in-place occupancy 18%/);
+    expect(d.sources.vacancyPct?.page).toBe("p. 9");
+    expect(d.meta.occupancyPct).toBeCloseTo(0.18, 6);
+    // No occupancy row at all → the class default, marked as one.
+    const none = deriveUnderwriteInputs(ex([metric("Asking price", "$30,000,000"), metric("In-place NOI", "$1,800,000")], { assetClass: "office" }), "fallback");
+    expect(none.inputs.vacancyPct).toBeCloseTo(0.1, 6);
+    expect(none.sources.vacancyPct?.provenance).toBe("assumption");
+    // A stabilized figure alone states no occupancy today → still the default.
+    const stabilizedOnly = deriveUnderwriteInputs(ex([metric("Asking price", "$30,000,000"), metric("In-place NOI", "$1,800,000"), metric("Stabilized occupancy", "95%")], { assetClass: "office" }), "fallback");
+    expect(stabilizedOnly.sources.vacancyPct?.provenance).toBe("assumption");
+  });
+});

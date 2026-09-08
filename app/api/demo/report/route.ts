@@ -3,7 +3,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { buildReportData, ReportDocument } from "@/lib/memo/report-document";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
-import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { buildSensitivityData } from "@/lib/underwrite/report-grid";
 import { buildPlanReport } from "@/lib/plan-sensitivity";
 import type { DealRow } from "@/lib/deals";
@@ -41,13 +41,12 @@ function getSampleReport(dateStr: string): Promise<Buffer> {
     SAMPLE_DEMO_BOX,
   );
 
-  // The real report route's derivation chain, minus the per-user actuals
-  // (the public sample has no rent roll / T-12 rows): extraction → model
-  // inputs → both heat grids, graded against the demo mandate's IRR target.
-  const derived = deriveUnderwriteInputs(
-    SAMPLE_DEAL.extraction as ExtractionResult,
-    SAMPLE_DEAL.name,
-  );
+  // The real report route's derivation chain, actuals included — the same
+  // derivation the demo page and the demo workbook run (lib/sample-derive),
+  // so the report's grids, max bid and hurdle verdict are the page's:
+  // extraction + rent roll + T-12 → model inputs → both heat grids, graded
+  // against the demo mandate's IRR target.
+  const derived = sampleDerivedInputs();
   const sensitivity = buildSensitivityData(
     derived.inputs,
     SAMPLE_DEMO_BOX.minIrrPct ?? null,

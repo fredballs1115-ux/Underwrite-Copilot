@@ -123,9 +123,14 @@ describe("computeModel — a conversion climbs to its stabilized income", () => 
     expect(returns.goingInCapPct).toBeGreaterThan(-10);
   });
 
-  it("judges the plan on yield on total cost: stabilized NOI over price + closing + budget", () => {
+  it("judges the plan on yield on total cost: stabilized NOI over price + closing + budget + the works years' carry", () => {
     expect(returns.capitalBudget).toBe(160_000_000);
-    expect(returns.totalCost).toBeCloseTo(20_000_000 * 1.02 + 160_000_000, 0);
+    // The two dark years each lose $1.2M of NOI — equity the IRR spends
+    // before the building earns, so it is cost here too, not a free ride.
+    const carry = cashFlow.slice(0, 2).reduce((s, c) => s + Math.max(0, -c.noi), 0);
+    expect(carry).toBeCloseTo(2_400_000, 0);
+    expect(returns.worksCarry).toBeCloseTo(carry, 6);
+    expect(returns.totalCost).toBeCloseTo(20_000_000 * 1.02 + 160_000_000 + carry, 0);
     expect(returns.yieldOnCostPct).toBeCloseTo((21_000_000 / returns.totalCost) * 100, 1);
     expect(returns.yieldOnCostPct).toBeGreaterThan(11);
     expect(returns.yieldOnCostPct).toBeLessThan(12);

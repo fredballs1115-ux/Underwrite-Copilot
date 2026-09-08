@@ -3,15 +3,15 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#229 merged to main (live build
-sha `a7c2c4f`, #228, confirmed equal to the main tip by live-verify at 06:05
-UTC — every one of the first fifty-three is live; #229 follows on its deploy).
+**Last updated 2026-09-08**, after PRs #176–#230 merged to main (live build
+sha `6e0f0f9`, #229, confirmed equal to the main tip by live-verify at 06:33
+UTC — every one of the first fifty-four is live; #230 follows on its deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Fifty-four PRs (#176–#229) landed across one review session and the
+Fifty-five PRs (#176–#230) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -208,6 +208,19 @@ deploy (live-verify shows the sha).
   limit; a phone shows each deal's price, cap and fit on their own line;
   the bridge's before / after columns read "$13.7M" and "8.00%" instead of
   raw inputs; the reconciler's gap sentence keeps "NOI" in capitals.
+- **The derivation layer, read a seventh time** (#230): twelve verified
+  findings closed with tests. The public sample report now runs the
+  sample's rent roll and T-12 like the page beside it (one derivation for
+  all three demo downloads); "$18,000 per unit" is a rate, never an $18k
+  budget; a development's construction budget is no longer thrown out
+  because its land is a tenth of the works; a total project cost beside no
+  asking price reaches the workbook; a development's land price is never
+  judged as an apartment price; the market memory, the analytics $/unit
+  series and the pipeline row read a plan deal the way every other surface
+  does; the workbook omits per-SF yardsticks over an assumed size; the
+  model's yield on cost carries the dark years' cost; the note for a
+  skipped NOI tells the truth for each case; and an OM's in-place occupancy
+  sets the vacancy line.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":

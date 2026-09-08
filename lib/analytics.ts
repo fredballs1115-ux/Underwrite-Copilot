@@ -75,8 +75,17 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
     const priceMetric = findPriceMetric(metrics, strategy.kind);
     const price = priceMetric ? parseMoney(priceMetric.value) : null;
 
+    // A $/unit only for multifamily — the class the series is named for.
+    // A hotel's price per key, an office's per suite and a storage deal's
+    // per locker are not the same basis, and one of them pooled into the
+    // "Price per unit" chart rescales it for every apartment deal on it.
+    // (lib/market-memory and lib/internal-comps branch on class the same
+    // way; the other classes are $/SF there.)
+    const cls = (extraction.assetClass ?? r.asset_class ?? "").toLowerCase();
     let perUnit: number | null = null;
-    if (plan) {
+    if (cls !== "multifamily") {
+      perUnit = null;
+    } else if (plan) {
       // Basis per planned unit: what a finished unit costs all-in. The
       // shell's price over units still to be built is not a comparable
       // figure, so with no total cost there is no point to plot.

@@ -16,7 +16,8 @@ import {
   parsePct,
   METRIC_FIND,
 } from "@/lib/criteria";
-import { unitCountFromMetrics } from "@/lib/deal-strategy";
+import { findPriceMetric, inferStrategy, planSummary, unitCountFromMetrics } from "@/lib/deal-strategy";
+import type { ExtractionResult } from "@/lib/anthropic/types";
 
 export interface MarketComp {
   dealId: string;
@@ -31,9 +32,13 @@ export interface MarketComp {
   /** verdict call if the screen finished */
   call: string | null;
   capPct: number | null;
-  /** $/unit (multifamily) or $/SF (other), numeric, when derivable */
+  /** $/unit (multifamily) or $/SF (other), numeric, when derivable — on a
+   *  plan deal the finished project's TOTAL COST over the planned units,
+   *  never the shell's or the site's price (see `allIn`) */
   perUnit: number | null;
   perUnitBasis: "unit" | "sf" | null;
+  /** the basis is total cost, not the price — a plan deal's figure */
+  allIn: boolean;
 }
 
 export interface Stat {
@@ -98,9 +103,12 @@ function deriveBasis(
   metrics: MetricLike[],
   assetClass: string,
   price: number | null,
+  /** the price is a plan deal's total cost: skip the OM's own per-unit
+   *  line, which is the shell's price over the units, not the basis */
+  allIn = false,
 ): { value: number; basis: "unit" | "sf" } | null {
   if (assetClass === "multifamily") {
-    const direct = findMetric(metrics, METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc);
+    const direct = allIn ? null : findMetric(metrics, METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc);
     if (direct) {
       const n = parseMoney(direct.value);
       if (n != null && n > 0) return { value: n, basis: "unit" };
@@ -137,17 +145,32 @@ export function buildComps(rows: DealRowLike[]): MarketComp[] {
     const assetClass = effectiveClass(row.asset_class, extraction);
     if (!assetClass) continue;
 
-    // The shared going-in reader: a plan deal's stabilized / pro forma cap
-    // never averages into what the account "usually sees" in a market.
-    const cap = findGoingInCap(metrics);
+    // The deal's kind first, as the comp memory and the analytics read it.
+    // A plan deal (value-add, lease-up, conversion, development) has no
+    // going-in cap — its stabilized cap or yield on cost is the finished
+    // project's — and its basis is total cost over the planned units,
+    // never a shell's or a site's price over apartments not built yet.
+    const ext = { ...extraction, metrics } as ExtractionResult;
+    const strategy = inferStrategy(ext);
+    const plan = planSummary(ext, strategy);
+
+    // The shared going-in reader on an operating asset only: a plan deal's
+    // stabilized / pro forma cap never averages into what the account
+    // "usually sees" in a market.
+    const cap = plan ? null : findGoingInCap(metrics);
     const rawCap = cap ? parsePct(cap.value) : null;
     // Drop physically implausible caps (a mis-extraction like -5% or 300%) —
     // not fabrication, just refusing to average garbage into the market read.
     const capPct = rawCap != null && rawCap > 0 && rawCap <= 25 ? rawCap : null;
 
-    const priceMetric = findMetric(metrics, METRIC_FIND.price.inc, METRIC_FIND.price.exc);
+    // The shared price reader: on a development with no ask, the land cost.
+    const priceMetric = findPriceMetric(metrics, strategy.kind);
     const price = priceMetric ? parseMoney(priceMetric.value) : null;
-    const basis = deriveBasis(metrics, assetClass, price);
+    const basis = plan
+      ? plan.totalCost != null
+        ? deriveBasis(metrics, assetClass, plan.totalCost, true)
+        : null
+      : deriveBasis(metrics, assetClass, price);
 
     // Nothing usable → not a comp (never pad the memory with empty rows).
     if (capPct == null && !basis) continue;
@@ -164,6 +187,7 @@ export function buildComps(rows: DealRowLike[]): MarketComp[] {
       capPct,
       perUnit: basis ? basis.value : null,
       perUnitBasis: basis ? basis.basis : null,
+      allIn: plan != null && basis != null,
     });
   }
   return comps;

@@ -153,3 +153,21 @@ describe("deriveAnalytics — rows saved before the fields existed", () => {
     expect(deriveAnalytics([row("7", "Nothing", null)])).toEqual([]);
   });
 });
+
+describe("deriveAnalytics — the $/unit series is multifamily's, never a pool of bases", () => {
+  it("a hotel's price per key and an office's per suite never plot as a price per unit", () => {
+    const deals = deriveAnalytics([
+      row("1", "Maddox", STABILIZED),
+      row("2", "Harbor Inn", { ...STABILIZED, assetClass: "hotel", metrics: [metric("Asking price", "$48,000,000"), metric("Keys", "180 keys")] }, { asset_class: "hotel" }),
+      row("3", "Tysons Plaza", { ...STABILIZED, assetClass: "office", metrics: [metric("Asking price", "$42,000,000"), metric("Suites", "24"), metric("Total SF", "310,000 SF")] }, { asset_class: "office" }),
+      row("4", "1200 K", CONVERSION),
+    ]);
+    expect(deals.find((d) => d.id === "1")?.perUnit).toBeCloseTo(50_000_000 / 248, 3);
+    expect(deals.find((d) => d.id === "2")?.perUnit).toBeNull();
+    expect(deals.find((d) => d.id === "3")?.perUnit).toBeNull();
+    // A multifamily plan deal keeps its all-in basis per planned unit.
+    expect(deals.find((d) => d.id === "4")?.perUnit).toBeCloseTo(180_000_000 / 612, 3);
+    const units = deals.map((d) => d.perUnit).filter((v): v is number => v != null);
+    expect(median(units)).toBeCloseTo((50_000_000 / 248 + 180_000_000 / 612) / 2, 3);
+  });
+});

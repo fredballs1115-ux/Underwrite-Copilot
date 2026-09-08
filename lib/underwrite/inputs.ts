@@ -17,6 +17,7 @@ import {
   buildingSfRow,
   findGoingInCap,
   occupancyPctFromMetrics,
+  occupancyRow,
   parseMoney,
   parsePct,
   parseSf,
@@ -27,6 +28,7 @@ import {
   capitalBudgetFromMetrics,
   findPriceMetric,
   inferStrategy,
+  isPlanDeal,
   noiFigures,
   type StrategyKind,
   unitCountFromMetrics,
@@ -193,10 +195,16 @@ export function deriveUnderwriteInputs(
     mark("purchasePrice", "assumption", "Enter the purchase price");
   }
 
+  // The price the OM stated, or null. A placeholder never bounds a budget
+  // and never appears in a note as "98% of price" — a percentage of an
+  // invented figure is not a fact about the deal.
+  const statedPrice = sources.purchasePrice?.provenance === "assumption" ? null : price;
+
   /** Can this NOI be the going-in figure on THIS price? Positive, and under
    *  the cap ceiling — past it the two cannot describe the same building. */
   const plausibleOnPrice = (n: number) => n > 0 && n / price < IMPLIED_CAP_CEILING;
-  const pctOfPrice = (n: number) => `${Math.round((n / price) * 100)}% of price`;
+  const pctOfPrice = (n: number) =>
+    statedPrice != null ? ` is ${Math.round((n / statedPrice) * 100)}% of price —` : " —";
 
   // ── NOI (the anchor) ───────────────────────────────────────────────────
   // T-12 actual NOI outranks the OM narrative when a statement was uploaded —
@@ -206,8 +214,17 @@ export function deriveUnderwriteInputs(
   // income); then price × cap; then a labelled default. An OM figure that
   // cannot be a going-in NOI on this price is named, not used.
   const ttmNote = t12End ? ` (TTM to ${t12End})` : "";
-  const implausible = (f: { label: string; value: number }) =>
-    `The OM's ${f.label} of $${Math.round(f.value).toLocaleString("en-US")} is ${pctOfPrice(f.value)} — the finished project's stabilized figure on a ${strategy.label.toLowerCase()} deal, not year-1 income, so it does not anchor year 1 here`;
+  // Why a stated NOI was not the anchor — said truthfully for each case: a
+  // zero or negative figure is no income to anchor on; a plan deal's
+  // stabilized figure is the finished project's; a figure past the cap
+  // ceiling on an operating asset cannot be year-1 income on this price.
+  const implausible = (f: { label: string; value: number }) => {
+    const amount = `$${Math.round(f.value).toLocaleString("en-US")}`;
+    if (!(f.value > 0)) return `The OM's ${f.label} is ${amount} — no income in place to anchor year 1 on`;
+    return isPlanDeal(strategy.kind)
+      ? `The OM's ${f.label} of ${amount}${pctOfPrice(f.value)} the finished project's stabilized figure on a ${strategy.label.toLowerCase()} deal, not year-1 income, so it does not anchor year 1 here`
+      : `The OM's ${f.label} of ${amount}${pctOfPrice(f.value)} above any going-in cap on this price, so it cannot be year-1 income and does not anchor year 1 here`;
+  };
   let noi: number;
   if (t12Noi != null) {
     noi = t12Noi;
@@ -263,9 +280,12 @@ export function deriveUnderwriteInputs(
   // for it. Shared reader with the deal page and the challenger's brief
   // (lib/deal-strategy): a "total project cost" includes the price, a budget
   // line does not, a mis-parsed figure never lands, absent is absent.
+  // Read against the STATED price only: a "total project cost" beside no
+  // ask must not be thrown out as ten times a $10M placeholder. Against a
+  // land price the ten-times bound does not apply at all.
   const budgetRead =
-    capitalBudgetFromMetrics(metrics, price) ??
-    budgetFromText(extraction?.strategy?.capitalBudget, price);
+    capitalBudgetFromMetrics(metrics, statedPrice, !priceIsLand) ??
+    budgetFromText(extraction?.strategy?.capitalBudget, statedPrice, !priceIsLand);
   const capitalBudget = budgetRead?.budget ?? 0;
 
   // ── RSF ────────────────────────────────────────────────────────────────
@@ -286,19 +306,21 @@ export function deriveUnderwriteInputs(
   // The ratios come from the actuals when available: the T-12's expense load
   // and the rent roll's vacancy replace the class defaults, so the whole
   // income statement re-bases on the documents.
+  // ── Occupancy ────────────────────────────────────────────────────────────
+  // Today's occupancy through the shared reader: the cell the workbook
+  // labels "In-Place Occupancy" never carries a stabilized or pro forma
+  // figure, and an OM that states only the finished project's occupancy
+  // states none. It seeds the vacancy line too (below), so the Assumptions
+  // tab never prints an 18% in-place occupancy beside a 10% class default.
+  const occPct = occupancyPctFromMetrics(metrics);
+
   const expenseRatio = t12Er ?? cd.expenseRatio;
-  const vacancy = rrOcc != null ? 1 - rrOcc : cd.vacancy;
+  const vacancy =
+    rrOcc != null ? 1 - rrOcc : occPct != null ? Math.min(0.99, Math.max(0, 1 - occPct / 100)) : cd.vacancy;
   const egr = noi / (1 - expenseRatio);
   const pgr = egr / (1 - vacancy);
   const inPlaceRentAnnual = pgr;
   const operatingExpenses = egr - noi; // = expenseRatio × EGR
-
-  // ── Occupancy (display) ──────────────────────────────────────────────────
-  // Today's occupancy through the shared reader: the cell the workbook
-  // labels "In-Place Occupancy" never carries a stabilized or pro forma
-  // figure, and an OM that states only the finished project's occupancy
-  // states none.
-  const occPct = occupancyPctFromMetrics(metrics);
 
   const inputs: UnderwriteInputs = {
     purchasePrice: price,
@@ -349,6 +371,13 @@ export function deriveUnderwriteInputs(
       "vacancyPct",
       "extracted",
       `Rent roll actual — ${(rrOcc * 100).toFixed(1)}% SF-weighted occupancy${rrAsOf ? ` as of ${rrAsOf}` : ""}`,
+    );
+  } else if (occPct != null) {
+    mark(
+      "vacancyPct",
+      "extracted",
+      `OM in-place occupancy ${occPct}% — the vacancy is what it leaves`,
+      (occupancyRow(metrics) as { page?: string } | null)?.page,
     );
   } else {
     mark("vacancyPct", "assumption", `${assetClass} default (${Math.round(cd.vacancy * 100)}%)`);

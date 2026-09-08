@@ -126,8 +126,11 @@ export interface ModelReturns {
   // ── The plan's own yardsticks. Null when the deal carries no plan. ──────
   /** the plan's capital budget, $ (0 when none) */
   capitalBudget: number;
-  /** price + closing costs + capital budget */
+  /** price + closing costs + capital budget + the works years' carry */
   totalCost: number;
+  /** the works years' negative NOI, summed — equity the IRR spends before
+   *  the building earns, so cost here too; null with no plan */
+  worksCarry: number | null;
   /** first fully stabilized operating year (1-based); null with no ramp */
   stabilizedYear: number | null;
   /** NOI in that year, in that year's dollars; null with no plan */
@@ -476,9 +479,14 @@ export function computeModel(inp: ModelInputs): {
   const equityMultiple = equity ? totalDistributions / equity : null;
 
   // The plan's yardsticks: what the finished building earns against
-  // everything it cost to get there. Null when there is no plan — a
-  // stabilized asset is judged on its going-in cap.
-  const totalCost = inp.purchasePrice + closingCosts + plan.budget;
+  // everything it cost to get there — the price, the closing costs, the
+  // budget AND the carry: the works years' negative NOI is equity out the
+  // door in the IRR, so it is cost here too. Null when there is no plan —
+  // a stabilized asset is judged on its going-in cap.
+  const worksCarry = plan.active
+    ? cashFlow.slice(0, plan.works).reduce((s, c) => s + Math.max(0, -c.noi), 0)
+    : 0;
+  const totalCost = inp.purchasePrice + closingCosts + plan.budget + worksCarry;
   const rampYears = plan.works + plan.leaseUp;
   const stabilizedYear = plan.active && rampYears > 0 ? rampYears + 1 : null;
   const stabilizedNoi = plan.active
@@ -506,6 +514,7 @@ export function computeModel(inp: ModelInputs): {
       profit: totalDistributions - equity,
       capitalBudget: plan.budget,
       totalCost,
+      worksCarry: plan.active ? worksCarry : null,
       stabilizedYear,
       stabilizedNoi,
       yieldOnCostPct,
