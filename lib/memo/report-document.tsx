@@ -41,6 +41,7 @@ import {
 import { planFacts } from "@/lib/plan-facts";
 import { inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { basisScale, fmtBasis, subjectBasis } from "@/lib/comp-detail";
+import { gapScale } from "@/lib/gap-detail";
 import { parsePageNumber } from "@/lib/facts";
 
 const C = {
@@ -648,6 +649,13 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   const rows = list(reconciliation?.rows) as NonNullable<
     ReconciliationResult["rows"]
   >;
+  // Each reconciliation gap as a bar from a centre line — the same reader as
+  // the deal page's table (lib/gap-detail), so a dollar gap scales against
+  // the widest dollar gap and a basis-point gap against the widest in basis
+  // points, never across; a neutral or figureless row draws none.
+  const gapShares = gapScale(
+    rows.map((r) => ({ gap: str(r?.gap), direction: str(r?.direction) })),
+  ).shares;
 
   const BASIS_LABEL: Record<string, string> = {
     in_place: "In place",
@@ -1188,26 +1196,75 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             <Text style={[s.headText, { width: "22%" }]}>Your model</Text>
             <Text style={[s.headText, { width: "30%" }]}>Gap</Text>
           </View>
-          {rows.map((r, i) => (
-            <View key={i} style={i % 2 === 1 ? [s.row, s.rowAlt] : s.row} wrap={false}>
-              <Text style={{ width: "26%", fontSize: 8.5 }}>{str(r?.metric)}</Text>
-              <Text style={{ width: "22%", fontSize: 8.5 }}>{str(r?.omValue)}</Text>
-              <Text style={{ width: "22%", fontSize: 8.5 }}>{str(r?.myValue)}</Text>
-              <Text
-                style={{
-                  width: "30%",
-                  fontSize: 8.5,
-                  fontFamily:
-                    str(r?.direction) === "unfavorable"
-                      ? "Helvetica-Bold"
-                      : "Helvetica",
-                  color: DIR_COLOR[str(r?.direction)] ?? C.ink,
-                }}
-              >
-                {str(r?.gap)}
-              </Text>
-            </View>
-          ))}
+          {rows.map((r, i) => {
+            const share = gapShares[i] ?? null;
+            // The bar: a 60pt track, the fill from its centre — right for a
+            // favorable gap, left for an unfavorable one — and a 1pt centre
+            // tick, three shapes a drawn row.
+            const track = 60;
+            const half = share === null ? 0 : Math.abs(share) * (track / 2);
+            return (
+              <View key={i} style={i % 2 === 1 ? [s.row, s.rowAlt] : s.row} wrap={false}>
+                <Text style={{ width: "26%", fontSize: 8.5 }}>{str(r?.metric)}</Text>
+                <Text style={{ width: "22%", fontSize: 8.5 }}>{str(r?.omValue)}</Text>
+                <Text style={{ width: "22%", fontSize: 8.5 }}>{str(r?.myValue)}</Text>
+                <View style={{ width: "30%" }}>
+                  <Text
+                    style={{
+                      fontSize: 8.5,
+                      fontFamily:
+                        str(r?.direction) === "unfavorable"
+                          ? "Helvetica-Bold"
+                          : "Helvetica",
+                      color: DIR_COLOR[str(r?.direction)] ?? C.ink,
+                    }}
+                  >
+                    {str(r?.gap)}
+                  </Text>
+                  {share !== null ? (
+                    <View
+                      style={{
+                        position: "relative",
+                        width: track,
+                        height: 2.5,
+                        marginTop: 2.5,
+                        borderRadius: 1.25,
+                        backgroundColor: C.line,
+                      }}
+                    >
+                      <View
+                        style={{
+                          position: "absolute",
+                          top: 0,
+                          left: share < 0 ? track / 2 - half : track / 2,
+                          width: Math.max(0.5, half),
+                          height: 2.5,
+                          borderRadius: 1.25,
+                          backgroundColor:
+                            DIR_COLOR[share < 0 ? "unfavorable" : "favorable"] ?? C.ink,
+                        }}
+                      />
+                      <View
+                        style={{
+                          position: "absolute",
+                          top: -1.5,
+                          left: track / 2 - 0.5,
+                          width: 1,
+                          height: 5.5,
+                          backgroundColor: C.ink,
+                        }}
+                      />
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            );
+          })}
+          {gapShares.some((g) => g !== null) ? (
+            <Text style={{ fontSize: 6.5, color: C.muted, marginTop: 3 }}>
+              Bars: each gap scaled to the widest of its kind; favorable right, unfavorable left.
+            </Text>
+          ) : null}
           {str(reconciliation?.takeaway) ? (
             <View style={s.summaryBox} wrap={false}>
               <Text style={s.summaryText}>{str(reconciliation?.takeaway)}</Text>

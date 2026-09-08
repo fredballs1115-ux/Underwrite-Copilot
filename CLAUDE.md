@@ -45,6 +45,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   conversion or a development), and puts the set on one track
   (`basisScale`). It reads only what the text states; nothing is inferred.
   Every surface that draws a comp against the subject goes through it.
+- A reconciliation gap's figure: `lib/gap-detail.ts` reads the dollar,
+  basis-point or percent magnitude a row's gap line states (`gapFigure`) and
+  puts every row on its own unit's track, signed by the row's stated
+  direction (`gapScale`) — never across units, never inferring a sign from
+  the words. The deal page's Reconciliation table and the report's
+  reconciliation page both draw from it.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`
