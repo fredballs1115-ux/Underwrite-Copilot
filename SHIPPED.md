@@ -204,6 +204,15 @@ confirmed equal to the main tip after each batch.
   figure is judged on yield on total cost and stressed, the challenger tests
   the plan's conservatism, and the debt follows the plan. live-verify gains
   the marker.
+- **#205 A development's price is its land cost.** A ground-up OM says "land
+  cost" or "site acquisition" where a building's OM says "asking price"; with
+  no price found, the plan strip, the yield-on-cost grid and the construction
+  sizer stayed silent and the Excel model fell back to a $10M placeholder. One
+  shared reader (`findPriceMetric`) now takes the asking price first and, on
+  a development only, the land or site cost — never an appraised land value,
+  never a per-acre figure, and never on an operating asset or a conversion.
+  The Excel source column names it as the acquisition basis with the build in
+  the capital plan. Tests on the reader, the plan summary and the inputs.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

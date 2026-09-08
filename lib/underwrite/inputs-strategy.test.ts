@@ -252,3 +252,24 @@ describe("deriveUnderwriteInputs — the budget from the strategy's own words", 
     expect(sources.capitalImprovementsYr1?.page).toBe("p. 44");
   });
 });
+
+describe("deriveUnderwriteInputs — a development's price is its land cost", () => {
+  it("anchors the price on the land cost and says so, instead of a $10M placeholder", () => {
+    const dev = ex(
+      [
+        metric("Land cost", "$8,000,000", { basis: "na", page: "p. 2" }),
+        metric("Total development cost", "$60,000,000", { basis: "pro_forma", page: "p. 9" }),
+        metric("Stabilized NOI (pro forma)", "$4,500,000", { basis: "pro_forma", page: "p. 11" }),
+      ],
+      { dealName: "Ground-up development — 240 units, fully entitled" },
+    );
+    const { inputs, sources, meta } = deriveUnderwriteInputs(dev, "fallback");
+    expect(meta.strategy).toBe("development");
+    expect(inputs.purchasePrice).toBe(8_000_000);
+    expect(sources.purchasePrice?.provenance).toBe("extracted");
+    expect(sources.purchasePrice?.note).toMatch(/land \/ site cost/);
+    expect(sources.purchasePrice?.page).toBe("p. 2");
+    // The build is the capital plan: total development cost less the land.
+    expect(inputs.capitalImprovementsYr1).toBe(52_000_000);
+  });
+});
