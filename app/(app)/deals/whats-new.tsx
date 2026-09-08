@@ -16,9 +16,7 @@ export function WhatsNewCard({ limit = 3 }: { limit?: number }) {
   return (
     <section className="rounded-xl border border-line bg-surface p-4">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold tracking-tight">
-          New in Underwrite Copilot
-        </h2>
+        <h2 className="text-sm font-semibold tracking-tight">What&apos;s new</h2>
         <Link
           href="/whats-new"
           className="text-[11px] font-medium text-brand hover:text-brand-strong"
@@ -36,7 +34,6 @@ export function WhatsNewCard({ limit = 3 }: { limit?: number }) {
               {e.title}
             </Link>
             <span className="ml-2 text-[11px] text-muted">{fmt(e.date)}</span>
-            <p className="mt-0.5 text-[13px] text-muted">{e.blurb}</p>
           </li>
         ))}
       </ul>

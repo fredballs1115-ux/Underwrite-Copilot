@@ -139,7 +139,10 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(a11yIssues(emptyHtml), "a11y pipeline-empty").toEqual([]);
     const empty = visibleText(emptyHtml);
     expect(gluedWords(empty)).toEqual([]);
-    expect(empty.length).toBeGreaterThan(200);
+    // The empty state is a picture, a line and two ways in — not an essay.
+    expect(empty).toContain("Start your pipeline");
+    expect(empty).toContain("Try a sample deal");
+    expect(empty).toContain("Browse the covered markets");
     const atLimitHtml = render(
         React.createElement(Pipeline, {
           deals: CARDS.slice(0, 2),

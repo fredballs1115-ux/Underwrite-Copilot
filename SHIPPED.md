@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Sixty-five PRs, #176–#240, each
+estimate, and that's what it should flag." Sixty-six PRs, #176–#241, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -888,6 +888,25 @@ confirmed equal to the main tip after each batch.
   1440 and 390 before the commit. live-verify now gates on the hero headline and the build-sha
   stamp, not on copy that a redesign is meant to change, and the page lint
   read the new homepage clean before it shipped.
+- **#241 The pipeline and the deal page get the same cut.** The pipeline's
+  four empty stage headers ("Tracking 0", "Active pursuit 0", "LOI
+  submitted 0", "Under contract / DD 0") are one picture: a six-rung stage
+  funnel with a count on each rung, every rung a one-tap filter, hollow
+  where empty. The Go / Caution / No-go counts are one split bar with the
+  chips beneath; the free-plan allowance is a meter; the verdict select is
+  gone (the chips are the verdict filter); the two export buttons are an
+  icon and one word each; a teammate's deal wears their initials; a deal
+  not yet screened shows an empty ring where its verdict pill will sit; the
+  fit score carries a 0–100 bar; the getting-started card is three short
+  steps under a three-segment progress bar; the new-deal form and the
+  empty state each lost their paragraph (the empty state: 66 words to 34);
+  the What's-new card lists titles only. On the deal page, the sample's
+  "How to read this screen" is three icon steps and one line instead of
+  four paragraphs, the verdict's flip line says only what the strip cannot,
+  and the sensitivity, ask, decision-log, model and debt-sizer helper
+  sentences each lost their second half (the sample's overview: 647 words
+  to 466). Render tests on the fixtures, screenshotted at 1440 and 390 for
+  every state.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

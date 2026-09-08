@@ -78,10 +78,7 @@ export function DecisionLog({
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
       <h2 className="text-sm font-semibold tracking-tight">Decision log</h2>
-      <p className="mt-0.5 text-xs text-muted">
-        Notes and stage moves, newest first — the deal’s memory for the next
-        call.
-      </p>
+      <p className="mt-0.5 text-xs text-muted">Notes and stage moves, newest first.</p>
 
       <form action={addDealNote} className="mt-3">
         <div className="flex items-start gap-2">
@@ -97,14 +94,10 @@ export function DecisionLog({
           />
           <SaveButton />
         </div>
-        <p className="mt-1 text-[11px] text-muted">Up to 500 characters.</p>
       </form>
 
       {entries.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">
-          Nothing logged yet — the first note usually saves a future you an
-          hour.
-        </p>
+        <p className="mt-4 text-sm text-muted">Nothing logged yet.</p>
       ) : (
         <ol className="mt-4 space-y-3">
           {entries.map((e, i) => (

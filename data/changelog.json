@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "The pipeline and the deal page say it in pictures too",
+      "blurb": "The stage ladder is a six-rung funnel with a count on each rung — tap a rung to see only those deals — in place of four empty section headers; the Go / Caution / No-go split is one bar; the free-plan allowance is a meter; a teammate's deal wears their initials; a deal not yet screened shows an empty ring where its verdict will sit; the fit score carries its own 0–100 bar. The setup card, the new-deal form and the empty pipeline each lost their paragraph. On the deal page, the sample's reading guide is three marked steps and one line, and every helper sentence lost its second half.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-08",
       "title": "The homepage and the sample screen say it in pictures: half the height, a fifth of the words",
       "blurb": "Words that can be a picture are now a picture. The homepage was twenty-one blocks and six and a half thousand words; it is one idea per section — the sample deal card beside a one-sentence headline, two-word stats, the two-analyst spread drawn as a bar, the six stages as icons with the running trace beneath, the verdict as the deal page's own tabs, the live stress bench, the fifteen markets as aerial photographs, four artifact tiles you can download from, an eight-icon grid for everything else, pricing and the FAQ. The sample screen lost its introductory paragraphs and its scrolling text band the same way; the deliverables, the four deeper tools and the research cards each read in a line. The long-form case lives on the Why page for anyone who wants the words.",
       "href": "/"
