@@ -2,6 +2,7 @@ import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { downloadDealFile } from "@/lib/storage";
 import { parseModelFile } from "@/lib/model-parse";
+import { describeRunFailure } from "@/lib/anthropic/failure";
 import { extractDocFacts } from "@/lib/anthropic/model-extract";
 import { reconcileDocs } from "@/lib/anthropic/model-reconcile";
 import { DOC_KIND_LABEL } from "@/lib/documents";
@@ -124,9 +125,11 @@ export async function runModelGeneration(dealId: string): Promise<void> {
       error: null,
     });
   } catch (err) {
-    await patchJob(dealId, {
-      status: "error",
-      error: err instanceof Error ? err.message : "Model generation failed.",
-    });
+    // The same job row and banner as the screen: one sentence the analyst can
+    // act on (our own "add a document first" messages pass through as
+    // written), the provider's raw text in the server log.
+    const failure = describeRunFailure(err);
+    console.error(`[build-model] failed for deal ${dealId}: ${failure.detail}`);
+    await patchJob(dealId, { status: "error", error: failure.message });
   }
 }

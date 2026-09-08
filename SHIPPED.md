@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Sixty-two PRs, #176–#237, each
+estimate, and that's what it should flag." Sixty-three PRs, #176–#238, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -797,6 +797,38 @@ confirmed equal to the main tip after each batch.
   under-counts, so the gate can never fire falsely). Both driven through the
   real pipeline in the tests: four concurrent screens peak at two, a failing
   run frees its slot, a 700-page OM never reaches the first read.
+- **#238 The first ten minutes, read by a tenth reviewer: a password reset
+  that works, sign-up errors that name themselves.** The review walked a new
+  visitor from sign-up to first export and found the front door's worst
+  fault: password reset was a dead end. The reset email's link came back
+  with a one-time code that nothing ever exchanged for a session (the server
+  client keeps `detectSessionInUrl` off, and a Server Component cannot write
+  cookies), so the link landed on the Account page signed out and bounced to
+  sign-in — nobody who forgot a password could get back in. Now
+  `app/auth/callback/route.ts` exchanges the code, and `proxy.ts` hands any
+  auth link that lands elsewhere (the Account page, the sign-in page, the
+  site root) to it before a sign-in bounce can strip the code — so the reset
+  link works without a change to the Supabase redirect allowlist, and a
+  confirmation link signs the person in and lands in the pipeline instead
+  of on a "sign in below" banner. A refused link (expired, already used,
+  opened in a different browser than the one that asked) says so on the
+  sign-in page, opened on the reset form; an expired confirmation no longer
+  reads "Email confirmed". Sign-up with an email that already has an
+  account said "Account created — check your email" (the enumeration-
+  protected placeholder user has no identities); it now says sign in
+  instead. Every auth failure reads by the service's stable code
+  (`lib/auth-flow.ts`): a weak password, an invalid address, a closed
+  sign-up, an unauthorized recipient, a reset asked for too soon with its
+  wait in seconds — none of them "something went wrong signing you in" any
+  more, and the sign-up tab's error never lingers on the sign-in tab.
+  Around it: a signed-in visit to `/login?next=/deals?error=auth` keeps its
+  query; every signed-in area (submarkets, comps, news, data health)
+  bounces with its destination; the rent-roll workbook's failure and its
+  Pro upsell have their sentences; the billing portal reads "not set up"
+  instead of a raw error when Stripe's key is missing; seven error codes no
+  route emitted are gone. The comp search and the model generator fail in
+  the screen's sentences too. 34 new tests drive the callback, the proxy
+  and the copy.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

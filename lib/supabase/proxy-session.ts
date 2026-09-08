@@ -1,5 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { authLinkHandoff, safeNextPath } from "@/lib/auth-flow";
+
+export { safeNextPath };
 
 /**
  * Runs on every request (from proxy.ts) to keep the Supabase auth session
@@ -7,20 +10,26 @@ import { NextResponse, type NextRequest } from "next/server";
  * the updated cookie back onto the response. It also does a fast "optimistic"
  * redirect: signed-out users hitting the app go to /login (carrying a `next`
  * param so invite links survive the sign-in), and signed-in users hitting
- * /login go where they were headed.
+ * /login go where they were headed. An email link's one-time code goes to the
+ * callback that can exchange it, whichever page the link landed on.
  *
  * (The real security check still happens inside the app layout + Row-Level
  * Security — this is just the first gate.)
  */
 
-/** Only ever bounce to a same-origin path — never an absolute URL. */
-export function safeNextPath(next: string | null): string | null {
-  if (!next) return null;
-  if (!/^\/[a-zA-Z0-9/_\-?=&%.]*$/.test(next) || next.startsWith("//")) {
-    return null;
-  }
-  return next;
-}
+/** Every signed-in area: a signed-out visit bounces to /login with `next`. */
+export const PROTECTED_PREFIXES = [
+  "/deals",
+  "/team",
+  "/billing",
+  "/account",
+  "/criteria",
+  "/analytics",
+  "/submarkets",
+  "/comps",
+  "/news",
+  "/data-health",
+] as const;
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -60,10 +69,13 @@ export async function updateSession(request: NextRequest) {
     signedIn = false;
   }
 
+  // A password-reset or confirmation link that landed on a page instead of
+  // the callback: hand its code over before any sign-in bounce can strip it.
+  const handoff = authLinkHandoff(request.nextUrl);
+  if (handoff) return redirectWithCookies(request, supabaseResponse, handoff);
+
   const { pathname } = request.nextUrl;
-  const isProtected = ["/deals", "/team", "/billing", "/account", "/criteria", "/analytics"].some(
-    (p) => pathname.startsWith(p),
-  );
+  const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
   const isAuthPage = pathname === "/login";
 
   if (!signedIn && isProtected) {
@@ -79,16 +91,18 @@ export async function updateSession(request: NextRequest) {
   return supabaseResponse;
 }
 
-/** Redirect while carrying over any refreshed auth cookies. */
+/**
+ * Redirect while carrying over any refreshed auth cookies. `target` is a
+ * same-origin path that may carry its own query (`/deals?error=auth`), which
+ * survives; `params` are added on top.
+ */
 function redirectWithCookies(
   request: NextRequest,
   response: NextResponse,
-  pathname: string,
+  target: string,
   params?: Record<string, string>,
 ) {
-  const url = request.nextUrl.clone();
-  url.pathname = pathname;
-  url.search = "";
+  const url = new URL(target, request.url);
   for (const [k, v] of Object.entries(params ?? {})) {
     url.searchParams.set(k, v);
   }

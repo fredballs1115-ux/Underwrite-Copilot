@@ -3,6 +3,7 @@ import Link from "next/link";
 import { LogoMark } from "@/app/logo";
 import { FREE_DEALS } from "@/lib/marketing-constants";
 import { MARKET_COUNT } from "@/app/markets-marquee";
+import { authLinkBanner, initialLoginMode } from "@/lib/auth-flow";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = {
@@ -15,9 +16,23 @@ export const metadata: Metadata = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string; next?: string; deleted?: string; confirmed?: string }>;
+  searchParams: Promise<{
+    mode?: string;
+    next?: string;
+    deleted?: string;
+    confirmed?: string;
+    link?: string;
+    error?: string;
+    error_code?: string;
+    error_description?: string;
+  }>;
 }) {
-  const { mode, next, deleted, confirmed } = await searchParams;
+  const params = await searchParams;
+  const { next, deleted } = params;
+  // The email link that brought someone here — confirmed, or refused. The
+  // auth service's own error parameters are read too, so an expired
+  // confirmation never shows as "Email confirmed".
+  const linkBanner = authLinkBanner(params);
   return (
     <div className="band-dark flex flex-1 flex-col">
       <main id="main" className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16">
@@ -37,9 +52,16 @@ export default async function LoginPage({
             Underwrite Copilot.
           </p>
         )}
-        {confirmed && (
-          <p className="mt-6 rounded-lg bg-surface/95 px-3 py-2 text-center text-sm text-ink shadow-card">
-            Email confirmed — sign in below and your pipeline is ready.
+        {linkBanner && (
+          <p
+            role={linkBanner.tone === "warn" ? "alert" : "status"}
+            className={`mt-6 rounded-lg px-3 py-2 text-center text-sm shadow-card ${
+              linkBanner.tone === "warn"
+                ? "bg-caution/15 text-white"
+                : "bg-surface/95 text-ink"
+            }`}
+          >
+            {linkBanner.text}
           </p>
         )}
         <div className="shadow-float mt-8 rounded-2xl border border-line bg-surface p-7">
@@ -49,10 +71,7 @@ export default async function LoginPage({
             are free — no card required, and a fully-worked sample deal is
             waiting inside.
           </p>
-          <LoginForm
-            initialMode={mode === "signup" ? "signup" : "signin"}
-            next={next ?? null}
-          />
+          <LoginForm initialMode={initialLoginMode(params)} next={next ?? null} />
         </div>
 
         {/* The login wall is a doorway, not a dead end — the public research

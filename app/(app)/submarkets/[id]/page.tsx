@@ -43,7 +43,7 @@ export default async function SubmarketPage({
 
   const supabase = await createSupabaseServerClient();
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect(`/login?next=${encodeURIComponent(`/submarkets/${id}`)}`);
 
   const view = await loadSubmarketView(supabase, id);
   if (!view) notFound();

@@ -81,6 +81,20 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   before any model call. `lib/anthropic/pipeline.test.ts` drives the real
   pipeline against a recording fake database — reproduce a failure there
   before fixing it.
+- The front door: `lib/auth-flow.ts` is the pure layer — an auth failure's
+  sentence by the service's stable `code` (`authErrorCopy`), the sign-in
+  page's link banner, and where an email link's one-time code goes.
+  `@supabase/ssr`'s server client runs PKCE with `detectSessionInUrl` off,
+  so a reset or confirmation link's `code` must be exchanged in
+  `app/auth/callback/route.ts` (a Route Handler can write cookies; a Server
+  Component cannot). `proxy.ts` (`lib/supabase/proxy-session.ts`) hands any
+  link that lands elsewhere to that route (`authLinkHandoff`) before the
+  sign-in bounce runs, so the redirect targets in Supabase never have to
+  change; `PROTECTED_PREFIXES` there is the one list of signed-in areas.
+  The code verifier lives in the requesting browser's cookies — a link opened
+  elsewhere fails, and the page says so. Tests drive the route and the proxy
+  with a fake auth client (`lib/auth-callback.test.ts`,
+  `lib/supabase/proxy-session.test.ts`).
 - DB schema: `supabase/migrations/`
 
 ## Conventions

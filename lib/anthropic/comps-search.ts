@@ -1,6 +1,7 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import { getAnthropic } from "./client";
+import { describeRunFailure } from "./failure";
 import { MODELS } from "./models";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { ExtractionResult } from "./types";
@@ -153,10 +154,10 @@ export async function runCompSearch(dealId: string): Promise<void> {
       error: null,
     });
   } catch (err) {
-    await patchJob(dealId, {
-      status: "error",
-      error:
-        err instanceof Error ? err.message : "Public-web comp search failed.",
-    });
+    // The same job row and banner as the screen: one sentence the analyst can
+    // act on, the provider's raw text in the server log.
+    const failure = describeRunFailure(err);
+    console.error(`[comps-search] failed for deal ${dealId}: ${failure.detail}`);
+    await patchJob(dealId, { status: "error", error: failure.message });
   }
 }
