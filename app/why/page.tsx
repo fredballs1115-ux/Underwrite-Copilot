@@ -64,6 +64,13 @@ const SECTIONS: { h: string; body: string[] }[] = [
     ],
   },
   {
+    h: "It knows what kind of deal it is",
+    body: [
+      "A stabilized building, a value-add, a lease-up, a conversion and a ground-up development are not the same kind of thing, and the same number means different things in each. The screen reads the strategy first, from the OM's own words, and every NOI is labelled: in place, Year 1, or the finished project's stabilized pro forma.",
+      "On a deal with a plan, the stabilized figure is never called a misread and never read as a cap rate against the price. It is the finished project's income, judged on yield on total cost — price plus the works. The screen stresses it: NOI under the pro forma, budget over it, the spread over the cap the finished product trades at. The challenger is asked the question that matters, whether the plan is as conservative as the deck says. The debt follows the plan too: construction or bridge debt sized to cost, and the take-out the finished NOI can carry.",
+    ],
+  },
+  {
     h: "It knows the ground",
     body: [
       `Give a deal an address and the app checks the local rules: rent control coverage, small-landlord exemptions, purchase rights — ${RULE_COUNT} machine-evaluable rules focused on the Mid-Atlantic and the ${MAJOR_MARKET_COUNT} biggest US markets, DC to Brooklyn to LA to Chicago. It answers with the statute linked, or names the exact open question — year built, whether you'll live in a unit — and takes your answer right on the deal. Unknown jurisdictions say so — never a silent pass.`,

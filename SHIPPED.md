@@ -197,6 +197,13 @@ confirmed equal to the main tip after each batch.
   against cost alone because it has no income yet. The panel's opening
   sentence now says which, and a render test holds both branches (the
   value-add fixture seeds 1.5 years from "18 months").
+- **#204 The why page says it knows what kind of deal it is.** The public
+  page that explains the product had nothing on the biggest change of this
+  run. A new section, between "It shows its work" and "It knows the ground",
+  says the strategy is read first, every NOI is labelled, a plan's stabilized
+  figure is judged on yield on total cost and stressed, the challenger tests
+  the plan's conservatism, and the debt follows the plan. live-verify gains
+  the marker.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
