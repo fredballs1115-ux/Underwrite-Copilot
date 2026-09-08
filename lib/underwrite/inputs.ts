@@ -22,6 +22,7 @@ import {
   inferStrategy,
   noiFigures,
   type StrategyKind,
+  unitCountFromMetrics,
 } from "@/lib/deal-strategy";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
@@ -399,16 +400,11 @@ export function deriveUnderwriteInputs(
   mark("saleCostPct", "assumption", "Default 2.0% of sale price");
 
   // Unit count, same precedence as occupancy: rent-roll actual first, then
-  // the OM's stated metric. Bounds guard against a mis-parsed dollar figure
-  // landing in a "units" label; nothing plausible → null, never a guess.
-  const unitsMetric = findMetric(metrics, /\bunits?\b|\bdoors?\b/i, /\bper\b|\/|price|rent|psf|value/i);
-  const omUnits = unitsMetric ? parseMoney(unitsMetric.value) : null;
-  const units =
-    rr?.unitCount && rr.unitCount > 0
-      ? rr.unitCount
-      : omUnits != null && omUnits >= 1 && omUnits <= 50_000
-        ? Math.round(omUnits)
-        : null;
+  // the OM's stated metric through the shared count reader (a whole number
+  // from a row that counts units — never a "Unit mix" or a "Vacant units"
+  // row, never a dollar figure). Nothing plausible → null, never a guess.
+  const omUnits = unitCountFromMetrics(metrics);
+  const units = rr?.unitCount && rr.unitCount > 0 ? rr.unitCount : omUnits;
 
   return {
     inputs,

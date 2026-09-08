@@ -12,6 +12,7 @@ import {
   parseCount,
   planSummary,
   unitCountFromMetrics,
+  unitCountRow,
 } from "./deal-strategy";
 
 const m = (label: string, value: string): ExtractedMetric => ({ label, value, flagged: false, page: "" });
@@ -72,6 +73,19 @@ describe("findPriceMetric — every name an OM gives the number being asked", ()
     expect(findPriceMetric([m("Contract price", "$42,000,000")], "value_add")?.value).toBe("$42,000,000");
   });
 
+  it("reads an offer price; never a land allocation on an operating asset, never a price reduction", () => {
+    expect(findPriceMetric([m("Offer price", "$42,000,000")], "stabilized")?.value).toBe("$42,000,000");
+    expect(findPriceMetric([m("Land price", "$4,000,000")], "stabilized")).toBeNull();
+    // On a development the land IS what is being bought.
+    expect(findPriceMetric([m("Land price", "$4,000,000")], "development")?.value).toBe("$4,000,000");
+    expect(
+      findPriceMetric(
+        [m("Price reduction", "$2,000,000"), m("Asking price", "$40,000,000")],
+        "stabilized",
+      )?.value,
+    ).toBe("$40,000,000");
+  });
+
   it("never reads what the building last traded for, or a per-unit price", () => {
     expect(findPriceMetric([m("Last sale price", "$30,000,000")], "stabilized")).toBeNull();
     expect(findPriceMetric([m("Prior sale price (2019)", "$30,000,000")], "stabilized")).toBeNull();
@@ -108,5 +122,59 @@ describe("a legacy row with no metrics array is read, not thrown on", () => {
   it("a legacy row with no plan words is unknown, never stabilized", () => {
     const bare = { dealName: "Old Screen", assetClass: "office", market: "", address: "" } as unknown as ExtractionResult;
     expect(inferStrategy(bare).kind).toBe("unknown");
+  });
+});
+
+describe("unitCountFromMetrics — every row that counts units, no row that merely mentions them", () => {
+  it("reads the names an OM uses for the count", () => {
+    expect(unitCountFromMetrics([m("Residential units", "312")])).toBe(312);
+    expect(unitCountFromMetrics([m("Apartment units", "312")])).toBe(312);
+    expect(unitCountFromMetrics([m("Number of units", "312")])).toBe(312);
+    expect(unitCountFromMetrics([m("Doors", "312")])).toBe(312);
+    expect(unitCountFromMetrics([m("Keys", "180")])).toBe(180);
+    expect(unitCountFromMetrics([m("Proposed units", "612")])).toBe(612);
+  });
+
+  it("a partial count is never the count", () => {
+    expect(unitCountFromMetrics([m("Vacant units", "12")])).toBeNull();
+    expect(unitCountFromMetrics([m("Affordable units", "27")])).toBeNull();
+    expect(unitCountFromMetrics([m("Renovated units", "120")])).toBeNull();
+    expect(unitCountFromMetrics([m("Vacant units", "12"), m("Units", "312")])).toBe(312);
+  });
+
+  it("unitCountRow hands back the OM's own row, with its page", () => {
+    const row = unitCountRow([
+      m("Unit mix", "40% studio / 60% 1BR"),
+      { ...m("Units", "248 units"), page: "p. 4" },
+    ]);
+    expect(row?.value).toBe("248 units");
+    expect(row?.page).toBe("p. 4");
+  });
+});
+
+describe("assessPlausibility — the basis check divides by the real count", () => {
+  const ex = (metrics: ExtractedMetric[]): ExtractionResult => ({
+    dealName: "Maddox Apartments",
+    assetClass: "multifamily",
+    market: "Dallas, TX",
+    address: "",
+    metrics,
+  });
+
+  it("a 'Vacant units' or 'Unit mix' row never manufactures an out-of-band basis", () => {
+    const f = assessPlausibility(
+      ex([
+        m("Asking price", "$50,000,000"),
+        m("Vacant units", "12"),
+        m("Unit mix", "40% studio / 60% 1BR"),
+        m("Units", "248"),
+      ]),
+    );
+    expect(f.find((x) => x.code === "basis_out_of_band")).toBeUndefined();
+  });
+
+  it("still names a basis no market trades at when the real count says so", () => {
+    const f = assessPlausibility(ex([m("Asking price", "$50,000,000"), m("Vacant units", "12"), m("Units", "5")]));
+    expect(f.find((x) => x.code === "basis_out_of_band")?.title).toContain("5 units");
   });
 });

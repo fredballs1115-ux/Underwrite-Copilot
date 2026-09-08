@@ -44,6 +44,39 @@ describe("deriveUnderwriteInputs — NOI anchor", () => {
   });
 });
 
+describe("deriveUnderwriteInputs — the unit count is the row that counts units", () => {
+  const mf = (metrics: Array<[string, string]>): ExtractionResult => ({
+    dealName: "Maddox Apartments",
+    assetClass: "multifamily",
+    market: "Dallas, TX",
+    address: "",
+    metrics: metrics.map(([label, value]) => ({ label, value, flagged: false, page: "" })),
+  });
+
+  it("a 'Unit mix' row ahead of 'Units' never shadows the count, and '248 units' parses", () => {
+    const { meta } = deriveUnderwriteInputs(
+      mf([
+        ["Asking price", "$50,000,000"],
+        ["Unit mix", "40% studio / 60% 1BR"],
+        ["Units", "248 units"],
+      ]),
+      "x",
+    );
+    expect(meta.units).toBe(248);
+  });
+
+  it("a partial count ('Vacant units') is not the count — null, never a guess", () => {
+    const { meta } = deriveUnderwriteInputs(
+      mf([
+        ["Asking price", "$50,000,000"],
+        ["Vacant units", "12"],
+      ]),
+      "x",
+    );
+    expect(meta.units).toBeNull();
+  });
+});
+
 describe("deriveUnderwriteInputs — empty extraction", () => {
   it("falls back to labelled assumptions and still computes a balanced model", () => {
     const { inputs, sources } = deriveUnderwriteInputs(null, "Blank Deal");

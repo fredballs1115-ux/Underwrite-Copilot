@@ -12,7 +12,7 @@ import { seedBenchmarks } from "@/lib/research-data";
 import { sectorLeaderboard } from "@/lib/sector-leaderboard";
 import { sampleLegal } from "@/lib/sample-legal";
 import { scoreMandateFit } from "@/lib/mandate";
-import { inferStrategy } from "@/lib/deal-strategy";
+import { findPriceMetric, inferStrategy, unitCountRow } from "@/lib/deal-strategy";
 import type { ExtractedMetric } from "@/lib/anthropic/types";
 import { DemoSections, type DemoData } from "./sections";
 import { ModelSlideshow } from "./model-slideshow";
@@ -210,17 +210,14 @@ export default function DemoPage() {
     underwrite: derived.inputs,
   };
   const metrics = data.extraction.metrics;
-  const price = findValue(
-    metrics,
-    /purchase price|asking price|\bprice\b/i,
-    /unit|\/sf|per sf|per unit|psf/i,
-  );
+  // The shared price reader, as the deal page uses it.
+  const price = findPriceMetric(metrics, inferStrategy(data.extraction).kind)?.value ?? null;
   const sfValue = findValue(
     metrics,
     /\b(total sf|square (foot|feet|footage)|sq\.? ?ft|rentable|nra|gla|building size|\bsf\b)/i,
     /price|\$|per|\/|psf/i,
   );
-  const unitValue = findValue(metrics, /\bunits?\b|unit count/i, /price|\$|per|\//i);
+  const unitValue = unitCountRow(metrics)?.value ?? null;
   // A bare unit count ("248") reads wrong in a Size slot — say what it counts.
   const size =
     sfValue ??

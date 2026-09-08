@@ -4,6 +4,7 @@ import {
   inferStrategy,
   planSummary,
   type StrategyKind,
+  unitCountFromMetrics,
 } from "@/lib/deal-strategy";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
@@ -86,9 +87,10 @@ function deriveBasis(
 
   if (price == null) return null;
   if (assetClass === "multifamily") {
-    const units = findMetric(metrics, /^units?\b|number of units|unit count/i, /per|\/|price|\$/i);
-    const n = units ? Number(units.value.replace(/[,\s]/g, "")) : NaN;
-    if (Number.isFinite(n) && n > 0) return `${fmtCompact(price / n)}/unit${suffix}`;
+    // The shared count reader: "312 units" parses, a "Unit mix" row ahead
+    // of "Units" never shadows it.
+    const n = unitCountFromMetrics(metrics);
+    if (n != null && n > 0) return `${fmtCompact(price / n)}/unit${suffix}`;
     return null;
   }
   // Office / industrial / retail: dollars per square foot.

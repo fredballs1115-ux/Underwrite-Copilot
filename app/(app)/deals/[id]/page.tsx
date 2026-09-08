@@ -49,9 +49,11 @@ import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import {
   IMPLIED_CAP_CEILING,
   assessPlausibility,
+  findPriceMetric,
   inferStrategy,
   isPlanDeal,
   planSummary,
+  unitCountRow,
 } from "@/lib/deal-strategy";
 import { PlanStrip, PlausibilityPanel } from "./plausibility-panel";
 import { PlanSensitivity } from "./plan-sensitivity";
@@ -486,15 +488,28 @@ export default async function DealPage({
     const f = parseFactRow(row);
     if (!(f.field in factsByField)) factsByField[f.field] = f;
   }
+  // What kind of deal this is, what its plan says (stabilized NOI, cost,
+  // yield on cost), and whether its headline figures can all be true at
+  // once — pure code over the extraction. On a conversion a $21M stabilized
+  // NOI over a $20M price is the plan and shows as such; on a deal read as
+  // stabilized the same pair is a misread, and is named as such, above
+  // every number built on it.
+  const strategy = inferStrategy(extraction, firstSignal);
+  const plan = planSummary(extraction, strategy);
+  const plausibility = assessPlausibility(extraction, strategy);
+  const summaryStrategy = strategy.kind === "unknown" ? null : strategy.label;
+  // The shared price reader; on a development with no asking price the land
+  // or site cost is what is being bought.
   const summaryPrice =
-    findValue(metrics, /purchase price|asking price|\bprice\b/i, /unit|\/sf|per sf|per unit|psf/i) ??
-    (firstSignal?.askPrice.trim() || null);
+    findPriceMetric(metrics, strategy.kind)?.value ?? (firstSignal?.askPrice.trim() || null);
   const sizeSf = findValue(
     metrics,
     /\b(total sf|square (foot|feet|footage)|sq\.? ?ft|rentable|nra|gla|building size|\bsf\b)/i,
     /price|\$|per|\/|psf/i,
   );
-  const sizeUnits = findValue(metrics, /\bunits?\b|unit count/i, /price|\$|per|\//i);
+  // The shared count reader: the row that counts the units, never a "Unit
+  // mix" row ahead of it.
+  const sizeUnits = unitCountRow(metrics)?.value ?? null;
   // A bare unit count ("248") reads wrong in a Size slot — say what it counts.
   const summarySize =
     sizeSf ??
@@ -532,17 +547,6 @@ export default async function DealPage({
   const yearBuiltNum = yearBuiltRaw ? Number(yearBuiltRaw) : null;
   const summaryYearBuilt =
     yearBuiltNum != null && yearBuiltNum >= 1700 && yearBuiltNum <= 2100 ? yearBuiltNum : null;
-
-  // What kind of deal this is, what its plan says (stabilized NOI, cost,
-  // yield on cost), and whether its headline figures can all be true at
-  // once — pure code over the extraction. On a conversion a $21M stabilized
-  // NOI over a $20M price is the plan and shows as such; on a deal read as
-  // stabilized the same pair is a misread, and is named as such, above
-  // every number built on it.
-  const strategy = inferStrategy(extraction, firstSignal);
-  const plan = planSummary(extraction, strategy);
-  const plausibility = assessPlausibility(extraction, strategy);
-  const summaryStrategy = strategy.kind === "unknown" ? null : strategy.label;
 
   // Public-record comps (auto-comps v2): render whatever the background pull
   // stored; when a deal has an address but nothing stored yet (pre-feature

@@ -3,15 +3,15 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#215 merged to main (live build
-sha `3e7dbfc`, #215, confirmed equal to the main tip by live-verify at 02:06
-UTC — everything below is live).
+**Last updated 2026-09-08**, after PRs #176–#218 merged to main (live build
+sha `ace6ea1`, #217, confirmed equal to the main tip by live-verify at 02:27
+UTC; #218 follows on the next Render deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Forty-two PRs (#176–#217) landed across one review session and the
+Forty-three PRs (#176–#218) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -113,6 +113,12 @@ deploy (live-verify shows the sha).
   never pairs a total project cost with a construction budget as one
   retrade, and an older deal with no metrics array no longer breaks the LOI
   draft. The sample screen's summary bar names the deal's kind.
+- **One count and one price behind every surface** (#218): the market and
+  comp memories, the plausibility check, the Excel model, the pipeline row,
+  the deal page's summary and the debt sizer all read the unit count and the
+  price through the two shared readers — a "Vacant units" row is never the
+  count, a "Last sale price" is never the ask, and a development's land cost
+  is its price on the pipeline and the deal page too.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":
