@@ -10,6 +10,10 @@ export default defineConfig({
     include: ["lib/**/*.test.ts"],
     environment: "node",
   },
+  // A few tests server-render app components (plain React on pure math) to
+  // catch runtime errors in their markup; the app's tsconfig leaves JSX to
+  // Next ("preserve"), so the test runner compiles it itself.
+  esbuild: { jsx: "automatic", jsxImportSource: "react" },
   resolve: {
     alias: {
       "@": resolve(__dirname, "."),
