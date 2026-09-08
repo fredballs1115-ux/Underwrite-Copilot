@@ -147,7 +147,15 @@ export async function openPortal() {
   const customerId = (profile?.stripe_customer_id as string) ?? null;
   if (!customerId) redirect("/billing?error=nocustomer");
 
-  const stripe = getStripe();
+  // Same as checkout: a missing STRIPE_SECRET_KEY reads as "not set up",
+  // never a raw error page.
+  let stripe: ReturnType<typeof getStripe>;
+  try {
+    stripe = getStripe();
+  } catch (err) {
+    console.error("portal: Stripe client init failed (STRIPE_SECRET_KEY set?):", err);
+    redirect("/billing?error=config");
+  }
   try {
     if (await isStaleCustomer(stripe, customerId)) {
       console.warn(`portal: stale stripe customer ${customerId} for ${user.id} — resetting billing mirror`);

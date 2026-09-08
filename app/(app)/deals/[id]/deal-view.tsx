@@ -167,13 +167,6 @@ const MODEL_ERRORS: Record<string, string> = {
   busy: "A screen is already running on this deal — let it finish first.",
   memoempty: "Run the analysis first — the memo needs a verdict to export.",
   memofail: "Couldn’t build the memo just now — please try again in a moment.",
-  memopro:
-    "The one-page IC memo is part of Pro — upgrade on the Billing page and it exports instantly.",
-  modelpro:
-    "The Excel model export is part of Pro — upgrade on the Billing page to download it.",
-  modelempty:
-    "There’s no generated model on this deal yet — build one from the Financials section first.",
-  modelfail: "Couldn’t build the Excel just now — please try again in a moment.",
   docfile: "Please choose a file to add.",
   docsize: "That file is larger than 32 MB — please try a smaller one.",
   exportfail:
@@ -192,8 +185,6 @@ const MODEL_ERRORS: Record<string, string> = {
   taskdelete: "Couldn’t remove that task — please try again.",
   tasknosteps: "This verdict has no next steps to import.",
   share: "Couldn’t manage that share link — please try again.",
-  loipro:
-    "The LOI draft is part of Pro — upgrade on the Billing page to generate it.",
   loiprice:
     "Couldn’t read the LOI’s price or deposit as dollar amounts — check the two figures.",
   loideposit:
@@ -201,13 +192,9 @@ const MODEL_ERRORS: Record<string, string> = {
   loisample:
     "The sample deal is a walkthrough — LOI drafts generate on your own deals.",
   loifail: "Couldn’t build the LOI just now — please try again in a moment.",
-  reportpro:
-    "The full report is part of Pro — upgrade on the Billing page to export it.",
   reportempty: "Run the screen first — the full report needs a verdict to export.",
   reportfail:
     "Couldn’t build the full report just now — please try again in a moment.",
-  underwritepro:
-    "The Excel underwriting model is part of Pro — upgrade on the Billing page to download it.",
   underwriteempty:
     "Run the screen first — the model builds from the OM’s extracted terms.",
   underwritefail:

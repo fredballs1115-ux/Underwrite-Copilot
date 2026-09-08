@@ -13,7 +13,7 @@ landmarks included).
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Sixty-two PRs (#176–#237) landed across one review session and the
+Sixty-three PRs (#176–#238) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -283,6 +283,17 @@ deploy (live-verify shows the sha).
   wait, so a queued screen never reads as stalled); `ANALYSIS_CONCURRENCY`
   raises it on a bigger instance. A deck past the provider's ~600-page
   limit stops before any model call, with the page count in the message.
+- **Password reset works** (#238). The reset link used to land on the
+  Account page signed out and bounce to sign-in — its one-time code was
+  never exchanged for a session, so nobody who forgot a password could get
+  back in. `app/auth/callback` exchanges it now, and the proxy routes any
+  auth link's code there whichever page it lands on, so no Supabase setting
+  had to change. A confirmation link signs the person in and opens the
+  pipeline; a refused link says why and opens the reset form; sign-up with
+  an existing email says "sign in instead" rather than "check your email";
+  every auth failure names itself (weak password, invalid address, closed
+  sign-up, a reset asked for too soon with its wait). Item 7 under "Your
+  moves" has the three Supabase settings to check.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":
@@ -448,6 +459,24 @@ migrations do I still need?" stops being a guess.
    migrations and seeds themselves instead of handing you SQL. Trade-off: the
    service-role key bypasses RLS. **This is what would have let item 1 be done
    for you rather than by you.**
+7. **Three sign-in settings in Supabase → Authentication (~5 min), then one
+   try.** (a) **URL Configuration → Site URL** should be
+   `https://underwrite-copilot.onrender.com`. A reset or confirmation link
+   whose target is not on the allowlist falls back to the Site URL; the site
+   now handles a link's code on any page, but a `localhost` Site URL sends
+   the person nowhere. (b) **Redirect URLs** should contain
+   `https://underwrite-copilot.onrender.com/**` — today's `/login?confirmed=1`
+   and `/account?reset=1` targets are proven allowlisted (the links reach
+   them), so this is a widening, not a fix. (c) **SMTP settings** — if the
+   project still sends through Supabase's built-in mailer, confirmation and
+   reset emails reach only the project's own team members, and a stranger's
+   sign-up now fails with "We can't send email to that address yet — a setup
+   problem on our side" instead of a silent nothing. Point it at Resend
+   (the `RESEND_API_KEY` you already hold; Authentication → SMTP settings)
+   so a new visitor's confirmation arrives. Then the try: Forgot password →
+   open the link **in the same browser** → you should land on Account,
+   signed in, with the reset banner. Open the same link a second time and
+   the sign-in page should say the link was already used and offer a new one.
 
 ---
 

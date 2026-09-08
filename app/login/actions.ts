@@ -2,36 +2,18 @@
 
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { safeNextPath } from "@/lib/supabase/proxy-session";
+import {
+  ACCOUNT_EXISTS,
+  authErrorCopy,
+  safeNextPath,
+  type AuthIntent,
+} from "@/lib/auth-flow";
 
-export type AuthState = { error?: string; notice?: string } | null;
+/** `intent` names the form that produced the state, so the sign-in tab never
+ *  shows the sign-up tab's error. */
+export type AuthState = { error?: string; notice?: string; intent?: AuthIntent } | null;
 
-/** Map raw Supabase auth errors onto copy a person can act on. */
-function friendly(message: string): string {
-  const m = message.toLowerCase();
-  if (m.includes("invalid login credentials"))
-    return "Wrong email or password. If you're new, switch to Create account.";
-  if (m.includes("already registered") || m.includes("already been registered"))
-    return "That email already has an account — sign in instead.";
-  if (m.includes("rate limit"))
-    return "Too many attempts — wait a minute and try again.";
-  if (m.includes("email not confirmed"))
-    return "Confirm your email first — check your inbox for the link.";
-  // supabase-js returns network/backend-unreachable failures as an error whose
-  // message is a raw fetch or JSON-parse string ("not valid JSON", "fetch
-  // failed", "Host not …"). Never show that gibberish at the front door.
-  if (
-    m.includes("not valid json") ||
-    m.includes("fetch failed") ||
-    m.includes("failed to fetch") ||
-    m.includes("network") ||
-    m.includes("host not")
-  )
-    return "Couldn't reach the sign-in service — please try again in a moment.";
-  // Anything still unmapped is an unexpected backend message; keep it generic
-  // rather than leaking internals.
-  return "Something went wrong signing you in — please try again.";
-}
+const UNREACHABLE = "Couldn't reach the sign-in service — try again in a moment.";
 
 /**
  * One server action handles both sign-in and sign-up — the form sends an
@@ -44,10 +26,10 @@ export async function authenticate(
 ): Promise<AuthState> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const intent = String(formData.get("intent") ?? "signin");
+  const intent: AuthIntent = formData.get("intent") === "signup" ? "signup" : "signin";
 
   if (!email || !password) {
-    return { error: "Email and password are required." };
+    return { intent, error: "Email and password are required." };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -61,7 +43,9 @@ export async function authenticate(
             options: {
               // The confirmation email's link lands back here with a banner
               // instead of dead-ending on the marketing homepage. The URL
-              // must be on the Supabase project's redirect allowlist.
+              // must be on the Supabase project's redirect allowlist; the
+              // proxy hands the link's code to /auth/callback, which signs
+              // the person in.
               emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/login?confirmed=1`,
             },
           })
@@ -69,11 +53,19 @@ export async function authenticate(
   } catch {
     // Network failure or a non-JSON response from the auth service — don't
     // surface a raw parse error to the person signing in.
-    return { error: "Couldn't reach the sign-in service — try again in a moment." };
+    return { intent, error: UNREACHABLE };
   }
 
   if (error) {
-    return { error: friendly(error.message) };
+    return { intent, error: authErrorCopy(error, intent) };
+  }
+
+  // With enumeration protection on, signing up an email that already has an
+  // account "succeeds" with a placeholder user that has no identities and no
+  // session. Left alone, that reads as "Account created — check your email"
+  // and the person waits for a message that never comes.
+  if (intent === "signup" && data.user && (data.user.identities?.length ?? 0) === 0) {
+    return { intent, error: ACCOUNT_EXISTS };
   }
 
   // If the project requires email confirmation, sign-up succeeds but no session
@@ -81,8 +73,9 @@ export async function authenticate(
   // tell the user to confirm their email instead.
   if (!data.session) {
     return {
+      intent,
       notice:
-        "Account created. Check your email to confirm your address, then sign in.",
+        "Account created. Check your email for the confirmation link — opening it signs you in.",
     };
   }
 
@@ -92,29 +85,34 @@ export async function authenticate(
   redirect(next ?? "/deals");
 }
 
-/** Email a password-recovery link. The link signs the user in; they then set a
- *  new password on the Account page (which the redirect points at). */
+/** Email a password-recovery link. Opening it signs the person in (the code
+ *  is exchanged by /auth/callback) and lands on the Account page, where they
+ *  set a new password. */
 export async function requestPasswordReset(
   _prev: AuthState,
   formData: FormData,
 ): Promise<AuthState> {
   const email = String(formData.get("email") ?? "").trim();
-  if (!email) return { error: "Enter your account email first." };
+  if (!email) return { intent: "reset", error: "Enter your account email first." };
 
   const supabase = await createSupabaseServerClient();
   const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   let error;
   try {
+    // The target stays the Account page — it is on the project's redirect
+    // allowlist today, and the proxy routes the link's code through the
+    // callback on the way there.
     ({ error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${origin}/account?reset=1`,
     }));
   } catch {
-    return { error: "Couldn't reach the sign-in service — try again in a moment." };
+    return { intent: "reset", error: UNREACHABLE };
   }
-  if (error) return { error: friendly(error.message) };
+  if (error) return { intent: "reset", error: authErrorCopy(error, "reset") };
   return {
+    intent: "reset",
     notice:
-      "If that email has an account, a reset link is on its way. It signs you in — set a new password on the Account page.",
+      "If that email has an account, a reset link is on its way. Open it in this browser — it signs you in, and you set a new password on the Account page.",
   };
 }
 

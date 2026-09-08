@@ -63,6 +63,7 @@ export default async function BillingPage({
     underwrite: "export the institutional Excel model",
     loi: "export the LOI draft",
     branding: "put your firm's name and logo on exported reports",
+    rentroll: "export the live-formula rent-roll workbook",
   };
   const supabase = await createSupabaseServerClient();
   const {

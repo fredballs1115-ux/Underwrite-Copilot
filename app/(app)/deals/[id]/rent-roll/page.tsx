@@ -28,6 +28,7 @@ const ERRORS: Record<string, string> = {
   save: "Couldn't save the import.",
   notfound: "That import no longer exists.",
   nodoc: "The uploaded file is no longer in storage, so the mapping can't be re-applied.",
+  exportfail: "Couldn't build the workbook just now — please try again in a moment.",
 };
 
 /** Absorption pace used for the lease-up curve until the user overrides it:

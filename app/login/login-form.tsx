@@ -45,7 +45,9 @@ export function LoginForm({
     initialState,
   );
 
-  const active = mode === "reset" ? resetState : state;
+  // Each tab shows only its own result: an error from Create account must not
+  // stay on screen after switching to Sign in.
+  const active = mode === "reset" ? resetState : state?.intent === mode ? state : null;
 
   return (
     <div className="mt-6">
