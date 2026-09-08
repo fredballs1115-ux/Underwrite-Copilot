@@ -152,10 +152,9 @@ function runsOf(content: string): string[] {
   return out;
 }
 
-/** The text of every content stream in the document, one line per text
- *  operator, in the order the streams appear. */
-export function pdfTextOf(pdf: Buffer): string {
-  const lines: string[] = [];
+/** Every content stream in the document, inflated, in the order they appear. */
+function streamsOf(pdf: Buffer): string[] {
+  const streams: string[] = [];
   let at = 0;
   for (;;) {
     const start = pdf.indexOf("stream", at, "latin1");
@@ -172,14 +171,36 @@ export function pdfTextOf(pdf: Buffer): string {
     if (end === -1) break;
     const dict = pdf.toString("latin1", Math.max(0, start - 300), start);
     const raw = pdf.subarray(dataStart, end);
-    let content: string;
     try {
-      content = (/\/FlateDecode/.test(dict) ? inflateSync(raw) : raw).toString("latin1");
+      streams.push((/\/FlateDecode/.test(dict) ? inflateSync(raw) : raw).toString("latin1"));
     } catch {
-      content = raw.toString("latin1");
+      streams.push(raw.toString("latin1"));
     }
-    lines.push(...runsOf(content));
     at = end + 9;
   }
-  return lines.join("\n");
+  return streams;
+}
+
+/** The text of every content stream in the document, one line per text
+ *  operator, in the order the streams appear. */
+export function pdfTextOf(pdf: Buffer): string {
+  return streamsOf(pdf)
+    .flatMap((content) => runsOf(content))
+    .join("\n");
+}
+
+/**
+ * How many filled shapes the document draws — every `f` / `f*` operator
+ * outside a text string. A View with a background is one fill, so the
+ * pictures a page draws with plain Views (a bar, a dot) can be counted
+ * against a render without them; text and stroked borders are not fills.
+ */
+export function pdfFillCountOf(pdf: Buffer): number {
+  const strings = new RegExp(STRING, "g");
+  let count = 0;
+  for (const content of streamsOf(pdf)) {
+    const ops = content.replace(strings, "()");
+    count += (ops.match(/(?:^|\s)f\*?(?=\s|$)/g) ?? []).length;
+  }
+  return count;
 }

@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "The memo draws where each base sits, and reserves its footer",
+      "blurb": "The one-page memo's ranges table now shows where the base sits between low and high as a small bar with a dot — amber when the base hugs the optimistic end — and each scenario's call in the flip strip carries its coloured dot, the same marks the deal page and the shared screen use. Drawn as shapes, so nothing is embedded and no height is added. The memo also reserves the band its footer prints in: a memo that cannot fit one page flows to a second instead of running its last line into the footer.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-08",
       "title": "The IC memo and the full report open on the building from above",
       "blurb": "The one-page memo and the full report now carry the property's aerial at the top right of the masthead — the same USGS frame the deal page's Aerial tab shows, credited under the picture — without costing the memo a line. The picture is fetched when the PDF is made and gets a few seconds; if it does not arrive, the memo prints exactly as before. A deal without an address prints as before too. The sample memo on the public site shows Brewerytown.",
       "href": "/deals"

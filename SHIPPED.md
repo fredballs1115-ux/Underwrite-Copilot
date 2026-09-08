@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Seventy-four PRs, #176–#249, each
+estimate, and that's what it should flag." Seventy-five PRs, #176–#250, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1015,6 +1015,20 @@ confirmed equal to the main tip after each batch.
   deflate and a real CRC (`lib/memo/test-png.ts`). Ten tests on the fetcher
   and the guard; the memo render test asserts the image object on page one
   and the page count.
+- **#250 Pictures in the memo, and its footer band reserved.** The memo's
+  ranges table gains an "In range" column — the deal page's positional read,
+  drawn as a track, the span up to the base and a dot (caution-coloured when
+  the base hugs the optimistic end) — and each scenario's call in the flip
+  strip carries its dot, all plain react-pdf Views: nothing to decode, no
+  height beyond the row's text (Low, High and Conf. gave up a little width).
+  The footer band the sample memo ran to within a few points of is reserved
+  now (`paddingBottom` covers the footer's rule and line), with the room
+  found in the masthead, section and card margins, so the sample still fits
+  one page and a memo that cannot fit flows to a second page instead of over
+  its own footer. `pdfFillCountOf` (test tooling beside `pdfTextOf`) counts
+  the filled shapes in a PDF's content streams; the memo render test asserts
+  three fills per range against a render whose ranges do not parse, and that
+  a base below its low end sits at the start of the track.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
