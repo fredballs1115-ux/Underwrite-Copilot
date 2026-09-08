@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SPREAD_BPS } from "@/lib/marketing-constants";
+import { SkipLink } from "./skip-link";
 import "./globals.css";
 
 // next/font downloads and self-hosts the fonts at build time (no extra network
@@ -112,6 +113,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: SELF_HEAL_SCRIPT }} />
       </head>
       <body className="flex min-h-full flex-col font-sans antialiased">
+        <SkipLink />
         {children}
       </body>
     </html>

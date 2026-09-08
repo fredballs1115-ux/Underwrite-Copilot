@@ -376,7 +376,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="flex-1">
+      <main id="main" className="flex-1">
         {/* Hero — dark navy with soft accent glows; the product is the visual. */}
         <section className="band-dark relative overflow-hidden text-white">
           {/* Ambient glows: pure CSS, no layout shift, subtle by design. */}

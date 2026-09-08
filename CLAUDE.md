@@ -52,6 +52,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   margin-spaced `<span>` is one word to a screen reader — spell the space.
   The public pages get the same lint after every deploy:
   `scripts/lint-pages.mjs` over the HTML live-verify fetches.
+  `lib/a11y-source.test.ts` scans every page's source for a form control
+  with no accessible name (the pages the render tests cannot reach). The
+  root layout renders the one skip link (`app/skip-link.tsx`); every page's
+  main content is `<main id="main">`, and the lint fails an in-page link
+  whose target id is missing. Never crawl a local `next start` while a
+  build runs, and never leave one running across a rebuild: an ISR page it
+  re-renders overwrites the fresh build's prerender with its stale code.
 - The documents: the memo and report PDFs are read back as text in their
   tests (`lib/memo/pdf-text-of.ts`, test tooling) — assert on what the page
   says, not on its page count. `lib/key-terms.ts` orders a "Key terms" block

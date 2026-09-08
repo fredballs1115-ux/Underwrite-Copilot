@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Fifty-eight PRs, #176–#233, each
+estimate, and that's what it should flag." Fifty-nine PRs, #176–#234, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -732,6 +732,16 @@ confirmed equal to the main tip after each batch.
   the new-task field, the rent-roll mapping selects and the mapping name,
   the leasing-profile select, the submarket select and the team-name
   field. Each has a name now, and the scan runs in CI.
+- **#234 One skip link, and a landmark on every page.** A keyboard or
+  screen-reader user's first tab stop on any page is now "Skip to content"
+  (`app/skip-link.tsx`, rendered once by the root layout — the signed-in
+  shell had its own; the public pages had none), and every page's main
+  content carries the `id="main"` it points at: the homepage, /demo, /why,
+  /whats-new, /market (its content wrapper is a `<main>` now), /login,
+  /privacy, /security, /terms and the shared screen. The accessibility lint
+  gained the rule that makes it stick: an in-page link whose target id
+  is missing fails the render tests and the public-page lint, so a skip
+  link can never point at nothing again.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

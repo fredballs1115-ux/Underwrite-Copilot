@@ -3,17 +3,17 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#233 merged to main (live build
-sha `4258ee6`, #232, confirmed equal to the main tip by live-verify at 07:31
-UTC — every one of the first fifty-seven is live, and the public-page lint
-#231 added reads all twelve public pages clean on every run; #233 follows
+**Last updated 2026-09-08**, after PRs #176–#234 merged to main (live build
+sha `e934a83`, #233, confirmed equal to the main tip by live-verify at 07:40
+UTC — every one of the first fifty-eight is live, and the public-page lint
+#231 added reads all twelve public pages clean on every run; #234 follows
 on its deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Fifty-eight PRs (#176–#233) landed across one review session and the
+Fifty-nine PRs (#176–#234) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -249,6 +249,12 @@ deploy (live-verify shows the sha).
   selects and mapping name, the leasing-profile and submarket selects, the
   team-name field. Each is named now, and the scan runs in CI beside the
   render tests' accessibility lint.
+- **One skip link, and a landmark on every page** (#234): "Skip to
+  content" is the first tab stop on every page now — rendered once by the
+  root layout instead of only inside the signed-in shell — and every
+  public page's main content carries the `id="main"` it targets. The
+  accessibility lint fails an in-page link whose target is missing, so
+  the skip link can never point at nothing.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":

@@ -51,4 +51,12 @@ describe("visibleText + a11yIssues", () => {
       `<label>Kind <select><option>a</option></select></label><input type="hidden">`;
     expect(a11yIssues(clean)).toEqual([]);
   });
+
+  it("an in-page link must have its target: a skip link to a <main> with no id is a dead first tab stop", () => {
+    expect(a11yIssues(`<a href="#main">Skip to content</a><main>…</main>`)).toEqual([
+      'in-page link to a missing id "#main"',
+    ]);
+    expect(a11yIssues(`<a href="#main">Skip to content</a><main id="main">…</main>`)).toEqual([]);
+    expect(a11yIssues(`<a href="#faq">FAQ</a><section id="faq"></section>`)).toEqual([]);
+  });
 });

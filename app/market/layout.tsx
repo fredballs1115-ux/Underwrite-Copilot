@@ -54,7 +54,7 @@ export default async function MarketLayout({
       </header>
       {/* The signed-in shell pads its content; a prospect gets the same
           measure here, so the briefs never run edge to edge. */}
-      <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">{children}</div>
+      <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">{children}</main>
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-6 text-xs text-muted">
           <span>
