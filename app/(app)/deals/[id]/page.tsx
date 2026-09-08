@@ -48,6 +48,7 @@ import { scoreMandateFit, type MandateScore, type MandateVerdict } from "@/lib/m
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { assessPlausibility, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { PlanStrip, PlausibilityPanel } from "./plausibility-panel";
+import { PlanSensitivity } from "./plan-sensitivity";
 import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { ActualsData } from "./property-actuals";
@@ -361,26 +362,35 @@ export default async function DealPage({
   // Sensitivity playground (Feature 2 of the competitive spec): the deal's
   // base underwriting model — actuals folded in — computed once server-side;
   // the sliders recompute it in the browser via the same pure engine.
-  const playground: PlaygroundData | null = extraction
-    ? (() => {
-        const derived = deriveUnderwriteInputs(extraction, deal.name, {
-          rentRoll: actuals.rentRoll
-            ? { summary: actuals.rentRoll.summary, asOf: actuals.rentRoll.asOf }
-            : null,
-          t12: actuals.t12
-            ? { summary: actuals.t12.summary, periodEnd: actuals.t12.periodEnd }
-            : null,
-        });
-        return {
-          inputs: derived.inputs,
-          dealAssetClass: deal.asset_class,
-          checkSource,
-          box: buyBox,
-          // A plan deal's price ⇄ cap control must say its cap is year-1
-          // income as modelled, not the finished project's pro forma.
-          strategy: derived.meta.strategy ?? null,
-        };
-      })()
+  const derived = extraction
+    ? deriveUnderwriteInputs(extraction, deal.name, {
+        rentRoll: actuals.rentRoll
+          ? { summary: actuals.rentRoll.summary, asOf: actuals.rentRoll.asOf }
+          : null,
+        t12: actuals.t12
+          ? { summary: actuals.t12.summary, periodEnd: actuals.t12.periodEnd }
+          : null,
+      })
+    : null;
+  const playground: PlaygroundData | null = derived
+    ? {
+        inputs: derived.inputs,
+        dealAssetClass: deal.asset_class,
+        checkSource,
+        box: buyBox,
+        // A plan deal's price ⇄ cap control must say its cap is year-1
+        // income as modelled, not the finished project's pro forma.
+        strategy: derived.meta.strategy ?? null,
+      }
+    : null;
+  // The cap the plan's yield on cost is measured against: the model's own
+  // exit-cap assumption, with its provenance, so the spread is against a
+  // number the reader can see and change.
+  const refCap = derived
+    ? {
+        pct: derived.inputs.exitCapPct,
+        provenance: derived.sources.exitCapPct?.provenance ?? ("assumption" as const),
+      }
     : null;
 
   // Submarket supply & pipeline (Phase 4). Both reads are best-effort: on a
@@ -850,6 +860,7 @@ export default async function DealPage({
             that genuinely does not tie. */}
         <PlanStrip strategy={strategy} plan={plan} />
         <PlausibilityPanel findings={plausibility} strategy={strategy} />
+        <PlanSensitivity plan={plan} refCap={refCap} />
 
         {!extraction && firstSignal?.take && (
           <p className="mt-3 border-t border-line pt-3 text-sm leading-relaxed text-muted">

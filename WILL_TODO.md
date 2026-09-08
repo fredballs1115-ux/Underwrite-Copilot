@@ -3,8 +3,9 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-07**, after PRs #176–#189 merged to main (live build
-sha confirmed equal to the main tip by live-verify at 23:12 UTC).
+**Last updated 2026-09-08**, after PRs #176–#194 merged to main (live build
+sha `97184aa` confirmed equal to the main tip by live-verify at 23:50 UTC on
+Sep 7; #193–#194 follow on the next Render deploy).
 
 ---
 
@@ -32,6 +33,14 @@ Four PRs landed from one review session; each is live once Render finishes the
   ranked and linked, refreshed every half hour, no key and no cron. The scored
   buyer-specific feed still follows once the weekday sweep runs. Two optional
   cost levers, `MODEL_EXTRACTION` and `MODEL_REASONING`, are read at boot.
+- **The Excel workbook names the deal type** (#193) on its Cover, Deal
+  Summary and Assumptions tabs, and the capital line carries the OM page its
+  budget came from; the submarket supply warning tells a plan deal it
+  delivers into the pipeline it is being warned about.
+- **Yield on cost, stressed** (#194): under the plan strip, a 5×5 grid of
+  stabilized NOI under the pro forma × budget over the OM's, each cell the
+  yield on total cost and its spread over the model's exit cap, plus the NOI
+  floor and the overrun that erase the spread.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":
@@ -40,8 +49,12 @@ also linked from `/data-health` under "Service probes":
    header should now say *Deal type: Conversion* and show a teal "The plan"
    strip — stabilized NOI $21M, price, budget, total cost, yield on cost — not
    a red panel: on a conversion that figure is the plan, and the challenger is
-   briefed to test whether it is as conservative as the OM says. The Excel
-   model's SOURCE column names the stabilized figure it kept out of year 1.
+   briefed to test whether it is as conservative as the OM says. Under the
+   strip, "Yield on cost, stressed" should read 11.7% at the outlined base
+   cell (+567 bps over a 6% reference cap) with the NOI floor at $10.8M. The
+   Excel model's Cover says *Deal type: Conversion*, and its SOURCE column
+   names the stabilized figure it kept out of year 1 and the OM page the
+   $160M capital line came from.
    Then **re-screen it** (the stated strategy, the timeline and the three NOI
    labels arrive with the next screen, and the challenger gets the plan
    brief) and **regenerate its model** — the model tab should show Yield on

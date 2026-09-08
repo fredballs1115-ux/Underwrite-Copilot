@@ -89,6 +89,23 @@ gated on tsc / eslint / the full suite / a production build.
   real shapes), refreshed every half hour, every headline linked and every
   outlet named; `/api/news/health` reports what each feed returned. The
   scored buyer-specific feed follows once the sweep's secret is fixed.
+- **#193 The workbook knows what the deal is.** The exported Excel model —
+  the file people hand to others — read a conversion as a stabilized asset:
+  no deal type anywhere, and a $160M year-1 capital line with no source. Now
+  the Cover, Deal Summary and Assumptions tabs name the type (with the
+  one-line reading of what it means for the figures on a plan deal), the
+  capital line prints its OM page and derivation like every other anchored
+  input, and the submarket supply warning tells a plan deal it delivers into
+  the pipeline it is being warned about. Five workbook tests on the
+  conversion fixture, including zero formula errors when the year-1 outflow
+  makes IRR non-convergent.
+- **#194 Yield on cost, stressed.** The analytic a plan deal is judged on,
+  under the plan strip: a 5×5 grid of stabilized NOI 10–20% under the pro
+  forma × budget 10–30% over the OM's, each cell the yield on total cost and
+  its spread over the model's own exit cap in basis points, coloured by
+  development-spread band; two exact sentences name the NOI floor and the
+  overrun that erases the spread ($10.8M and +106% on the conversion). Pure
+  module, ten tests; no stated budget or stabilized NOI means no grid.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
