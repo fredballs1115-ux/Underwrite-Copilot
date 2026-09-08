@@ -1555,6 +1555,14 @@ function InternalCompsBlock({ comps }: { comps: InternalComp[] }) {
                         {c.market}
                       </span>
                     )}
+                    {c.kindLabel && (
+                      <span
+                        className="mt-0.5 inline-block rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand"
+                        title="A plan deal — its figures describe the finished project and are judged on yield on total cost; the basis shown is all-in"
+                      >
+                        {c.kindLabel}
+                      </span>
+                    )}
                   </td>
                   <td className="whitespace-nowrap py-2 pr-3 font-mono text-xs tabular-nums text-muted">
                     {new Date(c.screenedAt).toLocaleDateString("en-US", {
@@ -1568,7 +1576,20 @@ function InternalCompsBlock({ comps }: { comps: InternalComp[] }) {
                     {c.priceLabel ?? <span className="text-line">—</span>}
                   </td>
                   <td className="whitespace-nowrap py-2 pr-3 text-right font-mono text-xs tabular-nums">
-                    {c.capLabel ?? <span className="text-line">—</span>}
+                    {c.capLabel ??
+                      (c.yieldOnCostLabel ? (
+                        <span
+                          className="text-brand"
+                          title="Yield on cost — a plan deal has no going-in cap; this is its stabilized NOI over total cost"
+                        >
+                          {c.yieldOnCostLabel}
+                          <span className="ml-0.5 font-sans text-[9px] font-medium uppercase">
+                            yoc
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-line">—</span>
+                      ))}
                   </td>
                   <td className="whitespace-nowrap py-2 pr-3 text-right font-mono text-xs tabular-nums">
                     {c.basisLabel ?? <span className="text-line">—</span>}

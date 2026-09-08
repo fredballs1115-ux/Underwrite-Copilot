@@ -234,6 +234,17 @@ confirmed equal to the main tip after each batch.
   and carries the plan's five facts from the same `planFacts()` the deal
   page's strip uses. Tests read the .xlsx back cell by cell and render the
   shared block against the plan strip.
+- **#209 The comp memory and the retrade diff read the deal's kind.** "From
+  your pipeline" on a deal page read each sibling's cap with only exit-cap
+  exclusions, so a conversion screened earlier lent its 11.7% stabilized cap
+  to the comp set, at $33k per planned unit on the shell's price. Siblings
+  now go through the shared readers: a plan deal is labelled, shows its
+  yield on cost where a cap would sit, and its basis is total cost over the
+  planned units, "all-in"; a stabilized asset is unchanged. The
+  since-last-screen diff's cap tracker excludes stabilized / pro forma caps
+  and yields, and three plan trackers (stabilized NOI, capital budget, yield
+  on cost) show a re-screened plan deal's retrade. New tests for both
+  modules.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
