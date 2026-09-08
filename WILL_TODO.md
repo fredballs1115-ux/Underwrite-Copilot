@@ -11,7 +11,7 @@ UTC — everything below is live).
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Forty-one PRs (#176–#216) landed across one review session and the
+Forty-two PRs (#176–#217) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -106,6 +106,13 @@ deploy (live-verify shows the sha).
   row or a "newly renovated" note no longer infers value-add for a deal
   screened before the extraction stated its kind, so older stabilized deals
   keep their going-in cap everywhere.
+- **The readers read the row they are named for** (#217): a "Unit mix" row
+  never counts as the unit count (analytics, the strip, the share page and
+  the memo divide by the real count), a "Sale price" row is the price (comp
+  memory and the meeting export keep the deal), the since-last-screen diff
+  never pairs a total project cost with a construction budget as one
+  retrade, and an older deal with no metrics array no longer breaks the LOI
+  draft. The sample screen's summary bar names the deal's kind.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":

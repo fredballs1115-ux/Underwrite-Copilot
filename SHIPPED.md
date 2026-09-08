@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Forty PRs, #176–#215, each
+estimate, and that's what it should flag." Forty-two PRs, #176–#217, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -326,6 +326,30 @@ confirmed equal to the main tip after each batch.
   rows (year built / renovated, renovation year, vintage) never count as
   evidence. A stated strategy still wins. `CLAUDE.md` gains a "Where things
   live" line for the strategy modules; four new inference tests.
+- **#217 The readers read the row they are named for.** A review of the
+  week's diff found four ways a shared reader could put a wrong number on a
+  right label. The unit-count reader matched any row starting with "Unit",
+  so a "Unit mix: 40% studio / 60% 1BR" row ahead of "Units: 312" made the
+  building forty units — price per unit on analytics, the all-in basis on
+  the strip, the share page and the memo all divided by forty. It now reads
+  the first row that IS a count (`parseCount`: a whole number, alone or with
+  what it counts — "312", "312 units (proposed)", "approx. 300 apartments" —
+  never "40% studio", "650–1,200 SF" or "312 / 285,000 SF"), and skips mix,
+  sizes, type, density and per-unit rows. The price reader had narrowed to
+  asking / purchase / offering / guidance when the strategy work centralised
+  it, so a sibling screened off a "Sale price" row dropped out of the comp
+  memory and showed a dash in the meeting export; it now takes every name an
+  OM gives the number being asked (sale, list, contract, whisper) and never
+  what the building last traded for. The since-last-screen diff paired
+  "Total project cost" before with "Construction budget" after — the same
+  deal, the cost named two ways — and read the price inside the total as a
+  $20M retrade; the two are now two trackers, the stabilized-NOI tracker
+  never reads its per-unit expression, and the price-per-unit tracker never
+  reads an NOI, a rent or a cost per unit. And a deal saved before
+  extractions carried a metrics array no longer throws in the strategy
+  inference (the LOI route returned a 500 on one). The sample screen's
+  summary bar shows the deal's kind, read from its own extraction, with a
+  live-verify marker. Twenty-one new tests across three files.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

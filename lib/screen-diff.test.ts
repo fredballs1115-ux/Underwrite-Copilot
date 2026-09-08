@@ -53,8 +53,9 @@ describe("computeScreenDiff — a plan deal retrades on its plan", () => {
     expect(by["Asking price"].direction).toBe("flat");
     expect(by["Stabilized NOI (pro forma)"].delta).toBe("−$1.5M (−7.1%)");
     expect(by["Stabilized NOI (pro forma)"].direction).toBe("worse");
-    expect(by["Capital budget"].delta).toBe("+$15.0M (+8.3%)");
-    expect(by["Capital budget"].direction).toBe("worse");
+    expect(by["Total project cost"].delta).toBe("+$15.0M (+8.3%)");
+    expect(by["Total project cost"].direction).toBe("worse");
+    expect(by["Capital budget"]).toBeUndefined();
     expect(by["Yield on cost"].delta).toBe("−1.70pt");
     expect(by["Yield on cost"].direction).toBe("worse");
     expect(d.allFlat).toBe(false);
@@ -82,5 +83,36 @@ describe("computeScreenDiff — a plan deal retrades on its plan", () => {
     )!;
     expect(yr1.rows.map((r) => r.label)).toEqual(["NOI"]);
     expect(yr1.rows[0].direction).toBe("better");
+  });
+
+  it("the all-in total and the works alone are two figures, never paired as one retrade", () => {
+    // Same deal, two extractions that named the cost differently: one carried
+    // the total (with the price inside), the other the construction budget.
+    // Pairing them would read the price as a $20M retrade.
+    const d = computeScreenDiff(
+      prior([m("Total project cost", "$180,000,000", "pro_forma")]),
+      { metrics: [m("Construction budget", "$160,000,000", "pro_forma")] },
+      null,
+    );
+    expect(d).toBeNull();
+
+    const both = computeScreenDiff(
+      prior([m("Total project cost", "$180,000,000"), m("Construction budget", "$160,000,000")]),
+      { metrics: [m("Total project cost", "$190,000,000"), m("Construction budget", "$170,000,000")] },
+      null,
+    )!;
+    const by = Object.fromEntries(both.rows.map((r) => [r.label, r]));
+    expect(by["Total project cost"].delta).toBe("+$10.0M (+5.6%)");
+    expect(by["Capital budget"].delta).toBe("+$10.0M (+6.3%)");
+  });
+
+  it("the stabilized NOI tracker reads the headline figure, never its per-unit expression", () => {
+    const d = computeScreenDiff(
+      prior([m("Stabilized NOI per unit", "$34,000"), m("Stabilized NOI (pro forma)", "$21,000,000")]),
+      { metrics: [m("Stabilized NOI per unit", "$32,000"), m("Stabilized NOI (pro forma)", "$21,000,000")] },
+      null,
+    )!;
+    expect(d.rows.map((r) => r.label)).toEqual(["Stabilized NOI (pro forma)"]);
+    expect(d.allFlat).toBe(true);
   });
 });
