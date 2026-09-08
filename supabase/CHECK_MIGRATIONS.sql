@@ -139,7 +139,10 @@ with
     values
       (292, '0030_public_data_layer.sql (RPC half)',
             'nearest_property() — the deal page’s closest-parcel lookup. ❌ here with the two rows above ✅ means 0028 was missing when you ran it: run 0028, then this file again.',
-            array['nearest_property'])
+            array['nearest_property']),
+      (340, '0034_authorization_hardening.sql',
+            'Storage-path guards on deals / deal_documents / jobs / branding, and the alerts column grant (the eleventh review)',
+            array['deals_storage_guard', 'deal_documents_storage_guard'])
   ),
 
   tbl_res as (

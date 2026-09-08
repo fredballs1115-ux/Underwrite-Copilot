@@ -140,7 +140,10 @@ export async function GET(
     if (b) {
       branding = {
         firmName: b.firmName ?? null,
-        logoDataUri: await brandingLogoDataUri(b),
+        logoDataUri: await brandingLogoDataUri(b, {
+          userId: ownership.user_id,
+          teamId: ownership.team_id,
+        }),
         footerText: b.footerText ?? null,
       };
     }

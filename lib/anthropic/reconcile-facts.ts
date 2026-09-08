@@ -50,7 +50,7 @@ export async function runDocReconciliation(admin: Admin, dealId: string): Promis
   // The OM: prefer the primary om_storage_path; skip any duplicate om-kind doc.
   if (deal?.om_storage_path) {
     try {
-      const buf = await downloadOmPdf(deal.om_storage_path as string);
+      const buf = await downloadOmPdf(deal.om_storage_path as string, { kind: "deal", dealId });
       const parsed = await parseModelFile("offering-memorandum.pdf", buf);
       allFacts.push(await extractDocFacts({ name: "Offering Memorandum", kind: "om", parsed }));
     } catch {
@@ -60,7 +60,7 @@ export async function runDocReconciliation(admin: Admin, dealId: string): Promis
   for (const d of docs) {
     if (d.kind === "om") continue; // handled via om_storage_path
     try {
-      const buf = await downloadDealFile(d.storage_path);
+      const buf = await downloadDealFile(d.storage_path, { kind: "deal", dealId });
       const parsed = await parseModelFile(d.filename, buf);
       allFacts.push(await extractDocFacts({ name: d.filename, kind: d.kind, parsed }));
     } catch {

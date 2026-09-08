@@ -3,7 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { uploadSupplement, removeSupplementFile, signatureMismatch } from "@/lib/storage";
+import {
+  uploadSupplement,
+  removeSupplementFile,
+  signatureMismatch,
+  supplementPath,
+} from "@/lib/storage";
 
 type Supp = {
   notes: { id: string; text: string; createdAt: string }[];
@@ -81,15 +86,14 @@ export async function addSupplementFile(formData: FormData) {
   if (!ctx) return;
 
   const id = crypto.randomUUID();
-  const safeName = file.name.replace(/[^a-z0-9._-]+/gi, "_").slice(0, 80) || "file";
-  const path = `supplements/${dealId}/${id}-${safeName}`;
+  const path = supplementPath(dealId, id, file.name);
   const buffer = Buffer.from(await file.arrayBuffer());
   // Same trust-the-bytes gate the OM upload applies: a file whose name
   // claims a known format must actually be that format.
   if (signatureMismatch(file.name, buffer)) {
     redirect(`/deals/${dealId}?error=docformat`);
   }
-  await uploadSupplement(path, buffer, file.type);
+  await uploadSupplement(path, buffer, file.type, { kind: "deal", dealId });
 
   tabBucket(ctx.map, tab).files.push({
     id,
@@ -120,7 +124,7 @@ export async function removeSupplement(formData: FormData) {
   if (kind === "file") {
     const f = supp.files.find((x) => x.id === id);
     if (f) {
-      await removeSupplementFile(f.path);
+      await removeSupplementFile(f.path, { kind: "deal", dealId });
       supp.files = supp.files.filter((x) => x.id !== id);
     }
   } else {

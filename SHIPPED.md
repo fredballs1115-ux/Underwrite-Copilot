@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Sixty-three PRs, #176–#238, each
+estimate, and that's what it should flag." Sixty-four PRs, #176–#239, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -829,6 +829,38 @@ confirmed equal to the main tip after each batch.
   route emitted are gone. The comp search and the model generator fail in
   the screen's sentences too. 34 new tests drive the callback, the proxy
   and the copy.
+- **#239 Your files are yours alone: the eleventh review, on authorization
+  and data isolation.** The reviewer read every route handler, server
+  action, RLS policy, share token, storage path and the Stripe webhook, and
+  found the RLS layer sound — every deal-child table carries per-verb
+  policies over `can_access_deal`, every handler reads through the
+  user-scoped client. The breach was one layer down: **storage object paths
+  are read off ordinary user-writable columns and handed to the
+  service-role storage client, which has no RLS.** A signed-in user who
+  edited their own deal row's `om_storage_path` (one PostgREST call with the
+  browser's anon key) could mint a signed URL for another user's OM, have
+  Ask-the-deal summarise it into their own thread, overwrite it through
+  Replace OM, or delete it; the same held for `deal_documents.storage_path`,
+  a supplement's path, a branding logo's path and a worker job's parked
+  model path. Confirmed by driving the real actions with a fake database.
+  Now `lib/storage-paths.ts` is the one definition of the bucket's layout
+  (a deal's objects all carry the deal's id; a logo sits in its account's or
+  team's folder), and every storage primitive takes the scope it acts for
+  and refuses a path outside it before any read, write, signed URL or
+  delete — nothing per call site. Migration 0034 asserts the same shapes at
+  the row. Alongside: `deleteDeal` treated a teammate's RLS-refused delete
+  (zero rows, no error) as success and swept the creator's OM, documents and
+  supplements out of storage while the row survived — it now sweeps only
+  once a row was actually deleted, says who may delete, and the menu no
+  longer offers Delete to a teammate; `regulatory_alerts` had an
+  update-anything policy behind the banner every user sees — users may now
+  write exactly the two dismissal columns (0034), and the banner links only
+  a real web URL; a removed or departed teammate's share links on the
+  team's other deals are revoked, and the shared page re-checks the
+  sender's access on every render; the health probes no longer echo
+  upstream bodies verbatim. A migration lint fails any future write policy
+  with a bare `true`. 41 new tests, three of them the reviewer's probes
+  turned into regressions.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

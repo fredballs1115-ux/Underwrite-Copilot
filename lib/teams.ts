@@ -95,6 +95,38 @@ export async function getTeam(
   };
 }
 
+/**
+ * Kill the share links a departing member minted for the team's OTHER deals
+ * — the ones they lose access to by leaving. Their own deals stay theirs, so
+ * links on those stay live. Run BEFORE the membership row is deleted: the
+ * share policy follows deal access, and the leaver's own client loses it the
+ * moment the row is gone. Best-effort; the shared page also re-checks the
+ * creator's access on every render, so a missed sweep still dies there.
+ */
+export async function revokeSharesOfDepartingMember(
+  supabase: SupabaseClient,
+  teamId: string,
+  memberId: string,
+): Promise<void> {
+  try {
+    const { data: deals } = await supabase
+      .from("deals")
+      .select("id")
+      .eq("team_id", teamId)
+      .neq("user_id", memberId);
+    const ids = ((deals ?? []) as { id: string }[]).map((d) => d.id);
+    if (ids.length === 0) return;
+    await supabase
+      .from("deal_shares")
+      .update({ revoked: true })
+      .eq("created_by", memberId)
+      .eq("revoked", false)
+      .in("deal_id", ids);
+  } catch (err) {
+    console.error(`[teams] revoking ${memberId}'s share links on team ${teamId} failed:`, err);
+  }
+}
+
 /** Display name for a member: full name, else the email's local part. */
 export function memberLabel(m: {
   fullName: string | null;

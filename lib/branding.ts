@@ -3,6 +3,8 @@
 // caps and empties handled here so every writer stores the same clean shape.
 // (Universal module: settings page, export routes, tests.)
 
+import { BRANDING_LOGO_RE } from "@/lib/storage-paths";
+
 export interface Branding {
   /** shown in the report header, ≤50 chars */
   firmName?: string;
@@ -32,8 +34,11 @@ export function sanitizeBranding(raw: unknown): Branding | null {
     typeof o.firmName === "string" && o.firmName.trim()
       ? o.firmName.trim().slice(0, FIRM_NAME_MAX)
       : undefined;
+  // Only a logo path shaped like one the app minted survives: the column is
+  // user-writable, and the export renderer reads the path with the service
+  // role (the scope check there pins the folder to the account or team).
   const logoPath =
-    typeof o.logoPath === "string" && o.logoPath.trim()
+    typeof o.logoPath === "string" && BRANDING_LOGO_RE.test(o.logoPath.trim())
       ? o.logoPath.trim()
       : undefined;
   const footerText =

@@ -7,7 +7,7 @@ import { after } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getStripe } from "@/lib/stripe/client";
 import { classifyStripeError, isStaleCustomer } from "@/lib/stripe/diagnose";
-import { getTeam } from "@/lib/teams";
+import { getTeam, revokeSharesOfDepartingMember } from "@/lib/teams";
 import { syncTeamSeats } from "@/lib/stripe/seats";
 import {
   teamCheckoutLineItems,
@@ -119,6 +119,10 @@ export async function removeMember(formData: FormData) {
   const team = await getTeam(supabase, user.id);
   if (!team || team.role !== "owner") redirect("/team?error=owner");
 
+  // A removed member must not keep reading the team's deals through the
+  // share links they minted — revoke those before their access goes.
+  await revokeSharesOfDepartingMember(supabase, team.id, memberId);
+
   const { error } = await supabase
     .from("team_members")
     .delete()
@@ -142,6 +146,10 @@ export async function leaveTeam() {
   const team = await getTeam(supabase, user.id);
   if (!team) redirect("/team");
   if (team.role === "owner") redirect("/team?error=ownerleave");
+
+  // Before the membership row goes (and with it this client's access to the
+  // team's deals): the links they minted for those deals die with the seat.
+  await revokeSharesOfDepartingMember(supabase, team.id, user.id);
 
   const { error } = await supabase
     .from("team_members")

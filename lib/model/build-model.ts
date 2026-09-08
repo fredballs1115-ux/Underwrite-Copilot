@@ -64,7 +64,7 @@ export async function runModelGeneration(dealId: string): Promise<void> {
     const skipped: string[] = [];
     for (const d of docs) {
       try {
-        const buffer = await downloadDealFile(d.storage_path);
+        const buffer = await downloadDealFile(d.storage_path, { kind: "deal", dealId });
         const parsed = await parseModelFile(d.filename, buffer);
         const facts = await extractDocFacts({
           name: d.filename,

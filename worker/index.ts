@@ -34,7 +34,7 @@
  */
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
-import { downloadDealFile, removeSupplementFile } from "@/lib/storage";
+import { downloadDealFile, removeSupplementFile, type StorageScope } from "@/lib/storage";
 import { runWeeklyDigests } from "@/lib/digest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -94,6 +94,14 @@ let shuttingDown = false;
 let current: ClaimedJob | null = null;
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/** The only storage object a reconcile job may touch: its own deal's
+ *  parked model (`<folder>/<dealId>.model-tmp`). */
+const parkedModelScope = (dealId: string): StorageScope => ({
+  kind: "deal",
+  dealId,
+  only: ["model-tmp"],
+});
 
 /** True once analysis_jobs has the 0016 columns this worker depends on. */
 async function schemaReady(): Promise<boolean> {
@@ -214,7 +222,9 @@ async function claimNext(): Promise<ClaimedJob | null> {
     });
     if (killed) {
       log(`job ${next.id} exceeded ${MAX_ATTEMPTS} attempts — marked error`);
-      if (payload.model?.path) await removeSupplementFile(payload.model.path);
+      if (payload.model?.path) {
+        await removeSupplementFile(payload.model.path, parkedModelScope(next.deal_id as string));
+      }
     }
     return null;
   }
@@ -277,9 +287,12 @@ async function runJob(job: ClaimedJob): Promise<void> {
       await failJob(job.id, "This reconcile job lost its model file — upload it again.");
       return;
     }
+    // The payload is a row the deal's owner can write; the parked path it
+    // names must be THIS deal's parked-model slot and nothing else.
+    const scope = parkedModelScope(job.dealId);
     let buffer: Buffer;
     try {
-      buffer = await downloadDealFile(model.path);
+      buffer = await downloadDealFile(model.path, scope);
     } catch {
       // The parked file couldn't be read — a terminal, honest failure (the
       // user re-uploads; retrying without the bytes can't succeed).
@@ -287,7 +300,7 @@ async function runJob(job: ClaimedJob): Promise<void> {
         job.id,
         "Your model file couldn't be read back for the run — please upload it again.",
       );
-      await removeSupplementFile(model.path);
+      await removeSupplementFile(model.path, scope);
       return;
     }
     try {
@@ -297,7 +310,7 @@ async function runJob(job: ClaimedJob): Promise<void> {
       // Terminal either way (done or error) — the parked model is deleted.
       // A SIGTERM re-queue exits the process before reaching this, which is
       // exactly right: the retry still needs the file.
-      await removeSupplementFile(model.path);
+      await removeSupplementFile(model.path, scope);
     }
     return;
   }

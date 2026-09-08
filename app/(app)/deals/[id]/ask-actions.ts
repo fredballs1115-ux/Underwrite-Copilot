@@ -93,7 +93,7 @@ export async function askDeal(
   }
 
   try {
-    const pdf = await downloadOmPdf(deal.om_storage_path as string);
+    const pdf = await downloadOmPdf(deal.om_storage_path as string, { kind: "deal", dealId });
     const result = await askDealQuestion(
       pdf,
       question,

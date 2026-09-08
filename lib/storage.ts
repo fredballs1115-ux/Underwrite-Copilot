@@ -1,13 +1,50 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { isScopedPath, scopedPath, type StorageScope } from "@/lib/storage-paths";
 
-// The private Supabase Storage bucket that holds the uploaded OM PDFs.
+export {
+  StoragePathError,
+  brandingLogoPath,
+  classifyDealPath,
+  documentPath,
+  isScopedPath,
+  modelTmpPath,
+  omStoragePath,
+  scopedPath,
+  supplementPath,
+  type DealObjectKind,
+  type StorageScope,
+} from "@/lib/storage-paths";
+
+// The private Supabase Storage bucket that holds the uploaded OM PDFs and
+// everything else a deal or an account attaches.
 const BUCKET = "offering-memoranda";
 
+/**
+ * Every primitive here runs as the service role, which has no row-level
+ * security, and every path it is handed was read off a database row the
+ * row's owner can edit. So each one takes the scope the path is used on
+ * behalf of — the deal, or the account/team whose logo it is — and refuses
+ * a path that is not one of that scope's own shapes (`lib/storage-paths.ts`)
+ * before any bytes move. Reads, writes and signed URLs throw a
+ * StoragePathError; the best-effort removals skip the path and log it.
+ */
+
+function skipUnscoped(paths: string[], scope: StorageScope, op: string): string[] {
+  const keep: string[] = [];
+  for (const p of paths) {
+    if (!p) continue;
+    if (isScopedPath(p, scope)) keep.push(p);
+    else console.warn(`[storage] ${op}: refused a path outside its scope (${JSON.stringify(scope)}): ${p}`);
+  }
+  return keep;
+}
+
 /** Store an OM PDF at `<user_id>/<deal_id>.pdf`. */
-export async function uploadOmPdf(path: string, body: Buffer): Promise<void> {
+export async function uploadOmPdf(path: string, body: Buffer, scope: StorageScope): Promise<void> {
+  const target = scopedPath(path, scope);
   const admin = createSupabaseAdminClient();
-  const { error } = await admin.storage.from(BUCKET).upload(path, body, {
+  const { error } = await admin.storage.from(BUCKET).upload(target, body, {
     contentType: "application/pdf",
     upsert: true,
   });
@@ -17,19 +54,22 @@ export async function uploadOmPdf(path: string, body: Buffer): Promise<void> {
 }
 
 /** Read an OM PDF back out of Storage as a Buffer (for sending to Claude). */
-export async function downloadOmPdf(path: string): Promise<Buffer> {
+export async function downloadOmPdf(path: string, scope: StorageScope): Promise<Buffer> {
+  const target = scopedPath(path, scope);
   const admin = createSupabaseAdminClient();
-  const { data, error } = await admin.storage.from(BUCKET).download(path);
+  const { data, error } = await admin.storage.from(BUCKET).download(target);
   if (error || !data) {
     throw new Error(`Storage download failed: ${error?.message ?? "no data"}`);
   }
   return Buffer.from(await data.arrayBuffer());
 }
 
-/** Download any file in the bucket as a Buffer (model source documents). */
-export async function downloadDealFile(path: string): Promise<Buffer> {
+/** Download any file in the bucket as a Buffer (model source documents, a
+ *  branding logo) — within its scope. */
+export async function downloadDealFile(path: string, scope: StorageScope): Promise<Buffer> {
+  const target = scopedPath(path, scope);
   const admin = createSupabaseAdminClient();
-  const { data, error } = await admin.storage.from(BUCKET).download(path);
+  const { data, error } = await admin.storage.from(BUCKET).download(target);
   if (error || !data) {
     throw new Error(`Storage download failed: ${error?.message ?? "no data"}`);
   }
@@ -65,19 +105,22 @@ export function signatureMismatch(fileName: string, body: Buffer): string | null
   return null;
 }
 
-/** Store a user-uploaded supplement file. The browser-declared content type is
- *  honored only if it's on the inline-safe allowlist; anything else is stored
- *  as octet-stream so it can't render as active content when opened. */
+/** Store a user-uploaded supplement, document, parked model or logo. The
+ *  browser-declared content type is honored only if it's on the inline-safe
+ *  allowlist; anything else is stored as octet-stream so it can't render as
+ *  active content when opened. */
 export async function uploadSupplement(
   path: string,
   body: Buffer,
   contentType: string,
+  scope: StorageScope,
 ): Promise<void> {
+  const target = scopedPath(path, scope);
   const safeType = INLINE_SAFE_TYPES.has(contentType)
     ? contentType
     : "application/octet-stream";
   const admin = createSupabaseAdminClient();
-  const { error } = await admin.storage.from(BUCKET).upload(path, body, {
+  const { error } = await admin.storage.from(BUCKET).upload(target, body, {
     contentType: safeType,
     upsert: true,
   });
@@ -86,30 +129,29 @@ export async function uploadSupplement(
   }
 }
 
-/** Remove a supplement file from Storage (best-effort). */
-export async function removeSupplementFile(path: string): Promise<void> {
-  const admin = createSupabaseAdminClient();
-  await admin.storage.from(BUCKET).remove([path]);
-}
-
-/** Where a worker-mode reconcile parks the buyer's model file: next to the
- *  OM, fixed name per deal. ONE definition on purpose — the enqueue path,
- *  the worker's cleanup, and the deal/account deletion sweeps must all agree
- *  or deleted deals would leak parked models. */
-export function modelTmpPath(omStoragePath: string): string {
-  return omStoragePath.replace(/\.pdf$/i, "") + ".model-tmp";
-}
-
-/** Remove several files at once (best-effort — used when deleting a deal). */
-export async function removeStorageFiles(paths: string[]): Promise<void> {
-  const clean = paths.filter(Boolean);
+/** Remove one file from Storage (best-effort; a path outside its scope is
+ *  skipped and logged, never removed). */
+export async function removeSupplementFile(path: string, scope: StorageScope): Promise<void> {
+  const clean = skipUnscoped([path], scope, "remove");
   if (clean.length === 0) return;
   const admin = createSupabaseAdminClient();
   await admin.storage.from(BUCKET).remove(clean);
 }
 
-/** A short-lived signed URL so the user can download their supplement file. */
-export async function signedSupplementUrl(path: string): Promise<string | null> {
+/** Remove several files at once (best-effort — used when deleting a deal or
+ *  an account). Every path must belong to the one scope; the rest are
+ *  skipped and logged. */
+export async function removeStorageFiles(paths: string[], scope: StorageScope): Promise<void> {
+  const clean = skipUnscoped(paths, scope, "remove");
+  if (clean.length === 0) return;
+  const admin = createSupabaseAdminClient();
+  await admin.storage.from(BUCKET).remove(clean);
+}
+
+/** A short-lived signed URL so the user can download their file. Null when
+ *  the path is outside its scope (logged) or the bucket has no such object. */
+export async function signedSupplementUrl(path: string, scope: StorageScope): Promise<string | null> {
+  if (skipUnscoped([path], scope, "sign").length === 0) return null;
   const admin = createSupabaseAdminClient();
   const { data } = await admin.storage.from(BUCKET).createSignedUrl(path, 3600);
   return data?.signedUrl ?? null;

@@ -10,6 +10,7 @@ import {
   removeStorageFiles,
   uploadSupplement,
   modelTmpPath,
+  omStoragePath,
 } from "@/lib/storage";
 import { getBilling } from "@/lib/billing";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
@@ -149,7 +150,7 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
   if (insertErr || !deal) return { ok: false, error: "save" };
 
   const dealId = deal.id as string;
-  const path = `${user.id}/${dealId}.pdf`;
+  const path = omStoragePath(user.id, dealId);
 
   // Optional property address from the autocomplete: the structured pick
   // when the user selected a suggestion, else the raw text as a bare label.
@@ -184,7 +185,7 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
   // If the upload or the follow-up writes fail, remove the half-created deal —
   // otherwise the user is stranded with a ghost row that eats a free slot.
   try {
-    await uploadOmPdf(path, buffer);
+    await uploadOmPdf(path, buffer, { kind: "deal", dealId });
 
     const { error: pathErr } = await supabase
       .from("deals")
@@ -206,7 +207,7 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
     if (jobErr) throw new Error(jobErr.message);
   } catch {
     await supabase.from("deals").delete().eq("id", dealId);
-    await removeStorageFiles([path]);
+    await removeStorageFiles([path], { kind: "deal", dealId });
     return { ok: false, error: "upload" };
   }
 
@@ -755,12 +756,15 @@ export async function deleteDeal(formData: FormData) {
 
   const { data: deal } = await supabase
     .from("deals")
-    .select("id, om_storage_path, supplements")
+    .select("id, user_id, om_storage_path, supplements")
     .eq("id", dealId)
     .maybeSingle();
   if (!deal) redirect("/deals");
 
-  // Collect every storage path this deal owns.
+  // Collect every storage path this deal owns. Each is checked against the
+  // deal's own shapes before the service role removes it — a path on the row
+  // that names another deal's object is skipped, never swept.
+  const scope = { kind: "deal", dealId } as const;
   const paths: string[] = [];
   if (deal.om_storage_path) {
     paths.push(deal.om_storage_path as string);
@@ -768,6 +772,7 @@ export async function deleteDeal(formData: FormData) {
     // path that doesn't exist is a no-op, so always sweep it.
     paths.push(modelTmpPath(deal.om_storage_path as string));
   }
+  paths.push(modelTmpPath(omStoragePath(deal.user_id as string, dealId)));
   const supp = (deal.supplements as Record<
     string,
     { files?: { path: string }[] }
@@ -781,14 +786,20 @@ export async function deleteDeal(formData: FormData) {
   for (const d of (docs ?? []) as { storage_path: string }[])
     if (d.storage_path) paths.push(d.storage_path);
 
-  // Delete the row FIRST (checked) — a row pointing at deleted files is an
-  // unrecoverable state, while orphaned storage objects are sweepable later.
-  const { error: delErr } = await supabase
+  // Delete the row FIRST, and sweep only once a row was actually deleted.
+  // The delete policy is creator-or-team-owner, and PostgREST answers a
+  // DELETE that matched nothing with 204 and no error — so without the row
+  // count, a teammate's refused delete would still sweep the creator's files
+  // out from under the surviving row. (A row pointing at deleted files is
+  // unrecoverable; orphaned storage objects are sweepable later.)
+  const { data: gone, error: delErr } = await supabase
     .from("deals")
     .delete()
-    .eq("id", dealId);
+    .eq("id", dealId)
+    .select("id");
   if (delErr) redirect(`/deals/${dealId}?error=delete`);
-  await removeStorageFiles(paths);
+  if (!gone || gone.length === 0) redirect(`/deals/${dealId}?error=deletepermission`);
+  await removeStorageFiles(paths, scope);
 
   revalidatePath("/deals");
   redirect("/deals?deleted=1");
@@ -952,10 +963,14 @@ export async function replaceOm(formData: FormData) {
   }
 
   // Keep the same storage path (upsert) so every reference — signed URLs,
-  // the pipeline download, deletion cleanup — stays valid.
-  const path = (deal.om_storage_path as string) ?? `${user.id}/${dealId}.pdf`;
+  // the pipeline download, deletion cleanup — stays valid. A manual deal
+  // getting its first OM takes the creator's folder, whoever uploads it.
+  // The upload refuses a path that is not this deal's own (a stored path
+  // naming another deal's object never gets written over).
+  const path =
+    (deal.om_storage_path as string | null) ?? omStoragePath(deal.user_id as string, dealId);
   try {
-    await uploadOmPdf(path, replacementBytes);
+    await uploadOmPdf(path, replacementBytes, { kind: "deal", dealId, only: ["om"] });
   } catch {
     // Release the claim or the deal reads "queued" with no runner.
     await releaseClaim(
@@ -1004,7 +1019,7 @@ export async function reconcileWithModel(formData: FormData) {
 
   const { data: deal } = await supabase
     .from("deals")
-    .select("id, om_storage_path")
+    .select("id, user_id, om_storage_path")
     .eq("id", dealId)
     .maybeSingle();
   if (!deal?.om_storage_path) redirect(`/deals/${dealId}`);
@@ -1029,10 +1044,11 @@ export async function reconcileWithModel(formData: FormData) {
   // is parked in the private Storage bucket (creator's folder, fixed name per
   // deal) and referenced from the job payload. The worker deletes it the
   // moment the run reaches a terminal state; in-process runs never store it.
+  // The slot is minted from the deal's own ids, never read off a column.
   const workerMode =
     analysisWorkerEnabled() && (await workerSchemaReady(supabase));
   const tmpPath = workerMode
-    ? modelTmpPath(deal.om_storage_path as string)
+    ? modelTmpPath(omStoragePath(deal.user_id as string, dealId))
     : null;
 
   // Atomic claim (not a check-then-act read): two concurrent triggers on the
@@ -1074,7 +1090,11 @@ export async function reconcileWithModel(formData: FormData) {
 
   if (workerMode && tmpPath) {
     try {
-      await uploadSupplement(tmpPath, buffer, "application/octet-stream");
+      await uploadSupplement(tmpPath, buffer, "application/octet-stream", {
+        kind: "deal",
+        dealId,
+        only: ["model-tmp"],
+      });
     } catch {
       // We own the claim — release it or the deal reads busy with no runner.
       await releaseClaim(

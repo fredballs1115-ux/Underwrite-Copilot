@@ -51,12 +51,14 @@ export async function BrandingSection({
   let branding: Branding | null = null;
   let scope: "team" | "personal" = "personal";
   let editable = true;
+  let teamId: string | null = null;
   try {
     const supabase = await createSupabaseServerClient();
     const active = await getActiveBranding(supabase, userId);
     branding = active.branding;
     scope = active.scope;
     editable = active.editable;
+    teamId = active.teamId;
   } catch {
     branding = null;
   }
@@ -64,7 +66,8 @@ export async function BrandingSection({
   let logoUrl: string | null = null;
   if (branding?.logoPath) {
     try {
-      logoUrl = await signedSupplementUrl(branding.logoPath);
+      // The logo must sit in this account's (or its team's) own folder.
+      logoUrl = await signedSupplementUrl(branding.logoPath, { kind: "branding", userId, teamId });
     } catch {
       logoUrl = null;
     }

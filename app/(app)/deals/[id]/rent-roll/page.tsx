@@ -78,14 +78,17 @@ export default async function RentRollPage({
   if (record?.sourceDocumentId) {
     const { data: doc } = await supabase
       .from("deal_documents")
-      .select("storage_path, filename")
+      .select("deal_id, storage_path, filename")
       .eq("id", record.sourceDocumentId)
       .maybeSingle();
     if (doc) {
       try {
         const grid = await readGrid(
           String(doc.filename),
-          await downloadDealFile(doc.storage_path as string),
+          await downloadDealFile(doc.storage_path as string, {
+            kind: "deal",
+            dealId: String(doc.deal_id),
+          }),
         );
         headers = (grid[record.mapping.headerRow] ?? []).map((c) => String(c ?? "").trim());
         sampleRows = grid
