@@ -204,4 +204,16 @@ describe("computeScreenDiff — the Occupancy row is today's occupancy", () => {
     expect(d.rows.map((r) => r.label)).toEqual(["Occupancy"]);
     expect(d.rows[0].delta).toBe("+2.00pt");
   });
+
+  it("an 'Avg SF / unit' row ahead of the price per unit is never the 'Price / unit' row", () => {
+    const d = computeScreenDiff(
+      prior([m("Avg SF / unit", "912"), m("Price per unit", "$252,016")]),
+      { metrics: [m("Avg SF / unit", "905"), m("Price per unit", "$240,000")] },
+      null,
+    )!;
+    const row = d.rows.find((r) => r.label === "Price / unit")!;
+    expect(row.before).toBe("$252,016");
+    expect(row.after).toBe("$240,000");
+    expect(row.direction).toBe("better");
+  });
 });

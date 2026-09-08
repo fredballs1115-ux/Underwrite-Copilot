@@ -12,6 +12,7 @@ import {
   inferStrategy,
   parseCount,
   planSummary,
+  plausibilityNote,
   signalAskPrice,
   unitCountFromMetrics,
   unitCountRow,
@@ -455,5 +456,52 @@ describe("the fourth review's cases", () => {
     expect(signalAskPrice({ askPrice: null })).toBeNull();
     expect(signalAskPrice(null)).toBeNull();
     expect(signalAskPrice(undefined)).toBeNull();
+  });
+});
+
+describe("the sixth review's strategy and plausibility cases", () => {
+  const ex = (metrics: ExtractedMetric[], extra: Partial<ExtractionResult> = {}) =>
+    ({ assetClass: "multifamily", market: "Dallas, TX", address: "", metrics, ...extra }) as unknown as ExtractionResult;
+
+  it("a Year-1 NOI is income for the building as bought — a 2024-built asset with a construction cost row stays stabilized", () => {
+    const built = ex([
+      m("Asking price", "$42,000,000"),
+      m("Year 1 NOI", "$2,400,000"),
+      m("Construction cost", "$38,000,000"),
+      m("Units", "248"),
+      m("Year built", "2024"),
+    ]);
+    expect(inferStrategy(built).kind).toBe("stabilized");
+    expect(planSummary(built)).toBeNull();
+    for (const label of ["NOI (Year 1)", "Yr 1 NOI", "Yr. 1 NOI", "T-12 NOI"]) {
+      expect(inferStrategy(ex([m(label, "$2,400,000"), m("Construction budget", "$38,000,000")])).kind, label).toBe("stabilized");
+    }
+    // A later year's NOI beside the plan's rows is still a development.
+    for (const label of ["Year 2 NOI", "Yr. 3 NOI", "Year 10 NOI", "Stabilized NOI"]) {
+      expect(inferStrategy(ex([m(label, "$2,400,000"), m("Construction budget", "$38,000,000")])).kind, label).toBe("development");
+    }
+  });
+
+  it("plausibility reads the cap through the shared reader — a residual, Year-3 or on-cost cap manufactures no finding", () => {
+    for (const label of ["Cap rate (Year 3)", "Cap Rate (Yr. 3)", "Residual cap rate", "Cap rate on cost", "Cap rate at completion"]) {
+      const e = ex([m("Asking price", "$42,000,000"), m("In-place NOI", "$2,100,000"), m(label, "7.50%")]);
+      expect(assessPlausibility(e).map((f) => f.code), label).not.toContain("cap_mismatch");
+    }
+    const stated = ex([m("Asking price", "$42,000,000"), m("In-place NOI", "$2,100,000"), m("Cap rate", "7.50%")]);
+    expect(assessPlausibility(stated).map((f) => f.code)).toContain("cap_mismatch");
+    const formal = ex([m("Asking price", "$42,000,000"), m("In-place NOI", "$2,100,000"), m("Capitalization rate", "7.50%")]);
+    expect(assessPlausibility(formal).map((f) => f.code)).toContain("cap_mismatch");
+  });
+
+  it("an inferred plan deal's reading line is printed once in the brief", () => {
+    const e = ex([m("Land cost", "$4,000,000"), m("Construction budget", "$36,000,000"), m("Units (proposed)", "240"), m("Stabilized NOI", "$5,000,000")]);
+    const s = inferStrategy(e);
+    expect(s.kind).toBe("development");
+    expect(s.source).toBe("inferred");
+    const note = plausibilityNote([], s, planSummary(e, s));
+    expect(note.split("Ground-up or to-be-built").length - 1).toBe(1);
+    // A stated summary in the OM's own words still prints beside the reading.
+    const stated = plausibilityNote([], { ...s, summary: "Ground-up 240 units on an entitled site.", source: "extraction" }, null);
+    expect(stated).toContain("— Ground-up 240 units on an entitled site. Ground-up or to-be-built");
   });
 });

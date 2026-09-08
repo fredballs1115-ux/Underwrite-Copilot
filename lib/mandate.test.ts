@@ -259,6 +259,25 @@ describe("scoreMandateFit — the fifth review's dealbreaker cases", () => {
   });
 });
 
+describe("scoreMandateFit — the sixth review's dealbreaker case", () => {
+  it("an 'Avg SF / unit' row ahead of the price per unit never clears a basis dealbreaker", () => {
+    const box: BuyBox = { maxPerUnitK: 100, dealbreakers: { maxPerUnitK: 100 } };
+    const r = scoreMandateFit(
+      "multifamily",
+      ex([
+        ["Asking price", "$62,500,000"],
+        ["Units", "248"],
+        ["Avg SF / unit", "912"],
+        ["Price per unit", "$252,016"],
+      ]),
+      box,
+    );
+    expect(r.dealbreakerTripped).toBe(true);
+    expect(dim(r, "dealbreakers")?.status).toBe("miss");
+    expect(dim(r, "dealbreakers")?.detail).toContain("$252k/unit");
+  });
+});
+
 describe("scoreMandateFit — a plan deal's stabilized cap never earns cap credit", () => {
   it("a conversion showing only a stabilized 11.7% cap leaves the cap dimension unknown", () => {
     const box: BuyBox = { minCapPct: 5.0 };

@@ -14,6 +14,7 @@ import {
   buyBoxLines,
   parseMoney,
   parsePct,
+  pastYearSource,
   resolveBuyBoxStore,
   sanitizeGeoTargets,
   serializeBuyBoxStore,
@@ -906,5 +907,147 @@ describe("the fifth review's price, per-unit, cap, size, occupancy and money cas
     expect(parseMoney("(see p. 14)")).toBeNull();
     expect(parseMoney("Call for offers")).toBeNull();
     expect(parseMoney("$0")).toBe(0);
+  });
+});
+
+// The sixth review read the reader layer again after the fifth's fixes and
+// verified twelve findings by execution. Each is pinned here or beside the
+// module it belongs to (deal-strategy, mandate, screen-diff).
+describe("the sixth review's per-unit, cap, price, size and occupancy cases", () => {
+  it("a ratio the KPI table prints per unit — SF, parking, beds — is never the price per unit", () => {
+    const box: BuyBox = { maxPerUnitK: 100, dealbreakers: { maxPerUnitK: 100 } };
+    const r = evaluateBuyBox(
+      "multifamily",
+      ex([
+        ["Asking price", "$62,500,000"],
+        ["Units", "248"],
+        ["Avg SF / unit", "912"],
+        ["Price per unit", "$252,016"],
+      ]),
+      box,
+    );
+    expect(check(r, "Basis / unit")?.status).toBe("miss");
+    expect(check(r, "Basis / unit")?.detail).toContain("$252k");
+    for (const label of [
+      "Avg SF / unit",
+      "Average SF per unit",
+      "SF per unit",
+      "Avg SF/unit",
+      "Parking spaces per unit",
+      "Beds per unit",
+      "Baths per unit",
+      "Parking ratio per unit",
+      "Last sale price per unit",
+      "Exit price per unit",
+    ]) {
+      expect(findMetric([{ label, value: "912" }], METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc), label).toBeNull();
+    }
+    // The shapes the price per unit takes all still read.
+    for (const label of [
+      "Price per unit",
+      "Price / Unit",
+      "$ / Unit",
+      "Price/unit",
+      "Unit price",
+      "Asking price per unit",
+      "Purchase price per unit",
+      "Price per door",
+      "Price per key",
+      "Basis per unit",
+      "Avg. price per unit",
+    ]) {
+      expect(findMetric([{ label, value: "$252,016" }], METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc)?.value, label).toBe("$252,016");
+    }
+  });
+
+  it("a Yr. 3, Year 10 or calendar-year cap is a projection; Year 1 and 'Capitalization rate' are today's", () => {
+    for (const label of ["Cap Rate (Yr. 3)", "Cap rate — Year 10", "Year 10 cap rate", "Cap rate (2028)", "Capitalization Rate (Stabilized)", "Y2 cap rate"]) {
+      expect(findGoingInCap([{ label, value: "7.50%" }]), label).toBeNull();
+    }
+    for (const label of ["Year 1 cap rate", "Cap rate (Year 1)", "Yr 1 cap rate", "Yr. 1 cap rate", "Cap rate", "Capitalization rate", "Going-in capitalization rate"]) {
+      expect(findGoingInCap([{ label, value: "5.50%" }])?.value, label).toBe("5.50%");
+    }
+  });
+
+  it("a size label whose parenthetical states the unit reads; a bare one still needs the noun", () => {
+    for (const label of ["Size (SF)", "Total Area (SF)", "Property Size (SF)", "Area (RSF)"]) {
+      expect(buildingSfFromMetrics([{ label, value: "250,000" }]), label).toBe(250_000);
+    }
+    expect(buildingSfFromMetrics([{ label: "Size:", value: "250,000" }])).toBeNull();
+    // Beside the stated lot the same figure is still the land's.
+    expect(buildingSfFromMetrics([{ label: "Size (SF)", value: "545,000" }, { label: "Acres", value: "12.5" }])).toBeNull();
+    expect(buildingSfFromMetrics([{ label: "Size (SF)", value: "545,000 SF" }, { label: "Acres", value: "12.5" }])).toBeNull();
+  });
+
+  it("an ask dated this year or later reads; a past year, or a sale word beside any year, is a prior trade", () => {
+    const y = new Date().getFullYear();
+    for (const label of [
+      `Revised asking price (March ${y})`,
+      `Asking price (${y})`,
+      `${y} asking price`,
+      `Purchase price (${y + 1} close)`,
+      `Price guidance (Q1 ${y})`,
+    ]) {
+      expect(findPriceRow([{ label, value: "$42,000,000" }])?.value, label).toBe("$42,000,000");
+    }
+    for (const label of [
+      "2019 sale price",
+      "Sale price, 2019",
+      "Sale price 2019",
+      "Sold 2019 — price",
+      "Sale price (2019)",
+      "Purchase price (2019)",
+      `Purchase price (${y - 1})`,
+      `Sale price (${y})`,
+      "Projected sale price (Year 5)",
+      "Residual sale price",
+      "Disposition price",
+      "Pro forma sale price",
+    ]) {
+      expect(findPriceRow([{ label, value: "$42,000,000" }]), label).toBeNull();
+    }
+    // The past-year fragment, in its own right.
+    expect(pastYearSource(2026)).toBe("\\b(?:19\\d\\d|20[0-1]\\d|202[0-5])\\b");
+    expect(pastYearSource(2020)).toBe("\\b(?:19\\d\\d|20[0-0]\\d|201[0-9])\\b");
+    expect(pastYearSource(2009)).toBe("\\b(?:19\\d\\d|200[0-8])\\b");
+    const past = new RegExp(pastYearSource(2026));
+    for (const s of ["2025", "1998", "2000", "2019"]) expect(past.test(s), s).toBe(true);
+    for (const s of ["2026", "2027", "20250", "12025"]) expect(past.test(s), s).toBe(false);
+  });
+
+  it("a second figure in the occupancy cell never blanks today's figure; a qualifier still does", () => {
+    expect(occupancyPctFromMetrics([{ label: "Occupancy", value: "94% (Target: 95%)" }])).toBe(94);
+    expect(occupancyPctFromMetrics([{ label: "Occupancy", value: "88% occupied, 95% pre-leased" }])).toBe(88);
+    expect(occupancyPctFromMetrics([{ label: "Occupancy", value: "88% physical / 84% economic" }])).toBe(88);
+    for (const value of ["95% (stabilized)", "95% at stabilization", "95% pro forma", "95% target", "95% (target)"]) {
+      expect(occupancyPctFromMetrics([{ label: "Occupancy", value }]), value).toBeNull();
+    }
+  });
+
+  it("on a development an ask that states no figure yields to the land cost", () => {
+    const metrics = [
+      { label: "Asking price", value: "Call for offers" },
+      { label: "Land cost", value: "$4,000,000" },
+      { label: "Construction budget", value: "$36,000,000" },
+      { label: "Units (proposed)", value: "240" },
+    ];
+    expect(findPriceRow(metrics, "development")?.value).toBe("$4,000,000");
+    // On an operating asset the unpriced ask row is still the price row.
+    expect(findPriceRow(metrics, "stabilized")?.value).toBe("Call for offers");
+    // With no land cost the ask row comes back as it is.
+    expect(findPriceRow([{ label: "Asking price", value: "Call for offers" }], "development")?.value).toBe("Call for offers");
+    const r = evaluateBuyBox("multifamily", { ...ex([]), metrics, strategy: { kind: "development" } }, { maxPriceM: 3 });
+    expect(check(r, "Price")?.status).toBe("miss");
+    expect(check(r, "Price")?.detail).toContain("land cost is $4.0M");
+  });
+
+  it("the price band's unknown branch names the figure a development is judged on", () => {
+    const dev = { ...ex([["Land cost", "TBD"]]), strategy: { kind: "development" } };
+    const r = check(evaluateBuyBox("multifamily", dev, { maxPriceM: 3 }), "Price");
+    expect(r?.status).toBe("unknown");
+    expect(r?.detail).toContain("no parseable land cost");
+    const bare = { ...ex([["Acres", "12"]]), strategy: { kind: "development" } };
+    expect(check(evaluateBuyBox("multifamily", bare, { maxPriceM: 3 }), "Price")?.detail).toContain("asking price or land cost");
+    expect(check(evaluateBuyBox("multifamily", ex([["Acres", "12"]]), { maxPriceM: 3 }), "Price")?.detail).toContain("no parseable asking price");
   });
 });

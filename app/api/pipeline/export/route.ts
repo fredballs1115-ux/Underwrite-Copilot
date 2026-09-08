@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { evaluateBuyBox, findGoingInCap } from "@/lib/criteria";
+import { buyBoxCheckSource, evaluateBuyBox, findGoingInCap } from "@/lib/criteria";
 import { findPriceMetric, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { getTeam } from "@/lib/teams";
 import { getActiveBranding } from "@/lib/branding-server";
@@ -109,7 +109,10 @@ export async function GET(req: Request) {
     const box = d.team_id ? teamBox : personalBox;
     let fit: PipelineExportRow["fit"] = null;
     if (box && extraction) {
-      const checks = evaluateBuyBox(d.asset_class, extraction, box);
+      // The inferred kind rides along, as on the pipeline page, so the fit
+      // column judges the land cost this row prints as a development's price.
+      const source = buyBoxCheckSource(extraction, null, null, strategy.kind);
+      const checks = source ? evaluateBuyBox(d.asset_class, source, box) : [];
       fit = checks.some((c) => c.status === "miss")
         ? "outside"
         : checks.some((c) => c.status === "near")
