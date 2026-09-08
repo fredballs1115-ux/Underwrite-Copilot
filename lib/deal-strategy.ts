@@ -264,6 +264,24 @@ export function capitalBudgetFromMetrics(metrics: MetricLike[], price: number | 
   return { budget, allIn, label: m.label, page: m.page };
 }
 
+// A ground-up development buys land, and its OM says "land cost" or "site
+// acquisition" where a building's OM says "asking price". Only a development
+// reads that line as the price: on an operating asset a "land value" is an
+// allocation, not what is being bought.
+const LAND_PRICE_INCLUDE = /\b(land|site) (cost|price|acquisition|purchase|basis)\b/i;
+const LAND_PRICE_EXCLUDE = /value|\bper\b|\/|psf|acre|\bsf\b/i;
+
+/** The price metric: the asking / purchase price, else — on a development
+ *  only — the land or site cost. Null when the OM states neither. */
+export function findPriceMetric(metrics: MetricLike[], kind: StrategyKind): MetricLike | null {
+  return (
+    (findMetric(metrics, PRICE_INCLUDE, PRICE_EXCLUDE) as MetricLike | null) ??
+    (kind === "development"
+      ? (findMetric(metrics, LAND_PRICE_INCLUDE, LAND_PRICE_EXCLUDE) as MetricLike | null)
+      : null)
+  );
+}
+
 const MONEY_IN_TEXT = /\$\s?(\d[\d,]*(?:\.\d+)?)\s*(billion|million|thousand|bn|mm|m|k|b)?\b/i;
 
 /**
@@ -335,7 +353,7 @@ export function planSummary(
 ): PlanSummary | null {
   if (!extraction || !isPlanDeal(strategy.kind)) return null;
   const metrics = extraction.metrics;
-  const priceMetric = findMetric(metrics, PRICE_INCLUDE, PRICE_EXCLUDE);
+  const priceMetric = findPriceMetric(metrics, strategy.kind);
   const priceRaw = priceMetric ? parseMoney(priceMetric.value) : null;
   const price = priceRaw != null && priceRaw > 0 ? priceRaw : null;
   const stabilizedNoi = noiFigures(metrics).find((f) => f.kind === "stabilized") ?? null;
@@ -374,7 +392,7 @@ export function assessPlausibility(
 ): PlausibilityFinding[] {
   if (!extraction) return [];
   const metrics = extraction.metrics;
-  const priceMetric = findMetric(metrics, PRICE_INCLUDE, PRICE_EXCLUDE);
+  const priceMetric = findPriceMetric(metrics, strategy.kind);
   const price = priceMetric ? parseMoney(priceMetric.value) : null;
   if (price == null || !(price > 0)) return [];
 

@@ -6,6 +6,7 @@ import {
   budgetFromText,
   capitalBudgetFromMetrics,
   classifyNoi,
+  findPriceMetric,
   inferStrategy,
   isPlanDeal,
   noiFigures,
@@ -485,5 +486,36 @@ describe("timelineFromMetrics — the plan's timing from metric rows", () => {
       }),
     )!;
     expect(stated.timeline).toBe("24 months of works, 12 of lease-up");
+  });
+});
+
+describe("findPriceMetric — a development buys land", () => {
+  const DEVELOPMENT = ex(
+    [
+      metric("Land cost", "$8,000,000", { basis: "na", page: "p. 2" }),
+      metric("Total development cost", "$60,000,000", { basis: "pro_forma", page: "p. 9" }),
+      metric("Stabilized NOI (pro forma)", "$4,500,000", { basis: "pro_forma", page: "p. 11" }),
+      metric("Land value (appraised)", "$9,500,000", { basis: "na" }),
+    ],
+    { dealName: "Ground-up development — 240 units, fully entitled" },
+  );
+
+  it("reads the land cost as the price on a development, never the appraised land value", () => {
+    expect(inferStrategy(DEVELOPMENT).kind).toBe("development");
+    expect(findPriceMetric(DEVELOPMENT.metrics, "development")?.value).toBe("$8,000,000");
+    const p = planSummary(DEVELOPMENT)!;
+    expect(p.price).toBe(8_000_000);
+    expect(p.budget).toMatchObject({ budget: 52_000_000, allIn: true });
+    expect(p.totalCost).toBe(60_000_000);
+    expect(p.yieldOnCost).toBeCloseTo(4.5 / 60, 9);
+  });
+
+  it("the asking price still wins when both are stated, and other deals never read a land line as the price", () => {
+    const both = [metric("Land cost", "$8,000,000"), metric("Asking price", "$50,000,000")];
+    expect(findPriceMetric(both, "development")?.value).toBe("$50,000,000");
+    expect(findPriceMetric([metric("Land cost", "$8,000,000")], "stabilized")).toBeNull();
+    expect(findPriceMetric([metric("Land cost", "$8,000,000")], "conversion")).toBeNull();
+    expect(findPriceMetric([metric("Land cost per acre", "$400,000")], "development")).toBeNull();
+    expect(findPriceMetric([metric("Land value", "$9,500,000")], "development")).toBeNull();
   });
 });

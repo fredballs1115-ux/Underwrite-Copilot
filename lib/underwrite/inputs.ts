@@ -18,6 +18,7 @@ import {
   IMPLIED_CAP_CEILING,
   budgetFromText,
   capitalBudgetFromMetrics,
+  findPriceMetric,
   inferStrategy,
   noiFigures,
   type StrategyKind,
@@ -140,11 +141,10 @@ export function deriveUnderwriteInputs(
   // ── Purchase price ─────────────────────────────────────────────────────
   // Excludes are word-bounded: a bare /per/ would match the "per" inside
   // "oPERating" and silently disqualify "Net operating income" itself.
-  const priceMetric = findMetric(
-    metrics,
-    /asking price|purchase price|guidance|^price\b|offering price/i,
-    /unit|\bsf\b|\bper\b|\/|psf/i,
-  );
+  // The shared price reader: the asking / purchase price, else — on a ground-up
+  // development only — the land or site cost, which is what is being bought.
+  const priceMetric = findPriceMetric(metrics, inferStrategy(extraction).kind);
+  const priceIsLand = priceMetric != null && /\b(land|site)\b/i.test(priceMetric.label);
   const capMetric = findMetric(
     metrics,
     /going[- ]?in cap|^cap rate|\bcap\b/i,
@@ -175,7 +175,14 @@ export function deriveUnderwriteInputs(
   let price = priceMetric ? parseMoney(priceMetric.value) : null;
 
   if (price != null) {
-    mark("purchasePrice", "extracted", "OM asking / purchase price", pageOf(priceMetric));
+    mark(
+      "purchasePrice",
+      "extracted",
+      priceIsLand
+        ? "OM land / site cost — the development's acquisition basis; the build sits in the capital plan"
+        : "OM asking / purchase price",
+      pageOf(priceMetric),
+    );
   } else if (goingFig && capPct) {
     // Only an in-place / Year-1 NOI may back a price out of the going-in cap.
     price = goingFig.value / capPct;
