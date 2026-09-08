@@ -136,6 +136,7 @@ export async function buildPipelineWorkbook(
   for (const r of rows) byStage.get(normalizeStage(r.stage))!.push(r);
 
   let rowN = 5;
+  let lastDealRow = 0;
   const today = exportedAt.toISOString().slice(0, 10);
   for (const stage of STAGES) {
     const group = byStage.get(stage)!;
@@ -235,9 +236,38 @@ export async function buildPipelineWorkbook(
       row.getCell(13).font = baseFont;
       row.getCell(14).value = d.addedBy ?? "";
       row.getCell(14).font = baseFont;
+      lastDealRow = rowN;
       rowN++;
     }
     rowN++; // breathing room between stages
+  }
+
+  // Data bars on the three figures a meeting compares across the sheet —
+  // price, cap, yield on cost. Excel draws these itself and keeps them live
+  // as the numbers change: a picture with no chart library and nothing
+  // computed into a cell. Text cells (a dash, "n/a — plan", a band header)
+  // draw no bar, so a plan deal's cap column stays honestly empty.
+  if (lastDealRow > 0) {
+    for (const col of ["G", "H", "I"]) {
+      ws.addConditionalFormatting({
+        ref: `${col}5:${col}${lastDealRow}`,
+        rules: [
+          {
+            type: "dataBar",
+            priority: 1,
+            gradient: false,
+            minLength: 0,
+            maxLength: 100,
+            showValue: true,
+            border: false,
+            cfvo: [{ type: "min" }, { type: "max" }],
+            // The bar's colour rides the rule's model even though the typing
+            // omits it (exceljs writes it as the databar's <color>).
+            color: { argb: "FFB5CDC9" },
+          } as unknown as ExcelJS.ConditionalFormattingRule,
+        ],
+      });
+    }
   }
 
   /* ------------------------------ Summary ------------------------------- */

@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "The meeting workbook draws its price, cap and yield columns as bars",
+      "blurb": "The pipeline export's price, cap-rate and yield-on-cost columns now carry Excel's own data bars, so a meeting reads the spread across deals at a glance — and the bars stay live as anyone edits the numbers, because Excel draws them, not the export. A plan deal's cap cell, which says n/a — plan, draws no bar.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-08",
       "title": "The memo draws where each base sits, and reserves its footer",
       "blurb": "The one-page memo's ranges table now shows where the base sits between low and high as a small bar with a dot — amber when the base hugs the optimistic end — and each scenario's call in the flip strip carries its coloured dot, the same marks the deal page and the shared screen use. Drawn as shapes, so nothing is embedded and no height is added. The memo also reserves the band its footer prints in: a memo that cannot fit one page flows to a second instead of running its last line into the footer.",
       "href": "/deals"
