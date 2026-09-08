@@ -308,11 +308,10 @@ export function ValuationsView({
       </div>
 
       <p className="text-xs leading-relaxed text-muted">
-        A number with a page reference was read off that page — hover for the quote, click to open
-        the document. <span className="font-medium text-caution">der</span> marks a cap rate backed
-        out of a stated value and NOI rather than stated. A dash means the source is silent; nothing
-        is filled in for it. The IRR row runs each price through <em>your</em>{" "}model — the
-        superscript counts assumptions borrowed from it because the source didn&apos;t state them.
+        Superscripts are page references — hover for the quote, click to open.{" "}
+        <span className="font-medium text-caution">der</span> = a cap rate derived from value and
+        NOI. A dash = the source is silent. The IRR row runs each price through your model; its
+        superscript counts borrowed assumptions.
       </p>
 
       {/* ── Bridge ────────────────────────────────────────────────────── */}

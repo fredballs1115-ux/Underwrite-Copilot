@@ -13,7 +13,7 @@ added reads all twelve public pages clean on every run).
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Sixty-six PRs (#176–#241) landed across one review session and the
+Sixty-seven PRs (#176–#242) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -322,6 +322,23 @@ deploy (live-verify shows the sha).
   form and the empty state lost their paragraphs. The sample deal's reading
   guide is three icon steps and one line; the deal page's helper sentences
   each lost their second half.
+- **The model view, comps, bridge and valuations, cut the same way** (#242).
+  The model's inputs are a row of ticked chips instead of described rows;
+  every helper note under a model panel is one line; the comps footnotes,
+  the bridge's method line and the valuations legend are half their length.
+  live-verify prints a `DEPLOY: LIVE` / `LAGGING` line so a deploy that has
+  not landed reads as a sentence.
+
+**First, the deploy itself.** At 15:09 UTC live-verify still read the live
+build as `fab27ec` (#239) while main was `b36628a` (#241) — eighteen minutes
+after #240 merged, when every earlier deploy today landed in about four. Open
+dashboard.render.com → underwrite-copilot-web → Events. A failed build there
+wants its log read (the production build passes locally at `47f4f2d`,
+`bef4cf6` and `b36628a`, so the likely cause is the starter instance running
+out of memory mid-build — a retry usually lands); a deploy stuck "in
+progress" wants a Manual Deploy of main. live-verify now prints one
+`DEPLOY: LIVE` / `DEPLOY: LAGGING` line (#242), so the next dispatched run
+says which it is without comparing shas.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":

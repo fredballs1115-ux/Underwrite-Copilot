@@ -94,12 +94,9 @@ function Intro() {
         Build a first-draft underwriting model
       </h2>
       <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted">
-        Upload whatever you have on the deal — the OM, a rent roll, a T-12,
-        offering financials, loan terms, or your own Argus export. We build the
-        model around what you give us: actuals beat pro forma, every conflict is
-        surfaced (not hidden), and you get a first-draft Excel model with sourced
-        assumptions and returns. Start with one document — you can always add
-        more to deepen it.
+        Upload what you have — one document is enough to start. Actuals beat
+        pro forma, every conflict is shown, and the Excel comes with every
+        number sourced.
       </p>
     </div>
   );
@@ -112,46 +109,36 @@ function InputsNeeded({ documents }: { documents: DealDocument[] }) {
       <h2 className="text-sm font-semibold tracking-tight">
         Add more to the model
       </h2>
-      <ul className="mt-3 space-y-3">
+      {/* One chip per input, ticked when it is in: what each one adds to the
+          model is the tooltip, not a line of copy under every row. */}
+      <ul className="mt-3 flex flex-wrap gap-2">
         {MODEL_INPUTS.map((inp) => {
           const ok = have.has(inp.kind);
           return (
-            <li key={inp.kind} className="flex items-start gap-3">
-              <span
-                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                  ok ? "bg-pass/15 text-pass" : "bg-brand/10 text-brand"
-                }`}
-              >
+            <li
+              key={inp.kind}
+              title={`${inp.fills} — ${ok ? "added" : "optional"}`}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
+                ok ? "border-pass/30 bg-pass/10 text-pass" : "border-line bg-paper text-ink"
+              }`}
+            >
+              <span aria-hidden className="font-bold">
                 {ok ? "✓" : "+"}
               </span>
-              <div className="min-w-0">
-                <p className="text-sm font-medium">
-                  {inp.label}{" "}
-                  <span
-                    className={`ml-1 text-xs font-normal ${ok ? "text-pass" : "text-muted"}`}
-                  >
-                    {ok ? "added" : "optional"}
-                  </span>
-                </p>
-                <p className="text-xs leading-relaxed text-muted">{inp.fills}</p>
-              </div>
+              {inp.label}
+              <span className="sr-only">{ok ? "— added" : "— optional"}</span>
             </li>
           );
         })}
         {MODEL_PASTES.map((p, i) => (
-          <li key={i} className="flex items-start gap-3">
-            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[11px] font-bold text-brand">
-              +
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm font-medium">
-                {p.label}{" "}
-                <span className="ml-1 text-xs font-normal text-muted">
-                  optional
-                </span>
-              </p>
-              <p className="text-xs leading-relaxed text-muted">{p.fills}</p>
-            </div>
+          <li
+            key={i}
+            title={`${p.fills} — optional`}
+            className="inline-flex items-center gap-1.5 rounded-full border border-line bg-paper px-2.5 py-1 text-xs font-medium text-ink"
+          >
+            <span aria-hidden className="font-bold">+</span>
+            {p.label}
+            <span className="sr-only">— optional</span>
           </li>
         ))}
       </ul>
@@ -309,8 +296,7 @@ export function Sensitivity({ model }: { model: UnderwritingModel }) {
         <span className="font-normal text-muted">· levered IRR</span>
       </h2>
       <p className="mt-1 text-sm leading-relaxed text-muted">
-        How the IRR moves across exit cap and price. Your base case is
-        highlighted; the rest re-run the same math.
+        IRR by exit cap and price; your base case is highlighted.
       </p>
       <div className="mt-3 overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
         <table className="w-full min-w-[34rem] text-sm">
@@ -473,8 +459,7 @@ export function StressPanel({ model }: { model: UnderwritingModel }) {
         )}
       </div>
       <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">
-        Nudge the levers a screen turns on — exit cap, rent growth, rate, hold
-        — and watch the returns move. The saved model doesn&apos;t change.
+        Live — the saved model doesn&apos;t change.
       </p>
 
       <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
@@ -742,9 +727,8 @@ export function CapexPanel({ model }: { model: UnderwritingModel }) {
         ))}
       </dl>
       <p className="mt-3 text-xs leading-relaxed text-muted">
-        The reserve is deducted below NOI in every cash-flow year, so returns
-        already carry it. A screening reserve, not an engineering budget —
-        replace it with the real capital plan when you have one.
+        Deducted below NOI in every year — a screening reserve, not an
+        engineering budget.
       </p>
     </section>
   );

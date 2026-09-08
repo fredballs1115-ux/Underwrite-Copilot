@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Sixty-six PRs, #176–#241, each
+estimate, and that's what it should flag." Sixty-seven PRs, #176–#242, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -907,6 +907,17 @@ confirmed equal to the main tip after each batch.
   sentences each lost their second half (the sample's overview: 647 words
   to 466). Render tests on the fixtures, screenshotted at 1440 and 390 for
   every state.
+- **#242 The model view, the comps footnotes, the bridge and the valuations
+  legend, cut the same way.** "Add more to the model" is a row of chips,
+  ticked where the document is in (what each one adds is the tooltip); the
+  model's intro, stress, sensitivity and capital-plan lines each say one
+  thing; the comps map's footnote and the public-web comps note are a line
+  each; the bridge's method line and the valuations table's legend are half
+  their length. The sample model view: 661 words to 568; the Financials
+  tab: 956 to 863; the comps tab: 355 to 289. live-verify now prints one
+  `DEPLOY: LIVE` / `DEPLOY: LAGGING` line comparing the live build to the
+  main tip, so a deploy that has not landed is a sentence rather than two
+  shas to compare by eye.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
