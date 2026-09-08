@@ -73,11 +73,42 @@ describe("findPriceMetric — every name an OM gives the number being asked", ()
     expect(findPriceMetric([m("Contract price", "$42,000,000")], "value_add")?.value).toBe("$42,000,000");
   });
 
-  it("reads an offer price; never a land allocation on an operating asset, never a price reduction", () => {
+  it("reads an offer price, a 'Pricing' header, 'Price / Terms'; never a reserve, bid or target figure, never a price reduction", () => {
     expect(findPriceMetric([m("Offer price", "$42,000,000")], "stabilized")?.value).toBe("$42,000,000");
-    expect(findPriceMetric([m("Land price", "$4,000,000")], "stabilized")).toBeNull();
-    // On a development the land IS what is being bought.
+    expect(findPriceMetric([m("Pricing", "$42,000,000")], "stabilized")?.value).toBe("$42,000,000");
+    expect(findPriceMetric([m("Asking", "$42,000,000")], "stabilized")?.value).toBe("$42,000,000");
+    expect(findPriceMetric([m("Price / Terms", "$42,000,000 all cash")], "stabilized")?.value).toBe(
+      "$42,000,000 all cash",
+    );
+    for (const label of ["Reserve price", "Bid price", "Target price", "Underwritten price", "Price range"]) {
+      expect(findPriceMetric([m(label, "$42,000,000")], "stabilized"), label).toBeNull();
+    }
+    // The land is what is being bought on a development, when no ask exists
+    // at all; on an operating asset a land line is an allocation.
     expect(findPriceMetric([m("Land price", "$4,000,000")], "development")?.value).toBe("$4,000,000");
+    expect(findPriceMetric([m("Land price", "$4,000,000")], "stabilized")).toBeNull();
+    expect(
+      findPriceMetric([m("Land cost", "$4,000,000"), m("Asking price", "$40,000,000")], "stabilized")?.value,
+    ).toBe("$40,000,000");
+    expect(findPriceMetric([m("Land value", "$4,000,000")], "development")).toBeNull();
+  });
+
+  it("a bare land OM — a land price and no income figure — is read as a development, so its land price is its price", () => {
+    const land = {
+      dealName: "12 acres, Frisco",
+      assetClass: "land",
+      market: "Dallas, TX",
+      address: "",
+      metrics: [m("Land price", "$4,000,000"), m("Acres", "12"), m("Zoning", "MF-2")],
+    } as ExtractionResult;
+    const kind = inferStrategy(land).kind;
+    expect(kind).toBe("development");
+    expect(findPriceMetric(land.metrics, kind)?.value).toBe("$4,000,000");
+    // With income in the deck the land line is an allocation: still an
+    // operating asset, and never the price.
+    const operating = { ...land, metrics: [m("Land cost", "$4,000,000"), m("NOI (in-place)", "$1,200,000")] };
+    expect(inferStrategy(operating).kind).toBe("stabilized");
+    expect(findPriceMetric(operating.metrics, "stabilized")).toBeNull();
     expect(
       findPriceMetric(
         [m("Price reduction", "$2,000,000"), m("Asking price", "$40,000,000")],
@@ -126,20 +157,112 @@ describe("a legacy row with no metrics array is read, not thrown on", () => {
 });
 
 describe("unitCountFromMetrics — every row that counts units, no row that merely mentions them", () => {
-  it("reads the names an OM uses for the count", () => {
-    expect(unitCountFromMetrics([m("Residential units", "312")])).toBe(312);
-    expect(unitCountFromMetrics([m("Apartment units", "312")])).toBe(312);
-    expect(unitCountFromMetrics([m("Number of units", "312")])).toBe(312);
-    expect(unitCountFromMetrics([m("Doors", "312")])).toBe(312);
-    expect(unitCountFromMetrics([m("Keys", "180")])).toBe(180);
-    expect(unitCountFromMetrics([m("Proposed units", "612")])).toBe(612);
+  it("reads every name an OM gives the whole count", () => {
+    for (const label of [
+      "Units",
+      "Unit",
+      "Total units",
+      "Total Units:",
+      "Number of units",
+      "No. of units",
+      "# of units",
+      "Total # of units",
+      "Total number of units",
+      "Unit count",
+      "Total unit count",
+      "Residential units",
+      "Total residential units",
+      "Apartment units",
+      "Total apartment units",
+      "Apartment homes",
+      "Total dwelling units",
+      "Total multifamily units",
+      "Multi-family units",
+      "Total rental units",
+      "Net rentable units",
+      "Existing units",
+      "Proposed units",
+      "Planned units",
+      "Units (proposed)",
+      "Units — proposed",
+      "Units (per rent roll)",
+      "Total units (IL/AL/MC)",
+      "Doors",
+      "Total doors",
+      "Keys",
+      "Total keys",
+      "Guest rooms",
+      "Rooms",
+      "Room count",
+      "Beds",
+      "Total beds",
+      "Bed count",
+      "Student beds",
+      "Pads",
+      "Sites",
+      "Homesites",
+      "RV sites",
+      "Mobile home sites",
+      "Storage units",
+      "Self-storage units",
+      "Senior living units",
+      "Suites",
+      "Number of apartments",
+    ]) {
+      expect(unitCountFromMetrics([m(label, "312")]), label).toBe(312);
+    }
   });
 
-  it("a partial count is never the count", () => {
-    expect(unitCountFromMetrics([m("Vacant units", "12")])).toBeNull();
-    expect(unitCountFromMetrics([m("Affordable units", "27")])).toBeNull();
-    expect(unitCountFromMetrics([m("Renovated units", "120")])).toBeNull();
+  it("a partial count, or a row about the units, is never the count", () => {
+    for (const label of [
+      "Vacant units",
+      "Occupied units",
+      "Leased units",
+      "Affordable units",
+      "Market-rate units",
+      "Renovated units",
+      "Classic units",
+      "Absorbed units",
+      "Remaining units",
+      "Units under renovation",
+      "Units offline",
+      "Units available",
+      "Units delivered",
+      "Units sold",
+      "Units expiring",
+      "Units at market",
+      "Units (Phase I)",
+      "Units (Building A)",
+      "Climate-controlled units",
+      "Independent living units",
+      "Unit mix",
+      "Unit sizes",
+      "Unit type",
+      "Average unit size",
+      "Units per acre",
+      "Unit price",
+      "Price per unit",
+      "Units / SF",
+      "Rent per unit",
+    ]) {
+      expect(unitCountFromMetrics([m(label, "312")]), label).toBeNull();
+    }
     expect(unitCountFromMetrics([m("Vacant units", "12"), m("Units", "312")])).toBe(312);
+    expect(unitCountFromMetrics([m("Units under renovation", "40"), m("Total units", "312")])).toBe(312);
+  });
+
+  it("parseCount reads the shapes a value takes and refuses a subset", () => {
+    expect(parseCount("248-unit")).toBe(248);
+    expect(parseCount("Units: 248")).toBe(248);
+    expect(parseCount("≈248")).toBe(248);
+    expect(parseCount("248 total")).toBe(248);
+    expect(parseCount("248 units total")).toBe(248);
+    expect(parseCount("248.0")).toBe(248);
+    expect(parseCount("120 suites")).toBe(120);
+    expect(parseCount("248 (of 312)")).toBeNull();
+    expect(parseCount("248 of 312")).toBeNull();
+    expect(parseCount("248 units / 12 buildings")).toBeNull();
+    expect(parseCount("0")).toBeNull();
   });
 
   it("unitCountRow hands back the OM's own row, with its page", () => {

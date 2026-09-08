@@ -58,6 +58,20 @@ describe("buildComps — the unit count is the row that counts units", () => {
     expect(comps[0].perUnitBasis).toBe("unit");
   });
 
+  it("a rent per unit is never the basis — the price over the units is", () => {
+    const comps = buildComps([
+      deal("d1", {
+        market: "Dallas, TX",
+        metrics: [
+          ["Purchase price", "$50,000,000"],
+          ["Avg rent per unit", "$2,400"],
+          ["Units", "200"],
+        ],
+      }),
+    ]);
+    expect(comps[0].perUnit).toBe(250_000);
+  });
+
   it("a partial count ('Vacant units') is not the count", () => {
     const comps = buildComps([
       deal("d1", { market: "Dallas, TX", metrics: [["Purchase price", "$62,400,000"], ["Vacant units", "12"]] }),

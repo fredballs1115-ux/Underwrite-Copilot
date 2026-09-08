@@ -70,10 +70,11 @@ const TRACKED: Tracked[] = [
   },
   {
     label: "Price / unit",
-    include: /per unit|\/unit|unit price/i,
-    // The price over the units — never an NOI, a rent, a cost or an expense
-    // expressed per unit.
-    exclude: /noi|income|rent|cost|budget|expense|tax|reserve|revenue|\begi\b/i,
+    // The shared per-unit reader — the price over the units, never an NOI,
+    // a rent, a cost or an expense expressed per unit — so this row and the
+    // buy box read the same figure.
+    include: METRIC_FIND.perUnit.inc,
+    exclude: METRIC_FIND.perUnit.exc,
     kind: "money",
     betterWhen: "down",
   },
@@ -89,7 +90,9 @@ const TRACKED: Tracked[] = [
   {
     label: "NOI",
     include: /\bnoi\b/i,
-    exclude: /stabili[sz]ed|pro ?forma/i,
+    // Not the finished project's figure, and never a per-unit / per-SF
+    // expression, a margin, a growth rate or a yield.
+    exclude: /stabili[sz]ed|pro ?forma|\bper\b|\/|unit|psf|\bsf\b|margin|growth|yield|multiple/i,
     kind: "money",
     betterWhen: "up",
   },

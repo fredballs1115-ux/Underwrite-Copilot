@@ -1,4 +1,4 @@
-import { findGoingInCap, findMetric, parseMoney, parsePct } from "@/lib/criteria";
+import { METRIC_FIND, findGoingInCap, findMetric, parseMoney, parsePct } from "@/lib/criteria";
 import {
   findPriceMetric,
   inferStrategy,
@@ -80,7 +80,9 @@ function deriveBasis(
   allIn = false,
 ): string | null {
   if (!allIn) {
-    const direct = findMetric(metrics, /per unit|\/unit|price\/unit|unit price/i);
+    // The shared per-unit reader: the price over the units, never a rent
+    // or an expense per unit.
+    const direct = findMetric(metrics, METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc);
     if (direct) return direct.value;
   }
   const suffix = allIn ? " all-in" : "";

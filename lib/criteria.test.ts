@@ -76,6 +76,36 @@ describe("evaluateBuyBox — reads the expected figures", () => {
     expect(check(onlyLast, "Price")?.status).toBe("unknown");
   });
 
+  it("the basis ceiling reads the price per unit, never a rent or an expense per unit", () => {
+    const box: BuyBox = { maxPerUnitK: 100 };
+    const r = evaluateBuyBox(
+      "auto",
+      ex([
+        ["Avg rent per unit", "$2,400"],
+        ["Insurance per unit", "$1,100"],
+        ["Price per unit", "$252,000"],
+      ]),
+      box,
+    );
+    expect(check(r, "Basis / unit")?.status).toBe("miss");
+    expect(check(r, "Basis / unit")?.detail).toContain("$252k");
+    const rentOnly = evaluateBuyBox("auto", ex([["Avg rent per unit", "$2,400"]]), box);
+    expect(check(rentOnly, "Basis / unit")?.status).toBe("unknown");
+  });
+
+  it("reads a 'Pricing' header as the price and never a reserve or bid figure", () => {
+    const box: BuyBox = { priceMaxM: 100 };
+    const r = evaluateBuyBox(
+      "auto",
+      ex([
+        ["Reserve price", "$140,000,000"],
+        ["Pricing", "$80,000,000"],
+      ]),
+      box,
+    );
+    expect(check(r, "Price")?.status).toBe("pass");
+  });
+
   it("reads the asking price but not the per-unit price", () => {
     const box: BuyBox = { priceMaxM: 100 };
     const r = evaluateBuyBox(
