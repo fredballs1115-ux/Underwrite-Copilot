@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "The homepage and the sample screen say it in pictures: half the height, a fifth of the words",
+      "blurb": "Words that can be a picture are now a picture. The homepage was twenty-one blocks and six and a half thousand words; it is one idea per section — the sample deal card beside a one-sentence headline, two-word stats, the two-analyst spread drawn as a bar, the six stages as icons with the running trace beneath, the verdict as the deal page's own tabs, the live stress bench, the fifteen markets as aerial photographs, four artifact tiles you can download from, an eight-icon grid for everything else, pricing and the FAQ. The sample screen lost its introductory paragraphs and its scrolling text band the same way; the deliverables, the four deeper tools and the research cards each read in a line. The long-form case lives on the Why page for anyone who wants the words.",
+      "href": "/"
+    },
+    {
+      "date": "2026-09-08",
       "title": "Your files are yours alone: every document read, link and delete is checked against the deal it belongs to",
       "blurb": "A review of who can reach what found the row-level security sound and one layer beneath it too trusting: the stored location of an OM, a document, a supplement or a logo was read straight off the deal's own record and handed to the storage service, which does not apply per-user rules. Every storage read, signed link, replacement and delete now checks the path against the deal (or account) it acts for, in one place, before any bytes move; the database asserts the same shapes. Alongside it: a teammate's Delete on a deal they did not create used to report success and remove the creator's files while the deal stayed — it now removes nothing, says who may delete, and the menu no longer offers it; the red regulatory-alert banner every user sees can be dismissed but not rewritten; a teammate who leaves or is removed takes their share links on the team's other deals with them; and the service-health probes no longer repeat an upstream service's answer word for word.",
       "href": "/account"

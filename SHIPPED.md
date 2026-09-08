@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Sixty-four PRs, #176–#239, each
+estimate, and that's what it should flag." Sixty-five PRs, #176–#240, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -861,6 +861,33 @@ confirmed equal to the main tip after each batch.
   upstream bodies verbatim. A migration lint fails any future write policy
   with a bare `true`. 41 new tests, three of them the reviewer's probes
   turned into regressions.
+- **#240 Words that can be a picture are a picture: the homepage and the
+  sample screen, cut to one idea per section.** Your note — "homescreen is
+  too jumbled… too many words and graphics and not enough just pictures…
+  words that can be a picture should always be a picture" — measured
+  first, then acted on. The homepage was 15,557px tall at desktop width,
+  6,474 words, 45 headings and 42 paragraphs over 25 words, across 21
+  blocks (a research ticker, a proof strip, the pulse board, the problem
+  essay, the spread board, the retrade replay, six paragraph cards for the
+  stages, a nine-card toolkit with four deep tools and eight workflow
+  bullets, the rent-control playground, a markets marquee, the ground
+  layer's four cards, seven artifact tiles, three pillars, a shipped-this-
+  week block…). It is now 8,004px, 1,295 words, 15 headings and two long
+  paragraphs (both FAQ answers, collapsed): the hero is one sentence and
+  the sample deal card; the stats carry two-word labels; the problem is
+  the spread drawn, not argued; the six stages are an icon rail with one
+  word each, followed by the running trace; the verdict is the deal page's
+  own tabs; the engine is the live stress bench; coverage is the aerial
+  gallery; the artifacts are four tiles with the thing itself in each;
+  everything else is an icon grid of eight labels; pricing, FAQ and one
+  closing line. The long-form argument lives on `/why`, where it belongs.
+  The sample screen's introduction, deliverables note, deep-tools cards,
+  research cards and closing CTA each lost their paragraph; the marquee
+  left it; the page now reads 4,557px and 1,029 words at desktop width,
+  and the screen itself is most of that. Both pages were screenshotted at
+  1440 and 390 before the commit. live-verify now gates on the hero headline and the build-sha
+  stamp, not on copy that a redesign is meant to change, and the page lint
+  read the new homepage clean before it shipped.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

@@ -41,13 +41,12 @@ export function MarketsGallery() {
 
   return (
     <section className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-      <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-        The {MARKET_COUNT} covered markets, from above
+      <p className="text-xs font-medium uppercase tracking-wider text-muted">Coverage</p>
+      <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+        The {MARKET_COUNT} covered markets, from above.
       </h2>
-      <p className="mt-2 max-w-2xl text-muted">
-        Every screen is anchored to a real place. These are the business
-        districts behind the benchmarks — actual aerial photography, not
-        illustrations.
+      <p className="mt-2 max-w-2xl text-sm text-muted">
+        Real aerials of the districts behind the benchmarks — tap one for its brief.
       </p>
 
       <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">

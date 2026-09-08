@@ -111,6 +111,17 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
 
 ## Conventions
 
+- **The public pages say it in pictures.** The operator's rule (2026-09-08):
+  "words that can be a picture should always be a picture." The homepage is
+  one idea per section — an eyebrow, a headline of a few words, and the
+  thing itself (the sample deal card, the six-icon stage rail, the verdict
+  tabs, the live stress bench, the aerial gallery, the artifact tiles, an
+  icon grid). No paragraph runs past a line there or on `/demo`; the
+  long-form argument belongs on `/why`. Before adding a section to `/`,
+  measure it (`scratchpad`'s shoot script pattern: full-page height, word
+  count, pictures, headings) and ask what picture replaces the words.
+  live-verify gates on the hero headline and the build-sha stamp only, so a
+  redesign never has to preserve copy to stay green.
 - Anything that touches a secret (Anthropic key, Supabase service-role key) is server-only.
 - Claude PDF facts to design around: the 1M-context models (Opus 4.8, Sonnet 4.6)
   read PDFs up to ~600 pages / 32MB in one request; enable Citations for

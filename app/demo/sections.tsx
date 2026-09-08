@@ -114,20 +114,16 @@ export function DemoSections({ data }: { data: DemoData }) {
         {tab === "buybox" && data.buyBox && (
           <div className="flex flex-col gap-3">
             <BuyBoxPanel data={data.buyBox} />
-            <p className="text-xs leading-relaxed text-muted">
-              Judged against a hypothetical mandate (multifamily, ≥5.75%
-              going-in, ≥13% IRR, ≥5% cash-on-cash). Signed in, this panel
-              scores every deal against <em>your</em> buy box.
+            <p className="text-xs text-muted">
+              A sample mandate (multifamily · ≥5.75% going-in · ≥13% IRR · ≥5% cash-on-cash). Signed in, it&apos;s yours.
             </p>
           </div>
         )}
         {tab === "sensitivity" && data.playground && (
           <div className="flex flex-col gap-3">
             <SensitivityPlayground data={data.playground} />
-            <p className="text-xs leading-relaxed text-muted">
-              Live — type a price (or a going-in cap) and drag the sliders.
-              Returns, the mandate fit, and the max bid recompute in your
-              browser from the same engine that builds the Excel model.
+            <p className="text-xs text-muted">
+              Live: type a price or drag a slider — returns, fit and max bid recompute in your browser.
             </p>
           </div>
         )}
