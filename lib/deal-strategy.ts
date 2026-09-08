@@ -85,9 +85,17 @@ const RX = {
   development:
     /\b(ground[- ]?up|development (site|opportunity|parcel)|to[- ]be[- ]built|proposed (development|project|building|tower)|shovel[- ]ready|fully entitled|entitled (site|land)|land (sale|site)|construction loan)\b/i,
   leaseUp: /\b(lease[- ]?up|spec (building|suite|space)|shell (space|condition)|vacant (building|asset|space)|100% vacant)\b/i,
+  // "renovation", "renovate", "renovating" describe a plan; "renovated"
+  // describes what was done — a newly renovated building is stabilized.
   valueAdd:
-    /\b(value[- ]?add|renovat(ion|ed|e|ing)|reposition(ing|ed)?|upgrade program|interior upgrades|unit upgrades|heavy lift|rehab(ilitation)?|capital program)\b/i,
+    /\b(value[- ]?add|renovat(ion|e|ing)|reposition(ing|ed)?|upgrade program|interior upgrades|unit upgrades|heavy lift|rehab(ilitation)?|capital program)\b/i,
 };
+
+// Identity rows — "Year built / renovated", "Renovation year", "Vintage" —
+// describe the building's history, not a plan; they never count as evidence
+// of one.
+const IDENTITY_ROW =
+  /year (built|renovated|completed|constructed|of construction)|(built|renovated|completed|constructed) (in|year|date)|renovation (year|date)|vintage/i;
 
 function haystack(
   extraction: ExtractionResult | null,
@@ -98,7 +106,10 @@ function haystack(
     bits.push(extraction.dealName ?? "");
     bits.push(extraction.buyerNotes ?? "");
     bits.push(extraction.strategy?.summary ?? "");
-    for (const m of extraction.metrics) bits.push(m.label, m.value);
+    for (const m of extraction.metrics) {
+      if (IDENTITY_ROW.test(m.label)) continue;
+      bits.push(m.label, m.value);
+    }
   }
   if (signal) bits.push(signal.take ?? "", signal.dealName ?? "");
   return bits.join(" \n ");

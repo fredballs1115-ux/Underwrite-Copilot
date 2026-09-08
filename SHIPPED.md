@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Thirty-six PRs, #176–#211, each
+estimate, and that's what it should flag." Forty PRs, #176–#215, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -316,6 +316,16 @@ confirmed equal to the main tip after each batch.
   asset with no capital plan they equal the price rows. The workbook test
   evaluates both in HyperFormula ($600/SF on the conversion; price plus
   capital plan over 250 units on the stabilized fixture).
+- **#216 A building's history is not a plan.** The strategy inference — the
+  fallback for a deal screened before the extraction stated its kind —
+  matched the bare word "renovated", so a stabilized OM's "Year built /
+  renovated" row or a "newly renovated" note read as value-add, which strips
+  the going-in cap on the compare table, analytics, the export and the
+  buy-box check. The pattern now takes "renovation", "renovate" and
+  "renovating" (a plan) and not "renovated" (what was done), and identity
+  rows (year built / renovated, renovation year, vintage) never count as
+  evidence. A stated strategy still wins. `CLAUDE.md` gains a "Where things
+  live" line for the strategy modules; four new inference tests.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
