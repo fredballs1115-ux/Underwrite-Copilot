@@ -3,18 +3,18 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#246 merged to main (live build
-sha `72c0c12`, #246, confirmed equal to the main tip by live-verify at 15:59
-UTC with its `DEPLOY: LIVE` line — every one of the seventy-one is live, the
+**Last updated 2026-09-08**, after PRs #176–#247 merged to main (live build
+sha `a0b7072`, #247, confirmed equal to the main tip by live-verify at 16:18
+UTC with its `DEPLOY: LIVE` line — every one of the seventy-two is live, the
 homepage serves at 196 KB where it served at 488 KB, and the public-page
-lint #231 added reads all twelve public pages clean on every run; #247
+lint #231 added reads all twelve public pages clean on every run; #248
 follows and awaits the same proof).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Seventy-two PRs (#176–#247) landed across one review session and the
+Seventy-three PRs (#176–#248) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -356,6 +356,11 @@ deploy (live-verify shows the sha).
   is a card with its Low / Base / High strip and base-position bar (the
   table scrolled sideways on a phone), the comp and market reads fold to a
   sentence, and a key term's label wraps instead of trailing off.
+- **The shared screen opens on the building from above** (#248): the USGS
+  aerial at the top of the read-only page, served by a route scoped to the
+  same share token — a revoked or expired link gets a bare 404 for the
+  picture before any source is asked; one resolver (`lib/share-resolve.ts`)
+  behind the page and the route, eight tests on a fake admin client.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -587,12 +592,14 @@ overhead shot. Without it nothing breaks or looks broken.
    look identical from the outside (deals just keep showing aerials), so
    check this rather than guessing.
 
-Not yet covered by imagery, in rough value order:
+Not yet covered by imagery, in rough value order (the shared screen got its
+aerial in #248, through a route scoped to the share token):
 
-1. **The shared report** (`/share/[token]`) — needs a token-scoped aerial
-   route, since `/api/deals/[id]/aerial` requires a signed-in session.
-2. **The exported PDF memo** — same static URL would work, same auth problem.
-3. **Submarket pages** — a map of the submarket with its pipeline properties
+1. **The exported PDF memo** — the memo renders server-side, so the USGS
+   frame can be fetched at render time and embedded (no URL, no auth
+   problem); the memo's tests read its text, so the frame needs its own
+   assertion.
+2. **Submarket pages** — a map of the submarket with its pipeline properties
    plotted; needs submarket geocoding, which does not exist yet.
 
 ## Claude's moves (next session)
@@ -624,14 +631,12 @@ Not yet covered by imagery, in rough value order:
    times with a roll-up and per-asset contribution to blended IRR; mostly a
    loop around existing code plus a CSV importer. Named as the next build in
    the LPC plan.
-8. **The shared screen shows the building from above.** `/share/[token]` is
-   the one surface still without imagery (#247 gave it its fixture render
-   and its pictures; the aerial is what is left): the deal page's aerial
-   route needs a signed-in session. A token-scoped route
-   (`/api/share/[token]/aerial`) that runs the same expiry, revocation and
-   sender-access checks as the page, then proxies the deal's aerial, would
-   put the building at the top of the screen a lender opens — the imagery
-   notes above list it first.
+8. **The IC memo opens on the building from above.** The memo renders
+   server-side (`lib/memo/`), so the deal's USGS frame can be fetched at
+   render time and embedded on the cover — no URL for a reader to be denied,
+   no key. The renderer's tests read the PDF back as text, so the frame
+   needs its own assertion (an image object on page one), and a deal with no
+   address or a frame nothing produces must leave the cover as it is today.
 
 ---
 
