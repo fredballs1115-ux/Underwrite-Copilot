@@ -13,7 +13,14 @@
  * to the OM. Gross rent is grossed up from that NOI at an assumed expense ratio
  * and vacancy — the split is a labelled assumption, the NOI is real.
  */
-import { buildingSfRow, findMetric, parseMoney, parsePct, parseSf } from "@/lib/criteria";
+import {
+  buildingSfRow,
+  findMetric,
+  occupancyPctFromMetrics,
+  parseMoney,
+  parsePct,
+  parseSf,
+} from "@/lib/criteria";
 import {
   IMPLIED_CAP_CEILING,
   budgetFromText,
@@ -291,8 +298,11 @@ export function deriveUnderwriteInputs(
   const operatingExpenses = egr - noi; // = expenseRatio × EGR
 
   // ── Occupancy (display) ──────────────────────────────────────────────────
-  const occMetric = findMetric(metrics, /occupancy|occupied|leased/i, /economic|physical vacancy/i);
-  const occPct = occMetric ? parsePct(occMetric.value) : null;
+  // Today's occupancy through the shared reader: the cell the workbook
+  // labels "In-Place Occupancy" never carries a stabilized or pro forma
+  // figure, and an OM that states only the finished project's occupancy
+  // states none.
+  const occPct = occupancyPctFromMetrics(metrics);
 
   const inputs: UnderwriteInputs = {
     purchasePrice: price,

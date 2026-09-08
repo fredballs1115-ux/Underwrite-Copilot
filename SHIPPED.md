@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Forty-six PRs, #176–#221, each
+estimate, and that's what it should flag." Forty-seven PRs, #176–#222, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -436,6 +436,24 @@ confirmed equal to the main tip after each batch.
   unit, component ("Retail SF", "Total SF (office)"), partial ("Vacant SF",
   "Leased SF") and phase rows never pass. Fifty-odd label and value cases
   in the buy-box and market-memory tests.
+- **#222 The occupancy the model calls "in place" is today's.** The Excel
+  model's Deal Summary tab labels a cell "In-Place Occupancy" and filled it
+  with the first row whose label said occupancy, occupied or leased — so an
+  OM that put "Stabilized occupancy: 95%" above "Current occupancy: 42%"
+  wrote the sponsor's projection into the cell labelled in place, and one
+  that stated only the stabilized figure wrote that. The retrade diff's
+  Occupancy row read the same way. One reader now, beside the size and
+  price readers in `lib/criteria`: an explicitly in-place row (current,
+  physical, actual, as-of, T-12, existing) wins, else a plain occupancy
+  row with no forward word; a stabilized, pro forma, projected, target,
+  year-N, at-completion, pre-leased, break-even, market or average row
+  never qualifies, so an OM that states only the finished project's
+  occupancy states none and the cell reads "n/a". Tests on the reader,
+  the Excel inputs and the retrade row. And the going-in cap on the deal
+  page's summary bar, the pipeline card and the sample screen now comes
+  from the shared `findGoingInCap` too — the sample's own reader had no
+  stabilized / pro forma exclude, and the other two carried near-copies of
+  the buy box's.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

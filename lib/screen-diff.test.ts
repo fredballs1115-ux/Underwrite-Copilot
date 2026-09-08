@@ -150,3 +150,23 @@ describe("computeScreenDiff — the asking price tracker reads the ask", () => {
     expect(row.direction).toBe("better");
   });
 });
+
+describe("computeScreenDiff — the Occupancy row is today's occupancy", () => {
+  it("a stabilized occupancy never pairs as the Occupancy row", () => {
+    expect(
+      computeScreenDiff(
+        prior([m("Stabilized occupancy", "95%")]),
+        { metrics: [m("Stabilized occupancy", "96%")] },
+        null,
+      ),
+    ).toBeNull();
+    const d = computeScreenDiff(
+      prior([m("Stabilized occupancy", "95%"), m("Current occupancy", "42%")]),
+      { metrics: [m("Stabilized occupancy", "95%"), m("Current occupancy", "45%")] },
+      null,
+    )!;
+    expect(d.rows.map((r) => r.label)).toEqual(["Occupancy"]);
+    expect(d.rows[0].delta).toBe("+3.00pt");
+    expect(d.rows[0].direction).toBe("better");
+  });
+});

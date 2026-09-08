@@ -8,7 +8,7 @@ import { parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { WhatsNewCard } from "./whats-new";
 import { Pipeline, type DealCard } from "./pipeline";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
+import { evaluateBuyBox, findGoingInCap, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
 import { findPriceMetric, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { scoreMandateFit } from "@/lib/mandate";
 import { metroForAddress } from "@/lib/market-match";
@@ -43,19 +43,15 @@ function pickSlots(extraction: ExtractionResult, signal: FirstSignal | null): {
   yoc: string | null;
 } {
   const metrics = extraction.metrics;
-  const find = (inc: RegExp, exc?: RegExp) =>
-    metrics.find((m) => inc.test(m.label) && !(exc && exc.test(m.label)))
-      ?.value ?? null;
   // The same read the deal page makes — extraction plus the first signal —
   // so a deal never shows a price on one surface and none on the other.
   const strategy = inferStrategy(extraction, signal);
   const plan = planSummary(extraction, strategy);
   return {
-    // The going-in cap only — a stabilized / pro forma cap or a yield on
-    // cost describes a plan deal's finished project, not the price paid.
-    cap:
-      find(/going[- ]?in cap/i, /stabili[sz]|pro ?forma|forward|projected/i) ??
-      find(/\bcap rate\b/i, /exit|terminal|reversion|stabili[sz]|pro ?forma|forward|projected|yield/i),
+    // The going-in cap only — the shared reader, so a stabilized / pro forma
+    // cap or a yield on cost (a plan deal's finished project) never fills
+    // the slot, and the card agrees with the deal page and the buy box.
+    cap: findGoingInCap(metrics)?.value ?? null,
     // The shared price reader; on a development with no asking price the
     // land or site cost is what is being bought.
     price: findPriceMetric(metrics, strategy.kind)?.value ?? null,

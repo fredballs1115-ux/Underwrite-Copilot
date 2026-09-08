@@ -6,14 +6,13 @@ import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { FREE_DEALS, DEEP_TOOLS } from "@/lib/marketing-constants";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
-import { buildingSfRow, evaluateBuyBox, parsePct } from "@/lib/criteria";
+import { buildingSfRow, evaluateBuyBox, findGoingInCap, parsePct } from "@/lib/criteria";
 import { leverageRead } from "@/lib/leverage";
 import { seedBenchmarks } from "@/lib/research-data";
 import { sectorLeaderboard } from "@/lib/sector-leaderboard";
 import { sampleLegal } from "@/lib/sample-legal";
 import { scoreMandateFit } from "@/lib/mandate";
 import { findPriceMetric, inferStrategy, unitCountRow } from "@/lib/deal-strategy";
-import type { ExtractedMetric } from "@/lib/anthropic/types";
 import { DemoSections, type DemoData } from "./sections";
 import { ModelSlideshow } from "./model-slideshow";
 import { BrokerQuestions } from "./broker-questions";
@@ -44,19 +43,6 @@ export const metadata: Metadata = {
     images: ["/opengraph-image"],
   },
 };
-
-// Same slot-picking the deal page's summary bar uses — the demo should read
-// exactly like the product.
-function findValue(
-  metrics: ExtractedMetric[],
-  include: RegExp,
-  exclude?: RegExp,
-): string | null {
-  return (
-    metrics.find((m) => include.test(m.label) && !(exclude && exclude.test(m.label)))
-      ?.value ?? null
-  );
-}
 
 /** The deal page's Regulation & benchmarks panel for the sample deal —
  *  derived by lib/sample-legal through the real rules engine. Full-width
@@ -225,9 +211,8 @@ export default function DemoPage() {
         ? `${unitValue.trim()} units`
         : unitValue
       : null);
-  const cap =
-    findValue(metrics, /going[- ]?in cap/i) ??
-    findValue(metrics, /\bcap rate\b/i, /exit|terminal|reversion/i);
+  // The shared going-in cap reader, as the deal page and the buy box use it.
+  const cap = findGoingInCap(metrics)?.value ?? null;
 
   // Leverage check on the SAMPLE — the same lib/leverage code path every
   // real deal page runs, against the same sourced PMMS snapshot, so the

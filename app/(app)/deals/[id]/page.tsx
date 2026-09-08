@@ -11,7 +11,7 @@ import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import { SiteFlagsCard } from "./site-flags-card";
 import { PublicRecordCard } from "./public-record-card";
-import { buildingSfRow, parseMoney } from "@/lib/criteria";
+import { buildingSfRow, findGoingInCap, parseMoney } from "@/lib/criteria";
 import { after } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { signedSupplementUrl } from "@/lib/storage";
@@ -545,14 +545,9 @@ export default async function DealPage({
     Number.isFinite(signalCapPct) &&
     signalCapPct > 0.5 &&
     signalCapPct <= IMPLIED_CAP_CEILING * 100;
-  const summaryCap =
-    findValue(metrics, /going[- ]?in cap/i, /stabili[sz]|pro ?forma|forward|projected/i) ??
-    findValue(
-      metrics,
-      /\bcap rate\b/i,
-      /exit|terminal|reversion|stabili[sz]|pro ?forma|forward|projected|yield/i,
-    ) ??
-    (signalCapPlausible ? signalCap : null);
+  // The shared going-in cap reader — the same call the buy box, the mandate
+  // and the memories make.
+  const summaryCap = findGoingInCap(metrics)?.value ?? (signalCapPlausible ? signalCap : null);
   // Year built feeds the rules engine's age-based coverage tests (NYC
   // pre-1974, JC pre-1987, LA pre-1979, MoCo's rolling-age exemption). The
   // plausibility window guards against a mis-matched metric value.
