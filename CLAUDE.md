@@ -40,7 +40,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   and the demo report: `lib/sample-derive.ts` (actuals included — never call
   `deriveUnderwriteInputs` on the sample directly).
 - Render smoke tests: `lib/deal-view.render.test.ts` and
-  `lib/views.render.test.ts` render the signed-in views on fixtures and lint
+  `lib/views.render.test.ts` render the signed-in views on fixtures — and the
+  shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`
+  is only the loader, so keep the markup in the view) — and lint
   the visible text with `lib/render-lint.ts` (a digit glued to a word, a word
   doubled; `a11yIssues`: an image with no alt, a nameless button or link, an
   unlabelled control, a duplicate id). With `VIEW_SHOTS_DIR` set they also

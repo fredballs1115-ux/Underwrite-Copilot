@@ -579,3 +579,122 @@ describe("DualAxisTrend — a submarket's vacancy bars and rent line render", ()
     expect(empty).toContain("No periods loaded yet.");
   });
 });
+
+// ── The shared screen (the one signed-out surface) ─────────────────────────
+import { Expired, ShareView } from "@/app/share/[token]/share-view";
+import type { ExtractionResult, VerdictResult } from "@/lib/anthropic/types";
+
+describe("ShareView — the read-only screen a partner or lender opens", () => {
+  it("renders the sample deal: the verdict mark, the flip dots, every range, the killers, key terms and the folded reads", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ShareView, {
+        dealName: SAMPLE_DEAL.name,
+        assetClass: SAMPLE_DEAL.asset_class,
+        expiresAt: "2026-09-30T12:00:00Z",
+        verdictStale: false,
+        extraction: SAMPLE_DEAL.extraction,
+        comps: SAMPLE_DEAL.comps,
+        market: SAMPLE_DEAL.market,
+        verdict: SAMPLE_DEAL.verdict,
+      }),
+    );
+    expect(html.length).toBeGreaterThan(5_000);
+    dumpView("share", html);
+    expect(a11yIssues(html), "a11y share").toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toContain(SAMPLE_DEAL.name);
+    expect(text).toContain("expires Sep 30");
+    expect(text).toContain("Caution");
+    // The call across the range, as three dots — No-go / Caution / Go.
+    expect(text).toMatch(/Conservative\s*No-go/);
+    expect(text).toMatch(/Sponsor\s*Go/);
+    for (const r of SAMPLE_DEAL.verdict.screen?.ranges ?? []) expect(text, r.label).toContain(r.label);
+    // Each range carries the deal page's positional read of where the base
+    // sits; the vacancy base at 9.0% between 6.0% and 9.5% hugs the high end.
+    expect(html).toContain('aria-label="Base sits near the optimistic end of the range"');
+    expect(html).toContain('aria-label="Where the base sits inside the range"');
+    expect(text).toContain("Basis");
+    expect(text).toContain("Breaks if:");
+    expect(text).toContain("Key terms");
+    expect(text).toContain("pro forma");
+    // The comp and market reads: first sentence in the open, the rest folded
+    // but still on the page.
+    expect(html).toContain("<details");
+    expect(text).toContain("sell-side selections usually do.");
+    expect(text).toContain("the basis looks 8–12% rich.");
+    // Nothing editable, nothing of the buyer's.
+    expect(text).not.toMatch(/Buy box|Notes|Documents/);
+    expect(html).not.toMatch(/<(button|input|textarea|select)\b/);
+  });
+
+  it("renders a conversion with the plan block and a stale verdict, and the expired state", () => {
+    const conversion: ExtractionResult = {
+      dealName: "1200 K Street — Office-to-Residential Conversion",
+      assetClass: "multifamily",
+      market: "Washington, DC",
+      address: "1200 K St NW, Washington, DC",
+      strategy: {
+        kind: "conversion",
+        summary: "Convert a vacant 300,000 SF office building into 320 apartments.",
+        capitalBudget: "$160M hard and soft costs",
+        timeline: "24 months of construction, 12 months of lease-up",
+      },
+      metrics: [
+        { label: "Purchase price", value: "$20,000,000", flagged: false, page: "p. 3" },
+        { label: "NOI (stabilized, pro forma)", value: "$21,000,000", flagged: true, page: "p. 12" },
+        { label: "Total project cost", value: "$180,000,000", flagged: false, page: "p. 14" },
+      ],
+    };
+    const verdict: VerdictResult = {
+      verdict: "pass",
+      reason: "The plan holds a 567 bps spread over the exit cap in the worst corner of the grid.",
+      topRisks: ["Entitlements are not yet in hand."],
+      nextSteps: [],
+      screen: {
+        ranges: [
+          { label: "Total cost", low: "$170M", base: "$180M", high: "$200M", source: "OM budget (p. 14)", basis: "High adds a 10% contingency.", confidence: "low" },
+        ],
+        dealKillers: [{ lever: "exit", read: "Stabilized value at a 6% cap.", risk: "" }],
+        sensitivity: [],
+      },
+    };
+    const html = renderToStaticMarkup(
+      React.createElement(ShareView, {
+        dealName: conversion.dealName ?? "",
+        assetClass: "multifamily",
+        expiresAt: "2026-10-05T12:00:00Z",
+        verdictStale: true,
+        extraction: conversion,
+        comps: null,
+        market: null,
+        verdict,
+      }),
+    );
+    dumpView("share-conversion", html);
+    expect(a11yIssues(html), "a11y share-conversion").toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toMatch(/\bGo\b/);
+    expect(text).toContain("From the previous completed screen");
+    // The plan first: the conversion's finished-project figures and its yield
+    // on cost, so the $21M NOI beside a $20M price reads as the plan.
+    expect(text).toContain("The plan");
+    expect(text).toContain("Conversion");
+    expect(text).toContain("$21.0M");
+    expect(text).toContain("11.7%");
+    expect(text).toContain("A conversion deal has no going-in cap");
+    expect(text).toContain("verify vs. source");
+    expect(text).toContain("Exit");
+    expect(text).not.toContain("Breaks if:");
+    expect(text).not.toContain("Comp read");
+
+    const expired = renderToStaticMarkup(
+      React.createElement(Expired, { reason: "The sender revoked this link." }),
+    );
+    expect(a11yIssues(expired), "a11y share-expired").toEqual([]);
+    const gone = visibleText(expired);
+    expect(gone).toContain("This link isn’t available");
+    expect(gone).toContain("The sender revoked this link.");
+  });
+});

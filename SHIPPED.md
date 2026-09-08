@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Seventy-one PRs, #176–#246, each
+estimate, and that's what it should flag." Seventy-two PRs, #176–#247, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -964,6 +964,24 @@ confirmed equal to the main tip after each batch.
   whose aerial answered 404 would have painted the browser's broken-image
   glyph over the market's name; the image now removes itself (`AerialImg`,
   the rule `DealThumb` already applied) and the label carries on.
+- **#247 The shared screen is rendered on fixtures, and says it in pictures.**
+  The read-only page a partner or lender opens (`/share/[token]`) read the
+  database inline, so it was the one signed-out surface the render tests and
+  the phone walk could not reach. It is a loader and a pure view now
+  (`share-view.tsx`); the view renders on the sample deal, on a conversion
+  with a stale verdict, and in its expired state in
+  `lib/views.render.test.ts` — accessibility, glued words and content
+  asserted, the fixtures screenshotted at 1440 and 390. What the walk
+  changed: the verdict wears the deal page's mark (the disc and the word in
+  the call's colour); the conservative / base / sponsor calls are three dots
+  beneath it; each range is the deal page's card — the Low / Base / High
+  strip and the bar showing where the base sits — instead of a table that
+  scrolled sideways on a phone and left a lender with the Low column; the
+  three deal-killers carry their lever's numbered badge; the comp and market
+  reads fold to their first sentence with the rest one tap away; a key
+  term's label wraps instead of trailing off as "PRO FORMA …", and its value
+  no longer runs into the next column on a phone. The source test that
+  guarded the page's key-term ordering and basis badges now reads the view.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
