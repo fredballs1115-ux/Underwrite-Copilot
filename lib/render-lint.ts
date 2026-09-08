@@ -37,7 +37,12 @@ const UNIT_SUFFIX =
  *  in product copy and are flagged so a human decides. */
 export function gluedWords(text: string): string[] {
   const out = new Set<string>();
-  for (const m of text.matchAll(/\b(\d+)([a-z]{3,})\b/g)) if (!UNIT_SUFFIX.test(m[2])) out.add(m[0]);
+  for (const m of text.matchAll(/\b(\d+)([a-z]{3,})\b/g)) {
+    // A git sha ("543ebdb" in the build stamp) is digits and letters by
+    // nature, not a glued word: live-verify once failed on its own stamp.
+    if (UNIT_SUFFIX.test(m[2]) || /^[0-9a-f]{7,40}$/.test(m[0])) continue;
+    out.add(m[0]);
+  }
   for (const m of text.matchAll(/\b([a-z]{3,})\1\b/g)) out.add(m[0]);
   // "From verdict to to-do list" is fine: the doubled word must not be the
   // start of a hyphenated one.
