@@ -14,6 +14,7 @@ import { SourceChip } from "./source-chip";
 import { CompsMap, type MapComp } from "./comps-map";
 import { geocodeCandidates } from "@/lib/geo";
 import { safeHttpUrl } from "@/lib/safe-url";
+import { basisScale, fmtBasis, type SubjectBasis } from "@/lib/comp-detail";
 import type { DealFact } from "@/lib/facts";
 import { FileDrop } from "../../file-drop";
 import { FileField } from "../../file-field";
@@ -825,6 +826,7 @@ export function BrokerComps({
   isPro,
   publicDemo = false,
   mapContext = null,
+  subject = null,
 }: {
   result: BrokerCompsResult;
   dealId: string;
@@ -835,6 +837,9 @@ export function BrokerComps({
   publicDemo?: boolean;
   /** subject location for the comps map (Feature 4); null hides the map */
   mapContext?: { subjectLabel: string; market: string; omUrl: string | null } | null;
+  /** the subject's own basis (lib/comp-detail's subjectBasis), the tick the
+   *  sale comps' bars are drawn against; null draws the bars with no tick */
+  subject?: SubjectBasis | null;
 }) {
   // Guarded once here: a legacy row with a null list must not take the
   // whole tab down (the schema forces arrays on every write the app makes).
@@ -918,7 +923,7 @@ export function BrokerComps({
         </div>
       )}
       {saleComps.length > 0 && (
-        <CompTable title="Sale comps" comps={saleComps} />
+        <CompTable title="Sale comps" comps={saleComps} subject={subject ?? null} />
       )}
       {leaseComps.length > 0 && (
         <CompTable title="Lease comps" comps={leaseComps} />
@@ -1064,7 +1069,17 @@ function PublicWebComps({
   );
 }
 
-function CompTable({ title, comps }: { title: string; comps: BrokerComp[] }) {
+function CompTable({
+  title,
+  comps,
+  subject,
+}: {
+  title: string;
+  comps: BrokerComp[];
+  /** sale comps carry the subject (null when it has no basis) and draw their
+   *  stated basis as a bar against it; lease comps pass nothing and draw none */
+  subject?: SubjectBasis | null;
+}) {
   const INITIAL = 4;
   const [open, setOpen] = useState(false);
   // Risk first — a stretched comp must never hide behind "Show all".
@@ -1073,6 +1088,10 @@ function CompTable({ title, comps }: { title: string; comps: BrokerComp[] }) {
       (COMP_RATING[a.support]?.rank ?? 1) - (COMP_RATING[b.support]?.rank ?? 1),
   );
   const shown = open ? ordered : ordered.slice(0, INITIAL);
+  // Every comp's stated basis on one track, the subject's as a tick — read
+  // once from the detail lines (lib/comp-detail), never inferred. Indexed
+  // against `ordered`, of which `shown` is a prefix.
+  const scale = subject === undefined ? null : basisScale(ordered, subject);
   const counts = { stretched: 0, favorable: 0, supports: 0 };
   for (const c of comps) counts[c.support] = (counts[c.support] ?? 0) + 1;
   return (
@@ -1125,6 +1144,36 @@ function CompTable({ title, comps }: { title: string; comps: BrokerComp[] }) {
                   </td>
                   <td className="min-w-[9rem] max-w-[16rem] break-words px-4 py-3 font-mono text-xs leading-relaxed tabular-nums text-muted">
                     {c.detail}
+                    {scale && scale.shares[i] != null && (
+                      <span
+                        data-comp-bar
+                        className="relative mt-1.5 block h-1 w-24 rounded-full bg-faint"
+                        title={
+                          scale.subjectValue != null
+                            ? `Basis ${fmtBasis(scale.shares[i]! * scale.max, scale.unit)}; the tick is the subject at ${fmtBasis(scale.subjectValue, scale.unit)}`
+                            : `Basis ${fmtBasis(scale.shares[i]! * scale.max, scale.unit)}, scaled to the widest in the set`
+                        }
+                      >
+                        <span
+                          aria-hidden
+                          className="absolute inset-y-0 left-0 rounded-full bg-brand/40"
+                          style={{ width: `${Math.round(scale.shares[i]! * 100)}%` }}
+                        />
+                        {scale.subjectShare != null && (
+                          <span
+                            aria-hidden
+                            data-comp-subject
+                            className="absolute -inset-y-0.5 w-0.5 rounded-full bg-ink"
+                            style={{ left: `calc(${Math.round(scale.subjectShare * 100)}% - 1px)` }}
+                          />
+                        )}
+                        <span className="sr-only">
+                          {scale.subjectValue != null
+                            ? `${fmtBasis(scale.shares[i]! * scale.max, scale.unit)} against the subject's ${fmtBasis(scale.subjectValue, scale.unit)}`
+                            : fmtBasis(scale.shares[i]! * scale.max, scale.unit)}
+                        </span>
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <span
@@ -1139,6 +1188,14 @@ function CompTable({ title, comps }: { title: string; comps: BrokerComp[] }) {
           </tbody>
         </table>
       </div>
+      {scale && (
+        // The legend for the bars: one line, so the tick needs no guessing.
+        <p className="mt-1.5 text-[11px] text-muted">
+          {scale.subjectValue != null
+            ? `Bars: each comp's basis per ${scale.unit === "unit" ? "unit" : "SF"}; the tick is the subject at ${fmtBasis(scale.subjectValue, scale.unit)}.`
+            : `Bars: each comp's basis per ${scale.unit === "unit" ? "unit" : "SF"}, scaled to the widest in the set.`}
+        </p>
+      )}
       {comps.length > INITIAL && (
         <button
           type="button"
