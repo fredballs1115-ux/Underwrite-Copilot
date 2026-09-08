@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Fifty-three PRs, #176–#228, each
+estimate, and that's what it should flag." Fifty-four PRs, #176–#229, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -616,6 +616,28 @@ confirmed equal to the main tip after each batch.
   `lib/deal-view.render.test.ts` renders every section of the deal page on
   the sample deal and reads the text for a digit run into a word, a word
   doubled, or "the the".
+- **#229 The signed-in screens, rendered on fixtures and walked at phone
+  width.** `lib/views.render.test.ts` renders the pipeline (ten cards in
+  every state — plan deals, a development priced at its land, an office
+  deal, a screening job, a failed one, a dead one, a teammate's, plus the
+  empty and at-limit states), the model tab, the compare table, the
+  assumption bridge, the BOV reconciler, the rent-roll dashboard on the
+  fixture roll, the analytics charts and the submarket trend chart, and
+  reads each for glued or doubled words (`lib/render-lint.ts` holds the
+  shared lint). With `VIEW_SHOTS_DIR` set, every render is also written as
+  a full document inside the app shell's own column with the built
+  stylesheet linked, so headless Chromium can open it at 390px — the
+  visual half, run by hand, of pages a crawl of the live site never
+  reaches. That walk found four things: the pipeline's header ran 30px
+  past a phone's viewport at the deal limit ("Compare" + "Upgrade for
+  more" beside the title — it wraps now); a phone showed each deal's
+  market and hid its price, cap and fit behind one truncated line (two
+  lines now: where it is, then what it costs and how it fits); the
+  assumption bridge's before / after columns printed the raw model inputs
+  ("13700000", "0.08") instead of "$13.7M" and "8.00%"; and the
+  reconciler's copied gap sentence read "51% year-1 noi" (acronyms keep
+  their case). The compare table's "best" badge gets a space so "2.10x
+  best" is two words when read aloud or copied.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
