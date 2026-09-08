@@ -488,12 +488,8 @@ export function CompsMap({
       </div>
 
       <p className="mt-2 text-[11px] leading-relaxed text-muted">
-        Broker comps are read out of the OM; public-web comps come from publicly
-        reported sales as cited by their sources. Pins are geocoded from
-        addresses when one is stated, else the comp&apos;s name — locations are
-        approximate, and a comp that can&apos;t be placed confidently is listed
-        without a pin, never guessed. Accuracy depends on public reporting and
-        may lag the current market.
+        Pins are approximate, geocoded from stated addresses; a comp that
+        can&apos;t be placed is listed without a pin.
       </p>
     </div>
   );

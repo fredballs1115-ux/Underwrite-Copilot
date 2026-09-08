@@ -178,7 +178,9 @@ describe("ModelView — the sample model renders every panel", () => {
     const text = visibleText(html);
     expect(gluedWords(text)).toEqual([]);
     expect(text).toMatch(/IRR/);
-    expect(text).toMatch(/Cash flow|Cash Flow/);
+    // The cash-flow panel itself (it used to be matched by accident through
+    // a "Cash Flow tab" phrase in the inputs list, which is a tooltip now).
+    expect(text).toMatch(/Operating cash flow/);
   });
 
   it("renders the no-model state without a runtime error", () => {

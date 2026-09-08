@@ -50,6 +50,16 @@ jobs:
           grep -o 'name="uc-build" content="[0-9a-f]*"' body.html | head -1 && echo "SELF-HEAL SENTINEL: armed (stale browser copies reload themselves)" || echo "SELF-HEAL SENTINEL: not yet deployed"
           live=$(grep -o 'commit/[0-9a-f]\{7\}' body.html | head -1 | cut -d/ -f2)
           echo "LIVE BUILD SHA: ${live:-not stamped yet} · this run's main tip: ${GITHUB_SHA:0:7}"
+          # The one comparison that matters, spelled out so nobody eyeballs two
+          # shas: a push-triggered run lands minutes before the deploy does
+          # (LAGGING is expected there); a dispatched run more than ~10 minutes
+          # after the merge still LAGGING means Render did not deploy main —
+          # check dashboard.render.com → underwrite-copilot-web → Events.
+          if [ "${live:-}" = "${GITHUB_SHA:0:7}" ]; then
+            echo "DEPLOY: LIVE — the live build is this run's main tip"
+          else
+            echo "DEPLOY: LAGGING — live build ${live:-none} is not main tip ${GITHUB_SHA:0:7} (expected right after a merge; after ~10 minutes it means Render did not deploy)"
+          fi
           echo "== FIRST 1200 CHARS OF BODY =="
           head -c 1200 body.html
       - name: Alternate-host check (diagnostic, non-gating)

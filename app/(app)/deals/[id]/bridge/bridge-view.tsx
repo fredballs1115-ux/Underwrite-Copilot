@@ -291,11 +291,11 @@ export function BridgeView({
 
       <p className="text-xs leading-relaxed text-muted">
         {bridge.method === "exact"
-          ? `Exact Shapley attribution over ${bridge.steps.length} changed assumption${
+          ? `Shapley attribution over ${bridge.steps.length} changed assumption${
               bridge.steps.length === 1 ? "" : "s"
-            } (${bridge.scenariosEvaluated} model runs). Contributions are order-independent and sum to the headline move.`
-          : `Sampled Shapley attribution — ${bridge.steps.length} assumptions changed, so contributions are averaged over 2,000 random orderings (${bridge.scenariosEvaluated} model runs). The ± figure is one standard error.`}{" "}
-        Unexplained residual {Math.abs(bridge.unexplainedBps).toFixed(2)} bps.
+            } (${bridge.scenariosEvaluated} model runs); contributions sum to the move.`
+          : `Sampled Shapley attribution over ${bridge.steps.length} changed assumptions, averaged across 2,000 orderings (${bridge.scenariosEvaluated} model runs); ± is one standard error.`}{" "}
+        Residual {Math.abs(bridge.unexplainedBps).toFixed(2)} bps.
         {bridge.flooredScenarios > 0
           ? ` ${bridge.flooredScenarios} intermediate scenario${
               bridge.flooredScenarios === 1 ? "" : "s"
