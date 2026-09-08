@@ -5,6 +5,7 @@ import { computeUnderwrite } from "./engine";
 import { defaultIncrements } from "./sensitivity";
 import type { DerivedModel, InputSource } from "./inputs";
 import { applyWorkbookBranding, type ExportBranding } from "@/lib/excel-branding";
+import { STRATEGY_LABEL, STRATEGY_READING, isPlanDeal } from "@/lib/deal-strategy";
 
 /**
  * The institutional acquisition-template workbook (Feature 1). Visible tabs:
@@ -157,7 +158,7 @@ export async function buildUnderwriteWorkbook(
   wsSens.properties.tabColor = { argb: "FFA05A1C" };
 
   buildCover(wsCover, model, branding);
-  buildAssumptions(wsAssum, inputs, model.sources);
+  buildAssumptions(wsAssum, inputs, model.sources, model.meta.strategy);
   const cf = buildCashFlow(wsCf, inputs, holdYears);
   buildDealSummary(wsSummary, model, cf, holdYears);
   buildMonthlyCashFlow(wsMonthly, cf, inputs, holdYears);
@@ -226,6 +227,22 @@ function buildCover(ws: ExcelJS.Worksheet, model: DerivedModel, branding?: Expor
   fact("Asset class", meta.assetClass);
   fact("Market", meta.market);
   fact("Address", meta.address);
+  // The deal's strategy decides what its figures mean. On a plan deal
+  // (value-add, conversion, development, lease-up) the cover says so, because
+  // the OM's stabilized NOI is the finished project's figure — never this
+  // model's year 1 — and a reader opening the file cold has to know that.
+  const dealKind = meta.strategy ?? "unknown";
+  if (dealKind !== "unknown") {
+    fact("Deal type", STRATEGY_LABEL[dealKind]);
+    const reading = ws.getCell(r, 3);
+    reading.value = isPlanDeal(dealKind)
+      ? `${STRATEGY_READING[dealKind]} This annual model books the capital budget in year 1 and anchors year-1 income on in-place or assumed figures — the Assumptions tab names each source.`
+      : STRATEGY_READING[dealKind];
+    reading.font = { name: ARIAL, size: 9, color: MUTED };
+    reading.alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r).height = isPlanDeal(dealKind) ? 54 : 28;
+    r++;
+  }
   r++;
 
   sectionHeader(ws, r, "Contents", 2, 3);
@@ -274,7 +291,12 @@ function buildCover(ws: ExcelJS.Worksheet, model: DerivedModel, branding?: Expor
 }
 
 // ── ASSUMPTIONS ───────────────────────────────────────────────────────────────
-function buildAssumptions(ws: ExcelJS.Worksheet, inp: UnderwriteInputs, sources: DerivedModel["sources"]) {
+function buildAssumptions(
+  ws: ExcelJS.Worksheet,
+  inp: UnderwriteInputs,
+  sources: DerivedModel["sources"],
+  strategy: DerivedModel["meta"]["strategy"],
+) {
   ws.getColumn(1).width = 36;
   ws.getColumn(2).width = 16;
   ws.getColumn(3).width = 64;
@@ -309,6 +331,20 @@ function buildAssumptions(ws: ExcelJS.Worksheet, inp: UnderwriteInputs, sources:
   const header = (t: string) => { sectionHeader(ws, r, t, 1, 3); r++; };
 
   header("Deal");
+  // What kind of deal this is, before any number: on a plan deal the OM's
+  // stabilized pro forma is the finished project's NOI and must not be read
+  // as the year-1 income the rows below anchor on.
+  const dealKind = strategy ?? "unknown";
+  if (dealKind !== "unknown") {
+    label(ws.getCell(r, 1), "Deal Type", { indent: 1 });
+    label(ws.getCell(r, 2), STRATEGY_LABEL[dealKind]);
+    const note = ws.getCell(r, 3);
+    note.value = isPlanDeal(dealKind)
+      ? `${STRATEGY_READING[dealKind]} Year-1 income below is in-place or assumed — never the OM's stabilized pro forma.`
+      : STRATEGY_READING[dealKind];
+    note.font = { name: ARIAL, size: 9, color: MUTED };
+    r++;
+  }
   input("Purchase Price", inp.purchasePrice, "PurchasePrice", FMT.usd, "purchasePrice", true);
   // Hold is STRUCTURAL: it sets the number of cash-flow years and the sale
   // year, which are baked at export. Not a flex input — editing it in the file
@@ -356,7 +392,7 @@ function buildAssumptions(ws: ExcelJS.Worksheet, inp: UnderwriteInputs, sources:
   header("Capital");
   input("Rentable SF", inp.rsf, "RSF", FMT.int, "rsf");
   input("Capital Reserves $/SF/yr", inp.reservesPsf, "ReservesPSF", FMT.psf, "reservesPsf");
-  input("Capital Improvements (yr 1)", inp.capitalImprovementsYr1, "CapImprovements", FMT.usd);
+  input("Capital Improvements (yr 1)", inp.capitalImprovementsYr1, "CapImprovements", FMT.usd, "capitalImprovementsYr1");
   input("Tenant Improvements $/SF", inp.tiPsf, "TIPSF", FMT.psf);
   input("Leasing Commission % of rent", inp.lcPct, "LCPct", FMT.pct1);
 
@@ -568,6 +604,17 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   label(ws.getCell(r, 4), "In-Place Occupancy");
   if (meta.occupancyPct != null) { ws.getCell(r, 5).value = meta.occupancyPct; styleLink(ws.getCell(r, 5), FMT.pct1); }
   else label(ws.getCell(r, 5), "n/a", { color: MUTED });
+  // Deal type, and on a plan deal the budget the returns have to pay for —
+  // a live link to the Assumptions cell, so flexing it flows through.
+  const dealKind = meta.strategy ?? "unknown";
+  if (dealKind !== "unknown") {
+    r++;
+    label(ws.getCell(r, 1), "Deal Type"); label(ws.getCell(r, 2), STRATEGY_LABEL[dealKind], { color: GREEN });
+    if (isPlanDeal(dealKind)) {
+      label(ws.getCell(r, 4), "Capital Budget (yr 1)");
+      ws.getCell(r, 5).value = { formula: "CapImprovements" } as ExcelJS.CellFormulaValue; styleLink(ws.getCell(r, 5), FMT.usd);
+    }
+  }
   r += 2;
 
   // ── SOURCES & USES ──

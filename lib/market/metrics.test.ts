@@ -390,6 +390,35 @@ describe("assumptionWarnings", () => {
     expect(w.message).toContain("5.50% exit cap");
   });
 
+  it("on a plan deal, says the deal itself delivers into the pipeline it is warned about", () => {
+    const heavy = submarketMetrics(
+      PERIODS.map((p) => ({ ...p, underConstructionSf: 4_000_000 })),
+      [],
+    );
+    const plan = assumptionWarnings(INPUTS, heavy, SUBMARKET, [], "conversion").find(
+      (x) => x.code === "supply_vs_exit_cap",
+    )!;
+    expect(plan.message).toContain("This conversion deal delivers into that same pipeline");
+    const shrinking = submarketMetrics(
+      PERIODS.map((p) => ({ ...p, netAbsorptionSf: -50_000 })),
+      [],
+    );
+    const dev = assumptionWarnings(INPUTS, shrinking, SUBMARKET, [], "development").find(
+      (x) => x.code === "supply_vs_exit_cap",
+    )!;
+    expect(dev.message).toContain("This development deal delivers into that same pipeline");
+    // An operating asset is a bystander to the pipeline — no such clause.
+    const stabilized = assumptionWarnings(INPUTS, heavy, SUBMARKET, [], "stabilized").find(
+      (x) => x.code === "supply_vs_exit_cap",
+    )!;
+    expect(stabilized.message).not.toContain("delivers into");
+    // The default (no strategy passed) reads exactly as before.
+    const legacy = assumptionWarnings(INPUTS, heavy, SUBMARKET).find(
+      (x) => x.code === "supply_vs_exit_cap",
+    )!;
+    expect(legacy.message).toBe(stabilized.message);
+  });
+
   it("names the different problem when the market is giving space back", () => {
     const shrinking = submarketMetrics(
       PERIODS.map((p) => ({ ...p, netAbsorptionSf: -50_000 })),

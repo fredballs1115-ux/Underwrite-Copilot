@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { currentDealAssumptions } from "@/lib/bridge/deal-assumptions";
+import { inferStrategy } from "@/lib/deal-strategy";
 import { assumptionWarnings, memoLinesFor, type AssumptionWarning } from "./checks";
 import { getDealSubmarket, loadSubmarketView, type SubmarketView } from "./store";
 
@@ -32,11 +33,14 @@ export async function dealSubmarketCheck(
   ]);
   if (!view || !assumptions) return null;
 
+  // The deal's strategy shapes the wording: a conversion or development is
+  // part of the pipeline it is being warned about, not a bystander to it.
   const warnings = assumptionWarnings(
     assumptions,
     view.metrics,
     view.submarket,
     link.dismissals,
+    inferStrategy(extraction).kind,
   );
   return { view, warnings, memoLines: memoLinesFor(warnings) };
 }
