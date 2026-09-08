@@ -34,8 +34,11 @@ what shipped; that one is the forward list.
 deals, an office conversion to multi, Year 1 NOI is calculated to be more
 than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
-asset class"; "too much emphasis on the buy box". Four PRs, #176–#179, each
-gated on tsc / eslint / the full suite / a production build.
+asset class"; "too much emphasis on the buy box". Then the correction that
+reshaped the rest of the run: "that NOI makes sense — it's a conservative
+estimate, and that's what it should flag." Twenty-six PRs, #176–#201, each
+gated on tsc / eslint / the full suite / a production build, the live sha
+confirmed equal to the main tip after each batch.
 
 - **#176 Imagery.** Root cause was the point, not the pictures: Photon put a
   street address on the street centreline or the city and the code stamped it
@@ -179,6 +182,15 @@ gated on tsc / eslint / the full suite / a production build.
   period: 30 months; Stabilized in: year 4" — when the strategy text states
   none, so the construction sizer's years-to-take-out seeds from the OM
   rather than a default. Tests on the row reader and the fallback order.
+- **#202 The plan panels render under test.** The yield-on-cost grid and
+  the construction & take-out panel are plain React on pure math, so the
+  test runner now server-renders them on the conversion fixture and reads
+  the markup: 25 signed spreads with the OM's case at 11.7% (+567 bps), the
+  $10.8M floor and the 106% overrun in the sentences, the construction loan
+  at $117.29M with take-out headroom and no cash-in line, the inputs seeded
+  with the OM's exact dollars and three years from its timeline, and the
+  two-year default (and the note that says so) when the OM states no
+  timeline. A runtime error in either panel now fails CI, not a deal page.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
