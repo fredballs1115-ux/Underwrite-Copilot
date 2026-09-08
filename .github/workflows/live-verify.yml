@@ -119,6 +119,7 @@ jobs:
           grep -q "ticker-track-reverse" p_why.html && echo "/why: markets band present" || echo "/why: markets band not yet deployed"
           grep -q "screenrun-line" p_why.html && echo "/why: screen-run trace present" || echo "/why: screen-run trace not yet deployed"
           grep -q "multifamily, and retail vacancy" p_why.html && echo "/why: asset-type copy includes retail (Aug 25)" || echo "/why: asset-type copy still pre-retail"
+          grep -q "It knows what kind of deal it is" p_why.html && echo "/why: strategy section present (Sep 8)" || echo "/why: strategy section not yet deployed"
           grep -q "improvement" p_whats-new.html && echo "/whats-new: public changelog serves" || echo "/whats-new: not serving (pre-#98 build or auth-walled)"
           # The changelog-as-tour rebuild: day groups, momentum line, and
           # every entry linking to where it landed.
