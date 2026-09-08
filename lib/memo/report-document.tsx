@@ -9,7 +9,17 @@ import type {
   ReconciliationResult,
   MarketResult,
 } from "@/lib/anthropic/types";
-import { buildMemoData, MemoPage, pdfSafe, type MemoData } from "./memo-document";
+import { basePosition, buildMemoData, MemoPage, pdfSafe, type MemoData } from "./memo-document";
+
+/** The OM's figure placed on the typical range — "5.25%" on "5.25–5.75%" —
+ *  as the memo places a base between its low and high: 0..1, clamped, so a
+ *  figure past either end sits at that end (the Read chip says which way);
+ *  null when either side does not parse as one scale. */
+export function rangeRead(omSays: string, typicalRange: string): number | null {
+  const m = typicalRange.match(/(\$?-?\d[\d,]*\.?\d*)\s*(?:–|—|-|to)\s*(\$?-?\d[\d,]*\.?\d*)/);
+  if (!m) return null;
+  return basePosition({ low: m[1], base: omSays, high: m[2] });
+}
 import {
   heatBucket,
   heatCellIrr,
@@ -1017,36 +1027,81 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             class — rules of thumb, not a live comps feed.
           </Text>
           <View style={s.tableHead}>
-            <Text style={[s.headText, { width: "26%" }]}>Assumption</Text>
-            <Text style={[s.headText, { width: "18%" }]}>OM says</Text>
-            <Text style={[s.headText, { width: "18%" }]}>Typical</Text>
-            <Text style={[s.headText, { width: "14%" }]}>Read</Text>
+            <Text style={[s.headText, { width: "24%" }]}>Assumption</Text>
+            <Text style={[s.headText, { width: "14%" }]}>OM says</Text>
+            <Text style={[s.headText, { width: "14%" }]}>Typical</Text>
+            <Text style={[s.headText, { width: "12%" }]}>On range</Text>
+            <Text style={[s.headText, { width: "12%" }]}>Read</Text>
             <Text style={[s.headText, { width: "24%" }]}>Note</Text>
           </View>
-          {checks.map((c, i) => (
-            <View key={i} style={i % 2 === 1 ? [s.row, s.rowAlt] : s.row} wrap={false}>
-              <Text style={{ width: "26%", fontSize: 8.5 }}>
-                {str(c?.assumption)}
-              </Text>
-              <Text
-                style={{ width: "18%", fontSize: 8.5, fontFamily: "Helvetica-Bold" }}
-              >
-                {str(c?.omSays)}
-              </Text>
-              <Text style={{ width: "18%", fontSize: 8.5 }}>
-                {str(c?.typicalRange)}
-              </Text>
-              <View style={{ width: "14%", paddingRight: 3 }}>
-                <RateChip
-                  word={str(c?.assessment)}
-                  color={ASSESS_COLOR[str(c?.assessment)] ?? C.muted}
-                />
+          {checks.map((c, i) => {
+            // The OM's figure on the typical range, as the memo draws a base
+            // on its low–high: a track, the span to the figure, a dot in the
+            // read's colour. Plain Views; no height beyond the row's text.
+            const pos = rangeRead(str(c?.omSays), str(c?.typicalRange));
+            const track = 50;
+            const tone = ASSESS_COLOR[str(c?.assessment)] ?? C.brand;
+            return (
+              <View key={i} style={i % 2 === 1 ? [s.row, s.rowAlt] : s.row} wrap={false}>
+                <Text style={{ width: "24%", fontSize: 8.5 }}>
+                  {str(c?.assumption)}
+                </Text>
+                <Text
+                  style={{ width: "14%", fontSize: 8.5, fontFamily: "Helvetica-Bold" }}
+                >
+                  {str(c?.omSays)}
+                </Text>
+                <Text style={{ width: "14%", fontSize: 8.5 }}>
+                  {str(c?.typicalRange)}
+                </Text>
+                <View style={{ width: "12%", paddingTop: 3.5, paddingRight: 6 }}>
+                  {pos != null ? (
+                    <View
+                      style={{
+                        width: track,
+                        height: 2.5,
+                        borderRadius: 1.25,
+                        backgroundColor: C.line,
+                        position: "relative",
+                      }}
+                    >
+                      <View
+                        style={{
+                          position: "absolute",
+                          left: 0,
+                          top: 0,
+                          height: 2.5,
+                          borderRadius: 1.25,
+                          width: pos * track,
+                          backgroundColor: "#b5cdc9",
+                        }}
+                      />
+                      <View
+                        style={{
+                          position: "absolute",
+                          top: -1.75,
+                          left: pos * track - 3,
+                          width: 6,
+                          height: 6,
+                          borderRadius: 3,
+                          backgroundColor: tone,
+                        }}
+                      />
+                    </View>
+                  ) : null}
+                </View>
+                <View style={{ width: "12%", paddingRight: 3 }}>
+                  <RateChip
+                    word={str(c?.assessment)}
+                    color={ASSESS_COLOR[str(c?.assessment)] ?? C.muted}
+                  />
+                </View>
+                <Text style={{ width: "24%", fontSize: 7.5, color: C.muted }}>
+                  {str(c?.note)}
+                </Text>
               </View>
-              <Text style={{ width: "24%", fontSize: 7.5, color: C.muted }}>
-                {str(c?.note)}
-              </Text>
-            </View>
-          ))}
+            );
+          })}
           {str(market?.summary) ? (
             <View style={s.summaryBox} wrap={false}>
               <Text style={s.summaryText}>{str(market?.summary)}</Text>

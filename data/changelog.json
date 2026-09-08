@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "The full report draws each OM assumption on its typical range",
+      "blurb": "The report's Market plausibility page now shows where each OM assumption sits against the typical range for the asset class — a small track with a dot placed on it, red where the read is aggressive, green where it is conservative — so an exit cap at the tight end or a rent-growth figure past the range reads before the words do. A range the check states in words rather than figures prints as before.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-08",
       "title": "Compare draws the spread between your deals",
       "blurb": "On the compare page, every return figure — levered IRR, equity multiple, cash-on-cash, going-in cap, yield on cost — now carries a small bar scaled to the best figure in its row, so which deal leads reads at a glance. A rejected deal's bar is drawn muted and never gets the best mark; a plan deal's cap cell, which is judged on yield on cost instead, draws none.",
       "href": "/deals/compare"

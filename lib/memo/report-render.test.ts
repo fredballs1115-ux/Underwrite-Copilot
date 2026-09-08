@@ -7,7 +7,8 @@
 import { describe, it, expect } from "vitest";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
-import { buildReportData, ReportDocument } from "./report-document";
+import { buildReportData, rangeRead, ReportDocument } from "./report-document";
+import { pdfFillCountOf } from "./pdf-text-of";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
@@ -66,7 +67,38 @@ describe("ReportDocument (full report)", () => {
     const pages = buf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? [];
     expect(pages.length).toBeGreaterThanOrEqual(7);
     expect(pages.length).toBeLessThanOrEqual(14);
-  }, 30000);
+
+    // The market page draws each OM figure on its typical range — a track,
+    // the span to the figure and a dot, three fills a check — so the same
+    // report with ranges that do not parse draws nine fewer shapes.
+    const checksCount = SAMPLE_DEAL.market.checks.length;
+    expect(checksCount).toBe(3);
+    const unranged = {
+      ...deal,
+      market: {
+        ...SAMPLE_DEAL.market,
+        checks: SAMPLE_DEAL.market.checks.map((c) => ({ ...c, typicalRange: "varies by submarket" })),
+      },
+    } as unknown as DealRow;
+    const plain = await renderToBuffer(
+      React.createElement(ReportDocument, {
+        input: buildReportData(unranged, "August 24, 2026", checks, sensitivity),
+      }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    expect(pdfFillCountOf(buf) - pdfFillCountOf(plain)).toBe(checksCount * 3);
+  }, 45000);
+
+  it("reads the OM's figure onto its typical range", () => {
+    // The sample's three checks: at the low end, past the high end, inside.
+    expect(rangeRead("5.25%", "5.25–5.75%")).toBe(0);
+    expect(rangeRead("4.0%", "2.5–3.5%")).toBe(1);
+    expect(rangeRead("6.0%", "5–7%")).toBeCloseTo(0.5, 6);
+    // Dollar ranges, a spelled "to", and a range that is not one.
+    expect(rangeRead("$1,300", "$1,200–$1,400")).toBeCloseTo(0.5, 6);
+    expect(rangeRead("55%", "50 to 60%")).toBeCloseTo(0.5, 6);
+    expect(rangeRead("5%", "varies")).toBeNull();
+    expect(rangeRead("n/a", "5–7%")).toBeNull();
+  });
   it("renders a conversion with the plan page — yield on cost, stressed — and one more page than without it", async () => {
     const extraction: ExtractionResult = {
       dealName: "1200 K Street — Office-to-Residential Conversion",
