@@ -642,7 +642,14 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               [
                 ["STABILIZED NOI", plan.plan.stabilizedNoi ? fmtCompactUsd(plan.plan.stabilizedNoi.value) : "not stated"],
                 [plan.plan.priceLabel.toUpperCase(), plan.plan.price != null ? fmtCompactUsd(plan.plan.price) : "not stated"],
-                [plan.plan.budget?.allIn ? "BUDGET (LESS PRICE)" : "BUDGET", plan.plan.budget ? fmtCompactUsd(plan.plan.budget.budget) : "not stated"],
+                [
+                  plan.plan.budget?.allIn ? "BUDGET (LESS PRICE)" : "BUDGET",
+                  plan.plan.budget
+                    ? plan.plan.budget.isTotal
+                      ? "in the total"
+                      : fmtCompactUsd(plan.plan.budget.budget)
+                    : "not stated",
+                ],
                 ["TOTAL COST", plan.plan.totalCost != null ? fmtCompactUsd(plan.plan.totalCost) : "-"],
                 ["YIELD ON COST", plan.plan.yieldOnCost != null ? fmtPct(plan.plan.yieldOnCost) : "-"],
               ] as [string, string][]

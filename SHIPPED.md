@@ -271,6 +271,18 @@ confirmed equal to the main tip after each batch.
   asking price. `lib/loi.test.ts` unzips the .docx and reads the clauses
   back for a stabilized asset, a conversion, a development, a value-add and
   a lease-up.
+- **#212 A stated total cost with no price is still a total cost.** An OM
+  that states an all-in development or project cost and no price — a sponsor
+  who already owns the land, a recapitalisation — left the plan with no
+  total cost and no yield on cost, a silent grid and sizer, and a budget
+  row labelled "less price" though nothing had been subtracted. The budget
+  readers now flag such a figure as the total itself (`isTotal`); the plan
+  summary carries it as total cost, so the yield on cost, the stressed grid
+  (with nothing to add to the total), the construction sizer (price 0) and
+  the report all work; the plan facts say the budget sits inside the stated
+  total; the challenger's brief says the acquisition is not separable; the
+  Excel note says the same. `lib/plan-total.test.ts` covers the path end
+  to end on a land-owned development.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

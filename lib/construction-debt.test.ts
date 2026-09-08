@@ -90,6 +90,17 @@ describe("sizeConstructionDebt — the loan is sized to cost, with the carry ins
     expect(free.interestReserve).toBe(0);
     expect(free.constructionLoan).toBeCloseTo(0.6 * 180_000_000, 6);
   });
+
+  it("a zero price is legal — an all-in total with no price stated — and the loan is sized to that total", () => {
+    // A sponsor who owns the land: $60M all-in, $4.5M finished NOI, no price.
+    const owned = sizeConstructionDebt({ ...BASE, price: 0, budget: 60_000_000, stabilizedNoi: 4_500_000 })!;
+    expect(owned).not.toBeNull();
+    expect(owned.hardSoftCost).toBe(60_000_000);
+    expect(owned.constructionLoan).toBeCloseTo(0.6 * owned.totalCost, 6);
+    expect(owned.yieldOnCost).toBeLessThan(0.075); // the carry dilutes the OM's 7.5%
+    // A negative price is still nonsense.
+    expect(sizeConstructionDebt({ ...BASE, price: -1 })).toBeNull();
+  });
 });
 
 describe("takeOutCapacity", () => {

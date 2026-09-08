@@ -183,10 +183,12 @@ describe("planSummary / capitalBudgetFromMetrics", () => {
       budget: 160_000_000,
       allIn: true,
     });
-    // No price to take out of an all-in figure: the figure stands, flagged all-in.
+    // No price to take out of an all-in figure: the figure stands as the
+    // total cost itself — not "less the price", since nothing was taken out.
     expect(capitalBudgetFromMetrics([metric("All-in cost", "$180M")], null)).toMatchObject({
       budget: 180_000_000,
-      allIn: true,
+      allIn: false,
+      isTotal: true,
     });
   });
 

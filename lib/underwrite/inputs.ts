@@ -368,7 +368,13 @@ export function deriveUnderwriteInputs(
       "capitalImprovementsYr1",
       "extracted",
       // sourceText() already prefixes "OM p. N —", so the note names the line.
-      `${budgetRead.label}${budgetRead.allIn ? " less the price" : ""} — spent in year 1 in this annual model; the OM's own timeline may run longer`,
+      `${budgetRead.label}${
+        budgetRead.allIn
+          ? " less the price"
+          : budgetRead.isTotal
+            ? " (stated all-in; the OM gives no price to take out of it)"
+            : ""
+      } — spent in year 1 in this annual model; the OM's own timeline may run longer`,
       budgetRead.page,
     );
   } else {

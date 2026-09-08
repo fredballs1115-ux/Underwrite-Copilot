@@ -59,7 +59,9 @@ export function ConstructionDebtPanel({
 
   const budget = parseMoney(budgetRaw);
   const noi = parseMoney(noiRaw);
-  const price = plan.price;
+  // An OM that states an all-in total and no price: the total is the works
+  // figure seeded above, and there is no price to add to it.
+  const price = plan.price ?? (plan.budget?.isTotal ? 0 : null);
 
   const r = useMemo(
     () =>

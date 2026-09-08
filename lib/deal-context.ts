@@ -44,7 +44,7 @@ export function dealContextFor(extraction: ExtractionResult | null): string | nu
     if (units != null) {
       lines.push(
         `Total cost is ${compact(plan.totalCost / units)} per planned unit (${units.toLocaleString("en-US")} units) — the basis to hold sale comps and per-unit norms against, never the ${
-          plan.priceLabel === "Land cost" ? "land" : "shell's"
+          plan.kind === "development" ? "land" : "shell's"
         } price.`,
       );
     }
