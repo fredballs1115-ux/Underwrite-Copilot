@@ -135,11 +135,14 @@ export default async function ValuationsPage({
   if (docIds.length) {
     const { data: docs } = await supabase
       .from("deal_documents")
-      .select("id, storage_path")
+      .select("id, deal_id, storage_path")
       .in("id", docIds);
     await Promise.all(
       (docs ?? []).map(async (d) => {
-        const url = await signedSupplementUrl(d.storage_path as string);
+        const url = await signedSupplementUrl(d.storage_path as string, {
+          kind: "deal",
+          dealId: String(d.deal_id),
+        });
         if (url) docUrls.set(String(d.id), url);
       }),
     );

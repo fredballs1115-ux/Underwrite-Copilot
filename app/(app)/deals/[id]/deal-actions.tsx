@@ -9,9 +9,13 @@ const itemCls =
 export function DealActions({
   dealId,
   dealName,
+  canDelete = true,
 }: {
   dealId: string;
   dealName: string;
+  /** Deleting is the creator's or the team owner's; a teammate sees no
+   *  Delete rather than a refusal after the fact. */
+  canDelete?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"menu" | "rename" | "delete">("menu");
@@ -74,13 +78,15 @@ export function DealActions({
                 >
                   Rename
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setMode("delete")}
-                  className={`${itemCls} text-kill hover:bg-kill/5`}
-                >
-                  Delete deal
-                </button>
+                {canDelete && (
+                  <button
+                    type="button"
+                    onClick={() => setMode("delete")}
+                    className={`${itemCls} text-kill hover:bg-kill/5`}
+                  >
+                    Delete deal
+                  </button>
+                )}
               </>
             )}
 

@@ -10,6 +10,7 @@ import type {
 import { inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { keyTermRows } from "@/lib/key-terms";
 import { staleAfterFailure } from "@/lib/screen-run";
+import { senderStillHasAccess } from "@/lib/share-access";
 import { SharePlan } from "./plan-facts";
 
 // A range's confidence, in the deal page's colours (RANGE_CONF there).
@@ -80,7 +81,7 @@ export default async function SharePage({
   const admin = createSupabaseAdminClient();
   const { data: share } = await admin
     .from("deal_shares")
-    .select("id, deal_id, expires_at, revoked")
+    .select("id, deal_id, expires_at, revoked, created_by")
     .eq("id", token)
     .maybeSingle();
 
@@ -96,11 +97,17 @@ export default async function SharePage({
 
   const { data: deal } = await admin
     .from("deals")
-    .select("name, asset_class, extraction, comps, market, verdict, updated_at")
+    .select("name, asset_class, extraction, comps, market, verdict, updated_at, user_id, team_id")
     .eq("id", share.deal_id as string)
     .maybeSingle();
   if (!deal?.verdict) {
     return <Expired reason="The deal behind this link is no longer available." />;
+  }
+  // The link is only as good as its sender's own access: a teammate who has
+  // since left (or been removed) must not keep reading the deal through a
+  // link they minted while they were on the team.
+  if (!(await senderStillHasAccess(admin, share.created_by as string | null, deal))) {
+    return <Expired reason="The sender no longer has access to this deal." />;
   }
   // The sender's latest screen may have failed before reaching the verdict:
   // the call shown then belongs to the previous completed screen — say so,

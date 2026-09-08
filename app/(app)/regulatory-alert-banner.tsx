@@ -5,6 +5,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
+import { safeHttpUrl } from "@/lib/safe-url";
 
 interface AlertRow {
   id: string;
@@ -46,7 +47,11 @@ export async function RegulatoryAlertBanner() {
 
   return (
     <div className="space-y-px">
-      {alerts.map((a) => (
+      {alerts.map((a) => {
+        // The row is shared state written outside this request — only a real
+        // web URL ever becomes a link (the same allowlist the comps map uses).
+        const href = safeHttpUrl(a.url);
+        return (
         <div
           key={a.id}
           className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-red-600 px-4 py-2 text-sm text-white"
@@ -55,8 +60,8 @@ export async function RegulatoryAlertBanner() {
             Possible rule change
           </span>
           <span className="min-w-0 flex-1">
-            {a.url ? (
-              <a href={a.url} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+            {href ? (
+              <a href={href} target="_blank" rel="noreferrer" className="underline underline-offset-2">
                 {a.headline}
               </a>
             ) : (
@@ -76,7 +81,8 @@ export async function RegulatoryAlertBanner() {
             </button>
           </form>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

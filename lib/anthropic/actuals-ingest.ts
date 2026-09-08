@@ -39,7 +39,7 @@ export async function runActualsIngestion(admin: Admin, dealId: string): Promise
 
   if (rentRollDoc) {
     try {
-      const buf = await downloadDealFile(rentRollDoc.storage_path);
+      const buf = await downloadDealFile(rentRollDoc.storage_path, { kind: "deal", dealId });
       const parsed = await parseModelFile(rentRollDoc.filename, buf);
       const extraction = await extractRentRoll(parsed);
       const summary = {
@@ -66,7 +66,7 @@ export async function runActualsIngestion(admin: Admin, dealId: string): Promise
 
   if (t12Doc) {
     try {
-      const buf = await downloadDealFile(t12Doc.storage_path);
+      const buf = await downloadDealFile(t12Doc.storage_path, { kind: "deal", dealId });
       const parsed = await parseModelFile(t12Doc.filename, buf);
       const extraction = await extractT12(parsed);
       const summary = summarizeT12(extraction);

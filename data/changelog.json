@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "Your files are yours alone: every document read, link and delete is checked against the deal it belongs to",
+      "blurb": "A review of who can reach what found the row-level security sound and one layer beneath it too trusting: the stored location of an OM, a document, a supplement or a logo was read straight off the deal's own record and handed to the storage service, which does not apply per-user rules. Every storage read, signed link, replacement and delete now checks the path against the deal (or account) it acts for, in one place, before any bytes move; the database asserts the same shapes. Alongside it: a teammate's Delete on a deal they did not create used to report success and remove the creator's files while the deal stayed — it now removes nothing, says who may delete, and the menu no longer offers it; the red regulatory-alert banner every user sees can be dismissed but not rewritten; a teammate who leaves or is removed takes their share links on the team's other deals with them; and the service-health probes no longer repeat an upstream service's answer word for word.",
+      "href": "/account"
+    },
+    {
+      "date": "2026-09-08",
       "title": "Password reset works, and the front door says what went wrong in plain words",
       "blurb": "The reset email's link used to land on the Account page signed out and bounce back to sign-in — the one-time code it carried was never turned into a session, so nobody who forgot a password could get back in. The link signs you in now and lands on the Account page, where you set a new password; a confirmation link signs you in and opens your pipeline instead of a 'sign in below' banner. A link that has expired, was already used, or was opened in a different browser than the one you asked from says so and opens the reset form. Creating an account with an email that already has one no longer says 'Account created — check your email'; it says sign in instead. A weak password, a mistyped address, a closed sign-up or a reset asked for too soon each name themselves (with the wait in seconds) rather than 'something went wrong'. A signed-in visit to a deep link keeps its destination, the rent-roll workbook's failure has its sentence, and billing says 'not set up' instead of a raw error when the payment key is missing.",
       "href": "/account"

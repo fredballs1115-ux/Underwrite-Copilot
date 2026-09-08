@@ -18,6 +18,7 @@ import { BASEMAPS, usgsAerialUrl } from "@/lib/basemaps";
 import { imagePlan } from "@/lib/imagery-plan";
 import { googleConfigured } from "@/lib/imagery";
 import { geocodeAddress } from "@/lib/geocode";
+import { upstreamNote } from "@/lib/upstream-note";
 
 /** A street Google has certainly photographed — so a miss is our config. */
 const PROBE = {
@@ -50,11 +51,15 @@ async function probeStreetView(key: string | undefined): Promise<Probe> {
       return { ok: true, detail: "OK — Street View imagery is being served." };
     }
     // Google's own error_message is the actionable part: it names the
-    // unenabled API or the restriction that rejected the key.
+    // unenabled API or the restriction that rejected the key. The raw text
+    // goes to the log; the page gets it short and with anything
+    // credential-shaped stripped (an upstream that echoed its request would
+    // otherwise hand the key to every signed-in visitor).
+    if (body.error_message) console.warn(`[imagery/health] street view: ${body.error_message}`);
     return {
       ok: false,
       detail: body.error_message
-        ? `${status}: ${body.error_message}`
+        ? `${status}: ${upstreamNote(body.error_message)}`
         : `${status}. REQUEST_DENIED usually means the Street View Static API is not enabled on the project, the key's API restrictions exclude it, or billing is off.`,
     };
   } catch (e) {
@@ -83,9 +88,11 @@ async function probeSatellite(key: string | undefined): Promise<Probe> {
     }
     // Static Maps returns a plain-text reason on 4xx, and it is the actionable
     // part: it names the unenabled API or the restriction that rejected it.
+    const text = await res.text();
+    console.warn(`[imagery/health] satellite HTTP ${res.status}: ${text.slice(0, 1000)}`);
     return {
       ok: false,
-      detail: `HTTP ${res.status}: ${(await res.text()).slice(0, 300)} — usually the Maps Static API is not enabled on the project, or the key's API restrictions exclude it.`,
+      detail: `HTTP ${res.status}: ${upstreamNote(text)} — usually the Maps Static API is not enabled on the project, or the key's API restrictions exclude it.`,
     };
   } catch (e) {
     return { ok: false, detail: `Could not reach Google: ${(e as Error).message}` };
@@ -149,9 +156,11 @@ async function probeAerial(): Promise<Probe> {
     }
     // The ArcGIS export endpoint answers 200 with a JSON error body, so the
     // content type is the real test and its body is the useful message.
+    const text = await res.text();
+    console.warn(`[imagery/health] aerial HTTP ${res.status}: ${text.slice(0, 1000)}`);
     return {
       ok: false,
-      detail: `HTTP ${res.status}, content-type ${type || "(none)"} — ${(await res.text()).slice(0, 300)}`,
+      detail: `HTTP ${res.status}, content-type ${type || "(none)"} — ${upstreamNote(text)}`,
     };
   } catch (e) {
     return { ok: false, detail: `Could not reach USGS: ${(e as Error).message}` };

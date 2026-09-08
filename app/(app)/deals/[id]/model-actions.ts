@@ -8,6 +8,7 @@ import {
   uploadSupplement,
   signatureMismatch,
   removeSupplementFile,
+  documentPath,
 } from "@/lib/storage";
 import { DOC_KIND_KEYS } from "@/lib/documents";
 import { isPro } from "@/lib/billing";
@@ -51,14 +52,13 @@ export async function addDealDocument(formData: FormData) {
   if (!supabase) return;
 
   const id = crypto.randomUUID();
-  const safeName = file.name.replace(/[^a-z0-9._-]+/gi, "_").slice(0, 80) || "file";
-  const path = `documents/${dealId}/${id}-${safeName}`;
+  const path = documentPath(dealId, id, file.name);
   const buffer = Buffer.from(await file.arrayBuffer());
   // Trust the bytes, not the name: reject a mislabeled known format early.
   if (signatureMismatch(file.name, buffer)) {
     redirect(`/deals/${dealId}?error=docformat`);
   }
-  await uploadSupplement(path, buffer, file.type);
+  await uploadSupplement(path, buffer, file.type, { kind: "deal", dealId });
 
   await supabase.from("deal_documents").insert({
     id,
@@ -87,7 +87,10 @@ export async function removeDealDocument(formData: FormData) {
     .eq("deal_id", dealId)
     .maybeSingle();
   if (doc) {
-    await removeSupplementFile((doc as { storage_path: string }).storage_path);
+    await removeSupplementFile((doc as { storage_path: string }).storage_path, {
+      kind: "deal",
+      dealId,
+    });
     await supabase.from("deal_documents").delete().eq("id", docId);
   }
   revalidatePath(`/deals/${dealId}`);

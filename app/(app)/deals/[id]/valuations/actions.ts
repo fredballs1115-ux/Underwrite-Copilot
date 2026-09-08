@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { uploadSupplement, signatureMismatch, downloadDealFile } from "@/lib/storage";
+import { uploadSupplement, signatureMismatch, downloadDealFile, documentPath } from "@/lib/storage";
 import { omSourceFor, omFromBuffer } from "@/lib/anthropic/om-source";
 import { extractBov } from "@/lib/anthropic/bov-extract";
 import { VALUATION_FIELDS, type ValuationField } from "@/lib/valuation/types";
@@ -122,9 +122,8 @@ export async function addValuationFromPdf(formData: FormData) {
   }
 
   const docId = crypto.randomUUID();
-  const safeName = file.name.replace(/[^a-z0-9._-]+/gi, "_").slice(0, 80) || "bov.pdf";
-  const path = `documents/${dealId}/${docId}-${safeName}`;
-  await uploadSupplement(path, buffer, file.type);
+  const path = documentPath(dealId, docId, file.name, "bov.pdf");
+  await uploadSupplement(path, buffer, file.type, { kind: "deal", dealId });
   await ctx.supabase.from("deal_documents").insert({
     id: docId,
     deal_id: dealId,
@@ -240,7 +239,7 @@ export async function reextractValuation(formData: FormData) {
   if (!doc) redirect(`/deals/${dealId}/valuations?error=nodoc`);
 
   try {
-    const buffer = await downloadDealFile(doc.storage_path as string);
+    const buffer = await downloadDealFile(doc.storage_path as string, { kind: "deal", dealId });
     const bov = await extractBov(
       buffer.length > 0 ? await omSourceFor(buffer, String(doc.filename)) : omFromBuffer(buffer),
     );

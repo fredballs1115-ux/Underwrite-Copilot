@@ -103,14 +103,17 @@ export async function saveBrandingValue(
 }
 
 /** The logo as a data URI for the PDF renderer — react-pdf takes it directly.
- *  Best-effort: any failure (missing file, pre-0021 schema) returns null and
- *  the export renders text-only branding. */
+ *  Best-effort: any failure (missing file, pre-0021 schema, a path outside
+ *  the account's or team's folder) returns null and the export renders
+ *  text-only branding. `owner` is whose branding this is — the deal's
+ *  creator and team for an export, the signed-in user for the settings page. */
 export async function brandingLogoDataUri(
   branding: Branding | null,
+  owner: { userId: string | null; teamId: string | null },
 ): Promise<string | null> {
   if (!branding?.logoPath) return null;
   try {
-    const buf = await downloadDealFile(branding.logoPath);
+    const buf = await downloadDealFile(branding.logoPath, { kind: "branding", ...owner });
     const mime = branding.logoPath.toLowerCase().endsWith(".png")
       ? "image/png"
       : "image/jpeg";

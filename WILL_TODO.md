@@ -3,17 +3,18 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#237 merged to main (live build
-sha `da1d184`, #237, confirmed equal to the main tip by live-verify at 08:32
-UTC — every one of the sixty-two is live, and the public-page lint #231
-added reads all twelve public pages clean on every run, skip link and
-landmarks included).
+**Last updated 2026-09-08**, after PRs #176–#238 merged to main (live build
+sha `6c35c3c`, #238, confirmed equal to the main tip by live-verify at 09:06
+UTC — every one of the sixty-three is live, the footer's latest-improvement
+line reads "Password reset works…", and the public-page lint #231 added
+reads all twelve public pages clean on every run, the sign-in page's new
+banner path included).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Sixty-three PRs (#176–#238) landed across one review session and the
+Sixty-four PRs (#176–#239) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -294,6 +295,16 @@ deploy (live-verify shows the sha).
   every auth failure names itself (weak password, invalid address, closed
   sign-up, a reset asked for too soon with its wait). Item 7 under "Your
   moves" has the three Supabase settings to check.
+- **Your files are yours alone** (#239, the eleventh review: authorization).
+  Storage paths were read off user-writable columns and handed to the
+  service-role storage client, so a signed-in user who edited their own
+  deal row could read, replace or delete another user's OM, documents,
+  supplements or logo. Every storage read, write, signed URL and delete now
+  checks the path against the deal (or account) it acts for, in one place.
+  A teammate's refused Delete no longer sweeps the creator's files; the
+  alert banner can be dismissed but not rewritten by users; a departed
+  teammate's share links die with their seat. **Migration 0034 asserts the
+  same shapes at the row and pins the alerts grant — run it** (below).
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":
@@ -365,6 +376,7 @@ this order:
 | `0031_valuations.sql` | `valuations` | Deal → **Valuations** |
 | `0032_rent_roll_engine.sql` | `rent_roll_imports`, `rent_roll_mappings`, `market_leasing_profiles` | Deal → **Rent roll** |
 | `0033_submarkets.sql` | `submarkets`, `submarket_periods`, `pipeline_properties`, `deal_submarkets` | **Submarkets** + the deal-page supply card |
+| `0034_authorization_hardening.sql` | storage-path guard triggers on `deals`, `deal_documents`, `analysis_jobs`, `profiles`/`teams`; the `regulatory_alerts` column grant | **The eleventh review's row-level half** (#239): a forged storage path can no longer reach a table, and users can dismiss but not rewrite the alert banner. The app already refuses such paths in code; this makes the database agree. Safe on a schema missing 0016/0021/0023 — each block checks first. |
 
 All are additive, idempotent and RLS-scoped — no destructive step, safe to
 re-run. Run each file **whole** (the SQL editor only runs highlighted text if

@@ -277,7 +277,7 @@ export async function runAnalysis(
     const needsDoc = pdfSteps.some((s) => !completed.has(s));
     const pdf =
       needsDoc && !manual
-        ? await downloadOmPdf(deal.om_storage_path as string)
+        ? await downloadOmPdf(deal.om_storage_path as string, { kind: "deal", dealId })
         : null;
     if (pdf) {
       const pages = countPdfPages(pdf);
@@ -641,7 +641,7 @@ export async function runReconciliation(
       error: null,
     });
 
-    const omPdf = await downloadOmPdf(deal.om_storage_path as string);
+    const omPdf = await downloadOmPdf(deal.om_storage_path as string, { kind: "deal", dealId });
     const parsed = await parseModelFile(model.name, model.buffer);
     omSource = await omSourceFor(omPdf);
     // The reconciler is told the deal's kind, so a buyer's model that carries

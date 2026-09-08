@@ -7,6 +7,8 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   removeStorageFiles,
   modelTmpPath,
+  omStoragePath,
+  brandingLogoPath,
   uploadSupplement,
   removeSupplementFile,
   signatureMismatch,
@@ -103,13 +105,14 @@ export async function saveBranding(formData: FormData) {
     // never aliases the new one, even across simultaneous saves.
     const scopeId = active.teamId ?? user.id;
     const suffix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-    const newPath = `${scopeId}/branding-logo-${suffix}.${ext}`;
+    const newPath = brandingLogoPath(scopeId, suffix, ext);
     let uploadFailed = false;
     try {
       await uploadSupplement(
         newPath,
         buf,
         ext === "png" ? "image/png" : "image/jpeg",
+        { kind: "branding", userId: user.id, teamId: active.teamId },
       );
     } catch {
       uploadFailed = true;
@@ -123,7 +126,13 @@ export async function saveBranding(formData: FormData) {
   const res = await saveBrandingValue(supabase, user.id, branding);
   if (!res.ok) {
     // The row never pointed at the fresh upload — don't strand it.
-    if (uploadedPath) await removeSupplementFile(uploadedPath);
+    if (uploadedPath) {
+      await removeSupplementFile(uploadedPath, {
+        kind: "branding",
+        userId: user.id,
+        teamId: active.teamId,
+      });
+    }
     redirect(
       `/account?error=${res.error === "owner" ? "brandowner" : "brandsave"}`,
     );
@@ -132,7 +141,11 @@ export async function saveBranding(formData: FormData) {
   // Save committed — now sweep the file the branding no longer points at.
   const keptPath = branding?.logoPath ?? null;
   if (oldLogoPath && oldLogoPath !== keptPath) {
-    await removeSupplementFile(oldLogoPath);
+    await removeSupplementFile(oldLogoPath, {
+      kind: "branding",
+      userId: user.id,
+      teamId: active.teamId,
+    });
   }
 
   revalidatePath("/account");
@@ -236,44 +249,49 @@ export async function deleteAccount(formData: FormData) {
       .eq("user_id", user.id);
   }
 
-  // 4. Collect the personal deals' storage paths before the rows cascade.
+  // 4. Collect the personal deals' storage paths before the rows cascade —
+  //    per deal, so each path is checked against the deal it claims to belong
+  //    to before the service role removes anything.
   const { data: deals } = await admin
     .from("deals")
     .select("id, om_storage_path, supplements")
     .eq("user_id", user.id);
-  const dealIds = ((deals ?? []) as { id: string }[]).map((d) => d.id);
-  const paths: string[] = [];
-  for (const d of (deals ?? []) as {
+  const dealRows = (deals ?? []) as {
+    id: string;
     om_storage_path: string | null;
     supplements: Record<string, { files?: { path: string }[] }> | null;
-  }[]) {
+  }[];
+  const byDeal = new Map<string, string[]>();
+  for (const d of dealRows) {
+    // Worker-mode reconciles park a model file next to the OM — sweep that
+    // slot too (removing a nonexistent path is a no-op).
+    const paths: string[] = [modelTmpPath(omStoragePath(user.id, d.id))];
     if (d.om_storage_path) {
       paths.push(d.om_storage_path);
-      // Worker-mode reconciles park a model file next to the OM — sweep it
-      // too (removing a nonexistent path is a no-op).
       paths.push(modelTmpPath(d.om_storage_path));
     }
     for (const tab of Object.values(d.supplements ?? {}))
       for (const f of tab.files ?? []) if (f.path) paths.push(f.path);
+    byDeal.set(d.id, paths);
   }
-  if (dealIds.length) {
+  if (byDeal.size) {
     const { data: docs } = await admin
       .from("deal_documents")
-      .select("storage_path")
-      .in("deal_id", dealIds);
-    for (const doc of (docs ?? []) as { storage_path: string }[])
-      if (doc.storage_path) paths.push(doc.storage_path);
+      .select("deal_id, storage_path")
+      .in("deal_id", [...byDeal.keys()]);
+    for (const doc of (docs ?? []) as { deal_id: string; storage_path: string }[])
+      if (doc.storage_path) byDeal.get(doc.deal_id)?.push(doc.storage_path);
   }
   // Personal branding logo (0021) — pre-migration schemas just return an
   // error object, which reads as "no branding".
+  let logoPath: string | null = null;
   try {
     const { data: bp } = await admin
       .from("profiles")
       .select("branding")
       .eq("id", user.id)
       .maybeSingle();
-    const logoPath = (bp?.branding as { logoPath?: string } | null)?.logoPath;
-    if (logoPath) paths.push(logoPath);
+    logoPath = (bp?.branding as { logoPath?: string } | null)?.logoPath ?? null;
   } catch {
     // sweep is best-effort
   }
@@ -283,7 +301,12 @@ export async function deleteAccount(formData: FormData) {
   //    deleted account is not — so the user row goes first.
   const { error: delErr } = await admin.auth.admin.deleteUser(user.id);
   if (delErr) redirect("/account?error=delete");
-  await removeStorageFiles(paths);
+  for (const [dealId, paths] of byDeal) {
+    await removeStorageFiles(paths, { kind: "deal", dealId });
+  }
+  if (logoPath) {
+    await removeStorageFiles([logoPath], { kind: "branding", userId: user.id, teamId: null });
+  }
 
   if (team) await syncTeamSeats(team.id);
 

@@ -10,6 +10,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { PROVIDERS } from "@/lib/public-comps/core";
+import { bareUrl, jsonShape, upstreamNote } from "@/lib/upstream-note";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -50,6 +51,11 @@ export async function GET() {
           b?.data?.attributes?.fields?.map((f) => f.name);
         const backingUrl = b?.data?.attributes?.url;
         const distilled = layers || services || fields || backingUrl;
+        // The provider's own words stay in the server log; the page gets the
+        // shape of the answer (its keys, its URL's host and path), never a
+        // verbatim body — an upstream that echoed its request could
+        // otherwise hand a credential to any signed-in visitor.
+        if (!distilled) console.warn(`[comps/health] ${p.id} HTTP ${res.status}: ${text.slice(0, 1000)}`);
         return {
           provider: p.id,
           name: p.name,
@@ -60,8 +66,8 @@ export async function GET() {
           layers,
           services: services?.slice(0, 40),
           fields: fields?.slice(0, 80),
-          backingUrl,
-          sample: distilled ? undefined : body,
+          backingUrl: backingUrl ? bareUrl(backingUrl) : undefined,
+          sample: distilled ? undefined : (jsonShape(body) ?? upstreamNote(body)),
         };
       } catch (err) {
         return {
@@ -71,7 +77,7 @@ export async function GET() {
           needsFieldVerification: p.needsFieldVerification,
           httpStatus: null,
           ok: false,
-          error: String(err).slice(0, 300),
+          error: upstreamNote(String(err)),
         };
       }
     })

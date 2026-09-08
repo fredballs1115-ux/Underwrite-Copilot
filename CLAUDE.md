@@ -95,6 +95,18 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   elsewhere fails, and the page says so. Tests drive the route and the proxy
   with a fake auth client (`lib/auth-callback.test.ts`,
   `lib/supabase/proxy-session.test.ts`).
+- The private bucket: `lib/storage-paths.ts` is the one definition of where
+  objects live (`<userId>/<dealId>.pdf`, `…/<dealId>.model-tmp`,
+  `documents/<dealId>/…`, `supplements/<dealId>/…`,
+  `<teamId|userId>/branding-logo-…`) and every primitive in `lib/storage.ts`
+  takes the scope it acts for — `{ kind: "deal", dealId }` or
+  `{ kind: "branding", userId, teamId }` — and refuses a path outside it
+  before any read, write, signed URL or delete. Paths come off user-writable
+  columns and the storage client is the service role (no RLS), so this gate
+  is the boundary; never call the client directly, and mint paths with the
+  helpers there. Migration 0034 asserts the same shapes at the row.
+  `lib/rls-policies.test.ts` lints the migrations: no write policy may be a
+  bare `true` without a column grant behind it.
 - DB schema: `supabase/migrations/`
 
 ## Conventions

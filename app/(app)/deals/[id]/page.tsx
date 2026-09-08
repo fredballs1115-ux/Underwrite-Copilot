@@ -259,7 +259,7 @@ export default async function DealPage({
   const rawSupp = (deal.supplements as Record<string, RawSupp> | null) ?? {};
   // Signed link so the user can re-open the OM they uploaded (1-hour expiry).
   const omUrlPromise = deal.om_storage_path
-    ? signedSupplementUrl(deal.om_storage_path)
+    ? signedSupplementUrl(deal.om_storage_path, { kind: "deal", dealId: id })
     : Promise.resolve(null);
   const supplements: Record<
     string,
@@ -281,12 +281,24 @@ export default async function DealPage({
           id: f.id,
           name: f.name,
           createdAt: f.createdAt,
-          url: await signedSupplementUrl(f.path),
+          url: await signedSupplementUrl(f.path, { kind: "deal", dealId: id }),
         })),
       );
       supplements[tabKey] = { notes: s.notes ?? [], files };
     }),
   ]);
+
+  // Delete is the creator's or the team owner's (the RLS delete policy); a
+  // teammate is not offered it rather than refused after the fact.
+  let canDelete = !!user && ownership.user_id === user.id;
+  if (!canDelete && user && ownership.team_id) {
+    const { data: team } = await supabase
+      .from("teams")
+      .select("owner_id")
+      .eq("id", ownership.team_id)
+      .maybeSingle();
+    canDelete = team?.owner_id === user.id;
+  }
 
   // Judge the buy box against the full extraction when it's in; until then,
   // the first signal stands in — so "outside your box" can surface ~30s into
@@ -873,7 +885,7 @@ export default async function DealPage({
               dealId={id}
               stage={((deal as { stage?: string }).stage as string) ?? "screening"}
             />
-            <DealActions dealId={id} dealName={deal.name} />
+            <DealActions dealId={id} dealName={deal.name} canDelete={canDelete} />
           </div>
         </div>
 

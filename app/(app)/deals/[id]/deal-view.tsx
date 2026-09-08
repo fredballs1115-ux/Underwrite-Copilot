@@ -175,6 +175,8 @@ const MODEL_ERRORS: Record<string, string> = {
     "That file’s contents don’t match its extension — re-export it and try again.",
   supp: "Couldn’t save your change — please try again.",
   delete: "Couldn’t delete the deal — please try again.",
+  deletepermission:
+    "Only the deal’s creator or the team owner can delete this deal. Nothing was removed.",
   stage: "Couldn’t save the stage — please try again.",
   note: "Couldn’t save your note — please try again.",
   noteempty: "Write something in the note first — whitespace doesn’t count.",

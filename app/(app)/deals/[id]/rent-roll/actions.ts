@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { downloadDealFile, signatureMismatch, uploadSupplement } from "@/lib/storage";
+import { downloadDealFile, signatureMismatch, uploadSupplement, documentPath } from "@/lib/storage";
 import {
   headerSignature,
   readGrid,
@@ -78,9 +78,8 @@ export async function uploadRentRoll(formData: FormData) {
   const issues = validateLeases(parsed.leases, { nra });
 
   const docId = crypto.randomUUID();
-  const safeName = file.name.replace(/[^a-z0-9._-]+/gi, "_").slice(0, 80) || "rent-roll";
-  const path = `documents/${dealId}/${docId}-${safeName}`;
-  await uploadSupplement(path, buffer, file.type);
+  const path = documentPath(dealId, docId, file.name, "rent-roll");
+  await uploadSupplement(path, buffer, file.type, { kind: "deal", dealId });
   await ctx.supabase.from("deal_documents").insert({
     id: docId,
     deal_id: dealId,
@@ -135,7 +134,7 @@ export async function confirmMapping(formData: FormData) {
     .maybeSingle();
   if (!doc) redirect(`/deals/${dealId}/rent-roll?error=nodoc`);
 
-  const buffer = await downloadDealFile(doc.storage_path as string);
+  const buffer = await downloadDealFile(doc.storage_path as string, { kind: "deal", dealId });
   const grid = await readGrid(String(doc.filename), buffer);
 
   const headerRow = num(formData.get("headerRow"));
