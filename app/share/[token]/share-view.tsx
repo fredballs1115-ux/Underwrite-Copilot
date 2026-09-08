@@ -11,6 +11,7 @@ import type {
 import { inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { keyTermRows } from "@/lib/key-terms";
 import { SharePlan } from "./plan-facts";
+import { ShareAerial } from "./share-aerial";
 
 /**
  * The read-only shared screen, as pure markup. `page.tsx` is the loader: it
@@ -30,6 +31,9 @@ export interface ShareViewProps {
   expiresAt: string;
   /** the sender's latest screen failed before it reached the verdict */
   verdictStale: boolean;
+  /** the building from above — the token-scoped aerial route and the place
+   *  it frames; null when the deal has no address */
+  aerial: { src: string; place: string } | null;
   extraction: ExtractionResult | null;
   comps: BrokerCompsResult | null;
   market: MarketResult | null;
@@ -200,6 +204,7 @@ export function ShareView({
   assetClass,
   expiresAt,
   verdictStale,
+  aerial,
   extraction,
   comps,
   market,
@@ -247,6 +252,8 @@ export function ShareView({
           .filter(Boolean)
           .join(" · ")}
       </p>
+
+      {aerial && <ShareAerial src={aerial.src} place={aerial.place} />}
 
       <section
         className={`mt-6 rounded-2xl border border-line bg-surface p-5 shadow-sm border-l-4 ${vmeta.border}`}

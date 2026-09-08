@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Seventy-two PRs, #176–#247, each
+estimate, and that's what it should flag." Seventy-three PRs, #176–#248, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -982,6 +982,20 @@ confirmed equal to the main tip after each batch.
   term's label wraps instead of trailing off as "PRO FORMA …", and its value
   no longer runs into the next column on a phone. The source test that
   guarded the page's key-term ordering and basis badges now reads the view.
+- **#248 The shared screen opens on the building from above.** It was the
+  one surface still without imagery: the deal page's aerial route needs a
+  signed-in session. The token's resolution — malformed, missing, revoked,
+  expired, the deal gone or unscreened, the sender without access — moved
+  out of the page into one function (`lib/share-resolve.ts`) that the page
+  and a new token-scoped route (`/api/share/[token]/aerial`) both run, so
+  the picture lives exactly as long as the link: a dead link is a bare 404
+  there before any imagery source is asked. Pinned to USGS (public domain,
+  no key, the credit line printed under the frame); a deal with no address,
+  or a frame nothing can produce, removes the whole figure rather than
+  leaving a glyph or a credit under an empty frame. Eight tests drive the
+  resolver and the route against a fake admin client; the render test
+  asserts the figure on the sample and its absence on the address-less
+  conversion.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

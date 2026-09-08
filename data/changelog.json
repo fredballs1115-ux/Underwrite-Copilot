@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "The screen you share opens on the building from above",
+      "blurb": "A share link now shows the property's aerial at the top of the read-only screen — the USGS frame the deal page's Aerial tab shows, credited under the picture — so a partner or lender sees the place before the numbers. The picture is scoped to the link itself: it goes dark the moment the link is revoked or expires, exactly as the page does, and a deal without an address simply shows no frame.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-08",
       "title": "The screen you share reads at a glance, on a phone too",
       "blurb": "The read-only page a partner or lender opens from your share link shows the call as the deal page's own mark — the disc and the word in its colour — with the conservative, base and sponsor calls as three dots beneath it. Every screening range is a card with its Low / Base / High strip and a bar showing where the base sits, in place of a table that scrolled sideways on a phone and left the reader with the Low column. The three deal-killers carry numbered badges, the comp and market reads open on their first sentence with the rest one tap away, and a key term's label wraps instead of trailing off.",
       "href": "/deals"

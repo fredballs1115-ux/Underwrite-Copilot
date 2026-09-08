@@ -592,6 +592,10 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
         assetClass: SAMPLE_DEAL.asset_class,
         expiresAt: "2026-09-30T12:00:00Z",
         verdictStale: false,
+        aerial: {
+          src: "/api/share/0f6f2d4e-1b2c-4d5e-8f90-a1b2c3d4e5f6/aerial?w=960&h=400",
+          place: "Brewerytown, Philadelphia, PA",
+        },
         extraction: SAMPLE_DEAL.extraction,
         comps: SAMPLE_DEAL.comps,
         market: SAMPLE_DEAL.market,
@@ -605,6 +609,10 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     expect(gluedWords(text)).toEqual([]);
     expect(text).toContain(SAMPLE_DEAL.name);
     expect(text).toContain("expires Sep 30");
+    // The building from above, through the token-scoped route, credited.
+    expect(html).toContain('alt="Aerial view of Brewerytown, Philadelphia, PA"');
+    expect(html).toContain("/api/share/0f6f2d4e-1b2c-4d5e-8f90-a1b2c3d4e5f6/aerial");
+    expect(text).toContain("USGS The National Map");
     expect(text).toContain("Caution");
     // The call across the range, as three dots — No-go / Caution / Go.
     expect(text).toMatch(/Conservative\s*No-go/);
@@ -665,6 +673,7 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
         assetClass: "multifamily",
         expiresAt: "2026-10-05T12:00:00Z",
         verdictStale: true,
+        aerial: null,
         extraction: conversion,
         comps: null,
         market: null,
@@ -688,6 +697,9 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     expect(text).toContain("Exit");
     expect(text).not.toContain("Breaks if:");
     expect(text).not.toContain("Comp read");
+    // No address, no picture — and no empty frame or credit line either.
+    expect(html).not.toContain("<img");
+    expect(text).not.toContain("USGS");
 
     const expired = renderToStaticMarkup(
       React.createElement(Expired, { reason: "The sender revoked this link." }),
