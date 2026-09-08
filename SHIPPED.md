@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Eighty PRs, #176–#255, each
+estimate, and that's what it should flag." Eighty-one PRs, #176–#256, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1078,6 +1078,19 @@ confirmed equal to the main tip after each batch.
   fixture asserts four signed bars (two per layout), the Maddox's −60 bps at
   16% of the half-track to the left against the Tysons' +190 at the full
   half to the right, and none for a single column; shot at 1440 and 390.
+- **#256 The pipeline row draws its fit below `lg`.** From `lg` up each row
+  draws its mandate score as a 0–100 bar in the call's colour; below `md`
+  the fit was a word at the end of the row's second meta line ("$68.0M ·
+  5.6% cap · Fit 71 · Watch"), the part a one-line truncation cut first, so
+  at 390 most rows ended in "…". The row now draws the same bar on its own
+  line below `lg` — a "fit" micro-label, the bar, the words for a screen
+  reader — and the fit word leaves the phone and tablet meta lines; a deal
+  with a buy-box read but no score keeps its word, having no figure to
+  draw. One `FitBar` serves the column and the line. A plan deal's "7.2%
+  yield on cost" bit, which only ever shows below `md`, wears the cap
+  column's "yoc" micro-label there so the line fits too. The pipeline
+  fixture asserts twelve bars (six scored live deals, twice each) and the
+  words once per deal; shot at 390.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

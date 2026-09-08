@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "The pipeline draws each deal's fit on a phone",
+      "blurb": "On a phone or tablet the pipeline row now draws a deal's mandate fit as a small bar in the call's colour — green to pursue, amber to watch, red to pass — instead of spelling it out at the end of a line that a narrow screen cut short; a plan deal's yield on cost on that line is labelled the way the cap column labels it, so the figure is never the part that is cut. Wider screens keep the score column; the bar there is the same one.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-08",
       "title": "Compare draws each deal's leverage spread from a centre line",
       "blurb": "The compare page's leverage row — each deal's going-in cap against the freshest 30-year fixed — now draws its spread as a bar from a centre line: to the right in green when the cap clears the rate, to the left in red when it sits below it, thin in amber when the spread is slim. Scaled to the widest spread on the page, muted on a deal the screen rejected, and absent on a plan deal, which is judged on yield on cost instead.",
       "href": "/deals/compare"

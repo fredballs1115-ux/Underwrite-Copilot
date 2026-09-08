@@ -123,6 +123,15 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(text).toContain("Stalled");
     expect(text).toContain("Failed");
     expect(text).not.toMatch(/Elm Street Lofts[^]*?\bGo\b[^]*?Arlington Flex Park|Elm Street Lofts[\s\S]{0,400}\bGo\b/);
+    // The mandate fit is drawn, not said: the six scored live deals (the
+    // dead one is folded away) each draw the bar twice — once in the `lg`
+    // score column, once on the line the narrower widths show — and the
+    // words a screen reader gets appear once per deal, not once per meta
+    // line as they did when the fit was a word the truncation cut first.
+    expect((html.match(/data-fit-bar/g) ?? []).length).toBe(12);
+    expect((html.match(/Fit 71 · Watch/g) ?? []).length).toBe(2);
+    expect((html.match(/Fit 88 · Pursue/g) ?? []).length).toBe(1);
+    expect((html.match(/Fit 42 · Outside box/g) ?? []).length).toBe(1);
   });
 
   it("renders the empty pipeline with the getting-started state, and the at-limit notice", () => {

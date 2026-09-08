@@ -3,19 +3,19 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#254 merged to main (live build
-sha `a407f5f`, #253, confirmed equal to the main tip by live-verify at 17:09
-UTC with its `DEPLOY: LIVE` line — every one of the seventy-eight through
-#253 is live, the homepage serves at 196 KB where it served at 488 KB, the
+**Last updated 2026-09-08**, after PRs #176–#255 merged to main (live build
+sha `395a311`, #254, confirmed equal to the main tip by live-verify at 17:16
+UTC with its `DEPLOY: LIVE` line — every one of the seventy-nine through
+#254 is live, the homepage serves at 196 KB where it served at 488 KB, the
 public sample memo at 57 KB where it served at 11 KB (the Brewerytown frame
 is in it), and the public-page lint #231 added reads all twelve public pages
-clean on every run; #254 is merged and awaits its proof, #255 follows).
+clean on every run; #255 is merged and awaits its proof, #256 follows).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Eighty PRs (#176–#255) landed across one review session and the
+Eighty-one PRs (#176–#256) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -390,6 +390,9 @@ deploy (live-verify shows the sha).
   from a centre line, right in the pass colour and left in the kill colour,
   scaled to the row's widest spread; muted on a rejected deal, none on a
   plan deal.
+- **The pipeline row draws its fit below `lg`** (#256): the same 0–100 bar
+  the score column draws, on its own line in the call's colour, where the
+  fit word used to be the part a phone cut off.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -666,16 +669,15 @@ a route scoped to the share token; the memo and the report got theirs in
    "+4.2%" or "−$120k" and a comp detail's "$262k/unit"), returning nothing
    when the text is not a figure. Plain `View`s, height-neutral, the same
    fill-count assertion.
-9. **The pipeline row's fit at phone width.** From `lg` up each row draws
-   its mandate score as a 0–100 bar in the call's colour; below `md` the
-   fit is a word at the end of the row's second meta line ("$68.0M · 5.6%
-   cap · Near miss"), which is the part a one-line truncation cuts first —
-   at 390 most rows end in "…". The picture is already drawn for wide
-   screens: show the same bar (no number) under the verdict chip on a
-   phone and drop the fit word from that meta line, so the row reads
-   price · cap and a bar. `DealRow` in `app/(app)/deals/pipeline.tsx`;
-   the pipeline fixture in `lib/views.render.test.ts` already renders at
-   390 — assert the bar count there and shoot.
+9. **Data bars in the rent-roll workbook's Rollover tab.** #251 gave the
+   meeting workbook Excel's own data bars on price, cap and yield on cost;
+   the rent-roll export's Rollover tab still carries the space expiring
+   each year as figures alone. The same `addConditionalFormatting` data-bar
+   rule over the year rows' expiring-SF (or share-of-NRA) column, live as
+   the leases are edited because Excel draws it; the range ends at the last
+   year row, never the total, and an empty schedule writes no rule. Read
+   the rule back in `lib/export/` 's workbook test the way
+   `lib/pipeline-workbook.test.ts` does.
 
 ---
 
