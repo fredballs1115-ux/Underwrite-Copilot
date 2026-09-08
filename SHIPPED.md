@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Seventy-eight PRs, #176–#253, each
+estimate, and that's what it should flag." Seventy-nine PRs, #176–#254, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1056,6 +1056,16 @@ confirmed equal to the main tip after each batch.
   range that is not one, so the row prints as before. Plain Views, no height
   added; the report render test asserts three fills a check against the same
   report with ranges that do not parse, and the parser's cases.
+- **#254 The compare page at phone width stacks a card per deal.** Below the
+  `sm` breakpoint the side-by-side table scrolled inside its card, so a phone
+  read one deal's column and a sliver of the next. It now renders one card
+  per deal — the name and verdict pill, the screen's reason, the buy-box fit,
+  then every table row as a two-column list with the same figures, "best"
+  pills and spread bars — and the table takes over from `sm` up. The spread
+  and the best marks are computed once for both layouts, so the two can
+  never disagree. The compare fixture asserts twenty-two bars (eleven per
+  layout), four "best" pills, a card per deal and the table hidden below
+  `sm`; shot at 390.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

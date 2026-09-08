@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "Compare reads on a phone, one deal at a time",
+      "blurb": "On a phone the compare page now stacks a card per deal — name, verdict, the screen's reason, the buy-box fit, then every return row with its figure, best mark and spread bar — instead of a side-by-side table that scrolled sideways and showed one deal and a sliver of the next. From a tablet up the table is unchanged.",
+      "href": "/deals/compare"
+    },
+    {
+      "date": "2026-09-08",
       "title": "The full report draws each OM assumption on its typical range",
       "blurb": "The report's Market plausibility page now shows where each OM assumption sits against the typical range for the asset class — a small track with a dot placed on it, red where the read is aggressive, green where it is conservative — so an exit cap at the tight end or a rent-growth figure past the range reads before the words do. A range the check states in words rather than figures prints as before.",
       "href": "/deals"
