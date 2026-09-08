@@ -7,6 +7,8 @@ import type {
   MarketResult,
   VerdictResult,
 } from "@/lib/anthropic/types";
+import { inferStrategy, planSummary } from "@/lib/deal-strategy";
+import { SharePlan } from "./plan-facts";
 
 // Every render checks expiry/revocation against the database.
 export const dynamic = "force-dynamic";
@@ -104,6 +106,13 @@ export default async function SharePage({
 
   const metrics = (extraction?.metrics ?? []).slice(0, 8);
   const screen = verdict.screen;
+  // The deal's kind first — a partner reading "$21M stabilized NOI" beside a
+  // $20M price needs to know it is a conversion's finished-project figure.
+  const safeExtraction = extraction
+    ? { ...extraction, metrics: extraction.metrics ?? [] }
+    : null;
+  const strategy = inferStrategy(safeExtraction);
+  const plan = planSummary(safeExtraction, strategy);
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-10">
@@ -125,7 +134,11 @@ export default async function SharePage({
         {deal.name as string}
       </h1>
       <p className="mt-1 text-sm capitalize text-muted">
-        {[extraction?.market, deal.asset_class as string]
+        {[
+          extraction?.market,
+          deal.asset_class as string,
+          strategy.kind !== "unknown" ? strategy.label : null,
+        ]
           .filter(Boolean)
           .join(" · ")}
       </p>
@@ -155,6 +168,8 @@ export default async function SharePage({
           </ul>
         )}
       </section>
+
+      <SharePlan strategy={strategy} plan={plan} />
 
       {screen && (screen.ranges ?? []).length > 0 && (
         <section className="mt-6 rounded-2xl border border-line bg-surface p-5 shadow-sm">

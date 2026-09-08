@@ -29,9 +29,16 @@ export interface PipelineExportRow {
   stage: string;
   assetClass: string;
   market: string;
+  /** the deal's kind as a label ("Conversion") — null when the OM gives nothing to read */
+  dealType: string | null;
+  /** a plan deal — value-add, lease-up, conversion or development: no going-in cap */
+  planDeal: boolean;
   /** raw extracted strings — parsed for number cells, kept verbatim otherwise */
   price: string | null;
+  /** the going-in cap on today's income — always null on a plan deal */
   cap: string | null;
+  /** a plan deal's stabilized NOI over total cost, e.g. "11.7%" */
+  yieldOnCost: string | null;
   fit: "fits" | "near" | "outside" | null;
   verdict: string | null; // pass | caution | pass_on
   offersDue: string | null; // YYYY-MM-DD
@@ -69,9 +76,11 @@ export async function buildPipelineWorkbook(
     { width: 34 }, // Deal
     { width: 20 }, // Stage
     { width: 13 }, // Asset
+    { width: 13 }, // Deal type
     { width: 22 }, // Market
     { width: 14 }, // Price
-    { width: 10 }, // Cap
+    { width: 11 }, // Cap
+    { width: 13 }, // Yield on cost
     { width: 10 }, // Buy box
     { width: 10 }, // Verdict
     { width: 12 }, // Offers due
@@ -90,9 +99,11 @@ export async function buildPipelineWorkbook(
     "Deal",
     "Stage",
     "Asset class",
+    "Deal type",
     "Market",
     "Price",
     "Cap rate",
+    "Yield on cost",
     "Buy box",
     "Verdict",
     "Offers due",
@@ -106,9 +117,15 @@ export async function buildPipelineWorkbook(
     c.font = { bold: true, size: 10, color: { argb: WHITE } };
     c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BRAND } };
     c.alignment = {
-      horizontal: i >= 4 && i <= 5 ? "right" : "left",
+      horizontal: i >= 5 && i <= 7 ? "right" : "left",
       vertical: "middle",
     };
+    if (h === "Yield on cost") {
+      c.note =
+        "Plan deals — value-add, lease-up, conversion, development — have no going-in cap. " +
+        "This is the OM's stabilized NOI over total cost (price plus the capital budget), " +
+        "the figure such a deal is judged on.";
+    }
   });
   headRow.height = 18;
 
@@ -126,7 +143,7 @@ export async function buildPipelineWorkbook(
     const isDead = stage === "dead";
 
     // Stage band.
-    ws.mergeCells(`B${rowN}:L${rowN}`);
+    ws.mergeCells(`B${rowN}:N${rowN}`);
     const band = ws.getCell(`B${rowN}`);
     band.value = `${STAGE_LABEL[stage]}  ·  ${group.length}`;
     band.font = { bold: true, size: 10, color: { argb: isDead ? MUTED : BRAND } };
@@ -148,11 +165,19 @@ export async function buildPipelineWorkbook(
       row.getCell(3).font = baseFont;
       row.getCell(4).value = d.assetClass === "auto" ? "—" : d.assetClass;
       row.getCell(4).font = baseFont;
-      row.getCell(5).value = d.market || "—";
-      row.getCell(5).font = baseFont;
+      // The deal's kind beside its asset class: a conversion's figures read
+      // differently from a stabilized asset's, and a meeting reads the row
+      // before anyone opens the deal.
+      row.getCell(5).value = d.dealType ?? "—";
+      row.getCell(5).font =
+        d.planDeal && !isDead
+          ? { size: 10, bold: true, color: { argb: BRAND } }
+          : baseFont;
+      row.getCell(6).value = d.market || "—";
+      row.getCell(6).font = baseFont;
 
       const priceNum = d.price ? parseMoney(d.price) : null;
-      const priceCell = row.getCell(6);
+      const priceCell = row.getCell(7);
       if (priceNum != null) {
         priceCell.value = priceNum;
         priceCell.numFmt = USD;
@@ -162,40 +187,54 @@ export async function buildPipelineWorkbook(
       priceCell.font = baseFont;
       priceCell.alignment = { horizontal: "right" };
 
+      // A plan deal has no going-in cap; its yield on cost sits in the next
+      // column, so the cap cell says so rather than showing a dash a reader
+      // would take for "not stated".
       const capNum = d.cap ? parsePct(d.cap) : null;
-      const capCell = row.getCell(7);
+      const capCell = row.getCell(8);
       if (capNum != null) {
         capCell.value = capNum / 100;
         capCell.numFmt = PCT2;
       } else {
-        capCell.value = d.cap ?? "—";
+        capCell.value = d.cap ?? (d.planDeal ? "n/a — plan" : "—");
       }
       capCell.font = baseFont;
       capCell.alignment = { horizontal: "right" };
 
+      const yocNum = d.yieldOnCost ? parsePct(d.yieldOnCost) : null;
+      const yocCell = row.getCell(9);
+      if (yocNum != null) {
+        yocCell.value = yocNum / 100;
+        yocCell.numFmt = PCT2;
+      } else {
+        yocCell.value = d.yieldOnCost ?? "—";
+      }
+      yocCell.font = baseFont;
+      yocCell.alignment = { horizontal: "right" };
+
       const fit = d.fit ? FIT_LABEL[d.fit] : null;
-      row.getCell(8).value = fit?.label ?? "—";
-      row.getCell(8).font = fit
+      row.getCell(10).value = fit?.label ?? "—";
+      row.getCell(10).font = fit
         ? { size: 10, bold: true, color: { argb: fit.color } }
         : baseFont;
 
       const v = d.verdict ? VERDICT_LABEL[d.verdict] : null;
-      row.getCell(9).value = v?.label ?? "—";
-      row.getCell(9).font = v
+      row.getCell(11).value = v?.label ?? "—";
+      row.getCell(11).font = v
         ? { size: 10, bold: true, color: { argb: v.color } }
         : baseFont;
 
-      const dueCell = row.getCell(10);
+      const dueCell = row.getCell(12);
       dueCell.value = d.offersDue ?? "—";
       dueCell.font =
         d.offersDue && d.offersDue < today && !isDead
           ? { size: 10, bold: true, color: { argb: KILL } }
           : baseFont;
 
-      row.getCell(11).value = d.createdAt.slice(0, 10);
-      row.getCell(11).font = baseFont;
-      row.getCell(12).value = d.addedBy ?? "";
-      row.getCell(12).font = baseFont;
+      row.getCell(13).value = d.createdAt.slice(0, 10);
+      row.getCell(13).font = baseFont;
+      row.getCell(14).value = d.addedBy ?? "";
+      row.getCell(14).font = baseFont;
       rowN++;
     }
     rowN++; // breathing room between stages
@@ -264,6 +303,17 @@ export async function buildPipelineWorkbook(
   sum.getCell(`C${totalRow + 2}`).value = prices.reduce((a, b) => a + b, 0);
   sum.getCell(`C${totalRow + 2}`).numFmt = USD;
   sum.getCell(`C${totalRow + 2}`).font = { size: 10, bold: true, color: { argb: INK } };
+  // How many live rows read on yield on cost rather than a going-in cap —
+  // the meeting should know before it compares caps across the sheet.
+  const planLive = live.filter((d) => d.planDeal).length;
+  sum.getCell(`B${totalRow + 3}`).value = "Plan deals (judged on yield on cost)";
+  sum.getCell(`B${totalRow + 3}`).font = { size: 10, color: { argb: INK } };
+  sum.getCell(`C${totalRow + 3}`).value = planLive;
+  sum.getCell(`C${totalRow + 3}`).font = {
+    size: 10,
+    bold: true,
+    color: { argb: planLive ? INK : MUTED },
+  };
 
   // Firm branding (Feature 6): file properties + print chrome only — the
   // meeting workbook is the artifact most likely to be projected, so it

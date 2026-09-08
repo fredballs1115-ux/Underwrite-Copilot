@@ -1,4 +1,11 @@
-import { findMetric, parseMoney, parsePct } from "@/lib/criteria";
+import { findGoingInCap, findMetric, parseMoney, parsePct } from "@/lib/criteria";
+import {
+  findPriceMetric,
+  inferStrategy,
+  planSummary,
+  type StrategyKind,
+} from "@/lib/deal-strategy";
+import type { ExtractedMetric, ExtractionResult } from "@/lib/anthropic/types";
 import { normalizeStage, type Stage } from "@/lib/stages";
 
 /**
@@ -6,6 +13,12 @@ import { normalizeStage, type Stage } from "@/lib/stages";
  * this derives the numeric series the /analytics charts plot. Same honesty
  * rules as the internal comps memory: the sample deal never counts, and a
  * deal only contributes a point when its figure actually parsed.
+ *
+ * The deal's kind is read first. A plan deal (value-add, lease-up,
+ * conversion, development) has no going-in cap — its stabilized figure is
+ * the finished project's, judged on yield on total cost — so it never lands
+ * in the cap series, and its basis per unit is total cost over the planned
+ * units, never the shell's price over apartments that do not exist yet.
  */
 
 export interface AnalyticsDeal {
@@ -15,17 +28,17 @@ export interface AnalyticsDeal {
   at: string;
   stage: Stage;
   verdict: "pass" | "caution" | "pass_on" | null;
+  /** the deal's strategy — "unknown" only when the extraction gives nothing to read */
+  kind: StrategyKind;
+  /** going-in cap, % — null on a plan deal, which has none */
   capPct: number | null;
+  /** a plan deal's stabilized NOI over total cost, % — null for a stabilized asset */
+  yieldOnCostPct: number | null;
   /** derived $/unit (multifamily) — null when either side didn't parse */
   perUnit: number | null;
   price: number | null;
   market: string;
   assetClass: string;
-}
-
-interface MetricLike {
-  label: string;
-  value: string;
 }
 
 export interface AnalyticsRow {
@@ -39,43 +52,52 @@ export interface AnalyticsRow {
   extraction: unknown;
 }
 
+function unitCount(metrics: ExtractedMetric[]): number | null {
+  const units = findMetric(
+    metrics,
+    /^units?\b|number of units|unit count/i,
+    /per|\/|price|\$/i,
+  );
+  const n = units ? Number(units.value.replace(/[,\s]/g, "")) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
   const out: AnalyticsDeal[] = [];
   for (const r of rows) {
     if (r.is_sample) continue;
-    const extraction = (r.extraction ?? null) as {
-      assetClass?: string;
-      market?: string;
-      metrics?: MetricLike[];
-    } | null;
-    if (!extraction) continue;
-    const metrics = Array.isArray(extraction.metrics) ? extraction.metrics : [];
+    const raw = (r.extraction ?? null) as Partial<ExtractionResult> | null;
+    if (!raw) continue;
+    // Rows saved before `metrics` / `strategy` existed: normalise once so the
+    // strategy reader never meets a missing array.
+    const metrics = Array.isArray(raw.metrics) ? raw.metrics : [];
+    const extraction = { ...raw, metrics } as ExtractionResult;
+    const strategy = inferStrategy(extraction);
+    const plan = planSummary(extraction, strategy);
 
-    const capMetric = findMetric(
-      metrics,
-      /going[- ]?in cap|cap rate/i,
-      /exit|pro ?forma|stabilized|terminal|reversion/i,
-    );
+    // A plan deal has no going-in cap: a stabilized or pro forma cap, or a
+    // yield on cost, describes the finished project, not the price paid.
+    const capMetric = plan ? null : findGoingInCap(metrics);
     const capPct = capMetric ? parsePct(capMetric.value) : null;
 
-    const priceMetric = findMetric(
-      metrics,
-      /asking price|purchase price|^price\b/i,
-      /unit|\bsf\b|per|\/|psf/i,
-    );
+    // The asking / purchase price — or, on a development, the land cost.
+    const priceMetric = findPriceMetric(metrics, strategy.kind);
     const price = priceMetric ? parseMoney(priceMetric.value) : null;
 
     let perUnit: number | null = null;
-    const directPer = findMetric(metrics, /per unit|\/unit|unit price/i);
-    if (directPer) perUnit = parseMoney(directPer.value);
-    if (perUnit == null && price != null) {
-      const units = findMetric(
-        metrics,
-        /^units?\b|number of units|unit count/i,
-        /per|\/|price|\$/i,
-      );
-      const n = units ? Number(units.value.replace(/[,\s]/g, "")) : NaN;
-      if (Number.isFinite(n) && n > 0) perUnit = price / n;
+    if (plan) {
+      // Basis per planned unit: what a finished unit costs all-in. The
+      // shell's price over units still to be built is not a comparable
+      // figure, so with no total cost there is no point to plot.
+      const units = unitCount(metrics);
+      if (plan.totalCost != null && units != null) perUnit = plan.totalCost / units;
+    } else {
+      const directPer = findMetric(metrics, /per unit|\/unit|unit price/i);
+      if (directPer) perUnit = parseMoney(directPer.value);
+      if (perUnit == null && price != null) {
+        const units = unitCount(metrics);
+        if (units != null) perUnit = price / units;
+      }
     }
 
     const verdictRaw = (r.verdict as { verdict?: string } | null)?.verdict;
@@ -88,7 +110,9 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
         verdictRaw === "pass" || verdictRaw === "caution" || verdictRaw === "pass_on"
           ? verdictRaw
           : null,
+      kind: strategy.kind,
       capPct: capPct != null && capPct > 0 && capPct < 25 ? capPct : null,
+      yieldOnCostPct: plan?.yieldOnCost != null ? plan.yieldOnCost * 100 : null,
       perUnit: perUnit != null && perUnit > 1_000 ? perUnit : null,
       price,
       market: extraction.market ?? "",

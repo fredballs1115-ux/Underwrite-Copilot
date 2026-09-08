@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { evaluateBuyBox, findMetric } from "@/lib/criteria";
+import { evaluateBuyBox, findGoingInCap } from "@/lib/criteria";
+import { findPriceMetric, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { getTeam } from "@/lib/teams";
 import { getActiveBranding } from "@/lib/branding-server";
 import {
@@ -99,6 +100,12 @@ export async function GET(req: Request) {
   const exportRows: PipelineExportRow[] = rows.map((d) => {
     const extraction = d.extraction as ExtractionResult | null;
     const metrics = extraction?.metrics ?? [];
+    // The deal's kind first. A plan deal (value-add, lease-up, conversion,
+    // development) has no going-in cap — its stabilized figure is the
+    // finished project's, judged on yield on total cost — and a development's
+    // price is its land cost when the OM states no asking price.
+    const strategy = inferStrategy(extraction ? { ...extraction, metrics } : null);
+    const plan = planSummary(extraction ? { ...extraction, metrics } : null, strategy);
     const box = d.team_id ? teamBox : personalBox;
     let fit: PipelineExportRow["fit"] = null;
     if (box && extraction) {
@@ -116,17 +123,12 @@ export async function GET(req: Request) {
       stage: d.stage ?? "screening",
       assetClass: d.asset_class,
       market: extraction?.market ?? "",
-      price:
-        findMetric(
-          metrics,
-          /purchase price|asking price|\bprice\b/i,
-          /unit|\/sf|per sf|per unit|psf/i,
-        )?.value ?? null,
-      cap:
-        (
-          findMetric(metrics, /going[- ]?in cap/i) ??
-          findMetric(metrics, /\bcap rate\b/i, /exit|terminal|reversion|pro ?forma/i)
-        )?.value ?? null,
+      dealType: strategy.kind === "unknown" ? null : strategy.label,
+      planDeal: plan != null,
+      price: findPriceMetric(metrics, strategy.kind)?.value ?? null,
+      cap: plan ? null : (findGoingInCap(metrics)?.value ?? null),
+      yieldOnCost:
+        plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,
       fit,
       verdict: (d.verdict as { verdict?: string } | null)?.verdict ?? null,
       offersDue: dueById.get(d.id) ?? null,

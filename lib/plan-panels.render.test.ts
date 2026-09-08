@@ -9,6 +9,8 @@ import type { ExtractionResult } from "@/lib/anthropic/types";
 import { inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { PlanSensitivity } from "@/app/(app)/deals/[id]/plan-sensitivity";
 import { ConstructionDebtPanel } from "@/app/(app)/deals/[id]/construction-debt-panel";
+import { PlanStrip } from "@/app/(app)/deals/[id]/plausibility-panel";
+import { SharePlan } from "@/app/share/[token]/plan-facts";
 
 const CONVERSION: ExtractionResult = {
   dealName: "1200 K Street — Office-to-Residential Conversion",
@@ -130,5 +132,38 @@ describe("ConstructionDebtPanel — the opening sentence follows the kind of pla
       React.createElement(ConstructionDebtPanel, { ...base, plan, planLabel: "Conversion" }),
     );
     expect(conv).toContain("income it does not have yet");
+  });
+});
+
+describe("SharePlan — the plan on the shared screen", () => {
+  const strategy = inferStrategy(CONVERSION);
+
+  it("names the kind, prints the five figures and says how to read them", () => {
+    const html = renderToStaticMarkup(React.createElement(SharePlan, { strategy, plan }));
+    expect(html).toContain("Conversion");
+    expect(html).toContain("$21.0M"); // stabilized NOI
+    expect(html).toContain("$20.0M"); // price
+    expect(html).toContain("Budget (total cost less price)");
+    expect(html).toContain("$160.0M");
+    expect(html).toContain("$180.0M"); // total cost
+    expect(html).toContain("11.7%"); // yield on cost
+    expect(html).toContain("24 months of construction");
+    expect(html).toContain("A conversion deal has no going-in cap");
+    expect(html).toContain("never a cap rate on the acquisition price");
+    // Nothing from the deal page that has no counterpart here.
+    expect(html).not.toContain("challenger");
+  });
+
+  it("renders nothing on a stabilized asset", () => {
+    expect(renderToStaticMarkup(React.createElement(SharePlan, { strategy, plan: null }))).toBe("");
+  });
+
+  it("prints the same five facts as the deal page's plan strip", () => {
+    const share = renderToStaticMarkup(React.createElement(SharePlan, { strategy, plan }));
+    const strip = renderToStaticMarkup(React.createElement(PlanStrip, { strategy, plan }));
+    for (const figure of ["$21.0M", "$20.0M", "$160.0M", "$180.0M", "11.7%"]) {
+      expect(share).toContain(figure);
+      expect(strip).toContain(figure);
+    }
   });
 });

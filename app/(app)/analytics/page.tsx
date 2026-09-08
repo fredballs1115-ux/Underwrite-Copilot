@@ -9,6 +9,7 @@ import {
   type AnalyticsRow,
 } from "@/lib/analytics";
 import { STAGES, STAGE_LABEL, normalizeStage } from "@/lib/stages";
+import { isPlanDeal } from "@/lib/deal-strategy";
 import { DotTimeline, VerdictMix, StageFunnel } from "./charts";
 
 export const metadata: Metadata = { title: "Analytics" };
@@ -42,6 +43,13 @@ export default async function AnalyticsPage() {
   const unitPoints = deals
     .filter((d) => d.perUnit != null)
     .map((d) => ({ at: d.at, value: d.perUnit!, name: d.name }));
+  // Plan deals have no going-in cap — their stabilized figure is the finished
+  // project's, judged on yield on total cost — so they sit outside the cap
+  // series and are counted, and read, on their own.
+  const planDeals = deals.filter((d) => isPlanDeal(d.kind));
+  const medYoc = median(
+    planDeals.map((d) => d.yieldOnCostPct).filter((v): v is number => v != null),
+  );
 
   const live = deals.filter((d) => d.stage !== "dead");
   const decided = deals.filter((d) => d.verdict !== null);
@@ -116,7 +124,10 @@ export default async function AnalyticsPage() {
               {
                 label: "Median going-in cap",
                 value: medCap != null ? pct(medCap) : "—",
-                sub: `${capPoints.length} deals parsed`,
+                sub:
+                  planDeals.length > 0
+                    ? `${capPoints.length} parsed · ${planDeals.length} plan deal${planDeals.length === 1 ? "" : "s"} judged on yield on cost${medYoc != null ? ` (median ${pct(medYoc)})` : ""}`
+                    : `${capPoints.length} deals parsed`,
               },
               {
                 label: "Median $/unit",
@@ -150,6 +161,8 @@ export default async function AnalyticsPage() {
                 </h2>
                 <p className="mb-2 mt-0.5 text-xs text-muted">
                   One dot per deal — hover for the name.
+                  {planDeals.length > 0 &&
+                    " Plan deals have no going-in cap and are not plotted."}
                 </p>
                 <DotTimeline points={capPoints} format={pct} medianLabel="median" />
               </div>
@@ -161,6 +174,8 @@ export default async function AnalyticsPage() {
                 </h2>
                 <p className="mb-2 mt-0.5 text-xs text-muted">
                   Multifamily deals where price and unit count both parsed.
+                  {planDeals.length > 0 &&
+                    " A plan deal plots its total cost per planned unit."}
                 </p>
                 <DotTimeline
                   points={unitPoints}
@@ -230,6 +245,8 @@ export default async function AnalyticsPage() {
               <p className="mt-2 text-xs text-muted">
                 Deals whose figures didn&rsquo;t parse are counted in Screens
                 but excluded from the medians.
+                {planDeals.length > 0 &&
+                  " Plan deals carry no going-in cap and sit outside the cap medians."}
               </p>
             </section>
           )}
