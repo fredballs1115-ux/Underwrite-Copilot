@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Fifty PRs, #176–#225, each
+estimate, and that's what it should flag." Fifty-one PRs, #176–#226, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -523,6 +523,28 @@ confirmed equal to the main tip after each batch.
   "Unpriced" or a "Call for offers" printed where a price goes. Both live
   in `lib/deal-strategy` (`findPricedMetric`, `signalAskPrice`) with the
   other readers, tested.
+- **#226 The public pages, walked as a visitor.** A production build was
+  started locally and every public page crawled, measured and screenshotted
+  at phone (390px) and desktop (1440px) widths with headless Chromium: all
+  51 internal links resolve, no page overflows horizontally, no console
+  errors. What the walk found, fixed: the covered-markets page ran edge to
+  edge for a signed-out visitor — the public chrome gave it no container
+  (the signed-in shell does) — so it now sits in the same measure as the
+  header; the homepage read "aboutabout half a minute", "9real scenarios"
+  and "Seattlepipelines wired" — a compiler quirk drops the leading space
+  of a JSX text node that spans lines and carries an HTML entity, so every
+  such site across the app (eight, including the construction-debt note,
+  the sample guide, the sector-facts form, the valuations note and the
+  compare page) now spells its space explicitly; the "Built in the open"
+  cards on the homepage clamp a note to four lines with a "Read the note"
+  link, and /whats-new folds a note longer than 600 characters behind its
+  opening sentences (native `<details>`, no script) — the plan-deal round's
+  note had become a full page of text on a phone; a rule effect that
+  already ended in a period no longer prints two; and the demo's model
+  slideshow no longer reserves the tallest slide's height on a phone (a
+  screen of blank space under the compact Returns slide) — inactive slides
+  are display:none there and autoplay is off, so nothing reflows under the
+  reader's thumb. The excerpt helper is tested.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

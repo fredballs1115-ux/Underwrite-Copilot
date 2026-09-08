@@ -714,7 +714,7 @@ export default function Home() {
               Our proof is public: a fully worked screen.
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
-              A first read — headline numbers and buy-box fit — lands in about
+              A first read — headline numbers and buy-box fit — lands in{" "}
               {FIRST_READ_CLAIM}, while the six deeper stages keep working. And
               the grilling speaks each asset type&apos;s language: office deals
               get pressed on lease rollover and today&apos;s TI packages,
@@ -975,7 +975,7 @@ export default function Home() {
                 The rent-control engine, running live on this page.
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
-                {SCENARIO_COUNT} real scenarios, one click apart — DC to
+                {SCENARIO_COUNT}{" "}real scenarios, one click apart — DC to
                 Brooklyn to LA to Chicago. Watch entity title flip a DC
                 rowhouse from exempt to rent-stabilized, two regimes split on
                 one 1930 Brooklyn eight-unit, and Montgomery County&apos;s
@@ -1015,7 +1015,7 @@ export default function Home() {
                 Coverage is deliberately focused: {MARKET_COUNT} markets — the
                 whole Mid-Atlantic plus the {MAJOR_MARKET_COUNT} biggest US
                 metros — with {RULE_COUNT} statute-linked rules and the
-                property database ({WIRED_MARKETS.join(", ")} pipelines
+                property database ({WIRED_MARKETS.join(", ")}{" "}pipelines
                 wired). Outside those markets the screener says
                 &ldquo;unscreened&rdquo; — it never guesses.
               </p>
@@ -2108,12 +2108,20 @@ function ShippedThisWeek() {
             Full log →
           </Link>
         </div>
+        {/* The card shows the note's opening, not the note: a long entry
+            (the plan-deal round runs to a page) would be a wall of text on
+            a phone. The full note is one tap away on /whats-new. */}
         <ul className="mt-3 grid gap-3 sm:grid-cols-3">
           {entries.map((e) => (
             <li key={`${e.date}|${e.title}`} className="rounded-xl border border-line bg-surface p-3.5">
               <p className="text-sm font-medium leading-snug">{e.title}</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted">{e.blurb}</p>
-              <p className="mt-1.5 text-[11px] text-muted">{fmt(e.date)}</p>
+              <p className="mt-1 line-clamp-4 text-xs leading-relaxed text-muted">{e.blurb}</p>
+              <p className="mt-1.5 flex items-baseline justify-between gap-2 text-[11px] text-muted">
+                <span>{fmt(e.date)}</span>
+                <Link href="/whats-new" className="font-medium text-brand hover:text-brand-strong">
+                  Read the note →
+                </Link>
+              </p>
             </li>
           ))}
         </ul>

@@ -728,7 +728,7 @@ async function MetroExplorer({ selected }: { selected?: string }) {
                   >
                     {r.status}
                   </span>
-                  {r.effect.split(". ")[0]}.
+                  {r.effect.split(". ")[0].replace(/\.\s*$/, "")}.
                   {r.source && (
                     <a
                       href={r.source}
