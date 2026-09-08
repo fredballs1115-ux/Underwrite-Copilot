@@ -155,6 +155,21 @@ gated on tsc / eslint / the full suite / a production build.
   — construction or bridge debt sized to cost, not permanent debt sized to
   today's income — instead of a silent gap. A value-add with a real
   in-place cap keeps its leverage check.
+- **#200 Construction & take-out debt for plan deals.** The debt sizer only
+  knew permanent debt, and on a conversion it sat blank — no in-place NOI to
+  size on. The Financing & capital card now opens, on a plan deal, with the
+  plan's own debt: a construction or bridge loan sized to total cost at the
+  lender's loan-to-cost cap, with the interest reserve it funds inside the
+  loan solved in closed form (L = ltc·C ÷ (1 − ltc·r·t·p)); the take-out the
+  finished NOI can carry at stabilization under DSCR, debt yield and LTV on
+  stabilized value, the binding one named; the cash-in refinance when the
+  construction loan is bigger than the take-out, or the headroom when it is
+  not; equity as a share of cost; and yield on total cost with the carry
+  inside it, set against the OM's figure that leaves it out. Seeded from the
+  OM's budget, stabilized NOI and timeline ("24 months of construction, 12
+  months of lease-up" reads as three years), and from the permanent sizer's
+  own lender terms so one set of assumptions drives both. Pure module
+  (`lib/construction-debt.ts`), ten tests.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

@@ -3,9 +3,9 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#199 merged to main (live build
-sha `87fdd0c`, #196, confirmed equal to the main tip by live-verify at 00:25
-UTC; #197–#199 follow on the next Render deploy).
+**Last updated 2026-09-08**, after PRs #176–#200 merged to main (live build
+sha `1bb5adf`, #198, confirmed equal to the main tip by live-verify at 00:36
+UTC; #199–#200 follow on the next Render deploy).
 
 ---
 
@@ -52,6 +52,11 @@ Four PRs landed from one review session; each is live once Render finishes the
   conversion no longer scores "Fit 100" on its stabilized cap. The compare
   table and the leverage check (#199) say "n/a — plan" and "judged on
   yield on cost" instead of reading a dark building's year-1 cap.
+- **Construction & take-out debt** (#200): on a plan deal the Financing &
+  capital card opens with a construction loan sized to total cost (interest
+  reserve inside it), the take-out the finished NOI carries, the cash-in
+  refinance or headroom between the two, equity as a share of cost, and
+  yield on cost with the carry included.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":
@@ -62,7 +67,10 @@ also linked from `/data-health` under "Service probes":
    a red panel: on a conversion that figure is the plan, and the challenger is
    briefed to test whether it is as conservative as the OM says. Under the
    strip, "Yield on cost, stressed" should read 11.7% at the outlined base
-   cell (+567 bps over a 6% reference cap) with the NOI floor at $10.8M. The
+   cell (+567 bps over a 6% reference cap) with the NOI floor at $10.8M. In
+   Financing & capital, "Construction & take-out" should show a construction
+   loan of about $117M at 60% of a ~$195M total cost (carry included, three
+   years at 8%) and no cash-in refinance at a 6% exit cap. The
    Excel model's Cover says *Deal type: Conversion*, and its SOURCE column
    names the stabilized figure it kept out of year 1 and the OM page the
    $160M capital line came from.

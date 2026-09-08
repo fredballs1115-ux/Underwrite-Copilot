@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { findMetric, parseMoney } from "@/lib/criteria";
-import { IMPLIED_CAP_CEILING, noiFigures } from "@/lib/deal-strategy";
+import { IMPLIED_CAP_CEILING, inferStrategy, isPlanDeal, noiFigures, planSummary } from "@/lib/deal-strategy";
+import { ConstructionDebtPanel } from "./construction-debt-panel";
 import type { UnderwritingModel } from "@/lib/model/types";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { ExtractionResult } from "@/lib/anthropic/types";
@@ -195,6 +196,15 @@ export function DebtSizer({
 }) {
   const seed = useMemo(() => deriveSeed(model, extraction), [model, extraction]);
   const omTerms = useMemo(() => omLoanTerms(extraction), [extraction]);
+  // A plan deal's debt is construction or bridge debt sized to cost, paid off
+  // at stabilization: the plan block above the permanent sizer, seeded from
+  // the OM's own budget, NOI and timeline.
+  const strategy = useMemo(() => inferStrategy(extraction), [extraction]);
+  const plan = useMemo(
+    () => (isPlanDeal(strategy.kind) ? planSummary(extraction, strategy) : null),
+    [extraction, strategy],
+  );
+  const planDebt = plan != null && plan.price != null && plan.stabilizedNoi != null && plan.budget != null;
 
   // Money fields stay strings so "68m", "68,000,000" and "$68M" all work.
   const [priceRaw, setPriceRaw] = useState(seed.price != null ? fmtInput(seed.price) : "");
@@ -405,7 +415,31 @@ export function DebtSizer({
           </>
         )}
 
-        <SubHead>Debt sizer</SubHead>
+        {planDebt && plan && (
+          <>
+            <SubHead>Construction &amp; take-out — the plan&apos;s debt</SubHead>
+            <ConstructionDebtPanel
+              plan={plan}
+              planLabel={strategy.label}
+              exitCapPct={underwrite && underwrite.exitCapPct > 0 ? Math.round(underwrite.exitCapPct * 10_000) / 100 : null}
+              takeOutRatePct={ratePct}
+              amortYears={amortYears}
+              minDscr={minDscr}
+              minDebtYieldPct={minDebtYieldPct}
+              maxLtvPct={maxLtvPct}
+              numCls={numCls}
+            />
+          </>
+        )}
+
+        <SubHead>{planDebt ? "Permanent debt sizer — the take-out's lender terms" : "Debt sizer"}</SubHead>
+        {planDebt && noi == null && (
+          <p className="mt-1 text-xs text-muted">
+            No in-place NOI to size permanent debt on today — the rate, amortization, LTV, DSCR and
+            debt-yield terms here drive the take-out above. Enter a stabilized NOI as Year-1 NOI to
+            size the permanent loan on the finished building directly.
+          </p>
+        )}
         <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <label className="block">
             <span className="text-[10px] font-medium uppercase tracking-wide text-muted">Price</span>
