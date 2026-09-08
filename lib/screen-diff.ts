@@ -75,14 +75,40 @@ const TRACKED: Tracked[] = [
   {
     label: "Going-in cap",
     include: /going[- ]?in cap/i,
+    // A stabilized / pro forma cap or a yield on cost is the finished
+    // project's figure on a plan deal, not the cap on today's income.
+    exclude: /stabili[sz]|pro ?forma|forward|projected|yield|exit|terminal|reversion/i,
     kind: "pct",
     betterWhen: "up",
   },
   {
     label: "NOI",
     include: /\bnoi\b/i,
-    exclude: /stabilized|pro ?forma/i,
+    exclude: /stabili[sz]ed|pro ?forma/i,
     kind: "money",
+    betterWhen: "up",
+  },
+  // A plan deal retrades on its plan: the finished project's NOI, what it
+  // costs to get there, and the yield the two imply. Label-matched like the
+  // rest, so an OM that carries none of these adds no rows.
+  {
+    label: "Stabilized NOI (pro forma)",
+    include: /(stabili[sz]ed|pro ?forma)[^a-z]*\bnoi\b|\bnoi\b[^a-z]*\((stabili[sz]ed|pro ?forma)/i,
+    kind: "money",
+    betterWhen: "up",
+  },
+  {
+    label: "Capital budget",
+    include:
+      /total (project|development) cost|renovation (budget|cost)|capex budget|capital (budget|plan)|construction (cost|budget)|hard costs?/i,
+    exclude: /\bper\b|\/|psf|unit|reserve|annual/i,
+    kind: "money",
+    betterWhen: "down",
+  },
+  {
+    label: "Yield on cost",
+    include: /yield on (total )?cost|\byoc\b|return on cost/i,
+    kind: "pct",
     betterWhen: "up",
   },
   {

@@ -3,15 +3,15 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#208 merged to main (live build
-sha `522cbbf`, #207, confirmed equal to the main tip by live-verify at 01:09
-UTC; #208 follows on the next Render deploy).
+**Last updated 2026-09-08**, after PRs #176–#209 merged to main (live build
+sha `3317969`, #208, confirmed equal to the main tip by live-verify at 01:28
+UTC; #209 follows on the next Render deploy).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Thirty-three PRs (#176–#208) landed across one review session and the
+Thirty-four PRs (#176–#209) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -67,6 +67,12 @@ deploy (live-verify shows the sha).
   columns (a plan deal's cap cell reads "n/a — plan"; the summary counts live
   plan deals). The read-only share link names the kind and carries the plan's
   five facts above the key terms, from the same source as the deal page.
+- **The comp memory and the retrade diff read the deal's kind too** (#209).
+  "From your pipeline" labels a plan-deal sibling, shows its yield on cost
+  where a cap would sit and an all-in basis (total cost over planned units);
+  the since-last-screen diff tracks a plan deal's stabilized NOI, capital
+  budget and yield on cost, and never reads a stabilized cap as the going-in
+  cap.
 
 **Your checks (~10 min, after the deploy)** — the three JSON probes below are
 also linked from `/data-health` under "Service probes":
@@ -92,7 +98,9 @@ also linked from `/data-health` under "Service probes":
    "· Conversion" and a teal "The plan" block sits above the key terms; and
    **Export** the pipeline from `/deals` — the row shows *Conversion* under
    Deal type, "n/a — plan" under Cap rate and 11.7% under Yield on cost, and
-   `/analytics` no longer plots it as a cap point.
+   `/analytics` no longer plots it as a cap point. On any other multifamily
+   deal's page, "From your pipeline" lists it as *Conversion* with 11.7% yoc
+   and $294k/unit all-in (#209).
 2. **Hit `/api/imagery/health` signed in.** A new `geocoder` key leads the
    JSON: it should read `ok: true`, `source: "census"`, `precision: "street"`,
    a few tens of metres off. Paste it back if anything else shows.

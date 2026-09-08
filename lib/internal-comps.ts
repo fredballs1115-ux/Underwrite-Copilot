@@ -1,4 +1,11 @@
-import { findMetric, parseMoney, parsePct } from "@/lib/criteria";
+import { findGoingInCap, findMetric, parseMoney, parsePct } from "@/lib/criteria";
+import {
+  findPriceMetric,
+  inferStrategy,
+  planSummary,
+  type StrategyKind,
+} from "@/lib/deal-strategy";
+import type { ExtractionResult } from "@/lib/anthropic/types";
 
 /**
  * Internal comps memory: every deal the user screens leaves extracted figures
@@ -18,8 +25,16 @@ export interface InternalComp {
   /** raw extracted values — shown as extracted, never restated */
   priceLabel: string | null;
   capLabel: string | null;
-  /** derived $/unit or $/SF when both sides parsed (label carries the basis) */
+  /** derived $/unit or $/SF when both sides parsed (label carries the basis);
+   *  on a plan deal it is total cost over the planned units — "all-in" */
   basisLabel: string | null;
+  /** the sibling's strategy — a plan deal's figures describe its finished project */
+  kind: StrategyKind;
+  /** "Conversion", "Value-add"… on a plan deal; null for a stabilized asset */
+  kindLabel: string | null;
+  /** a plan deal's stabilized NOI over total cost, e.g. "11.7%" — its answer
+   *  where a stabilized asset shows a cap */
+  yieldOnCostLabel: string | null;
 }
 
 interface MetricLike {
@@ -59,15 +74,21 @@ function deriveBasis(
   metrics: MetricLike[],
   assetClass: string,
   price: number | null,
+  /** the price is a plan deal's total cost: skip the OM's own per-unit line
+   *  (whose basis is unknowable there) and say so in the label */
+  allIn = false,
 ): string | null {
-  const direct = findMetric(metrics, /per unit|\/unit|price\/unit|unit price/i);
-  if (direct) return direct.value;
+  if (!allIn) {
+    const direct = findMetric(metrics, /per unit|\/unit|price\/unit|unit price/i);
+    if (direct) return direct.value;
+  }
+  const suffix = allIn ? " all-in" : "";
 
   if (price == null) return null;
   if (assetClass === "multifamily") {
     const units = findMetric(metrics, /^units?\b|number of units|unit count/i, /per|\/|price|\$/i);
     const n = units ? Number(units.value.replace(/[,\s]/g, "")) : NaN;
-    if (Number.isFinite(n) && n > 0) return `${fmtCompact(price / n)}/unit`;
+    if (Number.isFinite(n) && n > 0) return `${fmtCompact(price / n)}/unit${suffix}`;
     return null;
   }
   // Office / industrial / retail: dollars per square foot.
@@ -77,7 +98,7 @@ function deriveBasis(
     /price|\$|per|\/|psf/i,
   );
   const n = sf ? parseMoney(sf.value) : null; // handles "412,000" and "412k"
-  if (n != null && n > 0) return `$${Math.round(price / n)}/SF`;
+  if (n != null && n > 0) return `$${Math.round(price / n)}/SF${suffix}`;
   return null;
 }
 
@@ -111,20 +132,23 @@ export function deriveInternalComps(
     if (!Array.isArray(metrics) || metrics.length === 0) continue;
     if (effectiveClass(row.asset_class, extraction) !== wanted) continue;
 
-    const price = findMetric(
-      metrics,
-      /purchase price|asking price|\bprice\b/i,
-      /unit|\/sf|per sf|per unit|psf/i,
-    );
-    const cap =
-      findMetric(metrics, /going[- ]?in cap/i) ??
-      findMetric(metrics, /\bcap rate\b/i, /exit|terminal|reversion/i);
-    if (!price && !cap) continue;
+    // The sibling's kind first. A plan deal (value-add, lease-up, conversion,
+    // development) has no going-in cap — its stabilized cap or yield on cost
+    // describes the finished project — and its comparable basis is total
+    // cost over the planned units, never a shell's price over apartments
+    // that do not exist yet.
+    const ext = { ...extraction, metrics } as ExtractionResult;
+    const strategy = inferStrategy(ext);
+    const plan = planSummary(ext, strategy);
+    const price = findPriceMetric(metrics, strategy.kind);
+    const cap = plan ? null : findGoingInCap(metrics);
+    const yoc = plan?.yieldOnCost ?? null;
+    if (!price && !cap && yoc == null) continue;
     // Only rows whose values actually parse — a garbled extraction ("TBD",
     // "see broker") isn't a comp.
     const priceNum = price ? parseMoney(price.value) : null;
     const capNum = cap ? parsePct(cap.value) : null;
-    if (priceNum == null && capNum == null) continue;
+    if (priceNum == null && capNum == null && yoc == null) continue;
 
     comps.push({
       dealId: row.id,
@@ -134,7 +158,14 @@ export function deriveInternalComps(
       call: (row.verdict as { verdict?: string } | null)?.verdict ?? null,
       priceLabel: priceNum != null ? fmtCompact(priceNum) : null,
       capLabel: capNum != null ? cap!.value : null,
-      basisLabel: deriveBasis(metrics, wanted, priceNum),
+      basisLabel: plan
+        ? plan.totalCost != null
+          ? deriveBasis(metrics, wanted, plan.totalCost, true)
+          : null
+        : deriveBasis(metrics, wanted, priceNum),
+      kind: strategy.kind,
+      kindLabel: plan ? strategy.label : null,
+      yieldOnCostLabel: yoc != null ? `${(yoc * 100).toFixed(1)}%` : null,
     });
     if (comps.length >= limit) break;
   }
