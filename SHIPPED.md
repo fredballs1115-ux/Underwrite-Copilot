@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Forty-eight PRs, #176–#223, each
+estimate, and that's what it should flag." Forty-nine PRs, #176–#224, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -482,6 +482,21 @@ confirmed equal to the main tip after each batch.
   LOI prefill (its own reader took "Asking rent") and the pipeline card,
   which now falls back to the first signal's ask as the deal page does.
   Seventy-odd new cases.
+- **#224 The extraction names the headline rows exactly.** Seven PRs of
+  reader work made the screen robust to whatever an OM calls a figure;
+  the cheaper half of the fix is to ask the extraction for the five
+  headline rows by name in the first place. The extraction prompt now
+  says: "Asking price" for the whole-asset ask (a per-unit or per-SF
+  figure under "Price per unit" / "Price per SF", a prior trade under
+  "Last sale price"), "Units" for the whole count (a subset under its own
+  label), "Total SF" for the building's rentable area (land under "Land
+  area", a unit's average under "Average unit size"), "Occupancy" for
+  today's physical occupancy (a projection under "Stabilized occupancy")
+  and "Going-in cap rate" for the cap on today's income (a projection
+  under "Stabilized cap rate") — with the number alone in the value. Every
+  new screen lands on the readers' first-choice labels; the readers keep
+  covering the OMs already screened. The prompt test locks the labels and
+  the look-alikes.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

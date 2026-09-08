@@ -76,6 +76,29 @@ describe("plan deals are judged on their own terms", () => {
     expect(p).toContain("never write 0 for a figure the OM does not state");
   });
 
+  // The headline rows, by the exact labels the shared readers match
+  // (lib/criteria: METRIC_FIND.price, buildingSfRow, occupancyRow,
+  // findGoingInCap; lib/deal-strategy: unitCountRow), with the figures that
+  // must NOT share those labels named beside them.
+  it("the extraction names the headline labels exactly and keeps the look-alikes apart", () => {
+    const p = extractionInstruction("multifamily");
+    expect(p).toContain("Label the headline rows exactly");
+    for (const label of ['"Asking price"', '"Units"', '"Total SF"', '"Occupancy"', '"Going-in cap rate"']) {
+      expect(p).toContain(label);
+    }
+    for (const lookAlike of [
+      '"Price per unit"',
+      '"Last sale price"',
+      '"Land area"',
+      '"Average unit size"',
+      '"Stabilized occupancy"',
+      '"Stabilized cap rate"',
+    ]) {
+      expect(p).toContain(lookAlike);
+    }
+    expect(p).toContain("Put the number alone in the value");
+  });
+
   it("the model reconciliation asks for the plan and forbids a stabilized pro forma as year 1 without it", () => {
     const p = reconciliationInstruction();
     for (const field of [
