@@ -168,6 +168,21 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(text).toMatch(/\$252k\/unit against the subject's \$274k\/unit/);
   });
 
+  it("the reconciler tab draws each stated gap as a bar from a centre line", () => {
+    const html = render(sampleProps("analyses", "reconciler"));
+    // Two of the sample's three rows state a figure — "$174k below the OM"
+    // and "300 bps higher", both unfavorable and each the widest of its own
+    // unit — so two bars draw, each filling the left half in the kill
+    // colour; "In agreement" (neutral) draws none. Dollars and basis points
+    // are scaled apart, so both fill their whole half.
+    expect((html.match(/data-gap-bar/g) ?? []).length).toBe(2);
+    expect((html.match(/bg-kill" style="right:50%;width:50%"/g) ?? []).length).toBe(2);
+    expect(html).not.toMatch(/bg-pass" style="left:50%/);
+    expect(html).toContain("100% of the widest dollar gap in the table");
+    expect(html).toContain("100% of the widest basis-point gap in the table");
+    expect(textOf(html)).toMatch(/Bars: each gap scaled to the widest of its kind/);
+  });
+
   it("the overview carries the verdict and the buy-box fit; the financials carry the price", () => {
     const overview = textOf(render(sampleProps("overview")));
     expect(overview).toMatch(/Caution/);

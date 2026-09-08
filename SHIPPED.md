@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Eighty-seven PRs, #176–#262, each
+estimate, and that's what it should flag." Eighty-eight PRs, #176–#263, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1161,6 +1161,23 @@ confirmed equal to the main tip after each batch.
   disagree. The deal-view render test asserts six bars and six ticks on
   the sample (three per layout), a card list per table and the table
   hidden below `sm`; shot at 390.
+- **#263 The reconciliation's gap draws as a bar from a centre line.** The
+  last of the report's number-only reads (WILL_TODO item 8): each
+  reconciliation row carried its gap as text — "$174k below the OM", "300
+  bps higher", "In agreement" — coloured by its direction. A pure reader,
+  `lib/gap-detail.ts`, reads the magnitude that text states (dollars with
+  their k / M suffixes, basis points, a percentage; dollars first when a
+  line carries two) and nothing otherwise, and `gapScale` puts each row on
+  its own unit's track — a dollar gap against the widest dollar gap, a
+  basis-point gap against the widest in basis points, never across — signed
+  by the row's stated direction, so the words are never second-guessed. The
+  deal page's Reconciliation table draws it under the gap figure (favorable
+  right in the pass colour, unfavorable left in the kill colour, a centre
+  tick, one legend line) and the report's reconciliation page draws the
+  same bar as plain Views — track, fill, tick — with the fill count
+  asserted: the sample's two stated gaps draw six shapes more than a report
+  whose rows all agree. Seven reader tests, a deal-view render test on the
+  reconciler tab, and the report test.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

@@ -3,19 +3,19 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#261 merged to main (live build
-sha `d87fade`, #260, confirmed equal to the main tip by live-verify at 17:50
-UTC with its `DEPLOY: LIVE` line — every one of the eighty-five through
-#260 is live, the homepage serves at 196 KB where it served at 488 KB, the
+**Last updated 2026-09-08**, after PRs #176–#262 merged to main (live build
+sha `e533e8c`, #262, confirmed equal to the main tip by live-verify at 18:04
+UTC with its `DEPLOY: LIVE` line — every one of the eighty-seven through
+#262 is live, the homepage serves at 196 KB where it served at 488 KB, the
 public sample memo at 57 KB where it served at 11 KB (the Brewerytown frame
 is in it), and the public-page lint #231 added reads all twelve public pages
-clean on every run; #261 is merged and awaits its proof, #262 follows).
+clean on every run; #263 follows).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Eighty-seven PRs (#176–#262) landed across one review session and the
+Eighty-eight PRs (#176–#263) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -414,6 +414,12 @@ deploy (live-verify shows the sha).
 - **The comps table at phone width stacks a card per comp** (#262): name
   and rating, note, the detail with its basis bar; the table keeps from
   `sm` up.
+- **The reconciliation's gap draws as a bar from a centre line** (#263):
+  `lib/gap-detail.ts` reads the dollar, basis-point or percent magnitude a
+  gap line states and nothing otherwise; each row's bar is scaled to the
+  widest of its own unit and signed by the row's stated direction — under
+  the gap figure on the deal page and on the report's reconciliation page,
+  fill count asserted.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -681,30 +687,17 @@ a route scoped to the share token; the memo and the report got theirs in
    times with a roll-up and per-asset contribution to blended IRR; mostly a
    loop around existing code plus a CSV importer. Named as the next build in
    the LPC plan.
-8. **The report's remaining pages say it in pictures too.** #250 gave the
-   memo its bars and dots and #253 the market page its OM-on-range dots;
-   two pages still carry their reads as numbers alone: the reconciliation's
-   gap could draw as a signed bar beside its figure (the direction is
-   already a colour), and the comp table's per-unit basis as a bar against
-   the subject's — both need a parser as honest as `rangeRead` (a gap like
-   "+4.2%" or "−$120k" and a comp detail's "$262k/unit"), returning nothing
-   when the text is not a figure. Plain `View`s, height-neutral, the same
-   fill-count assertion. #260 and #261 did the comp half (the reader is
-   `lib/comp-detail.ts`, behind the web table and the report page); the
-   reconciliation gap's signed bar is what remains here.
-9. **The reconciliation's gap as a signed bar, on the page and in the
-   report.** The last of item 8: each reconciliation row (`ReconRow` —
-   omValue, myValue, gap, direction) carries its gap as text ("+4.2%",
-   "−$120k", "12 bps"), coloured by direction. A pure reader
-   (`lib/gap-detail.ts`, beside `lib/comp-detail.ts`) that reads a signed
-   percent or dollar gap out of that text and nothing otherwise, then a
-   bar from a centre line — favorable to the right in the pass colour,
-   unfavorable to the left in the kill colour, the direction the row
-   already states — scaled to the widest gap of the same unit in the
-   table, drawn under the gap figure in the deal page's Reconciliation
-   table (`deal-sections.tsx`) and on the report's reconciliation page as
-   plain Views with the fill-count assertion. Percent and dollar gaps are
-   different yardsticks: scale each unit to its own widest, never mix.
+8. **The reconciliation table at phone width stacks a card per row.** The
+   last table on the deal page that still scrolls sideways on a phone: the
+   Reconciliation table keeps `min-w-[36rem]`, so at 390 the gap column —
+   the direction badge, the figure and now #263's bar — sits off-screen to
+   the right of the metric. The same shape #254 (compare), #259 (rent
+   roll) and #262 (comps) took: below `sm` a card per row — the metric,
+   the OM's figure and yours side by side, the direction badge, the gap
+   with its bar — and the table from `sm` up, one `GapBar` drawing in
+   both; assert both layouts in the deal-view render test and shoot at
+   390. (The report's pages all say it in pictures now: #250 the memo,
+   #253 the market page, #261 the comps, #263 the reconciliation.)
 
 ---
 

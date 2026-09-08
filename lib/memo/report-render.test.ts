@@ -106,7 +106,28 @@ describe("ReportDocument (full report)", () => {
       }) as unknown as Parameters<typeof renderToBuffer>[0],
     );
     expect(pdfFillCountOf(buf) - pdfFillCountOf(bare)).toBe(saleCount * 3);
-  }, 90000);
+
+    // The reconciliation page draws each stated gap from a centre line — a
+    // track, the fill and the centre tick, three fills a drawn row. Two of
+    // the sample's three rows state a figure ("$174k below", "300 bps
+    // higher"); "In agreement" draws none — so a report whose rows all
+    // agree draws six fewer shapes.
+    const drawnGaps = SAMPLE_DEAL.reconciliation.rows.filter((r) => r.direction !== "neutral").length;
+    expect(drawnGaps).toBe(2);
+    const agreed = {
+      ...deal,
+      reconciliation: {
+        ...SAMPLE_DEAL.reconciliation,
+        rows: SAMPLE_DEAL.reconciliation.rows.map((r) => ({ ...r, gap: "In agreement" })),
+      },
+    } as unknown as DealRow;
+    const flat = await renderToBuffer(
+      React.createElement(ReportDocument, {
+        input: buildReportData(agreed, "August 24, 2026", checks, sensitivity),
+      }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    expect(pdfFillCountOf(buf) - pdfFillCountOf(flat)).toBe(drawnGaps * 3);
+  }, 120000);
 
   it("reads the OM's figure onto its typical range", () => {
     // The sample's three checks: at the low end, past the high end, inside.

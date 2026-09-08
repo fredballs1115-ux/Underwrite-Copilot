@@ -15,6 +15,7 @@ import { CompsMap, type MapComp } from "./comps-map";
 import { geocodeCandidates } from "@/lib/geo";
 import { safeHttpUrl } from "@/lib/safe-url";
 import { basisScale, fmtBasis, type BasisScale, type SubjectBasis } from "@/lib/comp-detail";
+import { gapScale, type GapUnit } from "@/lib/gap-detail";
 import type { DealFact } from "@/lib/facts";
 import { FileDrop } from "../../file-drop";
 import { FileField } from "../../file-field";
@@ -1249,8 +1250,39 @@ const DIR = {
   neutral: { badge: "bg-brand/10 text-brand", label: "Neutral", Icon: IconMinus },
 } as const;
 
+const GAP_UNIT_WORD: Record<GapUnit, string> = {
+  usd: "dollar",
+  bps: "basis-point",
+  pct: "percentage",
+};
+
+/** The gap as a bar from a centre line — favorable to the right in the pass
+ *  colour, unfavorable to the left in the kill colour, the direction the
+ *  row's badge already states — scaled to the widest gap of the same unit
+ *  in the table (lib/gap-detail), so a dollar gap and a basis-point gap
+ *  never share a scale. The words beside it carry the figure. */
+function GapBar({ share, unit }: { share: number; unit: GapUnit }) {
+  const half = Math.round(Math.abs(share) * 50);
+  return (
+    <span
+      aria-hidden
+      data-gap-bar
+      title={`${Math.round(Math.abs(share) * 100)}% of the widest ${GAP_UNIT_WORD[unit]} gap in the table`}
+      className="relative mt-1.5 block h-1 w-24 rounded-full bg-faint"
+    >
+      <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-muted/40" />
+      <span
+        className={`absolute inset-y-0 rounded-full ${share < 0 ? "bg-kill" : "bg-pass"}`}
+        style={share < 0 ? { right: "50%", width: `${half}%` } : { left: "50%", width: `${half}%` }}
+      />
+    </span>
+  );
+}
+
 export function Reconciliation({ result }: { result: ReconciliationResult }) {
   const rows = result.rows ?? [];
+  const scale = gapScale(rows);
+  const drawn = scale.shares.some((s) => s !== null);
   const counts = { unfavorable: 0, favorable: 0, neutral: 0 };
   for (const r of rows) counts[r.direction] = (counts[r.direction] ?? 0) + 1;
   return (
@@ -1297,6 +1329,8 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
           <tbody>
             {rows.map((r, i) => {
               const d = DIR[r.direction] ?? DIR.neutral;
+              const share = scale.shares[i] ?? null;
+              const unit = scale.units[i] ?? null;
               return (
                 <tr
                   key={i}
@@ -1317,12 +1351,18 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
                       {d.label}
                     </span>
                     {r.gap && <p className="mt-1 text-ink">{r.gap}</p>}
+                    {share !== null && unit && <GapBar share={share} unit={unit} />}
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+        {drawn && (
+          <p className="border-t border-line px-4 py-2 text-[11px] text-muted">
+            Bars: each gap scaled to the widest of its kind; favorable right, unfavorable left.
+          </p>
+        )}
       </div>
     </section>
   );
