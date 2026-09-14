@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { fetchLiveHeadlines } from "@/lib/news/live";
-import { searchHostsAnswering, timeAgo } from "@/lib/news/feeds";
+import { LiveHeadlinesView } from "./live-headlines";
 
 export const metadata: Metadata = { title: "News" };
 export const dynamic = "force-dynamic";
@@ -92,114 +92,13 @@ function LiveHeadlinesFallback() {
 }
 
 /**
- * The live layer: ranked headlines with publisher, age and a one-line
- * snippet, then the sources — the ones that answered as links, the ones
- * that did not, named. Renders a plain sentence, never a fake list, when
- * every source is unreachable. Async so it streams in behind the rest of
- * the page (see the Suspense boundary in NewsPage).
+ * The live layer, fetched here and drawn by the pure view (live-headlines.tsx),
+ * which the render tests draw on a fixture. Async so it streams in behind
+ * the rest of the page (see the Suspense boundary in NewsPage).
  */
 async function LiveHeadlinesSection() {
   const live = await fetchLiveHeadlines();
-  const answered = live.sources.filter((s) => s.ok || s.stale);
-  const missing = live.sources.filter((s) => !s.ok && !s.stale);
-  const publishers = answered.filter((s) => s.kind === "publisher");
-  const searchHosts = searchHostsAnswering(live.sources);
-  const now = Date.parse(live.fetchedAt);
-  return (
-    <section aria-labelledby="live-news">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="live-news" className="text-xs font-semibold uppercase tracking-wide text-muted">
-          Headlines now
-        </h2>
-        <span className="text-[11px] text-muted">
-          live from {answered.length} of {live.sources.length} sources · refreshed every 30 min
-        </span>
-      </div>
-
-      {live.headlines.length === 0 ? (
-        <p className="mt-2 rounded-xl border border-dashed border-line p-4 text-sm text-muted">
-          None of the publishers answered just now — their feeds are checked
-          again on the next visit.{" "}
-          <a href="/news" className="font-medium text-brand hover:text-brand-strong">
-            Try again
-          </a>
-          . <code className="text-[11px]">/api/news/health</code> shows what each one said.
-        </p>
-      ) : (
-        <ol className="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
-          {live.headlines.map((h, i) => (
-            <li key={h.url} className="flex gap-3 px-3.5 py-3 text-sm leading-snug">
-              <span className="mt-px w-5 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted">
-                {i + 1}
-              </span>
-              <div className="min-w-0 flex-1">
-                <a
-                  href={h.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
-                >
-                  {h.title}
-                </a>
-                <span className="ml-2 whitespace-nowrap text-[11px] text-muted">
-                  {h.publisherUrl ? (
-                    <a href={h.publisherUrl} target="_blank" rel="noreferrer" className="hover:text-brand">
-                      {h.publisher}
-                    </a>
-                  ) : (
-                    h.publisher
-                  )}
-                  {h.publishedAt ? ` · ${timeAgo(h.publishedAt, now)}` : ""}
-                </span>
-                {h.snippet && (
-                  <p className="mt-0.5 line-clamp-2 text-[13px] text-muted">{h.snippet}</p>
-                )}
-              </div>
-            </li>
-          ))}
-        </ol>
-      )}
-
-      <p className="mt-2 text-[11px] leading-relaxed text-muted">
-        Sources:{" "}
-        {publishers.length > 0
-          ? publishers.map((s, i) => (
-              <span key={s.id}>
-                {i > 0 && ", "}
-                <a href={s.home} target="_blank" rel="noreferrer" className="hover:text-brand">
-                  {s.name}
-                </a>
-                {s.stale ? " (earlier copy)" : ""}
-              </span>
-            ))
-          : "no publisher feed answered"}
-        {searchHosts.length > 0 && (
-          <>
-            {publishers.length > 0 ? ", plus " : ", "}
-            {searchHosts.map((h, i) => (
-              <span key={h.name}>
-                {i > 0 && " and "}
-                <a href={h.home} target="_blank" rel="noreferrer" className="hover:text-brand">
-                  {h.name}
-                </a>
-              </span>
-            ))}{" "}
-            topic searches naming each outlet
-          </>
-        )}
-        .
-        {missing.length > 0 && (
-          <>
-            {" "}
-            Did not answer just now:{" "}
-            {missing.map((s) => s.name.replace(/^Google News · /, "GN ")).join(", ")}.
-          </>
-        )}{" "}
-        Ranked by recency and by how much the headline touches rates, cap
-        rates, distress, regulation and supply — nothing here is written by us.
-      </p>
-    </section>
-  );
+  return <LiveHeadlinesView live={live} />;
 }
 
 export default async function NewsPage({
