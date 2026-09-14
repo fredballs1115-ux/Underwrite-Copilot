@@ -48,7 +48,12 @@ warmed 11 of 12 sources at boot, `NEWS HELD: none`); #291 (the runner
 probes four more doors for Commercial Property Executive), #292 (the
 scored feed as a pure view, rendered on a fixture), #293 (the
 fifteenth review's nine findings) and #294 (the News page as a front
-page; the pipeline's rail off the numbers) follow.
+page; the pipeline's rail off the numbers) are proven (`a836c30` at
+20:04: `DEPLOY: LIVE`, a fresh process 137 s old that warmed 11 of 12
+sources at boot in 14.8 s — Commercial Property Executive answering
+through its Google door at last, REBusinessOnline the one timeout —
+`NEWS HELD: none`, twelve public pages lint clean); #295 (a real
+photograph behind the hero, four slots for the operator's) follows.
 
 ---
 

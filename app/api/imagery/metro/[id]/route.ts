@@ -17,7 +17,10 @@ import { usgsAerialUrl } from "@/lib/basemaps";
 import { frameZoom } from "@/lib/imagery-plan";
 import { METRO_FRAME_METRES, metroView } from "@/lib/metro-imagery";
 
-const SIZE = { min: 96, max: 1024, defaultW: 480, defaultH: 360 };
+// 1600 is the hero's backdrop (lib/photos HERO_AERIAL): a 1.2km frame across
+// 1600px is ~0.75 m/px, still inside NAIP's native 0.6–1.0 m/px, so even
+// the largest frame is not upscaled.
+const SIZE = { min: 96, max: 1600, defaultW: 480, defaultH: 360 };
 
 function clamp(raw: string | null, lo: number, hi: number, fallback: number): number {
   const n = Number(raw);
