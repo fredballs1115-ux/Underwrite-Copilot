@@ -107,8 +107,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   pages at least, half of them dense with text of their own — a line that
   recurs on half the pages once or twice a page is furniture and counts on
   none, so is a line whose exact words recur on half the pages however
-  many times a page (the caption tiled under every rendering), a table's
-  rows never are); the PDF inline or as a Files-API
+  many times a page (the caption tiled under every rendering — never a
+  line carrying a figure), a table's rows never are); the PDF inline or
+  as a Files-API
   reference otherwise. Only the screen and Ask pass `textFirst`; a buyer's
   model, a BOV and a rent roll keep their pages. `OM_READ=pdf|text`
   overrides per call. The layer's page count is what the facts are
@@ -129,10 +130,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   429/5xx, a last-good copy, a gate of two requests in flight per host,
   one request per source shared by concurrent callers, and a host held
   at bay: three timeouts / dropped connections / 429s / 5xx inside a
-  minute and it is not asked for 45 s, its doors skipped at once so the
+  minute and it is not asked for 45 s, its doors skipped at once — a
+  caller already queued on the host gives its slot back unused — so the
   next door gets the whole budget (a 403, a 404 or an empty page never
-  counts — the publisher said no, the host is up); the status names the
-  way in as `via`, on a cached or a stale line too). Every Google News
+  counts — the publisher said no, the host is up — nor a timeout on a
+  request given under 300 ms; a 429 or a 5xx always does); the status
+  names the way in as `via`, on a cached or a stale line too). Every Google News
   read has a Bing News read behind it (`News:Source` is the outlet; the
   click redirect is unwrapped by `directUrl`; a Bing query is plain
   keywords or one quoted phrase — Google's `OR` syntax parses to zero

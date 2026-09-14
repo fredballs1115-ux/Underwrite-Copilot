@@ -22,18 +22,21 @@ under two seconds through the gate. #275–#278 are proven (`2c362a6` at
 `7c965aa` at 17:59, `f562a27` at 18:05, `ac33d36` at 18:12, `abb797c`
 at 18:36 — #283's fresh process read 11 of 12, every search-backed
 source `via Bing`, `NEWS HELD: news.google.com … after 3 failures`);
-#284 (the thirteenth review's two remaining findings) is merged and
-awaits its proof; #285 (one news state per process: Next runs
-`instrumentation.ts` in its own module runtime, so the warm-up filled
-one copy of the live layer's state and the routes read another — that is
-why `warm` was null on every read; the state now lives on `globalThis`)
-is open.
+#284 (the thirteenth review's two remaining findings) is proven
+(`1735df6`, the link-audit bot's commit on top of it, at 18:46 — 12 of
+12 sources, Google answering again); #285 (one news state per process:
+Next runs `instrumentation.ts` in its own module runtime, so the warm-up
+filled one copy of the live layer's state and the routes read another —
+that is why `warm` was null on every read; the state now lives on
+`globalThis`) is merged and awaits its proof; #286 (the fourteenth
+review's five findings, the first a #284 regression that read `NOI /
+RSF` as the NOI, live for twenty minutes) is open.
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-A hundred and ten PRs (#176–#285) landed across one review session and the
+A hundred and eleven PRs (#176–#286) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -554,6 +557,13 @@ deploy (live-verify shows the sha).
   deploy fetched everything fresh and reported no warm-up. The state
   lives on `globalThis` now; the health JSON names the process (`pid`,
   `uptimeS`) and live-verify prints `NEWS PROCESS`.
+- **The fourteenth review's five findings** (#286): `NOI / RSF`, `NOI /
+  EGI` and `Price / NOI` are rates again (a #284 regression, live for
+  twenty minutes, had read them as the NOI); a caller queued on a host
+  when its hold trips gives the slot back unused; a first door that
+  ignores its abort no longer eats the doors behind it; the breaker's
+  comment matches its code; a line with a figure is never a tiled
+  caption.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
