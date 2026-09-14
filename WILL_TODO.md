@@ -19,13 +19,13 @@ and #278 fixed it: the first read on its own fresh process (`f2895c9`,
 proven at 17:53 UTC) answered 12 of 12, every source fetched fresh in
 under two seconds through the gate. #275–#278 are proven (`2c362a6` at
 17:24 UTC, `f26a4e2` at 17:29, `bb3061c` at 17:37, `f2895c9` at 17:53);
-#279 is merged and awaits its proof; #280 follows).
+#279 and #280 are merged and await their proofs; #281 follows).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-A hundred and five PRs (#176–#280) landed across one review session and the
+A hundred and six PRs (#176–#281) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -514,6 +514,10 @@ deploy (live-verify shows the sha).
   last run on this process) and live-verify prints it; a new non-gating
   step fetches Bing's and Google's RSS from the runner and prints each
   door's status, item count, outlet-element count and redirect count.
+- **A plain retry keeps the pages fallback with its checkpoints** (#281):
+  `claimJob`'s `keepCheckpoints` carries `omPages` alongside `completed`
+  — never on a replace-OM, never off a done prior — so a retried attempt
+  that skips the extraction reads the pages the failed attempt had to.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as

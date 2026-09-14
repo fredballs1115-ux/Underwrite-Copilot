@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and five PRs, #176–#280, each
+estimate, and that's what it should flag." A hundred and six PRs, #176–#281, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1483,6 +1483,17 @@ confirmed equal to the main tip after each batch.
   prints each door's HTTP status, item count, `News:Source` count and
   click-redirect count, so the shape is verified from a network that can
   reach it, on every run.
+- **#281 A plain retry keeps the pages fallback with its checkpoints.**
+  Found while holding #279's fix up to the worker's other resume door.
+  The claim a plain retry makes after a failed screen (`claimJob` with
+  `keepCheckpoints`) rebuilt the payload from the fresh handoff plus the
+  prior `completed` list — and dropped `omPages`, so a retry that skipped
+  the extraction would have built the OM text-first and handed the
+  challenger the layer the failed attempt had already found wanting. The
+  mark now rides with the checkpoints on that path only: never on a
+  replace-OM (whose checkpoints describe the old file), never off a done
+  prior (which is diffed against, not resumed). `jobs.test.ts` holds all
+  three.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
