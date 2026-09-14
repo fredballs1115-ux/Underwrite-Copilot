@@ -36,15 +36,20 @@ twenty minutes) and #287 (the pipeline gets the wide shell and whole
 deal names; the News caption counts its sources) are proven (`f3b6ede`
 at 19:12: 12 of 12 sources, `NEWS WARM-UP: 12 of 12 sources answered
 at boot, 11.4s`, `NEWS HELD: none`, twelve public pages lint clean);
-#288 (the News page's sources as a row of chips), #289 (each
-headline's tags and the fold at twelve) and #290 (a covered market
-named in a headline links to its brief) follow.
+#288 (the News page's sources as a row of chips) and #289 (each
+headline's tags and the fold at twelve) are proven (`5173a8f` at
+19:28: `DEPLOY: LIVE`, a fresh process 133 s old that warmed 11 of 12
+sources at boot in 16.7 s — Commercial Property Executive the miss,
+its one search door parsing to zero — `NEWS HELD: none`, twelve public
+pages lint clean); #290 (a covered market named in a headline links to
+its brief) and #291 (the runner probes four more doors for Commercial
+Property Executive) follow.
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-A hundred and fifteen PRs (#176–#290) landed across one review session and the
+A hundred and sixteen PRs (#176–#291) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -591,6 +596,11 @@ deploy (live-verify shows the sha).
   "Atlanta", "Manhattan", "Fort Worth", "Bay Area" become a tag beside
   the signal tags that opens the metro's page; a word that names two
   places ("Washington" alone, "Arlington") tags nothing.
+- **Four more doors probed for Commercial Property Executive** (#291):
+  the one source every fresh process today missed (feed 403, every Bing
+  phrasing zero) — live-verify now reads its feed at the site root, the
+  outlet's old domain, Google's phrase search and Bing on the bare
+  domain from the runner, so the next fix wires the door that answers.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as

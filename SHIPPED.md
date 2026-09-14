@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and fifteen PRs, #176–#290, each
+estimate, and that's what it should flag." A hundred and sixteen PRs, #176–#291, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1652,6 +1652,16 @@ confirmed equal to the main tip after each batch.
   market is a tag beside the signal tags, and it opens
   `/market?metro=…` — the news tied to the ground layer. Six tests hold
   the table; the render test asserts the links on the fixture.
+- **#291 The runner probes four more doors for Commercial Property
+  Executive.** Every fresh process today warmed 11 of 12 sources, and
+  the miss was always CPE: its feed answers 403, every Bing phrasing
+  parses to zero, and when Google is held at bay it is the one source
+  with no way in. live-verify now fetches its feed at the site root, the
+  outlet's old domain (`cpexecutive.com`), Google's phrase search and
+  Bing on the bare domain from the runner and prints the counts, so the
+  next session wires the door that answers instead of guessing. The
+  News caption under the list also shrinks to what the tags cannot say
+  ("the coloured tags are the deal-movers").
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

@@ -226,6 +226,16 @@ jobs:
           probe "Bing · site:commercialsearch.com" "https://www.bing.com/news/search?q=site%3Acommercialsearch.com&format=rss"
           probe "Bing · site:commercialsearch.com/news" "https://www.bing.com/news/search?q=site%3Acommercialsearch.com%2Fnews&format=rss"
           probe "Bing · Commercial Property Executive (phrase)" "https://www.bing.com/news/search?q=%22Commercial+Property+Executive%22&format=rss"
+          # Doors CPE might still have (19:25 UTC: Google held at bay on a
+          # fresh process left it the one source with no answer, since
+          # every Bing phrasing above parses to zero): its own feed at
+          # the site root and at the outlet's old domain, Google's phrase
+          # search, and Bing on the bare domain. Read the counts here
+          # before wiring any of them.
+          probe "CPE · own feed at the root" "https://www.commercialsearch.com/feed/"
+          probe "CPE · old domain feed" "https://www.cpexecutive.com/feed/"
+          probe "Google · Commercial Property Executive (phrase)" "https://news.google.com/rss/search?q=%22Commercial+Property+Executive%22&hl=en-US&gl=US&ceid=US%3Aen"
+          probe "Bing · commercialsearch.com (bare)" "https://www.bing.com/news/search?q=commercialsearch.com&format=rss"
           probe "Google · site:therealdeal.com" "https://news.google.com/rss/search?q=site%3Atherealdeal.com&hl=en-US&gl=US&ceid=US%3Aen"
       - name: Verdict
         # Two tiers: the hero headline proves the site is up and on the right

@@ -91,9 +91,8 @@ export function LiveHeadlinesView({ live }: { live: LiveHeadlines }) {
         ))}
       </ul>
       <p className="mt-2 text-[11px] leading-relaxed text-muted">
-        Ranked by recency and by what the headline touches — its tags say
-        what: rates, cap rates, distress and regulation in colour, the asset
-        class, supply, debt and costs beside them. Nothing here is written by us.
+        Ranked by recency and by what the headline touches — the coloured
+        tags are the deal-movers. Nothing here is written by us.
       </p>
     </section>
   );
