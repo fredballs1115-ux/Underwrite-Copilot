@@ -23,8 +23,11 @@ const CSP = [
   // sources, both keyless: USGS National Map (public-domain aerial imagery,
   // the default basemap and the property photos) and OpenStreetMap (the
   // street base). Drop either host and its basemap renders as gray canvas.
-  // Kept in step with BASEMAP_IMG_HOSTS in lib/basemaps.ts.
-  "img-src 'self' data: blob: https://basemap.nationalmap.gov https://tile.openstreetmap.org https://*.tile.openstreetmap.org",
+  // Kept in step with BASEMAP_IMG_HOSTS in lib/basemaps.ts. The trailing
+  // https: is for the News page: a story's picture comes from its
+  // publisher's own host (or Bing's thumbnail host), and an image cannot
+  // run script — scripts, styles and fetches stay pinned above and below.
+  "img-src 'self' data: blob: https://basemap.nationalmap.gov https://tile.openstreetmap.org https://*.tile.openstreetmap.org https:",
   "font-src 'self' data:",
   // Supabase (auth/storage/signed URLs) + Photon geocoder are the only
   // cross-origin fetch targets from the browser.

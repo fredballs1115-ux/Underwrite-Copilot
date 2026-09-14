@@ -27,27 +27,33 @@ export const dynamic = "force-dynamic";
 // reads (the session, the two tables, the live layer) and hands the rows in.
 // Nothing here is written by us — it's the news itself, ranked and linked.
 
-/** What the live section looks like while the feeds are still answering. */
+/** What the front page looks like while the feeds are still answering:
+ *  the masthead line, a lead block, three columns. */
 function LiveHeadlinesFallback() {
   return (
     <section aria-busy="true" aria-label="Headlines loading">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Headlines now</h2>
-        <span className="text-[11px] text-muted">reading the publishers’ feeds…</span>
+      <div className="flex flex-wrap items-baseline justify-between gap-2 border-y-2 border-ink py-1.5 text-[11px] uppercase tracking-[0.14em] text-muted">
+        <h2 className="font-semibold text-ink">Today&apos;s headlines</h2>
+        <span>reading the publishers’ feeds…</span>
       </div>
-      <ol className="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">
-        {Array.from({ length: 6 }, (_, i) => (
-          <li key={i} className="flex gap-3 px-3.5 py-3">
-            <span className="mt-px w-5 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted">
-              {i + 1}
-            </span>
-            <div className="min-w-0 flex-1 space-y-1.5">
-              <div className="h-3.5 animate-pulse rounded bg-faint" style={{ width: `${62 + ((i * 13) % 30)}%` }} />
-              <div className="h-3 w-1/3 animate-pulse rounded bg-faint" />
-            </div>
-          </li>
+      <div className="mt-5 grid gap-5 border-b border-line pb-6 md:grid-cols-5 md:gap-8">
+        <div className="space-y-3 md:col-span-3">
+          <div className="h-3 w-24 animate-pulse rounded bg-faint" />
+          <div className="h-8 w-11/12 animate-pulse rounded bg-faint" />
+          <div className="h-8 w-2/3 animate-pulse rounded bg-faint" />
+          <div className="h-4 w-3/4 animate-pulse rounded bg-faint" />
+        </div>
+        <div className="aspect-[3/2] animate-pulse rounded-sm bg-faint md:col-span-2" />
+      </div>
+      <div className="grid gap-6 py-5 md:grid-cols-3">
+        {Array.from({ length: 3 }, (_, i) => (
+          <div key={i} className="space-y-2">
+            <div className="aspect-[16/9] animate-pulse rounded-sm bg-faint" />
+            <div className="h-4 w-11/12 animate-pulse rounded bg-faint" />
+            <div className="h-4 w-2/3 animate-pulse rounded bg-faint" />
+          </div>
         ))}
-      </ol>
+      </div>
     </section>
   );
 }
@@ -97,11 +103,11 @@ export default async function NewsPage({
 
   return (
     <div className="space-y-5">
-      <header>
-        <h1 className="text-xl font-semibold tracking-tight">News</h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted">
-          Live from the publishers&apos; own feeds, most decision-relevant first; every headline
-          links to its source.
+      <header className="flex flex-wrap items-baseline justify-between gap-2">
+        <h1 className="font-serif text-3xl font-semibold tracking-tight">News</h1>
+        <p className="text-sm text-muted">
+          The publishers&apos; own feeds, most decision-relevant first; every headline opens its
+          source.
         </p>
       </header>
 

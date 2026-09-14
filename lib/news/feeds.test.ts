@@ -167,6 +167,33 @@ describe("parseFeed", () => {
     expect(items[0].publisherUrl).toBeNull();
   });
 
+  it("reads the story's picture from media:content, an image enclosure, Bing's News:Image or the body's first img — https only", () => {
+    const item = (inner: string) =>
+      parseFeed(
+        `<rss xmlns:media="http://search.yahoo.com/mrss/"><channel><item><title>T</title><link>https://x.example/a</link>${inner}</item></channel></rss>`,
+        src(),
+      )[0];
+    expect(item('<media:content url="https://cdn.x.test/a.jpg" medium="image" width="1200"/>').image).toBe(
+      "https://cdn.x.test/a.jpg",
+    );
+    expect(item('<media:thumbnail url="https://cdn.x.test/t.jpg"/>').image).toBe("https://cdn.x.test/t.jpg");
+    expect(item('<media:content url="https://cdn.x.test/clip.mp4" medium="video"/>').image).toBeNull();
+    expect(item('<enclosure url="https://cdn.x.test/e.jpg" type="image/jpeg" length="1"/>').image).toBe(
+      "https://cdn.x.test/e.jpg",
+    );
+    expect(item('<enclosure url="https://cdn.x.test/e.mp3" type="audio/mpeg"/>').image).toBeNull();
+    expect(
+      item('<content:encoded><![CDATA[<p>Text</p><img src="https://cdn.x.test/body.jpg" alt=""> more]]></content:encoded>')
+        .image,
+    ).toBe("https://cdn.x.test/body.jpg");
+    // a plain-http picture would be blocked on the https page: none
+    expect(item('<media:content url="http://cdn.x.test/a.jpg" medium="image"/>').image).toBeNull();
+    expect(item("<description>no picture</description>").image).toBeNull();
+    expect(parseFeed(BING, src({ id: "trd", name: "The Real Deal", kind: "topic" }))[0].image).toBe(
+      "https://www.bing.com/th?id=abc",
+    );
+  });
+
   it("returns nothing for garbage, never throws", () => {
     expect(parseFeed("<html>not a feed</html>", src())).toEqual([]);
     expect(parseFeed("", src())).toEqual([]);
@@ -368,7 +395,7 @@ describe("NEWS_SOURCES", () => {
         .filter((d) => d.startsWith("https://www.bing.com/news/search?"))
         .map((d) => new URL(d).searchParams.get("q") ?? ""),
     );
-    expect(bingQueries.length).toBe(8);
+    expect(bingQueries.length).toBe(9);
     for (const q of bingQueries) {
       expect(q).not.toMatch(/\bOR\b/);
       // at most one quoted phrase, and nothing outside it
@@ -449,5 +476,20 @@ describe("timeAgo", () => {
     expect(timeAgo(new Date(NOW - 30 * 3_600_000).toISOString(), NOW)).toBe("yesterday");
     expect(timeAgo("2026-09-01T12:00:00Z", NOW)).toBe("Sep 1");
     expect(timeAgo(null, NOW)).toBe("");
+  });
+});
+
+describe("Commercial Property Executive's doors", () => {
+  it("has four behind its feed: the site reads, the bare domain on Bing, the outlet's name on Google", () => {
+    const cpe = NEWS_SOURCES.find((s) => s.id === "cpe");
+    expect(cpe?.fallbacks?.map((f) => f.label)).toEqual([
+      "Google News · site:commercialsearch.com",
+      "Bing News · site:commercialsearch.com",
+      "Bing News · commercialsearch.com",
+      "Google News · Commercial Property Executive",
+    ]);
+    // the Bing door is a plain keyword; the phrase is Google's, where it parses
+    const bare = cpe?.fallbacks?.find((f) => f.label === "Bing News · commercialsearch.com");
+    expect(bare?.feed).toMatch(/^https:\/\/www\.bing\.com\/news\/search\?q=commercialsearch\.com/);
   });
 });

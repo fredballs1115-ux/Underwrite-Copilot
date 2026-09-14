@@ -797,6 +797,7 @@ describe("News live section", () => {
         publishedAt: "2026-09-14T17:00:00Z",
         snippet: "The lender-controlled sale closed at a 6.4% cap.",
         sourceId: "connect",
+        image: "https://cdn.a.test/atlanta.jpg",
         score: 3.2,
       },
       {
@@ -807,6 +808,7 @@ describe("News live section", () => {
         publishedAt: null,
         snippet: "",
         sourceId: "co",
+        image: null,
         score: 2.1,
       },
     ],
@@ -825,34 +827,35 @@ describe("News live section", () => {
     ],
   };
 
-  it("draws the headlines, one chip per source in its state, the search host behind them, and reads clean", () => {
+  it("leads with the top story — kicker, headline, dek, the publisher's picture — then the sources as one line, and reads clean", () => {
     const html = render(React.createElement(LiveHeadlinesView, { live }));
     const text = visibleText(html);
     expect(text).toContain("live from 4 of 5 sources");
+    expect(text).toContain("Monday, September 14, 2026");
     expect(text).toContain("Investor takes over distressed Atlanta apartment asset");
+    // the kicker: what the story touches, and the covered market it names
+    expect(text).toContain("distress");
+    expect(text).toContain("Atlanta");
+    expect(html).toContain('href="/market?metro=atlanta"');
     expect(text).toContain("Connect CRE");
     expect(text).toContain("2h ago");
-    // the topic chip reads as its topic; the row already names the host
+    // the publisher's picture, decorative beside its headline
+    expect(html).toContain('src="https://cdn.a.test/atlanta.jpg"');
+    expect(html).toMatch(/<img[^>]*\salt=""/);
+    // two stories: the lead and one in the grid, no list yet
+    expect((html.match(/<article/g) ?? []).length).toBe(2);
+    expect(text).not.toContain("More headlines");
+    // the topic source reads as its topic; the row already names the host
     expect(text).toContain("commercial real estate");
     expect(text).toContain("(earlier copy)");
     expect(text).toContain("(did not answer)");
     expect(text).toContain("via Bing News");
-    // the tags say why each headline ranks: the same matches the score counted
-    expect(text).toContain("distress");
-    expect(text).toContain("multifamily");
-    expect(text).toContain("supply");
-    // a covered market the headline names is a tag into its brief
-    expect(html).toContain('href="/market?metro=atlanta"');
-    expect(html).toContain('href="/market?metro=nyc"');
-    expect(text).toContain("NYC");
-    // two headlines: nothing folds
-    expect(text).not.toContain("more headline");
     expect(gluedWords(text)).toEqual([]);
     expect(a11yIssues(html)).toEqual([]);
     dumpView("news-live", html);
   });
 
-  it("shows the top twelve and folds the rest behind one row, all of it still in the HTML", () => {
+  it("keeps the front page's shape at fourteen stories: one lead, six in the grid, the rest in the list", () => {
     const many: LiveHeadlines = {
       ...live,
       headlines: Array.from({ length: 14 }, (_, i) => ({
@@ -863,17 +866,15 @@ describe("News live section", () => {
     };
     const html = render(React.createElement(LiveHeadlinesView, { live: many }));
     const text = visibleText(html);
-    expect(text).toContain("Show 2 more headlines");
-    expect(text).toContain("Show fewer");
-    // the folded rows keep their rank and stay in the page
-    expect(html).toContain('start="13"');
+    expect((html.match(/<article/g) ?? []).length).toBe(7);
+    expect(text).toContain("More headlines");
     expect(text).toContain("(14)");
     expect(gluedWords(text)).toEqual([]);
     expect(a11yIssues(html)).toEqual([]);
     dumpView("news-live-fold", html);
   });
 
-  it("says so when nothing answered — a sentence, never a fake list", () => {
+  it("says so when nothing answered — a sentence, never a fake page", () => {
     const dark: LiveHeadlines = {
       ...live,
       headlines: [],
@@ -884,6 +885,7 @@ describe("News live section", () => {
     expect(text).toContain("None of the publishers answered just now");
     expect(text).toContain("live from 0 of 5 sources");
     expect(text).not.toContain("via ");
+    expect(html).not.toContain("<article");
     expect(gluedWords(text)).toEqual([]);
     expect(a11yIssues(html)).toEqual([]);
     dumpView("news-live-dark", html);
