@@ -173,7 +173,7 @@ jobs:
             const fs = require("fs");
             let j; try { j = JSON.parse(fs.readFileSync("news.json", "utf8")); } catch { console.log("NEWS HEALTH: no JSON (pre-#269 build, or the route failed)"); process.exit(0); }
             console.log("NEWS HEALTH: " + j.summary);
-            for (const s of j.sources ?? []) console.log(`  ${s.ok ? "ok  " : "FAIL"} ${String(s.ms).padStart(5)} ms  ${String(s.count).padStart(3)} items  ${s.stale ? "stale " : ""}${s.cached ? "cached " : ""}${s.name}${s.error ? " — " + s.error : ""}`);
+            for (const s of j.sources ?? []) console.log(`  ${s.ok ? "ok  " : "FAIL"} ${String(s.ms).padStart(5)} ms  ${String(s.count).padStart(3)} items  ${s.stale ? "stale " : ""}${s.cached ? "cached " : ""}${s.name}${s.via ? " via " + s.via : ""}${s.error ? " — " + s.error : ""}`);
             for (const h of (j.top ?? []).slice(0, 3)) console.log(`  top: ${h.title} — ${h.publisher}`);
           ' || true
       - name: Verdict

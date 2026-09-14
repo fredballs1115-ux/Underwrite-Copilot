@@ -27,6 +27,16 @@ export interface NewsSource {
   kind: "publisher" | "topic";
   /** how many of this source's items may make the ranked list */
   cap: number;
+  /** where to read this publisher when its own feed refuses the fetcher
+   *  or parses to nothing — tried in order, inside the same deadline */
+  fallbacks?: readonly NewsFallback[];
+}
+
+export interface NewsFallback {
+  feed: string;
+  kind: "publisher" | "topic";
+  /** named in the source's status when this candidate answered */
+  label: string;
 }
 
 const googleNews = (q: string): string => {
@@ -37,6 +47,14 @@ const googleNews = (q: string): string => {
   u.searchParams.set("ceid", "US:en");
   return u.toString();
 };
+
+/** A publisher read through Google News, scoped to its own site: the items
+ *  name the outlet in <source>, so they rank and show as the publisher's. */
+const siteNews = (domain: string): NewsFallback => ({
+  feed: googleNews(`site:${domain}`),
+  kind: "topic",
+  label: `Google News · site:${domain}`,
+});
 
 /**
  * The sources. Publisher feeds first — those are the links a reader trusts —
@@ -53,6 +71,9 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     kind: "publisher",
     cap: 4,
   },
+  // The four below answer a server fetch with HTTP 403 or an empty page
+  // (read from Render's own network by live-verify's NEWS HEALTH lines);
+  // each falls back to a site-scoped Google News read of the same outlet.
   {
     id: "the-real-deal",
     name: "The Real Deal",
@@ -60,6 +81,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     feed: "https://therealdeal.com/feed/",
     kind: "publisher",
     cap: 4,
+    fallbacks: [siteNews("therealdeal.com")],
   },
   {
     id: "globest",
@@ -68,6 +90,10 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     feed: "https://feeds.feedblitz.com/globest/national",
     kind: "publisher",
     cap: 4,
+    fallbacks: [
+      { feed: "https://www.globest.com/feed/", kind: "publisher", label: "globest.com/feed" },
+      siteNews("globest.com"),
+    ],
   },
   {
     id: "multi-housing-news",
@@ -76,6 +102,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     feed: "https://www.multihousingnews.com/feed/",
     kind: "publisher",
     cap: 3,
+    fallbacks: [siteNews("multihousingnews.com")],
   },
   {
     id: "cpe",
@@ -84,6 +111,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     feed: "https://www.commercialsearch.com/news/feed/",
     kind: "publisher",
     cap: 3,
+    fallbacks: [siteNews("commercialsearch.com")],
   },
   {
     id: "connect-cre",
