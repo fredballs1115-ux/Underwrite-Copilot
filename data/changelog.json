@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-14",
+      "title": "The pipeline shows the whole deal name",
+      "blurb": "The pipeline is a table of eight columns and now gets a table's width on a desktop screen, and a deal's name wraps to a second line instead of cutting to \"The Maddox at Bre…\" beside a half-empty column. The News page's headline caption now counts the sources that answered.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-14",
       "title": "The boot warm-up reaches the News page",
       "blurb": "The server warms the news sources as it starts, but the copy of the code that warmed them was not the copy that served the page, so the first visitors after every deploy still waited on twelve fetches the server had already made. One state per server now, whichever copy answers; the health page also says which process answered and how long it has been up.",
       "href": "/news"

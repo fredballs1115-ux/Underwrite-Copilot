@@ -112,7 +112,7 @@ async function LiveHeadlinesSection() {
           Headlines now
         </h2>
         <span className="text-[11px] text-muted">
-          live from the sources · refreshed every 30 min
+          live from {answered.length} of {live.sources.length} sources · refreshed every 30 min
         </span>
       </div>
 
@@ -330,13 +330,14 @@ export default async function NewsPage({
       )}
 
       {items.length === 0 ? (
-        <section className="rounded-xl border border-dashed border-line p-4 text-sm text-muted">
-          <span className="font-medium text-ink">Scored for your markets — not yet.</span>{" "}
-          The weekday sweep gathers the news each morning and scores every
-          story 0–10 for your buy box, with law and rule changes flagged. It
-          runs from GitHub Actions once its secrets are set; until then the
-          live headlines above are the news, unscored.
-        </section>
+        // No box for what has not started: the headlines above are the
+        // page; one quiet line says what the sweep will add.
+        <p className="text-[12px] leading-relaxed text-muted">
+          The scored feed — every story rated 0–10 for your buy box, law and
+          rule changes flagged — starts with the weekday sweep once its
+          GitHub secret is set. Until then the headlines above are the news,
+          unscored.
+        </p>
       ) : (
         [...byDay.entries()].map(([day, list]) => (
           <section key={day}>

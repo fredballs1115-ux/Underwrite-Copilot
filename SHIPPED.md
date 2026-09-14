@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and eleven PRs, #176–#286, each
+estimate, and that's what it should flag." A hundred and twelve PRs, #176–#287, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1600,6 +1600,19 @@ confirmed equal to the main tip after each batch.
   currency sign) is never a tiled caption, so a self-storage inventory
   whose size rows repeat across half the deck stays the deck
   (`pdf-text.test.ts`).
+- **#287 The pipeline gets a table's room, and the News page says how
+  many sources answered.** Your 18:47 note ("0 changes on the actual
+  site … the pipeline as well") sent me back to the screenshots: at
+  desktop width seven fixed columns and the stage select left the deal
+  name about 150 px inside the reading-width shell, so most names cut
+  to "The Maddox at Bre…" beside a half-empty asset column. The pipeline
+  list now takes the wide shell (`max-w-7xl`, the only page that does —
+  every other page keeps the reading width) and a name wraps to two
+  lines before an ellipsis at every width, with the full name on hover.
+  On the News page the section caption counts the sources that answered
+  ("live from 11 of 12 sources") and the scored-feed empty state is one
+  quiet line under the headlines instead of a dashed box that read as a
+  broken page.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

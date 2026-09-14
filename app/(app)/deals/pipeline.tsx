@@ -1431,9 +1431,12 @@ const DealRow = memo(function DealRow({
       )}
       <DealThumb dealId={d.id} hasAddress={d.hasAddress} />
       <div className="min-w-0 flex-1">
-        {/* The name is the row on a phone — two lines there rather than a
-            word and a half; the columns give it one line from sm up. */}
-        <p className="line-clamp-2 font-medium sm:line-clamp-none sm:truncate">{d.name}</p>
+        {/* The name is the row: two lines before an ellipsis at every
+            width, so "The Maddox at Brewerytown" is never "The Maddox at
+            Bre…" beside a half-empty column. */}
+        <p className="line-clamp-2 font-medium" title={d.name}>
+          {d.name}
+        </p>
         {/* A phone gets two lines — where the deal is (the row's coloured
             edge already says what it is), then what it costs and how it
             fits — so the price, the cap and the fit are never the part a
