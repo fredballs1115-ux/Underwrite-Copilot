@@ -8,6 +8,7 @@ import type {
   VerdictResult,
   VerdictScenario,
 } from "@/lib/anthropic/types";
+import { assetClassLabel } from "@/lib/asset-class";
 import { inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { keyTermRows } from "@/lib/key-terms";
 import { SharePlan } from "./plan-facts";
@@ -243,10 +244,10 @@ export function ShareView({
       </header>
 
       <h1 className="mt-6 text-3xl font-semibold tracking-tight">{dealName}</h1>
-      <p className="mt-1 text-sm capitalize text-muted">
+      <p className="mt-1 text-sm text-muted">
         {[
           extraction?.market,
-          assetClass,
+          assetClassLabel(assetClass),
           strategy.kind !== "unknown" ? strategy.label : null,
         ]
           .filter(Boolean)

@@ -5,6 +5,7 @@ import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/serve
 import { loadSubmarketView } from "@/lib/market/store";
 import { exclusionSummary } from "@/lib/market/exclusions";
 import { RENT_BASIS_LABEL, RENT_BASES } from "@/lib/market/types";
+import { assetClassLabel } from "@/lib/asset-class";
 import { DualAxisTrend } from "./trend-chart";
 import {
   deleteSubmarket,
@@ -69,7 +70,7 @@ export default async function SubmarketPage({
         <h1 className="text-2xl font-semibold tracking-tight text-ink">{submarket.name}</h1>
         <p className="text-sm text-muted">
           {submarket.metro ? `${submarket.metro} · ` : ""}
-          <span className="capitalize">{submarket.assetClass}</span> ·{" "}
+          <span>{assetClassLabel(submarket.assetClass)}</span> ·{" "}
           {metrics.periodsCovered} period{metrics.periodsCovered === 1 ? "" : "s"} loaded
         </p>
       </header>

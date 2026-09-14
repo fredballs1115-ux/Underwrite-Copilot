@@ -3,20 +3,20 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-08**, after PRs #176–#266 merged to main (live build
-sha `5c2dd92`, #265, confirmed equal to the main tip by live-verify at 18:27
-UTC with its `DEPLOY: LIVE` line — every one of the ninety through #265 is
-live, the homepage serves at 196 KB where it served at 488 KB, the public
-sample memo at 57 KB where it served at 11 KB (the Brewerytown frame is in
-it), and the public-page lint #231 added reads all twelve public pages
-clean on every run; #266 and #267 are merged and await their proofs, #268
-follows).
+**Last updated 2026-09-14**, after PRs #176–#269 merged to main (live build
+sha `82dd186`, #268, confirmed equal to the main tip by live-verify at 16:30
+UTC with its `DEPLOY: LIVE` line — every one of the ninety-three through
+#268 is live, the homepage serves at 196 KB where it served at 488 KB, the
+public sample memo at 57 KB where it served at 11 KB (the Brewerytown frame
+is in it), and the public-page lint #231 added reads all twelve public
+pages clean on every run; #269 (the News fix) is merged and awaits its
+proof — its run is the first to print the NEWS HEALTH lines; #270 follows).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Ninety-four PRs (#176–#269) landed across one review session and the
+Ninety-five PRs (#176–#270) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -443,6 +443,13 @@ deploy (live-verify shows the sha).
   fetch cache, so a publisher that never answers can no longer hold the
   streamed section on its skeleton; `/api/news/health` is public and
   live-verify prints each feed's outcome from Render's own network.
+- **The pipeline's formatting, from the operator's screenshot** (#270):
+  one filter row with the exports at its right edge, a picture slot of one
+  size on every row so the names line up, "Auto" never shown as an asset
+  class, and one asset-class label module (`lib/asset-class.ts`) behind
+  every surface that prints one, so "self_storage" reads "Self-storage"
+  on the row, the filter, the exports, the compare table, the shared
+  screen and the market cards.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as

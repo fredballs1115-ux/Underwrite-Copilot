@@ -12,6 +12,7 @@ import type {
   VerdictResult,
   FirstSignal,
 } from "@/lib/anthropic/types";
+import { assetClassLabel } from "@/lib/asset-class";
 import type { BuyBoxCheck } from "@/lib/criteria";
 import type { MandateScore, MandateVerdict } from "@/lib/mandate";
 import {
@@ -1024,7 +1025,7 @@ function MarketMemoryStrip({ group }: { group: MarketGroup }) {
       <p className="mt-1 text-sm leading-relaxed text-muted">
         You&apos;ve screened{" "}
         <span className="font-medium text-ink">{group.count}</span> other{" "}
-        {group.market} <span className="capitalize">{group.assetClass}</span>{" "}
+        {group.market} <span>{assetClassLabel(group.assetClass)}</span>{" "}
         deal{group.count === 1 ? "" : "s"}
         {bits.length ? (
           <>

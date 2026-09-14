@@ -13,15 +13,38 @@ import { useState } from "react";
  * the moment GOOGLE_MAPS_API_KEY is configured — no code change, no
  * re-import of the deal.
  *
- * 404 (no address, nothing geocodes, every source failed) collapses this to
- * nothing rather than to a placeholder graphic.
+ * The slot is always the same size from `sm` up: a deal with no address, or
+ * one whose picture 404s (nothing geocodes, every source failed), shows a
+ * blank plate in its place rather than nothing — a row with a picture and a
+ * row without used to start their names at different x, and a column of
+ * names that does not line up reads as a mistake.
  *
  * Lazy by design: a long pipeline must not fire a geocode for every row the
  * reader never scrolls to.
  */
-export function DealThumb({ dealId }: { dealId: string }) {
+export function DealThumb({ dealId, hasAddress = true }: { dealId: string; hasAddress?: boolean }) {
   const [gone, setGone] = useState(false);
-  if (gone) return null;
+  if (!hasAddress || gone) {
+    return (
+      <span
+        aria-hidden
+        data-deal-thumb="blank"
+        className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-md border border-dashed border-line bg-faint text-muted/60 sm:flex"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-4 w-4"
+        >
+          <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5M9 10h.01M15 10h.01M9 14h.01M15 14h.01" />
+        </svg>
+      </span>
+    );
+  }
   return (
     /* eslint-disable-next-line @next/next/no-img-element -- proxied,
        auth-scoped route; next/image can't add anything over a route that
@@ -30,6 +53,7 @@ export function DealThumb({ dealId }: { dealId: string }) {
       src={`/api/deals/${dealId}/image?w=96&h=96`}
       alt=""
       aria-hidden
+      data-deal-thumb="photo"
       width={96}
       height={96}
       loading="lazy"

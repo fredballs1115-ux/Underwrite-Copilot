@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-14",
+      "title": "The pipeline lines up",
+      "blurb": "Every row on the pipeline now holds a picture slot of one size — the aerial where the deal has an address, an empty plate where it does not — so the deal names sit in one column instead of stepping in and out. The filters stay on one line with the CSV and Excel buttons at the right edge, and a deal whose class was left on Auto now shows the class the screen read from its OM.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-14",
       "title": "The News headlines load every time",
       "blurb": "The live headlines on the News page could sit on their loading skeleton for as long as you waited: one publisher that accepted the connection and never answered held the whole section open. Every feed now answers inside a hard deadline — with its headlines, an earlier copy, or a named miss — so the page paints within seconds every visit, and a Try again link sits under an empty list.",
       "href": "/news"

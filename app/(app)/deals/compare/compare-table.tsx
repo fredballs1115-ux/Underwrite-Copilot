@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { assetClassLabel } from "@/lib/asset-class";
 import type { LeverageRead } from "@/lib/leverage";
 
 export const VERDICT_PILL: Record<string, { label: string; cls: string }> = {
@@ -137,7 +138,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     { label: "Covered market", get: (c) => c.coveredMarket ?? "—" },
     {
       label: "Asset class",
-      get: (c) => c.assetClass.charAt(0).toUpperCase() + c.assetClass.slice(1),
+      get: (c) => assetClassLabel(c.assetClass) || "—",
     },
     // A conversion and a stabilized building are not the same kind of thing,
     // and a side-by-side that hides that compares apples to plans.

@@ -132,6 +132,18 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect((html.match(/Fit 71 · Watch/g) ?? []).length).toBe(2);
     expect((html.match(/Fit 88 · Pursue/g) ?? []).length).toBe(1);
     expect((html.match(/Fit 42 · Outside box/g) ?? []).length).toBe(1);
+    // Every row keeps a picture slot of the same size, so the names line
+    // up: the nine live deals with an address try their photo, the two
+    // without one (Logan Square, Arlington Flex Park) show a blank plate;
+    // the dead one is folded away.
+    expect((html.match(/data-deal-thumb="photo"/g) ?? []).length).toBe(9);
+    expect((html.match(/data-deal-thumb="blank"/g) ?? []).length).toBe(2);
+    // The two exports travel together at the filter row's right edge.
+    expect(html).toMatch(/class="flex items-center gap-2 md:ml-auto"/);
+    // A stored class prints its words: the storage deal's row and the
+    // asset filter both say "Self-storage", and the key never shows.
+    expect(text).toContain("Self-storage");
+    expect(text).not.toMatch(/self_storage|Self_storage/);
   });
 
   it("renders the empty pipeline with the getting-started state, and the at-limit notice", () => {

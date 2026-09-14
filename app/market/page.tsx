@@ -11,6 +11,7 @@ import {
 } from "@/lib/market-memory";
 import { mergeBenchmarks, seedBenchmarks, seedRules } from "@/lib/research-data";
 import { linkOk } from "@/lib/link-audit";
+import { assetClassLabel } from "@/lib/asset-class";
 import { looseValue, SECTORS } from "@/lib/research-sectors";
 import { COVERAGE_DISCOVERY, COVERAGE_SUMMARY, PROVIDERS } from "@/lib/public-comps/core";
 import metrosSeed from "@/data/research/metros.json";
@@ -1404,7 +1405,7 @@ function MarketCard({ g }: { g: MarketGroup }) {
           <h2 className="truncate text-sm font-semibold tracking-tight">
             {g.market}
           </h2>
-          <p className="mt-0.5 text-xs capitalize text-muted">{g.assetClass}</p>
+          <p className="mt-0.5 text-xs text-muted">{assetClassLabel(g.assetClass)}</p>
         </div>
         <span className="shrink-0 rounded-full bg-faint px-2 py-0.5 font-mono text-[11px] tabular-nums text-muted">
           {g.count} screen{g.count === 1 ? "" : "s"}

@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Ninety-four PRs, #176–#269, each
+estimate, and that's what it should flag." Ninety-five PRs, #176–#270, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1264,6 +1264,31 @@ confirmed equal to the main tip after each batch.
   from Render's own network after each deploy, so an empty section is
   diagnosed there, never guessed at from a sandbox that cannot reach the
   publishers. The empty state gets a Try again link.
+- **#270 The pipeline's formatting, from the operator's screenshot.** Three
+  things the eye caught on the live page. The filter row wrapped with one
+  stranded "All fit" select on a second line beside the exports: a select
+  is as wide as its longest option and a market name can run to a whole
+  line, so the asset and market selects are capped and the CSV and Excel
+  buttons travel together at the row's right edge. A row with a building
+  picture started its name forty pixels to the right of a row without
+  one: every row keeps a picture slot of one size now — a blank plate
+  where there is no address, or where the picture 404s — so the names sit
+  in one column. And a deal created with "Auto-detect" showed "● Auto" as
+  if it were an asset class: the row shows what the extraction read the
+  deck as, and nothing before anything has read it (`shownAssetClass` in
+  `lib/pipeline-slots.ts`, tested). The shot of the fixture caught a
+  fourth: a storage deal's row said "Self_storage", the stored key with
+  its underscore, because every surface printed the key under a CSS
+  capitalize. One module now holds the classes and their words
+  (`lib/asset-class.ts`: `ASSET_CLASS_LABEL`, `assetClassLabel`, and the
+  forms' option list drawn from it), and the pipeline row and its filter,
+  the CSV and the meeting .xlsx, the compare table, the shared screen, the
+  market cards and the submarket pages all print through it — "Self-
+  storage", "SFR / BTR", "Manufactured housing"; a class the extraction
+  phrased itself reads with its first letter up; "auto" and nothing read
+  as nothing. The pipeline render test asserts the nine photo slots, the
+  two blank plates, the exports' group, and that the key never shows;
+  shot at 1440 and 390.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

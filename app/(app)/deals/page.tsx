@@ -10,7 +10,7 @@ import { Pipeline, type DealCard } from "./pipeline";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
 import { inferStrategy } from "@/lib/deal-strategy";
-import { pickSlots } from "@/lib/pipeline-slots";
+import { pickSlots, shownAssetClass } from "@/lib/pipeline-slots";
 import { scoreMandateFit } from "@/lib/mandate";
 import { metroForAddress } from "@/lib/market-match";
 import { listJobStatus, type JobLike } from "@/lib/screen-run";
@@ -195,7 +195,9 @@ export default async function DealsPage({
     return {
       id: d.id,
       name: d.name,
-      assetClass: d.asset_class,
+      // "auto" is the create form's choice, not a class: the row shows what
+      // the extraction read the deck as, and nothing until it has.
+      assetClass: shownAssetClass(d.asset_class, extraction),
       createdAt: d.created_at,
       verdict: verdict?.verdict ?? null,
       stage: (d.stage as DealCard["stage"]) ?? "screening",

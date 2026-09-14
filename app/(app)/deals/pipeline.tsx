@@ -21,6 +21,7 @@ import { FileDrop } from "../file-drop";
 import { PendingButton } from "../pending-button";
 import { AddressAutocomplete } from "../address-autocomplete";
 import type { StructuredAddress } from "@/lib/address";
+import { ASSET_CLASS_OPTIONS, assetClassLabel } from "@/lib/asset-class";
 import { StageSelect } from "./[id]/stage-select";
 import { OffersDueBit } from "./offers-due";
 import { parseMoney, parsePct } from "@/lib/criteria";
@@ -185,10 +186,6 @@ const DATE_FMT = new Intl.DateTimeFormat("en-US", {
 
 function fmtDate(iso: string): string {
   return DATE_FMT.format(new Date(iso));
-}
-
-function cap(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 const PERSIST_KEY = "uc-pipeline-view";
@@ -494,7 +491,7 @@ export function Pipeline({
     const lines = filtered.map((d) =>
       [
         d.name,
-        d.assetClass,
+        assetClassLabel(d.assetClass),
         d.market,
         d.coveredMarket ?? "",
         d.slots.price ?? "",
@@ -719,17 +716,23 @@ export function Pipeline({
               label="Filter by asset class"
               value={asset}
               onChange={setAsset}
+              className="max-w-40"
               options={[
                 ["all", "All assets"],
-                ...assets.map((a) => [a, cap(a)] as [string, string]),
+                ...assets.map((a) => [a, assetClassLabel(a)] as [string, string]),
               ]}
             />
           )}
+          {/* A select is as wide as its longest option, and a market name can
+              run to a whole line ("Washington, DC (DC Proper / Fort Totten …)")
+              — capped, so the row keeps every filter on one line at desktop
+              width instead of stranding the next one below. */}
           {markets.length > 1 && (
             <FilterSelect
               label="Filter by market"
               value={market}
               onChange={setMarket}
+              className="max-w-48"
               options={[
                 ["all", "All markets"],
                 ...markets.map((m) => [m, m] as [string, string]),
@@ -783,28 +786,33 @@ export function Pipeline({
               ["name:asc", "Name A–Z"],
             ]}
           />
-          <button
-            type="button"
-            onClick={exportCsv}
-            disabled={filtered.length === 0}
-            title={
-              filtered.length === 0
-                ? "Nothing to export — clear the filters first"
-                : "Download the current view as a CSV"
-            }
-            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-faint disabled:cursor-not-allowed disabled:opacity-50 md:ml-auto"
-          >
-            <DownloadIcon />
-            CSV
-          </button>
-          <a
-            href="/api/pipeline/export"
-            title="The whole pipeline as an Excel workbook — stage-grouped, with verdict and buy-box markers and a summary sheet, for the pipeline meeting"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-faint"
-          >
-            <SheetIcon />
-            Excel
-          </a>
+          {/* The two exports travel together at the right edge: when the
+              filters wrap, the last line ends with them, never with one
+              stranded select beside them. */}
+          <div className="flex items-center gap-2 md:ml-auto">
+            <button
+              type="button"
+              onClick={exportCsv}
+              disabled={filtered.length === 0}
+              title={
+                filtered.length === 0
+                  ? "Nothing to export — clear the filters first"
+                  : "Download the current view as a CSV"
+              }
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-faint disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <DownloadIcon />
+              CSV
+            </button>
+            <a
+              href="/api/pipeline/export"
+              title="The whole pipeline as an Excel workbook — stage-grouped, with verdict and buy-box markers and a summary sheet, for the pipeline meeting"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-faint"
+            >
+              <SheetIcon />
+              Excel
+            </a>
+          </div>
         </div>
       )}
 
@@ -1312,9 +1320,9 @@ const DealRow = memo(function DealRow({
   ) : null;
   const asset = assetMeta(d.assetClass ?? "");
   const assetBit = d.assetClass ? (
-    <span className="inline-flex items-center gap-1 capitalize">
+    <span className="inline-flex items-center gap-1">
       <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${asset.dot}`} />
-      {d.assetClass}
+      {assetClassLabel(d.assetClass)}
     </span>
   ) : null;
   const priceBit = d.slots.price ? (
@@ -1421,7 +1429,7 @@ const DealRow = memo(function DealRow({
           )}
         </span>
       )}
-      {d.hasAddress && <DealThumb dealId={d.id} />}
+      <DealThumb dealId={d.id} hasAddress={d.hasAddress} />
       <div className="min-w-0 flex-1">
         {/* The name is the row on a phone — two lines there rather than a
             word and a half; the columns give it one line from sm up. */}
@@ -1447,11 +1455,13 @@ const DealRow = memo(function DealRow({
         {fitBar}
       </div>
       {/* Column cells — widths, order, and gaps mirror the header row. */}
-      <span className="hidden w-24 shrink-0 items-center gap-1.5 truncate text-sm capitalize text-muted lg:flex">
+      <span className="hidden w-24 shrink-0 items-center gap-1.5 truncate text-sm text-muted lg:flex">
         {d.assetClass ? (
           <>
             <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${asset.dot}`} />
-            <span className="truncate">{d.assetClass}</span>
+            <span className="truncate" title={assetClassLabel(d.assetClass)}>
+              {assetClassLabel(d.assetClass)}
+            </span>
           </>
         ) : (
           <span className="text-line">—</span>
@@ -2010,15 +2020,11 @@ function NewDealForm({
             className="rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
           >
             <option value="auto">Auto-detect</option>
-            <option value="multifamily">Multifamily</option>
-            <option value="office">Office</option>
-            <option value="industrial">Industrial</option>
-            <option value="retail">Retail</option>
-            <option value="sfr_btr">SFR / BTR</option>
-            <option value="self_storage">Self-storage</option>
-            <option value="manufactured_housing">Manufactured housing</option>
-            <option value="hospitality_str">Hospitality / STR</option>
-            <option value="land_infill">Land / infill</option>
+            {ASSET_CLASS_OPTIONS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
           </select>
         </div>
         <div>
