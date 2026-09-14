@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and twelve PRs, #176–#287, each
+estimate, and that's what it should flag." A hundred and thirteen PRs, #176–#288, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1613,6 +1613,19 @@ confirmed equal to the main tip after each batch.
   ("live from 11 of 12 sources") and the scored-feed empty state is one
   quiet line under the headlines instead of a dashed box that read as a
   broken page.
+- **#288 The News page shows its sources as a row of chips.** The live
+  section is now a pure view (`app/(app)/news/live-headlines.tsx`) the
+  page hands one fetch to and the render tests draw on a fixture, and
+  under the headlines the sources are a row of chips instead of a
+  sentence: a green dot for a publisher that answered just now, an amber
+  one for a copy from earlier, a dashed grey chip for one that did not
+  answer, each chip a link to the publisher with the item count or the
+  error on hover, and a "via Bing News" pill for the search host that
+  stood behind the topic reads. A screen reader hears "(earlier copy)"
+  and "(did not answer)" where a sighted reader sees the dot. The render
+  test's two new cases (four of five sources answering; none answering)
+  lint the visible text and the accessible names, and the fixture
+  screenshots at 1440 and 390 read clean. Words that can be a picture.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

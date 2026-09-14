@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-14",
+      "title": "The News page shows its sources as a row",
+      "blurb": "Under the headlines each publisher is now a chip — a green dot for one that answered just now, amber for a copy from earlier, dashed grey for one that did not answer — with the item count or what it said on hover, and a pill for the search host that stood behind the topic reads. What a sentence used to list, at a glance.",
+      "href": "/news"
+    },
+    {
+      "date": "2026-09-14",
       "title": "The pipeline shows the whole deal name",
       "blurb": "The pipeline is a table of eight columns and now gets a table's width on a desktop screen, and a deal's name wraps to a second line instead of cutting to \"The Maddox at Bre…\" beside a half-empty column. The News page's headline caption now counts the sources that answered.",
       "href": "/deals"

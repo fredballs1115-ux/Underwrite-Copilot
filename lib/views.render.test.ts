@@ -763,3 +763,97 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     expect(gone).toContain("The sender revoked this link.");
   });
 });
+
+// ── The News page's live section ─────────────────────────────────────────
+// A pure view of one fetch: the ranked headlines, then one chip per source
+// in the state it answered in (live, an earlier copy, did not answer) and
+// the search host behind the topic searches. The page hands it the real
+// fetch; this hands it a fixture with every state.
+import { LiveHeadlinesView } from "@/app/(app)/news/live-headlines";
+import type { LiveHeadlines, SourceStatus } from "@/lib/news/live";
+
+describe("News live section", () => {
+  const status = (id: string, name: string, over: Partial<SourceStatus> = {}): SourceStatus => ({
+    id,
+    name,
+    home: `https://${id}.test/`,
+    kind: "publisher",
+    ok: true,
+    count: 12,
+    ms: 40,
+    stale: false,
+    cached: false,
+    ...over,
+  });
+  const live: LiveHeadlines = {
+    fetchedAt: "2026-09-14T19:00:00Z",
+    headlines: [
+      {
+        title: "Investor takes over distressed Atlanta apartment asset",
+        url: "https://a.test/1",
+        publisher: "Connect CRE",
+        publisherUrl: "https://a.test/",
+        publishedAt: "2026-09-14T17:00:00Z",
+        snippet: "The lender-controlled sale closed at a 6.4% cap.",
+        sourceId: "connect",
+        score: 3.2,
+      },
+      {
+        title: "PGIM refis Manhattan office-to-storage conversion",
+        url: "https://b.test/2",
+        publisher: "Commercial Observer",
+        publisherUrl: null,
+        publishedAt: null,
+        snippet: "",
+        sourceId: "co",
+        score: 2.1,
+      },
+    ],
+    sources: [
+      status("co", "Commercial Observer"),
+      status("trd", "The Real Deal", { via: "Bing News · site:therealdeal.com" }),
+      status("cpe", "Commercial Property Executive", {
+        ok: false,
+        stale: true,
+        count: 100,
+        ms: 4187,
+        error: "HTTP 403 · Google News · site:commercialsearch.com: The operation was aborted due to timeout",
+      }),
+      status("gn-cre", "Google News · commercial real estate", { kind: "topic", via: "Bing News · commercial real estate" }),
+      status("mhn", "Multi-Housing News", { ok: false, count: 0, ms: 8000, error: "HTTP 403" }),
+    ],
+  };
+
+  it("draws the headlines, one chip per source in its state, the search host behind them, and reads clean", () => {
+    const html = render(React.createElement(LiveHeadlinesView, { live }));
+    const text = visibleText(html);
+    expect(text).toContain("live from 4 of 5 sources");
+    expect(text).toContain("Investor takes over distressed Atlanta apartment asset");
+    expect(text).toContain("Connect CRE");
+    expect(text).toContain("2h ago");
+    // the topic chip reads as its topic; the row already names the host
+    expect(text).toContain("commercial real estate");
+    expect(text).toContain("(earlier copy)");
+    expect(text).toContain("(did not answer)");
+    expect(text).toContain("via Bing News");
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    dumpView("news-live", html);
+  });
+
+  it("says so when nothing answered — a sentence, never a fake list", () => {
+    const dark: LiveHeadlines = {
+      ...live,
+      headlines: [],
+      sources: live.sources.map((s) => ({ ...s, ok: false, stale: false, count: 0, via: undefined, error: "HTTP 503" })),
+    };
+    const html = render(React.createElement(LiveHeadlinesView, { live: dark }));
+    const text = visibleText(html);
+    expect(text).toContain("None of the publishers answered just now");
+    expect(text).toContain("live from 0 of 5 sources");
+    expect(text).not.toContain("via ");
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    dumpView("news-live-dark", html);
+  });
+});

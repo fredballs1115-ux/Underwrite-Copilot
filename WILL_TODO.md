@@ -32,14 +32,15 @@ that is why `warm` was null on every read; the state now lives on
 sources answered at boot, 17.3s`, every source `cached` on the first
 read after the deploy); #286 (the fourteenth review's five findings,
 the first a #284 regression that read `NOI / RSF` as the NOI, live for
-twenty minutes) and #287 (the pipeline gets the wide shell and whole
-deal names; the News caption counts its sources) follow.
+twenty minutes), #287 (the pipeline gets the wide shell and whole
+deal names; the News caption counts its sources) and #288 (the News
+page's sources as a row of chips) follow.
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-A hundred and twelve PRs (#176–#287) landed across one review session and the
+A hundred and thirteen PRs (#176–#288) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -572,6 +573,12 @@ deploy (live-verify shows the sha).
   before an ellipsis, so "The Maddox at Brewerytown" is never "The
   Maddox at Bre…"; the News caption says "live from 11 of 12 sources"
   and the scored-feed note is one quiet line.
+- **The News page's sources are a row of chips** (#288): the live
+  section is a pure view the render tests draw on a fixture; under the
+  headlines each source is a chip — a green dot answered just now, amber
+  an earlier copy, dashed grey did not answer, the count or the error on
+  hover — with a "via Bing News" pill for the search host behind the
+  topic reads.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
