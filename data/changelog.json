@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-14",
+      "title": "How your OM is handled, beside the price",
+      "blurb": "Under the plans on the homepage, four tiles now say what happens to an uploaded offering memorandum — private storage with links that expire, isolation in the database itself, never used to train a model, delete it all yourself — each opening the security page, which states every one in full and says plainly that there is no attestation badge to show.",
+      "href": "/#pricing"
+    },
+    {
+      "date": "2026-09-14",
       "title": "The deck is read as text first",
       "blurb": "An OM exported from a layout tool carries its own text layer, and that layer — every page tagged, every table row kept as one line — is a third to a quarter of what the same pages cost to read as pictures. Every step of a screen now reads it when it is dense enough to stand in for the pages, with the page count taken from the layer itself; a scanned deck, or one that is mostly photographs, is still read page by page.",
       "href": "/deals"

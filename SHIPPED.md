@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Ninety-seven PRs, #176–#272, each
+estimate, and that's what it should flag." Ninety-eight PRs, #176–#273, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1343,6 +1343,21 @@ confirmed equal to the main tip after each batch.
   unreadable file as no pages; the line rebuild's gap rule; the density
   read; the document's header; and the transport choice under each
   `OM_READ`.
+- **#273 How the OM is handled, beside the price.** The operator asked
+  for the category's professional conventions, so they were read (the
+  sites themselves are unreachable from the sandbox; what their pages
+  carry is in the public record): the deal-management leader leads with
+  its SOC 2 Type 2 attestation, its customers' logos and a transaction
+  total, and every 2026 homepage guide puts the trust signals beside the
+  pricing. We have no attestation, no named customers and no total, and
+  the site says nothing it cannot back — so the one convention that
+  applies honestly is the placement. Under the three plans, four tiles
+  say how an uploaded OM is handled — private storage with links that
+  expire, isolation in the database itself, never used to train a model,
+  delete it all self-serve — each an icon and a few words, each opening
+  `/security`, which states every one in full and says plainly that
+  there is no badge. live-verify greps the strip's class on every run.
+  Shot at 1440 and 390.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

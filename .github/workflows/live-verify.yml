@@ -39,6 +39,7 @@ jobs:
           grep -o "data last verified[^<]*" body.html && echo "STEWARD MARKER: present" || echo "STEWARD MARKER: absent (no steward run yet — expected until the nightly cron lands)"
           grep -c "stage-rail" body.html && echo "SIX-STAGE RAIL (Sep 8, #240): present" || echo "SIX-STAGE RAIL (Sep 8, #240): not yet deployed"
           grep -c "feature-grid" body.html && echo "FEATURE ICON GRID (Sep 8, #240): present" || echo "FEATURE ICON GRID (Sep 8, #240): not yet deployed"
+          grep -c "trust-strip" body.html && echo "TRUST STRIP under pricing (Sep 14, #273): present" || echo "TRUST STRIP under pricing (Sep 14, #273): not yet deployed"
           grep -c "screenrun-line" body.html && echo "SCREEN-RUN TRACE: present" || echo "SCREEN-RUN TRACE: missing"
           grep -c "Break it yourself" body.html && echo "STRESS BENCH: present" || echo "STRESS BENCH: missing"
           grep -c "irr-gauge" body.html && echo "IRR GAUGE: present" || echo "IRR GAUGE: missing"
