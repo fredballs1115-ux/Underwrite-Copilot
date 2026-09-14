@@ -118,8 +118,11 @@ async function LiveHeadlinesSection() {
       {live.headlines.length === 0 ? (
         <p className="mt-2 rounded-xl border border-dashed border-line p-4 text-sm text-muted">
           None of the publishers answered just now — their feeds are checked
-          again on the next visit. <code className="text-[11px]">/api/news/health</code>{" "}
-          shows what each one said.
+          again on the next visit.{" "}
+          <a href="/news" className="font-medium text-brand hover:text-brand-strong">
+            Try again
+          </a>
+          . <code className="text-[11px]">/api/news/health</code> shows what each one said.
         </p>
       ) : (
         <ol className="mt-2 divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">

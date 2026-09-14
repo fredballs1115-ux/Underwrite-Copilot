@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Ninety-three PRs, #176–#268, each
+estimate, and that's what it should flag." Ninety-four PRs, #176–#269, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1245,6 +1245,25 @@ confirmed equal to the main tip after each batch.
   reader refused "5.25%–5.75%" — a unit after the low figure broke its
   match, so the report drew that range only when the unit came once, at
   the end — and now takes it, with a hyphen or "to" for the dash.
+- **#269 The News page's live headlines always paint.** The section
+  streams in behind the page, and on the live site it never arrived: the
+  skeleton sat there ("reading the publishers' feeds…") for as long as the
+  browser waited. Each feed was fetched through Next's data cache with an
+  abort signal the cache does not reliably honour, so one publisher that
+  accepts the connection and never answers held the whole streamed section
+  open. The live layer now keeps its own fresh copy per source (half an
+  hour, per process), fetches with `cache: "no-store"` so the signal is
+  the request's own, and races every source against a wall-clock deadline
+  — whatever a publisher does, its slot resolves inside the timeout plus a
+  hair, with its items, its last good copy, or nothing, named. A test
+  drives the worst case (a feed that accepts and never replies, ignoring
+  the abort) and sees the section resolve in under a second at a short
+  timeout; two more cover the fresh copy and the last-good copy. The
+  health route is public now — publisher names, outcomes, latency, the
+  top links; nothing secret — and live-verify prints every feed's outcome
+  from Render's own network after each deploy, so an empty section is
+  diagnosed there, never guessed at from a sandbox that cannot reach the
+  publishers. The empty state gets a Try again link.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
