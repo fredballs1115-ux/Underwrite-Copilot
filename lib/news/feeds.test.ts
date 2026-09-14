@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   NEWS_SOURCES,
+  SEARCH_HOSTS,
   decodeText,
+  directUrl,
   parseFeed,
   rankHeadlines,
   scoreHeadline,
+  searchHostsAnswering,
   timeAgo,
   toSnippet,
   type FeedItem,
@@ -256,6 +259,85 @@ describe("NEWS_SOURCES", () => {
     expect(kinds[0]).toBe("publisher");
     expect(kinds.at(-1)).toBe("topic");
     expect(NEWS_SOURCES.filter((s) => s.kind === "publisher").length).toBeGreaterThanOrEqual(6);
+  });
+
+  it("every Google News read has a Bing News read behind it, in that order, labelled as the way in", () => {
+    let searchBacked = 0;
+    for (const s of NEWS_SOURCES) {
+      const doors = [s.feed, ...(s.fallbacks ?? []).map((f) => f.feed)];
+      const g = doors.findIndex((d) => d.startsWith("https://news.google.com/rss/search?"));
+      if (g < 0) continue;
+      searchBacked++;
+      const b = doors.findIndex((d) => d.startsWith("https://www.bing.com/news/search?"));
+      expect(b).toBeGreaterThan(g);
+      expect(new URL(doors[b]).searchParams.get("format")).toBe("rss");
+      expect((s.fallbacks ?? []).find((f) => f.feed === doors[b])?.label).toMatch(/^Bing News · /);
+    }
+    expect(searchBacked).toBe(8);
+  });
+});
+
+/** Bing News search RSS: the outlet rides in <News:Source>, the link goes
+ *  through a click-tracking redirect whose `url` parameter is the article. */
+const BING = `<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:News="https://www.bing.com:443/news/search?q=site%3atherealdeal.com&amp;format=rss">
+<channel><title>site:therealdeal.com - Bing News</title>
+<item>
+  <title>Blackstone Refinances Manhattan Tower With $500M Loan</title>
+  <link>https://www.bing.com/news/apiclick.aspx?ref=FexRss&amp;aid=&amp;tid=abc&amp;url=https%3a%2f%2ftherealdeal.com%2fnew-york%2f2026%2f09%2f07%2fblackstone-refi%2f&amp;c=123&amp;mkt=en-us</link>
+  <description>The loan replaces a maturing CMBS note.</description>
+  <pubDate>Mon, 07 Sep 2026 15:00:00 GMT</pubDate>
+  <News:Source>The Real Deal</News:Source>
+  <News:Image>https://www.bing.com/th?id=abc</News:Image>
+</item>
+</channel></rss>`;
+
+describe("parseFeed — a Bing News read", () => {
+  it("names the outlet from News:Source and lands the reader on the article, not the click redirect", () => {
+    const items = parseFeed(BING, src({ id: "the-real-deal", name: "The Real Deal", kind: "topic" }));
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      title: "Blackstone Refinances Manhattan Tower With $500M Loan",
+      url: "https://therealdeal.com/new-york/2026/09/07/blackstone-refi/",
+      publisher: "The Real Deal",
+      publisherUrl: null,
+      publishedAt: "2026-09-07T15:00:00.000Z",
+      snippet: "The loan replaces a maturing CMBS note.",
+      sourceId: "the-real-deal",
+    });
+  });
+
+  it("directUrl unwraps only Bing's click redirect, to an http(s) address, and leaves every other link alone", () => {
+    expect(directUrl("https://www.bing.com/news/apiclick.aspx?ref=FexRss&url=https%3a%2f%2fx.example%2fa&c=1")).toBe(
+      "https://x.example/a",
+    );
+    const notWeb = "https://www.bing.com/news/apiclick.aspx?ref=FexRss&url=javascript%3aalert(1)";
+    expect(directUrl(notWeb)).toBe(notWeb);
+    expect(directUrl("https://news.google.com/rss/articles/x?oc=5")).toBe("https://news.google.com/rss/articles/x?oc=5");
+    expect(directUrl("not a url")).toBe("not a url");
+  });
+});
+
+describe("searchHostsAnswering", () => {
+  const st = (kind: NewsSource["kind"], ok: boolean, via?: string) => ({ kind, ok, stale: false, via });
+
+  it("names the search hosts behind the topic sources that answered, each once, in order of first use", () => {
+    const hosts = searchHostsAnswering([
+      st("publisher", true),
+      st("topic", true),
+      st("topic", true, "Bing News · multifamily"),
+      st("topic", true),
+      st("topic", true, "Bing News · rent regulation"),
+    ]);
+    expect(hosts).toEqual([SEARCH_HOSTS.google, SEARCH_HOSTS.bing]);
+  });
+
+  it("names nothing when no topic source answered; a publisher read through a search host is still the publisher", () => {
+    expect(searchHostsAnswering([st("publisher", true, "Google News · site:x.com"), st("topic", false)])).toEqual([]);
+  });
+
+  it("counts a stale topic copy — the page shows it, so its host is named", () => {
+    expect(searchHostsAnswering([{ kind: "topic", ok: false, stale: true }])).toEqual([SEARCH_HOSTS.google]);
   });
 });
 

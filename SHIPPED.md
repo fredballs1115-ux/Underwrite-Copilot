@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and two PRs, #176–#277, each
+estimate, and that's what it should flag." A hundred and three PRs, #176–#278, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1419,6 +1419,30 @@ confirmed equal to the main tip after each batch.
   both on the recording fake: the second read on the buffer source, the
   challenger and the market check on the buffer too, the stored
   extraction the second read's; and the double-empty stop.
+- **#278 The News layer survives a cold start.** The first health read
+  on a fresh process — minutes after a deploy, twice in a row (runs 410
+  and 412) — found 4 of 12 sources: a first visitor's parallel read sends
+  eight requests to Google News at once from one address, and Google
+  answers a burst with 503s and held connections, so the four topic
+  searches and the four site-scoped fallbacks all died together. Six
+  layers now: a gate per host (two requests in flight per host from this
+  process, the rest queued in order, a freed slot handed to the next in
+  line); a door with others behind it holds at most half the source's
+  budget, so a host that hangs leaves time for the next; one request per
+  source shared by whoever arrives while it is in flight; a second search
+  host — Bing News as RSS, its `News:Source` read as the outlet, its
+  click-tracking redirect unwrapped to the article — behind every Google
+  News read, topic and site-scoped alike; the fresh copy keeps its `via`,
+  so a cached line still says the way in; and a warm-up at boot
+  (`instrumentation.ts`, the Node runtime only, two seconds after the
+  server is up, `NEWS_WARM=0` to turn off) that reads the sources one at a
+  time so the first visitor after a deploy finds every source cached. The
+  footer names the search hosts it leaned on. `live.test.ts` drives each
+  with a fake fetch that honours the abort signal: the gate's peak of two,
+  the half-budget cap answering through the second door in under the
+  budget, the shared request fetched once, the cached `via`, the warm-up
+  at one in flight with its log line; `feeds.test.ts` parses a Bing item
+  and holds every Google read to a Bing door behind it.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

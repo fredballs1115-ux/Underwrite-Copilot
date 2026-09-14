@@ -13,14 +13,16 @@ from Render's own network say 12 of 12 sources answered and 30 headlines
 ranked: the three publishers that answered Render with HTTP 403 (The Real
 Deal, Multi-Housing News, Commercial Property Executive) and GlobeSt,
 whose FeedBlitz URL parsed to zero items, now come in through #274's
-fallbacks at a hundred items each. #275 and #276 are merged and await
-their proofs; #277 follows).
+fallbacks at a hundred items each — on a warm process; the first read on
+a fresh one, minutes after a deploy, found 4 of 12, which is what #278
+fixes. #275, #276 and #277 are proven (`2c362a6` at 17:24 UTC, `f26a4e2`
+at 17:29, `bb3061c` at 17:37); #278 follows).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-A hundred and two PRs (#176–#277) landed across one review session and the
+A hundred and three PRs (#176–#278) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -490,6 +492,13 @@ deploy (live-verify shows the sha).
   the extraction step retries once on the PDF when the dense text layer
   yielded nothing, every later step reads the pages too, and a deck that
   is empty both ways still stops honestly.
+- **The News layer survives a cold start** (#278): a gate per host (two
+  requests in flight per host, so the eight Google News reads never burst
+  from one address), a first door capped at half the budget so a host
+  that hangs leaves time for the next, one request per source shared by
+  concurrent callers, Bing News as RSS behind every Google News read, the
+  cached copy keeping its `via`, and a warm-up at boot
+  (`instrumentation.ts`) that reads the sources one at a time.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -561,11 +570,20 @@ also linked from `/data-health` under "Service probes":
    Multi-Housing News and Commercial Property Executive — and GlobeSt,
    whose FeedBlitz URL parsed to zero items, each served a hundred items,
    the count a site-scoped Google News read returns: the fallbacks #274
-   added are the way in. On a run that fetches fresh the NEWS HEALTH line
-   says `ok … via Google News · site:therealdeal.com`; a line served from
-   the process's cache says `cached` and carries no `via`. A line that
-   says `HTTP 403` with no `via` means the search fallback failed too and
-   wants a look.
+   added are the way in. That was a warm process. The next three runs
+   (17:24, 17:30 and 17:37), each minutes after a deploy, read a fresh
+   one: 4 of 12,
+   because the first read fires eight requests at Google News at once
+   from one address and Google answers a burst with `HTTP 503` and held
+   connections — the topic searches and the site-scoped fallbacks died
+   together. #278 gates the host to two requests at a time, caps a first
+   door at half the budget, puts Bing News behind every Google read, and
+   warms the sources one at a time at boot, so read the first NEWS HEALTH
+   after its deploy: the sources should say `cached` (the warm-up ran
+   before the probe) and, on a run that fetched fresh, `via Google News ·
+   site:…` or `via Bing News · …`. A line that says `HTTP 403` or `503`
+   with no `via` means every door closed and wants a look; `[news]
+   warm-up: N of 12 sources answered` is in the service log at each boot.
    `/api/news/health` is public, so the same JSON is one click away under
    Service probes on `/data-health`. The
    scored feed under the headlines fills in once the GitHub Actions secret

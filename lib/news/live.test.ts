@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchLiveHeadlines, forgetLiveHeadlines } from "./live";
+import { fetchLiveHeadlines, forgetLiveHeadlines, warmLiveHeadlines } from "./live";
 import type { NewsSource } from "./feeds";
 
 // The network half of the live headlines, driven with a fake fetch. The
@@ -171,5 +171,119 @@ describe("fetchLiveHeadlines — a publisher that refuses the fetcher is read an
     expect(live.sources[0]).toMatchObject({ ok: false, count: 0 });
     expect(live.sources[0].error).toMatch(/no answer within 800 ms/);
     expect(calls).toBe(1);
+  });
+});
+
+/** A fake fetch that answers after `delayMs`, honouring the abort signal the
+ *  way a real socket does — the fetcher's own timeout can interrupt it. */
+const answer =
+  (body: string, delayMs: number, status = 200) =>
+  (init?: RequestInit) =>
+    new Promise<Response>((resolve, reject) => {
+      const t = setTimeout(() => resolve(new Response(body, { status })), delayMs);
+      init?.signal?.addEventListener("abort", () => {
+        clearTimeout(t);
+        reject(init.signal?.reason ?? new Error("aborted"));
+      });
+    });
+
+describe("fetchLiveHeadlines — a cold start does not burst", () => {
+  const realFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    forgetLiveHeadlines();
+  });
+
+  it("at most two requests are in flight to one host at a time; the rest wait their turn and still answer", async () => {
+    let inflight = 0;
+    let peak = 0;
+    globalThis.fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      inflight++;
+      peak = Math.max(peak, inflight);
+      try {
+        return await answer(rss("Cap rates hold"), 15)(init);
+      } finally {
+        inflight--;
+      }
+    }) as typeof fetch;
+    const sources = Array.from({ length: 8 }, (_, i) => ({ ...src(`gate${i}`), feed: `https://gate.test/rss?q=${i}` }));
+    const live = await fetchLiveHeadlines(sources, 30, { timeoutMs: 2_000 });
+    expect(live.sources.map((s) => s.ok)).toEqual(Array(8).fill(true));
+    expect(peak).toBe(2);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(8);
+  });
+
+  it("a door with others behind it holds at most half the budget: a search host that hangs leaves time for the next", async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+      String(input).startsWith("https://held.test")
+        ? answer("", 10_000)(init) // holds the connection open; honours the abort
+        : answer(gnRss("Lender takes back the tower", "The Paper"), 5)(init),
+    ) as typeof fetch;
+    const s: NewsSource = {
+      ...src("held"),
+      fallbacks: [{ feed: "https://second.test/rss", kind: "topic", label: "Bing News · site:held.test" }],
+    };
+    const t0 = Date.now();
+    const live = await fetchLiveHeadlines([s], 10, { timeoutMs: 1_000 });
+    expect(Date.now() - t0).toBeLessThan(1_000);
+    expect(live.sources[0]).toMatchObject({ ok: true, count: 1, via: "Bing News · site:held.test" });
+    expect(live.sources[0].error).toBeUndefined();
+    expect(live.headlines.map((h) => [h.title, h.publisher])).toEqual([["Lender takes back the tower", "The Paper"]]);
+  });
+
+  it("two callers who arrive together share one request", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => answer(rss("Fed holds"), 20)(init));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const [a, b] = await Promise.all([
+      fetchLiveHeadlines([src("shared")], 10, { timeoutMs: 1_000 }),
+      fetchLiveHeadlines([src("shared")], 10, { timeoutMs: 1_000 }),
+    ]);
+    expect(a.sources[0]).toMatchObject({ ok: true, cached: false, count: 1 });
+    expect(b.sources[0]).toMatchObject({ ok: true, cached: false, count: 1 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("a cached copy still says the way it came in", async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) =>
+      String(input).startsWith("https://door.test")
+        ? new Response("forbidden", { status: 403 })
+        : new Response(gnRss("Tower trades", "The Paper"), { status: 200 }),
+    ) as typeof fetch;
+    const s: NewsSource = {
+      ...src("door"),
+      fallbacks: [{ feed: "https://news.test/rss?q=site:door.test", kind: "topic", label: "Google News · site:door.test" }],
+    };
+    const first = await fetchLiveHeadlines([s], 10, { timeoutMs: 1_000 });
+    expect(first.sources[0]).toMatchObject({ ok: true, cached: false, via: "Google News · site:door.test" });
+    const again = await fetchLiveHeadlines([s], 10, { timeoutMs: 1_000 });
+    expect(again.sources[0]).toMatchObject({ ok: true, cached: true, ms: 0, via: "Google News · site:door.test" });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("the warm-up reads the sources one at a time, never throws, says what it found, and the next read finds them cached", async () => {
+    let inflight = 0;
+    let peak = 0;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      inflight++;
+      peak = Math.max(peak, inflight);
+      try {
+        return String(input).startsWith("https://warm2.test")
+          ? new Response("no", { status: 403 })
+          : await answer(rss("Rates hold"), 10)(init);
+      } finally {
+        inflight--;
+      }
+    }) as typeof fetch;
+    const sources = [src("warm0"), src("warm1"), src("warm2")];
+    const lines: string[] = [];
+    const r = await warmLiveHeadlines(sources, { timeoutMs: 1_000, gapMs: 0, log: (l) => lines.push(l) });
+    expect(r).toMatchObject({ answered: 2, total: 3 });
+    expect(peak).toBe(1);
+    expect(lines).toEqual([expect.stringMatching(/^\[news\] warm-up: 2 of 3 sources answered in \d+\.\ds$/)]);
+
+    const live = await fetchLiveHeadlines(sources, 10, { timeoutMs: 1_000 });
+    expect(live.sources.map((s) => s.cached)).toEqual([true, true, false]);
+    expect(live.sources[2]).toMatchObject({ ok: false, error: "HTTP 403" });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(4); // three in the warm-up, the refused one once more
   });
 });

@@ -48,13 +48,51 @@ const googleNews = (q: string): string => {
   return u.toString();
 };
 
-/** A publisher read through Google News, scoped to its own site: the items
- *  name the outlet in <source>, so they rank and show as the publisher's. */
-const siteNews = (domain: string): NewsFallback => ({
-  feed: googleNews(`site:${domain}`),
+/** Bing News search as RSS — a second search host, so one throttled host
+ *  never blanks every search-backed source at once. Its items name the
+ *  outlet in <News:Source> and link through a redirect the parser unwraps. */
+const bingNews = (q: string): string => {
+  const u = new URL("https://www.bing.com/news/search");
+  u.searchParams.set("q", q);
+  u.searchParams.set("format", "rss");
+  return u.toString();
+};
+
+/** A publisher read through the search hosts, scoped to its own site: the
+ *  items name the outlet, so they rank and show as the publisher's. Google
+ *  first, Bing when Google refuses or hangs — inside the same deadline. */
+const siteReads = (domain: string): NewsFallback[] => [
+  { feed: googleNews(`site:${domain}`), kind: "topic", label: `Google News · site:${domain}` },
+  { feed: bingNews(`site:${domain}`), kind: "topic", label: `Bing News · site:${domain}` },
+];
+
+/** The same topic on Bing, behind a Google News topic search. */
+const bingTopic = (q: string, topic: string): NewsFallback => ({
+  feed: bingNews(q),
   kind: "topic",
-  label: `Google News · site:${domain}`,
+  label: `Bing News · ${topic}`,
 });
+
+/** The search host a status came in through, read off the way-in label
+ *  (`via`) the fetcher wrote — Google unless the label says Bing. */
+export const SEARCH_HOSTS = {
+  google: { name: "Google News", home: "https://news.google.com/" },
+  bing: { name: "Bing News", home: "https://www.bing.com/news" },
+} as const;
+
+/** Which search hosts stand behind the topic sources that answered, in the
+ *  order they first appear — the footer names each one it leaned on. */
+export function searchHostsAnswering(
+  sources: readonly { kind: NewsSource["kind"]; ok: boolean; stale: boolean; via?: string }[],
+): { name: string; home: string }[] {
+  const out: { name: string; home: string }[] = [];
+  for (const s of sources) {
+    if (s.kind !== "topic" || !(s.ok || s.stale)) continue;
+    const host = s.via?.startsWith("Bing News") ? SEARCH_HOSTS.bing : SEARCH_HOSTS.google;
+    if (!out.includes(host)) out.push(host);
+  }
+  return out;
+}
 
 /**
  * The sources. Publisher feeds first — those are the links a reader trusts —
@@ -73,7 +111,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
   },
   // The four below answer a server fetch with HTTP 403 or an empty page
   // (read from Render's own network by live-verify's NEWS HEALTH lines);
-  // each falls back to a site-scoped Google News read of the same outlet.
+  // each falls back to a site-scoped search read of the same outlet.
   {
     id: "the-real-deal",
     name: "The Real Deal",
@@ -81,7 +119,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     feed: "https://therealdeal.com/feed/",
     kind: "publisher",
     cap: 4,
-    fallbacks: [siteNews("therealdeal.com")],
+    fallbacks: siteReads("therealdeal.com"),
   },
   {
     id: "globest",
@@ -92,7 +130,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     cap: 4,
     fallbacks: [
       { feed: "https://www.globest.com/feed/", kind: "publisher", label: "globest.com/feed" },
-      siteNews("globest.com"),
+      ...siteReads("globest.com"),
     ],
   },
   {
@@ -102,7 +140,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     feed: "https://www.multihousingnews.com/feed/",
     kind: "publisher",
     cap: 3,
-    fallbacks: [siteNews("multihousingnews.com")],
+    fallbacks: siteReads("multihousingnews.com"),
   },
   {
     id: "cpe",
@@ -111,7 +149,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     feed: "https://www.commercialsearch.com/news/feed/",
     kind: "publisher",
     cap: 3,
-    fallbacks: [siteNews("commercialsearch.com")],
+    fallbacks: siteReads("commercialsearch.com"),
   },
   {
     id: "connect-cre",
@@ -137,6 +175,9 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     kind: "publisher",
     cap: 2,
   },
+  // The topic searches: Google News first, the same topic on Bing when
+  // Google answers 503 or holds the connection (it does both under a burst
+  // from one address — read on a fresh process by live-verify).
   {
     id: "gn-cre",
     name: "Google News · commercial real estate",
@@ -144,6 +185,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     feed: googleNews('"commercial real estate"'),
     kind: "topic",
     cap: 6,
+    fallbacks: [bingTopic('"commercial real estate"', "commercial real estate")],
   },
   {
     id: "gn-multifamily",
@@ -152,6 +194,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     feed: googleNews('multifamily OR apartment "cap rate" OR portfolio sale OR acquisition'),
     kind: "topic",
     cap: 5,
+    fallbacks: [bingTopic('multifamily OR apartments "cap rate" OR sale', "multifamily")],
   },
   {
     id: "gn-debt",
@@ -160,6 +203,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     feed: googleNews('CMBS OR "commercial mortgage" delinquency OR distress OR foreclosure office OR multifamily'),
     kind: "topic",
     cap: 5,
+    fallbacks: [bingTopic('CMBS OR "commercial mortgage" delinquency OR distress', "CRE debt & distress")],
   },
   {
     id: "gn-regulation",
@@ -168,6 +212,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     feed: googleNews('"rent control" OR "rent stabilization" OR "good cause eviction" landlord council'),
     kind: "topic",
     cap: 4,
+    fallbacks: [bingTopic('"rent control" OR "rent stabilization" OR "good cause eviction"', "rent regulation")],
   },
 ];
 
@@ -239,6 +284,19 @@ const attr = (openTag: string, name: string): string | null => {
   return m ? decodeText(m[1]) : null;
 };
 
+/** Bing News links through a click-tracking redirect whose `url` parameter
+ *  is the article; the reader should land on the article, and the ranker
+ *  should see the same address it sees from the publisher's own feed. */
+export function directUrl(url: string): string {
+  if (!/^https?:\/\/(?:www\.)?bing\.com\/news\/apiclick\.aspx/i.test(url)) return url;
+  try {
+    const real = new URL(url).searchParams.get("url");
+    return real && /^https?:\/\//i.test(real) ? real : url;
+  } catch {
+    return url;
+  }
+}
+
 function isoOrNull(s: string | null): string | null {
   if (!s) return null;
   const t = Date.parse(decodeText(s));
@@ -267,17 +325,19 @@ export function parseFeed(xml: string, source: NewsSource): FeedItem[] {
 
   for (const block of blocks) {
     let title = decodeText(tag(block, "title") ?? "");
-    const url = isAtom
+    const rawUrl = isAtom
       ? (atomLink(block) ?? "")
       : decodeText(tag(block, "link") ?? "") || (attr(block.match(/<link\b[^>]*\/?>/i)?.[0] ?? "", "href") ?? "");
+    const url = directUrl(rawUrl);
     if (!title || !/^https?:\/\//i.test(url)) continue;
 
     // Google News names the outlet in <source url="…">Name</source> and
     // suffixes the title with " - Name"; keep the outlet, drop the suffix.
+    // Bing News names it in <News:Source>, no url, no suffix.
     let publisher = source.kind === "topic" ? "" : source.name;
     let publisherUrl: string | null = source.kind === "topic" ? null : source.home;
-    const srcOpen = block.match(/<source\b[^>]*>/i)?.[0] ?? "";
-    const srcName = decodeText(tag(block, "source") ?? "");
+    const srcOpen = block.match(/<(?:news:)?source\b[^>]*>/i)?.[0] ?? "";
+    const srcName = decodeText(tag(block, "source") ?? tag(block, "News:Source") ?? "");
     if (srcName) {
       publisher = srcName;
       publisherUrl = attr(srcOpen, "url");
