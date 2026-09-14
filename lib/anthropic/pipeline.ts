@@ -4,6 +4,7 @@ import { downloadOmPdf } from "@/lib/storage";
 import { readFirstSignal } from "./first-signal";
 import { describeRunFailure, ScreenError } from "./failure";
 import { RunGate, concurrencyFromEnv } from "./run-gate";
+import { newLedger, summarizeUsage, usageLogLine, withUsageLedger, type UsageLedger } from "./usage";
 import { omSourceFor, omFromText, releaseOmSource, type OmSource } from "./om-source";
 import {
   manualFactSheet,
@@ -180,6 +181,24 @@ async function regenerateVerdict(
  * Reconcile runs separately (it needs the buyer's own model, uploaded later —
  * see runReconciliation), and regenerates the verdict when it lands.
  */
+/**
+ * What the run spent, written to its job row when it ends — on success and
+ * on failure alike, since a failed screen still paid for its steps — and
+ * said once in the log. Best-effort: a deployment without the column
+ * (migration 0035) or a deal deleted under the run records nothing.
+ */
+async function writeUsage(dealId: string, ledger: UsageLedger): Promise<void> {
+  if (ledger.calls.length === 0) return;
+  const summary = summarizeUsage(ledger);
+  console.log(usageLogLine(dealId, summary));
+  try {
+    const admin = createSupabaseAdminClient();
+    await admin.from("analysis_jobs").update({ usage: summary }).eq("deal_id", dealId);
+  } catch {
+    // the ledger is telemetry — never a reason to fail a finished screen
+  }
+}
+
 export async function runAnalysis(
   dealId: string,
   opts?: {
@@ -191,6 +210,19 @@ export async function runAnalysis(
      *  they land (migration 0016). In-process runs never pass this. */
     resume?: boolean;
   },
+): Promise<void> {
+  // Every model call inside the run records its meters into this ledger.
+  const ledger = newLedger();
+  try {
+    await withUsageLedger(ledger, () => runAnalysisSteps(dealId, opts));
+  } finally {
+    await writeUsage(dealId, ledger);
+  }
+}
+
+async function runAnalysisSteps(
+  dealId: string,
+  opts?: { snapshotPrior?: boolean; resume?: boolean },
 ): Promise<void> {
   const snapshotPrior = opts?.snapshotPrior ?? true;
   const resume = opts?.resume ?? false;
@@ -614,6 +646,21 @@ export async function runAnalysis(
  * raw model isn't persisted — only the reconciliation result is.
  */
 export async function runReconciliation(
+  dealId: string,
+  model: { name: string; buffer: Buffer },
+): Promise<void> {
+  // The reconciler re-reads the whole OM (a fresh cache write — it runs on
+  // its own, outside the screen's cache window), so its spend is said in
+  // the log; the job row's ledger stays the screen's.
+  const ledger = newLedger();
+  try {
+    await withUsageLedger(ledger, () => runReconciliationSteps(dealId, model));
+  } finally {
+    if (ledger.calls.length) console.log(usageLogLine(dealId, summarizeUsage(ledger)).replace("screen usage", "reconciliation usage"));
+  }
+}
+
+async function runReconciliationSteps(
   dealId: string,
   model: { name: string; buffer: Buffer },
 ): Promise<void> {

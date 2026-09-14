@@ -10,6 +10,7 @@
  * directly; the SDK's errors are recognized by shape (an HTTP `status`, a
  * connection-error name, the parser's own message), never by class.
  */
+import { recordUsage, usageOfResponse } from "./usage";
 
 /** An error whose message was written for the analyst and shows as it is. */
 export class ScreenError extends Error {
@@ -131,10 +132,18 @@ export function describeRunFailure(err: unknown): RunFailure {
   return { message: looksReadable(msg) ? msg : UNEXPECTED, detail };
 }
 
-/** The part of a structured-output response the guards below read. */
+/** The part of a structured-output response the guards below read — and the
+ *  meters the usage ledger records when the response carries them. */
 export interface StructuredResponse<T> {
   parsed_output: T | null;
   stop_reason?: string | null;
+  model?: string | null;
+  usage?: {
+    input_tokens?: number | null;
+    cache_creation_input_tokens?: number | null;
+    cache_read_input_tokens?: number | null;
+    output_tokens?: number | null;
+  } | null;
 }
 
 /**
@@ -169,6 +178,7 @@ export async function structured<T>(
   call: () => Promise<StructuredResponse<T>>,
 ): Promise<T> {
   let response: StructuredResponse<T>;
+  const started = Date.now();
   try {
     response = await call();
   } catch (err) {
@@ -180,5 +190,9 @@ export async function structured<T>(
     }
     throw err;
   }
+  // The meters are recorded before the guards below run: a cut-off or a
+  // refusal still spent the tokens, and the ledger should say so.
+  const used = usageOfResponse(what, response, Date.now() - started);
+  if (used) recordUsage(used);
   return structuredOutput(response, what);
 }

@@ -193,7 +193,7 @@ export async function synthesizeVerdict(
   const client = getAnthropic();
 
   const out = await structured("The verdict", () => client.messages.parse({
-    model: MODELS.reasoning,
+    model: MODELS.verdict,
     max_tokens: MAX_TOKENS.verdict,
     system: ANALYST_SYSTEM,
     messages: [

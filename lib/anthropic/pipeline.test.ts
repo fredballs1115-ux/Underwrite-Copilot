@@ -150,6 +150,8 @@ vi.mock("./om-source", async (importOriginal) => {
 });
 
 import { runAnalysis } from "./pipeline";
+import { recordUsage, type CallUsage, type UsageSummary } from "./usage";
+import { PRICES } from "./models";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { readFirstSignal } from "./first-signal";
 import { extractTerms } from "./extract";
@@ -251,6 +253,51 @@ function addDeals(...ids: string[]) {
     state.jobs.push({ ...freshState().jobs[0], id: `j-${id}`, deal_id: id });
   }
 }
+
+describe("runAnalysis — what the run spent lands on its job row", () => {
+  const meter = (what: string, over: Partial<CallUsage> = {}) =>
+    recordUsage({ what, model: PRICES[0].prefix, input: 1_000, cacheWrite: 0, cacheRead: 0, output: 500, ms: 100, ...over });
+
+  it("writes the ledger with its totals and a list-price estimate when the screen finishes", async () => {
+    vi.mocked(readFirstSignal).mockImplementation(async () => {
+      meter("The first signal", { cacheWrite: 300_000 });
+      return SIGNAL;
+    });
+    vi.mocked(extractTerms).mockImplementation(async () => {
+      meter("Extraction", { cacheRead: 300_000, output: 6_000 });
+      return EXTRACTION;
+    });
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const usage = (state.jobs[0] as { usage?: UsageSummary }).usage;
+    expect(usage?.calls.map((c) => c.what)).toEqual(["The first signal", "Extraction"]);
+    expect(usage?.totals).toEqual({ input: 2_000, cacheWrite: 300_000, cacheRead: 300_000, output: 6_500 });
+    expect(usage?.usd).toBeGreaterThan(0);
+    expect(usage?.unpriced).toEqual([]);
+    expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/^\[pipeline\] screen usage for deal d1: 2 calls/));
+    logSpy.mockRestore();
+  });
+
+  it("a failed screen still records what it spent; a run with no model calls records nothing", async () => {
+    vi.mocked(extractTerms).mockImplementation(async () => {
+      meter("Extraction");
+      throw apiError(529, "overloaded_error", "Overloaded");
+    });
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    await runAnalysis("d1");
+    logSpy.mockRestore();
+    expect(job().status).toBe("error");
+    expect((state.jobs[0] as { usage?: UsageSummary }).usage?.calls.map((c) => c.what)).toEqual(["Extraction"]);
+
+    state = freshState();
+    vi.mocked(extractTerms).mockResolvedValue(EXTRACTION);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect((state.jobs[0] as { usage?: unknown }).usage).toBeUndefined();
+    expect(state.writes.some((w) => w.table === "analysis_jobs" && "usage" in w.patch)).toBe(false);
+  });
+});
 
 describe("runAnalysis — the happy path", () => {
   it("runs the six steps in order, writes every result and finishes done", async () => {
