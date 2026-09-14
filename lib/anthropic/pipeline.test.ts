@@ -149,7 +149,7 @@ vi.mock("./om-source", async (importOriginal) => {
   };
 });
 
-import { runAnalysis } from "./pipeline";
+import { runAnalysis, textLayerMissed } from "./pipeline";
 import { recordUsage, type CallUsage, type UsageSummary } from "./usage";
 import { PRICES } from "./models";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -178,6 +178,25 @@ const CHALLENGES = { challenges: [], summary: "" } as unknown as ChallengerResul
 const COMPS = { saleComps: [], leaseComps: [], redFlags: [], summary: "" } as unknown as BrokerCompsResult;
 const MARKET = { checks: [], summary: "" } as unknown as MarketResult;
 const VERDICT = { verdict: "caution", reason: "", topRisks: [], nextSteps: [], screen: null } as unknown as VerdictResult;
+
+describe("textLayerMissed — what sends a text-layer read back to the pages", () => {
+  const metric = (label: string, value: string) => ({ ...EXTRACTION.metrics[0], label, value });
+  const ex = (metrics: unknown[]) => ({ ...EXTRACTION, metrics } as unknown as ExtractionResult);
+
+  it("no figures at all, or figures but no NOI of any kind", () => {
+    expect(textLayerMissed(ex([]))).toBe("no figures");
+    expect(textLayerMissed(ex([metric("Asking price", "$20,000,000")]))).toBe("no NOI");
+    expect(textLayerMissed(ex([metric("Asking price", "$20,000,000"), metric("NOI (Year 1)", "TBD")]))).toBe("no NOI");
+    expect(textLayerMissed(EXTRACTION)).toBeNull();
+  });
+
+  it("an NOI stated under a label with a slash that is not a rate is an NOI — the deck is not re-read", () => {
+    expect(textLayerMissed(ex([metric("Asking price", "$20,000,000"), metric("NOI (T-12 / TTM)", "$1,200,000")]))).toBeNull();
+    expect(textLayerMissed(ex([metric("NOI / cash flow (in place)", "$1.2M")]))).toBeNull();
+    // …while a per-SF or per-unit NOI alone is still not the NOI.
+    expect(textLayerMissed(ex([metric("Asking price", "$20,000,000"), metric("NOI / SF", "$12.10")]))).toBe("no NOI");
+  });
+});
 
 /** The SDK's APIError, by shape: an HTTP status and its "529 {…}" message. */
 function apiError(status: number, type: string, message: string): Error {

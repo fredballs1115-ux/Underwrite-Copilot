@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and eight PRs, #176–#283, each
+estimate, and that's what it should flag." A hundred and nine PRs, #176–#284, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1538,6 +1538,22 @@ confirmed equal to the main tip after each batch.
   the signal, and a caller's deadline drops only its own request from the
   shared map. `live.test.ts` drives each with a fake fetch; the two news
   suites hold 49 tests.
+- **#284 The thirteenth review's two remaining findings.** Both cost,
+  not correctness: each sent a deck back to the pages for nothing. The
+  furniture rule (#279) discounted a line only when it appeared once or
+  twice a page, so the caption tiled under three renderings on every
+  page of a picture deck counted as text and the deck read as dense —
+  the model read a layer of captions, found no figures, and the pages
+  were read after all. `summarize` now also treats a line whose exact
+  words recur on half the pages, however many times a page, as furniture
+  (`lineText`; a table's rows differ by their figures and never match).
+  And `classifyNoi` refused any label with a slash as a per-unit rate,
+  so `NOI (T-12 / TTM)` read as no NOI and `textLayerMissed` re-read the
+  pages; a slash is a rate only when a unit follows it (`NOI / SF`,
+  `NOI/key`, `NOI / month` still are). `pdf-text.test.ts` holds the
+  tiled caption (bare, and under real text) and a table's header row
+  against its rows; `deal-strategy.test.ts` the slash labels;
+  `pipeline.test.ts` drives `textLayerMissed` directly.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

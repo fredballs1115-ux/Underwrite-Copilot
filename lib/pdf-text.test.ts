@@ -7,6 +7,7 @@ import {
   isDenseLayer,
   lineOf,
   lineShape,
+  lineText,
   linesOf,
   pageTaggedText,
   pdfTextLayer,
@@ -196,6 +197,45 @@ describe("the density read and the page-tagged document", () => {
     expect(layer.boilerplateLines).toBe(1); // "Rent roll", once a page on every page
     expect(layer.densePages).toBe(6);
     expect(isDenseLayer(layer)).toBe(true);
+  });
+
+  it("the caption tiled under three renderings on every page is furniture — the same words, however many times a page", () => {
+    const caption =
+      "Rendering for illustrative purposes only; final design, materials and finishes are subject to change.";
+    const pages = Array.from({ length: 14 }, (_, i) => ({
+      page: i + 1,
+      text: [caption, caption, caption].join("\n"),
+      chars: caption.length * 3,
+    }));
+    const layer = summarize(pages);
+    expect(layer.boilerplateLines).toBe(1);
+    expect(layer.densePages).toBe(0);
+    expect(layer.totalChars).toBe(0);
+    expect(isDenseLayer(layer)).toBe(false);
+    // The same caption three times a page under real text: the text counts.
+    const body = (i: number) => `${"Suite leased to a tenant at market rent with years of term. ".repeat(14)}${WORDS[i % 12]}`;
+    const withBody = summarize(pages.map((p, i) => ({ ...p, text: `${body(i)}\n${p.text}` })));
+    expect(withBody.boilerplateLines).toBe(1);
+    expect(withBody.densePages).toBe(14);
+    expect(isDenseLayer(withBody)).toBe(true);
+  });
+
+  it("a table's header row, the same words on every page, is furniture; its rows, which differ by their figures, are not", () => {
+    const header = "Unit Type SF Monthly rent Lease end";
+    const roll = (n: number) =>
+      Array.from({ length: 24 }, (_, i) => `${n * 100 + i} 2BR/2BA 950 $${2400 + i} 12/31/2027`).join("\n");
+    const pages = Array.from({ length: 6 }, (_, i) => ({ page: i + 1, text: `${header}\n${roll(i + 1)}`, chars: 0 }));
+    const layer = summarize(pages);
+    expect(layer.boilerplateLines).toBe(1);
+    expect(layer.densePages).toBe(6);
+    expect(isDenseLayer(layer)).toBe(true);
+  });
+
+  it("a line's exact words: case and spacing folded, digits kept; a numeric row or a short word has none", () => {
+    expect(lineText("Rendering  for illustrative purposes only")).toBe("rendering for illustrative purposes only");
+    expect(lineText("Page 3 of 40")).toBe("page 3 of 40");
+    expect(lineText("$1,200,000")).toBeNull();
+    expect(lineText("Total")).toBeNull();
   });
 
   it("a line's shape: digits out, case and spacing folded; a numeric row or a short word has none", () => {
