@@ -32,6 +32,9 @@ import { StressBench } from "./landing-stress";
 import metrosSeed from "@/data/research/metros.json";
 import { MARKET_COUNT } from "./markets-marquee";
 import { MarketsGallery } from "./markets-gallery";
+import { AerialBackdrop } from "./aerial-img";
+import { HERO_AERIAL, photoSrc, stripPhotos, type PhotoSlot } from "@/lib/photos";
+import { photosOnDisk } from "@/lib/photos-fs";
 
 // The research layer's scale, DERIVED from the same seeds the app evaluates
 // — the homepage can never claim coverage the rules engine doesn't have.
@@ -413,7 +416,77 @@ function SectionHead({
   );
 }
 
+/**
+ * The photograph behind the hero's headline. The operator's own (a real
+ * building, a team at work) when `public/photos/hero.jpg` exists; until
+ * then a real USGS aerial of Midtown Manhattan, the one photograph the site
+ * can always produce for itself. Either sits under a scrim so the type
+ * keeps its contrast whatever the picture's brightness, and the aerial's
+ * credit sits in the corner.
+ */
+function HeroBackdrop({ photo }: { photo: PhotoSlot | undefined }) {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0">
+      {photo ? (
+        // eslint-disable-next-line @next/next/no-img-element -- a static file under public/, sized by the slot
+        <img
+          src={photoSrc(photo)}
+          alt=""
+          width={photo.width}
+          height={photo.height}
+          decoding="async"
+          className="h-full w-full object-cover opacity-45"
+        />
+      ) : (
+        <AerialBackdrop
+          src={`/api/imagery/metro/${HERO_AERIAL.metro}?w=${HERO_AERIAL.width}&h=${HERO_AERIAL.height}`}
+          width={HERO_AERIAL.width}
+          height={HERO_AERIAL.height}
+          credit={`${HERO_AERIAL.place} from above · USGS`}
+          className="h-full w-full object-cover opacity-30"
+        />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-r from-sidebar via-sidebar/85 to-sidebar/55" />
+      <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-sidebar to-transparent" />
+    </div>
+  );
+}
+
+/**
+ * The people the screen is for, photographed — only when the operator's
+ * files are on disk (lib/photos). A strip with a hole would say "stock
+ * placeholder"; an absent strip says nothing, which is the honest default.
+ */
+function PeopleStrip({ photos }: { photos: PhotoSlot[] }) {
+  if (!photos.length) return null;
+  const cols = photos.length === 1 ? "sm:grid-cols-1" : photos.length === 2 ? "sm:grid-cols-2" : "sm:grid-cols-3";
+  return (
+    <section aria-label="Who it is for" className="border-b border-line">
+      <div className="mx-auto max-w-6xl px-6 py-12 sm:py-16">
+        <SectionHead eyebrow="Who it's for" title="Acquisitions teams, on deal day." />
+        <ul className={`mt-8 grid grid-cols-1 gap-4 ${cols}`}>
+          {photos.map((p) => (
+            <li key={p.id} className="overflow-hidden rounded-2xl border border-line bg-faint">
+              {/* eslint-disable-next-line @next/next/no-img-element -- a static file under public/, sized by the slot */}
+              <img
+                src={photoSrc(p)}
+                alt={p.alt}
+                width={p.width}
+                height={p.height}
+                loading="lazy"
+                decoding="async"
+                className="aspect-[4/3] w-full object-cover"
+              />
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
+  const photos = photosOnDisk();
   return (
     <div className="flex flex-1 flex-col">
       <script
@@ -513,6 +586,9 @@ export default function Home() {
       <main id="main" className="flex-1">
         {/* Hero — dark navy with soft accent glows; the product is the visual. */}
         <section className="band-dark relative overflow-hidden text-white">
+          {/* A real photograph behind the headline — the operator's, or a
+              USGS aerial of a covered downtown until it arrives. */}
+          <HeroBackdrop photo={photos.hero} />
           {/* Ambient glows: pure CSS, no layout shift, subtle by design. */}
           <div
             aria-hidden
@@ -612,6 +688,8 @@ export default function Home() {
             </dl>
           </div>
         </section>
+
+        <PeopleStrip photos={stripPhotos(photos)} />
 
         {/* The problem, drawn: two analysts, one deal, the spread between
             them. Both ends are neutral on purpose — the spread is the problem. */}

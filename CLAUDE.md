@@ -124,6 +124,16 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   `assetClassLabel`, the forms' option list) — every surface that prints
   one goes through it, so a stored `self_storage` never reaches a page
   raw; the pipeline row's slots and its "Auto" rule are `lib/pipeline-slots.ts`.
+- The homepage's photographs: `lib/photos.ts` (pure — the four slots with
+  their file names, briefs, sizes and alt text; `presentPhotos` over an
+  `exists` callback; `stripPhotos`; `HERO_AERIAL`) and `lib/photos-fs.ts`
+  (the disk: `public/photos/<file>`, checked at render time). A slot
+  renders only when its file exists — the "Who it's for" strip folds
+  away otherwise, never a placeholder. Until the operator's `hero.jpg`
+  lands, the hero's backdrop is a USGS aerial of Midtown Manhattan from
+  the metro imagery route (`AerialBackdrop` in `app/aerial-img.tsx`: the
+  credit goes with the picture on a 404). The sandbox cannot fetch a
+  photograph from any image host; the files are the operator's move.
 - The News page's live layer: `lib/news/feeds.ts` (pure: the sources with
   their fallbacks, parsing, ranking) and `lib/news/live.ts` (the network:
   a fresh copy per process, a wall-clock deadline per source, the

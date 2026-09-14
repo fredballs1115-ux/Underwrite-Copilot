@@ -41,3 +41,42 @@ export function AerialImg({
     />
   );
 }
+
+/**
+ * The hero's backdrop: the same self-removing photograph, painted with the
+ * page rather than lazily, with its credit in the corner — and the credit
+ * goes with the picture, so a frame the route cannot produce leaves no
+ * caption naming a photograph that is not there.
+ */
+export function AerialBackdrop({
+  src,
+  width,
+  height,
+  credit,
+  className,
+}: {
+  src: string;
+  width: number;
+  height: number;
+  credit: string;
+  className?: string;
+}) {
+  const [gone, setGone] = useState(false);
+  if (gone) return null;
+  return (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element -- see AerialImg */}
+      <img
+        src={src}
+        alt=""
+        width={width}
+        height={height}
+        loading="eager"
+        decoding="async"
+        onError={() => setGone(true)}
+        className={className}
+      />
+      <p className="absolute bottom-3 right-4 z-10 text-[10px] text-white/50">{credit}</p>
+    </>
+  );
+}

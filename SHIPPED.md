@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and nineteen PRs, #176–#294, each
+estimate, and that's what it should flag." A hundred and twenty PRs, #176–#295, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1715,6 +1715,22 @@ confirmed equal to the main tip after each batch.
   count now. Commercial Property Executive, the one source every fresh
   process missed today, gets the two doors the runner proved answer (its
   bare domain on Bing, its name as a phrase on Google).
+- **#295 A real photograph behind the hero, and four slots for yours.**
+  Your 19:45 note: "start using real pictures of actual things in the
+  homescreen… built for a human, not a robot." The one photograph the
+  site can always produce for itself is a USGS aerial of a covered
+  downtown — the same public-domain frames the coverage gallery has
+  drawn since the markets showroom — so Midtown Manhattan from above now
+  stands behind the hero's headline, under a scrim that keeps the type's
+  contrast, with its credit in the corner (a frame the route cannot
+  produce takes its credit with it). The ground-level photographs — a
+  team on deal day, a site walk, the building itself, and a hero of your
+  own — are files you drop into `public/photos/` (`lib/photos.ts` names
+  the four, with a one-line brief and the size for each); a slot renders
+  only when its file exists, and the "Who it's for" strip folds away
+  entirely until one does, so there is never a placeholder or a hole.
+  This sandbox cannot fetch a photograph from any image host, so the
+  files are your move — the exact names are in WILL_TODO.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
