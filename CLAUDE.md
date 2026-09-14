@@ -158,8 +158,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   feed URL; the sandbox cannot reach the publishers or the search hosts.
   The page's live section is the pure view
   `app/(app)/news/live-headlines.tsx` (`LiveHeadlinesView`: the ranked
-  list, then the sources as a row of chips — answered / earlier copy /
-  did not answer — and the search hosts behind them); the page fetches
+  list — each headline tagged by `headlineSignals`, the words the
+  score's own matches carry, so a tag never says what the score did not
+  count; the top twelve shown, the rest folded in a native `<details>`
+  with their ranks kept — then the sources as a row of chips — answered
+  / earlier copy / did not answer — and the search hosts behind them); the page fetches
   and hands the result in, and `lib/views.render.test.ts` draws it on a
   fixture. Keep it free of I/O so the test stays a render.
 - The pipeline's failure modes: `lib/anthropic/failure.ts` turns any failure

@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-14",
+      "title": "Each headline says why it ranks",
+      "blurb": "Every headline on the News page now wears the tags that put it where it is — rates, cap rates, distress and regulation in colour, the asset class, supply, debt and costs beside them — off the same matches the ranking counts. The top twelve show and the rest are one click away, their ranks kept.",
+      "href": "/news"
+    },
+    {
+      "date": "2026-09-14",
       "title": "The News page shows its sources as a row",
       "blurb": "Under the headlines each publisher is now a chip — a green dot for one that answered just now, amber for a copy from earlier, dashed grey for one that did not answer — with the item count or what it said on hover, and a pill for the search host that stood behind the topic reads. What a sentence used to list, at a glance.",
       "href": "/news"
