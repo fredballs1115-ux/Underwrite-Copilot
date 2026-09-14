@@ -18,6 +18,7 @@ import {
 } from "@/lib/anthropic/prompts";
 import { gapFigure } from "@/lib/gap-detail";
 import { compFigures } from "@/lib/comp-detail";
+import { rangeRead } from "@/lib/memo/report-document";
 
 // A deal with a plan — conversion, development, lease-up, heavy value-add —
 // is judged on yield on total cost, and its stabilized pro forma is the
@@ -188,6 +189,33 @@ describe("the comp scrutiny names each comp's detail line", () => {
     const lease = (p.match(/for a lease comp [^"]*"([^"]+)" or "([^"]+)"/) ?? []).slice(1);
     expect(lease).toHaveLength(2);
     for (const ex of lease) expect(compFigures(ex).perUnit == null, ex).toBe(true);
+  });
+});
+
+// The deal page's market tab and the report's market page draw the OM's
+// figure on its typical range only when both parse as numbers in one unit
+// (rangeRead), so the market check is told the shape of both fields — and
+// every pair of examples it holds up must read as a position on the range.
+describe("the market check names the shape of its figures", () => {
+  it("asks for omSays with its unit and typicalRange low to high, and its examples draw", () => {
+    for (const cls of ["multifamily", "office", "industrial", "retail", "auto"] as const) {
+      const p = marketCheckInstruction(cls);
+      expect(p, cls).toContain("Write `omSays` as the OM's figure with its unit");
+      expect(p, cls).toContain("`typicalRange` as low to high in the same unit with an en dash");
+      expect(p, cls).toContain("rather than inventing one");
+    }
+    const p = marketCheckInstruction("multifamily");
+    const oms = (p.match(/figure with its unit \("([^"]+)", "([^"]+)", "([^"]+)"\)/) ?? []).slice(1);
+    const ranges = (p.match(/with an en dash \("([^"]+)", "([^"]+)", "([^"]+)"\)/) ?? []).slice(1);
+    expect(oms).toHaveLength(3);
+    expect(ranges).toHaveLength(3);
+    for (let i = 0; i < 3; i++) {
+      const pos = rangeRead(oms[i], ranges[i]);
+      expect(pos, `${oms[i]} on ${ranges[i]}`).not.toBeNull();
+      expect(typeof pos).toBe("number");
+    }
+    // A range in words draws nothing — it is not read as a range.
+    expect(rangeRead("5.45%", "varies by submarket")).toBeNull();
   });
 });
 

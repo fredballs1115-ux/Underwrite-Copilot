@@ -159,7 +159,7 @@ export function marketCheckInstruction(assetClass: AssetClass, context?: string 
     assetClass,
   )}
 
-You do NOT have a live comps feed — reason from typical ranges and explicitly flag anything that looks off-market. For each assumption, give what the OM says, a typical range, an assessment (\`in-line\`, \`aggressive\`, or \`conservative\`), short reasoning, and \`page\` — the OM page where the assumption appears, as a short string like "p. 40" (empty string if unknown). Finish with a one-sentence overall plausibility summary.
+You do NOT have a live comps feed — reason from typical ranges and explicitly flag anything that looks off-market. For each assumption, give what the OM says, a typical range, an assessment (\`in-line\`, \`aggressive\`, or \`conservative\`), short reasoning, and \`page\` — the OM page where the assumption appears, as a short string like "p. 40" (empty string if unknown). Write \`omSays\` as the OM's figure with its unit ("5.45%", "$2,400/mo", "4.0%/yr") and \`typicalRange\` as low to high in the same unit with an en dash ("5.25%–5.75%", "$2,150–$2,450/mo", "2.5%–3.5%") — the two are drawn against each other — and where no numeric range applies, say so in words rather than inventing one. Finish with a one-sentence overall plausibility summary.
 
 Two demand-side traps to check by name: absorption or demand claims that never mention the SUPPLY side (competing space delivering into the same submarket), and growth stories resting on projected population or job growth rather than evidence that exists today — in-place rents, current occupancy, existing rooftops. The OM's own leasing anecdotes are the seller's narrative, not market data.
 

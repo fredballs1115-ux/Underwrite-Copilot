@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Ninety-two PRs, #176–#267, each
+estimate, and that's what it should flag." Ninety-three PRs, #176–#268, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1228,6 +1228,23 @@ confirmed equal to the main tip after each batch.
   ($252k a unit, a 5.4% cap) and checks the lease examples carry no basis
   to draw, so the prompt can never promise a shape the reader will not
   draw.
+- **#268 The market check names the shape of its figures.** The deal
+  page's market tab draws each OM figure on its typical range only when
+  both parse as numbers in one unit (`parseRange`, `firstNum`), and the
+  report's market page the same (`rangeRead`, #253) — and the market
+  prompt asked only for "what the OM says, a typical range", no shape;
+  the schema's two fields were bare strings. The prompt now writes
+  `omSays` as the OM's figure with its unit ("5.45%", "$2,400/mo",
+  "4.0%/yr") and `typicalRange` low to high in the same unit with an en
+  dash ("5.25%–5.75%", "$2,150–$2,450/mo", "2.5%–3.5%"), words rather
+  than an invented range where none applies; the zod fields carry the
+  same descriptions. A prompt test holds the three example pairs up to
+  `rangeRead` — each reads as a position on its range — and checks a
+  range in words reads as none, so the prompt can never promise a shape
+  the two pages will not draw. Its first run earned its keep: the report's
+  reader refused "5.25%–5.75%" — a unit after the low figure broke its
+  match, so the report drew that range only when the unit came once, at
+  the end — and now takes it, with a hyphen or "to" for the dash.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
