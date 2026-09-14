@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and seven PRs, #176–#282, each
+estimate, and that's what it should flag." A hundred and eight PRs, #176–#283, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1508,6 +1508,36 @@ confirmed equal to the main tip after each batch.
   counts are known before the code depends on them, and the health print
   gains the `NEWS HELD` line #283's route will feed. `WILL_TODO` records
   the 17:59 and 18:03 reads.
+- **#283 A host that hangs is held at bay.** The 18:12 read (on #282's
+  fresh process) was the same weather as 17:59: Google News hung on every
+  request, and the eight sources that read through it queued behind two
+  hanging requests until their budget was gone — 5 of 12, Bing never
+  tried for the site-scoped fallbacks. Three changes in `lib/news/live.ts`.
+  A door with another behind it waits in its host's queue at most half
+  the budget that is left, then moves on (the error says `queued past
+  half the budget`). A host that timed out, dropped the connection or
+  answered 429/5xx three times inside a minute is held for 45 seconds and
+  its doors skipped at once, so the next door gets the whole budget — a
+  403, a 404 or an empty page never counts (the host is up, the publisher
+  said no), nor does a request given under 300 ms. And the warm-up
+  reports its progress while it runs (`warm.done`, the count so far).
+  `/api/news/health` names the held hosts (`held`); live-verify prints
+  `NEWS HELD` and a running warm-up. The three Bing topic queries drop
+  Google's `OR` syntax: the runner's probes read 12 items for `CMBS
+  delinquency distress` but 2 for `multifamily apartments sale` and 1 for
+  `rent control ordinance`, so the code uses `multifamily` and `"rent
+  control"`, and the probes keep a second phrasing beside each. The
+  thirteenth review's three findings on this file ride along: the
+  half-budget cap was half the *whole* budget, so two doors that hang
+  spent it all and a third (Bing, behind GlobeSt's two own URLs and
+  Google) was never asked — each door now holds at most half of what is
+  left (4000 → 2000 → 2000 ms); a stale copy carried no `via`, so a
+  source that had answered through Bing was credited to Google once
+  served stale; and a fetch that outlives its abort kept its host slot for
+  the life of the process — `fetchFeed` now races the wall clock beside
+  the signal, and a caller's deadline drops only its own request from the
+  shared map. `live.test.ts` drives each with a fake fetch; the two news
+  suites hold 49 tests.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

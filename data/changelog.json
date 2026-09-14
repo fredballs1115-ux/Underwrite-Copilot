@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-14",
+      "title": "The News page stays full when a search host stalls",
+      "blurb": "When one search host stopped answering, the sources that read through it waited in line for it until their time ran out, and the second search host was never asked. A source now waits at most half its time for a busy host before moving to the next door, a host that has stalled three times in a minute is left alone for 45 seconds so the other host gets the whole time, a source served from an earlier copy still says which host it came through, and the topic searches on the second host use plain phrasings that return items. The health page names any host being left alone and shows the boot warm-up while it runs.",
+      "href": "/news"
+    },
+    {
+      "date": "2026-09-14",
       "title": "A deck whose figures are pictures is read as pictures",
       "blurb": "The text-first read now tells a deck's own words from its furniture: the disclaimer under every photo and the running page header count toward no page, so a picture deck with a footer on each page is read page by page, and a deck of a few pages always is. When the text layer yields figures but no NOI at all — the shape of a narrative whose financial tables were pasted in as images — the screen re-reads the pages before it goes on, and a screen resumed after a restart remembers that it had to.",
       "href": "/deals"

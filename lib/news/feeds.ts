@@ -177,7 +177,10 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
   },
   // The topic searches: Google News first, the same topic on Bing when
   // Google answers 503 or holds the connection (it does both under a burst
-  // from one address — read on a fresh process by live-verify).
+  // from one address — read on a fresh process by live-verify). A Bing
+  // query is plain keywords or one quoted phrase: Google's OR syntax
+  // passed through parsed to zero items there, and live-verify's search-
+  // door probes say what each phrasing returns from the runner.
   {
     id: "gn-cre",
     name: "Google News · commercial real estate",
@@ -194,7 +197,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     feed: googleNews('multifamily OR apartment "cap rate" OR portfolio sale OR acquisition'),
     kind: "topic",
     cap: 5,
-    fallbacks: [bingTopic('multifamily OR apartments "cap rate" OR sale', "multifamily")],
+    fallbacks: [bingTopic("multifamily", "multifamily")],
   },
   {
     id: "gn-debt",
@@ -203,7 +206,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     feed: googleNews('CMBS OR "commercial mortgage" delinquency OR distress OR foreclosure office OR multifamily'),
     kind: "topic",
     cap: 5,
-    fallbacks: [bingTopic('CMBS OR "commercial mortgage" delinquency OR distress', "CRE debt & distress")],
+    fallbacks: [bingTopic("CMBS delinquency distress", "CRE debt & distress")],
   },
   {
     id: "gn-regulation",
@@ -212,7 +215,7 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     feed: googleNews('"rent control" OR "rent stabilization" OR "good cause eviction" landlord council'),
     kind: "topic",
     cap: 4,
-    fallbacks: [bingTopic('"rent control" OR "rent stabilization" OR "good cause eviction"', "rent regulation")],
+    fallbacks: [bingTopic('"rent control"', "rent regulation")],
   },
 ];
 

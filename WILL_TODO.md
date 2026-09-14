@@ -19,15 +19,20 @@ and #278 fixed it: the first read on its own fresh process (`f2895c9`,
 proven at 17:53 UTC) answered 12 of 12, every source fetched fresh in
 under two seconds through the gate. #275–#278 are proven (`2c362a6` at
 17:24 UTC, `f26a4e2` at 17:29, `bb3061c` at 17:37, `f2895c9` at 17:53,
-`7c965aa` at 17:59); #280 and #281 are merged and await their proofs;
-#282 (the runner probes the queries #283 will use) is open; #283 (a host
-that hangs is held at bay) and the thirteenth review's findings follow).
+`7c965aa` at 17:59, `f562a27` at 18:05, `ac33d36` at 18:12); #283 (a
+host that hangs is held at bay, a door waits at most half its budget in a
+host's queue, the warm-up reports its progress while it runs — the 18:05
+and 18:12 probes landed on fresh processes before the warm-up had
+finished, so `warm` was still null — and the thirteenth review's three
+findings on the live layer) is open; that review's two remaining
+findings (a caption tiled three times a page reads as a dense deck; an
+NOI label with a slash reads as no NOI) follow as #284.
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-A hundred and seven PRs (#176–#282) landed across one review session and the
+A hundred and eight PRs (#176–#283) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -525,6 +530,16 @@ deploy (live-verify shows the sha).
   `News:Source`, 12 click redirects on the site-scoped feed); the three
   plain keyword topic queries #283 will use join the probes, and the
   health print gains the `NEWS HELD` line.
+- **A host that hangs is held at bay** (#283): a door with another behind
+  it waits in its host's queue at most half the budget that is left; a
+  host that timed out or answered 429/5xx three times inside a minute is
+  held for 45 s and its doors skipped at once (`/api/news/health` names
+  it under `held`; live-verify prints `NEWS HELD`); the warm-up reports
+  its progress while it runs; the Bing topic queries are `multifamily`,
+  `CMBS delinquency distress` and `"rent control"` (the probes read 12, 2
+  and 1 items for the first phrasings, so two changed); each door holds
+  at most half of what is left, a stale copy keeps its `via`, and a fetch
+  that outlives its abort gives its host slot back at the wall clock.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -614,16 +629,27 @@ also linked from `/data-health` under "Service probes":
    behind the hanging topic searches until their budget was gone (8,001
    ms with only `HTTP 403` in the error: Google never ran, Bing was never
    tried), and Bing's multifamily and debt queries parsed to zero items —
-   5 of 12. #283 caps the queue wait at half the budget when another door
+   5 of 12; the 18:12 read on #282's fresh process was the same. #283
+   caps the queue wait at half the budget that is left when another door
    stands behind, holds a host that times out three times in a minute for
-   45 s so its doors are skipped instantly, and simplifies the Bing
-   queries. On later runs a source says `cached` when the warm-up or an
-   earlier visitor filled it, `via Bing News · …` when Google refused and
-   the second door answered; since #280 the route also reports the
-   warm-up (`NEWS WARM-UP: N of 12 … at boot`) and the runner checks both
-   search doors' shape. A line that says `HTTP 403` or `503` with no
-   `via` means every door closed and wants a look; `[news] warm-up: N of
-   12 sources answered` is in the service log at each boot.
+   45 s so its doors are skipped instantly (the health JSON's `held`
+   names it; live-verify prints `NEWS HELD`), makes each door hold at
+   most half of what is left so a third door is always reached, and sets
+   the Bing queries to the phrasings the runner's probes found items for
+   (`multifamily`, `CMBS delinquency distress`, `"rent control"`; the
+   probes keep a second phrasing beside each in case those thin out).
+   The first NEWS HEALTH after #283's deploy is the proof to read: the
+   search-backed sources should come `via Bing News · …` in about a
+   second each, and `NEWS HELD` should name `news.google.com` if Google
+   is still hanging. On later runs a source says `cached` when the
+   warm-up or an earlier visitor filled it, `via Bing News · …` when
+   Google refused and the second door answered (a stale line keeps its
+   `via` too); since #280 the route also reports the warm-up (`NEWS
+   WARM-UP: N of 12 … at boot`, or `running — N of 12 so far` while it
+   runs) and the runner checks both search doors' shape. A line that says
+   `HTTP 403` or `503` with no `via` means every door closed and wants a
+   look; `[news] warm-up: N of 12 sources answered` is in the service log
+   at each boot.
    `/api/news/health` is public, so the same JSON is one click away under
    Service probes on `/data-health`. The
    scored feed under the headlines fills in once the GitHub Actions secret

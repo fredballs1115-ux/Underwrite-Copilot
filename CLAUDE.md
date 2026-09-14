@@ -122,19 +122,28 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   their fallbacks, parsing, ranking) and `lib/news/live.ts` (the network:
   a fresh copy per process, a wall-clock deadline per source, the
   publisher's own feed then its fallbacks inside one budget — a door with
-  others behind it holds at most half of it — one retry after a fast
+  others behind it holds at most half of what is left, whether it spends
+  that in its host's queue or on the request — one retry after a fast
   429/5xx, a last-good copy, a gate of two requests in flight per host,
-  one request per source shared by concurrent callers; the status names
-  the way in as `via`, on a cached line too). Every Google News read has
-  a Bing News read behind it (`News:Source` is the outlet; the click
-  redirect is unwrapped by `directUrl`). `instrumentation.ts` warms the
-  sources one at a time at boot (`warmLiveHeadlines`; `NEWS_WARM=0` off)
-  because a fresh process's first parallel read bursts one host and gets
-  503s back; the health route reports that run as `warm` (`lastWarmUp`).
+  one request per source shared by concurrent callers, and a host held
+  at bay: three timeouts / dropped connections / 429s / 5xx inside a
+  minute and it is not asked for 45 s, its doors skipped at once so the
+  next door gets the whole budget (a 403, a 404 or an empty page never
+  counts — the publisher said no, the host is up); the status names the
+  way in as `via`, on a cached or a stale line too). Every Google News
+  read has a Bing News read behind it (`News:Source` is the outlet; the
+  click redirect is unwrapped by `directUrl`; a Bing query is plain
+  keywords or one quoted phrase — Google's `OR` syntax parses to zero
+  items there). `instrumentation.ts` warms the sources one at a time at
+  boot (`warmLiveHeadlines`; `NEWS_WARM=0` off) because a fresh process's
+  first parallel read bursts one host and gets 503s back; the health
+  route reports that run as `warm` (`lastWarmUp`: its progress while it
+  runs, then its result) and the held hosts as `held` (`heldHosts`).
   `/api/news/health` is public and live-verify prints every source's
-  outcome from Render's own network, the warm-up line, and the search
-  doors' shape fetched from the runner — read those lines before touching
-  a feed URL; the sandbox cannot reach the publishers or the search hosts.
+  outcome from Render's own network, the warm-up line, the held hosts,
+  and the search doors' shape fetched from the runner (each topic query
+  and a second phrasing beside it) — read those lines before touching a
+  feed URL; the sandbox cannot reach the publishers or the search hosts.
 - The pipeline's failure modes: `lib/anthropic/failure.ts` turns any failure
   into one sentence the analyst can act on (the raw text goes to the server
   log, never the page), and its `structured()` wraps every structured-output
