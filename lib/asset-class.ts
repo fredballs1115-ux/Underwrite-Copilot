@@ -1,6 +1,7 @@
 // The asset classes a deal is filed under, and the words each one shows.
 // The keys are what the deal row stores (the new-deal forms' option values,
-// or the extraction's read lower-cased); every surface that prints one —
+// or the extraction's read — a known class as its key, a phrase of the
+// model's own as written); every surface that prints one —
 // the pipeline row and its filter, the CSV and the meeting .xlsx, the
 // compare table, the shared screen, the market cards — goes through
 // `assetClassLabel`, so a stored `self_storage` never reaches a page as

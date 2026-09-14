@@ -16,13 +16,14 @@ whose FeedBlitz URL parsed to zero items, now come in through #274's
 fallbacks at a hundred items each — on a warm process; the first read on
 a fresh one, minutes after a deploy, found 4 of 12, which is what #278
 fixes. #275, #276 and #277 are proven (`2c362a6` at 17:24 UTC, `f26a4e2`
-at 17:29, `bb3061c` at 17:37); #278 follows).
+at 17:29, `bb3061c` at 17:37); #278 is merged and awaits its proof; #279
+follows).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-A hundred and three PRs (#176–#278) landed across one review session and the
+A hundred and four PRs (#176–#279) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -499,6 +500,13 @@ deploy (live-verify shows the sha).
   concurrent callers, Bing News as RSS behind every Google News read, the
   cached copy keeping its `via`, and a warm-up at boot
   (`instrumentation.ts`) that reads the sources one at a time.
+- **The text layer is held to the deck** (#279, the twelfth review's
+  findings): a resumed attempt reads the pages the previous attempt fell
+  back to (the checkpoint payload carries `omPages`); a line that recurs
+  on half the pages is furniture and counts toward no page's density; a
+  deck under four pages goes as its pages; the extraction re-reads the
+  pages when the layer found figures but no NOI; the cost card counts the
+  screens that priced; a class the model phrased itself keeps its case.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as

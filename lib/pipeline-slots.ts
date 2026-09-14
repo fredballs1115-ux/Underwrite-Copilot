@@ -4,6 +4,7 @@
 // page, the meeting .xlsx and the analytics agree on which figure a deal
 // carries. Pure: no I/O, no LLM.
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
+import { ASSET_CLASS_LABEL } from "@/lib/asset-class";
 import { findGoingInCap } from "@/lib/criteria";
 import { findPriceMetric, inferStrategy, planSummary, signalAskPrice } from "@/lib/deal-strategy";
 
@@ -23,15 +24,23 @@ export interface PipelineSlots {
  * the extraction — so the row shows that read, and shows nothing (no rail,
  * no dot, a dash) while nothing has read the deck yet. "Auto" was never an
  * asset class, and a row that said so read as one.
+ *
+ * A known class comes back as its key, whatever its case, so the filter
+ * and the colour rail match it; a class the model phrased itself keeps
+ * its case — "NNN retail" is not "Nnn retail" — and `assetClassLabel`
+ * only raises its first letter.
  */
 export function shownAssetClass(
   stored: string | null | undefined,
   extraction: { assetClass?: string | null } | null | undefined,
 ): string {
-  const s = (stored ?? "").trim().toLowerCase();
-  if (s && s !== "auto") return s;
-  const e = (extraction?.assetClass ?? "").trim().toLowerCase();
-  return e && e !== "auto" ? e : "";
+  const norm = (v: string | null | undefined): string => {
+    const t = (v ?? "").trim();
+    const lower = t.toLowerCase();
+    if (!t || lower === "auto") return "";
+    return ASSET_CLASS_LABEL[lower] ? lower : t;
+  };
+  return norm(stored) || norm(extraction?.assetClass);
 }
 
 export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | null): PipelineSlots {

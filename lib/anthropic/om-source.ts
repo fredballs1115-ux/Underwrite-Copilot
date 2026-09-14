@@ -71,7 +71,9 @@ export async function omSourceFor(
     const mode = omReadMode();
     if (mode !== "pdf") {
       const layer = await pdfTextLayer(pdf);
-      if (mode === "text" ? layer.totalChars > 0 : isDenseLayer(layer)) {
+      // `text` means any text at all — the raw count, before the running
+      // lines are discounted; `auto` asks whether the layer is the deck.
+      if (mode === "text" ? layer.pages.some((p) => p.chars > 0) : isDenseLayer(layer)) {
         return omFromPages(layer, opts.title);
       }
     }

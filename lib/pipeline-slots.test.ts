@@ -4,6 +4,7 @@
 // the shared reader with the first signal as the fallback.
 import { describe, expect, it } from "vitest";
 import type { ExtractedMetric, ExtractionResult } from "@/lib/anthropic/types";
+import { assetClassLabel } from "./asset-class";
 import { pickSlots, shownAssetClass } from "./pipeline-slots";
 
 describe("shownAssetClass — a row never says \"Auto\"", () => {
@@ -15,6 +16,17 @@ describe("shownAssetClass — a row never says \"Auto\"", () => {
     expect(shownAssetClass("auto", { assetClass: "auto" })).toBe("");
     expect(shownAssetClass(null, { assetClass: "retail" })).toBe("retail");
     expect(shownAssetClass("", undefined)).toBe("");
+  });
+
+  it("a known class comes back as its key whatever its case; a class the model phrased itself keeps its case", () => {
+    expect(shownAssetClass("Multifamily", null)).toBe("multifamily");
+    expect(shownAssetClass("auto", { assetClass: "Self_Storage" })).toBe("self_storage");
+    expect(shownAssetClass("auto", { assetClass: "NNN retail" })).toBe("NNN retail");
+    expect(shownAssetClass("auto", { assetClass: "Medical office / MOB" })).toBe("Medical office / MOB");
+    // …so the row's label never mangles an acronym the model wrote.
+    expect(assetClassLabel(shownAssetClass("auto", { assetClass: "NNN retail" }))).toBe("NNN retail");
+    expect(assetClassLabel(shownAssetClass("auto", { assetClass: "SFR portfolio" }))).toBe("SFR portfolio");
+    expect(assetClassLabel(shownAssetClass("auto", { assetClass: "Self_Storage" }))).toBe("Self-storage");
   });
 });
 

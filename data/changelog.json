@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-14",
+      "title": "A deck whose figures are pictures is read as pictures",
+      "blurb": "The text-first read now tells a deck's own words from its furniture: the disclaimer under every photo and the running page header count toward no page, so a picture deck with a footer on each page is read page by page, and a deck of a few pages always is. When the text layer yields figures but no NOI at all — the shape of a narrative whose financial tables were pasted in as images — the screen re-reads the pages before it goes on, and a screen resumed after a restart remembers that it had to.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-14",
       "title": "The News page is full from the first minute after a deploy",
       "blurb": "A freshly started server used to ask all twelve news sources at once — eight of them one search host, which answers a burst from one address by refusing — so the first visitors after a deploy saw a thin page. The server now warms the sources one at a time as it starts, asks any one host at most two things at a time, gives a slow door only half the time limit before trying the next, and has a second search host behind every search. The footer names the hosts it leaned on.",
       "href": "/news"
