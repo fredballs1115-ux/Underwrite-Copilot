@@ -144,17 +144,58 @@ interface Fetched {
   via: string | null;
 }
 
-const fresh = new Map<string, { at: number; items: FeedItem[]; via: string | null }>();
-/** the last copy that answered, with the way it came in — a stale line
- *  credits the host that actually answered, not the first door */
-const lastGood = new Map<string, { at: number; items: FeedItem[]; via: string | null }>();
-/** the one request in flight per source, shared by whoever asks meanwhile */
-const pending = new Map<string, Promise<Fetched>>();
+// ── The process's one state ──────────────────────────────────────────────
+
+interface LiveState {
+  /** a source's fresh copy, good for FRESH_MS, with the way it came in */
+  fresh: Map<string, { at: number; items: FeedItem[]; via: string | null }>;
+  /** the last copy that answered, with the way it came in — a stale line
+   *  credits the host that actually answered, not the first door */
+  lastGood: Map<string, { at: number; items: FeedItem[]; via: string | null }>;
+  /** the one request in flight per source, shared by whoever asks meanwhile */
+  pending: Map<string, Promise<Fetched>>;
+  /** the per-host gate: requests in flight, and the callers waiting */
+  inFlight: Map<string, number>;
+  waiting: Map<string, Array<() => void>>;
+  /** the hosts' fault records and holds */
+  hosts: Map<string, HostRecord>;
+  /** the warm-up this process is running or last finished; null before the
+   *  first one starts (or when NEWS_WARM=0) */
+  lastWarm: WarmProgress | null;
+}
+
+/**
+ * ONE state per process, however many copies of this module the server
+ * holds. Next compiles `instrumentation.ts` — which runs the boot warm-up —
+ * into its own module graph with its own runtime, apart from the routes'
+ * (in the built output: `.next/server/chunks/[turbopack]_runtime.js` under
+ * `instrumentation.js`, `.next/server/chunks/ssr/[turbopack]_runtime.js`
+ * under every route; each runtime keeps its own module cache). A
+ * module-level Map here was therefore two Maps in one process: the warm-up
+ * filled one, and the News page and the health route read the other,
+ * empty — every deploy's first read fetched everything fresh and reported
+ * no warm-up. The state lives on globalThis under a registered symbol,
+ * which every copy of the module finds.
+ */
+const STATE_KEY = Symbol.for("underwrite-copilot.news.live");
+
+function liveState(): LiveState {
+  const g = globalThis as unknown as Record<symbol, LiveState | undefined>;
+  return (g[STATE_KEY] ??= {
+    fresh: new Map(),
+    lastGood: new Map(),
+    pending: new Map(),
+    inFlight: new Map(),
+    waiting: new Map(),
+    hosts: new Map(),
+    lastWarm: null,
+  });
+}
+
+const state = liveState();
+const { fresh, lastGood, pending, inFlight, waiting, hosts } = state;
 
 // ── The per-host gate ────────────────────────────────────────────────────
-
-const inFlight = new Map<string, number>();
-const waiting = new Map<string, Array<() => void>>();
 
 const hostOf = (url: string): string => {
   try {
@@ -220,8 +261,6 @@ interface HostRecord {
   /** the faults that set the current hold */
   failures: number;
 }
-
-const hosts = new Map<string, HostRecord>();
 
 function noteFault(host: string, now: number): void {
   const rec = hosts.get(host) ?? { faults: [], heldUntil: 0, failures: 0 };
@@ -497,11 +536,11 @@ export interface WarmProgress extends WarmResult {
 }
 
 /** The warm-up this process is running or last finished — null before the
- *  first one starts (or when NEWS_WARM=0). */
-let lastWarm: WarmProgress | null = null;
-
+ *  first one starts (or when NEWS_WARM=0). Read off the process's one
+ *  state, so the copy of this module a route holds sees the run the
+ *  instrumentation's copy made. */
 export function lastWarmUp(): WarmProgress | null {
-  return lastWarm;
+  return state.lastWarm;
 }
 
 /**
@@ -527,7 +566,7 @@ export async function warmLiveHeadlines(
     ms: 0,
     at: null,
   };
-  lastWarm = progress;
+  state.lastWarm = progress;
   for (let i = 0; i < sources.length; i++) {
     try {
       const r = await fetchSource(sources[i], Date.now(), timeoutMs);

@@ -487,6 +487,32 @@ describe("fetchLiveHeadlines — a host that hangs is not allowed to hold the ot
     expect(globalThis.fetch).toHaveBeenCalledTimes(3);
   });
 
+  it("one state per process: a second copy of the module sees the warm-up the first copy ran, and the copies it filled", async () => {
+    // Next compiles instrumentation.ts (which runs the boot warm-up) into
+    // its own runtime, apart from the routes' — two copies of this module
+    // in one process. A fresh module instance stands in for the second.
+    globalThis.fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => answer(rss("Rates hold"), 5)(init)) as typeof fetch;
+    const first = await import("./live");
+    await first.warmLiveHeadlines([src("copy-a"), src("copy-b")], { timeoutMs: 1_000, gapMs: 0, log: () => {} });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+
+    vi.resetModules();
+    const second = await import("./live");
+    expect(second.fetchLiveHeadlines).not.toBe(first.fetchLiveHeadlines);
+    expect(second.lastWarmUp()).toMatchObject({ done: true, answered: 2, total: 2 });
+    const live = await second.fetchLiveHeadlines([src("copy-a"), src("copy-b")], 10, { timeoutMs: 1_000 });
+    expect(live.sources.map((s) => [s.ok, s.cached])).toEqual([
+      [true, true],
+      [true, true],
+    ]);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    // …and forgetting through either copy clears the one state.
+    second.forgetLiveHeadlines();
+    expect(first.lastWarmUp()).not.toBeNull(); // the warm-up record is not a copy
+    const again = await first.fetchLiveHeadlines([src("copy-a")], 10, { timeoutMs: 1_000 });
+    expect(again.sources[0]).toMatchObject({ ok: true, cached: false });
+  });
+
   it("an answer between two faults clears the host: it is intermittent, not down", async () => {
     let n = 0;
     globalThis.fetch = vi.fn(async () => {

@@ -19,21 +19,21 @@ and #278 fixed it: the first read on its own fresh process (`f2895c9`,
 proven at 17:53 UTC) answered 12 of 12, every source fetched fresh in
 under two seconds through the gate. #275–#278 are proven (`2c362a6` at
 17:24 UTC, `f26a4e2` at 17:29, `bb3061c` at 17:37, `f2895c9` at 17:53,
-`7c965aa` at 17:59, `f562a27` at 18:05, `ac33d36` at 18:12); #283 (a
-host that hangs is held at bay, a door waits at most half its budget in a
-host's queue, the warm-up reports its progress while it runs — the 18:05
-and 18:12 probes landed on fresh processes before the warm-up had
-finished, so `warm` was still null — and the thirteenth review's three
-findings on the live layer) is merged and awaits its proof; #284 (that
-review's two remaining findings: a caption tiled three times a page no
-longer reads as a dense deck, an NOI label with a slash that is not a
-rate no longer reads as no NOI) is open.
+`7c965aa` at 17:59, `f562a27` at 18:05, `ac33d36` at 18:12, `abb797c`
+at 18:36 — #283's fresh process read 11 of 12, every search-backed
+source `via Bing`, `NEWS HELD: news.google.com … after 3 failures`);
+#284 (the thirteenth review's two remaining findings) is merged and
+awaits its proof; #285 (one news state per process: Next runs
+`instrumentation.ts` in its own module runtime, so the warm-up filled
+one copy of the live layer's state and the routes read another — that is
+why `warm` was null on every read; the state now lives on `globalThis`)
+is open.
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-A hundred and nine PRs (#176–#284) landed across one review session and the
+A hundred and ten PRs (#176–#285) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -547,6 +547,13 @@ deploy (live-verify shows the sha).
   is read as pictures from the start; and a slash in an NOI label is a
   rate only when a unit follows it, so `NOI (T-12 / TTM)` is the NOI and
   the deck is not re-read as pages.
+- **One news state per process** (#285): Next compiles
+  `instrumentation.ts` into its own module runtime, apart from the
+  routes', so the boot warm-up filled one copy of the live layer's Maps
+  and the News page read another, empty — the reason every read after a
+  deploy fetched everything fresh and reported no warm-up. The state
+  lives on `globalThis` now; the health JSON names the process (`pid`,
+  `uptimeS`) and live-verify prints `NEWS PROCESS`.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -645,18 +652,26 @@ also linked from `/data-health` under "Service probes":
    the Bing queries to the phrasings the runner's probes found items for
    (`multifamily`, `CMBS delinquency distress`, `"rent control"`; the
    probes keep a second phrasing beside each in case those thin out).
-   The first NEWS HEALTH after #283's deploy is the proof to read: the
-   search-backed sources should come `via Bing News · …` in about a
-   second each, and `NEWS HELD` should name `news.google.com` if Google
-   is still hanging. On later runs a source says `cached` when the
-   warm-up or an earlier visitor filled it, `via Bing News · …` when
-   Google refused and the second door answered (a stale line keeps its
-   `via` too); since #280 the route also reports the warm-up (`NEWS
-   WARM-UP: N of 12 … at boot`, or `running — N of 12 so far` while it
-   runs) and the runner checks both search doors' shape. A line that says
-   `HTTP 403` or `503` with no `via` means every door closed and wants a
-   look; `[news] warm-up: N of 12 sources answered` is in the service log
-   at each boot.
+   The first NEWS HEALTH after #283's deploy (18:36 UTC, a fresh
+   process) read 11 of 12: every search-backed source `via Bing News ·
+   …` (The Real Deal, GlobeSt and Multi-Housing News at 12 items each,
+   the four topics at 12 / 11 / 12 / 4), `NEWS HELD: news.google.com …
+   after 3 failures`, and Commercial Property Executive the one miss
+   (Google hanging, Bing's site-scoped read of commercialsearch.com
+   parsing to zero items — #285's runner probes try three phrasings).
+   `warm` was still null, and #285 found why: the warm-up ran in a
+   different copy of the module than the routes read (Next's own
+   runtime for `instrumentation.ts`), so its copies never reached the
+   page. After #285's deploy the first read should show `NEWS WARM-UP:
+   N of 12 sources answered at boot` (or `running — …`) and `cached`
+   lines, with `NEWS PROCESS: pid …, up …s` saying which process
+   answered. On later runs a source says `cached` when the warm-up or an
+   earlier visitor filled it, `via Bing News · …` when Google refused and
+   the second door answered (a stale line keeps its `via` too); the
+   runner checks both search doors' shape. A line that says `HTTP 403`
+   or `503` with no `via` means every door closed and wants a look;
+   `[news] warm-up: N of 12 sources answered` is in the service log at
+   each boot.
    `/api/news/health` is public, so the same JSON is one click away under
    Service probes on `/data-health`. The
    scored feed under the headlines fills in once the GitHub Actions secret
