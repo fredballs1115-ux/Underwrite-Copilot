@@ -174,7 +174,7 @@ export async function claimJob(
     id: string;
     status: string;
     updated_at: string;
-    payload?: { completed?: unknown } | null;
+    payload?: { completed?: unknown; omPages?: unknown } | null;
   } | null;
   if (!existing) return { outcome: "none", priorStatus: null };
 
@@ -184,13 +184,15 @@ export async function claimJob(
   const stale = !isFinite(updated) || Date.now() - updated >= STALE_MS;
   if (live && !stale) return { outcome: "busy", priorStatus };
 
-  const priorCompleted =
-    opts?.keepCheckpoints && priorStatus === "error" && workerPayload
-      ? existing.payload?.completed
-      : undefined;
+  const keep = Boolean(opts?.keepCheckpoints && priorStatus === "error" && workerPayload);
+  const priorCompleted = keep ? existing.payload?.completed : undefined;
   const completed = Array.isArray(priorCompleted)
     ? priorCompleted.filter((s): s is string => typeof s === "string")
     : [];
+  // The pages fallback rides with the checkpoints: a retry that skips the
+  // extraction must read the pages the failed attempt had to fall back to,
+  // not the text layer that attempt found wanting.
+  const omPages = keep && existing.payload?.omPages === true;
 
   // The WHERE clause re-checks the observed state inside the UPDATE itself,
   // so the decision and the write are one statement — a racing claimant's
@@ -210,6 +212,7 @@ export async function claimJob(
                   ...workerPayload,
                   snapshotPrior: priorStatus === "done",
                   completed,
+                  ...(omPages ? { omPages: true } : {}),
                 }
               : null,
             attempts: 0,

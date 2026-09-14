@@ -58,11 +58,13 @@ const failedRun = (): Row => ({
   id: "j1",
   status: "error",
   updated_at: HOUR_AGO,
-  payload: { kind: "screen", snapshotPrior: true, completed: ["signal", "extract", "challenge"] },
+  // …an attempt whose extraction had to fall back from the text layer to
+  // the pages (pipeline.ts writes omPages the moment it does)
+  payload: { kind: "screen", snapshotPrior: true, completed: ["signal", "extract", "challenge"], omPages: true },
 });
 
 describe("claimJob — a retry after a failed worker run keeps the steps that finished", () => {
-  it("keepCheckpoints on an errored row carries `completed` into the new payload", async () => {
+  it("keepCheckpoints on an errored row carries `completed` and the pages fallback into the new payload", async () => {
     const { db, calls } = fakeDb(failedRun());
     const claim = await claimJob(db, "d1", "signal", { kind: "screen" }, "queued", {
       keepCheckpoints: true,
@@ -73,16 +75,25 @@ describe("claimJob — a retry after a failed worker run keeps the steps that fi
       kind: "screen",
       snapshotPrior: false,
       completed: ["signal", "extract", "challenge"],
+      omPages: true,
     });
     // The payload column is read only in worker mode, where 0016 is live.
     expect(calls[0].selectCols).toContain("payload");
   });
 
-  it("without keepCheckpoints the same retry starts from nothing (a replace-OM must never resume the old file)", async () => {
+  it("a failed attempt that never fell back carries no omPages mark", async () => {
+    const { db, calls } = fakeDb({ ...failedRun(), payload: { kind: "screen", completed: ["signal"] } });
+    await claimJob(db, "d1", "signal", { kind: "screen" }, "queued", { keepCheckpoints: true });
+    const update = calls.find((c) => c.update)!.update as { payload: Row };
+    expect(update.payload).toEqual({ kind: "screen", snapshotPrior: false, completed: ["signal"] });
+  });
+
+  it("without keepCheckpoints the same retry starts from nothing (a replace-OM must never resume the old file, nor its pages fallback)", async () => {
     const { db, calls } = fakeDb(failedRun());
     await claimJob(db, "d1", "signal", { kind: "screen" });
     const update = calls.find((c) => c.update)!.update as { payload: Row };
     expect(update.payload.completed).toEqual([]);
+    expect("omPages" in update.payload).toBe(false);
   });
 
   it("a completed prior run is never resumed, only diffed against", async () => {
