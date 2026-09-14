@@ -3,25 +3,24 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-14**, after PRs #176–#273 merged to main (live build
-sha `999a280`, #272, confirmed equal to the main tip by live-verify at 17:09
-UTC with its `DEPLOY: LIVE` line — every one of the ninety-seven through
-#272 is live, the homepage serves at 196 KB where it served at 488 KB, the
-public sample memo at 57 KB where it served at 11 KB (the Brewerytown frame
-is in it), and the public-page lint #231 added reads all twelve public
-pages clean on every run. The NEWS HEALTH lines read from Render's own
-network on every run since #269: 8 of 12 sources answer and 26 headlines
-rank, so `/news` paints; three publishers answer Render with HTTP 403
-(The Real Deal, Multi-Housing News, Commercial Property Executive) and
-GlobeSt's FeedBlitz URL parses to zero items — #274 reads each another
-way, and item 4 below says what its first run should show. #273 (the
-trust strip) is merged and awaits its proof; #274 follows).
+**Last updated 2026-09-14**, after PRs #176–#276 merged to main (live build
+sha `5e12854`, #274, read by live-verify at 17:20 UTC — every one of the
+ninety-nine through #274 is live, the homepage serves at 203 KB where it
+served at 488 KB, the public sample memo at 57 KB where it served at 11 KB
+(the Brewerytown frame is in it), the public-page lint #231 added reads
+all twelve public pages clean on every run, and the NEWS HEALTH lines read
+from Render's own network say 12 of 12 sources answered and 30 headlines
+ranked: the three publishers that answered Render with HTTP 403 (The Real
+Deal, Multi-Housing News, Commercial Property Executive) and GlobeSt,
+whose FeedBlitz URL parsed to zero items, now come in through #274's
+fallbacks at a hundred items each. #275 and #276 are merged and await
+their proofs; #277 follows).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Ninety-nine PRs (#176–#274) landed across one review session and the
+A hundred and two PRs (#176–#277) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -478,6 +477,19 @@ deploy (live-verify shows the sha).
   refusing outlet) inside the same deadline, one retry after a fast
   429/5xx, and a status that names the way in (`via`) or every door that
   closed; live-verify prints `via`.
+- **A question's spend is said in the log** (#275): ask-the-deal opens
+  its own ledger and logs "ask usage for deal …" with the four meters and
+  the estimate, so a deal's cost picture includes the questions asked of
+  it.
+- **The Cost per screen card is rendered on fixtures** (#276): the card
+  is its own pure view and `lib/cost-card.render.test.ts` draws it on
+  three fixtures — the median, the six-segment bar and its spoken label,
+  the meters line, an unpriced step, the empty states — through the same
+  lint as every other view.
+- **A text layer that reads to no figures is re-read as pages** (#277):
+  the extraction step retries once on the PDF when the dense text layer
+  yielded nothing, every later step reads the pages too, and a deck that
+  is empty both ways still stops honestly.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -542,18 +554,18 @@ also linked from `/data-health` under "Service probes":
    `OM_READ=pdf` on the web service (and the worker) restores the pages
    for every deck; paste that deck's name back and the density rule gets
    corrected instead.
-4. **Open `/news` — it paints now.** The first live-verify run after #269
-   read the feeds from Render's own network: 8 of 12 sources answered and
-   26 headlines ranked (Commercial Observer, Connect CRE, REBusinessOnline,
-   the Federal Reserve and the four Google News searches). Three
-   publishers answered Render with `HTTP 403` — The Real Deal,
-   Multi-Housing News and Commercial Property Executive — and GlobeSt's
-   FeedBlitz URL parsed to zero items; since #274 the fetcher asks as a
-   browser-shaped reader and each of the four falls back to a site-scoped
-   Google News read of the same outlet, so the next run's NEWS HEALTH
-   lines say either `ok … via Google News · site:therealdeal.com` or
-   which doors closed — read them; a line that still says `HTTP 403` with
-   no `via` means the search fallback failed too and wants a look.
+4. **Open `/news` — it paints, and every source answers.** The first
+   live-verify run after #274 (17:20 UTC) read the feeds from Render's own
+   network: 12 of 12 sources answered and 30 headlines ranked. The three
+   publishers that had answered Render with `HTTP 403` — The Real Deal,
+   Multi-Housing News and Commercial Property Executive — and GlobeSt,
+   whose FeedBlitz URL parsed to zero items, each served a hundred items,
+   the count a site-scoped Google News read returns: the fallbacks #274
+   added are the way in. On a run that fetches fresh the NEWS HEALTH line
+   says `ok … via Google News · site:therealdeal.com`; a line served from
+   the process's cache says `cached` and carries no `via`. A line that
+   says `HTTP 403` with no `via` means the search fallback failed too and
+   wants a look.
    `/api/news/health` is public, so the same JSON is one click away under
    Service probes on `/data-health`. The
    scored feed under the headlines fills in once the GitHub Actions secret
