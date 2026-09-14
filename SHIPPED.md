@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Ninety-nine PRs, #176–#274, each
+estimate, and that's what it should flag." A hundred and two PRs, #176–#277, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1382,6 +1382,43 @@ confirmed equal to the main tip after each batch.
   error naming each candidate; a fast 503 retried once and a 403 not; a
   hanging publisher leaving no time for its fallbacks inside a held
   deadline.
+- **#275 A question's spend is said in the log.** Ask-the-deal is one
+  read of the whole deck per question — up to twenty-five a deal — and
+  until now it spent silently. `askDealQuestion` opens its own ledger
+  around the call and, when the answer is back (or has failed), logs the
+  same line a screen does, headed "ask usage for deal …", with the four
+  meters and the list-price estimate; the server action hands it the
+  deal's id. Since #272 the deck goes as its text layer here too, so the
+  line is also where that saving shows on a question.
+- **#276 The Cost per screen card is rendered on fixtures.** The card
+  #271 added lived inside the operator's page, which reads a database no
+  test can reach — the one signed-in picture with no render test. It is
+  now its own pure view (`app/(app)/data-health/cost-card.tsx`: the page
+  hands it the ledgers it read), and `lib/cost-card.render.test.ts` draws
+  it on three fixtures and reads it back: the median as the number and
+  the row without a ledger ignored; one bar with six segments in
+  pipeline order, the cache write the widest, the widths summing to 100,
+  the bar's spoken label naming every step's dollars; the meters line
+  with its counts; a screen with an unpriced step leaving that step's
+  dollars blank, naming the model, and the median counting only the
+  screens that priced; the two empty states. The text and the markup go
+  through the same lint as every other view. `CLAUDE.md` gains the
+  orientation lines for what this round added — the usage ledger and the
+  price table, the OM's text-first read, the asset-class words, the News
+  layer's fallbacks — so the next session reads them before touching any
+  of it.
+- **#277 A text layer that reads to no figures is re-read as pages.** The
+  safety net under #272. A layer can be dense and still not be the deck —
+  OCR noise on a scan that was run through a recognizer, a layer of
+  captions under the pictures that hold the figures — and then the
+  extraction finds nothing. Before the screen gives up, the extraction
+  step reads the pages themselves once (the PDF is right there), says so
+  in the log, and every later step reads the pages too; a deck that is
+  empty both ways still stops with the honest "scan or
+  password-protected" sentence, nothing stored. The pipeline test drives
+  both on the recording fake: the second read on the buffer source, the
+  challenger and the market check on the buffer too, the stored
+  extraction the second read's; and the double-empty stop.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

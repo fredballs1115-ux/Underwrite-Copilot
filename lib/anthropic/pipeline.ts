@@ -410,7 +410,17 @@ async function runAnalysisSteps(
         progress: 10,
         error: null,
       });
-      const extraction = await extractTerms(om(), assetClass);
+      let extraction = await extractTerms(om(), assetClass);
+      // A text layer can be dense and still not be the deck — OCR noise, a
+      // layer of captions under the pictures that hold the figures — and
+      // then the read finds nothing. Before giving up, read the pages
+      // themselves once; the PDF is right here, and every later step then
+      // reads the pages too.
+      if (extraction.metrics.length === 0 && omSource?.kind === "pages" && pdf) {
+        console.log(`[pipeline] the text layer of deal ${dealId} read to no figures — re-reading the pages`);
+        omSource = await omSourceFor(pdf, "om.pdf", { textFirst: false });
+        extraction = await extractTerms(om(), assetClass);
+      }
       // A scan, a password-protected file or an empty deck yields a
       // schema-valid extraction with no figures at all. Stored, it flowed to
       // a Caution verdict on a document the product never read — stop here.

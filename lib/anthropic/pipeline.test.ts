@@ -363,6 +363,35 @@ describe("runAnalysis — what a failure leaves behind, and what it tells the an
     expect(synthesizeVerdict).not.toHaveBeenCalled();
   });
 
+  it("a text layer that reads to no figures is re-read as pages before the screen gives up", async () => {
+    const pages = { kind: "pages" as const, text: "[[page 1]]\nnoise", pages: 1, sparsePages: 0 };
+    const buffer = { kind: "buffer" as const, data: Buffer.alloc(0) };
+    vi.mocked(omSourceFor).mockResolvedValueOnce(pages).mockResolvedValueOnce(buffer);
+    vi.mocked(extractTerms).mockResolvedValueOnce({ ...EXTRACTION, metrics: [] }).mockResolvedValueOnce(EXTRACTION);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect(state.deals.d1.extraction).toEqual(EXTRACTION);
+    expect(extractTerms).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(extractTerms).mock.calls[0][0]).toBe(pages);
+    expect(vi.mocked(extractTerms).mock.calls[1][0]).toBe(buffer);
+    expect(omSourceFor).toHaveBeenNthCalledWith(2, expect.anything(), "om.pdf", { textFirst: false });
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("re-reading the pages"));
+    logSpy.mockRestore();
+    // …and every step after the extraction reads the pages too.
+    expect(vi.mocked(challengeAssumptions).mock.calls[0][0]).toBe(buffer);
+    expect(vi.mocked(checkMarket).mock.calls[0][0]).toBe(buffer);
+
+    // Both reads empty: the honest stop, as before.
+    state = freshState();
+    vi.mocked(omSourceFor).mockResolvedValueOnce(pages).mockResolvedValueOnce(buffer);
+    vi.mocked(extractTerms).mockResolvedValue({ ...EXTRACTION, metrics: [] });
+    await runAnalysis("d1");
+    expect(job().status).toBe("error");
+    expect(job().error).toMatch(/scan or password-protected/);
+    expect(state.deals.d1.extraction).toEqual({ old: true });
+  });
+
   it("the previous first signal survives a failed first read (it is no longer cleared ahead of the call)", async () => {
     vi.mocked(readFirstSignal).mockRejectedValue(new Error("boom"));
     await runAnalysis("d1");
