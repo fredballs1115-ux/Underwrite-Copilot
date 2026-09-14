@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fragment } from "react";
 import Link from "next/link";
+import { PlaceBackdrop } from "@/app/place-band";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import {
   buildComps,
@@ -602,12 +603,20 @@ async function MetroExplorer({ selected }: { selected?: string }) {
       </div>
 
       <div className="mt-4 space-y-4">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-brand">
-          {(active as { region?: string }).region ?? "More markets"} ·{" "}
-          <span className="font-normal normal-case tracking-normal text-muted">
-            {active.name}
-          </span>
-        </p>
+        {/* The brief opens on the market itself, from above — the same
+            USGS frame the homepage gallery draws for it (app/place-band);
+            a metro with no frame keeps the flat band. */}
+        <div className="band-dark relative overflow-hidden rounded-2xl text-white">
+          <PlaceBackdrop metro={active.id} height={480} opacity="opacity-35" />
+          <div className="relative px-5 py-7 sm:px-6 sm:py-9">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-accent">
+              {(active as { region?: string }).region ?? "More markets"}
+            </p>
+            <h3 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
+              {active.name}
+            </h3>
+          </div>
+        </div>
         <p className="text-sm leading-relaxed">
           {(active.market_notes as { value?: string } | null)?.value}
           <span className={`ml-2 rounded px-1.5 py-px align-middle text-[10px] font-medium ${noteMeta}`}>

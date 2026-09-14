@@ -136,7 +136,8 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   the credit — `AerialBackdrop` in `app/aerial-img.tsx` drops the credit
   with the picture on a 404) and `PlaceBand` (a dark section at the
   page's content width); `/why` opens on `dc`, `/demo` on
-  `philadelphia`, `/login` on `baltimore`. A new public page opens the same way — pick the
+  `philadelphia`, `/login` on `baltimore`, and a metro brief on `/market`
+  on its own metro (a rounded band inside the page's column). A new public page opens the same way — pick the
   covered market that means something to it. The sandbox cannot fetch a
   photograph from any image host; the ground-level files are the
   operator's move.

@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and twenty-two PRs, #176–#297, each
+estimate, and that's what it should flag." A hundred and twenty-three PRs, #176–#298, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1745,6 +1745,12 @@ confirmed equal to the main tip after each batch.
   core, stands behind the sign-in card at a quarter strength under the
   same scrim, with its credit in the corner — the last public page
   that opened on a flat colour.
+- **#298 Each market brief opens on its own downtown.** Pick a metro on
+  `/market` and the brief opens on that market from above — Dallas on
+  downtown Dallas, Boston on downtown Boston — the same USGS frame the
+  homepage gallery draws for it, as a rounded band carrying the region
+  and the market's name where a text eyebrow sat. The picture is the
+  subject: it is the place whose rules, rents and benchmarks follow.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-14",
+      "title": "Each market brief opens on its own downtown",
+      "blurb": "Pick a market on /market and the brief opens on that market from above — the same public-domain USGS frame the homepage gallery draws for it — as a band carrying the region and the market's name. The picture is the place whose rules, rents and benchmarks follow.",
+      "href": "/market?metro=dallas"
+    },
+    {
+      "date": "2026-09-14",
       "title": "The sign-in page opens on a real place",
       "blurb": "Baltimore's Inner Harbor from above stands behind the sign-in card — the last public page that opened on a flat colour — a public-domain USGS frame under the same scrim, credited in the corner.",
       "href": "/login"
