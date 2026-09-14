@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-14",
+      "title": "A headline that names a covered market opens its brief",
+      "blurb": "When a headline on the News page names one of the covered markets — Atlanta, Manhattan, Fort Worth, the Bay Area — the market is a tag beside the others, and it opens that metro's page: the news tied to the ground layer. A word that names two places tags nothing rather than guessing.",
+      "href": "/news"
+    },
+    {
+      "date": "2026-09-14",
       "title": "Each headline says why it ranks",
       "blurb": "Every headline on the News page now wears the tags that put it where it is — rates, cap rates, distress and regulation in colour, the asset class, supply, debt and costs beside them — off the same matches the ranking counts. The top twelve show and the rest are one click away, their ranks kept.",
       "href": "/news"

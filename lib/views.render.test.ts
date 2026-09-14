@@ -840,6 +840,10 @@ describe("News live section", () => {
     expect(text).toContain("distress");
     expect(text).toContain("multifamily");
     expect(text).toContain("supply");
+    // a covered market the headline names is a tag into its brief
+    expect(html).toContain('href="/market?metro=atlanta"');
+    expect(html).toContain('href="/market?metro=nyc"');
+    expect(text).toContain("NYC");
     // two headlines: nothing folds
     expect(text).not.toContain("more headline");
     expect(gluedWords(text)).toEqual([]);

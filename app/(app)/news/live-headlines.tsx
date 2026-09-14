@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import type { LiveHeadlines, SourceStatus } from "@/lib/news/live";
 import { headlineSignals, searchHostsAnswering, timeAgo, type RankedHeadline } from "@/lib/news/feeds";
+import { headlineMarkets } from "@/lib/news/markets";
 
 /** How many headlines show before the fold. */
 const SHOW = 12;
@@ -102,6 +103,7 @@ export function LiveHeadlinesView({ live }: { live: LiveHeadlines }) {
  *  say why it ranks, and a snippet clamped to two lines. */
 function HeadlineRow({ h, n, now }: { h: RankedHeadline; n: number; now: number }) {
   const tags = headlineSignals(h);
+  const markets = headlineMarkets(h);
   return (
     <li className="flex gap-3 px-3.5 py-3 text-sm leading-snug">
       <span className="mt-px w-5 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted">
@@ -126,7 +128,7 @@ function HeadlineRow({ h, n, now }: { h: RankedHeadline; n: number; now: number 
           )}
           {h.publishedAt ? ` · ${timeAgo(h.publishedAt, now)}` : ""}
         </span>
-        {tags.length > 0 && (
+        {(tags.length > 0 || markets.length > 0) && (
           <>
             {" "}
             <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
@@ -140,6 +142,20 @@ function HeadlineRow({ h, n, now }: { h: RankedHeadline; n: number; now: number 
                   >
                     {t.label}
                   </span>
+                </Fragment>
+              ))}
+              {/* A covered market the headline names is a tag that opens
+                  the metro's brief — the news tied to the ground layer. */}
+              {markets.map((m) => (
+                <Fragment key={m.id}>
+                  {" "}
+                  <a
+                    href={m.href}
+                    title={`${m.name} — open the market brief`}
+                    className="rounded border border-line bg-surface px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-ink hover:border-brand hover:text-brand"
+                  >
+                    {m.label}
+                  </a>
                 </Fragment>
               ))}
             </span>
