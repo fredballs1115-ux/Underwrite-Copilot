@@ -16,7 +16,7 @@ follows).
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Ninety-three PRs (#176–#268) landed across one review session and the
+Ninety-four PRs (#176–#269) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -438,6 +438,11 @@ deploy (live-verify shows the sha).
 - **The market check names the shape of its figures** (#268): `omSays`
   with its unit, `typicalRange` low to high in that unit, in the prompt
   and the schema; a prompt test reads each example pair as a position.
+- **The News page's live headlines always paint** (#269): every feed
+  races a wall-clock deadline and a per-process fresh copy replaces Next's
+  fetch cache, so a publisher that never answers can no longer hold the
+  streamed section on its skeleton; `/api/news/health` is public and
+  live-verify prints each feed's outcome from Render's own network.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -486,9 +491,12 @@ also linked from `/data-health` under "Service probes":
    `lib/anthropic/models.ts` names the levers in order. Judge a screen or two
    before deciding; the judgement steps stay on the flagship unless you also
    set `MODEL_REASONING`.
-4. **Open `/news`, then hit `/api/news/health` signed in.** The page should
-   open with a ranked list of today's headlines and a "Sources:" line naming
-   the publishers that answered. The health JSON says what each feed returned
+4. **Open `/news`; then read the NEWS HEALTH lines in the next live-verify
+   run.** `/api/news/health` is public since #269 and every live-verify run
+   prints each feed's outcome (HTTP status or error, items, latency) from
+   Render's own network, so an empty section is diagnosed there. The page
+   should open with a ranked list of today's headlines and a "Sources:"
+   line naming the publishers that answered. The health JSON says what each feed returned
    from Render; publisher feeds were chosen from public feed directories, not
    fetched from here (the sandbox cannot reach them), so a feed that has moved
    shows up there as `HTTP 404` — paste the JSON back and it gets corrected.

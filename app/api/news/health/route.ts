@@ -5,26 +5,36 @@
 // few Google News topic searches. A publisher can block server fetches, move
 // its feed, or time out, and every one of those looks the same from the
 // page: a source quietly missing. This route names each source's outcome
-// (HTTP status or error, item count, latency, whether a stale copy stood
-// in) so a thin section can be diagnosed instead of guessed at.
+// (HTTP status or error, item count, latency, whether a stale or a cached
+// copy stood in) so a thin section can be diagnosed instead of guessed at.
 //
-// Signed-in users only. Nothing here is secret; it is simply not a public
-// surface.
+// Public: nothing here is secret — publisher names, HTTP outcomes, latency,
+// the top headlines with their links — and live-verify reads it after every
+// deploy, so an empty section is diagnosed from the deployment's own
+// network, not from a sandbox that cannot reach the publishers. Signed-in
+// callers may add `?refresh=1` to drop this process's fresh copies first and
+// exercise every feed; anonymous callers read what the page would show.
 
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { fetchLiveHeadlines } from "@/lib/news/live";
+import { fetchLiveHeadlines, forgetLiveHeadlines } from "@/lib/news/live";
 
-export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+export const dynamic = "force-dynamic";
+
+export async function GET(req: Request) {
+  const refresh = new URL(req.url).searchParams.get("refresh") === "1";
+  if (refresh) {
+    const user = await getCurrentUser();
+    if (user) forgetLiveHeadlines();
+  }
 
   const live = await fetchLiveHeadlines();
   const answered = live.sources.filter((s) => s.ok).length;
+  const stale = live.sources.filter((s) => s.stale).length;
   return NextResponse.json(
     {
       fetchedAt: live.fetchedAt,
-      summary: `${answered} of ${live.sources.length} sources answered; ${live.headlines.length} headlines ranked.`,
+      summary: `${answered} of ${live.sources.length} sources answered${stale ? ` (${stale} from an earlier copy)` : ""}; ${live.headlines.length} headlines ranked.`,
       sources: live.sources,
       top: live.headlines.slice(0, 8).map((h) => ({
         title: h.title,
