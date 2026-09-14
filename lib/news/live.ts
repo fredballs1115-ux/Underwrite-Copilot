@@ -38,7 +38,15 @@ const TIMEOUT_MS = 8_000;
 /** the wall-clock cap runs this much past the request's own timeout */
 const DEADLINE_GRACE_MS = 700;
 const STALE_MAX_MS = 24 * 3_600_000;
-const UA = "underwrite-copilot/1.0 (+https://underwrite-copilot.onrender.com; news reader)";
+/** a second try of a candidate that answered 429 or 5xx waits this long */
+const RETRY_WAIT_MS = 500;
+/** no attempt starts with less of the source's budget than this left */
+const MIN_ATTEMPT_MS = 300;
+// Browser-shaped, and honest about who is asking: a publisher's edge rules
+// refuse a bare product token outright (HTTP 403 from three of the feeds
+// on Render's network), and the "compatible" form is what feed readers
+// send. The contact URL stays, so a publisher can still find us.
+const UA = "Mozilla/5.0 (compatible; UnderwriteCopilot/1.0; +https://underwrite-copilot.onrender.com/news)";
 
 export interface SourceStatus {
   id: string;
@@ -53,8 +61,25 @@ export interface SourceStatus {
   stale: boolean;
   /** served from this process's fresh copy — no fetch was made */
   cached: boolean;
+  /** the fallback that answered when the publisher's own feed did not */
+  via?: string;
   error?: string;
 }
+
+class FeedError extends Error {
+  constructor(
+    message: string,
+    readonly status: number | null = null,
+  ) {
+    super(message);
+  }
+}
+
+/** A 429 or a 5xx is the kind of refusal a second try can clear. */
+const retriable = (e: unknown): boolean =>
+  e instanceof FeedError && e.status != null && (e.status === 429 || e.status >= 500);
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export interface LiveHeadlines {
   headlines: RankedHeadline[];
@@ -79,8 +104,13 @@ function deadline(ms: number): Promise<never> {
   });
 }
 
-async function fetchFeed(source: NewsSource, timeoutMs: number): Promise<FeedItem[]> {
-  const res = await fetch(source.feed, {
+async function fetchFeed(
+  url: string,
+  kind: NewsSource["kind"],
+  source: NewsSource,
+  timeoutMs: number,
+): Promise<FeedItem[]> {
+  const res = await fetch(url, {
     headers: {
       "user-agent": UA,
       accept: "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5",
@@ -88,11 +118,55 @@ async function fetchFeed(source: NewsSource, timeoutMs: number): Promise<FeedIte
     cache: "no-store",
     signal: AbortSignal.timeout(timeoutMs),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) throw new FeedError(`HTTP ${res.status}`, res.status);
   const xml = await res.text();
-  const items = parseFeed(xml, source);
-  if (items.length === 0) throw new Error("feed parsed to zero items");
+  // A fallback read through Google News parses as a topic feed: its items
+  // name the outlet in <source>, which the parser keeps as the publisher.
+  const items = parseFeed(xml, kind === source.kind ? source : { ...source, kind });
+  if (items.length === 0) throw new FeedError("feed parsed to zero items");
   return items;
+}
+
+/**
+ * The publisher's own feed first, then its fallbacks in order, all inside
+ * one budget — a candidate that answered 429 or 5xx gets one more try after
+ * a short wait, while the budget allows. The error a source reports names
+ * every candidate that failed, so the health line says which door closed.
+ */
+async function fetchWithFallbacks(
+  source: NewsSource,
+  timeoutMs: number,
+): Promise<{ items: FeedItem[]; via: string | null }> {
+  const started = Date.now();
+  const left = () => timeoutMs - (Date.now() - started);
+  const candidates = [
+    { feed: source.feed, kind: source.kind, label: null as string | null },
+    ...(source.fallbacks ?? []).map((f) => ({ feed: f.feed, kind: f.kind, label: f.label as string | null })),
+  ];
+  const errors: string[] = [];
+  let attempted = 0;
+  outer: for (const c of candidates) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const budget = left();
+      // The publisher's own feed always gets its try, however short the
+      // budget; a fallback or a retry starts only with real time left.
+      if (attempted > 0 && budget < MIN_ATTEMPT_MS) break outer;
+      attempted++;
+      try {
+        const items = await fetchFeed(c.feed, c.kind, source, budget);
+        return { items, via: c.label };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        errors.push(c.label ? `${c.label}: ${msg}` : msg);
+        if (attempt === 0 && retriable(e) && left() > RETRY_WAIT_MS + MIN_ATTEMPT_MS) {
+          await sleep(RETRY_WAIT_MS);
+          continue;
+        }
+        break;
+      }
+    }
+  }
+  throw new Error(errors.length ? [...new Set(errors)].join(" · ") : "no candidate answered");
 }
 
 async function fetchSource(
@@ -110,15 +184,23 @@ async function fetchSource(
   }
   const t0 = Date.now();
   try {
-    const items = await Promise.race([
-      fetchFeed(source, timeoutMs),
+    const { items, via } = await Promise.race([
+      fetchWithFallbacks(source, timeoutMs),
       deadline(timeoutMs + DEADLINE_GRACE_MS),
     ]);
     fresh.set(source.id, { at: Date.now(), items });
     lastGood.set(source.id, { at: Date.now(), items });
     return {
       items,
-      status: { ...base, ok: true, count: items.length, ms: Date.now() - t0, stale: false, cached: false },
+      status: {
+        ...base,
+        ok: true,
+        count: items.length,
+        ms: Date.now() - t0,
+        stale: false,
+        cached: false,
+        ...(via ? { via } : {}),
+      },
     };
   } catch (e) {
     const err = e instanceof Error ? e.message : String(e);

@@ -79,3 +79,97 @@ describe("fetchLiveHeadlines — every source answers inside its deadline", () =
     expect(live.headlines).toEqual([]);
   });
 });
+
+/** A Google News item: the outlet rides in <source>. */
+const gnRss = (title: string, outlet: string) =>
+  `<?xml version="1.0"?><rss version="2.0"><channel><item><title>${title} - ${outlet}</title>` +
+  `<link>https://news.google.com/rss/articles/x</link><pubDate>${new Date().toUTCString()}</pubDate>` +
+  `<source url="https://${outlet.toLowerCase().replace(/\s+/g, "")}.com">${outlet}</source></item></channel></rss>`;
+
+describe("fetchLiveHeadlines — a publisher that refuses the fetcher is read another way", () => {
+  const realFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    forgetLiveHeadlines();
+  });
+
+  // One id per test: the last-good copy is per source id for the life of
+  // the process, so a source that answered in one test would stand in for
+  // a failure in the next.
+  const withFallback = (id: string): NewsSource => ({
+    ...src(id),
+    fallbacks: [{ feed: `https://news.test/rss?q=site:${id}.test`, kind: "topic", label: `Google News · site:${id}.test` }],
+  });
+
+  it("asks as a browser-shaped reader that still says who it is", async () => {
+    let ua = "";
+    globalThis.fetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      ua = String((init?.headers as Record<string, string>)["user-agent"]);
+      return new Response(rss("Rates hold"), { status: 200 });
+    }) as typeof fetch;
+    await fetchLiveHeadlines([src("feed")], 10, { timeoutMs: 500 });
+    expect(ua).toMatch(/^Mozilla\/5\.0 \(compatible; UnderwriteCopilot\/1\.0; \+https:\/\/underwrite-copilot\.onrender\.com\/news\)$/);
+  });
+
+  it("HTTP 403 on the publisher's feed: the site-scoped Google News read answers, named as the way in, with the outlet kept", async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) =>
+      String(input).startsWith("https://paper.test")
+        ? new Response("forbidden", { status: 403 })
+        : new Response(gnRss("Lender takes back the tower", "The Paper"), { status: 200 }),
+    ) as typeof fetch;
+    const live = await fetchLiveHeadlines([withFallback("paper")], 10, { timeoutMs: 2_000 });
+    expect(live.sources[0]).toMatchObject({ ok: true, count: 1, stale: false, via: "Google News · site:paper.test" });
+    expect(live.sources[0].error).toBeUndefined();
+    expect(live.headlines.map((h) => [h.title, h.publisher])).toEqual([["Lender takes back the tower", "The Paper"]]);
+  });
+
+  it("a feed that parses to nothing falls through the same way; when every door closes the error names each", async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) =>
+      String(input).startsWith("https://blank.test")
+        ? new Response("<html>a landing page</html>", { status: 200 })
+        : new Response("gone", { status: 404 }),
+    ) as typeof fetch;
+    const live = await fetchLiveHeadlines([withFallback("blank")], 10, { timeoutMs: 2_000 });
+    expect(live.sources[0]).toMatchObject({ ok: false, count: 0 });
+    expect(live.sources[0].error).toBe("feed parsed to zero items · Google News · site:blank.test: HTTP 404");
+    expect(live.sources[0].via).toBeUndefined();
+  });
+
+  it("a 503 that came back quickly is tried once more after a short wait; a 403 is not", async () => {
+    let calls = 0;
+    globalThis.fetch = vi.fn(async () => {
+      calls++;
+      return calls === 1 ? new Response("busy", { status: 503 }) : new Response(rss("Fed holds"), { status: 200 });
+    }) as unknown as typeof fetch;
+    const t0 = Date.now();
+    const live = await fetchLiveHeadlines([src("gn")], 10, { timeoutMs: 3_000 });
+    expect(live.sources[0]).toMatchObject({ ok: true, count: 1 });
+    expect(live.sources[0].via).toBeUndefined();
+    expect(calls).toBe(2);
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(450);
+
+    forgetLiveHeadlines();
+    calls = 0;
+    globalThis.fetch = vi.fn(async () => {
+      calls++;
+      return new Response("no", { status: 403 });
+    }) as unknown as typeof fetch;
+    const refused = await fetchLiveHeadlines([src("wall")], 10, { timeoutMs: 3_000 });
+    expect(refused.sources[0]).toMatchObject({ ok: false, error: "HTTP 403" });
+    expect(calls).toBe(1);
+  });
+
+  it("the fallbacks share the source's budget: a publisher that hangs leaves no time for them, and the deadline still holds", async () => {
+    let calls = 0;
+    globalThis.fetch = vi.fn(async () => {
+      calls++;
+      return new Promise<Response>(() => {});
+    }) as unknown as typeof fetch;
+    const t0 = Date.now();
+    const live = await fetchLiveHeadlines([withFallback("slow")], 10, { timeoutMs: 100 });
+    expect(Date.now() - t0).toBeLessThan(2_000);
+    expect(live.sources[0]).toMatchObject({ ok: false, count: 0 });
+    expect(live.sources[0].error).toMatch(/no answer within 800 ms/);
+    expect(calls).toBe(1);
+  });
+});

@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-14",
+      "title": "News from the publishers that block the server",
+      "blurb": "Four of the twelve news sources refused the server's request or answered with an empty page, so the News page listed eight. Each of those four is now read another way — through a search scoped to that publisher's own site — inside the same time limit, and the health line names which way in answered. A source that answers busy is asked once more before it is given up on.",
+      "href": "/news"
+    },
+    {
+      "date": "2026-09-14",
       "title": "How your OM is handled, beside the price",
       "blurb": "Under the plans on the homepage, four tiles now say what happens to an uploaded offering memorandum — private storage with links that expire, isolation in the database itself, never used to train a model, delete it all yourself — each opening the security page, which states every one in full and says plainly that there is no attestation badge to show.",
       "href": "/#pricing"

@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Ninety-eight PRs, #176–#273, each
+estimate, and that's what it should flag." Ninety-nine PRs, #176–#274, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1358,6 +1358,30 @@ confirmed equal to the main tip after each batch.
   `/security`, which states every one in full and says plainly that
   there is no badge. live-verify greps the strip's class on every run.
   Shot at 1440 and 390.
+- **#274 The publishers that refuse the fetcher are read another way.**
+  The NEWS HEALTH lines that #269 added read the feeds from Render's own
+  network and said which doors were closed: The Real Deal, Multi-Housing
+  News and Commercial Property Executive answer the server with HTTP 403,
+  GlobeSt's FeedBlitz address parses to nothing, and one run saw Google
+  News answer 503 on all four topic searches at once. Three changes. The
+  fetcher asks as a browser-shaped reader that still says who it is
+  ("Mozilla/5.0 (compatible; UnderwriteCopilot/1.0; +…/news)") — a bare
+  product token is what a publisher's edge rules refuse outright. Each of
+  the four gains fallbacks (`NewsFallback` on the source: GlobeSt's own
+  `/feed/`, then for all four a Google News search scoped to the outlet's
+  site, whose items name the outlet in `<source>` and so rank and show as
+  the publisher's), tried in order inside the source's one budget — the
+  publisher's own feed always gets its try, a fallback or a retry starts
+  only with real time left, and the wall-clock deadline holds regardless.
+  A candidate that answered 429 or 5xx is tried once more after half a
+  second. The status names the way in (`via`) when a fallback answered and
+  every door that closed when none did ("feed parsed to zero items ·
+  Google News · site:globest.com: HTTP 404"); live-verify prints `via`.
+  Tests: the user agent; a 403 read through the site-scoped search with
+  the outlet kept; a landing page falling through the same way and the
+  error naming each candidate; a fast 503 retried once and a 403 not; a
+  hanging publisher leaving no time for its fallbacks inside a held
+  deadline.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
