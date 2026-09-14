@@ -4,19 +4,22 @@ Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
 **Last updated 2026-09-14**, after PRs #176–#269 merged to main (live build
-sha `82dd186`, #268, confirmed equal to the main tip by live-verify at 16:30
-UTC with its `DEPLOY: LIVE` line — every one of the ninety-three through
-#268 is live, the homepage serves at 196 KB where it served at 488 KB, the
+sha `a3a661f`, #269, confirmed equal to the main tip by live-verify at 16:40
+UTC with its `DEPLOY: LIVE` line — every one of the ninety-four through
+#269 is live, the homepage serves at 196 KB where it served at 488 KB, the
 public sample memo at 57 KB where it served at 11 KB (the Brewerytown frame
 is in it), and the public-page lint #231 added reads all twelve public
-pages clean on every run; #269 (the News fix) is merged and awaits its
-proof — its run is the first to print the NEWS HEALTH lines; #270 follows).
+pages clean on every run. That run was the first to print the NEWS HEALTH
+lines from Render's own network: 8 of 12 sources answered and 26 headlines
+ranked, so `/news` paints; three publishers answer Render with HTTP 403
+(The Real Deal, Multi-Housing News, Commercial Property Executive) and
+GlobeSt's FeedBlitz URL parses to zero items — item 4 below. #270 follows).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Ninety-five PRs (#176–#270) landed across one review session and the
+Ninety-six PRs (#176–#271) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -450,6 +453,13 @@ deploy (live-verify shows the sha).
   every surface that prints one, so "self_storage" reads "Self-storage"
   on the row, the filter, the exports, the compare table, the shared
   screen and the market cards.
+- **Every screen records what it cost** (#271): the four token meters of
+  every model call land in a per-run ledger, on the job row (migration
+  0035) and in one log line with a list-price estimate; `/data-health`
+  shows the median of the last screens and the latest screen's split by
+  step as a bar; `MODEL_VERDICT` joins the env levers, and `models.ts`
+  names them in the right order (the cache is per model — move the
+  OM-reading steps together).
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -490,26 +500,36 @@ also linked from `/data-health` under "Service probes":
 2. **Hit `/api/imagery/health` signed in.** A new `geocoder` key leads the
    JSON: it should read `ok: true`, `source: "census"`, `precision: "street"`,
    a few tens of metres off. Paste it back if anything else shows.
-3. **Cost (your call, one env var).** Screening runs every step on the
-   flagship tier. The extraction and first signal are look-up work and carry
-   the one uncached full read of the PDF; setting `MODEL_EXTRACTION` on the
-   web service (and the worker, if `ANALYSIS_WORKER=1`) to the mid-tier model
-   id and redeploying moves that read to a tier at roughly 40% of the price —
-   `lib/anthropic/models.ts` names the levers in order. Judge a screen or two
-   before deciding; the judgement steps stay on the flagship unless you also
-   set `MODEL_REASONING`.
-4. **Open `/news`; then read the NEWS HEALTH lines in the next live-verify
-   run.** `/api/news/health` is public since #269 and every live-verify run
-   prints each feed's outcome (HTTP status or error, items, latency) from
-   Render's own network, so an empty section is diagnosed there. The page
-   should open with a ranked list of today's headlines and a "Sources:"
-   line naming the publishers that answered. The health JSON says what each feed returned
-   from Render; publisher feeds were chosen from public feed directories, not
-   fetched from here (the sandbox cannot reach them), so a feed that has moved
-   shows up there as `HTTP 404` — paste the JSON back and it gets corrected.
-   The scored feed under the headlines fills in once the GitHub Actions
-   secret is spelled `ANTHROPIC_API_KEY` (it is `NTHROPIC_API_KEY` today) and
-   the weekday sweep runs.
+3. **Cost per screen — measure first, then one env var (your call).** Since
+   #271 every screen writes what it spent to its job row (migration 0035 —
+   run it) and to the log, and `/data-health` shows the median cost of the
+   last screens with the split by step drawn as a bar. Read that number
+   before pulling anything. The shape of the bill on the flagship, for a
+   deck the model reads as ~300k tokens: the one cache write of the OM is
+   ~60% of it, the four cached reads ~20%, the outputs the rest — about $3.
+   The lever: `MODEL_EXTRACTION` **and** `MODEL_REASONING` to the mid-tier
+   id **together** on the web service (and the worker, if
+   `ANALYSIS_WORKER=1`), then redeploy — the same screen lands near $1.25
+   at that tier's list price. Never split them: the prompt cache is per
+   model, so a cheaper extraction under a flagship judgement writes the
+   deck to two caches and costs more. `MODEL_VERDICT` is the one step that
+   can differ for free (it reads the results, not the deck).
+   `lib/anthropic/models.ts` says the same in order. Judge a few screens
+   against their saved verdicts before deciding. The next lever that keeps
+   the flagship — a text-first read of the deck — is in the build queue.
+4. **Open `/news` — it paints now.** The first live-verify run after #269
+   read the feeds from Render's own network: 8 of 12 sources answered and
+   26 headlines ranked (Commercial Observer, Connect CRE, REBusinessOnline,
+   the Federal Reserve and the four Google News searches). Three
+   publishers answer Render with `HTTP 403` — The Real Deal, Multi-Housing
+   News and Commercial Property Executive block the fetcher — and GlobeSt's
+   FeedBlitz URL parses to zero items; a browser-like user agent and a
+   fresh feed URL are the next slice, and every run's NEWS HEALTH lines
+   will show whether it worked. `/api/news/health` is public, so the same
+   JSON is one click away under Service probes on `/data-health`. The
+   scored feed under the headlines fills in once the GitHub Actions secret
+   is spelled `ANTHROPIC_API_KEY` (it is `NTHROPIC_API_KEY` today) and the
+   weekday sweep runs.
 
 Everything in the red section below still stands — the migrations remain the
 blocker for Bridge, Valuations, Rent roll and Submarkets.

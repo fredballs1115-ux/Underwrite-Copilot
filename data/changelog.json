@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-14",
+      "title": "Every screen records what it cost",
+      "blurb": "Each screen now keeps a ledger of what it spent — the four token meters of every model call, on a finished screen and on a failed one — and the Data health page shows the median cost of your last screens as one number, with the latest screen's split by step drawn as a bar. The levers that bring it down are named beside the number, in the order to pull them.",
+      "href": "/data-health"
+    },
+    {
+      "date": "2026-09-14",
       "title": "The pipeline lines up",
       "blurb": "Every row on the pipeline now holds a picture slot of one size — the aerial where the deal has an address, an empty plate where it does not — so the deal names sit in one column instead of stepping in and out. The filters stay on one line with the CSV and Excel buttons at the right edge, and a deal whose class was left on Auto now shows the class the screen read from its OM.",
       "href": "/deals"

@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Ninety-five PRs, #176–#270, each
+estimate, and that's what it should flag." Ninety-six PRs, #176–#271, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1289,6 +1289,34 @@ confirmed equal to the main tip after each batch.
   as nothing. The pipeline render test asserts the nine photo slots, the
   two blank plates, the exports' group, and that the key never shows;
   shot at 1440 and 390.
+- **#271 Every screen records what it cost.** The operator's ask: a screen
+  on the flagship runs about $3, and the margins are not there at $3. The
+  first move is to measure rather than estimate. Every structured-output
+  call already reports four token meters on its response (uncached input,
+  cache writes, cache reads, output); `structured()` now records them —
+  before its guards run, so a cut-off or a refusal still counts — into
+  whichever ledger is open on the async context (`lib/anthropic/usage.ts`,
+  an `AsyncLocalStorage`; a call outside a screen records nowhere).
+  `runAnalysis` opens one, and when the run ends — on success and on
+  failure alike — writes the ledger with its totals and a list-price
+  estimate to the job row (`analysis_jobs.usage`, migration 0035,
+  best-effort) and says it once in the log; the reconciler logs its own.
+  The prices live in `models.ts` by id prefix, with the cache write at
+  1.25× and the read at a tenth; a model the table does not know is still
+  metered and its dollars left blank. `/data-health` gains a Cost per
+  screen card: the median of the last screens as the number, the latest
+  screen's split by step as a stacked bar, the four meters in one line.
+  `models.ts` also gains the verdict's own override (`MODEL_VERDICT`) — the
+  verdict reads the gathered results, never the deck, so it is the one
+  step that can run on a different model without a second cache write —
+  and its comment now says the thing the old one had wrong: the prompt
+  cache is per model, so splitting the extraction onto a cheaper tier
+  under a flagship judgement writes the deck twice and costs more; the
+  OM-reading steps move together or not at all. Tests: the ledger
+  (records only when open, two runs side by side, meters read defensively,
+  the price table, the split by step, the median), `structured()` recording
+  a finished answer and a cut-off, and the pipeline writing the ledger on
+  a finished and on a failed screen, and nothing when no call was made.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

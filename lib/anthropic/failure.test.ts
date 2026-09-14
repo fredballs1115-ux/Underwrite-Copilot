@@ -6,6 +6,7 @@ import {
   structured,
   structuredOutput,
 } from "./failure";
+import { newLedger, withUsageLedger } from "./usage";
 
 /** The SDK's APIError, by shape: an HTTP status and its "401 {…}" message. */
 function apiError(status: number, type: string, message: string): Error {
@@ -106,6 +107,28 @@ describe("structuredOutput / structured — a cut-off, a refusal and an empty an
     expect(() => structuredOutput({ parsed_output: null, stop_reason: "end_turn" }, "The verdict")).toThrow(
       /did not return structured output/,
     );
+  });
+
+  it("records the response's meters into the open ledger — on a finished answer and on a cut-off alike", async () => {
+    const ledger = newLedger();
+    const finished = { parsed_output: { a: 1 }, stop_reason: "end_turn", model: "m-1", usage: { input_tokens: 10, cache_creation_input_tokens: 5, cache_read_input_tokens: 0, output_tokens: 3 } };
+    const cutOff = { ...finished, stop_reason: "max_tokens", usage: { ...finished.usage, output_tokens: 8000 } };
+    await withUsageLedger(ledger, async () => {
+      await structured("Extraction", async () => finished);
+      await expect(structured("The verdict", async () => cutOff)).rejects.toThrow(/cut off/);
+    });
+    expect(ledger.calls.map((c) => [c.what, c.model, c.input, c.cacheWrite, c.output])).toEqual([
+      ["Extraction", "m-1", 10, 5, 3],
+      ["The verdict", "m-1", 10, 5, 8000],
+    ]);
+    // A response with no meters records nothing, and a call outside a
+    // ledger records nowhere.
+    await withUsageLedger(ledger, async () => {
+      await structured("Extraction", async () => ({ parsed_output: { a: 1 }, stop_reason: "end_turn" }));
+    });
+    expect(ledger.calls).toHaveLength(2);
+    await structured("Extraction", async () => finished);
+    expect(ledger.calls).toHaveLength(2);
   });
 
   it("turns the SDK's parse failure into a ScreenError that keeps the parser's text as detail", async () => {
