@@ -149,7 +149,20 @@ export const NEWS_SOURCES: readonly NewsSource[] = [
     feed: "https://www.commercialsearch.com/news/feed/",
     kind: "publisher",
     cap: 3,
-    fallbacks: siteReads("commercialsearch.com"),
+    // The feed answers 403 and the site-scoped reads parse to zero on Bing
+    // and time out on Google (every fresh process on 2026-09-14 missed this
+    // one source). From the runner, the bare domain on Bing answered two
+    // items and the outlet's name as a phrase on Google a hundred — enough
+    // for a cap of three either way — so both stand behind the site reads.
+    fallbacks: [
+      ...siteReads("commercialsearch.com"),
+      { feed: bingNews("commercialsearch.com"), kind: "topic", label: "Bing News · commercialsearch.com" },
+      {
+        feed: googleNews('"Commercial Property Executive"'),
+        kind: "topic",
+        label: "Google News · Commercial Property Executive",
+      },
+    ],
   },
   {
     id: "connect-cre",
@@ -233,6 +246,8 @@ export interface FeedItem {
   /** one plain-text line, ≤ 220 chars, "" when none */
   snippet: string;
   sourceId: string;
+  /** the story's picture from the feed, https only; null when it carries none */
+  image?: string | null;
 }
 
 const ENTITIES: Record<string, string> = {
@@ -299,6 +314,33 @@ const attr = (openTag: string, name: string): string | null => {
   const m = openTag.match(new RegExp(`\\s${name}\\s*=\\s*"([^"]*)"`, "i"));
   return m ? decodeText(m[1]) : null;
 };
+
+const IMAGE_TYPE = /^image\//i;
+
+/** The story's picture, when the feed carries one: media:content or
+ *  media:thumbnail (WordPress and most publishers), an image enclosure,
+ *  Bing's News:Image, or the first <img> in the body — https only, since
+ *  it reaches an <img src> on an https page. */
+export function itemImage(block: string, body: string): string | null {
+  const candidates: (string | null)[] = [];
+  for (const m of block.matchAll(/<media:(?:content|thumbnail)\b[^>]*>/gi)) {
+    const medium = attr(m[0], "medium");
+    const type = attr(m[0], "type");
+    if ((medium && medium !== "image") || (type && !IMAGE_TYPE.test(type))) continue;
+    candidates.push(attr(m[0], "url"));
+  }
+  for (const m of block.matchAll(/<enclosure\b[^>]*>/gi)) {
+    if (IMAGE_TYPE.test(attr(m[0], "type") ?? "")) candidates.push(attr(m[0], "url"));
+  }
+  candidates.push(decodeText(tag(block, "News:Image") ?? ""));
+  const inBody = decodeText(body).match(/<img\b[^>]*\ssrc\s*=\s*"([^"]+)"/i);
+  if (inBody) candidates.push(inBody[1]);
+  for (const c of candidates) {
+    const u = c?.trim();
+    if (u && /^https:\/\//i.test(u)) return u;
+  }
+  return null;
+}
 
 /** Bing News links through a click-tracking redirect whose `url` parameter
  *  is the article; the reader should land on the article, and the ranker
@@ -382,6 +424,7 @@ export function parseFeed(xml: string, source: NewsSource): FeedItem[] {
       url,
       publisher,
       publisherUrl,
+      image: itemImage(block, bodyRaw),
       publishedAt: isoOrNull(dateRaw),
       snippet: toSnippet(bodyRaw),
       sourceId: source.id,

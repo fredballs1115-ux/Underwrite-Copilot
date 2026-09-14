@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-14",
+      "title": "The News page reads like a front page",
+      "blurb": "The top story leads — a kicker for what it touches and the market it names, a headline in type, its summary, the publisher's own picture where the feed carries one — six more stand in a three-column grid, the rest run as a list, and the sources close the page in one line. On the pipeline, the stage rail no longer runs through the count circles.",
+      "href": "/news"
+    },
+    {
+      "date": "2026-09-14",
       "title": "News snippets read cleanly",
       "blurb": "A Google or Bing story's summary arrives escaped twice over, and the page was showing the literal \"&nbsp;\" and \"&#39;\" in it. Summaries are decoded fully now, a story whose summary carries a broken character no longer takes its whole source down, and \"rate cuts\" ranks as \"rate cut\" always did.",
       "href": "/news"

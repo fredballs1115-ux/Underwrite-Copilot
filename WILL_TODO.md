@@ -45,14 +45,16 @@ pages lint clean); #290 (a covered market named in a headline links to
 its brief) is proven (`844c5b6` at 19:33: `DEPLOY: LIVE`, the homepage
 footer naming it as the latest improvement, a fresh process that
 warmed 11 of 12 sources at boot, `NEWS HELD: none`); #291 (the runner
-probes four more doors for Commercial Property Executive) and #292
-(the scored feed as a pure view, rendered on a fixture) follow.
+probes four more doors for Commercial Property Executive), #292 (the
+scored feed as a pure view, rendered on a fixture), #293 (the
+fifteenth review's nine findings) and #294 (the News page as a front
+page; the pipeline's rail off the numbers) follow.
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-A hundred and eighteen PRs (#176–#293) landed across one review session and the
+A hundred and nineteen PRs (#176–#294) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -615,6 +617,11 @@ deploy (live-verify shows the sha).
   tiled caption with a figure, the NOI period words after a slash
   (`2026E`, `(Loss)`, `Current`, `As-Is` …), and a late answer kept for
   the next reader.
+- **The News page reads like a front page** (#294): the lead story with
+  a kicker, a serif headline, its dek and the publisher's picture; six
+  more in a three-column grid; the rest as a two-column list; the
+  sources as one line. The pipeline's rail no longer runs through the
+  count circles, and Commercial Property Executive has two more doors.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as

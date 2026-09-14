@@ -1035,17 +1035,20 @@ function StageFunnel({
               title={`${STAGE_LABEL[s]} · ${n} ${n === 1 ? "deal" : "deals"}`}
               className="flex w-full flex-col items-center gap-1.5 rounded-lg px-0.5 py-1 text-center transition-colors enabled:hover:bg-faint disabled:cursor-default"
             >
-              <span
-                aria-hidden
-                className={`flex h-6 w-6 items-center justify-center rounded-full font-mono text-[11px] font-semibold tabular-nums ring-2 transition-colors ${
-                  on
-                    ? "bg-brand text-white ring-brand"
-                    : n > 0
-                      ? "bg-brand/10 text-brand ring-brand/40"
-                      : "bg-surface ring-line"
-                }`}
-              >
-                {n > 0 ? n : ""}
+              {/* An opaque disc under the count: the tint is translucent, and
+                  without it the rail's hairline ran through the number. */}
+              <span aria-hidden className="relative rounded-full bg-surface">
+                <span
+                  className={`flex h-6 w-6 items-center justify-center rounded-full font-mono text-[11px] font-semibold tabular-nums ring-2 transition-colors ${
+                    on
+                      ? "bg-brand text-white ring-brand"
+                      : n > 0
+                        ? "bg-brand/10 text-brand ring-brand/40"
+                        : "bg-surface ring-line"
+                  }`}
+                >
+                  {n > 0 ? n : ""}
+                </span>
               </span>
               {/* Six rungs share a phone's width: the label shrinks there
                   rather than truncating; the full name is the tooltip. */}

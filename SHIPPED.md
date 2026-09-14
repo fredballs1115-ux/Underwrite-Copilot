@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and eighteen PRs, #176–#293, each
+estimate, and that's what it should flag." A hundred and nineteen PRs, #176–#294, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1696,6 +1696,25 @@ confirmed equal to the main tip after each batch.
   that answered in its grace after the caller's deadline was thrown
   away, so the next visitor asked the publisher again — the copy is
   recorded by the request, not the caller.
+- **#294 The News page reads like a front page, and the pipeline's rail
+  stays off the numbers.** Your 19:45 note: "terrible… look at the way
+  the Wall Street Journal puts news articles out… lines running through
+  the numbers at the top." The News page is built the way a front page
+  is now: a masthead line (the day, how much of the press answered), the
+  top story as the lead — a kicker in small capitals (what it touches,
+  the covered market it names), a serif headline, its dek, the
+  publisher's own picture where the feed carries one — six more in a
+  three-column grid under rules, the rest as a two-column list, and the
+  sources as one closing line. The pictures are the publishers'
+  (`media:content`, `media:thumbnail`, an image enclosure, Bing's
+  `News:Image`, or the body's first image; https only), so the
+  content-security policy's `img-src` gains `https:` — an image cannot
+  run script; scripts, styles and fetches stay pinned as they were. On
+  the pipeline, the stage rail's hairline ran through the count circles
+  because their tint was translucent; an opaque disc sits under each
+  count now. Commercial Property Executive, the one source every fresh
+  process missed today, gets the two doors the runner proved answer (its
+  bare domain on Bing, its name as a phrase on Google).
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
