@@ -275,6 +275,22 @@ describe("NEWS_SOURCES", () => {
     }
     expect(searchBacked).toBe(8);
   });
+
+  it("a Bing door's query is plain keywords or one quoted phrase — Google's OR syntax parsed to zero items there", () => {
+    const bingQueries = NEWS_SOURCES.flatMap((s) =>
+      (s.fallbacks ?? [])
+        .map((f) => f.feed)
+        .filter((d) => d.startsWith("https://www.bing.com/news/search?"))
+        .map((d) => new URL(d).searchParams.get("q") ?? ""),
+    );
+    expect(bingQueries.length).toBe(8);
+    for (const q of bingQueries) {
+      expect(q).not.toMatch(/\bOR\b/);
+      // at most one quoted phrase, and nothing outside it
+      expect(q.split('"').length - 1).toBeLessThanOrEqual(2);
+      expect(q.trim().length).toBeGreaterThan(0);
+    }
+  });
 });
 
 /** Bing News search RSS: the outlet rides in <News:Source>, the link goes

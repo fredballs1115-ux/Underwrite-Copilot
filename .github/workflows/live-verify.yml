@@ -176,9 +176,11 @@ jobs:
             for (const s of j.sources ?? []) console.log(`  ${s.ok ? "ok  " : "FAIL"} ${String(s.ms).padStart(5)} ms  ${String(s.count).padStart(3)} items  ${s.stale ? "stale " : ""}${s.cached ? "cached " : ""}${s.name}${s.via ? " via " + s.via : ""}${s.error ? " — " + s.error : ""}`);
             for (const h of (j.top ?? []).slice(0, 3)) console.log(`  top: ${h.title} — ${h.publisher}`);
             // The boot warm-up (#278) reads the sources one at a time before
-            // any visitor; the route reports its last run (#280).
-            if (j.warm) console.log(`NEWS WARM-UP: ${j.warm.answered} of ${j.warm.total} sources answered at boot, ${(j.warm.ms / 1000).toFixed(1)}s, at ${j.warm.at}`);
-            else console.log("NEWS WARM-UP: not reported (pre-#280 build, or the warm-up has not finished on this process)");
+            // any visitor; the route reports its last run (#280) and, since
+            // #283, its progress while it is still running.
+            if (j.warm && j.warm.done === false) console.log(`NEWS WARM-UP: running — ${j.warm.answered} of ${j.warm.total} sources answered so far, ${(j.warm.ms / 1000).toFixed(1)}s in, started ${j.warm.started}`);
+            else if (j.warm) console.log(`NEWS WARM-UP: ${j.warm.answered} of ${j.warm.total} sources answered at boot, ${(j.warm.ms / 1000).toFixed(1)}s, at ${j.warm.at}`);
+            else console.log("NEWS WARM-UP: not reported (pre-#280 build, NEWS_WARM=0, or a pre-#283 process still warming)");
             // A host that timed out or answered 5xx three times in a minute
             // is held at bay (#283); its doors are skipped so the second
             // search host gets the whole budget. Named here while held.
@@ -203,10 +205,17 @@ jobs:
           probe "Bing · site:therealdeal.com" "https://www.bing.com/news/search?q=site%3Atherealdeal.com&format=rss"
           probe "Bing · commercial real estate" "https://www.bing.com/news/search?q=%22commercial+real+estate%22&format=rss"
           # The three topic queries behind the other Google searches (#283
-          # dropped the OR / quote syntax that parsed to zero items).
-          probe "Bing · multifamily" "https://www.bing.com/news/search?q=multifamily+apartments+sale&format=rss"
+          # dropped the OR / quote syntax that parsed to zero items), each
+          # with a second phrasing beside it: the run on 18:12 UTC read 12
+          # items for the debt query but 2 for "multifamily apartments
+          # sale" and 1 for "rent control ordinance", so the code uses the
+          # one word and the one quoted phrase, and the probes keep a
+          # candidate each in case those thin out.
+          probe "Bing · multifamily" "https://www.bing.com/news/search?q=multifamily&format=rss"
+          probe "Bing · multifamily (alt: apartment complex)" "https://www.bing.com/news/search?q=%22apartment+complex%22&format=rss"
           probe "Bing · CRE debt" "https://www.bing.com/news/search?q=CMBS+delinquency+distress&format=rss"
-          probe "Bing · rent regulation" "https://www.bing.com/news/search?q=rent+control+ordinance&format=rss"
+          probe "Bing · rent regulation" "https://www.bing.com/news/search?q=%22rent+control%22&format=rss"
+          probe "Bing · rent regulation (alt: rent stabilization)" "https://www.bing.com/news/search?q=%22rent+stabilization%22&format=rss"
           probe "Google · site:therealdeal.com" "https://news.google.com/rss/search?q=site%3Atherealdeal.com&hl=en-US&gl=US&ceid=US%3Aen"
       - name: Verdict
         # Two tiers: the hero headline proves the site is up and on the right

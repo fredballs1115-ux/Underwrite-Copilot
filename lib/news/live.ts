@@ -10,7 +10,7 @@ import {
 
 /**
  * The network half of the live headlines: fetch every source in parallel,
- * parse, rank. Six layers of patience so the News page is never empty and
+ * parse, rank. Eight layers of patience so the News page is never empty and
  * never slow:
  *
  *   1. A fresh copy per source in this process, good for half an hour —
@@ -38,7 +38,20 @@ import {
  *      the same request instead of doubling it.
  *   6. A warm-up at boot (instrumentation.ts → warmLiveHeadlines) that
  *      reads the sources one at a time, so the first visitor after a deploy
- *      finds every source cached — the burst never happens.
+ *      finds every source cached — the burst never happens. It reports its
+ *      progress while it runs, so the health route can say so.
+ *   7. A cap on the wait for a slot: a door with another behind it waits in
+ *      the host's queue at most half the budget that is left, then moves on
+ *      to the next door and says so. Without it, a search host that hangs
+ *      on every request held the site-scoped fallbacks in its queue until
+ *      their whole budget was gone, and the second search host was never
+ *      tried — live-verify read that too.
+ *   8. A host held at bay: one that timed out, dropped the connection or
+ *      answered 429/5xx three times inside a minute is not asked again for
+ *      45 seconds; its doors are skipped at once so the next door gets the
+ *      whole budget. A 403, a 404 or an empty page never counts — that is
+ *      the publisher's answer, and the host is fine. The held hosts are
+ *      named by the health route while the hold lasts.
  *
  * A source that has never answered is simply absent from the list and named
  * in the status, so the page can say "GlobeSt did not answer just now"
@@ -58,6 +71,11 @@ const MIN_ATTEMPT_MS = 300;
 const HOST_WIDTH = 2;
 /** the warm-up leaves this long between one source and the next */
 const WARM_GAP_MS = 250;
+/** faults from one host inside the window that hold it at bay… */
+const HOST_HOLD_AFTER = 3;
+const HOST_FAULT_WINDOW_MS = 60_000;
+/** …and for how long */
+const HOST_HOLD_MS = 45_000;
 // Browser-shaped, and honest about who is asking: a publisher's edge rules
 // refuse a bare product token outright (HTTP 403 from three of the feeds
 // on Render's network), and the "compatible" form is what feed readers
@@ -96,6 +114,18 @@ class FeedError extends Error {
 const retriable = (e: unknown): boolean =>
   e instanceof FeedError && e.status != null && (e.status === 429 || e.status >= 500);
 
+/** A host is struggling when it times out, drops the connection or answers
+ *  429/5xx. It is not when it answers 403, 404 or an empty page: that is the
+ *  publisher's decision, made by a host that is up. */
+function isFault(e: unknown): boolean {
+  if (retriable(e)) return true;
+  if (e instanceof FeedError) return false;
+  const name = typeof e === "object" && e && "name" in e ? String((e as { name: unknown }).name) : "";
+  if (name === "TimeoutError" || name === "AbortError") return true;
+  const msg = e instanceof Error ? e.message : String(e);
+  return /timeout|aborted|no answer within|fetch failed|ECONN|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|socket hang up/i.test(msg);
+}
+
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export interface LiveHeadlines {
@@ -115,7 +145,9 @@ interface Fetched {
 }
 
 const fresh = new Map<string, { at: number; items: FeedItem[]; via: string | null }>();
-const lastGood = new Map<string, { at: number; items: FeedItem[] }>();
+/** the last copy that answered, with the way it came in — a stale line
+ *  credits the host that actually answered, not the first door */
+const lastGood = new Map<string, { at: number; items: FeedItem[]; via: string | null }>();
 /** the one request in flight per source, shared by whoever asks meanwhile */
 const pending = new Map<string, Promise<Fetched>>();
 
@@ -132,18 +164,37 @@ const hostOf = (url: string): string => {
   }
 };
 
+const unref = (t: ReturnType<typeof setTimeout>): void => {
+  // Never keep the process alive for a timer whose race is already over.
+  if (typeof t === "object" && t && "unref" in t) t.unref();
+};
+
 /** Resolves to the release once a slot on the host is free: at most
  *  HOST_WIDTH requests in flight per host, the rest queued in order. A slot
- *  a request gives up passes straight to the next in line. */
-function acquireHost(host: string): Promise<() => void> {
+ *  a request gives up passes straight to the next in line. A caller who
+ *  has waited `maxWaitMs` leaves the queue and gets null instead. */
+function acquireHost(host: string, maxWaitMs: number): Promise<(() => void) | null> {
   const n = inFlight.get(host) ?? 0;
   if (n < HOST_WIDTH) {
     inFlight.set(host, n + 1);
     return Promise.resolve(() => releaseHost(host));
   }
+  if (maxWaitMs <= 0) return Promise.resolve(null);
   return new Promise((resolve) => {
     const q = waiting.get(host) ?? [];
-    q.push(() => resolve(() => releaseHost(host)));
+    const waiter = () => {
+      clearTimeout(t);
+      resolve(() => releaseHost(host));
+    };
+    const t = setTimeout(() => {
+      const line = waiting.get(host);
+      const i = line?.indexOf(waiter) ?? -1;
+      if (line && i >= 0) line.splice(i, 1);
+      if (line && line.length === 0) waiting.delete(host);
+      resolve(null);
+    }, maxWaitMs);
+    unref(t);
+    q.push(waiter);
     waiting.set(host, q);
   });
 }
@@ -159,12 +210,69 @@ function releaseHost(host: string): void {
   else inFlight.set(host, n);
 }
 
+// ── The hosts held at bay ────────────────────────────────────────────────
+
+interface HostRecord {
+  /** when each recent fault happened (inside the window) */
+  faults: number[];
+  /** when the current hold ends; 0 when the host is not held */
+  heldUntil: number;
+  /** the faults that set the current hold */
+  failures: number;
+}
+
+const hosts = new Map<string, HostRecord>();
+
+function noteFault(host: string, now: number): void {
+  const rec = hosts.get(host) ?? { faults: [], heldUntil: 0, failures: 0 };
+  rec.faults = rec.faults.filter((t) => now - t < HOST_FAULT_WINDOW_MS);
+  rec.faults.push(now);
+  if (rec.faults.length >= HOST_HOLD_AFTER) {
+    rec.heldUntil = now + HOST_HOLD_MS;
+    rec.failures = rec.faults.length;
+    rec.faults = [];
+  }
+  hosts.set(host, rec);
+}
+
+/** An answer clears the host's record: a host that answers between two
+ *  faults is intermittent, not down. */
+function noteAnswer(host: string): void {
+  hosts.delete(host);
+}
+
+/** How much longer the host is held, in ms; 0 when it is not. */
+function heldFor(host: string, now: number): number {
+  const rec = hosts.get(host);
+  return rec && rec.heldUntil > now ? rec.heldUntil - now : 0;
+}
+
+export interface HeldHost {
+  host: string;
+  /** ISO time the hold ends */
+  until: string;
+  /** the faults inside one minute that set it */
+  failures: number;
+}
+
+/** The hosts this process is not asking right now — the health route
+ *  names them, so a run that finds every search-backed source `via Bing`
+ *  can see why. */
+export function heldHosts(now = Date.now()): HeldHost[] {
+  const out: HeldHost[] = [];
+  for (const [host, rec] of hosts) {
+    if (rec.heldUntil > now) {
+      out.push({ host, until: new Date(rec.heldUntil).toISOString(), failures: rec.failures });
+    }
+  }
+  return out;
+}
+
 /** Rejects after `ms` — the wall clock, not the request's own signal. */
 function deadline(ms: number): Promise<never> {
   return new Promise((_, reject) => {
     const t = setTimeout(() => reject(new Error(`no answer within ${ms} ms`)), ms);
-    // Never keep the process alive for a timer whose race is already over.
-    if (typeof t === "object" && t && "unref" in t) t.unref();
+    unref(t);
   });
 }
 
@@ -174,31 +282,38 @@ async function fetchFeed(
   source: NewsSource,
   timeoutMs: number,
 ): Promise<FeedItem[]> {
-  const res = await fetch(url, {
-    headers: {
-      "user-agent": UA,
-      accept: "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5",
-    },
-    cache: "no-store",
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-  if (!res.ok) throw new FeedError(`HTTP ${res.status}`, res.status);
-  const xml = await res.text();
-  // A fallback read through a search host parses as a topic feed: its items
-  // name the outlet, which the parser keeps as the publisher.
-  const items = parseFeed(xml, kind === source.kind ? source : { ...source, kind });
-  if (items.length === 0) throw new FeedError("feed parsed to zero items");
-  return items;
+  const read = async (): Promise<FeedItem[]> => {
+    const res = await fetch(url, {
+      headers: {
+        "user-agent": UA,
+        accept: "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5",
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) throw new FeedError(`HTTP ${res.status}`, res.status);
+    const xml = await res.text();
+    // A fallback read through a search host parses as a topic feed: its items
+    // name the outlet, which the parser keeps as the publisher.
+    const items = parseFeed(xml, kind === source.kind ? source : { ...source, kind });
+    if (items.length === 0) throw new FeedError("feed parsed to zero items");
+    return items;
+  };
+  // The wall clock beside the signal: a fetch that outlives its abort (Node's
+  // honours it; a patched one might not) would otherwise keep its slot on
+  // the host for the life of the process, and two of those close the host.
+  return Promise.race([read(), deadline(timeoutMs + DEADLINE_GRACE_MS)]);
 }
 
 /**
  * The publisher's own feed first, then its fallbacks in order, all inside
  * one budget — a candidate that answered 429 or 5xx gets one more try after
  * a short wait, while the budget allows. A door with others behind it holds
- * at most half the budget, so one that hangs leaves time for the next. Each
- * attempt waits for a slot on its host (the wait counts against the
- * budget). The error a source reports names every candidate that failed,
- * so the health line says which door closed.
+ * at most half the budget that is left, whether it spends that in the
+ * host's queue or on the request itself, so one that hangs leaves time for
+ * the next. A door on a host held at bay is skipped at once. The error a
+ * source reports names every candidate that failed and how, so the health
+ * line says which door closed.
  */
 async function fetchWithFallbacks(source: NewsSource, timeoutMs: number): Promise<Fetched> {
   const started = Date.now();
@@ -211,10 +326,22 @@ async function fetchWithFallbacks(source: NewsSource, timeoutMs: number): Promis
   let attempted = 0;
   outer: for (let i = 0; i < candidates.length; i++) {
     const c = candidates[i];
+    const host = hostOf(c.feed);
     const hasNext = i < candidates.length - 1;
+    const name = c.label ?? host;
     for (let attempt = 0; attempt < 2; attempt++) {
-      const release = await acquireHost(hostOf(c.feed));
+      const held = heldFor(host, Date.now());
+      if (held > 0) {
+        errors.push(`${name}: ${host} held at bay for ${Math.ceil(held / 1000)}s`);
+        continue outer;
+      }
+      const release = await acquireHost(host, hasNext ? Math.floor(left() / 2) : left());
+      if (!release) {
+        errors.push(`${name}: queued past ${hasNext ? "half " : ""}the budget`);
+        continue outer;
+      }
       let retry = false;
+      let given = 0;
       try {
         const budget = left();
         // The publisher's own feed always gets its try, however short the
@@ -224,12 +351,22 @@ async function fetchWithFallbacks(source: NewsSource, timeoutMs: number): Promis
           break outer;
         }
         attempted++;
-        const cap = hasNext ? Math.max(MIN_ATTEMPT_MS, Math.floor(timeoutMs / 2)) : budget;
-        const items = await fetchFeed(c.feed, c.kind, source, Math.min(budget, cap));
+          // Half of what is LEFT, not half of the whole: the second of three
+        // doors then leaves the third its share (4000 → 2000 → 2000 ms at
+        // the default budget), where half the whole let two doors that hang
+        // spend it all and the third was never asked.
+        const cap = hasNext ? Math.max(MIN_ATTEMPT_MS, Math.floor(budget / 2)) : budget;
+        given = Math.min(budget, cap);
+        const items = await fetchFeed(c.feed, c.kind, source, given);
+        noteAnswer(host);
         return { items, via: c.label };
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         errors.push(c.label ? `${c.label}: ${msg}` : msg);
+        // A request that had real time and still failed the host's way
+        // counts against the host; one cut short by its own budget says
+        // nothing about the host.
+        if (retriable(e) || (given >= MIN_ATTEMPT_MS && isFault(e))) noteFault(host, Date.now());
         retry = attempt === 0 && retriable(e) && left() > RETRY_WAIT_MS + MIN_ATTEMPT_MS;
       } finally {
         release();
@@ -275,14 +412,12 @@ async function fetchSource(
     };
   }
   const t0 = Date.now();
+  const request = fetchShared(source, timeoutMs);
   try {
-    const { items, via } = await Promise.race([
-      fetchShared(source, timeoutMs),
-      deadline(timeoutMs + DEADLINE_GRACE_MS),
-    ]);
+    const { items, via } = await Promise.race([request, deadline(timeoutMs + DEADLINE_GRACE_MS)]);
     const at = Date.now();
     fresh.set(source.id, { at, items, via });
-    lastGood.set(source.id, { at, items });
+    lastGood.set(source.id, { at, items, via });
     return {
       items,
       status: {
@@ -297,8 +432,10 @@ async function fetchSource(
     };
   } catch (e) {
     // Whether the request failed or the deadline won, the next caller
-    // starts afresh rather than joining a request past its budget.
-    pending.delete(source.id);
+    // starts afresh rather than joining a request past its budget — but
+    // only this caller's request is dropped, never a newer one another
+    // caller has since started.
+    if (pending.get(source.id) === request) pending.delete(source.id);
     const err = e instanceof Error ? e.message : String(e);
     const prev = lastGood.get(source.id);
     if (prev && Date.now() - prev.at < STALE_MAX_MS) {
@@ -311,6 +448,7 @@ async function fetchSource(
           ms: Date.now() - t0,
           stale: true,
           cached: false,
+          ...(prev.via ? { via: prev.via } : {}),
           error: err,
         },
       };
@@ -345,12 +483,24 @@ export interface WarmResult {
   ms: number;
 }
 
-/** The last warm-up this process finished — the health route reports it,
- *  so a run after a deploy can say the boot read happened before any
- *  visitor's, not just infer it from the cached lines. */
-let lastWarm: (WarmResult & { at: string }) | null = null;
+/** The warm-up's progress, then its result: the health route reports it,
+ *  so a run after a deploy can say the boot read is under way or happened
+ *  before any visitor's, not just infer it from the cached lines. */
+export interface WarmProgress extends WarmResult {
+  /** ISO time the warm-up started */
+  started: string;
+  /** false while the sources are still being read; `answered` and `ms`
+   *  are the count and the elapsed time so far */
+  done: boolean;
+  /** ISO time the warm-up finished; null while it runs */
+  at: string | null;
+}
 
-export function lastWarmUp(): (WarmResult & { at: string }) | null {
+/** The warm-up this process is running or last finished — null before the
+ *  first one starts (or when NEWS_WARM=0). */
+let lastWarm: WarmProgress | null = null;
+
+export function lastWarmUp(): WarmProgress | null {
   return lastWarm;
 }
 
@@ -358,7 +508,8 @@ export function lastWarmUp(): (WarmResult & { at: string }) | null {
  * Read the sources one at a time, with a breath between, so a fresh process
  * fills its copies without the burst a first visitor's parallel read would
  * send. Meant for boot (instrumentation.ts); a source already fresh is not
- * fetched again; never throws — every outcome is one log line.
+ * fetched again; never throws — every outcome is one log line, and the
+ * progress is readable while it runs.
  */
 export async function warmLiveHeadlines(
   sources: readonly NewsSource[] = NEWS_SOURCES,
@@ -368,24 +519,38 @@ export async function warmLiveHeadlines(
   const timeoutMs = opts.timeoutMs ?? TIMEOUT_MS;
   const gapMs = opts.gapMs ?? WARM_GAP_MS;
   const log = opts.log ?? ((line: string) => console.log(line));
-  let answered = 0;
+  const progress: WarmProgress = {
+    started: new Date(t0).toISOString(),
+    done: false,
+    answered: 0,
+    total: sources.length,
+    ms: 0,
+    at: null,
+  };
+  lastWarm = progress;
   for (let i = 0; i < sources.length; i++) {
     try {
       const r = await fetchSource(sources[i], Date.now(), timeoutMs);
-      if (r.status.ok) answered++;
+      if (r.status.ok) progress.answered++;
     } catch {
       // fetchSource resolves for every outcome; a throw here would be a bug
       // in the parser, and the warm-up is not the place to surface it.
     }
+    progress.ms = Date.now() - t0;
     if (gapMs > 0 && i < sources.length - 1) await sleep(gapMs);
   }
-  const ms = Date.now() - t0;
-  log(`[news] warm-up: ${answered} of ${sources.length} sources answered in ${(ms / 1000).toFixed(1)}s`);
-  lastWarm = { answered, total: sources.length, ms, at: new Date().toISOString() };
-  return { answered, total: sources.length, ms };
+  progress.ms = Date.now() - t0;
+  progress.done = true;
+  progress.at = new Date().toISOString();
+  log(
+    `[news] warm-up: ${progress.answered} of ${sources.length} sources answered in ${(progress.ms / 1000).toFixed(1)}s`,
+  );
+  return { answered: progress.answered, total: sources.length, ms: progress.ms };
 }
 
-/** Forget this process's fresh copies — the next call fetches every feed. */
+/** Forget this process's fresh copies and lift every hold — the next call
+ *  fetches every feed through every door. */
 export function forgetLiveHeadlines(): void {
   fresh.clear();
+  hosts.clear();
 }
