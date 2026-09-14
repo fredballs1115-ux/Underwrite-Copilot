@@ -131,9 +131,15 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   renders only when its file exists — the "Who it's for" strip folds
   away otherwise, never a placeholder. Until the operator's `hero.jpg`
   lands, the hero's backdrop is a USGS aerial of Midtown Manhattan from
-  the metro imagery route (`AerialBackdrop` in `app/aerial-img.tsx`: the
-  credit goes with the picture on a 404). The sandbox cannot fetch a
-  photograph from any image host; the files are the operator's move.
+  the metro imagery route. `app/place-band.tsx` is the one piece behind
+  every public page's opening: `PlaceBackdrop` (the picture, its scrim,
+  the credit — `AerialBackdrop` in `app/aerial-img.tsx` drops the credit
+  with the picture on a 404) and `PlaceBand` (a dark section at the
+  page's content width); `/why` opens on `dc`, `/demo` on
+  `philadelphia`. A new public page opens the same way — pick the
+  covered market that means something to it. The sandbox cannot fetch a
+  photograph from any image host; the ground-level files are the
+  operator's move.
 - The News page's live layer: `lib/news/feeds.ts` (pure: the sources with
   their fallbacks, parsing, ranking) and `lib/news/live.ts` (the network:
   a fresh copy per process, a wall-clock deadline per source, the

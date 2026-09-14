@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and twenty PRs, #176–#295, each
+estimate, and that's what it should flag." A hundred and twenty-one PRs, #176–#296, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1731,6 +1731,15 @@ confirmed equal to the main tip after each batch.
   entirely until one does, so there is never a placeholder or a hole.
   This sandbox cannot fetch a photograph from any image host, so the
   files are your move — the exact names are in WILL_TODO.
+- **#296 Every public page opens on a real place.** The hero's backdrop
+  becomes one shared piece (`app/place-band.tsx`: the picture, its scrim
+  in the band's own colour, the credit that goes with it) and the other
+  public pages take it: `/why` opens on downtown Washington, the market
+  at the centre of the DMV core, and `/demo` on Center City,
+  Philadelphia — the sample deal's own city, two miles from Brewerytown
+  — with their opening words on the picture where a plain heading sat.
+  The same public-domain USGS frames as the gallery, at the imagery
+  route's largest size, nothing upscaled.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

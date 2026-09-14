@@ -32,7 +32,7 @@ import { StressBench } from "./landing-stress";
 import metrosSeed from "@/data/research/metros.json";
 import { MARKET_COUNT } from "./markets-marquee";
 import { MarketsGallery } from "./markets-gallery";
-import { AerialBackdrop } from "./aerial-img";
+import { PlaceBackdrop } from "./place-band";
 import { HERO_AERIAL, photoSrc, stripPhotos, type PhotoSlot } from "@/lib/photos";
 import { photosOnDisk } from "@/lib/photos-fs";
 
@@ -420,32 +420,23 @@ function SectionHead({
  * The photograph behind the hero's headline. The operator's own (a real
  * building, a team at work) when `public/photos/hero.jpg` exists; until
  * then a real USGS aerial of Midtown Manhattan, the one photograph the site
- * can always produce for itself. Either sits under a scrim so the type
- * keeps its contrast whatever the picture's brightness, and the aerial's
- * credit sits in the corner.
+ * can always produce for itself (PlaceBackdrop, shared with the other
+ * public pages' opening bands). Either sits under a scrim so the type
+ * keeps its contrast whatever the picture's brightness.
  */
 function HeroBackdrop({ photo }: { photo: PhotoSlot | undefined }) {
+  if (!photo) return <PlaceBackdrop metro={HERO_AERIAL.metro} height={HERO_AERIAL.height} />;
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0">
-      {photo ? (
-        // eslint-disable-next-line @next/next/no-img-element -- a static file under public/, sized by the slot
-        <img
-          src={photoSrc(photo)}
-          alt=""
-          width={photo.width}
-          height={photo.height}
-          decoding="async"
-          className="h-full w-full object-cover opacity-45"
-        />
-      ) : (
-        <AerialBackdrop
-          src={`/api/imagery/metro/${HERO_AERIAL.metro}?w=${HERO_AERIAL.width}&h=${HERO_AERIAL.height}`}
-          width={HERO_AERIAL.width}
-          height={HERO_AERIAL.height}
-          credit={`${HERO_AERIAL.place} from above · USGS`}
-          className="h-full w-full object-cover opacity-30"
-        />
-      )}
+      {/* eslint-disable-next-line @next/next/no-img-element -- a static file under public/, sized by the slot */}
+      <img
+        src={photoSrc(photo)}
+        alt=""
+        width={photo.width}
+        height={photo.height}
+        decoding="async"
+        className="h-full w-full object-cover opacity-45"
+      />
       <div className="absolute inset-0 bg-gradient-to-r from-sidebar via-sidebar/85 to-sidebar/55" />
       <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-sidebar to-transparent" />
     </div>

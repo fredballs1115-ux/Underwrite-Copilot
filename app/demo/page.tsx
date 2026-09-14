@@ -15,6 +15,7 @@ import { findPriceMetric, inferStrategy, unitCountRow } from "@/lib/deal-strateg
 import { DemoSections, type DemoData } from "./sections";
 import { ModelSlideshow } from "./model-slideshow";
 import { BrokerQuestions } from "./broker-questions";
+import { PlaceBand } from "@/app/place-band";
 
 // ISR, five-minute window: without a revalidate this page is fully static
 // and browsers may serve a year-stale copy under stale-while-revalidate —
@@ -278,147 +279,153 @@ export default function DemoPage() {
         </div>
       </header>
 
-      <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            A complete screen, worked end to end
-          </h1>
-          <span className="rounded-full bg-caution/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-caution">
-            Illustrative sample
-          </span>
-        </div>
-        <p className="mt-2 max-w-2xl text-sm text-muted">
-          The product, on an invented deal — not a real listing, not investment advice.
-        </p>
-
-        {/* Summary bar — mirrors the in-app deal page. */}
-        <div className="mt-6 rounded-2xl border border-line bg-surface p-5 shadow-card">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h2 className="text-xl font-semibold tracking-tight">
-              The Maddox at Brewerytown
-            </h2>
-            <span className="rounded-full bg-caution/15 px-2.5 py-1 text-[11px] font-medium text-caution">
-              Caution
-            </span>
-            {/* The deal's kind, read from the sample's own extraction the way
-                the real deal page reads it — never a hardcoded label. */}
-            <span
-              className="rounded-full bg-brand/10 px-2.5 py-1 text-[11px] font-medium text-brand"
-              title="The deal's kind is read first. A conversion or a development would show its plan here — stabilized NOI, budget, total cost, yield on cost — and be judged on yield on cost, never on a cap rate against the price."
-            >
-              {inferStrategy(SAMPLE_DEAL.extraction).label}
+      <main id="main" className="flex-1">
+        {/* The sample deal's own city, from above: Center City, Philadelphia
+            — Brewerytown is two miles north-west of the frame. */}
+        <PlaceBand metro="philadelphia" width="max-w-5xl">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              A complete screen, worked end to end
+            </h1>
+            <span className="rounded-full bg-caution/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-caution">
+              Illustrative sample
             </span>
           </div>
-          <p className="mt-1 text-sm text-muted">
-            {data.extraction.market || "Brewerytown, Philadelphia, PA"} ·{" "}
-            <span className="capitalize">multifamily</span>
+          <p className="mt-2 max-w-2xl text-sm text-white/75">
+            The product, on an invented deal in Philadelphia — not a real listing, not investment advice.
           </p>
-          <dl className="mt-4 grid grid-cols-1 gap-3 border-t border-line pt-4 sm:grid-cols-3">
-            {[
-              ["Price", price],
-              ["Size", size],
-              ["Going-in cap", cap],
-            ].map(([label, value]) => (
-              <div key={label} className="min-w-0">
-                <dt className="text-[11px] uppercase tracking-wide text-muted">
-                  {label}
-                </dt>
-                <dd className="mt-1 truncate font-mono text-base font-semibold leading-none tabular-nums">
-                  {value ?? "—"}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
+        </PlaceBand>
+        <div className="mx-auto w-full max-w-5xl px-6 py-10">
 
-        <div className="mt-8">
-          <DemoSections data={data} />
-        </div>
-
-        {/* Regulation & benchmarks — the deal page's legal panel, run by the
-            same engine on the sample's real Philadelphia jurisdiction. The
-            sample's one rule happens to be dormant on a purchase, and the
-            panel says so instead of hiding it — that honesty IS the demo. */}
-        <LegalPanel />
-
-        {/* Interactive: the challenger's real broker questions, revealed on
-            click — the reader plays analyst before seeing the drafted ask. */}
-        <BrokerQuestions />
-
-
-        {/* The actual deliverables — a prospect can hold the export in their
-            hands, not just look at a screenshot of it. Public fixture data. */}
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-5 shadow-card">
-          <div>
-            <h2 className="text-sm font-semibold tracking-tight">
-              Take the deliverables with you
-            </h2>
-            <p className="mt-1 max-w-md text-sm text-muted">
-              The same files a signed-in analyst exports from this screen.
+          {/* Summary bar — mirrors the in-app deal page. */}
+          <div className="mt-6 rounded-2xl border border-line bg-surface p-5 shadow-card">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="text-xl font-semibold tracking-tight">
+                The Maddox at Brewerytown
+              </h2>
+              <span className="rounded-full bg-caution/15 px-2.5 py-1 text-[11px] font-medium text-caution">
+                Caution
+              </span>
+              {/* The deal's kind, read from the sample's own extraction the way
+                  the real deal page reads it — never a hardcoded label. */}
+              <span
+                className="rounded-full bg-brand/10 px-2.5 py-1 text-[11px] font-medium text-brand"
+                title="The deal's kind is read first. A conversion or a development would show its plan here — stabilized NOI, budget, total cost, yield on cost — and be judged on yield on cost, never on a cap rate against the price."
+              >
+                {inferStrategy(SAMPLE_DEAL.extraction).label}
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-muted">
+              {data.extraction.market || "Brewerytown, Philadelphia, PA"} ·{" "}
+              <span className="capitalize">multifamily</span>
             </p>
+            <dl className="mt-4 grid grid-cols-1 gap-3 border-t border-line pt-4 sm:grid-cols-3">
+              {[
+                ["Price", price],
+                ["Size", size],
+                ["Going-in cap", cap],
+              ].map(([label, value]) => (
+                <div key={label} className="min-w-0">
+                  <dt className="text-[11px] uppercase tracking-wide text-muted">
+                    {label}
+                  </dt>
+                  <dd className="mt-1 truncate font-mono text-base font-semibold leading-none tabular-nums">
+                    {value ?? "—"}
+                  </dd>
+                </div>
+              ))}
+            </dl>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <a
-              href="/api/demo/memo"
-              className="rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
-            >
-              Sample IC memo (PDF)
-            </a>
-            <a
-              href="/api/demo/report"
-              className="rounded-lg border border-line px-3.5 py-2 text-sm font-medium transition-colors hover:bg-faint"
-            >
-              Full report (PDF)
-            </a>
-            <a
-              href="/api/demo/underwrite.xlsx"
-              className="rounded-lg border border-line px-3.5 py-2 text-sm font-medium transition-colors hover:bg-faint"
-            >
-              Sample model (.xlsx)
-            </a>
+
+          <div className="mt-8">
+            <DemoSections data={data} />
           </div>
-        </div>
 
-        {/* The model, worked through as a slideshow — the artifact that
-            makes the screen concrete. */}
-        <div className="mt-10">
-          <ModelSlideshow model={data.model} />
-        </div>
+          {/* Regulation & benchmarks — the deal page's legal panel, run by the
+              same engine on the sample's real Philadelphia jurisdiction. The
+              sample's one rule happens to be dormant on a purchase, and the
+              panel says so instead of hiding it — that honesty IS the demo. */}
+          <LegalPanel />
 
-        {/* What comes after the screen. Rendered from the SAME DEEP_TOOLS
-            constant the homepage's grid uses, so the sample screen and the
-            marketing page can never describe the product differently. */}
-        <div className="mt-12 rounded-2xl border border-line bg-faint/60 p-6">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted">
-            Past the screen
-          </p>
-          <h2 className="mt-2 text-xl font-semibold tracking-tight">
-            This sample is the triage. Four more tools pick up where it stops.
-          </h2>
-          <div className="mt-5 grid gap-3 sm:grid-cols-4">
-            {DEEP_TOOLS.map((t) => (
-              <div key={t.title} className="rounded-xl border border-line bg-surface p-4" title={t.blurb}>
-                <h3 className="text-sm font-semibold leading-snug">{t.title}</h3>
-                <p className="mt-1.5 text-[11px] uppercase tracking-wide text-muted">{t.where}</p>
-              </div>
-            ))}
+          {/* Interactive: the challenger's real broker questions, revealed on
+              click — the reader plays analyst before seeing the drafted ask. */}
+          <BrokerQuestions />
+
+
+          {/* The actual deliverables — a prospect can hold the export in their
+              hands, not just look at a screenshot of it. Public fixture data. */}
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-5 shadow-card">
+            <div>
+              <h2 className="text-sm font-semibold tracking-tight">
+                Take the deliverables with you
+              </h2>
+              <p className="mt-1 max-w-md text-sm text-muted">
+                The same files a signed-in analyst exports from this screen.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href="/api/demo/memo"
+                className="rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+              >
+                Sample IC memo (PDF)
+              </a>
+              <a
+                href="/api/demo/report"
+                className="rounded-lg border border-line px-3.5 py-2 text-sm font-medium transition-colors hover:bg-faint"
+              >
+                Full report (PDF)
+              </a>
+              <a
+                href="/api/demo/underwrite.xlsx"
+                className="rounded-lg border border-line px-3.5 py-2 text-sm font-medium transition-colors hover:bg-faint"
+              >
+                Sample model (.xlsx)
+              </a>
+            </div>
           </div>
-        </div>
 
-        {/* The conversion moment — after they've seen the whole screen. */}
-        <div className="mt-12 rounded-2xl bg-sidebar p-8 text-center">
-          <h2 className="text-xl font-semibold tracking-tight text-white">
-            Run this screen on your own OM
-          </h2>
-          <p className="mx-auto mt-2 max-w-md text-sm text-white/70">
-            First {FREE_DEALS} deals free · no card.
-          </p>
-          <Link
-            href="/login?mode=signup"
-            className="mt-5 inline-flex rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-brand-strong transition-colors hover:bg-accent"
-          >
-            Get started free
-          </Link>
+          {/* The model, worked through as a slideshow — the artifact that
+              makes the screen concrete. */}
+          <div className="mt-10">
+            <ModelSlideshow model={data.model} />
+          </div>
+
+          {/* What comes after the screen. Rendered from the SAME DEEP_TOOLS
+              constant the homepage's grid uses, so the sample screen and the
+              marketing page can never describe the product differently. */}
+          <div className="mt-12 rounded-2xl border border-line bg-faint/60 p-6">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted">
+              Past the screen
+            </p>
+            <h2 className="mt-2 text-xl font-semibold tracking-tight">
+              This sample is the triage. Four more tools pick up where it stops.
+            </h2>
+            <div className="mt-5 grid gap-3 sm:grid-cols-4">
+              {DEEP_TOOLS.map((t) => (
+                <div key={t.title} className="rounded-xl border border-line bg-surface p-4" title={t.blurb}>
+                  <h3 className="text-sm font-semibold leading-snug">{t.title}</h3>
+                  <p className="mt-1.5 text-[11px] uppercase tracking-wide text-muted">{t.where}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* The conversion moment — after they've seen the whole screen. */}
+          <div className="mt-12 rounded-2xl bg-sidebar p-8 text-center">
+            <h2 className="text-xl font-semibold tracking-tight text-white">
+              Run this screen on your own OM
+            </h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-white/70">
+              First {FREE_DEALS} deals free · no card.
+            </p>
+            <Link
+              href="/login?mode=signup"
+              className="mt-5 inline-flex rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-brand-strong transition-colors hover:bg-accent"
+            >
+              Get started free
+            </Link>
+          </div>
         </div>
       </main>
 

@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-14",
+      "title": "Every public page opens on a real place",
+      "blurb": "The homepage's hero, the argument on /why and the sample screen on /demo each open on a real photograph of a covered downtown — Midtown Manhattan, Washington, and Center City Philadelphia, the sample deal's own city — public-domain USGS frames under a scrim, credited in the corner.",
+      "href": "/why"
+    },
+    {
+      "date": "2026-09-14",
       "title": "A real photograph behind the homepage's headline",
       "blurb": "Midtown Manhattan from above — a public-domain USGS frame, the same source as the coverage gallery — now stands behind the hero, under a scrim that keeps the type readable, with its credit in the corner. Four slots wait for ground-level photographs (a team on deal day, a site walk, the building itself, a hero of your own) and show nothing until the files exist — never a placeholder.",
       "href": "/"
