@@ -3,6 +3,7 @@ import Link from "next/link";
 import { LogoMark } from "@/app/logo";
 import { MarketsMarquee } from "@/app/markets-marquee";
 import { ScreenRunStrip } from "@/app/screen-run-strip";
+import { PlaceBand } from "@/app/place-band";
 import { COVERAGE_SUMMARY } from "@/lib/public-comps/core";
 import { seedRules } from "@/lib/research-data";
 import metrosSeed from "@/data/research/metros.json";
@@ -114,50 +115,56 @@ export default function WhyPage() {
         </div>
       </header>
 
-      <main id="main" className="mx-auto w-full max-w-3xl flex-1 px-6 py-12">
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Why Underwrite Copilot
-        </h1>
-        <p className="mt-5 max-w-2xl text-base leading-relaxed text-muted">
-          You get more offering memoranda than you can model. Underwrite Copilot
-          reads an OM and tells you what the deal is, where it breaks, and
-          whether it fits your mandate. You decide what to model.
-        </p>
-
-        <div className="mt-10 space-y-8">
-          {SECTIONS.map((s) => (
-            <section key={s.h}>
-              <h2 className="text-lg font-semibold tracking-tight">{s.h}</h2>
-              {s.body.map((p, i) => (
-                <p key={i} className="mt-2 text-sm leading-relaxed text-muted">
-                  {p}
-                </p>
-              ))}
-            </section>
-          ))}
-        </div>
-
-        <div className="mt-12 rounded-2xl border border-line bg-surface p-6">
-          <h2 className="text-lg font-semibold tracking-tight">
-            See it on a real deal
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted">
-            Start with a fully worked sample, or upload an OM and get a verdict
-            in a few minutes.
+      <main id="main" className="flex-1">
+        {/* The argument opens on a real place: downtown Washington, the
+            covered market at the centre of the DMV core. */}
+        <PlaceBand metro="dc">
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+            Why Underwrite Copilot
+          </h1>
+          <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/75">
+            You get more offering memoranda than you can model. Underwrite Copilot
+            reads an OM and tells you what the deal is, where it breaks, and
+            whether it fits your mandate. You decide what to model.
           </p>
-          <div className="mt-4 flex flex-wrap gap-2.5">
-            <Link
-              href="/login?mode=signup"
-              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
-            >
-              Get started
-            </Link>
-            <Link
-              href="/security"
-              className="rounded-lg border border-line px-4 py-2 text-sm font-medium transition-colors hover:bg-faint"
-            >
-              How your data is handled
-            </Link>
+        </PlaceBand>
+
+        <div className="mx-auto w-full max-w-3xl px-6 py-12">
+          <div className="space-y-8">
+            {SECTIONS.map((s) => (
+              <section key={s.h}>
+                <h2 className="text-lg font-semibold tracking-tight">{s.h}</h2>
+                {s.body.map((p, i) => (
+                  <p key={i} className="mt-2 text-sm leading-relaxed text-muted">
+                    {p}
+                  </p>
+                ))}
+              </section>
+            ))}
+          </div>
+
+          <div className="mt-12 rounded-2xl border border-line bg-surface p-6">
+            <h2 className="text-lg font-semibold tracking-tight">
+              See it on a real deal
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              Start with a fully worked sample, or upload an OM and get a verdict
+              in a few minutes.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2.5">
+              <Link
+                href="/login?mode=signup"
+                className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+              >
+                Get started
+              </Link>
+              <Link
+                href="/security"
+                className="rounded-lg border border-line px-4 py-2 text-sm font-medium transition-colors hover:bg-faint"
+              >
+                How your data is handled
+              </Link>
+            </div>
           </div>
         </div>
       </main>

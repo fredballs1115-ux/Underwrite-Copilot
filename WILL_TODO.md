@@ -53,7 +53,8 @@ page; the pipeline's rail off the numbers) are proven (`a836c30` at
 sources at boot in 14.8 s — Commercial Property Executive answering
 through its Google door at last, REBusinessOnline the one timeout —
 `NEWS HELD: none`, twelve public pages lint clean); #295 (a real
-photograph behind the hero, four slots for the operator's) follows.
+photograph behind the hero, four slots for the operator's) and #296
+(`/why` and `/demo` open on a real place too) follow.
 
 ---
 
