@@ -6,6 +6,7 @@ import { structured } from "./failure";
 import { omDocument, omRequestOptions, omSourceFor, releaseOmSource } from "./om-source";
 import { MODELS } from "./models";
 import { ANALYST_SYSTEM } from "./prompts";
+import { newLedger, summarizeUsage, usageLogLine, withUsageLedger } from "./usage";
 // What the screen established about the deal — shared with the broker-comp
 // scrutiny, the market check and the reconciler; re-exported here so the
 // server action keeps its import. (Lives in lib/deal-context, not in the
@@ -67,32 +68,44 @@ export async function askDealQuestion(
   pdf: Buffer,
   question: string,
   context?: string | null,
+  opts?: { dealId?: string },
 ): Promise<AskResult> {
   const client = getAnthropic();
   // The same source the pipeline reads — the deck's text layer when dense,
   // the PDF otherwise (oversized ones as a Files-API reference) — so a
   // question asked near a screen shares its cached prefix.
   const om = await omSourceFor(pdf, "om.pdf", { textFirst: true });
+  // A question is one read of the whole deck. Its spend is said in the log
+  // the way a screen's is, so the operator's picture of what a deal costs
+  // includes the questions asked of it.
+  const ledger = newLedger();
   try {
-    return await structured("The answer", () =>
-      client.messages.parse({
-        model: MODELS.reasoning,
-        max_tokens: 2500,
-        system: ANALYST_SYSTEM,
-        messages: [
-          {
-            role: "user",
-            content: [
-              omDocument(om),
-              { type: "text", text: askInstruction(question, context) },
-            ],
-          },
-        ],
-        output_config: { format: zodOutputFormat(AskSchema) },
-      }, omRequestOptions(om)),
+    return await withUsageLedger(ledger, () =>
+      structured("The answer", () =>
+        client.messages.parse({
+          model: MODELS.reasoning,
+          max_tokens: 2500,
+          system: ANALYST_SYSTEM,
+          messages: [
+            {
+              role: "user",
+              content: [
+                omDocument(om),
+                { type: "text", text: askInstruction(question, context) },
+              ],
+            },
+          ],
+          output_config: { format: zodOutputFormat(AskSchema) },
+        }, omRequestOptions(om)),
+      ),
     );
   } finally {
     // The Files-API copy of a large OM lives only for this one question.
     await releaseOmSource(om);
+    if (ledger.calls.length) {
+      console.log(
+        usageLogLine(opts?.dealId ?? "(unnamed)", summarizeUsage(ledger)).replace("screen usage", "ask usage"),
+      );
+    }
   }
 }
