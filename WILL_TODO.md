@@ -28,15 +28,18 @@ source `via Bing`, `NEWS HELD: news.google.com … after 3 failures`);
 Next runs `instrumentation.ts` in its own module runtime, so the warm-up
 filled one copy of the live layer's state and the routes read another —
 that is why `warm` was null on every read; the state now lives on
-`globalThis`) is merged and awaits its proof; #286 (the fourteenth
-review's five findings, the first a #284 regression that read `NOI /
-RSF` as the NOI, live for twenty minutes) is open.
+`globalThis`) is proven (`b9c223b` at 19:00: `NEWS WARM-UP: 11 of 12
+sources answered at boot, 17.3s`, every source `cached` on the first
+read after the deploy); #286 (the fourteenth review's five findings,
+the first a #284 regression that read `NOI / RSF` as the NOI, live for
+twenty minutes) and #287 (the pipeline gets the wide shell and whole
+deal names; the News caption counts its sources) follow.
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-A hundred and eleven PRs (#176–#286) landed across one review session and the
+A hundred and twelve PRs (#176–#287) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -564,6 +567,11 @@ deploy (live-verify shows the sha).
   ignores its abort no longer eats the doors behind it; the breaker's
   comment matches its code; a line with a figure is never a tiled
   caption.
+- **The pipeline gets a table's room** (#287): the list takes the wide
+  shell (the only page that does) and a deal name wraps to two lines
+  before an ellipsis, so "The Maddox at Brewerytown" is never "The
+  Maddox at Bre…"; the News caption says "live from 11 of 12 sources"
+  and the scored-feed note is one quiet line.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as

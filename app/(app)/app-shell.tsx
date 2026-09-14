@@ -301,7 +301,9 @@ export function AppShell({
         </header>
 
         <main id="main" className="flex-1">
-          <div className="mx-auto w-full max-w-5xl px-5 py-8 sm:px-8">
+          {/* The pipeline is a table of eight columns and gets a table's
+              room; every other page keeps the reading width. */}
+          <div className={`mx-auto w-full px-5 py-8 sm:px-8 ${pathname === "/deals" ? "max-w-7xl" : "max-w-5xl"}`}>
             {children}
           </div>
         </main>
