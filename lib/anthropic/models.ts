@@ -32,13 +32,17 @@
  *     against the flagship's $5 / $25) puts the same screen near $1.25 —
  *     near-flagship quality on this kind of read, but it changes the
  *     product; judge a few screens against their saved verdicts first.
- *  4. Fewer tokens per deck: a text-first read of the OM (the PDF's own
- *     text layer, page-tagged, with the pages only where the text is
- *     sparse) cuts the deck to a third or a quarter of its PDF token count
- *     on every step at once. That is the lever that keeps the flagship.
+ *  4. Fewer tokens per deck — ON by default: the OM goes as its own text
+ *     layer, page-tagged, whenever that layer is dense enough to stand in
+ *     for the pages (`lib/pdf-text.ts`, `omSourceFor` with `textFirst`),
+ *     a third to a quarter of the PDF's token count on every step at once.
+ *     A scan or a picture-heavy deck still goes as PDF. `OM_READ=pdf`
+ *     forces the pages for every deck; the ledger shows the difference.
+ *     That is the lever that keeps the flagship.
  *
- * The overrides are read once at boot from the environment, so a Render
- * env-var change plus a redeploy is the whole experiment — no code change.
+ * The model overrides are read once at boot from the environment, so a
+ * Render env-var change plus a redeploy is the whole experiment — no code
+ * change. `OM_READ` is read per call.
  */
 
 const FLAGSHIP = "claude-opus-4-8";

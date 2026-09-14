@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." Ninety-six PRs, #176–#271, each
+estimate, and that's what it should flag." Ninety-seven PRs, #176–#272, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1317,6 +1317,32 @@ confirmed equal to the main tip after each batch.
   the price table, the split by step, the median), `structured()` recording
   a finished answer and a cut-off, and the pipeline writing the ledger on
   a finished and on a failed screen, and nothing when no call was made.
+- **#272 The deck goes as text first.** The lever that keeps the flagship.
+  A deck the model reads as PDF pages costs tokens for every page's pixels;
+  the same deck's own text layer — what a reader's select-all would copy —
+  is a third to a quarter of that, on every OM-reading step at once, and
+  most OMs are exported from a layout tool and carry a full one.
+  `lib/pdf-text.ts` reads it with pdfjs (loaded lazily, in-process, no
+  worker thread and no canvas): items on one baseline become one line,
+  left to right, with a space only where the gap between two runs is
+  wider than a fraction of the type size, so "$21.0" and "M" read back as
+  "$21.0M" and a rent roll's row stays one line. The layer stands in for
+  the pages when it is dense — half the pages carrying text and a few
+  thousand characters in all, which admits a glossy deck's photo pages and
+  refuses a scan — as one page-tagged document whose header says how to
+  cite a page (`omSourceFor` with `textFirst`: the screen and Ask; a
+  buyer's model, a BOV, a rent roll keep their pages). A page with no text
+  says so, so the model never wonders whether a page went missing, and the
+  layer's page count — exact, pdfjs walked the pages — is what the facts
+  are validated against. `OM_READ=pdf` forces the pages for every deck,
+  `OM_READ=text` the layer whenever there is any; the ledger (#271) shows
+  the difference. `next.config.ts` keeps pdfjs external to the server
+  bundle, as the worker's bundler already does for every package. Tests
+  render real PDFs (react-pdf) and read them back: every page in order, a
+  table row as one line, the split run rejoined, the empty page marked, an
+  unreadable file as no pages; the line rebuild's gap rule; the density
+  read; the document's header; and the transport choice under each
+  `OM_READ`.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
