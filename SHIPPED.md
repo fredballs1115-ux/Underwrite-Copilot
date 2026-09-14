@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and four PRs, #176–#279, each
+estimate, and that's what it should flag." A hundred and five PRs, #176–#280, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1469,6 +1469,20 @@ confirmed equal to the main tip after each batch.
   the payload remembers), two rendered decks (footer-only sparse, footer
   under text dense) and the synthetic rent roll, the cost card's three
   sentences, the row's acronyms.
+- **#280 The warm-up reports, and the search doors are checked from the
+  runner.** Two things #278 left to inference. Whether the boot warm-up
+  ran before the probe could only be read off the `cached` lines;
+  `/api/news/health` now carries `warm` — the last warm-up this process
+  finished: sources answered, of how many, how long, when — and
+  live-verify prints it as one `NEWS WARM-UP` line. And the Bing door was
+  written blind: the sandbox that writes this code cannot reach either
+  search host, so the parser's assumptions (`News:Source` names the
+  outlet, the link is a click redirect the parser unwraps) had no
+  witness. A new non-gating live-verify step fetches Bing's site-scoped
+  and topic feeds and Google's site-scoped feed from the runner and
+  prints each door's HTTP status, item count, `News:Source` count and
+  click-redirect count, so the shape is verified from a network that can
+  reach it, on every run.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

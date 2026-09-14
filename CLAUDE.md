@@ -130,9 +130,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   redirect is unwrapped by `directUrl`). `instrumentation.ts` warms the
   sources one at a time at boot (`warmLiveHeadlines`; `NEWS_WARM=0` off)
   because a fresh process's first parallel read bursts one host and gets
-  503s back. `/api/news/health` is public and live-verify prints every
-  source's outcome from Render's own network — read those lines before
-  touching a feed URL; the sandbox cannot reach the publishers.
+  503s back; the health route reports that run as `warm` (`lastWarmUp`).
+  `/api/news/health` is public and live-verify prints every source's
+  outcome from Render's own network, the warm-up line, and the search
+  doors' shape fetched from the runner — read those lines before touching
+  a feed URL; the sandbox cannot reach the publishers or the search hosts.
 - The pipeline's failure modes: `lib/anthropic/failure.ts` turns any failure
   into one sentence the analyst can act on (the raw text goes to the server
   log, never the page), and its `structured()` wraps every structured-output
