@@ -143,6 +143,29 @@ describe("classifyNoi / noiFigures", () => {
     expect(classifyNoi(metric("NOI (T-12 / TTM)", "$1,200,000"))).toBe("in_place");
     expect(classifyNoi(metric("NOI / cash flow (in place)", "$1,200,000"))).toBe("in_place");
     expect(classifyNoi(metric("Net operating income (2025 / 2026 budget)", "$1,250,000"))).toBe("year1");
+    expect(classifyNoi(metric("NOI / T-12 actual", "$1,200,000"))).toBe("in_place");
+  });
+
+  it("any other word after a slash is a denominator — a rate or a ratio the list never has to have heard of", () => {
+    for (const label of [
+      "NOI / RSF",
+      "NOI/RSF",
+      "NOI / NRA",
+      "NOI / GLA",
+      "NOI / Rentable SF",
+      "NOI / Lot",
+      "NOI / Space",
+      "NOI / Property",
+      "NOI / Quarter",
+      "NOI / Month",
+      "NOI / Price",
+      "NOI / EGI",
+      "Price / NOI",
+      "T-12 NOI / RSF",
+      "NOI / year",
+    ]) {
+      expect(classifyNoi(metric(label, "$12.10")), label).toBeNull();
+    }
   });
 
   it("drops a blank — a dash is not zero", () => {

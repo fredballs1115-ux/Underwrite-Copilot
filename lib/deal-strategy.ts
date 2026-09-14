@@ -186,11 +186,25 @@ export interface NoiFigure {
 }
 
 const NOI_INCLUDE = /net operating income|\bnoi\b/i;
-// Per-unit / per-SF figures, margins and growth rates are not the NOI. A
-// slash makes a rate only when a unit follows it ("NOI / SF", "NOI/key");
-// "NOI (T-12 / TTM)" is the year's NOI under two names for the period.
-const RATE_SLASH = String.raw`\/\s*(?:unit|door|key|room|bed|pad|site|suite|apt|apartment|home|acre|sf|s\.f\.|sq|psf|month|mo\b|yr\b|year|annum)`;
-const NOI_EXCLUDE = new RegExp(String.raw`\bper\b|${RATE_SLASH}|psf|unit|margin|growth|debt|yield|multiple`, "i");
+// Per-unit / per-SF figures, margins and growth rates are not the NOI.
+const NOI_EXCLUDE = /\bper\b|psf|unit|margin|growth|debt|yield|multiple/i;
+// A slash is a denominator — "NOI / SF", "NOI / RSF", "NOI / key", "NOI /
+// EGI", "Price / NOI", "NOI / quarter" — and the figure a rate or a ratio,
+// never the NOI, UNLESS what follows the slash names a period or a basis:
+// "NOI (T-12 / TTM)", "NOI / cash flow (in place)", "(2025 / 2026 budget)"
+// are the whole building's NOI under two names. The list is of the
+// period words, so a unit word the list never heard of stays a rate.
+const PERIOD_AFTER_SLASH =
+  /^\s*(?:ttm|t-?\d{1,2}|trailing|in[- ]?place|actuals?|budget(?:ed)?|pro ?forma|forecast|projected|stabili[sz]ed|cash ?flow|fy\s?'?\d{2,4}|(?:19|20)\d{2}|year\s?\d|yr\.?\s?\d|annuali[sz]ed)\b/i;
+
+/** True when any slash in the label is followed by something other than a
+ *  period or basis word — a denominator, so the figure is a rate. */
+function slashMakesRate(label: string): boolean {
+  for (let i = label.indexOf("/"); i >= 0; i = label.indexOf("/", i + 1)) {
+    if (!PERIOD_AFTER_SLASH.test(label.slice(i + 1))) return true;
+  }
+  return false;
+}
 // A later year of the hold ("Year 2", "Yr. 3", "Year 10") is the shared
 // LATER_YEAR guard, so this classifier, the cap reader and the strategy
 // inference agree on which year is still today's.
@@ -203,7 +217,7 @@ const NOI_IN_PLACE = /t-?12|ttm|trailing|in[- ]?place|current|actual|historical|
 
 /** Which NOI a metric is — or null when it is not an NOI figure at all. */
 export function classifyNoi(m: MetricLike): NoiKind | null {
-  if (!NOI_INCLUDE.test(m.label) || NOI_EXCLUDE.test(m.label)) return null;
+  if (!NOI_INCLUDE.test(m.label) || NOI_EXCLUDE.test(m.label) || slashMakesRate(m.label)) return null;
   if (NOI_STABILIZED.test(m.label)) return "stabilized";
   if (NOI_IN_PLACE.test(m.label) || m.basis === "in_place") return "in_place";
   // A bare "NOI" — tagged pro forma or not — is the sponsor's year-one figure.

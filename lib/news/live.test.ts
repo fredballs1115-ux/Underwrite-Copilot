@@ -397,6 +397,36 @@ describe("fetchLiveHeadlines — a host that hangs is not allowed to hold the ot
     expect(heldHosts()).toEqual([]);
   });
 
+  it("a caller already in the host's queue when the hold trips never asks the held host: it gives its slot back and takes its second door", async () => {
+    globalThis.fetch = hangingHost("trips.test");
+    // Two prior faults…
+    for (const id of ["t0a", "t0b"]) {
+      const one = await fetchLiveHeadlines([twoDoors(id, "trips.test")], 10, { timeoutMs: 800 });
+      expect(one.sources[0]).toMatchObject({ ok: true, via: `Bing News · ${id}` });
+    }
+    expect(heldHosts()).toEqual([]);
+    // …then two sources hold the host's slots (the first to time out trips
+    // the hold) while a third waits in the queue behind them.
+    const live = await fetchLiveHeadlines(
+      ["t1", "t2", "t3"].map((id) => twoDoors(id, "trips.test")),
+      10,
+      { timeoutMs: 800 },
+    );
+    expect(live.sources.map((s) => [s.ok, s.via])).toEqual([
+      [true, "Bing News · t1"],
+      [true, "Bing News · t2"],
+      [true, "Bing News · t3"],
+    ]);
+    expect(heldHosts().map((h) => h.host)).toEqual(["trips.test"]);
+    const asked = vi.mocked(globalThis.fetch).mock.calls.map((c) => String(c[0]));
+    expect(asked.filter((u) => u.startsWith("https://trips.test"))).toEqual([
+      "https://trips.test/rss?q=t0a",
+      "https://trips.test/rss?q=t0b",
+      "https://trips.test/rss?q=t1",
+      "https://trips.test/rss?q=t2",
+    ]);
+  });
+
   it("a request cut short by its own budget is not the host's fault: three of those never hold it", async () => {
     // A request given under 300 ms that times out says nothing about the
     // host — the budget was too short to tell.

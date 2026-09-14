@@ -55,10 +55,15 @@ export function lineShape(line: string): string | null {
 
 /** A line's exact words for the tiled-caption test: lower-cased and
  *  whitespace-collapsed, digits kept — a rent roll's rows differ by theirs,
- *  the caption under every rendering does not. */
+ *  the caption under every rendering does not. A line that carries a
+ *  figure (three digits or more, or a currency sign) is never a caption:
+ *  an inventory grouped by size repeats its rows across half a deck
+ *  ("10 x 10 Non-Climate $125 Occupied"), and those rows are the deck. */
 export function lineText(line: string): string | null {
   const s = line.toLowerCase().replace(/\s+/g, " ").trim();
-  return s.length >= 8 && (s.match(/[a-z]/g) ?? []).length >= 3 ? s : null;
+  if (s.length < 8 || (s.match(/[a-z]/g) ?? []).length < 3) return null;
+  if ((s.match(/\d/g) ?? []).length > 2 || /[$€£%]/.test(s)) return null;
+  return s;
 }
 
 /** The gap, as a fraction of the type size, past which two items on one

@@ -48,10 +48,13 @@ import {
  *      tried — live-verify read that too.
  *   8. A host held at bay: one that timed out, dropped the connection or
  *      answered 429/5xx three times inside a minute is not asked again for
- *      45 seconds; its doors are skipped at once so the next door gets the
- *      whole budget. A 403, a 404 or an empty page never counts — that is
- *      the publisher's answer, and the host is fine. The held hosts are
- *      named by the health route while the hold lasts.
+ *      45 seconds; its doors are skipped at once — a caller already in the
+ *      host's queue when the hold trips gives its slot back unused — so the
+ *      next door gets the whole budget. A 403, a 404 or an empty page never
+ *      counts (that is the publisher's answer, and the host is fine), nor
+ *      does a timeout on a request given under 300 ms; a 429 or a 5xx
+ *      always does. The held hosts are named by the health route while
+ *      the hold lasts.
  *
  * A source that has never answered is simply absent from the list and named
  * in the status, so the page can say "GlobeSt did not answer just now"
@@ -324,6 +327,9 @@ async function fetchFeed(
   kind: NewsSource["kind"],
   source: NewsSource,
   timeoutMs: number,
+  /** how far behind the source's own deadline the slot clock runs — set
+   *  for a source's last door only, whose window is the source's window */
+  slotSlackMs = 0,
 ): Promise<FeedItem[]> {
   const read = async (): Promise<FeedItem[]> => {
     const res = await fetch(url, {
@@ -345,9 +351,11 @@ async function fetchFeed(
   // The wall clock beside the signal: a fetch that outlives its abort (Node's
   // honours it; a patched one might not) would otherwise keep its slot on
   // the host for the life of the process, and two of those close the host.
-  // It runs SLOT_GRACE_MS behind the source's own deadline (fetchSource),
-  // which therefore always resolves the caller first and names the window.
-  return Promise.race([read(), deadline(timeoutMs + DEADLINE_GRACE_MS + SLOT_GRACE_MS)]);
+  // A door with others behind it gives up a grace past its own timeout so
+  // the next door still gets its share; a source's last door runs
+  // SLOT_GRACE_MS behind the source's own deadline (fetchSource), which
+  // therefore resolves the caller first and names the source's window.
+  return Promise.race([read(), deadline(timeoutMs + DEADLINE_GRACE_MS + slotSlackMs)]);
 }
 
 /**
@@ -385,6 +393,15 @@ async function fetchWithFallbacks(source: NewsSource, timeoutMs: number): Promis
         errors.push(`${name}: queued past ${hasNext ? "half " : ""}the budget`);
         continue outer;
       }
+      // The hold may have tripped while this caller waited in the queue —
+      // the two ahead of it timing out are what tripped it — so the slot
+      // is given back unused rather than spent on the held host.
+      const heldNow = heldFor(host, Date.now());
+      if (heldNow > 0) {
+        release();
+        errors.push(`${name}: ${host} held at bay for ${Math.ceil(heldNow / 1000)}s`);
+        continue outer;
+      }
       let retry = false;
       let given = 0;
       try {
@@ -402,15 +419,15 @@ async function fetchWithFallbacks(source: NewsSource, timeoutMs: number): Promis
         // spend it all and the third was never asked.
         const cap = hasNext ? Math.max(MIN_ATTEMPT_MS, Math.floor(budget / 2)) : budget;
         given = Math.min(budget, cap);
-        const items = await fetchFeed(c.feed, c.kind, source, given);
+        const items = await fetchFeed(c.feed, c.kind, source, given, hasNext ? 0 : SLOT_GRACE_MS);
         noteAnswer(host);
         return { items, via: c.label };
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         errors.push(c.label ? `${c.label}: ${msg}` : msg);
-        // A request that had real time and still failed the host's way
-        // counts against the host; one cut short by its own budget says
-        // nothing about the host.
+        // A 429 or a 5xx is the host's answer and always counts. A timeout
+        // or a dropped connection counts only when the request had real
+        // time: one cut short by its own budget says nothing about the host.
         if (retriable(e) || (given >= MIN_ATTEMPT_MS && isFault(e))) noteFault(host, Date.now());
         retry = attempt === 0 && retriable(e) && left() > RETRY_WAIT_MS + MIN_ATTEMPT_MS;
       } finally {

@@ -231,11 +231,31 @@ describe("the density read and the page-tagged document", () => {
     expect(isDenseLayer(layer)).toBe(true);
   });
 
-  it("a line's exact words: case and spacing folded, digits kept; a numeric row or a short word has none", () => {
+  it("a line's exact words: case and spacing folded; a line carrying a figure, a numeric row or a short word has none", () => {
     expect(lineText("Rendering  for illustrative purposes only")).toBe("rendering for illustrative purposes only");
-    expect(lineText("Page 3 of 40")).toBe("page 3 of 40");
+    expect(lineText("Page 3 of 40")).toBeNull();
+    expect(lineText("10 x 10 Non-Climate $125 Occupied")).toBeNull();
+    expect(lineText("Occupancy at 94% as of the rent roll")).toBeNull();
     expect(lineText("$1,200,000")).toBeNull();
     expect(lineText("Total")).toBeNull();
+  });
+
+  it("a table whose rows repeat across the pages — an inventory grouped by size — is the deck, not its furniture", () => {
+    const sizes = [
+      "10 x 10 Non-Climate $125 Occupied",
+      "10 x 15 Climate $165 Occupied",
+      "5 x 10 Non-Climate $75 Vacant",
+      "10 x 20 Climate $210 Occupied",
+      "5 x 5 Non-Climate $45 Occupied",
+      "10 x 30 Non-Climate $260 Occupied",
+    ];
+    const inventory = (n: number) => Array.from({ length: 30 }, (_, i) => sizes[(i + n) % 6]).join("\n");
+    const body = (i: number) => `${"Suite leased to a tenant at market rent with years of term. ".repeat(14)}${WORDS[i % 12]}`;
+    const pages = Array.from({ length: 12 }, (_, i) => ({ page: i + 1, text: i < 7 ? inventory(i) : body(i), chars: 0 }));
+    const layer = summarize(pages);
+    expect(layer.boilerplateLines).toBe(0);
+    expect(layer.densePages).toBe(12);
+    expect(isDenseLayer(layer)).toBe(true);
   });
 
   it("a line's shape: digits out, case and spacing folded; a numeric row or a short word has none", () => {

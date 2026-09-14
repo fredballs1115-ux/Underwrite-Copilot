@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and ten PRs, #176–#285, each
+estimate, and that's what it should flag." A hundred and eleven PRs, #176–#286, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1577,6 +1577,29 @@ confirmed equal to the main tip after each batch.
   live-verify prints `NEWS PROCESS` and probes three Bing phrasings for
   Commercial Property Executive, whose site-scoped read parsed to zero
   items on Render.
+- **#286 The fourteenth review's five findings.** The first was a
+  regression #284 shipped for twenty minutes: its slash rule listed the
+  unit words that make a rate, so any denominator the list had never
+  heard of — `NOI / RSF`, `NOI / NRA`, `NOI / GLA`, `NOI / EGI`, `NOI /
+  Quarter`, `Price / NOI` — read as the NOI itself, and a $12.10-per-foot
+  row would have anchored the workbook, the debt sizer and the T-12
+  comparison. The rule is inverted: after a slash, only a period or a
+  basis word keeps the label an NOI (`T-12 / TTM`, `/ cash flow (in
+  place)`, `2025 / 2026 budget`); anything else is a denominator, as
+  before #284. `deal-strategy.test.ts` holds fifteen denominators. In
+  the news layer: a caller already in a host's queue when the hold
+  trips now gives its slot back unused instead of spending half its
+  budget on the held host (`live.test.ts`: two prior faults, then two
+  sources that trip the hold with a third queued behind them — the
+  third never asks the host); a door with others behind it gives up a
+  grace past its own timeout rather than the source's whole window, so
+  an abort-ignoring first door no longer eats the doors after it; and
+  the module comment says what the code does — a timeout on a request
+  given under 300 ms never counts, a 429 or a 5xx always does. In the
+  text layer, a line carrying a figure (three digits or more, or a
+  currency sign) is never a tiled caption, so a self-storage inventory
+  whose size rows repeat across half the deck stays the deck
+  (`pdf-text.test.ts`).
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
