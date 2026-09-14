@@ -560,3 +560,28 @@ describe("fetchLiveHeadlines — a host that hangs is not allowed to hold the ot
     expect(heldHosts()).toEqual([]);
   });
 });
+
+describe("an answer that lands in the grace after the caller's deadline", () => {
+  const realFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    forgetLiveHeadlines();
+  });
+
+  it("is kept: the next caller reads the copy, and the publisher is not asked again", async () => {
+    let calls = 0;
+    globalThis.fetch = vi.fn(async () => {
+      calls++;
+      // Answers 1.2 s in, ignoring the abort — after the caller's 1.1 s
+      // deadline (400 + 700) and inside the last door's 200 ms of grace.
+      await new Promise((r) => setTimeout(r, 1200));
+      return new Response(rss("Late but real"), { status: 200 });
+    }) as typeof fetch;
+    const first = await fetchLiveHeadlines([src("late")], 10, { timeoutMs: 400 });
+    expect(first.sources[0].ok).toBe(false);
+    await new Promise((r) => setTimeout(r, 300));
+    const second = await fetchLiveHeadlines([src("late")], 10, { timeoutMs: 400 });
+    expect(second.sources[0]).toMatchObject({ ok: true, cached: true, count: 1 });
+    expect(calls).toBe(1);
+  });
+});

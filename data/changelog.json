@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-14",
+      "title": "News snippets read cleanly",
+      "blurb": "A Google or Bing story's summary arrives escaped twice over, and the page was showing the literal \"&nbsp;\" and \"&#39;\" in it. Summaries are decoded fully now, a story whose summary carries a broken character no longer takes its whole source down, and \"rate cuts\" ranks as \"rate cut\" always did.",
+      "href": "/news"
+    },
+    {
+      "date": "2026-09-14",
       "title": "A headline that names a covered market opens its brief",
       "blurb": "When a headline on the News page names one of the covered markets — Atlanta, Manhattan, Fort Worth, the Bay Area — the market is a tag beside the others, and it opens that metro's page: the news tied to the ground layer. A word that names two places tags nothing rather than guessing.",
       "href": "/news"

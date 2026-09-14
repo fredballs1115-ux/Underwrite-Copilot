@@ -97,6 +97,26 @@ describe("decodeText / toSnippet", () => {
     expect(s.endsWith("…")).toBe(true);
     expect(s).not.toContain("<");
   });
+
+  it("decodes an escaped body twice — the feed's level, then the html's — so a Google row never shows a literal entity", () => {
+    expect(
+      toSnippet(
+        '&lt;a href="https://x.test"&gt;Office Loan Delinquencies Hit 11%&lt;/a&gt;&amp;nbsp;&amp;nbsp;&lt;font color="#6f6f6f"&gt;Bisnow&lt;/font&gt;',
+      ),
+    ).toBe("Office Loan Delinquencies Hit 11% Bisnow");
+    expect(toSnippet("M&amp;amp;A activity picks up")).toBe("M&A activity picks up");
+    expect(toSnippet("&amp;#39;quoted&amp;#39;")).toBe("'quoted'");
+    // a body escaped once is not decoded past its meaning
+    expect(toSnippet("Tom &amp; Jerry")).toBe("Tom & Jerry");
+  });
+
+  it("leaves a numeric entity outside Unicode as it came and never throws — a parser that throws loses the whole source", () => {
+    const bad = "Rates &#1114112; hold &#x110000; steady &#99999999999999999999; today &#55296;";
+    expect(() => decodeText(bad)).not.toThrow();
+    expect(decodeText(bad)).toBe(bad);
+    const xml = `<rss><channel><item><title>Rates &#1114112; hold</title><link>https://x.example/a</link></item></channel></rss>`;
+    expect(parseFeed(xml, src())[0].title).toBe("Rates &#1114112; hold");
+  });
 });
 
 describe("parseFeed", () => {
@@ -134,7 +154,17 @@ describe("parseFeed", () => {
       title: "Office Loan Delinquencies Hit 11% as CMBS Distress Deepens",
       publisher: "Bisnow",
       publisherUrl: "https://www.bisnow.com",
+      // the escaped body's own "&amp;nbsp;" never reaches the page
+      snippet: "Office Loan Delinquencies Hit 11% Bisnow",
     });
+  });
+
+  it("keeps only an http(s) outlet home — a javascript: source url never reaches an href", () => {
+    const xml = GOOGLE.replace(/url="https:\/\/www\.bisnow\.com"/, 'url="javascript:alert(1)"');
+    expect(xml).toContain("javascript:");
+    const items = parseFeed(xml, src({ id: "gn", name: "Google News · CRE", kind: "topic", cap: 5 }));
+    expect(items[0].publisher).toBe("Bisnow");
+    expect(items[0].publisherUrl).toBeNull();
   });
 
   it("returns nothing for garbage, never throws", () => {
@@ -195,6 +225,17 @@ describe("scoreHeadline", () => {
 
 describe("headlineSignals", () => {
   const labels = (title: string, snippet = "") => headlineSignals({ title, snippet }).map((s) => s.label);
+
+  it("'rate cuts' counts as 'rate cut' does, and 'fed up' is a tenant, not the Fed", () => {
+    const base = { url: "https://x.test/", publisher: "X", publisherUrl: null, publishedAt: null, snippet: "", sourceId: "x" };
+    const NOW2 = Date.parse("2026-09-07T18:00:00Z");
+    const cuts = scoreHeadline({ ...base, title: "Markets price in two rate cuts by December" }, NOW2);
+    const cut = scoreHeadline({ ...base, title: "A rate cut is coming" }, NOW2);
+    expect(cuts).toBe(cut);
+    expect(labels("Markets price in two rate cuts by December")).toEqual(["rates"]);
+    expect(labels("Tenants fed up with rent increases")).toEqual([]);
+    expect(labels("Fed holds steady")).toEqual(["rates"]);
+  });
 
   it("names what the headline touches, the deal-moving signals first, three at most", () => {
     expect(labels("Fed holds rates as CMBS delinquencies climb")).toEqual(["rates", "distress"]);

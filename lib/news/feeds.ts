@@ -251,25 +251,38 @@ const ENTITIES: Record<string, string> = {
   hellip: "…",
 };
 
+/** A numeric entity's character, or null when the code point is outside
+ *  Unicode ("&#1114112;", "&#x110000;", a runaway digit string):
+ *  String.fromCodePoint throws on those, and a parser that throws loses
+ *  the whole source. The entity is left as it came instead. */
+function codePoint(n: number): string | null {
+  return Number.isFinite(n) && n >= 0 && n <= 0x10ffff && !(n >= 0xd800 && n <= 0xdfff)
+    ? String.fromCodePoint(n)
+    : null;
+}
+
 /** Unwrap CDATA, decode entities (named, decimal, hex), collapse whitespace. */
 export function decodeText(raw: string): string {
   return raw
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
-    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (m: string, h: string) => codePoint(parseInt(h, 16)) ?? m)
+    .replace(/&#(\d+);/g, (m: string, d: string) => codePoint(parseInt(d, 10)) ?? m)
     .replace(/&([a-z]+);/gi, (m, name: string) => ENTITIES[name.toLowerCase()] ?? m)
     .replace(/\s+/g, " ")
     .trim();
 }
 
 /** Tags out, entities decoded, one line, capped. CDATA is unwrapped before
- *  the tag strip (or the strip eats the CDATA opener and leaves "]]>"), and
- *  tags are stripped again after decoding, because Atom summaries arrive as
- *  ESCAPED html — "&lt;p&gt;" only becomes a tag once decoded. */
+ *  the tag strip (or the strip eats the CDATA opener and leaves "]]>").
+ *  Two levels, because an Atom or Google body arrives as ESCAPED html:
+ *  the first decode reveals its tags ("&lt;p&gt;" becomes a tag) and
+ *  leaves its own entities one level down ("&amp;nbsp;" becomes
+ *  "&nbsp;"), so the tags are stripped and the entities decoded once
+ *  more — or the page shows the literal "&nbsp;" on every such row. */
 export function toSnippet(html: string, max = 220): string {
   const unwrapped = html.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
-  const decoded = decodeText(unwrapped.replace(/<[^>]+>/g, " "));
-  const text = decoded.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const xmlLevel = decodeText(unwrapped.replace(/<[^>]+>/g, " "));
+  const text = decodeText(xmlLevel.replace(/<[^>]+>/g, " "));
   if (text.length <= max) return text;
   const cut = text.slice(0, max);
   const at = cut.lastIndexOf(" ");
@@ -343,7 +356,9 @@ export function parseFeed(xml: string, source: NewsSource): FeedItem[] {
     const srcName = decodeText(tag(block, "source") ?? tag(block, "News:Source") ?? "");
     if (srcName) {
       publisher = srcName;
-      publisherUrl = attr(srcOpen, "url");
+      // The outlet's home reaches an href: only http(s) does.
+      const home = attr(srcOpen, "url");
+      publisherUrl = home && /^https?:\/\//i.test(home) ? home : null;
       const suffix = ` - ${srcName}`;
       if (title.endsWith(suffix)) title = title.slice(0, -suffix.length).trim();
     }
@@ -402,7 +417,8 @@ const ASSET_CLASS_TAG: Record<string, string> = {
  *  decides between two live stories. */
 const SIGNALS: Signal[] = [
   { label: "cap rates", rx: /\bcap rates?\b/i, w: 2 },
-  { label: "rates", rx: /\b(fed|federal reserve|fomc|rate (cut|hike)|interest rates?|treasury|10-year|sofr)\b/i, w: 2 },
+  // "rate cuts" as often as "rate cut"; "fed up" is a tenant, not the Fed.
+  { label: "rates", rx: /\b(fed(?!\s+up)|federal reserve|fomc|rate (?:cuts?|hikes?)|interest rates?|treasury|10-year|sofr)\b/i, w: 2 },
   { label: "distress", rx: /\b(cmbs|delinquen\w*|distress\w*|default\w*|foreclos\w*|receiver\w*|special servic\w*|maturit\w*)\b/i, w: 2 },
   { label: "regulation", rx: /\b(rent control|rent stabili[sz]ation|good cause|eviction|topa|ordinance|zoning|entitle\w*)\b/i, w: 2 },
   { label: "costs & tax", rx: /\b(tariffs?|insurance premiums?|property tax\w*|assessment\w*|opportunity zone|1031|bonus depreciation)\b/i, w: 1 },

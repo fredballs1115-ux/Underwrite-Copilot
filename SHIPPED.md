@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and seventeen PRs, #176–#292, each
+estimate, and that's what it should flag." A hundred and eighteen PRs, #176–#293, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1673,6 +1673,29 @@ confirmed equal to the main tip after each batch.
   text and the accessible names, so the day the secret is fixed the page
   that appears has already been read. The sector chips became a
   `<nav aria-label="Sectors">` landmark on the way.
+- **#293 The fifteenth review's nine findings.** The one you could see:
+  a Google or Bing snippet arrives as escaped HTML, was decoded once,
+  and so showed the literal `&nbsp;` (and `&#39;`) on every such row —
+  the snippet is now decoded at the feed's level and then at the body's,
+  and the render lint decodes `&amp;` last so it can never mask one
+  again. The rest, each with a test: a numeric entity outside Unicode
+  threw inside the parser and lost the whole source until the item aged
+  out (left as it came now); "rate cuts" never scored where "rate cut"
+  did, and "fed up" tagged a tenant story as the Fed; an outlet's
+  `<source url>` reached an `href` unchecked (http(s) only now); the
+  title link and the publisher ran together for a screen reader (the
+  explicit space); a tiled caption that carried a figure ("Occupancy
+  shown is 95% … illustrative only" under three renderings) escaped both
+  density rules, so twelve photo pages read as a dense deck — a line with
+  a figure is a caption where it is a page's whole text, and an
+  inventory's identical rows stay the deck; `NOI / 2026E`, `NOI / FY26E`,
+  `NOI (2025A / 2026B)`, `NOI / (Loss)`, `NOI / Current`, `NOI / As-Is`,
+  `NOI / At Completion` and `NOI / Untrended` were dropped as rates — the
+  period words after a slash are the two classifiers' own now, with a
+  year's estimate letter and the accounting "(Loss)"; and a last door
+  that answered in its grace after the caller's deadline was thrown
+  away, so the next visitor asked the publisher again — the copy is
+  recorded by the request, not the caller.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

@@ -248,7 +248,9 @@ function acquireHost(host: string, maxWaitMs: number): Promise<(() => void) | nu
 }
 
 function releaseHost(host: string): void {
-  const next = waiting.get(host)?.shift();
+  const q = waiting.get(host);
+  const next = q?.shift();
+  if (q && q.length === 0) waiting.delete(host);
   if (next) {
     next();
     return;
@@ -445,9 +447,20 @@ async function fetchWithFallbacks(source: NewsSource, timeoutMs: number): Promis
 function fetchShared(source: NewsSource, timeoutMs: number): Promise<Fetched> {
   const have = pending.get(source.id);
   if (have) return have;
-  const p: Promise<Fetched> = fetchWithFallbacks(source, timeoutMs).finally(() => {
-    if (pending.get(source.id) === p) pending.delete(source.id);
-  });
+  const p: Promise<Fetched> = fetchWithFallbacks(source, timeoutMs)
+    .then((r) => {
+      // The copy is recorded here, not by the caller: a last door that
+      // answers in its grace after the caller's deadline spoke still
+      // fills it, so the next caller reads the copy instead of asking
+      // the publisher again.
+      const at = Date.now();
+      fresh.set(source.id, { at, items: r.items, via: r.via });
+      lastGood.set(source.id, { at, items: r.items, via: r.via });
+      return r;
+    })
+    .finally(() => {
+      if (pending.get(source.id) === p) pending.delete(source.id);
+    });
   pending.set(source.id, p);
   return p;
 }
@@ -478,8 +491,6 @@ async function fetchSource(
   try {
     const { items, via } = await Promise.race([request, deadline(timeoutMs + DEADLINE_GRACE_MS)]);
     const at = Date.now();
-    fresh.set(source.id, { at, items, via });
-    lastGood.set(source.id, { at, items, via });
     return {
       items,
       status: {

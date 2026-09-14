@@ -55,15 +55,27 @@ export function lineShape(line: string): string | null {
 
 /** A line's exact words for the tiled-caption test: lower-cased and
  *  whitespace-collapsed, digits kept — a rent roll's rows differ by theirs,
- *  the caption under every rendering does not. A line that carries a
- *  figure (three digits or more, or a currency sign) is never a caption:
- *  an inventory grouped by size repeats its rows across half a deck
- *  ("10 x 10 Non-Climate $125 Occupied"), and those rows are the deck. */
-export function lineText(line: string): string | null {
+ *  the caption under every rendering does not. Only a line with a few
+ *  letters and some length can be a caption. */
+export function lineExact(line: string): string | null {
   const s = line.toLowerCase().replace(/\s+/g, " ").trim();
-  if (s.length < 8 || (s.match(/[a-z]/g) ?? []).length < 3) return null;
-  if ((s.match(/\d/g) ?? []).length > 2 || /[$€£%]/.test(s)) return null;
-  return s;
+  return s.length >= 8 && (s.match(/[a-z]/g) ?? []).length >= 3 ? s : null;
+}
+
+/** Whether a line carries a figure: three digits or more, or a currency
+ *  or percent sign. */
+export function carriesFigure(s: string): boolean {
+  return (s.match(/\d/g) ?? []).length > 2 || /[$€£%]/.test(s);
+}
+
+/** The exact line unless it carries a figure: an inventory grouped by
+ *  size repeats its rows across half a deck ("10 x 10 Non-Climate $125
+ *  Occupied"), and those rows are the deck — a line with a figure is a
+ *  caption only where it is a page's whole text, which `summarize` reads
+ *  from the page, not from here. */
+export function lineText(line: string): string | null {
+  const s = lineExact(line);
+  return s && !carriesFigure(s) ? s : null;
 }
 
 /** The gap, as a fraction of the type size, past which two items on one
@@ -194,17 +206,30 @@ export function summarize(pages: PdfTextPage[]): PdfTextLayer {
   const shaped = pages.map((p) => {
     const lines = p.text ? p.text.split("\n") : [];
     const onPage = new Map<string, number>();
-    const exactHere = new Set<string>();
+    const exactHere = new Map<string, number>();
+    let pageChars = 0;
     for (const line of lines) {
+      pageChars += line.replace(/\s+/g, "").length;
       const s = lineShape(line);
       if (s) onPage.set(s, (onPage.get(s) ?? 0) + 1);
-      const e = lineText(line);
-      if (e) exactHere.add(e);
+      const e = lineExact(line);
+      if (e) exactHere.set(e, (exactHere.get(e) ?? 0) + 1);
     }
     for (const [s, n] of onPage) {
       if (n <= FURNITURE_PER_PAGE) seenOn.set(s, (seenOn.get(s) ?? 0) + 1);
     }
-    for (const e of exactHere) exactOn.set(e, (exactOn.get(e) ?? 0) + 1);
+    for (const [e, n] of exactHere) {
+      // A line carrying a figure counts as a caption only where it is
+      // the page's whole text — its copies at least four fifths of the
+      // page's characters, "Occupancy shown is 95% … illustrative only"
+      // under three renderings on a photo page. Beside other rows, even
+      // repeated, it is a row of the deck's own table (an inventory lists
+      // its identical units), however many pages repeat it.
+      const own = n * e.replace(/\s+/g, "").length;
+      if (!carriesFigure(e) || (n >= 2 && own >= 0.8 * pageChars)) {
+        exactOn.set(e, (exactOn.get(e) ?? 0) + 1);
+      }
+    }
     return lines;
   });
   const need = Math.max(3, Math.ceil(pages.length / 2));
@@ -216,7 +241,7 @@ export function summarize(pages: PdfTextPage[]): PdfTextLayer {
     let chars = 0;
     const discounted = new Map<string, number>();
     for (const line of lines) {
-      const e = lineText(line);
+      const e = lineExact(line);
       if (e && tiled.has(e)) continue;
       const s = lineShape(line);
       if (s && furniture.has(s) && (discounted.get(s) ?? 0) < FURNITURE_PER_PAGE) {

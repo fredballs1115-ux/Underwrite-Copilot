@@ -116,8 +116,8 @@ function HeadlineRow({ h, n, now }: { h: RankedHeadline; n: number; now: number 
           className="font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
         >
           {h.title}
-        </a>
-        <span className="ml-2 whitespace-nowrap text-[11px] text-muted">
+        </a>{" "}
+        <span className="ml-1 whitespace-nowrap text-[11px] text-muted">
           {h.publisherUrl ? (
             <a href={h.publisherUrl} target="_blank" rel="noreferrer" className="hover:text-brand">
               {h.publisher}

@@ -168,6 +168,23 @@ describe("classifyNoi / noiFigures", () => {
     }
   });
 
+  it("a year with its estimate letter, an accounting '(Loss)' and the classifiers' own period words after a slash are periods, not denominators", () => {
+    expect(classifyNoi(metric("Net Operating Income / 2026E", "$1,300,000"))).toBe("year1");
+    expect(classifyNoi(metric("NOI / 2026P", "$1,300,000"))).toBe("year1");
+    expect(classifyNoi(metric("NOI / FY26E", "$1,300,000"))).toBe("year1");
+    expect(classifyNoi(metric("NOI (2025A / 2026B)", "$1,300,000"))).toBe("year1");
+    expect(classifyNoi(metric("Net Operating Income / (Loss)", "$1,300,000"))).toBe("year1");
+    expect(classifyNoi(metric("NOI/(Loss)", "$1,300,000"))).toBe("year1");
+    expect(classifyNoi(metric("NOI / Current", "$1,200,000"))).toBe("in_place");
+    expect(classifyNoi(metric("NOI / As-Is", "$1,200,000"))).toBe("in_place");
+    expect(classifyNoi(metric("NOI / At Completion", "$1,900,000"))).toBe("stabilized");
+    expect(classifyNoi(metric("NOI / Untrended", "$1,900,000"))).toBe("stabilized");
+    // the order of the two names does not decide
+    expect(classifyNoi(metric("NOI (Current / Stabilized)", "$1,900,000"))).toBe("stabilized");
+    expect(classifyNoi(metric("NOI (Stabilized / Current)", "$1,900,000"))).toBe("stabilized");
+    expect(classifyNoi(metric("NOI / Yr 1", "$1,300,000"))).toBe("year1");
+  });
+
   it("drops a blank — a dash is not zero", () => {
     expect(noiFigures([metric("NOI (in-place)", "—"), metric("NOI (Year 1)", "n/a")])).toEqual([]);
   });

@@ -193,9 +193,15 @@ const NOI_EXCLUDE = /\bper\b|psf|unit|margin|growth|debt|yield|multiple/i;
 // never the NOI, UNLESS what follows the slash names a period or a basis:
 // "NOI (T-12 / TTM)", "NOI / cash flow (in place)", "(2025 / 2026 budget)"
 // are the whole building's NOI under two names. The list is of the
-// period words, so a unit word the list never heard of stays a rate.
-const PERIOD_AFTER_SLASH =
-  /^\s*(?:ttm|t-?\d{1,2}|trailing|in[- ]?place|actuals?|budget(?:ed)?|pro ?forma|forecast|projected|stabili[sz]ed|cash ?flow|fy\s?'?\d{2,4}|(?:19|20)\d{2}|year\s?\d|yr\.?\s?\d|annuali[sz]ed)\b/i;
+// period words, so a unit word the list never heard of stays a rate. The
+// words are the two classifiers' own (in place: T-12, TTM, trailing,
+// current, actual, historical, as-is, run-rate; stabilized: pro forma,
+// forward, projected, untrended, at completion, post-…) plus a year with
+// its estimate letter ("2026E", "FY26E", "2025A"), a budget, a cash flow,
+// an annualized figure, and "(Loss)" — the accounting idiom on an
+// "NOI / (Loss)" row, never a denominator.
+const PERIOD_WORDS = String.raw`ttm|t-?\d{1,2}|trailing|in[- ]?place|current|actuals?|historical|as[- ]is|run[- ]rate|budget(?:ed)?|pro ?forma|forecast|forward|projected|stabili[sz]ed|untrended|at (?:completion|stabilization)|post[- ]?(?:conversion|renovation|reno|construction|completion)|cash ?flow|fy\s?'?\d{2,4}[a-z]?|(?:19|20)\d{2}[a-z]?|year\s?\d|yr\.?\s?\d|annuali[sz]ed|loss`;
+const PERIOD_AFTER_SLASH = new RegExp(String.raw`^\s*\(?(?:${PERIOD_WORDS})\)?(?![a-z])`, "i");
 
 /** True when any slash in the label is followed by something other than a
  *  period or basis word — a denominator, so the figure is a rate. */
