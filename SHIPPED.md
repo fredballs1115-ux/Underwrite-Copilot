@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and six PRs, #176–#281, each
+estimate, and that's what it should flag." A hundred and seven PRs, #176–#282, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1494,6 +1494,20 @@ confirmed equal to the main tip after each batch.
   replace-OM (whose checkpoints describe the old file), never off a done
   prior (which is diffed against, not resumed). `jobs.test.ts` holds all
   three.
+- **#282 The runner probes the queries the next fix will use.** The first
+  run of #280's search-door step said what the sandbox could not: Bing's
+  site-scoped and topic feeds answer with items, a `News:Source` per item
+  and a click redirect per item — the parser's assumptions hold — and
+  Google answers the runner's address at once. The same run's health
+  lines, on a process where Google News hung on every request, showed
+  the shape of the next fix: the site-scoped fallbacks queued behind the
+  hanging topic searches until their budget was gone, and Bing's
+  multifamily and debt topic queries (Google's `OR` and quote syntax
+  passed through) parsed to zero items. This slice adds the three plain
+  keyword queries #283 will use to the runner's probes, so their item
+  counts are known before the code depends on them, and the health print
+  gains the `NEWS HELD` line #283's route will feed. `WILL_TODO` records
+  the 17:59 and 18:03 reads.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

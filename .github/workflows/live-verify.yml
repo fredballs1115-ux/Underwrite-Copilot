@@ -179,6 +179,11 @@ jobs:
             // any visitor; the route reports its last run (#280).
             if (j.warm) console.log(`NEWS WARM-UP: ${j.warm.answered} of ${j.warm.total} sources answered at boot, ${(j.warm.ms / 1000).toFixed(1)}s, at ${j.warm.at}`);
             else console.log("NEWS WARM-UP: not reported (pre-#280 build, or the warm-up has not finished on this process)");
+            // A host that timed out or answered 5xx three times in a minute
+            // is held at bay (#283); its doors are skipped so the second
+            // search host gets the whole budget. Named here while held.
+            if (Array.isArray(j.held) && j.held.length) console.log("NEWS HELD: " + j.held.map((h) => `${h.host} until ${h.until} after ${h.failures} failures`).join(" · "));
+            else if (Array.isArray(j.held)) console.log("NEWS HELD: none");
           ' || true
       - name: The search doors, from the runner (diagnostic, non-gating)
         # Every Google News read has a Bing News read behind it (#278). The
@@ -197,6 +202,11 @@ jobs:
           }
           probe "Bing · site:therealdeal.com" "https://www.bing.com/news/search?q=site%3Atherealdeal.com&format=rss"
           probe "Bing · commercial real estate" "https://www.bing.com/news/search?q=%22commercial+real+estate%22&format=rss"
+          # The three topic queries behind the other Google searches (#283
+          # dropped the OR / quote syntax that parsed to zero items).
+          probe "Bing · multifamily" "https://www.bing.com/news/search?q=multifamily+apartments+sale&format=rss"
+          probe "Bing · CRE debt" "https://www.bing.com/news/search?q=CMBS+delinquency+distress&format=rss"
+          probe "Bing · rent regulation" "https://www.bing.com/news/search?q=rent+control+ordinance&format=rss"
           probe "Google · site:therealdeal.com" "https://news.google.com/rss/search?q=site%3Atherealdeal.com&hl=en-US&gl=US&ceid=US%3Aen"
       - name: Verdict
         # Two tiers: the hero headline proves the site is up and on the right
