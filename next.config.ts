@@ -48,6 +48,10 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  // The PDF text-layer reader (lib/pdf-text.ts) loads pdfjs at run time on
+  // the server only; keep it out of the server bundle so Node resolves it
+  // like any dependency, as the worker's bundler already does.
+  serverExternalPackages: ["pdfjs-dist"],
   // Cap how long caches (browsers included — Chrome honors
   // stale-while-revalidate) may serve a STALE prerendered page while
   // revalidating. Next's default expire is a year, which made every homepage

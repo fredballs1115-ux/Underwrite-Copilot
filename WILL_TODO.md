@@ -19,7 +19,7 @@ GlobeSt's FeedBlitz URL parses to zero items — item 4 below. #270 follows).
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Ninety-six PRs (#176–#271) landed across one review session and the
+Ninety-seven PRs (#176–#272) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -460,6 +460,11 @@ deploy (live-verify shows the sha).
   step as a bar; `MODEL_VERDICT` joins the env levers, and `models.ts`
   names them in the right order (the cache is per model — move the
   OM-reading steps together).
+- **The deck goes as text first** (#272): the OM's own text layer,
+  page-tagged, stands in for its pages when dense (`lib/pdf-text.ts`,
+  pdfjs in-process) — a third to a quarter of the tokens on every
+  OM-reading step — a scan or a picture-heavy deck still goes as PDF;
+  `OM_READ=pdf` forces the pages, `OM_READ=text` the layer.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -515,8 +520,15 @@ also linked from `/data-health` under "Service probes":
    deck to two caches and costs more. `MODEL_VERDICT` is the one step that
    can differ for free (it reads the results, not the deck).
    `lib/anthropic/models.ts` says the same in order. Judge a few screens
-   against their saved verdicts before deciding. The next lever that keeps
-   the flagship — a text-first read of the deck — is in the build queue.
+   against their saved verdicts before deciding. The lever that keeps the
+   flagship is already on since #272: the deck goes as its own text layer
+   when that layer is dense, a third to a quarter of the tokens on every
+   OM-reading step — the ledger of the next screens shows it (a cache
+   write near 100k tokens on a deck that wrote 300k before). If a screen
+   reads worse than it did — a deck whose figures live in pictures —
+   `OM_READ=pdf` on the web service (and the worker) restores the pages
+   for every deck; paste that deck's name back and the density rule gets
+   corrected instead.
 4. **Open `/news` — it paints now.** The first live-verify run after #269
    read the feeds from Render's own network: 8 of 12 sources answered and
    26 headlines ranked (Commercial Observer, Connect CRE, REBusinessOnline,

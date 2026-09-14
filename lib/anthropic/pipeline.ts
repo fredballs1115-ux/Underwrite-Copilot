@@ -322,12 +322,15 @@ async function runAnalysisSteps(
     // Inline for anything the request cap carries; one Files-API upload for
     // larger OMs, which every step then references by id (a resumed run
     // re-uploads — one extra upload, never a stale reference).
+    // The OM goes text first: its own text layer, page-tagged, when dense
+    // enough to stand in for the pages (a fraction of the tokens on every
+    // step below); the PDF itself otherwise. `OM_READ` overrides.
     omSource = manualExtraction
       ? needsDoc
         ? omFromText(manualFactSheet(manualExtraction, (deal.name as string) ?? "Deal"))
         : null
       : pdf
-        ? await omSourceFor(pdf)
+        ? await omSourceFor(pdf, "om.pdf", { textFirst: true })
         : null;
     // Every use sits inside a `!completed.has(<pdf step>)` guard, so the
     // source above must have been built; this just makes that invariant loud.
@@ -427,15 +430,19 @@ async function runAnalysisSteps(
       // never shown). Best-effort — a pre-0018 schema or a write failure must
       // never sink the screen.
       try {
-        // Prefer the model's own page count (it read the native PDF — robust
-        // to object-stream / bookmarked PDFs the byte counter mis-reads); fall
-        // back to the fail-safe byte counter only when the model didn't report.
+        // The text layer's page count is exact (pdfjs walked the pages).
+        // Otherwise prefer the model's own count (it read the native PDF —
+        // robust to object-stream / bookmarked PDFs the byte counter
+        // mis-reads), and fall back to the fail-safe byte counter only when
+        // the model didn't report.
         const pageCount =
-          extraction.totalPages && extraction.totalPages > 0
-            ? extraction.totalPages
-            : pdf
-              ? countPdfPages(pdf)
-              : 0;
+          omSource?.kind === "pages"
+            ? omSource.pages
+            : extraction.totalPages && extraction.totalPages > 0
+              ? extraction.totalPages
+              : pdf
+                ? countPdfPages(pdf)
+                : 0;
         const facts = buildDealFacts(extraction.metrics, pageCount);
         await admin.from("deal_facts").delete().eq("deal_id", dealId);
         const rows = toFactRows(dealId, facts);

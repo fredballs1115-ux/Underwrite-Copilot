@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-14",
+      "title": "The deck is read as text first",
+      "blurb": "An OM exported from a layout tool carries its own text layer, and that layer — every page tagged, every table row kept as one line — is a third to a quarter of what the same pages cost to read as pictures. Every step of a screen now reads it when it is dense enough to stand in for the pages, with the page count taken from the layer itself; a scanned deck, or one that is mostly photographs, is still read page by page.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-14",
       "title": "Every screen records what it cost",
       "blurb": "Each screen now keeps a ledger of what it spent — the four token meters of every model call, on a finished screen and on a failed one — and the Data health page shows the median cost of your last screens as one number, with the latest screen's split by step drawn as a bar. The levers that bring it down are named beside the number, in the order to pull them.",
       "href": "/data-health"

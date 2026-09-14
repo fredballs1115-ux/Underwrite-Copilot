@@ -69,9 +69,10 @@ export async function askDealQuestion(
   context?: string | null,
 ): Promise<AskResult> {
   const client = getAnthropic();
-  // Oversized OMs ride as a Files-API reference (same prefix the pipeline
-  // caches); everything else keeps the inline path.
-  const om = await omSourceFor(pdf);
+  // The same source the pipeline reads — the deck's text layer when dense,
+  // the PDF otherwise (oversized ones as a Files-API reference) — so a
+  // question asked near a screen shares its cached prefix.
+  const om = await omSourceFor(pdf, "om.pdf", { textFirst: true });
   try {
     return await structured("The answer", () =>
       client.messages.parse({
