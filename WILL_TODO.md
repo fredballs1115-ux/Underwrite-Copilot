@@ -3,7 +3,135 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-**Last updated 2026-09-14**, after PRs #176–#276 merged to main (live build
+## 🟢 6 PM ET, 2026-09-14 — where the site stands, and your list
+
+**Everything merged today is live.** live-verify read the live build as
+`4b926fa` (#297) at 21:44 UTC (`DEPLOY: LIVE`, `VERDICT: LIVE SITE IS
+CURRENT`, 12 of 12 news sources answering, twelve public pages lint
+clean), and a later main sha proven live proves its ancestors, so every
+PR from #176 to #297 is on the site; #298 (merged at 21:44) and this
+note follow by the same route and are proven in the closing message. If a tab still looks unchanged: the page carries a build
+stamp and reloads itself within about ten minutes of a deploy; a hard
+refresh (Ctrl/Cmd+Shift+R) does it now. The footer of the homepage names
+the live build (`build …`, the sha the footer shows is the one live-verify
+read) and the latest improvement.
+
+**What you will see that you did not see this morning**
+
+- **News** (`/news`, signed in): the page is full on the first visit
+  after a deploy — the server warms all twelve sources at boot — and
+  each headline wears the tags that put it where it is (rates, cap
+  rates, distress and regulation in colour; the asset class, supply,
+  debt and costs beside them), a covered market it names is a tag into
+  that metro's brief, the top twelve show with the rest one click away,
+  and under the list the sources are a row of chips (green answered,
+  amber an earlier copy, dashed grey did not answer) with the search
+  host behind them. `/api/news/health` (public) says what each source
+  said, which process answered, the boot warm-up and any host held at
+  bay.
+- **Pipeline** (`/deals`): the list takes the wide shell, a deal's name
+  wraps to two lines instead of "The Maddox at Bre…", numeric columns
+  align including their dashes, one filter row, "Auto" never shown as
+  an asset class, plan deals show yield on cost where the cap would be.
+- **Homepage, `/why`, `/demo`, `/login`**: each opens on a real
+  photograph — Midtown Manhattan behind the hero, downtown Washington
+  behind the argument, Center City Philadelphia (the sample deal's own
+  city) behind the sample screen, Baltimore's Inner Harbor behind the
+  sign-in card, and on `/market` each brief on its own downtown —
+  public-domain USGS frames under a scrim, credited in
+  the corner — and the homepage keeps the four-tile trust strip under the pricing
+  (private storage with expiring links, isolation in the database, never
+  used to train, delete everything self-serve), each tile opening
+  `/security`. The ground-level photographs you asked for need your
+  files (item 5).
+- **Cost per screen**: every screen's token usage lands on the job row
+  and in one log line with a list-price estimate; `/data-health` draws
+  the split by step. The text-first OM read cuts the input three to four
+  times on a dense deck, and a deck the text layer cannot read falls
+  back to the pages on its own.
+
+**Your list, in the order it pays** (each is yours alone — a login, a
+secret, or a judgment call):
+
+1. **Run the outstanding migrations** (`supabase/CHECK_MIGRATIONS.sql`
+   first; it names what is missing — 0028–0035, and 0016 for the
+   worker). Until they run, the four LPC pages save nothing, the cost
+   card has no column to read, and the scored feed has no table. See
+   "🔴 Blocking everything" below for the two gotchas (PostGIS first;
+   two files numbered 0030).
+2. **Set the GitHub Actions secrets for the scheduled jobs** — and fix
+   the misspelled one: the daily-intel sweep reads `ANTHROPIC_API_KEY`,
+   and the repository secret is saved as `NTHROPIC_API_KEY`, so the
+   scored feed under the headlines has never filled. Rename it (or add
+   the right name), then run the workflow once by hand and open `/news`.
+3. **Rotate the six credentials that were pasted into chat as
+   screenshots** — Stripe secret key, Stripe webhook secret, the
+   Supabase service-role key, the two Resend keys and the Anthropic key
+   — create the new one, set it in Render (and GitHub Actions where the
+   workflows use it), deploy, then revoke the old. Nothing was stored
+   here; rotation is the only way to be sure.
+4. **Supabase → Authentication** (five minutes): the three sign-in
+   settings in "Your moves" item 7 below, so a reset link and a magic
+   link land on `/auth/callback` and the confirmation copy matches.
+5. **Drop four photographs into `public/photos/` and commit them** —
+   the homepage is ready for them and shows nothing until they exist
+   (no placeholders). This sandbox cannot fetch a picture from any
+   image host (Unsplash, Wikimedia, the Library of Congress and Bing
+   all answer 403 through the proxy), so the files are yours: buy or
+   shoot them, and use these exact names —
+   `hero.jpg` (2400×1350, wide, quiet mid-tones: a building you would
+   buy or your team at work; it sits under the headline),
+   `team.jpg` (1200×900, an acquisitions team around a table on deal
+   day, the screen open between them),
+   `site-walk.jpg` (1200×900, an analyst walking a property),
+   `building.jpg` (1200×900, a mid-rise multifamily or an industrial
+   box at street level). JPEG, under 400 KB each. The alternative is
+   to allow one image host in the Claude environment's network policy
+   and say which; then the next session can source public-domain
+   frames itself.
+6. **Re-screen the conversion deal** that once showed Year-1 NOI above
+   its price and read the header: *Deal type: Conversion*, the teal plan
+   strip, yield on cost where the cap would be. That is the check that
+   the strategy layer reads your real decks the way it reads the
+   fixtures.
+7. **Optional levers, your call**: `ANALYSIS_WORKER=1` on Render moves
+   screens to the worker (needs migration 0016); `MODEL_VERDICT` picks
+   the verdict model (the measured cost per screen is on
+   `/data-health`); `OM_READ=pdf` forces the page read if a deck ever
+   reads wrong from its text layer; `NEWS_WARM=0` turns the boot
+   warm-up off.
+8. **Read the three probes after the deploy** — `/api/news/health`,
+   `/api/imagery/health` (signed in) and `/data-health` — and the
+   live-verify run on the Actions tab; the `NEWS` and `SEARCH DOOR`
+   lines are the news layer's health from Render's own network.
+
+**Claude's moves next session** (no login needed):
+
+- Commercial Property Executive: #294 wired the two doors the runner
+  proved answer (its bare domain on Bing, its name as a phrase on
+  Google). Read the `NEWS WARM-UP` line on the next fresh process; if
+  it still misses, replace the source.
+- The homepage's photographs, once the files land (item 5): fit each
+  slot at 1440 and 390, check the hero's scrim against the real
+  picture, and shoot the page.
+- The JLL-style cleanliness pass, section by section, on every public
+  page and every signed-in view: one idea per section, more white
+  space, fewer words per line, the sample deal card and the stage rail
+  carrying the argument; measure each page (height, word count,
+  pictures) before and after with the scratchpad shoot scripts.
+- The scored feed's day groups and sector chips, once the sweep runs:
+  render them on a fixture like the live section.
+- The sixteenth review, of #290–#298 (the market tagger, the review
+  fixes, the front page, the photo slots, the place bands), verified by
+  execution with gitignored scratch tests; fold the findings in.
+- REBusinessOnline is the source that misses on every fresh process
+  now (a timeout, then a refused connection from Render): give it a
+  second door the way #274 and #294 did, after reading the runner's
+  probe of its feed.
+
+---
+
+**Last updated 2026-09-14, 6 PM ET**, after PRs #176–#298 merged to main (live build
 sha `5e12854`, #274, read by live-verify at 17:20 UTC — every one of the
 ninety-nine through #274 is live, the homepage serves at 203 KB where it
 served at 488 KB, the public sample memo at 57 KB where it served at 11 KB
@@ -59,9 +187,17 @@ the Midtown frame, the footer naming the improvement, a fresh process
 185 s old that warmed 11 of 12 sources at boot — every search-backed
 source through Bing, Commercial Property Executive with two items,
 REBusinessOnline the one timeout — `NEWS HELD: none`, twelve public
-pages lint clean); #296 (`/why` and `/demo` open on a real place too),
-#297 (the sign-in page too) and #298 (each market brief on its own
-downtown) follow.
+pages lint clean); #296 (`/why` and `/demo` open on a real place too)
+is proven (`a674fd6` at 20:19: `DEPLOY: LIVE`, the footer naming it, a
+fresh process 144 s old that warmed 11 of 12 sources at boot in 14.6 s
+— REBusinessOnline the miss, its host refusing the connection —
+`NEWS HELD: none`, twelve public pages lint clean); #297 (the sign-in
+page too) is proven (`4b926fa` at 21:44: `DEPLOY: LIVE`, 12 of 12
+sources answering on a process 81 minutes old — REBusinessOnline back,
+Google held at bay for the minute after three slow answers, every
+search-backed source through Bing — twelve public pages lint clean);
+#298 (each market brief on its own downtown) and #299 (this hand-off)
+follow.
 
 ---
 
