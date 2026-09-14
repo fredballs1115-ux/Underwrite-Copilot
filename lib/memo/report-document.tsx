@@ -16,7 +16,11 @@ import { basePosition, buildMemoData, MemoPage, pdfSafe, type MemoData } from ".
  *  figure past either end sits at that end (the Read chip says which way);
  *  null when either side does not parse as one scale. */
 export function rangeRead(omSays: string, typicalRange: string): number | null {
-  const m = typicalRange.match(/(\$?-?\d[\d,]*\.?\d*)\s*(?:–|—|-|to)\s*(\$?-?\d[\d,]*\.?\d*)/);
+  // "5.25–5.75%", "5.25%–5.75%" (the unit after the low figure too),
+  // "$2,150–$2,450/mo", "2.5 to 3.5%", "5.25%-5.75%" (a hyphen).
+  const m = typicalRange.match(
+    /(\$?-?\d[\d,]*\.?\d*)\s*%?\s*(?:–|—|-|to)\s*(\$?-?\d[\d,]*\.?\d*)/,
+  );
   if (!m) return null;
   return basePosition({ low: m[1], base: omSays, high: m[2] });
 }

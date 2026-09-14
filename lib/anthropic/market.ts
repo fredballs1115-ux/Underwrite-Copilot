@@ -12,8 +12,17 @@ const MarketSchema = z.object({
   checks: z.array(
     z.object({
       assumption: z.string(),
-      omSays: z.string(),
-      typicalRange: z.string(),
+      // The deal page and the report draw omSays on the typicalRange band
+      // (deal-sections.tsx PositionBar, report-document.tsx rangeRead), so
+      // both carry a unit and the range runs low to high in that unit.
+      omSays: z
+        .string()
+        .describe('The OM\'s figure with its unit — "5.45%", "$2,400/mo", "4.0%/yr".'),
+      typicalRange: z
+        .string()
+        .describe(
+          'Low to high in the same unit as omSays, with an en dash — "5.25%–5.75%", "$2,150–$2,450/mo", "2.5%–3.5%"; words, not an invented range, where no numeric range applies.',
+        ),
       assessment: z.enum(["in-line", "aggressive", "conservative"]),
       note: z.string(),
       page: z.string(),

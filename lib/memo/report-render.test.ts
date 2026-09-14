@@ -139,6 +139,14 @@ describe("ReportDocument (full report)", () => {
     expect(rangeRead("55%", "50 to 60%")).toBeCloseTo(0.5, 6);
     expect(rangeRead("5%", "varies")).toBeNull();
     expect(rangeRead("n/a", "5–7%")).toBeNull();
+    // The shapes the market prompt names (#268): the unit after the low
+    // figure too, a hyphen for the dash, spaces around it, a per-month
+    // dollar range.
+    expect(rangeRead("5.45%", "5.25%–5.75%")).toBeCloseTo(0.4, 6);
+    expect(rangeRead("5.45%", "5.25%-5.75%")).toBeCloseTo(0.4, 6);
+    expect(rangeRead("$2,400/mo", "$2,150–$2,450/mo")).toBeCloseTo(0.8333, 3);
+    expect(rangeRead("$2,400/mo", "$2,150 – $2,450 per month")).toBeCloseTo(0.8333, 3);
+    expect(rangeRead("4.0%/yr", "2.5%–3.5%")).toBe(1);
   });
   it("renders a conversion with the plan page — yield on cost, stressed — and one more page than without it", async () => {
     const extraction: ExtractionResult = {

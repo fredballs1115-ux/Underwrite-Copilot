@@ -9,13 +9,14 @@ UTC with its `DEPLOY: LIVE` line — every one of the ninety through #265 is
 live, the homepage serves at 196 KB where it served at 488 KB, the public
 sample memo at 57 KB where it served at 11 KB (the Brewerytown frame is in
 it), and the public-page lint #231 added reads all twelve public pages
-clean on every run; #266 is merged and awaits its proof, #267 follows).
+clean on every run; #266 and #267 are merged and await their proofs, #268
+follows).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Ninety-two PRs (#176–#267) landed across one review session and the
+Ninety-three PRs (#176–#268) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -434,6 +435,9 @@ deploy (live-verify shows the sha).
   and the schema ask for a comp's stated basis first — price per unit or
   SF and cap, then date and size — and a prompt test holds the example up
   to the comp reader.
+- **The market check names the shape of its figures** (#268): `omSays`
+  with its unit, `typicalRange` low to high in that unit, in the prompt
+  and the schema; a prompt test reads each example pair as a position.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -701,22 +705,22 @@ a route scoped to the share token; the memo and the report got theirs in
    times with a roll-up and per-asset contribution to blended IRR; mostly a
    loop around existing code plus a CSV importer. Named as the next build in
    the LPC plan.
-8. **The market check names the shape of its figures.** The deal page's
-   market tab draws each OM figure on its typical range only when the range
-   parses (`parseRange` in `deal-sections.tsx`), and the report's market
-   page the same (`rangeRead`, #253) — and the market prompt
-   (`lib/anthropic/prompts.ts`) asks only for "what the OM says, a typical
-   range", no shape. Ask for them by shape, the way #265 and #267 did for
-   the reconciler's gap and the comp's detail: `omSays` the OM's figure
-   with its unit ("5.45%", "$2,400/mo", "4.0%/yr"), `typicalRange` low to
-   high in the same unit with an en dash ("5.25%–5.75%",
-   "$2,150–$2,450/mo", "2.5%–3.5%"); describe the fields in the zod schema
-   too. A prompt test holds the examples up to `rangeRead` so every example
-   the prompt names is one both pages draw. (The report's pages all say it
-   in pictures now — #250 the memo, #253 the market page, #261 the comps,
-   #263 the reconciliation; every table on the deal page stacks into cards
-   on a phone after #262 and #264; #265 and #267 made the reconciler and
-   the comp scrutiny state their figures; #266 drew the section counts.)
+8. **The comp reader takes every shape a detail line comes in.** #267
+   asks the comp scrutiny for "$252k/unit · 5.4% cap · …" and
+   `lib/comp-detail.ts` reads that shape; a model asked for a figure also
+   writes "$252,000 per unit", "$252K/door", "$410 PSF", "$410 per SF",
+   "5.4% cap rate", "cap rate of 5.4%", "5.40% going-in cap" — check each
+   against `compFigures` and widen the readers where one falls through,
+   the way #265 did for the gap reader ("$1.2 million", "2 pp"), with a
+   test per shape and never a word that merely starts with a unit. The
+   same pass for the market check's `parseRange` / `rangeRead`: "5.25 to
+   5.75%", "5.25%-5.75%" (a hyphen), "$2,150 – $2,450 per month". (The
+   report's pages all say it in pictures now — #250 the memo, #253 the
+   market page, #261 the comps, #263 the reconciliation; every table on
+   the deal page stacks into cards on a phone after #262 and #264; #265,
+   #267 and #268 made the reconciler, the comp scrutiny and the market
+   check state their figures in the shapes the readers draw; #266 drew
+   the section counts.)
 
 ---
 

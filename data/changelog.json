@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-08",
+      "title": "Every market check comes back drawable",
+      "blurb": "The market check now states the OM's figure with its unit and the typical range as low to high in that unit — \"5.45%\" against \"5.25%–5.75%\" — so the picture the market tab and the full report draw of each assumption against its range appears on every screen, not only the sample. Where no numeric range applies, the check says so in words and draws nothing.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-08",
       "title": "Every comp comes back with its basis stated",
       "blurb": "The comp scrutiny now leads each comp's detail line with the figures the OM states — a sale comp's price per unit or per foot and its cap rate, then the date and size; a lease comp's rent and unit type — so the basis bars the comps tab and the full report draw appear on every screen, not only the sample. A comp whose terms the OM withholds says so and draws no bar.",
       "href": "/deals"
