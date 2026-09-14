@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { hoursSince } from "@/lib/research";
-import { costByStep, medianUsd, type UsageSummary } from "@/lib/anthropic/usage";
+import { CostCard, type UsageRow } from "./cost-card";
 
 export const metadata: Metadata = { title: "Data health" };
 
@@ -75,24 +75,6 @@ const fmtTs = (iso: string) =>
     hour12: false,
   }) + " UTC";
 
-/** A screen's ledger as the job row carries it (migration 0035). */
-interface UsageRow {
-  id: string;
-  usage: UsageSummary | null;
-  updated_at: string;
-}
-
-/** The steps' colours in the cost bar, in the order the pipeline runs them. */
-const STEP_COLORS = ["bg-brand", "bg-pass", "bg-caution", "bg-kill", "bg-ink/50", "bg-muted"];
-
-/** "The first signal" → "First signal": the step's name as a legend word. */
-const stepWord = (what: string) => {
-  const w = what.replace(/^The /, "");
-  return w.charAt(0).toUpperCase() + w.slice(1);
-};
-
-const fmtTokens = (n: number) => n.toLocaleString("en-US");
-
 export default async function DataHealthPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/data-health");
@@ -144,17 +126,10 @@ export default async function DataHealthPage() {
       .order("updated_at", { ascending: false })
       .limit(20);
     if (error) usageColumn = false;
-    else screens = ((data as UsageRow[] | null) ?? []).filter((s) => s.usage && Array.isArray(s.usage.calls));
+    else screens = (data as UsageRow[] | null) ?? [];
   } catch {
     usageColumn = false;
   }
-  const pricedScreens = screens
-    .map((s) => s.usage?.usd)
-    .filter((x): x is number => typeof x === "number" && Number.isFinite(x));
-  const medianCost = medianUsd(pricedScreens);
-  const latestScreen = screens[0]?.usage ?? null;
-  const split = latestScreen ? costByStep(latestScreen) : [];
-  const splitTotal = split.reduce((acc, s) => acc + (s.usd ?? 0), 0);
 
   return (
     <div className="space-y-6">
@@ -190,72 +165,7 @@ export default async function DataHealthPage() {
         </ul>
       </section>
 
-      <section className="rounded-xl border border-line bg-surface p-4" data-cost-card>
-        <h2 className="text-sm font-semibold">Cost per screen</h2>
-        {!usageColumn ? (
-          <p className="mt-1 text-sm text-muted">
-            The ledger column isn&apos;t there yet — run migration 0035; the next
-            screen writes what it spent here.
-          </p>
-        ) : screens.length === 0 ? (
-          <p className="mt-1 text-sm text-muted">
-            No screen has recorded what it spent yet — the next one will.
-          </p>
-        ) : (
-          <div className="mt-2">
-            <p className="flex flex-wrap items-baseline gap-x-2">
-              <span className="font-mono text-2xl font-semibold tabular-nums">
-                {medianCost != null ? `$${medianCost.toFixed(2)}` : "—"}
-              </span>
-              <span className="text-xs text-muted">
-                median of the last {screens.length} screen{screens.length === 1 ? "" : "s"}
-                {pricedScreens.length < screens.length ? " that priced" : ""}, at list price
-              </span>
-            </p>
-            {latestScreen && split.length > 0 && (
-              <>
-                <div
-                  className="mt-3 flex h-2 w-full overflow-hidden rounded-full bg-faint"
-                  data-cost-bar
-                  role="img"
-                  aria-label={`Latest screen, ${
-                    latestScreen.usd != null ? `$${latestScreen.usd.toFixed(2)}` : "unpriced"
-                  }: ${split.map((s) => `${stepWord(s.what)} ${s.usd != null ? `$${s.usd.toFixed(2)}` : "unpriced"}`).join(", ")}`}
-                >
-                  {split.map((s, i) => (
-                    <span
-                      key={s.what}
-                      className={`${STEP_COLORS[i % STEP_COLORS.length]} h-full`}
-                      style={{ width: `${splitTotal > 0 && s.usd != null ? (s.usd / splitTotal) * 100 : 0}%` }}
-                    />
-                  ))}
-                </div>
-                <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted" aria-hidden>
-                  {split.map((s, i) => (
-                    <li key={s.what} className="inline-flex items-center gap-1.5">
-                      <span className={`inline-block h-2 w-2 rounded-sm ${STEP_COLORS[i % STEP_COLORS.length]}`} />
-                      {stepWord(s.what)}
-                      <span className="font-mono tabular-nums text-ink">
-                        {s.usd != null ? `$${s.usd.toFixed(2)}` : "—"}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-2 font-mono text-[11px] tabular-nums text-muted">
-                  latest screen · {latestScreen.calls.length} calls · in {fmtTokens(latestScreen.totals.input)} · cache write{" "}
-                  {fmtTokens(latestScreen.totals.cacheWrite)} · cache read {fmtTokens(latestScreen.totals.cacheRead)} · out{" "}
-                  {fmtTokens(latestScreen.totals.output)} · {Math.round(latestScreen.ms / 1000)}s
-                  {latestScreen.unpriced.length ? ` · unpriced: ${latestScreen.unpriced.join(", ")}` : ""}
-                </p>
-              </>
-            )}
-            <p className="mt-2 text-xs leading-relaxed text-muted">
-              The one cache write of the OM is most of a screen; the levers that cut it are
-              named in order in <code className="rounded bg-faint px-1">lib/anthropic/models.ts</code>.
-            </p>
-          </div>
-        )}
-      </section>
+      <CostCard screens={screens} usageColumn={usageColumn} />
 
       <section
         className={`rounded-xl border p-4 ${
