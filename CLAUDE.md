@@ -106,7 +106,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   it is dense enough to stand in for the pages (`isDenseLayer`: four
   pages at least, half of them dense with text of their own — a line that
   recurs on half the pages once or twice a page is furniture and counts on
-  none, a table's rows never are); the PDF inline or as a Files-API
+  none, so is a line whose exact words recur on half the pages however
+  many times a page (the caption tiled under every rendering), a table's
+  rows never are); the PDF inline or as a Files-API
   reference otherwise. Only the screen and Ask pass `textFirst`; a buyer's
   model, a BOV and a rent roll keep their pages. `OM_READ=pdf|text`
   overrides per call. The layer's page count is what the facts are

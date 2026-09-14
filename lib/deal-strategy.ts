@@ -186,8 +186,11 @@ export interface NoiFigure {
 }
 
 const NOI_INCLUDE = /net operating income|\bnoi\b/i;
-// Per-unit / per-SF figures, margins and growth rates are not the NOI.
-const NOI_EXCLUDE = /\bper\b|\/|psf|unit|margin|growth|debt|yield|multiple/i;
+// Per-unit / per-SF figures, margins and growth rates are not the NOI. A
+// slash makes a rate only when a unit follows it ("NOI / SF", "NOI/key");
+// "NOI (T-12 / TTM)" is the year's NOI under two names for the period.
+const RATE_SLASH = String.raw`\/\s*(?:unit|door|key|room|bed|pad|site|suite|apt|apartment|home|acre|sf|s\.f\.|sq|psf|month|mo\b|yr\b|year|annum)`;
+const NOI_EXCLUDE = new RegExp(String.raw`\bper\b|${RATE_SLASH}|psf|unit|margin|growth|debt|yield|multiple`, "i");
 // A later year of the hold ("Year 2", "Yr. 3", "Year 10") is the shared
 // LATER_YEAR guard, so this classifier, the cap reader and the strategy
 // inference agree on which year is still today's.

@@ -53,6 +53,14 @@ export function lineShape(line: string): string | null {
   return s.length >= 8 && (s.match(/[a-z]/g) ?? []).length >= 3 ? s : null;
 }
 
+/** A line's exact words for the tiled-caption test: lower-cased and
+ *  whitespace-collapsed, digits kept — a rent roll's rows differ by theirs,
+ *  the caption under every rendering does not. */
+export function lineText(line: string): string | null {
+  const s = line.toLowerCase().replace(/\s+/g, " ").trim();
+  return s.length >= 8 && (s.match(/[a-z]/g) ?? []).length >= 3 ? s : null;
+}
+
 /** The gap, as a fraction of the type size, past which two items on one
  *  baseline are two words. */
 const WORD_GAP = 0.18;
@@ -168,30 +176,43 @@ const FURNITURE_PER_PAGE = 2;
  * on three), once or twice a page, is the deck's furniture — a running
  * header, a page footer, the disclaimer under every picture — and counts
  * on no page: a photo deck whose only text is that footer must read as the
- * pictures it is, not as a dense deck. Each page's own `chars` stays the
- * raw count (the tagged document uses it to mark a page with no text).
+ * pictures it is, not as a dense deck. So is a line whose exact words
+ * recur on that many pages however many times a page — the caption
+ * tiled under three renderings on every page — while a table's rows,
+ * which share a shape but differ by their figures, never are. Each page's
+ * own `chars` stays the raw count (the tagged document uses it to mark a
+ * page with no text).
  */
 export function summarize(pages: PdfTextPage[]): PdfTextLayer {
   const seenOn = new Map<string, number>();
+  const exactOn = new Map<string, number>();
   const shaped = pages.map((p) => {
     const lines = p.text ? p.text.split("\n") : [];
     const onPage = new Map<string, number>();
+    const exactHere = new Set<string>();
     for (const line of lines) {
       const s = lineShape(line);
       if (s) onPage.set(s, (onPage.get(s) ?? 0) + 1);
+      const e = lineText(line);
+      if (e) exactHere.add(e);
     }
     for (const [s, n] of onPage) {
       if (n <= FURNITURE_PER_PAGE) seenOn.set(s, (seenOn.get(s) ?? 0) + 1);
     }
+    for (const e of exactHere) exactOn.set(e, (exactOn.get(e) ?? 0) + 1);
     return lines;
   });
   const need = Math.max(3, Math.ceil(pages.length / 2));
   const furniture = new Set<string>();
   for (const [s, n] of seenOn) if (n >= need) furniture.add(s);
+  const tiled = new Set<string>();
+  for (const [e, n] of exactOn) if (n >= need) tiled.add(e);
   const ownChars = shaped.map((lines) => {
     let chars = 0;
     const discounted = new Map<string, number>();
     for (const line of lines) {
+      const e = lineText(line);
+      if (e && tiled.has(e)) continue;
       const s = lineShape(line);
       if (s && furniture.has(s) && (discounted.get(s) ?? 0) < FURNITURE_PER_PAGE) {
         discounted.set(s, (discounted.get(s) ?? 0) + 1);
@@ -201,11 +222,18 @@ export function summarize(pages: PdfTextPage[]): PdfTextLayer {
     }
     return chars;
   });
+  // Distinct running lines: a tiled line whose shape is already furniture
+  // (the same footer on every page is both) is one line, not two.
+  let boilerplateLines = furniture.size;
+  for (const e of tiled) {
+    const s = lineShape(e);
+    if (!s || !furniture.has(s)) boilerplateLines++;
+  }
   return {
     pages,
     totalChars: ownChars.reduce((a, c) => a + c, 0),
     densePages: ownChars.filter((c) => c >= DENSE_PAGE_CHARS).length,
-    boilerplateLines: furniture.size,
+    boilerplateLines,
   };
 }
 

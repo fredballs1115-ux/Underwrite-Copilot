@@ -24,15 +24,16 @@ host that hangs is held at bay, a door waits at most half its budget in a
 host's queue, the warm-up reports its progress while it runs — the 18:05
 and 18:12 probes landed on fresh processes before the warm-up had
 finished, so `warm` was still null — and the thirteenth review's three
-findings on the live layer) is open; that review's two remaining
-findings (a caption tiled three times a page reads as a dense deck; an
-NOI label with a slash reads as no NOI) follow as #284.
+findings on the live layer) is merged and awaits its proof; #284 (that
+review's two remaining findings: a caption tiled three times a page no
+longer reads as a dense deck, an NOI label with a slash that is not a
+rate no longer reads as no NOI) is open.
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-A hundred and eight PRs (#176–#283) landed across one review session and the
+A hundred and nine PRs (#176–#284) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -540,6 +541,12 @@ deploy (live-verify shows the sha).
   and 1 items for the first phrasings, so two changed); each door holds
   at most half of what is left, a stale copy keeps its `via`, and a fetch
   that outlives its abort gives its host slot back at the wall clock.
+- **The thirteenth review's two remaining findings** (#284): a line whose
+  exact words recur on half the pages, however many times a page (the
+  caption tiled under three renderings), is furniture, so a picture deck
+  is read as pictures from the start; and a slash in an NOI label is a
+  rate only when a unit follows it, so `NOI (T-12 / TTM)` is the NOI and
+  the deck is not re-read as pages.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as

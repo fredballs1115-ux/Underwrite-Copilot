@@ -10,7 +10,7 @@
     {
       "date": "2026-09-14",
       "title": "A deck whose figures are pictures is read as pictures",
-      "blurb": "The text-first read now tells a deck's own words from its furniture: the disclaimer under every photo and the running page header count toward no page, so a picture deck with a footer on each page is read page by page, and a deck of a few pages always is. When the text layer yields figures but no NOI at all — the shape of a narrative whose financial tables were pasted in as images — the screen re-reads the pages before it goes on, and a screen resumed after a restart remembers that it had to.",
+      "blurb": "The text-first read now tells a deck's own words from its furniture: the disclaimer under every photo, the running page header and the caption tiled under every rendering count toward no page, so a picture deck with a footer or a caption on each page is read page by page, and a deck of a few pages always is. When the text layer yields figures but no NOI at all — the shape of a narrative whose financial tables were pasted in as images — the screen re-reads the pages before it goes on (an NOI stated under a label like \"NOI (T-12 / TTM)\" counts as one), and a screen resumed after a restart remembers that it had to.",
       "href": "/deals"
     },
     {

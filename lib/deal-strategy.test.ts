@@ -131,9 +131,18 @@ describe("classifyNoi / noiFigures", () => {
   it("is not fooled by per-unit figures, margins or growth", () => {
     expect(classifyNoi(metric("NOI per unit", "$15,600"))).toBeNull();
     expect(classifyNoi(metric("NOI / SF", "$12.10"))).toBeNull();
+    expect(classifyNoi(metric("NOI/key", "$14,200"))).toBeNull();
+    expect(classifyNoi(metric("NOI / door", "$9,800"))).toBeNull();
+    expect(classifyNoi(metric("NOI / month", "$98,000"))).toBeNull();
     expect(classifyNoi(metric("NOI margin", "62%"))).toBeNull();
     expect(classifyNoi(metric("NOI growth", "3%"))).toBeNull();
     expect(classifyNoi(metric("Asking price", "$20M"))).toBeNull();
+  });
+
+  it("a slash between two names for the period is not a rate: the NOI stated under it classifies", () => {
+    expect(classifyNoi(metric("NOI (T-12 / TTM)", "$1,200,000"))).toBe("in_place");
+    expect(classifyNoi(metric("NOI / cash flow (in place)", "$1,200,000"))).toBe("in_place");
+    expect(classifyNoi(metric("Net operating income (2025 / 2026 budget)", "$1,250,000"))).toBe("year1");
   });
 
   it("drops a blank — a dash is not zero", () => {
