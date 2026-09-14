@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and fourteen PRs, #176–#289, each
+estimate, and that's what it should flag." A hundred and fifteen PRs, #176–#290, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1640,6 +1640,18 @@ confirmed equal to the main tip after each batch.
   holds the tags to the score and to the asset-class mapping (apartments
   → multifamily, warehouse → industrial); the render test asserts the
   tags on the fixture and the fold on fourteen headlines.
+- **#290 A headline that names a covered market links to its brief.**
+  `lib/news/markets.ts` reads the proper nouns each of the eighteen
+  metro entries goes by in a headline (New York, Manhattan, Brooklyn →
+  NYC; Bethesda, Silver Spring → Montgomery County; Fort Worth, DFW →
+  Dallas–Fort Worth; Bay Area, Oakland → San Francisco …) on word
+  boundaries, and a word that names two places — "Washington" alone,
+  "Arlington", a bare "Richmond" — tags nothing rather than guessing;
+  the address matcher's state-guarded keywords ("king", "cook",
+  "hudson") were never the right table for prose. On the News page the
+  market is a tag beside the signal tags, and it opens
+  `/market?metro=…` — the news tied to the ground layer. Six tests hold
+  the table; the render test asserts the links on the fixture.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

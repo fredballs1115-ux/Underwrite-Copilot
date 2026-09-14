@@ -36,14 +36,15 @@ twenty minutes) and #287 (the pipeline gets the wide shell and whole
 deal names; the News caption counts its sources) are proven (`f3b6ede`
 at 19:12: 12 of 12 sources, `NEWS WARM-UP: 12 of 12 sources answered
 at boot, 11.4s`, `NEWS HELD: none`, twelve public pages lint clean);
-#288 (the News page's sources as a row of chips) and #289 (each
-headline's tags and the fold at twelve) follow.
+#288 (the News page's sources as a row of chips), #289 (each
+headline's tags and the fold at twelve) and #290 (a covered market
+named in a headline links to its brief) follow.
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-A hundred and fourteen PRs (#176–#289) landed across one review session and the
+A hundred and fifteen PRs (#176–#290) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -586,6 +587,10 @@ deploy (live-verify shows the sha).
   the score counts — rates, cap rates, distress and regulation in
   colour; the asset class, supply, debt and costs & tax in grey — and
   the list shows twelve, the rest one click away with their ranks kept.
+- **A headline that names a covered market links to its brief** (#290):
+  "Atlanta", "Manhattan", "Fort Worth", "Bay Area" become a tag beside
+  the signal tags that opens the metro's page; a word that names two
+  places ("Washington" alone, "Arlington") tags nothing.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
