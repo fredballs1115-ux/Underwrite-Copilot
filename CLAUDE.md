@@ -91,6 +91,35 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   beside `pdfTextOf` — against a render without it; the memo reserves its
   footer band (`paddingBottom`), so a memo that cannot fit one page flows to
   a second rather than over its footer.
+- What a screen costs: `lib/anthropic/usage.ts` is the per-run ledger —
+  `structured()` records every call's four token meters into whichever
+  ledger is open on the async context, `runAnalysis` writes the summary to
+  `analysis_jobs.usage` (migration 0035) and one log line, Ask logs its
+  own; the list prices live in `lib/anthropic/models.ts` (`PRICES`, by id
+  prefix) beside the model levers, whose comment says the one thing to
+  know: the prompt cache is per model, so the OM-reading steps move
+  together or not at all. The operator's picture is the pure
+  `app/(app)/data-health/cost-card.tsx`, rendered on fixtures in
+  `lib/cost-card.render.test.ts`.
+- How the OM reaches the model: `lib/anthropic/om-source.ts` — the deck's
+  own text layer, page-tagged (`lib/pdf-text.ts`, pdfjs in-process), when
+  it is dense enough to stand in for the pages (`isDenseLayer`); the PDF
+  inline or as a Files-API reference otherwise. Only the screen and Ask
+  pass `textFirst`; a buyer's model, a BOV and a rent roll keep their
+  pages. `OM_READ=pdf|text` overrides per call. The layer's page count is
+  what the facts are validated against.
+- An asset class's words: `lib/asset-class.ts` (`ASSET_CLASS_LABEL`,
+  `assetClassLabel`, the forms' option list) — every surface that prints
+  one goes through it, so a stored `self_storage` never reaches a page
+  raw; the pipeline row's slots and its "Auto" rule are `lib/pipeline-slots.ts`.
+- The News page's live layer: `lib/news/feeds.ts` (pure: the sources with
+  their fallbacks, parsing, ranking) and `lib/news/live.ts` (the network:
+  a fresh copy per process, a wall-clock deadline per source, the
+  publisher's own feed then its fallbacks inside one budget, one retry
+  after a fast 429/5xx, a last-good copy; the status names the way in as
+  `via`). `/api/news/health` is public and live-verify prints every
+  source's outcome from Render's own network — read those lines before
+  touching a feed URL; the sandbox cannot reach the publishers.
 - The pipeline's failure modes: `lib/anthropic/failure.ts` turns any failure
   into one sentence the analyst can act on (the raw text goes to the server
   log, never the page), and its `structured()` wraps every structured-output
