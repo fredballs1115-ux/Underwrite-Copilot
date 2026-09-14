@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-14",
+      "title": "The sign-in page opens on a real place",
+      "blurb": "Baltimore's Inner Harbor from above stands behind the sign-in card — the last public page that opened on a flat colour — a public-domain USGS frame under the same scrim, credited in the corner.",
+      "href": "/login"
+    },
+    {
+      "date": "2026-09-14",
       "title": "Every public page opens on a real place",
       "blurb": "The homepage's hero, the argument on /why and the sample screen on /demo each open on a real photograph of a covered downtown — Midtown Manhattan, Washington, and Center City Philadelphia, the sample deal's own city — public-domain USGS frames under a scrim, credited in the corner.",
       "href": "/why"

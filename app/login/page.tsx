@@ -5,6 +5,7 @@ import { FREE_DEALS } from "@/lib/marketing-constants";
 import { MARKET_COUNT } from "@/app/markets-marquee";
 import { authLinkBanner, initialLoginMode } from "@/lib/auth-flow";
 import { LoginForm } from "./login-form";
+import { PlaceBackdrop } from "@/app/place-band";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -34,8 +35,11 @@ export default async function LoginPage({
   // confirmation never shows as "Email confirmed".
   const linkBanner = authLinkBanner(params);
   return (
-    <div className="band-dark flex flex-1 flex-col">
-      <main id="main" className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16">
+    <div className="band-dark relative flex flex-1 flex-col overflow-hidden">
+      {/* The door opens on a real place too: Baltimore's Inner Harbor, a
+          covered market a few miles from the DMV core (app/place-band). */}
+      <PlaceBackdrop metro="baltimore" height={900} opacity="opacity-25" />
+      <main id="main" className="relative mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16">
         <Link
           href="/"
           className="flex items-center justify-center gap-2.5 transition-opacity hover:opacity-80"

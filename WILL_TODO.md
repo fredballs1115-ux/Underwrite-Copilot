@@ -53,8 +53,14 @@ page; the pipeline's rail off the numbers) are proven (`a836c30` at
 sources at boot in 14.8 s — Commercial Property Executive answering
 through its Google door at last, REBusinessOnline the one timeout —
 `NEWS HELD: none`, twelve public pages lint clean); #295 (a real
-photograph behind the hero, four slots for the operator's) and #296
-(`/why` and `/demo` open on a real place too) follow.
+photograph behind the hero, four slots for the operator's) is proven
+(`d74dbbf` at 20:15: `DEPLOY: LIVE`, the homepage's head preloading
+the Midtown frame, the footer naming the improvement, a fresh process
+185 s old that warmed 11 of 12 sources at boot — every search-backed
+source through Bing, Commercial Property Executive with two items,
+REBusinessOnline the one timeout — `NEWS HELD: none`, twelve public
+pages lint clean); #296 (`/why` and `/demo` open on a real place too)
+and #297 (the sign-in page too) follow.
 
 ---
 
