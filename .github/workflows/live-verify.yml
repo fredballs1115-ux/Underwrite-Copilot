@@ -175,7 +175,29 @@ jobs:
             console.log("NEWS HEALTH: " + j.summary);
             for (const s of j.sources ?? []) console.log(`  ${s.ok ? "ok  " : "FAIL"} ${String(s.ms).padStart(5)} ms  ${String(s.count).padStart(3)} items  ${s.stale ? "stale " : ""}${s.cached ? "cached " : ""}${s.name}${s.via ? " via " + s.via : ""}${s.error ? " — " + s.error : ""}`);
             for (const h of (j.top ?? []).slice(0, 3)) console.log(`  top: ${h.title} — ${h.publisher}`);
+            // The boot warm-up (#278) reads the sources one at a time before
+            // any visitor; the route reports its last run (#280).
+            if (j.warm) console.log(`NEWS WARM-UP: ${j.warm.answered} of ${j.warm.total} sources answered at boot, ${(j.warm.ms / 1000).toFixed(1)}s, at ${j.warm.at}`);
+            else console.log("NEWS WARM-UP: not reported (pre-#280 build, or the warm-up has not finished on this process)");
           ' || true
+      - name: The search doors, from the runner (diagnostic, non-gating)
+        # Every Google News read has a Bing News read behind it (#278). The
+        # sandbox that writes this code cannot reach either host, so the
+        # runner checks each door's shape: HTTP status, item count, the
+        # outlet element the parser reads, the click redirect it unwraps.
+        run: |
+          probe() {
+            local label="$1" url="$2" code items src click
+            code=$(curl -sS -o door.xml -w "%{http_code}" --max-time 30 -A "Mozilla/5.0 (compatible; UnderwriteCopilot/1.0; +https://underwrite-copilot.onrender.com/news)" "$url" || echo "FETCH-FAILED")
+            items=$(grep -o "<item>" door.xml 2>/dev/null | wc -l | tr -d ' ')
+            src=$(grep -o -i "<news:source>" door.xml 2>/dev/null | wc -l | tr -d ' ')
+            click=$(grep -o "apiclick.aspx" door.xml 2>/dev/null | wc -l | tr -d ' ')
+            echo "SEARCH DOOR ${label}: HTTP ${code} · ${items} items · ${src} News:Source · ${click} click redirects"
+            rm -f door.xml
+          }
+          probe "Bing · site:therealdeal.com" "https://www.bing.com/news/search?q=site%3Atherealdeal.com&format=rss"
+          probe "Bing · commercial real estate" "https://www.bing.com/news/search?q=%22commercial+real+estate%22&format=rss"
+          probe "Google · site:therealdeal.com" "https://news.google.com/rss/search?q=site%3Atherealdeal.com&hl=en-US&gl=US&ceid=US%3Aen"
       - name: Verdict
         # Two tiers: the hero headline proves the site is up and on the right
         # lineage; the build-sha stamp (the uc-build sentinel, printed above

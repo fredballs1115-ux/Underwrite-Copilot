@@ -14,16 +14,18 @@ ranked: the three publishers that answered Render with HTTP 403 (The Real
 Deal, Multi-Housing News, Commercial Property Executive) and GlobeSt,
 whose FeedBlitz URL parsed to zero items, now come in through #274's
 fallbacks at a hundred items each — on a warm process; the first read on
-a fresh one, minutes after a deploy, found 4 of 12, which is what #278
-fixes. #275, #276 and #277 are proven (`2c362a6` at 17:24 UTC, `f26a4e2`
-at 17:29, `bb3061c` at 17:37); #278 is merged and awaits its proof; #279
-follows).
+a fresh one, minutes after a deploy, found 4 of 12 three deploys running,
+and #278 fixed it: the first read on its own fresh process (`f2895c9`,
+proven at 17:53 UTC) answered 12 of 12, every source fetched fresh in
+under two seconds through the gate. #275–#278 are proven (`2c362a6` at
+17:24 UTC, `f26a4e2` at 17:29, `bb3061c` at 17:37, `f2895c9` at 17:53);
+#279 is merged and awaits its proof; #280 follows).
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-A hundred and four PRs (#176–#279) landed across one review session and the
+A hundred and five PRs (#176–#280) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -507,6 +509,11 @@ deploy (live-verify shows the sha).
   deck under four pages goes as its pages; the extraction re-reads the
   pages when the layer found figures but no NOI; the cost card counts the
   screens that priced; a class the model phrased itself keeps its case.
+- **The warm-up reports, and the search doors are checked from the
+  runner** (#280): `/api/news/health` carries `warm` (the boot warm-up's
+  last run on this process) and live-verify prints it; a new non-gating
+  step fetches Bing's and Google's RSS from the runner and prints each
+  door's status, item count, outlet-element count and redirect count.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
@@ -586,10 +593,14 @@ also linked from `/data-health` under "Service probes":
    connections — the topic searches and the site-scoped fallbacks died
    together. #278 gates the host to two requests at a time, caps a first
    door at half the budget, puts Bing News behind every Google read, and
-   warms the sources one at a time at boot, so read the first NEWS HEALTH
-   after its deploy: the sources should say `cached` (the warm-up ran
-   before the probe) and, on a run that fetched fresh, `via Google News ·
-   site:…` or `via Bing News · …`. A line that says `HTTP 403` or `503`
+   warms the sources one at a time at boot. The first NEWS HEALTH after
+   its deploy (17:53 UTC) read 12 of 12 on the fresh process, every
+   source fetched fresh in 41–1,793 ms, the four blocked publishers `via
+   Google News · site:…`. On later runs a source says `cached` when the
+   warm-up or an earlier visitor filled it, `via Bing News · …` when
+   Google refused and the second door answered; since #280 the route also
+   reports the warm-up (`NEWS WARM-UP: N of 12 … at boot`) and the runner
+   checks both search doors' shape. A line that says `HTTP 403` or `503`
    with no `via` means every door closed and wants a look; `[news]
    warm-up: N of 12 sources answered` is in the service log at each boot.
    `/api/news/health` is public, so the same JSON is one click away under

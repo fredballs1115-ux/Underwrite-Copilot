@@ -17,7 +17,7 @@
 
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { fetchLiveHeadlines, forgetLiveHeadlines } from "@/lib/news/live";
+import { fetchLiveHeadlines, forgetLiveHeadlines, lastWarmUp } from "@/lib/news/live";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +35,9 @@ export async function GET(req: Request) {
     {
       fetchedAt: live.fetchedAt,
       summary: `${answered} of ${live.sources.length} sources answered${stale ? ` (${stale} from an earlier copy)` : ""}; ${live.headlines.length} headlines ranked.`,
+      // The boot warm-up's last run on this process (null before it finishes,
+      // or when NEWS_WARM=0): live-verify prints it after a deploy.
+      warm: lastWarmUp(),
       sources: live.sources,
       top: live.headlines.slice(0, 8).map((h) => ({
         title: h.title,

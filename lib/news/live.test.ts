@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchLiveHeadlines, forgetLiveHeadlines, warmLiveHeadlines } from "./live";
+import { fetchLiveHeadlines, forgetLiveHeadlines, lastWarmUp, warmLiveHeadlines } from "./live";
 import type { NewsSource } from "./feeds";
 
 // The network half of the live headlines, driven with a fake fetch. The
@@ -276,10 +276,14 @@ describe("fetchLiveHeadlines — a cold start does not burst", () => {
     }) as typeof fetch;
     const sources = [src("warm0"), src("warm1"), src("warm2")];
     const lines: string[] = [];
+    expect(lastWarmUp()).toBeNull();
     const r = await warmLiveHeadlines(sources, { timeoutMs: 1_000, gapMs: 0, log: (l) => lines.push(l) });
     expect(r).toMatchObject({ answered: 2, total: 3 });
     expect(peak).toBe(1);
     expect(lines).toEqual([expect.stringMatching(/^\[news\] warm-up: 2 of 3 sources answered in \d+\.\ds$/)]);
+    // …and the health route can say it happened.
+    expect(lastWarmUp()).toMatchObject({ answered: 2, total: 3 });
+    expect(Date.parse(lastWarmUp()!.at)).toBeGreaterThan(Date.now() - 60_000);
 
     const live = await fetchLiveHeadlines(sources, 10, { timeoutMs: 1_000 });
     expect(live.sources.map((s) => s.cached)).toEqual([true, true, false]);

@@ -345,6 +345,15 @@ export interface WarmResult {
   ms: number;
 }
 
+/** The last warm-up this process finished — the health route reports it,
+ *  so a run after a deploy can say the boot read happened before any
+ *  visitor's, not just infer it from the cached lines. */
+let lastWarm: (WarmResult & { at: string }) | null = null;
+
+export function lastWarmUp(): (WarmResult & { at: string }) | null {
+  return lastWarm;
+}
+
 /**
  * Read the sources one at a time, with a breath between, so a fresh process
  * fills its copies without the burst a first visitor's parallel read would
@@ -372,6 +381,7 @@ export async function warmLiveHeadlines(
   }
   const ms = Date.now() - t0;
   log(`[news] warm-up: ${answered} of ${sources.length} sources answered in ${(ms / 1000).toFixed(1)}s`);
+  lastWarm = { answered, total: sources.length, ms, at: new Date().toISOString() };
   return { answered, total: sources.length, ms };
 }
 
