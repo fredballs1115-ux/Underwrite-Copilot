@@ -115,9 +115,16 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
 - The News page's live layer: `lib/news/feeds.ts` (pure: the sources with
   their fallbacks, parsing, ranking) and `lib/news/live.ts` (the network:
   a fresh copy per process, a wall-clock deadline per source, the
-  publisher's own feed then its fallbacks inside one budget, one retry
-  after a fast 429/5xx, a last-good copy; the status names the way in as
-  `via`). `/api/news/health` is public and live-verify prints every
+  publisher's own feed then its fallbacks inside one budget — a door with
+  others behind it holds at most half of it — one retry after a fast
+  429/5xx, a last-good copy, a gate of two requests in flight per host,
+  one request per source shared by concurrent callers; the status names
+  the way in as `via`, on a cached line too). Every Google News read has
+  a Bing News read behind it (`News:Source` is the outlet; the click
+  redirect is unwrapped by `directUrl`). `instrumentation.ts` warms the
+  sources one at a time at boot (`warmLiveHeadlines`; `NEWS_WARM=0` off)
+  because a fresh process's first parallel read bursts one host and gets
+  503s back. `/api/news/health` is public and live-verify prints every
   source's outcome from Render's own network — read those lines before
   touching a feed URL; the sandbox cannot reach the publishers.
 - The pipeline's failure modes: `lib/anthropic/failure.ts` turns any failure

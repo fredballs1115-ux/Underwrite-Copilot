@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { fetchLiveHeadlines } from "@/lib/news/live";
-import { timeAgo } from "@/lib/news/feeds";
+import { searchHostsAnswering, timeAgo } from "@/lib/news/feeds";
 
 export const metadata: Metadata = { title: "News" };
 export const dynamic = "force-dynamic";
@@ -103,6 +103,7 @@ async function LiveHeadlinesSection() {
   const answered = live.sources.filter((s) => s.ok || s.stale);
   const missing = live.sources.filter((s) => !s.ok && !s.stale);
   const publishers = answered.filter((s) => s.kind === "publisher");
+  const searchHosts = searchHostsAnswering(live.sources);
   const now = Date.parse(live.fetchedAt);
   return (
     <section aria-labelledby="live-news">
@@ -172,17 +173,17 @@ async function LiveHeadlinesSection() {
               </span>
             ))
           : "no publisher feed answered"}
-        {answered.some((s) => s.kind === "topic") && (
+        {searchHosts.length > 0 && (
           <>
             {publishers.length > 0 ? ", plus " : ", "}
-            <a
-              href="https://news.google.com/"
-              target="_blank"
-              rel="noreferrer"
-              className="hover:text-brand"
-            >
-              Google News
-            </a>{" "}
+            {searchHosts.map((h, i) => (
+              <span key={h.name}>
+                {i > 0 && " and "}
+                <a href={h.home} target="_blank" rel="noreferrer" className="hover:text-brand">
+                  {h.name}
+                </a>
+              </span>
+            ))}{" "}
             topic searches naming each outlet
           </>
         )}
