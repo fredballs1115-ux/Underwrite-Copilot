@@ -17,6 +17,23 @@ export interface PipelineSlots {
   yoc: string | null;
 }
 
+/**
+ * The asset class a pipeline row shows. A deal created with "Auto-detect"
+ * keeps "auto" in its column, and what the deck turned out to be lives in
+ * the extraction — so the row shows that read, and shows nothing (no rail,
+ * no dot, a dash) while nothing has read the deck yet. "Auto" was never an
+ * asset class, and a row that said so read as one.
+ */
+export function shownAssetClass(
+  stored: string | null | undefined,
+  extraction: { assetClass?: string | null } | null | undefined,
+): string {
+  const s = (stored ?? "").trim().toLowerCase();
+  if (s && s !== "auto") return s;
+  const e = (extraction?.assetClass ?? "").trim().toLowerCase();
+  return e && e !== "auto" ? e : "";
+}
+
 export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | null): PipelineSlots {
   const metrics = extraction.metrics ?? [];
   // The same read the deal page makes — extraction plus the first signal —

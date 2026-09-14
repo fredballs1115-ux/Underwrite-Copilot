@@ -2,6 +2,7 @@ import "server-only";
 import ExcelJS from "exceljs";
 import { applyWorkbookBranding, type ExportBranding } from "@/lib/excel-branding";
 import { STAGES, STAGE_LABEL, normalizeStage, type Stage } from "@/lib/stages";
+import { assetClassLabel } from "@/lib/asset-class";
 import { parseMoney, parsePct } from "@/lib/criteria";
 
 /**
@@ -164,7 +165,7 @@ export async function buildPipelineWorkbook(
       row.getCell(2).font = { ...baseFont, bold: !isDead };
       row.getCell(3).value = STAGE_LABEL[normalizeStage(d.stage)];
       row.getCell(3).font = baseFont;
-      row.getCell(4).value = d.assetClass === "auto" ? "—" : d.assetClass;
+      row.getCell(4).value = assetClassLabel(d.assetClass) || "—";
       row.getCell(4).font = baseFont;
       // The deal's kind beside its asset class: a conversion's figures read
       // differently from a stabilized asset's, and a meeting reads the row

@@ -9,6 +9,7 @@ import {
 } from "./actions";
 import { AddressAutocomplete } from "../address-autocomplete";
 import type { StructuredAddress } from "@/lib/address";
+import { ASSET_CLASS_OPTIONS } from "@/lib/asset-class";
 import { NOTES_MAX, type ManualDealFacts } from "@/lib/manual-deal";
 
 /**
@@ -99,15 +100,11 @@ export function ManualDealForm({
           aria-label="Asset class"
           className="rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
         >
-          <option value="multifamily">Multifamily</option>
-          <option value="office">Office</option>
-          <option value="industrial">Industrial</option>
-          <option value="retail">Retail</option>
-            <option value="sfr_btr">SFR / BTR</option>
-            <option value="self_storage">Self-storage</option>
-            <option value="manufactured_housing">Manufactured housing</option>
-            <option value="hospitality_str">Hospitality / STR</option>
-            <option value="land_infill">Land / infill</option>
+          {ASSET_CLASS_OPTIONS.map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
         </select>
       </div>
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { listSubmarkets } from "@/lib/market/store";
 import type { Submarket } from "@/lib/market/types";
+import { assetClassLabel } from "@/lib/asset-class";
 import { createSubmarket } from "@/app/(app)/submarkets/actions";
 
 /**
@@ -91,7 +92,7 @@ export async function SubmarketsPanel({
                   <span className="text-sm font-medium text-ink">{s.name}</span>
                   <span className="text-xs text-muted">
                     {s.metro ? `${s.metro} · ` : ""}
-                    <span className="capitalize">{s.assetClass}</span>
+                    <span>{assetClassLabel(s.assetClass)}</span>
                     {" · "}warns past {s.supplyWarningMonths} mo of supply
                   </span>
                   {excl ? (

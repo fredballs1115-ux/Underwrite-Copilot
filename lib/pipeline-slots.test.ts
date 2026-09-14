@@ -4,7 +4,19 @@
 // the shared reader with the first signal as the fallback.
 import { describe, expect, it } from "vitest";
 import type { ExtractedMetric, ExtractionResult } from "@/lib/anthropic/types";
-import { pickSlots } from "./pipeline-slots";
+import { pickSlots, shownAssetClass } from "./pipeline-slots";
+
+describe("shownAssetClass — a row never says \"Auto\"", () => {
+  it("shows the stored class, the extraction's read for an auto-detect deal, and nothing before any read", () => {
+    expect(shownAssetClass("office", null)).toBe("office");
+    expect(shownAssetClass("auto", { assetClass: "multifamily" })).toBe("multifamily");
+    expect(shownAssetClass("Auto", { assetClass: "Industrial" })).toBe("industrial");
+    expect(shownAssetClass("auto", null)).toBe("");
+    expect(shownAssetClass("auto", { assetClass: "auto" })).toBe("");
+    expect(shownAssetClass(null, { assetClass: "retail" })).toBe("retail");
+    expect(shownAssetClass("", undefined)).toBe("");
+  });
+});
 
 const m = (label: string, value: string): ExtractedMetric => ({ label, value, flagged: false, page: "" });
 const ex = (metrics: ExtractedMetric[], over: Partial<ExtractionResult> = {}): ExtractionResult =>
