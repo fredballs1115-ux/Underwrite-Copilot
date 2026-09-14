@@ -80,9 +80,15 @@ describe("CostCard — what the last screens cost, drawn", () => {
     const text = visibleText(html);
     expect(gluedWords(text)).toEqual([]);
     expect(text).toContain("$2.50");
-    expect(text).toContain("median of the last 2 screens that priced, at list price");
+    expect(text).toContain("median of the 1 screen that priced, of the last 2, at list price");
     expect(html).toMatch(/aria-label="Latest screen, unpriced: .*Verdict unpriced"/);
     expect(text).toContain("unpriced: mystery-model");
+
+    // No screen priced: no median to show, and the sentence says why.
+    const none = visibleText(render([row("j2", summary(mystery, null, ["mystery-model"]))]));
+    expect(gluedWords(none)).toEqual([]);
+    expect(none).toContain("none of the last 1 screen priced — an unpriced model");
+    expect(none).not.toContain("median of");
   });
 
   it("says plainly when no screen has recorded a ledger, and when the column is not there yet", () => {

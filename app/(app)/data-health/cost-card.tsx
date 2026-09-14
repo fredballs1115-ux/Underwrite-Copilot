@@ -64,8 +64,11 @@ export function CostCard({
               {usd(medianCost) ?? "—"}
             </span>
             <span className="text-xs text-muted">
-              median of the last {rows.length} screen{rows.length === 1 ? "" : "s"}
-              {priced.length < rows.length ? " that priced" : ""}, at list price
+              {priced.length === rows.length
+                ? `median of the last ${rows.length} screen${rows.length === 1 ? "" : "s"}, at list price`
+                : priced.length === 0
+                  ? `none of the last ${rows.length} screen${rows.length === 1 ? "" : "s"} priced — an unpriced model`
+                  : `median of the ${priced.length} screen${priced.length === 1 ? "" : "s"} that priced, of the last ${rows.length}, at list price`}
             </span>
           </p>
           {latest && split.length > 0 && (

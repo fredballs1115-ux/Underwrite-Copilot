@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and three PRs, #176–#278, each
+estimate, and that's what it should flag." A hundred and four PRs, #176–#279, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1443,6 +1443,32 @@ confirmed equal to the main tip after each batch.
   budget, the shared request fetched once, the cached `via`, the warm-up
   at one in flight with its log line; `feeds.test.ts` parses a Bing item
   and holds every Google read to a Bing door behind it.
+- **#279 The twelfth review's findings: the text layer is held to the
+  deck.** Four findings on #269–#277, each reproduced by execution before
+  it was fixed. A worker attempt resumed after the extraction had fallen
+  back to the pages rebuilt the OM text-first, so the challenger, the comp
+  scrutiny and the market check read the layer the previous attempt had
+  already found empty: the fallback now writes `omPages` into the
+  checkpoint payload the moment it happens, and a resumed attempt builds
+  the pages source from the start. The density read counted every
+  character, so a picture deck whose only text was the disclaimer under
+  each photo read as dense: a line that recurs on half the pages, once or
+  twice a page, is the deck's furniture and counts on none (a rent roll's
+  rows share one shape once the digits are out and are never furniture),
+  and a deck under four pages goes as its pages — a cover letter over a
+  scan is not a deck. The same fallback now fires when the layer read
+  figures but no NOI of any kind, the shape of a narrative whose
+  financial tables were pasted in as pictures. The cost card said "median
+  of the last 3 screens that priced" with one priced; it now counts the
+  screens that priced, and says so plainly when none did. And the
+  pipeline row lower-cased a class the model phrased itself before the
+  label raised its first letter — "NNN retail" showed as "Nnn retail"; a
+  known class still comes back as its key whatever its case, a phrase of
+  the model's own keeps its case. Tests: two pipeline runs on the
+  recording fake (the no-NOI re-read, and attempt two reading the pages
+  the payload remembers), two rendered decks (footer-only sparse, footer
+  under text dense) and the synthetic rent roll, the cost card's three
+  sentences, the row's acronyms.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

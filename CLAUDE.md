@@ -103,11 +103,17 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   `lib/cost-card.render.test.ts`.
 - How the OM reaches the model: `lib/anthropic/om-source.ts` — the deck's
   own text layer, page-tagged (`lib/pdf-text.ts`, pdfjs in-process), when
-  it is dense enough to stand in for the pages (`isDenseLayer`); the PDF
-  inline or as a Files-API reference otherwise. Only the screen and Ask
-  pass `textFirst`; a buyer's model, a BOV and a rent roll keep their
-  pages. `OM_READ=pdf|text` overrides per call. The layer's page count is
-  what the facts are validated against.
+  it is dense enough to stand in for the pages (`isDenseLayer`: four
+  pages at least, half of them dense with text of their own — a line that
+  recurs on half the pages once or twice a page is furniture and counts on
+  none, a table's rows never are); the PDF inline or as a Files-API
+  reference otherwise. Only the screen and Ask pass `textFirst`; a buyer's
+  model, a BOV and a rent roll keep their pages. `OM_READ=pdf|text`
+  overrides per call. The layer's page count is what the facts are
+  validated against. The pipeline holds the layer to the deck
+  (`textLayerMissed`): a read with no figures, or figures but no NOI, is
+  re-read as pages, and the checkpoint payload's `omPages` makes a resumed
+  attempt read the pages from the start.
 - An asset class's words: `lib/asset-class.ts` (`ASSET_CLASS_LABEL`,
   `assetClassLabel`, the forms' option list) — every surface that prints
   one goes through it, so a stored `self_storage` never reaches a page

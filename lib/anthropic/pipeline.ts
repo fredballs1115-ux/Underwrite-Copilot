@@ -27,6 +27,7 @@ import {
   assessPlausibility,
   inferStrategy,
   isPlanDeal,
+  noiFigures,
   planSummary,
   plausibilityNote,
 } from "@/lib/deal-strategy";
@@ -49,6 +50,18 @@ type JobPatch = {
   progress?: number;
   error?: string | null;
 };
+
+/**
+ * What a text-layer read failed to find, or null when it read the deck:
+ * no figures at all, or figures but no NOI of any kind — the shape of a
+ * deck whose financial tables were pasted in as pictures under a text
+ * narrative. Either sends the extraction back to the pages.
+ */
+export function textLayerMissed(x: ExtractionResult): "no figures" | "no NOI" | null {
+  const metrics = x.metrics ?? [];
+  if (metrics.length === 0) return "no figures";
+  return noiFigures(metrics).length === 0 ? "no NOI" : null;
+}
 
 async function patchJob(dealId: string, patch: JobPatch): Promise<void> {
   const admin = createSupabaseAdminClient();
@@ -264,6 +277,10 @@ async function runAnalysisSteps(
     // bookkeeping is best-effort — it must never sink a run.
     let payload: Record<string, unknown> = {};
     const completed = new Set<string>();
+    // A previous attempt that fell back from the text layer to the pages
+    // said so in the payload; this attempt then reads the pages from the
+    // start, rather than the layer that attempt already found wanting.
+    let pagesRead = false;
     if (resume) {
       try {
         const { data: jobRow, error: jobErr } = await admin
@@ -278,13 +295,13 @@ async function runAnalysisSteps(
         if (jobErr) throw jobErr;
         payload = (jobRow?.payload as Record<string, unknown>) ?? {};
         for (const s of (payload.completed as string[]) ?? []) completed.add(s);
+        pagesRead = payload.omPages === true;
       } catch {
         // no checkpoints — run everything
       }
     }
-    const markDone = async (step: string) => {
+    const writeCheckpoint = async () => {
       if (!resume) return;
-      completed.add(step);
       try {
         // The handoff contract rides along: a checkpoint written from an
         // unread payload must still say what kind of job this row is, or a
@@ -298,6 +315,11 @@ async function runAnalysisSteps(
       } catch {
         // checkpointing is an optimization, never a failure
       }
+    };
+    const markDone = async (step: string) => {
+      if (!resume) return;
+      completed.add(step);
+      await writeCheckpoint();
     };
 
     // The OM is only needed by the document-reading steps. A run resumed at
@@ -324,13 +346,14 @@ async function runAnalysisSteps(
     // re-uploads — one extra upload, never a stale reference).
     // The OM goes text first: its own text layer, page-tagged, when dense
     // enough to stand in for the pages (a fraction of the tokens on every
-    // step below); the PDF itself otherwise. `OM_READ` overrides.
+    // step below); the PDF itself otherwise, or when an earlier attempt of
+    // this run already had to fall back to it. `OM_READ` overrides.
     omSource = manualExtraction
       ? needsDoc
         ? omFromText(manualFactSheet(manualExtraction, (deal.name as string) ?? "Deal"))
         : null
       : pdf
-        ? await omSourceFor(pdf, "om.pdf", { textFirst: true })
+        ? await omSourceFor(pdf, "om.pdf", { textFirst: !pagesRead })
         : null;
     // Every use sits inside a `!completed.has(<pdf step>)` guard, so the
     // source above must have been built; this just makes that invariant loud.
@@ -412,13 +435,19 @@ async function runAnalysisSteps(
       });
       let extraction = await extractTerms(om(), assetClass);
       // A text layer can be dense and still not be the deck — OCR noise, a
-      // layer of captions under the pictures that hold the figures — and
-      // then the read finds nothing. Before giving up, read the pages
-      // themselves once; the PDF is right here, and every later step then
-      // reads the pages too.
-      if (extraction.metrics.length === 0 && omSource?.kind === "pages" && pdf) {
-        console.log(`[pipeline] the text layer of deal ${dealId} read to no figures — re-reading the pages`);
+      // layer of captions under the pictures that hold the figures, a
+      // narrative whose financial tables were pasted in as images — and
+      // then the read finds nothing, or everything but the money. Before
+      // giving up (or proceeding on a deck whose financials it never saw),
+      // read the pages themselves once; the PDF is right here, every later
+      // step then reads the pages too, and the checkpoint payload remembers,
+      // so an attempt resumed after a restart reads the pages from the start.
+      const missed = textLayerMissed(extraction);
+      if (missed && omSource?.kind === "pages" && pdf) {
+        console.log(`[pipeline] the text layer of deal ${dealId} read to ${missed} — re-reading the pages`);
         omSource = await omSourceFor(pdf, "om.pdf", { textFirst: false });
+        payload.omPages = true;
+        await writeCheckpoint();
         extraction = await extractTerms(om(), assetClass);
       }
       // A scan, a password-protected file or an empty deck yields a

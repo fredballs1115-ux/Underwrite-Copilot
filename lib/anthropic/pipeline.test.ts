@@ -498,4 +498,76 @@ describe("runAnalysis — the run keeps its claim alive and cleans up after itse
       expect(payload.completed).toContain("signal");
     }
   });
+
+  it("a text layer that reads to figures but no NOI is re-read as pages — the money was in pictures", async () => {
+    const pages = { kind: "pages" as const, text: "[[page 1]]\nnarrative", pages: 1, sparsePages: 0 };
+    const buffer = { kind: "buffer" as const, data: Buffer.alloc(0) };
+    vi.mocked(omSourceFor).mockResolvedValueOnce(pages).mockResolvedValueOnce(buffer);
+    const noMoney = { ...EXTRACTION, metrics: [EXTRACTION.metrics[0]] }; // the asking price alone
+    vi.mocked(extractTerms).mockResolvedValueOnce(noMoney).mockResolvedValueOnce(EXTRACTION);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    await runAnalysis("d1");
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("read to no NOI — re-reading the pages"));
+    logSpy.mockRestore();
+    expect(job().status).toBe("done");
+    expect(extractTerms).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(extractTerms).mock.calls[1][0]).toBe(buffer);
+    expect(state.deals.d1.extraction).toEqual(EXTRACTION);
+    expect(vi.mocked(challengeAssumptions).mock.calls[0][0]).toBe(buffer);
+
+    // A layer that read the NOI is the deck: one read, no fallback.
+    state = freshState();
+    const extractsBefore = vi.mocked(extractTerms).mock.calls.length;
+    const sourcesBefore = vi.mocked(omSourceFor).mock.calls.length;
+    vi.mocked(omSourceFor).mockResolvedValueOnce(pages);
+    vi.mocked(extractTerms).mockResolvedValue(EXTRACTION);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect(vi.mocked(extractTerms).mock.calls.length).toBe(extractsBefore + 1);
+    expect(vi.mocked(omSourceFor).mock.calls.length).toBe(sourcesBefore + 1);
+    expect(vi.mocked(challengeAssumptions).mock.calls.at(-1)?.[0]).toBe(pages);
+  });
+
+  it("an attempt resumed after the fallback to the pages reads the pages from the start — the payload remembers", async () => {
+    // Attempt 1, resumed mode: the layer reads to nothing, the pages are
+    // read, and the checkpoint written right then says so.
+    const pages = { kind: "pages" as const, text: "[[page 1]]\nnoise", pages: 1, sparsePages: 0 };
+    const buffer = { kind: "buffer" as const, data: Buffer.alloc(0) };
+    vi.mocked(omSourceFor).mockResolvedValueOnce(pages).mockResolvedValueOnce(buffer);
+    vi.mocked(extractTerms).mockResolvedValueOnce({ ...EXTRACTION, metrics: [] }).mockResolvedValueOnce(EXTRACTION);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    await runAnalysis("d1", { resume: true });
+    logSpy.mockRestore();
+    expect(job().status).toBe("done");
+    const remembered = state.writes.filter(
+      (w) => w.table === "analysis_jobs" && (w.patch.payload as { omPages?: boolean } | undefined)?.omPages === true,
+    );
+    expect(remembered.length).toBeGreaterThan(0);
+    // …and every checkpoint after it keeps the mark, the job's kind and the earlier steps.
+    const last = remembered.at(-1)!.patch.payload as { kind: string; completed: string[]; omPages: boolean };
+    expect(last.kind).toBe("screen");
+    expect(last.completed).toEqual(expect.arrayContaining(["signal", "extract", "challenge"]));
+
+    // Attempt 2: the worker restarted after the extraction landed. The
+    // payload says the pages were read, so this attempt builds the pages
+    // source first and never hands the challenger the layer.
+    state = freshState();
+    state.deals.d1.extraction = EXTRACTION;
+    state.jobs[0].payload = {
+      kind: "screen",
+      completed: ["signal", "extract", "reconcile_docs", "ingest_actuals"],
+      omPages: true,
+    };
+    vi.mocked(omSourceFor).mockClear();
+    vi.mocked(omSourceFor).mockResolvedValueOnce(buffer);
+    vi.mocked(extractTerms).mockClear();
+    await runAnalysis("d1", { resume: true });
+    expect(job().status).toBe("done");
+    expect(extractTerms).not.toHaveBeenCalled();
+    expect(omSourceFor).toHaveBeenCalledTimes(1);
+    expect(omSourceFor).toHaveBeenCalledWith(expect.anything(), "om.pdf", { textFirst: false });
+    expect(vi.mocked(challengeAssumptions).mock.calls.at(-1)?.[0]).toBe(buffer);
+    expect(vi.mocked(scrutinizeComps).mock.calls.at(-1)?.[0]).toBe(buffer);
+    expect(vi.mocked(checkMarket).mock.calls.at(-1)?.[0]).toBe(buffer);
+  });
 });
