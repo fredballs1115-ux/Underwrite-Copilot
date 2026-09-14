@@ -477,13 +477,16 @@ describe("fetchLiveHeadlines — a host that hangs is not allowed to hold the ot
         : new Promise<Response>(() => {}),
     ) as typeof fetch;
     const on = (id: string): NewsSource => ({ ...src(id), feed: `https://stuck.test/rss?q=${id}` });
-    // Two requests that never settle take the host's two slots…
+    // Two requests that never settle take the host's two slots; the
+    // sources' own deadlines speak (the slot clock runs 200 ms behind)…
     const first = await fetchLiveHeadlines([on("stuck0"), on("stuck1")], 10, { timeoutMs: 50 });
     expect(first.sources.map((s) => s.error)).toEqual(["no answer within 750 ms", "no answer within 750 ms"]);
-    // …and give them back when their wall clock runs out, so a third
-    // source on the host is fetched, not queued past its budget.
-    const then = await fetchLiveHeadlines([on("late")], 10, { timeoutMs: 50 });
+    // …and give them back when their slot clock runs out, so a third
+    // source on the host is fetched inside its budget, not queued past it.
+    const t1 = Date.now();
+    const then = await fetchLiveHeadlines([on("late")], 10, { timeoutMs: 1_000 });
     expect(then.sources[0]).toMatchObject({ ok: true, count: 1 });
+    expect(Date.now() - t1).toBeLessThan(1_000);
     expect(globalThis.fetch).toHaveBeenCalledTimes(3);
   });
 

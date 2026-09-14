@@ -62,6 +62,10 @@ const FRESH_MS = 30 * 60_000;
 const TIMEOUT_MS = 8_000;
 /** the wall-clock cap runs this much past the request's own timeout */
 const DEADLINE_GRACE_MS = 700;
+/** the slot-release clock inside fetchFeed runs this much behind the
+ *  source's deadline, so the source's deadline always speaks first (its
+ *  message names the source's whole window) and the slot still comes back */
+const SLOT_GRACE_MS = 200;
 const STALE_MAX_MS = 24 * 3_600_000;
 /** a second try of a candidate that answered 429 or 5xx waits this long */
 const RETRY_WAIT_MS = 500;
@@ -341,7 +345,9 @@ async function fetchFeed(
   // The wall clock beside the signal: a fetch that outlives its abort (Node's
   // honours it; a patched one might not) would otherwise keep its slot on
   // the host for the life of the process, and two of those close the host.
-  return Promise.race([read(), deadline(timeoutMs + DEADLINE_GRACE_MS)]);
+  // It runs SLOT_GRACE_MS behind the source's own deadline (fetchSource),
+  // which therefore always resolves the caller first and names the window.
+  return Promise.race([read(), deadline(timeoutMs + DEADLINE_GRACE_MS + SLOT_GRACE_MS)]);
 }
 
 /**
