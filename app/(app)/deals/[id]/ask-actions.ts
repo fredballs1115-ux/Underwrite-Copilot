@@ -98,6 +98,7 @@ export async function askDeal(
       pdf,
       question,
       dealContextFor((deal.extraction as ExtractionResult | null) ?? null),
+      { dealId },
     );
     const entry = {
       at: new Date().toISOString(),
