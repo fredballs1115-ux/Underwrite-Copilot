@@ -140,7 +140,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   boot (`warmLiveHeadlines`; `NEWS_WARM=0` off) because a fresh process's
   first parallel read bursts one host and gets 503s back; the health
   route reports that run as `warm` (`lastWarmUp`: its progress while it
-  runs, then its result) and the held hosts as `held` (`heldHosts`).
+  runs, then its result), the held hosts as `held` (`heldHosts`) and the
+  process (`pid`, `uptimeS`). The layer's state lives on `globalThis`
+  (`liveState`, a registered symbol), never in module-level variables:
+  Next compiles `instrumentation.ts` into its own module runtime
+  (`.next/server/chunks/[turbopack]_runtime.js`), apart from the routes'
+  (`…/chunks/ssr/`), each with its own module cache, so a module-level
+  Map is two Maps in one process — any state a route must share with
+  `instrumentation.ts` goes on `globalThis` the same way.
   `/api/news/health` is public and live-verify prints every source's
   outcome from Render's own network, the warm-up line, the held hosts,
   and the search doors' shape fetched from the runner (each topic query

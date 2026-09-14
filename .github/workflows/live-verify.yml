@@ -175,6 +175,9 @@ jobs:
             console.log("NEWS HEALTH: " + j.summary);
             for (const s of j.sources ?? []) console.log(`  ${s.ok ? "ok  " : "FAIL"} ${String(s.ms).padStart(5)} ms  ${String(s.count).padStart(3)} items  ${s.stale ? "stale " : ""}${s.cached ? "cached " : ""}${s.name}${s.via ? " via " + s.via : ""}${s.error ? " — " + s.error : ""}`);
             for (const h of (j.top ?? []).slice(0, 3)) console.log(`  top: ${h.title} — ${h.publisher}`);
+            // Which process answered and how long it has been up (#285):
+            // a warm-up of null on a process minutes old is a defect.
+            if (j.process) console.log(`NEWS PROCESS: pid ${j.process.pid}, up ${j.process.uptimeS}s`);
             // The boot warm-up (#278) reads the sources one at a time before
             // any visitor; the route reports its last run (#280) and, since
             // #283, its progress while it is still running.
@@ -216,6 +219,13 @@ jobs:
           probe "Bing · CRE debt" "https://www.bing.com/news/search?q=CMBS+delinquency+distress&format=rss"
           probe "Bing · rent regulation" "https://www.bing.com/news/search?q=%22rent+control%22&format=rss"
           probe "Bing · rent regulation (alt: rent stabilization)" "https://www.bing.com/news/search?q=%22rent+stabilization%22&format=rss"
+          # Commercial Property Executive's site-scoped Bing read parsed to
+          # zero items on Render (18:36 UTC): the outlet publishes under
+          # commercialsearch.com. Three phrasings, so the next fix can pick
+          # the one Bing answers.
+          probe "Bing · site:commercialsearch.com" "https://www.bing.com/news/search?q=site%3Acommercialsearch.com&format=rss"
+          probe "Bing · site:commercialsearch.com/news" "https://www.bing.com/news/search?q=site%3Acommercialsearch.com%2Fnews&format=rss"
+          probe "Bing · Commercial Property Executive (phrase)" "https://www.bing.com/news/search?q=%22Commercial+Property+Executive%22&format=rss"
           probe "Google · site:therealdeal.com" "https://news.google.com/rss/search?q=site%3Atherealdeal.com&hl=en-US&gl=US&ceid=US%3Aen"
       - name: Verdict
         # Two tiers: the hero headline proves the site is up and on the right

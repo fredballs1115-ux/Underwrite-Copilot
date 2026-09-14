@@ -35,6 +35,10 @@ export async function GET(req: Request) {
     {
       fetchedAt: live.fetchedAt,
       summary: `${answered} of ${live.sources.length} sources answered${stale ? ` (${stale} from an earlier copy)` : ""}; ${live.headlines.length} headlines ranked.`,
+      // Which process answered, and for how long it has been up: a `warm`
+      // of null on a process minutes old is a defect, on one seconds old
+      // it is the boot.
+      process: { pid: process.pid, uptimeS: Math.round(process.uptime()) },
       // The boot warm-up on this process — its progress while it runs
       // (`done: false`), then its result; null before it starts or when
       // NEWS_WARM=0. live-verify prints it after a deploy.

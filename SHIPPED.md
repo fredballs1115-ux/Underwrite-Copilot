@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and nine PRs, #176–#284, each
+estimate, and that's what it should flag." A hundred and ten PRs, #176–#285, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1554,6 +1554,29 @@ confirmed equal to the main tip after each batch.
   tiled caption (bare, and under real text) and a table's header row
   against its rows; `deal-strategy.test.ts` the slash labels;
   `pipeline.test.ts` drives `textLayerMissed` directly.
+- **#285 One news state per process.** #283's proof (18:36 UTC, a fresh
+  process) read 11 of 12 with every search-backed source `via Bing` and
+  `NEWS HELD: news.google.com … after 3 failures` — the breaker at work
+  — but `warm` was still null, as it had been at 18:05 and 18:12 on
+  processes minutes old. Reproduced on the built server in the sandbox:
+  the service log printed `[news] warm-up: 0 of 12 sources answered`
+  while the health route in the same process said `warm: null` and
+  nothing cached. A loader hook showed why: Next compiles
+  `instrumentation.ts` into its own module graph with its own runtime
+  (`.next/server/chunks/[turbopack]_runtime.js`), apart from the routes'
+  (`.next/server/chunks/ssr/[turbopack]_runtime.js`), and each runtime
+  keeps its own module cache — so `lib/news/live.ts`'s module-level Maps
+  were two sets in one process: the warm-up filled one, the News page and
+  the health route read the other. Every deploy's first visitors were
+  waiting on twelve fetches the warm-up had already made. The state now
+  lives on `globalThis` under a registered symbol (`liveState`), which
+  every copy of the module finds; `live.test.ts` loads the module twice
+  (`vi.resetModules`) and asserts the second copy sees the first's
+  warm-up and cached copies. The health JSON gains `process` (pid,
+  uptime) so a null `warm` can be told from a process seconds old;
+  live-verify prints `NEWS PROCESS` and probes three Bing phrasings for
+  Commercial Property Executive, whose site-scoped read parsed to zero
+  items on Render.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
