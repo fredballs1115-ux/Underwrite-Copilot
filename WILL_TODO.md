@@ -52,7 +52,7 @@ probes four more doors for Commercial Property Executive) and #292
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-A hundred and seventeen PRs (#176–#292) landed across one review session and the
+A hundred and eighteen PRs (#176–#293) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -608,6 +608,13 @@ deploy (live-verify shows the sha).
   chips (a nav landmark now), the day groups and the quiet line render
   on a fixture in the views test, so the day the sweep's secret is
   fixed the page that appears has already been read.
+- **The fifteenth review's nine findings** (#293): the literal `&nbsp;`
+  in Google and Bing snippets (decoded at two levels now), an entity
+  outside Unicode that lost a source, "rate cuts" and "fed up", the
+  outlet link's scheme, the screen-reader space after a headline, a
+  tiled caption with a figure, the NOI period words after a slash
+  (`2026E`, `(Loss)`, `Current`, `As-Is` …), and a late answer kept for
+  the next reader.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as

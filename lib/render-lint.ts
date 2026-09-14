@@ -18,12 +18,14 @@ export function visibleText(html: string): string {
       "\n",
     )
     .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&")
     .replace(/&#x27;|&#39;/g, "'")
     .replace(/&quot;/g, '"')
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
-    .replace(/&nbsp;/g, " ");
+    .replace(/&nbsp;/g, " ")
+    // Last, so a double-escaped entity ("&amp;nbsp;" — the literal
+    // "&nbsp;" a reader would see) stays in the text for the lints.
+    .replace(/&amp;/g, "&");
 }
 
 // Units a digit may legitimately touch: "5yr", "30bps", "10k", "250sf",

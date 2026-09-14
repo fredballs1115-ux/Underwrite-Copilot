@@ -280,3 +280,20 @@ describe("the density read and the page-tagged document", () => {
     expect(pageTaggedText(summarize([page(1, 5)]), "Buyer model")).toMatch(/^Buyer model — text layer, 1 page\./);
   });
 });
+
+describe("a tiled caption that carries a figure", () => {
+  it("is still a caption when tiled on the page itself: twelve pages of one disclaimer three times each read as no text", () => {
+    const caption =
+      "Occupancy shown is 95% stabilized and is illustrative only; see the rent roll for the actual figures.";
+    const pages = Array.from({ length: 12 }, (_, i) => ({
+      page: i + 1,
+      text: [caption, caption, caption].join("\n"),
+      chars: caption.length * 3,
+    }));
+    const layer = summarize(pages);
+    expect(layer.totalChars).toBe(0);
+    expect(layer.densePages).toBe(0);
+    expect(layer.boilerplateLines).toBe(1);
+    expect(isDenseLayer(layer)).toBe(false);
+  });
+});

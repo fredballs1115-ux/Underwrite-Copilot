@@ -33,6 +33,10 @@ describe("visibleText + a11yIssues", () => {
     );
   });
 
+  it("keeps a double-escaped entity visible — the literal a reader would see — by decoding &amp; last", () => {
+    expect(visibleText("<p>Hit 11% &amp;nbsp; Bisnow</p>")).toBe("Hit 11% &nbsp; Bisnow\n");
+  });
+
   it("names each accessibility fault once, and passes labelled markup", () => {
     const faulty =
       `<img src="/a.png"><button class="x"></button><a href="/x"></a>` +

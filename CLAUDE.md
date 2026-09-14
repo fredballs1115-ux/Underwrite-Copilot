@@ -60,7 +60,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   so never resolve a share anywhere else) — and lint
   the visible text with `lib/render-lint.ts` (a digit glued to a word, a word
   doubled; `a11yIssues`: an image with no alt, a nameless button or link, an
-  unlabelled control, a duplicate id). With `VIEW_SHOTS_DIR` set they also
+  unlabelled control, a duplicate id; `visibleText` decodes `&amp;` last,
+  so a double-escaped entity — the literal `&nbsp;` a reader would see —
+  stays in the text). With `VIEW_SHOTS_DIR` set they also
   write each view as a full document with the built stylesheet linked, so
   headless Chromium can open it at 390px — the visual half, run by hand.
   `lib/jsx-whitespace.test.ts` scans every page's source for the JSX shape
@@ -107,8 +109,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   pages at least, half of them dense with text of their own — a line that
   recurs on half the pages once or twice a page is furniture and counts on
   none, so is a line whose exact words recur on half the pages however
-  many times a page (the caption tiled under every rendering — never a
-  line carrying a figure), a table's rows never are); the PDF inline or
+  many times a page (the caption tiled under every rendering — a line
+  carrying a figure only where it is a page's whole text, so an
+  inventory's identical rows stay the deck), a table's rows never are); the PDF inline or
   as a Files-API
   reference otherwise. Only the screen and Ask pass `textFirst`; a buyer's
   model, a BOV and a rent roll keep their pages. `OM_READ=pdf|text`
@@ -137,7 +140,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   request given under 300 ms; a 429 or a 5xx always does); the status
   names the way in as `via`, on a cached or a stale line too). Every Google News
   read has a Bing News read behind it (`News:Source` is the outlet; the
-  click redirect is unwrapped by `directUrl`; a Bing query is plain
+  click redirect is unwrapped by `directUrl`; a body arrives as escaped
+  HTML and `toSnippet` decodes it at the feed's level and then the
+  body's, or the page shows a literal `&nbsp;`; a Bing query is plain
   keywords or one quoted phrase — Google's `OR` syntax parses to zero
   items there). `instrumentation.ts` warms the sources one at a time at
   boot (`warmLiveHeadlines`; `NEWS_WARM=0` off) because a fresh process's
