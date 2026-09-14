@@ -42,14 +42,17 @@ headline's tags and the fold at twelve) are proven (`5173a8f` at
 sources at boot in 16.7 s — Commercial Property Executive the miss,
 its one search door parsing to zero — `NEWS HELD: none`, twelve public
 pages lint clean); #290 (a covered market named in a headline links to
-its brief) and #291 (the runner probes four more doors for Commercial
-Property Executive) follow.
+its brief) is proven (`844c5b6` at 19:33: `DEPLOY: LIVE`, the homepage
+footer naming it as the latest improvement, a fresh process that
+warmed 11 of 12 sources at boot, `NEWS HELD: none`); #291 (the runner
+probes four more doors for Commercial Property Executive) and #292
+(the scored feed as a pure view, rendered on a fixture) follow.
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-A hundred and sixteen PRs (#176–#291) landed across one review session and the
+A hundred and seventeen PRs (#176–#292) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -601,6 +604,10 @@ deploy (live-verify shows the sha).
   phrasing zero) — live-verify now reads its feed at the site root, the
   outlet's old domain, Google's phrase search and Bing on the bare
   domain from the runner, so the next fix wires the door that answers.
+- **The scored feed is a pure view** (#292): the law strip, the sector
+  chips (a nav landmark now), the day groups and the quiet line render
+  on a fixture in the views test, so the day the sweep's secret is
+  fixed the page that appears has already been read.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as

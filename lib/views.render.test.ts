@@ -46,6 +46,7 @@ import { Pipeline, type DealCard } from "@/app/(app)/deals/pipeline";
 import { ModelView } from "@/app/(app)/deals/[id]/model-view";
 import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table";
 import { ToastProvider } from "@/app/(app)/toaster";
+import { ScoredFeedView, type AlertRow, type ItemRow } from "@/app/(app)/news/scored-feed";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { leverageRead } from "@/lib/leverage";
 import { a11yIssues, dumpView, gluedWords, visibleText } from "./render-lint";
@@ -886,5 +887,90 @@ describe("News live section", () => {
     expect(gluedWords(text)).toEqual([]);
     expect(a11yIssues(html)).toEqual([]);
     dumpView("news-live-dark", html);
+  });
+});
+
+describe("News scored feed", () => {
+  const item = (over: Partial<ItemRow>): ItemRow => ({
+    url: "https://x.test/1",
+    title: "t",
+    source: "GlobeSt",
+    sector: "multifamily",
+    relevance: 7,
+    summary: null,
+    action: null,
+    published_at: null,
+    created_at: "2026-09-14T11:00:00Z",
+    ...over,
+  });
+  const items: ItemRow[] = [
+    item({
+      url: "https://x.test/1",
+      title: "Rent cap bill advances in Annapolis",
+      sector: "regulation-md",
+      relevance: 8,
+      summary: "The bill would cap increases at CPI plus 3%.",
+      action: "Re-run the Maryland deals' rent growth at the cap.",
+    }),
+    item({
+      url: "https://x.test/2",
+      title: "Fannie tightens agency debt terms",
+      sector: "capital-markets",
+      relevance: 3,
+      created_at: "2026-09-13T11:00:00Z",
+    }),
+    item({ url: "https://x.test/3", title: "Local bakery opens second location", relevance: null }),
+  ];
+  const alerts: AlertRow[] = [
+    {
+      id: "a1",
+      rule_id: "md-rent-cap",
+      headline: "Maryland rent stabilization act signed",
+      url: "https://x.test/law",
+      detail: null,
+      detected_at: "2026-09-14T10:00:00Z",
+    },
+  ];
+
+  it("groups the stories by the day the sweep picked them up, highest relevance first, with the sector chips and the law strip", () => {
+    const html = render(React.createElement(ScoredFeedView, { items, alerts, wantSector: "" }));
+    const text = visibleText(html);
+    expect(text).toContain("rule changes");
+    expect(text).toContain("Maryland rent stabilization act signed");
+    expect(text).toContain("affects md-rent-cap");
+    expect(text).toContain("Monday, Sep 14");
+    expect(text).toContain("Sunday, Sep 13");
+    expect(text).toContain("8/10");
+    expect(text).toContain("MD regulation");
+    expect(text).toContain("capital markets");
+    expect(html).toContain('href="/news?sector=regulation-md"');
+    // within a day the scored story leads and the unscored one trails
+    expect(text.indexOf("Rent cap bill")).toBeLessThan(text.indexOf("Local bakery"));
+    expect(text).toContain("Re-run the Maryland deals");
+    expect(text).not.toContain("starts with the weekday sweep");
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    dumpView("news-scored", html);
+  });
+
+  it("filters to the sector asked for, and ignores one the rows have never seen", () => {
+    const one = visibleText(render(React.createElement(ScoredFeedView, { items, alerts: [], wantSector: "capital-markets" })));
+    expect(one).toContain("Fannie tightens");
+    expect(one).not.toContain("Rent cap bill");
+    const all = visibleText(render(React.createElement(ScoredFeedView, { items, alerts: [], wantSector: "nope" })));
+    expect(all).toContain("Rent cap bill");
+    expect(all).toContain("Fannie tightens");
+  });
+
+  it("says the sweep has not run, in one quiet line, when there are no rows", () => {
+    const html = render(React.createElement(ScoredFeedView, { items: [], alerts: [], wantSector: "" }));
+    const text = visibleText(html);
+    expect(text).toContain("starts with the weekday sweep");
+    // no law strip, no sector chips, no day group — one line only
+    expect(html).not.toContain("<section");
+    expect(html).not.toContain("<nav");
+    expect(html).not.toContain("<h2");
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
   });
 });

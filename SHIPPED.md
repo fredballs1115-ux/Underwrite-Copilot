@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and sixteen PRs, #176–#291, each
+estimate, and that's what it should flag." A hundred and seventeen PRs, #176–#292, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1662,6 +1662,17 @@ confirmed equal to the main tip after each batch.
   next session wires the door that answers instead of guessing. The
   News caption under the list also shrinks to what the tags cannot say
   ("the coloured tags are the deal-movers").
+- **#292 The scored feed is a pure view, rendered before the sweep ever
+  fills it.** The lower half of the News page — the law-and-rule strip,
+  the sector chips, the stories by the day the sweep picked them up with
+  their 0–10 relevance pills — had never been drawn in a test, because
+  the sweep has never run (its secret is misspelled; your list). It is
+  now `app/(app)/news/scored-feed.tsx`, a pure view the page hands the
+  two tables' rows to, and `views.render.test.ts` draws it on a fixture
+  (two days, a law alert, a sector filter, the empty line) and lints the
+  text and the accessible names, so the day the secret is fixed the page
+  that appears has already been read. The sector chips became a
+  `<nav aria-label="Sectors">` landmark on the way.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

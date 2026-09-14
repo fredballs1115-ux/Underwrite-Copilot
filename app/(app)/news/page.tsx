@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { fetchLiveHeadlines } from "@/lib/news/live";
 import { LiveHeadlinesView } from "./live-headlines";
+import { ScoredFeedView, type AlertRow, type ItemRow } from "./scored-feed";
 
 export const metadata: Metadata = { title: "News" };
 export const dynamic = "force-dynamic";
@@ -16,55 +16,16 @@ export const dynamic = "force-dynamic";
 //      the Fed) plus Google News topic searches, fetched at request time with
 //      a half-hour cache and ranked by recency and how much the headline
 //      touches what moves a deal. Needs no key and no cron, so this page is
-//      never empty.
+//      never empty. Drawn by the pure view in live-headlines.tsx.
 //   2. THE SCORED FEED — every headline the weekday intel sweep gathered and
 //      scored 0–10 for THIS buyer, newest day first. Big law/regulation
 //      changes get the top strip (they also red-banner app-wide until
-//      dismissed). Quiet until the cron has run, and it says so.
+//      dismissed). Quiet until the cron has run, and it says so. Drawn by
+//      the pure view in scored-feed.tsx.
 //
+// Both views render on fixtures in lib/views.render.test.ts; this file only
+// reads (the session, the two tables, the live layer) and hands the rows in.
 // Nothing here is written by us — it's the news itself, ranked and linked.
-
-interface ItemRow {
-  url: string;
-  title: string;
-  source: string | null;
-  sector: string;
-  relevance: number | null;
-  summary: string | null;
-  action: string | null;
-  published_at: string | null;
-  created_at: string;
-}
-interface AlertRow {
-  id: string;
-  rule_id: string | null;
-  headline: string;
-  url: string | null;
-  detail: string | null;
-  detected_at: string;
-}
-
-const SECTOR_LABEL: Record<string, string> = {
-  "regulation-dc": "DC regulation",
-  "regulation-md": "MD regulation",
-  "regulation-va": "VA regulation",
-  "regulation-east": "East Coast regulation",
-  multifamily: "multifamily",
-  "capital-markets": "capital markets",
-  tax: "tax",
-  "housing-policy": "housing policy",
-  "national-markets": "national markets",
-  "deal-flow": "deal flow",
-  "construction-supply": "construction",
-};
-
-const fmtDay = (iso: string) =>
-  new Date(iso).toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
 
 /** What the live section looks like while the feeds are still answering. */
 function LiveHeadlinesFallback() {
@@ -131,26 +92,7 @@ export default async function NewsPage({
     items = (it as ItemRow[] | null) ?? [];
     alerts = (al as AlertRow[] | null) ?? [];
   } catch {
-    // tables absent until migrations run — empty state below explains
-  }
-
-  const sectors = [...new Set(items.map((i) => i.sector))].sort();
-  const want = (params.sector ?? "").slice(0, 40);
-  const active = sectors.includes(want) ? want : null;
-  const shown = (active ? items.filter((i) => i.sector === active) : items)
-    // High-signal first within the feed, but keep day order dominant below.
-    .slice(0, 120);
-
-  // Group by the day the sweep picked the story up.
-  const byDay = new Map<string, ItemRow[]>();
-  for (const it of shown) {
-    const day = it.created_at.slice(0, 10);
-    const list = byDay.get(day) ?? [];
-    list.push(it);
-    byDay.set(day, list);
-  }
-  for (const list of byDay.values()) {
-    list.sort((a, b) => (b.relevance ?? -1) - (a.relevance ?? -1));
+    // tables absent until migrations run — the view's empty line explains
   }
 
   return (
@@ -170,127 +112,7 @@ export default async function NewsPage({
         <LiveHeadlinesSection />
       </Suspense>
 
-      {alerts.length > 0 && (
-        <section className="rounded-xl border border-red-500/30 bg-red-500/5 p-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-red-600">
-            Law &amp; rule changes
-          </h2>
-          <ul className="mt-2 space-y-1.5 text-sm">
-            {alerts.map((a) => (
-              <li key={a.id} className="leading-snug">
-                {a.url ? (
-                  <a
-                    href={a.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline decoration-dotted underline-offset-2 hover:text-brand"
-                  >
-                    {a.headline}
-                  </a>
-                ) : (
-                  a.headline
-                )}
-                <span className="ml-2 text-[11px] text-muted">
-                  {a.detected_at.slice(0, 10)}
-                  {a.rule_id ? ` · affects ${a.rule_id}` : ""}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {sectors.length > 1 && (
-        <div className="flex flex-wrap gap-1.5 text-xs">
-          <Link
-            href="/news"
-            className={`rounded-full border px-2.5 py-1 transition-colors ${
-              !active
-                ? "border-brand bg-brand/10 text-brand"
-                : "border-line text-muted hover:border-brand hover:text-brand"
-            }`}
-          >
-            All
-          </Link>
-          {sectors.map((s) => (
-            <Link
-              key={s}
-              href={`/news?sector=${encodeURIComponent(s)}`}
-              className={`rounded-full border px-2.5 py-1 transition-colors ${
-                active === s
-                  ? "border-brand bg-brand/10 text-brand"
-                  : "border-line text-muted hover:border-brand hover:text-brand"
-              }`}
-            >
-              {SECTOR_LABEL[s] ?? s}
-            </Link>
-          ))}
-        </div>
-      )}
-
-      {items.length === 0 ? (
-        // No box for what has not started: the headlines above are the
-        // page; one quiet line says what the sweep will add.
-        <p className="text-[12px] leading-relaxed text-muted">
-          The scored feed — every story rated 0–10 for your buy box, law and
-          rule changes flagged — starts with the weekday sweep once its
-          GitHub secret is set. Until then the headlines above are the news,
-          unscored.
-        </p>
-      ) : (
-        [...byDay.entries()].map(([day, list]) => (
-          <section key={day}>
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
-              {fmtDay(day)}
-            </h2>
-            <ul className="mt-2 space-y-2.5">
-              {list.map((it) => (
-                <li
-                  key={it.url}
-                  className="rounded-xl border border-line bg-surface p-3.5 text-sm leading-snug"
-                >
-                  <div className="flex items-start gap-2.5">
-                    {it.relevance !== null && (
-                      <span
-                        className={`mt-px shrink-0 rounded px-1.5 py-px font-mono text-[11px] tabular-nums ${
-                          it.relevance >= 6
-                            ? "bg-brand/10 text-brand"
-                            : "bg-faint text-muted"
-                        }`}
-                      >
-                        {it.relevance}/10
-                      </span>
-                    )}
-                    <div className="min-w-0">
-                      <a
-                        href={it.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
-                      >
-                        {it.title}
-                      </a>
-                      <span className="ml-2 text-[11px] text-muted">
-                        {it.source ?? "source"}
-                        {" · "}
-                        {SECTOR_LABEL[it.sector] ?? it.sector}
-                      </span>
-                      {it.summary && (
-                        <p className="mt-1 text-[13px] text-muted">{it.summary}</p>
-                      )}
-                      {it.action && (
-                        <p className="mt-1 text-[13px] font-medium text-ink/80">
-                          → {it.action}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))
-      )}
+      <ScoredFeedView items={items} alerts={alerts} wantSector={params.sector ?? ""} />
     </div>
   );
 }
