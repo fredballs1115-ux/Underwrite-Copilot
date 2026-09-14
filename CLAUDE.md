@@ -167,7 +167,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   with their ranks kept — then the sources as a row of chips — answered
   / earlier copy / did not answer — and the search hosts behind them); the page fetches
   and hands the result in, and `lib/views.render.test.ts` draws it on a
-  fixture. Keep it free of I/O so the test stays a render.
+  fixture. Keep it free of I/O so the test stays a render. The scored
+  feed below it is the same shape: `app/(app)/news/scored-feed.tsx`
+  (`ScoredFeedView`: the law strip, the sector chips, the day groups
+  highest relevance first, the one quiet line) takes the two tables'
+  rows from the page and renders on a fixture in the same test.
 - The pipeline's failure modes: `lib/anthropic/failure.ts` turns any failure
   into one sentence the analyst can act on (the raw text goes to the server
   log, never the page), and its `structured()` wraps every structured-output
