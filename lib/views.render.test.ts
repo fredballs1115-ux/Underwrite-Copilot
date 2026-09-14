@@ -836,9 +836,36 @@ describe("News live section", () => {
     expect(text).toContain("(earlier copy)");
     expect(text).toContain("(did not answer)");
     expect(text).toContain("via Bing News");
+    // the tags say why each headline ranks: the same matches the score counted
+    expect(text).toContain("distress");
+    expect(text).toContain("multifamily");
+    expect(text).toContain("supply");
+    // two headlines: nothing folds
+    expect(text).not.toContain("more headline");
     expect(gluedWords(text)).toEqual([]);
     expect(a11yIssues(html)).toEqual([]);
     dumpView("news-live", html);
+  });
+
+  it("shows the top twelve and folds the rest behind one row, all of it still in the HTML", () => {
+    const many: LiveHeadlines = {
+      ...live,
+      headlines: Array.from({ length: 14 }, (_, i) => ({
+        ...live.headlines[i % 2],
+        url: `https://m.test/${i}`,
+        title: `${live.headlines[i % 2].title} (${i + 1})`,
+      })),
+    };
+    const html = render(React.createElement(LiveHeadlinesView, { live: many }));
+    const text = visibleText(html);
+    expect(text).toContain("Show 2 more headlines");
+    expect(text).toContain("Show fewer");
+    // the folded rows keep their rank and stay in the page
+    expect(html).toContain('start="13"');
+    expect(text).toContain("(14)");
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    dumpView("news-live-fold", html);
   });
 
   it("says so when nothing answered — a sentence, never a fake list", () => {

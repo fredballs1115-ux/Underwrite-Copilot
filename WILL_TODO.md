@@ -32,15 +32,18 @@ that is why `warm` was null on every read; the state now lives on
 sources answered at boot, 17.3s`, every source `cached` on the first
 read after the deploy); #286 (the fourteenth review's five findings,
 the first a #284 regression that read `NOI / RSF` as the NOI, live for
-twenty minutes), #287 (the pipeline gets the wide shell and whole
-deal names; the News caption counts its sources) and #288 (the News
-page's sources as a row of chips) follow.
+twenty minutes) and #287 (the pipeline gets the wide shell and whole
+deal names; the News caption counts its sources) are proven (`f3b6ede`
+at 19:12: 12 of 12 sources, `NEWS WARM-UP: 12 of 12 sources answered
+at boot, 11.4s`, `NEWS HELD: none`, twelve public pages lint clean);
+#288 (the News page's sources as a row of chips) and #289 (each
+headline's tags and the fold at twelve) follow.
 
 ---
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-A hundred and thirteen PRs (#176–#288) landed across one review session and the
+A hundred and fourteen PRs (#176–#289) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -579,6 +582,10 @@ deploy (live-verify shows the sha).
   an earlier copy, dashed grey did not answer, the count or the error on
   hover — with a "via Bing News" pill for the search host behind the
   topic reads.
+- **Each headline says why it ranks** (#289): tags off the same matches
+  the score counts — rates, cap rates, distress and regulation in
+  colour; the asset class, supply, debt and costs & tax in grey — and
+  the list shows twelve, the rest one click away with their ranks kept.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as

@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and thirteen PRs, #176–#288, each
+estimate, and that's what it should flag." A hundred and fourteen PRs, #176–#289, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1626,6 +1626,20 @@ confirmed equal to the main tip after each batch.
   test's two new cases (four of five sources answering; none answering)
   lint the visible text and the accessible names, and the fixture
   screenshots at 1440 and 390 read clean. Words that can be a picture.
+- **#289 Each headline says why it ranks, and the list folds past
+  twelve.** The ranker's signals carry a word each now (`headlineSignals`
+  in `lib/news/feeds.ts`, off the same matches the score counts, so a tag
+  never says what the score did not), and every headline on the News
+  page wears them as tags: rates, cap rates, distress and regulation in
+  the brand tint — the deal-moving ones — and the asset class it names,
+  supply, debt and costs & tax in grey beside them; "deal" counts in the
+  score but is never a tag, since every other headline is one. The top
+  twelve show; the rest fold behind one row ("Show 18 more headlines",
+  a native `<details>`, no script) and stay in the HTML for the lints
+  and a screen reader, their ranks continuing at 13. `feeds.test.ts`
+  holds the tags to the score and to the asset-class mapping (apartments
+  → multifamily, warehouse → industrial); the render test asserts the
+  tags on the fixture and the fold on fourteen headlines.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

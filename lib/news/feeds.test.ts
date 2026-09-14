@@ -5,6 +5,7 @@ import {
   decodeText,
   directUrl,
   parseFeed,
+  headlineSignals,
   rankHeadlines,
   scoreHeadline,
   searchHostsAnswering,
@@ -189,6 +190,49 @@ describe("scoreHeadline", () => {
 
   it("gives an undated item a middling recency, never zero", () => {
     expect(scoreHeadline({ ...base, publishedAt: null, title: "x" }, NOW)).toBeGreaterThan(0);
+  });
+});
+
+describe("headlineSignals", () => {
+  const labels = (title: string, snippet = "") => headlineSignals({ title, snippet }).map((s) => s.label);
+
+  it("names what the headline touches, the deal-moving signals first, three at most", () => {
+    expect(labels("Fed holds rates as CMBS delinquencies climb")).toEqual(["rates", "distress"]);
+    expect(
+      labels("Investor takes over distressed Atlanta apartment asset", "The lender-controlled sale closed at a 6.4% cap."),
+    ).toEqual(["distress", "multifamily", "debt"]);
+    expect(labels("Office cap rates widen as vacancy climbs and lenders pull back; tariffs bite")).toHaveLength(3);
+  });
+
+  it("tints the deal-moving signals and not the context", () => {
+    const tags = headlineSignals({ title: "Rent control vote lands as apartment supply peaks", snippet: "" });
+    expect(tags).toEqual([
+      { label: "regulation", strong: true },
+      { label: "multifamily", strong: false },
+      { label: "supply", strong: false },
+    ]);
+  });
+
+  it("tags the asset class it names, as the class the site names", () => {
+    expect(labels("Apartment portfolio trades in Dallas")).toEqual(["multifamily"]);
+    expect(labels("Warehouse lease signed near the port")).toEqual(["industrial"]);
+    expect(labels("Shopping center refinanced")).toEqual(["retail", "debt"]);
+    expect(labels("Data center campus breaks ground")).toEqual(["data center"]);
+  });
+
+  it("never tags 'deal' — every other headline is one — and nothing on a headline touching nothing", () => {
+    expect(labels("Portfolio sold for $40M")).toEqual([]);
+    expect(labels("Local bakery opens second location")).toEqual([]);
+  });
+
+  it("agrees with the score: what it tags is what the score counted", () => {
+    const NOW2 = Date.parse("2026-09-07T18:00:00Z");
+    const base = { url: "https://x.test/", publisher: "X", publisherUrl: null, publishedAt: null, snippet: "", sourceId: "x" };
+    const tagged = { ...base, title: "Fed holds rates as CMBS delinquencies climb" };
+    const plain = { ...base, title: "Local bakery opens second location" };
+    expect(headlineSignals(tagged).length).toBeGreaterThan(0);
+    expect(headlineSignals(plain)).toEqual([]);
+    expect(scoreHeadline(tagged, NOW2)).toBeGreaterThan(scoreHeadline(plain, NOW2));
   });
 });
 

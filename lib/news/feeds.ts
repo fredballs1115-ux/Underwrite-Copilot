@@ -377,19 +377,47 @@ export function parseFeed(xml: string, source: NewsSource): FeedItem[] {
 
 // ── Ranking ──────────────────────────────────────────────────────────────
 
+/** One thing a headline can touch: the pattern, its weight in the score,
+ *  and the word the page tags the headline with — the same match drives
+ *  both, so a tag never says what the score did not count. */
+interface Signal {
+  /** the tag; an asset-class signal tags the class it matched */
+  label: string | ((m: RegExpExecArray) => string);
+  rx: RegExp;
+  w: number;
+  /** false: counts in the score but is never a tag */
+  tag?: false;
+}
+
+/** The asset word a headline uses, as the class the site names. */
+const ASSET_CLASS_TAG: Record<string, string> = {
+  apartment: "multifamily",
+  apartments: "multifamily",
+  warehouse: "industrial",
+  "shopping center": "retail",
+};
+
 /** What moves a deal — a headline touching these ranks above one that does
  *  not, whatever its age. Weights are small and capped so recency still
  *  decides between two live stories. */
-const SIGNALS: [RegExp, number][] = [
-  [/\bcap rates?\b/i, 2],
-  [/\b(fed|federal reserve|fomc|rate (cut|hike)|interest rates?|treasury|10-year|sofr)\b/i, 2],
-  [/\b(cmbs|delinquen\w*|distress\w*|default\w*|foreclos\w*|receiver\w*|special servic\w*|maturit\w*)\b/i, 2],
-  [/\b(rent control|rent stabili[sz]ation|good cause|eviction|topa|ordinance|zoning|entitle\w*)\b/i, 2],
-  [/\b(tariffs?|insurance premiums?|property tax\w*|assessment\w*|opportunity zone|1031|bonus depreciation)\b/i, 1],
-  [/\b(multifamily|apartments?|office|industrial|warehouse|retail|shopping center|data center|hotel|self-storage)\b/i, 1],
-  [/\b(vacancy|absorption|supply|deliveries|construction starts|permits|pipeline|conversion)\b/i, 1],
-  [/\b(refinanc\w*|loan|lender|lending|fannie mae|freddie mac|hud|fha|agency debt|debt fund)\b/i, 1],
-  [/\b(acqui\w*|sale|sold|portfolio|trade[sd]?|deal|price per|\$\d)/i, 1],
+const SIGNALS: Signal[] = [
+  { label: "cap rates", rx: /\bcap rates?\b/i, w: 2 },
+  { label: "rates", rx: /\b(fed|federal reserve|fomc|rate (cut|hike)|interest rates?|treasury|10-year|sofr)\b/i, w: 2 },
+  { label: "distress", rx: /\b(cmbs|delinquen\w*|distress\w*|default\w*|foreclos\w*|receiver\w*|special servic\w*|maturit\w*)\b/i, w: 2 },
+  { label: "regulation", rx: /\b(rent control|rent stabili[sz]ation|good cause|eviction|topa|ordinance|zoning|entitle\w*)\b/i, w: 2 },
+  { label: "costs & tax", rx: /\b(tariffs?|insurance premiums?|property tax\w*|assessment\w*|opportunity zone|1031|bonus depreciation)\b/i, w: 1 },
+  {
+    label: (m) => {
+      const word = m[1].toLowerCase();
+      return ASSET_CLASS_TAG[word] ?? word;
+    },
+    rx: /\b(multifamily|apartments?|office|industrial|warehouse|retail|shopping center|data center|hotel|self-storage)\b/i,
+    w: 1,
+  },
+  { label: "supply", rx: /\b(vacancy|absorption|supply|deliveries|construction starts|permits|pipeline|conversion)\b/i, w: 1 },
+  { label: "debt", rx: /\b(refinanc\w*|loan|lender|lending|fannie mae|freddie mac|hud|fha|agency debt|debt fund)\b/i, w: 1 },
+  // Every other headline is a deal; it counts, but it is not worth a tag.
+  { label: "deal", rx: /\b(acqui\w*|sale|sold|portfolio|trade[sd]?|deal|price per|\$\d)/i, w: 1, tag: false },
 ];
 const SIGNAL_CAP = 5;
 
@@ -402,8 +430,38 @@ export function scoreHeadline(item: FeedItem, now = Date.now()): number {
   }
   const text = `${item.title} ${item.snippet}`;
   let signal = 0;
-  for (const [rx, w] of SIGNALS) if (rx.test(text)) signal += w;
+  for (const s of SIGNALS) if (s.rx.test(text)) signal += s.w;
   return recency + Math.min(SIGNAL_CAP, signal);
+}
+
+export interface HeadlineSignal {
+  label: string;
+  /** a deal-moving signal (weight 2) — the page tints it; the rest are context */
+  strong: boolean;
+}
+
+/**
+ * Why the headline ranks, as the words the page tags it with: the
+ * deal-moving signals it touches (cap rates, rates, distress, regulation),
+ * then the context (costs & tax, the asset class it names, supply, debt),
+ * in that order, at most `max`. The score counts "deal" too, but every
+ * other headline is one, so it is never a tag; a headline touching nothing
+ * gets none.
+ */
+export function headlineSignals(item: Pick<FeedItem, "title" | "snippet">, max = 3): HeadlineSignal[] {
+  const text = `${item.title} ${item.snippet}`;
+  const out: HeadlineSignal[] = [];
+  // Stable sort: strongest first, the table's order within a weight.
+  for (const s of [...SIGNALS].sort((a, b) => b.w - a.w)) {
+    if (s.tag === false) continue;
+    const m = s.rx.exec(text);
+    if (!m) continue;
+    const label = typeof s.label === "function" ? s.label(m) : s.label;
+    if (out.some((o) => o.label === label)) continue;
+    out.push({ label, strong: s.w >= 2 });
+    if (out.length >= max) break;
+  }
+  return out;
 }
 
 const normTitle = (t: string) =>
