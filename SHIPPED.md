@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and twenty-one PRs, #176–#296, each
+estimate, and that's what it should flag." A hundred and twenty-two PRs, #176–#297, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1740,6 +1740,11 @@ confirmed equal to the main tip after each batch.
   — with their opening words on the picture where a plain heading sat.
   The same public-domain USGS frames as the gallery, at the imagery
   route's largest size, nothing upscaled.
+- **#297 The sign-in page opens on a real place.** The door too:
+  Baltimore's Inner Harbor, a covered market a few miles from the DMV
+  core, stands behind the sign-in card at a quarter strength under the
+  same scrim, with its credit in the corner — the last public page
+  that opened on a flat colour.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 
