@@ -59,8 +59,9 @@ the Midtown frame, the footer naming the improvement, a fresh process
 185 s old that warmed 11 of 12 sources at boot — every search-backed
 source through Bing, Commercial Property Executive with two items,
 REBusinessOnline the one timeout — `NEWS HELD: none`, twelve public
-pages lint clean); #296 (`/why` and `/demo` open on a real place too)
-and #297 (the sign-in page too) follow.
+pages lint clean); #296 (`/why` and `/demo` open on a real place too),
+#297 (the sign-in page too) and #298 (each market brief on its own
+downtown) follow.
 
 ---
 
