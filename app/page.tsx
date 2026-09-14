@@ -347,6 +347,50 @@ const JSON_LD = {
   ],
 };
 
+// How an uploaded OM is handled, beside the price — the four things the
+// security page states in full, each an icon and a few words, each opening
+// that page. Only what is true: no attestation badge, because we hold none.
+const TRUST: { label: string; icon: ReactNode }[] = [
+  {
+    label: "Private storage, links that expire",
+    icon: (
+      <Icon>
+        <rect x="4" y="10" width="16" height="11" rx="2" />
+        <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Isolated in the database itself",
+    icon: (
+      <Icon>
+        <ellipse cx="12" cy="6" rx="8" ry="3" />
+        <path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6" />
+        <path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Never used to train a model",
+    icon: (
+      <Icon>
+        <path d="M9 4a3 3 0 0 0-3 3v1a3 3 0 0 0-2 3 3 3 0 0 0 2 3v1a3 3 0 0 0 3 3h1V4z" />
+        <path d="M15 4a3 3 0 0 1 3 3v1a3 3 0 0 1 2 3 3 3 0 0 1-2 3v1a3 3 0 0 1-3 3h-1V4z" />
+        <path d="M3 3l18 18" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Delete it all, self-serve",
+    icon: (
+      <Icon>
+        <path d="M4 7h16M10 11v6M14 11v6" />
+        <path d="M6 7l1 13h10l1-13M9 7V4h6v3" />
+      </Icon>
+    ),
+  },
+];
+
 /** One section's header: an eyebrow and a headline of a few words. */
 function SectionHead({
   eyebrow,
@@ -935,6 +979,25 @@ export default function Home() {
           <p className="mt-5 text-center text-xs text-muted">
             Billed monthly through Stripe · cancel anytime · no card required for Free.
           </p>
+          {/* How the OM is handled, beside the price — each tile opens the
+              security page, which states it in full. */}
+          <Reveal delay={120}>
+            <ul className="trust-strip mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {TRUST.map((t) => (
+                <li key={t.label}>
+                  <Link
+                    href="/security"
+                    className="hover-lift flex h-full items-center gap-3 rounded-xl border border-line bg-surface p-3.5 shadow-card transition-colors hover:border-brand/30"
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">
+                      {t.icon}
+                    </span>
+                    <span className="text-sm font-medium leading-snug">{t.label}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Reveal>
           </div>
         </section>
 

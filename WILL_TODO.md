@@ -19,7 +19,7 @@ GlobeSt's FeedBlitz URL parses to zero items — item 4 below. #270 follows).
 
 ## 🟢 What changed on 2026-09-07, and the three checks it asks of you
 
-Ninety-seven PRs (#176–#272) landed across one review session and the
+Ninety-eight PRs (#176–#273) landed across one review session and the
 correction round that followed; each is live once Render finishes the `main`
 deploy (live-verify shows the sha).
 
@@ -465,6 +465,11 @@ deploy (live-verify shows the sha).
   pdfjs in-process) — a third to a quarter of the tokens on every
   OM-reading step — a scan or a picture-heavy deck still goes as PDF;
   `OM_READ=pdf` forces the pages, `OM_READ=text` the layer.
+- **How the OM is handled, beside the price** (#273): the category's
+  one honest convention adopted — four trust tiles under the pricing
+  (private storage with expiring links, isolation in the database, never
+  used to train, delete it all self-serve), each opening `/security`; no
+  badge we do not hold, no logos we do not have.
 
 **The deploy that lagged landed.** live-verify read the live build as
 `fab27ec` (#239) at 15:09 UTC, eighteen minutes after #240 merged, and as
