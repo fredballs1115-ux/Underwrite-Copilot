@@ -11,6 +11,7 @@ import {
 } from "./skyline";
 import { gluedWords } from "./render-lint";
 import metrosSeed from "@/data/research/metros.json";
+import candidateFile from "@/data/skyline-candidates.json";
 
 const METRO_IDS = new Set((metrosSeed.metros ?? []).map((m) => (m as { id: string }).id));
 
@@ -137,5 +138,57 @@ describe("the credit line", () => {
     });
     expect(line).toContain("Wikimedia Commons");
     expect(line).not.toContain("unknown");
+  });
+});
+
+// ── the candidate file the runner probes ───────────────────────────────────
+//
+// WHY THIS IS A TEST AND NOT A CONVENTION. scripts/probe-skylines.mjs reads
+// `cand.file` out of each entry. NoVA's four candidates were committed as
+// bare STRINGS rather than `{ file, note }` objects, so `cand.file` was
+// undefined, and the probe's verify pass printed
+//
+//     DEAD  undefined — no such file on Commons
+//
+// four times — which reads exactly like a dead photograph and is nothing of
+// the sort: the file was never asked for. That shipped, and the round's
+// marker passed anyway because it grepped the credit line out of the
+// server's HTML, which renders whether or not the picture resolves.
+//
+// The sandbox cannot check Commons, so the probe is the ONLY way a dead file
+// is ever caught. A malformed entry silently disables it for that market.
+describe("the candidate file", () => {
+  it("gives every candidate a file the probe can actually ask for", () => {
+    for (const market of candidateFile.markets ?? []) {
+      for (const [i, cand] of (market.candidates ?? []).entries()) {
+        const where = `${market.metroId}[${i}]`;
+        expect(typeof cand, `${where} is not an object`).toBe("object");
+        expect(typeof (cand as { file?: unknown }).file, `${where}.file`).toBe("string");
+        expect((cand as { file: string }).file, where).toMatch(/\.(jpe?g|png|webp)$/i);
+      }
+    }
+  });
+
+  it("offers a candidate for every market whose table entry names a file", () => {
+    // The table is what the site serves; the candidate file is what the
+    // runner verifies. A market in one and not the other is unverifiable.
+    const probed = new Set(
+      (candidateFile.markets ?? [])
+        .filter((m) => (m.candidates ?? []).length > 0)
+        .map((m) => m.metroId),
+    );
+    for (const id of Object.keys(SKYLINES)) {
+      expect(probed.has(id), `${id} is served but never probed`).toBe(true);
+    }
+  });
+
+  it("probes the file the table actually serves, not merely some file", () => {
+    // A candidate list that has drifted off the chosen file verifies the
+    // wrong picture — green, and meaningless.
+    for (const [id, shot] of Object.entries(SKYLINES)) {
+      const market = (candidateFile.markets ?? []).find((m) => m.metroId === id);
+      const files = (market?.candidates ?? []).map((c) => (c as { file: string }).file);
+      expect(files, `${id}: the served file is not among its candidates`).toContain(shot.file);
+    }
   });
 });

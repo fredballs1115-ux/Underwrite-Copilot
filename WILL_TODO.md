@@ -25,6 +25,7 @@ letter:
 | **Net effective rent** | Both ways — straight-line and discounted — with free rent, TI and the commission against the *gross* |
 | **Rentable vs usable** (#312) | The load factor, and what it does to a quote. **$38.00 per rentable foot is $43.70 per foot you can furnish** — and the two numbers people both call "the load factor" (15.0% and 13.0%) are the same building |
 | **After tax** (#315) | Land is never depreciable; the gain at the sale has THREE rates, not one; and depreciation is a **timing** benefit — shelter and recapture at the same rate and it nets to zero. Cost segregation lifts year-one write-off 4.5× and leaves this deal **$130,909 worse off** in raw dollars |
+| **Closing statement** (#317) | The one that comes after yes, and the one people get *backwards*: taxes in arrears mean the seller credits the buyer, in advance the reverse, so the wrong reading misses by the **sum** of the two figures. Deposits are the tenants' money and go over whole. The closing day itself is worth **$657.53** on a $240,000 bill, so the contract decides it, not a default |
 | **Opex translator** | One expense per unit, per foot, as a share of income |
 | **Cap triangle · Rent converter · Build or buy** | The quick ones |
 
