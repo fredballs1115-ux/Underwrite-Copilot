@@ -7,6 +7,7 @@ import {
   creditLine,
   hasSkyline,
   skylineFor,
+  skylineTag,
 } from "./skyline";
 import { gluedWords } from "./render-lint";
 import metrosSeed from "@/data/research/metros.json";
@@ -66,6 +67,21 @@ describe("the Commons URLs", () => {
     expect(commonsUrl("a.jpg", 99999)).toContain(`width=${SKYLINE_WIDTH.max}`);
     expect(commonsUrl("a.jpg", 10)).toContain(`width=${SKYLINE_WIDTH.min}`);
     expect(commonsUrl("a.jpg", Number.NaN)).toContain(`width=${SKYLINE_WIDTH.default}`);
+  });
+
+  it("tags a market by the file it currently names", () => {
+    // The token exists so a year-long immutable cache is honest. It has to
+    // be stable for the same file (or every deploy would needlessly bust
+    // every browser's copy) and different for a different file (or the
+    // cache would never be busted when it should be).
+    const tags = Object.keys(SKYLINES).map((id) => skylineTag(id));
+    expect(new Set(tags).size, "two markets share a tag").toBe(tags.length);
+    for (const id of Object.keys(SKYLINES)) {
+      expect(skylineTag(id)).toBe(skylineTag(id));
+      expect(skylineTag(id)).toMatch(/^[0-9a-z]+$/);
+    }
+    // A market with no photograph has nothing to bust.
+    expect(skylineTag("definitely-not-a-metro")).toBe("0");
   });
 
   it("escapes a name on the way into the file's own page", () => {

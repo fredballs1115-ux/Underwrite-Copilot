@@ -204,6 +204,32 @@ export function commonsUrl(file: string, width: number): string {
   return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=${w}`;
 }
 
+/**
+ * A short token that changes when a market's photograph changes.
+ *
+ * The route serves these `immutable` for a year, which is right for the
+ * bytes — a Commons file's content does not change under its name — but
+ * WRONG for the URL, because `/api/imagery/skyline/miami` means a different
+ * photograph the day this table is edited. Without a token in the query, a
+ * visitor who has been here before holds last year's picture and never
+ * learns otherwise.
+ *
+ * FNV-1a over the filename: tiny, stable across processes and deploys (so
+ * two servers agree and a rebuild does not needlessly bust every cache),
+ * and derived from the one field that decides which photograph renders. It
+ * is a cache key, never a checksum — nothing here is trusting it.
+ */
+export function skylineTag(id: string): string {
+  const shot = SKYLINES[id];
+  if (!shot) return "0";
+  let h = 2166136261;
+  for (let i = 0; i < shot.file.length; i++) {
+    h ^= shot.file.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(36);
+}
+
 /** The page that documents the file, for the credit link. */
 export function commonsPage(file: string): string {
   return `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(file)}`;

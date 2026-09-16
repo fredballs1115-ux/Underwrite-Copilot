@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { METRO_VIEWS } from "@/lib/metro-imagery";
-import { creditLine, skylineFor } from "@/lib/skyline";
+import { creditLine, skylineFor, skylineTag } from "@/lib/skyline";
 
 /**
  * The picture of a covered market, and the honest sentence under it.
@@ -60,8 +60,12 @@ export function CityPhoto({
   if (mode === "none") return null;
 
   const skyline = mode === "skyline" && shot;
+  // `v` is a cache buster, not a parameter the route reads: the bytes are
+  // served immutable for a year, and without a token that moves when the
+  // table names a different file, a returning visitor would hold last
+  // year's photograph forever.
   const src = skyline
-    ? `/api/imagery/skyline/${metro}?w=${width}`
+    ? `/api/imagery/skyline/${metro}?w=${width}&v=${skylineTag(metro)}`
     : `/api/imagery/metro/${metro}?w=${width}&h=${height}`;
   const credit = skyline
     ? creditLine(shot)
