@@ -49,6 +49,16 @@ const COMMONS = "https://commons.wikimedia.org/w/api.php";
 const WIKIPEDIA = "https://en.wikipedia.org/w/api.php";
 const WIDTH = 1600;
 
+/**
+ * TERSE — one line per usable photograph instead of five, and the doors'
+ * chatter dropped. The verbose form is what you want when a market comes
+ * back empty and you need to know which door failed; the terse form is what
+ * you want when the doors are working and you are choosing between eighteen
+ * markets' worth of results, which is most of the time. live-verify runs
+ * terse so the whole sweep can be read in one pass.
+ */
+const terse = process.argv.includes("--terse");
+
 /** How many candidates a market's metadata is actually fetched for. */
 const PER_MARKET = 9;
 /** The whole search pass gives up here, so live-verify stays quick. */
@@ -326,10 +336,12 @@ async function searchMode(markets) {
         continue;
       }
       const useful = art.files.filter((f) => nameScore(f) >= 0);
-      console.log(
-        `   article "${title}": ${art.files.length} images` +
-          `${art.lead.length ? `, lead ${art.lead[0]}` : ", no lead image"}`,
-      );
+      if (!terse) {
+        console.log(
+          `   article "${title}": ${art.files.length} images` +
+            `${art.lead.length ? `, lead ${art.lead[0]}` : ", no lead image"}`,
+        );
+      }
       for (const f of art.lead) note(f, "article lead");
       for (const f of useful) if (nameScore(f) > 0) note(f, `article "${title}"`);
     }
@@ -344,7 +356,7 @@ async function searchMode(markets) {
         continue;
       }
       if (res.files.length === 0) continue;
-      console.log(`   category "${cat}": ${res.files.length} files`);
+      if (!terse) console.log(`   category "${cat}": ${res.files.length} files`);
       const ranked = res.files.filter((f) => nameScore(f) >= 0).sort((a, b) => nameScore(b) - nameScore(a));
       for (const f of ranked.slice(0, 12)) note(f, `category "${cat}"`);
     }
@@ -366,6 +378,7 @@ async function searchMode(markets) {
       console.log("   NO CANDIDATES from any door — every request above failed or came back empty");
       continue;
     }
+    if (terse) console.log("");
 
     // Now spend the metadata calls, best-named first.
     const ordered = [...found.entries()].sort((a, b) => nameScore(b[0]) - nameScore(a[0]));
@@ -377,21 +390,35 @@ async function searchMode(markets) {
       const meta = await metadata(file);
       const verdict = judge(meta);
       if (!verdict.usable) {
-        console.log(`   no   ${file} — ${verdict.why}`);
+        if (!terse) console.log(`   no   ${file} — ${verdict.why}`);
         continue;
       }
       usable++;
-      console.log(
-        `   YES  ${meta.width}x${meta.height} (${(meta.width / meta.height).toFixed(2)}:1)  ${file}\n` +
-          `        from: ${from}\n` +
-          `        author: ${meta.artist}\n` +
-          `        licence: ${meta.license}${meta.licenseUrl ? ` (${meta.licenseUrl})` : ""}` +
-          `${meta.description ? `\n        shows: ${meta.description}` : ""}`,
-      );
+      const shape = `${meta.width}x${meta.height} (${(meta.width / meta.height).toFixed(2)}:1)`;
+      const type = (meta.mime ?? "").replace("image/", "");
+      if (terse) {
+        // Everything needed to choose AND to attribute, on one line.
+        console.log(
+          `   ${shape} ${type} | ${file} | ${meta.artist} | ${meta.license}` +
+            `${meta.licenseUrl ? ` | ${meta.licenseUrl}` : ""}`,
+        );
+      } else {
+        console.log(
+          `   YES  ${shape} ${type}  ${file}\n` +
+            `        from: ${from}\n` +
+            `        author: ${meta.artist}\n` +
+            `        licence: ${meta.license}${meta.licenseUrl ? ` (${meta.licenseUrl})` : ""}` +
+            `${meta.description ? `\n        shows: ${meta.description}` : ""}`,
+        );
+      }
     }
-    console.log(
-      `   -- ${usable} usable of ${checked} checked (${found.size} candidates gathered)`,
-    );
+    if (!terse) {
+      console.log(
+        `   -- ${usable} usable of ${checked} checked (${found.size} candidates gathered)`,
+      );
+    } else if (usable === 0) {
+      console.log(`   (nothing usable of ${checked} checked — run without --terse to see why)`);
+    }
   }
   console.log(`\nSKYLINE SEARCH: done in ${((Date.now() - startedAt) / 1000).toFixed(0)}s`);
 }

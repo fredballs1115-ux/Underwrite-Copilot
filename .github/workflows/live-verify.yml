@@ -249,7 +249,7 @@ jobs:
         # --search asks Commons what exists; with no flag it verifies the
         # candidates already chosen. While the table is being filled the
         # search is what earns its keep, so that is the mode wired here.
-        run: node scripts/probe-skylines.mjs --search || true
+        run: node scripts/probe-skylines.mjs --search --terse || true
 
       - name: Verdict
         # Two tiers: the hero headline proves the site is up and on the right
