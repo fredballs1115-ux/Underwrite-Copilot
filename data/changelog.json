@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-16",
+      "title": "What the lease is really worth, and one expense three ways",
+      "blurb": "Every office and industrial rent in a memorandum is a STARTING rent, and the gap to net effective is where the broker's number lives. $36 a foot on a ten-year deal with twelve months free and $90 of tenant improvements is not $36 a foot — /tools now draws where the face rent actually goes, and gives both net effective figures, the straight-line one most memoranda quote and the discounted one that charges the landlord for waiting. Plus one operating expense said per unit, per foot and as a share of income, because a broker quotes the first and an underwriter argues the third.",
+      "href": "/tools"
+    },
+    {
+      "date": "2026-09-16",
       "title": "A sizing is a link, and a table is a paste",
       "blurb": "“Send me that sizing” used to mean a screenshot. Every field on /tools now writes itself into the address bar, so the whole page — all five calculators — travels as a link, and an untouched page still copies as a bare /tools rather than a paragraph of defaults. The cash-flow table copies tab-delimited with its headers and the numbers raw, so they land in a spreadsheet as numbers instead of as text somebody has to clean.",
       "href": "/tools"

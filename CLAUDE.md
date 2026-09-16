@@ -198,6 +198,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   HTML carries the seeded figures. A table's Copy button writes it
   tab-delimited with headers and the numbers RAW, never the formatted
   ones, so a paste lands in a spreadsheet as numbers.
+- A lease, and an expense: `lib/tools/lease-math.ts` (pure). `readLease`
+  gives BOTH net effective rents and names them — straight-line, the one
+  most memoranda quote, and discounted, which charges the landlord for
+  waiting and is therefore always lower on a deal with free rent up
+  front. Two rules the arithmetic turns on: escalations step **annually
+  on the lease's own anniversary**, so free rent taken at the front is
+  priced at the rate it WOULD have been paid at (treating it as "the term
+  starts a year later" understates the concession, and is the common
+  mistake); and the commission is written against the **gross** rent over
+  the term, the face deal, which is why a concession-heavy lease still
+  pays a full fee. `readOpex` says one expense per unit, per SF and as a
+  share of EGI, and names a sub-20% ratio as a net lease rather than a
+  cheap building.
 - The homepage's photographs: `lib/photos.ts` (pure — the four slots with
   their file names, briefs, sizes and alt text; `presentPhotos` over an
   `exists` callback; `stripPhotos`; `HERO_AERIAL`) and `lib/photos-fs.ts`
