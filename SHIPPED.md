@@ -36,9 +36,56 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and twenty-six PRs, #176–#301, each
+estimate, and that's what it should flag." A hundred and twenty-seven PRs, #176–#302, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
+
+- **#302 The photographs, actually visible — and /tools reading what you
+  type.** Two defects in what shipped that morning, both found by looking at
+  it rather than at the tests.
+
+  Fifteen verified skylines landed in #301 and then rendered at about an
+  eighth of their strength: the image itself at `opacity-30`, under a
+  gradient still 55% opaque at its lightest, under a third scrim. Your
+  complaint — "the pictures all around the site are TERRIBLE" — survived the
+  fix that was supposed to answer it. A washed photograph is worse than
+  none: it reads as a texture and costs the same bytes.
+
+  The picture now draws at full strength and the scrim does all the work,
+  running bottom to top — opaque under the words a band sets at its bottom,
+  clearing until the city is about 80% of the frame across the top. That
+  direction rather than the obvious left-to-right one because every file in
+  the table is a PANORAMA (Seattle is 8443×3361, Chicago 3127×795): a tall
+  narrow window down the right-hand side crops a panorama to a sliver of two
+  towers, and a wide short window across the top is the crop the photograph
+  was taken for. Measured on the same band it shows two thirds of the
+  picture where the horizontal shape showed a quarter, and holds better
+  contrast under the type as well. The sign-in page keeps its own shape — a
+  plateau down the middle from `lg`, both margins clear, so Baltimore shows
+  on either side of the card.
+
+  `lib/place-band.contrast.test.ts` is the guard, and it is arithmetic
+  rather than a screenshot because the photographs are fetched at request
+  time and next week's file is a different picture. It reads the gradient
+  stops back out of the component and recomputes white type against a PURE
+  WHITE frame — the worst photograph a market could ever have, and a
+  blown-out sky behind a skyline is most of them at midday. Four ways the
+  treatment could regress were mutated in and all four fail the suite.
+
+  Second: typing `$20M` into a price field on /tools yielded nothing at all —
+  a page of em dashes for a perfectly ordinary number, because the local
+  parser stripped `$` and `,` but not the magnitude suffix. Every field now
+  reads through `readFigure` (`lib/money.ts`), which takes `$20M`, `500k`,
+  `1.2mm`, `63 million`, `6.5%`, `1.25x` and a negative — a negative NOI is a
+  real thing to put into a debt sizer, and `sizeLoan` has a deliberate
+  answer for it. It shares ONE suffix table with `parseUsd` and keeps its own
+  rules, because the two answer different questions: `parseUsd` reads a
+  building price out of a pasted line and has a typo floor, this reads a
+  whole field and cannot have one (the same page holds a $36 rent).
+
+  Also: the coverage grid's credit line now names the licences as well as
+  the photographers, which is what CC BY actually asks for, and it is built
+  from the table so a swapped photograph can never leave a name behind.
 
 - **#176 Imagery.** Root cause was the point, not the pictures: Photon put a
   street address on the street centreline or the city and the code stamped it

@@ -230,6 +230,28 @@ export function skylineTag(id: string): string {
   return (h >>> 0).toString(36);
 }
 
+/**
+ * One attribution line for a GRID of these photographs.
+ *
+ * A tile 240px wide has no room for a photographer's name under it, but
+ * every licence here except the public-domain ones obliges us to give one.
+ * Creative Commons asks for attribution "in any manner reasonable to the
+ * medium", and the reasonable manner for a gallery is a single line under
+ * it naming every creator and every licence — which is what a museum or a
+ * newspaper does with a picture grid. So the tiles stay clean and this
+ * sentence carries the obligation for all of them.
+ *
+ * Built from the table rather than written out, so a market added or a
+ * photograph changed can never leave a name behind on the page.
+ */
+export function galleryCredit(ids: readonly string[]): string {
+  const shots = ids.map((id) => SKYLINES[id]).filter((s): s is SkylineShot => Boolean(s));
+  if (shots.length === 0) return "";
+  const names = [...new Set(shots.map((s) => (s.credit && s.credit !== "unknown" ? s.credit : "Wikimedia Commons")))];
+  const licenses = [...new Set(shots.map((s) => s.license))].sort();
+  return `Skyline photographs by ${names.join(", ")} — via Wikimedia Commons, ${licenses.join(" / ")}.`;
+}
+
 /** The page that documents the file, for the credit link. */
 export function commonsPage(file: string): string {
   return `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(file)}`;

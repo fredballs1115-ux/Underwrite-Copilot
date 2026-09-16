@@ -122,7 +122,7 @@ export default function WhyPage() {
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
             Why Underwrite Copilot
           </h1>
-          <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/75">
+          <p className="mt-5 text-base leading-relaxed text-white">
             You get more offering memoranda than you can model. Underwrite Copilot
             reads an OM and tells you what the deal is, where it breaks, and
             whether it fits your mandate. You decide what to model.

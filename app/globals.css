@@ -165,6 +165,31 @@ body {
   background-color: var(--color-sidebar);
 }
 
+/* White type laid over a photograph (app/place-band).
+
+   The scrim under it already carries the measured contrast — see the
+   arithmetic in lib/place-band.contrast.test.ts — so this is not what
+   makes the words legible. It is the belt to that braces: the brightest
+   pixel of a photograph nobody has looked at yet is not knowable when
+   this is written, and a soft dark halo is what every picture-led
+   publication puts under a line set on an image. Two shadows: a tight one
+   for the letterform's own edge, a wide faint one to sink the whole line
+   half a stop into the picture. */
+.on-photo {
+  text-shadow:
+    0 1px 2px rgb(0 0 0 / 0.55),
+    0 2px 14px rgb(0 0 0 / 0.35);
+}
+
+/* The measure a band's words are held to. Narrow enough to read in one
+   eye movement, and — the reason it is a rule rather than a preference —
+   narrow enough that the scrim beside it has somewhere to clear. A line
+   that runs to 90% of the viewport leaves no width for the photograph and
+   no contrast for itself. 36rem ≈ 70 characters. */
+.band-words {
+  max-width: 36rem;
+}
+
 /* Scroll-reveal: elements fade/rise in the first time they enter the
    viewport (driven by the Reveal client component). The hidden start state
    is scoped to `.js` so that without JavaScript the server-rendered content

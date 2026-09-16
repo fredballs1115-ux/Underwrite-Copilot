@@ -291,7 +291,7 @@ export default function DemoPage() {
               Illustrative sample
             </span>
           </div>
-          <p className="mt-2 max-w-2xl text-sm text-white/75">
+          <p className="mt-2 text-sm text-white">
             The product, on an invented deal in Philadelphia — not a real listing, not investment advice.
           </p>
         </PlaceBand>

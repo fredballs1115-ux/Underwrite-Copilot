@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { readFigure } from "@/lib/money";
 import {
   breakEvenOccupancyPct,
   capRatePct,
@@ -29,13 +30,11 @@ import {
 
 // ── the input layer ────────────────────────────────────────────────────────
 
-/** What someone types, read as a number — and read as nothing when blank. */
-function num(raw: string): number | null {
-  const cleaned = raw.replace(/[$,\s%x]/gi, "");
-  if (cleaned === "" || cleaned === "-" || cleaned === ".") return null;
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
-}
+// What someone types, read as a number. `readFigure` (lib/money) is the one
+// reader behind every field here, and it takes the shorthand an analyst
+// actually uses — "$20M", "500k", "1.2mm" — because a field that quietly
+// ignores "$20M" answers a page of em dashes to a perfectly ordinary price.
+const num = readFigure;
 
 function Field({
   label,
@@ -136,7 +135,7 @@ function Card({
 // ── 1. the debt sizer ──────────────────────────────────────────────────────
 
 function DebtSizer() {
-  const [price, setPrice] = useState("20,000,000");
+  const [price, setPrice] = useState("$20M");
   const [noi, setNoi] = useState("1,200,000");
   const [rate, setRate] = useState("6.5");
   const [amort, setAmort] = useState("30");
@@ -171,7 +170,7 @@ function DebtSizer() {
   return (
     <Card eyebrow="Debt" title="Size the loan">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <Field label="Price" value={price} onChange={setPrice} placeholder="20,000,000" />
+        <Field label="Price" value={price} onChange={setPrice} placeholder="$20M" />
         <Field label="NOI" value={noi} onChange={setNoi} placeholder="1,200,000" />
         <Field label="Rate" suffix="%" value={rate} onChange={setRate} placeholder="6.5" />
         <Field label="Amort" suffix="yr" value={amort} onChange={setAmort} placeholder="30" />
@@ -286,7 +285,7 @@ function DebtSizer() {
 
 function CapTriangle() {
   const [noi, setNoi] = useState("1,200,000");
-  const [price, setPrice] = useState("20,000,000");
+  const [price, setPrice] = useState("$20M");
   const [cap, setCap] = useState("");
   const [units, setUnits] = useState("120");
   const [sf, setSf] = useState("");
@@ -315,7 +314,7 @@ function CapTriangle() {
       <p className="text-sm text-muted">Fill any two. The third solves.</p>
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Field label="NOI" value={noi} onChange={setNoi} placeholder="1,200,000" />
-        <Field label="Price" value={price} onChange={setPrice} placeholder="20,000,000" />
+        <Field label="Price" value={price} onChange={setPrice} placeholder="$20M" />
         <Field label="Cap rate" suffix="%" value={cap} onChange={setCap} placeholder="6.00" />
       </div>
 
@@ -359,9 +358,9 @@ function CapTriangle() {
 // ── 3. build or buy ────────────────────────────────────────────────────────
 
 function BuildOrBuy() {
-  const [land, setLand] = useState("5,000,000");
-  const [hard, setHard] = useState("30,000,000");
-  const [soft, setSoft] = useState("6,000,000");
+  const [land, setLand] = useState("$5M");
+  const [hard, setHard] = useState("$30M");
+  const [soft, setSoft] = useState("$6M");
   const [conting, setConting] = useState("5");
   const [stabNoi, setStabNoi] = useState("2,975,000");
   const [exitCap, setExitCap] = useState("5.5");

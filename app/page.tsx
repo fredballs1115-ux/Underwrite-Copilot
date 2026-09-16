@@ -32,7 +32,7 @@ import { StressBench } from "./landing-stress";
 import metrosSeed from "@/data/research/metros.json";
 import { MARKET_COUNT } from "./markets-marquee";
 import { MarketsGallery } from "./markets-gallery";
-import { PlaceBackdrop } from "./place-band";
+import { PhotoScrim, PlaceBackdrop } from "./place-band";
 import { HERO_AERIAL, photoSrc, stripPhotos, type PhotoSlot } from "@/lib/photos";
 import { photosOnDisk } from "@/lib/photos-fs";
 
@@ -419,10 +419,11 @@ function SectionHead({
 /**
  * The photograph behind the hero's headline. The operator's own (a real
  * building, a team at work) when `public/photos/hero.jpg` exists; until
- * then a real USGS aerial of Midtown Manhattan, the one photograph the site
- * can always produce for itself (PlaceBackdrop, shared with the other
- * public pages' opening bands). Either sits under a scrim so the type
- * keeps its contrast whatever the picture's brightness.
+ * then Manhattan's skyline, the one photograph the site can always produce
+ * for itself (PlaceBackdrop, shared with the other public pages' opening
+ * bands). Both draw at full strength under the SAME scrim (PhotoScrim):
+ * dark under the left-hand type, clear over the picture. A photograph the
+ * treatment washes out costs the same bytes and says nothing.
  */
 function HeroBackdrop({ photo }: { photo: PhotoSlot | undefined }) {
   if (!photo) return <PlaceBackdrop metro={HERO_AERIAL.metro} height={HERO_AERIAL.height} />;
@@ -435,10 +436,9 @@ function HeroBackdrop({ photo }: { photo: PhotoSlot | undefined }) {
         width={photo.width}
         height={photo.height}
         decoding="async"
-        className="h-full w-full object-cover opacity-45"
+        className="h-full w-full object-cover object-[50%_42%]"
       />
-      <div className="absolute inset-0 bg-gradient-to-r from-sidebar via-sidebar/85 to-sidebar/55" />
-      <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-sidebar to-transparent" />
+      <PhotoScrim />
     </div>
   );
 }
@@ -604,7 +604,7 @@ export default function Home() {
                 wider than small phones — masked by the section's
                 overflow-hidden, so the page didn't scroll, it just clipped. */}
             <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
-              <div>
+              <div className="on-photo">
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-xs font-medium text-accent">
                   <span className="h-1.5 w-1.5 rounded-full bg-accent" />
                   AI deal screening for CRE acquisitions
@@ -630,7 +630,7 @@ export default function Home() {
                     </svg>
                   </span>
                 </h1>
-                <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/70">
+                <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/90">
                   Upload the OM. Every figure sourced, the three deal-killers stressed, a Go / Caution / No-go — in minutes.
                 </p>
                 <div className="mt-8 flex flex-wrap items-center gap-3">
