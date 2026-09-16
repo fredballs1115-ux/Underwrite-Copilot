@@ -1099,4 +1099,36 @@ describe("the deal math tools", () => {
     expect(html.match(/rounded-full bg-kill/g)?.length).toBe(1);
     expect(html.match(/rounded-full bg-brand/g)?.length).toBeGreaterThanOrEqual(6);
   });
+
+  it("runs the loan over the hold and draws each year's split", () => {
+    // $13M at 6.5% over 30 years, held 10: a $986,026 payment, and $11.02M
+    // STILL OWED at the balloon. The point of the card is that a third of
+    // the schedule has run and 85% of the loan is still there.
+    expect(text).toContain("What the loan does");
+    expect(text).toContain("$986,026");
+    expect(text).toContain("$11.02M");
+    expect(text).toContain("15.2% of the loan is repaid over the term");
+    expect(text).toContain("80% of everything paid is interest");
+    // …and the sentence that names amortisation as equity rather than cost.
+    expect(text).toContain("Principal — equity, returned at sale");
+    // One column per year of the term, each split into two segments.
+    const cols = html.match(/w-full bg-brand(\/30)?"/g) ?? [];
+    expect(cols.length, "ten years, two segments each").toBe(20);
+  });
+
+  it("holds the take-out against what is owed", () => {
+    // The schedule's balloon feeds the refinance directly — nothing here is
+    // retyped. $1.45M of NOI at a 6.5% exit cap is $22.31M of value, and
+    // the DSCR test lends $14.17M of it against $11.02M owed.
+    expect(text).toContain("Can the balloon be refinanced?");
+    expect(text).toContain("Owed at the balloon");
+    expect(text).toContain("New loan");
+    expect(text).toContain("$22.31M");
+    expect(text).toContain("$14.17M");
+    expect(text).toContain("cash-out refinance");
+    // Two bars, one per side of the comparison.
+    expect((html.match(/data-bar="refi"/g) ?? []).length).toBe(2);
+    // The binding test is named, as it is in the sizer.
+    expect(text).toContain("Debt service coverage");
+  });
 });

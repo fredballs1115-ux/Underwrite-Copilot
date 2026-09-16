@@ -211,6 +211,24 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   pays a full fee. `readOpex` says one expense per unit, per SF and as a
   share of EGI, and names a sub-20% ratio as a net lease rather than a
   cheap building.
+- The loan over its life, and the refinance at the end:
+  `lib/tools/debt-math.ts` (pure). `readDebt` runs the schedule **monthly**
+  and reports it a year at a time — annual approximation gets a 30-year
+  loan's first year wrong by enough to matter over a five-year hold. Two
+  rules: the payment after an interest-only front end amortises over the
+  **full** period again (the market convention, and why IO makes the
+  balloon *bigger* rather than merely the early payments smaller), and each
+  year's five figures are derived from the **rounded balances** — rounded
+  independently, interest + principal misses debt service by a dollar often
+  enough to be visible, and a schedule whose rows do not add up reads as
+  broken whatever the arithmetic behind it. `testRefi` sizes the take-out
+  through `sizeLoan`, so a refinance is judged by exactly the same three
+  tests as the original loan, and adds the comparison the sizer cannot
+  make: a loan that is healthy on its own terms is still a cash-in
+  refinance if it lands under the balance it has to retire. `noiToClear`
+  inverts the **binding** test only — a target to work toward, not a
+  promise, since pushing NOI past it hands the job to whichever test binds
+  next.
 - The homepage's photographs: `lib/photos.ts` (pure — the four slots with
   their file names, briefs, sizes and alt text; `presentPhotos` over an
   `exists` callback; `stripPhotos`; `HERO_AERIAL`) and `lib/photos-fs.ts`
