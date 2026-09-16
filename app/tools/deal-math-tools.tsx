@@ -5,6 +5,7 @@ import { readFigure } from "@/lib/money";
 import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
 import { readDebt, testRefi } from "@/lib/tools/debt-math";
 import { readLease, readOpex } from "@/lib/tools/lease-math";
+import { readLand, readSpace } from "@/lib/tools/measure-math";
 import { buildStack } from "@/lib/tools/sources-uses";
 import { readMix, totalMix } from "@/lib/tools/unit-mix";
 import { runWaterfall } from "@/lib/tools/waterfall-math";
@@ -251,8 +252,10 @@ const INDEX = [
   { id: "cash-flow-strip", label: "Cash flow" },
   { id: "sources-and-uses", label: "Sources & uses" },
   { id: "unit-mix", label: "Unit mix" },
+  { id: "the-site", label: "The site" },
   { id: "the-waterfall", label: "LP / GP split" },
   { id: "net-effective-rent", label: "Net effective rent" },
+  { id: "rentable-vs-usable", label: "Rentable vs usable" },
   { id: "cap-rate-triangle", label: "Cap rate" },
   { id: "rent-converter", label: "Rent, four ways" },
   { id: "operating-expense", label: "One expense" },
@@ -1014,7 +1017,231 @@ function NetEffectiveRent() {
   );
 }
 
-// ── 7. one operating expense, three ways ───────────────────────────────────
+// ── 7a. the site, and what it carries ──────────────────────────────────────
+
+/**
+ * The measures printed on the first page of every offering memorandum.
+ *
+ * These are the smallest calculations on this site and the ones people most
+ * reliably leave it for, because nobody keeps 43,560 in their head. Acres
+ * and square feet are one measurement entered from whichever side the
+ * document stated, and everything else — density, the floor area ratio
+ * against the zoning limit, land per unit, the average unit, parking said
+ * both ways — falls out of the same six fields.
+ *
+ * The picture is the built floor area inside what the zoning allows, so the
+ * unbuilt part of a site is a visible gap rather than a subtraction.
+ */
+function SiteMeasures() {
+  const [acres, setAcres] = useShared("sac", "2.5");
+  const [landSf, setLandSf] = useShared("slsf", "");
+  const [buildingSf, setBuildingSf] = useShared("sbsf", "165,000");
+  const [units, setUnits] = useShared("sun", "180");
+  const [spaces, setSpaces] = useShared("spk", "270");
+  const [farLimit, setFarLimit] = useShared("sfar", "1.75");
+
+  const r = useMemo(
+    () =>
+      readLand({
+        acres: num(acres),
+        landSf: num(landSf),
+        buildingSf: num(buildingSf),
+        units: num(units),
+        spaces: num(spaces),
+        farLimit: num(farLimit),
+      }),
+    [acres, landSf, buildingSf, units, spaces, farLimit],
+  );
+
+  const over = r.headroomSf !== null && r.headroomSf < 0;
+
+  return (
+    <Card id="the-site" eyebrow="The dirt" title="The site, and what it carries">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <Field label="Acres" value={acres} onChange={setAcres} placeholder="2.5" />
+        <Field label="or Land SF" value={landSf} onChange={setLandSf} placeholder="108,900" />
+        <Field label="Building SF, gross" value={buildingSf} onChange={setBuildingSf} placeholder="165,000" />
+        <Field label="Units" value={units} onChange={setUnits} placeholder="180" />
+        <Field label="Parking spaces" value={spaces} onChange={setSpaces} placeholder="270" />
+        <Field label="FAR allowed" value={farLimit} onChange={setFarLimit} placeholder="1.75" />
+      </div>
+
+      {r.landSf !== null && (
+        <p className="mt-5 text-sm text-muted">
+          <span className="font-semibold tabular-nums text-ink">
+            {r.acres?.toLocaleString("en-US")} acres
+          </span>{" "}
+          is{" "}
+          <span className="font-semibold tabular-nums text-ink">
+            {r.landSf.toLocaleString("en-US")} SF
+          </span>
+          . One acre is 43,560 square feet.
+        </p>
+      )}
+
+      {r.allowedSf !== null && r.far !== null && (
+        <div className="mt-5">
+          <div className="h-4 overflow-hidden rounded-full bg-faint">
+            <div
+              data-bar="far"
+              className={`h-full rounded-full ${over ? "bg-kill" : "bg-brand"}`}
+              style={{
+                width: `${Math.min(100, ((r.far ?? 0) / (num(farLimit) || 1)) * 100)}%`,
+              }}
+            />
+          </div>
+          <p className="mt-2 text-sm text-muted">
+            Built at{" "}
+            <span className="font-semibold tabular-nums text-ink">{r.far.toFixed(2)} FAR</span>{" "}
+            of an allowed {num(farLimit)?.toFixed(2)} —{" "}
+            {over ? (
+              <span className="font-semibold tabular-nums text-kill">
+                {Math.abs(r.headroomSf ?? 0).toLocaleString("en-US")} SF over the limit
+              </span>
+            ) : (
+              <span className="font-semibold tabular-nums text-ink">
+                {(r.headroomSf ?? 0).toLocaleString("en-US")} SF unbuilt
+              </span>
+            )}
+            .
+          </p>
+        </div>
+      )}
+
+      <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-3 lg:grid-cols-6">
+        <Stat
+          label="Units / acre"
+          value={r.unitsPerAcre === null ? "—" : r.unitsPerAcre.toFixed(1)}
+          tone="brand"
+        />
+        <Stat
+          label="Land SF / unit"
+          value={r.landSfPerUnit === null ? "—" : r.landSfPerUnit.toLocaleString("en-US")}
+        />
+        <Stat
+          label="Avg unit, gross"
+          value={r.avgUnitSf === null ? "—" : `${r.avgUnitSf.toLocaleString("en-US")} SF`}
+        />
+        <Stat label="FAR" value={r.far === null ? "—" : r.far.toFixed(2)} />
+        <Stat
+          label="Spaces / unit"
+          value={r.spacesPerUnit === null ? "—" : r.spacesPerUnit.toFixed(2)}
+          tone="muted"
+        />
+        <Stat
+          label="Spaces / 1,000 SF"
+          value={r.spacesPer1000Sf === null ? "—" : r.spacesPer1000Sf.toFixed(2)}
+          tone="muted"
+        />
+      </div>
+
+      {r.note && <p className="mt-4 text-sm text-caution">{r.note}</p>}
+    </Card>
+  );
+}
+
+// ── 7b. rentable, usable, and the rent you actually pay ────────────────────
+
+/**
+ * The load factor, and what it does to a quoted rent.
+ *
+ * The whole card exists for one inversion: two buildings quoting different
+ * rents per rentable foot can rank the other way round per foot a tenant
+ * can furnish, and the load factor is the only thing standing between the
+ * two readings. A $40 quote at an 18% load is $47.20 of usable space; a $42
+ * quote at 10% is $46.20. The cheaper-looking quote is the dearer space.
+ *
+ * The picture is one rentable foot split into what the tenant occupies and
+ * what it pays for in the lobby, the corridors and the core.
+ */
+function RentableUsable() {
+  const [grossSf, setGrossSf] = useShared("mgs", "100,000");
+  const [rentableSf, setRentableSf] = useShared("mrs", "92,000");
+  const [usableSf, setUsableSf] = useShared("mus", "80,000");
+  const [rentPerRsf, setRentPerRsf] = useShared("mrr", "38");
+
+  const r = useMemo(
+    () =>
+      readSpace({
+        grossSf: num(grossSf),
+        rentableSf: num(rentableSf),
+        usableSf: num(usableSf),
+        rentPerRsf: num(rentPerRsf),
+      }),
+    [grossSf, rentableSf, usableSf, rentPerRsf],
+  );
+
+  const usableShare =
+    r.commonAreaSharePct === null ? null : 100 - r.commonAreaSharePct;
+
+  return (
+    <Card
+      id="rentable-vs-usable"
+      eyebrow="Leasing"
+      title="Rentable, usable, and the rent you actually pay"
+    >
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Field label="Building SF, gross" value={grossSf} onChange={setGrossSf} placeholder="100,000" />
+        <Field label="Rentable SF" value={rentableSf} onChange={setRentableSf} placeholder="92,000" />
+        <Field label="Usable SF" value={usableSf} onChange={setUsableSf} placeholder="80,000" />
+        <Field label="Rent / RSF, annual" value={rentPerRsf} onChange={setRentPerRsf} placeholder="38" />
+      </div>
+
+      {usableShare !== null && (
+        <div className="mt-6">
+          <div className="flex h-4 overflow-hidden rounded-full bg-faint">
+            <div
+              data-bar="load-usable"
+              className="h-full bg-brand"
+              style={{ width: `${Math.max(0, Math.min(100, usableShare))}%` }}
+            />
+            <div
+              data-bar="load-common"
+              className="h-full bg-sidebar"
+              style={{ width: `${Math.max(0, Math.min(100, r.commonAreaSharePct ?? 0))}%` }}
+            />
+          </div>
+          <p className="mt-2 text-sm text-muted">
+            Every 100 rentable feet is{" "}
+            <span className="font-semibold tabular-nums text-ink">
+              {usableShare.toFixed(0)} you occupy
+            </span>{" "}
+            and{" "}
+            <span className="font-semibold tabular-nums text-ink">
+              {(r.commonAreaSharePct ?? 0).toFixed(0)} of lobby, corridor and core
+            </span>
+            .
+          </p>
+        </div>
+      )}
+
+      {r.rentPerUsf !== null && (
+        <p className="mt-4 text-sm text-muted">
+          <span className="font-semibold tabular-nums text-ink">
+            ${(num(rentPerRsf) ?? 0).toFixed(2)} per rentable foot
+          </span>{" "}
+          is{" "}
+          <span className="font-semibold tabular-nums text-brand">
+            ${r.rentPerUsf.toFixed(2)} per foot you can furnish
+          </span>
+          . That is the figure that compares two buildings, because a lower
+          quote at a heavier load can be the more expensive space.
+        </p>
+      )}
+
+      <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
+        <Stat label="Load factor" value={pct(r.loadFactorPct, 1)} tone="brand" />
+        <Stat label="Common area share" value={pct(r.commonAreaSharePct, 1)} tone="muted" />
+        <Stat label="Efficiency" value={pct(r.efficiencyPct, 1)} tone="muted" />
+        <Stat label="Rent, monthly" value={usdExact(r.monthlyRent)} />
+      </div>
+
+      {r.note && <p className="mt-4 text-sm text-caution">{r.note}</p>}
+    </Card>
+  );
+}
+
+// ── 8. one operating expense, three ways ───────────────────────────────────
 
 function OpexTranslator() {
   const [opex, setOpex] = useShared("ox", "504,000");
@@ -1718,7 +1945,7 @@ function LoanOverTime() {
 export function DealMathTools() {
   return (
     <div className="space-y-6">
-      {/* The index. Eleven cards is more than a reader should have to
+      {/* The index. Thirteen cards is more than a reader should have to
           scroll past to find one, and a list of what is here is also the
           honest answer to "what does this page do". */}
       <nav aria-label="The calculators on this page" className="rounded-2xl border border-line bg-white p-4 sm:p-5">
@@ -1754,8 +1981,10 @@ export function DealMathTools() {
       <CashFlowStrip />
       <SourcesUses />
       <UnitMix />
+      <SiteMeasures />
       <Waterfall />
       <NetEffectiveRent />
+      <RentableUsable />
       <div className="grid gap-6 lg:grid-cols-2">
         <CapTriangle />
         <RentConverter />

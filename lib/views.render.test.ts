@@ -1107,8 +1107,8 @@ describe("the deal math tools", () => {
     // every card must be reachable from the index.
     const hrefs = [...html.matchAll(/href="#([a-z0-9-]+)"/g)].map((m) => m[1]);
     const ids = new Set([...html.matchAll(/<section id="([a-z0-9-]+)"/g)].map((m) => m[1]));
-    expect(hrefs.length).toBe(11);
-    expect(ids.size).toBe(11);
+    expect(hrefs.length).toBe(13);
+    expect(ids.size).toBe(13);
     for (const h of hrefs) expect(ids.has(h), `#${h} has no card`).toBe(true);
     for (const id of ids) expect(hrefs, `${id} is not in the index`).toContain(id);
     expect(text).toContain("Jump to");
@@ -1165,6 +1165,53 @@ describe("the deal math tools", () => {
     expect((html.match(/data-bar="mix-row"/g) ?? []).length).toBe(4);
     // Nothing is missing from this table, so no caveat is printed.
     expect(text).not.toContain("no square footage stated");
+  });
+
+  it("turns acres into square feet, so nobody has to remember 43,560", () => {
+    expect(text).toContain("The site, and what it carries");
+    expect(text).toContain("2.5 acres");
+    expect(text).toContain("108,900 SF");
+    expect(text).toContain("One acre is 43,560 square feet");
+  });
+
+  it("draws the built floor area inside what the zoning allows", () => {
+    // 165,000 SF on 108,900 of land is 1.52 FAR against a 1.75 limit —
+    // 25,575 SF of the site never built. The bar is the gap.
+    expect(text).toContain("Built at 1.52 FAR");
+    expect(text).toContain("of an allowed 1.75");
+    expect(text).toContain("25,575 SF unbuilt");
+    expect((html.match(/data-bar="far"/g) ?? []).length).toBe(1);
+  });
+
+  it("counts density, land per unit and parking both ways", () => {
+    // 180 units on 2.5 acres is 72/acre; 270 spaces is 1.50 per unit and
+    // 1.64 per 1,000 SF — the residential and commercial conventions, which
+    // are different numbers for the same car park.
+    expect(text).toContain("72.0");
+    expect(text).toContain("605");
+    expect(text).toContain("917 SF");
+    expect(text).toContain("1.50");
+    expect(text).toContain("1.64");
+  });
+
+  it("splits the rentable foot into what you occupy and what you pay for", () => {
+    expect(text).toContain("Rentable, usable, and the rent you actually pay");
+    expect(text).toContain("Every 100 rentable feet is 87 you occupy");
+    expect(text).toContain("13 of lobby, corridor and core");
+    expect((html.match(/data-bar="load-usable"/g) ?? []).length).toBe(1);
+    expect((html.match(/data-bar="load-common"/g) ?? []).length).toBe(1);
+  });
+
+  it("converts the quoted rent to the foot a tenant can furnish", () => {
+    // A 15% load turns $38.00 per rentable foot into $43.70 per usable one.
+    // The card also keeps the two figures people both call "the load
+    // factor" side by side: 15.0% and 13.0% are the same building.
+    expect(text).toContain("$38.00 per rentable foot");
+    expect(text).toContain("$43.70 per foot you can furnish");
+    expect(text).toContain("15.0%");
+    expect(text).toContain("13.0%");
+    expect(text).toContain("92.0%");
+    expect(text).toContain("$291,333");
   });
 
   it("says the property's IRR is not anybody's IRR", () => {

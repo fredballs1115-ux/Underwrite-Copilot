@@ -340,3 +340,5 @@ jobs:
           mark "#309 the unit mix reader is on /tools" grep -q "Read the unit mix" p_tools2.html
           mark "#310 sources and uses is on /tools" grep -q "Sources and uses" p_tools2.html
           mark "#310 /tools indexes itself" grep -q "Jump to" p_tools2.html
+          mark "#312 acres into square feet, on the page" grep -q "One acre is 43,560 square feet" p_tools2.html
+          mark "#312 the load factor converts the quoted rent" grep -q "per foot you can furnish" p_tools2.html

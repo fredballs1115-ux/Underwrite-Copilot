@@ -239,6 +239,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   table** by the median ratio of the last two — a market rent sits near its
   in-place rent by definition, a square footage does not, and a column is a
   property of the table rather than of a row.
+- The measures on a page of an OM: `lib/tools/measure-math.ts` (pure).
+  `readLand` treats acres and square feet as ONE measurement entered from
+  whichever side the document stated (`SF_PER_ACRE`, 43,560), and where both
+  are given and disagree by more than 1% it names the gap and answers from
+  the **acreage**, which is what a deed carries and what zoning is written
+  against. FAR headroom is signed and never clamped: a building over its
+  limit is a legal non-conforming condition, not a zero. `readSpace` keeps
+  apart the two figures people both call "the load factor" — **rentable over
+  usable less one** (a landlord's 15%) and **common area over rentable** (the
+  same building's 13.0%) — because quoting the smaller one understates the
+  rent per usable foot every time; that rent is the point of the module,
+  since a $40 quote at an 18% load is dearer space than a $42 quote at 10%.
+  A usable area larger than the rentable one is refused rather than computed.
 - Who gets the return: `lib/tools/waterfall-math.ts` (pure). `runWaterfall`
   distributes a deal's cash period by period through a pref and its promote
   tiers with an **IRR lookback** — each hurdle measured on the LP's ACTUAL

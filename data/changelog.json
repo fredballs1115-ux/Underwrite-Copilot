@@ -3,6 +3,18 @@
   "entries": [
     {
       "date": "2026-09-16",
+      "title": "The measures an analyst used to Google",
+      "blurb": "Two new cards on /tools. The first turns a site into everything it implies — acres into square feet (one acre is 43,560, and nobody keeps that in their head), the floor area ratio drawn INSIDE whatever the zoning allows so the unbuilt part of a site is a visible gap rather than a subtraction, units per acre, land per unit, the average unit, and parking said both ways, because the same car park is 1.50 spaces per unit and 1.64 per 1,000 feet. The second keeps apart the two figures people both call the load factor: rentable over usable less one, which is a landlord's 15%, and common area over rentable, which is the same building's 13.0%. Quoting the smaller one understates the rent every time, so the card says what the quote really is — $38.00 per rentable foot is $43.70 per foot you can furnish. That is the figure that compares two buildings, because a lower quote at a heavier load is the more expensive space.",
+      "href": "/tools"
+    },
+    {
+      "date": "2026-09-16",
+      "title": "A typo is not an instruction",
+      "blurb": "Typing 120 into a promote tier's LP share used to pay the GP negative dollars and leave everything above the last hurdle splitting at −20%; a loan term of 0.4 years ran no schedule at all while still reporting a balloon. Both now refuse and say why, rather than clamping — clamping 120 to 100 would quietly answer a different question than the one that was typed.",
+      "href": "/tools"
+    },
+    {
+      "date": "2026-09-16",
       "title": "/tools indexes itself",
       "blurb": "Eleven calculators is more than anyone should scroll past to find one, so the page opens with a row of jump links — which is also the honest answer to \"what does this page do\". The index and the cards read one list, and a test holds the two together: every link must name a card that exists, and every card must be reachable from the index, so neither can drift. The page's own description said it had four calculators; it says eleven now, and names them.",
       "href": "/tools"
@@ -72,18 +84,6 @@
       "title": "Deal math you can run before there is a deal",
       "blurb": "Size a loan against LTV, debt service coverage and debt yield and see which one actually binds — that is the half of the answer a bare number leaves out. Plus the cap rate triangle, yield on cost against the exit cap, and one rent said four ways. It all runs in your browser; nothing is sent anywhere.",
       "href": "/tools"
-    },
-    {
-      "date": "2026-09-16",
-      "title": "Fifteen markets get the photograph they are known by",
-      "blurb": "Washington opens on the Mall, Miami on Brickell, Philadelphia on the Schuylkill River. Every file, photographer and licence was read back from Wikimedia Commons by the deploy probe rather than written from memory, and each deploy re-checks that all fifteen still resolve.",
-      "href": "/market"
-    },
-    {
-      "date": "2026-09-16",
-      "title": "Every market picture becomes a photograph of the place",
-      "blurb": "A market is known by its skyline, not by its roofs. Each covered market now draws a real skyline photograph where one is verified, with the photographer and licence named beside it, and keeps its overhead frame only as the floor. A deal still shows its own site from above — that roof is the asset.",
-      "href": "/market"
     }
   ]
 }
