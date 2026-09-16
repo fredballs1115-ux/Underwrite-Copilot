@@ -23,6 +23,17 @@ import { METRO_FRAME_METRES, metroView } from "@/lib/metro-imagery";
 const SIZE = { min: 96, max: 1600, defaultW: 480, defaultH: 360 };
 
 function clamp(raw: string | null, lo: number, hi: number, fallback: number): number {
+  // A MISSING dimension is the default, not the floor. This is the same
+  // defect the skyline route carried: `Number(null)` and `Number("")` are
+  // both 0, which is finite, so the "not a number" branch never fired for
+  // the one case it was written for — only for nonsense like `?w=abc`. A
+  // request without `?w=` came back 96px wide instead of 480, and without
+  // `?h=` 96 tall instead of 360. Nothing renders wrong today because
+  // CityPhoto always passes both; it is anyone hitting the route directly
+  // who got a thumbnail. The two imagery routes are the only two places in
+  // the codebase with this shape — everywhere else guards the empty string
+  // before converting.
+  if (raw === null || raw.trim() === "") return fallback;
   const n = Number(raw);
   if (!Number.isFinite(n)) return fallback;
   return Math.min(hi, Math.max(lo, Math.round(n)));
