@@ -2,6 +2,12 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-09-17",
+      "title": "What a 1031 exchange actually defers",
+      "blurb": "The card above it prices the tax bill at a sale. This one answers what happens if you roll the gain into the next deal instead — and it opens on a trade that looks completely sensible and still owes $305,000. Sell for $26M, buy for $30M with more debt on it, and the price test passes comfortably; $1.22M of proceeds stayed in your pocket, and nothing about borrowing more on the other side cures that. Debt runs the other way: coming down on the mortgage is taxable even when every dollar of cash is reinvested, but cash you add to the replacement offsets it. So the page draws three tests rather than one, and names the one that binds. Two more things it says out loud. The bill on boot is filled depreciation-first, at the higher rate, so the first dollars out are the expensive ones. And deferred is not forgiven: the replacement here costs $30M and carries a $20.5M basis, because the rolled-in gain comes off it and is standing there again at the next sale. The clock is drawn rather than listed — 45 days and 180 days both run from the day you close, not one after the other, and a November closing loses 29 days off the back of the window because the replacement has to be bought before that year's return is filed.",
+      "href": "/tools#exchange-1031"
+    },
+    {
       "date": "2026-09-16",
       "title": "Philadelphia gets its skyline back",
       "blurb": "The sample deal's own city had quietly been showing a satellite frame instead of the Schuylkill skyline, and so had its market brief. The photograph was fine and had been all along; the page that serves it was not. Every market picture is served with a line naming its photographer, and Philadelphia's is credited on Wikimedia Commons under a Chinese name — which an HTTP header cannot carry, so that one request failed. The page then did exactly what it was built to do: it fell back to the aerial and moved the credit to match. That is why nobody noticed. A picture quietly replaced by its backup looks like a working page from the outside, so the only way to see it is to ask the site for the image itself — which now happens on every deploy, for every market.",

@@ -299,6 +299,59 @@ jobs:
         # gone, wrong content-type — so a 200 with an image type is the whole
         # claim, and it cannot be satisfied by anything but a real photograph.
         run: |
+          # ONE probe behind both loops. It prints the market's line and
+          # returns 0 for a real photograph, so the two callers only count.
+          #
+          # Two things it gets right that the first version did not.
+          #
+          # A TRANSPORT failure is retried once. Run 35162762657 reported
+          # `DEAD norfolk_hampton_roads` on `curl: (35) Recv failure:
+          # Connection reset by peer`, eight seconds after the same file
+          # resolved LIVE from Commons and one run after it served LIVE from
+          # the site. That is a dropped connection between the runner and
+          # Render, not a broken picture — and a check that cries wolf on a
+          # flake is a check people stop reading, which costs more than the
+          # flake. Only code 000 (curl's own failure) is retried: a 404 or a
+          # 500 is the route's real answer, and asking twice would hide it.
+          #
+          # And the fallback REPLACES curl's output rather than appending to
+          # it. curl writes its `-w` line even when it fails, so the old
+          # `|| echo "000 0 -"` landed on the same line and printed
+          # `HTTP 000 · 000 0 -`. Assigning in the `||` branch discards the
+          # partial line.
+          #
+          # The two NUMERIC fields come first and the content type LAST,
+          # because a type is the one field that can carry a space
+          # ("image/jpeg; charset=…"). Typed last, that space lands in the
+          # field this reads as the type and nowhere else; typed in the
+          # middle it would shift the byte count into `$((size/1024))`,
+          # which is an arithmetic error, and under `bash -e` an error there
+          # takes the whole step down.
+          probe_img() {
+            local id="$1" url="$2" out code size type attempt
+            for attempt in 1 2; do
+              out=$(curl -sS -o /tmp/img.bin -w '%{http_code} %{size_download} %{content_type}' \
+                --max-time 60 "$url") || out="000 0 -"
+              code=$(printf '%s' "$out" | cut -d' ' -f1)
+              size=$(printf '%s' "$out" | cut -d' ' -f2)
+              type=$(printf '%s' "$out" | cut -d' ' -f3-)
+              if [ "$code" = "000" ] && [ "$attempt" = "1" ]; then
+                printf '  retry %-24s the connection dropped, asking once more\n' "$id"
+                sleep 3
+                continue
+              fi
+              break
+            done
+            case "$code $type" in
+              "200 image/"*)
+                printf '  LIVE  %-24s %s · %s KB\n' "$id" "$type" "$((size/1024))"
+                return 0 ;;
+              *)
+                printf '  DEAD  %-24s HTTP %s · %s\n' "$id" "$code" "${type:--}"
+                return 1 ;;
+            esac
+          }
+
           echo "PHOTOGRAPHS, through the site's own route:"
           live=0; dead=0
           # The ids come from the table the site actually serves, read out of
@@ -308,23 +361,11 @@ jobs:
           for id in $ids; do
             # Ask at the width a page actually renders, so the byte counts
             # here are comparable to the Commons probe's above.
-            #
-            # The two NUMERIC fields come first and the content type LAST,
-            # because a type is the one field that can carry a space
-            # ("image/jpeg; charset=…"). Typed last, that space lands in the
-            # field this reads as the type and nowhere else; typed in the
-            # middle it would shift the byte count into `$((size/1024))`,
-            # which is an arithmetic error, and under `bash -e` an error
-            # there takes the whole step down.
-            out=$(curl -sS -o /tmp/sky.bin -w '%{http_code} %{size_download} %{content_type}' \
-              --max-time 60 "https://underwrite-copilot.onrender.com/api/imagery/skyline/$id?w=1600" || echo "000 0 -")
-            code=$(echo "$out" | cut -d' ' -f1)
-            size=$(echo "$out" | cut -d' ' -f2)
-            type=$(echo "$out" | cut -d' ' -f3-)
-            case "$code $type" in
-              "200 image/"*) live=$((live+1)); printf '  LIVE  %-24s %s · %s KB\n' "$id" "$type" "$((size/1024))" ;;
-              *)             dead=$((dead+1)); printf '  DEAD  %-24s HTTP %s · %s\n' "$id" "$code" "${type:--}" ;;
-            esac
+            if probe_img "$id" "https://underwrite-copilot.onrender.com/api/imagery/skyline/$id?w=1600"; then
+              live=$((live+1))
+            else
+              dead=$((dead+1))
+            fi
           done
           echo "PHOTOGRAPHS: $live live, $dead dead — a DEAD market is showing an aerial, not a skyline"
 
@@ -341,15 +382,11 @@ jobs:
           allids=$(node -e 'const s=require("fs").readFileSync("lib/metro-imagery.ts","utf8");for(const m of s.matchAll(/^  ([a-z_]+): \{/gm))console.log(m[1])')
           for id in $allids; do
             case " $skyids " in *" $id "*) continue ;; esac
-            out=$(curl -sS -o /tmp/aer.bin -w '%{http_code} %{size_download} %{content_type}' \
-              --max-time 60 "https://underwrite-copilot.onrender.com/api/imagery/metro/$id?w=1600&h=900" || echo "000 0 -")
-            code=$(echo "$out" | cut -d' ' -f1)
-            size=$(echo "$out" | cut -d' ' -f2)
-            type=$(echo "$out" | cut -d' ' -f3-)
-            case "$code $type" in
-              "200 image/"*) alive=$((alive+1)); printf '  LIVE  %-24s %s · %s KB\n' "$id" "$type" "$((size/1024))" ;;
-              *)             gone=$((gone+1));  printf '  DEAD  %-24s HTTP %s · %s\n' "$id" "$code" "${type:--}" ;;
-            esac
+            if probe_img "$id" "https://underwrite-copilot.onrender.com/api/imagery/metro/$id?w=1600&h=900"; then
+              alive=$((alive+1))
+            else
+              gone=$((gone+1))
+            fi
           done
           echo "AERIALS: $alive live, $gone dead — these markets have no skyline to fall back to"
 
@@ -430,3 +467,8 @@ jobs:
           mark "#316 NoVA's brief carries the Rosslyn credit" grep -q "Theodore Christopher" p_market_nova.html
           mark "#317 the settlement statement is on /tools" grep -q "Who owes whom at closing" p_tools2.html
           mark "#317 it names the direction, not just the figure" grep -q "misses by the sum of the two figures" p_tools2.html
+          mark "#319 the 1031 exchange is on /tools" grep -q "Roll it into the next deal" p_tools2.html
+          # The claim the card exists for, and the one a price-only test
+          # would get wrong: the seeded trade passes on price and owes tax.
+          mark "#319 trading up does not cure cash boot" grep -q "STILL boot" p_tools2.html
+          mark "#319 the clock loses days to the return's due date" grep -q "An extension restores the full 180 days" p_tools2.html
