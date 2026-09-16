@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { CityPhoto } from "./city-photo";
 import { METRO_VIEWS } from "@/lib/metro-imagery";
+import { hasSkyline } from "@/lib/skyline";
 
 // A real place behind a page's opening words.
 //
@@ -27,7 +28,12 @@ export function PlaceBackdrop({
   /** how far the photograph reads through the band's colour */
   opacity?: string;
 }) {
-  if (!METRO_VIEWS[metro]) return null;
+  // Either picture is enough to open on. Gating on the overhead alone was
+  // safe only by accident — every market with a skyline happens to have an
+  // aerial too — and would have blanked the band for the first market that
+  // got a photograph without one. CityPhoto decides between them; this only
+  // decides whether there is anything to decide between.
+  if (!METRO_VIEWS[metro] && !hasSkyline(metro)) return null;
   return (
     <div className="pointer-events-none absolute inset-0">
       {/* 1200 rather than 1600: this picture sits under two scrims at 30–40%
