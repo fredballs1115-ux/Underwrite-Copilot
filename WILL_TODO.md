@@ -3,6 +3,42 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
+## 🟢 2026-09-16, later — `/tools` becomes the reason not to open Excel
+
+Four more PRs, #307–#310, all on `/tools`, all proven live by the round
+markers. Twelve calculators there now, and they cover the arithmetic an
+acquisitions analyst does between opening a memorandum and sending a
+letter:
+
+| | What it answers |
+|---|---|
+| **Debt sizer** | LTV, DSCR and debt yield at once — and *which one binds* |
+| **The loan over the hold** (#307) | What you still owe. $13M at 6.5% over thirty years, held ten, leaves **$11.02M** at the balloon — a third of the schedule run, 85% of the loan still there. Draws each year's debt service split into interest and principal |
+| **The refinance test** (#307) | Whether the balloon can be taken out, on the same three lender tests. Cash out, covers it, or **the cash-in refinance nobody plans for**, with the NOI that would clear it |
+| **Cash-flow strip** | IRR, multiple, payback — and how much of the return is the residual, discounted at the deal's own IRR |
+| **Sources and uses** (#310) | The cheque. Price less loan says $7M; the real number is **$11.03M** once capital, closing, the loan fee and reserves are counted |
+| **LP / GP waterfall** (#308) | The property's IRR is not anybody's IRR: 14.1% for the building, 13.3% to the LP, 20.6% to the GP |
+| **Unit mix** (#309) | Paste the OM's table. Weighted average rent, GPR both ways, loss to lease — **weighted by unit count**, which is $1,858 where averaging the rows gives $1,961 |
+| **Net effective rent** | Both ways — straight-line and discounted — with free rent, TI and the commission against the *gross* |
+| **Opex translator** | One expense per unit, per foot, as a share of income |
+| **Cap triangle · Rent converter · Build or buy** | The quick ones |
+
+Three things they share: every field reads shorthand (`$20M`, `4.75%`,
+`1.25x`); every field travels in the URL, so a sizing is a link; and the
+math is a pure tested module before it reaches a page — **101 tests**
+across the four new this round, **183** behind `/tools` altogether.
+
+*Nothing on this list is yours to do.* It is here so you know what is
+there.
+
+**What I'd build next, when you want more:** an amortisation-linked debt
+schedule you can export, measures and density conversion, depreciation
+and after-tax. Then the pieces that are not calculators at all —
+copy-as-table on the comps and pipeline tables, a print stylesheet,
+breadcrumbs, a keyboard layer.
+
+---
+
 ## 🟢 2026-09-16 — the photograph round, and the analyst's own math
 
 Seven PRs, #300–#306. Two of them (#300, #301) are the thing you asked
