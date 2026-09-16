@@ -169,7 +169,19 @@ describe("fetchLiveHeadlines — a publisher that refuses the fetcher is read an
     const live = await fetchLiveHeadlines([withFallback("slow")], 10, { timeoutMs: 100 });
     expect(Date.now() - t0).toBeLessThan(2_000);
     expect(live.sources[0]).toMatchObject({ ok: false, count: 0 });
-    expect(live.sources[0].error).toMatch(/no answer within 800 ms/);
+    // The window is `given + DEADLINE_GRACE_MS`, and `given` is
+    // `timeoutMs - (Date.now() - started)` — so the figure in the message is
+    // literally 100 minus however many milliseconds real time took to get
+    // there, plus 700. Asserting the exact integer passes on an idle machine
+    // (0 ms elapse, 800) and fails on a busy one (2 ms elapse, 798), which is
+    // what CI caught. The band is the real contract: this door got ITS OWN
+    // ~100 ms budget plus the grace, not the source's whole window, and not
+    // the 300 ms floor a later door would have.
+    const err = live.sources[0].error ?? "";
+    expect(err).toMatch(/no answer within \d+ ms/);
+    const window = Number(/no answer within (\d+) ms/.exec(err)?.[1]);
+    expect(window).toBeGreaterThan(750);
+    expect(window).toBeLessThanOrEqual(800);
     expect(calls).toBe(1);
   });
 });
