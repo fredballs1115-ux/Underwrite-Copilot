@@ -211,6 +211,21 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   pays a full fee. `readOpex` says one expense per unit, per SF and as a
   share of EGI, and names a sub-20% ratio as a net lease rather than a
   cheap building.
+- Who gets the return: `lib/tools/waterfall-math.ts` (pure). `runWaterfall`
+  distributes a deal's cash period by period through a pref and its promote
+  tiers with an **IRR lookback** — each hurdle measured on the LP's ACTUAL
+  cash, contributions and everything paid to it including this period's
+  distribution, never an accrual account kept alongside. That is the market
+  convention and the only checkable version: the LP's realised IRR at a
+  hurdle boundary equals the hurdle, which the tests assert. Two rules that
+  are easy to get backwards. **The pref tier splits PRO RATA**, not 100% to
+  the LP — a GP with 10% of the equity is entitled to 10% of the money
+  coming back, and what makes the tier a pref is that the LP must REACH
+  that IRR before anyone's share changes; paying it entirely to the LP
+  leaves no promote to measure at all. And **the promote is what the GP
+  took ABOVE its pro-rata share** — the only honest definition, for the
+  same reason. Return OF capital is not a separate step: an 8% IRR is not
+  reached until every dollar in has come back plus 8% on it.
 - The loan over its life, and the refinance at the end:
   `lib/tools/debt-math.ts` (pure). `readDebt` runs the schedule **monthly**
   and reports it a year at a time — annual approximation gets a 30-year
