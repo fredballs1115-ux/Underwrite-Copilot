@@ -88,9 +88,9 @@ function imageHeaders(type: string, credit: string): HeadersInit {
     // headerSafe, not the raw credit: a header value is a ByteString and
     // `new Headers()` THROWS above U+00FF rather than dropping the
     // character. Philadelphia's photographer is credited as 颐园居, so this
-    // line threw, and a throw here is a 500 — which is not the 404 that
-    // tells CityPhoto to fall back, so the picture vanished instead of
-    // degrading. See headerSafe in lib/skyline.ts.
+    // line threw, and a throw here is a 500 — which CityPhoto's onError
+    // treats exactly like the 404, so the market quietly served the
+    // overhead instead of its skyline. See headerSafe in lib/skyline.ts.
     "x-imagery-source": headerSafe(credit),
   };
 }

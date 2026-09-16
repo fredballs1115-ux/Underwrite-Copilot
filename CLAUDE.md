@@ -171,10 +171,16 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   the route's `x-imagery-source` header carries the credit, a header value
   is a ByteString, and `new Headers()` THROWS above U+00FF rather than
   dropping the character — Philadelphia's photographer is credited as
-  颐园居, so that route 500'd, and a 500 is not the 404 `CityPhoto` needs to
-  fall back, so /demo's own metro lost its picture silently. `headerSafe`
-  in `lib/skyline.ts` percent-encodes what a header cannot carry, and
-  `lib/skyline.test.ts` puts every market's credit through a real `Headers`.
+  颐园居, so that route 500'd for /demo's own metro. **The fallback then
+  worked, which is exactly why nobody noticed**: `CityPhoto` falls back on
+  the `<img>`'s `onError`, and a browser fires `error` for any failed load,
+  a 500 as much as a 404 (checked in a real Chromium against both), so the
+  market quietly served the overhead with the credit correctly moved to
+  USGS. A graceful silent degradation is invisible to every HTML-based
+  check — which is the case for asking the site for the image itself.
+  `headerSafe` in `lib/skyline.ts` percent-encodes what a header cannot
+  carry, and `lib/skyline.test.ts` puts every market's credit through a
+  real `Headers`.
   PG County and Montgomery County
   are deliberately absent: a suburban submarket has no skyline, and the
   overhead is the more honest picture of a place shaped by its land. **NoVA

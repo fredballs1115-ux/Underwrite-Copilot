@@ -81,8 +81,12 @@ and the fallback to the overhead is deliberately silent. So:
 - **Philadelphia** — the sample deal's own city, and /demo's opening
   band — was serving a 500, not a photograph. Its photographer is
   credited on Commons under a Chinese name, which an HTTP header cannot
-  carry, so the route threw instead of answering. It had been showing an
-  aerial since the photograph was added.
+  carry, so the route threw instead of answering. The page then fell back
+  to the aerial exactly as designed, credit and all, and had been showing
+  that overhead ever since the photograph was added. **The fallback
+  working is why nobody saw it** — a picture quietly replaced by its
+  backup looks like a healthy page from every angle except asking for the
+  image.
 - **NoVA's** four candidate filenames had been committed in the wrong
   shape, so the deploy probe skipped the market entirely and printed
   `DEAD undefined` — which looks like a dead photograph and was not one.
