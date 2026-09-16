@@ -155,6 +155,17 @@ describe("readDebt — the edges", () => {
     expect(readDebt({ ...BASE, loan: null }).years).toEqual([]);
   });
 
+  it("refuses a term it cannot report in whole years", () => {
+    // 0.4 rounds to zero: the schedule runs no years while still reporting a
+    // balloon, which is a figure for a loan that never ran.
+    const d = readDebt({ ...BASE, termYears: 0.4 });
+    expect(d.note).toMatch(/whole years/);
+    expect(d.years).toEqual([]);
+    expect(d.balloon).toBeNull();
+    // Half a year rounds UP to one, which this can report.
+    expect(readDebt({ ...BASE, termYears: 0.5 }).years).toHaveLength(1);
+  });
+
   it("a negative rate is refused, not amortised", () => {
     expect(readDebt({ ...BASE, ratePct: -2 }).years).toEqual([]);
   });

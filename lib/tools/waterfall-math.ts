@@ -133,6 +133,14 @@ export function runWaterfall(t: WaterfallTerms): WaterfallRead {
   if (!real(t.prefPct) || t.prefPct < 0) {
     return { ...EMPTY, note: "Set the preferred return." };
   }
+  // A tier's LP share outside 0–100 is not a lopsided split, it is a typo,
+  // and the arithmetic takes it literally: 120% to the LP pays the GP
+  // NEGATIVE dollars, and a negative share hands the GP more than the tier
+  // holds. Both render as a bar with a negative width. Refuse rather than
+  // clamp — clamping to 100 would silently answer a different question.
+  if (t.tiers.some((x) => real(x.lpSharePct) && (x.lpSharePct < 0 || x.lpSharePct > 100))) {
+    return { ...EMPTY, note: "A tier's LP share is a share of that tier, so it sits between 0 and 100." };
+  }
 
   const lpShareOfEquity = t.lpEquityPct / 100;
   // The tiers, in the order cash passes through them. The pref is simply the
