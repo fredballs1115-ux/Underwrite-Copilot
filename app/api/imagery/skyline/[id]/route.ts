@@ -39,20 +39,40 @@ const UA =
  * its own module runtime, so it had to live on `globalThis`. Route handlers
  * share one runtime, and nothing outside this route reads this map.
  */
-const MAX_ENTRIES = 16;
-const MAX_BYTES = 400_000;
+const MAX_ENTRIES = 24;
+/**
+ * Bounded on TOTAL bytes, not just per entry.
+ *
+ * A count alone is not a memory bound when the entries differ by an order
+ * of magnitude: the deploy probe measures these at 1600px and they run from
+ * 260 KB (Jersey City) to 1011 KB (Atlanta), so sixteen entries could be
+ * four megabytes or sixteen. The per-entry ceiling keeps one pathological
+ * file from filling the cache by itself; the total is what actually protects
+ * a small instance's heap.
+ */
+const MAX_BYTES = 1_400_000;
+const MAX_TOTAL_BYTES = 8_000_000;
 const memory = new Map<string, { body: ArrayBuffer; type: string }>();
+let heldBytes = 0;
+
+function forget(key: string) {
+  const gone = memory.get(key);
+  if (!gone) return;
+  heldBytes -= gone.body.byteLength;
+  memory.delete(key);
+}
 
 function remember(key: string, body: ArrayBuffer, type: string) {
   if (body.byteLength > MAX_BYTES) return;
   // Re-inserting moves a key to the end, so the first key really is the
   // least recently stored.
-  memory.delete(key);
+  forget(key);
   memory.set(key, { body, type });
-  while (memory.size > MAX_ENTRIES) {
+  heldBytes += body.byteLength;
+  while (memory.size > MAX_ENTRIES || heldBytes > MAX_TOTAL_BYTES) {
     const oldest = memory.keys().next().value;
-    if (oldest === undefined) break;
-    memory.delete(oldest);
+    if (oldest === undefined || oldest === key) break;
+    forget(oldest);
   }
 }
 

@@ -140,8 +140,33 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   time. **Never write a filename, author or licence into that table from
   memory**: the sandbox cannot reach Commons (403 through its egress
   proxy), so `scripts/probe-skylines.mjs` runs from the GitHub runner via
-  live-verify — `--search` asks Commons what exists, no flag verifies what
-  is chosen — and only what that run prints goes in the table.
+  live-verify and only what that run prints goes in the table. It verifies
+  by default (every deploy re-resolves all fifteen files and prints LIVE or
+  DEAD with the byte count at 1600px); tick `skyline_search` on the
+  dispatch to hunt for new candidates, and `skyline_markets` narrows either
+  mode to a few metros. Its doors, best first: a city's **Wikipedia article
+  images** (argued over by people who care which photograph represents the
+  place), hand-filed **Commons categories**, then full-text search — which
+  on its own surfaces maps and diagrams long before photographs. Three
+  traps it has already fallen into, all fixed: `mime` is its own `iiprop`
+  value (leave it out and every file fails the type test as `undefined`),
+  Commons treats `_` and a space as the same character so the two APIs
+  return the same file under two spellings, and an un-paced sweep collects
+  429s that read as an empty shelf. PG County, Montgomery County and NoVA
+  are deliberately absent: a suburban submarket has no skyline, and the
+  overhead is the more honest picture of a place shaped by its land.
+- Deal math without a deal: `lib/tools/deal-math.ts` (pure — the cap rate
+  triangle, the mortgage constant, `sizeLoan` against whichever of LTV /
+  DSCR / debt yield were set with the **binding one named**, break-even
+  occupancy, yield on cost and its spread over the exit cap, and one rent
+  said four ways), rendered by `app/tools/`. Two conventions, both
+  deliberate: **a rate is a percent here** (`6.5` means 6.5%) because that
+  is what a person types, while `lib/underwrite/engine.ts` keeps decimals
+  to match how Excel stores a percent cell — the two never meet inside one
+  function; and a blank is null, so an unset lender test is dropped rather
+  than sized at nothing. `/tools` and `/market` are the two public pages
+  that also serve signed-in visitors; both draw their chrome from
+  `app/public-shell.tsx`, never their own copy.
 - The homepage's photographs: `lib/photos.ts` (pure — the four slots with
   their file names, briefs, sizes and alt text; `presentPhotos` over an
   `exists` callback; `stripPhotos`; `HERO_AERIAL`) and `lib/photos-fs.ts`

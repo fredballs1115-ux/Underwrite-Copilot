@@ -87,6 +87,15 @@ const IconPin = (p: { className?: string }) => (
     <circle cx="12" cy="10" r="3" />
   </NavIcon>
 );
+const IconCalc = (p: { className?: string }) => (
+  <NavIcon className={p.className}>
+    <rect x="4" y="2" width="16" height="20" rx="2" />
+    <path d="M8 6h8" />
+    <path d="M8 11h.01M12 11h.01M16 11h.01" />
+    <path d="M8 15h.01M12 15h.01M16 15h4" />
+    <path d="M8 19h.01M12 19h.01" />
+  </NavIcon>
+);
 const IconNews = (p: { className?: string }) => (
   <NavIcon className={p.className}>
     <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2" />
@@ -116,6 +125,7 @@ export function AppShell({
   // submarket's detail page lights the same nav item.
   const inMarket = pathname.startsWith("/market") || pathname.startsWith("/submarkets");
   const inNews = pathname.startsWith("/news");
+  const inTools = pathname.startsWith("/tools");
   const inTeam = pathname.startsWith("/team");
   const inBilling = pathname.startsWith("/billing");
   const inAccount = pathname.startsWith("/account");
@@ -169,6 +179,7 @@ export function AppShell({
               ["/criteria", "Buy box", inCriteria, IconTarget],
               ["/comps", "Pull comps", inComps, IconPin],
               ["/market", "Market data", inMarket, IconMemory],
+              ["/tools", "Deal math", inTools, IconCalc],
               ["/news", "News", inNews, IconNews],
               ["/analytics", "Analytics", inAnalytics, IconChart],
               ["/team", "Team", inTeam, IconUsers],
@@ -278,6 +289,7 @@ export function AppShell({
               { href: "/criteria", label: "Buy box", active: inCriteria },
               { href: "/comps", label: "Pull comps", active: inComps },
               { href: "/market", label: "Market data", active: inMarket },
+              { href: "/tools", label: "Deal math", active: inTools },
               { href: "/news", label: "News", active: inNews },
               { href: "/analytics", label: "Analytics", active: inAnalytics },
               { href: "/team", label: "Team", active: inTeam },

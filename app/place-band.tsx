@@ -30,9 +30,14 @@ export function PlaceBackdrop({
   if (!METRO_VIEWS[metro]) return null;
   return (
     <div className="pointer-events-none absolute inset-0">
+      {/* 1200 rather than 1600: this picture sits under two scrims at 30–40%
+          opacity with type over it, so the detail a larger render buys is
+          detail nobody can see. The deploy probe measures these at 1600 —
+          Atlanta's is a megabyte there — and a band is the one place that
+          weight would be paid on every page load. */}
       <CityPhoto
         metro={metro}
-        width={1600}
+        width={1200}
         height={height}
         className={`h-full w-full object-cover ${opacity}`}
       />

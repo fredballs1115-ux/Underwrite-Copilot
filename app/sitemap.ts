@@ -35,6 +35,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.7,
     },
     {
+      // The deal-math calculators — public because a calculator behind a
+      // login is a calculator nobody reaches for, and because "cap rate
+      // calculator" is a thing people search for.
+      url: `${APP_URL}/tools`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
       url: `${APP_URL}/whats-new`,
       lastModified: now,
       changeFrequency: "weekly",

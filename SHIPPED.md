@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and twenty-five PRs, #176–#300, each
+estimate, and that's what it should flag." A hundred and twenty-six PRs, #176–#301, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1777,6 +1777,51 @@ confirmed equal to the main tip after each batch.
   goes in the table.
 
 What only you can do next is at the top of `WILL_TODO.md`.
+
+- **#301 Deal math you can run before there is a deal.** Your note: build
+  every small thing an analyst needs and he never has to leave the site.
+  Everything else here needs a deal — an offering memorandum to read, a
+  model to reconcile against, a pipeline to sit in. `/tools` needs nothing,
+  and it is the arithmetic that happens on the phone call before any of
+  that: *"eight and a quarter, what does that size to."* Four calculators.
+  **Size the loan** draws LTV, coverage and debt yield as three bars against
+  the most permissive, so the binding test is visibly the short bar before
+  it is read, and names it in a sentence — "it sizes to $12.7M" is half an
+  answer, "and you are coverage constrained, not LTV" is the half that says
+  what to negotiate. Break-even occupancy sits beside it and goes red above
+  100%, because a building that does not cover when full is the one thing
+  worth knowing. **Cap rate, price, NOI**: fill any two, the third solves.
+  **Build or buy** draws the yield-on-cost spread over the exit cap from a
+  centre line, so a negative spread looks wrong rather than reading as a
+  smaller number. **One rent, four ways**, because office quotes per foot
+  per year, industrial per foot per month and multifamily per unit per
+  month, and a comp set mixes them freely. All of it runs in the browser;
+  nothing is sent anywhere, which is the reason people reach for a
+  spreadsheet instead of a website. Public on purpose — a calculator behind
+  a login is a calculator nobody reaches for.
+
+- **#301 Fifteen markets get the photograph they are known by.** #300 shipped
+  the mechanism with the table deliberately empty, to be filled from what the
+  runner printed. The first sweep found nothing usable in all eighteen
+  markets, and the reason was one missing word: the type test read
+  `imageinfo.mime`, and `mime` is its own API field — `size` returns the
+  dimensions, `url` returns the paths, neither carries the media type. So
+  every file failed as "not a photograph (undefined)", including *Dallas
+  downtown skyline seen from Lake Cliff*. With that fixed, and with two
+  better doors than blind search (a city's own Wikipedia article images, and
+  hand-filed Commons categories), every market that has a skyline produced
+  real candidates. Washington opens on the Mall rather than a wall of
+  towers, because the Height Act means that is the picture the city is
+  actually known by. Miami opens on Brickell, because Brickell is the
+  submarket a CRE reader means when they say Miami. Prince George's County,
+  Montgomery County and Northern Virginia get nothing on purpose: a suburban
+  submarket does not have a skyline, and the overhead is the more honest
+  picture of a place shaped by its land. The deploy probe now **verifies**
+  rather than searches — every deploy re-resolves all fifteen files and
+  prints LIVE or DEAD with the byte count, so a file deleted upstream shows
+  up there instead of as a market that quietly lost its picture. The run on
+  2026-09-16 at 16:07 UTC read **15 live, 0 dead**.
+
 
 ## Monday night (Aug 24–25 ET) — homescreen eye-catchers, then the big one: real data on the asset types that matter
 
