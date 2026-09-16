@@ -335,7 +335,18 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   page-level "verify against source"; cache the OM across the pipeline steps to
   keep cost down. These models use adaptive thinking (no `budget_tokens`).
 - The broker-comp scrutiny step reads comps OUT of the OM itself — no external
-  comps data source (deliberate: avoids data-licensing constraints).
+  comps data source (deliberate: avoids data-licensing constraints). The
+  SEPARATE public-records pull (`lib/public-comps/`, `/comps`) has its own
+  rule: **a figure is only as strong as the count behind it.**
+  `compEvidence` grades a set — `individual` under `MEDIAN_FLOOR` (3),
+  `thin` under `CONFIDENT_FLOOR` (5), `usable` above — and
+  `medianLabel` / `salesPhrase` / `evidenceNote` say so on the page. One
+  sale is never called a median (it is "the one recorded sale"), the
+  vs-median CALL is withheld below the floor entirely, and a 3–4 sale
+  median prints with its count attached. The figure itself is never
+  hidden: a single recorded sale is the only evidence there is, and an
+  analyst who can see it decides for themselves. `medianPerSqft` has
+  honoured the floor since it shipped; the whole-price median did not.
 - This is **Next.js 16** — see AGENTS.md; check `node_modules/next/dist/docs/`
   before using unfamiliar Next APIs.
 

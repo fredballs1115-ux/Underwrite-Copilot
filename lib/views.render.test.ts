@@ -1017,6 +1017,16 @@ describe("the deal math tools", () => {
     expect(text).toContain("$2,500");
   });
 
+  it("shows the shorthand in the price fields it now accepts", () => {
+    // Both the fix and the teaching: a field seeded with "$20M" tells the
+    // next person the notation works, and the figures below it prove the
+    // reader read it. live-verify greps the live page for this exact
+    // attribute, because the old build could not produce it — the old
+    // parser could not read "$20M", so it could not have been seeded.
+    expect(html).toContain('value="$20M"');
+    expect(text).toContain("$12,656,86"); // …and $20M sized the loan
+  });
+
   it("draws the binding test rather than only naming it", () => {
     // three tracks, one filled in the brand colour and two in the line
     // colour — the picture that makes the short bar the answer

@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  compEvidence,
   compStats,
+  CONFIDENT_FLOOR,
   COVERAGE_DISCOVERY,
   COVERAGE_SUMMARY,
+  evidenceNote,
   finalizeComps,
+  MEDIAN_FLOOR,
+  medianLabel,
   PROVIDERS,
   providerFor,
+  salesPhrase,
 } from "./core";
 
 const philly = PROVIDERS.find((p) => p.id === "philly_opa")!;
@@ -278,5 +284,86 @@ describe("finalizeComps + compStats", () => {
     expect(s.medianPrice).toBe(400000);
     expect(s.medianPerSqft).toBeNull(); // only 2 rows have sqft
     expect(compStats([])).toBeUndefined();
+  });
+});
+
+describe("how much a comp set can actually support", () => {
+  const sale = (price: number, sqft: number | null = 2000) =>
+    ({
+      id: String(price),
+      address: `${price} Main St`,
+      saleDate: "2026-01-01",
+      price,
+      sqft,
+      propertyType: "apartment",
+      distanceKm: 0.5,
+      sourceUrl: "https://example.gov/1",
+    }) as never;
+
+  it("grades a set by how many sales are behind it", () => {
+    expect(compEvidence(0)).toBe("none");
+    expect(compEvidence(1)).toBe("individual");
+    expect(compEvidence(2)).toBe("individual");
+    expect(compEvidence(MEDIAN_FLOOR)).toBe("thin");
+    expect(compEvidence(4)).toBe("thin");
+    expect(compEvidence(CONFIDENT_FLOOR)).toBe("usable");
+    expect(compEvidence(40)).toBe("usable");
+  });
+
+  it("refuses to call one sale a median", () => {
+    // The defect: with a single recorded sale the page printed
+    // "1 recorded sales — median $400,000 · range $400,000–$400,000",
+    // dressing one data point as a market. The figure is fine to show;
+    // calling it a median is not.
+    expect(medianLabel(1)).toBe("the one recorded sale");
+    expect(medianLabel(1)).not.toContain("median");
+    expect(medianLabel(2)).not.toContain("median");
+    expect(medianLabel(MEDIAN_FLOOR)).toBe("median");
+    expect(medianLabel(50)).toBe("median");
+  });
+
+  it("counts in English", () => {
+    expect(salesPhrase(1)).toBe("1 recorded sale");
+    expect(salesPhrase(0)).toBe("0 recorded sales");
+    expect(salesPhrase(7)).toBe("7 recorded sales");
+  });
+
+  it("says what is thin about a thin set, and nothing about a full one", () => {
+    expect(evidenceNote(1)).toContain("not a market");
+    expect(evidenceNote(2)).toContain("cannot establish a middle");
+    expect(evidenceNote(3)).toContain("3 sales");
+    expect(evidenceNote(4)).toContain("one unusual trade");
+    expect(evidenceNote(CONFIDENT_FLOOR)).toBe("");
+    expect(evidenceNote(200)).toBe("");
+    // Every note is a sentence somebody reads, so it meets the same bar.
+    for (const n of [1, 2, 3, 4]) {
+      const note = evidenceNote(n);
+      expect(note.endsWith("."), `${n}: ${note}`).toBe(true);
+      expect(note).not.toContain("undefined");
+    }
+  });
+
+  it("holds the per-SF median to the same floor the whole price now honours", () => {
+    // Two sales with a size: no per-SF median, and no whole-price median
+    // either as far as the page is concerned.
+    const two = compStats([sale(400_000), sale(600_000)])!;
+    expect(two.medianPerSqft).toBeNull();
+    expect(compEvidence(two.count)).toBe("individual");
+
+    // Three: both figures exist, and the set is thin rather than silent.
+    const three = compStats([sale(400_000), sale(600_000), sale(500_000)])!;
+    expect(three.medianPerSqft).not.toBeNull();
+    expect(three.medianPrice).toBe(500_000);
+    expect(compEvidence(three.count)).toBe("thin");
+  });
+
+  it("still reports the one sale's own figures, rather than hiding them", () => {
+    // Hiding is the wrong fix: a single recorded sale is the only evidence
+    // there is, and an analyst who can see it decides for themselves.
+    const one = compStats([sale(400_000)])!;
+    expect(one.count).toBe(1);
+    expect(one.medianPrice).toBe(400_000);
+    expect(one.low).toBe(400_000);
+    expect(one.high).toBe(400_000);
   });
 });
