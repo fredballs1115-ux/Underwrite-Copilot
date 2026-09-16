@@ -184,6 +184,34 @@ describe("runWaterfall — it asks rather than answering wrongly", () => {
     expect(runWaterfall({ ...DEAL, lpEquityPct: null }).note).toMatch(/LP/);
     expect(runWaterfall({ ...DEAL, lpEquityPct: 140 }).note).toMatch(/between 0 and 100/);
   });
+  it("refuses a tier share outside 0 and 100", () => {
+    // 120% to the LP pays the GP NEGATIVE dollars; −30% hands the GP 130%
+    // of the tier. Both are typos, and both render as a negative bar.
+    const over = runWaterfall({ ...DEAL, tiers: [{ hurdlePct: 12, lpSharePct: 120 }] });
+    expect(over.note).toMatch(/between 0 and 100/);
+    expect(over.byTier).toEqual([]);
+    const under = runWaterfall({ ...DEAL, tiers: [{ hurdlePct: 12, lpSharePct: -30 }] });
+    expect(under.note).toMatch(/between 0 and 100/);
+    // The boundaries themselves are legitimate splits.
+    expect(runWaterfall({ ...DEAL, tiers: [{ hurdlePct: 12, lpSharePct: 100 }] }).note).toBeNull();
+    expect(runWaterfall({ ...DEAL, tiers: [{ hurdlePct: 12, lpSharePct: 0 }] }).note).toBeNull();
+  });
+
+  it("no side of any tier is ever paid a negative amount", () => {
+    for (const tiers of [
+      [{ hurdlePct: 12, lpSharePct: 80 }],
+      [{ hurdlePct: 12, lpSharePct: 100 }],
+      [{ hurdlePct: 12, lpSharePct: 0 }],
+      [{ hurdlePct: 12, lpSharePct: 80 }, { hurdlePct: 18, lpSharePct: 70 }],
+    ]) {
+      const w = runWaterfall({ ...DEAL, cashFlows: [-10_000_000, 0, 0, 0, 40_000_000], tiers });
+      for (const t of w.byTier) {
+        expect(t.toLp, t.label).toBeGreaterThanOrEqual(0);
+        expect(t.toGp, t.label).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
   it("wants a preferred return", () => {
     expect(runWaterfall({ ...DEAL, prefPct: null }).note).toMatch(/preferred/);
     expect(runWaterfall({ ...DEAL, prefPct: -3 }).note).toMatch(/preferred/);

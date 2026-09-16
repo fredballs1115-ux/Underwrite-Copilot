@@ -114,8 +114,12 @@ export function readDebt(t: DebtTerms): DebtRead {
   if (!positive(t.loan) || !real(t.ratePct) || t.ratePct < 0) {
     return { ...EMPTY, note: "Enter a loan amount and a rate." };
   }
-  if (!positive(t.termYears)) {
-    return { ...EMPTY, note: "Enter the loan term — the years until the balloon." };
+  // A term under half a year rounds to zero, and the loop then runs no years
+  // at all while still reporting a balloon — a figure for a schedule that
+  // never ran. This reports in whole years, so a term it cannot represent is
+  // refused rather than answered.
+  if (!positive(t.termYears) || Math.round(t.termYears) < 1) {
+    return { ...EMPTY, note: "Enter the loan term in whole years — the years until the balloon." };
   }
 
   const termYears = Math.min(Math.round(t.termYears), 40);
