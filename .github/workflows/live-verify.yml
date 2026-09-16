@@ -342,3 +342,5 @@ jobs:
           mark "#310 /tools indexes itself" grep -q "Jump to" p_tools2.html
           mark "#312 acres into square feet, on the page" grep -q "One acre is 43,560 square feet" p_tools2.html
           mark "#312 the load factor converts the quoted rent" grep -q "per foot you can furnish" p_tools2.html
+          mark "#313 the land residual is on /tools" grep -q "What the land can be worth" p_tools2.html
+          mark "#313 the residual says its own sensitivity" grep -q "a residual is a range and not a number" p_tools2.html

@@ -5,6 +5,7 @@ import { readFigure } from "@/lib/money";
 import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
 import { readDebt, testRefi } from "@/lib/tools/debt-math";
 import { readLease, readOpex } from "@/lib/tools/lease-math";
+import { readResidual } from "@/lib/tools/land-residual";
 import { readLand, readSpace } from "@/lib/tools/measure-math";
 import { buildStack } from "@/lib/tools/sources-uses";
 import { readMix, totalMix } from "@/lib/tools/unit-mix";
@@ -253,6 +254,7 @@ const INDEX = [
   { id: "sources-and-uses", label: "Sources & uses" },
   { id: "unit-mix", label: "Unit mix" },
   { id: "the-site", label: "The site" },
+  { id: "residual-land", label: "Land residual" },
   { id: "the-waterfall", label: "LP / GP split" },
   { id: "net-effective-rent", label: "Net effective rent" },
   { id: "rentable-vs-usable", label: "Rentable vs usable" },
@@ -1140,7 +1142,153 @@ function SiteMeasures() {
   );
 }
 
-// ── 7b. rentable, usable, and the rent you actually pay ────────────────────
+// ── 7b. what the land can be worth ─────────────────────────────────────────
+
+/**
+ * The one calculation on this page that solves for a price instead of
+ * judging one.
+ *
+ * A developer looking at a site does not ask whether the asking price is
+ * good; they ask what they can pay and still make their number. The answer
+ * is whatever is left of the finished building's value after the cost of
+ * building it and the return required for doing so — which makes the land a
+ * SMALL difference between two LARGE numbers, and that is the whole point of
+ * drawing it. The land segment is visibly the thin one, and the two shock
+ * lines under the bar say what a quarter point or a 5% overrun does to it.
+ */
+function ResidualLand() {
+  const [buildable, setBuildable] = useShared("rbsf", "165,000");
+  const [units, setUnits] = useShared("run", "180");
+  const [noi, setNoi] = useShared("rnoi", "4,200,000");
+  const [exitCap, setExitCap] = useShared("rcap", "5.5");
+  const [hardPerSf, setHardPerSf] = useShared("rhc", "270");
+  const [softPct, setSoftPct] = useShared("rsc", "22");
+  const [carry, setCarry] = useShared("rcy", "6");
+  const [profit, setProfit] = useShared("rpc", "15");
+  const [yoc, setYoc] = useShared("ryc", "6.25");
+
+  const r = useMemo(
+    () =>
+      readResidual({
+        buildableSf: num(buildable),
+        units: num(units),
+        stabilizedNoi: num(noi),
+        exitCapPct: num(exitCap),
+        hardCostPerSf: num(hardPerSf),
+        softCostPct: num(softPct),
+        carryPct: num(carry),
+        profitOnCostPct: num(profit),
+        targetYieldOnCostPct: num(yoc),
+      }),
+    [buildable, units, noi, exitCap, hardPerSf, softPct, carry, profit, yoc],
+  );
+
+  // The costs recede in one dark tone, the two things the deal is FOR — the
+  // developer's margin and the land — come forward in the brand colour, and
+  // the land is solid because it is the answer.
+  const tone: Record<string, string> = {
+    "Hard costs": "bg-sidebar",
+    "Soft costs": "bg-sidebar/60",
+    Carry: "bg-sidebar/35",
+    "Developer profit": "bg-brand/40",
+    Land: "bg-brand",
+  };
+  const negative = r.land !== null && r.land < 0;
+
+  return (
+    <Card id="residual-land" eyebrow="Development" title="What the land can be worth">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <Field label="Buildable SF" value={buildable} onChange={setBuildable} placeholder="165,000" />
+        <Field label="Units" value={units} onChange={setUnits} placeholder="180" />
+        <Field label="Stabilized NOI" value={noi} onChange={setNoi} placeholder="4,200,000" />
+        <Field label="Exit cap" suffix="%" value={exitCap} onChange={setExitCap} placeholder="5.5" />
+        <Field label="Hard cost / SF" value={hardPerSf} onChange={setHardPerSf} placeholder="270" />
+        <Field label="Soft, % of hard" suffix="%" value={softPct} onChange={setSoftPct} placeholder="22" />
+        <Field label="Carry" suffix="%" value={carry} onChange={setCarry} placeholder="6" />
+        <Field label="Profit on cost" suffix="%" value={profit} onChange={setProfit} placeholder="15" />
+        <Field label="Target yield on cost" suffix="%" value={yoc} onChange={setYoc} placeholder="6.25" />
+      </div>
+
+      {r.lines.length > 0 && r.completedValue !== null && (
+        <div className="mt-6">
+          <div className="mb-2 flex items-baseline justify-between text-sm">
+            <span className="text-muted">Finished building, at the exit cap</span>
+            <span className="font-semibold tabular-nums">{usd(r.completedValue)}</span>
+          </div>
+          <div className="flex h-5 overflow-hidden rounded-full bg-faint">
+            {r.lines.map((l) => (
+              <div
+                key={l.label}
+                data-bar="residual"
+                title={`${l.label} · ${usdExact(l.amount)}`}
+                className={`h-full ${l.label === "Land" && negative ? "bg-kill" : tone[l.label]}`}
+                style={{ width: `${Math.max(0, l.sharePct)}%` }}
+              />
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1">
+            {r.lines.map((l) => (
+              <span key={l.label} className="flex items-center gap-1.5 text-xs">
+                <span
+                  aria-hidden="true"
+                  className={`inline-block h-2.5 w-2.5 rounded-sm ${
+                    l.label === "Land" && negative ? "bg-kill" : tone[l.label]
+                  }`}
+                />
+                <span className={l.label === "Land" ? "font-semibold" : "text-muted"}>
+                  {l.label}
+                </span>
+                <span className="font-mono tabular-nums text-muted">{usd(l.amount)}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {r.land !== null && (
+        <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
+          <Stat label="Land, residual" value={usd(r.land)} tone={negative ? "muted" : "brand"} />
+          <Stat
+            label="Per buildable SF"
+            value={r.landPerBuildableSf === null ? "—" : `$${r.landPerBuildableSf.toFixed(2)}`}
+          />
+          <Stat label="Per unit" value={usdExact(r.landPerUnit)} />
+          <Stat
+            label="Binding test"
+            value={r.binding === "profit" ? "Profit on cost" : r.binding === "yield" ? "Yield on cost" : "—"}
+            tone="muted"
+          />
+        </div>
+      )}
+
+      {r.byProfit && r.byYield && (
+        <p className="mt-4 text-sm text-muted">
+          At {num(profit)?.toFixed(0)}% profit on cost the site is worth{" "}
+          <span className="font-semibold tabular-nums text-ink">{usd(r.byProfit.land)}</span>; at a{" "}
+          {num(yoc)?.toFixed(2)}% yield on cost,{" "}
+          <span className="font-semibold tabular-nums text-ink">{usd(r.byYield.land)}</span>. You
+          can only pay the lower of two tests you have agreed to meet.
+        </p>
+      )}
+
+      {r.capShockLand !== null && r.costShockLand !== null && r.land !== null && r.land > 0 && (
+        <p className="mt-3 text-sm text-muted">
+          A quarter point wider on the exit cap takes it to{" "}
+          <span className="font-semibold tabular-nums text-caution">{usd(r.capShockLand)}</span>; a
+          5% overrun on the build, to{" "}
+          <span className="font-semibold tabular-nums text-caution">{usd(r.costShockLand)}</span>.
+          The land is a small difference between large numbers, so everything
+          upstream of it arrives here multiplied — which is why a residual is a
+          range and not a number.
+        </p>
+      )}
+
+      {r.note && <p className="mt-4 text-sm text-caution">{r.note}</p>}
+    </Card>
+  );
+}
+
+// ── 7c. rentable, usable, and the rent you actually pay ────────────────────
 
 /**
  * The load factor, and what it does to a quoted rent.
@@ -1982,6 +2130,7 @@ export function DealMathTools() {
       <SourcesUses />
       <UnitMix />
       <SiteMeasures />
+      <ResidualLand />
       <Waterfall />
       <NetEffectiveRent />
       <RentableUsable />

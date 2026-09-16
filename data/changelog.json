@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-16",
+      "title": "What the land can be worth",
+      "blurb": "Every other calculator on /tools starts from a price. This one solves for it: the finished building at the exit cap, less the cost of building it, less the return required for doing so, and whatever is left is what you can pay for the site. The picture is the finished value drawn as one bar — hard costs, soft costs, carry, the developer's profit, and the land — because the land being the THIN segment is the whole point. Two lines under it say what that thinness costs you: on the seeded deal a quarter point wider on the exit cap takes $8.29M to $5.57M, and a 5% overrun on the build takes it to $5.58M. A third gone, either way. The carry is charged on the land as well, which is the figure being solved for, so it is solved rather than approximated — the shortcut understates a cost and therefore overstates the land, which is the direction a developer can least afford to be wrong in. And where both a profit on cost and a target yield on cost are set, the lower of the two binds, because you cannot pay the higher of two tests you have agreed to meet.",
+      "href": "/tools"
+    },
+    {
+      "date": "2026-09-16",
       "title": "The measures an analyst used to Google",
       "blurb": "Two new cards on /tools. The first turns a site into everything it implies — acres into square feet (one acre is 43,560, and nobody keeps that in their head), the floor area ratio drawn INSIDE whatever the zoning allows so the unbuilt part of a site is a visible gap rather than a subtraction, units per acre, land per unit, the average unit, and parking said both ways, because the same car park is 1.50 spaces per unit and 1.64 per 1,000 feet. The second keeps apart the two figures people both call the load factor: rentable over usable less one, which is a landlord's 15%, and common area over rentable, which is the same building's 13.0%. Quoting the smaller one understates the rent every time, so the card says what the quote really is — $38.00 per rentable foot is $43.70 per foot you can furnish. That is the figure that compares two buildings, because a lower quote at a heavier load is the more expensive space.",
       "href": "/tools"
@@ -77,12 +83,6 @@
       "date": "2026-09-16",
       "title": "The deal math reads what you actually type",
       "blurb": "Typing $20M into a price field used to yield nothing at all — a page of em dashes for a perfectly ordinary number. Every field on /tools now reads the shorthand an analyst uses: $20M, 500k, 1.2mm, 6.5%, 1.25x, and a negative NOI, which is a real thing to put into a debt sizer.",
-      "href": "/tools"
-    },
-    {
-      "date": "2026-09-16",
-      "title": "Deal math you can run before there is a deal",
-      "blurb": "Size a loan against LTV, debt service coverage and debt yield and see which one actually binds — that is the half of the answer a bare number leaves out. Plus the cap rate triangle, yield on cost against the exit cap, and one rent said four ways. It all runs in your browser; nothing is sent anywhere.",
       "href": "/tools"
     }
   ]

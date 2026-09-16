@@ -1107,8 +1107,8 @@ describe("the deal math tools", () => {
     // every card must be reachable from the index.
     const hrefs = [...html.matchAll(/href="#([a-z0-9-]+)"/g)].map((m) => m[1]);
     const ids = new Set([...html.matchAll(/<section id="([a-z0-9-]+)"/g)].map((m) => m[1]));
-    expect(hrefs.length).toBe(13);
-    expect(ids.size).toBe(13);
+    expect(hrefs.length).toBe(14);
+    expect(ids.size).toBe(14);
     for (const h of hrefs) expect(ids.has(h), `#${h} has no card`).toBe(true);
     for (const id of ids) expect(hrefs, `${id} is not in the index`).toContain(id);
     expect(text).toContain("Jump to");
@@ -1192,6 +1192,42 @@ describe("the deal math tools", () => {
     expect(text).toContain("917 SF");
     expect(text).toContain("1.50");
     expect(text).toContain("1.64");
+  });
+
+  it("solves for the land instead of judging a price", () => {
+    // $4.2M at a 5.5% cap is a $76.36M building. Build it for $44.55M hard,
+    // $9.80M soft and $3.76M of carry, take 15% on cost, and $8.29M is what
+    // is left for the dirt.
+    expect(text).toContain("What the land can be worth");
+    expect(text).toContain("$76.36M");
+    expect(text).toContain("$44.55M");
+    expect(text).toContain("$9.80M");
+    expect(text).toContain("$3.76M");
+    expect(text).toContain("$8.29M");
+    expect(text).toContain("$50.26");
+    expect(text).toContain("$46,075");
+  });
+
+  it("draws the land as a segment of the finished value, five parts in all", () => {
+    // Hard, soft, carry, profit, land — and they sum to the whole, which is
+    // what makes the thin land segment read as the point rather than as a
+    // gap in the picture.
+    expect((html.match(/data-bar="residual"/g) ?? []).length).toBe(5);
+  });
+
+  it("names the binding test, and what the other one would have allowed", () => {
+    expect(text).toContain("Binding test");
+    expect(text).toContain("Profit on cost");
+    expect(text).toContain("At 15% profit on cost the site is worth $8.29M");
+    expect(text).toContain("6.25% yield on cost, $9.05M");
+    expect(text).toContain("lower of two tests you have agreed to meet");
+  });
+
+  it("says what a quarter point and a 5% overrun do to it", () => {
+    // $8.29M becomes $5.57M and $5.58M — about a third gone either way.
+    expect(text).toContain("A quarter point wider on the exit cap takes it to $5.57M");
+    expect(text).toContain("5% overrun on the build, to $5.58M");
+    expect(text).toContain("a residual is a range and not a number");
   });
 
   it("splits the rentable foot into what you occupy and what you pay for", () => {
