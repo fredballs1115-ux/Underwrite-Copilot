@@ -36,9 +36,46 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and thirty PRs, #176–#305, each
+estimate, and that's what it should flag." A hundred and thirty-one PRs, #176–#306, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
+
+- **#306 What the lease is really worth.** Every office and industrial
+  rent in a memorandum is a STARTING rent, and the gap to net effective is
+  where the broker's number lives. $36 a foot on a ten-year deal with
+  twelve months free and $90 of tenant improvements is not $36 a foot.
+
+  /tools draws where the face rent actually goes — kept, free rent, TI,
+  commission, four segments of one bar — and gives BOTH net effective
+  figures rather than picking one and calling it the answer, because a
+  broker who says "net effective" may mean either: the straight-line one
+  most memoranda quote, and the discounted one, which charges the
+  landlord for waiting and is always the lower of the two on a deal with
+  free rent up front.
+
+  Two rules the arithmetic turns on, both easy to get wrong quietly:
+
+  Escalations step ANNUALLY ON THE LEASE'S OWN ANNIVERSARY, so free rent
+  taken at the front is priced at the rate it would have been paid at —
+  month 13 of a lease with twelve months free pays the year-two rate,
+  because the escalation ran while the tenant was not paying. Treating
+  free rent as "the term starts a year later" understates the concession
+  and is the common mistake.
+
+  And the commission is written against the GROSS rent over the term, the
+  face deal rather than the discounted one, which is how a listing
+  agreement states it and why a concession-heavy lease still pays a full
+  fee. The test asserts the fee exceeds four per cent of what is actually
+  collected, which is the whole point.
+
+  Beside it: one operating expense said three ways — per unit, per foot,
+  and as a share of income — because a broker quotes "$4,200 a unit" and
+  an underwriter cannot argue with it until it is a ratio. A ratio under
+  twenty per cent is named as what it almost always is, a net lease where
+  the tenant pays the expenses directly, rather than left to read as a
+  remarkably cheap building.
+
+  Fifteen tests on the pure layer.
 
 - **#305 The work can leave the page.** Two things an analyst needs from
   a calculator that has nothing to do with the arithmetic.

@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { readFigure } from "@/lib/money";
 import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
+import { readLease, readOpex } from "@/lib/tools/lease-math";
 import {
   breakEvenOccupancyPct,
   capRatePct,
@@ -334,7 +335,11 @@ function DebtSizer() {
                   </span>
                 </div>
                 <div className="mt-1 h-2 overflow-hidden rounded-full bg-faint">
+                  {/* A hook, not a style: three of these bars exist and the
+                      binding one must be countable on its own, now that
+                      other cards on the page draw bars in the same colour. */}
                   <div
+                    data-bar="lender-test"
                     className={`h-full rounded-full ${t.binding ? "bg-brand" : "bg-line"}`}
                     style={{
                       width: `${widest > 0 ? Math.max(2, (t.maxLoan / widest) * 100) : 0}%`,
@@ -849,6 +854,183 @@ function CashFlowStrip() {
   );
 }
 
+
+// ── 6. net effective rent ──────────────────────────────────────────────────
+
+/**
+ * What a lease is worth after what it cost to sign.
+ *
+ * Every office and industrial rent in an OM is a STARTING rent, and the
+ * gap to net effective is where the broker's number lives. The picture is
+ * the point: the face rent as a bar, with the free months, the tenant
+ * improvements and the commission taken out of it in their own colours, so
+ * the size of the concession is visible before the figure is read.
+ */
+function NetEffectiveRent() {
+  const [months, setMonths] = useShared("lt", "120");
+  const [rent, setRent] = useShared("lr", "36");
+  const [free, setFree] = useShared("lf", "12");
+  const [ti, setTi] = useShared("lti", "90");
+  const [lc, setLc] = useShared("llc", "4");
+  const [esc, setEsc] = useShared("lesc", "3");
+  const [disc, setDisc] = useShared("ldisc", "8");
+
+  const r = useMemo(
+    () =>
+      readLease({
+        months: num(months),
+        startingRentPsf: num(rent),
+        freeMonths: num(free),
+        tiPsf: num(ti),
+        lcPct: num(lc),
+        escalationPct: num(esc),
+        discountPct: num(disc),
+      }),
+    [months, rent, free, ti, lc, esc, disc],
+  );
+
+  const gross = r.grossRentPsf ?? 0;
+  const cost = r.costOfDeal;
+  const share = (n: number) => (gross > 0 ? Math.max(0, (n / gross) * 100) : 0);
+
+  return (
+    <Card eyebrow="Leasing" title="What the lease is really worth">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+        <Field label="Term" suffix="mo" value={months} onChange={setMonths} placeholder="120" />
+        <Field label="Starting rent" suffix="/SF" value={rent} onChange={setRent} placeholder="36" />
+        <Field label="Free rent" suffix="mo" value={free} onChange={setFree} placeholder="12" />
+        <Field label="TI" suffix="/SF" value={ti} onChange={setTi} placeholder="90" />
+        <Field label="Commission" suffix="%" value={lc} onChange={setLc} placeholder="4" />
+        <Field label="Escalation" suffix="%" value={esc} onChange={setEsc} placeholder="3" />
+        <Field label="Discount rate" suffix="%" value={disc} onChange={setDisc} placeholder="8" />
+      </div>
+
+      {r.nerPsfYr === null ? (
+        <p className="mt-6 rounded-lg bg-faint px-4 py-3 text-sm text-muted">{r.note}</p>
+      ) : (
+        <>
+          {cost && gross > 0 && (
+            <div className="mt-6">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                Where the face rent goes
+              </p>
+              <div className="mt-2 flex h-3 overflow-hidden rounded-full bg-faint">
+                <div
+                  className="bg-brand"
+                  style={{ width: `${share(Math.max(0, r.netPsf ?? 0))}%` }}
+                />
+                <div className="bg-caution" style={{ width: `${share(cost.free)}%` }} />
+                <div className="bg-sidebar" style={{ width: `${share(cost.ti)}%` }} />
+                <div className="bg-line" style={{ width: `${share(cost.lc)}%` }} />
+              </div>
+              <p className="mt-2 text-xs text-muted">
+                <span className="font-semibold text-brand">kept</span>
+                {" · "}
+                <span className="font-semibold text-caution">free rent</span>
+                {" · "}
+                <span className="font-semibold text-sidebar">TI</span>
+                {" · "}
+                <span className="font-semibold">commission</span>
+              </p>
+            </div>
+          )}
+
+          <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-3 lg:grid-cols-5">
+            <Stat
+              label="Net effective"
+              value={r.nerPsfYr === null ? "—" : `$${r.nerPsfYr.toFixed(2)}`}
+              tone="brand"
+            />
+            <Stat
+              label="…discounted"
+              value={
+                r.discountedNerPsfYr === null ? "—" : `$${r.discountedNerPsfYr.toFixed(2)}`
+              }
+            />
+            <Stat label="Below face" value={pct(r.discountToFacePct, 1)} />
+            <Stat
+              label="Collected / SF"
+              value={r.collectedPsf === null ? "—" : `$${r.collectedPsf.toFixed(0)}`}
+              tone="muted"
+            />
+            <Stat
+              label="Cost to sign / SF"
+              value={
+                cost === null ? "—" : `$${(cost.free + cost.ti + cost.lc).toFixed(0)}`
+              }
+              tone="muted"
+            />
+          </div>
+
+          <p className="mt-4 text-sm text-muted">
+            The face rent is{" "}
+            <span className="font-semibold tabular-nums text-ink">
+              ${num(rent)?.toFixed(2) ?? "—"}
+            </span>
+            . Straight-line net effective is the simple one most memoranda quote;
+            the discounted figure charges the landlord for waiting, so it is
+            always the lower of the two on a deal with free rent up front.
+          </p>
+          {r.note && <p className="mt-2 text-sm text-caution">{r.note}</p>}
+        </>
+      )}
+    </Card>
+  );
+}
+
+// ── 7. one operating expense, three ways ───────────────────────────────────
+
+function OpexTranslator() {
+  const [opex, setOpex] = useShared("ox", "504,000");
+  const [units, setUnits] = useShared("oxu", "120");
+  const [sf, setSf] = useShared("oxsf", "96,000");
+  const [egi, setEgi] = useShared("egi", "1,680,000");
+
+  const r = useMemo(
+    () => readOpex({ opex: num(opex), units: num(units), sf: num(sf), egi: num(egi) }),
+    [opex, units, sf, egi],
+  );
+  const ratio = r.ratioPct;
+
+  return (
+    <Card eyebrow="Operations" title="One expense, three ways">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Field label="Operating expenses" value={opex} onChange={setOpex} placeholder="504,000" />
+        <Field label="Units" value={units} onChange={setUnits} placeholder="120" />
+        <Field label="Square feet" value={sf} onChange={setSf} placeholder="96,000" />
+        <Field label="Effective gross income" value={egi} onChange={setEgi} placeholder="1,680,000" />
+      </div>
+
+      {ratio !== null && (
+        <div className="mt-6">
+          <div className="h-3 overflow-hidden rounded-full bg-faint">
+            <div
+              className={`h-full rounded-full ${ratio >= 100 ? "bg-kill" : "bg-brand"}`}
+              style={{ width: `${Math.min(100, ratio)}%` }}
+            />
+          </div>
+          <p className="mt-2 text-sm text-muted">
+            <span className="font-semibold tabular-nums text-ink">{ratio.toFixed(1)}%</span> of
+            the income goes out as expenses.
+          </p>
+        </div>
+      )}
+
+      <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
+        <Stat label="Per unit" value={usdExact(r.perUnit)} tone="brand" />
+        <Stat
+          label="Per SF"
+          value={r.perSf === null ? "—" : `$${r.perSf.toFixed(2)}`}
+        />
+        <Stat label="Expense ratio" value={pct(ratio, 1)} />
+        <Stat label="NOI" value={usd(r.noi)} />
+      </div>
+
+      {r.note && <p className="mt-4 text-sm text-caution">{r.note}</p>}
+    </Card>
+  );
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 
 export function DealMathTools() {
@@ -867,10 +1049,12 @@ export function DealMathTools() {
       </div>
       <DebtSizer />
       <CashFlowStrip />
+      <NetEffectiveRent />
       <div className="grid gap-6 lg:grid-cols-2">
         <CapTriangle />
         <RentConverter />
       </div>
+      <OpexTranslator />
       <BuildOrBuy />
     </div>
   );

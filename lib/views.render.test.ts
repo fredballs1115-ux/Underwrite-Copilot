@@ -1045,13 +1045,40 @@ describe("the deal math tools", () => {
     expect(text).toContain("$12,656,86"); // …and $20M sized the loan
   });
 
+  it("shows what a lease is worth after what it cost to sign", () => {
+    // $36 face, ten years, twelve months free, $90 TI, 4% commission, 3%
+    // steps. The point of the card is that $36 face is nothing like $36
+    // effective, so the seeded case has to show that gap.
+    expect(text).toContain("What the lease is really worth");
+    expect(text).toContain("Net effective");
+    expect(text).toContain("Where the face rent goes");
+    // The concession is DRAWN before it is said: four segments, one each
+    // for what is kept, the free rent, the TI and the commission.
+    expect(html).toContain('class="bg-caution"');
+    // …and the face rent is named beside the effective one, or the gap
+    // has nothing to be a gap from.
+    expect(text).toContain("The face rent is");
+  });
+
+  it("says one operating expense three ways", () => {
+    // $504k on 120 units, 96,000 SF, $1.68M of income: $4,200 a unit,
+    // $5.25 a foot, 30% of income. A broker quotes the first; an
+    // underwriter argues the third.
+    expect(text).toContain("One expense, three ways");
+    expect(text).toContain("$4,200");
+    expect(text).toContain("$5.25");
+    expect(text).toContain("30.0%");
+  });
+
   it("draws the binding test rather than only naming it", () => {
     // three tracks in the debt sizer, one filled in the brand colour and
     // two in the line colour — the picture that makes the short bar the
     // answer. (The cash-flow strip draws its own bars; they are counted in
     // their own test below, which is why this one anchors on `h-full`.)
-    expect(html.match(/h-full rounded-full bg-brand/g)?.length).toBe(1);
-    expect(html.match(/h-full rounded-full bg-line/g)?.length).toBe(2);
+    const sizerBars = html.match(/data-bar="lender-test"[^>]*/g) ?? [];
+    expect(sizerBars.length, "three lender tests").toBe(3);
+    expect(sizerBars.filter((b) => b.includes("bg-brand")).length, "one binds").toBe(1);
+    expect(sizerBars.filter((b) => b.includes("bg-line")).length).toBe(2);
   });
 
   it("reads a pasted cash flow and says where the return comes from", () => {
