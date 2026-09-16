@@ -252,6 +252,23 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   rent per usable foot every time; that rent is the point of the module,
   since a $40 quote at an 18% load is dearer space than a $42 quote at 10%.
   A usable area larger than the rentable one is refused rather than computed.
+- What the dirt is worth: `lib/tools/land-residual.ts` (pure). The one
+  calculation on `/tools` that solves for a price instead of judging one —
+  the finished building's value less the cost of building it and the return
+  required for doing so. Three rules. The carry is charged on the land
+  too, which is the thing being solved for, so it is **solved rather than
+  approximated**: `T = (L + H + S)(1 + c)`, hence `L = T/(1+c) − H − S`;
+  quoting the carry against hard and soft alone understates a cost and
+  therefore overstates the land. **Profit on cost and yield on cost are two
+  different tests** — each reduces to a total-cost budget, and where both
+  are set the LOWER land value binds. And the land is **derived from the
+  rounded pieces** (the debt schedule's rule) because the five figures draw
+  as segments of one bar and the land is the leftover, so it should absorb
+  the rounding rather than leave a gap. A negative residual is reported as
+  a negative: the site does not work at any price, free included. The two
+  shocks it prints — 25bp on the exit cap, 5% on the build — are re-SOLVED
+  rather than scaled, because a residual amplifies everything upstream of
+  it (5% on the cost is ~33% on the land).
 - Who gets the return: `lib/tools/waterfall-math.ts` (pure). `runWaterfall`
   distributes a deal's cash period by period through a pref and its promote
   tiers with an **IRR lookback** — each hurdle measured on the LP's ACTUAL

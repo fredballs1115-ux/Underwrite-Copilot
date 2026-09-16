@@ -36,9 +36,34 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and thirty-seven PRs, #176–#312, each
+estimate, and that's what it should flag." A hundred and thirty-eight PRs, #176–#313, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
+
+- **#313 What the land can be worth.** Every other calculator on `/tools`
+  starts from a price. This one solves for it: the finished building at
+  the exit cap, less the cost of building it, less the return required for
+  doing so, and whatever is left is what the site is worth.
+
+  The picture is the finished value drawn as one bar — hard costs, soft
+  costs, carry, the developer's profit, and the land — because the land
+  being the THIN segment is the whole point. Two lines under it say what
+  that thinness costs: a quarter point wider on the exit cap takes $8.29M
+  to $5.57M, and a 5% overrun on the build takes it to $5.58M. A third
+  gone, either way, and both re-solved rather than scaled.
+
+  Three rules. The carry is charged on the land as well — the figure being
+  solved for — so it is solved algebraically rather than approximated,
+  because the shortcut understates a cost and therefore overstates the
+  land, which is the direction a developer can least afford to be wrong
+  in. Profit on cost and yield on cost are two different tests, and where
+  both are set the LOWER land value binds. And a negative residual is
+  reported as a negative: the site does not work at any price, free
+  included, and a zero would hide exactly that.
+
+  Twenty tests on the pure layer, including an invariant that the five
+  segments sum to the finished value across a range of inputs — the land
+  is derived from the rounded pieces so the bar always fills.
 
 - **#312 The measures an analyst used to Google.** Two cards, both for
   figures people leave a screening tool to find. The first turns a site

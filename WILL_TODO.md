@@ -5,8 +5,8 @@ Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 
 ## 🟢 2026-09-16, later — `/tools` becomes the reason not to open Excel
 
-Six more PRs, #307–#312, all on `/tools`, all proven live by the round
-markers. Fourteen calculations there now, and they cover the arithmetic an
+Seven more PRs, #307–#313, all on `/tools`, all proven live by the round
+markers. Fifteen calculations there now, and they cover the arithmetic an
 acquisitions analyst does between opening a memorandum and sending a
 letter:
 
@@ -20,6 +20,7 @@ letter:
 | **LP / GP waterfall** (#308) | The property's IRR is not anybody's IRR: 14.1% for the building, 13.3% to the LP, 20.6% to the GP |
 | **Unit mix** (#309) | Paste the OM's table. Weighted average rent, GPR both ways, loss to lease — **weighted by unit count**, which is $1,858 where averaging the rows gives $1,961 |
 | **The site** (#312) | Acres into square feet (43,560, which nobody remembers), FAR drawn *inside* the zoning limit so the unbuilt part of a site is a visible gap, units per acre, land per unit, and parking said both ways — the same car park is **1.50 spaces per unit and 1.64 per 1,000 feet** |
+| **Land residual** (#313) | The only one that solves for a price rather than judging one. What is left of the finished building after the build and the required return: **$8.29M**, which a quarter point on the exit cap takes to **$5.57M** |
 | **Net effective rent** | Both ways — straight-line and discounted — with free rent, TI and the commission against the *gross* |
 | **Rentable vs usable** (#312) | The load factor, and what it does to a quote. **$38.00 per rentable foot is $43.70 per foot you can furnish** — and the two numbers people both call "the load factor" (15.0% and 13.0%) are the same building |
 | **Opex translator** | One expense per unit, per foot, as a share of income |
@@ -27,18 +28,17 @@ letter:
 
 Three things they share: every field reads shorthand (`$20M`, `4.75%`,
 `1.25x`); every field travels in the URL, so a sizing is a link; and the
-math is a pure tested module before it reaches a page — **198 tests** on
-the eight modules, plus **23** that render the page itself and check the
+math is a pure tested module before it reaches a page — **218 tests** on
+the nine modules, plus **27** that render the page itself and check the
 figures it prints.
 
 *Nothing on this list is yours to do.* It is here so you know what is
 there.
 
-**What I'd build next, when you want more:** residual land value (what
-the dirt can be worth at a required yield), an amortisation schedule you
-can export, depreciation and after-tax. Then the pieces that are not
-calculators at all — copy-as-table on the comps and pipeline tables, a
-print stylesheet, breadcrumbs, a keyboard layer.
+**What I'd build next, when you want more:** an amortisation schedule you
+can export, depreciation and after-tax, a closing proration. Then the
+pieces that are not calculators at all — copy-as-table on the comps and
+pipeline tables, a print stylesheet, breadcrumbs, a keyboard layer.
 
 ---
 
