@@ -6,7 +6,7 @@ import { DealMathTools } from "./deal-math-tools";
 export const metadata: Metadata = {
   title: "Deal math — Underwrite Copilot",
   description:
-    "Eleven calculators for a commercial deal: size a loan and see which test binds, run the loan over the hold and test the refinance, sources and uses, the LP/GP waterfall, a pasted cash flow, an OM's unit mix, net effective rent, and the quick conversions. Runs in your browser; nothing is sent anywhere.",
+    "Thirteen calculators for a commercial deal: size a loan and see which test binds, run the loan over the hold and test the refinance, sources and uses, the LP/GP waterfall, a pasted cash flow, an OM's unit mix, the site's density and floor area ratio, net effective rent, rentable against usable feet, and the quick conversions. Runs in your browser; nothing is sent anywhere.",
 };
 
 /**

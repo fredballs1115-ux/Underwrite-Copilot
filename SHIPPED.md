@@ -36,9 +36,37 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and thirty-five PRs, #176–#310, each
+estimate, and that's what it should flag." A hundred and thirty-seven PRs, #176–#312, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
+
+- **#312 The measures an analyst used to Google.** Two cards, both for
+  figures people leave a screening tool to find. The first turns a site
+  into everything it implies — acres into square feet, the floor area
+  ratio drawn INSIDE whatever the zoning allows so the unbuilt part of a
+  site is a gap you can see, units per acre, land per unit, and parking
+  said both ways because the same car park is 1.50 spaces per unit and
+  1.64 per thousand feet.
+
+  The second is the one that changes a decision. Rentable and usable are
+  not the same foot, and the two numbers people BOTH call "the load
+  factor" — rentable over usable less one, which is a landlord's 15%, and
+  common area over rentable, which is the same building's 13.0% — are
+  kept apart on the page, because quoting the smaller one understates the
+  rent every time. $38.00 per rentable foot is $43.70 per foot a tenant
+  can furnish, and that is the figure that compares two buildings: a $40
+  quote at an 18% load is dearer space than a $42 quote at 10%.
+
+  Twenty-five tests on the pure layer, five more on the rendered page.
+
+- **#311 A typo is not an instruction.** An adversarial pass over the four
+  modules added this round, driven with values a person can actually type.
+  Three took a typo literally: a tier's LP share of 120 paid the GP
+  −$319,546 and split the residual at −20%; a negative share left the GP
+  taking 130% of everything above the last hurdle; a loan term of 0.4
+  years rounded to zero, ran no schedule, and still reported a balloon.
+  Both fixes refuse rather than clamp — clamping 120 to 100 would quietly
+  answer a different question than the one typed.
 
 - **#306 What the lease is really worth.** Every office and industrial
   rent in a memorandum is a STARTING rent, and the gap to net effective is
