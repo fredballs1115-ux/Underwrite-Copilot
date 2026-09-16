@@ -5,6 +5,7 @@ import { readFigure } from "@/lib/money";
 import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
 import { readDebt, testRefi } from "@/lib/tools/debt-math";
 import { readLease, readOpex } from "@/lib/tools/lease-math";
+import { readMix, totalMix } from "@/lib/tools/unit-mix";
 import { runWaterfall } from "@/lib/tools/waterfall-math";
 import {
   breakEvenOccupancyPct,
@@ -1035,7 +1036,139 @@ function OpexTranslator() {
   );
 }
 
-// ── 8. the LP / GP split ───────────────────────────────────────────────────
+// ── 8. the unit mix ────────────────────────────────────────────────────────
+
+/**
+ * The table every multifamily memorandum prints, read into the four figures
+ * an underwriter actually wants out of it.
+ *
+ * The picture is a row per unit type, width by unit count — so a mix that is
+ * two-thirds one-bedrooms looks like it, rather than reading as one row of
+ * four. Each row's in-place rent sits on a track with its market rent as a
+ * tick, which is loss to lease drawn per type instead of only totalled.
+ */
+function UnitMix() {
+  const [raw, setRaw] = useShared(
+    "mix",
+    "Studio\t24\t520\t1,395\t1,525\n1 Bed / 1 Bath\t60\t715\t1,650\t1,795\n2 Bed / 2 Bath\t48\t1,040\t2,150\t2,340\n3 Bed / 2 Bath\t12\t1,320\t2,650\t2,795",
+  );
+
+  const read = useMemo(() => readMix(raw), [raw]);
+  const t = useMemo(() => totalMix(read.rows), [read.rows]);
+
+  // Each row's bar is scaled to the highest rent in the table, so the types
+  // are comparable to each other rather than each filling its own track.
+  const topRent = Math.max(
+    1,
+    ...read.rows.flatMap((r) => [r.inPlace ?? 0, r.market ?? 0]),
+  );
+
+  return (
+    <Card eyebrow="Multifamily" title="Read the unit mix">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+        <div>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
+              Type, units, SF, in-place, market
+            </span>
+            <textarea
+              value={raw}
+              onChange={(e) => setRaw(e.target.value)}
+              rows={7}
+              spellCheck={false}
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-xs tabular-nums outline-none transition-colors focus:border-brand"
+            />
+          </label>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
+            Paste the table straight out of the memorandum. Leave the market
+            column off and it reads the rest.
+          </p>
+          {read.skipped.length > 0 && (
+            <p className="mt-2 text-xs text-caution">
+              Ignored: {read.skipped.slice(0, 3).join(", ")}
+              {read.skipped.length > 3 ? ` and ${read.skipped.length - 3} more` : ""}.
+            </p>
+          )}
+        </div>
+
+        <div>
+          {t.units > 0 && (
+            <>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <Stat label="Units" value={t.units.toLocaleString("en-US")} />
+                <Stat
+                  label="Avg rent, weighted"
+                  value={t.avgInPlace === null ? "—" : usdExact(t.avgInPlace)}
+                />
+                <Stat label="GPR, in place" value={usd(t.gprInPlace)} />
+                <Stat
+                  label="Loss to lease"
+                  value={usd(t.lossToLease)}
+                  tone={t.lossToLease && t.lossToLease > 0 ? "brand" : "ink"}
+                />
+              </div>
+
+              {read.rows.length > 0 && (
+                <div className="mt-5 space-y-2">
+                  {read.rows.map((r) => (
+                    <div key={`${r.label}|${r.units}`}>
+                      <div className="flex items-baseline justify-between gap-3 text-sm">
+                        <span className="truncate">
+                          <span className="font-medium">{r.label}</span>{" "}
+                          <span className="text-muted">
+                            · {r.units} {r.units === 1 ? "unit" : "units"}
+                            {r.sf !== null && <> · {r.sf.toLocaleString("en-US")} SF</>}
+                          </span>
+                        </span>
+                        <span className="shrink-0 font-mono tabular-nums">
+                          {r.inPlace === null ? "—" : usdExact(r.inPlace)}
+                          {r.market !== null && (
+                            <span className="text-muted"> → {usdExact(r.market)}</span>
+                          )}
+                        </span>
+                      </div>
+                      {/* The row's width is its share of the building, so the
+                          mix is visible before any figure is read. */}
+                      <div
+                        className="mt-1 h-2 overflow-hidden rounded-full bg-faint"
+                        style={{ width: `${Math.max(6, (r.units / t.units) * 100)}%` }}
+                      >
+                        <div
+                          data-bar="mix-row"
+                          className="h-full rounded-full bg-brand"
+                          style={{ width: `${((r.inPlace ?? 0) / topRent) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <p className="pt-1 text-[11px] text-muted">
+                    Each row is as wide as its share of the building; the fill is
+                    its rent against the highest in the table.
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <Stat label="Avg SF" value={t.avgSf === null ? "—" : t.avgSf.toLocaleString("en-US")} tone="muted" />
+                <Stat
+                  label="Rent / SF, in place"
+                  value={t.inPlacePerSf === null ? "—" : `$${t.inPlacePerSf.toFixed(2)}`}
+                  tone="muted"
+                />
+                <Stat label="GPR at market" value={usd(t.gprMarket)} tone="muted" />
+                <Stat label="Under market by" value={pct(t.lossToLeasePct, 1)} tone="muted" />
+              </div>
+            </>
+          )}
+
+          {t.note && <p className="mt-4 text-sm text-caution">{t.note}</p>}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ── 9. the LP / GP split ───────────────────────────────────────────────────
 
 /**
  * The property's IRR is not anybody's IRR.
@@ -1202,7 +1335,7 @@ const trimPct = (raw: string) => {
   return n === null ? raw : String(n);
 };
 
-// ── 9. what the loan does over the hold, and the refinance at the end ──────
+// ── 10. what the loan does over the hold, and the refinance at the end ────
 
 /**
  * These two read as one question, so they share a card and the schedule's
@@ -1455,6 +1588,7 @@ export function DealMathTools() {
       <DebtSizer />
       <LoanOverTime />
       <CashFlowStrip />
+      <UnitMix />
       <Waterfall />
       <NetEffectiveRent />
       <div className="grid gap-6 lg:grid-cols-2">

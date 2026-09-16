@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-16",
+      "title": "Read the unit mix straight off the memorandum",
+      "blurb": "Every multifamily OM prints the same table — type, units, SF, in-place rent, market rent — and every analyst retypes it into Excel for four figures. Paste it into /tools instead. It weights by UNIT COUNT rather than by row, which matters more than it sounds: the seeded 144-unit mix averages $1,858, while averaging the four row rents gives $1,961 — the number you get from what you can see. Under the totals, each unit type draws as a row as wide as its share of the building, so a mix that is two-thirds one-bedrooms looks like it. Loss to lease is summed only over the rows that state both rents, and the card says how many units that covers — an OM that quotes market rents for the renovated types only must never produce a loss-to-lease figure for 60 units that reads as the building's.",
+      "href": "/tools"
+    },
+    {
+      "date": "2026-09-16",
       "title": "Who actually gets the return",
       "blurb": "The property's IRR is not anybody's IRR, and that is the one calculation a deal page structurally cannot show — it depends on a term sheet, not on the building. Paste the deal's cash into /tools with the LP/GP equity split, the pref and the promote tiers, and it runs the waterfall period by period: the seeded deal makes 14.1%, the LP keeps 13.3% and the GP takes 20.6%. Under the three figures, every dollar distributed is drawn as a bar per tier, LP share against GP share, so you can see where the gap went. The promote is named as what it actually is — what the GP took ABOVE its pro-rata share of the equity, because a GP co-investing 10% is entitled to 10% of everything before it has promoted anything.",
       "href": "/tools"
@@ -78,12 +84,6 @@
       "title": "The sign-in page opens on a real place",
       "blurb": "Baltimore's Inner Harbor from above stands behind the sign-in card — the last public page that opened on a flat colour — a public-domain USGS frame under the same scrim, credited in the corner.",
       "href": "/login"
-    },
-    {
-      "date": "2026-09-14",
-      "title": "Every public page opens on a real place",
-      "blurb": "The homepage's hero, the argument on /why and the sample screen on /demo each open on a real photograph of a covered downtown — Midtown Manhattan, Washington, and Center City Philadelphia, the sample deal's own city — public-domain USGS frames under a scrim, credited in the corner.",
-      "href": "/why"
     }
   ]
 }

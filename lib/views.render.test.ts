@@ -1100,6 +1100,32 @@ describe("the deal math tools", () => {
     expect(html.match(/rounded-full bg-brand/g)?.length).toBeGreaterThanOrEqual(6);
   });
 
+  it("reads a pasted unit mix and weights it by units", () => {
+    // 144 units: 24 studios, 60 ones, 48 twos, 12 threes. The weighted
+    // average rent is $1,858 — the average of the four ROW rents is $1,961,
+    // which is the number you get by averaging what you can see.
+    expect(text).toContain("Read the unit mix");
+    expect(text).toContain("144");
+    expect(text).toContain("$1,858");
+    expect(text).not.toContain("$1,961");
+    // GPR both ways, and the gap between them.
+    expect(text).toContain("$3.21M");
+    expect(text).toContain("$3.48M");
+    expect(text).toContain("$272,160");
+    expect(text).toContain("7.8%");
+    // Rent per foot needs the SF column, which this table has.
+    expect(text).toContain("841");
+    expect(text).toContain("$26.50");
+  });
+
+  it("draws a row per unit type, as wide as its share of the building", () => {
+    expect(text).toContain("Studio");
+    expect(text).toContain("1 Bed / 1 Bath");
+    expect((html.match(/data-bar="mix-row"/g) ?? []).length).toBe(4);
+    // Nothing is missing from this table, so no caveat is printed.
+    expect(text).not.toContain("no square footage stated");
+  });
+
   it("says the property's IRR is not anybody's IRR", () => {
     // One property, three answers: the deal makes 14.1%, the LP keeps 13.3%
     // and the GP takes 20.6%. That row IS the card — everything under it

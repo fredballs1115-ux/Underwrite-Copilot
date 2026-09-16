@@ -211,6 +211,22 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   pays a full fee. `readOpex` says one expense per unit, per SF and as a
   share of EGI, and names a sub-20% ratio as a net lease rather than a
   cheap building.
+- An OM's unit mix table: `lib/tools/unit-mix.ts` (pure). Two rules.
+  **Weight by unit count, never by row** — 200 studios at $1,200 beside 4
+  penthouses at $6,000 do not average $3,600, and averaging the rows is the
+  easiest error to make because the rows are what you can see. And **loss to
+  lease is summed only over the rows that state BOTH rents**, so the two
+  sides of the subtraction always cover the same units; a half-filled market
+  column is the normal case (an OM quotes market rents for the renovated
+  types only) and `note` says how many units the figure covers. Two reader
+  rules that cost a debugging round each: the separator is chosen by
+  PRECEDENCE (tab > pipe > runs of spaces > comma), because a comma does
+  double duty and accepting both at once reads "1,395" as two cells and
+  turns a $1,395 rent into $1; and a row of three numbers is
+  (count, rent, market) or (count, SF, rent) decided **once for the whole
+  table** by the median ratio of the last two — a market rent sits near its
+  in-place rent by definition, a square footage does not, and a column is a
+  property of the table rather than of a row.
 - Who gets the return: `lib/tools/waterfall-math.ts` (pure). `runWaterfall`
   distributes a deal's cash period by period through a pref and its promote
   tiers with an **IRR lookback** — each hurdle measured on the LP's ACTUAL
