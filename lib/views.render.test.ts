@@ -1100,6 +1100,20 @@ describe("the deal math tools", () => {
     expect(html.match(/rounded-full bg-brand/g)?.length).toBeGreaterThanOrEqual(6);
   });
 
+  it("indexes itself, and every jump link lands on a real card", () => {
+    // Eleven cards is more than a reader should scroll past to find one.
+    // The nav and the cards read one INDEX, and this holds the two sides
+    // together: every href must name an id the page actually emits, and
+    // every card must be reachable from the index.
+    const hrefs = [...html.matchAll(/href="#([a-z0-9-]+)"/g)].map((m) => m[1]);
+    const ids = new Set([...html.matchAll(/<section id="([a-z0-9-]+)"/g)].map((m) => m[1]));
+    expect(hrefs.length).toBe(11);
+    expect(ids.size).toBe(11);
+    for (const h of hrefs) expect(ids.has(h), `#${h} has no card`).toBe(true);
+    for (const id of ids) expect(hrefs, `${id} is not in the index`).toContain(id);
+    expect(text).toContain("Jump to");
+  });
+
   it("makes the equity the plug, and says how far above the price it is", () => {
     // $20M price, $3M capital, 2% closing, 1% loan fee, $500k reserve, $13M
     // loan. The figure people carry is $20M − $13M = $7M; the cheque is

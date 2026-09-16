@@ -236,17 +236,47 @@ function Stat({
   );
 }
 
+/**
+ * The page's index, in the order the cards appear.
+ *
+ * One list, read twice: the jump nav renders from it, and each Card takes
+ * its `id` from it. A label here with no card is a link to nowhere — the
+ * accessibility lint fails an in-page link whose target id is missing, and
+ * the render test holds every href in this list up to the ids actually
+ * emitted, so the two cannot drift apart silently.
+ */
+const INDEX = [
+  { id: "size-the-loan", label: "Size the loan" },
+  { id: "the-loan-over-the-hold", label: "Over the hold" },
+  { id: "cash-flow-strip", label: "Cash flow" },
+  { id: "sources-and-uses", label: "Sources & uses" },
+  { id: "unit-mix", label: "Unit mix" },
+  { id: "the-waterfall", label: "LP / GP split" },
+  { id: "net-effective-rent", label: "Net effective rent" },
+  { id: "cap-rate-triangle", label: "Cap rate" },
+  { id: "rent-converter", label: "Rent, four ways" },
+  { id: "operating-expense", label: "One expense" },
+  { id: "build-or-buy", label: "Build or buy" },
+] as const;
+
 function Card({
+  id,
   eyebrow,
   title,
   children,
 }: {
+  id: string;
   eyebrow: string;
   title: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-line bg-white p-5 sm:p-6">
+    <section
+      id={id}
+      // The index links here, so leave room for the header rather than
+      // landing with the eyebrow under it.
+      className="scroll-mt-4 rounded-2xl border border-line bg-white p-5 sm:p-6"
+    >
       <p className="text-[11px] font-semibold uppercase tracking-widest text-brand">
         {eyebrow}
       </p>
@@ -292,7 +322,7 @@ function DebtSizer() {
   const binding = s.tests.find((t) => t.binding);
 
   return (
-    <Card eyebrow="Debt" title="Size the loan">
+    <Card id="size-the-loan" eyebrow="Debt" title="Size the loan">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Field label="Price" value={price} onChange={setPrice} placeholder="$20M" />
         <Field label="NOI" value={noi} onChange={setNoi} placeholder="1,200,000" />
@@ -438,7 +468,7 @@ function CapTriangle() {
   const perSf = per(shownPrice, num(sf));
 
   return (
-    <Card eyebrow="Value" title="Cap rate, price, NOI">
+    <Card id="cap-rate-triangle" eyebrow="Value" title="Cap rate, price, NOI">
       <p className="text-sm text-muted">Fill any two. The third solves.</p>
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Field label="NOI" value={noi} onChange={setNoi} placeholder="1,200,000" />
@@ -517,7 +547,7 @@ function BuildOrBuy() {
   const healthy = bps >= 0;
 
   return (
-    <Card eyebrow="Development" title="Build or buy">
+    <Card id="build-or-buy" eyebrow="Development" title="Build or buy">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Field label="Land" value={land} onChange={setLand} />
         <Field label="Hard cost" value={hard} onChange={setHard} />
@@ -619,7 +649,7 @@ function RentConverter() {
   ];
 
   return (
-    <Card eyebrow="Rent" title="One rent, four ways">
+    <Card id="rent-converter" eyebrow="Rent" title="One rent, four ways">
       <div className="flex flex-wrap gap-2">
         {BASES.map((b) => (
           <button
@@ -715,7 +745,7 @@ function CashFlowStrip() {
   const split = r.fromResidualPct;
 
   return (
-    <Card eyebrow="Returns" title="Paste a cash flow">
+    <Card id="cash-flow-strip" eyebrow="Returns" title="Paste a cash flow">
       <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <div>
           <label className="block">
@@ -900,7 +930,7 @@ function NetEffectiveRent() {
   const share = (n: number) => (gross > 0 ? Math.max(0, (n / gross) * 100) : 0);
 
   return (
-    <Card eyebrow="Leasing" title="What the lease is really worth">
+    <Card id="net-effective-rent" eyebrow="Leasing" title="What the lease is really worth">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
         <Field label="Term" suffix="mo" value={months} onChange={setMonths} placeholder="120" />
         <Field label="Starting rent" suffix="/SF" value={rent} onChange={setRent} placeholder="36" />
@@ -999,7 +1029,7 @@ function OpexTranslator() {
   const ratio = r.ratioPct;
 
   return (
-    <Card eyebrow="Operations" title="One expense, three ways">
+    <Card id="operating-expense" eyebrow="Operations" title="One expense, three ways">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Field label="Operating expenses" value={opex} onChange={setOpex} placeholder="504,000" />
         <Field label="Units" value={units} onChange={setUnits} placeholder="120" />
@@ -1080,7 +1110,7 @@ function SourcesUses() {
   const sourceTone = ["bg-sidebar", "bg-brand"];
 
   return (
-    <Card eyebrow="Capital" title="Sources and uses">
+    <Card id="sources-and-uses" eyebrow="Capital" title="Sources and uses">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
         <Field label="Price" value={price} onChange={setPrice} placeholder="$20M" />
         <Field label="Capital" value={capital} onChange={setCapital} placeholder="$3M" />
@@ -1178,7 +1208,7 @@ function UnitMix() {
   );
 
   return (
-    <Card eyebrow="Multifamily" title="Read the unit mix">
+    <Card id="unit-mix" eyebrow="Multifamily" title="Read the unit mix">
       <div className="grid gap-5 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
         <div>
           <label className="block">
@@ -1327,7 +1357,7 @@ function Waterfall() {
   const totalOut = w.lp.distributed + w.gp.distributed;
 
   return (
-    <Card eyebrow="Structure" title="Who actually gets the return">
+    <Card id="the-waterfall" eyebrow="Structure" title="Who actually gets the return">
       <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div>
           <label className="block">
@@ -1515,7 +1545,7 @@ function LoanOverTime() {
     r.verdict === "cash out" ? "text-pass" : r.verdict === "cash in" ? "text-kill" : "text-ink";
 
   return (
-    <Card eyebrow="Debt" title="What the loan does, and the refinance at the end">
+    <Card id="the-loan-over-the-hold" eyebrow="Debt" title="What the loan does, and the refinance at the end">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Field label="Loan" value={loan} onChange={setLoan} placeholder="$13M" />
         <Field label="Rate" suffix="%" value={rate} onChange={setRate} placeholder="6.5" />
@@ -1688,9 +1718,29 @@ function LoanOverTime() {
 export function DealMathTools() {
   return (
     <div className="space-y-6">
+      {/* The index. Eleven cards is more than a reader should have to
+          scroll past to find one, and a list of what is here is also the
+          honest answer to "what does this page do". */}
+      <nav aria-label="The calculators on this page" className="rounded-2xl border border-line bg-white p-4 sm:p-5">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-muted">
+            Jump to
+          </span>
+          {INDEX.map((x) => (
+            <a
+              key={x.id}
+              href={`#${x.id}`}
+              className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium transition-colors hover:border-brand hover:text-brand"
+            >
+              {x.label}
+            </a>
+          ))}
+        </div>
+      </nav>
+
       {/* "Send me that sizing" is the sentence this answers. Every field on
           the page writes itself into the query string (useShared), so the
-          link carries the whole state of all five calculators — and carries
+          link carries the whole state of every calculator — and carries
           only what was CHANGED, so an untouched page copies as a bare
           /tools rather than a paragraph of defaults. */}
       <div className="flex items-center justify-end">
