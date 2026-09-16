@@ -788,6 +788,18 @@ export default function Home() {
                 <StressBench />
               </div>
             </Reveal>
+            {/* The bench stresses one screened deal. /tools is the same
+                arithmetic with no deal behind it — the natural next click
+                for anyone who has just finished dragging these sliders. */}
+            <Reveal delay={160}>
+              <Link
+                href="/tools"
+                className="mt-6 inline-flex items-center gap-1.5 text-sm font-medium text-accent underline-offset-4 transition-colors hover:underline"
+              >
+                Size a loan, or run the cap rate math, on your own numbers
+                <span aria-hidden="true">→</span>
+              </Link>
+            </Reveal>
           </div>
         </section>
 
