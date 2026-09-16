@@ -623,8 +623,75 @@ export function compStats(comps: RecordComp[]): RecordCompsStats | undefined {
   return {
     count: comps.length,
     medianPrice: Math.round(median(prices)),
-    medianPerSqft: perSqft.length >= 3 ? Math.round(median(perSqft)) : null,
+    medianPerSqft: perSqft.length >= MEDIAN_FLOOR ? Math.round(median(perSqft)) : null,
     low: Math.min(...prices),
     high: Math.max(...prices),
   };
+}
+
+/**
+ * How many recorded sales it takes before the middle one means anything.
+ *
+ * THREE to say "median" at all. Below that there is no middle — with one
+ * sale the median IS that sale, and printing it under the word "median"
+ * dresses a single data point as a market. With two it is the average of
+ * the only two, which is the same problem wearing a hat.
+ *
+ * FIVE before the figure is quoted without a caveat. Between three and
+ * four a median exists but one unusual trade moves it, so the page keeps
+ * the number and says how thin it is rather than hiding it — an analyst
+ * who can see "three sales" can decide for themselves, and an analyst who
+ * is shown a bare median cannot.
+ *
+ * `medianPerSqft` has honoured the first floor since this shipped; the
+ * whole-price median did not, which is the inconsistency this names.
+ */
+export const MEDIAN_FLOOR = 3;
+export const CONFIDENT_FLOOR = 5;
+
+/** What a comp set is strong enough to support. */
+export type CompEvidence = "none" | "individual" | "thin" | "usable";
+
+export function compEvidence(count: number): CompEvidence {
+  if (count <= 0) return "none";
+  if (count < MEDIAN_FLOOR) return "individual";
+  if (count < CONFIDENT_FLOOR) return "thin";
+  return "usable";
+}
+
+/**
+ * What to call the middle figure, given how many sales are behind it.
+ *
+ * Below the floor the honest word is not "median": one sale is "the one
+ * recorded sale", two are "the two recorded sales, averaged". Naming the
+ * statistic correctly is the whole fix — the number itself is fine to
+ * show, and hiding it would throw away the only evidence there is.
+ */
+export function medianLabel(count: number): string {
+  if (count === 1) return "the one recorded sale";
+  if (count === 2) return "midpoint of the two";
+  return "median";
+}
+
+/** "1 recorded sale" / "4 recorded sales" — the count, said correctly. */
+export function salesPhrase(count: number): string {
+  return `${count} recorded ${count === 1 ? "sale" : "sales"}`;
+}
+
+/**
+ * The sentence that qualifies a thin comp set, or "" when there is nothing
+ * to qualify. The zero case already has its own sentence on the page; this
+ * covers the cases that currently print with no caveat at all.
+ */
+export function evidenceNote(count: number): string {
+  switch (compEvidence(count)) {
+    case "individual":
+      return count === 1
+        ? "One sale is a data point, not a market — treat this as a sighting, not a comparable set."
+        : "Two sales cannot establish a middle. Treat these as sightings, not a comparable set.";
+    case "thin":
+      return `Only ${count} sales behind that figure, so one unusual trade moves it. Thin comp evidence is itself a finding.`;
+    default:
+      return "";
+  }
 }

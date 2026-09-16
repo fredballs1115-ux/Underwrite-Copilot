@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-16",
+      "title": "One recorded sale is no longer called a median",
+      "blurb": "The public-records comps readout printed “1 recorded sales — median $400,000 · range $400,000–$400,000” and then a confident percentage against it. One sale is a data point, not a market. The figure still shows — it is the only evidence there is — but it is named correctly, the range is dropped where there is nothing to range over, and the above/below call is withheld until there are enough sales to have a middle.",
+      "href": "/comps"
+    },
+    {
+      "date": "2026-09-16",
       "title": "The market photographs are actually visible now",
       "blurb": "Fifteen skylines shipped this morning and then rendered at about an eighth of their strength, under a wash nobody had measured. The picture now draws at full strength and the scrim does the work — dark under the words at the bottom of a band, clearing until the city is most of what you see. The contrast is computed against a pure white frame, the worst photograph a market could have, so it can never quietly slide back.",
       "href": "/why"

@@ -36,9 +36,36 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and twenty-seven PRs, #176–#302, each
+estimate, and that's what it should flag." A hundred and twenty-eight PRs, #176–#303, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
+
+- **#303 One recorded sale is not a median.** The public-records comps
+  readout printed, verbatim, "1 recorded sales — median $400,000 · range
+  $400,000–$400,000" and then "This deal is 43% above the recorded median."
+  Every figure in that line is arithmetically correct and the sentence as a
+  whole is not true: one sale has no middle, no range, and nothing to be
+  above.
+
+  The tell was already in the file. `medianPerSqft` has refused to compute
+  below three observations since it shipped — the author clearly believed in
+  a floor — and the whole-price median never honoured the same one.
+
+  So the floor is now named and shared. `compEvidence` grades a set:
+  `individual` below three, `thin` below five, `usable` above. Below the
+  floor the word "median" is not used (one sale is "the one recorded sale",
+  two are the "midpoint of the two"), the range is dropped where there is
+  nothing to range over, and the above/below CALL is withheld entirely —
+  that sentence is the most confident-sounding and least supported thing
+  this page can print. Between three and four the median prints with its
+  count attached, and a line under it says one unusual trade moves it.
+
+  The figure itself is never hidden. Hiding would be the wrong fix: a single
+  recorded sale is the only evidence there is, and an analyst who can see it
+  decides for themselves — which is the same reasoning behind the page's
+  existing "thin comp evidence is itself a finding" line for zero sales.
+
+  Also fixed: "1 recorded sales" now says "1 recorded sale."
 
 - **#302 The photographs, actually visible — and /tools reading what you
   type.** Two defects in what shipped that morning, both found by looking at

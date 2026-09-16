@@ -9,6 +9,10 @@ import { fmtMiles, kmToMiles } from "@/lib/geo";
 import {
   COVERAGE_DISCOVERY,
   COVERAGE_SUMMARY,
+  compEvidence,
+  evidenceNote,
+  medianLabel,
+  salesPhrase,
   type RecordCompsResult,
 } from "@/lib/public-comps/core";
 
@@ -80,15 +84,22 @@ export function CompsResultView({
   // sales would read "20,000% above market" — suppress outside a plausible
   // band instead of rendering a meaningless verdict.
   const ratio = subjectPrice && s.medianPrice > 0 ? subjectPrice / s.medianPrice : null;
-  const vsMedian =
-    ratio !== null && ratio >= 0.25 && ratio <= 4 ? Math.round((ratio - 1) * 100) : null;
-  const scaleMismatch = ratio !== null && vsMedian === null;
+  const inBand = ratio !== null && ratio >= 0.25 && ratio <= 4;
+  // …and it is a CALL, not a figure. A call needs a middle to be measured
+  // against, so below the floor it is withheld even when the arithmetic
+  // would happily produce a percentage: "43% above the recorded median" off
+  // a single sale is the most confident-sounding and least supported
+  // sentence this page can print.
+  const enough = compEvidence(s.count) !== "individual";
+  const vsMedian = inBand && enough ? Math.round((ratio - 1) * 100) : null;
+  const scaleMismatch = ratio !== null && !inBand;
+  const note = evidenceNote(s.count);
 
   return (
     <>
       <p className="mt-2 text-sm leading-relaxed">
-        <span className="font-semibold">{s.count} recorded sales</span>{" "}
-        <span className="text-muted">{scope}</span> — median{" "}
+        <span className="font-semibold">{salesPhrase(s.count)}</span>{" "}
+        <span className="text-muted">{scope}</span> — {medianLabel(s.count)}{" "}
         <span className="font-mono font-semibold tabular-nums">{fmtMoney(s.medianPrice)}</span>
         {s.medianPerSqft && (
           <>
@@ -96,10 +107,14 @@ export function CompsResultView({
             <span className="font-mono tabular-nums">${s.medianPerSqft}/SF</span>
           </>
         )}
-        {" · range "}
-        <span className="font-mono tabular-nums">
-          {fmtMoney(s.low)}–{fmtMoney(s.high)}
-        </span>
+        {s.count > 1 && (
+          <>
+            {" · range "}
+            <span className="font-mono tabular-nums">
+              {fmtMoney(s.low)}–{fmtMoney(s.high)}
+            </span>
+          </>
+        )}
         {vsMedian !== null && (
           <>
             {". "}
@@ -107,7 +122,8 @@ export function CompsResultView({
               className={vsMedian > 10 ? "text-kill" : vsMedian < -10 ? "text-pass" : "text-muted"}
             >
               This deal is {Math.abs(vsMedian)}% {vsMedian >= 0 ? "above" : "below"} the
-              recorded median.
+              recorded {medianLabel(s.count)}
+              {compEvidence(s.count) === "thin" ? `, on ${s.count} sales` : ""}.
             </span>
           </>
         )}
@@ -121,6 +137,10 @@ export function CompsResultView({
           </>
         )}
       </p>
+
+      {note && (
+        <p className="mt-1.5 text-xs leading-relaxed text-caution">{note}</p>
+      )}
 
       <div className="mt-3 overflow-x-auto">
         <table className="w-full min-w-[560px] text-left text-sm">
