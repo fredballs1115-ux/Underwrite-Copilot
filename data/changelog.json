@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-16",
+      "title": "Who actually gets the return",
+      "blurb": "The property's IRR is not anybody's IRR, and that is the one calculation a deal page structurally cannot show — it depends on a term sheet, not on the building. Paste the deal's cash into /tools with the LP/GP equity split, the pref and the promote tiers, and it runs the waterfall period by period: the seeded deal makes 14.1%, the LP keeps 13.3% and the GP takes 20.6%. Under the three figures, every dollar distributed is drawn as a bar per tier, LP share against GP share, so you can see where the gap went. The promote is named as what it actually is — what the GP took ABOVE its pro-rata share of the equity, because a GP co-investing 10% is entitled to 10% of everything before it has promoted anything.",
+      "href": "/tools"
+    },
+    {
+      "date": "2026-09-16",
       "title": "What the loan does over the hold, and the refinance at the end",
       "blurb": "A payment tells you nothing about what you still owe. $13M at 6.5% over thirty years, held ten, leaves $11.02M at the balloon — a third of the schedule has run and 85% of the loan is still there. /tools now draws every year's debt service split into interest and principal, so the widening principal sliver shows what amortisation actually is: equity, paid in instalments and returned at sale, not a cost. Set an interest-only period and the balloon gets BIGGER rather than the early payments merely getting smaller, which is the market convention and the opposite of how deferral sounds. Under it the balloon feeds a take-out test sized on the same three lender tests as any loan — cash out, covers it, or the cash-in refinance nobody plans for, with the NOI that would clear it.",
       "href": "/tools"
@@ -78,12 +84,6 @@
       "title": "Every public page opens on a real place",
       "blurb": "The homepage's hero, the argument on /why and the sample screen on /demo each open on a real photograph of a covered downtown — Midtown Manhattan, Washington, and Center City Philadelphia, the sample deal's own city — public-domain USGS frames under a scrim, credited in the corner.",
       "href": "/why"
-    },
-    {
-      "date": "2026-09-14",
-      "title": "A real photograph behind the homepage's headline",
-      "blurb": "Midtown Manhattan from above — a public-domain USGS frame, the same source as the coverage gallery — now stands behind the hero, under a scrim that keeps the type readable, with its credit in the corner. Four slots wait for ground-level photographs (a team on deal day, a site walk, the building itself, a hero of your own) and show nothing until the files exist — never a placeholder.",
-      "href": "/"
     }
   ]
 }

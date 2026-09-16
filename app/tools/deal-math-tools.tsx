@@ -5,6 +5,7 @@ import { readFigure } from "@/lib/money";
 import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
 import { readDebt, testRefi } from "@/lib/tools/debt-math";
 import { readLease, readOpex } from "@/lib/tools/lease-math";
+import { runWaterfall } from "@/lib/tools/waterfall-math";
 import {
   breakEvenOccupancyPct,
   capRatePct,
@@ -1034,7 +1035,174 @@ function OpexTranslator() {
   );
 }
 
-// ── 8. what the loan does over the hold, and the refinance at the end ──────
+// ── 8. the LP / GP split ───────────────────────────────────────────────────
+
+/**
+ * The property's IRR is not anybody's IRR.
+ *
+ * This is the calculation a deal page structurally cannot show, because it
+ * depends on a term sheet rather than on the building. A deal at 16% with an
+ * 8% pref and a 20% promote pays the LP nearer 14% and the GP nearer 30%,
+ * and which of those is "the return" depends on which side of the table you
+ * sit. An analyst who cannot run it here builds it in Excel, every time.
+ *
+ * It reads the SAME pasted strip as the cash-flow card above — the deal's
+ * cash is the deal's cash — so the two answer the same column from two
+ * different seats.
+ */
+function Waterfall() {
+  const [raw, setRaw] = useShared(
+    "wcf",
+    "-10,000,000\n400,000\n500,000\n600,000\n15,000,000",
+  );
+  const [lpPct, setLpPct] = useShared("lp", "90");
+  const [pref, setPref] = useShared("pref", "8");
+  const [h1, setH1] = useShared("h1", "12");
+  const [s1, setS1] = useShared("s1", "80");
+  const [h2, setH2] = useShared("h2", "18");
+  const [s2, setS2] = useShared("s2", "70");
+
+  const read = useMemo(() => readStrip(raw), [raw]);
+  const w = useMemo(
+    () =>
+      runWaterfall({
+        cashFlows: read.values,
+        lpEquityPct: num(lpPct),
+        prefPct: num(pref),
+        tiers: [
+          { hurdlePct: num(h1) ?? NaN, lpSharePct: num(s1) ?? NaN },
+          { hurdlePct: num(h2) ?? NaN, lpSharePct: num(s2) ?? NaN },
+        ].filter((t) => Number.isFinite(t.hurdlePct) && Number.isFinite(t.lpSharePct)),
+      }),
+    [read.values, lpPct, pref, h1, s1, h2, s2],
+  );
+
+  const totalOut = w.lp.distributed + w.gp.distributed;
+
+  return (
+    <Card eyebrow="Structure" title="Who actually gets the return">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+        <div>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
+              The deal&apos;s cash — year 0 first
+            </span>
+            <textarea
+              value={raw}
+              onChange={(e) => setRaw(e.target.value)}
+              rows={6}
+              spellCheck={false}
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-sm tabular-nums outline-none transition-colors focus:border-brand"
+            />
+          </label>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <Field label="LP equity" suffix="%" value={lpPct} onChange={setLpPct} placeholder="90" />
+            <Field label="Pref" suffix="%" value={pref} onChange={setPref} placeholder="8" />
+            <Field label="Hurdle 1" suffix="%" value={h1} onChange={setH1} placeholder="12" />
+            <Field label="LP above it" suffix="%" value={s1} onChange={setS1} placeholder="80" />
+            <Field label="Hurdle 2" suffix="%" value={h2} onChange={setH2} placeholder="18" />
+            <Field label="LP above it" suffix="%" value={s2} onChange={setS2} placeholder="70" />
+          </div>
+        </div>
+
+        <div>
+          {w.dealIrrPct !== null && (
+            <>
+              {/* The three IRRs side by side is the whole argument: one
+                  property, three different answers. */}
+              <div className="grid grid-cols-3 gap-4">
+                <Stat label="The property" value={pct(w.dealIrrPct, 1)} tone="muted" />
+                <Stat label="The LP gets" value={pct(w.lp.irrPct, 1)} />
+                <Stat label="The GP gets" value={pct(w.gp.irrPct, 1)} tone="brand" />
+              </div>
+
+              {totalOut > 0 && (
+                <div className="mt-5">
+                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
+                    Every dollar back, by tier
+                  </p>
+                  <div className="space-y-2">
+                    {w.byTier.map((t) => (
+                      <div key={t.label}>
+                        <div className="flex items-baseline justify-between gap-3 text-sm">
+                          <span className="text-muted">{t.label}</span>
+                          <span className="font-mono tabular-nums">{usd(t.total)}</span>
+                        </div>
+                        <div className="mt-1 flex h-2 w-full overflow-hidden rounded-full bg-faint">
+                          <div
+                            data-bar="tier-lp"
+                            className="h-full bg-brand"
+                            style={{ width: `${(t.toLp / totalOut) * 100}%` }}
+                          />
+                          <div
+                            data-bar="tier-gp"
+                            className="h-full bg-sidebar"
+                            style={{ width: `${(t.toGp / totalOut) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted">
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block h-2.5 w-2.5 rounded-sm bg-brand" />
+                      To the LP
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block h-2.5 w-2.5 rounded-sm bg-sidebar" />
+                      To the GP
+                    </span>
+                    <span>Each bar is its tier&apos;s share of everything distributed.</span>
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <Stat label="LP multiple" value={mult(w.lp.multiple)} />
+                <Stat label="GP multiple" value={mult(w.gp.multiple)} />
+                <Stat label="The promote" value={usd(w.promote)} tone="brand" />
+                <Stat label="LP gives up" value={`${Math.abs(w.lpDragPts ?? 0).toFixed(1)} pts`} tone="muted" />
+              </div>
+
+              <p className="mt-4 text-sm text-muted">
+                {w.promote > 0 ? (
+                  <>
+                    The GP put in {usd(w.gp.contributed)} and takes {usd(w.gp.distributed)} —{" "}
+                    <span className="font-semibold text-ink">{usd(w.promote)}</span> of that is
+                    promote, above its share of the equity
+                    {w.promoteSharePct !== null && <> and {pct(w.promoteSharePct, 0)} of the deal&apos;s profit</>}
+                    .
+                  </>
+                ) : (
+                  <>
+                    The deal never clears the {trimPct(pref)}% pref, so there is no promote — the
+                    GP takes its share of the equity and nothing more.
+                  </>
+                )}
+              </p>
+            </>
+          )}
+
+          {w.note && <p className="mt-2 text-sm text-caution">{w.note}</p>}
+          {read.skipped.length > 0 && (
+            <p className="mt-2 text-xs text-caution">
+              Ignored: {read.skipped.slice(0, 4).join(", ")}
+              {read.skipped.length > 4 ? ` and ${read.skipped.length - 4} more` : ""}.
+            </p>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/** A percent the user typed, shown back without its trailing zeroes. */
+const trimPct = (raw: string) => {
+  const n = num(raw);
+  return n === null ? raw : String(n);
+};
+
+// ── 9. what the loan does over the hold, and the refinance at the end ──────
 
 /**
  * These two read as one question, so they share a card and the schedule's
@@ -1287,6 +1455,7 @@ export function DealMathTools() {
       <DebtSizer />
       <LoanOverTime />
       <CashFlowStrip />
+      <Waterfall />
       <NetEffectiveRent />
       <div className="grid gap-6 lg:grid-cols-2">
         <CapTriangle />

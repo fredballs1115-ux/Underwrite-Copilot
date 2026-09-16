@@ -1100,6 +1100,33 @@ describe("the deal math tools", () => {
     expect(html.match(/rounded-full bg-brand/g)?.length).toBeGreaterThanOrEqual(6);
   });
 
+  it("says the property's IRR is not anybody's IRR", () => {
+    // One property, three answers: the deal makes 14.1%, the LP keeps 13.3%
+    // and the GP takes 20.6%. That row IS the card — everything under it
+    // explains where the gap went.
+    expect(text).toContain("Who actually gets the return");
+    expect(text).toContain("14.1%");
+    expect(text).toContain("13.3%");
+    expect(text).toContain("20.6%");
+    expect(text).toContain("1.61x");
+    expect(text).toContain("2.05x");
+    // The promote, named as what the GP took above its share of the equity.
+    expect(text).toContain("$400,565");
+    expect(text).toContain("above its share of the equity");
+    expect(text).toContain("0.8 pts");
+  });
+
+  it("draws every dollar back, split by tier", () => {
+    // Three tiers reached on the seeded deal — the pref, 80/20 to 12%, and
+    // 70/30 climbing toward 18% where the cash runs out.
+    expect(text).toContain("Preferred return, 8%");
+    expect(text).toContain("To 12% — 80/20");
+    expect(text).toContain("To 18% — 70/30");
+    // Each tier draws two segments, LP then GP.
+    expect((html.match(/data-bar="tier-lp"/g) ?? []).length).toBe(3);
+    expect((html.match(/data-bar="tier-gp"/g) ?? []).length).toBe(3);
+  });
+
   it("runs the loan over the hold and draws each year's split", () => {
     // $13M at 6.5% over 30 years, held 10: a $986,026 payment, and $11.02M
     // STILL OWED at the balloon. The point of the card is that a third of
