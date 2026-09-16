@@ -5,8 +5,9 @@ Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 
 ## 🟢 2026-09-16, later — `/tools` becomes the reason not to open Excel
 
-Nine more PRs, #307–#315, all on `/tools` or its shop window, all proven
-live by the round markers. Sixteen calculations there now, and they cover the arithmetic an
+Ten more PRs, #307–#316, nine on `/tools` or its shop window and one on
+the photographs, all proven live by the round markers. Sixteen
+calculations there now, and they cover the arithmetic an
 acquisitions analyst does between opening a memorandum and sending a
 letter:
 
@@ -52,16 +53,21 @@ Seven PRs, #300–#306. Two of them (#300, #301) are the thing you asked
 for; #302 is the one that made it actually *look* like it.
 
 **The market pictures are photographs of the place, not of roofs.**
-Fifteen of the eighteen covered markets draw a real skyline photograph
+Sixteen of the eighteen covered markets draw a real skyline photograph
 instead of an overhead frame: Washington on the National Mall, Baltimore
 on its skyline, Miami on Brickell, Philadelphia on the Schuylkill River,
 and so on. Each names its photographer *and* its licence beside it — CC
 BY requires the licence link, not just the name — and every filename,
 author and licence was read back from Wikimedia Commons by the deploy
-probe rather than written from memory. Prince George's County,
-Montgomery County and Northern Virginia deliberately keep their
-overhead: a suburban submarket does not have a skyline, and the overhead
-is the more honest picture of a place shaped by its land.
+probe rather than written from memory.
+
+Northern Virginia joined them on 2026-09-16 (#316), on Rosslyn seen from
+Georgetown. It had been keeping an overhead on the rule that a suburban
+submarket has no skyline — but Rosslyn is a real high-rise cluster, zoned
+tall precisely because it stands across the Potomac from a height-limited
+Washington, so the aerial was answering a question nobody asked. Prince
+George's County and Montgomery County still keep theirs, and should: a
+place shaped by its land is photographed from above.
 
 **They were rendering at an eighth of their strength until #302.** Worth
 recording plainly, because the earlier note in this file said the

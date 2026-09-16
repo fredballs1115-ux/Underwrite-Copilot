@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-16",
+      "title": "Northern Virginia gets its skyline",
+      "blurb": "Every covered market shows a real photograph rather than a satellite frame, with one holdout: NoVA was still on an overhead, on the rule that a suburban submarket has no skyline worth showing. Rosslyn is the exception that proves it — a genuine high-rise cluster, zoned tall precisely because it stands across the Potomac from a height-limited Washington. So the brief now opens on Rosslyn seen from Georgetown, the frame an Arlington broker would put on a cover. PG County and Montgomery County keep their overheads, because there the land really is the story.",
+      "href": "/market?metro=nova"
+    },
+    {
+      "date": "2026-09-16",
       "title": "Depreciation, and what the sale takes back",
       "blurb": "The calculation people most reliably leave a screening tool for, with the three errors that cost the most money. Land is never depreciable, so the basis on a $20M building that is a quarter dirt is $15M — and that writes off enough to turn $1.2M of NOI into a $190,455 paper loss. The gain at the sale then has THREE rates, not one: what you depreciated on the building comes back at 25%, anything a cost segregation study carved out comes back at your ordinary rate, and only the appreciation over the original price is capital gain. Running the whole thing at 20% says $2.29M; the real bill is $2.56M. And the headline the card exists for: depreciation is a TIMING benefit. Shelter at one rate and recapture at the same rate and it nets to exactly nothing. Which is also why cost segregation is not a free lunch — it lifts year-one depreciation four and a half times and, in raw dollars, leaves this deal $130,909 worse off. It wins on getting the money early, not on the total, and a tool that showed only the year-one number would tell you the opposite.",
       "href": "/tools"
@@ -78,12 +84,6 @@
       "title": "Paste a cash flow, get the IRR — and where it came from",
       "blurb": "The most common reason an analyst leaves a screening tool mid-call is to paste a column of numbers into Excel and read the IRR off the bottom. /tools now takes that column — tabs, line breaks, (1,200), $1.2M, all of it — and answers with the rate, the multiple, the profit and the payback inside the year. Then the figure nothing else here computes: how much of the return is the sale rather than the operations. A 17% that is three-quarters residual and a 17% that is a quarter are different deals wearing the same number.",
       "href": "/tools"
-    },
-    {
-      "date": "2026-09-16",
-      "title": "One recorded sale is no longer called a median",
-      "blurb": "The public-records comps readout printed “1 recorded sales — median $400,000 · range $400,000–$400,000” and then a confident percentage against it. One sale is a data point, not a market. The figure still shows — it is the only evidence there is — but it is named correctly, the range is dropped where there is nothing to range over, and the above/below call is withheld until there are enough sales to have a middle.",
-      "href": "/comps"
     }
   ]
 }

@@ -152,9 +152,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   value (leave it out and every file fails the type test as `undefined`),
   Commons treats `_` and a space as the same character so the two APIs
   return the same file under two spellings, and an un-paced sweep collects
-  429s that read as an empty shelf. PG County, Montgomery County and NoVA
+  429s that read as an empty shelf. PG County and Montgomery County
   are deliberately absent: a suburban submarket has no skyline, and the
-  overhead is the more honest picture of a place shaped by its land.
+  overhead is the more honest picture of a place shaped by its land. **NoVA
+  is the exception** (added 2026-09-16, from the runner's own search):
+  Rosslyn is a real high-rise cluster, zoned tall because it stands across
+  the Potomac from a height-limited Washington, so there is a skyline to
+  photograph and an aerial was answering a question nobody asked.
 - Deal math without a deal: `lib/tools/deal-math.ts` (pure — the cap rate
   triangle, the mortgage constant, `sizeLoan` against whichever of LTV /
   DSCR / debt yield were set with the **binding one named**, break-even
