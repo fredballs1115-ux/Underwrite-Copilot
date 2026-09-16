@@ -1406,13 +1406,16 @@ function Proration() {
           <div className="space-y-2">
             {r.lines.map((l) => (
               <div key={l.label}>
+                {/* The label and the figure on one line, the note beneath.
+                    Truncating them onto a single line loses the note at
+                    phone width — and the note is the part that teaches: it
+                    says WHY the money moves, which is the whole point of a
+                    card about a payment people send the wrong way. */}
                 <div className="flex items-baseline justify-between gap-3 text-sm">
-                  <span className="truncate">
-                    <span className="font-medium">{l.label}</span>{" "}
-                    <span className="text-muted">· {l.note}</span>
-                  </span>
+                  <span className="font-medium">{l.label}</span>
                   <span className="shrink-0 font-mono tabular-nums">{usdExact(l.amount)}</span>
                 </div>
+                <p className="text-xs text-muted">{l.note}</p>
                 {/* One track, a centre line, and the bar on the side the
                     money actually moves to. */}
                 <div className="mt-1 flex h-2.5 items-stretch overflow-hidden rounded-full bg-faint">
