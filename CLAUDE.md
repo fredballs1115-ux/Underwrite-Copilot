@@ -164,9 +164,16 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   is what a person types, while `lib/underwrite/engine.ts` keeps decimals
   to match how Excel stores a percent cell — the two never meet inside one
   function; and a blank is null, so an unset lender test is dropped rather
-  than sized at nothing. `/tools` and `/market` are the two public pages
-  that also serve signed-in visitors; both draw their chrome from
-  `app/public-shell.tsx`, never their own copy.
+  than sized at nothing. Every field there reads through `readFigure`
+  (`lib/money.ts`), which takes the shorthand an analyst types — `$20M`,
+  `500k`, `1.2mm`, `6.5%`, `1.25x`, and a negative, because `sizeLoan`
+  has a deliberate answer for a negative NOI. It shares ONE suffix table
+  with `parseUsd` but keeps its own rules: no floor (the same page holds
+  a $36 rent and a $20M price) and no sign rule, and it is strict about
+  the whole string where `parseUsd` is loose (a field's contents are the
+  figure; a pasted line is not). `/tools` and `/market` are the two
+  public pages that also serve signed-in visitors; both draw their chrome
+  from `app/public-shell.tsx`, never their own copy.
 - The homepage's photographs: `lib/photos.ts` (pure — the four slots with
   their file names, briefs, sizes and alt text; `presentPhotos` over an
   `exists` callback; `stripPhotos`; `HERO_AERIAL`) and `lib/photos-fs.ts`
@@ -183,7 +190,22 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   on its own metro (a rounded band inside the page's column). A new public page opens the same way — pick the
   covered market that means something to it. The sandbox cannot fetch a
   photograph from any image host; the ground-level files are the
-  operator's move.
+  operator's move. **The scrim is the design, and it is measured.** The
+  picture draws at full strength and `PhotoScrim` does all the work:
+  `"band"` runs bottom to top (opaque under the words the band sets at
+  its bottom, clearing until the photograph is ~80% of the frame across
+  the top — the right crop for files that are all panoramas), `"center"`
+  a plateau down the middle from `lg` with both margins clear, for the
+  sign-in card. Words go inside `on-photo band-words` (globals.css: a
+  dark halo, a 36rem measure). `lib/place-band.contrast.test.ts` reads
+  the gradient stops back out of the component and recomputes white
+  against a PURE WHITE frame — the worst photograph a market could have
+  — so a lightened scrim fails rather than quietly shipping; the first
+  version rendered the image at `opacity-30` under a gradient still 55%
+  opaque, i.e. an eighth of the picture, and nothing caught it. A tier
+  like `text-white/75` reads at 10:1 on a flat teal band and far less on
+  the same band with a photograph behind it, so every tier a band uses is
+  measured too.
 - The News page's live layer: `lib/news/feeds.ts` (pure: the sources with
   their fallbacks, parsing, ranking) and `lib/news/live.ts` (the network:
   a fresh copy per process, a wall-clock deadline per source, the

@@ -25,16 +25,16 @@ export const metadata: Metadata = {
 export default function ToolsPage() {
   return (
     <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-2xl text-white">
-        <PlaceBackdrop metro="chicago" height={420} opacity="opacity-40" />
-        <div className="relative px-6 py-10 sm:px-10 sm:py-12">
+      <section className="relative flex min-h-[15rem] items-end overflow-hidden rounded-2xl text-white sm:min-h-[18rem]">
+        <PlaceBackdrop metro="chicago" height={420} />
+        <div className="on-photo band-words relative w-full px-6 pb-8 pt-12 sm:px-10 sm:pb-10 sm:pt-16">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-accent">
             Deal math
           </p>
-          <h1 className="mt-2 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
             The numbers, before the deal
           </h1>
-          <p className="mt-3 max-w-xl text-sm text-white/75">
+          <p className="mt-3 text-sm text-white">
             Runs in your browser. Nothing is sent anywhere, nothing is stored.
           </p>
         </div>

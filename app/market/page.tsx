@@ -603,12 +603,12 @@ async function MetroExplorer({ selected }: { selected?: string }) {
       </div>
 
       <div className="mt-4 space-y-4">
-        {/* The brief opens on the market itself, from above — the same
-            USGS frame the homepage gallery draws for it (app/place-band);
-            a metro with no frame keeps the flat band. */}
-        <div className="band-dark relative overflow-hidden rounded-2xl text-white">
-          <PlaceBackdrop metro={active.id} height={480} opacity="opacity-35" />
-          <div className="relative px-5 py-7 sm:px-6 sm:py-9">
+        {/* The brief opens on the market itself — its own skyline where one
+            is verified, its USGS frame otherwise (app/place-band); a metro
+            with neither keeps the flat band. */}
+        <div className="band-dark relative flex min-h-[13rem] items-end overflow-hidden rounded-2xl text-white sm:min-h-[16rem]">
+          <PlaceBackdrop metro={active.id} height={480} />
+          <div className="on-photo band-words relative w-full px-5 pb-6 pt-10 sm:px-6 sm:pb-7 sm:pt-12">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-accent">
               {(active as { region?: string }).region ?? "More markets"}
             </p>

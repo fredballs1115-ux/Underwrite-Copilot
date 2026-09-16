@@ -33,7 +33,7 @@ export function CityPhoto({
   width,
   height,
   className,
-  creditClassName = "absolute bottom-3 right-4 z-10 text-[10px] text-white/50",
+  creditClassName = "absolute bottom-3 right-4 z-10 text-[10px] text-white/75",
   alt,
   eager = false,
   showCredit = true,

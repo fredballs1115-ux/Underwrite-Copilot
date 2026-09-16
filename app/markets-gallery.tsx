@@ -3,7 +3,7 @@ import metrosSeed from "@/data/research/metros.json";
 import { METRO_VIEWS } from "@/lib/metro-imagery";
 import { MARKET_COUNT, metroFact } from "./markets-marquee";
 import { CityPhoto } from "./city-photo";
-import { skylineFor } from "@/lib/skyline";
+import { galleryCredit, hasSkyline } from "@/lib/skyline";
 
 // Server-component module only: it pulls a research seed JSON, which must
 // never ride into a client bundle.
@@ -39,16 +39,11 @@ export function MarketsGallery() {
     // the marquee rather than show a hole.
     .filter((m) => m.place !== null);
 
-  // Every photographer whose work is in this grid, named once and in the
-  // grid's own order, with duplicates collapsed (one photographer can hold
-  // two markets).
-  const photographers = [
-    ...new Set(
-      items
-        .map((m) => skylineFor(m.id)?.credit)
-        .filter((c): c is string => Boolean(c) && c !== "unknown"),
-    ),
-  ];
+  // The one attribution line this grid owes, built from the table itself
+  // (lib/skyline) so a market added or a photograph swapped can never leave
+  // a photographer's name behind on the page.
+  const credit = galleryCredit(items.map((m) => m.id));
+  const anyOverhead = items.some((m) => !hasSkyline(m.id));
 
   if (!items.length) return null;
 
@@ -56,10 +51,10 @@ export function MarketsGallery() {
     <section className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
       <p className="text-xs font-medium uppercase tracking-wider text-muted">Coverage</p>
       <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
-        The {MARKET_COUNT} covered markets, from above.
+        The {MARKET_COUNT} covered markets.
       </h2>
       <p className="mt-2 max-w-2xl text-sm text-muted">
-        Real aerials of the districts behind the benchmarks — tap one for its brief.
+        The skyline behind each set of benchmarks — tap one for its brief.
       </p>
 
       <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -95,19 +90,18 @@ export function MarketsGallery() {
 
       {/* One credit line for the whole grid rather than eighteen captions.
           Each Creative Commons photograph obliges us to name its
-          photographer; naming them together under the grid discharges that
-          and keeps the tiles clean, which is how every publication that
-          runs a photo grid handles it. The USGS line stays because a market
-          without a verified photograph still shows its overhead frame. */}
+          photographer AND its licence; naming them together under the grid
+          discharges both and keeps the tiles clean, which is how every
+          publication that runs a photo grid handles it. The USGS line stays
+          only while some market still shows its overhead frame. */}
       <p className="mt-4 text-[11px] leading-relaxed text-muted">
-        {photographers.length > 0 ? (
+        {credit ? <>{credit} </> : null}
+        {anyOverhead ? (
           <>
-            Skyline photographs: {photographers.join(", ")} (Wikimedia Commons,
-            under their respective licences).{" "}
+            Overhead frames: USGS The National Map (public domain), each centred
+            on that market&apos;s business district.
           </>
         ) : null}
-        Overhead frames: USGS The National Map (public domain), each centred on
-        that market&apos;s business district.
       </p>
     </section>
   );

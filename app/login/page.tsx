@@ -36,16 +36,17 @@ export default async function LoginPage({
   const linkBanner = authLinkBanner(params);
   return (
     <div className="band-dark relative flex flex-1 flex-col overflow-hidden">
-      {/* The door opens on a real place too: Baltimore's Inner Harbor, a
-          covered market a few miles from the DMV core (app/place-band). */}
-      <PlaceBackdrop metro="baltimore" height={900} opacity="opacity-25" />
+      {/* The door opens on a real place too: Baltimore, a covered market a
+          few miles from the DMV core. The centred scrim leaves the harbour
+          showing on either side of the card (app/place-band). */}
+      <PlaceBackdrop metro="baltimore" height={900} scrim="center" />
       <main id="main" className="relative mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16">
         <Link
           href="/"
           className="flex items-center justify-center gap-2.5 transition-opacity hover:opacity-80"
         >
           <LogoMark className="h-8 w-8" />
-          <span className="font-semibold tracking-tight text-white">
+          <span className="on-photo font-semibold tracking-tight text-white">
             Underwrite Copilot
           </span>
         </Link>
@@ -80,7 +81,7 @@ export default async function LoginPage({
 
         {/* The login wall is a doorway, not a dead end — the public research
             surfaces stay one tap away for a prospect who isn't ready. */}
-        <p className="mt-6 text-center text-xs leading-relaxed text-white/60">
+        <p className="on-photo mt-6 text-center text-xs leading-relaxed text-white/75">
           Not ready to sign in? Browse the{" "}
           <Link
             href="/market"
@@ -97,7 +98,7 @@ export default async function LoginPage({
           </Link>{" "}
           — no account needed.
         </p>
-        <p className="mt-3 text-center text-xs leading-relaxed text-white/50">
+        <p className="on-photo mt-3 text-center text-xs leading-relaxed text-white/70">
           First-pass screen, not investment advice.
         </p>
       </main>
