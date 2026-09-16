@@ -986,6 +986,7 @@ describe("News scored feed", () => {
 // this doubles as a check that the seeded numbers actually compute rather
 // than showing a page of em dashes.
 import { DealMathTools } from "@/app/tools/deal-math-tools";
+import { TOOL_INDEX } from "@/lib/tools/catalog";
 
 describe("the deal math tools", () => {
   const html = render(React.createElement(DealMathTools));
@@ -1096,19 +1097,31 @@ describe("the deal math tools", () => {
     // A deal that is mostly its exit says so in words too.
     expect(text).toContain("the cap you sell at is the argument");
     // Every year is drawn from a centre line: six rows, the first negative.
-    expect(html.match(/rounded-full bg-kill/g)?.length).toBe(1);
-    expect(html.match(/rounded-full bg-brand/g)?.length).toBeGreaterThanOrEqual(6);
+    // Scoped to THIS card's own bars. Counting `bg-kill` across the whole
+    // page counted every other card's red too, so a new card with a failing
+    // test in it broke an assertion about a cash flow.
+    const years = html.match(/data-bar="year"[^>]*/g) ?? [];
+    expect(years.length, "one bar per year").toBe(6);
+    expect(years.filter((b) => b.includes("bg-kill")).length, "the year in").toBe(1);
+    expect(years.filter((b) => b.includes("bg-brand")).length).toBe(5);
   });
 
   it("indexes itself, and every jump link lands on a real card", () => {
-    // Eleven cards is more than a reader should scroll past to find one.
-    // The nav and the cards read one INDEX, and this holds the two sides
-    // together: every href must name an id the page actually emits, and
-    // every card must be reachable from the index.
+    // A page of this many cards is more than a reader should scroll past to
+    // find one. The nav and the cards read one INDEX, and this holds the
+    // two sides together: every href must name an id the page actually
+    // emits, and every card must be reachable from the index.
+    //
+    // UNIQUE hrefs, and both counts read from the catalog rather than a
+    // number written here. A card may be linked from more than one place —
+    // the after-tax card's fine print points at the exchange — so a raw
+    // count of hrefs is a count of links, not of cards, and a literal here
+    // is one more thing to remember to bump.
     const hrefs = [...html.matchAll(/href="#([a-z0-9-]+)"/g)].map((m) => m[1]);
+    const linked = new Set(hrefs);
     const ids = new Set([...html.matchAll(/<section id="([a-z0-9-]+)"/g)].map((m) => m[1]));
-    expect(hrefs.length).toBe(16);
-    expect(ids.size).toBe(16);
+    expect(linked.size).toBe(TOOL_INDEX.length);
+    expect(ids.size).toBe(TOOL_INDEX.length);
     for (const h of hrefs) expect(ids.has(h), `#${h} has no card`).toBe(true);
     for (const id of ids) expect(hrefs, `${id} is not in the index`).toContain(id);
     expect(text).toContain("Jump to");
@@ -1264,6 +1277,50 @@ describe("the deal math tools", () => {
   it("never lets the tenants' deposits read as the seller's money", () => {
     expect(text).toContain("Security deposits");
     expect(text).toContain("the buyer inherits the obligation to return it");
+  });
+
+  it("shows an exchange that passes the price test and still owes tax", () => {
+    // The seeded deal is the trap, on first load: $26M sold and $30M bought
+    // with MORE debt, so the price test passes comfortably — and $1.22M of
+    // proceeds stayed in the seller's pocket, which no amount of fresh
+    // borrowing cures.
+    expect(text).toContain("Roll it into the next deal");
+    expect(text).toContain("$30.00M of $25.22M"); // trade up: met
+    expect(text).toContain("$12.00M of $13.22M"); // reinvest the equity: not
+    expect(text).toContain("$18.00M of $12.00M"); // replace the debt: met
+    expect(text).toContain("Short by $1,220,000");
+    expect(text).toContain("STILL boot");
+    expect(text).toContain("$305,000"); // the bill on the boot
+    expect(text).toContain("$2.11M"); // what the exchange deferred
+  });
+
+  it("draws the three tests, failing the one that causes the boot", () => {
+    const bars = html.match(/data-bar="exchange-test"[^>]*/g) ?? [];
+    expect(bars.length, "one bar per test").toBe(3);
+    expect(bars.filter((b) => b.includes("bg-pass")).length).toBe(2);
+    expect(bars.filter((b) => b.includes("bg-kill")).length).toBe(1);
+    // The gain splits into what rolls forward and what is taxed now.
+    expect((html.match(/data-bar="gain-split"/g) ?? []).length).toBe(2);
+  });
+
+  it("says the deferred gain is still there, in the replacement's basis", () => {
+    // $30M of property carrying a $20.5M basis. A card that stopped at "tax
+    // deferred" would read as a saving, which is the thing it must not do.
+    expect(text).toContain("Deferred is not forgiven");
+    expect(text).toContain("$20.50M");
+    expect(text).toContain("$9.50M"); // rolled into the replacement
+  });
+
+  it("draws the clock, and shows the days a Q4 closing loses", () => {
+    expect(text).toContain("both windows from the day you close");
+    expect(text).toContain("2026-12-30"); // 45 days to identify
+    expect(text).toContain("2027-04-15"); // the return's due date, not day 180
+    expect(text).toContain("151 days");
+    expect(text).toContain("29 days");
+    expect(text).toContain("An extension restores the full 180 days");
+    // Two segments of the window plus the part the due date takes off it.
+    expect((html.match(/data-bar="clock"/g) ?? []).length).toBe(2);
+    expect((html.match(/data-bar="clock-lost"/g) ?? []).length).toBe(1);
   });
 
   it("solves for the land instead of judging a price", () => {

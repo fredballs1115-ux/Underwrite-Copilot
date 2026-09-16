@@ -316,6 +316,22 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   not a free lunch**: on the seeded deal it lifts year-one depreciation 4.5×
   and leaves the owner $130,909 WORSE off in raw dollars, winning only on
   the time value the module deliberately does not count.
+- Rolling the gain forward instead: `lib/tools/exchange-1031.ts` (pure —
+  the sibling of the card above, and the reason its fine print now points
+  at one instead of disclaiming one). Three rules, two of which reverse an
+  answer rather than shade it. **Debt relief is boot** — coming down on the
+  mortgage is taxable even when every dollar of cash is reinvested. **Cash
+  boot is NOT cured by borrowing more**: net debt relief is offset by cash
+  ADDED to the replacement, but the offset runs one way only, so an
+  exchange can clear the price test comfortably and still recognise gain —
+  which is exactly what the seeded deal does, on first load. And
+  **deferred is not forgiven**: the replacement's basis is its price LESS
+  the rolled-in gain, so the new building's depreciation runs on the old
+  basis and the gain is standing there at the next sale. The three tests
+  are reported with the binding one named (`sizeLoan`'s convention), boot
+  is taxed recapture-first at the higher rate, and `exchangeClock` draws
+  the 45 and the 180 from the SAME day — capped by the return's due date,
+  which costs a Q4 closing real weeks unless an extension is filed.
 - Who owes whom at closing: `lib/tools/proration.ts` (pure). The one
   calculation here that comes AFTER yes, and the one people get BACKWARDS
   rather than merely wrong, because two of its rules reverse a payment's

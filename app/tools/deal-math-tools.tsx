@@ -6,6 +6,7 @@ import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
 import { readDebt, testRefi } from "@/lib/tools/debt-math";
 import { readLease, readOpex } from "@/lib/tools/lease-math";
 import { readAfterTax } from "@/lib/tools/after-tax";
+import { EXCHANGE_DAYS, IDENTIFY_DAYS, readExchange } from "@/lib/tools/exchange-1031";
 import { readProration } from "@/lib/tools/proration";
 import { TOOL_INDEX } from "@/lib/tools/catalog";
 import { readResidual } from "@/lib/tools/land-residual";
@@ -882,6 +883,7 @@ function CashFlowStrip() {
                     <span className="relative h-2.5 flex-1 rounded-full bg-faint">
                       <span className="absolute inset-y-0 left-1/2 w-px bg-line" />
                       <span
+                        data-bar="year"
                         className={`absolute inset-y-0 rounded-full ${
                           row.flow >= 0 ? "bg-brand" : "bg-kill"
                         }`}
@@ -1690,8 +1692,249 @@ function AfterTax() {
 
       <p className="mt-4 text-xs text-muted">
         Screening arithmetic, federal only — no state tax, no passive-activity
-        limits, no 1031 exchange, no net investment income tax, and the
-        mid-month convention is ignored. Not tax advice.
+        limits, no net investment income tax, and the mid-month convention is
+        ignored. Not tax advice. Rolling the gain forward instead of paying it
+        is the <a href="#exchange-1031" className="underline hover:text-brand">next card</a>.
+      </p>
+
+      {r.note && <p className="mt-4 text-sm text-caution">{r.note}</p>}
+    </Card>
+  );
+}
+
+// ── 7c-ii. the exchange, and what it actually defers ───────────────────────
+
+/**
+ * Rolling the gain into the next deal.
+ *
+ * The card above prices the bill at a sale; this one answers the question
+ * that follows it. It sits here rather than anywhere else on the page
+ * because the after-tax card's own fine print says it does not do a 1031 —
+ * and an analyst reading that sentence is one scroll from needing this.
+ *
+ * The picture is three tests drawn as bars, the same grammar the debt sizer
+ * uses, because an exchange is sized by whichever of the three binds — and
+ * the seeded deal deliberately PASSES the price test while still owing tax.
+ * That is the trap: trading up in price does not cure cash taken off the
+ * table, and a tool that tests only the price says "fully deferred" on a
+ * deal with a bill.
+ *
+ * The clock is drawn rather than listed, because the 45 and the 180 run
+ * from the same day and a list of two dates hides that. The seeded closing
+ * is in November so the shortened window shows on first load.
+ */
+function Exchange1031() {
+  const [sale, setSale] = useShared("xsp", "$26M");
+  const [costs, setCosts] = useShared("xsc", "780,000");
+  const [basis, setBasis] = useShared("xab", "14,500,000");
+  const [depreciation, setDepreciation] = useShared("xdp", "5,500,000");
+  const [payoff, setPayoff] = useShared("xmp", "$12M");
+  const [closing, setClosing] = useShared("xcd", "2026-11-15");
+  const [replacement, setReplacement] = useShared("xrp", "$30M");
+  const [newLoan, setNewLoan] = useShared("xnm", "$18M");
+  const [recapture, setRecapture] = useShared("xrr", "25");
+  const [capGains, setCapGains] = useShared("xcg", "20");
+
+  const r = useMemo(
+    () =>
+      readExchange({
+        salePrice: num(sale),
+        sellingCosts: num(costs),
+        adjustedBasis: num(basis),
+        depreciationTaken: num(depreciation),
+        mortgagePayoff: num(payoff),
+        replacementPrice: num(replacement),
+        newMortgage: num(newLoan),
+        closing: closing.trim() || null,
+        recaptureRatePct: num(recapture),
+        capGainsRatePct: num(capGains),
+      }),
+    [sale, costs, basis, depreciation, payoff, replacement, newLoan, closing, recapture, capGains],
+  );
+
+  const gain = r.realizedGain ?? 0;
+
+  return (
+    <Card id="exchange-1031" eyebrow="Exchange" title="Roll it into the next deal">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
+        <Field label="Sale price" value={sale} onChange={setSale} placeholder="$26M" />
+        <Field label="Costs of selling" value={costs} onChange={setCosts} placeholder="780,000" />
+        <Field label="Adjusted basis" value={basis} onChange={setBasis} placeholder="14,500,000" />
+        <Field
+          label="Depreciation taken"
+          value={depreciation}
+          onChange={setDepreciation}
+          placeholder="5,500,000"
+        />
+        <Field label="Loan paid off" value={payoff} onChange={setPayoff} placeholder="$12M" />
+        <Field label="Replacement price" value={replacement} onChange={setReplacement} placeholder="$30M" />
+        <Field label="New loan" value={newLoan} onChange={setNewLoan} placeholder="$18M" />
+        <Field label="Closing date" value={closing} onChange={setClosing} placeholder="2026-11-15" />
+        <Field label="Recapture rate" suffix="%" value={recapture} onChange={setRecapture} placeholder="25" />
+        <Field label="Capital gains" suffix="%" value={capGains} onChange={setCapGains} placeholder="20" />
+      </div>
+
+      {r.tests.length > 0 && (
+        <div className="mt-6 space-y-3">
+          <p className="text-sm text-muted">
+            Three tests, and the gain is fully deferred only when all three are met.
+          </p>
+          {r.tests.map((x) => {
+            const share = x.required <= 0 ? 1 : Math.min(1, x.actual / x.required);
+            return (
+              <div key={x.label}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="font-medium">{x.label}</span>
+                  <span className="shrink-0 font-mono tabular-nums">
+                    {usd(x.actual)} of {usd(x.required)}
+                  </span>
+                </div>
+                <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-faint">
+                  <div
+                    data-bar="exchange-test"
+                    className={`h-full rounded-full ${x.met ? "bg-pass" : "bg-kill"}`}
+                    style={{ width: `${Math.max(2, share * 100)}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-xs text-muted">
+                  {x.met ? x.note : `Short by ${usdExact(x.shortfall)}. ${x.note}`}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {r.totalBoot !== null && gain > 0 && (
+        <div className="mt-6">
+          <div className="mb-2 flex items-baseline justify-between text-sm">
+            <span className="text-muted">The gain, and where it goes</span>
+            <span className="font-semibold tabular-nums">{usd(gain)}</span>
+          </div>
+          <div className="flex h-5 overflow-hidden rounded-full bg-faint">
+            <div
+              data-bar="gain-split"
+              title={`Deferred · ${usdExact(r.deferredGain)}`}
+              className="h-full bg-brand"
+              style={{ width: `${((r.deferredGain ?? 0) / gain) * 100}%` }}
+            />
+            <div
+              data-bar="gain-split"
+              title={`Taxed now · ${usdExact(r.recognizedGain)}`}
+              className="h-full bg-kill"
+              style={{ width: `${((r.recognizedGain ?? 0) / gain) * 100}%` }}
+            />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs">
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden="true" className="inline-block h-2.5 w-2.5 rounded-sm bg-brand" />
+              <span className="text-muted">Rolled into the replacement</span>
+              <span className="font-mono tabular-nums">{usd(r.deferredGain)}</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden="true" className="inline-block h-2.5 w-2.5 rounded-sm bg-kill" />
+              <span className="text-muted">Taxed now, as boot</span>
+              <span className="font-mono tabular-nums">{usd(r.recognizedGain)}</span>
+            </span>
+          </div>
+        </div>
+      )}
+
+      {r.clock && (
+        <div className="mt-6">
+          <div className="mb-2 flex items-baseline justify-between text-sm">
+            <span className="text-muted">The clock, both windows from the day you close</span>
+            <span className="font-semibold tabular-nums">{r.clock.closeDays} days</span>
+          </div>
+          {/* The full 180 is the track. The identification deadline sits at
+              45/180 of it, and anything the return's due date takes off the
+              back is drawn as lost rather than left off — a window that got
+              shorter is the thing a Q4 seller has to see. */}
+          <div className="relative h-8">
+            <div className="absolute inset-x-0 top-3 flex h-2.5 overflow-hidden rounded-full bg-faint">
+              <div
+                data-bar="clock"
+                className="h-full bg-brand/30"
+                style={{ width: `${(IDENTIFY_DAYS / EXCHANGE_DAYS) * 100}%` }}
+              />
+              <div
+                data-bar="clock"
+                className="h-full bg-brand/60"
+                style={{ width: `${((r.clock.closeDays - IDENTIFY_DAYS) / EXCHANGE_DAYS) * 100}%` }}
+              />
+              {r.clock.cutShort && (
+                <div
+                  data-bar="clock-lost"
+                  className="h-full bg-kill/30"
+                  style={{
+                    width: `${((EXCHANGE_DAYS - r.clock.closeDays) / EXCHANGE_DAYS) * 100}%`,
+                  }}
+                />
+              )}
+            </div>
+            <span
+              aria-hidden="true"
+              className="absolute top-2 h-4 w-px bg-ink"
+              style={{ left: `${(IDENTIFY_DAYS / EXCHANGE_DAYS) * 100}%` }}
+            />
+          </div>
+          <div className="mt-1 flex flex-wrap gap-x-6 gap-y-1 text-xs">
+            <span>
+              <span className="text-muted">Identify by</span>{" "}
+              <span className="font-mono tabular-nums">{r.clock.identifyBy}</span>
+            </span>
+            <span>
+              <span className="text-muted">Close by</span>{" "}
+              <span className="font-mono tabular-nums">{r.clock.closeBy}</span>
+            </span>
+          </div>
+          {r.clock.cutShort && (
+            <p className="mt-2 text-sm text-caution">
+              This closing loses{" "}
+              <span className="font-semibold tabular-nums">
+                {EXCHANGE_DAYS - r.clock.closeDays} days
+              </span>{" "}
+              off the back of the window: the replacement has to be acquired before
+              the return for {closing.slice(0, 4)} is filed, due{" "}
+              <span className="font-mono tabular-nums">{r.clock.returnDueBy}</span>. An
+              extension restores the full {EXCHANGE_DAYS} days, which is why a
+              fourth-quarter exchange files one first.
+            </p>
+          )}
+        </div>
+      )}
+
+      {r.tax && (
+        <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
+          {/* Boot is loud when there is any and quiet at zero — the one
+              figure on the row whose SIZE is not the news, its existence
+              is. */}
+          <Stat label="Boot" value={usd(r.totalBoot)} tone={(r.totalBoot ?? 0) > 0 ? "ink" : "muted"} />
+          <Stat label="Tax now" value={usdExact(r.tax.total)} />
+          <Stat label="Tax deferred" value={usd(r.taxDeferred)} tone="brand" />
+          <Stat label="Basis of the replacement" value={usd(r.newBasis)} tone="muted" />
+        </div>
+      )}
+
+      {r.tax && r.newBasis !== null && (
+        <p className="mt-4 text-sm text-muted">
+          Deferred is not forgiven. The replacement cost{" "}
+          <span className="font-semibold tabular-nums text-ink">{usd(num(replacement))}</span>{" "}
+          but carries a basis of{" "}
+          <span className="font-semibold tabular-nums text-ink">{usd(r.newBasis)}</span> — the
+          rolled-in gain comes off it, so the depreciation on the new building runs
+          on the old basis and the gain is standing there again at the next sale.
+          What the exchange buys is the use of{" "}
+          <span className="font-semibold tabular-nums text-ink">{usd(r.taxDeferred)}</span>{" "}
+          in the meantime.
+        </p>
+      )}
+
+      <p className="mt-4 text-xs text-muted">
+        Screening arithmetic, federal only — and since 2017 only REAL property is
+        like-kind, so anything a cost segregation study carved out is a taxable
+        disposition of its own and is not counted here. No state tax, no net
+        investment income tax, no related-party rules. Not tax advice.
       </p>
 
       {r.note && <p className="mt-4 text-sm text-caution">{r.note}</p>}
@@ -2546,6 +2789,7 @@ export function DealMathTools() {
       <NetEffectiveRent />
       <RentableUsable />
       <AfterTax />
+      <Exchange1031 />
       <Proration />
       <div className="grid gap-6 lg:grid-cols-2">
         <CapTriangle />
