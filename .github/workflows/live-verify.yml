@@ -328,6 +328,31 @@ jobs:
           done
           echo "PHOTOGRAPHS: $live live, $dead dead — a DEAD market is showing an aerial, not a skyline"
 
+          # The markets that keep an overhead ON PURPOSE — a suburban
+          # submarket has no skyline, so PG County and Montgomery County are
+          # deliberately out of lib/skyline.ts. That left them probed by
+          # nothing at all: the loop above only walks the skyline table, so
+          # the two markets whose ONLY picture is the aerial were the least
+          # observed on the site. If that route breaks they have no fallback
+          # left, which makes them the ones most worth watching, not least.
+          echo "AERIALS, for the markets that keep an overhead on purpose:"
+          alive=0; gone=0
+          skyids=$(echo "$ids" | tr '\n' ' ')
+          allids=$(node -e 'const s=require("fs").readFileSync("lib/metro-imagery.ts","utf8");for(const m of s.matchAll(/^  ([a-z_]+): \{/gm))console.log(m[1])')
+          for id in $allids; do
+            case " $skyids " in *" $id "*) continue ;; esac
+            out=$(curl -sS -o /tmp/aer.bin -w '%{http_code} %{size_download} %{content_type}' \
+              --max-time 60 "https://underwrite-copilot.onrender.com/api/imagery/metro/$id?w=1600&h=900" || echo "000 0 -")
+            code=$(echo "$out" | cut -d' ' -f1)
+            size=$(echo "$out" | cut -d' ' -f2)
+            type=$(echo "$out" | cut -d' ' -f3-)
+            case "$code $type" in
+              "200 image/"*) alive=$((alive+1)); printf '  LIVE  %-24s %s · %s KB\n' "$id" "$type" "$((size/1024))" ;;
+              *)             gone=$((gone+1));  printf '  DEAD  %-24s HTTP %s · %s\n' "$id" "$code" "${type:--}" ;;
+            esac
+          done
+          echo "AERIALS: $alive live, $gone dead — these markets have no skyline to fall back to"
+
       - name: Verdict
         # Two tiers: the hero headline proves the site is up and on the right
         # lineage; the build-sha stamp (the uc-build sentinel, printed above

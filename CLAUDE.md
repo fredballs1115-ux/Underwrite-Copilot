@@ -153,7 +153,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   runner-to-Commons test; the live-verify PHOTOGRAPHS step is the
   visitor's** — it fetches `/api/imagery/skyline/<id>` from the site and
   reports the content type, which is the claim that matters, since the route
-  404s on every failure. Prefer that step's lines over a round marker:
+  404s on every failure. The **AERIALS** lines beneath it do the same for
+  the markets deliberately kept on an overhead: they were probed by nothing
+  at all, because the skyline loop only walks the skyline table — and a
+  market whose only picture is the aerial has no fallback left if that
+  route breaks, which makes it the one most worth watching rather than
+  least. Prefer those steps' lines over a round marker:
   a marker greps the served HTML, and the credit line is in the HTML whether
   or not the picture resolves (the fallback to the overhead is client-side,
   in `CityPhoto`, by design). Its doors, best first: a city's **Wikipedia article
