@@ -976,3 +976,51 @@ describe("News scored feed", () => {
     expect(a11yIssues(html)).toEqual([]);
   });
 });
+
+// ── /tools, the deal-math calculators ──────────────────────────────────────
+//
+// A client component full of controls is exactly the shape the a11y lint
+// exists for: eleven text inputs, a checkbox and three toggle buttons, every
+// one of which needs a name a screen reader can read. Rendered here in its
+// default state, which is also the state a first-time visitor meets — so
+// this doubles as a check that the seeded numbers actually compute rather
+// than showing a page of em dashes.
+import { DealMathTools } from "@/app/tools/deal-math-tools";
+
+describe("the deal math tools", () => {
+  const html = render(React.createElement(DealMathTools));
+  const text = visibleText(html);
+
+  it("names every control and reads clean", () => {
+    expect(a11yIssues(html), "a11y tools").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+    dumpView("tools", html);
+  });
+
+  it("answers on its seeded numbers rather than showing a page of dashes", () => {
+    // $20M at a $1.2M NOI, 6.5% over 30 years, 65 / 1.25x / 9% — coverage is
+    // the binding test, and saying so is the point of the whole card.
+    expect(text).toContain("Debt service coverage");
+    expect(text).toContain("governs at");
+    expect(text).toContain("1.25x");
+    // the loan lands where lib/tools/deal-math says it does
+    expect(text).toContain("$12,656,86");
+    // 5% of $30M hard cost, on a $42.5M total, at a 7% yield on cost
+    expect(text).toContain("$42.50M");
+    expect(text).toContain("7.00%");
+    expect(text).toContain("150 bps");
+    // $36/SF/yr over 100,000 SF and 120 units: $3.60M a year, $2,500 a
+    // unit a month. The totals read compact, the per-unit rent exact —
+    // which is the right way round, since one is a magnitude and the other
+    // is a figure somebody will type into a comp sheet.
+    expect(text).toContain("$3.60M");
+    expect(text).toContain("$2,500");
+  });
+
+  it("draws the binding test rather than only naming it", () => {
+    // three tracks, one filled in the brand colour and two in the line
+    // colour — the picture that makes the short bar the answer
+    expect(html.match(/rounded-full bg-brand/g)?.length).toBe(1);
+    expect(html.match(/rounded-full bg-line/g)?.length).toBe(2);
+  });
+});

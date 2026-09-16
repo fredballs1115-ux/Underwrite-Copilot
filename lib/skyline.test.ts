@@ -7,7 +7,9 @@ import {
   creditLine,
   hasSkyline,
   skylineFor,
+  skylineTag,
 } from "./skyline";
+import { gluedWords } from "./render-lint";
 import metrosSeed from "@/data/research/metros.json";
 
 const METRO_IDS = new Set((metrosSeed.metros ?? []).map((m) => (m as { id: string }).id));
@@ -67,10 +69,49 @@ describe("the Commons URLs", () => {
     expect(commonsUrl("a.jpg", Number.NaN)).toContain(`width=${SKYLINE_WIDTH.default}`);
   });
 
+  it("tags a market by the file it currently names", () => {
+    // The token exists so a year-long immutable cache is honest. It has to
+    // be stable for the same file (or every deploy would needlessly bust
+    // every browser's copy) and different for a different file (or the
+    // cache would never be busted when it should be).
+    const tags = Object.keys(SKYLINES).map((id) => skylineTag(id));
+    expect(new Set(tags).size, "two markets share a tag").toBe(tags.length);
+    for (const id of Object.keys(SKYLINES)) {
+      expect(skylineTag(id)).toBe(skylineTag(id));
+      expect(skylineTag(id)).toMatch(/^[0-9a-z]+$/);
+    }
+    // A market with no photograph has nothing to bust.
+    expect(skylineTag("definitely-not-a-metro")).toBe("0");
+  });
+
   it("escapes a name on the way into the file's own page", () => {
     expect(commonsPage("Foo Bar.jpg")).toBe(
       "https://commons.wikimedia.org/wiki/File:Foo%20Bar.jpg",
     );
+  });
+});
+
+describe("every credit the table will actually print", () => {
+  it("survives the same text lint the live pages are held to", () => {
+    // These strings go onto public pages, so they meet the public pages'
+    // standard. Worth asserting rather than assuming: the photographers are
+    // named exactly as Commons names them, which means one credit is in
+    // Chinese characters and another carries a parenthetical real name —
+    // neither shape has appeared in this codebase's copy before.
+    for (const [id, shot] of Object.entries(SKYLINES)) {
+      const line = creditLine(shot);
+      expect(gluedWords(line), `${id}: ${line}`).toEqual([]);
+      expect(line, id).not.toContain("undefined");
+      expect(line, id).not.toContain("  ");
+    }
+  });
+
+  it("names a real place and a real photographer, never a placeholder", () => {
+    for (const [id, shot] of Object.entries(SKYLINES)) {
+      expect(shot.credit.toLowerCase(), id).not.toBe("unknown");
+      expect(shot.credit.trim(), id).toBe(shot.credit);
+      expect(shot.place.trim(), id).toBe(shot.place);
+    }
   });
 });
 

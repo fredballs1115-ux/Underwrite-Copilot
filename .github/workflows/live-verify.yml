@@ -5,6 +5,20 @@ name: live-verify
 # workflow) or automatically on every push to main.
 on:
   workflow_dispatch:
+    inputs:
+      skyline_markets:
+        description: >-
+          Skyline sweep: space-separated metro ids (e.g. "dc baltimore
+          richmond"). Blank sweeps every market.
+        required: false
+        default: ""
+      skyline_search:
+        description: >-
+          Skyline sweep: hunt for NEW candidates instead of verifying the
+          photographs already chosen.
+        type: boolean
+        required: false
+        default: false
   push:
     branches: [main]
 jobs:
@@ -249,7 +263,20 @@ jobs:
         # --search asks Commons what exists; with no flag it verifies the
         # candidates already chosen. While the table is being filled the
         # search is what earns its keep, so that is the mode wired here.
-        run: node scripts/probe-skylines.mjs --search || true
+        # Verify by default, now that lib/skyline.ts names a photograph for
+        # every market that has one: each deploy re-resolves those files from
+        # Commons and prints LIVE or DEAD, so a file deleted upstream shows
+        # up here rather than as a market that quietly lost its picture.
+        # Tick skyline_search to hunt for new candidates instead.
+        #
+        # Both inputs come in through the environment rather than being
+        # interpolated into the script line: a ${{ }} expression spliced into
+        # a shell command is the standard Actions injection hole, and word
+        # splitting an env var is exactly the behaviour wanted here anyway.
+        env:
+          SKYLINE_MARKETS: ${{ inputs.skyline_markets }}
+          SKYLINE_SEARCH: ${{ inputs.skyline_search == true && '--search' || '' }}
+        run: node scripts/probe-skylines.mjs --terse $SKYLINE_SEARCH $SKYLINE_MARKETS || true
 
       - name: Verdict
         # Two tiers: the hero headline proves the site is up and on the right

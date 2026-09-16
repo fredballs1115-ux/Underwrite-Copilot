@@ -3,6 +3,48 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
+## 🟢 2026-09-16 — what landed since the migrations ran
+
+Two things you asked for, both live behind PR #301.
+
+**The market pictures are photographs now.** Fifteen of the eighteen
+covered markets draw a real skyline photograph instead of an overhead
+frame: Washington on the National Mall, Baltimore on its skyline, Miami
+on Brickell, Philadelphia on the Schuylkill River, and so on. Each one
+names its photographer and licence beside it, and every filename, author
+and licence was read back from Wikimedia Commons by the deploy probe
+rather than written from memory — the run at 16:07 UTC read **15 live, 0
+dead**. Prince George's County, Montgomery County and Northern Virginia
+deliberately keep their overhead: a suburban submarket does not have a
+skyline, and the overhead is the more honest picture of a place shaped by
+its land.
+
+*Nothing here is yours to do.* If you ever want a market's photograph
+changed, the whole loop is: Actions → live-verify → Run workflow, tick
+**skyline_search**, put the metro id in **skyline_markets**, read the
+candidates it prints, and say which one you want.
+
+**`/tools` — deal math.** The calculators an analyst leaves the site to
+run: size a loan against LTV, DSCR and debt yield and see *which one
+binds*; the cap rate triangle; yield on cost against the exit cap; one
+rent said four ways. Public, so it is also a way in from a search for
+"debt yield calculator". It is in the sidebar under Market data.
+
+**Still yours, unchanged from the list below:** the six credentials to
+rotate (they were exposed in screenshots — Stripe live secret, the
+Supabase service-role key, the Stripe webhook secret, both Resend keys,
+and the Anthropic key), the Actions secrets including the misspelled one,
+the auth redirect settings, and the four ground-level photographs for
+`public/photos/`. Those are the items that still gate things.
+
+**Claude's move next session:** the three DMV submarkets have no skyline
+worth publishing, but Rosslyn genuinely does — worth one more targeted
+search. Beyond that, `/tools` is the first of the "never has to leave the
+site" pieces; the next candidates are a lease abstract reader and a
+sources-and-uses builder that both feed a real deal.
+
+---
+
 ## 🟢 6 PM ET, 2026-09-14 — where the site stands, and your list
 
 **Everything merged today is live.** live-verify read the live build as

@@ -43,8 +43,136 @@ export interface SkylineShot {
  * Keyed by the `id` in data/research/metros.json. A market with no entry
  * is not a bug — it falls back to its overhead frame, which is why the
  * table can grow one verified photograph at a time.
+ *
+ * Every row below was printed by the probe running on the GitHub runner on
+ * 2026-09-16: the filename, the pixel size, the media type, the
+ * photographer and the licence are all what Commons itself returned, not
+ * what anybody remembered. A credit written from memory is a licence breach
+ * with a name attached, which is why this is the one table in the codebase
+ * that may never be edited from the sandbox alone.
+ *
+ * WHAT IS NOT HERE, and why. Prince George's County, Montgomery County and
+ * Northern Virginia have no entry: they are suburban submarkets, and a
+ * submarket does not have a skyline the way a city does. The overhead frame
+ * is the more honest picture of a place whose shape is the shape of its
+ * land, so those three keep it rather than being given a photograph of some
+ * arbitrary building that happens to stand there.
  */
-export const SKYLINES: Record<string, SkylineShot> = {};
+export const SKYLINES: Record<string, SkylineShot> = {
+  // The Height Act means Washington's skyline is the Mall, not a wall of
+  // towers — so this is the picture the city is actually known by.
+  dc: {
+    file: "Aerial view National Mall 12 2014 DC 711.JPG",
+    place: "The National Mall, Washington",
+    credit: "Mariordo (Mario Roberto Durán Ortiz)",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+  },
+  baltimore: {
+    file: "Baltimore, Maryland skyline (cropped).jpg",
+    place: "Baltimore",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+  },
+  richmond: {
+    file: "Skyline of Richmond, Virginia.jpg",
+    place: "Richmond",
+    credit: "Jim",
+    license: "CC BY-SA 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0",
+  },
+  norfolk_hampton_roads: {
+    file: "Downtown Norfolk at Dusk.jpg",
+    place: "Downtown Norfolk",
+    credit: "Bruce Emmerling",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+  },
+  // The sample deal's own city, so this one carries /demo as well.
+  philadelphia: {
+    file: "Philadelphia skyline 20240528 (cropped).jpg",
+    place: "Center City Philadelphia",
+    credit: "颐园居",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+  },
+  newark_jc: {
+    file: "Jersey City Skyline September 2025 038 (cropped).jpg",
+    place: "Jersey City",
+    credit: "Kidfly182",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+  },
+  nyc: {
+    file: "View of Empire State Building from Rockefeller Center New York City dllu (cropped).jpg",
+    place: "Midtown Manhattan",
+    credit: "Dllu",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+  },
+  boston: {
+    file: "Boston skyline from Longfellow Bridge September 2017 panorama 2.jpg",
+    place: "Back Bay, Boston",
+    credit: "King of Hearts",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+  },
+  chicago: {
+    file: "Chicago Skyline in September 2023 pano.jpg",
+    place: "Chicago",
+    credit: "TheWxResearcher",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+  },
+  los_angeles: {
+    file: "Skyline of Los Angeles, Downtown Los Angeles, California 13.jpg",
+    place: "Downtown Los Angeles",
+    credit: "Levi Clancy",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+  },
+  san_francisco: {
+    file: "SF From Marin Highlands3.jpg",
+    place: "San Francisco from the Marin Headlands",
+    credit: "Paul.h",
+    license: "Public domain",
+    licenseUrl: "",
+  },
+  seattle: {
+    file: "View of Downtown Seattle from Ella Bailey Park (27305770463).jpg",
+    place: "Downtown Seattle",
+    credit: "Tiffany Von Arnim",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+  },
+  // Brickell rather than the whole bay: it is the submarket a CRE reader
+  // means when they say Miami.
+  miami: {
+    file: "Brickell neighborhood skyline (60062p).jpg",
+    place: "Brickell, Miami",
+    credit: "Rhododendrites",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+  },
+  atlanta: {
+    file: "Atlanta, Georgia Skyline.jpg",
+    place: "Atlanta",
+    credit: "Shawn M. Kent",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+  },
+  // The better-looking Dallas candidate is a 6000px PNG, and a PNG
+  // photograph at 1600px is megabytes where a JPEG is hundreds of
+  // kilobytes. Page weight wins on a tile nobody stops to admire.
+  dallas: {
+    file: "IMAG2591-dallas-downtown.jpg",
+    place: "Downtown Dallas",
+    credit: "alfred twu",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  },
+};
 
 export function skylineFor(id: string): SkylineShot | null {
   return SKYLINES[id] ?? null;
@@ -74,6 +202,32 @@ export function commonsUrl(file: string, width: number): string {
     Math.max(SKYLINE_WIDTH.min, Math.round(width) || SKYLINE_WIDTH.default),
   );
   return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=${w}`;
+}
+
+/**
+ * A short token that changes when a market's photograph changes.
+ *
+ * The route serves these `immutable` for a year, which is right for the
+ * bytes — a Commons file's content does not change under its name — but
+ * WRONG for the URL, because `/api/imagery/skyline/miami` means a different
+ * photograph the day this table is edited. Without a token in the query, a
+ * visitor who has been here before holds last year's picture and never
+ * learns otherwise.
+ *
+ * FNV-1a over the filename: tiny, stable across processes and deploys (so
+ * two servers agree and a rebuild does not needlessly bust every cache),
+ * and derived from the one field that decides which photograph renders. It
+ * is a cache key, never a checksum — nothing here is trusting it.
+ */
+export function skylineTag(id: string): string {
+  const shot = SKYLINES[id];
+  if (!shot) return "0";
+  let h = 2166136261;
+  for (let i = 0; i < shot.file.length; i++) {
+    h ^= shot.file.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(36);
 }
 
 /** The page that documents the file, for the credit link. */
