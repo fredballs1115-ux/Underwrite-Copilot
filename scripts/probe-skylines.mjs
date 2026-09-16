@@ -59,6 +59,25 @@ const outOfTime = () => Date.now() - startedAt > DEADLINE_MS;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * Never two requests inside PACE_MS of each other, across the whole run.
+ *
+ * The second run still collected 429s from Commons partway through (San
+ * Francisco's categories, every one). Backing off after the refusal is the
+ * cure; pacing is the prevention, and Wikimedia's guidance asks for serial,
+ * unhurried reads rather than a burst an IP has to be throttled out of.
+ * ~200 requests at this pace is about thirty seconds, which live-verify can
+ * comfortably carry.
+ */
+const PACE_MS = 150;
+let nextSlot = 0;
+async function paced() {
+  const now = Date.now();
+  const at = Math.max(now, nextSlot);
+  nextSlot = at + PACE_MS;
+  if (at > now) await sleep(at - now);
+}
+
+/**
  * One request, with the courtesy a free service is owed.
  *
  * Wikimedia asks automated readers to identify themselves and to back off
@@ -68,8 +87,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * host that had started refusing, reported as "nothing found".
  */
 async function api(url, { tries = 3 } = {}) {
-  let wait = 600;
+  let wait = 1500;
   for (let attempt = 1; attempt <= tries; attempt++) {
+    await paced();
     let res;
     try {
       res = await fetch(url, {
@@ -94,6 +114,20 @@ async function api(url, { tries = 3 } = {}) {
   return { ok: false, status: 0, error: "unreachable" };
 }
 
+/**
+ * One spelling per file.
+ *
+ * Commons treats an underscore and a space as the same character in a title,
+ * and the two APIs disagree about which to hand back: `pageimages` returns
+ * "Boston_Financial_District_skyline.jpg" while `images` returns the same
+ * file with spaces. Left alone that is two candidates, two metadata calls
+ * and two identical rejection lines, which is exactly what the last run
+ * printed for Boston, Los Angeles and Dallas.
+ */
+function canonical(file) {
+  return String(file).replace(/_/g, " ").trim();
+}
+
 /** extmetadata values arrive as HTML — the credit line needs plain text. */
 function plain(html) {
   if (typeof html !== "string") return "";
@@ -110,10 +144,16 @@ function plain(html) {
 }
 
 async function metadata(file) {
+  // `mime` is its OWN iiprop value — `size` gives width/height/bytes and
+  // `url` gives the paths, neither carries the media type. Leaving it out
+  // is what made the first two runs reject all eighteen markets with "not a
+  // photograph (undefined)": the type test was reading a field that had
+  // never been requested, so every file failed it, including the ones we
+  // were looking for.
   const url =
     `${COMMONS}?action=query&format=json&formatversion=2` +
     `&titles=${encodeURIComponent(`File:${file}`)}` +
-    `&prop=imageinfo&iiprop=url%7Csize%7Cextmetadata`;
+    `&prop=imageinfo&iiprop=url%7Csize%7Cmime%7Cextmetadata`;
   const res = await api(url);
   if (!res.ok) return { ok: false, error: `api ${res.error}` };
   const page = res.body?.query?.pages?.[0];
@@ -167,9 +207,9 @@ async function articleImages(title) {
   if (!res.ok) return { ok: false, error: res.error, files: [] };
   const page = res.body?.query?.pages?.[0];
   if (!page || page.missing) return { ok: false, error: "no such article", files: [] };
-  const lead = page.pageimage ? [String(page.pageimage)] : [];
+  const lead = page.pageimage ? [canonical(page.pageimage)] : [];
   const rest = (page.images ?? [])
-    .map((i) => String(i.title).replace(/^File:/, ""))
+    .map((i) => canonical(String(i.title).replace(/^File:/, "")))
     .filter((f) => /\.(jpe?g|png|webp)$/i.test(f));
   return { ok: true, lead, files: [...lead, ...rest] };
 }
@@ -186,7 +226,7 @@ async function categoryFiles(category, limit = 40) {
   return {
     ok: true,
     files: members
-      .map((m) => String(m.title).replace(/^File:/, ""))
+      .map((m) => canonical(String(m.title).replace(/^File:/, "")))
       .filter((f) => /\.(jpe?g|png|webp)$/i.test(f)),
   };
 }
@@ -202,7 +242,7 @@ async function search(query, limit = 12) {
   return {
     ok: true,
     files: (res.body?.query?.search ?? [])
-      .map((r) => String(r.title).replace(/^File:/, ""))
+      .map((r) => canonical(String(r.title).replace(/^File:/, "")))
       .filter((f) => /\.(jpe?g|png|webp)$/i.test(f)),
   };
 }
