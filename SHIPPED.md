@@ -36,9 +36,28 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and forty PRs, #176–#315, each
+estimate, and that's what it should flag." A hundred and forty-one PRs, #176–#316, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
+
+- **#316 Northern Virginia gets its skyline.** Fourteen of the fifteen
+  covered markets showed a real photograph; NoVA was the holdout, still on
+  a satellite frame, on the table's own rule that a suburban submarket has
+  no skyline worth showing.
+
+  Rosslyn is the exception that proves it — a genuine high-rise cluster,
+  zoned tall precisely because it stands across the Potomac from a
+  height-limited Washington. The brief now opens on Rosslyn seen from
+  Georgetown: `Rosslyn from Georgetown 1.jpg`, Theodore Christopher, CC0,
+  4867x2692. PG County and Montgomery County keep their overheads, where
+  the land really is the story.
+
+  The filename came from the GitHub runner, not from memory: live-verify
+  dispatched with the skyline search on `nova` read Rosslyn's Wikipedia
+  article and the hand-filed Commons categories and printed five
+  candidates with their authors, licences and pixel sizes. The pick is the
+  only one that is both a panorama (the band crops to one) and large. CC0
+  obliges nobody, and the photographer is credited anyway.
 
 - **#315 Depreciation, and what the sale takes back.** The calculation
   people most reliably leave a screening tool for, built around the three
