@@ -348,3 +348,4 @@ jobs:
           mark "#314 the homepage links a card by its anchor" grep -q 'href="/tools#residual-land"' body.html
           mark "#315 the after-tax card is on /tools" grep -q "Depreciation, and what the sale takes back" p_tools2.html
           mark "#315 it names the error it prevents" grep -q "Running the whole gain at the capital gains rate" p_tools2.html
+          mark "#316 NoVA shows Rosslyn, not an aerial" grep -q "Theodore Christopher" p_market_nova.html

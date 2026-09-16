@@ -68,6 +68,28 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
   },
+  // Northern Virginia is the one suburban market that gets a skyline, and
+  // Rosslyn is the reason. PG County and Montgomery County still keep their
+  // overheads — a place shaped by its land is photographed from above — but
+  // Rosslyn is a genuine high-rise cluster, zoned tall precisely because it
+  // stands across the Potomac from a height-limited Washington. There IS a
+  // skyline here, so showing an aerial instead was answering a question
+  // nobody asked.
+  //
+  // Of the five files the runner surfaced, this one: 4867x2692 is the
+  // widest useful frame (the band crops to a panorama, so the two 4:3 files
+  // would be cropped to a sliver), it is the largest at that ratio, it is
+  // CC0, and it is the view — Rosslyn from Georgetown is the frame an
+  // Arlington broker would put on a cover.
+  nova: {
+    file: "Rosslyn from Georgetown 1.jpg",
+    place: "Rosslyn, seen from Georgetown across the Potomac",
+    // CC0 obliges nobody, but the photographer is named anyway: the house
+    // rule is that whoever took the picture is credited beside it.
+    credit: "Theodore Christopher",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  },
   baltimore: {
     file: "Baltimore, Maryland skyline (cropped).jpg",
     place: "Baltimore",
