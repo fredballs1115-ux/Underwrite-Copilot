@@ -262,6 +262,22 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   meta description is prose and cannot render from the constant, so
   `catalog.test.ts` holds the spelled-out number to `TOOL_COUNT` instead;
   that claim went stale twice in one evening before the guard existed.
+- Depreciation and the sale's tax bill: `lib/tools/after-tax.ts` (pure,
+  screening arithmetic, federal only — the card says so). Three rules, in
+  the order they cost money. **Land is never depreciable**, so the basis is
+  price less the land share and never the price. **The gain at the sale has
+  THREE rates, not one** — section 1245 property from a cost-segregation
+  carve-out recaptures at the ORDINARY rate, the building's depreciation
+  comes back as unrecaptured 1250 gain at 25%, and only appreciation over
+  the original price is capital gain; they are filled in that order, and
+  running the whole gain at the capital-gains rate understates the bill on
+  any long hold. And **depreciation is a TIMING benefit** — `netOfRecapture`
+  is the shelter less what the sale took back, and a test pins it to exactly
+  zero when the sheltering and recapture rates are equal, which is the claim
+  the module exists to make checkable. It follows that **cost segregation is
+  not a free lunch**: on the seeded deal it lifts year-one depreciation 4.5×
+  and leaves the owner $130,909 WORSE off in raw dollars, winning only on
+  the time value the module deliberately does not count.
 - What the dirt is worth: `lib/tools/land-residual.ts` (pure). The one
   calculation on `/tools` that solves for a price instead of judging one —
   the finished building's value less the cost of building it and the return

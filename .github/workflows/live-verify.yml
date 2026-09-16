@@ -346,3 +346,5 @@ jobs:
           mark "#313 the residual says its own sensitivity" grep -q "a residual is a range and not a number" p_tools2.html
           mark "#314 the homepage names what /tools serves" grep -q "more, with no deal behind them" body.html
           mark "#314 the homepage links a card by its anchor" grep -q 'href="/tools#residual-land"' body.html
+          mark "#315 the after-tax card is on /tools" grep -q "Depreciation, and what the sale takes back" p_tools2.html
+          mark "#315 it names the error it prevents" grep -q "Running the whole gain at the capital gains rate" p_tools2.html

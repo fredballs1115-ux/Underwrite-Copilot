@@ -36,9 +36,43 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and thirty-eight PRs, #176–#313, each
+estimate, and that's what it should flag." A hundred and forty PRs, #176–#315, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
+
+- **#315 Depreciation, and what the sale takes back.** The calculation
+  people most reliably leave a screening tool for, built around the three
+  errors that cost the most money.
+
+  **Land is never depreciable.** On a $20M building that is a quarter
+  dirt the basis is $15M, and the write-off turns $1.2M of NOI into a
+  $190,455 paper loss on a building that made money.
+
+  **The gain at the sale has three rates, not one.** What you depreciated
+  on the building comes back as unrecaptured 1250 gain at 25%; anything a
+  cost segregation study carved out comes back under section 1245 at your
+  ordinary rate; only appreciation over the original price is capital
+  gain. The card draws them as one bar and names the error: $11.45M at 20%
+  says $2.29M, and the bill is $2.56M.
+
+  **Depreciation is a timing benefit.** Shelter at one rate and recapture
+  at the same rate and it nets to exactly zero — a test pins that, which
+  is what makes the claim checkable rather than a slogan. It follows that
+  cost segregation is not a free lunch: it lifts year-one depreciation
+  four and a half times and, in raw dollars, leaves this deal $130,909
+  worse off. It wins on getting the money early, not on the total, and a
+  tool that showed only the year-one number would say the opposite.
+
+  Twenty-one tests on the pure layer, five on the page. Federal only, and
+  the card says so.
+
+- **#314 The homepage names what /tools actually serves.** `/tools` grew
+  from four calculators to sixteen in two evenings while the homepage went
+  on offering "size a loan, or run the cap rate math". It is now a shelf of
+  every calculation by name, rendered from the SAME list the page builds
+  its cards from, so it can only advertise what exists. The one claim that
+  could not be fixed that way — a count spelled out in prose — is held to
+  the constant by a test, checked by breaking it.
 
 - **#313 What the land can be worth.** Every other calculator on `/tools`
   starts from a price. This one solves for it: the finished building at

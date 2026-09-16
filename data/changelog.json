@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-16",
+      "title": "Depreciation, and what the sale takes back",
+      "blurb": "The calculation people most reliably leave a screening tool for, with the three errors that cost the most money. Land is never depreciable, so the basis on a $20M building that is a quarter dirt is $15M — and that writes off enough to turn $1.2M of NOI into a $190,455 paper loss. The gain at the sale then has THREE rates, not one: what you depreciated on the building comes back at 25%, anything a cost segregation study carved out comes back at your ordinary rate, and only the appreciation over the original price is capital gain. Running the whole thing at 20% says $2.29M; the real bill is $2.56M. And the headline the card exists for: depreciation is a TIMING benefit. Shelter at one rate and recapture at the same rate and it nets to exactly nothing. Which is also why cost segregation is not a free lunch — it lifts year-one depreciation four and a half times and, in raw dollars, leaves this deal $130,909 worse off. It wins on getting the money early, not on the total, and a tool that showed only the year-one number would tell you the opposite.",
+      "href": "/tools"
+    },
+    {
+      "date": "2026-09-16",
       "title": "The homepage names what the tools page actually serves",
       "blurb": "/tools grew from four calculators to fifteen in two evenings, and the homepage went on describing it as \"size a loan, or run the cap rate math\" the whole time. It is now a shelf of every calculation by name, each one a link straight to its card — and it renders from the same list /tools builds its cards from, so it can only ever advertise what the page really has. The count in the page's own description is prose and cannot render from a constant, so a test holds the spelled-out number to it instead; that claim had gone stale twice in one evening.",
       "href": "/tools"
@@ -78,12 +84,6 @@
       "title": "One recorded sale is no longer called a median",
       "blurb": "The public-records comps readout printed “1 recorded sales — median $400,000 · range $400,000–$400,000” and then a confident percentage against it. One sale is a data point, not a market. The figure still shows — it is the only evidence there is — but it is named correctly, the range is dropped where there is nothing to range over, and the above/below call is withheld until there are enough sales to have a middle.",
       "href": "/comps"
-    },
-    {
-      "date": "2026-09-16",
-      "title": "The market photographs are actually visible now",
-      "blurb": "Fifteen skylines shipped this morning and then rendered at about an eighth of their strength, under a wash nobody had measured. The picture now draws at full strength and the scrim does the work — dark under the words at the bottom of a band, clearing until the city is most of what you see. The contrast is computed against a pure white frame, the worst photograph a market could have, so it can never quietly slide back.",
-      "href": "/why"
     }
   ]
 }

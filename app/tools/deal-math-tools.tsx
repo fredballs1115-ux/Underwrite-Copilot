@@ -5,6 +5,7 @@ import { readFigure } from "@/lib/money";
 import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
 import { readDebt, testRefi } from "@/lib/tools/debt-math";
 import { readLease, readOpex } from "@/lib/tools/lease-math";
+import { readAfterTax } from "@/lib/tools/after-tax";
 import { TOOL_INDEX } from "@/lib/tools/catalog";
 import { readResidual } from "@/lib/tools/land-residual";
 import { readLand, readSpace } from "@/lib/tools/measure-math";
@@ -1279,7 +1280,217 @@ function ResidualLand() {
   );
 }
 
-// ── 7c. rentable, usable, and the rent you actually pay ────────────────────
+// ── 7c. depreciation, and what the sale takes back ─────────────────────────
+
+/**
+ * The write-off while you hold, and the bill when you sell.
+ *
+ * Every other card here answers a question about the property. This one
+ * answers a question about the OWNER, which is why it is the calculation
+ * people most reliably leave a screening tool to do — and why the errors in
+ * it are the largest on the page.
+ *
+ * The picture is the sale's tax bill split into its three rates, because
+ * the single most expensive mistake is running the whole gain at the
+ * capital gains rate. The line under it is the one the card exists for:
+ * depreciation is a TIMING benefit, and what survives the sale is only the
+ * gap between the rate that sheltered it and the rate that recaptures it.
+ */
+function AfterTax() {
+  const [price, setPrice] = useShared("atp", "$20M");
+  const [landPct, setLandPct] = useShared("atl", "25");
+  const [life, setLife] = useShared("atlife", "27.5");
+  const [segPct, setSegPct] = useShared("atseg", "0");
+  const [bonus, setBonus] = useShared("atb", "0");
+  const [noi, setNoi] = useShared("atnoi", "1,200,000");
+  const [interest, setInterest] = useShared("ati", "845,000");
+  const [hold, setHold] = useShared("ath", "10");
+  const [sale, setSale] = useShared("ats", "$26M");
+  const [ordinary, setOrdinary] = useShared("ator", "37");
+  const [capGains, setCapGains] = useShared("atcg", "20");
+
+  const terms = useMemo(
+    () => ({
+      price: num(price),
+      landPct: num(landPct),
+      lifeYears: num(life),
+      costSegPct: num(segPct),
+      costSegLifeYears: 5,
+      bonusPct: num(bonus),
+      noi: num(noi),
+      interest: num(interest),
+      holdYears: num(hold),
+      salePrice: num(sale),
+      ordinaryRatePct: num(ordinary),
+      capGainsRatePct: num(capGains),
+      recaptureRatePct: 25,
+    }),
+    [price, landPct, life, segPct, bonus, noi, interest, hold, sale, ordinary, capGains],
+  );
+
+  const r = useMemo(() => readAfterTax(terms), [terms]);
+  // The same deal with no cost segregation, so the card can say what the
+  // study actually bought — which on a long hold is often less than the
+  // year-one number suggests.
+  const plain = useMemo(
+    () => readAfterTax({ ...terms, costSegPct: 0, bonusPct: 0 }),
+    [terms],
+  );
+  const segOn = (num(segPct) ?? 0) > 0;
+
+  const slice: { label: string; amount: number; rate: string; tone: string }[] = r.sale
+    ? [
+        {
+          label: "Section 1245 recapture",
+          amount: r.sale.ordinaryRecapture,
+          rate: `${(num(ordinary) ?? 0).toFixed(0)}%`,
+          tone: "bg-kill",
+        },
+        {
+          label: "Unrecaptured 1250",
+          amount: r.sale.unrecaptured1250,
+          rate: "25%",
+          tone: "bg-caution",
+        },
+        {
+          label: "Capital gain",
+          amount: r.sale.capitalGain,
+          rate: `${(num(capGains) ?? 0).toFixed(0)}%`,
+          tone: "bg-brand",
+        },
+      ].filter((x) => x.amount > 0)
+    : [];
+  const gain = r.totalGain ?? 0;
+
+  return (
+    <Card id="after-tax" eyebrow="After tax" title="Depreciation, and what the sale takes back">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+        <Field label="Price" value={price} onChange={setPrice} placeholder="$20M" />
+        <Field label="Land, % of price" suffix="%" value={landPct} onChange={setLandPct} placeholder="25" />
+        <Field label="Life (27.5 or 39)" value={life} onChange={setLife} placeholder="27.5" />
+        <Field label="Cost seg, % of price" suffix="%" value={segPct} onChange={setSegPct} placeholder="0" />
+        <Field label="Bonus on that" suffix="%" value={bonus} onChange={setBonus} placeholder="0" />
+        <Field label="NOI" value={noi} onChange={setNoi} placeholder="1,200,000" />
+        <Field label="Interest" value={interest} onChange={setInterest} placeholder="845,000" />
+        <Field label="Hold, years" value={hold} onChange={setHold} placeholder="10" />
+        <Field label="Sale price" value={sale} onChange={setSale} placeholder="$26M" />
+        <Field label="Ordinary rate" suffix="%" value={ordinary} onChange={setOrdinary} placeholder="37" />
+        <Field label="Capital gains" suffix="%" value={capGains} onChange={setCapGains} placeholder="20" />
+      </div>
+
+      {r.yearOneTaxable !== null && (
+        <p className="mt-5 text-sm text-muted">
+          Land is never depreciable, so the basis is{" "}
+          <span className="font-semibold tabular-nums text-ink">{usd(r.depreciableBasis)}</span>,
+          not the price. That writes off{" "}
+          <span className="font-semibold tabular-nums text-ink">{usdExact(r.yearOneDepreciation)}</span>{" "}
+          in year one and turns {usd(num(noi))} of NOI into{" "}
+          {r.yearOneTaxable < 0 ? (
+            <>
+              {/* The sign goes in the words, not in front of the dollar
+                  sign: "$-190,455" is not how anyone writes a loss. */}
+              <span className="font-semibold tabular-nums text-brand">
+                a {usdExact(Math.abs(r.yearOneTaxable))} paper loss
+              </span>{" "}
+              on a building that made money.
+            </>
+          ) : (
+            <>
+              <span className="font-semibold tabular-nums text-ink">
+                {usdExact(r.yearOneTaxable)} of taxable income
+              </span>
+              .
+            </>
+          )}
+        </p>
+      )}
+
+      {slice.length > 0 && gain > 0 && (
+        <div className="mt-6">
+          <div className="mb-2 flex items-baseline justify-between text-sm">
+            <span className="text-muted">The gain at the sale, by the rate it is taxed at</span>
+            <span className="font-semibold tabular-nums">{usd(gain)}</span>
+          </div>
+          <div className="flex h-5 overflow-hidden rounded-full bg-faint">
+            {slice.map((s) => (
+              <div
+                key={s.label}
+                data-bar="gain-slice"
+                title={`${s.label} · ${usdExact(s.amount)} at ${s.rate}`}
+                className={`h-full ${s.tone}`}
+                style={{ width: `${Math.max(0, (s.amount / gain) * 100)}%` }}
+              />
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1">
+            {slice.map((s) => (
+              <span key={s.label} className="flex items-center gap-1.5 text-xs">
+                <span aria-hidden="true" className={`inline-block h-2.5 w-2.5 rounded-sm ${s.tone}`} />
+                <span className="text-muted">{s.label}</span>
+                <span className="font-mono tabular-nums">{usd(s.amount)}</span>
+                <span className="text-muted">at {s.rate}</span>
+              </span>
+            ))}
+          </div>
+          <p className="mt-3 text-sm text-muted">
+            Running the whole gain at the capital gains rate would say{" "}
+            <span className="font-semibold tabular-nums text-ink">
+              {usd(gain * ((num(capGains) ?? 0) / 100))}
+            </span>
+            . The bill is{" "}
+            <span className="font-semibold tabular-nums text-kill">{usd(r.sale!.tax)}</span>,
+            because what you depreciated comes back at a higher rate than what
+            you made.
+          </p>
+        </div>
+      )}
+
+      {r.netOfRecapture !== null && (
+        <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
+          <Stat label="Written off over the hold" value={usd(r.totalDepreciation)} />
+          <Stat label="Worth, at your rate" value={usd(r.shelterValue)} tone="muted" />
+          <Stat label="Taken back at the sale" value={usd((r.shelterValue ?? 0) - r.netOfRecapture)} tone="muted" />
+          <Stat label="What you keep" value={usd(r.netOfRecapture)} tone="brand" />
+        </div>
+      )}
+
+      {r.netOfRecapture !== null && (
+        <p className="mt-4 text-sm text-muted">
+          Depreciation is a <span className="font-semibold text-ink">timing</span> benefit,
+          not a permanent one: shelter and recapture at the same rate and it nets
+          to nothing. What survives here is the gap between the{" "}
+          {(num(ordinary) ?? 0).toFixed(0)}% that sheltered it and the 25% that
+          recaptures it — plus the time value of having had the money in
+          between, which this does not count.
+        </p>
+      )}
+
+      {segOn && plain.netOfRecapture !== null && r.netOfRecapture !== null && (
+        <p className="mt-3 rounded-xl bg-faint p-3 text-sm text-muted">
+          <span className="font-semibold text-ink">Cost segregation is not a free lunch.</span>{" "}
+          It moves {usdExact(plain.yearOneDepreciation)} of year-one write-off up to{" "}
+          {usdExact(r.yearOneDepreciation)} — but the carved-out part comes back
+          under section 1245 at {(num(ordinary) ?? 0).toFixed(0)}%, not at 25%. In
+          raw dollars this deal keeps{" "}
+          <span className="font-semibold tabular-nums text-ink">{usd(r.netOfRecapture)}</span>{" "}
+          with the study against{" "}
+          <span className="font-semibold tabular-nums text-ink">{usd(plain.netOfRecapture)}</span>{" "}
+          without it. The study wins on getting the money early, not on the total.
+        </p>
+      )}
+
+      <p className="mt-4 text-xs text-muted">
+        Screening arithmetic, federal only — no state tax, no passive-activity
+        limits, no 1031 exchange, no net investment income tax, and the
+        mid-month convention is ignored. Not tax advice.
+      </p>
+
+      {r.note && <p className="mt-4 text-sm text-caution">{r.note}</p>}
+    </Card>
+  );
+}
+
+// ── 7d. rentable, usable, and the rent you actually pay ────────────────────
 
 /**
  * The load factor, and what it does to a quoted rent.
@@ -2125,6 +2336,7 @@ export function DealMathTools() {
       <Waterfall />
       <NetEffectiveRent />
       <RentableUsable />
+      <AfterTax />
       <div className="grid gap-6 lg:grid-cols-2">
         <CapTriangle />
         <RentConverter />

@@ -5,8 +5,8 @@ Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 
 ## 🟢 2026-09-16, later — `/tools` becomes the reason not to open Excel
 
-Seven more PRs, #307–#313, all on `/tools`, all proven live by the round
-markers. Fifteen calculations there now, and they cover the arithmetic an
+Nine more PRs, #307–#315, all on `/tools` or its shop window, all proven
+live by the round markers. Sixteen calculations there now, and they cover the arithmetic an
 acquisitions analyst does between opening a memorandum and sending a
 letter:
 
@@ -23,22 +23,26 @@ letter:
 | **Land residual** (#313) | The only one that solves for a price rather than judging one. What is left of the finished building after the build and the required return: **$8.29M**, which a quarter point on the exit cap takes to **$5.57M** |
 | **Net effective rent** | Both ways — straight-line and discounted — with free rent, TI and the commission against the *gross* |
 | **Rentable vs usable** (#312) | The load factor, and what it does to a quote. **$38.00 per rentable foot is $43.70 per foot you can furnish** — and the two numbers people both call "the load factor" (15.0% and 13.0%) are the same building |
+| **After tax** (#315) | Land is never depreciable; the gain at the sale has THREE rates, not one; and depreciation is a **timing** benefit — shelter and recapture at the same rate and it nets to zero. Cost segregation lifts year-one write-off 4.5× and leaves this deal **$130,909 worse off** in raw dollars |
 | **Opex translator** | One expense per unit, per foot, as a share of income |
 | **Cap triangle · Rent converter · Build or buy** | The quick ones |
 
 Three things they share: every field reads shorthand (`$20M`, `4.75%`,
 `1.25x`); every field travels in the URL, so a sizing is a link; and the
-math is a pure tested module before it reaches a page — **218 tests** on
-the nine modules, plus **27** that render the page itself and check the
-figures it prints.
+math is a pure tested module before it reaches a page — **244 tests** on
+the ten modules, plus **32** that render the page itself and check the
+figures it prints. And since #314 the homepage renders its shelf of those
+calculations from the SAME list the page builds its cards from, so it can
+no longer advertise a version of `/tools` that does not exist.
 
 *Nothing on this list is yours to do.* It is here so you know what is
 there.
 
 **What I'd build next, when you want more:** an amortisation schedule you
-can export, depreciation and after-tax, a closing proration. Then the
-pieces that are not calculators at all — copy-as-table on the comps and
-pipeline tables, a print stylesheet, breadcrumbs, a keyboard layer.
+can export, a closing proration, a lease-abstract reader. Then the pieces
+that are not calculators at all — a copy-as-table button on the deal
+page's comps (the pipeline already exports CSV and .xlsx), a print
+stylesheet, breadcrumbs, a keyboard layer.
 
 ---
 
