@@ -36,9 +36,44 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and twenty-eight PRs, #176–#303, each
+estimate, and that's what it should flag." A hundred and twenty-nine PRs, #176–#304, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
+
+- **#304 Paste a cash flow.** The single most common reason an analyst
+  leaves a screening tool mid-call is to paste a column of numbers into
+  Excel and read the IRR off the bottom. /tools takes that column now —
+  tab- and newline-separated the way a spreadsheet's clipboard writes it,
+  `(1,200)` the way it writes a negative, `$1.2M` the way a person writes
+  one — and answers with the rate, the multiple, the profit, and the
+  payback interpolated inside the year, because the difference between
+  month two and month eleven is most of a year.
+
+  One thing in `readStrip` is worth naming, because getting it backwards
+  is silent: a comma is BOTH a separator and a thousands mark. So the
+  separator is decided by what the text contains — a line break or a tab
+  means the commas are grouping. Split on commas first and "1,200,000"
+  becomes three years.
+
+  Then the figure nothing else on the page computes: HOW MUCH OF THE
+  RETURN IS THE EXIT. A 17% that is three-quarters residual and a 17% that
+  is a quarter are different deals wearing the same number, and which one
+  it is decides how hard to argue about the exit cap. It is the standard
+  partition — every inflow discounted at the deal's own IRR — which is
+  always a smaller, more honest residual share than a raw-dollar ratio,
+  and it is drawn as a two-segment bar before it is said in words. It
+  needs the sale proceeds stated, because nothing in a bare column says
+  where the building was sold; it asks rather than guessing.
+
+  Every strip that has no answer says so: a single figure, an all-positive
+  column (nothing invested), an all-negative one (nothing comes back), and
+  the two-sign-change shape where no single rate solves it. `irr()`'s scan
+  starts at −90%, so without those guards a column with nothing invested
+  would report the scan floor as though it were a rate.
+
+  ONE IRR: it comes from `lib/underwrite/engine`, the same function behind
+  the Excel export whose formulas CI recalculates against it, so the page
+  and the workbook cannot disagree. Twenty-one tests on the pure layer.
 
 - **#303 One recorded sale is not a median.** The public-records comps
   readout printed, verbatim, "1 recorded sales — median $400,000 · range

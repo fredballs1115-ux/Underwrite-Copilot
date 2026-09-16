@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { readFigure } from "@/lib/money";
+import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
 import {
   breakEvenOccupancyPct,
   capRatePct,
@@ -549,12 +550,180 @@ function RentConverter() {
   );
 }
 
+
+// ── 5. paste a cash flow ───────────────────────────────────────────────────
+
+/**
+ * The reason an analyst opens Excel mid-call: a column of numbers and the
+ * question "what does that IRR to".
+ *
+ * The rate, the multiple, the profit and the payback are the easy half. The
+ * half nothing else here does is the SPLIT — how much of the return is the
+ * sale. A 17% that is three-quarters residual and a 17% that is a quarter
+ * are different deals wearing the same number, and which one it is decides
+ * how hard to argue about the exit cap.
+ */
+function CashFlowStrip() {
+  const [raw, setRaw] = useState(
+    "-10,000,000\n650,000\n700,000\n750,000\n800,000\n15,200,000",
+  );
+  const [residual, setResidual] = useState("14,400,000");
+  const [discount, setDiscount] = useState("10");
+
+  const read = useMemo(() => readStrip(raw), [raw]);
+  const r = useMemo(
+    () =>
+      analyzeStrip(read.values, {
+        discountPct: num(discount),
+        residual: num(residual),
+      }),
+    [read.values, discount, residual],
+  );
+
+  // Every year drawn against the largest flow in the strip, from a centre
+  // line, so the shape of the deal — one big outflow, a thin middle, a fat
+  // exit — is visible before a single figure is read.
+  const widest = Math.max(1, ...r.rows.map((x) => Math.abs(x.flow)));
+  const split = r.fromResidualPct;
+
+  return (
+    <Card eyebrow="Returns" title="Paste a cash flow">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+        <div>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
+              The strip — year 0 first
+            </span>
+            <textarea
+              value={raw}
+              onChange={(e) => setRaw(e.target.value)}
+              rows={8}
+              spellCheck={false}
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-sm tabular-nums outline-none transition-colors focus:border-brand"
+            />
+          </label>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
+            Paste a column straight out of a model. Tabs, line breaks,
+            {" "}
+            <span className="font-mono">(1,200)</span> and{" "}
+            <span className="font-mono">$1.2M</span> all read.
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <Field
+              label="Of which, the sale"
+              value={residual}
+              onChange={setResidual}
+              placeholder="14,400,000"
+            />
+            <Field
+              label="Discount rate"
+              suffix="%"
+              value={discount}
+              onChange={setDiscount}
+              placeholder="10"
+            />
+          </div>
+          {read.skipped.length > 0 && (
+            <p className="mt-2 text-xs text-caution">
+              Ignored: {read.skipped.slice(0, 4).join(", ")}
+              {read.skipped.length > 4 ? ` and ${read.skipped.length - 4} more` : ""}.
+            </p>
+          )}
+        </div>
+
+        <div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <Stat label="IRR" value={pct(r.irrPct, 1)} tone="brand" />
+            <Stat label="Equity multiple" value={mult(r.equityMultiple)} />
+            <Stat label="Profit" value={usd(r.profit)} />
+            <Stat
+              label="Payback"
+              value={r.paybackYears === null ? "—" : `${r.paybackYears.toFixed(1)} yr`}
+            />
+            <Stat label={`NPV at ${num(discount) ?? "—"}%`} value={usd(r.npv)} />
+            <Stat label="Invested" value={usd(-r.invested)} tone="muted" />
+          </div>
+
+          {r.note && <p className="mt-3 text-sm text-caution">{r.note}</p>}
+
+          {split !== null && (
+            <div className="mt-5">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                Where the return comes from
+              </p>
+              <div className="mt-2 flex h-3 overflow-hidden rounded-full bg-faint">
+                <div className="bg-brand" style={{ width: `${100 - split}%` }} />
+                <div className="bg-sidebar" style={{ width: `${split}%` }} />
+              </div>
+              <p className="mt-2 text-sm">
+                <span className="font-semibold tabular-nums text-brand">
+                  {Math.round(100 - split)}%
+                </span>
+                <span className="text-muted"> from cash flow, </span>
+                <span className="font-semibold tabular-nums text-sidebar">
+                  {Math.round(split)}%
+                </span>
+                <span className="text-muted">
+                  {" "}
+                  from the sale.{" "}
+                  {split >= 70
+                    ? "Most of this deal is the exit — the cap you sell at is the argument."
+                    : split >= 40
+                      ? "A balanced return; the exit matters but does not decide it."
+                      : "The return is in the operations, so the exit cap is the smaller risk."}
+                </span>
+              </p>
+            </div>
+          )}
+
+          {r.rows.length > 1 && (
+            <div className="mt-5 border-t border-line pt-4">
+              <div className="space-y-1.5">
+                {r.rows.map((row) => (
+                  <div key={row.year} className="flex items-center gap-3 text-xs">
+                    <span className="w-10 shrink-0 text-muted">
+                      {row.year === 0 ? "Now" : `Yr ${row.year}`}
+                    </span>
+                    <span className="relative h-2.5 flex-1 rounded-full bg-faint">
+                      <span className="absolute inset-y-0 left-1/2 w-px bg-line" />
+                      <span
+                        className={`absolute inset-y-0 rounded-full ${
+                          row.flow >= 0 ? "bg-brand" : "bg-kill"
+                        }`}
+                        style={
+                          row.flow >= 0
+                            ? { left: "50%", width: `${(row.flow / widest) * 50}%` }
+                            : { right: "50%", width: `${(-row.flow / widest) * 50}%` }
+                        }
+                      />
+                    </span>
+                    <span className="w-24 shrink-0 text-right font-mono tabular-nums">
+                      {usd(row.flow)}
+                    </span>
+                    <span className="hidden w-24 shrink-0 text-right font-mono tabular-nums text-muted sm:block">
+                      {usd(row.cumulative)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] text-muted">
+                Each year against the largest flow; the right column is the running total.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 
 export function DealMathTools() {
   return (
     <div className="space-y-6">
       <DebtSizer />
+      <CashFlowStrip />
       <div className="grid gap-6 lg:grid-cols-2">
         <CapTriangle />
         <RentConverter />
