@@ -1028,9 +1028,30 @@ describe("the deal math tools", () => {
   });
 
   it("draws the binding test rather than only naming it", () => {
-    // three tracks, one filled in the brand colour and two in the line
-    // colour — the picture that makes the short bar the answer
-    expect(html.match(/rounded-full bg-brand/g)?.length).toBe(1);
-    expect(html.match(/rounded-full bg-line/g)?.length).toBe(2);
+    // three tracks in the debt sizer, one filled in the brand colour and
+    // two in the line colour — the picture that makes the short bar the
+    // answer. (The cash-flow strip draws its own bars; they are counted in
+    // their own test below, which is why this one anchors on `h-full`.)
+    expect(html.match(/h-full rounded-full bg-brand/g)?.length).toBe(1);
+    expect(html.match(/h-full rounded-full bg-line/g)?.length).toBe(2);
+  });
+
+  it("reads a pasted cash flow and says where the return comes from", () => {
+    // The seeded strip: −$10M, four thin years, a $15.2M exit of which
+    // $14.4M is the sale. It must answer on arrival, like every other card.
+    expect(text).toContain("Paste a cash flow");
+    expect(text).toContain("1.81x"); // $18.1M back on $10M in
+    expect(text).toContain("$8.10M"); // the profit
+    expect(text).toContain("4.5 yr"); // payback, inside the year
+    // The split is the figure nothing else on the page computes, and it is
+    // DRAWN before it is said: two segments, brand and sidebar.
+    expect(text).toContain("from cash flow");
+    expect(text).toContain("from the sale");
+    expect(html).toContain('class="bg-sidebar"');
+    // A deal that is mostly its exit says so in words too.
+    expect(text).toContain("the cap you sell at is the argument");
+    // Every year is drawn from a centre line: six rows, the first negative.
+    expect(html.match(/rounded-full bg-kill/g)?.length).toBe(1);
+    expect(html.match(/rounded-full bg-brand/g)?.length).toBeGreaterThanOrEqual(6);
   });
 });

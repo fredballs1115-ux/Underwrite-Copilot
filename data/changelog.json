@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-16",
+      "title": "Paste a cash flow, get the IRR — and where it came from",
+      "blurb": "The most common reason an analyst leaves a screening tool mid-call is to paste a column of numbers into Excel and read the IRR off the bottom. /tools now takes that column — tabs, line breaks, (1,200), $1.2M, all of it — and answers with the rate, the multiple, the profit and the payback inside the year. Then the figure nothing else here computes: how much of the return is the sale rather than the operations. A 17% that is three-quarters residual and a 17% that is a quarter are different deals wearing the same number.",
+      "href": "/tools"
+    },
+    {
+      "date": "2026-09-16",
       "title": "One recorded sale is no longer called a median",
       "blurb": "The public-records comps readout printed “1 recorded sales — median $400,000 · range $400,000–$400,000” and then a confident percentage against it. One sale is a data point, not a market. The figure still shows — it is the only evidence there is — but it is named correctly, the range is dropped where there is nothing to range over, and the above/below call is withheld until there are enough sales to have a middle.",
       "href": "/comps"

@@ -174,6 +174,20 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   figure; a pasted line is not). `/tools` and `/market` are the two
   public pages that also serve signed-in visitors; both draw their chrome
   from `app/public-shell.tsx`, never their own copy.
+- A pasted column of cash flows: `lib/tools/cashflow-math.ts` (pure —
+  `readStrip` takes what a spreadsheet's clipboard actually puts on it,
+  deciding the separator by what the text contains, because a comma is
+  BOTH a separator and a thousands mark; `analyzeStrip` answers with the
+  rate, the multiple, the profit, the payback interpolated inside the
+  year, an NPV, and the SPLIT — how much of the return is the sale). The
+  split is discounted at the deal's own IRR, which is the standard
+  partition and always the smaller, honest number against a raw-dollar
+  ratio; it needs the sale stated, because nothing in a bare column says
+  where the building was sold, and it says so rather than guessing.
+  **`irr` comes from `lib/underwrite/engine`** — the one behind the Excel
+  export, whose formulas CI recalculates against it — so the page and the
+  workbook can never disagree. (`lib/model/compute` holds a second,
+  coarser copy for the model tab; a third would be worse than either.)
 - The homepage's photographs: `lib/photos.ts` (pure — the four slots with
   their file names, briefs, sizes and alt text; `presentPhotos` over an
   `exists` callback; `stripPhotos`; `HERO_AERIAL`) and `lib/photos-fs.ts`
