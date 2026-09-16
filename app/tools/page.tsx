@@ -6,7 +6,7 @@ import { DealMathTools } from "./deal-math-tools";
 export const metadata: Metadata = {
   title: "Deal math — Underwrite Copilot",
   description:
-    "Size a loan against LTV, DSCR and debt yield and see which one binds. Cap rate, price and NOI. Yield on cost against the exit cap. One rent said four ways. Runs in your browser; nothing is sent anywhere.",
+    "Eleven calculators for a commercial deal: size a loan and see which test binds, run the loan over the hold and test the refinance, sources and uses, the LP/GP waterfall, a pasted cash flow, an OM's unit mix, net effective rent, and the quick conversions. Runs in your browser; nothing is sent anywhere.",
 };
 
 /**
@@ -47,7 +47,7 @@ export default function ToolsPage() {
           When the deal is real
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-muted">
-          These four take numbers you already have. Upload the offering memorandum
+          These take numbers you already have. Upload the offering memorandum
           and the same engine reads them out of it, argues with them, checks the
           broker&apos;s comps against the market, and reconciles it all against your
           own model.

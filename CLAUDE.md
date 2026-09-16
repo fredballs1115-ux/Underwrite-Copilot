@@ -211,6 +211,18 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   pays a full fee. `readOpex` says one expense per unit, per SF and as a
   share of EGI, and names a sub-20% ratio as a net lease rather than a
   cheap building.
+- How the deal is capitalised: `lib/tools/sources-uses.ts` (pure). Three
+  rules. **Equity is the plug, never an input** — typing both an equity and
+  a debt figure states a capital structure rather than deriving one, and a
+  tool that allows it will happily show a stack that does not add up; the
+  uses side decides the cheque. **Closing costs quote against the PRICE**,
+  not against total uses, because quoting them against a total that
+  includes themselves is circular. And **the loan fee is a USE funded at
+  closing**, not a reduction of the loan — netting it out of proceeds
+  understates both the loan and the equity, which is how it goes missing
+  from a screening model. A loan larger than total uses reports a NEGATIVE
+  equity line rather than clamping to zero: it means the loan is oversized
+  for the basis, and hiding that is the one thing this must not do.
 - An OM's unit mix table: `lib/tools/unit-mix.ts` (pure). Two rules.
   **Weight by unit count, never by row** — 200 studios at $1,200 beside 4
   penthouses at $6,000 do not average $3,600, and averaging the rows is the

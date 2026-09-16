@@ -338,3 +338,5 @@ jobs:
           mark "#307 the refinance test reads the balloon" grep -q "Can the balloon be refinanced" p_tools2.html
           mark "#308 the LP/GP waterfall is on /tools" grep -q "Who actually gets the return" p_tools2.html
           mark "#309 the unit mix reader is on /tools" grep -q "Read the unit mix" p_tools2.html
+          mark "#310 sources and uses is on /tools" grep -q "Sources and uses" p_tools2.html
+          mark "#310 /tools indexes itself" grep -q "Jump to" p_tools2.html

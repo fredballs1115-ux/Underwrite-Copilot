@@ -3,6 +3,18 @@
   "entries": [
     {
       "date": "2026-09-16",
+      "title": "/tools indexes itself",
+      "blurb": "Eleven calculators is more than anyone should scroll past to find one, so the page opens with a row of jump links — which is also the honest answer to \"what does this page do\". The index and the cards read one list, and a test holds the two together: every link must name a card that exists, and every card must be reachable from the index, so neither can drift. The page's own description said it had four calculators; it says eleven now, and names them.",
+      "href": "/tools"
+    },
+    {
+      "date": "2026-09-16",
+      "title": "Sources and uses, with the equity as the plug",
+      "blurb": "The figure everyone carries is price less loan. On the seeded deal that is $20M − $13M = $7M; the actual cheque is $11.03M, because a $3M capital budget, 2% of closing, a 1% loan fee and a $500k reserve are all equity too. /tools draws both sides as bars of the SAME LENGTH — which is what \"the sides balance\" looks like — and names the leverage twice, because 65% of the price is only 54.1% of what the deal actually costs. The equity is derived, never typed: type both a debt and an equity figure and you have stated a capital structure rather than derived one. A loan bigger than the deal's uses shows a negative equity line rather than clamping to zero, because that means the loan is oversized for the basis and hiding it is the one thing this must not do.",
+      "href": "/tools"
+    },
+    {
+      "date": "2026-09-16",
       "title": "Read the unit mix straight off the memorandum",
       "blurb": "Every multifamily OM prints the same table — type, units, SF, in-place rent, market rent — and every analyst retypes it into Excel for four figures. Paste it into /tools instead. It weights by UNIT COUNT rather than by row, which matters more than it sounds: the seeded 144-unit mix averages $1,858, while averaging the four row rents gives $1,961 — the number you get from what you can see. Under the totals, each unit type draws as a row as wide as its share of the building, so a mix that is two-thirds one-bedrooms looks like it. Loss to lease is summed only over the rows that state both rents, and the card says how many units that covers — an OM that quotes market rents for the renovated types only must never produce a loss-to-lease figure for 60 units that reads as the building's.",
       "href": "/tools"
@@ -72,18 +84,6 @@
       "title": "Every market picture becomes a photograph of the place",
       "blurb": "A market is known by its skyline, not by its roofs. Each covered market now draws a real skyline photograph where one is verified, with the photographer and licence named beside it, and keeps its overhead frame only as the floor. A deal still shows its own site from above — that roof is the asset.",
       "href": "/market"
-    },
-    {
-      "date": "2026-09-14",
-      "title": "Each market brief opens on its own downtown",
-      "blurb": "Pick a market on /market and the brief opens on that market from above — the same public-domain USGS frame the homepage gallery draws for it — as a band carrying the region and the market's name. The picture is the place whose rules, rents and benchmarks follow.",
-      "href": "/market?metro=dallas"
-    },
-    {
-      "date": "2026-09-14",
-      "title": "The sign-in page opens on a real place",
-      "blurb": "Baltimore's Inner Harbor from above stands behind the sign-in card — the last public page that opened on a flat colour — a public-domain USGS frame under the same scrim, credited in the corner.",
-      "href": "/login"
     }
   ]
 }

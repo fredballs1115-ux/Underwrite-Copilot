@@ -5,6 +5,7 @@ import { readFigure } from "@/lib/money";
 import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
 import { readDebt, testRefi } from "@/lib/tools/debt-math";
 import { readLease, readOpex } from "@/lib/tools/lease-math";
+import { buildStack } from "@/lib/tools/sources-uses";
 import { readMix, totalMix } from "@/lib/tools/unit-mix";
 import { runWaterfall } from "@/lib/tools/waterfall-math";
 import {
@@ -235,17 +236,47 @@ function Stat({
   );
 }
 
+/**
+ * The page's index, in the order the cards appear.
+ *
+ * One list, read twice: the jump nav renders from it, and each Card takes
+ * its `id` from it. A label here with no card is a link to nowhere — the
+ * accessibility lint fails an in-page link whose target id is missing, and
+ * the render test holds every href in this list up to the ids actually
+ * emitted, so the two cannot drift apart silently.
+ */
+const INDEX = [
+  { id: "size-the-loan", label: "Size the loan" },
+  { id: "the-loan-over-the-hold", label: "Over the hold" },
+  { id: "cash-flow-strip", label: "Cash flow" },
+  { id: "sources-and-uses", label: "Sources & uses" },
+  { id: "unit-mix", label: "Unit mix" },
+  { id: "the-waterfall", label: "LP / GP split" },
+  { id: "net-effective-rent", label: "Net effective rent" },
+  { id: "cap-rate-triangle", label: "Cap rate" },
+  { id: "rent-converter", label: "Rent, four ways" },
+  { id: "operating-expense", label: "One expense" },
+  { id: "build-or-buy", label: "Build or buy" },
+] as const;
+
 function Card({
+  id,
   eyebrow,
   title,
   children,
 }: {
+  id: string;
   eyebrow: string;
   title: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-line bg-white p-5 sm:p-6">
+    <section
+      id={id}
+      // The index links here, so leave room for the header rather than
+      // landing with the eyebrow under it.
+      className="scroll-mt-4 rounded-2xl border border-line bg-white p-5 sm:p-6"
+    >
       <p className="text-[11px] font-semibold uppercase tracking-widest text-brand">
         {eyebrow}
       </p>
@@ -291,7 +322,7 @@ function DebtSizer() {
   const binding = s.tests.find((t) => t.binding);
 
   return (
-    <Card eyebrow="Debt" title="Size the loan">
+    <Card id="size-the-loan" eyebrow="Debt" title="Size the loan">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Field label="Price" value={price} onChange={setPrice} placeholder="$20M" />
         <Field label="NOI" value={noi} onChange={setNoi} placeholder="1,200,000" />
@@ -437,7 +468,7 @@ function CapTriangle() {
   const perSf = per(shownPrice, num(sf));
 
   return (
-    <Card eyebrow="Value" title="Cap rate, price, NOI">
+    <Card id="cap-rate-triangle" eyebrow="Value" title="Cap rate, price, NOI">
       <p className="text-sm text-muted">Fill any two. The third solves.</p>
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Field label="NOI" value={noi} onChange={setNoi} placeholder="1,200,000" />
@@ -516,7 +547,7 @@ function BuildOrBuy() {
   const healthy = bps >= 0;
 
   return (
-    <Card eyebrow="Development" title="Build or buy">
+    <Card id="build-or-buy" eyebrow="Development" title="Build or buy">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Field label="Land" value={land} onChange={setLand} />
         <Field label="Hard cost" value={hard} onChange={setHard} />
@@ -618,7 +649,7 @@ function RentConverter() {
   ];
 
   return (
-    <Card eyebrow="Rent" title="One rent, four ways">
+    <Card id="rent-converter" eyebrow="Rent" title="One rent, four ways">
       <div className="flex flex-wrap gap-2">
         {BASES.map((b) => (
           <button
@@ -714,7 +745,7 @@ function CashFlowStrip() {
   const split = r.fromResidualPct;
 
   return (
-    <Card eyebrow="Returns" title="Paste a cash flow">
+    <Card id="cash-flow-strip" eyebrow="Returns" title="Paste a cash flow">
       <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <div>
           <label className="block">
@@ -899,7 +930,7 @@ function NetEffectiveRent() {
   const share = (n: number) => (gross > 0 ? Math.max(0, (n / gross) * 100) : 0);
 
   return (
-    <Card eyebrow="Leasing" title="What the lease is really worth">
+    <Card id="net-effective-rent" eyebrow="Leasing" title="What the lease is really worth">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
         <Field label="Term" suffix="mo" value={months} onChange={setMonths} placeholder="120" />
         <Field label="Starting rent" suffix="/SF" value={rent} onChange={setRent} placeholder="36" />
@@ -998,7 +1029,7 @@ function OpexTranslator() {
   const ratio = r.ratioPct;
 
   return (
-    <Card eyebrow="Operations" title="One expense, three ways">
+    <Card id="operating-expense" eyebrow="Operations" title="One expense, three ways">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Field label="Operating expenses" value={opex} onChange={setOpex} placeholder="504,000" />
         <Field label="Units" value={units} onChange={setUnits} placeholder="120" />
@@ -1036,7 +1067,120 @@ function OpexTranslator() {
   );
 }
 
-// ── 8. the unit mix ────────────────────────────────────────────────────────
+// ── 8. sources and uses ────────────────────────────────────────────────────
+
+/**
+ * What the deal costs and where the money comes from.
+ *
+ * The picture is two bars of the SAME LENGTH, segmented — which is what
+ * "the sides balance" means, said as a shape rather than as a pair of
+ * totals a reader has to compare. The equity segment is the cheque, and
+ * seeing it sit beside the purchase price is the point: $20M at 65% is not
+ * $7M of equity once closing, capital and a reserve are counted.
+ */
+function SourcesUses() {
+  const [price, setPrice] = useShared("sp", "$20M");
+  const [capital, setCapital] = useShared("scap", "$3M");
+  const [closing, setClosing] = useShared("scl", "2");
+  const [reserve, setReserve] = useShared("sres", "500,000");
+  const [other, setOther] = useShared("soth", "");
+  const [loan, setLoan] = useShared("sln", "$13M");
+  const [fee, setFee] = useShared("sfee", "1");
+
+  const s = useMemo(
+    () =>
+      buildStack({
+        price: num(price),
+        capital: num(capital),
+        closingPct: num(closing),
+        closingAmount: null,
+        reserve: num(reserve),
+        other: num(other),
+        loan: num(loan),
+        loanFeePct: num(fee),
+      }),
+    [price, capital, closing, reserve, other, loan, fee],
+  );
+
+  // One palette per side, walked in order, so a segment's colour is stable
+  // as figures move.
+  const useTone = ["bg-brand", "bg-brand/70", "bg-brand/45", "bg-brand/30", "bg-brand/20", "bg-brand/10"];
+  // Debt dark, equity in the brand colour. NOT bg-accent: globals.css
+  // marks that token "dark surfaces only", and this card sits on white.
+  const sourceTone = ["bg-sidebar", "bg-brand"];
+
+  return (
+    <Card id="sources-and-uses" eyebrow="Capital" title="Sources and uses">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+        <Field label="Price" value={price} onChange={setPrice} placeholder="$20M" />
+        <Field label="Capital" value={capital} onChange={setCapital} placeholder="$3M" />
+        <Field label="Closing" suffix="%" value={closing} onChange={setClosing} placeholder="2" />
+        <Field label="Reserves" value={reserve} onChange={setReserve} placeholder="500,000" />
+        <Field label="Other" value={other} onChange={setOther} placeholder="—" />
+        <Field label="Loan" value={loan} onChange={setLoan} placeholder="$13M" />
+        <Field label="Loan fee" suffix="%" value={fee} onChange={setFee} placeholder="1" />
+      </div>
+
+      {s.totalUses > 0 && (
+        <>
+          <div className="mt-6 space-y-5">
+            {[
+              { side: "Uses", lines: s.uses, total: s.totalUses, tones: useTone },
+              { side: "Sources", lines: s.sources, total: s.totalSources, tones: sourceTone },
+            ].map((b) => (
+              <div key={b.side}>
+                <div className="flex items-baseline justify-between text-sm">
+                  <span className="font-medium">{b.side}</span>
+                  <span className="font-mono font-semibold tabular-nums">{usd(b.total)}</span>
+                </div>
+                {/* Both bars run the full width, because both sides are the
+                    same total — that identity IS the balance. */}
+                <div className="mt-1.5 flex h-4 w-full overflow-hidden rounded-full bg-faint">
+                  {b.lines.map((l, i) => (
+                    <div
+                      key={l.label}
+                      data-bar="stack"
+                      className={`h-full ${b.tones[i % b.tones.length]}`}
+                      style={{ width: `${Math.max(0, l.sharePct)}%` }}
+                    />
+                  ))}
+                </div>
+                <p className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted">
+                  {b.lines.map((l, i) => (
+                    <span key={l.label} className="flex items-center gap-1.5">
+                      <span
+                        className={`inline-block h-2.5 w-2.5 rounded-sm ${b.tones[i % b.tones.length]}`}
+                      />
+                      {l.label} {usd(l.amount)}
+                    </span>
+                  ))}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Stat label="The cheque" value={usd(s.equity)} tone="brand" />
+            <Stat label="Loan to cost" value={pct(s.loanToCostPct, 1)} />
+            <Stat label="Loan to price" value={pct(s.loanToPricePct, 1)} tone="muted" />
+            <Stat label="Over the price" value={pct(s.overPricePct, 1)} tone="muted" />
+          </div>
+
+          <p className="mt-4 text-sm text-muted">
+            The price less the loan is {usd((num(price) ?? 0) - (num(loan) ?? 0))}. The cheque is{" "}
+            <span className="font-semibold text-ink">{usd(s.equity)}</span> — everything below the
+            purchase price is equity too, and it is where a screening model most often comes up
+            short.
+          </p>
+        </>
+      )}
+
+      {s.note && <p className="mt-4 text-sm text-caution">{s.note}</p>}
+    </Card>
+  );
+}
+
+// ── 9. the unit mix ────────────────────────────────────────────────────────
 
 /**
  * The table every multifamily memorandum prints, read into the four figures
@@ -1064,7 +1208,7 @@ function UnitMix() {
   );
 
   return (
-    <Card eyebrow="Multifamily" title="Read the unit mix">
+    <Card id="unit-mix" eyebrow="Multifamily" title="Read the unit mix">
       <div className="grid gap-5 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
         <div>
           <label className="block">
@@ -1168,7 +1312,7 @@ function UnitMix() {
   );
 }
 
-// ── 9. the LP / GP split ───────────────────────────────────────────────────
+// ── 10. the LP / GP split ──────────────────────────────────────────────────
 
 /**
  * The property's IRR is not anybody's IRR.
@@ -1213,7 +1357,7 @@ function Waterfall() {
   const totalOut = w.lp.distributed + w.gp.distributed;
 
   return (
-    <Card eyebrow="Structure" title="Who actually gets the return">
+    <Card id="the-waterfall" eyebrow="Structure" title="Who actually gets the return">
       <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div>
           <label className="block">
@@ -1335,7 +1479,7 @@ const trimPct = (raw: string) => {
   return n === null ? raw : String(n);
 };
 
-// ── 10. what the loan does over the hold, and the refinance at the end ────
+// ── 11. what the loan does over the hold, and the refinance at the end ────
 
 /**
  * These two read as one question, so they share a card and the schedule's
@@ -1401,7 +1545,7 @@ function LoanOverTime() {
     r.verdict === "cash out" ? "text-pass" : r.verdict === "cash in" ? "text-kill" : "text-ink";
 
   return (
-    <Card eyebrow="Debt" title="What the loan does, and the refinance at the end">
+    <Card id="the-loan-over-the-hold" eyebrow="Debt" title="What the loan does, and the refinance at the end">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Field label="Loan" value={loan} onChange={setLoan} placeholder="$13M" />
         <Field label="Rate" suffix="%" value={rate} onChange={setRate} placeholder="6.5" />
@@ -1574,9 +1718,29 @@ function LoanOverTime() {
 export function DealMathTools() {
   return (
     <div className="space-y-6">
+      {/* The index. Eleven cards is more than a reader should have to
+          scroll past to find one, and a list of what is here is also the
+          honest answer to "what does this page do". */}
+      <nav aria-label="The calculators on this page" className="rounded-2xl border border-line bg-white p-4 sm:p-5">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-muted">
+            Jump to
+          </span>
+          {INDEX.map((x) => (
+            <a
+              key={x.id}
+              href={`#${x.id}`}
+              className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium transition-colors hover:border-brand hover:text-brand"
+            >
+              {x.label}
+            </a>
+          ))}
+        </div>
+      </nav>
+
       {/* "Send me that sizing" is the sentence this answers. Every field on
           the page writes itself into the query string (useShared), so the
-          link carries the whole state of all five calculators — and carries
+          link carries the whole state of every calculator — and carries
           only what was CHANGED, so an untouched page copies as a bare
           /tools rather than a paragraph of defaults. */}
       <div className="flex items-center justify-end">
@@ -1588,6 +1752,7 @@ export function DealMathTools() {
       <DebtSizer />
       <LoanOverTime />
       <CashFlowStrip />
+      <SourcesUses />
       <UnitMix />
       <Waterfall />
       <NetEffectiveRent />
