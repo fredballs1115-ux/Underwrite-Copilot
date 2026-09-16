@@ -5,6 +5,7 @@ import { readFigure } from "@/lib/money";
 import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
 import { readDebt, testRefi } from "@/lib/tools/debt-math";
 import { readLease, readOpex } from "@/lib/tools/lease-math";
+import { buildStack } from "@/lib/tools/sources-uses";
 import { readMix, totalMix } from "@/lib/tools/unit-mix";
 import { runWaterfall } from "@/lib/tools/waterfall-math";
 import {
@@ -1036,7 +1037,120 @@ function OpexTranslator() {
   );
 }
 
-// ── 8. the unit mix ────────────────────────────────────────────────────────
+// ── 8. sources and uses ────────────────────────────────────────────────────
+
+/**
+ * What the deal costs and where the money comes from.
+ *
+ * The picture is two bars of the SAME LENGTH, segmented — which is what
+ * "the sides balance" means, said as a shape rather than as a pair of
+ * totals a reader has to compare. The equity segment is the cheque, and
+ * seeing it sit beside the purchase price is the point: $20M at 65% is not
+ * $7M of equity once closing, capital and a reserve are counted.
+ */
+function SourcesUses() {
+  const [price, setPrice] = useShared("sp", "$20M");
+  const [capital, setCapital] = useShared("scap", "$3M");
+  const [closing, setClosing] = useShared("scl", "2");
+  const [reserve, setReserve] = useShared("sres", "500,000");
+  const [other, setOther] = useShared("soth", "");
+  const [loan, setLoan] = useShared("sln", "$13M");
+  const [fee, setFee] = useShared("sfee", "1");
+
+  const s = useMemo(
+    () =>
+      buildStack({
+        price: num(price),
+        capital: num(capital),
+        closingPct: num(closing),
+        closingAmount: null,
+        reserve: num(reserve),
+        other: num(other),
+        loan: num(loan),
+        loanFeePct: num(fee),
+      }),
+    [price, capital, closing, reserve, other, loan, fee],
+  );
+
+  // One palette per side, walked in order, so a segment's colour is stable
+  // as figures move.
+  const useTone = ["bg-brand", "bg-brand/70", "bg-brand/45", "bg-brand/30", "bg-brand/20", "bg-brand/10"];
+  // Debt dark, equity in the brand colour. NOT bg-accent: globals.css
+  // marks that token "dark surfaces only", and this card sits on white.
+  const sourceTone = ["bg-sidebar", "bg-brand"];
+
+  return (
+    <Card eyebrow="Capital" title="Sources and uses">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+        <Field label="Price" value={price} onChange={setPrice} placeholder="$20M" />
+        <Field label="Capital" value={capital} onChange={setCapital} placeholder="$3M" />
+        <Field label="Closing" suffix="%" value={closing} onChange={setClosing} placeholder="2" />
+        <Field label="Reserves" value={reserve} onChange={setReserve} placeholder="500,000" />
+        <Field label="Other" value={other} onChange={setOther} placeholder="—" />
+        <Field label="Loan" value={loan} onChange={setLoan} placeholder="$13M" />
+        <Field label="Loan fee" suffix="%" value={fee} onChange={setFee} placeholder="1" />
+      </div>
+
+      {s.totalUses > 0 && (
+        <>
+          <div className="mt-6 space-y-5">
+            {[
+              { side: "Uses", lines: s.uses, total: s.totalUses, tones: useTone },
+              { side: "Sources", lines: s.sources, total: s.totalSources, tones: sourceTone },
+            ].map((b) => (
+              <div key={b.side}>
+                <div className="flex items-baseline justify-between text-sm">
+                  <span className="font-medium">{b.side}</span>
+                  <span className="font-mono font-semibold tabular-nums">{usd(b.total)}</span>
+                </div>
+                {/* Both bars run the full width, because both sides are the
+                    same total — that identity IS the balance. */}
+                <div className="mt-1.5 flex h-4 w-full overflow-hidden rounded-full bg-faint">
+                  {b.lines.map((l, i) => (
+                    <div
+                      key={l.label}
+                      data-bar="stack"
+                      className={`h-full ${b.tones[i % b.tones.length]}`}
+                      style={{ width: `${Math.max(0, l.sharePct)}%` }}
+                    />
+                  ))}
+                </div>
+                <p className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted">
+                  {b.lines.map((l, i) => (
+                    <span key={l.label} className="flex items-center gap-1.5">
+                      <span
+                        className={`inline-block h-2.5 w-2.5 rounded-sm ${b.tones[i % b.tones.length]}`}
+                      />
+                      {l.label} {usd(l.amount)}
+                    </span>
+                  ))}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Stat label="The cheque" value={usd(s.equity)} tone="brand" />
+            <Stat label="Loan to cost" value={pct(s.loanToCostPct, 1)} />
+            <Stat label="Loan to price" value={pct(s.loanToPricePct, 1)} tone="muted" />
+            <Stat label="Over the price" value={pct(s.overPricePct, 1)} tone="muted" />
+          </div>
+
+          <p className="mt-4 text-sm text-muted">
+            The price less the loan is {usd((num(price) ?? 0) - (num(loan) ?? 0))}. The cheque is{" "}
+            <span className="font-semibold text-ink">{usd(s.equity)}</span> — everything below the
+            purchase price is equity too, and it is where a screening model most often comes up
+            short.
+          </p>
+        </>
+      )}
+
+      {s.note && <p className="mt-4 text-sm text-caution">{s.note}</p>}
+    </Card>
+  );
+}
+
+// ── 9. the unit mix ────────────────────────────────────────────────────────
 
 /**
  * The table every multifamily memorandum prints, read into the four figures
@@ -1168,7 +1282,7 @@ function UnitMix() {
   );
 }
 
-// ── 9. the LP / GP split ───────────────────────────────────────────────────
+// ── 10. the LP / GP split ──────────────────────────────────────────────────
 
 /**
  * The property's IRR is not anybody's IRR.
@@ -1335,7 +1449,7 @@ const trimPct = (raw: string) => {
   return n === null ? raw : String(n);
 };
 
-// ── 10. what the loan does over the hold, and the refinance at the end ────
+// ── 11. what the loan does over the hold, and the refinance at the end ────
 
 /**
  * These two read as one question, so they share a card and the schedule's
@@ -1588,6 +1702,7 @@ export function DealMathTools() {
       <DebtSizer />
       <LoanOverTime />
       <CashFlowStrip />
+      <SourcesUses />
       <UnitMix />
       <Waterfall />
       <NetEffectiveRent />
