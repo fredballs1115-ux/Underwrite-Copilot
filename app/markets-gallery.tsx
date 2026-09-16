@@ -2,7 +2,8 @@ import Link from "next/link";
 import metrosSeed from "@/data/research/metros.json";
 import { METRO_VIEWS } from "@/lib/metro-imagery";
 import { MARKET_COUNT, metroFact } from "./markets-marquee";
-import { AerialImg } from "./aerial-img";
+import { CityPhoto } from "./city-photo";
+import { skylineFor } from "@/lib/skyline";
 
 // Server-component module only: it pulls a research seed JSON, which must
 // never ride into a client bundle.
@@ -38,6 +39,17 @@ export function MarketsGallery() {
     // the marquee rather than show a hole.
     .filter((m) => m.place !== null);
 
+  // Every photographer whose work is in this grid, named once and in the
+  // grid's own order, with duplicates collapsed (one photographer can hold
+  // two markets).
+  const photographers = [
+    ...new Set(
+      items
+        .map((m) => skylineFor(m.id)?.credit)
+        .filter((c): c is string => Boolean(c) && c !== "unknown"),
+    ),
+  ];
+
   if (!items.length) return null;
 
   return (
@@ -57,11 +69,12 @@ export function MarketsGallery() {
               href={`/market?metro=${m.id}`}
               className="group relative block overflow-hidden rounded-xl border border-line outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
             >
-              <AerialImg
-                src={`/api/imagery/metro/${m.id}?w=480&h=360`}
-                alt={`Aerial view of ${m.place}`}
+              <CityPhoto
+                metro={m.id}
                 width={480}
                 height={360}
+                alt={`${m.name} skyline`}
+                showCredit={false}
                 className="aspect-[4/3] w-full bg-faint object-cover transition-transform duration-300 group-hover:scale-105"
               />
               {/* The scrim is what keeps the label legible over a photograph
@@ -80,9 +93,21 @@ export function MarketsGallery() {
         ))}
       </ul>
 
-      <p className="mt-4 text-[11px] text-muted">
-        Aerial imagery: USGS The National Map (public domain). Each tile is
-        centred on that market&apos;s business district.
+      {/* One credit line for the whole grid rather than eighteen captions.
+          Each Creative Commons photograph obliges us to name its
+          photographer; naming them together under the grid discharges that
+          and keeps the tiles clean, which is how every publication that
+          runs a photo grid handles it. The USGS line stays because a market
+          without a verified photograph still shows its overhead frame. */}
+      <p className="mt-4 text-[11px] leading-relaxed text-muted">
+        {photographers.length > 0 ? (
+          <>
+            Skyline photographs: {photographers.join(", ")} (Wikimedia Commons,
+            under their respective licences).{" "}
+          </>
+        ) : null}
+        Overhead frames: USGS The National Map (public domain), each centred on
+        that market&apos;s business district.
       </p>
     </section>
   );

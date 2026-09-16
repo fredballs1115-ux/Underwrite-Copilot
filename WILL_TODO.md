@@ -900,134 +900,292 @@ blocker for Bridge, Valuations, Rent roll and Submarkets.
 
 ---
 
-## 🔴 Blocking everything: run the outstanding migrations
+## ✅ The migrations are run — here is what just came alive
 
-Several pages are merged and deployed but inert until their tables exist.
-**Run `supabase/CHECK_MIGRATIONS.sql` first** — it reports which of these you
-actually still owe. Then run those, from `supabase/migrations/`, in exactly
-this order:
+**Done 2026-09-16.** You ran every outstanding migration and
+`supabase/CHECK_MIGRATIONS.sql` reported them all ✅. That was the single
+blocking item for four months of merged work, and it means the pages below
+stopped being empty shells this morning. Nothing else in this file depends
+on it any more.
 
-| File | Creates | Unblocks |
-|------|---------|----------|
-| `0028_property_database.sql` † | `properties`, `recorded_sales`, `journal_entries`, … | Property DB, journal, Data Health, steward — **and it now gates the file below** |
-| `0030_public_data_layer.sql` † | `incentive_zones`, `deals.site_flags`, `nearest_property()` | Opportunity-zone flags + the deal page's closest-parcel card |
-| `0030_deal_versions.sql` | `deal_versions`, `deal_version_bridges` | Deal → **Bridge** |
-| `0031_valuations.sql` | `valuations` | Deal → **Valuations** |
-| `0032_rent_roll_engine.sql` | `rent_roll_imports`, `rent_roll_mappings`, `market_leasing_profiles` | Deal → **Rent roll** |
-| `0033_submarkets.sql` | `submarkets`, `submarket_periods`, `pipeline_properties`, `deal_submarkets` | **Submarkets** + the deal-page supply card |
-| `0034_authorization_hardening.sql` | storage-path guard triggers on `deals`, `deal_documents`, `analysis_jobs`, `profiles`/`teams`; the `regulatory_alerts` column grant | **The eleventh review's row-level half** (#239): a forged storage path can no longer reach a table, and users can dismiss but not rewrite the alert banner. The app already refuses such paths in code; this makes the database agree. Safe on a schema missing 0016/0021/0023 — each block checks first. |
+**Walk these seven checks once — ten minutes, and it converts "the migration
+ran" into "the feature works".** Each one writes a row, because a table can
+exist and still refuse a write if a policy is wrong, and a write is the only
+thing that proves the whole path.
 
-All are additive, idempotent and RLS-scoped — no destructive step, safe to
-re-run. Run each file **whole** (the SQL editor only runs highlighted text if
-anything is selected — click once at the end so nothing is highlighted).
+| Check | Where | What proves it |
+|---|---|---|
+| 1. Save a deal version | any deal → **Bridge** | Save twice with a changed assumption; the bridge draws the IRR attribution. Writes `deal_versions`. |
+| 2. Add an opinion of value | any deal → **Valuations** | Enter a broker's number and yours; the gap decomposes. Writes `valuations`. |
+| 3. Import a rent roll | any deal → **Rent roll** | Upload a CSV; map the columns once; WALT and mark-to-market appear, and the mapping is remembered next time. Writes `rent_roll_imports` + `rent_roll_mappings`. |
+| 4. Create a submarket | **Markets → Submarkets** | Name one, attach it to a deal; the deal page's supply card fills. Writes `submarkets` + `deal_submarkets`. |
+| 5. Read a cost | **/data-health** | The "Cost per screen" card needs `analysis_jobs.usage` (0035). It fills the first time you run a screen AFTER the migration — older screens have no ledger and are correctly blank. |
+| 6. Check a site flag | any deal with an address | The closest-parcel and opportunity-zone card needs 0028 + 0030_public_data_layer and PostGIS. If it stays quiet, the property table is empty rather than missing — that is seeding, not migrating. |
+| 7. Dismiss an alert | any deal with a regulatory alert | Dismissing writes; rewriting the alert text must fail. That is 0034's column grant doing its job. |
 
-† **Two ordering traps, both verified against a real Postgres:**
+If any of those still refuses to save, re-run `CHECK_MIGRATIONS.sql` and send
+me the output — it names the exact table, column or function still owed.
+
+<details>
+<summary>The ordering traps, kept for a future environment</summary>
+
+You will meet these again if you ever stand up a second Supabase project
+(a staging environment, or a restore onto a fresh database). Both were
+verified against a real Postgres:
 
 1. **0028 needs PostGIS enabled first** (Database → Extensions → postgis).
-   Its first statement creates that extension; without it nothing in the file
-   gets created, which is exactly why 0028 can look unrun even after you ran it.
-2. **There are two files numbered `0030`.** `0030_public_data_layer.sql` came
-   from a different branch and declares an RPC returning
-   `setof public.properties`, so it fails with
+   Its first statement creates that extension; without it nothing in the
+   file gets created, which is why 0028 can look unrun even after a run.
+2. **There are two files numbered `0030`.** `0030_public_data_layer.sql`
+   declares an RPC returning `setof public.properties`, so it fails with
    `type "public.properties" does not exist` unless 0028 ran first — and it
    fails *halfway*, keeping `incentive_zones` and `deals.site_flags` while
-   losing the RPC. A table-only check would call that done, so the checker
-   below tests the function too. Run order: **0028 → 0030_public_data_layer →
-   0030_deal_versions → 0031 → 0032 → 0033.**
+   losing the RPC. A table-only check would call that done, which is why
+   `CHECK_MIGRATIONS.sql` tests the function too.
 
-Until they run, the behaviour is deliberate, not broken: every new read is
-best-effort, so the pages render with empty states rather than erroring. Saving
-anything on them will fail. That is the tell that this step is still pending.
+Run order: **0028 → 0030_public_data_layer → 0030_deal_versions → 0031 →
+0032 → 0033 → 0034 → 0035.** `0033` also needs
+`public.can_access_deal(...)` from `0017`. Every file is additive,
+idempotent and RLS-scoped — no destructive step, safe to re-run. Run each
+file **whole**: the SQL editor runs only the highlighted text if anything
+is selected, so click once at the end to clear the selection.
 
-`0033` also depends on `public.can_access_deal(...)` from `0017`.
-
-**Don't take any of that on faith — check it.** Paste
-`supabase/CHECK_MIGRATIONS.sql` into the SQL editor and run it: it reads the
-live schema and marks every migration ✅ run or ❌ NOT RUN, naming the exact
-tables, columns or functions any missing one still owes. It writes nothing.
-Run it before this section and again after, and the question "which
-migrations do I still need?" stops being a guess.
+</details>
 
 ---
 
-## Your moves (need your logins / a human's judgment)
+## Your moves — the full list, in the order that unblocks the most
 
-1. **Run `supabase/CHECK_MIGRATIONS.sql`, then run whatever it flags** — see
-   above. Nothing else in phases 1–4 works until this happens.
-2. **The scheduled jobs — pick GitHub Actions, not Render crons.** All four
-   (intel, rates, fmr, steward) now exist BOTH as Render cron services in
-   `render.yaml` and as free workflows in `.github/workflows/`, running the
-   identical scripts on the same schedules. Run one of each pair, never both.
-   The Actions route costs nothing and needs five repo secrets (Settings →
-   Secrets and variables → Actions): `SUPABASE_URL`,
-   `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `FRED_API_KEY` (free) and
-   `HUD_API_TOKEN` (free, huduser.gov/hudapi/public/register). Each workflow
-   no-ops with a printed instruction until its secrets exist, so nothing fails
-   while you set them up.
-   If you'd rather run them on Render, a **Blueprint sync** creates the four
-   cron services instead — same env vars. Note the rates command is
-   `node scripts/fetch-rates.mjs`, not `daily-rates.mjs`.
-   A Blueprint sync also now prompts for **`STRIPE_TEAM_PRICE_ID` and
-   `STRIPE_TEAM_SEAT_PRICE_ID`** on the web service. They were documented in
-   `.env.example` but missing from the Blueprint, so a sync never asked for
-   them — and the Stripe webhook refuses to process a subscription whose price
-   ids it can't match, so Team checkouts would have alerted instead of
-   activating. Set both, or leave Team billing off until you create the prices.
-3. ~~**Hit `/api/comps/health` signed in and paste the JSON back**~~ — **done
-   2026-09-04**, and it earned its keep. What the live run settled:
-   - **Philadelphia** was broken (`column "lat" does not exist`) — the table
-     carries PostGIS geometry, not lat/lng columns. Fixed.
-   - **Maryland** was broken on every column name at once. Socrata's error
-     named the real ones, so all nine are now read off the source rather than
-     guessed — including structure area, so MD comps can carry a $/SF.
-   - **New Jersey** needed nothing. All six fields verified present.
-   - **DC** is not wired and now says so: the service's own layer list has no
-     layer 53 and no sales table at all (it is a cadastral service).
-   - Four discovery providers point at wrong URLs; two more (Fairfax,
-     Allegheny) are ready to wire but need a parcel join for geometry.
-   `lib/public-comps/core.ts` records all of it inline.
-   **Re-run the probe after this deploys** — it will confirm Philadelphia and
-   Maryland, and Maryland's sample will reveal the transfer date's literal
-   format, which is the one thing still unproven.
-4. **The two human verifications** (high stakes, ~30 min):
-   - PG County DPIE PRSA FAQ PDF — confirm the ≤5-unit natural-person
-     exemption's conditions in the current revision; optionally email DPIE for
-     a written answer. (Research finding so far: domicile attaches only to the
-     condo exemption — confirm before you rely on it.)
-   - D.C. Law 26-80 enacted text on code.dccouncil.gov — the 2–4 unit TOPA
-     exemption's "business corporation" definition, and confirm the ≤4-unit
-     rent-control exemption's RAD registration requirement (unregistered =
-     stabilization applies).
-   Paste findings back → `regulatory_rules` rows upgrade sourced → verified.
-5. ~~**`RENDER_DEPLOY_HOOK`**~~ — **settled 2026-09-04: deleted.** The
-   `deploy-to-render` workflow was a no-op on every run (the secret was never
-   set, so its trigger step exited in 0s and the job still went green).
-   Deploys have always landed through Render's own `autoDeploy: true`, so
-   removing it loses nothing and removes a green job that deployed nothing.
-6. **Optionally**: add `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` +
-   `FRED_API_KEY` to this repo's Claude environment (code.claude.com) and allow
-   `*.supabase.co` in its network policy — then future sessions can run
-   migrations and seeds themselves instead of handing you SQL. Trade-off: the
-   service-role key bypasses RLS. **This is what would have let item 1 be done
-   for you rather than by you.**
-7. **Three sign-in settings in Supabase → Authentication (~5 min), then one
-   try.** (a) **URL Configuration → Site URL** should be
-   `https://underwrite-copilot.onrender.com`. A reset or confirmation link
-   whose target is not on the allowlist falls back to the Site URL; the site
-   now handles a link's code on any page, but a `localhost` Site URL sends
-   the person nowhere. (b) **Redirect URLs** should contain
-   `https://underwrite-copilot.onrender.com/**` — today's `/login?confirmed=1`
-   and `/account?reset=1` targets are proven allowlisted (the links reach
-   them), so this is a widening, not a fix. (c) **SMTP settings** — if the
-   project still sends through Supabase's built-in mailer, confirmation and
-   reset emails reach only the project's own team members, and a stranger's
-   sign-up now fails with "We can't send email to that address yet — a setup
-   problem on our side" instead of a silent nothing. Point it at Resend
-   (the `RESEND_API_KEY` you already hold; Authentication → SMTP settings)
-   so a new visitor's confirmation arrives. Then the try: Forgot password →
-   open the link **in the same browser** → you should land on Account,
-   signed in, with the reset banner. Open the same link a second time and
-   the sign-in page should say the link was already used and offer a new one.
+You asked for more than the eight items, and you were right that there is
+more. Here is everything standing between "the app is deployed" and "people
+who are not you rely on it and pay for it." Each item says **why** it
+matters, **where** to do it, and **how you know it worked** — that last part
+matters most, because several of these fail silently.
+
+The groups are sequenced. A later group is not urgent until the earlier one
+is done, with one exception: **A1 and A2 are sharp edges that affect people
+today**, so do those first whatever else you skip.
+
+### A. This week — sharp edges that affect real visitors
+
+**A1. Verify a sending domain in Resend, then point Supabase's mailer at
+it.** *The single highest-value item on this page.* Right now a stranger who
+signs up gets a confirmation email from Supabase's shared mailer, which is
+rate-limited to your own team and lands in spam for everyone else. That means
+**sign-up is effectively broken for anybody but you** and you would never see
+an error. Resend → Domains → add your domain → publish the three DNS records
+it gives you (SPF, DKIM, and a DMARC record). Then Supabase → Authentication
+→ SMTP settings → point at Resend with the `RESEND_API_KEY` you already hold,
+and set the from address to something on that domain (`hello@…`), never a
+gmail.com address — Gmail and Outlook reject those outright from a server.
+**How you know:** sign up with an address at a domain you do not control
+(a friend's, or a throwaway) and the confirmation lands in the inbox, not
+spam, within a minute. Until then, treat every "nobody is signing up" signal
+as unreliable.
+
+**A2. Rotate the six credentials that were pasted into chat as screenshots** —
+the Stripe secret key, the Stripe webhook secret, the Supabase service-role
+key, the two Resend keys and the Anthropic key. Create the new one first, set
+it in Render (and in GitHub Actions where the workflows use it), deploy,
+confirm the app still works, **then** revoke the old one. Nothing was stored
+on my side, but a key that has been in an image is a key you must assume is
+public. The service-role key is the frightening one: it bypasses every
+row-level security policy, so it can read every user's deals.
+**How you know:** the old keys are shown as revoked in each dashboard, and
+the site still screens a deal end to end after the swap.
+
+**A3. Set the GitHub Actions secrets, and fix the misspelled one.** The
+daily-intel sweep reads `ANTHROPIC_API_KEY`; the repository secret is saved
+as `NTHROPIC_API_KEY`. That single missing letter is why the scored feed
+under the News headlines has never filled. Settings → Secrets and variables →
+Actions. The five it needs: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+`ANTHROPIC_API_KEY`, `FRED_API_KEY` (free) and `HUD_API_TOKEN` (free, from
+huduser.gov/hudapi/public/register). Each workflow no-ops with a printed
+instruction until its secrets exist, so nothing has been failing loudly.
+Pick **either** the Actions workflows **or** the Render cron services in
+`render.yaml` — they run identical scripts on identical schedules, so
+running both doubles the cost and the writes.
+**How you know:** run the intel workflow once by hand from the Actions tab,
+then open `/news` — the scored feed below the headlines has rows.
+
+**A4. Put a spend cap on the Anthropic account.** A screen costs what
+`/data-health` now measures, but a runaway loop or an abusive upload costs
+whatever you let it. Anthropic console → Billing → set a monthly limit and an
+email alert at half of it. Do the same on Render and Supabase.
+**How you know:** the limit shows in the console, and you get a test alert.
+
+**A5. Walk the seven migration checks** in the green section above. They take
+ten minutes and they convert "the migration ran" into "the feature works" —
+a table can exist and still refuse writes if a policy is wrong.
+
+### B. Before you charge anyone money
+
+**B1. Decide about billing, explicitly.** Stripe keys exist in the
+environment, which means the code paths are reachable. Either finish it or
+close it — a half-wired checkout that errors is worse than a page that says
+"invoicing by hand while we are small". If you finish it: create the
+products and prices in Stripe, set `STRIPE_PRICE_ID`,
+`STRIPE_TEAM_PRICE_ID` and `STRIPE_TEAM_SEAT_PRICE_ID`, point the webhook
+endpoint at your real domain, and run `node scripts/stripe-test-flow.mjs`
+against test keys. The webhook refuses a subscription whose price ids it
+cannot match, so a missing id means a Team checkout alerts instead of
+activating.
+**How you know:** a test-mode card completes checkout, the account shows the
+plan, and cancelling in the customer portal downgrades it.
+
+**B2. Form the legal entity and put its real name on the site.** An LLC (or
+your decision to trade as a sole proprietor), an EIN, and a business bank
+account. Stripe will ask for all three. Your Terms and Privacy pages are
+written and live, but they name a product, not a legal person — a customer's
+counsel will notice.
+**How you know:** `/terms` and `/privacy` name the entity, and Stripe's
+account is out of restricted mode.
+
+**B3. Buy a domain and move the site onto it.** `underwrite-copilot.onrender.com`
+reads as a prototype, and no acquisitions professional forwards a link like
+that to their investment committee. Render → Settings → Custom Domain, add
+the DNS records, wait for the certificate. Then update, in this order:
+`NEXT_PUBLIC_APP_URL` in Render, Supabase → Authentication → URL
+Configuration (Site URL **and** Redirect URLs — `https://yourdomain.com/**`),
+and the Stripe webhook endpoint.
+**How you know:** a password-reset link mailed to yourself lands on the new
+domain and signs you in. Getting this order wrong is the classic way to lock
+yourself out of your own auth.
+
+### C. Before you rely on it
+
+**C1. Turn on error tracking.** Today a server error exists only in Render's
+log, which nobody reads at 2am. Sentry's free tier takes about twenty
+minutes to wire into a Next.js app and will tell you the first time a real
+OM breaks the pipeline in a way the tests never saw.
+**How you know:** you deliberately break something in a preview and the
+alert reaches your inbox.
+
+**C2. Turn on uptime monitoring.** Something that pings the homepage and
+`/api/news/health` every few minutes and texts you when it stops answering.
+Better Stack, UptimeRobot, or a Render cron that curls and alerts. Free tiers
+are fine.
+**How you know:** you pause the Render service for a minute and get paged.
+
+**C3. Prove a backup restores.** Supabase's free tier keeps very little
+history. Turn on point-in-time recovery on a paid tier, or schedule a
+`pg_dump` into storage. Then — and this is the part everyone skips — restore
+it once into a scratch project. An untested backup is a belief, not a backup.
+**How you know:** a scratch project comes up with your rows in it.
+
+**C4. Re-check isolation with two accounts.** Sign up a second account in a
+private window, create a deal in each, and try to reach account A's deal from
+account B by pasting the URL. It must refuse. Do the same with a share link
+after revoking it. The code and the database both enforce this and it is
+tested, but you should see it refuse with your own eyes once.
+**How you know:** both attempts land on a refusal, not a deal.
+
+### D. To make it worth opening
+
+**D1. Screen five to ten real offering memoranda you actually received.**
+This is the highest-information thing you can do all month. Every prompt in
+this system was tuned against a handful of decks; your inbox has the real
+distribution — bad scans, 200-page brochures, weird label wording, a
+conversion with no going-in cap. Each failure is a fix I can make precise.
+**How you know:** you have a list of what read wrong. Send me that list.
+
+**D2. Seed the property and submarket tables.** Migrations created them;
+they are empty, which is why the deal page's closest-parcel card and the
+supply card stay quiet. The NYC and Cook County ingest pipelines are wired —
+run the `ingest` workflow from the Actions tab. Create one submarket by hand
+on **Markets → Submarkets** and attach it to a deal to see the supply card
+fill.
+**How you know:** a deal with a New York address shows a nearest parcel.
+
+**D3. Re-screen the conversion deal** that once showed Year-1 NOI above its
+price, and read the header: *Deal type: Conversion*, the teal plan strip,
+yield on cost where the cap would be. That is the check that the strategy
+layer reads your real decks the way it reads the fixtures.
+
+**D4. Set `GOOGLE_MAPS_API_KEY` and every deal gets a photograph of its
+building instead of its roof.** This is the second half of your "terrible
+overhead photos" complaint. The market-level pictures are becoming real
+skyline photography this session, but a *deal* shows its own site, and for
+that the code already prefers Street View — an actual photograph of the
+building front — and only falls back to the USGS overhead when there is no
+key or no street-level address. The ordering is written and tested; it is
+waiting on the key. console.cloud.google.com → a project → enable **Street
+View Static API** and **Maps Static API** → create a key → restrict it to
+your domain → set it in Render. It is pay-as-you-go with a monthly free
+allowance that a screening product will not exhaust for a long time.
+**How you know:** open a deal with a real street address; the header shows
+the building from the street, and the pipeline row's thumbnail does too.
+
+**D5. Add privacy-friendly analytics.** Plausible or Fathom, one script tag.
+Without it you cannot tell whether people read `/why`, bounce off pricing, or
+never find `/demo`. You do not need cookie consent for these.
+**How you know:** you can answer "how many people opened the sample screen
+last week" without guessing.
+
+**D6. Put a working support address on the site and monitor it.** Even
+`hello@yourdomain`. A product that screens somebody's live acquisition needs
+a way to hear "this number is wrong."
+
+**D7. Drop four photographs into `public/photos/` and commit them.** Still
+open, and now the *only* photography gap — every market picture is being
+replaced with real skyline photography this session, but the human-scale
+shots still need files I cannot fetch. Exact names and sizes:
+`hero.jpg` (2400×1350, wide, quiet mid-tones — a building you would buy, or
+your team at work; the headline sits over it),
+`team.jpg` (1200×900, an acquisitions team around a table on deal day),
+`site-walk.jpg` (1200×900, an analyst walking a property),
+`building.jpg` (1200×900, a mid-rise multifamily or an industrial box at
+street level). JPEG, under 400 KB each. Until they exist the homepage shows
+a market skyline instead and the "Who it's for" strip stays folded away —
+never a placeholder.
+
+### E. Standing decisions, no deadline
+
+- **`ANALYSIS_WORKER=1`** on Render moves screens to the worker process.
+  Migration 0016 now exists, so this is available. Worth doing once you have
+  real concurrent users: a deploy mid-screen currently restarts the web
+  process (checkpoints resume it, but the worker is cleaner).
+- **`MODEL_VERDICT`** picks the verdict model; `/data-health` shows what each
+  choice costs per screen.
+- **`OM_READ=pdf`** forces the page read if a deck ever reads wrong from its
+  text layer.
+- **`NEWS_WARM=0`** turns the boot warm-up off.
+- **The two human verifications** (~30 min, high stakes, unchanged): the PG
+  County DPIE PRSA FAQ PDF — confirm the ≤5-unit natural-person exemption's
+  conditions in the current revision; and D.C. Law 26-80's enacted text on
+  code.dccouncil.gov — the 2–4 unit TOPA exemption's "business corporation"
+  definition, and whether the ≤4-unit rent-control exemption requires RAD
+  registration (unregistered would mean stabilization applies). Paste
+  findings back and those `regulatory_rules` rows upgrade from sourced to
+  verified.
+- **Optionally, give this environment database access**: add `SUPABASE_URL` +
+  `SUPABASE_SERVICE_ROLE_KEY` + `FRED_API_KEY` to the repo's Claude
+  environment and allow `*.supabase.co` in its network policy. Then future
+  sessions can run migrations and seeds directly instead of handing you SQL.
+  The trade-off is real: that key bypasses row-level security.
+- **Optionally, allow one image host** (`upload.wikimedia.org`) in the same
+  network policy. Today I cannot see a single photograph I put on the site —
+  the skyline work this session is verified by resolving each file from the
+  GitHub runner instead. Allowing that one host would let me look at what I
+  am shipping.
+
+<details>
+<summary>Settled earlier — kept so it is not re-litigated</summary>
+
+- **`/api/comps/health`** was run 2026-09-04 and earned its keep: Philadelphia
+  was broken (PostGIS geometry, not lat/lng columns) and is fixed; Maryland
+  was broken on every column name and now reads them off the source,
+  including structure area so MD comps carry a $/SF; New Jersey needed
+  nothing; DC is not wired and now says so (its service is cadastral, with no
+  sales table). Four discovery providers point at wrong URLs; Fairfax and
+  Allegheny are ready to wire but need a parcel join.
+  `lib/public-comps/core.ts` records all of it inline.
+- **`RENDER_DEPLOY_HOOK`** was deleted 2026-09-04. The `deploy-to-render`
+  workflow was a no-op on every run — the secret was never set, so its
+  trigger exited in 0s and the job still went green. Deploys land through
+  Render's own `autoDeploy: true`.
+
+</details>
 
 ---
 

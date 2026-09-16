@@ -237,6 +237,20 @@ jobs:
           probe "Google · Commercial Property Executive (phrase)" "https://news.google.com/rss/search?q=%22Commercial+Property+Executive%22&hl=en-US&gl=US&ceid=US%3Aen"
           probe "Bing · commercialsearch.com (bare)" "https://www.bing.com/news/search?q=commercialsearch.com&format=rss"
           probe "Google · site:therealdeal.com" "https://news.google.com/rss/search?q=site%3Atherealdeal.com&hl=en-US&gl=US&ceid=US%3Aen"
+      - name: The skyline photographs, resolved from the runner (diagnostic, non-gating)
+        # Every market photograph is a Wikimedia Commons file addressed by
+        # name. The sandbox that writes those names cannot reach Commons —
+        # its egress proxy answers 403 to the CONNECT — so a filename typed
+        # there is a claim, and an author or licence typed there would be a
+        # guess. A guessed attribution is a licence breach with somebody's
+        # name on it, so nothing is published on a guess: this step resolves
+        # each candidate here, where the network is open, and prints the real
+        # author, licence and pixel size to paste into lib/skyline.ts.
+        # --search asks Commons what exists; with no flag it verifies the
+        # candidates already chosen. While the table is being filled the
+        # search is what earns its keep, so that is the mode wired here.
+        run: node scripts/probe-skylines.mjs --search || true
+
       - name: Verdict
         # Two tiers: the hero headline proves the site is up and on the right
         # lineage; the build-sha stamp (the uc-build sentinel, printed above

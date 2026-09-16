@@ -124,6 +124,24 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   `assetClassLabel`, the forms' option list) — every surface that prints
   one goes through it, so a stored `self_storage` never reaches a page
   raw; the pipeline row's slots and its "Auto" rule are `lib/pipeline-slots.ts`.
+- A market's photograph: `lib/skyline.ts` (pure — one verified Wikimedia
+  Commons file per metro with its photographer and licence, plus
+  `commonsUrl` / `creditLine`), served by `app/api/imagery/skyline/[id]`
+  (proxied, validated by content-type, cached immutable, 404 on any
+  failure). `app/city-photo.tsx` (`CityPhoto`) is the one component every
+  market surface draws through: skyline first, the USGS overhead as the
+  floor, and **the credit follows whichever picture actually rendered** —
+  that is why the fallback is in the component and not the route, because
+  naming the wrong photographer is a licence breach. An overhead stays only
+  where the subject is one building (deal header, pipeline thumbnail, memo
+  cover, shared screen); there `lib/imagery.ts` already prefers a Street
+  View photograph when `GOOGLE_MAPS_API_KEY` is set. A market with no
+  verified file keeps its overhead, so the table grows one photograph at a
+  time. **Never write a filename, author or licence into that table from
+  memory**: the sandbox cannot reach Commons (403 through its egress
+  proxy), so `scripts/probe-skylines.mjs` runs from the GitHub runner via
+  live-verify — `--search` asks Commons what exists, no flag verifies what
+  is chosen — and only what that run prints goes in the table.
 - The homepage's photographs: `lib/photos.ts` (pure — the four slots with
   their file names, briefs, sizes and alt text; `presentPhotos` over an
   `exists` callback; `stripPhotos`; `HERO_AERIAL`) and `lib/photos-fs.ts`
@@ -277,10 +295,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
 ## Outstanding work
 
 `WILL_TODO.md` is the forward list — read it first in a new session. It names
-whose move each item is. As of 2026-08-28 the blocking item is **running
-migrations 0030–0033 in Supabase**: phases 1–4 are merged and deployed but
-their four pages stay inert (empty states, saves fail) until those tables
-exist.
+whose move each item is. **As of 2026-09-16 every migration through 0035 is
+run and verified** (`supabase/CHECK_MIGRATIONS.sql` reported them all ✅), so
+the four LPC pages, the cost ledger and the site-flag card are live rather
+than inert — the long-standing "blocked on migrations" caveat is retired.
+What remains is seeding and the operator's own accounts, not schema.
 
 ## Build roadmap
 
