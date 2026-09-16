@@ -308,11 +308,19 @@ jobs:
           for id in $ids; do
             # Ask at the width a page actually renders, so the byte counts
             # here are comparable to the Commons probe's above.
-            out=$(curl -sS -o /tmp/sky.bin -w '%{http_code} %{content_type} %{size_download}' \
-              --max-time 60 "https://underwrite-copilot.onrender.com/api/imagery/skyline/$id?w=1600" || echo "000 - 0")
+            #
+            # The two NUMERIC fields come first and the content type LAST,
+            # because a type is the one field that can carry a space
+            # ("image/jpeg; charset=…"). Typed last, that space lands in the
+            # field this reads as the type and nowhere else; typed in the
+            # middle it would shift the byte count into `$((size/1024))`,
+            # which is an arithmetic error, and under `bash -e` an error
+            # there takes the whole step down.
+            out=$(curl -sS -o /tmp/sky.bin -w '%{http_code} %{size_download} %{content_type}' \
+              --max-time 60 "https://underwrite-copilot.onrender.com/api/imagery/skyline/$id?w=1600" || echo "000 0 -")
             code=$(echo "$out" | cut -d' ' -f1)
-            type=$(echo "$out" | cut -d' ' -f2)
-            size=$(echo "$out" | cut -d' ' -f3)
+            size=$(echo "$out" | cut -d' ' -f2)
+            type=$(echo "$out" | cut -d' ' -f3-)
             case "$code $type" in
               "200 image/"*) live=$((live+1)); printf '  LIVE  %-24s %s · %s KB\n' "$id" "$type" "$((size/1024))" ;;
               *)             dead=$((dead+1)); printf '  DEAD  %-24s HTTP %s · %s\n' "$id" "$code" "${type:--}" ;;
