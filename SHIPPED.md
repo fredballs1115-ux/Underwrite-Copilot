@@ -36,7 +36,7 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and twenty-three PRs, #176–#298, each
+estimate, and that's what it should flag." A hundred and twenty-five PRs, #176–#300, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
 
@@ -1751,6 +1751,30 @@ confirmed equal to the main tip after each batch.
   homepage gallery draws for it, as a rounded band carrying the region
   and the market's name where a text eyebrow sat. The picture is the
   subject: it is the place whose rules, rents and benchmarks follow.
+
+- **#300 Every market picture becomes a photograph of the place.** Your
+  note: "the pictures all around the site are TERRIBLE overhead photos. I
+  need beautiful professional skyline photos of each market." Right, and
+  the distinction is what a reader is asking. An overhead answers *where
+  is it*; a skyline answers *what is it*, and on a market brief the second
+  is the question. So every market surface — the homepage hero, the
+  coverage tiles, the opening bands on `/why`, `/demo` and the sign-in
+  page, and each brief on `/market` — now draws through one component that
+  shows the market's skyline photograph and keeps the overhead only as the
+  floor. A deal keeps its overhead, because there the roof genuinely is the
+  asset; that picture becomes a street-level photograph of the building
+  front the moment a Maps key is set, which the code already prefers.
+  The photographs are Wikimedia Commons files addressed by name, proxied
+  through our own route so the security policy stays pinned and Commons is
+  asked once per deploy rather than once per visitor. Each one names its
+  photographer and licence beside it, and the credit follows whichever
+  picture actually rendered — if a file ever disappears, the overhead takes
+  its place and the caption changes in the same tick, because naming the
+  wrong photographer is worse than naming none. This sandbox cannot reach
+  Commons at all, so nothing is chosen from memory: `probe-skylines.mjs`
+  runs from the GitHub runner, asks Commons what exists, and prints each
+  file's real author, licence and pixel size. Only what that run prints
+  goes in the table.
 
 What only you can do next is at the top of `WILL_TODO.md`.
 

@@ -2,6 +2,12 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-09-16",
+      "title": "Every market picture becomes a photograph of the place",
+      "blurb": "A market is known by its skyline, not by its roofs. Each covered market now draws a real skyline photograph where one is verified, with the photographer and licence named beside it, and keeps its overhead frame only as the floor. A deal still shows its own site from above — that roof is the asset.",
+      "href": "/market"
+    },
+    {
       "date": "2026-09-14",
       "title": "Each market brief opens on its own downtown",
       "blurb": "Pick a market on /market and the brief opens on that market from above — the same public-domain USGS frame the homepage gallery draws for it — as a band carrying the region and the market's name. The picture is the place whose rules, rents and benchmarks follow.",

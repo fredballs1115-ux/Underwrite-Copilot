@@ -1,0 +1,185 @@
+{
+  "_note": "Search queries and candidate files for the market photographs. scripts/probe-skylines.mjs reads this from the GitHub runner, where Commons is reachable; the sandbox that edits it is not. Run with --search to ask Commons what exists, or with no flag to verify the candidates already listed. Promotion into lib/skyline.ts is by hand, because that is where the attribution obligation is taken on.",
+  "markets": [
+    {
+      "metroId": "dc",
+      "city": "Washington, D.C.",
+      "queries": [
+        "Washington DC skyline panorama",
+        "Washington DC cityscape from Arlington",
+        "Washington Monument skyline aerial view city"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "pg_county",
+      "city": "National Harbor, Maryland",
+      "queries": [
+        "National Harbor Maryland waterfront",
+        "National Harbor Capital Wheel",
+        "Oxon Hill Maryland National Harbor skyline"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "montgomery_county",
+      "city": "Bethesda, Maryland",
+      "queries": [
+        "Bethesda Maryland skyline",
+        "Silver Spring Maryland downtown skyline",
+        "Rockville Maryland skyline downtown"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "nova",
+      "city": "Rosslyn, Arlington, Virginia",
+      "queries": [
+        "Rosslyn Arlington Virginia skyline",
+        "Arlington Virginia skyline Potomac",
+        "Crystal City Arlington skyline"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "baltimore",
+      "city": "Baltimore, Maryland",
+      "queries": [
+        "Baltimore Inner Harbor skyline",
+        "Baltimore skyline panorama",
+        "Baltimore Maryland downtown skyline"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "richmond",
+      "city": "Richmond, Virginia",
+      "queries": [
+        "Richmond Virginia skyline James River",
+        "Richmond Virginia downtown skyline",
+        "Richmond Virginia cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "norfolk_hampton_roads",
+      "city": "Norfolk, Virginia",
+      "queries": [
+        "Norfolk Virginia skyline Elizabeth River",
+        "Norfolk Virginia downtown skyline",
+        "Hampton Roads Norfolk waterfront skyline"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "philadelphia",
+      "city": "Philadelphia, Pennsylvania",
+      "queries": [
+        "Philadelphia skyline Schuylkill",
+        "Philadelphia Center City skyline",
+        "Philadelphia Pennsylvania skyline panorama"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "newark_jc",
+      "city": "Jersey City, New Jersey",
+      "queries": [
+        "Jersey City skyline Hudson River",
+        "Jersey City Exchange Place skyline",
+        "Newark New Jersey downtown skyline"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "nyc",
+      "city": "New York City",
+      "queries": [
+        "Manhattan skyline from Brooklyn",
+        "Midtown Manhattan skyline daytime",
+        "New York City skyline panorama Hudson"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "boston",
+      "city": "Boston, Massachusetts",
+      "queries": [
+        "Boston skyline Charles River",
+        "Boston Massachusetts skyline harbor",
+        "Boston financial district skyline"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "chicago",
+      "city": "Chicago, Illinois",
+      "queries": [
+        "Chicago skyline Lake Michigan",
+        "Chicago Illinois skyline panorama",
+        "Chicago downtown Loop skyline"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "los_angeles",
+      "city": "Los Angeles, California",
+      "queries": [
+        "Downtown Los Angeles skyline",
+        "Los Angeles skyline mountains daytime",
+        "Los Angeles California cityscape downtown"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "san_francisco",
+      "city": "San Francisco, California",
+      "queries": [
+        "San Francisco skyline financial district",
+        "San Francisco skyline from Treasure Island",
+        "San Francisco California downtown skyline"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "seattle",
+      "city": "Seattle, Washington",
+      "queries": [
+        "Seattle skyline Kerry Park",
+        "Seattle Washington skyline Elliott Bay",
+        "Seattle downtown skyline daytime"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "miami",
+      "city": "Miami, Florida",
+      "queries": [
+        "Miami skyline Biscayne Bay",
+        "Downtown Miami skyline Brickell",
+        "Miami Florida skyline panorama"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "atlanta",
+      "city": "Atlanta, Georgia",
+      "queries": [
+        "Atlanta skyline Midtown",
+        "Atlanta Georgia downtown skyline",
+        "Atlanta skyline panorama daytime"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "dallas",
+      "city": "Dallas, Texas",
+      "queries": [
+        "Dallas skyline Reunion Tower",
+        "Dallas Texas downtown skyline",
+        "Dallas skyline panorama daytime"
+      ],
+      "candidates": []
+    }
+  ]
+}
