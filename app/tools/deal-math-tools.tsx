@@ -5,6 +5,7 @@ import { readFigure } from "@/lib/money";
 import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
 import { readDebt, testRefi } from "@/lib/tools/debt-math";
 import { readLease, readOpex } from "@/lib/tools/lease-math";
+import { TOOL_INDEX } from "@/lib/tools/catalog";
 import { readResidual } from "@/lib/tools/land-residual";
 import { readLand, readSpace } from "@/lib/tools/measure-math";
 import { buildStack } from "@/lib/tools/sources-uses";
@@ -241,28 +242,18 @@ function Stat({
 /**
  * The page's index, in the order the cards appear.
  *
- * One list, read twice: the jump nav renders from it, and each Card takes
- * its `id` from it. A label here with no card is a link to nowhere — the
- * accessibility lint fails an in-page link whose target id is missing, and
- * the render test holds every href in this list up to the ids actually
- * emitted, so the two cannot drift apart silently.
+ * The list itself lives in `lib/tools/catalog.ts` because the HOMEPAGE
+ * reads it too — it advertised "size a loan, or run the cap rate math"
+ * long after this page had grown past that, and one list imported by both
+ * makes that drift impossible rather than merely unlikely.
+ *
+ * The jump nav renders from it, and each Card takes its `id` from it. A
+ * label here with no card is a link to nowhere — the accessibility lint
+ * fails an in-page link whose target id is missing, and the render test
+ * holds every href in this list up to the ids actually emitted, so the two
+ * cannot drift apart silently.
  */
-const INDEX = [
-  { id: "size-the-loan", label: "Size the loan" },
-  { id: "the-loan-over-the-hold", label: "Over the hold" },
-  { id: "cash-flow-strip", label: "Cash flow" },
-  { id: "sources-and-uses", label: "Sources & uses" },
-  { id: "unit-mix", label: "Unit mix" },
-  { id: "the-site", label: "The site" },
-  { id: "residual-land", label: "Land residual" },
-  { id: "the-waterfall", label: "LP / GP split" },
-  { id: "net-effective-rent", label: "Net effective rent" },
-  { id: "rentable-vs-usable", label: "Rentable vs usable" },
-  { id: "cap-rate-triangle", label: "Cap rate" },
-  { id: "rent-converter", label: "Rent, four ways" },
-  { id: "operating-expense", label: "One expense" },
-  { id: "build-or-buy", label: "Build or buy" },
-] as const;
+const INDEX = TOOL_INDEX;
 
 function Card({
   id,

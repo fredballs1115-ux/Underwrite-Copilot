@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-16",
+      "title": "The homepage names what the tools page actually serves",
+      "blurb": "/tools grew from four calculators to fifteen in two evenings, and the homepage went on describing it as \"size a loan, or run the cap rate math\" the whole time. It is now a shelf of every calculation by name, each one a link straight to its card — and it renders from the same list /tools builds its cards from, so it can only ever advertise what the page really has. The count in the page's own description is prose and cannot render from a constant, so a test holds the spelled-out number to it instead; that claim had gone stale twice in one evening.",
+      "href": "/tools"
+    },
+    {
+      "date": "2026-09-16",
       "title": "What the land can be worth",
       "blurb": "Every other calculator on /tools starts from a price. This one solves for it: the finished building at the exit cap, less the cost of building it, less the return required for doing so, and whatever is left is what you can pay for the site. The picture is the finished value drawn as one bar — hard costs, soft costs, carry, the developer's profit, and the land — because the land being the THIN segment is the whole point. Two lines under it say what that thinness costs you: on the seeded deal a quarter point wider on the exit cap takes $8.29M to $5.57M, and a 5% overrun on the build takes it to $5.58M. A third gone, either way. The carry is charged on the land as well, which is the figure being solved for, so it is solved rather than approximated — the shortcut understates a cost and therefore overstates the land, which is the direction a developer can least afford to be wrong in. And where both a profit on cost and a target yield on cost are set, the lower of the two binds, because you cannot pay the higher of two tests you have agreed to meet.",
       "href": "/tools"
@@ -78,12 +84,6 @@
       "title": "The market photographs are actually visible now",
       "blurb": "Fifteen skylines shipped this morning and then rendered at about an eighth of their strength, under a wash nobody had measured. The picture now draws at full strength and the scrim does the work — dark under the words at the bottom of a band, clearing until the city is most of what you see. The contrast is computed against a pure white frame, the worst photograph a market could have, so it can never quietly slide back.",
       "href": "/why"
-    },
-    {
-      "date": "2026-09-16",
-      "title": "The deal math reads what you actually type",
-      "blurb": "Typing $20M into a price field used to yield nothing at all — a page of em dashes for a perfectly ordinary number. Every field on /tools now reads the shorthand an analyst uses: $20M, 500k, 1.2mm, 6.5%, 1.25x, and a negative NOI, which is a real thing to put into a debt sizer.",
-      "href": "/tools"
     }
   ]
 }
