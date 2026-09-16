@@ -18,7 +18,7 @@
 // been through live-verify's SKYLINE probe yet.
 
 import { NextResponse } from "next/server";
-import { SKYLINE_WIDTH, commonsUrl, skylineFor } from "@/lib/skyline";
+import { SKYLINE_WIDTH, commonsUrl, headerSafe, skylineFor } from "@/lib/skyline";
 
 /** Commons asks that automated readers say who they are. */
 const UA =
@@ -85,11 +85,25 @@ function imageHeaders(type: string, credit: string): HeadersInit {
     // caching is also what keeps a free service from being asked the same
     // question by every visitor.
     "cache-control": "public, max-age=31536000, immutable",
-    "x-imagery-source": credit,
+    // headerSafe, not the raw credit: a header value is a ByteString and
+    // `new Headers()` THROWS above U+00FF rather than dropping the
+    // character. Philadelphia's photographer is credited as 颐园居, so this
+    // line threw, and a throw here is a 500 — which CityPhoto's onError
+    // treats exactly like the 404, so the market quietly served the
+    // overhead instead of its skyline. See headerSafe in lib/skyline.ts.
+    "x-imagery-source": headerSafe(credit),
   };
 }
 
 function clampWidth(raw: string | null): number {
+  // A MISSING width is the default, not the floor. `Number(null)` and
+  // `Number("")` are both 0 — finite — so the finite test alone never fired
+  // for the one case it was written for, and a request with no `?w=` came
+  // back at the 320px minimum: a thumbnail behind a full-width band.
+  // Nothing rendered wrong, because CityPhoto always passes a width; it is
+  // anyone hitting the route directly who got the wrong picture, which is
+  // how live-verify's PHOTOGRAPHS step found it.
+  if (raw === null || raw.trim() === "") return SKYLINE_WIDTH.default;
   const n = Number(raw);
   if (!Number.isFinite(n)) return SKYLINE_WIDTH.default;
   return Math.min(SKYLINE_WIDTH.max, Math.max(SKYLINE_WIDTH.min, Math.round(n)));

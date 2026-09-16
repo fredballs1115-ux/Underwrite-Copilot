@@ -278,6 +278,56 @@ jobs:
           SKYLINE_SEARCH: ${{ inputs.skyline_search == true && '--search' || '' }}
         run: node scripts/probe-skylines.mjs --terse $SKYLINE_SEARCH $SKYLINE_MARKETS || true
 
+      - name: The photographs as a VISITOR gets them (diagnostic, non-gating)
+        # The step above asks Commons from this runner. That is a different
+        # network path from the one a reader uses, and it answers a different
+        # question. This one asks the SITE, which is the question that matters:
+        # does /api/imagery/skyline/<id> hand back an image?
+        #
+        # WHY THIS EXISTS. #316 gave NoVA a Rosslyn photograph and its round
+        # marker read `present`, because the marker grepped the photographer's
+        # name out of the served HTML — and the credit line renders whether or
+        # not the picture resolves (the fallback to the overhead is in the
+        # component, client-side, by design). So the marker could not fail.
+        # Meanwhile the Commons probe was printing `DEAD undefined` for that
+        # market, because the candidate entries had been committed as bare
+        # strings and the probe reads `cand.file`. A marker that cannot fail
+        # beside a probe that was not looking: the picture's actual state was
+        # unobserved in both directions.
+        #
+        # The route 404s on every failure — no file in the table, Commons
+        # gone, wrong content-type — so a 200 with an image type is the whole
+        # claim, and it cannot be satisfied by anything but a real photograph.
+        run: |
+          echo "PHOTOGRAPHS, through the site's own route:"
+          live=0; dead=0
+          # The ids come from the table the site actually serves, read out of
+          # the source rather than listed here, so a market added to
+          # lib/skyline.ts is probed the next run without touching this file.
+          ids=$(node -e 'const s=require("fs").readFileSync("lib/skyline.ts","utf8");for(const m of s.matchAll(/^  ([a-z_]+): \{$/gm))console.log(m[1])')
+          for id in $ids; do
+            # Ask at the width a page actually renders, so the byte counts
+            # here are comparable to the Commons probe's above.
+            #
+            # The two NUMERIC fields come first and the content type LAST,
+            # because a type is the one field that can carry a space
+            # ("image/jpeg; charset=…"). Typed last, that space lands in the
+            # field this reads as the type and nowhere else; typed in the
+            # middle it would shift the byte count into `$((size/1024))`,
+            # which is an arithmetic error, and under `bash -e` an error
+            # there takes the whole step down.
+            out=$(curl -sS -o /tmp/sky.bin -w '%{http_code} %{size_download} %{content_type}' \
+              --max-time 60 "https://underwrite-copilot.onrender.com/api/imagery/skyline/$id?w=1600" || echo "000 0 -")
+            code=$(echo "$out" | cut -d' ' -f1)
+            size=$(echo "$out" | cut -d' ' -f2)
+            type=$(echo "$out" | cut -d' ' -f3-)
+            case "$code $type" in
+              "200 image/"*) live=$((live+1)); printf '  LIVE  %-24s %s · %s KB\n' "$id" "$type" "$((size/1024))" ;;
+              *)             dead=$((dead+1)); printf '  DEAD  %-24s HTTP %s · %s\n' "$id" "$code" "${type:--}" ;;
+            esac
+          done
+          echo "PHOTOGRAPHS: $live live, $dead dead — a DEAD market is showing an aerial, not a skyline"
+
       - name: Verdict
         # Two tiers: the hero headline proves the site is up and on the right
         # lineage; the build-sha stamp (the uc-build sentinel, printed above
@@ -348,4 +398,10 @@ jobs:
           mark "#314 the homepage links a card by its anchor" grep -q 'href="/tools#residual-land"' body.html
           mark "#315 the after-tax card is on /tools" grep -q "Depreciation, and what the sale takes back" p_tools2.html
           mark "#315 it names the error it prevents" grep -q "Running the whole gain at the capital gains rate" p_tools2.html
-          mark "#316 NoVA shows Rosslyn, not an aerial" grep -q "Theodore Christopher" p_market_nova.html
+          # NOT a test that the picture renders — the credit line is in the
+          # server's HTML whether or not the file resolves, which is what
+          # made this marker a false positive for a whole round. Whether NoVA
+          # actually shows Rosslyn is answered by the PHOTOGRAPHS step above.
+          mark "#316 NoVA's brief carries the Rosslyn credit" grep -q "Theodore Christopher" p_market_nova.html
+          mark "#317 the settlement statement is on /tools" grep -q "Who owes whom at closing" p_tools2.html
+          mark "#317 it names the direction, not just the figure" grep -q "misses by the sum of the two figures" p_tools2.html

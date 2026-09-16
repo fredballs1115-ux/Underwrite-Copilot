@@ -82,10 +82,22 @@
         "Arlington Virginia skyline Potomac"
       ],
       "candidates": [
-        "Rosslyn from Georgetown 1.jpg",
-        "Rosslyn Skyline from Theodore Roosevelt Bridge.png",
-        "Rosslyn Skyline 2026.jpg",
-        "Skyline Rosslyn.jpg"
+        {
+          "file": "Rosslyn from Georgetown 1.jpg",
+          "note": "Rosslyn across the Potomac from Georgetown — Theodore Christopher, CC0. The chosen file, in lib/skyline.ts."
+        },
+        {
+          "file": "Rosslyn Skyline from Theodore Roosevelt Bridge.png",
+          "note": "The runner-up — Ejsamps, CC BY-SA 4.0. Same panorama shape, much smaller, and a PNG."
+        },
+        {
+          "file": "Rosslyn Skyline 2026.jpg",
+          "note": "Wikipedian1234, CC BY 4.0. Nearly square at 1.33:1, so the band would crop it to a sliver."
+        },
+        {
+          "file": "Skyline Rosslyn.jpg",
+          "note": "Discol, public domain. 1.33:1 and only 2048px wide."
+        }
       ]
     },
     {

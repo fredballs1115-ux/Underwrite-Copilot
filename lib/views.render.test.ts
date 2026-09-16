@@ -1107,8 +1107,8 @@ describe("the deal math tools", () => {
     // every card must be reachable from the index.
     const hrefs = [...html.matchAll(/href="#([a-z0-9-]+)"/g)].map((m) => m[1]);
     const ids = new Set([...html.matchAll(/<section id="([a-z0-9-]+)"/g)].map((m) => m[1]));
-    expect(hrefs.length).toBe(15);
-    expect(ids.size).toBe(15);
+    expect(hrefs.length).toBe(16);
+    expect(ids.size).toBe(16);
     for (const h of hrefs) expect(ids.has(h), `#${h} has no card`).toBe(true);
     for (const id of ids) expect(hrefs, `${id} is not in the index`).toContain(id);
     expect(text).toContain("Jump to");
@@ -1232,6 +1232,38 @@ describe("the deal math tools", () => {
   it("says plainly that it is not tax advice", () => {
     expect(text).toContain("federal only");
     expect(text).toContain("Not tax advice");
+  });
+
+  it("settles the closing statement, and says which way each line moves", () => {
+    // A 15 April close on a calendar-year bill: 105 of 365 days to the
+    // seller, so $69,041 of a $240,000 bill; half of April's $150,000 rent;
+    // the deposits whole; the escrow off the wire.
+    expect(text).toContain("Who owes whom at closing");
+    expect(text).toContain("$69,041");
+    expect(text).toContain("105 of 365 days the seller owned");
+    expect(text).toContain("15 of 30 days the buyer owns the building");
+    expect(text).toContain("$736,041"); // the net credit
+    expect(text).toContain("$19.26M"); // …so this is the wire
+    expect(text).toContain("105 / 260");
+  });
+
+  it("draws each credit on the side the money moves to", () => {
+    // The point of the picture: reading arrears as advance does not change a
+    // number, it flips a bar. Four lines on the seed, every one to the
+    // buyer, so every bar is on the brand side of the centre.
+    const bars = html.match(/data-bar="proration"[^>]*/g) ?? [];
+    expect(bars.length, "one bar per statement line").toBe(4);
+    expect(bars.filter((b) => b.includes("bg-brand")).length).toBe(4);
+    expect(bars.filter((b) => b.includes("bg-caution")).length).toBe(0);
+    // …and the direction is named in words as well as drawn.
+    expect(text).toContain("To the seller");
+    expect(text).toContain("To the buyer");
+    expect(text).toContain("misses by the sum of the two figures, not the difference");
+  });
+
+  it("never lets the tenants' deposits read as the seller's money", () => {
+    expect(text).toContain("Security deposits");
+    expect(text).toContain("the buyer inherits the obligation to return it");
   });
 
   it("solves for the land instead of judging a price", () => {

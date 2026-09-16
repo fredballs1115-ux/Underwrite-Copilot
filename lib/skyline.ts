@@ -288,3 +288,42 @@ export function creditLine(shot: SkylineShot): string {
   const author = shot.credit && shot.credit !== "unknown" ? shot.credit : "Wikimedia Commons";
   return `${shot.place} · ${author} · ${shot.license}`;
 }
+
+/**
+ * The same credit, safe to put in an HTTP header.
+ *
+ * WHY THIS EXISTS, AND IT IS NOT HYPOTHETICAL. A header value is a
+ * ByteString — every character must fit in one byte — and `new Headers()`
+ * THROWS on anything above U+00FF rather than dropping it. Philadelphia's
+ * photographer is credited on Commons as 颐园居, so the skyline route's
+ * `x-imagery-source` header threw on construction, and a throw inside a
+ * route handler is a 500. Philadelphia is the metro /demo opens on.
+ *
+ * WHAT A READER ACTUALLY SAW, because it is not what you would guess: the
+ * aerial. `CityPhoto`'s fallback hangs off the `<img>`'s `onError`, and a
+ * browser fires `error` for ANY failed image load — a 500 exactly as much
+ * as a 404 (checked in a real Chromium against both). So the component
+ * degraded as designed, swapped in the USGS overhead, and correctly moved
+ * the credit line to USGS with it. No licence was misattributed. The
+ * market simply showed the wrong kind of picture — an overhead where a
+ * skyline was meant — which is the one complaint this whole layer exists
+ * to answer.
+ *
+ * And THAT is why nothing caught it. A graceful, silent degradation is
+ * invisible to every check we had: the page renders, the HTML carries a
+ * credit either way, and the Commons probe resolves the FILE, which was
+ * never the problem. Only asking the site for the image itself can see it,
+ * which is what live-verify's PHOTOGRAPHS step does — it found this on its
+ * first run.
+ *
+ * So: keep printable ASCII and the printable Latin-1 range — which a header
+ * accepts, and which keeps "Mario Roberto Durán Ortiz" readable — and
+ * percent-encode everything else as UTF-8. A name in another script survives
+ * as something a reader can decode rather than as a 500. Control characters
+ * go the same way, which incidentally closes header injection.
+ */
+export function headerSafe(credit: string): string {
+  return credit.replace(/[^ -~ -ÿ]/gu, (ch) =>
+    encodeURIComponent(ch),
+  );
+}

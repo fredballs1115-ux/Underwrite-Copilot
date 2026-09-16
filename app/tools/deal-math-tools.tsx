@@ -6,6 +6,7 @@ import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
 import { readDebt, testRefi } from "@/lib/tools/debt-math";
 import { readLease, readOpex } from "@/lib/tools/lease-math";
 import { readAfterTax } from "@/lib/tools/after-tax";
+import { readProration } from "@/lib/tools/proration";
 import { TOOL_INDEX } from "@/lib/tools/catalog";
 import { readResidual } from "@/lib/tools/land-residual";
 import { readLand, readSpace } from "@/lib/tools/measure-math";
@@ -237,6 +238,45 @@ function Stat({
       <p className={`text-lg font-semibold tabular-nums ${colour}`}>{value}</p>
       <p className="text-[11px] uppercase tracking-wide text-muted">{label}</p>
     </div>
+  );
+}
+
+/**
+ * A choice between two named conventions.
+ *
+ * A `<select>` with its own `<label>`, not a pair of unlabelled buttons:
+ * `lib/a11y-source.test.ts` scans every page's source for a form control
+ * with no accessible name, and a segmented control built from bare buttons
+ * is exactly what it fails.
+ */
+function Choice<T extends string>({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: T; label: string }[];
+}) {
+  return (
+    <label className="block w-full">
+      <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-brand"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -1273,6 +1313,175 @@ function ResidualLand() {
           upstream of it arrives here multiplied — which is why a residual is a
           range and not a number.
         </p>
+      )}
+
+      {r.note && <p className="mt-4 text-sm text-caution">{r.note}</p>}
+    </Card>
+  );
+}
+
+// ── 7ba. the settlement statement ──────────────────────────────────────────
+
+/**
+ * Who owes whom on the day of closing.
+ *
+ * Every other card answers a question about whether to buy. This one comes
+ * after yes — and it is the calculation people get BACKWARDS rather than
+ * merely wrong, because two of its rules reverse the direction of a payment
+ * depending on a fact about the jurisdiction rather than about the deal.
+ *
+ * The picture is therefore a signed one: each line draws from a centre,
+ * right for a credit to the buyer and left for a credit to the seller, so
+ * the direction is visible before any figure is read. Reading arrears as
+ * advance does not change a number, it flips a bar.
+ */
+function Proration() {
+  const [closing, setClosing] = useShared("pcd", "2026-04-15");
+  const [taxStart, setTaxStart] = useShared("pts", "2026-01-01");
+  const [taxEnd, setTaxEnd] = useShared("pte", "2026-12-31");
+  const [taxAmount, setTaxAmount] = useShared("ptx", "240,000");
+  const [timing, setTiming] = useShared("ptm", "arrears");
+  const [dayTo, setDayTo] = useShared("pdy", "seller");
+  const [rent, setRent] = useShared("prc", "150,000");
+  const [deposits, setDeposits] = useShared("psd", "92,000");
+  const [price, setPrice] = useShared("ppr", "$20M");
+  const [escrow, setEscrow] = useShared("pem", "500,000");
+
+  const r = useMemo(
+    () =>
+      readProration({
+        closing: closing.trim() || null,
+        taxPeriodStart: taxStart.trim() || null,
+        taxPeriodEnd: taxEnd.trim() || null,
+        taxAmount: num(taxAmount),
+        taxTiming: timing === "advance" ? "advance" : "arrears",
+        closingDayTo: dayTo === "buyer" ? "buyer" : "seller",
+        rentCollected: num(rent),
+        securityDeposits: num(deposits),
+        price: num(price),
+        deposit: num(escrow),
+      }),
+    [closing, taxStart, taxEnd, taxAmount, timing, dayTo, rent, deposits, price, escrow],
+  );
+
+  const widest = Math.max(1, ...r.lines.map((l) => l.amount));
+
+  return (
+    <Card id="closing-proration" eyebrow="Closing" title="Who owes whom at closing">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <Field label="Closing date" value={closing} onChange={setClosing} placeholder="2026-04-15" />
+        <Field label="Tax period start" value={taxStart} onChange={setTaxStart} placeholder="2026-01-01" />
+        <Field label="Tax period end" value={taxEnd} onChange={setTaxEnd} placeholder="2026-12-31" />
+        <Field label="Tax bill" value={taxAmount} onChange={setTaxAmount} placeholder="240,000" />
+        <Choice
+          label="Taxes paid"
+          value={timing}
+          onChange={setTiming}
+          options={[
+            { value: "arrears", label: "In arrears" },
+            { value: "advance", label: "In advance" },
+          ]}
+        />
+        <Choice
+          label="Closing day charged to"
+          value={dayTo}
+          onChange={setDayTo}
+          options={[
+            { value: "seller", label: "The seller" },
+            { value: "buyer", label: "The buyer" },
+          ]}
+        />
+        <Field label="Rent collected, this month" value={rent} onChange={setRent} placeholder="150,000" />
+        <Field label="Security deposits held" value={deposits} onChange={setDeposits} placeholder="92,000" />
+        <Field label="Price" value={price} onChange={setPrice} placeholder="$20M" />
+        <Field label="Earnest money in escrow" value={escrow} onChange={setEscrow} placeholder="500,000" />
+      </div>
+
+      {r.lines.length > 0 && (
+        <div className="mt-6">
+          <div className="mb-2 flex items-baseline justify-between text-[11px] font-medium uppercase tracking-wide text-muted">
+            <span>To the seller</span>
+            <span>To the buyer</span>
+          </div>
+          <div className="space-y-2">
+            {r.lines.map((l) => (
+              <div key={l.label}>
+                {/* The label and the figure on one line, the note beneath.
+                    Truncating them onto a single line loses the note at
+                    phone width — and the note is the part that teaches: it
+                    says WHY the money moves, which is the whole point of a
+                    card about a payment people send the wrong way. */}
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="font-medium">{l.label}</span>
+                  <span className="shrink-0 font-mono tabular-nums">{usdExact(l.amount)}</span>
+                </div>
+                <p className="text-xs text-muted">{l.note}</p>
+                {/* One track, a centre line, and the bar on the side the
+                    money actually moves to. */}
+                <div className="mt-1 flex h-2.5 items-stretch overflow-hidden rounded-full bg-faint">
+                  <div className="flex w-1/2 justify-end">
+                    {l.to === "seller" && (
+                      <div
+                        data-bar="proration"
+                        className="h-full rounded-l-full bg-caution"
+                        style={{ width: `${(l.amount / widest) * 100}%` }}
+                      />
+                    )}
+                  </div>
+                  <div className="w-px bg-line" />
+                  <div className="flex w-1/2 justify-start">
+                    {l.to === "buyer" && (
+                      <div
+                        data-bar="proration"
+                        className="h-full rounded-r-full bg-brand"
+                        style={{ width: `${(l.amount / widest) * 100}%` }}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {r.taxLine && r.taxPeriodDays !== null && (
+        <p className="mt-4 text-sm text-muted">
+          {timing === "advance" ? (
+            <>
+              The seller has already paid the whole period, so the{" "}
+              <span className="font-semibold tabular-nums text-ink">{r.buyerDays}</span> days after
+              closing come back to them. Paid{" "}
+              <span className="font-semibold text-ink">in arrears</span> instead, the same bill
+              would move{" "}
+              <span className="font-semibold text-ink">to the buyer</span> — which is why the
+              wrong reading misses by the sum of the two figures, not the difference.
+            </>
+          ) : (
+            <>
+              The bill is not paid yet, so the{" "}
+              <span className="font-semibold tabular-nums text-ink">{r.sellerDays}</span> days the
+              seller owned are handed to the buyer, who will pay the whole thing. Paid{" "}
+              <span className="font-semibold text-ink">in advance</span> instead, the same bill
+              would move{" "}
+              <span className="font-semibold text-ink">to the seller</span> — which is why the
+              wrong reading misses by the sum of the two figures, not the difference.
+            </>
+          )}
+        </p>
+      )}
+
+      {r.netToBuyer !== null && (
+        <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
+          <Stat label="Tax period" value={r.taxPeriodDays === null ? "—" : `${r.taxPeriodDays} days`} tone="muted" />
+          <Stat
+            label="Seller / buyer days"
+            value={r.sellerDays === null ? "—" : `${r.sellerDays} / ${r.buyerDays}`}
+            tone="muted"
+          />
+          <Stat label="Net credit to buyer" value={usdExact(r.netToBuyer)} tone="brand" />
+          <Stat label="Buyer wires" value={usd(r.cashToClose)} />
+        </div>
       )}
 
       {r.note && <p className="mt-4 text-sm text-caution">{r.note}</p>}
@@ -2337,6 +2546,7 @@ export function DealMathTools() {
       <NetEffectiveRent />
       <RentableUsable />
       <AfterTax />
+      <Proration />
       <div className="grid gap-6 lg:grid-cols-2">
         <CapTriangle />
         <RentConverter />

@@ -3,6 +3,18 @@
   "entries": [
     {
       "date": "2026-09-16",
+      "title": "Philadelphia gets its skyline back",
+      "blurb": "The sample deal's own city had quietly been showing a satellite frame instead of the Schuylkill skyline, and so had its market brief. The photograph was fine and had been all along; the page that serves it was not. Every market picture is served with a line naming its photographer, and Philadelphia's is credited on Wikimedia Commons under a Chinese name — which an HTTP header cannot carry, so that one request failed. The page then did exactly what it was built to do: it fell back to the aerial and moved the credit to match. That is why nobody noticed. A picture quietly replaced by its backup looks like a working page from the outside, so the only way to see it is to ask the site for the image itself — which now happens on every deploy, for every market.",
+      "href": "/market?metro=philadelphia"
+    },
+    {
+      "date": "2026-09-16",
+      "title": "Who owes whom at closing",
+      "blurb": "Every other calculator here asks whether to buy. This one comes after yes — and it is the one people get BACKWARDS rather than merely wrong, because two of its rules reverse the direction of a payment on a fact about the jurisdiction rather than about the deal. Property taxes paid in arrears mean the seller credits the buyer, who will pay the whole year's bill; paid in advance it is the other way round. Read it the wrong way and the money moves the wrong direction, so the miss is the sum of the two figures and not the difference — which is why every line here is drawn from a centre, on the side the money actually goes to, before any number is read. Security deposits are the tenants' money and are credited to the buyer whole, never prorated, because the buyer inherits the obligation to give them back. And the day of closing itself is charged to one side by the contract, so it is something you set rather than something assumed: on a $240,000 bill that day is $657.53.",
+      "href": "/tools#closing-proration"
+    },
+    {
+      "date": "2026-09-16",
       "title": "Northern Virginia gets its skyline",
       "blurb": "Every covered market shows a real photograph rather than a satellite frame, with one holdout: NoVA was still on an overhead, on the rule that a suburban submarket has no skyline worth showing. Rosslyn is the exception that proves it — a genuine high-rise cluster, zoned tall precisely because it stands across the Potomac from a height-limited Washington. So the brief now opens on Rosslyn seen from Georgetown, the frame an Arlington broker would put on a cover. PG County and Montgomery County keep their overheads, because there the land really is the story.",
       "href": "/market?metro=nova"

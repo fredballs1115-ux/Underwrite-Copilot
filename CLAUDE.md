@@ -141,18 +141,47 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   memory**: the sandbox cannot reach Commons (403 through its egress
   proxy), so `scripts/probe-skylines.mjs` runs from the GitHub runner via
   live-verify and only what that run prints goes in the table. It verifies
-  by default (every deploy re-resolves all fifteen files and prints LIVE or
+  by default (every deploy re-resolves all sixteen files and prints LIVE or
   DEAD with the byte count at 1600px); tick `skyline_search` on the
   dispatch to hunt for new candidates, and `skyline_markets` narrows either
-  mode to a few metros. Its doors, best first: a city's **Wikipedia article
+  mode to a few metros. It reads `cand.file` out of
+  `data/skyline-candidates.json`, whose entries are `{ file, note }` objects
+  — `lib/skyline.test.ts` holds that shape, holds every served market to
+  having a candidate, and holds each market's candidates to containing the
+  file the table actually serves, because a malformed entry silently
+  disables the only check that can ever catch a dead file. **The probe is a
+  runner-to-Commons test; the live-verify PHOTOGRAPHS step is the
+  visitor's** — it fetches `/api/imagery/skyline/<id>` from the site and
+  reports the content type, which is the claim that matters, since the route
+  404s on every failure. Prefer that step's lines over a round marker:
+  a marker greps the served HTML, and the credit line is in the HTML whether
+  or not the picture resolves (the fallback to the overhead is client-side,
+  in `CityPhoto`, by design). Its doors, best first: a city's **Wikipedia article
   images** (argued over by people who care which photograph represents the
   place), hand-filed **Commons categories**, then full-text search — which
-  on its own surfaces maps and diagrams long before photographs. Three
+  on its own surfaces maps and diagrams long before photographs. Four
   traps it has already fallen into, all fixed: `mime` is its own `iiprop`
   value (leave it out and every file fails the type test as `undefined`),
   Commons treats `_` and a space as the same character so the two APIs
-  return the same file under two spellings, and an un-paced sweep collects
-  429s that read as an empty shelf. PG County and Montgomery County
+  return the same file under two spellings, an un-paced sweep collects
+  429s that read as an empty shelf, and a candidate committed as a bare
+  string instead of an object prints `DEAD undefined` — which reads exactly
+  like a dead photograph and is nothing of the sort, since the file was
+  never asked for. **A photographer's name is not necessarily Latin-1**:
+  the route's `x-imagery-source` header carries the credit, a header value
+  is a ByteString, and `new Headers()` THROWS above U+00FF rather than
+  dropping the character — Philadelphia's photographer is credited as
+  颐园居, so that route 500'd for /demo's own metro. **The fallback then
+  worked, which is exactly why nobody noticed**: `CityPhoto` falls back on
+  the `<img>`'s `onError`, and a browser fires `error` for any failed load,
+  a 500 as much as a 404 (checked in a real Chromium against both), so the
+  market quietly served the overhead with the credit correctly moved to
+  USGS. A graceful silent degradation is invisible to every HTML-based
+  check — which is the case for asking the site for the image itself.
+  `headerSafe` in `lib/skyline.ts` percent-encodes what a header cannot
+  carry, and `lib/skyline.test.ts` puts every market's credit through a
+  real `Headers`.
+  PG County and Montgomery County
   are deliberately absent: a suburban submarket has no skyline, and the
   overhead is the more honest picture of a place shaped by its land. **NoVA
   is the exception** (added 2026-09-16, from the runner's own search):
@@ -282,6 +311,25 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   not a free lunch**: on the seeded deal it lifts year-one depreciation 4.5×
   and leaves the owner $130,909 WORSE off in raw dollars, winning only on
   the time value the module deliberately does not count.
+- Who owes whom at closing: `lib/tools/proration.ts` (pure). The one
+  calculation here that comes AFTER yes, and the one people get BACKWARDS
+  rather than merely wrong, because two of its rules reverse a payment's
+  direction on a fact about the jurisdiction rather than about the deal.
+  **Taxes paid in ARREARS mean the seller credits the buyer** (the bill is
+  unpaid; the buyer will pay the whole year and needs the seller's days
+  handed over); paid in ADVANCE it is the other way round. Read the wrong
+  way the money moves the wrong direction, so the miss is the SUM of the two
+  figures and not the difference — which is why every line is reported as a
+  signed credit to a named side and the card draws it from a centre line.
+  **Security deposits are the TENANTS' money**, credited to the buyer whole
+  and never prorated: the buyer inherits the obligation to return them, so
+  no part belongs to the seller for the days they owned. And **the day of
+  closing is charged to one side by the contract**, not by a default, so it
+  is an input — a day of a $20M building's taxes is real money. Each line
+  rounds to the cent on its own, as a settlement statement's lines do, so
+  the difference of two rounded figures is not the rounded difference; a
+  test asserts within a cent rather than forcing an equality that would be
+  asserting a rounding bug.
 - What the dirt is worth: `lib/tools/land-residual.ts` (pure). The one
   calculation on `/tools` that solves for a price instead of judging one —
   the finished building's value less the cost of building it and the return
