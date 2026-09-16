@@ -6,6 +6,7 @@ import {
   commonsUrl,
   creditLine,
   hasSkyline,
+  headerSafe,
   skylineFor,
   skylineTag,
 } from "./skyline";
@@ -138,6 +139,54 @@ describe("the credit line", () => {
     });
     expect(line).toContain("Wikimedia Commons");
     expect(line).not.toContain("unknown");
+  });
+});
+
+// ── the credit as an HTTP header ───────────────────────────────────────────
+//
+// The bug this is the guard for: Philadelphia's photographer is credited on
+// Commons as 颐园居, the skyline route put the raw credit in
+// `x-imagery-source`, and `new Headers()` THROWS above U+00FF rather than
+// dropping the character. A throw in a route handler is a 500 — and 500 is
+// not the 404 that tells CityPhoto to fall back to the overhead, so the
+// picture vanished instead of degrading. Philadelphia is /demo's own metro.
+describe("the credit as a header value", () => {
+  it("can be put in a real Headers object for EVERY market in the table", () => {
+    // The assertion that would have caught it. Not a unit test of the
+    // helper — the whole table, through the real constructor.
+    for (const [id, shot] of Object.entries(SKYLINES)) {
+      const credit = `Wikimedia Commons · ${shot.credit} · ${shot.license}`;
+      expect(() => new Headers({ "x-imagery-source": headerSafe(credit) }), id).not.toThrow();
+    }
+  });
+
+  it("proves the raw credit really does throw, so the guard is not theatre", () => {
+    const philly = SKYLINES.philadelphia;
+    expect(philly, "philadelphia is still in the table").toBeTruthy();
+    expect(() =>
+      new Headers({ "x-imagery-source": `Wikimedia Commons · ${philly.credit}` }),
+    ).toThrow();
+  });
+
+  it("keeps a Latin-1 name readable rather than encoding it", () => {
+    // "Mario Roberto Durán Ortiz" is a real credit in this table, and á is
+    // inside the range a header accepts. Encoding it would be a regression
+    // in legibility for no safety gain.
+    expect(headerSafe("Mario Roberto Durán Ortiz")).toBe("Mario Roberto Durán Ortiz");
+    expect(headerSafe("Downtown Dallas · alfred twu · CC0")).toBe(
+      "Downtown Dallas · alfred twu · CC0",
+    );
+  });
+
+  it("percent-encodes what a header cannot carry, rather than dropping it", () => {
+    // The name survives as something a reader can decode back.
+    const encoded = headerSafe("颐园居");
+    expect(encoded).not.toContain("颐");
+    expect(decodeURIComponent(encoded)).toBe("颐园居");
+  });
+
+  it("takes a newline out of a credit, so a header cannot be split", () => {
+    expect(headerSafe("Jane Roe\r\nx-evil: 1")).not.toMatch(/[\r\n]/);
   });
 });
 

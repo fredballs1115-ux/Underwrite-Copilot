@@ -70,6 +70,30 @@ Washington, so the aerial was answering a question nobody asked. Prince
 George's County and Montgomery County still keep theirs, and should: a
 place shaped by its land is photographed from above.
 
+**Two of those photographs were not actually reaching the page, and
+nothing was looking.** Fixed on 2026-09-16 (#317), and worth recording
+because both failures were invisible in exactly the same way. Every check
+we had verified the *file* on Wikimedia Commons, or grepped the *credit*
+out of the served HTML — and a photograph can fail while both of those
+still pass, because the credit renders whether or not the picture loads
+and the fallback to the overhead is deliberately silent. So:
+
+- **Philadelphia** — the sample deal's own city, and /demo's opening
+  band — was serving a 500, not a photograph. Its photographer is
+  credited on Commons under a Chinese name, which an HTTP header cannot
+  carry, so the route threw instead of answering. It had been showing an
+  aerial since the photograph was added.
+- **NoVA's** four candidate filenames had been committed in the wrong
+  shape, so the deploy probe skipped the market entirely and printed
+  `DEAD undefined` — which looks like a dead photograph and was not one.
+  The picture was fine all along; the check was not.
+
+The fix that matters more than either: live-verify now asks **the site**
+for every market's picture and prints LIVE or DEAD with the content type.
+That is the visitor's question, and it found Philadelphia on its first
+run. Read those `PHOTOGRAPHS:` lines, not the round markers, when you
+want to know whether a market really has its skyline.
+
 **They were rendering at an eighth of their strength until #302.** Worth
 recording plainly, because the earlier note in this file said the
 photographs were live and stopped there. They *were* live — and washed

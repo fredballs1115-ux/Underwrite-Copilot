@@ -167,7 +167,15 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   429s that read as an empty shelf, and a candidate committed as a bare
   string instead of an object prints `DEAD undefined` — which reads exactly
   like a dead photograph and is nothing of the sort, since the file was
-  never asked for. PG County and Montgomery County
+  never asked for. **A photographer's name is not necessarily Latin-1**:
+  the route's `x-imagery-source` header carries the credit, a header value
+  is a ByteString, and `new Headers()` THROWS above U+00FF rather than
+  dropping the character — Philadelphia's photographer is credited as
+  颐园居, so that route 500'd, and a 500 is not the 404 `CityPhoto` needs to
+  fall back, so /demo's own metro lost its picture silently. `headerSafe`
+  in `lib/skyline.ts` percent-encodes what a header cannot carry, and
+  `lib/skyline.test.ts` puts every market's credit through a real `Headers`.
+  PG County and Montgomery County
   are deliberately absent: a suburban submarket has no skyline, and the
   overhead is the more honest picture of a place shaped by its land. **NoVA
   is the exception** (added 2026-09-16, from the runner's own search):

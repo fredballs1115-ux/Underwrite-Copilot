@@ -288,3 +288,33 @@ export function creditLine(shot: SkylineShot): string {
   const author = shot.credit && shot.credit !== "unknown" ? shot.credit : "Wikimedia Commons";
   return `${shot.place} · ${author} · ${shot.license}`;
 }
+
+/**
+ * The same credit, safe to put in an HTTP header.
+ *
+ * WHY THIS EXISTS, AND IT IS NOT HYPOTHETICAL. A header value is a
+ * ByteString — every character must fit in one byte — and `new Headers()`
+ * THROWS on anything above U+00FF rather than dropping it. Philadelphia's
+ * photographer is credited on Commons as 颐园居, so the skyline route's
+ * `x-imagery-source` header threw on construction, and a throw inside a
+ * route handler is a 500. The route's whole contract is that it answers 404
+ * when it cannot serve a photograph, because that is the signal `CityPhoto`
+ * needs to fall back to the overhead frame; a 500 is not that signal, and
+ * the picture simply vanished. Philadelphia is the metro /demo opens on.
+ *
+ * Nothing caught it for a week: the page still rendered, the credit is in
+ * the HTML either way, and the Commons probe resolves the FILE, which was
+ * never the problem. live-verify's PHOTOGRAPHS step, which asks the site
+ * rather than Commons, found it on its first run.
+ *
+ * So: keep printable ASCII and the printable Latin-1 range — which a header
+ * accepts, and which keeps "Mario Roberto Durán Ortiz" readable — and
+ * percent-encode everything else as UTF-8. A name in another script survives
+ * as something a reader can decode rather than as a 500. Control characters
+ * go the same way, which incidentally closes header injection.
+ */
+export function headerSafe(credit: string): string {
+  return credit.replace(/[^ -~ -ÿ]/gu, (ch) =>
+    encodeURIComponent(ch),
+  );
+}

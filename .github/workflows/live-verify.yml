@@ -306,8 +306,10 @@ jobs:
           # lib/skyline.ts is probed the next run without touching this file.
           ids=$(node -e 'const s=require("fs").readFileSync("lib/skyline.ts","utf8");for(const m of s.matchAll(/^  ([a-z_]+): \{$/gm))console.log(m[1])')
           for id in $ids; do
+            # Ask at the width a page actually renders, so the byte counts
+            # here are comparable to the Commons probe's above.
             out=$(curl -sS -o /tmp/sky.bin -w '%{http_code} %{content_type} %{size_download}' \
-              --max-time 60 "https://underwrite-copilot.onrender.com/api/imagery/skyline/$id" || echo "000 - 0")
+              --max-time 60 "https://underwrite-copilot.onrender.com/api/imagery/skyline/$id?w=1600" || echo "000 - 0")
             code=$(echo "$out" | cut -d' ' -f1)
             type=$(echo "$out" | cut -d' ' -f2)
             size=$(echo "$out" | cut -d' ' -f3)
