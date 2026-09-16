@@ -332,3 +332,7 @@ jobs:
           mark "#302 deal math reads the shorthand (seeded \$20M on /tools)" grep -q 'value="\$20M"' p_tools2.html
           mark "#302 gallery credit names the licence" grep -q "via Wikimedia Commons, CC BY" body.html
           mark "#304 the cash-flow strip is on /tools" grep -q "Paste a cash flow" p_tools2.html
+          mark "#305 the work leaves the page (Copy link)" grep -q "Copy link to this sizing" p_tools2.html
+          mark "#306 net effective rent, both ways" grep -q "The face rent is" p_tools2.html
+          mark "#307 the loan schedule draws its split" grep -q "equity, returned at sale" p_tools2.html
+          mark "#307 the refinance test reads the balloon" grep -q "Can the balloon be refinanced" p_tools2.html

@@ -3,45 +3,105 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-## 🟢 2026-09-16 — what landed since the migrations ran
+## 🟢 2026-09-16 — the photograph round, and the analyst's own math
 
-Two things you asked for, both live behind PR #301.
+Seven PRs, #300–#306. Two of them (#300, #301) are the thing you asked
+for; #302 is the one that made it actually *look* like it.
 
-**The market pictures are photographs now.** Fifteen of the eighteen
-covered markets draw a real skyline photograph instead of an overhead
-frame: Washington on the National Mall, Baltimore on its skyline, Miami
-on Brickell, Philadelphia on the Schuylkill River, and so on. Each one
-names its photographer and licence beside it, and every filename, author
-and licence was read back from Wikimedia Commons by the deploy probe
-rather than written from memory — the run at 16:07 UTC read **15 live, 0
-dead**. Prince George's County, Montgomery County and Northern Virginia
-deliberately keep their overhead: a suburban submarket does not have a
-skyline, and the overhead is the more honest picture of a place shaped by
-its land.
+**The market pictures are photographs of the place, not of roofs.**
+Fifteen of the eighteen covered markets draw a real skyline photograph
+instead of an overhead frame: Washington on the National Mall, Baltimore
+on its skyline, Miami on Brickell, Philadelphia on the Schuylkill River,
+and so on. Each names its photographer *and* its licence beside it — CC
+BY requires the licence link, not just the name — and every filename,
+author and licence was read back from Wikimedia Commons by the deploy
+probe rather than written from memory. Prince George's County,
+Montgomery County and Northern Virginia deliberately keep their
+overhead: a suburban submarket does not have a skyline, and the overhead
+is the more honest picture of a place shaped by its land.
 
-*Nothing here is yours to do.* If you ever want a market's photograph
-changed, the whole loop is: Actions → live-verify → Run workflow, tick
-**skyline_search**, put the metro id in **skyline_markets**, read the
-candidates it prints, and say which one you want.
+**They were rendering at an eighth of their strength until #302.** Worth
+recording plainly, because the earlier note in this file said the
+photographs were live and stopped there. They *were* live — and washed
+out to the point of being scenery. The band pages drew each picture at
+12% opacity under a scrim, which is how you get a blue-grey smear where
+Brickell should be. #302 deleted the opacity entirely and rebuilt the
+scrim as a bottom-to-top gradient: the picture is at full strength, and
+the darkness is only where the words are. That direction was not taste
+— **every file in the table is a panorama** (Seattle is 8443×3361,
+Chicago 3127×795), so a left-to-right scrim buries a quarter of the
+frame where a bottom-up one shows two thirds of it, and it measured
+7.4:1 against white where the horizontal one measured 4.9:1. A test
+(`lib/place-band.contrast.test.ts`) now reads the gradient stops back
+out of the source and recomputes the contrast against a worst-case pure
+white photograph, so weakening the scrim fails CI rather than quietly
+shipping unreadable text.
 
-**`/tools` — deal math.** The calculators an analyst leaves the site to
-run: size a loan against LTV, DSCR and debt yield and see *which one
-binds*; the cap rate triangle; yield on cost against the exit cap; one
-rent said four ways. Public, so it is also a way in from a search for
-"debt yield calculator". It is in the sidebar under Market data.
+*Nothing in the photographs is yours to do.* If you ever want a market's
+picture changed, the whole loop is: Actions → live-verify → Run
+workflow, tick **skyline_search**, put the metro id in
+**skyline_markets**, read the candidates it prints, and say which one
+you want.
 
-**Still yours, unchanged from the list below:** the six credentials to
-rotate (they were exposed in screenshots — Stripe live secret, the
-Supabase service-role key, the Stripe webhook secret, both Resend keys,
-and the Anthropic key), the Actions secrets including the misspelled one,
-the auth redirect settings, and the four ground-level photographs for
-`public/photos/`. Those are the items that still gate things.
+**`/tools` — the deal math an analyst leaves the site to run.** Seven
+calculators now, public (so each is also a way in from a search for
+"debt yield calculator"), in the sidebar under Market data:
 
-**Claude's move next session:** the three DMV submarkets have no skyline
-worth publishing, but Rosslyn genuinely does — worth one more targeted
-search. Beyond that, `/tools` is the first of the "never has to leave the
-site" pieces; the next candidates are a lease abstract reader and a
-sources-and-uses builder that both feed a real deal.
+- **Debt sizer** — LTV, DSCR and debt yield at once, and it names *which
+  one binds*.
+- **Cap rate triangle** — any two of price, NOI, cap gives the third.
+- **Rent converter** — one rent said four ways.
+- **Build or buy** — yield on cost against the exit cap.
+- **Cash-flow strip** (#304) — paste a column out of Excel and get IRR,
+  equity multiple, payback, and *how much of the return is the residual*
+  — discounted at the deal's own IRR, which is always a smaller share
+  than the naive dollar ratio flatters you into thinking.
+- **Net effective rent** (#306) — both ways, with free rent and TI/LC
+  against the term; the commission comes off the **gross** rent, not the
+  collected, which is the error that makes a concession look cheaper
+  than it is.
+- **Opex translator** (#306) — one operating expense read three ways.
+
+Three things they share. Every field reads shorthand — type `$20M`,
+`4.75%`, `1.25x` and it parses (#302; one reader, `lib/money.ts`, with
+its own test file). Every field is in the URL, so **the work can leave
+the page** (#305) — Copy link hands someone the exact scenario, Copy as
+table pastes into an email or a memo. And the math is pure and tested
+before any of it reaches a page: 21 tests on the cash-flow strip, 15 on
+the lease math.
+
+**One quieter fix worth naming** (#303): the comps readout used to print
+"43% above the recorded median" off a *single* recorded sale — the most
+confident-sounding and least supported sentence on the page. The figure
+still shows (one sale is the only evidence there is, and hiding it helps
+nobody); what is withheld now is the *call*. Below three sales it says
+"the one recorded sale" or "midpoint of the two" and names the thinness.
+
+**Also #303/#305:** live-verify now proves the round instead of proving
+the deploy. Its gate read the hero headline and the build stamp, and
+both of those survive almost any change — so a green run said nothing
+about whether the photographs or the deal math had actually reached the
+site. It now ends with a **ROUND MARKERS** block that fetches the real
+pages and greps for the specific thing each PR shipped, printing
+`present` or `NOT DEPLOYED` per item, as the last step so it is readable
+from the log's tail.
+
+**Still yours, unchanged and still the only things that gate anything:**
+the six credentials to rotate (exposed in screenshots — Stripe live
+secret, the Supabase service-role key, the Stripe webhook secret, both
+Resend keys, the Anthropic key), the Actions secrets including the
+misspelled `NTHROPIC_API_KEY`, the three Supabase auth settings, and the
+four ground-level photographs for `public/photos/`. Detail on each is in
+the numbered list below.
+
+**Claude's move next session:** keep building out `/tools` — the list
+from the research pass, in the order an analyst hits them: unit mix and
+loss-to-lease, a sources-and-uses builder, an equity waterfall, an
+amortisation and refi test, measures and density conversion. Then the
+workflow items that are not calculators at all: copy-as-table on the
+comps and pipeline tables (the same affordance #305 put on `/tools`), a
+print stylesheet, breadcrumbs, a keyboard layer. Rosslyn is still worth
+one targeted skyline search — the other two DMV submarkets are not.
 
 ---
 

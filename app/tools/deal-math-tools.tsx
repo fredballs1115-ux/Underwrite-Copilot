@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { readFigure } from "@/lib/money";
 import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
+import { readDebt, testRefi } from "@/lib/tools/debt-math";
 import { readLease, readOpex } from "@/lib/tools/lease-math";
 import {
   breakEvenOccupancyPct,
@@ -16,18 +17,20 @@ import {
 } from "@/lib/tools/deal-math";
 
 /**
- * The four calculations an analyst leaves a screening tool to do.
+ * The calculations an analyst leaves a screening tool to do.
  *
- * All of it runs in the browser off lib/tools/deal-math — no request, no
- * database, nothing stored. That is worth saying on the page, because the
- * reason people paste deal numbers into a spreadsheet instead of a website
- * is that they do not want the numbers going anywhere.
+ * All of it runs in the browser off the pure modules in lib/tools — no
+ * request, no database, nothing stored. That is worth saying on the page,
+ * because the reason people paste deal numbers into a spreadsheet instead of
+ * a website is that they do not want the numbers going anywhere.
  *
  * Each tool answers with a PICTURE first and the figure second, which is the
  * house rule: the debt sizer draws its three tests as bars so the binding one
- * is visible before it is read, and the build-or-buy tool draws its spread
- * from a centre line so a negative one looks wrong rather than merely reading
- * as a smaller number.
+ * is visible before it is read, the build-or-buy tool draws its spread from a
+ * centre line so a negative one looks wrong rather than merely reading as a
+ * smaller number, and the loan schedule draws each year's debt service split
+ * into interest and principal, because the widening principal sliver is the
+ * only way to see that amortisation is equity rather than cost.
  */
 
 // ── the input layer ────────────────────────────────────────────────────────
@@ -1031,6 +1034,240 @@ function OpexTranslator() {
   );
 }
 
+// ── 8. what the loan does over the hold, and the refinance at the end ──────
+
+/**
+ * These two read as one question, so they share a card and the schedule's
+ * balloon feeds the refinance test directly — an analyst should never have
+ * to retype a figure this page just computed.
+ *
+ * The picture is the year-by-year split of debt service into interest and
+ * principal. It is the one thing about a loan that reading the payment
+ * cannot tell you: year one of a thirty-year schedule is ~85% interest, and
+ * the principal sliver widening across the columns is amortisation being
+ * equity rather than cost.
+ */
+function LoanOverTime() {
+  const [loan, setLoan] = useShared("dl", "$13M");
+  const [rate, setRate] = useShared("dr", "6.5");
+  const [amort, setAmort] = useShared("dam", "30");
+  const [ioYears, setIoYears] = useShared("dio", "0");
+  const [term, setTerm] = useShared("dt", "10");
+
+  // The refinance's own inputs. The balloon is NOT among them: it comes from
+  // the schedule above.
+  const [noiRefi, setNoiRefi] = useShared("rn", "1,450,000");
+  const [exitCap, setExitCap] = useShared("rc", "6.5");
+  const [newRate, setNewRate] = useShared("rr", "7.25");
+  const [newAmort, setNewAmort] = useShared("ram", "30");
+  const [rLtv, setRLtv] = useShared("rltv", "65");
+  const [rDscr, setRDscr] = useShared("rdscr", "1.25");
+  const [rDy, setRDy] = useShared("rdy", "9");
+
+  const d = useMemo(
+    () =>
+      readDebt({
+        loan: num(loan),
+        ratePct: num(rate),
+        amortYears: num(amort),
+        ioYears: num(ioYears),
+        termYears: num(term),
+      }),
+    [loan, rate, amort, ioYears, term],
+  );
+
+  const r = useMemo(
+    () =>
+      testRefi({
+        balloon: d.balloon,
+        noiAtRefi: num(noiRefi),
+        exitCapPct: num(exitCap),
+        newRatePct: num(newRate),
+        newAmortYears: num(newAmort),
+        maxLtvPct: num(rLtv),
+        minDscr: num(rDscr),
+        minDebtYieldPct: num(rDy),
+      }),
+    [d.balloon, noiRefi, exitCap, newRate, newAmort, rLtv, rDscr, rDy],
+  );
+
+  // Every column is scaled to the biggest year's debt service, so the IO
+  // years read as visibly cheaper rather than merely all-interest.
+  const tallest = d.years.length ? Math.max(...d.years.map((y) => y.debtService)) : 0;
+  const widest = Math.max(r.newLoan ?? 0, d.balloon ?? 0);
+
+  const verdictTone =
+    r.verdict === "cash out" ? "text-pass" : r.verdict === "cash in" ? "text-kill" : "text-ink";
+
+  return (
+    <Card eyebrow="Debt" title="What the loan does, and the refinance at the end">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <Field label="Loan" value={loan} onChange={setLoan} placeholder="$13M" />
+        <Field label="Rate" suffix="%" value={rate} onChange={setRate} placeholder="6.5" />
+        <Field label="Amort" suffix="yr" value={amort} onChange={setAmort} placeholder="30" />
+        <Field
+          label="Interest-only"
+          suffix="yr"
+          value={ioYears}
+          onChange={setIoYears}
+          placeholder="0"
+        />
+        <Field label="Term" suffix="yr" value={term} onChange={setTerm} placeholder="10" />
+      </div>
+
+      {d.years.length > 0 && (
+        <>
+          <div className="mt-6">
+            <div className="flex items-end gap-1 sm:gap-1.5" aria-hidden="true">
+              {d.years.map((y) => {
+                const h = tallest > 0 ? (y.debtService / tallest) * 100 : 0;
+                const principalShare = y.debtService > 0 ? (y.principal / y.debtService) * 100 : 0;
+                return (
+                  <div key={y.year} className="flex flex-1 flex-col items-center gap-1">
+                    <div
+                      className="flex w-full flex-col justify-end overflow-hidden rounded-t bg-faint"
+                      style={{ height: "5rem" }}
+                    >
+                      <div className="w-full bg-brand" style={{ height: `${(h * principalShare) / 100}%` }} />
+                      <div
+                        className="w-full bg-brand/30"
+                        style={{ height: `${(h * (100 - principalShare)) / 100}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] tabular-nums text-muted">{y.year}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded-sm bg-brand/30" />
+                Interest
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2.5 w-2.5 rounded-sm bg-brand" />
+                Principal — equity, returned at sale
+              </span>
+              <span>Each column is one year of debt service.</span>
+            </p>
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Stat
+              label={d.amortisingPayment === null ? "Annual interest" : "Annual payment"}
+              value={usdExact(d.amortisingPayment ?? d.ioPayment)}
+            />
+            <Stat label={`Balloon, year ${d.years.length}`} value={usd(d.balloon)} tone="brand" />
+            <Stat label="Principal repaid" value={usd(d.principalPaid)} />
+            <Stat label="Interest paid" value={usd(d.interestPaid)} tone="muted" />
+          </div>
+
+          <p className="mt-3 text-sm text-muted">
+            {d.retiredInYear !== null ? (
+              <>The loan retires itself in year {d.retiredInYear} — there is no balloon.</>
+            ) : (
+              <>
+                {pct(d.paidOffPct, 1)} of the loan is repaid over the term
+                {d.interestSharePct !== null && (
+                  <>
+                    ; {pct(d.interestSharePct, 0)} of everything paid is interest
+                  </>
+                )}
+                .
+              </>
+            )}
+          </p>
+        </>
+      )}
+
+      {d.note && <p className="mt-3 text-sm text-caution">{d.note}</p>}
+
+      {/* ── the refinance ── */}
+      <div className="mt-8 border-t border-line pt-6">
+        <h3 className="text-sm font-semibold">
+          Can the balloon be refinanced?
+        </h3>
+        <p className="mt-1 text-sm text-muted">
+          The take-out is sized on the same three tests as any loan, then held
+          against what is owed.
+        </p>
+
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+          <Field label="NOI then" value={noiRefi} onChange={setNoiRefi} placeholder="1,450,000" />
+          <Field label="Exit cap" suffix="%" value={exitCap} onChange={setExitCap} placeholder="6.5" />
+          <Field label="New rate" suffix="%" value={newRate} onChange={setNewRate} placeholder="7.25" />
+          <Field label="Amort" suffix="yr" value={newAmort} onChange={setNewAmort} placeholder="30" />
+          <Field label="Max LTV" suffix="%" value={rLtv} onChange={setRLtv} placeholder="65" />
+          <Field label="Min DSCR" suffix="x" value={rDscr} onChange={setRDscr} placeholder="1.25" />
+          <Field label="Min debt yield" suffix="%" value={rDy} onChange={setRDy} placeholder="9" />
+        </div>
+
+        {r.newLoan !== null && widest > 0 && (
+          <>
+            <div className="mt-5 space-y-2.5">
+              {[
+                { label: "Owed at the balloon", amount: d.balloon ?? 0, tone: "bg-ink/25" },
+                { label: "New loan", amount: r.newLoan, tone: "bg-brand" },
+              ].map((row) => (
+                <div key={row.label}>
+                  <div className="flex items-baseline justify-between text-sm">
+                    <span className="text-muted">{row.label}</span>
+                    <span className="font-mono font-semibold tabular-nums">{usd(row.amount)}</span>
+                  </div>
+                  <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-faint">
+                    <div
+                      data-bar="refi"
+                      className={`h-full rounded-full ${row.tone}`}
+                      style={{ width: `${(row.amount / widest) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <Stat label="Value at refinance" value={usd(r.value)} />
+              <Stat
+                label={r.verdict === "cash in" ? "Cash in" : "Cash out"}
+                value={usd(Math.abs(r.proceeds ?? 0))}
+              />
+              <Stat label="New LTV" value={pct(r.newLtvPct, 1)} tone="muted" />
+              <Stat label="Binds on" value={r.binding?.label ?? "—"} tone="muted" />
+            </div>
+
+            <p className={`mt-4 text-sm font-medium ${verdictTone}`}>
+              {r.verdict === "cash out" && (
+                <>
+                  The take-out covers the balloon and returns {usd(r.proceeds)} —
+                  a cash-out refinance.
+                </>
+              )}
+              {r.verdict === "covers it" && (
+                <>The take-out covers the balloon almost exactly. No capital moves either way.</>
+              )}
+              {r.verdict === "cash in" && (
+                <>
+                  The take-out falls {usd(r.shortfall)} short — a cash-in refinance, written
+                  the day the term is up.
+                  {r.noiToClear !== null && (
+                    <>
+                      {" "}
+                      NOI of {usdExact(r.noiToClear)} clears it on the{" "}
+                      {r.binding?.label.toLowerCase()} test.
+                    </>
+                  )}
+                </>
+              )}
+            </p>
+          </>
+        )}
+
+        {r.note && <p className="mt-4 text-sm text-caution">{r.note}</p>}
+      </div>
+    </Card>
+  );
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 
 export function DealMathTools() {
@@ -1048,6 +1285,7 @@ export function DealMathTools() {
         />
       </div>
       <DebtSizer />
+      <LoanOverTime />
       <CashFlowStrip />
       <NetEffectiveRent />
       <div className="grid gap-6 lg:grid-cols-2">
