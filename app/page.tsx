@@ -29,6 +29,9 @@ import { seedRules } from "@/lib/research-data";
 import { hoursSince } from "@/lib/research";
 import { latestChange } from "@/lib/changelog";
 import { StressBench } from "./landing-stress";
+// The /tools shelf reads the SAME list /tools builds its cards from, so the
+// homepage can only ever advertise what the page actually serves.
+import { TOOL_COUNT, TOOL_INDEX } from "@/lib/tools/catalog";
 import metrosSeed from "@/data/research/metros.json";
 import { MARKET_COUNT } from "./markets-marquee";
 import { MarketsGallery } from "./markets-gallery";
@@ -789,16 +792,40 @@ export default function Home() {
               </div>
             </Reveal>
             {/* The bench stresses one screened deal. /tools is the same
-                arithmetic with no deal behind it — the natural next click
-                for anyone who has just finished dragging these sliders. */}
+                arithmetic with NO deal behind it — the natural next click
+                for anyone who has just finished dragging these sliders.
+
+                This was one underlined sentence for a long time, and it
+                said "size a loan, or run the cap rate math" well after the
+                page had grown past that. The shelf below renders from
+                TOOL_INDEX, the same list /tools builds its cards from, so
+                the homepage can only ever name what the page actually
+                serves. A count in prose would go stale; a list cannot. */}
             <Reveal delay={160}>
-              <Link
-                href="/tools"
-                className="mt-6 inline-flex items-center gap-1.5 text-sm font-medium text-accent underline-offset-4 transition-colors hover:underline"
-              >
-                Size a loan, or run the cap rate math, on your own numbers
-                <span aria-hidden="true">→</span>
-              </Link>
+              <div className="mt-8 border-t border-white/15 pt-6">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-white/60">
+                  {TOOL_COUNT} more, with no deal behind them
+                </p>
+                <ul className="mt-3 flex flex-wrap gap-2">
+                  {TOOL_INDEX.map((t) => (
+                    <li key={t.id}>
+                      <Link
+                        href={`/tools#${t.id}`}
+                        className="inline-block rounded-lg border border-white/20 px-2.5 py-1 text-xs font-medium text-white/85 transition-colors hover:border-accent hover:text-accent"
+                      >
+                        {t.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/tools"
+                  className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-accent underline-offset-4 transition-colors hover:underline"
+                >
+                  Run any of them on your own numbers
+                  <span aria-hidden="true">→</span>
+                </Link>
+              </div>
             </Reveal>
           </div>
         </section>

@@ -252,6 +252,16 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   rent per usable foot every time; that rent is the point of the module,
   since a $40 quote at an 18% load is dearer space than a $42 quote at 10%.
   A usable area larger than the rentable one is refused rather than computed.
+- What `/tools` answers: `lib/tools/catalog.ts` (`TOOL_INDEX`, `TOOL_COUNT`
+  — pure data, no `"use client"`, so a server-rendered page can import it).
+  The page's jump index renders from it, each card takes its `id` from it,
+  **and the homepage's shelf renders from it too** — the homepage went on
+  saying "size a loan, or run the cap rate math" while the page grew from
+  four calculators to fifteen, and one list imported by both makes that
+  drift impossible rather than merely unlikely. The count in the page's own
+  meta description is prose and cannot render from the constant, so
+  `catalog.test.ts` holds the spelled-out number to `TOOL_COUNT` instead;
+  that claim went stale twice in one evening before the guard existed.
 - What the dirt is worth: `lib/tools/land-residual.ts` (pure). The one
   calculation on `/tools` that solves for a price instead of judging one —
   the finished building's value less the cost of building it and the return
