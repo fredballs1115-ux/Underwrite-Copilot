@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { readFigure } from "@/lib/money";
 import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
 import {
@@ -76,6 +76,122 @@ function Field({
   );
 }
 
+
+// ── the link ───────────────────────────────────────────────────────────────
+
+/**
+ * Every field's value in the URL, so a sizing is a link.
+ *
+ * "Send me that" is the sentence this exists for. An analyst who has just
+ * dragged a loan to where it works has to be able to paste it into a
+ * message, and a calculator whose state lives only in its own inputs makes
+ * them screenshot it instead.
+ *
+ * It is deliberately NOT the Next router. `history.replaceState` writes the
+ * query string without a navigation, so nothing re-renders on the server
+ * and — replace, not push — the Back button still leaves the page rather
+ * than walking back through the keystrokes.
+ *
+ * The URL is read in an effect rather than during render: reading
+ * `window.location` while rendering makes the server's HTML and the
+ * browser's first paint disagree, which React calls a hydration error and a
+ * reader sees as a flash of the wrong numbers. So a shared link paints the
+ * seeded figures for one frame and then its own.
+ */
+/** The page's live field values, and the subscribers to tell when one moves. */
+const live = new Map<string, string>();
+const seeded = new Map<string, string>();
+const listeners = new Set<() => void>();
+let writeTimer: ReturnType<typeof setTimeout> | null = null;
+
+function subscribe(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+}
+
+function writeUrl() {
+  if (typeof window === "undefined") return;
+  const q = new URLSearchParams();
+  // Only what differs from the seed: an untouched page copies as a bare
+  // /tools, not a paragraph of defaults.
+  for (const [k, v] of live) if (v !== seeded.get(k)) q.set(k, v);
+  const query = q.toString();
+  window.history.replaceState(null, "", query ? `?${query}` : window.location.pathname);
+}
+
+/** One field's current value in the browser: the URL's, else the seed. */
+function snapshot(key: string, initial: string): string {
+  seeded.set(key, initial);
+  if (!live.has(key)) {
+    const fromUrl =
+      typeof window === "undefined"
+        ? null
+        : new URLSearchParams(window.location.search).get(key);
+    live.set(key, fromUrl ?? initial);
+  }
+  return live.get(key) ?? initial;
+}
+
+function useShared(key: string, initial: string): [string, (v: string) => void] {
+  // useSyncExternalStore rather than a useState + useEffect pair, and for
+  // the reason the API exists: the server has no URL, so it renders the
+  // seed, and the browser swaps in the link's own values on the render
+  // after hydration. Reading window.location during render instead would
+  // make the two disagree, which a reader sees as a flash of the wrong
+  // numbers and React calls a hydration error.
+  const value = useSyncExternalStore(
+    subscribe,
+    () => snapshot(key, initial),
+    () => initial,
+  );
+  const set = useCallback(
+    (next: string) => {
+      live.set(key, next);
+      for (const fn of listeners) fn();
+      if (writeTimer) clearTimeout(writeTimer);
+      // Debounced: every keystroke writing the URL is work nobody asked for.
+      writeTimer = setTimeout(writeUrl, 400);
+    },
+    [key],
+  );
+  return [value, set];
+}
+
+/** A button that puts something on the clipboard and says it did. */
+function CopyButton({
+  label,
+  text,
+  className = "",
+}: {
+  label: string;
+  /** computed at click time, so it is never a stale closure's copy */
+  text: () => string;
+  className?: string;
+}) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text());
+          setDone(true);
+          setTimeout(() => setDone(false), 1800);
+        } catch {
+          // A browser that refuses the clipboard (no permission, insecure
+          // origin) must not look like it worked.
+          setDone(false);
+        }
+      }}
+      className={`rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:border-brand hover:text-brand ${className}`}
+    >
+      {done ? "Copied" : label}
+    </button>
+  );
+}
+
 // ── the output layer ───────────────────────────────────────────────────────
 
 const usd = (n: number | null) =>
@@ -136,16 +252,16 @@ function Card({
 // ── 1. the debt sizer ──────────────────────────────────────────────────────
 
 function DebtSizer() {
-  const [price, setPrice] = useState("$20M");
-  const [noi, setNoi] = useState("1,200,000");
-  const [rate, setRate] = useState("6.5");
-  const [amort, setAmort] = useState("30");
+  const [price, setPrice] = useShared("p", "$20M");
+  const [noi, setNoi] = useShared("noi", "1,200,000");
+  const [rate, setRate] = useShared("r", "6.5");
+  const [amort, setAmort] = useShared("am", "30");
   const [io, setIo] = useState(false);
-  const [ltv, setLtv] = useState("65");
-  const [dscr, setDscr] = useState("1.25");
-  const [dy, setDy] = useState("9");
-  const [gpr, setGpr] = useState("2,000,000");
-  const [opex, setOpex] = useState("700,000");
+  const [ltv, setLtv] = useShared("ltv", "65");
+  const [dscr, setDscr] = useShared("dscr", "1.25");
+  const [dy, setDy] = useShared("dy", "9");
+  const [gpr, setGpr] = useShared("gpr", "2,000,000");
+  const [opex, setOpex] = useShared("opex", "700,000");
 
   const s = useMemo(
     () =>
@@ -285,11 +401,11 @@ function DebtSizer() {
 // ── 2. the cap rate triangle ───────────────────────────────────────────────
 
 function CapTriangle() {
-  const [noi, setNoi] = useState("1,200,000");
-  const [price, setPrice] = useState("$20M");
-  const [cap, setCap] = useState("");
-  const [units, setUnits] = useState("120");
-  const [sf, setSf] = useState("");
+  const [noi, setNoi] = useShared("cnoi", "1,200,000");
+  const [price, setPrice] = useShared("cp", "$20M");
+  const [cap, setCap] = useShared("cap", "");
+  const [units, setUnits] = useShared("cu", "120");
+  const [sf, setSf] = useShared("csf", "");
 
   const n = num(noi);
   const p = num(price);
@@ -359,12 +475,12 @@ function CapTriangle() {
 // ── 3. build or buy ────────────────────────────────────────────────────────
 
 function BuildOrBuy() {
-  const [land, setLand] = useState("$5M");
-  const [hard, setHard] = useState("$30M");
-  const [soft, setSoft] = useState("$6M");
-  const [conting, setConting] = useState("5");
-  const [stabNoi, setStabNoi] = useState("2,975,000");
-  const [exitCap, setExitCap] = useState("5.5");
+  const [land, setLand] = useShared("land", "$5M");
+  const [hard, setHard] = useShared("hard", "$30M");
+  const [soft, setSoft] = useShared("soft", "$6M");
+  const [conting, setConting] = useShared("cont", "5");
+  const [stabNoi, setStabNoi] = useShared("snoi", "2,975,000");
+  const [exitCap, setExitCap] = useShared("xcap", "5.5");
 
   const y = useMemo(
     () =>
@@ -467,10 +583,10 @@ function RentConverter() {
   const [basis, setBasis] = useState<"perSfYear" | "perSfMonth" | "perUnitMonth">(
     "perSfYear",
   );
-  const [amount, setAmount] = useState("36");
-  const [sf, setSf] = useState("100,000");
-  const [units, setUnits] = useState("120");
-  const [expenses, setExpenses] = useState("12.50");
+  const [amount, setAmount] = useShared("amt", "36");
+  const [sf, setSf] = useShared("rsf", "100,000");
+  const [units, setUnits] = useShared("ru", "120");
+  const [expenses, setExpenses] = useShared("exp", "12.50");
 
   const q = useMemo(
     () =>
@@ -564,11 +680,12 @@ function RentConverter() {
  * how hard to argue about the exit cap.
  */
 function CashFlowStrip() {
-  const [raw, setRaw] = useState(
+  const [raw, setRaw] = useShared(
+    "cf",
     "-10,000,000\n650,000\n700,000\n750,000\n800,000\n15,200,000",
   );
-  const [residual, setResidual] = useState("14,400,000");
-  const [discount, setDiscount] = useState("10");
+  const [residual, setResidual] = useShared("res", "14,400,000");
+  const [discount, setDiscount] = useShared("disc", "10");
 
   const read = useMemo(() => readStrip(raw), [raw]);
   const r = useMemo(
@@ -706,9 +823,24 @@ function CashFlowStrip() {
                   </div>
                 ))}
               </div>
-              <p className="mt-2 text-[11px] text-muted">
-                Each year against the largest flow; the right column is the running total.
-              </p>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] text-muted">
+                  Each year against the largest flow; the right column is the running total.
+                </p>
+                {/* Tab-delimited with headers, and the numbers RAW — no
+                    dollar signs, no commas, no compacting to "$8.10M" — so
+                    they land in a spreadsheet as numbers rather than as
+                    text somebody then has to clean. That is the whole
+                    point of a copy button on a table. */}
+                <CopyButton
+                  label="Copy as table"
+                  text={() =>
+                    ["Year\tCash flow\tCumulative"]
+                      .concat(r.rows.map((x) => `${x.year}\t${x.flow}\t${x.cumulative}`))
+                      .join("\n")
+                  }
+                />
+              </div>
             </div>
           )}
         </div>
@@ -722,6 +854,17 @@ function CashFlowStrip() {
 export function DealMathTools() {
   return (
     <div className="space-y-6">
+      {/* "Send me that sizing" is the sentence this answers. Every field on
+          the page writes itself into the query string (useShared), so the
+          link carries the whole state of all five calculators — and carries
+          only what was CHANGED, so an untouched page copies as a bare
+          /tools rather than a paragraph of defaults. */}
+      <div className="flex items-center justify-end">
+        <CopyButton
+          label="Copy link to this sizing"
+          text={() => window.location.href}
+        />
+      </div>
       <DebtSizer />
       <CashFlowStrip />
       <div className="grid gap-6 lg:grid-cols-2">

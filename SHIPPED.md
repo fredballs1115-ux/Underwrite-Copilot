@@ -36,9 +36,40 @@ than the purchase price, 21 million to 20 — it has to take into account
 construction and downtime and what the deal is"; "split the pipeline up by
 asset class"; "too much emphasis on the buy box". Then the correction that
 reshaped the rest of the run: "that NOI makes sense — it's a conservative
-estimate, and that's what it should flag." A hundred and twenty-nine PRs, #176–#304, each
+estimate, and that's what it should flag." A hundred and thirty PRs, #176–#305, each
 gated on tsc / eslint / the full suite / a production build, the live sha
 confirmed equal to the main tip after each batch.
+
+- **#305 The work can leave the page.** Two things an analyst needs from
+  a calculator that has nothing to do with the arithmetic.
+
+  A sizing is a LINK. "Send me that" used to mean a screenshot; every
+  field on /tools now writes itself into the query string, so the whole
+  page — all five calculators — travels in an address bar. It carries only
+  what was changed, so an untouched page copies as a bare /tools rather
+  than a paragraph of defaults, and it writes with `history.replaceState`
+  rather than the router: no navigation, nothing re-rendered on the
+  server, and the Back button still leaves the page instead of walking
+  back through the keystrokes.
+
+  The hook reads through `useSyncExternalStore` for the reason that API
+  exists. The server has no URL, so its snapshot is the seed; the browser
+  swaps in the link's own values on the render after hydration. Reading
+  `window.location` during render instead is a hydration error to React
+  and a flash of the wrong numbers to a reader — the render test asserts
+  the server's HTML still carries the seeded figures.
+
+  A table is a PASTE. The cash-flow rows copy tab-delimited with their
+  headers and the numbers RAW — no dollar signs, no commas, nothing
+  compacted to "$8.10M" — so they land in a spreadsheet as numbers rather
+  than as text somebody then has to clean. That is the only version of a
+  copy button that saves anybody time.
+
+  Also: live-verify's round markers moved to the LAST step. A job log is
+  read from its tail, and they were sitting mid-log behind forty lines of
+  echoed probe commands. They run under `if` rather than a bare grep now,
+  because these steps run with `bash -e` and one failing marker would
+  otherwise abort the step and take every marker after it down with it.
 
 - **#304 Paste a cash flow.** The single most common reason an analyst
   leaves a screening tool mid-call is to paste a column of numbers into

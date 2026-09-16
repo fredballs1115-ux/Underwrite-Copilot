@@ -140,29 +140,6 @@ jobs:
           grep -q "screenrun-line" p_why.html && echo "/why: screen-run trace present" || echo "/why: screen-run trace not yet deployed"
           grep -q "multifamily, and retail vacancy" p_why.html && echo "/why: asset-type copy includes retail (Aug 25)" || echo "/why: asset-type copy still pre-retail"
           grep -q "It knows what kind of deal it is" p_why.html && echo "/why: strategy section present (Sep 8)" || echo "/why: strategy section not yet deployed"
-          # Sep 16 (#302). The build-marker gate above only reads the hero
-          # headline and the build stamp, so it passes on a stale build too
-          # — these three are the first markers that actually move with a
-          # deploy, one per surface the round touched.
-          #
-          # `on-photo` and `band-words` are the classes the new scrim's
-          # treatment puts on a band's words; a build serving the washed
-          # photographs has neither.
-          grep -q "on-photo" p_why.html && grep -q "band-words" p_why.html \
-            && echo "PHOTO TREATMENT (#302): present" \
-            || echo "PHOTO TREATMENT (#302): not yet deployed"
-          # The deal-math price fields now SEED the shorthand, which is both
-          # the fix and its own proof: the old build cannot render it,
-          # because the old parser could not read it.
-          curl -sS -o p_tools.html --max-time 60 "https://underwrite-copilot.onrender.com/tools" || true
-          grep -q 'value="\$20M"' p_tools.html \
-            && echo "DEAL MATH SHORTHAND (#302): present" \
-            || echo "DEAL MATH SHORTHAND (#302): not yet deployed"
-          # The coverage grid's credit names the licences, not just the
-          # photographers — what CC BY actually asks for.
-          grep -q "via Wikimedia Commons, CC BY" body.html \
-            && echo "GALLERY LICENCE CREDIT (#302): present" \
-            || echo "GALLERY LICENCE CREDIT (#302): not yet deployed"
           grep -q "improvement" p_whats-new.html && echo "/whats-new: public changelog serves" || echo "/whats-new: not serving (pre-#98 build or auth-walled)"
           # The changelog-as-tour rebuild: day groups, momentum line, and
           # every entry linking to where it landed.
@@ -334,3 +311,24 @@ jobs:
             curl -sS -o "p_$path.html" --max-time 60 "https://underwrite-copilot.onrender.com/$path" || true
           done
           node scripts/lint-pages.mjs --allow=aboutabout,9real,29machine body.html p_*.html
+      # LAST ON PURPOSE. The build-marker gate near the top reads the hero
+      # headline and the build stamp, and both survive most rounds
+      # unchanged — so it passes on a stale build and says nothing about
+      # whether THIS round deployed. These do, one per surface a round
+      # touched, each chosen because the previous build cannot produce it.
+      #
+      # They print at the very end because that is where a reader looks
+      # first, and because a job log is read from its tail.
+      - name: Did this round actually deploy? (the round's own markers)
+        run: |
+          curl -sS -o p_tools2.html --max-time 60 "https://underwrite-copilot.onrender.com/tools" || true
+          # `if` rather than `cmd; check $?`: these steps run under `bash -e`,
+          # where a bare failing grep would abort the step and take every
+          # marker after it down with it. An `if` condition is exempt.
+          mark() { if "${@:2}"; then echo "  present      $1"; else echo "  NOT DEPLOYED $1"; fi; }
+          both() { grep -q "on-photo" p_why.html && grep -q "band-words" p_why.html; }
+          echo "ROUND MARKERS — what the live site is actually serving:"
+          mark "#302 photo treatment (on-photo + band-words on /why)" both
+          mark "#302 deal math reads the shorthand (seeded \$20M on /tools)" grep -q 'value="\$20M"' p_tools2.html
+          mark "#302 gallery credit names the licence" grep -q "via Wikimedia Commons, CC BY" body.html
+          mark "#304 the cash-flow strip is on /tools" grep -q "Paste a cash flow" p_tools2.html

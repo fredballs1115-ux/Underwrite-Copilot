@@ -991,6 +991,24 @@ describe("the deal math tools", () => {
   const html = render(React.createElement(DealMathTools));
   const text = visibleText(html);
 
+  it("renders the seed on the server, where there is no URL to read", () => {
+    // The trap useSyncExternalStore exists for: a hook that read
+    // window.location during render would make the server's HTML and the
+    // browser's first paint disagree — a hydration error to React, a flash
+    // of the wrong numbers to a reader. The server snapshot is the seed,
+    // and this render IS the server, so the seeded figures must be here.
+    expect(html).toContain('value="$20M"');
+    expect(text).toContain("$12,656,86");
+  });
+
+  it("offers a link and a table, so the work can leave the page", () => {
+    // An analyst who cannot get a sizing out of the page goes back to
+    // Excel, which is the thing this page exists to prevent.
+    expect(text).toContain("Copy link to this sizing");
+    expect(text).toContain("Copy as table");
+    expect(a11yIssues(html), "the copy buttons are named").toEqual([]);
+  });
+
   it("names every control and reads clean", () => {
     expect(a11yIssues(html), "a11y tools").toEqual([]);
     expect(gluedWords(text)).toEqual([]);
