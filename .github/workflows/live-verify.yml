@@ -5,6 +5,13 @@ name: live-verify
 # workflow) or automatically on every push to main.
 on:
   workflow_dispatch:
+    inputs:
+      skyline_markets:
+        description: >-
+          Skyline sweep: space-separated metro ids (e.g. "dc baltimore
+          richmond"). Blank sweeps all eighteen.
+        required: false
+        default: ""
   push:
     branches: [main]
 jobs:
@@ -249,7 +256,13 @@ jobs:
         # --search asks Commons what exists; with no flag it verifies the
         # candidates already chosen. While the table is being filled the
         # search is what earns its keep, so that is the mode wired here.
-        run: node scripts/probe-skylines.mjs --search --terse || true
+        # The markets come in through the environment rather than being
+        # interpolated into the script line: a ${{ }} expression spliced into
+        # a shell command is the standard Actions injection hole, and word
+        # splitting an env var is exactly the behaviour wanted here anyway.
+        env:
+          SKYLINE_MARKETS: ${{ inputs.skyline_markets }}
+        run: node scripts/probe-skylines.mjs --search --terse $SKYLINE_MARKETS || true
 
       - name: Verdict
         # Two tiers: the hero headline proves the site is up and on the right
