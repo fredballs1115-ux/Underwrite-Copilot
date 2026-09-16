@@ -4,7 +4,10 @@
     {
       "metroId": "dc",
       "city": "Washington, D.C.",
-      "wikipedia": ["Washington, D.C.", "Downtown Washington, D.C."],
+      "wikipedia": [
+        "Washington, D.C.",
+        "Downtown Washington, D.C."
+      ],
       "categories": [
         "Skyline of Washington, D.C.",
         "Views of Washington, D.C.",
@@ -15,12 +18,20 @@
         "Washington DC skyline panorama",
         "Washington DC cityscape from Arlington"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Aerial view National Mall 12 2014 DC 711.JPG",
+          "note": "The National Mall, Washington — Mariordo (Mario Roberto Durán Ortiz)"
+        }
+      ]
     },
     {
       "metroId": "pg_county",
       "city": "National Harbor, Maryland",
-      "wikipedia": ["National Harbor, Maryland", "Oxon Hill, Maryland"],
+      "wikipedia": [
+        "National Harbor, Maryland",
+        "Oxon Hill, Maryland"
+      ],
       "categories": [
         "National Harbor",
         "Views of National Harbor",
@@ -35,7 +46,11 @@
     {
       "metroId": "montgomery_county",
       "city": "Bethesda, Maryland",
-      "wikipedia": ["Bethesda, Maryland", "Silver Spring, Maryland", "Rockville, Maryland"],
+      "wikipedia": [
+        "Bethesda, Maryland",
+        "Silver Spring, Maryland",
+        "Rockville, Maryland"
+      ],
       "categories": [
         "Bethesda, Maryland",
         "Downtown Silver Spring",
@@ -51,7 +66,11 @@
     {
       "metroId": "nova",
       "city": "Arlington, Virginia",
-      "wikipedia": ["Rosslyn, Virginia", "Arlington County, Virginia", "Crystal City, Virginia"],
+      "wikipedia": [
+        "Rosslyn, Virginia",
+        "Arlington County, Virginia",
+        "Crystal City, Virginia"
+      ],
       "categories": [
         "Rosslyn, Arlington, Virginia",
         "Skyline of Arlington, Virginia",
@@ -67,7 +86,10 @@
     {
       "metroId": "baltimore",
       "city": "Baltimore",
-      "wikipedia": ["Baltimore", "Inner Harbor"],
+      "wikipedia": [
+        "Baltimore",
+        "Inner Harbor"
+      ],
       "categories": [
         "Skyline of Baltimore",
         "Views of Baltimore",
@@ -78,12 +100,20 @@
         "Baltimore Inner Harbor skyline",
         "Baltimore skyline panorama"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Baltimore, Maryland skyline (cropped).jpg",
+          "note": "Baltimore — Quintin Soloviev"
+        }
+      ]
     },
     {
       "metroId": "richmond",
       "city": "Richmond, Virginia",
-      "wikipedia": ["Richmond, Virginia", "Downtown Richmond, Virginia"],
+      "wikipedia": [
+        "Richmond, Virginia",
+        "Downtown Richmond, Virginia"
+      ],
       "categories": [
         "Skyline of Richmond, Virginia",
         "Views of Richmond, Virginia",
@@ -93,12 +123,20 @@
         "Richmond Virginia skyline James River",
         "Richmond Virginia downtown skyline"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Skyline of Richmond, Virginia.jpg",
+          "note": "Richmond — Jim"
+        }
+      ]
     },
     {
       "metroId": "norfolk_hampton_roads",
       "city": "Norfolk, Virginia",
-      "wikipedia": ["Norfolk, Virginia", "Downtown Norfolk"],
+      "wikipedia": [
+        "Norfolk, Virginia",
+        "Downtown Norfolk"
+      ],
       "categories": [
         "Skyline of Norfolk, Virginia",
         "Views of Norfolk, Virginia",
@@ -108,12 +146,20 @@
         "Norfolk Virginia skyline Elizabeth River",
         "Norfolk Virginia downtown skyline"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Downtown Norfolk at Dusk.jpg",
+          "note": "Downtown Norfolk — Bruce Emmerling"
+        }
+      ]
     },
     {
       "metroId": "philadelphia",
       "city": "Philadelphia",
-      "wikipedia": ["Philadelphia", "Center City, Philadelphia"],
+      "wikipedia": [
+        "Philadelphia",
+        "Center City, Philadelphia"
+      ],
       "categories": [
         "Skyline of Philadelphia",
         "Views of Philadelphia",
@@ -124,12 +170,21 @@
         "Philadelphia skyline Schuylkill",
         "Philadelphia Center City skyline"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Philadelphia skyline 20240528 (cropped).jpg",
+          "note": "Center City Philadelphia — 颐园居"
+        }
+      ]
     },
     {
       "metroId": "newark_jc",
       "city": "Jersey City, New Jersey",
-      "wikipedia": ["Jersey City, New Jersey", "Newark, New Jersey", "Exchange Place, Jersey City"],
+      "wikipedia": [
+        "Jersey City, New Jersey",
+        "Newark, New Jersey",
+        "Exchange Place, Jersey City"
+      ],
       "categories": [
         "Skyline of Jersey City",
         "Views of Jersey City",
@@ -140,12 +195,21 @@
         "Jersey City skyline Hudson River",
         "Newark New Jersey downtown skyline"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Jersey City Skyline September 2025 038 (cropped).jpg",
+          "note": "Jersey City — Kidfly182"
+        }
+      ]
     },
     {
       "metroId": "nyc",
       "city": "New York City",
-      "wikipedia": ["New York City", "Manhattan", "Midtown Manhattan"],
+      "wikipedia": [
+        "New York City",
+        "Manhattan",
+        "Midtown Manhattan"
+      ],
       "categories": [
         "Skyline of Manhattan",
         "Views of Manhattan",
@@ -156,12 +220,20 @@
         "Manhattan skyline from Brooklyn",
         "Midtown Manhattan skyline daytime"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "View of Empire State Building from Rockefeller Center New York City dllu (cropped).jpg",
+          "note": "Midtown Manhattan — Dllu"
+        }
+      ]
     },
     {
       "metroId": "boston",
       "city": "Boston",
-      "wikipedia": ["Boston", "Financial District, Boston"],
+      "wikipedia": [
+        "Boston",
+        "Financial District, Boston"
+      ],
       "categories": [
         "Skyline of Boston",
         "Views of Boston",
@@ -172,12 +244,20 @@
         "Boston skyline Charles River",
         "Boston Massachusetts skyline harbor"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Boston skyline from Longfellow Bridge September 2017 panorama 2.jpg",
+          "note": "Back Bay, Boston — King of Hearts"
+        }
+      ]
     },
     {
       "metroId": "chicago",
       "city": "Chicago",
-      "wikipedia": ["Chicago", "Chicago Loop"],
+      "wikipedia": [
+        "Chicago",
+        "Chicago Loop"
+      ],
       "categories": [
         "Skyline of Chicago",
         "Views of Chicago",
@@ -188,12 +268,20 @@
         "Chicago skyline Lake Michigan",
         "Chicago downtown Loop skyline"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Chicago Skyline in September 2023 pano.jpg",
+          "note": "Chicago — TheWxResearcher"
+        }
+      ]
     },
     {
       "metroId": "los_angeles",
       "city": "Los Angeles",
-      "wikipedia": ["Los Angeles", "Downtown Los Angeles"],
+      "wikipedia": [
+        "Los Angeles",
+        "Downtown Los Angeles"
+      ],
       "categories": [
         "Skyline of Los Angeles",
         "Views of Los Angeles",
@@ -204,12 +292,20 @@
         "Downtown Los Angeles skyline",
         "Los Angeles skyline mountains daytime"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Skyline of Los Angeles, Downtown Los Angeles, California 13.jpg",
+          "note": "Downtown Los Angeles — Levi Clancy"
+        }
+      ]
     },
     {
       "metroId": "san_francisco",
       "city": "San Francisco",
-      "wikipedia": ["San Francisco", "Financial District, San Francisco"],
+      "wikipedia": [
+        "San Francisco",
+        "Financial District, San Francisco"
+      ],
       "categories": [
         "Skyline of San Francisco",
         "Views of San Francisco",
@@ -219,12 +315,20 @@
         "San Francisco skyline financial district",
         "San Francisco skyline from Treasure Island"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "SF From Marin Highlands3.jpg",
+          "note": "San Francisco from the Marin Headlands — Paul.h"
+        }
+      ]
     },
     {
       "metroId": "seattle",
       "city": "Seattle",
-      "wikipedia": ["Seattle", "Downtown Seattle"],
+      "wikipedia": [
+        "Seattle",
+        "Downtown Seattle"
+      ],
       "categories": [
         "Skyline of Seattle",
         "Views of Seattle",
@@ -235,12 +339,21 @@
         "Seattle skyline Kerry Park",
         "Seattle Washington skyline Elliott Bay"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "View of Downtown Seattle from Ella Bailey Park (27305770463).jpg",
+          "note": "Downtown Seattle — Tiffany Von Arnim"
+        }
+      ]
     },
     {
       "metroId": "miami",
       "city": "Miami",
-      "wikipedia": ["Miami", "Downtown Miami", "Brickell"],
+      "wikipedia": [
+        "Miami",
+        "Downtown Miami",
+        "Brickell"
+      ],
       "categories": [
         "Skyline of Miami",
         "Views of Miami",
@@ -251,12 +364,21 @@
         "Miami skyline Biscayne Bay",
         "Downtown Miami skyline Brickell"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Brickell neighborhood skyline (60062p).jpg",
+          "note": "Brickell, Miami — Rhododendrites"
+        }
+      ]
     },
     {
       "metroId": "atlanta",
       "city": "Atlanta",
-      "wikipedia": ["Atlanta", "Midtown Atlanta", "Downtown Atlanta"],
+      "wikipedia": [
+        "Atlanta",
+        "Midtown Atlanta",
+        "Downtown Atlanta"
+      ],
       "categories": [
         "Skyline of Atlanta",
         "Views of Atlanta",
@@ -267,12 +389,21 @@
         "Atlanta skyline Midtown",
         "Atlanta Georgia downtown skyline"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Atlanta, Georgia Skyline.jpg",
+          "note": "Atlanta — Shawn M. Kent"
+        }
+      ]
     },
     {
       "metroId": "dallas",
       "city": "Dallas",
-      "wikipedia": ["Dallas", "Downtown Dallas", "Fort Worth, Texas"],
+      "wikipedia": [
+        "Dallas",
+        "Downtown Dallas",
+        "Fort Worth, Texas"
+      ],
       "categories": [
         "Skyline of Dallas",
         "Views of Dallas",
@@ -283,7 +414,12 @@
         "Dallas skyline Reunion Tower",
         "Dallas Texas downtown skyline"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "IMAG2591-dallas-downtown.jpg",
+          "note": "Downtown Dallas — alfred twu"
+        }
+      ]
     }
   ]
 }

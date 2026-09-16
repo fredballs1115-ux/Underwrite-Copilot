@@ -8,6 +8,7 @@ import {
   hasSkyline,
   skylineFor,
 } from "./skyline";
+import { gluedWords } from "./render-lint";
 import metrosSeed from "@/data/research/metros.json";
 
 const METRO_IDS = new Set((metrosSeed.metros ?? []).map((m) => (m as { id: string }).id));
@@ -71,6 +72,30 @@ describe("the Commons URLs", () => {
     expect(commonsPage("Foo Bar.jpg")).toBe(
       "https://commons.wikimedia.org/wiki/File:Foo%20Bar.jpg",
     );
+  });
+});
+
+describe("every credit the table will actually print", () => {
+  it("survives the same text lint the live pages are held to", () => {
+    // These strings go onto public pages, so they meet the public pages'
+    // standard. Worth asserting rather than assuming: the photographers are
+    // named exactly as Commons names them, which means one credit is in
+    // Chinese characters and another carries a parenthetical real name —
+    // neither shape has appeared in this codebase's copy before.
+    for (const [id, shot] of Object.entries(SKYLINES)) {
+      const line = creditLine(shot);
+      expect(gluedWords(line), `${id}: ${line}`).toEqual([]);
+      expect(line, id).not.toContain("undefined");
+      expect(line, id).not.toContain("  ");
+    }
+  });
+
+  it("names a real place and a real photographer, never a placeholder", () => {
+    for (const [id, shot] of Object.entries(SKYLINES)) {
+      expect(shot.credit.toLowerCase(), id).not.toBe("unknown");
+      expect(shot.credit.trim(), id).toBe(shot.credit);
+      expect(shot.place.trim(), id).toBe(shot.place);
+    }
   });
 });
 

@@ -447,13 +447,20 @@ async function verifyMode(markets) {
       verified++;
       const kb = Math.round(thumb.bytes / 1024);
       const verdict = judge(meta);
-      console.log(
-        `   LIVE  ${cand.file}\n` +
-          `         ${meta.width}x${meta.height} ${meta.mime} · ${kb} KB at ${WIDTH}px · ` +
-          `${verdict.usable ? "shape ok" : verdict.why}\n` +
-          `         author: ${meta.artist}\n` +
-          `         licence: ${meta.license}${meta.licenseUrl ? ` (${meta.licenseUrl})` : ""}`,
-      );
+      if (terse) {
+        console.log(
+          `   LIVE  ${kb} KB at ${WIDTH}px · ${meta.width}x${meta.height} · ` +
+            `${verdict.usable ? "shape ok" : verdict.why} | ${cand.file} | ${meta.artist} | ${meta.license}`,
+        );
+      } else {
+        console.log(
+          `   LIVE  ${cand.file}\n` +
+            `         ${meta.width}x${meta.height} ${meta.mime} · ${kb} KB at ${WIDTH}px · ` +
+            `${verdict.usable ? "shape ok" : verdict.why}\n` +
+            `         author: ${meta.artist}\n` +
+            `         licence: ${meta.license}${meta.licenseUrl ? ` (${meta.licenseUrl})` : ""}`,
+        );
+      }
     }
   }
   console.log(`\nSKYLINE PROBE: ${verified} live, ${dead} dead`);
