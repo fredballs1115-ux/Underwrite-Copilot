@@ -188,6 +188,16 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   export, whose formulas CI recalculates against it — so the page and the
   workbook can never disagree. (`lib/model/compute` holds a second,
   coarser copy for the model tab; a third would be worse than either.)
+  Every field on the page is on `useShared` (in the same client file): the
+  value goes into the query string so a sizing travels as a LINK, written
+  with `history.replaceState` (not the router — no navigation, and Back
+  still leaves the page) and debounced, carrying only what differs from
+  the seed. It reads through **`useSyncExternalStore`, whose server
+  snapshot is the seed** — reading `window.location` during render is the
+  hydration bug this avoids, and the render test asserts the server's
+  HTML carries the seeded figures. A table's Copy button writes it
+  tab-delimited with headers and the numbers RAW, never the formatted
+  ones, so a paste lands in a spreadsheet as numbers.
 - The homepage's photographs: `lib/photos.ts` (pure — the four slots with
   their file names, briefs, sizes and alt text; `presentPhotos` over an
   `exists` callback; `stripPhotos`; `HERO_AERIAL`) and `lib/photos-fs.ts`

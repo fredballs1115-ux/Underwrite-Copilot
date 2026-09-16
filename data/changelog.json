@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-16",
+      "title": "A sizing is a link, and a table is a paste",
+      "blurb": "“Send me that sizing” used to mean a screenshot. Every field on /tools now writes itself into the address bar, so the whole page — all five calculators — travels as a link, and an untouched page still copies as a bare /tools rather than a paragraph of defaults. The cash-flow table copies tab-delimited with its headers and the numbers raw, so they land in a spreadsheet as numbers instead of as text somebody has to clean.",
+      "href": "/tools"
+    },
+    {
+      "date": "2026-09-16",
       "title": "Paste a cash flow, get the IRR — and where it came from",
       "blurb": "The most common reason an analyst leaves a screening tool mid-call is to paste a column of numbers into Excel and read the IRR off the bottom. /tools now takes that column — tabs, line breaks, (1,200), $1.2M, all of it — and answers with the rate, the multiple, the profit and the payback inside the year. Then the figure nothing else here computes: how much of the return is the sale rather than the operations. A 17% that is three-quarters residual and a 17% that is a quarter are different deals wearing the same number.",
       "href": "/tools"
