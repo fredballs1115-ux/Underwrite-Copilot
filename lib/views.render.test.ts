@@ -1107,8 +1107,8 @@ describe("the deal math tools", () => {
     // every card must be reachable from the index.
     const hrefs = [...html.matchAll(/href="#([a-z0-9-]+)"/g)].map((m) => m[1]);
     const ids = new Set([...html.matchAll(/<section id="([a-z0-9-]+)"/g)].map((m) => m[1]));
-    expect(hrefs.length).toBe(14);
-    expect(ids.size).toBe(14);
+    expect(hrefs.length).toBe(15);
+    expect(ids.size).toBe(15);
     for (const h of hrefs) expect(ids.has(h), `#${h} has no card`).toBe(true);
     for (const id of ids) expect(hrefs, `${id} is not in the index`).toContain(id);
     expect(text).toContain("Jump to");
@@ -1192,6 +1192,46 @@ describe("the deal math tools", () => {
     expect(text).toContain("917 SF");
     expect(text).toContain("1.50");
     expect(text).toContain("1.64");
+  });
+
+  it("takes the land out before it depreciates anything", () => {
+    // $20M at 25% land is $15M of basis, and $545,455 a year off a 27.5-year
+    // schedule turns $1.2M of NOI into a loss.
+    expect(text).toContain("Depreciation, and what the sale takes back");
+    expect(text).toContain("Land is never depreciable");
+    expect(text).toContain("$15.00M");
+    expect(text).toContain("$545,455");
+    expect(text).toContain("a $190,455 paper loss");
+    // The sign belongs in the words, never in front of the dollar sign.
+    expect(text).not.toContain("$-190,455");
+  });
+
+  it("splits the gain at the sale into the rates it is actually taxed at", () => {
+    expect(text).toContain("$11.45M");
+    expect(text).toContain("Unrecaptured 1250");
+    expect(text).toContain("$5.45M");
+    expect(text).toContain("Capital gain");
+    expect(text).toContain("$6.00M");
+    // No cost segregation on the seed, so there is no 1245 slice.
+    expect((html.match(/data-bar="gain-slice"/g) ?? []).length).toBe(2);
+  });
+
+  it("names the error it exists to prevent", () => {
+    // $11.45M at 20% says $2.29M. The bill is $2.56M.
+    expect(text).toContain("Running the whole gain at the capital gains rate would say $2.29M");
+    expect(text).toContain("$2.56M");
+  });
+
+  it("says what the shelter was worth and what the sale took back", () => {
+    expect(text).toContain("$2.02M");
+    expect(text).toContain("$1.36M");
+    expect(text).toContain("$654,545");
+    expect(text).toContain("shelter and recapture at the same rate and it nets");
+  });
+
+  it("says plainly that it is not tax advice", () => {
+    expect(text).toContain("federal only");
+    expect(text).toContain("Not tax advice");
   });
 
   it("solves for the land instead of judging a price", () => {
