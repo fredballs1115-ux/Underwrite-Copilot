@@ -163,6 +163,17 @@ export function readHold(t: HoldInput): HoldResult {
   const taxNow = positive(t.taxOnSaleNow) ? t.taxOnSaleNow : 0;
   const loan = positive(t.loanBalance) ? t.loanBalance : 0;
 
+  // A loan whose schedule cannot be built is NOT a free loan. Without this
+  // the debt service reads zero and the balance never moves, while the sale
+  // proceeds still subtract the whole balance — a loan that costs nothing,
+  // amortises nothing and is repaid anyway. Refuse rather than answer that.
+  if (loan > 0 && !(real(t.ratePct) && t.ratePct >= 0 && positive(t.amortYears))) {
+    return {
+      ...EMPTY,
+      note: "Enter the loan's rate and amortisation, or clear the balance — a loan with neither cannot be run.",
+    };
+  }
+
   // ONE amortisation schedule in this codebase. The loan card's `readDebt`
   // runs it monthly and reports a year at a time, which is exactly the
   // granularity this needs — re-deriving it here would give the page two

@@ -225,6 +225,25 @@ describe("the loan", () => {
     const r = run({ loanBalance: 0 });
     expect(r.years[0].cashFlow).toBe(1_870_000);
   });
+
+  it("refuses a loan it cannot run rather than treating it as free", () => {
+    // Without this the schedule comes back empty, the debt service reads
+    // zero and the balance never moves — while the sale proceeds still
+    // subtract the whole balance. A loan that costs nothing, amortises
+    // nothing, and is repaid anyway.
+    for (const bad of [{ ratePct: Number.NaN }, { amortYears: 0 }]) {
+      const r = run(bad);
+      expect(r.years).toEqual([]);
+      expect(r.note).toContain("cannot be run");
+    }
+  });
+
+  it("and lets a genuinely absent loan through", () => {
+    // A zero balance with no rate is not a broken loan, it is no loan.
+    const r = run({ loanBalance: 0, ratePct: Number.NaN, amortYears: 0 });
+    expect(r.years).toHaveLength(10);
+    expect(r.years[0].cashFlow).toBe(1_870_000);
+  });
 });
 
 describe("what it refuses", () => {
