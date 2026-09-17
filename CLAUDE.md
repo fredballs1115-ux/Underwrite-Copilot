@@ -933,6 +933,41 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   took ABOVE its pro-rata share** — the only honest definition, for the
   same reason. Return OF capital is not a separate step: an 8% IRR is not
   reached until every dollar in has come back plus 8% on it.
+- What a hotel actually earns: `lib/tools/hotel.ts` (pure — the asset class
+  forty-two cards did not speak to, although the extraction readers have
+  known the word "keys" since #223). A hotel's lease is one night long and
+  three things follow. **RevPAR is one number made of TWO levers and they
+  are not interchangeable**: 10% more rate and 10% more occupancy are the
+  same RevPAR and the same top line, and a different bottom line, because
+  an occupied room costs money to turn and an empty one does not — $489,657
+  of value apart on the seed. The usual conclusion that rate always wins is
+  wrong in one direction: occupancy brings ancillary spend and rate does
+  not, so the crossing is SOLVED (`leverCrossingPerRoom`) and it is not the
+  obvious `other − variable` — the probe caught that. The rooms-revenue
+  terms cancel exactly between the two paths, but the ancillary revenue an
+  occupancy gain brings is itself taxed by the management fee and the
+  reserve while the variable cost is not, so the crossing is
+  `variableCost / (1 − managementFee% − reserve%)` — $32 of housekeeping
+  needs $34.41 of ancillary spend. Where the occupancy lift would pass 100%
+  the two no longer reach the same RevPAR, so the WINNER is withheld rather
+  than reported from a test the inputs no longer support. **The penetration
+  index says whether you are the problem or the market is, and only once it
+  is taken apart**: the seed takes 90% of its fair share while charging 8.8%
+  MORE than its comp set, so the whole shortfall is empty rooms and a
+  revenue manager reading only the RevPAR index would cut rate, which is
+  precisely the wrong move; `occupancyForParityPct` states the gap at
+  today's rate and clamps at 100 rather than printing an impossible figure.
+  **The FF&E reserve is 4% of REVENUE and it is real cash** — `below-the-line`'s
+  rule, except struck against revenue rather than NOI, which makes it
+  several times the equivalent line elsewhere: an 8.00% cap quoted before it
+  is 9.25%, $3.5M of price. And **the fee stack is three fees on TWO bases**
+  (franchise and marketing on rooms revenue, management on total), so it is
+  12.4% of rooms and 11.0% of total and neither is the term sheet's number.
+  Every displayed figure derives from the rounded pieces (the debt
+  schedule's rule): the three fee lines sum to the printed total, the NOI is
+  the displayed figure less the displayed reserve, and the value is that NOI
+  at the stated cap. Bars: `data-bar="revpar"` (three indices against a 100
+  line) and `data-bar="lever"` (the two paths to one RevPAR).
 - The value-add renovation program: `lib/tools/renovation.ts` (pure — page 12
   of every multifamily memorandum, quoted as one multiplication: $15,000 a
   door times 200 doors against $250 a month times 200 times twelve, "a twenty
