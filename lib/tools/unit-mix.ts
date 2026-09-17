@@ -133,6 +133,10 @@ function threeNumberShape(all: number[][]): boolean {
 /**
  * One line's cells, choosing ONE separator rather than accepting any.
  *
+ * Exported because every pasted table on `/tools` has the same problem and
+ * must solve it the same way — the rollover reader splits rent-roll lines
+ * through this rather than keeping a second copy of the precedence below.
+ *
  * Precedence matters because a comma does double duty: it separates columns
  * in a CSV and it groups thousands in every rent an OM prints. Accepting
  * both at once reads "1,395" as two cells and quietly turns a $1,395 rent
@@ -146,7 +150,7 @@ function threeNumberShape(all: number[][]): boolean {
  * number. It is the rarest of the shapes and the only one this cannot
  * resolve from the text alone.
  */
-function cellsOf(raw: string): string[] {
+export function cellsOf(raw: string): string[] {
   const parts = /\t/.test(raw)
     ? raw.split(/\t+/)
     : /\|/.test(raw)
