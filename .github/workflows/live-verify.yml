@@ -771,6 +771,16 @@ jobs:
           mark "#359 the sign convention is named from the comp" grep -q "an inferior comp adjusted DOWN" p_tools2.html
           mark "#359 and getting it backwards reverses the answer" grep -q "The convention does not shade the answer; it reverses it." p_tools2.html
           mark "#359 the three errors are drawn against each other" grep -q "What each error is worth" p_tools2.html
+          # #360 — the interest rate swap, the instrument floating-rate
+          # implies and nothing covered. The second and third are the
+          # decisive pair: the ladder caption renders only once nine
+          # positions have been marked at nine different market rates, and
+          # the third is the note, which fires only where the position is
+          # under water. All four verified through renderToString first.
+          mark "#360 the swap card is on /tools" grep -q "The swap, and getting out of one" p_tools2.html
+          mark "#360 the position is drawn both ways from a centre line" grep -q "The position, by where the market ends up" p_tools2.html
+          mark "#360 an obligation has no flat stretch, an option does" grep -q "which is the whole difference between an option and an obligation" p_tools2.html
+          mark "#360 the breakage is yield maintenance in another coat" grep -q "SAME exit problem yield maintenance creates" p_tools2.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then
