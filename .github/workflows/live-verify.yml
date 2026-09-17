@@ -460,6 +460,7 @@ jobs:
           }
           both() { grep -q "on-photo" p_why.html && grep -q "band-words" p_why.html; }
           copies() { [ "$(grep -o "Copy as table" p_tools2.html | wc -l)" -ge 2 ]; }
+          bidtwice() { [ "$(grep -o "What you can pay" p_tools2.html | wc -l)" -ge 2 ]; }
           echo "ROUND MARKERS — what the live site is actually serving:"
           mark "#302 photo treatment (on-photo + band-words on /why)" both
           mark "#302 deal math reads the shorthand (seeded \$20M on /tools)" grep -q 'value="\$20M"' p_tools2.html
@@ -634,6 +635,17 @@ jobs:
           mark "#341 the cap gap between the two NOIs is computed" grep -q "is 64bp of cap rate above the one a lender would underwrite" p_tools2.html
           mark "#341 and the omission is said as a price" grep -q "5,614,545" p_tools2.html
           mark "#341 the run-rate rule is stated on the card" grep -q "the cost is late rather than absent" p_tools2.html
+          # #342 — what you can pay. The first counts TWO occurrences, the
+          # jump-index chip and the card's own title, so it proves the
+          # catalog entry and the card together. The second is the
+          # decisive one: both halves of that sentence are computed — the
+          # binding test out of sizeLoan at the solved price, and the
+          # crossing solved from the coverage cap — so a `present` proves
+          # the bisection ran on the server.
+          mark "#342 the max-bid card is on /tools, and in its index" bidtwice
+          mark "#342 the binding test and its crossing are both solved" grep -q "Above \$26.77M the coverage tests take over instead" p_tools2.html
+          mark "#342 the solved price and its going-in cap" grep -q "6.46%" p_tools2.html
+          mark "#342 the circularity rule is stated on the card" grep -q "The price is circular through the debt" p_tools2.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

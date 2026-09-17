@@ -1819,6 +1819,34 @@ describe("the deal math tools", () => {
     expect(text).toContain("$472,000");
     expect(text).toContain("And the largest line is a guess");
   });
+
+  it("solves a price instead of judging one", () => {
+    // #342. $1.65M of NOI, a 15% levered target, ordinary agency debt:
+    // $25.54M, a 6.46% going-in cap — and the stream rebuilt at that price
+    // returns 15.0%, which is the round trip through the Excel export's
+    // own IRR.
+    expect(text).toContain("What you can pay");
+    expect(text).toContain("$25.54M");
+    expect(text).toContain("6.46%");
+    expect(text).toContain("Rebuilt, it returns");
+    expect(text).toContain("15.0%");
+  });
+
+  it("names which lender test governs, and where it changes hands", () => {
+    // Both halves computed: the binding test comes out of sizeLoan at the
+    // solved price, and the crossing is solved from the coverage cap.
+    expect(text).toContain(
+      "Loan to value governs at this price. Above $26.77M the coverage tests take over instead.",
+    );
+    expect(text).toContain("the shortest one is the loan");
+  });
+
+  it("draws the three tests and the equity stream", () => {
+    // One bar per lender test plus the price-against-crossing bar, and one
+    // per year of the equity stream including year zero.
+    expect((html.match(/data-bar="bid"/g) ?? []).length).toBe(4);
+    expect((html.match(/data-bar="bidflow"/g) ?? []).length).toBe(6);
+  });
 });
 
 // ── today's rates, across the top of /tools ────────────────────────────────

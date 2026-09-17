@@ -496,6 +496,29 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   loan balance comes from `readDebt`, run to the HORIZON rather than to
   the balloon — holding past a balloon is a refinance, which is
   `testRefi`'s question and not this one.
+- What you can pay: `lib/tools/max-bid.ts` (pure). Every other card judges
+  a price somebody else set; this one **solves for it**, and it is the
+  calculation people fudge hardest because doing it properly is circular —
+  a lower price means a smaller loan at the same loan-to-value, which
+  changes both the cheque and the debt service, which changes the return.
+  So the price is BISECTED (the levered IRR is monotone decreasing in
+  price, which a test asserts rather than assumes) and then the whole
+  stream is rebuilt at the answer and run back through `irr` from
+  `lib/underwrite/engine` — `checkIrrPct`, which the card prints beside the
+  price. Three more rules. **Which lender test binds moves with the
+  price**: LTV scales with the price and the coverage tests do not, so
+  `bindingFlipPrice` solves for the crossing, and the note's direction is
+  the easy thing to get backwards (LTV is the smaller, and therefore
+  binding, BELOW it) — both branches have a test, because the first version
+  had them swapped. **A levered target belongs here and only here**, which
+  is the complement of `what-you-believe` saying its return is unlevered.
+  And **the cheque is not the price less the loan**: closing costs and the
+  loan fee are funded at closing (`sources-uses`' rule), so they are equity
+  at risk and leaving them out overstates the bid. With coverage tests set
+  and NO loan-to-value cap the search's low end sizes a loan larger than
+  the building, so the refusal names the missing LTV rather than blaming
+  the target — a missing input and an unreachable return want different
+  answers.
 - What sits below the NOI line: `lib/tools/below-the-line.ts` (pure). A
   broker's NOI and an owner's NOI are different numbers for the same
   building, and the difference is **not** a disagreement about operations —
