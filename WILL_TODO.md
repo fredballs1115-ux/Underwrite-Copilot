@@ -3,7 +3,7 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
-## 🟢 2026-09-16, later — `/tools` becomes the reason not to open Excel
+## 🟢 2026-09-16 into 09-17 — `/tools` becomes the reason not to open Excel
 
 Ten more PRs, #307–#316, nine on `/tools` or its shop window and one on
 the photographs, all proven live by the round markers — and the table has
@@ -46,7 +46,7 @@ memorandum and sending a letter:
 
 Three things they share: every field reads shorthand (`$20M`, `4.75%`,
 `1.25x`); every field travels in the URL, so a sizing is a link; and the
-math is a pure tested module before it reaches a page — **706 tests** on
+math is a pure tested module before it reaches a page — **710 tests** on
 the twenty-seven modules, plus **83** that render the page itself and check the
 figures it prints. And since #314 the homepage renders its shelf of those
 calculations from the SAME list the page builds its cards from, so it can

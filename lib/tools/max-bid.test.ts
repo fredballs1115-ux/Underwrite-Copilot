@@ -209,6 +209,42 @@ describe("what it refuses", () => {
     expect(run({ maxLtvPct: 65 }).maxPrice).not.toBeNull();
   });
 
+  it("widens the search rather than reporting its own ceiling as the answer", () => {
+    // The bound started fixed at 100x the NOI, which looked safe and was
+    // not: at a 0.5% exit cap the exit is worth over 200x the NOI, a
+    // modest target clears at the bound, and the bisection converged ON
+    // the bound — returning exactly $100,000,000 while checkIrrPct quietly
+    // said 31.8% against a 6% target. A ceiling presented as a solve, in
+    // the overstating direction.
+    const r = readBid({
+      year1Noi: 1_000_000,
+      noiGrowthPct: 3,
+      holdYears: 5,
+      exitCapPct: 0.5,
+      sellingCostPct: 1.5,
+      targetLeveredIrrPct: 6,
+      maxLtvPct: 65,
+      minDscr: null,
+      minDebtYieldPct: null,
+      ratePct: 5,
+      amortYears: 30,
+      ioYears: 0,
+      loanFeePct: 0,
+      closingCostPct: 0,
+    });
+    expect(r.maxPrice!).toBeGreaterThan(100_000_000);
+    expect(r.maxPrice).not.toBe(100_000_000);
+    // The round trip is the check that caught it, so it is the check that
+    // pins the fix.
+    expect(r.checkIrrPct).toBe(6);
+  });
+
+  it("still lands well inside the bound on an ordinary deal", () => {
+    // The widening must not perturb the normal case.
+    expect(run().maxPrice!).toBeLessThan(SEED.year1Noi * 100);
+    expect(run().maxPrice).toBe(25_542_335);
+  });
+
   it("runs an all-cash bid when no lender test is set", () => {
     const r = run({ maxLtvPct: null, minDscr: null, minDebtYieldPct: null });
     expect(r.loan).toBe(0);

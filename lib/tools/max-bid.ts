@@ -208,11 +208,8 @@ export function readBid(t: BidInput): BidResult {
   }
 
   // The levered IRR falls as the price rises, so bisect between a price that
-  // clears the target easily and one that cannot. The upper bound is the
-  // building capitalised at a 1% cap — a price nothing could ever earn the
-  // target at — so the root is always bracketed.
+  // clears the target easily and one that cannot.
   let lo = t.year1Noi; // absurdly cheap: a 100% cap
-  let hi = t.year1Noi * 100;
   const clears = (p: number) => {
     const r = leveredIrrAt(t, p);
     return r !== null && r >= t.targetLeveredIrrPct;
@@ -246,6 +243,27 @@ export function readBid(t: BidInput): BidResult {
       note: `Even at a price of one year's NOI the equity does not reach ${t.targetLeveredIrrPct}% — the target is out of reach on these terms.`,
     };
   }
+
+  // The upper bound MUST NOT clear, or the bisection converges on the bound
+  // itself and reports it as the answer — a ceiling presented as a solve.
+  // A fixed 100× NOI looked safe and is not: at a 0.5% exit cap the exit is
+  // worth over 200× the NOI, so a modest target clears at 100× and the
+  // module returned exactly $100,000,000 while `checkIrrPct` quietly said
+  // 31.8% against a 6% target. So the bound is EXPANDED until it fails, and
+  // if it never does the inputs are refused rather than rounded to a wall.
+  let hi = t.year1Noi * 100;
+  let widened = 0;
+  while (clears(hi) && widened < 12) {
+    hi *= 4;
+    widened++;
+  }
+  if (clears(hi)) {
+    return {
+      ...EMPTY,
+      note: "No price is high enough to fall short of that return — check the exit cap, which is doing all the work.",
+    };
+  }
+
   for (let i = 0; i < 80; i++) {
     const mid = (lo + hi) / 2;
     if (clears(mid)) lo = mid;
