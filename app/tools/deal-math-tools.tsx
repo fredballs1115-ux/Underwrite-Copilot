@@ -38,6 +38,7 @@ import { DOWNSIDE_EXIT_HAIRCUT, readFeeDrag } from "@/lib/tools/fee-drag";
 import { readEnvelope } from "@/lib/tools/zoning-envelope";
 import { readStraightLine } from "@/lib/tools/straight-line-rent";
 import { readFeasibility } from "@/lib/tools/feasibility-rent";
+import { readRenovation } from "@/lib/tools/renovation";
 import {
   breakEvenOccupancyPct,
   capRatePct,
@@ -6319,6 +6320,213 @@ function FeasibilityRent() {
 }
 
 /**
+ * The value-add renovation program — page 12 of every multifamily
+ * memorandum, and the one calculation there that is quoted as a single
+ * multiplication.
+ *
+ * Two pictures. The quoted premium SPLIT, because the finding is that only
+ * part of it is renovation and a single figure cannot show a decomposition.
+ * And the program a year at a time, because the pace is set by turnover and
+ * "a 24-month program" is a claim about the rent roll rather than the crew.
+ */
+function Renovation() {
+  const [units, setUnits] = useShared("rnu", "200");
+  const [inPlace, setInPlace] = useShared("rnip", "1,400");
+  const [renoComp, setRenoComp] = useShared("rnrc", "1,650");
+  const [classicComp, setClassicComp] = useShared("rncc", "1,500");
+  const [cost, setCost] = useShared("rnc", "15,000");
+  const [makeReady, setMakeReady] = useShared("rnmr", "2,500");
+  const [turnDays, setTurnDays] = useShared("rntd", "14");
+  const [downDays, setDownDays] = useShared("rndd", "35");
+  const [turnover, setTurnover] = useShared("rnto", "35");
+  const [crew, setCrew] = useShared("rncr", "8");
+  const [exitCap, setExitCap] = useShared("rnec", "5.00");
+  const [hold, setHold] = useShared("rnh", "5");
+  const [claimed, setClaimed] = useShared("rncm", "24");
+
+  const r = useMemo(
+    () =>
+      readRenovation({
+        units: readFigure(units),
+        inPlaceRent: readFigure(inPlace),
+        renovatedCompRent: readFigure(renoComp),
+        classicCompRent: readFigure(classicComp),
+        costPerDoor: readFigure(cost),
+        makeReadyPerDoor: readFigure(makeReady),
+        normalTurnDays: num(turnDays),
+        renovationDownDays: num(downDays),
+        annualTurnoverPct: num(turnover),
+        crewDoorsPerMonth: num(crew),
+        exitCapPct: num(exitCap),
+        holdYears: num(hold),
+        claimedProgramMonths: num(claimed),
+      }),
+    [
+      units,
+      inPlace,
+      renoComp,
+      classicComp,
+      cost,
+      makeReady,
+      turnDays,
+      downDays,
+      turnover,
+      crew,
+      exitCap,
+      hold,
+      claimed,
+    ],
+  );
+
+  // The split is only a picture where there IS a split: a subject that
+  // out-rents the comparable's classic stock has a NEGATIVE gap, and drawing
+  // a negative segment inside a bar would say something that is not true.
+  const splitShown = r.buildingGap !== null && r.buildingGap > 0 && r.quotedPremium !== null;
+  const peakDoors = Math.max(...r.schedule.map((y) => y.doors), 1);
+
+  return (
+    <Card id="renovation-program" eyebrow="Value-add" title="The renovation program">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Doors to renovate" value={units} onChange={setUnits} placeholder="200" />
+          <Field label="In-place rent" suffix="/mo" value={inPlace} onChange={setInPlace} placeholder="1,400" />
+          <Field
+            label="Comp, renovated"
+            suffix="/mo"
+            value={renoComp}
+            onChange={setRenoComp}
+            placeholder="1,650"
+          />
+          <Field
+            label="Comp, classic"
+            suffix="/mo"
+            value={classicComp}
+            onChange={setClassicComp}
+            placeholder="1,500"
+          />
+          <Field label="Cost" suffix="/door" value={cost} onChange={setCost} placeholder="15,000" />
+          <Field
+            label="Make-ready"
+            suffix="/door"
+            value={makeReady}
+            onChange={setMakeReady}
+            placeholder="2,500"
+          />
+          <Field label="Normal turn" suffix="days" value={turnDays} onChange={setTurnDays} placeholder="14" />
+          <Field
+            label="Renovated turn"
+            suffix="days"
+            value={downDays}
+            onChange={setDownDays}
+            placeholder="35"
+          />
+          <Field label="Turnover" suffix="%/yr" value={turnover} onChange={setTurnover} placeholder="35" />
+          <Field label="Crew" suffix="/mo" value={crew} onChange={setCrew} placeholder="8" />
+          <Field label="Exit cap" suffix="%" value={exitCap} onChange={setExitCap} placeholder="5.00" />
+          <Field label="Hold" suffix="yrs" value={hold} onChange={setHold} placeholder="5" />
+          <Field label="Claimed program" suffix="mo" value={claimed} onChange={setClaimed} placeholder="24" />
+        </div>
+
+        <div>
+          {splitShown && (
+            <div>
+              <div className="flex items-baseline justify-between gap-3 text-sm">
+                <span className="text-muted">The premium being quoted</span>
+                <span className="font-mono tabular-nums font-semibold text-ink">
+                  {usdExact(r.quotedPremium)}
+                </span>
+              </div>
+              <div className="mt-1 flex h-3 w-full overflow-hidden rounded-full bg-faint">
+                <div
+                  data-bar="split"
+                  className="h-full bg-brand"
+                  style={{ width: `${((r.renovationPremium ?? 0) / r.quotedPremium!) * 100}%` }}
+                />
+                <div
+                  data-bar="split"
+                  className="h-full bg-caution/60"
+                  style={{ width: `${(r.buildingGap! / r.quotedPremium!) * 100}%` }}
+                />
+              </div>
+              <div className="mt-1 flex justify-between text-xs">
+                <span className="text-brand">
+                  {usdExact(r.renovationPremium)} renovation
+                </span>
+                <span className="text-muted">
+                  {usdExact(r.buildingGap)} a different building
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Stat label="The page says" value={pct(r.quotedReturnOnCostPct, 1)} tone="muted" />
+            <Stat label="On cost, corrected" value={pct(r.returnOnCostPct, 1)} tone="brand" />
+            <Stat label="Net cost / door" value={usd(r.netCostPerDoor)} />
+            <Stat label="Value / door" value={usd(r.valuePerDoor)} />
+          </div>
+
+          {r.schedule.length > 0 && (
+            <div className="mt-5">
+              <p className="text-xs uppercase tracking-wide text-muted">
+                {r.paceDoorsPerYear} doors a year —{" "}
+                <span className="text-ink">
+                  {r.binding === "turnover" ? "turnover" : "the crew"} binds
+                </span>
+              </p>
+              <div className="mt-2 space-y-1.5">
+                {r.schedule.map((y) => (
+                  <div key={y.year} className="flex items-center gap-3 text-xs">
+                    <span className="w-10 shrink-0 text-muted">Yr {y.year}</span>
+                    <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-faint">
+                      <div
+                        data-bar="reno"
+                        className="h-full bg-brand"
+                        style={{ width: `${(y.doors / peakDoors) * 100}%` }}
+                      />
+                    </div>
+                    <span className="w-20 shrink-0 text-right font-mono tabular-nums text-muted">
+                      {Math.round(y.doors)} doors
+                    </span>
+                    <span className="hidden w-24 shrink-0 text-right font-mono tabular-nums text-ink sm:inline">
+                      {usd(y.capital)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {r.claimedYears !== null && r.yearsToComplete !== null && (
+                <p className="mt-2 text-xs text-muted">
+                  {r.yearsToComplete} years against the {r.claimedYears} the page claims, which
+                  would need {pct(r.turnoverNeededForClaimPct, 0)} of the book turning a year.
+                </p>
+              )}
+            </div>
+          )}
+
+          {r.programIrrPct !== null && r.irrIfSoldAtCompletionPct !== null && (
+            <p className="mt-4 text-sm text-muted">
+              A return on cost has no clock in it. Sold the year the program finishes this earns{" "}
+              <span className="font-semibold text-brand">{pct(r.irrIfSoldAtCompletionPct, 1)}</span>;
+              held to the stated exit,{" "}
+              <span className="font-semibold text-ink">{pct(r.programIrrPct, 1)}</span> — same
+              premium, same cost, same building, because {pct(r.pvFromExitPct, 0)} of the value is
+              the resale rather than the rent.
+            </p>
+          )}
+
+          {r.note && <p className="mt-4 text-sm text-caution">{r.note}</p>}
+          <p className="mt-3 text-xs text-muted">
+            The make-ready comes out of the cost because the turn owed it anyway; the extra weeks
+            down go back in because the invoice never mentioned them. Break-even premium:{" "}
+            {usdExact(r.breakEvenPremium)} a month — the argument is how much, not whether.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/**
  * The rent the statement reports against the rent the building collects.
  *
  * Drawn as a signed bar a year from a centre line, because the finding is
@@ -7225,6 +7433,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <ResidualLand />
       <Waterfall />
       <FeeDrag />
+      <Renovation />
       <StraightLineRent />
       <NetEffectiveRent />
       <RentableUsable />

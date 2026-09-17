@@ -96,6 +96,7 @@ export const TOOL_INDEX: readonly ToolEntry[] = [
   { id: "residual-land", label: "Land residual", group: "Value" },
   { id: "the-waterfall", label: "LP / GP split", group: "Equity & returns" },
   { id: "fee-drag", label: "Sponsor fees", group: "Equity & returns" },
+  { id: "renovation-program", label: "Renovation program", group: "Value" },
   { id: "straight-line-rent", label: "Statement vs cash", group: "Leases" },
   { id: "net-effective-rent", label: "Net effective rent", group: "Leases" },
   { id: "rentable-vs-usable", label: "Rentable vs usable", group: "Leases" },

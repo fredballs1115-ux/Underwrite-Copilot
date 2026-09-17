@@ -2069,6 +2069,36 @@ describe("the deal math tools", () => {
     expect(text).toContain("the cost side is the one nobody models");
   });
 
+  it("splits the quoted renovation premium from the gap to a better building", () => {
+    // #354, rule 2. $250 quoted is $150 of renovation and $100 of the
+    // comparable simply being a different building — two segments on one
+    // track, because a decomposition is not a figure.
+    expect(text).toContain("The renovation program");
+    expect(text).toContain("$150 renovation");
+    expect(text).toContain("$100 a different building");
+    expect((html.match(/data-bar="split"/g) ?? []).length).toBe(2);
+  });
+
+  it("corrects the memorandum's own return on cost, and paces the program", () => {
+    // Rules 1 and 3: 20% becomes 13.4%, and turnover — not the crew, not
+    // ambition — sets 70 doors a year over three years against the two the
+    // page claims.
+    expect(text).toContain("The page says");
+    expect(text).toContain("20.0%");
+    expect(text).toContain("13.4%");
+    expect(text).toContain("turnover binds");
+    expect(text).toContain("2.9 years against the 2 the page claims");
+    expect((html.match(/data-bar="reno"/g) ?? []).length).toBe(3);
+  });
+
+  it("puts a clock on the return on cost, which has none of its own", () => {
+    // Rule 4: 63.7% sold at completion against 31.4% held to the stated
+    // exit, because 90% of the value is the resale rather than the rent.
+    expect(text).toContain("A return on cost has no clock in it");
+    expect(text).toContain("63.7%");
+    expect(text).toContain("31.4%");
+  });
+
   it("files forty cards into eight clusters, none of them at the ceiling", () => {
     // #353. Two of the six clusters had reached the eight-card ceiling
     // catalog.test.ts enforces, so the next lease card and the next land
