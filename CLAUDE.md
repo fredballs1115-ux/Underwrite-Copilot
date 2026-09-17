@@ -924,6 +924,30 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   took ABOVE its pro-rata share** — the only honest definition, for the
   same reason. Return OF capital is not a separate step: an 8% IRR is not
   reached until every dollar in has come back plus 8% on it.
+- Whether anyone will build against you: `lib/tools/feasibility-rent.ts` (pure).
+  "We are buying at sixty percent of replacement cost" is the most quoted
+  comfort in the business and on its own it protects NOTHING — replacement
+  cost says what building would cost, not whether anyone will. Four rules.
+  **The feasibility rent falls out of the developer's required return, not
+  the market**: `rent = (totalCost × yoc + opex × sf) / (sf × (1 − vacancy))`,
+  a COST-side figure that can sit above the rents being signed for years.
+  **The discount to replacement cost is not the moat; the RENT GAP is**, and
+  they can point opposite ways — the seeded building at 53.3% of replacement
+  is EXPOSED once the market pays $52 (the market already pays $9.92/ft more
+  than a new building needs), while the same building at 86% of replacement
+  in a market 40% under feasibility has 11.5 years. `supplyProtected` reads
+  the rent gap and nothing else, and a test drives the basis from $100 to
+  $900 to prove it cannot move the answer. **Replacement cost carries
+  TODAY's land price**, so the same building is a different percentage of it
+  in two different years with no brick having moved — hence
+  `landShareOfCostPct` beside it. And **the gap closes from either side**:
+  `yearsOfGrowthToFeasibility` prices rents rising, `breakEvenHardCostPerSf`
+  solves costs falling ($263.37 against the $310 assumed), and building at
+  that solved cost makes the feasibility rent EXACTLY today's market rent —
+  the round trip a test pins. A negative break-even is its own finding: the
+  land alone is dear enough that free construction would not work. The
+  developer's fee is struck on hard plus soft and never on the land. Bar:
+  `data-bar="feas"` (the two rents on one track).
 - The statement's rent against the building's: `lib/tools/straight-line-rent.ts`
   (pure). GAAP does not report the rent a tenant paid — it reports the TERM'S
   TOTAL OVER THE TERM, the same figure every year — so an "NOI" read off an

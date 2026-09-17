@@ -48,6 +48,16 @@ const WORDS = [
   "thirty-eight",
   "thirty-nine",
   "forty",
+  "forty-one",
+  "forty-two",
+  "forty-three",
+  "forty-four",
+  "forty-five",
+  "forty-six",
+  "forty-seven",
+  "forty-eight",
+  "forty-nine",
+  "fifty",
 ];
 
 // Longest first, so the alternation cannot match "twenty" inside

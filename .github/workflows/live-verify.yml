@@ -710,6 +710,14 @@ jobs:
           mark "#351 the gap is drawn a year a side of the line" grep -q "Statement below cash" p_tools2.html
           mark "#351 this year's gap is priced at the cap" grep -q "more rent than the building collects, which at the stated cap is" p_tools2.html
           mark "#351 the receivable is named as the seller's" grep -q "Deferred rent on the books" p_tools2.html
+          # #352 — the rent a new building needs. The second is decisive:
+          # that sentence renders only once the feasibility rent, the gap
+          # and the years of growth have ALL computed, and it carries the
+          # card's whole argument about what the discount does not buy.
+          mark "#352 the feasibility card is on /tools" grep -q "The rent a new building needs" p_tools2.html
+          mark "#352 the rent gap is what governs, not the discount" grep -q "that gap, not the discount to replacement cost, is what keeps a competitor off the block" p_tools2.html
+          mark "#352 the cost side is solved as well as the rent side" grep -q "the cost side is the one nobody models" p_tools2.html
+          mark "#352 the two rents are drawn against each other" grep -q "A new building needs" p_tools2.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

@@ -2050,6 +2050,24 @@ describe("the deal math tools", () => {
     expect(text).toContain("Deferred rent on the books");
     expect(text).toContain("$424,177");
   });
+
+  it("draws the feasibility rent against the rent the market signs", () => {
+    // #352, rules 1 and 2. A new building needs $42.08; the market pays
+    // $38.00, so nothing competes for 3.5 years of growth — even though the
+    // building being held cost 53.3% of replacement.
+    expect(text).toContain("The rent a new building needs");
+    expect(text).toContain("$42.08");
+    expect(text).toContain("$38.00");
+    expect(text).toContain("53.3%");
+    expect(text).toContain("Years of growth away");
+    expect((html.match(/data-bar="feas"/g) ?? []).length).toBe(2);
+  });
+
+  it("solves the cost side too, which is the half nobody models", () => {
+    // Rule 4b: today's $38 already pencils at $263.37 of hard cost.
+    expect(text).toContain("$263.37");
+    expect(text).toContain("the cost side is the one nobody models");
+  });
 });
 
 // ── today's rates, across the top of /tools ────────────────────────────────

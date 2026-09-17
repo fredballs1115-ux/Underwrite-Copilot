@@ -37,6 +37,7 @@ import { runWaterfall } from "@/lib/tools/waterfall-math";
 import { DOWNSIDE_EXIT_HAIRCUT, readFeeDrag } from "@/lib/tools/fee-drag";
 import { readEnvelope } from "@/lib/tools/zoning-envelope";
 import { readStraightLine } from "@/lib/tools/straight-line-rent";
+import { readFeasibility } from "@/lib/tools/feasibility-rent";
 import {
   breakEvenOccupancyPct,
   capRatePct,
@@ -6182,6 +6183,142 @@ function Waterfall() {
 }
 
 /**
+ * The rent a new building needs, against the rent the market signs.
+ *
+ * The two rents sit on one track with the gap between them shaded, because
+ * the gap IS the finding — the discount to replacement cost beside it is
+ * the thing that gets quoted and does not govern.
+ */
+function FeasibilityRent() {
+  const [sf, setSf] = useShared("fesf", "120,000");
+  const [land, setLand] = useShared("feland", "9,000,000");
+  const [hard, setHard] = useShared("fehard", "310");
+  const [soft, setSoft] = useShared("fesoft", "28");
+  const [fee, setFee] = useShared("fefee", "4");
+  const [yoc, setYoc] = useShared("feyoc", "6.25");
+  const [opex, setOpex] = useShared("feopex", "9.50");
+  const [vac, setVac] = useShared("fevac", "5");
+  const [market, setMarket] = useShared("femkt", "38");
+  const [growth, setGrowth] = useShared("fegro", "3");
+  const [basis, setBasis] = useShared("febas", "260");
+
+  const f = useMemo(
+    () =>
+      readFeasibility({
+        buildableSf: readFigure(sf),
+        landCost: readFigure(land),
+        hardCostPerSf: num(hard),
+        softCostPct: num(soft),
+        developerFeePct: num(fee),
+        requiredYieldOnCostPct: num(yoc),
+        opexPerSf: num(opex),
+        stabilizedVacancyPct: num(vac),
+        marketRentPerSf: num(market),
+        rentGrowthPct: num(growth),
+        yourBasisPerSf: num(basis),
+      }),
+    [sf, land, hard, soft, fee, yoc, opex, vac, market, growth, basis],
+  );
+
+  const top = Math.max(f.feasibilityRentPerSf ?? 0, num(market) ?? 0, 0.01);
+
+  return (
+    <Card
+      id="feasibility-rent"
+      eyebrow="Value &amp; land"
+      title="The rent a new building needs"
+    >
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Rentable area" suffix="SF" value={sf} onChange={setSf} placeholder="120,000" />
+          <Field label="Land, all in" value={land} onChange={setLand} placeholder="9,000,000" />
+          <Field label="Hard cost" suffix="/SF" value={hard} onChange={setHard} placeholder="310" />
+          <Field label="Soft, of hard" suffix="%" value={soft} onChange={setSoft} placeholder="28" />
+          <Field label="Developer fee" suffix="%" value={fee} onChange={setFee} placeholder="4" />
+          <Field label="Required yield" suffix="%" value={yoc} onChange={setYoc} placeholder="6.25" />
+          <Field label="Opex" suffix="/SF" value={opex} onChange={setOpex} placeholder="9.50" />
+          <Field label="Stabilized vacancy" suffix="%" value={vac} onChange={setVac} placeholder="5" />
+          <Field label="Market rent" suffix="/SF" value={market} onChange={setMarket} placeholder="38" />
+          <Field label="Rent growth" suffix="%" value={growth} onChange={setGrowth} placeholder="3" />
+          <Field label="Your basis" suffix="/SF" value={basis} onChange={setBasis} placeholder="260" />
+        </div>
+
+        <div>
+          {f.feasibilityRentPerSf !== null && (
+            <>
+              <div className="space-y-2">
+                {[
+                  { label: "A new building needs", value: f.feasibilityRentPerSf, brand: true },
+                  { label: "The market signs", value: num(market), brand: false },
+                ].map((row) => (
+                  <div key={row.label}>
+                    <div className="flex items-baseline justify-between gap-3 text-sm">
+                      <span className="text-muted">{row.label}</span>
+                      <span
+                        className={`font-mono tabular-nums ${row.brand ? "font-semibold text-brand" : "text-ink"}`}
+                      >
+                        {row.value === null ? "—" : `$${row.value.toFixed(2)}`}
+                      </span>
+                    </div>
+                    <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-faint">
+                      <div
+                        data-bar="feas"
+                        className={`h-full ${row.brand ? "bg-brand" : "bg-sidebar"}`}
+                        style={{ width: `${Math.min(100, ((row.value ?? 0) / top) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <Stat label="Replacement cost" value={`$${(f.costPerSf ?? 0).toFixed(2)}`} tone="muted" />
+                <Stat
+                  label="…of which land"
+                  value={pct(f.landShareOfCostPct, 1)}
+                  tone="muted"
+                />
+                <Stat label="Your basis, of that" value={pct(f.basisVsReplacementPct, 1)} />
+                <Stat
+                  label={f.supplyProtected === false ? "New supply pencils" : "Years of growth away"}
+                  value={
+                    f.supplyProtected === false
+                      ? "Today"
+                      : f.yearsOfGrowthToFeasibility === null
+                        ? "—"
+                        : `${f.yearsOfGrowthToFeasibility}`
+                  }
+                  tone="brand"
+                />
+              </div>
+
+              {f.breakEvenHardCostPerSf !== null && (
+                <p className="mt-4 text-sm text-muted">
+                  The gap closes from either side. Today&apos;s rent already pencils at a hard cost
+                  of{" "}
+                  <span className="font-semibold text-ink">
+                    ${f.breakEvenHardCostPerSf.toFixed(2)}
+                  </span>{" "}
+                  a foot against the {`$${(num(hard) ?? 0).toFixed(2)}`} assumed — the cost side is
+                  the one nobody models.
+                </p>
+              )}
+            </>
+          )}
+
+          {f.note && <p className="mt-4 text-sm text-caution">{f.note}</p>}
+          <p className="mt-3 text-xs text-muted">
+            Whether a competitor gets built turns on the rent gap, not on what the existing stock
+            trades for. A building bought at a deep discount to replacement cost in a market whose
+            rents already clear feasibility has no protection at all.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/**
  * The rent the statement reports against the rent the building collects.
  *
  * Drawn as a signed bar a year from a centre line, because the finding is
@@ -7084,6 +7221,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <LeaseUp />
       <SiteMeasures />
       <ZoningEnvelope />
+      <FeasibilityRent />
       <ResidualLand />
       <Waterfall />
       <FeeDrag />
