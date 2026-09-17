@@ -399,7 +399,8 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   rent per usable foot every time; that rent is the point of the module,
   since a $40 quote at an 18% load is dearer space than a $42 quote at 10%.
   A usable area larger than the rentable one is refused rather than computed.
-- What `/tools` answers: `lib/tools/catalog.ts` (`TOOL_INDEX`, `TOOL_COUNT`
+- What `/tools` answers: `lib/tools/catalog.ts` (`TOOL_INDEX`, `TOOL_COUNT`,
+  `TOOL_GROUPS` and `groupedTools()`
   — pure data, no `"use client"`, so a server-rendered page can import it).
   The page's jump index renders from it, each card takes its `id` from it,
   **and the homepage's shelf renders from it too** — the homepage went on
@@ -408,7 +409,21 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   drift impossible rather than merely unlikely. The count in the page's own
   meta description is prose and cannot render from the constant, so
   `catalog.test.ts` holds the spelled-out number to `TOOL_COUNT` instead;
-  that claim went stale twice in one evening before the guard existed.
+  that claim went stale twice in one evening before the guard existed. The
+  index is CLUSTERED, not a flat row: the page measured 187KB of HTML,
+  4,165 words and 189 input fields at twenty-six cards, and a row of
+  twenty-six chips is a wall rather than a directory — six named groups
+  of three to six scan, and the shape holds as the page grows instead of
+  degrading with every addition. `groupedTools()` is the one place that
+  regrouping lives, and `catalog.test.ts` holds every card to exactly one
+  cluster, every cluster to two through eight cards, and the order to
+  `TOOL_GROUPS` — because the filter means a card with a group outside
+  that list VANISHES from the index while staying on the page. The
+  `data-bar` namespace is flat across all of them and a collision adds
+  two cards' render counts together, which happened twice (`stack`,
+  `exit`); the same test now splits the file at its card functions and
+  holds each marker to one. A cluster heading with an ampersand serves as
+  `&amp;`, so a live-verify marker must grep the escaped form.
 - Depreciation and the sale's tax bill: `lib/tools/after-tax.ts` (pure,
   screening arithmetic, federal only — the card says so). Three rules, in
   the order they cost money. **Land is never depreciable**, so the basis is

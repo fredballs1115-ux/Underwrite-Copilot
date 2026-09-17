@@ -13,7 +13,7 @@ import { readProration } from "@/lib/tools/proration";
 import { readGroundLease } from "@/lib/tools/ground-lease";
 import { readBelief } from "@/lib/tools/what-you-believe";
 import { readReassessment } from "@/lib/tools/tax-reassessment";
-import { TOOL_INDEX } from "@/lib/tools/catalog";
+import { groupedTools } from "@/lib/tools/catalog";
 import { readResidual } from "@/lib/tools/land-residual";
 import { readLand, readSpace } from "@/lib/tools/measure-math";
 import { readStack } from "@/lib/tools/capital-stack";
@@ -318,7 +318,9 @@ function Choice<T extends string>({
  * holds every href in this list up to the ids actually emitted, so the two
  * cannot drift apart silently.
  */
-const INDEX = TOOL_INDEX;
+// The nav renders through `groupedTools()`, which filters this same list
+// into the index's clusters — so the page still has exactly one source of
+// truth for what is on it, reached one function further along.
 
 function Card({
   id,
@@ -4471,22 +4473,43 @@ function LoanOverTime() {
 export function DealMathTools() {
   return (
     <div className="space-y-6">
-      {/* The index. Thirteen cards is more than a reader should have to
-          scroll past to find one, and a list of what is here is also the
-          honest answer to "what does this page do". */}
+      {/* The index, clustered.
+          
+          It was one flat row, written when there were thirteen cards, and
+          a flat row of twenty-six is a wall rather than a directory — the
+          page measures 187KB of HTML, 4,165 words and 189 input fields,
+          so finding the one card you came for is the page's real problem
+          now, not having enough of them. Six named clusters of three to
+          six scan at a glance, and the shape holds as the page grows
+          instead of degrading with every addition.
+
+          The grouping lives in the catalog beside the list, so it cannot
+          drift from the cards it files. */}
       <nav aria-label="The calculators on this page" className="rounded-2xl border border-line bg-white p-4 sm:p-5 print:hidden">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-muted">
-            Jump to
-          </span>
-          {INDEX.map((x) => (
-            <a
-              key={x.id}
-              href={`#${x.id}`}
-              className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium transition-colors hover:border-brand hover:text-brand"
-            >
-              {x.label}
-            </a>
+        {/* The block still needs a name of its own. Six cluster headings
+            tell you what is in it; this tells you what it is FOR, and
+            the render test holds it there. */}
+        <p className="mb-4 text-[11px] font-semibold uppercase tracking-widest text-ink">
+          Jump to
+        </p>
+        <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+          {groupedTools().map(({ group, tools }) => (
+            <div key={group}>
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted">
+                {group}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {tools.map((x) => (
+                  <a
+                    key={x.id}
+                    href={`#${x.id}`}
+                    className="rounded-lg border border-line px-2.5 py-1 text-xs font-medium transition-colors hover:border-brand hover:text-brand"
+                  >
+                    {x.label}
+                  </a>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       </nav>

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { TOOL_COUNT, TOOL_INDEX } from "./catalog";
+import { TOOL_COUNT, TOOL_GROUPS, TOOL_INDEX, groupedTools } from "./catalog";
 
 const root = join(__dirname, "..", "..");
 const read = (p: string) => readFileSync(join(root, p), "utf8");
@@ -69,7 +69,9 @@ describe("the /tools catalog", () => {
     // on a page that had eleven.
     const src = read("app/tools/deal-math-tools.tsx");
     expect(src).toContain('from "@/lib/tools/catalog"');
-    expect(src).toContain("const INDEX = TOOL_INDEX");
+    // Through `groupedTools()` since the index became clustered — still
+    // this list, one function further along, never a second copy.
+    expect(src).toContain("groupedTools()");
   });
 
   it("the homepage reads it too", () => {
@@ -140,5 +142,48 @@ describe("the cards' bar markers", () => {
       shared,
       "two cards are using one data-bar name, so their render counts add together",
     ).toEqual([]);
+  });
+});
+
+/**
+ * The index's clusters.
+ *
+ * `groupedTools` filters TOOL_INDEX by group, which means a card whose
+ * group is not one of TOOL_GROUPS silently VANISHES from the index —
+ * still on the page, still reachable by scrolling, invisible in the
+ * directory. The type stops that at compile time; these stop it if the
+ * type ever loosens, and they stop the other half too, a cluster that
+ * exists in the list and holds nothing.
+ */
+describe("the index's clusters", () => {
+  const grouped = groupedTools();
+
+  it("files every card exactly once", () => {
+    const filed = grouped.flatMap((g) => g.tools.map((t) => t.id));
+    expect(filed.length, "a card is missing from the index or duplicated").toBe(
+      TOOL_INDEX.length,
+    );
+    expect(new Set(filed).size).toBe(TOOL_INDEX.length);
+    expect(new Set(filed)).toEqual(new Set(TOOL_INDEX.map((t) => t.id)));
+  });
+
+  it("leaves no cluster empty", () => {
+    const empty = grouped.filter((g) => g.tools.length === 0).map((g) => g.group);
+    expect(empty, "a named cluster with nothing in it is a heading over blank space").toEqual([]);
+  });
+
+  it("keeps the clusters scannable, which is the point of them", () => {
+    expect(grouped.length).toBe(TOOL_GROUPS.length);
+    for (const g of grouped) {
+      // Two is not a cluster and eight is a wall again. The bounds are
+      // loose on purpose — they catch a grouping that has stopped doing
+      // its job, not one that is merely lopsided.
+      expect(g.tools.length, `${g.group} has ${g.tools.length}`).toBeLessThanOrEqual(8);
+      expect(g.tools.length, `${g.group} has ${g.tools.length}`).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it("shows them in the order the list states", () => {
+    expect(grouped.map((g) => g.group)).toEqual([...TOOL_GROUPS]);
   });
 });

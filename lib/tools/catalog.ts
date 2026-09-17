@@ -19,39 +19,69 @@
  * Pure data, no I/O — which is why a server-rendered homepage can import it
  * without pulling the client bundle in behind it.
  */
+/**
+ * What a card is about, for the index's clusters.
+ *
+ * Added when the page passed twenty-five cards and the index became a
+ * wall of chips — measured at 187KB of HTML, 4,165 words and 189 input
+ * fields, which is a long way past the "thirteen cards is more than a
+ * reader should scroll past" the index's own comment was written for.
+ * Six named clusters of three to six scan; twenty-six in a row do not,
+ * and the problem gets worse with every card rather than better.
+ */
+export type ToolGroup =
+  | "Debt"
+  | "Equity & returns"
+  | "Leases"
+  | "The property"
+  | "Value & land"
+  | "Tax & closing";
+
+/** The clusters, in the order the index shows them. */
+export const TOOL_GROUPS: readonly ToolGroup[] = [
+  "Debt",
+  "Equity & returns",
+  "Leases",
+  "The property",
+  "Value & land",
+  "Tax & closing",
+] as const;
+
 export interface ToolEntry {
   /** the card's anchor id on /tools */
   id: string;
   /** what a reader sees, in the index and in the homepage's shelf */
   label: string;
+  /** which cluster the index files it under */
+  group: ToolGroup;
 }
 
 export const TOOL_INDEX: readonly ToolEntry[] = [
-  { id: "size-the-loan", label: "Size the loan" },
-  { id: "the-loan-over-the-hold", label: "Over the hold" },
-  { id: "cash-flow-strip", label: "Cash flow" },
-  { id: "what-you-believe", label: "What you believe" },
-  { id: "sources-and-uses", label: "Sources & uses" },
-  { id: "capital-stack", label: "Capital stack" },
-  { id: "lease-buyout", label: "Lease buyout" },
-  { id: "prepayment", label: "Getting out early" },
-  { id: "unit-mix", label: "Unit mix" },
-  { id: "the-site", label: "The site" },
-  { id: "residual-land", label: "Land residual" },
-  { id: "the-waterfall", label: "LP / GP split" },
-  { id: "net-effective-rent", label: "Net effective rent" },
-  { id: "rentable-vs-usable", label: "Rentable vs usable" },
-  { id: "after-tax", label: "After tax" },
-  { id: "exchange-1031", label: "1031 exchange" },
-  { id: "expense-recovery", label: "Expense recovery" },
-  { id: "percentage-rent", label: "Percentage rent" },
-  { id: "tax-reassessment", label: "Tax reassessment" },
-  { id: "ground-lease", label: "Ground lease" },
-  { id: "closing-proration", label: "Closing" },
-  { id: "cap-rate-triangle", label: "Cap rate" },
-  { id: "rent-converter", label: "Rent, four ways" },
-  { id: "operating-expense", label: "One expense" },
-  { id: "build-or-buy", label: "Build or buy" },
+  { id: "size-the-loan", label: "Size the loan", group: "Debt" },
+  { id: "the-loan-over-the-hold", label: "Over the hold", group: "Debt" },
+  { id: "cash-flow-strip", label: "Cash flow", group: "Equity & returns" },
+  { id: "what-you-believe", label: "What you believe", group: "Equity & returns" },
+  { id: "sources-and-uses", label: "Sources & uses", group: "Equity & returns" },
+  { id: "capital-stack", label: "Capital stack", group: "Debt" },
+  { id: "lease-buyout", label: "Lease buyout", group: "Leases" },
+  { id: "prepayment", label: "Getting out early", group: "Debt" },
+  { id: "unit-mix", label: "Unit mix", group: "The property" },
+  { id: "the-site", label: "The site", group: "The property" },
+  { id: "residual-land", label: "Land residual", group: "Value & land" },
+  { id: "the-waterfall", label: "LP / GP split", group: "Equity & returns" },
+  { id: "net-effective-rent", label: "Net effective rent", group: "Leases" },
+  { id: "rentable-vs-usable", label: "Rentable vs usable", group: "Leases" },
+  { id: "after-tax", label: "After tax", group: "Tax & closing" },
+  { id: "exchange-1031", label: "1031 exchange", group: "Tax & closing" },
+  { id: "expense-recovery", label: "Expense recovery", group: "Leases" },
+  { id: "percentage-rent", label: "Percentage rent", group: "Leases" },
+  { id: "tax-reassessment", label: "Tax reassessment", group: "Tax & closing" },
+  { id: "ground-lease", label: "Ground lease", group: "Value & land" },
+  { id: "closing-proration", label: "Closing", group: "Tax & closing" },
+  { id: "cap-rate-triangle", label: "Cap rate", group: "Value & land" },
+  { id: "rent-converter", label: "Rent, four ways", group: "The property" },
+  { id: "operating-expense", label: "One expense", group: "Leases" },
+  { id: "build-or-buy", label: "Build or buy", group: "Value & land" },
 ] as const;
 
 /**
@@ -63,3 +93,17 @@ export const TOOL_INDEX: readonly ToolEntry[] = [
  * description, the homepage and the docs cannot disagree about it.
  */
 export const TOOL_COUNT = TOOL_INDEX.length + 1;
+
+/**
+ * The cards clustered for the index, groups in `TOOL_GROUPS` order and
+ * each group's cards in page order.
+ *
+ * Pure, so the index, the tests and anything else that wants the shape
+ * read one function rather than three copies of this grouping.
+ */
+export function groupedTools(): { group: ToolGroup; tools: ToolEntry[] }[] {
+  return TOOL_GROUPS.map((group) => ({
+    group,
+    tools: TOOL_INDEX.filter((t) => t.group === group),
+  }));
+}

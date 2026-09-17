@@ -532,3 +532,8 @@ jobs:
           # The claim that reverses on a fact about the market rather than
           # about the building, and the one most intuitions get backwards.
           mark "#331 yield maintenance is cheap when rates rose" grep -q "Yield maintenance is cheap when rates have risen" p_tools2.html
+          # The index is six named clusters rather than twenty-six chips in
+          # a row. Greping two of the headings proves the grouping serves,
+          # and neither phrase was anywhere on the page before it.
+          mark "#332 the index is clustered" grep -q "Equity &amp; returns" p_tools2.html
+          mark "#332 and files the leases together" grep -q "Tax &amp; closing" p_tools2.html
