@@ -7,8 +7,8 @@ Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 
 Ten more PRs, #307–#316, nine on `/tools` or its shop window and one on
 the photographs, all proven live by the round markers — and the table has
-kept growing since (#317, #319, #320, #322, #324, #325). **Twenty-two
-calculations** there now, and
+kept growing since (#317, #319, #320, #322, #324, #325, #326).
+**Twenty-three calculations** there now, and
 they cover the arithmetic an acquisitions analyst does between opening a
 memorandum and sending a letter:
 
@@ -18,6 +18,7 @@ memorandum and sending a letter:
 | **The loan over the hold** (#307) | What you still owe. $13M at 6.5% over thirty years, held ten, leaves **$11.02M** at the balloon — a third of the schedule run, 85% of the loan still there. Draws each year's debt service split into interest and principal |
 | **The refinance test** (#307) | Whether the balloon can be taken out, on the same three lender tests. Cash out, covers it, or **the cash-in refinance nobody plans for**, with the NOI that would clear it |
 | **Cash-flow strip** | IRR, multiple, payback — and how much of the return is the residual, discounted at the deal's own IRR |
+| **What you believe** (#326) | The only one that runs *backwards*. It takes the price and the return and reports the growth rate the deal is quietly assuming — because a pro forma is a set of assumptions chosen to reach a conclusion, and a deal that pencils at 3% growth and one that pencils at 9% look identical on a summary page. The seeded $25M / $1.5M deal is a 6.00% cap; a **12% unlevered** return needs NOI to grow **7.16% a year**, which is 4.16 points past ordinary. Or leave growth alone and the exit cap has to come in to **5.01%** — 99bp *tighter* than the cap you are buying at, which is a bet on the market re-rating rather than on the building. The exit capitalises next year's NOI, not this year's; the rate is solved and then checked against the same IRR function the Excel export uses; and the card says out loud that the return is unlevered, because a levered target typed in here makes any deal look heroic |
 | **Sources and uses** (#310) | The cheque. Price less loan says $7M; the real number is **$11.03M** once capital, closing, the loan fee and reserves are counted |
 | **LP / GP waterfall** (#308) | The property's IRR is not anybody's IRR: 14.1% for the building, 13.3% to the LP, 20.6% to the GP |
 | **Unit mix** (#309) | Paste the OM's table. Weighted average rent, GPR both ways, loss to lease — **weighted by unit count**, which is $1,858 where averaging the rows gives $1,961 |
@@ -37,8 +38,8 @@ memorandum and sending a letter:
 
 Three things they share: every field reads shorthand (`$20M`, `4.75%`,
 `1.25x`); every field travels in the URL, so a sizing is a link; and the
-math is a pure tested module before it reaches a page — **380 tests** on
-the sixteen modules, plus **51** that render the page itself and check the
+math is a pure tested module before it reaches a page — **400 tests** on
+the seventeen modules, plus **53** that render the page itself and check the
 figures it prints. And since #314 the homepage renders its shelf of those
 calculations from the SAME list the page builds its cards from, so it can
 no longer advertise a version of `/tools` that does not exist.
@@ -62,9 +63,10 @@ there.
 
 **What I'd build next, when you want more:** a mezzanine / preferred
 stack with its blended cost of capital (the sources-and-uses card only
-knows one loan); the reverse solve — given a price and a target return,
-what exit price or rent growth would you have to *believe*; a
-lease-abstract reader; a tenant-buyout value for a below-market lease.
+knows one loan); a lease-abstract reader; a tenant-buyout value for a
+below-market lease; a partial-year stub and the first reconciliation
+after a mid-year close. (The reverse solve that used to head this list
+shipped as #326.)
 Then the pieces that are not calculators at all — a copy-as-table button
 on the deal page's comps (the pipeline already exports CSV and .xlsx),
 breadcrumbs, a keyboard layer. (The amortisation-schedule export and the
