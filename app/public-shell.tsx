@@ -32,7 +32,7 @@ export async function PublicShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b border-line">
+      <header className="border-b border-line print:hidden">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link href="/" className="flex items-center gap-2.5">
             <LogoMark className="h-8 w-8" />
@@ -61,7 +61,7 @@ export async function PublicShell({ children }: { children: ReactNode }) {
       <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
         {children}
       </main>
-      <footer className="border-t border-line">
+      <footer className="border-t border-line print:hidden">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-6 text-xs text-muted">
           <span>
             Underwrite Copilot — screen deals against this data.{" "}

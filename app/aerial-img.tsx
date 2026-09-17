@@ -37,7 +37,10 @@ export function AerialImg({
       loading="lazy"
       decoding="async"
       onError={() => setGone(true)}
-      className={className}
+      // Not on paper. A full-bleed photograph is a page of ink for no
+      // information, and the band it sits in keeps its dark scrim and its
+      // white words without it — so the heading still reads, printed.
+      className={`print:hidden ${className ?? ""}`}
     />
   );
 }
