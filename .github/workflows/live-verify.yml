@@ -694,6 +694,14 @@ jobs:
           mark "#349 both asset-management bases computed" grep -q "on one word the term sheet often leaves out" p_tools2.html
           mark "#349 the sponsor's take is drawn twice" grep -q "Exit 10% softer" p_tools2.html
           mark "#349 the fee share moves on the softer exit" grep -q "and 66.5% of it is fees rather than promote." p_tools2.html
+          # #350 — what the site holds. The second is the decisive one: that
+          # sentence renders only when the joint surface-parking solve came
+          # back the SMALLEST of the four caps, so a `present` proves every
+          # cap ran and the minimum was taken.
+          mark "#350 the zoning envelope card is on /tools" grep -q "What the site actually holds" p_tools2.html
+          mark "#350 the joint parking solve is the binding cap" grep -q "Parking binds: the spaces and the footprint are competing for the same 87,120 square feet" p_tools2.html
+          mark "#350 a unit is charged its gross area, not its net" grep -q "units that are not there" p_tools2.html
+          mark "#350 the density bonus is drawn against its break-even" grep -q "The density bonus, against what it costs" p_tools2.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

@@ -35,6 +35,7 @@ import { readLeaseback } from "@/lib/tools/sale-leaseback";
 import { readInsurance } from "@/lib/tools/insurance";
 import { runWaterfall } from "@/lib/tools/waterfall-math";
 import { DOWNSIDE_EXIT_HAIRCUT, readFeeDrag } from "@/lib/tools/fee-drag";
+import { readEnvelope } from "@/lib/tools/zoning-envelope";
 import {
   breakEvenOccupancyPct,
   capRatePct,
@@ -257,6 +258,10 @@ const pct = (n: number | null, places = 2) =>
   n === null ? "—" : `${n.toFixed(places)}%`;
 
 const mult = (n: number | null) => (n === null ? "—" : `${n.toFixed(2)}x`);
+
+/** An area, in the unit a zoning code and a rent roll both use. */
+const sf = (n: number | null) =>
+  n === null ? "—" : `${Math.round(n).toLocaleString("en-US")} SF`;
 
 /** A figure with its name under it — the shape every result here takes. */
 function Stat({
@@ -6176,6 +6181,194 @@ function Waterfall() {
 }
 
 /**
+ * What the site can actually hold.
+ *
+ * The four caps are drawn on one track so the smallest is visible rather
+ * than merely stated — the binding one is the answer's real name, and it is
+ * rarely the density limit everybody quotes.
+ */
+function ZoningEnvelope() {
+  const [site, setSite] = useShared("zsite", "87,120");
+  const [upa, setUpa] = useShared("zupa", "80");
+  const [far, setFar] = useShared("zfar", "2.5");
+  const [height, setHeight] = useShared("zht", "75");
+  const [f2f, setF2f] = useShared("zf2f", "11");
+  const [cov, setCov] = useShared("zcov", "50");
+  const [unitSf, setUnitSf] = useShared("zusf", "900");
+  const [eff, setEff] = useShared("zeff", "82");
+  const [ratio, setRatio] = useShared("zpk", "1.25");
+  const [pkType, setPkType] = useShared("zpt", "surface");
+  const [pkFar, setPkFar] = useShared("zpf", "no");
+  const [bonus, setBonus] = useShared("zbon", "20");
+  const [aside, setAside] = useShared("zase", "15");
+  const [mktRent, setMktRent] = useShared("zmr", "30,000");
+  const [resRent, setResRent] = useShared("zrr", "18,000");
+
+  const z = useMemo(
+    () =>
+      readEnvelope({
+        siteSf: readFigure(site),
+        unitsPerAcre: num(upa),
+        far: num(far),
+        maxHeightFt: num(height),
+        floorToFloorFt: num(f2f),
+        lotCoveragePct: num(cov),
+        avgUnitSf: readFigure(unitSf),
+        efficiencyPct: num(eff),
+        parkingRatio: num(ratio),
+        parkingType: pkType === "structured" ? "structured" : "surface",
+        parkingCountsAgainstFar: pkFar === "yes",
+        bonusDensityPct: num(bonus),
+        setAsidePct: num(aside),
+        marketRentAnnual: readFigure(mktRent),
+        restrictedRentAnnual: readFigure(resRent),
+      }),
+    [site, upa, far, height, f2f, cov, unitSf, eff, ratio, pkType, pkFar, bonus, aside, mktRent, resRent],
+  );
+
+  const caps: { name: string; units: number | null }[] = [
+    { name: "Density", units: z.unitsByDensity },
+    { name: "Floor area", units: z.unitsByFar },
+    { name: "Height", units: z.unitsByHeight },
+    { name: "Parking", units: z.unitsByParking },
+  ];
+  const widest = Math.max(...caps.map((c) => c.units ?? 0), 1);
+
+  return (
+    <Card id="zoning-envelope" eyebrow="Value &amp; land" title="What the site actually holds">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Site" suffix="SF" value={site} onChange={setSite} placeholder="87,120" />
+          <Field label="Density" suffix="/ac" value={upa} onChange={setUpa} placeholder="80" />
+          <Field label="Floor area ratio" value={far} onChange={setFar} placeholder="2.5" />
+          <Field label="Coverage" suffix="%" value={cov} onChange={setCov} placeholder="50" />
+          <Field label="Height" suffix="ft" value={height} onChange={setHeight} placeholder="75" />
+          <Field label="Floor to floor" suffix="ft" value={f2f} onChange={setF2f} placeholder="11" />
+          <Field label="Average unit, net" suffix="SF" value={unitSf} onChange={setUnitSf} placeholder="900" />
+          <Field label="Efficiency" suffix="%" value={eff} onChange={setEff} placeholder="82" />
+          <Field label="Parking" suffix="/unit" value={ratio} onChange={setRatio} placeholder="1.25" />
+          <Choice
+            label="Parking is"
+            value={pkType}
+            onChange={setPkType}
+            options={[
+              { value: "surface", label: "Surface" },
+              { value: "structured", label: "Structured" },
+            ]}
+          />
+          <Choice
+            label="Counts against FAR"
+            value={pkFar}
+            onChange={setPkFar}
+            options={[
+              { value: "no", label: "No" },
+              { value: "yes", label: "Yes" },
+            ]}
+          />
+          <Field label="Density bonus" suffix="%" value={bonus} onChange={setBonus} placeholder="20" />
+          <Field label="Set-aside" suffix="%" value={aside} onChange={setAside} placeholder="15" />
+          <Field label="Market rent" suffix="/yr" value={mktRent} onChange={setMktRent} placeholder="30,000" />
+          <Field label="Restricted rent" suffix="/yr" value={resRent} onChange={setResRent} placeholder="18,000" />
+        </div>
+
+        <div>
+          {z.units !== null && (
+            <>
+              {/* Four caps on one track — the smallest is the site. */}
+              <div className="space-y-2">
+                {caps.map((c) => (
+                  <div key={c.name}>
+                    <div className="flex items-baseline justify-between gap-3 text-sm">
+                      <span className={c.units === z.units ? "font-semibold text-ink" : "text-muted"}>
+                        {c.name}
+                        {/* The margin is not a space — without this a screen
+                            reader hears "Parkingbinds". */}
+                        {c.units === z.units && (
+                          <>
+                            {" "}
+                            <span className="text-brand">binds</span>
+                          </>
+                        )}
+                      </span>
+                      <span className="font-mono tabular-nums">
+                        {c.units === null ? "—" : `${c.units} units`}
+                      </span>
+                    </div>
+                    <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-faint">
+                      <div
+                        data-bar="envelope"
+                        className={`h-full ${c.units === z.units ? "bg-brand" : "bg-line"}`}
+                        style={{ width: `${((c.units ?? 0) / widest) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <Stat label="The site holds" value={`${z.units} units`} tone="brand" />
+                <Stat label="Gross building" value={sf(z.buildableGrossSf)} />
+                <Stat label="Storeys" value={z.floors === null ? "—" : String(z.floors)} />
+                <Stat label="Coverage used" value={pct(z.coverageUsedPct, 1)} tone="muted" />
+              </div>
+
+              {z.unitsOverstatedByEfficiency !== null && z.grossSfPerUnit !== null && (
+                <p className="mt-4 text-sm text-muted">
+                  A {sf(readFigure(unitSf))} unit at {trimPct(eff)}% efficiency consumes{" "}
+                  <span className="font-semibold text-ink">{sf(z.grossSfPerUnit)}</span> of floor
+                  area ratio, so the code allows {z.unitsByFar} rather than the{" "}
+                  {z.naiveUnitsByFar} that dividing by the unit size would claim —{" "}
+                  {z.unitsOverstatedByEfficiency} units that are not there.
+                </p>
+              )}
+
+              {z.bonusWorth !== null && z.bonusBreakEvenPct !== null && (
+                <div className="mt-5">
+                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
+                    The density bonus, against what it costs
+                  </p>
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    <Stat label="With the bonus" value={`${z.unitsWithBonus} units`} />
+                    <Stat label="Of those, restricted" value={`${z.setAsideUnits} units`} tone="muted" />
+                    <Stat
+                      label="Rent roll moves"
+                      value={`${z.bonusWorth >= 0 ? "+" : "−"}${usd(Math.abs(z.bonusWorth))}`}
+                      tone={z.bonusWorth >= 0 ? "brand" : "ink"}
+                    />
+                    <Stat label="Break-even bonus" value={pct(z.bonusBreakEvenPct, 1)} tone="muted" />
+                  </div>
+                  <div className="mt-3 flex h-2 w-full overflow-hidden rounded-full bg-faint">
+                    <div
+                      data-bar="setaside"
+                      className="h-full bg-sidebar"
+                      style={{ width: `${((z.setAsideUnits ?? 0) / (z.unitsWithBonus || 1)) * 100}%` }}
+                    />
+                    <div
+                      data-bar="setaside"
+                      className="h-full bg-brand"
+                      style={{
+                        width: `${(((z.unitsWithBonus ?? 0) - (z.setAsideUnits ?? 0)) / (z.unitsWithBonus || 1)) * 100}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {z.note && <p className="mt-4 text-sm text-caution">{z.note}</p>}
+          <p className="mt-3 text-xs text-muted">
+            Surface parking and the building compete for the same dirt, so the two are solved
+            together rather than asked as separate questions. Switch to a deck and watch which
+            line binds.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/**
  * What the LP nets once the sponsor has been paid.
  *
  * Drawn as the three returns on one track, because the argument is that
@@ -6769,6 +6962,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <Rollover />
       <LeaseUp />
       <SiteMeasures />
+      <ZoningEnvelope />
       <ResidualLand />
       <Waterfall />
       <FeeDrag />
