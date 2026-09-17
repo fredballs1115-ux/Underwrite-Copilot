@@ -7,7 +7,7 @@ Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 
 Ten more PRs, #307–#316, nine on `/tools` or its shop window and one on
 the photographs, all proven live by the round markers — and the table has
-kept growing since (#317, #319, #320). **Nineteen calculations** there now, and
+kept growing since (#317, #319, #320, #322). **Twenty calculations** there now, and
 they cover the arithmetic an acquisitions analyst does between opening a
 memorandum and sending a letter:
 
@@ -26,6 +26,7 @@ memorandum and sending a letter:
 | **Rentable vs usable** (#312) | The load factor, and what it does to a quote. **$38.00 per rentable foot is $43.70 per foot you can furnish** — and the two numbers people both call "the load factor" (15.0% and 13.0%) are the same building |
 | **After tax** (#315) | Land is never depreciable; the gain at the sale has THREE rates, not one; and depreciation is a **timing** benefit — shelter and recapture at the same rate and it nets to zero. Cost segregation lifts year-one write-off 4.5× and leaves this deal **$130,909 worse off** in raw dollars |
 | **Expense recovery** (#320) | The reconciliation statement that lands every spring and nobody checks. Gross up **both** years or neither: the seeded base year was struck at 72% occupancy, so gross-up adds **$287,500** to it against $12,553 to this year. Do it to only the current year — the commonest and costliest move in a reconciliation — and this tenant pays **$28,417** it does not owe. A base year is not an expense stop; a cumulative cap is not a non-cumulative one; and the cap reaches controllable expenses only |
+| **Percentage rent** (#322) | The retail lease's own arithmetic. The natural breakpoint is base rent over the rate — **$2.00M** on the seeded lease — and anything else the lease states is artificial, named and sided. The seeded tenant's year lands at $1.92M, *under* the breakpoint, so nothing is owed. Billed monthly against a twelfth of it with no year-end true-up, the same lease collects **$22,300**, because two months of Christmas clear the line and the ten below it give nothing back. Plus the occupancy cost ratio, solved for the sales that reach your ceiling — and honest that a 5% ceiling on a 6% lease is unreachable |
 | **1031 exchange** (#319) | What rolling it forward actually defers. The seeded trade sells at $26M, buys at $30M with *more* debt — passes the price test, and still owes **$305,000**, because $1.22M of proceeds stayed in the seller's pocket and borrowing more never cures that. Debt relief is boot even with every dollar of cash reinvested; cash added to the replacement offsets it. Deferred is not forgiven: $30M of property, a **$20.5M basis**. And the clock's 45 and 180 days run from the *same* day — a November closing loses **29 of them** to the return's due date |
 | **Closing statement** (#317) | The one that comes after yes, and the one people get *backwards*: taxes in arrears mean the seller credits the buyer, in advance the reverse, so the wrong reading misses by the **sum** of the two figures. Deposits are the tenants' money and go over whole. The closing day itself is worth **$657.53** on a $240,000 bill, so the contract decides it, not a default |
 | **Opex translator** | One expense per unit, per foot, as a share of income |
@@ -33,8 +34,8 @@ memorandum and sending a letter:
 
 Three things they share: every field reads shorthand (`$20M`, `4.75%`,
 `1.25x`); every field travels in the URL, so a sizing is a link; and the
-math is a pure tested module before it reaches a page — **314 tests** on
-the thirteen modules, plus **43** that render the page itself and check the
+math is a pure tested module before it reaches a page — **335 tests** on
+the fourteen modules, plus **46** that render the page itself and check the
 figures it prints. And since #314 the homepage renders its shelf of those
 calculations from the SAME list the page builds its cards from, so it can
 no longer advertise a version of `/tools` that does not exist.
@@ -50,8 +51,8 @@ the paper, and a card never splits across two sheets.
 there.
 
 **What I'd build next, when you want more:** an amortisation schedule you
-can export, a lease-abstract reader, percentage rent and the natural
-breakpoint for retail. Then the pieces that are not calculators at all
+can export, a lease-abstract reader, a CAM
+reconciliation's own escalation schedule. Then the pieces that are not calculators at all
 — a copy-as-table button on the deal page's comps (the pipeline already
 exports CSV and .xlsx), a print stylesheet, breadcrumbs, a keyboard
 layer.
@@ -1425,11 +1426,13 @@ a route scoped to the share token; the memo and the report got theirs in
 
 ## Claude's moves (next session)
 
-1. **Verify phases 1–4 end to end once the migrations land** — create a
-   submarket, import a pipeline CSV, upload a rent roll, download the workbook
-   and confirm the exit cap moves the IRR in real Excel, save two deal versions
-   and read the bridge. All of it is unit-tested, none of it has been exercised
-   against the live database.
+1. **Verify phases 1–4 end to end.** The migrations LANDED on 2026-09-16 —
+   all of 0030–0035 reported ✅ — so this is no longer blocked on schema, it
+   is simply not done: create a submarket, import a pipeline CSV, upload a
+   rent roll, download the workbook and confirm the exit cap moves the IRR
+   in real Excel, save two deal versions and read the bridge. Every one of
+   those is unit-tested and none has been exercised against the live
+   database, which is a different kind of unknown from an untested one.
 2. **Wire the discovery providers** from the health JSON: Fairfax County VA
    (sales table joins to parcels — needs a two-stage query), Arlington VA,
    Pittsburgh/Allegheny (WPRDC CKAN SQL), New Castle DE. Each becomes

@@ -6,7 +6,7 @@ import { DealMathTools } from "./deal-math-tools";
 export const metadata: Metadata = {
   title: "Deal math — Underwrite Copilot",
   description:
-    "Nineteen calculators for a commercial deal: size a loan and see which test binds, run the loan over the hold and test the refinance, sources and uses, what the land can be worth, the LP/GP waterfall, a pasted cash flow, an OM's unit mix, the site's density and floor area ratio, net effective rent, rentable against usable feet, depreciation and what recapture takes back, what a 1031 exchange actually defers, the operating-expense reconciliation with its gross-up, the settlement statement at closing, and the quick conversions. Runs in your browser; nothing is sent anywhere.",
+    "Twenty calculators for a commercial deal: size a loan and see which test binds, run the loan over the hold and test the refinance, sources and uses, what the land can be worth, the LP/GP waterfall, a pasted cash flow, an OM's unit mix, the site's density and floor area ratio, net effective rent, rentable against usable feet, depreciation and what recapture takes back, what a 1031 exchange actually defers, the operating-expense reconciliation with its gross-up, percentage rent and the natural breakpoint, the settlement statement at closing, and the quick conversions. Runs in your browser; nothing is sent anywhere.",
 };
 
 /**

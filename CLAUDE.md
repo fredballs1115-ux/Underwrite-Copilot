@@ -375,6 +375,27 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   insurance doubled. Every displayed figure is rounded once and the
   differences are taken from the rounded pair (the debt schedule's rule),
   so the card's numbers add up.
+- The retail lease's own arithmetic: `lib/tools/percentage-rent.ts` (pure).
+  Three rules, the middle one changing an answer rather than shading it.
+  **The natural breakpoint is DERIVED** — base rent over the rate, the
+  sales at which percentage rent equals base rent — so a lease stating
+  anything else has an ARTIFICIAL one, which the module names and sides
+  (below natural favours the landlord, above it the tenant). **Percentage
+  rent is owed on the YEAR'S sales, reconciled at year end**: billed
+  monthly against a twelfth of the breakpoint with no true-up, a landlord
+  collects on every strong month and refunds nothing for the weak ones, so
+  the seeded seasonal tenant pays $22,300 on a year whose annual figure is
+  ZERO — and no single month's statement shows it, which is why the card
+  draws twelve months with the monthly line across them. And **the
+  occupancy cost ratio is the test of whether the rent is durable**;
+  `salesToClearCeiling` SOLVES for the sales that reach the caller's
+  ceiling rather than scaling a ratio (above the breakpoint the cost is
+  itself a function of sales), and answers null for a ceiling at or under
+  the percentage rate, which no sales figure can ever reach. What counts as
+  healthy is the tenant's category, so the ceiling is an input with a
+  default and never a number this module asserts. The sales column reads
+  through `readStrip` — the cash-flow card's reader, so the
+  comma-as-thousands-mark trap stays solved in one place.
 - Who owes whom at closing: `lib/tools/proration.ts` (pure). The one
   calculation here that comes AFTER yes, and the one people get BACKWARDS
   rather than merely wrong, because two of its rules reverse a payment's

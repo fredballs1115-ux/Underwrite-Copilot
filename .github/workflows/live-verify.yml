@@ -487,3 +487,7 @@ jobs:
           # says the rule WORKS needs a real Chromium and is run by hand.
           mark "#321 a card never splits across a printed page" grep -q "print:break-inside-avoid" p_tools2.html
           mark "#321 the chrome leaves the paper" grep -q "print:hidden" p_tools2.html
+          mark "#322 percentage rent is on /tools" grep -q "Percentage rent, and the breakpoint" p_tools2.html
+          # The claim the card exists for: a year that owes nothing and is
+          # billed anyway. Prose with no interpolated value in it.
+          mark "#322 it prices the missing true-up" grep -q "that the year" p_tools2.html
