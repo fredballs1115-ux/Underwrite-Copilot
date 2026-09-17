@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-17",
+      "title": "The tax bill in the memorandum is the seller’s",
+      "blurb": "A new calculation on the deal math page, for the error that hides in plain sight. Every offering memorandum shows property taxes in the expense line, and in much of the country that figure is struck on an assessed value set when the SELLER bought — which has drifted ever since under a cap, a phase-in, or an assessor who simply has not looked. Where the jurisdiction reassesses on transfer, your purchase resets the assessment to what you paid. Nothing in the memorandum is false. It is describing someone else’s ownership, and it stops being true the day after closing. On the seeded deal — an ordinary $25M building the seller has held long enough for the assessment to fall to $14M — the bill goes from $210,000 to $375,000, and the 6.00% cap on the cover is 5.34% to the buyer. Sixty-six basis points, on figures that all tie. The page says it twice, because the two audiences are different: as a cap, which is what people quote to each other, and as a price, which is what they negotiate with. That price is solved rather than estimated: paying less lowers the assessment, which lowers the tax, which raises the NOI, so the answer feeds back on itself. Here it is $22.8M — $2.2M below the ask, and $550,000 more than the tempting shortcut of capitalising the lower NOI would have told you. Three more things it insists on. A tax bill is assessed value times a rate, and assessed value is usually not the price, so the ratio is a separate field; where you give it both the current bill and the current assessment it works out what rate is really being charged and tells you when that disagrees with what you typed. A phase-in is a deferral, not a discount — year one is shown, and the stabilized bill is the headline, because that is the one that prices the exit. And a jurisdiction that does not reassess gets a real answer rather than a blank. Which ones do is a fact about a place, not arithmetic, so the card asks you and says to check the county.",
+      "href": "/tools#tax-reassessment"
+    },
+    {
+      "date": "2026-09-17",
       "title": "The loan schedule leaves the page as numbers",
       "blurb": "Run a loan over its hold on the deal math page and you get a row per year — opening balance, interest, principal, debt service, closing balance, and whether that year was interest-only. Useful to look at, and until now the one table there you had to retype to use. It has a Copy button now, the same one the cash flow strip has had: tab-delimited with a header row and the numbers raw, no dollar signs and no commas, so it pastes into a spreadsheet as numbers rather than as text you then have to clean a column at a time. The interest-only years come across as a plain Yes/No column, because a balance that sits flat for two years reads as a broken schedule unless something says why. Small companion fix while we were here: copy buttons no longer print. They were showing up on paper as little empty boxes — a button nobody can click on a sheet of paper is just ink.",
       "href": "/tools#the-loan-over-the-hold"
@@ -113,12 +119,6 @@
       "date": "2026-09-16",
       "title": "What the lease is really worth, and one expense three ways",
       "blurb": "Every office and industrial rent in a memorandum is a STARTING rent, and the gap to net effective is where the broker's number lives. $36 a foot on a ten-year deal with twelve months free and $90 of tenant improvements is not $36 a foot — /tools now draws where the face rent actually goes, and gives both net effective figures, the straight-line one most memoranda quote and the discounted one that charges the landlord for waiting. Plus one operating expense said per unit, per foot and as a share of income, because a broker quotes the first and an underwriter argues the third.",
-      "href": "/tools"
-    },
-    {
-      "date": "2026-09-16",
-      "title": "A sizing is a link, and a table is a paste",
-      "blurb": "“Send me that sizing” used to mean a screenshot. Every field on /tools now writes itself into the address bar, so the whole page — all five calculators — travels as a link, and an untouched page still copies as a bare /tools rather than a paragraph of defaults. The cash-flow table copies tab-delimited with its headers and the numbers raw, so they land in a spreadsheet as numbers instead of as text somebody has to clean.",
       "href": "/tools"
     }
   ]

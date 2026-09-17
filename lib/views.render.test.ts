@@ -1369,6 +1369,26 @@ describe("the deal math tools", () => {
     expect(text).toContain("that the year's sales do not support");
   });
 
+  it("shows the cap the buyer actually gets after the assessor catches up", () => {
+    // The seeded building: $25M, a $14M assessment the seller has had for
+    // years, 1.5% — so the bill goes $210,000 to $375,000 and the 6% on
+    // the cover is 5.34% to the buyer.
+    expect(text).toContain("What the taxes become when you own it");
+    expect(text).toContain("$375,000"); // the bill after closing
+    expect(text).toContain("$265,000"); // year one, a third of the way in
+    expect(text).toContain("$165,000"); // what it adds to the expense line
+    expect(text).toContain("5.34%"); // the cap the buyer gets
+    expect(text).toContain("$22.80M"); // where the 6.00% is actually true
+    expect(text).toContain("$2.20M"); // what that is worth in negotiation
+  });
+
+  it("draws both caps and both prices, never one without the other", () => {
+    // Each pair is the comparison the card exists to make; a single bar
+    // is a figure with nothing to read it against.
+    expect((html.match(/data-bar="cap"/g) ?? []).length).toBe(2);
+    expect((html.match(/data-bar="price"/g) ?? []).length).toBe(2);
+  });
+
   it("draws the year against the line, and colours the months that clear it", () => {
     const months = html.match(/data-bar="month"[^>]*/g) ?? [];
     expect(months.length, "one bar per month pasted").toBe(12);

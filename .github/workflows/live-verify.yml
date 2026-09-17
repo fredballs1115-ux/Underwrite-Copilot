@@ -498,3 +498,7 @@ jobs:
           # claims to prove is not a marker.
           mark "#323 the loan schedule leaves the page as numbers" copies
           mark "#323 a copy button is never printed" grep -q "hover:text-brand print:hidden" p_tools2.html
+          mark "#324 the tax reassessment is on /tools" grep -q "What the taxes become when you own it" p_tools2.html
+          # The claim that makes it more than a subtraction. No apostrophe
+          # in the phrase: React escapes one to &#x27; in the served bytes.
+          mark "#324 it solves the price rather than scaling it" grep -q "gap is solved rather than scaled" p_tools2.html

@@ -404,6 +404,29 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   default and never a number this module asserts. The sales column reads
   through `readStrip` — the cash-flow card's reader, so the
   comma-as-thousands-mark trap stays solved in one place.
+- What the taxes become once you own it: `lib/tools/tax-reassessment.ts`
+  (pure). **The memorandum's tax line is the SELLER's bill**, struck on
+  the seller's assessed value — and where the jurisdiction reassesses on
+  transfer, the purchase resets that assessment to the price, so the NOI,
+  the cap and the coverage ratio downstream of it were all computed on a
+  bill that stops existing at closing. Nothing in the memorandum is false;
+  it is describing someone else's ownership, which is what makes this
+  invisible. Three more rules. **A bill is assessed value × rate and
+  assessed value is not the price** — the ratio is kept apart from the
+  rate, and where the current bill and assessment are both given the
+  module derives the rate they IMPLY and flags a disagreement (usually a
+  special district, sometimes a stale assessment). **A phase-in is a
+  deferral, not a discount**: year one is reported beside the stabilized
+  bill and the stabilized one is the headline, because pricing an exit off
+  the year-one figure prices it on a NOI the building never earns again.
+  And **the cost is said as a PRICE**, `priceForOmCap` SOLVED rather than
+  scaled — `P = (omNoi + currentTax) / (c + k)`, since paying less lowers
+  the assessment that lowers the tax that raises the NOI; on the seeded
+  $25M deal that is $22.8M, where scaling the stabilized NOI at the
+  advertised cap would have said $22.25M and overstated the discount. A
+  jurisdiction that does NOT reassess answers zero rather than nothing —
+  that is the answer, and which jurisdictions do is a fact about a place
+  rather than arithmetic, so it is an input and the card says so.
 - Who owes whom at closing: `lib/tools/proration.ts` (pure). The one
   calculation here that comes AFTER yes, and the one people get BACKWARDS
   rather than merely wrong, because two of its rules reverse a payment's
