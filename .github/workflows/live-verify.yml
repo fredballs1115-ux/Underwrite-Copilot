@@ -658,6 +658,16 @@ jobs:
           mark "#344 the roll is read as a pasted table" grep -q "Tenant, SF, rent per SF, years to expiry, break" p_tools2.html
           mark "#344 the cliff year's capital exceeds the rent rolling" grep -q "a cheque larger than the income at risk" p_tools2.html
           mark "#344 the average-hides-a-cliff rule is stated on the card" grep -q "an average cannot see a cliff" p_tools2.html
+          # #345 — filling an empty building. The third is the decisive one:
+          # that sentence renders ONLY when the six-months-slower schedule
+          # comes back with a SHALLOWER trough than the base case, so a
+          # `present` proves both schedules ran on the server and the
+          # counter-intuitive result held. The fourth is the position at the
+          # common date under that slip — a figure nothing else produces.
+          mark "#345 the lease-up card is on /tools" grep -q "Filling an empty building" p_tools2.html
+          mark "#345 the cumulative cash line is drawn" grep -q "Cumulative cash, month by month" p_tools2.html
+          mark "#345 slippage is shown shrinking the reserve it should stress" grep -q "The reserve is the wrong place to look for slippage" p_tools2.html
+          mark "#345 the slipped position at the common date is computed" grep -q "4,158,892" p_tools2.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

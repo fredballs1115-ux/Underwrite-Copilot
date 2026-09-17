@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-17",
+      "title": "Filling an empty building",
+      "blurb": "The months between a building delivering and filling up are where a development's money goes, and the pro forma covers them in a footnote. Three things nobody models: an empty building still pays its taxes; a signed lease is not a paying lease, so the seeded building is full at month 22 and paid in full at month 28; and the tenant allowance and the commission fall due at signing, ahead of the rent they buy. So the worst month is month 22 — the month it fills — not month one: $6,200,437 out, deep into a lease-up that is going well. And then the part that catches people out. Stress the absorption and the reserve looks BETTER: six months slower takes the worst month down to $5,674,789, because a slower pace spends the leasing capital slower. Anyone stress-testing slippage against the lease-up reserve concludes it is survivable and is measuring the wrong thing. The cost is time, and it only shows at a common date — at month 36 the plan is $3,465,450 out and the slipped case $4,158,892, which is 1.9 times what a 5% rent miss costs on the same building.",
+      "href": "/tools#lease-up"
+    },
+    {
+      "date": "2026-09-17",
       "title": "When the income rolls",
       "blurb": "Paste a rent roll and get the weighted average lease term the three ways a memorandum does not quote it. Weight by rent rather than by area — they are different numbers, and the longer one gets printed, because the long leases in a building are the cheap ones. The seeded flex building runs 7.0 years by area and 5.1 by rent, on the strength of one distribution tenant twelve years out at $8.50. A tenant's break option is an expiry: you cannot make them stay and a lender will not assume they will, so the term to bid on is 4.3, and the schedule puts the space in the year the tenant can leave rather than the year the lease ends. And an average hides a cliff — two rolls with the same 3.0-year term roll 20% and 60% of the income in their worst year, which only the schedule can see. Year 4 of the seeded roll owes $1,530,000 of leasing capital against $1,292,000 of rent rolling off it: a cheque larger than the income at risk, and none of it in the NOI.",
       "href": "/tools#rollover"
