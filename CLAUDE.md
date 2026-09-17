@@ -924,6 +924,35 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   took ABOVE its pro-rata share** — the only honest definition, for the
   same reason. Return OF capital is not a separate step: an 8% IRR is not
   reached until every dollar in has come back plus 8% on it.
+- What the site actually holds: `lib/tools/zoning-envelope.ts` (pure). A
+  development pro forma opens with a unit count that almost always comes
+  from ONE line of the code — usually density, because it is the one
+  written as a number of units — and the code imposes four caps at once.
+  Four rules. **The answer is the MINIMUM and the binding cap is its real
+  name** (`sizeLoan`'s convention, applied to dirt): the seeded two acres
+  allow 160 by density, 198 by floor area, 238 by the height-and-coverage
+  envelope and 140 by parking, so parking binds and nobody writes that
+  down. **Floor area ratio is measured GROSS and a unit is sold NET** — a
+  900 SF apartment at 82% efficiency consumes 1,098 SF of it, so dividing
+  buildable area by the unit size claims 242 against the 198 the code
+  allows, 44 units that are not there (`naiveUnitsByFar`). **Surface
+  parking is not a separate cap but a JOINT constraint** — the spaces and
+  the footprint compete for the same site, solved together as
+  `units × (ratio × SF_PER_SURFACE_SPACE + unitGross / floors) ≤ site`;
+  a deck escapes the land and pays in the envelope instead, which is worth
+  20 units here, and whether it consumes floor area is a fact about the
+  code so it is an input. With no storey count there is no footprint to
+  trade against, so the parking cap is null rather than assuming one
+  storey. And **a density bonus is a trade with a computable break-even**:
+  the set-aside is struck against the BONUSED count, so
+  `bonusBreakEvenPct = s(M−R) / (M − s(M−R))` — 8.7% at a 20% set-aside on
+  the seeded rents, and a 5% bonus for that set-aside costs $150,000 a year
+  while reading as free density. The crossing is continuous and apartments
+  are whole, so the realised sign flips a little above it (a 9% bonus is
+  still $12,000 down) — documented, not a rounding bug. Bars:
+  `data-bar="envelope"` (the four caps on one track) and
+  `data-bar="setaside"` (restricted against market). **`cap` was already
+  taken** by the cap-rate card and the catalog's collision guard caught it.
 - What the LP actually nets: `lib/tools/fee-drag.ts` (pure — the sponsor's
   fees layered around `runWaterfall`, never re-implementing the ladder). The
   IRR on a syndication's cover is the PROPERTY's return, and the gap to the

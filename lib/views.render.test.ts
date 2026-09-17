@@ -2004,6 +2004,34 @@ describe("the deal math tools", () => {
     expect((html.match(/data-bar="feereturn"/g) ?? []).length).toBe(3);
     expect((html.match(/data-bar="sponsor"/g) ?? []).length).toBe(4);
   });
+
+  it("draws every zoning cap and names the one that binds", () => {
+    // #350, rule 1. Density 160, floor area 198, height 238, parking 140 —
+    // the site is held by the cap nobody writes at the top of a pro forma.
+    expect(text).toContain("What the site actually holds");
+    expect(text).toContain("160 units");
+    expect(text).toContain("198 units");
+    expect(text).toContain("238 units");
+    expect(text).toContain("140 units");
+    expect(text).toContain("Parking binds");
+    expect((html.match(/data-bar="envelope"/g) ?? []).length).toBe(4);
+  });
+
+  it("charges a unit its gross area, not its net", () => {
+    // Rule 2: 900 SF at 82% is 1,098 SF of floor area ratio, so the code
+    // allows 198 against the 242 a napkin claims.
+    expect(text).toContain("1,098 SF");
+    expect(text).toContain("44 units that are not there");
+  });
+
+  it("prices the density bonus against the bonus it would take to break even", () => {
+    // Rule 4: +20% on a 15% set-aside clears the 6.4% crossing.
+    expect(text).toContain("The density bonus, against what it costs");
+    expect(text).toContain("168 units");
+    expect(text).toContain("Break-even bonus");
+    expect(text).toContain("6.4%");
+    expect((html.match(/data-bar="setaside"/g) ?? []).length).toBe(2);
+  });
 });
 
 // ── today's rates, across the top of /tools ────────────────────────────────
