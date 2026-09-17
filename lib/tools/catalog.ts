@@ -28,13 +28,25 @@
  * reader should scroll past" the index's own comment was written for.
  * Six named clusters of three to six scan; twenty-six in a row do not,
  * and the problem gets worse with every card rather than better.
+ *
+ * SPLIT AGAIN at forty cards (349KB, 7,521 words, 331 input fields —
+ * nearly double the measurement that prompted the first clustering). Two
+ * of the six clusters had reached the eight-card ceiling the test below
+ * enforces, which meant the next lease card and the next land card could
+ * not be filed at all. The guard refusing them IS the signal that the
+ * shape has run out; widening the ceiling would have answered the guard
+ * instead of the reader. "Leases" split from its recoveries, and
+ * "Value & land" split into what a standing building is worth and what a
+ * site could become — eight clusters of four to seven, headroom in each.
  */
 export type ToolGroup =
   | "Debt"
   | "Equity & returns"
   | "Leases"
+  | "Rent & recoveries"
   | "The property"
-  | "Value & land"
+  | "Value"
+  | "Development"
   | "Tax & closing";
 
 /** The clusters, in the order the index shows them. */
@@ -42,8 +54,10 @@ export const TOOL_GROUPS: readonly ToolGroup[] = [
   "Debt",
   "Equity & returns",
   "Leases",
+  "Rent & recoveries",
   "The property",
-  "Value & land",
+  "Value",
+  "Development",
   "Tax & closing",
 ] as const;
 
@@ -74,12 +88,12 @@ export const TOOL_INDEX: readonly ToolEntry[] = [
   { id: "below-the-line", label: "Below the line", group: "The property" },
   { id: "insurance", label: "Insurance", group: "The property" },
   { id: "unit-mix", label: "Unit mix", group: "The property" },
-  { id: "rollover", label: "When it rolls", group: "Leases" },
-  { id: "lease-up", label: "Lease-up", group: "Value & land" },
+  { id: "rollover", label: "When it rolls", group: "Rent & recoveries" },
+  { id: "lease-up", label: "Lease-up", group: "Development" },
   { id: "the-site", label: "The site", group: "The property" },
-  { id: "zoning-envelope", label: "What fits", group: "Value & land" },
-  { id: "feasibility-rent", label: "Feasibility rent", group: "Value & land" },
-  { id: "residual-land", label: "Land residual", group: "Value & land" },
+  { id: "zoning-envelope", label: "What fits", group: "Development" },
+  { id: "feasibility-rent", label: "Feasibility rent", group: "Development" },
+  { id: "residual-land", label: "Land residual", group: "Value" },
   { id: "the-waterfall", label: "LP / GP split", group: "Equity & returns" },
   { id: "fee-drag", label: "Sponsor fees", group: "Equity & returns" },
   { id: "straight-line-rent", label: "Statement vs cash", group: "Leases" },
@@ -87,16 +101,16 @@ export const TOOL_INDEX: readonly ToolEntry[] = [
   { id: "rentable-vs-usable", label: "Rentable vs usable", group: "Leases" },
   { id: "after-tax", label: "After tax", group: "Tax & closing" },
   { id: "exchange-1031", label: "1031 exchange", group: "Tax & closing" },
-  { id: "expense-recovery", label: "Expense recovery", group: "Leases" },
-  { id: "percentage-rent", label: "Percentage rent", group: "Leases" },
+  { id: "expense-recovery", label: "Expense recovery", group: "Rent & recoveries" },
+  { id: "percentage-rent", label: "Percentage rent", group: "Rent & recoveries" },
   { id: "tax-reassessment", label: "Tax reassessment", group: "Tax & closing" },
-  { id: "ground-lease", label: "Ground lease", group: "Value & land" },
-  { id: "sale-leaseback", label: "Sale-leaseback", group: "Value & land" },
+  { id: "ground-lease", label: "Ground lease", group: "Value" },
+  { id: "sale-leaseback", label: "Sale-leaseback", group: "Value" },
   { id: "closing-proration", label: "Closing", group: "Tax & closing" },
-  { id: "cap-rate-triangle", label: "Cap rate", group: "Value & land" },
+  { id: "cap-rate-triangle", label: "Cap rate", group: "Value" },
   { id: "rent-converter", label: "Rent, four ways", group: "The property" },
-  { id: "operating-expense", label: "One expense", group: "Leases" },
-  { id: "build-or-buy", label: "Build or buy", group: "Value & land" },
+  { id: "operating-expense", label: "One expense", group: "Rent & recoveries" },
+  { id: "build-or-buy", label: "Build or buy", group: "Development" },
 ] as const;
 
 /**
