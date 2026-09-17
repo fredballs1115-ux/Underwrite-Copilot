@@ -20,6 +20,7 @@ import { readLand, readSpace } from "@/lib/tools/measure-math";
 import { readStack } from "@/lib/tools/capital-stack";
 import { readTrailing } from "@/lib/tools/trailing-window";
 import { readEgi } from "@/lib/tools/economic-occupancy";
+import { readHold } from "@/lib/tools/hold-or-sell";
 import { readBuyout } from "@/lib/tools/lease-buyout";
 import { readDraw } from "@/lib/tools/construction-draw";
 import { readFloating } from "@/lib/tools/floating-rate";
@@ -4303,6 +4304,159 @@ const TRAILING_SEED = [
 
 // ── the doors against the dollars ──────────────────────────────────────────
 
+// ── when to sell ───────────────────────────────────────────────────────────
+
+function HoldOrSell() {
+  const [value, setValue] = useShared("hsV", "34M");
+  const [noi, setNoi] = useShared("hsN", "1,870,000");
+  const [growth, setGrowth] = useShared("hsG", "3");
+  const [cap, setCap] = useShared("hsC", "5.5");
+  const [cost, setCost] = useShared("hsS", "2");
+  const [hurdle, setHurdle] = useShared("hsR", "12.5");
+  const [loan, setLoan] = useShared("hsL", "18.5M");
+  const [rate, setRate] = useShared("hsI", "4.25");
+  const [amort, setAmort] = useShared("hsA", "30");
+  const [tax, setTax] = useShared("hsT", "");
+
+  const r = useMemo(
+    () =>
+      readHold({
+        currentValue: num(value) ?? 0,
+        nextYearNoi: num(noi) ?? 0,
+        noiGrowthPct: num(growth) ?? 0,
+        exitCapPct: num(cap) ?? 0,
+        sellingCostPct: num(cost) ?? 0,
+        reinvestmentRatePct: num(hurdle) ?? 0,
+        loanBalance: num(loan) ?? 0,
+        ratePct: num(rate) ?? 0,
+        amortYears: num(amort) ?? 0,
+        taxOnSaleNow: num(tax),
+        horizonYears: 10,
+      }),
+    [value, noi, growth, cap, cost, hurdle, loan, rate, amort, tax],
+  );
+
+  // Every year drawn against the first year's return, so the DECAY is the
+  // shape of the picture — the thing a lifetime IRR can never show. The
+  // hurdle is a line across all of them, and the bars past it are muted.
+  const top = Math.max(1, ...r.years.map((y) => y.marginalReturnPct ?? 0));
+  const hurdlePct = num(hurdle);
+  const hurdleAt = hurdlePct !== null && top > 0 ? (hurdlePct / top) * 100 : null;
+
+  return (
+    <Card id="hold-or-sell" eyebrow="Returns" title="Hold it or sell it">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Worth today" value={value} onChange={setValue} placeholder="34M" />
+          <Field label="Next year's NOI" value={noi} onChange={setNoi} placeholder="1,870,000" />
+          <Field label="NOI growth" suffix="%" value={growth} onChange={setGrowth} placeholder="3" />
+          <Field label="Exit cap" suffix="%" value={cap} onChange={setCap} placeholder="5.5" />
+          <Field label="Cost to sell" suffix="%" value={cost} onChange={setCost} placeholder="2" />
+          <Field
+            label="Next deal earns"
+            suffix="%"
+            value={hurdle}
+            onChange={setHurdle}
+            placeholder="12.5"
+          />
+          <Field label="Loan balance" value={loan} onChange={setLoan} placeholder="18.5M" />
+          <Field label="Loan rate" suffix="%" value={rate} onChange={setRate} placeholder="4.25" />
+          <Field label="Amortisation" suffix="yr" value={amort} onChange={setAmort} placeholder="30" />
+          <Field label="Tax on a sale now" value={tax} onChange={setTax} placeholder="optional" />
+        </div>
+
+        <div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Stat label="Cheque if you sell today" value={usd(r.netProceedsNow)} />
+            <Stat label="Holding one more year" value={pct(r.nextYearReturnPct, 1)} tone="brand" />
+            <Stat
+              label="The year to sell"
+              value={r.sellYear === null ? "not yet" : `Year ${r.sellYear}`}
+              tone={r.sellYear === null ? "muted" : undefined}
+            />
+            <Stat
+              label="Cap the price implies"
+              value={pct(r.impliedCapNowPct, 2)}
+              tone="muted"
+            />
+          </div>
+
+          {r.years.length > 0 && (
+            <div className="mt-5 border-t border-line pt-4">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                The return on holding, year by year
+              </p>
+              <div className="mt-2 space-y-1.5">
+                {r.years.map((y) => (
+                  <div key={y.year} className="flex items-center gap-3 text-xs">
+                    <span className="w-12 shrink-0 text-muted">Yr {y.year}</span>
+                    <span className="relative h-2.5 flex-1 rounded-full bg-faint">
+                      <span
+                        data-bar="hold"
+                        className={`absolute inset-y-0 left-0 rounded-full ${
+                          y.clears === false ? "bg-kill/60" : "bg-brand"
+                        }`}
+                        style={{
+                          width: `${Math.max(0, Math.min(100, ((y.marginalReturnPct ?? 0) / top) * 100))}%`,
+                        }}
+                      />
+                      {hurdleAt !== null && (
+                        <span
+                          className="absolute inset-y-0 w-px bg-ink/50"
+                          style={{ left: `${Math.max(0, Math.min(100, hurdleAt))}%` }}
+                        />
+                      )}
+                    </span>
+                    <span
+                      className={`w-14 shrink-0 text-right font-semibold tabular-nums ${
+                        y.clears === false ? "text-kill" : ""
+                      }`}
+                    >
+                      {pct(y.marginalReturnPct, 1)}
+                    </span>
+                    <span className="hidden w-24 shrink-0 text-right tabular-nums text-muted sm:inline">
+                      {usd(y.netProceeds)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {r.note && <p className="mt-3 text-sm text-caution">{r.note}</p>}
+
+          {r.naiveNextYearReturnPct !== null && r.nextYearReturnPct !== null && (
+            <p className="mt-2 text-sm">
+              <span className="text-muted">
+                Charge the whole cost of selling against the hold year, as though holding
+                avoided it, and the same year reads{" "}
+              </span>
+              <span className="font-semibold tabular-nums text-kill">
+                {pct(r.naiveNextYearReturnPct, 1)}
+              </span>
+              <span className="text-muted">
+                {" "}
+                instead. You pay that cost whenever you sell, so it belongs on both sides.
+              </span>
+            </p>
+          )}
+
+          <p className="mt-4 border-t border-line pt-3 text-[11px] leading-relaxed text-muted">
+            A lifetime IRR is an average over the whole hold and is dominated
+            by what already happened, so it cannot tell you about next year.
+            The capital at stake is the cheque you could take out today, not
+            the building&apos;s value and not what you put in. And the return
+            decays on its own: the cash flow grows with rents, but the equity
+            underneath it grows faster, because the loan amortises and the
+            value rises on top. A good deal becomes a mediocre hold with
+            nothing going wrong.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function EconomicOccupancy() {
   const [units, setUnits] = useShared("eoU", "200");
   const [market, setMarket] = useShared("eoM", "1,850");
@@ -5244,6 +5398,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <DebtSizer />
       <LoanOverTime />
       <CashFlowStrip />
+      <HoldOrSell />
       <WhatYouBelieve />
       <SourcesUses />
       <CapitalStack />

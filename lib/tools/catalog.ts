@@ -60,6 +60,7 @@ export const TOOL_INDEX: readonly ToolEntry[] = [
   { id: "size-the-loan", label: "Size the loan", group: "Debt" },
   { id: "the-loan-over-the-hold", label: "Over the hold", group: "Debt" },
   { id: "cash-flow-strip", label: "Cash flow", group: "Equity & returns" },
+  { id: "hold-or-sell", label: "Hold or sell", group: "Equity & returns" },
   { id: "what-you-believe", label: "What you believe", group: "Equity & returns" },
   { id: "sources-and-uses", label: "Sources & uses", group: "Equity & returns" },
   { id: "capital-stack", label: "Capital stack", group: "Debt" },

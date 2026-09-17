@@ -475,6 +475,27 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   against the same quarter a year earlier — five of those nine points are
   the season. The column reads through `readStrip` (the cash-flow card's
   reader), so the comma-as-thousands-mark trap stays solved in one place.
+- Whether to hold it another year: `lib/tools/hold-or-sell.ts` (pure). The
+  one question on `/tools` a **lifetime IRR cannot answer** — it is an
+  average over the whole hold, dominated by what already happened, so a
+  building can sit at a 17% lifetime IRR while the next twelve months earn
+  six. Five rules. **The decision is marginal, never average**: the return
+  on holding for ONE more year, which is the cash plus the change in the
+  cheque, over the cheque. **The capital at stake is the net sale
+  proceeds** — not the building's value (that ignores the debt) and not
+  the original equity (that ignores that the market moved). **Selling
+  costs are paid whenever you sell**, so they are on both sides and mostly
+  cancel; `naiveNextYearReturnPct` prices the error of charging the hold
+  year's own selling cost, which on the seed turns 14.1% into 18.8% and
+  reverses the answer. **The marginal return DECAYS on its own** (14.1% →
+  11.0% over ten years on the seed) because the equity in the denominator
+  grows faster than the cash flow does — the loan amortises and the value
+  rises on top — which is why the answer is a YEAR and the module runs a
+  schedule. And **the hurdle is an input**: what else the money would do.
+  The exit capitalises the forward NOI (`what-you-believe`'s rule) and the
+  loan balance comes from `readDebt`, run to the HORIZON rather than to
+  the balloon — holding past a balloon is a refinance, which is
+  `testRefi`'s question and not this one.
 - What the building actually collects: `lib/tools/economic-occupancy.ts`
   (pure — the bridge from gross potential rent to EGI). **Physical
   occupancy counts DOORS, economic occupancy counts DOLLARS**, and "95%
