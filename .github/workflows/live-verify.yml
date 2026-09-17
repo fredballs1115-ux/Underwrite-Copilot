@@ -522,3 +522,9 @@ jobs:
           # The claim the module exists to make, and the one an intuition
           # that starts from the spread always gets wrong.
           mark "#329 a lease with no term left is worth nothing to end" grep -q "A lease with nothing left to run is worth nothing to end" p_tools2.html
+          # /whats-new is where the changelog is SEEN, and it had quietly
+          # stopped two rounds short of the page it describes. These two
+          # grep the titles, which `{e.title}` renders whole (the blurb is
+          # excerpted above LONG_NOTE, so never grep that).
+          mark "#330 the changelog reaches the newest card" grep -q "A below-market lease, and what it is worth to end" p_whats-new.html
+          mark "#330 and the one before it" grep -q "The blend is hiding it" p_whats-new.html
