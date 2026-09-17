@@ -475,6 +475,27 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   against the same quarter a year earlier — five of those nine points are
   the season. The column reads through `readStrip` (the cash-flow card's
   reader), so the comma-as-thousands-mark trap stays solved in one place.
+- What the building actually collects: `lib/tools/economic-occupancy.ts`
+  (pure — the bridge from gross potential rent to EGI). **Physical
+  occupancy counts DOORS, economic occupancy counts DOLLARS**, and "95%
+  occupied" is on the cover because it is the higher of the two. Four more
+  rules. **The denominator is market rent, never the in-place rent roll** —
+  divide collections by the rents currently CHARGED and loss to lease
+  vanishes, because it is sitting in the denominator (the seeded building
+  reads 90.5% that way against an honest 87.3%). **Loss to lease is not a
+  collections problem**: it closes as leases roll rather than by managing
+  anything, which is why every line carries a `kind` and the note names
+  which bucket the largest part of the gap is in — the buckets carry
+  opposite instructions. **A concession is rent you agreed not to collect;
+  bad debt is rent you failed to** — both reduce EGI, only one is a
+  decision. And **other income stays out of the ratio** (rule 5): parking,
+  RUBS and fees belong in EGI and not in the numerator, or a full building
+  prints above 100%. Non-revenue units get their own line because the
+  cover's occupancy counts them as full — a model unit IS physically
+  occupied and pays nothing. `capIfVacancyOnlyPct` prices the naive
+  underwrite (4.96% against 4.30% on the seed, 66bp) and `valueOfGap`
+  capitalises the difference at the HONEST cap, since that is the rate this
+  NOI supports.
 - An OM's unit mix table: `lib/tools/unit-mix.ts` (pure). Two rules.
   **Weight by unit count, never by row** — 200 studios at $1,200 beside 4
   penthouses at $6,000 do not average $3,600, and averaging the rows is the

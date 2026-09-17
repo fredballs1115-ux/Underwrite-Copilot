@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-17",
+      "title": "The doors against the dollars",
+      "blurb": "\"95% occupied\" is a count of doors. It is on the front of almost every multifamily memorandum, and it is the higher of the two numbers that could go there. The other one — what share of market rent the building actually banks — is routinely six or eight points lower, and every figure downstream of the NOI moves with it. This card walks the bridge a rent roll has to cross to become an operating statement. The seeded 200-unit building at $1,850 is 95% leased and collects 87.3% of market: three model units that are physically full and pay nothing, sitting tenants under market, concessions, and bad debt. Underwrite the cover page — vacancy off the top and nothing else — and the going-in cap reads 4.96% against an honest 4.30%, which at the cap this NOI really supports is $7,950,698 of price. Four rules make it honest. The denominator is market rent, never the in-place rent roll: divide by the rents currently charged and loss to lease vanishes into the denominator, and the same building reads 90.5%. Loss to lease is not a collections problem — it closes as leases roll rather than by managing anything — so the card says which bucket the largest part of the gap is in, because the buckets carry opposite instructions. A concession is rent you agreed not to collect and bad debt is rent you failed to. And other income stays out of the ratio: put the parking and the fees in the numerator and a full building prints above 100%.",
+      "href": "/tools#economic-occupancy"
+    },
+    {
+      "date": "2026-09-17",
       "title": "Which trailing window the memorandum chose",
       "blurb": "Every offering memorandum quotes a trailing figure, and every one of them picks which trailing figure. \"T-3 annualized\" and \"T-12\" are both true statements about the same building; they are different numbers, and the seller quotes whichever is larger. Nothing on the cover page says a choice was made, which is what makes this the hardest trap on a summary page to see — there is no error to catch, only a selection. Paste the monthly column and this card runs all four windows at once and prices the choice: on the seeded building T-3 annualized reads $1,720,000 against a T-12 of $1,582,000, and that $138,000 at the stated 5.5% cap is $2,509,091 of value riding on which window the cover quoted. Then it does the thing a memorandum quoting T-3 almost never does — checks the last three months against the same three months a year earlier, where the season sits on both sides and cancels. The building really is growing, by 3.6%. The other five points were the summer. On an expense column the whole thing runs backwards, because there the seller wants the smallest figure and gets it by choosing a quarter that missed the tax bill: the card finds the lump, says which month it is, and names the windows that step over it.",
       "href": "/tools#trailing-window"
@@ -149,12 +155,6 @@
       "date": "2026-09-16",
       "title": "Sources and uses, with the equity as the plug",
       "blurb": "The figure everyone carries is price less loan. On the seeded deal that is $20M − $13M = $7M; the actual cheque is $11.03M, because a $3M capital budget, 2% of closing, a 1% loan fee and a $500k reserve are all equity too. /tools draws both sides as bars of the SAME LENGTH — which is what \"the sides balance\" looks like — and names the leverage twice, because 65% of the price is only 54.1% of what the deal actually costs. The equity is derived, never typed: type both a debt and an equity figure and you have stated a capital structure rather than derived one. A loan bigger than the deal's uses shows a negative equity line rather than clamping to zero, because that means the loan is oversized for the basis and hiding it is the one thing this must not do.",
-      "href": "/tools"
-    },
-    {
-      "date": "2026-09-16",
-      "title": "Read the unit mix straight off the memorandum",
-      "blurb": "Every multifamily OM prints the same table — type, units, SF, in-place rent, market rent — and every analyst retypes it into Excel for four figures. Paste it into /tools instead. It weights by UNIT COUNT rather than by row, which matters more than it sounds: the seeded 144-unit mix averages $1,858, while averaging the four row rents gives $1,961 — the number you get from what you can see. Under the totals, each unit type draws as a row as wide as its share of the building, so a mix that is two-thirds one-bedrooms looks like it. Loss to lease is summed only over the rows that state both rents, and the card says how many units that covers — an OM that quotes market rents for the renovated types only must never produce a loss-to-lease figure for 60 units that reads as the building's.",
       "href": "/tools"
     }
   ]

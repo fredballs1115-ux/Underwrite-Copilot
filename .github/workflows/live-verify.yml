@@ -584,3 +584,11 @@ jobs:
           mark "#337 the window choice is priced as value, not just a spread" grep -q "2,509,091" p_tools2.html
           mark "#337 and the season is separated from the growth" grep -q "The rest is the season, not the trend" p_tools2.html
           mark "#337 the expense side's rule is stated on the card" grep -q "annualizes a year that never pays the tax bill" p_tools2.html
+          # #338 — the doors against the dollars. The middle two are the
+          # computed ones: "7.7 pts" is the gap between physical and
+          # economic occupancy and "$7,950,698" is that gap capitalised, so
+          # a `present` on either proves the bridge ran on the server.
+          mark "#338 the occupancy bridge is on /tools" grep -q "The doors against the dollars" p_tools2.html
+          mark "#338 the cover page's 95% is 87.3% of the dollars" grep -q "7.7 pts" p_tools2.html
+          mark "#338 and the gap is priced against the honest cap" grep -q "7,950,698" p_tools2.html
+          mark "#338 the denominator rule is stated on the card" grep -q "loss to lease disappears into the denominator" p_tools2.html

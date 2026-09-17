@@ -1734,6 +1734,39 @@ describe("the deal math tools", () => {
     // standing clear of the full year is visible before a figure is read.
     expect((html.match(/data-bar="window"/g) ?? []).length).toBe(4);
   });
+
+  it("sets the cover page's occupancy against what the building banks", () => {
+    // #338. 200 units at $1,850, 95% leased — and 87.3% of market rent
+    // actually reaching the bank once loss to lease, concessions, three
+    // non-revenue units and bad debt are off. Both figures are true; only
+    // one is ever printed.
+    expect(text).toContain("The doors against the dollars");
+    expect(text).toContain("95.0%");
+    expect(text).toContain("87.3%");
+    expect(text).toContain("7.7 pts");
+  });
+
+  it("prices the naive underwrite — vacancy off the top and nothing else", () => {
+    // 4.96% against an honest 4.30%: 66bp of cap, which at the cap this
+    // NOI really supports is $7,950,698 of price.
+    expect(text).toContain("4.96%");
+    expect(text).toContain("4.30%");
+    expect(text).toContain("$7,950,698");
+    expect(text).toContain("Cap on doors alone");
+  });
+
+  it("draws the two occupancies and every line of the bridge", () => {
+    // Two bars on one track for the pair, five deductions below it.
+    expect((html.match(/data-bar="occ"/g) ?? []).length).toBe(2);
+    expect((html.match(/data-bar="egi"/g) ?? []).length).toBe(5);
+    expect(text).toContain("$4,440,000");
+  });
+
+  it("says which bucket the largest part of the gap is in", () => {
+    // Rule 3, and the two buckets carry opposite instructions.
+    expect(text).toContain("Loss to lease is the largest part");
+    expect(text).toContain("closes as leases roll");
+  });
 });
 
 // ── today's rates, across the top of /tools ────────────────────────────────
