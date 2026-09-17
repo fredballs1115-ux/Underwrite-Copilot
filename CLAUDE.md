@@ -317,6 +317,57 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   and an oversized stack reports negative common equity rather than zero.
   The card's marker on the bars is `data-bar="layer"` — `data-bar="stack"`
   belongs to sources-and-uses, and its own count test caught the collision.
+- Today's rates, and which may become a number in a box: `lib/live-rates.ts`
+  (pure — the four FRED series the weekday cron writes, each figure's age,
+  its move since the observation before, and the two rules) with
+  `lib/live-rates-read.ts` (the `server-only` read) and
+  `app/tools/rates-strip.tsx` (the pure strip across the top of `/tools`).
+  **A benchmark is not a quote.** Only a rate a loan document NAMES may
+  pre-fill a field — the Treasury and SOFR (`contractRate`). The 30-year
+  mortgage survey looks seedable and is not: it is an owner-occupier
+  RESIDENTIAL rate, which is why `lib/leverage.ts` already treats it as a
+  one-sided floor rather than a price, so it is shown and never seeded. And
+  **stale is per series, because the cadence is**: a quarterly observation
+  is dated the quarter's FIRST day and published about two months after
+  that quarter ENDS, so the April figure is the newest one available until
+  late November and is eight months old while current — a one-quarter
+  threshold (the obvious number, and the one written here first) reports a
+  working feed as broken, while a five-day one marks three of the four
+  permanently dead. Two more traps, both paid for: migration 0023 grants
+  `select` on `rates` `to authenticated`, so a PUBLIC page reads it with
+  the service role (a migration would be inert until the operator ran it,
+  and FRED data is public anyway); and the read is ONE QUERY PER SERIES,
+  because a single `order by obs_date desc limit N` silently drops the
+  quarterly series once the daily ones have filed a few months of rows.
+  A stale figure still SHOWS with its date — a dead feed is worth seeing —
+  it just stops seeding, because a date beside a figure is read and a
+  figure inside a form field is not.
+- The floating-rate loan and its cap: `lib/tools/floating-rate.ts` (pure —
+  the bridge debt every other card on `/tools` pretends is fixed, and the
+  one card whose main input the site already knows, since a note
+  references SOFR BY NAME with no term to match). **A cap struck above the
+  breach point protects nothing you care about**: the lender requires a
+  cap, the borrower buys the cheapest strike that satisfies it, and nobody
+  checks that strike against the index at which the loan breaks its OWN
+  covenant — the seeded $20M is struck at 4.00% against a breach at 3.92%,
+  so rates rise, the loan fails, the lender takes the building, and the
+  cap starts paying afterwards. It was covering the lender's loss severity
+  the whole time. **A cap and a floor are not a collar and do not act on
+  the same thing**: a floor is a term of the NOTE and lifts what is owed, a
+  cap is a separate instrument on the INDEX and reimburses the excess, so
+  the rate is `max(index, floor) + spread − max(0, index − strike)` and
+  the shorthand `min(max(index, floor), strike) + spread` agrees only
+  while the floor is under the strike — above it, the shorthand hands the
+  borrower a cap payment nothing triggered. **The premium is a rate**
+  ($300,000 on $20M over two years is 75 bps a year, the only unit in
+  which it sets against a fixed quote) and **a USE funded at closing**
+  (`sources-uses`' rule), never netted out of proceeds. It is an INPUT:
+  pricing a cap needs a vol surface, so it is a broker quote and the card
+  says so. The extension's required strike is the same solve on the
+  extension's NOI. `breachIndexPct` is solved through the loan constant
+  (`rateForConstant`, a bisection since the constant is monotone in the
+  rate), and a test rebuilds the loan at the solved index and asserts the
+  DSCR comes back exactly the covenant. Bars: `data-bar="float"`.
 - What it costs to get out of the loan early: `lib/tools/prepayment.ts`
   (pure — the calculation that decides whether a deal can be sold, and
   the one whose answer reverses on a fact about the MARKET rather than

@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PlaceBackdrop } from "@/app/place-band";
+import { rateSeeds } from "@/lib/live-rates";
+import { liveRates } from "@/lib/live-rates-read";
 import { DealMathTools } from "./deal-math-tools";
+import { RatesStrip } from "./rates-strip";
 
 export const metadata: Metadata = {
   title: "Deal math — Underwrite Copilot",
   description:
-    "Twenty-six calculators for a commercial deal: size a loan and see which test binds, run the loan over the hold and test the refinance, what yield maintenance or defeasance costs to get out early, sources and uses, the capital stack with the cost of every layer against what the building earns, what a below-market lease is worth to end, what the land can be worth, the LP/GP waterfall, a pasted cash flow, the growth rate a price is quietly assuming, an OM's unit mix, the site's density and floor area ratio, net effective rent, rentable against usable feet, depreciation and what recapture takes back, what a 1031 exchange actually defers, the operating-expense reconciliation with its gross-up, percentage rent and the natural breakpoint, what the property taxes become once the sale resets the assessment, what a leasehold is really worth when the ground lease ends, the settlement statement at closing, and the quick conversions. Runs in your browser; nothing is sent anywhere.",
+    "Twenty-seven calculators for a commercial deal: size a loan and see which test binds, run the loan over the hold and test the refinance, whether a bridge loan's rate cap reaches its own covenant, what yield maintenance or defeasance costs to get out early, sources and uses, the capital stack with the cost of every layer against what the building earns, what a below-market lease is worth to end, what the land can be worth, the LP/GP waterfall, a pasted cash flow, the growth rate a price is quietly assuming, an OM's unit mix, the site's density and floor area ratio, net effective rent, rentable against usable feet, depreciation and what recapture takes back, what a 1031 exchange actually defers, the operating-expense reconciliation with its gross-up, percentage rent and the natural breakpoint, what the property taxes become once the sale resets the assessment, what a leasehold is really worth when the ground lease ends, the settlement statement at closing, and the quick conversions. Runs in your browser; nothing is sent anywhere.",
 };
 
 /**
@@ -22,7 +25,15 @@ export const metadata: Metadata = {
  * reaches for, and it is the honest version of a demo: the same math the
  * screening engine runs, with nothing withheld.
  */
-export default function ToolsPage() {
+export default async function ToolsPage() {
+  const rates = await liveRates();
+  const seeds = rateSeeds(rates);
+  // Only the series that actually pre-fill a field are marked in the strip.
+  // Today that is SOFR alone: the floating-rate card references it by name.
+  // The 10-year is shown and not seeded — the prepayment card wants the
+  // Treasury matched to the remaining term, and the 10-year would flatter it.
+  const seeded = seeds.sofrPct !== null ? ["SOFR"] : [];
+
   return (
     <div className="space-y-8">
       <section className="relative flex min-h-[15rem] items-end overflow-hidden rounded-2xl text-white sm:min-h-[18rem]">
@@ -40,7 +51,9 @@ export default function ToolsPage() {
         </div>
       </section>
 
-      <DealMathTools />
+      <RatesStrip rates={rates} seeds={seeded} />
+
+      <DealMathTools seeds={seeds} />
 
       <section className="rounded-2xl border border-line bg-white p-6">
         <h2 className="text-lg font-semibold tracking-tight">

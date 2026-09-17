@@ -13,11 +13,13 @@ import { readProration } from "@/lib/tools/proration";
 import { readGroundLease } from "@/lib/tools/ground-lease";
 import { readBelief } from "@/lib/tools/what-you-believe";
 import { readReassessment } from "@/lib/tools/tax-reassessment";
+import { NO_SEEDS, type RateSeeds } from "@/lib/live-rates";
 import { groupedTools } from "@/lib/tools/catalog";
 import { readResidual } from "@/lib/tools/land-residual";
 import { readLand, readSpace } from "@/lib/tools/measure-math";
 import { readStack } from "@/lib/tools/capital-stack";
 import { readBuyout } from "@/lib/tools/lease-buyout";
+import { readFloating } from "@/lib/tools/floating-rate";
 import { readPrepayment } from "@/lib/tools/prepayment";
 import { buildStack } from "@/lib/tools/sources-uses";
 import { readMix, totalMix } from "@/lib/tools/unit-mix";
@@ -2867,11 +2869,195 @@ function GroundLease() {
  * them the OPPOSITE way. Those two numbers belong on one picture and
  * almost never appear on one page.
  */
+// ── the floating-rate loan, and the cap ────────────────────────────────────
+
+function FloatingRate({
+  sofrPct,
+  sofrAsOf,
+}: {
+  sofrPct: number | null;
+  sofrAsOf: string | null;
+}) {
+  const [loan, setLoan] = useShared("fra", "20,000,000");
+  // The only field on this page a live figure fills exactly. A floating note
+  // references SOFR by name — no spread to add, no term to match — so
+  // today's is the index, full stop. Where the table is unreachable or the
+  // series has stopped, the worked example stands.
+  const [idx, setIdx] = useShared("fri", sofrPct !== null ? String(sofrPct) : "3.64");
+  const [spread, setSpread] = useShared("frs", "300");
+  const [floorPct, setFloorPct] = useShared("frf", "3.00");
+  const [strike, setStrike] = useShared("frk", "4.00");
+  const [premium, setPremium] = useShared("frp", "300,000");
+  const [capTerm, setCapTerm] = useShared("frt", "24");
+  const [amort, setAmort] = useShared("frm", "");
+  const [noi, setNoi] = useShared("frn", "1,660,000");
+  const [cov, setCov] = useShared("frc", "1.20");
+  const [extNoi, setExtNoi] = useShared("fre", "1,750,000");
+
+  const r = useMemo(
+    () =>
+      readFloating({
+        loanAmount: num(loan),
+        indexPct: num(idx),
+        spreadBps: num(spread),
+        indexFloorPct: num(floorPct),
+        capStrikePct: num(strike),
+        capPremium: num(premium),
+        capTermMonths: num(capTerm),
+        amortYears: num(amort),
+        noi: num(noi),
+        covenantDscr: num(cov),
+        extensionNoi: num(extNoi),
+      }),
+    [loan, idx, spread, floorPct, strike, premium, capTerm, amort, noi, cov, extNoi],
+  );
+
+  // One track for the index, from the floor to a little past the worse of
+  // the strike and the breach, so the three marks sit on one scale and
+  // which comes first is visible before it is read.
+  const lo = r.rateBandLowPct !== null && r.allInRatePct !== null
+    ? Math.min(num(floorPct) ?? 0, num(idx) ?? 0)
+    : 0;
+  const hi = Math.max(
+    num(strike) ?? 0,
+    r.breachIndexPct ?? 0,
+    (num(idx) ?? 0) + 1,
+    lo + 1,
+  );
+  const at = (v: number | null) =>
+    v === null ? null : Math.max(0, Math.min(100, ((v - lo) / (hi - lo)) * 100));
+
+  return (
+    <Card
+      id="floating-rate"
+      eyebrow="Floating rate"
+      title="The bridge loan, and whether its cap protects anything"
+    >
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <Field label="Loan" value={loan} onChange={setLoan} placeholder="20,000,000" />
+        <Field
+          label={sofrAsOf ? "SOFR — live" : "Index (SOFR)"}
+          suffix="%"
+          value={idx}
+          onChange={setIdx}
+          placeholder="3.64"
+        />
+        <Field label="Spread" suffix="bps" value={spread} onChange={setSpread} placeholder="300" />
+        <Field label="Index floor" suffix="%" value={floorPct} onChange={setFloorPct} placeholder="3.00" />
+        <Field label="Cap strike" suffix="%" value={strike} onChange={setStrike} placeholder="4.00" />
+        <Field label="Cap premium" value={premium} onChange={setPremium} placeholder="300,000" />
+        <Field label="Cap term" suffix="mo" value={capTerm} onChange={setCapTerm} placeholder="24" />
+        <Field label="Amortisation" suffix="yr" value={amort} onChange={setAmort} placeholder="IO" />
+        <Field label="NOI" value={noi} onChange={setNoi} placeholder="1,660,000" />
+        <Field label="DSCR covenant" suffix="x" value={cov} onChange={setCov} placeholder="1.20" />
+        <Field label="NOI at extension" value={extNoi} onChange={setExtNoi} placeholder="1,750,000" />
+      </div>
+
+      {r.allInRatePct !== null && (
+        <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
+          <Stat label="Rate today" value={`${r.allInRatePct.toFixed(2)}%`} />
+          <Stat label="DSCR" value={r.dscr !== null ? `${r.dscr.toFixed(2)}x` : "—"} />
+          <Stat label="Debt service" value={usd(r.debtServiceAnnual)} tone="muted" />
+          <Stat
+            label="With the cap's cost"
+            value={r.allInWithCapPct !== null ? `${r.allInWithCapPct.toFixed(2)}%` : "—"}
+            tone="muted"
+          />
+        </div>
+      )}
+
+      {r.breachIndexPct !== null && (
+        <div className="mt-6 rounded-xl bg-faint p-4">
+          <p className="text-sm font-semibold">
+            {r.capProtects === false
+              ? "The cap is on the wrong side of the covenant."
+              : "The cap engages before the covenant does."}
+          </p>
+          <div className="relative mt-4 h-2 w-full rounded-full bg-white">
+            <div
+              data-bar="float"
+              className="absolute inset-y-0 left-0 rounded-l-full bg-brand/30"
+              style={{ width: `${at(r.breachIndexPct) ?? 0}%` }}
+            />
+            {[
+              { key: "index", label: "Today", v: num(idx), colour: "bg-ink" },
+              { key: "breach", label: "Breach", v: r.breachIndexPct, colour: "bg-kill" },
+              { key: "strike", label: "Strike", v: num(strike), colour: "bg-brand" },
+            ].map((m) =>
+              at(m.v) === null ? null : (
+                <div
+                  key={m.key}
+                  data-bar="float"
+                  className={`absolute top-1/2 h-4 w-1 -translate-y-1/2 rounded-full ${m.colour}`}
+                  style={{ left: `${at(m.v)}%` }}
+                  title={`${m.label} ${m.v!.toFixed(2)}%`}
+                />
+              ),
+            )}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-muted">
+            <span>
+              <span className="mr-1 inline-block h-2 w-2 rounded-full bg-ink align-middle" />
+              Today {(num(idx) ?? 0).toFixed(2)}%
+            </span>
+            <span>
+              <span className="mr-1 inline-block h-2 w-2 rounded-full bg-kill align-middle" />
+              Covenant breaks {r.breachIndexPct.toFixed(2)}%
+            </span>
+            {num(strike) !== null && (
+              <span>
+                <span className="mr-1 inline-block h-2 w-2 rounded-full bg-brand align-middle" />
+                Cap strike {num(strike)!.toFixed(2)}%
+              </span>
+            )}
+          </div>
+          {r.note && <p className="mt-3 text-xs text-muted">{r.note}</p>}
+        </div>
+      )}
+
+      {r.capCostBps !== null && (
+        <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
+          <Stat label="Cap costs, a year" value={`${r.capCostBps} bps`} />
+          <Stat
+            label="Headroom to breach"
+            value={r.breachHeadroomBps !== null ? `${r.breachHeadroomBps} bps` : "—"}
+            tone={r.breachHeadroomBps !== null && r.breachHeadroomBps < 0 ? "brand" : "muted"}
+          />
+          <Stat
+            label="DSCR at the strike"
+            value={r.worstCaseDscr !== null ? `${r.worstCaseDscr.toFixed(2)}x` : "—"}
+            tone="muted"
+          />
+          <Stat
+            label="Strike the extension allows"
+            value={r.extensionStrikePct !== null ? `${r.extensionStrikePct.toFixed(2)}%` : "—"}
+            tone="muted"
+          />
+        </div>
+      )}
+
+      <p className="mt-5 text-xs text-muted">
+        The premium is what a broker quoted you, never a number this works out:
+        pricing a cap needs a volatility surface, which is not screening
+        arithmetic. It is a use funded at closing, not a haircut on the loan.
+        {sofrAsOf ? ` SOFR is today's, as of ${sofrAsOf}.` : ""}
+      </p>
+    </Card>
+  );
+}
+
 function Prepayment() {
   const [bal, setBal] = useShared("ppb", "20,000,000");
   const [rate, setRate] = useShared("ppr", "3.75");
   const [months, setMonths] = useShared("ppm", "30");
   const [amort, setAmort] = useShared("ppa", "30");
+  // Deliberately NOT seeded from the live 10-year, although the strip above
+  // has it. The clause prices at the Treasury matched to the REMAINING term
+  // — thirty months here, not ten years — and on a normal curve that sits
+  // below the 10-year. A lower discount rate makes the present value of the
+  // remaining payments larger, so the penalty is larger: filling this with
+  // the 10-year would understate what it costs to get out, quietly, in the
+  // direction that flatters the deal. The note under the card says so.
   const [tsy, setTsy] = useShared("ppt", "4.75");
   const [floor, setFloor] = useShared("ppf", "1");
   const [costs, setCosts] = useShared("ppc", "75,000");
@@ -2987,7 +3173,10 @@ function Prepayment() {
         because the lender is being made whole on interest it can now
         earn elsewhere. The same move makes the loan more valuable to a
         buyer who could assume it. Both are worth having; only one can be
-        had.
+        had. The Treasury here is the one matched to the REMAINING term,
+        not the 10-year in the strip above — on a normal curve it sits
+        lower, and a lower rate makes the penalty bigger, so reaching for
+        the 10-year understates what getting out costs.
       </p>
     </Card>
   );
@@ -4470,7 +4659,7 @@ function LoanOverTime() {
 
 // ───────────────────────────────────────────────────────────────────────────
 
-export function DealMathTools() {
+export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
   return (
     <div className="space-y-6">
       {/* The index, clustered.
@@ -4532,6 +4721,7 @@ export function DealMathTools() {
       <SourcesUses />
       <CapitalStack />
       <LeaseBuyout />
+      <FloatingRate sofrPct={seeds.sofrPct} sofrAsOf={seeds.sofrAsOf} />
       <Prepayment />
       <UnitMix />
       <SiteMeasures />

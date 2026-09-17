@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import React from "react";
 import { renderToStaticMarkup, renderToString } from "react-dom/server";
 import { DealMathTools } from "@/app/tools/deal-math-tools";
+import { RatesStrip } from "@/app/tools/rates-strip";
+import { readRates } from "@/lib/live-rates";
 
 /**
  * Every live-verify marker that greps `/tools` must grep text that is
@@ -32,7 +34,11 @@ import { DealMathTools } from "@/app/tools/deal-math-tools";
  * A marker is a claim about the live site. A marker that cannot fail, and
  * a marker that fails on a page that is fine, are the same kind of broken.
  *
- * SCOPE: this covers the markers that grep `p_tools2.html` only. The ones
+ * SCOPE: this covers the markers that grep `p_tools2.html` only — and
+ * every piece of that page a test can render, which since the rates strip
+ * is two components rather than one. A marker greping the strip while the
+ * guard rendered only the cards would be unchecked, which is the state
+ * this file exists to prevent. The ones
  * against `body.html` (the homepage) are not checked here, because the
  * homepage is a server component that fetches its own data and cannot be
  * rendered from a test the way `DealMathTools` can. Those markers carry
@@ -62,9 +68,32 @@ function toolsPatterns(): string[] {
   return out;
 }
 
+/**
+ * What `/tools` serves, as one string.
+ *
+ * The page is the strip plus the cards. The strip is fed the four series
+ * the weekday cron actually writes, because a marker greping it is a claim
+ * about the page as it stands with a live table behind it.
+ */
+const page = (r: (n: React.ReactElement) => string) =>
+  r(
+    React.createElement(RatesStrip, {
+      rates: readRates(
+        [
+          { series_id: "DGS10", obs_date: "2026-09-14", value: 4.97 },
+          { series_id: "SOFR", obs_date: "2026-09-15", value: 3.64 },
+          { series_id: "MORTGAGE30US", obs_date: "2026-09-10", value: 6.76 },
+          { series_id: "DRCRELEXFACBS", obs_date: "2026-04-01", value: 1.53 },
+        ],
+        new Date("2026-09-17T14:00:00Z"),
+      ),
+      seeds: ["SOFR"],
+    }),
+  ) + r(React.createElement(DealMathTools));
+
 describe("the /tools round markers", () => {
-  const hydration = renderToString(React.createElement(DealMathTools));
-  const staticMarkup = renderToStaticMarkup(React.createElement(DealMathTools));
+  const hydration = page(renderToString);
+  const staticMarkup = page(renderToStaticMarkup);
 
   it("reads the markers out of the workflow rather than listing them here", () => {
     const patterns = toolsPatterns();
