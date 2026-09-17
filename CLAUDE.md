@@ -924,6 +924,35 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   took ABOVE its pro-rata share** — the only honest definition, for the
   same reason. Return OF capital is not a separate step: an 8% IRR is not
   reached until every dollar in has come back plus 8% on it.
+- What the LP actually nets: `lib/tools/fee-drag.ts` (pure — the sponsor's
+  fees layered around `runWaterfall`, never re-implementing the ladder). The
+  IRR on a syndication's cover is the PROPERTY's return, and the gap to the
+  LP is TWO numbers from two causes that move opposite ways: the promote,
+  earned only on performance and disclosed on its own page, and the fees,
+  collected either way and sitting in three lines at the back with no
+  arithmetic attached. Modelling only the waterfall sees the disclosed half.
+  Four rules. **An acquisition fee is quoted against the PRICE and paid out
+  of the EQUITY** — two denominators, and the larger one is in the deck:
+  1.5% of a $30M price is 4.11% of the $10.95M cheque, taken on day one. It
+  is an extra cheque at closing (`sources-uses`' rule), never netted from a
+  distribution. **The asset management fee's BASE is the lever the term
+  sheet omits** — "1.5%" is $164,250 a year on invested equity and $54,000
+  on gross revenue, so both are computed whenever both are available, and a
+  revenue base with no revenue given SAYS SO rather than charging nothing.
+  **The fees are senior to the pref**: run the seed weak (a 3.4% property
+  return) and the promote is exactly zero while $1,581,250 of fees is paid
+  in full — 100% of the sponsor's compensation on a deal that failed its
+  investors. And **the fee share grows as the deal weakens**, which is why
+  the take is drawn twice: 47.6% fee as underwritten, 66.5% on an exit
+  `DOWNSIDE_EXIT_HAIRCUT`% softer, because the promote more than halves
+  while the fees fall $40,000. That haircut is struck against the SALE
+  PRICE, not the final flow — the flow is net of the loan payoff, so
+  $4,000,000 off the sale against $2,150,000 off the flow, and it moves the
+  property's return 20.63% → 13.49%. Cutting the flow would understate the
+  downside by exactly the leverage. Identities the tests pin: with no fees
+  the LP's net return IS the waterfall's, and with no promote either it is
+  the property's. Bars: `data-bar="feereturn"` (the three returns on one
+  track) and `data-bar="sponsor"` (fee and promote, two rows).
 - The loan over its life, and the refinance at the end:
   `lib/tools/debt-math.ts` (pure). `readDebt` runs the schedule **monthly**
   and reports it a year at a time — annual approximation gets a 30-year

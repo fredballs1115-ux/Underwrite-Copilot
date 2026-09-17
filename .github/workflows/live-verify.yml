@@ -685,6 +685,15 @@ jobs:
           mark "#347 the deductible is drawn against a year of income" grep -q "The deductible against a year of income" p_tools2.html
           mark "#347 one event's retention is computed as years of NOI" grep -q "One named-storm event retains 0.9 years of NOI" p_tools2.html
           mark "#347 the premium gap is capitalised at the advertised cap" grep -q "6,857,143" p_tools2.html
+          # #349 — the sponsor's fees against the LP's return. The second
+          # and fourth are the decisive pair: the "one word" sentence
+          # renders only once BOTH fee bases resolved, and the note is one
+          # JS string (so it survives React's separators intact) that needs
+          # the downside promote AND the downside fees to have both run.
+          mark "#349 the fee-drag card is on /tools" grep -q "What the LP actually nets" p_tools2.html
+          mark "#349 both asset-management bases computed" grep -q "on one word the term sheet often leaves out" p_tools2.html
+          mark "#349 the sponsor's take is drawn twice" grep -q "Exit 10% softer" p_tools2.html
+          mark "#349 the fee share moves on the softer exit" grep -q "and 66.5% of it is fees rather than promote." p_tools2.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

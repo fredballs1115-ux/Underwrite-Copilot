@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-17",
+      "title": "What the LP actually nets",
+      "blurb": "The IRR on the front of a syndication's deck is the PROPERTY's return — not the return any investor in that offering receives. The gap is two numbers from two causes that behave in opposite ways: the promote, which the sponsor earns only if the deal performs, and the fees, which it collects either way. A screening tool that models only the waterfall sees the first and is blind to the second, which is backwards — the promote gets its own page in every deck and the fees are three lines in the back with no arithmetic attached. On the seeded deal a 20.63% property return reaches the LP as 15.71%: 3.24 points of promote and 1.68 points of fees. A \"1.5% acquisition fee\" is 4.11% of the cheque the LP actually wires, because it is quoted against a price three times the size of the equity. A \"1.5% asset management fee\" is $164,250 a year on invested equity and $54,000 on gross revenue — $110,250 apart, on one word most term sheets leave out. And the fees sit ahead of the preferred return, so run the same deal weak and the promote is exactly zero while $1,581,250 of fees is still paid in full. That is why the card draws the sponsor's take twice: as underwritten it is 47.6% fees, and on an exit 10% softer it is 66.5%.",
+      "href": "/tools#fee-drag"
+    },
+    {
+      "date": "2026-09-17",
       "title": "What insurance really costs",
       "blurb": "The expense line that reprices hardest and gets read least. The premium in a memorandum is the SELLER's expiring policy — bound on limits the seller chose, in a market that may no longer exist. Nothing in it is false; it is describing someone else's placement, which is exactly what makes it invisible. On the seeded Florida apartment the memorandum carries $420,000 and the quote comes back $780,000, and insurance is a fixed expense, so the whole $360,000 comes out of NOI: the advertised 5.25% cap is 4.60% to the buyer, or $6,857,143 of price. Then the figure nobody writes down. A named-storm deductible is a percentage of the INSURED VALUE, not a dollar amount — 5% of a $52M replacement cost is $2,600,000 retained per event, which is nine tenths of a year's NOI before the policy pays anything. The premium is the number people argue about; that is the number that takes the building.",
       "href": "/tools#insurance"
