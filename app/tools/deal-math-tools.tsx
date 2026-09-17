@@ -10,6 +10,7 @@ import { EXCHANGE_DAYS, IDENTIFY_DAYS, readExchange } from "@/lib/tools/exchange
 import { readRecovery } from "@/lib/tools/expense-recovery";
 import { readPercentageRent } from "@/lib/tools/percentage-rent";
 import { readProration } from "@/lib/tools/proration";
+import { readGroundLease } from "@/lib/tools/ground-lease";
 import { readReassessment } from "@/lib/tools/tax-reassessment";
 import { TOOL_INDEX } from "@/lib/tools/catalog";
 import { readResidual } from "@/lib/tools/land-residual";
@@ -2498,6 +2499,187 @@ function PercentageRent() {
 // ── 7d. rentable, usable, and the rent you actually pay ────────────────────
 
 /**
+ * A building on someone else's land.
+ *
+ * One card for the structure where ordinary screening arithmetic is not
+ * merely imprecise but wrong by a multiple, in the flattering direction:
+ * a leasehold is a WASTING asset, so capitalising its NOI values a
+ * perpetuity that expires. The two figures are drawn side by side because
+ * the gap between them is the entire content.
+ *
+ * The coverage pair underneath is the lender's test rather than DSCR,
+ * since on an unsubordinated lease the ground rent outranks the mortgage
+ * — and a reset to a share of land value can halve it without anything in
+ * the lease having changed.
+ */
+function GroundLease() {
+  const [noi, setNoi] = useShared("gln", "8,000,000");
+  const [rent, setRent] = useShared("glr", "2,000,000");
+  const [esc, setEsc] = useShared("gle", "2");
+  const [growth, setGrowth] = useShared("glg", "2.5");
+  const [years, setYears] = useShared("gly", "40");
+  const [disc, setDisc] = useShared("gld", "8");
+  const [feeCap, setFeeCap] = useShared("glc", "5");
+  const [loan, setLoan] = useShared("gll", "10");
+  const [land, setLand] = useShared("glv", "60,000,000");
+  const [reset, setReset] = useShared("glp", "6");
+  const [resetIn, setResetIn] = useShared("glri", "15");
+  const [sub, setSub] = useShared("gls", "no");
+
+  const r = useMemo(
+    () =>
+      readGroundLease({
+        noi: num(noi),
+        groundRent: num(rent),
+        escalationPct: num(esc),
+        noiGrowthPct: num(growth),
+        yearsRemaining: num(years),
+        discountRatePct: num(disc),
+        feeSimpleCapPct: num(feeCap),
+        subordinated: sub === "yes",
+        loanTermYears: num(loan),
+        yearsToReset: num(resetIn),
+        resetPctOfLand: num(reset),
+        landValue: num(land),
+      }),
+    [noi, rent, esc, growth, years, disc, feeCap, sub, loan, reset, resetIn, land],
+  );
+
+  const widestValue = Math.max(1, r.asIfPerpetual ?? 0, r.leaseholdValue ?? 0);
+  const widestCover = Math.max(0.01, r.coverage ?? 0, r.resetCoverage ?? 0);
+
+  return (
+    <Card
+      id="ground-lease"
+      eyebrow="Ground lease"
+      title="A building on someone else's land"
+    >
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <Field label="Building NOI" value={noi} onChange={setNoi} placeholder="8,000,000" />
+        <Field label="Ground rent" value={rent} onChange={setRent} placeholder="2,000,000" />
+        <Field label="Rent escalation" suffix="%" value={esc} onChange={setEsc} placeholder="2" />
+        <Field label="NOI growth" suffix="%" value={growth} onChange={setGrowth} placeholder="2.5" />
+        <Field label="Years left" suffix="yr" value={years} onChange={setYears} placeholder="40" />
+        <Field label="Discount rate" suffix="%" value={disc} onChange={setDisc} placeholder="8" />
+        <Field label="Fee-simple cap" suffix="%" value={feeCap} onChange={setFeeCap} placeholder="5" />
+        <Field label="Loan term" suffix="yr" value={loan} onChange={setLoan} placeholder="10" />
+        <Field label="Land value" value={land} onChange={setLand} placeholder="60,000,000" />
+        <Field label="Reset, of land" suffix="%" value={reset} onChange={setReset} placeholder="6" />
+        <Field label="Reset in" suffix="yr" value={resetIn} onChange={setResetIn} placeholder="15" />
+        <Choice
+          label="Fee owner"
+          value={sub}
+          onChange={setSub}
+          options={[
+            { value: "no", label: "Unsubordinated" },
+            { value: "yes", label: "Subordinated" },
+          ]}
+        />
+      </div>
+
+      {r.leaseholdValue !== null && r.asIfPerpetual !== null && (
+        <div className="mt-6 rounded-xl bg-faint p-4">
+          <p className="text-sm font-semibold">
+            The lease ends, so the leasehold ends with it. Capitalising its
+            NOI values a building you hand back.
+          </p>
+          <div className="mt-3 space-y-2">
+            {[
+              {
+                label: "Capitalised as though it ran forever",
+                amount: r.asIfPerpetual,
+                tone: "bg-kill",
+              },
+              {
+                label: `Worth over the ${years} years that are left`,
+                amount: r.leaseholdValue,
+                tone: "bg-brand",
+              },
+            ].map((row) => (
+              <div key={row.label}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="text-muted">{row.label}</span>
+                  <span className="shrink-0 font-mono font-semibold tabular-nums">
+                    {usd(row.amount)}
+                  </span>
+                </div>
+                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-white">
+                  <div
+                    data-bar="leasehold"
+                    className={`h-full rounded-full ${row.tone}`}
+                    style={{ width: `${(Math.max(0, row.amount) / widestValue) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {r.coverage !== null && (
+        <div className="mt-5">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+            Ground rent coverage — the lender&apos;s test, not the DSCR
+          </p>
+          <div className="mt-2 space-y-2">
+            {[
+              { label: "Today", amount: r.coverage, tone: "bg-brand" },
+              ...(r.resetCoverage !== null
+                ? [
+                    {
+                      label: `After the reset to ${reset}% of land value`,
+                      amount: r.resetCoverage,
+                      tone: r.resetCoverage < 2 ? "bg-kill" : "bg-brand",
+                    },
+                  ]
+                : []),
+            ].map((row) => (
+              <div key={row.label}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="text-muted">{row.label}</span>
+                  <span className="shrink-0 font-mono font-semibold tabular-nums">
+                    {row.amount.toFixed(2)}×
+                  </span>
+                </div>
+                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-faint">
+                  <div
+                    data-bar="coverage"
+                    className={`h-full rounded-full ${row.tone}`}
+                    style={{ width: `${(row.amount / widestCover) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {r.leasedFeeValue !== null && (
+        <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
+          <Stat label="Leasehold NOI" value={usd(r.leaseholdNoi)} tone="muted" />
+          <Stat label="Leasehold, over the term" value={usd(r.leaseholdValue)} />
+          <Stat label="Leased fee, the other half" value={usd(r.leasedFeeValue)} tone="muted" />
+          <Stat
+            label="Financeable"
+            value={r.financeable ? "Yes" : "No"}
+            tone={r.financeable ? "brand" : "ink"}
+          />
+        </div>
+      )}
+
+      {r.note && <p className="mt-4 text-sm text-muted">{r.note}</p>}
+
+      <p className="mt-4 text-[11px] leading-relaxed text-muted">
+        The clock that destroys the leasehold is the same clock that brings
+        the land back sooner, so the two halves of one lease move in
+        opposite directions as it runs. That is why they trade to different
+        buyers at different rates.
+      </p>
+    </Card>
+  );
+}
+
+/**
  * What the property taxes become once you own it.
  *
  * The card exists for one sentence: the memorandum's tax line is the
@@ -3571,6 +3753,7 @@ export function DealMathTools() {
       <Recovery />
       <PercentageRent />
       <TaxReassessment />
+      <GroundLease />
       <Proration />
       <div className="grid gap-6 lg:grid-cols-2">
         <CapTriangle />

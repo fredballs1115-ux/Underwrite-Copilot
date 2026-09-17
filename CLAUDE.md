@@ -404,6 +404,31 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   default and never a number this module asserts. The sales column reads
   through `readStrip` — the cash-flow card's reader, so the
   comma-as-thousands-mark trap stays solved in one place.
+- A building on someone else's land: `lib/tools/ground-lease.ts` (pure).
+  The one structure on `/tools` where ordinary screening arithmetic is
+  wrong by a MULTIPLE rather than by a margin, and wrong the flattering
+  way. **A leasehold is a WASTING asset**: at expiry the building reverts,
+  so its value is the present value of the term's cash flows and nothing
+  after them — no reversion, no terminal value. `leaseholdPv` runs the
+  schedule year by year because the NOI and the ground rent grow at
+  DIFFERENT rates and no single annuity factor covers it (a test pins it
+  against a hand-built schedule for exactly that reason). Capitalising the
+  leasehold's NOI at a fee-simple cap values a perpetuity that expires:
+  on the seeded lease that is $120M against $97.5M over 40 years (18.7%
+  imaginary), and the same lease with 10 years left is 62.8% imaginary —
+  the error grows as the term shortens, which is why both figures are
+  drawn side by side. **Ground rent coverage is the lender's test**, not
+  DSCR: on an unsubordinated lease the ground rent outranks the mortgage,
+  and a default terminates the lease, the building and the mortgage
+  together. **A reset is an uncapped repricing** — a rent struck at a
+  share of THEN-CURRENT land value takes the seeded lease from 4× to
+  2.22× coverage, and doubling land value takes it to 1.11×. And
+  **subordination decides financeability**: `TERM_MARGIN_YEARS` (10) is
+  the margin by which an unsubordinated term must outlast the loan, and
+  the boundary is stated so it cannot drift. The leased fee is the mirror
+  — the rent plus the land coming back — and it moves the OPPOSITE way as
+  the clock runs ($32.7M → $42.3M as the leasehold falls $97.5M → $44.7M),
+  which is why the two halves trade to different buyers.
 - What the taxes become once you own it: `lib/tools/tax-reassessment.ts`
   (pure). **The memorandum's tax line is the SELLER's bill**, struck on
   the seller's assessed value — and where the jurisdiction reassesses on
