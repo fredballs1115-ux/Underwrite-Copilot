@@ -575,6 +575,37 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   table** by the median ratio of the last two — a market rent sits near its
   in-place rent by definition, a square footage does not, and a column is a
   property of the table rather than of a row.
+- When the income rolls: `lib/tools/rollover.ts` (pure — a rent roll's
+  expiry schedule, and the WALT a memorandum quotes against the three it
+  does not). Four rules, the first two changing the figure rather than
+  shading it. **Weight by rent, never by area**: they are different numbers
+  and the longer one gets quoted, because the long leases in a building are
+  the cheap ones — the seeded roll runs 7.0 years by area and 5.1 by rent on
+  the strength of one 60,000-foot distribution tenant twelve years out at
+  $8.50. **A break option is an expiry** — the landlord cannot make the
+  tenant stay and the lender will not assume it, so `waltToBreak` (4.3 here,
+  0.8 years off the quoted term) is the one to bid on, and the schedule
+  buckets by the break rather than the expiry. **An average hides a cliff**:
+  two rolls with the same 3.0-year WALT roll 20% and 60% of the income in
+  their worst year, which the mean cannot see and the year-by-year table
+  can, so `worstYear` is drawn against `evenYearSharePct`. And **the cliff's
+  cost is capital, not rent** — the TI and commission land whole in the year
+  the space rolls, and on the seed year 4 owes $1,530,000 against $1,292,000
+  of rent rolling, a cheque larger than the income at risk and none of it in
+  the NOI (`below-the-line` prices the same cost as a run rate over an
+  average year; this prices it in the year it lands). The reader shares
+  `unit-mix`'s `cellsOf` — one copy of the comma-is-also-a-thousands-mark
+  precedence — and decides TWO columns for the whole table at once: whether
+  the rent column is per foot or a TOTAL annual rent (the ratio to the square
+  footage; at or above 1 would mean a lease of under one square foot, and
+  reading $1,012,000 as a per-foot rent puts the building's income in the
+  billions), and whether the expiry column is years remaining or calendar
+  years. A pasted date yields its year rather than dropping the lease, since
+  a dropped lease silently shortens every figure the module reports. The roll
+  is LEASED space, so occupancy needs the building's own size — and a roll
+  carrying more feet than the building says the two inputs disagree rather
+  than clamping quietly. Bars: `data-bar="walt"` (three terms on one track)
+  and `data-bar="roll"` (one a year, with the even-roll tick).
 - The measures on a page of an OM: `lib/tools/measure-math.ts` (pure).
   `readLand` treats acres and square feet as ONE measurement entered from
   whichever side the document stated (`SF_PER_ACRE`, 43,560), and where both

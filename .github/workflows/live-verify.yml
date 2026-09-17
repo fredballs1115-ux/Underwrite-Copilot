@@ -646,6 +646,18 @@ jobs:
           mark "#342 the binding test and its crossing are both solved" grep -q "Above \$26.77M the coverage tests take over instead" p_tools2.html
           mark "#342 the solved price and its going-in cap" grep -q "6.46%" p_tools2.html
           mark "#342 the circularity rule is stated on the card" grep -q "The price is circular through the debt" p_tools2.html
+          # #344 — the rollover schedule. The third is the decisive one:
+          # both dollar figures in that sentence are computed from the
+          # pasted roll (the cliff year's leasing capital against the rent
+          # rolling off it), and the sentence only renders at all when the
+          # cheque is the LARGER of the two — so a `present` proves the
+          # schedule ran and found the case the card exists to name. The
+          # phrase sits inside one text node, clear of the interpolated
+          # values either side of it, which is why it can be grepped.
+          mark "#344 the rollover card is on /tools" grep -q "When the income rolls" p_tools2.html
+          mark "#344 the roll is read as a pasted table" grep -q "Tenant, SF, rent per SF, years to expiry, break" p_tools2.html
+          mark "#344 the cliff year's capital exceeds the rent rolling" grep -q "a cheque larger than the income at risk" p_tools2.html
+          mark "#344 the average-hides-a-cliff rule is stated on the card" grep -q "an average cannot see a cliff" p_tools2.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

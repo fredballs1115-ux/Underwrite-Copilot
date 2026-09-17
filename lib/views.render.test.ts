@@ -1847,6 +1847,42 @@ describe("the deal math tools", () => {
     expect((html.match(/data-bar="bid"/g) ?? []).length).toBe(4);
     expect((html.match(/data-bar="bidflow"/g) ?? []).length).toBe(6);
   });
+
+  it("says the same building's lease term three different ways", () => {
+    // #344, rules 1 and 2 on the seeded roll: 7.0 years by area, 5.1 by
+    // rent, 4.3 to the break. Every step down is a figure the memorandum
+    // did not print, and the middle one is the flattering one it did.
+    expect(text).toContain("When the income rolls");
+    expect(text).toContain("7 yrs");
+    expect(text).toContain("5.1 yrs");
+    expect(text).toContain("4.3 yrs");
+    expect(text).toContain(
+      "Break options give up 0.8 years of the quoted term, leaving 4.3.",
+    );
+  });
+
+  it("prices the cliff year as capital rather than as rent", () => {
+    // Rule 4. The cheque is larger than the income at risk, which is the
+    // sentence the card exists to put on a page.
+    expect(text).toContain("$1,530,000");
+    expect(text).toContain("$1,292,000");
+    expect(text).toContain("a cheque larger than the income at risk");
+    expect(text).toContain("$5,040,000"); // over the whole hold
+  });
+
+  it("reads the roll against the building rather than against itself", () => {
+    // 172,000 leased feet in a 200,000-foot building, and 89.2% of the
+    // income rolling before a five-year sale.
+    expect(text).toContain("86.0%");
+    expect(text).toContain("89.2%");
+    expect(text).toContain("Meridian Health pays");
+  });
+
+  it("draws the terms and the schedule", () => {
+    // Three term bars, one row per year of the hold.
+    expect((html.match(/data-bar="walt"/g) ?? []).length).toBe(3);
+    expect((html.match(/data-bar="roll"/g) ?? []).length).toBe(5);
+  });
 });
 
 // ── today's rates, across the top of /tools ────────────────────────────────

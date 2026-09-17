@@ -29,6 +29,7 @@ import { readFloating } from "@/lib/tools/floating-rate";
 import { readPrepayment } from "@/lib/tools/prepayment";
 import { buildStack } from "@/lib/tools/sources-uses";
 import { readMix, totalMix } from "@/lib/tools/unit-mix";
+import { readRoll, readRollover } from "@/lib/tools/rollover";
 import { runWaterfall } from "@/lib/tools/waterfall-math";
 import {
   breakEvenOccupancyPct,
@@ -5145,6 +5146,229 @@ function TrailingWindow() {
   );
 }
 
+// ── the rollover schedule ──────────────────────────────────────────────────
+
+const ROLLOVER_SEED = [
+  "Anchor Distribution\t60,000\t8.50\t12",
+  "Ridgeline Capital\t22,000\t46.00\t3",
+  "Meridian Health\t34,000\t38.00\t7\t4",
+  "Croft & Palmer\t18,000\t42.00\t2",
+  "Vantage Studios\t26,000\t31.00\t5",
+  "Blue Harbor Foods\t12,000\t28.00\t1",
+].join("\n");
+
+function Rollover() {
+  const [raw, setRaw] = useShared("rr", ROLLOVER_SEED);
+  const [sf, setSf] = useShared("rrsf", "200,000");
+  const [hold, setHold] = useShared("rrh", "5");
+  const [capSf, setCapSf] = useShared("rrc", "45");
+  const [down, setDown] = useShared("rrd", "6");
+  const [renew, setRenew] = useShared("rrn", "65");
+
+  // The reader needs a year to subtract a calendar expiry from. It is the
+  // only clock on this page, and it is read once rather than per keystroke.
+  const thisYear = useMemo(() => new Date().getFullYear(), []);
+  const read = useMemo(() => readRoll(raw, thisYear), [raw, thisYear]);
+  const r = useMemo(
+    () =>
+      readRollover({
+        rows: read.rows,
+        buildingSf: num(sf),
+        holdYears: num(hold),
+        capitalPerSf: num(capSf),
+        downtimeMonths: num(down),
+        renewalProbabilityPct: num(renew),
+      }),
+    [read.rows, sf, hold, capSf, down, renew],
+  );
+
+  // Rules 1 and 2 as one picture: the same building's term, three ways, on
+  // one track. The bars shorten left to right, which is the whole argument
+  // — every step down is a figure the memorandum did not print.
+  const terms = [
+    { key: "area", label: "By area", years: r.waltByArea, tone: "bg-sidebar" },
+    { key: "rent", label: "By rent", years: r.waltByRent, tone: "bg-brand/60" },
+    { key: "break", label: "To break", years: r.waltToBreak, tone: "bg-caution" },
+  ].filter((t) => t.years !== null);
+  const longestTerm = Math.max(1, ...terms.map((t) => t.years ?? 0));
+
+  const peakShare = Math.max(1, ...r.years.map((y) => y.sharePct));
+
+  return (
+    <Card id="rollover" eyebrow="The rent roll" title="When the income rolls">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)]">
+        <div>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
+              Tenant, SF, rent per SF, years to expiry, break
+            </span>
+            <textarea
+              value={raw}
+              onChange={(e) => setRaw(e.target.value)}
+              rows={7}
+              spellCheck={false}
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-xs tabular-nums outline-none transition-colors focus:border-brand"
+            />
+          </label>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
+            A calendar year (2029) or a date works in the expiry column, and
+            a total annual rent works in the rent column — each is read for
+            the whole table at once.
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <Field label="Building" suffix="SF" value={sf} onChange={setSf} placeholder="200,000" />
+            <Field label="Hold" suffix="yrs" value={hold} onChange={setHold} placeholder="5" />
+            <Field label="TI + LC" suffix="/SF" value={capSf} onChange={setCapSf} placeholder="45" />
+            <Field label="Downtime" suffix="mo" value={down} onChange={setDown} placeholder="6" />
+            <Field label="Renewal rate" suffix="%" value={renew} onChange={setRenew} placeholder="65" />
+          </div>
+          {read.skipped.length > 0 && (
+            <p className="mt-2 text-xs text-caution">
+              Ignored: {read.skipped.slice(0, 3).join(", ")}
+              {read.skipped.length > 3 ? ` and ${read.skipped.length - 3} more` : ""}.
+            </p>
+          )}
+          {(read.rentWasTotal || read.expiryWasCalendar) && (
+            <p className="mt-2 text-xs text-muted">
+              Read as{" "}
+              {read.rentWasTotal ? "total annual rent" : "rent per foot"} and{" "}
+              {read.expiryWasCalendar ? "calendar years" : "years remaining"}.
+            </p>
+          )}
+        </div>
+
+        <div>
+          {terms.length > 0 && (
+            <div className="space-y-2">
+              {terms.map((t) => (
+                <div key={t.key} className="flex items-center gap-3 text-xs">
+                  <span className="w-20 shrink-0 text-muted">{t.label}</span>
+                  <span className="relative h-3 flex-1 rounded-full bg-faint">
+                    <span
+                      data-bar="walt"
+                      className={`absolute inset-y-0 left-0 rounded-full ${t.tone}`}
+                      style={{ width: `${((t.years ?? 0) / longestTerm) * 100}%` }}
+                    />
+                  </span>
+                  <span className="w-16 shrink-0 text-right font-semibold tabular-nums">
+                    {t.years} yrs
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {r.years.length > 0 && (
+            <div className="mt-5 border-t border-line pt-4">
+              <div className="mb-2 flex items-center gap-3 text-[11px] uppercase tracking-wide text-muted">
+                <span className="w-20 shrink-0">Year</span>
+                <span className="flex-1">Share of income rolling</span>
+                <span className="w-20 shrink-0 text-right">SF</span>
+                <span className="w-24 shrink-0 text-right">TI + LC</span>
+              </div>
+              <div className="space-y-1.5">
+                {r.years.map((y) => {
+                  const cliff = r.worstYear?.year === y.year && r.years.length > 1;
+                  return (
+                    <div key={y.year} className="flex items-center gap-3 text-xs">
+                      <span className="w-20 shrink-0 tabular-nums text-muted">
+                        Year {y.year}
+                      </span>
+                      <span className="relative h-3 flex-1 rounded-full bg-faint">
+                        <span
+                          data-bar="roll"
+                          className={`absolute inset-y-0 left-0 rounded-full ${
+                            cliff ? "bg-caution" : "bg-brand/50"
+                          }`}
+                          style={{ width: `${(y.sharePct / peakShare) * 100}%` }}
+                        />
+                        {r.evenYearSharePct !== null && (
+                          <span
+                            className="absolute inset-y-0 w-px bg-ink/50"
+                            style={{
+                              left: `${Math.min(100, (r.evenYearSharePct / peakShare) * 100)}%`,
+                            }}
+                          />
+                        )}
+                      </span>
+                      <span className="w-20 shrink-0 text-right tabular-nums">
+                        {y.sfExpiring === 0 ? "—" : y.sfExpiring.toLocaleString("en-US")}
+                      </span>
+                      <span
+                        className={`w-24 shrink-0 text-right tabular-nums ${
+                          cliff ? "font-semibold text-caution" : "text-muted"
+                        }`}
+                      >
+                        {y.capital === 0 ? "—" : usdExact(y.capital)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-[11px] text-muted">
+                The tick on each track is an even roll —{" "}
+                {r.evenYearSharePct === null ? "—" : `${r.evenYearSharePct}%`} a year.
+              </p>
+            </div>
+          )}
+
+          <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-4 sm:grid-cols-4">
+            <Stat
+              label="Leased"
+              value={r.occupancyPct === null ? "—" : pct(r.occupancyPct, 1)}
+              tone={r.occupancyPct === null ? "muted" : undefined}
+            />
+            <Stat
+              label="Rolls before the sale"
+              value={r.rollWithinHoldPct === null ? "—" : pct(r.rollWithinHoldPct, 1)}
+              tone={r.rollWithinHoldPct === null ? "muted" : undefined}
+            />
+            <Stat
+              label="Capital over the hold"
+              value={usdExact(r.capitalOverHold)}
+              tone={r.capitalOverHold === null ? "muted" : "brand"}
+            />
+            <Stat
+              label="Downtime over the hold"
+              value={usdExact(r.downtimeOverHold)}
+              tone={r.downtimeOverHold === null ? "muted" : undefined}
+            />
+          </div>
+
+          {r.note && <p className="mt-3 text-sm text-caution">{r.note}</p>}
+
+          {r.worstYear !== null && r.capitalWorstYear !== null &&
+            r.capitalWorstYear > r.worstYear.rentExpiring && (
+              <p className="mt-2 text-sm text-muted">
+                Year {r.worstYear.year} owes {usdExact(r.capitalWorstYear)} of
+                leasing capital against {usdExact(r.worstYear.rentExpiring)} of
+                rent rolling — a cheque larger than the income at risk, and
+                none of it in the NOI.
+              </p>
+            )}
+
+          {r.topTenant !== null && (
+            <p className="mt-2 text-sm text-muted">
+              {r.topTenant} pays{" "}
+              {r.topTenantPct === null ? "—" : pct(r.topTenantPct, 1)} of the
+              rent on this roll.
+            </p>
+          )}
+
+          <p className="mt-4 border-t border-line pt-3 text-[11px] leading-relaxed text-muted">
+            A weighted average term is quoted four ways and answers four
+            different questions. Weight it by rent rather than area, run it to
+            the break rather than the expiry, and read the schedule rather
+            than the mean — an average cannot see a cliff. The leasing capital
+            here is a blend; &ldquo;Below the line&rdquo; splits a renewal from a new
+            lease and prices the run rate.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function UnitMix() {
   const [raw, setRaw] = useShared(
     "mix",
@@ -5772,6 +5996,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <EconomicOccupancy />
       <BelowTheLine />
       <UnitMix />
+      <Rollover />
       <SiteMeasures />
       <ResidualLand />
       <Waterfall />
