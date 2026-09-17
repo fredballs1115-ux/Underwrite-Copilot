@@ -7,7 +7,8 @@ Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 
 Ten more PRs, #307–#316, nine on `/tools` or its shop window and one on
 the photographs, all proven live by the round markers — and the table has
-kept growing since (#317, #319, #320, #322). **Twenty calculations** there now, and
+kept growing since (#317, #319, #320, #322, #324, #325). **Twenty-two
+calculations** there now, and
 they cover the arithmetic an acquisitions analyst does between opening a
 memorandum and sending a letter:
 
@@ -28,14 +29,16 @@ memorandum and sending a letter:
 | **Expense recovery** (#320) | The reconciliation statement that lands every spring and nobody checks. Gross up **both** years or neither: the seeded base year was struck at 72% occupancy, so gross-up adds **$287,500** to it against $12,553 to this year. Do it to only the current year — the commonest and costliest move in a reconciliation — and this tenant pays **$28,417** it does not owe. A base year is not an expense stop; a cumulative cap is not a non-cumulative one; and the cap reaches controllable expenses only |
 | **Percentage rent** (#322) | The retail lease's own arithmetic. The natural breakpoint is base rent over the rate — **$2.00M** on the seeded lease — and anything else the lease states is artificial, named and sided. The seeded tenant's year lands at $1.92M, *under* the breakpoint, so nothing is owed. Billed monthly against a twelfth of it with no year-end true-up, the same lease collects **$22,300**, because two months of Christmas clear the line and the ten below it give nothing back. Plus the occupancy cost ratio, solved for the sales that reach your ceiling — and honest that a 5% ceiling on a 6% lease is unreachable |
 | **1031 exchange** (#319) | What rolling it forward actually defers. The seeded trade sells at $26M, buys at $30M with *more* debt — passes the price test, and still owes **$305,000**, because $1.22M of proceeds stayed in the seller's pocket and borrowing more never cures that. Debt relief is boot even with every dollar of cash reinvested; cash added to the replacement offsets it. Deferred is not forgiven: $30M of property, a **$20.5M basis**. And the clock's 45 and 180 days run from the *same* day — a November closing loses **29 of them** to the return's due date |
+| **Tax reassessment** (#324) | The error that hides in plain sight: the memorandum's tax line is the *seller's* bill, struck on the seller's assessed value. Where the jurisdiction reassesses on transfer, your purchase resets it to the price — so every figure downstream was computed on a bill that stops existing at closing. The seeded $25M building's bill goes $210,000 → **$375,000** and the **6.00% cap on the cover is 5.34%** to the buyer. Said as a price too, because that is what you negotiate with: **$22.8M**, solved rather than scaled, since paying less lowers the assessment that lowers the tax that raises the NOI. A phase-in is a deferral, not a discount |
+| **Ground lease** (#325) | The one structure where the standard arithmetic is wrong by a *multiple*. A leasehold is a wasting asset — at expiry the building reverts — so capitalising its NOI values a perpetuity that expires: **$120M** the lazy way against **$97.5M** over the forty years the lease has, and **62.8% imaginary** with ten years left. Coverage, not DSCR, is the lender's test, because an unsubordinated ground rent outranks the mortgage. A reset to a share of land value is uncapped: **4× coverage becomes 2.22×**, and 1.11× if land doubles. The leased fee moves the *opposite* way as the clock runs |
 | **Closing statement** (#317) | The one that comes after yes, and the one people get *backwards*: taxes in arrears mean the seller credits the buyer, in advance the reverse, so the wrong reading misses by the **sum** of the two figures. Deposits are the tenants' money and go over whole. The closing day itself is worth **$657.53** on a $240,000 bill, so the contract decides it, not a default |
 | **Opex translator** | One expense per unit, per foot, as a share of income |
 | **Cap triangle · Rent converter · Build or buy** | The quick ones |
 
 Three things they share: every field reads shorthand (`$20M`, `4.75%`,
 `1.25x`); every field travels in the URL, so a sizing is a link; and the
-math is a pure tested module before it reaches a page — **335 tests** on
-the fourteen modules, plus **46** that render the page itself and check the
+math is a pure tested module before it reaches a page — **380 tests** on
+the sixteen modules, plus **51** that render the page itself and check the
 figures it prints. And since #314 the homepage renders its shelf of those
 calculations from the SAME list the page builds its cards from, so it can
 no longer advertise a version of `/tools` that does not exist.
@@ -44,18 +47,29 @@ It also **prints**. Every picture on this site is a background colour and
 browsers drop those when printing, so the page used to come out of a
 printer as nineteen cards of empty grey tracks — fixed in #321, measured
 at just under two kilobytes of dropped colour before and none after. The
-photograph, the site chrome, the jump index and the copy button all leave
-the paper, and a card never splits across two sheets.
+photograph, the site chrome, the jump index and every copy button all
+leave the paper, and a card never splits across two sheets. (#323 moved
+`print:hidden` into the copy button itself, because the per-element
+version had been written once and then missed by both "Copy as table"
+buttons.)
+
+Two tables leave the page as numbers rather than as text you clean up:
+the cash flow and, since #323, the loan schedule — tab-delimited with
+headers, the figures raw, so a paste lands in a spreadsheet as numbers.
 
 *Nothing on this list is yours to do.* It is here so you know what is
 there.
 
-**What I'd build next, when you want more:** an amortisation schedule you
-can export, a lease-abstract reader, a CAM
-reconciliation's own escalation schedule. Then the pieces that are not calculators at all
-— a copy-as-table button on the deal page's comps (the pipeline already
-exports CSV and .xlsx), a print stylesheet, breadcrumbs, a keyboard
-layer.
+**What I'd build next, when you want more:** a mezzanine / preferred
+stack with its blended cost of capital (the sources-and-uses card only
+knows one loan); the reverse solve — given a price and a target return,
+what exit price or rent growth would you have to *believe*; a
+lease-abstract reader; a tenant-buyout value for a below-market lease.
+Then the pieces that are not calculators at all — a copy-as-table button
+on the deal page's comps (the pipeline already exports CSV and .xlsx),
+breadcrumbs, a keyboard layer. (The amortisation-schedule export and the
+print stylesheet that used to head this list are both done, #323 and
+#321.)
 
 ---
 
