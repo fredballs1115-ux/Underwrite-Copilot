@@ -457,7 +457,12 @@ jobs:
           mark "#312 the load factor converts the quoted rent" grep -q "per foot you can furnish" p_tools2.html
           mark "#313 the land residual is on /tools" grep -q "What the land can be worth" p_tools2.html
           mark "#313 the residual says its own sensitivity" grep -q "a residual is a range and not a number" p_tools2.html
-          mark "#314 the homepage names what /tools serves" grep -q "more, with no deal behind them" body.html
+          mark "#314 the homepage names what /tools serves" grep -q "more calculations, with no deal behind them" body.html
+          # #340 — the shelf is clustered, not one flat row of thirty
+          # chips. Grepping a cluster HEADING proves the grouping
+          # rendered; "Equity &amp; returns" is the escaped form,
+          # because React writes an ampersand that way.
+          mark "#340 the homepage shelf is clustered like the page it advertises" grep -q "Equity &amp; returns" body.html
           mark "#314 the homepage links a card by its anchor" grep -q 'href="/tools#residual-land"' body.html
           mark "#315 the after-tax card is on /tools" grep -q "Depreciation, and what the sale takes back" p_tools2.html
           mark "#315 it names the error it prevents" grep -q "Running the whole gain at the capital gains rate" p_tools2.html
