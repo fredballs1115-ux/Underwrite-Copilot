@@ -2091,6 +2091,34 @@ describe("the deal math tools", () => {
     expect((html.match(/data-bar="reno"/g) ?? []).length).toBe(3);
   });
 
+  it("draws a hotel's penetration index apart into its two halves", () => {
+    // #355, rule 2. A RevPAR index of 90 on a rate index of 108.8 — the
+    // shortfall is rooms, and a revenue manager reading only the 90 would
+    // cut rate, which is the one thing working.
+    expect(text).toContain("What a hotel actually earns");
+    expect(text).toContain("Against the competitive set, where 100 is fair share");
+    expect(text).toContain("108.8");
+    expect(text).toContain("82.7");
+    expect(text).toContain("the whole shortfall is empty rooms");
+    expect((html.match(/data-bar="revpar"/g) ?? []).length).toBe(3);
+  });
+
+  it("and sets the two RevPAR levers against each other at the same RevPAR", () => {
+    // Rule 1: $126.17 reached either way, $489,657 of value apart — and
+    // the crossing is solved rather than subtracted.
+    expect(text).toContain("$126.17");
+    expect(text).toContain("$489,657 of value at the stated cap");
+    expect(text).toContain("$34.41");
+    expect((html.match(/data-bar="lever"/g) ?? []).length).toBe(2);
+  });
+
+  it("charges the hotel's reserve against revenue and prices both caps", () => {
+    // Rule 3: $281,065 of reserve turns a 9.25% cap into 8.00%.
+    expect(text).toContain("struck on revenue, not on NOI");
+    expect(text).toContain("$281,065");
+    expect(text).toContain("9.25%");
+  });
+
   it("puts a clock on the return on cost, which has none of its own", () => {
     // Rule 4: 63.7% sold at completion against 31.4% held to the stated
     // exit, because 90% of the value is the resale rather than the rent.

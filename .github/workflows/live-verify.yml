@@ -735,6 +735,15 @@ jobs:
           mark "#354 only part of the quoted premium is renovation" grep -q "a different building" p_tools2.html
           mark "#354 the pace is turnover's, not the memorandum's" grep -q "the page claims, which would need" p_tools2.html
           mark "#354 a return on cost has no clock in it" grep -q "A return on cost has no clock in it. Sold the year the program finishes this earns" p_tools2.html
+          # #355 — hotels, the asset class forty-two cards did not speak to.
+          # The second and third are the decisive pair: the index caption
+          # renders only once the comp set resolves to three indices, and
+          # the note sentence only once the RevPAR index is BELOW 100 while
+          # the rate index is above it, which takes the whole decomposition.
+          mark "#355 the hotel card is on /tools" grep -q "What a hotel actually earns" p_tools2.html
+          mark "#355 the penetration index is drawn against fair share" grep -q "Against the competitive set, where 100 is fair share" p_tools2.html
+          mark "#355 the index is taken apart into rate and rooms" grep -q "the whole shortfall is empty rooms" p_tools2.html
+          mark "#355 the lever crossing is solved, not subtracted" grep -q "the variable cost plus what the management fee and the reserve take out of it" p_tools2.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

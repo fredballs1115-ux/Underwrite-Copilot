@@ -39,6 +39,7 @@ import { readEnvelope } from "@/lib/tools/zoning-envelope";
 import { readStraightLine } from "@/lib/tools/straight-line-rent";
 import { readFeasibility } from "@/lib/tools/feasibility-rent";
 import { readRenovation } from "@/lib/tools/renovation";
+import { readHotel } from "@/lib/tools/hotel";
 import {
   breakEvenOccupancyPct,
   capRatePct,
@@ -6319,6 +6320,189 @@ function FeasibilityRent() {
   );
 }
 
+
+/**
+ * What a hotel actually earns.
+ *
+ * Two pictures. The penetration index taken APART — three bars against a
+ * 100 line — because the single RevPAR figure the industry quotes leaves
+ * the cause open and invites the wrong move. And the two levers side by
+ * side at the same RevPAR, because the finding is that they are not the
+ * same deal.
+ */
+function Hotel() {
+  const [keys, setKeys] = useShared("htk", "150");
+  const [adr, setAdr] = useShared("hta", "185");
+  const [occ, setOcc] = useShared("hto", "62");
+  const [compAdr, setCompAdr] = useShared("htca", "170");
+  const [compOcc, setCompOcc] = useShared("htco", "75");
+  const [other, setOther] = useShared("htor", "22");
+  const [variable, setVariable] = useShared("htv", "32");
+  const [fixed, setFixed] = useShared("htf", "2,600,000");
+  const [royalty, setRoyalty] = useShared("htfr", "5");
+  const [marketing, setMarketing] = useShared("htmk", "4");
+  const [mgmt, setMgmt] = useShared("htmg", "3");
+  const [ti, setTi] = useShared("htti", "480,000");
+  const [reserve, setReserve] = useShared("htres", "4");
+  const [cap, setCap] = useShared("htcap", "8.00");
+
+  const h = useMemo(
+    () =>
+      readHotel({
+        keys: readFigure(keys),
+        adr: num(adr),
+        occupancyPct: num(occ),
+        compAdr: num(compAdr),
+        compOccupancyPct: num(compOcc),
+        otherRevenuePerOccupiedRoom: num(other),
+        variableCostPerOccupiedRoom: num(variable),
+        fixedOperatingCost: readFigure(fixed),
+        franchiseRoyaltyPct: num(royalty),
+        marketingFeePct: num(marketing),
+        managementFeePct: num(mgmt),
+        taxesAndInsurance: readFigure(ti),
+        ffeReservePct: num(reserve),
+        capRatePct: num(cap),
+      }),
+    [keys, adr, occ, compAdr, compOcc, other, variable, fixed, royalty, marketing, mgmt, ti, reserve, cap],
+  );
+
+  // The index bars run against 100, the comp set's own line. A hotel can
+  // sit well above it, so the track has to hold more than parity or an
+  // outperformer draws the same full bar as a hotel at exactly 100.
+  const indexRows = [
+    { label: "RevPAR", value: h.revparIndex },
+    { label: "Rate", value: h.adrIndex },
+    { label: "Occupancy", value: h.occupancyIndex },
+  ];
+  const indexTop = Math.max(120, ...indexRows.map((r) => r.value ?? 0));
+  const leverTop = Math.max(h.noiIfRateRises ?? 0, h.noiIfOccupancyRises ?? 0, 1);
+
+  return (
+    <Card id="hotel-revpar" eyebrow="Hotels" title="What a hotel actually earns">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Keys" value={keys} onChange={setKeys} placeholder="150" />
+          <Field label="ADR" value={adr} onChange={setAdr} placeholder="185" />
+          <Field label="Occupancy" suffix="%" value={occ} onChange={setOcc} placeholder="62" />
+          <Field label="Comp set ADR" value={compAdr} onChange={setCompAdr} placeholder="170" />
+          <Field label="Comp occupancy" suffix="%" value={compOcc} onChange={setCompOcc} placeholder="75" />
+          <Field label="Other revenue" suffix="/occ rm" value={other} onChange={setOther} placeholder="22" />
+          <Field label="Variable cost" suffix="/occ rm" value={variable} onChange={setVariable} placeholder="32" />
+          <Field label="Fixed operating" value={fixed} onChange={setFixed} placeholder="2,600,000" />
+          <Field label="Franchise" suffix="% rooms" value={royalty} onChange={setRoyalty} placeholder="5" />
+          <Field label="Marketing" suffix="% rooms" value={marketing} onChange={setMarketing} placeholder="4" />
+          <Field label="Management" suffix="% total" value={mgmt} onChange={setMgmt} placeholder="3" />
+          <Field label="Taxes + insurance" value={ti} onChange={setTi} placeholder="480,000" />
+          <Field label="FF&E reserve" suffix="% rev" value={reserve} onChange={setReserve} placeholder="4" />
+          <Field label="Cap rate" suffix="%" value={cap} onChange={setCap} placeholder="8.00" />
+        </div>
+
+        <div>
+          {h.revparIndex !== null && (
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted">
+                Against the competitive set, where 100 is fair share
+              </p>
+              <div className="mt-2 space-y-2">
+                {indexRows.map((row) => (
+                  <div key={row.label} className="flex items-center gap-3 text-sm">
+                    <span className="w-20 shrink-0 text-muted">{row.label}</span>
+                    <div className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-faint">
+                      <div
+                        data-bar="revpar"
+                        className={`h-full ${(row.value ?? 0) >= 100 ? "bg-brand" : "bg-caution"}`}
+                        style={{ width: `${Math.min(100, ((row.value ?? 0) / indexTop) * 100)}%` }}
+                      />
+                      <div
+                        className="absolute inset-y-0 w-px bg-ink/40"
+                        style={{ left: `${(100 / indexTop) * 100}%` }}
+                      />
+                    </div>
+                    <span className="w-14 shrink-0 text-right font-mono tabular-nums text-ink">
+                      {row.value === null ? "\u2014" : row.value.toFixed(1)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Stat
+              label="RevPAR"
+              value={h.revpar === null ? "\u2014" : `$${h.revpar.toFixed(2)}`}
+              tone="brand"
+            />
+            <Stat label="GOP margin" value={pct(h.gopMarginPct, 1)} />
+            <Stat label="Value / key" value={usd(h.valuePerKey)} />
+            <Stat label="Fees, of rooms" value={pct(h.feesPctOfRoomsRevenue, 1)} tone="muted" />
+          </div>
+
+          {h.leverThatWins !== null && h.leverThatWins !== "neither" && (
+            <div className="mt-5">
+              <p className="text-xs uppercase tracking-wide text-muted">
+                The same RevPAR of{" "}
+                {h.revparAfterLift === null ? "\u2014" : `$${h.revparAfterLift.toFixed(2)}`}, reached
+                two ways
+              </p>
+              <div className="mt-2 space-y-2">
+                {[
+                  { label: "All rate", value: h.noiIfRateRises, win: h.leverThatWins === "rate" },
+                  {
+                    label: "All occupancy",
+                    value: h.noiIfOccupancyRises,
+                    win: h.leverThatWins === "occupancy",
+                  },
+                ].map((row) => (
+                  <div key={row.label} className="flex items-center gap-3 text-sm">
+                    <span className="w-28 shrink-0 text-muted">{row.label}</span>
+                    <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-faint">
+                      <div
+                        data-bar="lever"
+                        className={`h-full ${row.win ? "bg-brand" : "bg-sidebar"}`}
+                        style={{ width: `${((row.value ?? 0) / leverTop) * 100}%` }}
+                      />
+                    </div>
+                    <span className="w-24 shrink-0 text-right font-mono tabular-nums text-ink">
+                      {usd(row.value)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted">
+                {usd(h.leverGap)} a year apart, {usd(h.leverGapValue)} of value at the stated cap.
+                Occupancy overtakes rate once ancillary spend passes{" "}
+                {h.leverCrossingPerRoom === null ? "\u2014" : `$${h.leverCrossingPerRoom.toFixed(2)}`} an
+                occupied room — the variable cost plus what
+                the management fee and the reserve take out of it.
+              </p>
+            </div>
+          )}
+
+          {h.ffeReserve !== null && (
+            <p className="mt-4 text-sm text-muted">
+              The FF&amp;E reserve is {usd(h.ffeReserve)} — struck on revenue, not on NOI, and
+              real cash a franchise agreement requires. Quoted before it the same price is a{" "}
+              <span className="font-semibold text-ink">{pct(h.capBeforeReservePct, 2)}</span> cap
+              rather than {pct(h.capPct, 2)}, which is {usd(h.valueOfReserveOmitted)} of price.
+            </p>
+          )}
+
+          {h.note && <p className="mt-4 text-sm text-caution">{h.note}</p>}
+          <p className="mt-3 text-xs text-muted">
+            Three fees on two bases: the franchise royalty and the marketing contribution are
+            struck on rooms revenue, the management fee on total revenue including ancillary — so
+            the stack is {pct(h.feesPctOfRoomsRevenue, 1)} of rooms and{" "}
+            {pct(h.feesPctOfTotalRevenue, 1)} of total, and neither is the number in the term
+            sheet.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 /**
  * The value-add renovation program — page 12 of every multifamily
  * memorandum, and the one calculation there that is quoted as a single
@@ -7434,6 +7618,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <Waterfall />
       <FeeDrag />
       <Renovation />
+      <Hotel />
       <StraightLineRent />
       <NetEffectiveRent />
       <RentableUsable />
