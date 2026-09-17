@@ -7,8 +7,8 @@ Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 
 Ten more PRs, #307–#316, nine on `/tools` or its shop window and one on
 the photographs, all proven live by the round markers — and the table has
-kept growing since (#317, #319, #320, #322, #324, #325, #326, #328, #329, #331, #334).
-**Twenty-seven calculations** there now, and
+kept growing since (#317, #319, #320, #322, #324, #325, #326, #328, #329, #331, #334, #336).
+**Twenty-eight calculations** there now, and
 they cover the arithmetic an acquisitions analyst does between opening a
 memorandum and sending a letter:
 
@@ -41,8 +41,8 @@ memorandum and sending a letter:
 
 Three things they share: every field reads shorthand (`$20M`, `4.75%`,
 `1.25x`); every field travels in the URL, so a sizing is a link; and the
-math is a pure tested module before it reaches a page — **519 tests** on
-the twenty-one modules, plus **65** that render the page itself and check the
+math is a pure tested module before it reaches a page — **551 tests** on
+the twenty-two modules, plus **67** that render the page itself and check the
 figures it prints. And since #314 the homepage renders its shelf of those
 calculations from the SAME list the page builds its cards from, so it can
 no longer advertise a version of `/tools` that does not exist.

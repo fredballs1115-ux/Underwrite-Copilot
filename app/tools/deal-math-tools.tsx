@@ -19,6 +19,7 @@ import { readResidual } from "@/lib/tools/land-residual";
 import { readLand, readSpace } from "@/lib/tools/measure-math";
 import { readStack } from "@/lib/tools/capital-stack";
 import { readBuyout } from "@/lib/tools/lease-buyout";
+import { readDraw } from "@/lib/tools/construction-draw";
 import { readFloating } from "@/lib/tools/floating-rate";
 import { readPrepayment } from "@/lib/tools/prepayment";
 import { buildStack } from "@/lib/tools/sources-uses";
@@ -2869,6 +2870,172 @@ function GroundLease() {
  * them the OPPOSITE way. Those two numbers belong on one picture and
  * almost never appear on one page.
  */
+// ── the construction draw, and the reserve it funds ────────────────────────
+
+function ConstructionDraw() {
+  const [land, setLand] = useShared("cdl", "5,000,000");
+  const [hard, setHard] = useShared("cdh", "20,000,000");
+  const [soft, setSoft] = useShared("cds", "5,000,000");
+  const [atClose, setAtClose] = useShared("cdc", "30");
+  const [months, setMonths] = useShared("cdm", "24");
+  const [rate, setRate] = useShared("cdr", "8.5");
+  const [ltc, setLtc] = useShared("cdt", "65");
+  const [curve, setCurve] = useShared("cdv", "s-curve");
+  const [order, setOrder] = useShared("cdo", "equity-first");
+
+  const r = useMemo(
+    () =>
+      readDraw({
+        landCost: num(land),
+        hardCost: num(hard),
+        softCost: num(soft),
+        softAtCloseP: num(atClose),
+        months: num(months),
+        ratePct: num(rate),
+        ltcPct: num(ltc),
+        curve: curve === "straight-line" ? "straight-line" : "s-curve",
+        order: order === "pari-passu" ? "pari-passu" : "equity-first",
+      }),
+    [land, hard, soft, atClose, months, rate, ltc, curve, order],
+  );
+
+  const widest = Math.max(
+    1,
+    r.reserveIfDrawnAtOnce ?? 0,
+    r.reserveAtShortcut ?? 0,
+    r.interestReserve ?? 0,
+  );
+  const peak = Math.max(1, r.peakBalance ?? 1);
+
+  return (
+    <Card
+      id="construction-draw"
+      eyebrow="Construction draw"
+      title="The interest reserve, run month by month"
+    >
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <Field label="Land" value={land} onChange={setLand} placeholder="5,000,000" />
+        <Field label="Hard costs" value={hard} onChange={setHard} placeholder="20,000,000" />
+        <Field label="Soft costs" value={soft} onChange={setSoft} placeholder="5,000,000" />
+        <Field label="Soft at closing" suffix="%" value={atClose} onChange={setAtClose} placeholder="30" />
+        <Field label="Works" suffix="mo" value={months} onChange={setMonths} placeholder="24" />
+        <Field label="Loan rate" suffix="%" value={rate} onChange={setRate} placeholder="8.5" />
+        <Field label="Loan to cost" suffix="%" value={ltc} onChange={setLtc} placeholder="65" />
+        <Choice
+          label="Draw curve"
+          value={curve}
+          onChange={setCurve}
+          options={[
+            { value: "s-curve", label: "S-curve" },
+            { value: "straight-line", label: "Straight line" },
+          ]}
+        />
+        <Choice
+          label="Funding order"
+          value={order}
+          onChange={setOrder}
+          options={[
+            { value: "equity-first", label: "Equity first" },
+            { value: "pari-passu", label: "Pari passu" },
+          ]}
+        />
+      </div>
+
+      {r.interestReserve !== null && (
+        <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
+          <Stat label="Interest reserve" value={usd(r.interestReserve)} />
+          <Stat label="Total cost" value={usd(r.totalCost)} tone="muted" />
+          <Stat label="Loan" value={usd(r.loan)} tone="muted" />
+          <Stat label="Equity" value={usd(r.equity)} tone="muted" />
+        </div>
+      )}
+
+      {r.schedule.length > 0 && (
+        <div className="mt-6 rounded-xl bg-faint p-4">
+          <p className="text-sm font-semibold">
+            The loan outstanding, month by month.
+          </p>
+          <div className="mt-3 flex h-24 items-end gap-px">
+            {r.schedule.map((m) => (
+              <div
+                key={m.month}
+                data-bar="draw"
+                className="flex-1 rounded-t-sm bg-brand"
+                style={{ height: `${Math.max(1, (m.balance / peak) * 100)}%` }}
+                title={`Month ${m.month}: ${usd(m.balance)}`}
+              />
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-muted">
+            Closing on the left, completion on the right. The flat start is the
+            equity going in ahead of the loan.
+          </p>
+        </div>
+      )}
+
+      {r.interestReserve !== null && r.reserveAtShortcut !== null && (
+        <div className="mt-5 border-t border-line pt-5">
+          <p className="text-sm font-semibold">
+            Three ways to state the same reserve.
+          </p>
+          <div className="mt-3 space-y-2">
+            {[
+              { label: "The schedule, run", amount: r.interestReserve, tone: "bg-brand" },
+              { label: "Average-balance shortcut", amount: r.reserveAtShortcut, tone: "bg-kill" },
+              { label: "As if drawn at closing", amount: r.reserveIfDrawnAtOnce, tone: "bg-line" },
+            ].map((row) => (
+              <div key={row.label}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="text-muted">{row.label}</span>
+                  <span className="shrink-0 font-mono font-semibold tabular-nums">
+                    {usd(row.amount)}
+                  </span>
+                </div>
+                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-white">
+                  <div
+                    data-bar="reserve"
+                    className={`h-full rounded-full ${row.tone}`}
+                    style={{ width: `${((row.amount ?? 0) / widest) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {r.impliedDrawProfile !== null && (
+        <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
+          <Stat label="Average outstanding" value={`${(r.impliedDrawProfile * 100).toFixed(0)}% of loan`} />
+          <Stat
+            label="First advance"
+            value={r.firstAdvanceMonth !== null ? `Month ${r.firstAdvanceMonth}` : "—"}
+            tone="muted"
+          />
+          <Stat
+            label="Reserve, share of loan"
+            value={r.reserveShareOfLoanPct !== null ? `${r.reserveShareOfLoanPct.toFixed(2)}%` : "—"}
+            tone="muted"
+          />
+          <Stat label="Shortcut is over by" value={usd(r.shortcutOverstatesBy)} tone="muted" />
+        </div>
+      )}
+
+      {r.note && <p className="mt-4 text-sm text-muted">{r.note}</p>}
+
+      <p className="mt-4 text-[11px] leading-relaxed text-muted">
+        A construction loan funds its own interest, so the reserve is a fixed
+        point rather than a formula and it is iterated here rather than
+        approximated. The shortcut every screening model uses assumes the loan
+        is outstanding for a fixed share of the term; where the lender requires
+        equity in first, it is not. Being too HIGH is what hides it — an
+        overstated reserve overstates cost and understates yield on cost, which
+        reads as prudence rather than as a mistake.
+      </p>
+    </Card>
+  );
+}
+
 // ── the floating-rate loan, and the cap ────────────────────────────────────
 
 function FloatingRate({
@@ -4722,6 +4889,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <CapitalStack />
       <LeaseBuyout />
       <FloatingRate sofrPct={seeds.sofrPct} sofrAsOf={seeds.sofrAsOf} />
+      <ConstructionDraw />
       <Prepayment />
       <UnitMix />
       <SiteMeasures />

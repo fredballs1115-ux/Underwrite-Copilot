@@ -1468,6 +1468,25 @@ describe("the deal math tools", () => {
     expect((html.match(/data-bar="float"/g) ?? []).length).toBe(4);
   });
 
+  it("runs the construction draw rather than approximating it", () => {
+    // The card exists to price the gap between the schedule and the
+    // constant lib/construction-debt.ts assumes.
+    expect(text).toContain("The interest reserve, run month by month");
+    expect(text).toContain("$1.36M"); // the schedule's reserve
+    expect(text).toContain("$1.91M"); // the average-balance shortcut
+    expect(text).toContain("$3.46M"); // as if drawn at closing
+    expect(text).toContain("42% of loan"); // measured, not the assumed 55%
+    expect(text).toContain("Month 7"); // equity funds the first seven
+    expect(text).toContain("Equity funds the first 7 of 24 months");
+    // One bar a month, closing through completion, plus the three reserves.
+    expect((html.match(/data-bar="draw"/g) ?? []).length).toBe(25);
+    expect((html.match(/data-bar="reserve"/g) ?? []).length).toBe(3);
+  });
+
+  it("names the direction the shortcut errs in, which is why it hides", () => {
+    expect(text).toContain("reads as prudence rather than as a mistake");
+  });
+
   it("says the premium is a quote and not something it worked out", () => {
     expect(text).toContain("never a number this works out");
     expect(text).toContain("use funded at closing");

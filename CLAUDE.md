@@ -347,6 +347,33 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   client, so a signed-in visitor saw four live rates and everyone else
   silently got a checked-in PMMS snapshot, with nothing on the page saying
   which. Both pages go through this one now.
+- The construction loan's interest reserve, run rather than approximated:
+  `lib/tools/construction-draw.ts` (pure). A construction loan funds its own
+  interest, so the reserve is CIRCULAR — the loan pays interest on a balance
+  that already holds the interest it has paid — and a closed form needs an
+  assumption about the draw's shape, which is why every screening model
+  swaps the schedule for a constant. `lib/construction-debt.ts`, which sizes
+  a plan deal's loan on the deal page, is one of them (`drawProfile`,
+  `DEFAULT_DRAW_PROFILE` 0.55). This runs the months and reports how far
+  that constant is off, holding itself to the exported constant so the two
+  cannot drift. **Equity goes in first, and that is the whole reason the
+  reserve is smaller than people expect**: a lender requires the sponsor's
+  equity fully funded before the first advance, so on the seeded $30M at 65%
+  LTC the loan does not draw until month 7 of 24 and averages 42% of itself
+  outstanding, not 55% — $1,357,269 against the shortcut's $1,905,738, 40%
+  high. Run the same project PARI PASSU and the constant is roughly right
+  (0.61), which is the point: it describes a funding order construction
+  lenders do not use. **The reserve is a fixed point**, iterated to
+  convergence, and a test pins the identity it has to close on —
+  `costs − equity + reserve === loan`. **And the shortcut errs
+  CONSERVATIVE**, which is why it survives: an overstated reserve overstates
+  cost and understates yield on cost, so it reads as prudence rather than as
+  a mistake and the deal it kills is killed quietly. The curve is an
+  assumption and named as one (smoothstep `3x² − 2x³`, or straight line);
+  land draws at closing, soft costs split between closing and the works. A
+  0% LTC is all-cash and answers zero rather than refusing. Bars:
+  `data-bar="draw"` (one a month) and `data-bar="reserve"` (the three ways
+  of stating it).
 - The floating-rate loan and its cap: `lib/tools/floating-rate.ts` (pure —
   the bridge debt every other card on `/tools` pretends is fixed, and the
   one card whose main input the site already knows, since a note
