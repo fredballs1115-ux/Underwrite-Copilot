@@ -81,9 +81,13 @@ describe("the operator list's numbers", () => {
       (a, f) => a + itCount(read(join("lib", "tools", f))),
       0,
     );
-    const said = willTodo.match(/\*\*(\d+) tests\*\* on/);
+    // A four-digit count is written with a thousands separator in prose, so
+    // the pattern reads one — the assertion below is unchanged, it is the
+    // DOC that should read naturally rather than the guard that should
+    // dictate its punctuation.
+    const said = willTodo.match(/\*\*([\d,]+) tests\*\* on/);
     expect(said, "WILL_TODO should say how many module tests there are").not.toBeNull();
-    expect(Number(said![1]), "the module test count has drifted").toBe(total);
+    expect(Number(said![1].replace(/,/g, "")), "the module test count has drifted").toBe(total);
   });
 
   it("counts the tests that render the page", () => {

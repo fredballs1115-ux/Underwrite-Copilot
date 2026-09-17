@@ -2131,6 +2131,26 @@ describe("the deal math tools", () => {
     expect((html.match(/data-bar="premium"/g) ?? []).length).toBe(2);
   });
 
+  it("draws a storage increase against the response it can take", () => {
+    // #357, rule 1. A 10% increase breaks even at a 25.8% move-out against
+    // the 5% assumed — 20.8 points of room, and $837,410 of value.
+    expect(text).toContain("The rate increase, and the runway it spends");
+    expect(text).toContain("The response the increase can take before it stops paying");
+    expect(text).toContain("25.8%");
+    expect(text).toContain("20.8 pts");
+    expect(text).toContain("$837,410");
+    expect((html.match(/data-bar="ecri"/g) ?? []).length).toBe(2);
+  });
+
+  it("and the runway each one spends, year by year", () => {
+    // Rule 2: 25.8 → 20.7 over five years, because the gap it is traded
+    // against widens from 29% to 48%.
+    expect(text).toContain("Put through every year, the break-even falls");
+    expect(text).toContain("20.7%");
+    expect(text).toContain("48% gap");
+    expect((html.match(/data-bar="runway"/g) ?? []).length).toBe(5);
+  });
+
   it("charges the hotel's reserve against revenue and prices both caps", () => {
     // Rule 3: $281,065 of reserve turns a 9.25% cap into 8.00%.
     expect(text).toContain("struck on revenue, not on NOI");

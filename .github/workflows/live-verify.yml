@@ -751,6 +751,14 @@ jobs:
           mark "#356 both complete positions are drawn, not either half" grep -q "Coverage gained" p_tools2.html
           mark "#356 the premium is solved against the asking price" grep -q "The premium against the asking price" p_tools2.html
           mark "#356 and named as the seller's to ask for" grep -q "A seller who does not ask for that hands it over" p_tools2.html
+          # #357 — self-storage, the last asset class the page did not speak
+          # to. The second and third are the decisive pair: both captions
+          # render only once the break-even resolves, and the runway one
+          # only once the whole schedule has run.
+          mark "#357 the storage card is on /tools" grep -q "The rate increase, and the runway it spends" p_tools2.html
+          mark "#357 the increase is drawn against what it can take" grep -q "The response the increase can take before it stops paying" p_tools2.html
+          mark "#357 and the runway it spends, year by year" grep -q "Put through every year, the break-even falls" p_tools2.html
+          mark "#357 the street-rate case is a forecast, not a stress test" grep -q "that is not a stress test but a forecast" p_tools2.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then
