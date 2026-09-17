@@ -78,6 +78,7 @@ export const TOOL_INDEX: readonly ToolEntry[] = [
   { id: "lease-up", label: "Lease-up", group: "Value & land" },
   { id: "the-site", label: "The site", group: "The property" },
   { id: "zoning-envelope", label: "What fits", group: "Value & land" },
+  { id: "feasibility-rent", label: "Feasibility rent", group: "Value & land" },
   { id: "residual-land", label: "Land residual", group: "Value & land" },
   { id: "the-waterfall", label: "LP / GP split", group: "Equity & returns" },
   { id: "fee-drag", label: "Sponsor fees", group: "Equity & returns" },
