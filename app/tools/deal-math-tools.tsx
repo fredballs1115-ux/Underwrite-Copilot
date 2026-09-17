@@ -17,6 +17,7 @@ import { TOOL_INDEX } from "@/lib/tools/catalog";
 import { readResidual } from "@/lib/tools/land-residual";
 import { readLand, readSpace } from "@/lib/tools/measure-math";
 import { readStack } from "@/lib/tools/capital-stack";
+import { readBuyout } from "@/lib/tools/lease-buyout";
 import { buildStack } from "@/lib/tools/sources-uses";
 import { readMix, totalMix } from "@/lib/tools/unit-mix";
 import { runWaterfall } from "@/lib/tools/waterfall-math";
@@ -2839,6 +2840,214 @@ function GroundLease() {
 }
 
 /**
+ * A below-market lease, and what it is worth to end it.
+ *
+ * Two pictures, and the first is the argument. The honest answer and the
+ * spread calculation are drawn as two bars from a CENTRE LINE, because on
+ * a modest spread they point in opposite directions — the spread says pay
+ * the tenant to go, the streams say pay them to stay — and a pair of bars
+ * on a common axis is the only drawing where that reads instantly.
+ *
+ * The second is the bargain: the landlord's ceiling and the tenant's floor
+ * on one track, with the gap between them shaded. Where they overlap there
+ * is a deal; where they do not, the shading is the distance something
+ * outside the rent has to cover.
+ */
+function LeaseBuyout() {
+  const [sf, setSf] = useShared("lbs", "40,000");
+  const [inPlace, setInPlace] = useShared("lbi", "28");
+  const [market, setMarket] = useShared("lbm", "42");
+  const [years, setYears] = useShared("lby", "6");
+  const [esc, setEsc] = useShared("lbe", "2.5");
+  const [growth, setGrowth] = useShared("lbg", "3");
+  const [llRate, setLlRate] = useShared("lbl", "8");
+  const [tenRate, setTenRate] = useShared("lbt", "15");
+  const [down, setDown] = useShared("lbd", "9");
+  const [ti, setTi] = useShared("lbti", "60");
+  const [comm, setComm] = useShared("lbc", "4");
+  const [newTerm, setNewTerm] = useShared("lbn", "10");
+  const [outside, setOutside] = useShared("lbo", "0");
+  const [moving, setMoving] = useShared("lbmv", "750,000");
+
+  const r = useMemo(
+    () =>
+      readBuyout({
+        sf: num(sf),
+        inPlaceRentPsf: num(inPlace),
+        marketRentPsf: num(market),
+        yearsRemaining: num(years),
+        inPlaceEscalationPct: num(esc),
+        marketGrowthPct: num(growth),
+        landlordRatePct: num(llRate),
+        tenantRatePct: num(tenRate),
+        downtimeMonths: num(down),
+        tiPsf: num(ti),
+        commissionPct: num(comm),
+        newTermYears: num(newTerm),
+        outsideValue: num(outside),
+        tenantMovingCost: num(moving),
+      }),
+    [sf, inPlace, market, years, esc, growth, llRate, tenRate, down, ti, comm, newTerm, outside, moving],
+  );
+
+  // One axis for the pair, signed, so a negative answer draws to the left
+  // of the same centre line the positive one draws to the right of.
+  const widestValue = Math.max(
+    1,
+    Math.abs(r.naiveSpreadPv ?? 0),
+    Math.abs(r.buyoutValue ?? 0),
+  );
+  const widestSide = Math.max(
+    1,
+    Math.abs(r.landlordCeiling ?? 0),
+    Math.abs(r.tenantFloor ?? 0),
+  );
+
+  return (
+    <Card
+      id="lease-buyout"
+      eyebrow="Lease buyout"
+      title="What a below-market lease is worth to end"
+    >
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <Field label="Space" suffix="SF" value={sf} onChange={setSf} placeholder="40,000" />
+        <Field label="Rent in place" suffix="/SF" value={inPlace} onChange={setInPlace} placeholder="28" />
+        <Field label="Market rent" suffix="/SF" value={market} onChange={setMarket} placeholder="42" />
+        <Field label="Years left" suffix="yr" value={years} onChange={setYears} placeholder="6" />
+        <Field label="Lease steps" suffix="%" value={esc} onChange={setEsc} placeholder="2.5" />
+        <Field label="Market growth" suffix="%" value={growth} onChange={setGrowth} placeholder="3" />
+        <Field label="Downtime" suffix="mo" value={down} onChange={setDown} placeholder="9" />
+        <Field label="Allowance" suffix="/SF" value={ti} onChange={setTi} placeholder="60" />
+        <Field label="Commission" suffix="%" value={comm} onChange={setComm} placeholder="4" />
+        <Field label="New term" suffix="yr" value={newTerm} onChange={setNewTerm} placeholder="10" />
+        <Field label="Landlord rate" suffix="%" value={llRate} onChange={setLlRate} placeholder="8" />
+        <Field label="Tenant rate" suffix="%" value={tenRate} onChange={setTenRate} placeholder="15" />
+        <Field label="Vacant possession worth" value={outside} onChange={setOutside} placeholder="0" />
+        <Field label="Tenant moving cost" value={moving} onChange={setMoving} placeholder="750,000" />
+      </div>
+
+      {r.buyoutValue !== null && r.naiveSpreadPv !== null && (
+        <div className="mt-6 rounded-xl bg-faint p-4">
+          <p className="text-sm font-semibold">
+            The spread is not the answer. The turnover is owed either way —
+            a buyout only brings it forward.
+          </p>
+          <div className="mt-3 space-y-2">
+            {[
+              {
+                label: "The spread over the term, which is where people start",
+                amount: r.naiveSpreadPv,
+              },
+              {
+                label: "What ending the lease is actually worth",
+                amount: r.buyoutValue,
+              },
+            ].map((row) => (
+              <div key={row.label}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="text-muted">{row.label}</span>
+                  <span className="shrink-0 font-mono font-semibold tabular-nums">
+                    {usd(row.amount)}
+                  </span>
+                </div>
+                {/* A centre line, because the two can point opposite ways. */}
+                <div className="relative mt-1 flex h-2 w-full overflow-hidden rounded-full bg-white">
+                  <div className="flex h-full w-1/2 justify-end">
+                    <div
+                      data-bar="buyout"
+                      className="h-full rounded-l-full bg-kill"
+                      style={{
+                        width: `${(Math.max(0, -row.amount) / widestValue) * 100}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="h-full w-1/2">
+                    <div
+                      data-bar="buyout"
+                      className="h-full rounded-r-full bg-brand"
+                      style={{
+                        width: `${(Math.max(0, row.amount) / widestValue) * 100}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {r.tenantFloor !== null && r.landlordCeiling !== null && (
+        <div className="mt-5">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+            The bargain — what each side can live with
+          </p>
+          <div className="mt-2 space-y-2">
+            {[
+              {
+                label: "Most the landlord can pay",
+                amount: r.landlordCeiling,
+                tone: "bg-brand",
+              },
+              {
+                label: "Least the tenant should take",
+                amount: r.tenantFloor,
+                tone: (r.zopa ?? 0) >= 0 ? "bg-brand" : "bg-kill",
+              },
+            ].map((row) => (
+              <div key={row.label}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="text-muted">{row.label}</span>
+                  <span className="shrink-0 font-mono font-semibold tabular-nums">
+                    {usd(row.amount)}
+                  </span>
+                </div>
+                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-faint">
+                  <div
+                    data-bar="side"
+                    className={`h-full rounded-full ${row.tone}`}
+                    style={{
+                      width: `${(Math.max(0, row.amount) / widestSide) * 100}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {r.reTenantingCost !== null && (
+        <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
+          {/* Cents, not whole dollars: `usd` rounds, and a rent is quoted
+              to the cent. A "$14 / SF" spread beside a "$41.50" market
+              rent reads as a different kind of number. */}
+          <Stat
+            label="Under market by"
+            value={r.spreadPsf === null ? "—" : `$${r.spreadPsf.toFixed(2)} / SF`}
+          />
+          <Stat label="A year, across the space" value={usd(r.spreadAnnual)} tone="muted" />
+          <Stat label="Turnover bill" value={usd(r.reTenantingCost)} tone="muted" />
+          <Stat label="Rent lost to downtime" value={usd(r.downtimeCost)} tone="muted" />
+        </div>
+      )}
+
+      {r.note && <p className="mt-4 text-sm text-muted">{r.note}</p>}
+
+      <p className="mt-4 text-[11px] leading-relaxed text-muted">
+        A lease with nothing left to run is worth nothing to end, however
+        far under market it is — the spread is still there on the last day.
+        And the spread cancels between the two sides, so with no frictions
+        and one discount rate there is exactly nothing on the table. What
+        makes a buyout happen is vacant possession being worth something
+        the rent does not contain, or a tenant who discounts the future far
+        harder than the landlord does.
+      </p>
+    </Card>
+  );
+}
+
+/**
  * The layers between the senior loan and the common equity.
  *
  * Two pictures, and the second is the point of the card. The first is the
@@ -4147,6 +4356,7 @@ export function DealMathTools() {
       <WhatYouBelieve />
       <SourcesUses />
       <CapitalStack />
+      <LeaseBuyout />
       <UnitMix />
       <SiteMeasures />
       <ResidualLand />

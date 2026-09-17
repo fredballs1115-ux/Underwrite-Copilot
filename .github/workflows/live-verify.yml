@@ -518,3 +518,7 @@ jobs:
           # and carries no interpolated value, so React puts no separator in
           # the middle of it.
           mark "#328 leverage is tested layer by layer" grep -q "Leverage is judged layer by layer, never on the average" p_tools2.html
+          mark "#329 the lease buyout is on /tools" grep -q "What a below-market lease is worth to end" p_tools2.html
+          # The claim the module exists to make, and the one an intuition
+          # that starts from the spread always gets wrong.
+          mark "#329 a lease with no term left is worth nothing to end" grep -q "A lease with nothing left to run is worth nothing to end" p_tools2.html
