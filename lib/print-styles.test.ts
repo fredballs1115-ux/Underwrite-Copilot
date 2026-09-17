@@ -69,4 +69,16 @@ describe("what paper does not want", () => {
     // list of links that cannot be clicked is noise.
     expect(tools).toMatch(/aria-label="The calculators on this page"[^>]*print:hidden/);
   });
+
+  it("hides every copy button, without any call site having to remember", () => {
+    // A copy button on paper is dead ink under every circumstance, so the
+    // rule lives in CopyButton's own base class rather than at the three
+    // places it is used — the jump index's version of this was written
+    // per-element, and the two "Copy as table" buttons were both missed.
+    const tools = read("app/tools/deal-math-tools.tsx");
+    const base = tools.slice(tools.indexOf("function CopyButton"));
+    const at = base.indexOf("className={`");
+    const cls = base.slice(at, base.indexOf("`}", at));
+    expect(cls, "CopyButton's own class must carry it").toContain("print:hidden");
+  });
 });

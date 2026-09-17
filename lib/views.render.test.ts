@@ -1347,6 +1347,14 @@ describe("the deal math tools", () => {
     expect(adj.length, "one gross-up segment per year").toBe(2);
   });
 
+  it("lets the loan schedule leave the page as numbers", () => {
+    // The one table here a reader most often wants OUT of the page — into
+    // a model, a lender's file, a memo. Two Copy-as-table buttons now: the
+    // cash flow's and this one.
+    const copies = (text.match(/Copy as table/g) ?? []).length;
+    expect(copies, "the cash flow's and the loan schedule's").toBe(2);
+  });
+
   it("shows a percentage-rent year that owes nothing and still collects", () => {
     // $120,000 at 6% is a $2M natural breakpoint, a twelfth of which is
     // $166,667. The seeded year lands at $1.92M — under the breakpoint, so
