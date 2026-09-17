@@ -471,4 +471,14 @@ jobs:
           # The claim the card exists for, and the one a price-only test
           # would get wrong: the seeded trade passes on price and owes tax.
           mark "#319 trading up does not cure cash boot" grep -q "STILL boot" p_tools2.html
-          mark "#319 the clock loses days to the return's due date" grep -q "An extension restores the full 180 days" p_tools2.html
+          # Grep prose with NO interpolated value in it. React splits
+          # `the full {EXCHANGE_DAYS} days` into separate text nodes with
+          # `<!-- -->` between them, so the literal sentence is not in the
+          # served HTML however correctly the page renders — which is what
+          # made this marker read NOT DEPLOYED on run 35164496034 while the
+          # card was live. The render test does not see it because
+          # visibleText strips the comments.
+          mark "#319 the clock loses days to the return's due date" grep -q "fourth-quarter exchange files one first" p_tools2.html
+          mark "#320 the expense reconciliation is on /tools" grep -q "What the tenant actually owes" p_tools2.html
+          # The claim the card exists for: the one-sided gross-up, priced.
+          mark "#320 it prices the one-sided gross-up" grep -q "leave the base year alone" p_tools2.html

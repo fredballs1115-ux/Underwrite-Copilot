@@ -1311,6 +1311,42 @@ describe("the deal math tools", () => {
     expect(text).toContain("$9.50M"); // rolled into the replacement
   });
 
+  it("reconciles the expenses, and grosses BOTH years up", () => {
+    // The seeded building: 100,000 SF, a 12,000 SF tenant, a base year
+    // struck at 72% occupancy. Gross-up adds $287,500 to the base and
+    // $12,553 to this year, which is the whole point of the picture.
+    expect(text).toContain("What the tenant actually owes");
+    expect(text).toContain("$1.83M"); // the grossed-up base
+    expect(text).toContain("$1.91M"); // the grossed-up current year
+    expect(text).toContain("72% full");
+    expect(text).toContain("94% full");
+    expect(text).toContain("12.00%"); // the pro rata share
+  });
+
+  it("prices the one-sided gross-up rather than warning about it", () => {
+    expect(text).toContain("leave the base year alone");
+    expect(text).toContain("$10,206"); // both years grossed up
+    expect(text).toContain("$38,623"); // only this year
+    expect(text).toContain("$28,417"); // the difference, in the sentence
+    const bars = html.match(/data-bar="one-sided"[^>]*/g) ?? [];
+    expect(bars.length, "the honest share against the one-sided one").toBe(2);
+    expect(bars.filter((b) => b.includes("bg-kill")).length).toBe(1);
+  });
+
+  it("answers in the direction the money moves, not as a total", () => {
+    // $10,206 of share against $30,000 of estimates is a REFUND, and the
+    // card says so in those words rather than leaving a reader to subtract.
+    expect(text).toContain("the tenant is owed");
+    expect(text).toContain("$19,794");
+  });
+
+  it("draws each year as fixed, variable and the gross-up on top", () => {
+    const years = html.match(/data-bar="recovery-year"/g) ?? [];
+    expect(years.length, "fixed and variable, both years").toBe(4);
+    const adj = html.match(/data-bar="recovery-grossup"/g) ?? [];
+    expect(adj.length, "one gross-up segment per year").toBe(2);
+  });
+
   it("draws the clock, and shows the days a Q4 closing loses", () => {
     expect(text).toContain("both windows from the day you close");
     expect(text).toContain("2026-12-30"); // 45 days to identify

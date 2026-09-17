@@ -39,6 +39,7 @@ export const TOOL_INDEX: readonly ToolEntry[] = [
   { id: "rentable-vs-usable", label: "Rentable vs usable" },
   { id: "after-tax", label: "After tax" },
   { id: "exchange-1031", label: "1031 exchange" },
+  { id: "expense-recovery", label: "Expense recovery" },
   { id: "closing-proration", label: "Closing" },
   { id: "cap-rate-triangle", label: "Cap rate" },
   { id: "rent-converter", label: "Rent, four ways" },
