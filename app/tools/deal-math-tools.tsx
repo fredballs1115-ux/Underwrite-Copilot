@@ -11,6 +11,7 @@ import { readRecovery } from "@/lib/tools/expense-recovery";
 import { readPercentageRent } from "@/lib/tools/percentage-rent";
 import { readProration } from "@/lib/tools/proration";
 import { readGroundLease } from "@/lib/tools/ground-lease";
+import { readBelief } from "@/lib/tools/what-you-believe";
 import { readReassessment } from "@/lib/tools/tax-reassessment";
 import { TOOL_INDEX } from "@/lib/tools/catalog";
 import { readResidual } from "@/lib/tools/land-residual";
@@ -2499,6 +2500,163 @@ function PercentageRent() {
 // ── 7d. rentable, usable, and the rent you actually pay ────────────────────
 
 /**
+ * What you would have to believe.
+ *
+ * The only card here that runs backwards: it takes the price and the
+ * return, and reports the growth rate the deal is quietly assuming. A pro
+ * forma is a set of assumptions chosen to reach a conclusion, and a deal
+ * that pencils at 3% growth and one that pencils at 9% look identical on
+ * a summary page — so the picture is the required growth drawn against
+ * the growth the reader called ordinary, and the second lever (the exit
+ * cap) drawn against the cap they are buying at.
+ *
+ * The return is UNLEVERED and the card says so, because typing a levered
+ * target into an unlevered solve makes every deal look heroic.
+ */
+function WhatYouBelieve() {
+  const [price, setPrice] = useShared("wbp", "25,000,000");
+  const [noi, setNoi] = useShared("wbn", "1,500,000");
+  const [hold, setHold] = useShared("wbh", "5");
+  const [exitCap, setExitCap] = useShared("wbx", "6.25");
+  const [target, setTarget] = useShared("wbt", "12");
+  const [saleCost, setSaleCost] = useShared("wbs", "2");
+  const [market, setMarket] = useShared("wbm", "3");
+
+  const r = useMemo(
+    () =>
+      readBelief({
+        price: num(price),
+        noi: num(noi),
+        holdYears: num(hold),
+        exitCapPct: num(exitCap),
+        targetIrrPct: num(target),
+        sellingCostPct: num(saleCost),
+        marketGrowthPct: num(market),
+      }),
+    [price, noi, hold, exitCap, target, saleCost, market],
+  );
+
+  const widestGrowth = Math.max(
+    0.5,
+    Math.abs(r.requiredGrowthPct ?? 0),
+    Math.abs(num(market) ?? 0),
+  );
+  const widestCap = Math.max(0.5, r.goingInCapPct ?? 0, r.requiredExitCapPct ?? 0);
+
+  return (
+    <Card
+      id="what-you-believe"
+      eyebrow="The inversion"
+      title="What you would have to believe"
+    >
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+        <Field label="Price" value={price} onChange={setPrice} placeholder="$25M" />
+        <Field label="NOI, year one" value={noi} onChange={setNoi} placeholder="1,500,000" />
+        <Field label="Hold" suffix="yr" value={hold} onChange={setHold} placeholder="5" />
+        <Field label="Exit cap" suffix="%" value={exitCap} onChange={setExitCap} placeholder="6.25" />
+        <Field label="Target, unlevered" suffix="%" value={target} onChange={setTarget} placeholder="12" />
+        <Field label="Cost of sale" suffix="%" value={saleCost} onChange={setSaleCost} placeholder="2" />
+        <Field label="Ordinary growth" suffix="%" value={market} onChange={setMarket} placeholder="3" />
+      </div>
+
+      {r.requiredGrowthPct !== null && (
+        <div className="mt-6 rounded-xl bg-faint p-4">
+          <p className="text-sm font-semibold">
+            This deal is assuming NOI grows{" "}
+            <span className="tabular-nums">{pct(r.requiredGrowthPct, 2)}</span>{" "}
+            a year. Nothing on a summary page says so.
+          </p>
+          <div className="mt-3 space-y-2">
+            {[
+              {
+                label: "What the return requires",
+                amount: r.requiredGrowthPct,
+                tone: r.reach === "at market" ? "bg-brand" : "bg-kill",
+              },
+              {
+                label: "What you called ordinary",
+                amount: num(market) ?? 0,
+                tone: "bg-ink/25",
+              },
+            ].map((row) => (
+              <div key={row.label}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="text-muted">{row.label}</span>
+                  <span className="shrink-0 font-mono font-semibold tabular-nums">
+                    {pct(row.amount, 2)}
+                  </span>
+                </div>
+                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-white">
+                  <div
+                    data-bar="growth"
+                    className={`h-full rounded-full ${row.tone}`}
+                    style={{
+                      width: `${(Math.max(0, row.amount) / widestGrowth) * 100}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {r.requiredExitCapPct !== null && (
+        <div className="mt-5">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+            Or leave growth at ordinary and move the exit instead
+          </p>
+          <div className="mt-2 space-y-2">
+            {[
+              { label: "The cap you are buying at", amount: r.goingInCapPct, tone: "bg-ink/25" },
+              {
+                label: "The exit cap the target then needs",
+                amount: r.requiredExitCapPct,
+                tone: (r.capShiftBps ?? 0) < 0 ? "bg-kill" : "bg-brand",
+              },
+            ].map((row) => (
+              <div key={row.label}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="text-muted">{row.label}</span>
+                  <span className="shrink-0 font-mono font-semibold tabular-nums">
+                    {pct(row.amount, 2)}
+                  </span>
+                </div>
+                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-faint">
+                  <div
+                    data-bar="exit"
+                    className={`h-full rounded-full ${row.tone}`}
+                    style={{ width: `${((row.amount ?? 0) / widestCap) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {r.exitPrice !== null && (
+        <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
+          <Stat label="Going-in cap" value={pct(r.goingInCapPct, 2)} tone="muted" />
+          <Stat label="Growth required" value={pct(r.requiredGrowthPct, 2)} />
+          <Stat label={`NOI in year ${(num(hold) ?? 5) + 1}`} value={usd(r.exitNoi)} tone="muted" />
+          <Stat label="Exit price, net of sale" value={usd(r.exitPrice)} tone="muted" />
+        </div>
+      )}
+
+      {r.note && <p className="mt-4 text-sm text-muted">{r.note}</p>}
+
+      <p className="mt-4 text-[11px] leading-relaxed text-muted">
+        This return is unlevered. Most stated targets are not: a 12% levered
+        on 60% debt is a far smaller ask than a 12% unlevered one, so a
+        levered number typed here will make any deal look heroic. Size the
+        debt separately above.
+      </p>
+    </Card>
+  );
+}
+
+/**
  * A building on someone else's land.
  *
  * One card for the structure where ordinary screening arithmetic is not
@@ -3741,6 +3899,7 @@ export function DealMathTools() {
       <DebtSizer />
       <LoanOverTime />
       <CashFlowStrip />
+      <WhatYouBelieve />
       <SourcesUses />
       <UnitMix />
       <SiteMeasures />

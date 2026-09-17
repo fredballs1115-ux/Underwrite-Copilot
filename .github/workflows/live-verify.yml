@@ -507,3 +507,8 @@ jobs:
           # served bytes, so a marker grepping it would read NOT DEPLOYED.
           mark "#325 the ground lease is on /tools" grep -q "The lease ends, so the leasehold ends with it" p_tools2.html
           mark "#325 the two halves move opposite ways" grep -q "opposite directions as it runs" p_tools2.html
+          mark "#326 the inversion is on /tools" grep -q "What you would have to believe" p_tools2.html
+          # The caveat that keeps the card honest: an unlevered solve fed a
+          # levered target calls every deal heroic. No apostrophe, no
+          # interpolated value inside the phrase.
+          mark "#326 it says the return is unlevered" grep -q "levered number typed here will make any deal look heroic" p_tools2.html

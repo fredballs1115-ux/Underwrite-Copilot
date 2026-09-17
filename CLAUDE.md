@@ -404,6 +404,32 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   default and never a number this module asserts. The sales column reads
   through `readStrip` — the cash-flow card's reader, so the
   comma-as-thousands-mark trap stays solved in one place.
+- What you would have to believe: `lib/tools/what-you-believe.ts` (pure).
+  The only card on `/tools` that runs BACKWARDS — it takes the price and
+  the return and reports the growth rate the deal is quietly assuming,
+  because a pro forma is a set of assumptions chosen to reach a
+  conclusion and a deal that pencils at 3% growth looks identical on a
+  summary page to one that pencils at 9%. Four rules. **The exit
+  capitalises the FORWARD NOI** (year N+1, what the next buyer is
+  purchasing); capitalising the trailing year understates the exit by a
+  whole year of growth, by an amount that varies with the rate being
+  solved for. **Solve, do not scan**: NPV at the TARGET rate is monotone
+  in growth, so its zero is exactly where the IRR equals the target —
+  and a test rebuilds the stream at the solved rate and runs it through
+  `irr` from `lib/underwrite/engine`, the one behind the Excel export, so
+  the page and the workbook can never disagree (the same round trip
+  checks the exit-cap solve). **The required growth is a CLAIM, not a
+  verdict** — the benchmark is an input and the words ("at market", "a
+  stretch", "heroic", at `STRETCH_POINTS` / `HEROIC_POINTS`) describe the
+  DISTANCE from it, never the market. And **cap compression is not a
+  plan**: the module solves the other lever too and flags the case that
+  should stop a screening, an exit cap required to be TIGHTER than the
+  going-in cap. On the seeded $25M / $1.5M deal a 12% unlevered return
+  needs 7.16% growth, or an exit cap of 5.01% against the 6.00% being
+  bought at. **The return is UNLEVERED and the card says so**: a levered
+  target typed into an unlevered solve makes every deal look heroic, and
+  debt is deliberately out of scope because `sizeLoan` and `readDebt`
+  already do it.
 - A building on someone else's land: `lib/tools/ground-lease.ts` (pure).
   The one structure on `/tools` where ordinary screening arithmetic is
   wrong by a MULTIPLE rather than by a margin, and wrong the flattering

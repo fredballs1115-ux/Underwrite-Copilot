@@ -30,6 +30,7 @@ export const TOOL_INDEX: readonly ToolEntry[] = [
   { id: "size-the-loan", label: "Size the loan" },
   { id: "the-loan-over-the-hold", label: "Over the hold" },
   { id: "cash-flow-strip", label: "Cash flow" },
+  { id: "what-you-believe", label: "What you believe" },
   { id: "sources-and-uses", label: "Sources & uses" },
   { id: "unit-mix", label: "Unit mix" },
   { id: "the-site", label: "The site" },

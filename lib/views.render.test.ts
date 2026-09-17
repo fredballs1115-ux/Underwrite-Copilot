@@ -1382,6 +1382,22 @@ describe("the deal math tools", () => {
     expect(text).toContain("$2.20M"); // what that is worth in negotiation
   });
 
+  it("names the growth rate a price is quietly assuming", () => {
+    // $25M for $1.5M is a 6.00% cap. Held five years and sold at 6.25%
+    // with 2% of sale cost, a 12% UNLEVERED return needs 7.16% growth —
+    // 4.16 points past the 3% the reader called ordinary, so "heroic".
+    expect(text).toContain("What you would have to believe");
+    expect(text).toContain("7.16%"); // the growth required
+    expect(text).toContain("heroic");
+    expect(text).toContain("5.01%"); // the exit cap at ordinary growth
+    expect(text).toContain("This return is unlevered");
+  });
+
+  it("draws the growth pair and the exit-cap pair", () => {
+    expect((html.match(/data-bar="growth"/g) ?? []).length).toBe(2);
+    expect((html.match(/data-bar="exit"/g) ?? []).length).toBe(2);
+  });
+
   it("prices a leasehold over its term rather than as a perpetuity", () => {
     // $8M NOI less $2M ground rent is $6M, which at a 5% fee-simple cap
     // looks like $120M. Over the 40 years the lease actually has, at 8%,
