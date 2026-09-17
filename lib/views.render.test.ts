@@ -1442,6 +1442,25 @@ describe("the deal math tools", () => {
     expect(text).toContain("decides who can take the property");
   });
 
+  it("draws the two ways out, one of them a gain", () => {
+    expect(text).toContain("What it costs to get out of the loan early");
+    expect(text).toContain("$200,000"); // yield maintenance, all of it the floor
+    // The sign goes outside the dollar, which it did not before this
+    // card made a negative headline figure impossible to miss.
+    expect(text).toContain("-$385,213"); // defeasance, a gain after hard costs
+    expect(text).not.toContain("$-");
+    expect(text).toContain("Yield maintenance — all of it the floor");
+    // Two rows, each a left and a right half of the same centre line.
+    expect((html.match(/data-bar="prepay"/g) ?? []).length).toBe(4);
+  });
+
+  it("names the cheaper route and what the debt is worth to a buyer", () => {
+    expect(text).toContain("defeasance");
+    expect(text).toContain("$1.24M"); // below market, to a buyer assuming it
+    expect(text).toContain("the lender loses nothing by being repaid");
+    expect(text).toContain("Both are worth having; only one can be had");
+  });
+
   it("draws the honest answer against the spread everyone starts from", () => {
     expect(text).toContain("What a below-market lease is worth to end");
     expect(text).toContain("$2.93M"); // the spread over the term

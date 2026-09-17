@@ -18,6 +18,7 @@ import { readResidual } from "@/lib/tools/land-residual";
 import { readLand, readSpace } from "@/lib/tools/measure-math";
 import { readStack } from "@/lib/tools/capital-stack";
 import { readBuyout } from "@/lib/tools/lease-buyout";
+import { readPrepayment } from "@/lib/tools/prepayment";
 import { buildStack } from "@/lib/tools/sources-uses";
 import { readMix, totalMix } from "@/lib/tools/unit-mix";
 import { runWaterfall } from "@/lib/tools/waterfall-math";
@@ -218,15 +219,26 @@ function CopyButton({
 
 // ── the output layer ───────────────────────────────────────────────────────
 
+// The sign goes OUTSIDE the dollar. Interpolating a negative straight in
+// gives "$-385,213", which is not how money is written anywhere, and it
+// shows up wherever a figure can legitimately go below zero — a stack
+// oversized against its basis, a residual that does not work at any
+// price, a defeasance that pays you. Ninety-odd call sites share these
+// two helpers, so it is fixed once here.
+const money = (n: number, body: (abs: number) => string) =>
+  `${n < 0 ? "-" : ""}$${body(Math.abs(n))}`;
+
 const usd = (n: number | null) =>
   n === null
     ? "—"
-    : Math.abs(n) >= 1_000_000
-      ? `$${(n / 1_000_000).toFixed(2)}M`
-      : `$${Math.round(n).toLocaleString("en-US")}`;
+    : money(n, (a) =>
+        a >= 1_000_000
+          ? `${(a / 1_000_000).toFixed(2)}M`
+          : Math.round(a).toLocaleString("en-US"),
+      );
 
 const usdExact = (n: number | null) =>
-  n === null ? "—" : `$${Math.round(n).toLocaleString("en-US")}`;
+  n === null ? "—" : money(n, (a) => Math.round(a).toLocaleString("en-US"));
 
 const pct = (n: number | null, places = 2) =>
   n === null ? "—" : `${n.toFixed(places)}%`;
@@ -2840,6 +2852,146 @@ function GroundLease() {
 }
 
 /**
+ * What it costs to get out of the loan early.
+ *
+ * Two pictures, and the first has to be signed from a centre line: on a
+ * loan struck when rates were low, defeasance is a GAIN and yield
+ * maintenance sits on its floor, so the two routes out point in opposite
+ * directions. Drawn from a common zero they can be read at a glance; on
+ * separate tracks a negative would have nowhere to go.
+ *
+ * The second draws the penalty against what the debt is worth to a buyer
+ * who could assume it, because the same rate move drives both and drives
+ * them the OPPOSITE way. Those two numbers belong on one picture and
+ * almost never appear on one page.
+ */
+function Prepayment() {
+  const [bal, setBal] = useShared("ppb", "20,000,000");
+  const [rate, setRate] = useShared("ppr", "3.75");
+  const [months, setMonths] = useShared("ppm", "30");
+  const [amort, setAmort] = useShared("ppa", "30");
+  const [tsy, setTsy] = useShared("ppt", "4.75");
+  const [floor, setFloor] = useShared("ppf", "1");
+  const [costs, setCosts] = useShared("ppc", "75,000");
+  const [open, setOpen] = useShared("ppo", "24");
+  const [mkt, setMkt] = useShared("ppk", "6.5");
+
+  const r = useMemo(
+    () =>
+      readPrepayment({
+        balance: num(bal),
+        loanRatePct: num(rate),
+        monthsRemaining: num(months),
+        amortYears: num(amort),
+        treasuryRatePct: num(tsy),
+        floorPct: num(floor),
+        defeasanceCosts: num(costs),
+        monthsToOpen: num(open),
+        marketLoanRatePct: num(mkt),
+      }),
+    [bal, rate, months, amort, tsy, floor, costs, open, mkt],
+  );
+
+  const widestWay = Math.max(
+    1,
+    Math.abs(r.yieldMaintenance ?? 0),
+    Math.abs(r.defeasance ?? 0),
+  );
+
+  return (
+    <Card
+      id="prepayment"
+      eyebrow="Prepayment"
+      title="What it costs to get out of the loan early"
+    >
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <Field label="Balance" value={bal} onChange={setBal} placeholder="20,000,000" />
+        <Field label="Loan rate" suffix="%" value={rate} onChange={setRate} placeholder="3.75" />
+        <Field label="Months left" suffix="mo" value={months} onChange={setMonths} placeholder="30" />
+        <Field label="Amortisation" suffix="yr" value={amort} onChange={setAmort} placeholder="30" />
+        <Field label="Treasury, that term" suffix="%" value={tsy} onChange={setTsy} placeholder="4.75" />
+        <Field label="Penalty floor" suffix="%" value={floor} onChange={setFloor} placeholder="1" />
+        <Field label="Defeasance costs" value={costs} onChange={setCosts} placeholder="75,000" />
+        <Field label="Open in" suffix="mo" value={open} onChange={setOpen} placeholder="24" />
+        <Field label="Market loan rate" suffix="%" value={mkt} onChange={setMkt} placeholder="6.5" />
+      </div>
+
+      {r.yieldMaintenance !== null && r.defeasance !== null && (
+        <div className="mt-6 rounded-xl bg-faint p-4">
+          <p className="text-sm font-semibold">
+            Two ways out, and they do not move together. A penalty cannot
+            go below its floor; a Treasury portfolio can cost less than
+            the balance it retires.
+          </p>
+          <div className="mt-3 space-y-2">
+            {[
+              {
+                label: r.atFloor
+                  ? "Yield maintenance — all of it the floor"
+                  : "Yield maintenance",
+                amount: r.yieldMaintenance,
+              },
+              {
+                label: "Defeasance, hard costs included",
+                amount: r.defeasance,
+              },
+            ].map((row) => (
+              <div key={row.label}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="text-muted">{row.label}</span>
+                  <span className="shrink-0 font-mono font-semibold tabular-nums">
+                    {usd(row.amount)}
+                  </span>
+                </div>
+                <div className="relative mt-1 flex h-2 w-full overflow-hidden rounded-full bg-white">
+                  <div className="flex h-full w-1/2 justify-end">
+                    <div
+                      data-bar="prepay"
+                      className="h-full rounded-l-full bg-brand"
+                      style={{ width: `${(Math.max(0, -row.amount) / widestWay) * 100}%` }}
+                    />
+                  </div>
+                  <div className="h-full w-1/2">
+                    <div
+                      data-bar="prepay"
+                      className="h-full rounded-r-full bg-kill"
+                      style={{ width: `${(Math.max(0, row.amount) / widestWay) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-muted">
+            Left of the line is money back. Right of it is money out.
+          </p>
+        </div>
+      )}
+
+      {r.cost !== null && (
+        <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
+          <Stat label="Cheaper route" value={r.cheaper ?? "—"} />
+          <Stat label="What it costs" value={usd(r.cost)} />
+          <Stat label="Below market by" value={usd(r.debtMarkToMarket)} tone="muted" />
+          <Stat label="Balloon at maturity" value={usd(r.balloon)} tone="muted" />
+        </div>
+      )}
+
+      {r.note && <p className="mt-4 text-sm text-muted">{r.note}</p>}
+
+      <p className="mt-4 text-[11px] leading-relaxed text-muted">
+        Yield maintenance is cheap when rates have risen and dear when
+        they have fallen, which is the opposite of most intuitions —
+        because the lender is being made whole on interest it can now
+        earn elsewhere. The same move makes the loan more valuable to a
+        buyer who could assume it. Both are worth having; only one can be
+        had.
+      </p>
+    </Card>
+  );
+}
+
+/**
  * A below-market lease, and what it is worth to end it.
  *
  * Two pictures, and the first is the argument. The honest answer and the
@@ -4357,6 +4509,7 @@ export function DealMathTools() {
       <SourcesUses />
       <CapitalStack />
       <LeaseBuyout />
+      <Prepayment />
       <UnitMix />
       <SiteMeasures />
       <ResidualLand />

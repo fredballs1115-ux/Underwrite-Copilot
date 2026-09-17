@@ -528,3 +528,7 @@ jobs:
           # excerpted above LONG_NOTE, so never grep that).
           mark "#330 the changelog reaches the newest card" grep -q "A below-market lease, and what it is worth to end" p_whats-new.html
           mark "#330 and the one before it" grep -q "The blend is hiding it" p_whats-new.html
+          mark "#331 getting out early is on /tools" grep -q "What it costs to get out of the loan early" p_tools2.html
+          # The claim that reverses on a fact about the market rather than
+          # about the building, and the one most intuitions get backwards.
+          mark "#331 yield maintenance is cheap when rates rose" grep -q "Yield maintenance is cheap when rates have risen" p_tools2.html

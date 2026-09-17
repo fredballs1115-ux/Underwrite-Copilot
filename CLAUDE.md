@@ -317,6 +317,32 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   and an oversized stack reports negative common equity rather than zero.
   The card's marker on the bars is `data-bar="layer"` — `data-bar="stack"`
   belongs to sources-and-uses, and its own count test caught the collision.
+- What it costs to get out of the loan early: `lib/tools/prepayment.ts`
+  (pure — the calculation that decides whether a deal can be sold, and
+  the one whose answer reverses on a fact about the MARKET rather than
+  about the building). **Yield maintenance is cheap when rates have
+  risen and dear when they have fallen**, which is the opposite of most
+  intuitions: it makes the lender whole on interest it will not receive,
+  so where today's Treasury is above the coupon there is no loss at all
+  and the penalty drops to its floor (the seeded $20M at 3.75% against a
+  4.75% Treasury is $200,000 of pure floor). **Defeasance is not a
+  penalty but a PURCHASE** — Treasuries replicating the remaining
+  payments — so when rates have risen that portfolio costs LESS than the
+  balance it retires and defeasance is a GAIN ($385,213 here, after
+  $75,000 of hard costs that do not scale); yield maintenance can never
+  go below its floor, defeasance can go below zero, and in a fallen-rate
+  world the order reverses. Two exact identities the tests pin: where
+  the floor does not bind, **defeasance is yield maintenance plus the
+  hard costs to the dollar** (both price the same stream at the same
+  rate), and at the coupon itself the raw penalty is exactly zero.
+  **The same rate move makes the loan worth MORE to a buyer who could
+  assume it** (`debtMarkToMarket`, against the market LENDING rate, not
+  the Treasury — conflating the two is the easy mistake), so the two
+  numbers pull opposite ways and belong on one page. And **the open
+  window costs nothing**, so the penalty is really the price of closing
+  sooner, said as a rate per month of waiting bought back — and null,
+  not negative, where leaving early pays. Runs monthly, as `debt-math`
+  does. Bars: `data-bar="prepay"`.
 - A below-market lease, and what ending it is worth: `lib/tools/lease-buyout.ts`
   (pure). The naive answer — market less in-place, over the years left,
   discounted, minus the cost of re-tenanting — is wrong on BOTH halves.
