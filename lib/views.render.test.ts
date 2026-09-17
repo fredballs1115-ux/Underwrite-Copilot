@@ -1382,6 +1382,23 @@ describe("the deal math tools", () => {
     expect(text).toContain("$2.20M"); // what that is worth in negotiation
   });
 
+  it("prices a leasehold over its term rather than as a perpetuity", () => {
+    // $8M NOI less $2M ground rent is $6M, which at a 5% fee-simple cap
+    // looks like $120M. Over the 40 years the lease actually has, at 8%,
+    // it is $97.5M — and 18.7% of the perpetual figure is a reversion
+    // the fee owner keeps.
+    expect(text).toContain("A building on someone else's land");
+    expect(text).toContain("$120.00M"); // capitalised as though forever
+    expect(text).toContain("$97.53M"); // worth over the term
+    expect(text).toContain("4.00×"); // ground rent coverage today
+    expect(text).toContain("2.22×"); // after the reset
+  });
+
+  it("draws the leasehold pair and the coverage pair", () => {
+    expect((html.match(/data-bar="leasehold"/g) ?? []).length).toBe(2);
+    expect((html.match(/data-bar="coverage"/g) ?? []).length).toBe(2);
+  });
+
   it("draws both caps and both prices, never one without the other", () => {
     // Each pair is the comparison the card exists to make; a single bar
     // is a figure with nothing to read it against.

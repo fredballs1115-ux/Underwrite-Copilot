@@ -502,3 +502,8 @@ jobs:
           # The claim that makes it more than a subtraction. No apostrophe
           # in the phrase: React escapes one to &#x27; in the served bytes.
           mark "#324 it solves the price rather than scaling it" grep -q "gap is solved rather than scaled" p_tools2.html
+          # No apostrophe in either phrase: the card's title is "A building
+          # on someone else's land" and React escapes that to &#x27; in the
+          # served bytes, so a marker grepping it would read NOT DEPLOYED.
+          mark "#325 the ground lease is on /tools" grep -q "The lease ends, so the leasehold ends with it" p_tools2.html
+          mark "#325 the two halves move opposite ways" grep -q "opposite directions as it runs" p_tools2.html
