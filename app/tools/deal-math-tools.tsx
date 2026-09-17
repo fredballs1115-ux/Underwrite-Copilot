@@ -16,6 +16,7 @@ import { readReassessment } from "@/lib/tools/tax-reassessment";
 import { TOOL_INDEX } from "@/lib/tools/catalog";
 import { readResidual } from "@/lib/tools/land-residual";
 import { readLand, readSpace } from "@/lib/tools/measure-math";
+import { readStack } from "@/lib/tools/capital-stack";
 import { buildStack } from "@/lib/tools/sources-uses";
 import { readMix, totalMix } from "@/lib/tools/unit-mix";
 import { runWaterfall } from "@/lib/tools/waterfall-math";
@@ -2838,6 +2839,250 @@ function GroundLease() {
 }
 
 /**
+ * The layers between the senior loan and the common equity.
+ *
+ * Two pictures, and the second is the point of the card. The first is the
+ * stack itself — one bar, bottom to top, because that is literally what a
+ * capital stack is and drawing it any other way throws away the one thing
+ * about it everybody already understands.
+ *
+ * The second draws every layer's rate against the yield on cost as a line
+ * across the chart. That single line is the whole argument: the blend sits
+ * to the left of it and reads fine, and the two layers that matter sit to
+ * the right of it. A table of rates cannot show that; a bar chart with a
+ * threshold on it shows it before you have read a word.
+ */
+function CapitalStack() {
+  const [cost, setCost] = useShared("csc", "100,000,000");
+  const [noi, setNoi] = useShared("csn", "6,500,000");
+  const [senior, setSenior] = useShared("css", "60,000,000");
+  const [seniorRate, setSeniorRate] = useShared("cssr", "5");
+  const [amort, setAmort] = useShared("csa", "30");
+  const [mezz, setMezz] = useShared("csm", "10,000,000");
+  const [mezzRate, setMezzRate] = useShared("csmr", "9");
+  const [pref, setPref] = useShared("csp", "8,000,000");
+  const [prefRate, setPrefRate] = useShared("cspr", "11");
+  const [accrues, setAccrues] = useShared("csac", "yes");
+  const [hold, setHold] = useShared("csh", "5");
+  const [target, setTarget] = useShared("cst", "15");
+
+  const r = useMemo(
+    () =>
+      readStack({
+        totalCost: num(cost),
+        noi: num(noi),
+        seniorAmount: num(senior),
+        seniorRatePct: num(seniorRate),
+        seniorAmortYears: num(amort),
+        mezzAmount: num(mezz),
+        mezzRatePct: num(mezzRate),
+        prefAmount: num(pref),
+        prefRatePct: num(prefRate),
+        prefAccrues: accrues === "yes",
+        holdYears: num(hold),
+        targetEquityReturnPct: num(target),
+      }),
+    [
+      cost,
+      noi,
+      senior,
+      seniorRate,
+      amort,
+      mezz,
+      mezzRate,
+      pref,
+      prefRate,
+      accrues,
+      hold,
+      target,
+    ],
+  );
+
+  const TONE: Record<string, string> = {
+    senior: "bg-ink",
+    mezz: "bg-brand",
+    pref: "bg-accent",
+    common: "bg-muted",
+  };
+
+  // The rate chart's scale. The yield-on-cost line has to land inside it
+  // whatever the rates are, or the threshold is off the page exactly when
+  // every layer is above it.
+  const rates = r.layers.map((l) => l.ratePct ?? 0);
+  const widestRate = Math.max(1, ...rates, r.yieldOnCostPct ?? 0, r.blendedRatePct ?? 0);
+
+  return (
+    <Card
+      id="capital-stack"
+      eyebrow="Capital stack"
+      title="What each layer costs, and whether it earns its place"
+    >
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <Field label="Total cost" value={cost} onChange={setCost} placeholder="100,000,000" />
+        <Field label="Year 1 NOI" value={noi} onChange={setNoi} placeholder="6,500,000" />
+        <Field label="Senior loan" value={senior} onChange={setSenior} placeholder="60,000,000" />
+        <Field label="Senior rate" suffix="%" value={seniorRate} onChange={setSeniorRate} placeholder="5" />
+        <Field label="Amortisation" suffix="yr" value={amort} onChange={setAmort} placeholder="30" />
+        <Field label="Mezzanine" value={mezz} onChange={setMezz} placeholder="10,000,000" />
+        <Field label="Mezz rate" suffix="%" value={mezzRate} onChange={setMezzRate} placeholder="9" />
+        <Field label="Preferred" value={pref} onChange={setPref} placeholder="8,000,000" />
+        <Field label="Pref rate" suffix="%" value={prefRate} onChange={setPrefRate} placeholder="11" />
+        <Field label="Hold" suffix="yr" value={hold} onChange={setHold} placeholder="5" />
+        <Field label="Equity target" suffix="%" value={target} onChange={setTarget} placeholder="15" />
+        <Choice
+          label="Preferred"
+          value={accrues}
+          onChange={setAccrues}
+          options={[
+            { value: "yes", label: "Accrues" },
+            { value: "no", label: "Pays current" },
+          ]}
+        />
+      </div>
+
+      {r.layers.length > 0 && (
+        <div className="mt-6">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+            The stack, bottom to top
+          </p>
+          <div className="mt-2 flex h-10 w-full overflow-hidden rounded-lg bg-faint">
+            {r.layers.map((l) => (
+              <div
+                key={l.key}
+                data-bar="layer"
+                className={`h-full ${TONE[l.key]}`}
+                style={{ width: `${Math.max(0, l.sharePct)}%` }}
+                title={`${l.label} — ${usd(l.amount)}`}
+              />
+            ))}
+          </div>
+          <div className="mt-3 space-y-1.5">
+            {r.layers.map((l) => (
+              <div key={l.key} className="flex items-baseline gap-2 text-sm">
+                <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-sm ${TONE[l.key]}`} />
+                <span className="text-muted">{l.label}</span>
+                <span className="flex-1 border-b border-dashed border-line" />
+                <span className="shrink-0 font-mono tabular-nums">{usd(l.amount)}</span>
+                <span className="w-14 shrink-0 text-right font-mono text-xs tabular-nums text-muted">
+                  {l.sharePct}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {r.yieldOnCostPct !== null && r.layers.some((l) => l.ratePct !== null) && (
+        <div className="mt-6 rounded-xl bg-faint p-4">
+          <p className="text-sm font-semibold">
+            Every layer against what the building earns. A layer past the
+            line costs more than the deal makes.
+          </p>
+          <div className="relative mt-3 space-y-2">
+            {[
+              ...r.layers
+                .filter((l) => l.ratePct !== null && l.key !== "common")
+                .map((l) => ({
+                  label: l.label,
+                  rate: l.ratePct!,
+                  over: l.accretive === false,
+                })),
+              ...(r.blendedRatePct !== null
+                ? [
+                    {
+                      label: "Blended, all layers",
+                      rate: r.blendedRatePct,
+                      over: r.blendedRatePct > r.yieldOnCostPct,
+                    },
+                  ]
+                : []),
+            ].map((row) => (
+              <div key={row.label}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="text-muted">{row.label}</span>
+                  <span className="shrink-0 font-mono font-semibold tabular-nums">
+                    {pct(row.rate)}
+                  </span>
+                </div>
+                <div className="relative mt-1 h-2 w-full overflow-hidden rounded-full bg-white">
+                  <div
+                    data-bar="rate"
+                    className={`h-full rounded-full ${row.over ? "bg-kill" : "bg-brand"}`}
+                    style={{ width: `${(row.rate / widestRate) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+            {/* The threshold, drawn once across all of them. */}
+            <div
+              className="pointer-events-none absolute inset-y-0 w-px bg-ink"
+              style={{ left: `${(r.yieldOnCostPct / widestRate) * 100}%` }}
+              aria-hidden="true"
+            />
+          </div>
+          <p className="mt-3 text-xs text-muted">
+            The line is the {pct(r.yieldOnCostPct)} yield on cost.
+          </p>
+        </div>
+      )}
+
+      {r.commonEquity !== null && (
+        <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
+          <Stat label="Common equity" value={usd(r.commonEquity)} />
+          <Stat label="Cash-on-cash" value={pct(r.cashOnCashPct)} tone="muted" />
+          <Stat label="Senior alone would give" value={pct(r.cashOnCashSeniorOnlyPct)} tone="muted" />
+          <Stat
+            label="Blended cost"
+            value={pct(r.blendedRatePct)}
+            tone={r.blendHidesIt ? "ink" : "brand"}
+          />
+        </div>
+      )}
+
+      {r.seniorDscr !== null && (
+        <div className="mt-5 grid grid-cols-3 gap-4 border-t border-line pt-5">
+          <Stat
+            label="Senior DSCR"
+            value={r.seniorDscr === null ? "—" : `${r.seniorDscr.toFixed(2)}×`}
+            tone="muted"
+          />
+          <Stat
+            label="With the mezzanine"
+            value={r.combinedDscr === null ? "—" : `${r.combinedDscr.toFixed(2)}×`}
+          />
+          <Stat
+            label="Fixed-charge coverage"
+            value={
+              r.fixedChargeCoverage === null ? "—" : `${r.fixedChargeCoverage.toFixed(2)}×`
+            }
+            tone="muted"
+          />
+        </div>
+      )}
+
+      {r.prefBalanceAtExit !== null && (
+        <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-3">
+          <Stat label="Preferred owed at the sale" value={usd(r.prefBalanceAtExit)} />
+          <Stat label="Of which accrual" value={usd(r.prefAccrued)} tone="muted" />
+          <Stat label="Compounding alone" value={usd(r.accrualCost)} tone="muted" />
+        </div>
+      )}
+
+      {r.note && <p className="mt-4 text-sm text-muted">{r.note}</p>}
+
+      <p className="mt-4 text-[11px] leading-relaxed text-muted">
+        Leverage is judged layer by layer, never on the average — a big
+        cheap senior drags a blended rate under the yield on cost while the
+        expensive layers above it take from the equity. Amortisation is a
+        transfer, not a cost, so the rate is what decides whether a layer
+        earns its place and the constant is what the coverage ratio is
+        sized on.
+      </p>
+    </Card>
+  );
+}
+
+/**
  * What the property taxes become once you own it.
  *
  * The card exists for one sentence: the memorandum's tax line is the
@@ -3901,6 +4146,7 @@ export function DealMathTools() {
       <CashFlowStrip />
       <WhatYouBelieve />
       <SourcesUses />
+      <CapitalStack />
       <UnitMix />
       <SiteMeasures />
       <ResidualLand />

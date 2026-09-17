@@ -1398,6 +1398,50 @@ describe("the deal math tools", () => {
     expect((html.match(/data-bar="exit"/g) ?? []).length).toBe(2);
   });
 
+  it("draws the stack bottom to top and names every layer", () => {
+    expect(text).toContain("What each layer costs, and whether it earns its place");
+    // One segment per layer, common equity included — the plug is part of
+    // the picture, not the space left over from it.
+    expect((html.match(/data-bar="layer"/g) ?? []).length).toBe(4);
+    expect(text).toContain("Senior loan");
+    expect(text).toContain("Mezzanine");
+    expect(text).toContain("Preferred (accruing)");
+    expect(text).toContain("Common equity");
+    expect(text).toContain("$22.00M"); // the plug: 100 less 60, 10 and 8
+  });
+
+  it("passes the blend and still marks the layers that are over the line", () => {
+    // The card's whole argument. A 6.13% blended cost against a 6.5%
+    // yield on cost reads fine, and both layers above the senior cost
+    // more than the building earns.
+    expect(text).toContain("6.13%");
+    expect(text).toContain("The line is the 6.50% yield on cost.");
+    expect(text).toContain("The blend is hiding it");
+    const rates = html.match(/data-bar="rate"[^>]*/g) ?? [];
+    expect(rates.length, "three layers plus the blend").toBe(4);
+    expect(rates.filter((b) => b.includes("bg-kill")).length, "mezz and pref").toBe(2);
+    expect(rates.filter((b) => b.includes("bg-brand")).length, "senior and blend").toBe(2);
+  });
+
+  it("shows the ratio rising while the cash falls", () => {
+    // Rule 3: the accruing preferred takes no cash, so cash-on-cash goes
+    // UP as the equity base shrinks. Both figures are drawn so the rise
+    // can be seen for what it is.
+    expect(text).toContain("7.89%"); // cash-on-cash with the full stack
+    expect(text).toContain("6.59%"); // the senior alone would give
+    expect(text).toContain("The ratio is not the test here");
+    // And the balloon it is hiding.
+    expect(text).toContain("$13.48M"); // owed at the sale
+    expect(text).toContain("$5.48M"); // of which accrual
+    expect(text).toContain("$1.08M"); // the compounding alone
+  });
+
+  it("separates the three coverage ratios", () => {
+    expect(text).toContain("1.68×"); // the senior's own
+    expect(text).toContain("1.36×"); // once the mezzanine is counted
+    expect(text).toContain("decides who can take the property");
+  });
+
   it("prices a leasehold over its term rather than as a perpetuity", () => {
     // $8M NOI less $2M ground rent is $6M, which at a 5% fee-simple cap
     // looks like $120M. Over the 40 years the lease actually has, at 8%,
