@@ -28,7 +28,16 @@ const WORDS = [
   "eighteen",
   "nineteen",
   "twenty",
+  "twenty-one",
+  "twenty-two",
+  "twenty-three",
+  "twenty-four",
+  "twenty-five",
 ];
+
+// Longest first, so the alternation cannot match "twenty" inside
+// "twenty-one" and then fail the whole pattern on the hyphen.
+const BY_LENGTH = [...WORDS].sort((a, b) => b.length - a.length);
 
 describe("the /tools catalog", () => {
   it("has a unique anchor per card", () => {
@@ -66,7 +75,7 @@ describe("the /tools catalog", () => {
     const src = read("app/tools/page.tsx");
     const word = WORDS[TOOL_COUNT];
     expect(word, `no word for ${TOOL_COUNT}`).toBeDefined();
-    const said = src.match(new RegExp(`\\b(${WORDS.join("|")}) calculators\\b`, "i"));
+    const said = src.match(new RegExp(`\\b(${BY_LENGTH.join("|")}) calculators\\b`, "i"));
     expect(said, "the description should say how many calculators there are").not.toBeNull();
     expect(said![1].toLowerCase()).toBe(word);
   });

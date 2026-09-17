@@ -10,6 +10,7 @@ import { EXCHANGE_DAYS, IDENTIFY_DAYS, readExchange } from "@/lib/tools/exchange
 import { readRecovery } from "@/lib/tools/expense-recovery";
 import { readPercentageRent } from "@/lib/tools/percentage-rent";
 import { readProration } from "@/lib/tools/proration";
+import { readReassessment } from "@/lib/tools/tax-reassessment";
 import { TOOL_INDEX } from "@/lib/tools/catalog";
 import { readResidual } from "@/lib/tools/land-residual";
 import { readLand, readSpace } from "@/lib/tools/measure-math";
@@ -2497,6 +2498,199 @@ function PercentageRent() {
 // ── 7d. rentable, usable, and the rent you actually pay ────────────────────
 
 /**
+ * What the property taxes become once you own it.
+ *
+ * The card exists for one sentence: the memorandum's tax line is the
+ * SELLER's. In a jurisdiction that reassesses on transfer, the purchase
+ * resets the assessment to the price, and every figure downstream of the
+ * expense line — NOI, cap rate, debt service coverage — was computed on a
+ * bill that stops existing at closing. Nothing in the memorandum is
+ * false; it is simply describing someone else's ownership.
+ *
+ * Two pictures. The caps side by side, because that is the number people
+ * quote to each other, and the prices side by side, because that is the
+ * number they negotiate with. The second is SOLVED rather than scaled —
+ * paying less lowers the assessment, which lowers the tax, which raises
+ * the NOI — and the module's own test pins the round trip.
+ */
+function TaxReassessment() {
+  const [price, setPrice] = useShared("txp", "25,000,000");
+  const [assessed, setAssessed] = useShared("txa", "14,000,000");
+  const [bill, setBill] = useShared("txb", "210,000");
+  const [ratio, setRatio] = useShared("txr", "100");
+  const [rate, setRate] = useShared("txt", "1.5");
+  const [phase, setPhase] = useShared("txph", "3");
+  const [noi, setNoi] = useShared("txn", "1,500,000");
+  const [rule, setRule] = useShared("txrule", "yes");
+
+  const r = useMemo(
+    () =>
+      readReassessment({
+        price: num(price),
+        currentAssessed: num(assessed),
+        currentTax: num(bill),
+        assessmentRatioPct: num(ratio),
+        taxRatePct: num(rate),
+        reassessesOnSale: rule === "yes",
+        phaseInYears: num(phase),
+        omNoi: num(noi),
+      }),
+    [price, assessed, bill, ratio, rate, rule, phase, noi],
+  );
+
+  const widestCap = Math.max(0.01, r.omCapPct ?? 0, r.realCapPct ?? 0);
+  const widestPrice = Math.max(1, num(price) ?? 0, r.priceForOmCap ?? 0);
+
+  return (
+    <Card
+      id="tax-reassessment"
+      eyebrow="Taxes"
+      title="What the taxes become when you own it"
+    >
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <Field label="Price" value={price} onChange={setPrice} placeholder="$25M" />
+        <Field label="NOI in the OM" value={noi} onChange={setNoi} placeholder="1,500,000" />
+        <Field
+          label="Assessed today"
+          value={assessed}
+          onChange={setAssessed}
+          placeholder="14,000,000"
+        />
+        <Field
+          label="Tax bill today"
+          value={bill}
+          onChange={setBill}
+          placeholder="210,000"
+        />
+        <Field label="Assessment ratio" suffix="%" value={ratio} onChange={setRatio} placeholder="100" />
+        <Field label="Tax rate" suffix="%" value={rate} onChange={setRate} placeholder="1.5" />
+        <Field label="Phase-in" suffix="yr" value={phase} onChange={setPhase} placeholder="1" />
+        <Choice
+          label="On transfer"
+          value={rule}
+          onChange={setRule}
+          options={[
+            { value: "yes", label: "Reassessed to price" },
+            { value: "no", label: "Assessment carries over" },
+          ]}
+        />
+      </div>
+
+      {r.newTax !== null && (
+        <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <Stat label="Assessed after closing" value={usd(r.newAssessed)} tone="muted" />
+          <Stat label="Your bill, stabilized" value={usd(r.newTax)} />
+          <Stat label="Year one" value={usd(r.year1Tax)} tone="muted" />
+          <Stat
+            label="Added to the expense line"
+            value={r.increase === null ? "—" : usd(r.increase)}
+            tone={(r.increase ?? 0) > 0 ? "ink" : "muted"}
+          />
+        </div>
+      )}
+
+      {r.omCapPct !== null && r.realCapPct !== null && (
+        <div className="mt-6 rounded-xl bg-faint p-4">
+          <p className="text-sm font-semibold">
+            {(r.capLostBps ?? 0) > 0 ? (
+              <>
+                You are buying a{" "}
+                <span className="tabular-nums">{pct(r.realCapPct, 2)}</span>, not
+                the{" "}
+                <span className="tabular-nums">{pct(r.omCapPct, 2)}</span>{" "}
+                on the cover.
+              </>
+            ) : (
+              <>The assessor changes nothing here — the cap on the cover is the cap you get.</>
+            )}
+          </p>
+
+          <div className="mt-3 space-y-2">
+            {[
+              { label: "The cap on the cover", amount: r.omCapPct, tone: "bg-brand" },
+              {
+                label: "The cap after the assessor catches up",
+                amount: r.realCapPct,
+                tone: (r.capLostBps ?? 0) > 0 ? "bg-kill" : "bg-brand",
+              },
+            ].map((row) => (
+              <div key={row.label}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="text-muted">{row.label}</span>
+                  <span className="shrink-0 font-mono font-semibold tabular-nums">
+                    {pct(row.amount, 2)}
+                  </span>
+                </div>
+                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-white">
+                  <div
+                    data-bar="cap"
+                    className={`h-full rounded-full ${row.tone}`}
+                    style={{ width: `${((row.amount ?? 0) / widestCap) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {r.priceForOmCap !== null && r.overpayment !== null && (
+        <div className="mt-5">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+            Said as a price, which is the number you negotiate with
+          </p>
+          <div className="mt-2 space-y-2">
+            {[
+              { label: "Asking", amount: num(price) ?? 0, tone: "bg-ink/25" },
+              {
+                label: `Where the ${pct(r.omCapPct, 2)} is actually true`,
+                amount: r.priceForOmCap,
+                tone: "bg-brand",
+              },
+            ].map((row) => (
+              <div key={row.label}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="text-muted">{row.label}</span>
+                  <span className="shrink-0 font-mono font-semibold tabular-nums">
+                    {usd(row.amount)}
+                  </span>
+                </div>
+                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-faint">
+                  <div
+                    data-bar="price"
+                    className={`h-full rounded-full ${row.tone}`}
+                    style={{ width: `${(row.amount / widestPrice) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          {r.overpayment > 0 && (
+            <p className="mt-3 text-sm">
+              <span className="font-semibold tabular-nums text-kill">
+                {usd(r.overpayment)}
+              </span>{" "}
+              of the price is the assessor&apos;s, not the seller&apos;s. The
+              gap is solved rather than scaled: paying less lowers the
+              assessment that caused it.
+            </p>
+          )}
+        </div>
+      )}
+
+      {r.note && <p className="mt-4 text-sm text-muted">{r.note}</p>}
+
+      <p className="mt-4 text-[11px] leading-relaxed text-muted">
+        Which jurisdictions reassess on transfer, what they assess at and how
+        long a phase-in runs are facts about a place rather than arithmetic, so
+        they are inputs here. Check them against the county before you price a
+        deal on this.
+      </p>
+    </Card>
+  );
+}
+
+/**
  * The load factor, and what it does to a quoted rent.
  *
  * The whole card exists for one inversion: two buildings quoting different
@@ -3376,6 +3570,7 @@ export function DealMathTools() {
       <Exchange1031 />
       <Recovery />
       <PercentageRent />
+      <TaxReassessment />
       <Proration />
       <div className="grid gap-6 lg:grid-cols-2">
         <CapTriangle />
