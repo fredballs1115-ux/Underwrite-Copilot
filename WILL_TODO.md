@@ -59,7 +59,7 @@ and never was.
 
 Three things they share: every field reads shorthand (`$20M`, `4.75%`,
 `1.25x`); every field travels in the URL, so a sizing is a link; and the
-math is a pure tested module before it reaches a page — **1,014 tests** on
+math is a pure tested module before it reaches a page — **1,019 tests** on
 the thirty-nine modules, plus **118** that render the page itself and check the
 figures it prints. And since #314 the homepage renders its shelf of those
 calculations from the SAME list the page builds its cards from, so it can

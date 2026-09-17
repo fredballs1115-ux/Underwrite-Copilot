@@ -291,11 +291,17 @@ export function readStorage(t: StorageTerms): StorageRead {
   // Rule 4. A free month costs one month out of the whole tenancy.
   const stay = positive(t.averageStayMonths) ? t.averageStayMonths : null;
   const free = nonNegative(t.freeMonths) ? t.freeMonths : 0;
-  const concession = stay === null || stay <= 0 ? null : (free / stay) * 100;
+  // Capped at 100: a tenant who is given more free months than they stay
+  // simply never pays, and the cost of that is all of the rent — not the
+  // 218% the arithmetic gives. Three months free in a two-month market is a
+  // real offer, not only a data-entry error, so this clamps rather than
+  // refusing.
+  const concession = stay === null || stay <= 0 ? null : Math.min(100, (free / stay) * 100);
   // The same offer at a nine-month tenancy — the market fact that makes it
   // a different price with an identical rate sheet.
   const shortStay = stay === null ? null : Math.max(1, stay * (1 - SHORTER_STAY_PCT / 100));
-  const concessionShort = shortStay === null ? null : (free / shortStay) * 100;
+  const concessionShort =
+    shortStay === null ? null : Math.min(100, (free / shortStay) * 100);
 
   const flow =
     nonNegative(t.flowThroughPct) && t.flowThroughPct <= 100 ? t.flowThroughPct / 100 : 1;

@@ -252,6 +252,17 @@ describe("readFeeDrag — the multiple counts every dollar in", () => {
     // The same cash back, a million more in — the multiple has to fall.
     expect(withCall.dealMultiple!).toBeLessThan(without.dealMultiple!);
   });
+
+describe("readFeeDrag — a missing stream is a sentence, not a throw", () => {
+  it("refuses rather than dereferencing an absent cashFlows", () => {
+    // Typed as required and the card always passes an array, so this is a
+    // belt rather than a live bug — but a throw inside a client component is
+    // a broken page where every sibling reader returns a sentence.
+    const r = readFeeDrag({ ...SEED, cashFlows: undefined as unknown as number[] });
+    expect(r.note).toContain("at least two periods");
+    expect(r.lpIrrPct).toBeNull();
+  });
+});
 });
 
 function round2(n: number): number {

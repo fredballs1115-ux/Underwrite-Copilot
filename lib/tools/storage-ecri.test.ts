@@ -151,6 +151,18 @@ describe("readStorage — rule 4, a free month costs what the tenancy is", () =>
     expect(short / long).toBeGreaterThan(2.9);
   });
 
+  it("never costs more than the whole tenancy", () => {
+    // Three months free where tenants stay two is a real offer, not only a
+    // data-entry error: the tenant simply never pays, and the cost of that
+    // is all of the rent rather than the 150% the arithmetic gives.
+    expect(readStorage({ ...SEED, freeMonths: 3, averageStayMonths: 2 }).concessionCostPct).toBe(
+      100,
+    );
+    const far = readStorage({ ...SEED, freeMonths: 24, averageStayMonths: 11 });
+    expect(far.concessionCostPct).toBe(100);
+    expect(far.concessionCostIfShortStayPct).toBe(100);
+  });
+
   it("no stay given, no concession figure — never a guessed one", () => {
     const r = readStorage({ ...SEED, averageStayMonths: null });
     expect(r.concessionCostPct).toBeNull();
