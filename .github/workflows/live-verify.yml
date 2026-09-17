@@ -437,7 +437,27 @@ jobs:
           # `if` rather than `cmd; check $?`: these steps run under `bash -e`,
           # where a bare failing grep would abort the step and take every
           # marker after it down with it. An `if` condition is exempt.
-          mark() { if "${@:2}"; then echo "  present      $1"; else echo "  NOT DEPLOYED $1"; fi; }
+          # …and it TALLIES, because this log is long and a truncated read
+          # shows only its tail. The markers against `body.html` sit near
+          # the top of the list and had become unreadable: the tail is all
+          # the /tools ones, and the full log downloads from a blob host
+          # that a sandboxed reader cannot reach. So the last line printed
+          # is a roll-up — how many passed, and the NAME of every one that
+          # did not — which makes a round's proof legible however much of
+          # the middle is out of reach.
+          MARKS_OK=0
+          MARKS_BAD=0
+          MARKS_FAILED=""
+          mark() {
+            if "${@:2}"; then
+              echo "  present      $1"
+              MARKS_OK=$((MARKS_OK + 1))
+            else
+              echo "  NOT DEPLOYED $1"
+              MARKS_BAD=$((MARKS_BAD + 1))
+              MARKS_FAILED="${MARKS_FAILED}~${1}"
+            fi
+          }
           both() { grep -q "on-photo" p_why.html && grep -q "band-words" p_why.html; }
           copies() { [ "$(grep -o "Copy as table" p_tools2.html | wc -l)" -ge 2 ]; }
           echo "ROUND MARKERS — what the live site is actually serving:"
@@ -614,3 +634,9 @@ jobs:
           mark "#341 the cap gap between the two NOIs is computed" grep -q "is 64bp of cap rate above the one a lender would underwrite" p_tools2.html
           mark "#341 and the omission is said as a price" grep -q "5,614,545" p_tools2.html
           mark "#341 the run-rate rule is stated on the card" grep -q "the cost is late rather than absent" p_tools2.html
+          echo ""
+          echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
+          if [ "$MARKS_BAD" -gt 0 ]; then
+            echo "STILL NOT DEPLOYED:"
+            echo "${MARKS_FAILED}" | tr '~' '\n' | sed '/^$/d;s/^/  /'
+          fi
