@@ -7,8 +7,8 @@ Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 
 Ten more PRs, #307–#316, nine on `/tools` or its shop window and one on
 the photographs, all proven live by the round markers — and the table has
-kept growing since (#317, #319, #320, #322, #324, #325, #326, #328).
-**Twenty-four calculations** there now, and
+kept growing since (#317, #319, #320, #322, #324, #325, #326, #328, #329).
+**Twenty-five calculations** there now, and
 they cover the arithmetic an acquisitions analyst does between opening a
 memorandum and sending a letter:
 
@@ -21,6 +21,7 @@ memorandum and sending a letter:
 | **What you believe** (#326) | The only one that runs *backwards*. It takes the price and the return and reports the growth rate the deal is quietly assuming — because a pro forma is a set of assumptions chosen to reach a conclusion, and a deal that pencils at 3% growth and one that pencils at 9% look identical on a summary page. The seeded $25M / $1.5M deal is a 6.00% cap; a **12% unlevered** return needs NOI to grow **7.16% a year**, which is 4.16 points past ordinary. Or leave growth alone and the exit cap has to come in to **5.01%** — 99bp *tighter* than the cap you are buying at, which is a bet on the market re-rating rather than on the building. The exit capitalises next year's NOI, not this year's; the rate is solved and then checked against the same IRR function the Excel export uses; and the card says out loud that the return is unlevered, because a levered target typed in here makes any deal look heroic |
 | **Sources and uses** (#310) | The cheque. Price less loan says $7M; the real number is **$11.03M** once capital, closing, the loan fee and reserves are counted |
 | **Capital stack** (#328) | What sits between the senior loan and the cheque — the mezzanine and preferred most deals actually get done with, and the one place a screening shortcut is wrong in the *flattering* direction. **Leverage is tested layer by layer, never on the blend**: the seeded $100M deal blends to **6.13%** against a **6.5%** yield on cost, which reads fine, and both layers above the senior cost more than the building earns — a big cheap senior drags the average under the line while the expensive layers take from the equity. Amortisation is a *transfer*, not a cost, so the rate decides whether a layer earns its place and the constant sizes the coverage. An accruing preferred flatters the current return by removing equity while paying nothing: this stack takes **$900,000 a year** out of cash flow and cash-on-cash still **rises, 6.59% → 7.89%** — with **$13.48M** owed at the sale, of which **$1.08M** is the compounding alone. Three coverage ratios, not one: **1.68× on the senior, 1.36×** once the mezzanine is counted, which is the ratio that decides who can take the property |
+| **Lease buyout** (#329) | The asset-management question everyone answers with the wrong arithmetic, in *both* directions at once. The turnover — downtime, allowance, commission — is owed either way, so charging it against a buyout counts a cost you were always going to pay; and ending the lease does not hand you market rent tomorrow, it hands you the vacancy first. So the answer is the difference between two whole cash-flow *streams*, not a spread. The seeded 40,000 feet at $28 against a $42 market: the spread says **$2.93M**, the honest figure is **$1.50M**. Drop the in-place rent to $38 and the answer **flips sign** — the spread says pay $908,072 to end it, the streams say **minus $527,092**, meaning pay them to stay. Two consequences with tests: a lease with nothing left to run is worth nothing to end, however far under market, because the spread is still there on the last day; and the spread *cancels* between landlord and tenant, so with no frictions and one discount rate there is exactly **zero** on the table. What makes a buyout happen is vacant possession being worth something the rent does not contain, or a tenant who discounts the future far harder than you do |
 | **LP / GP waterfall** (#308) | The property's IRR is not anybody's IRR: 14.1% for the building, 13.3% to the LP, 20.6% to the GP |
 | **Unit mix** (#309) | Paste the OM's table. Weighted average rent, GPR both ways, loss to lease — **weighted by unit count**, which is $1,858 where averaging the rows gives $1,961 |
 | **The site** (#312) | Acres into square feet (43,560, which nobody remembers), FAR drawn *inside* the zoning limit so the unbuilt part of a site is a visible gap, units per acre, land per unit, and parking said both ways — the same car park is **1.50 spaces per unit and 1.64 per 1,000 feet** |
@@ -39,8 +40,8 @@ memorandum and sending a letter:
 
 Three things they share: every field reads shorthand (`$20M`, `4.75%`,
 `1.25x`); every field travels in the URL, so a sizing is a link; and the
-math is a pure tested module before it reaches a page — **432 tests** on
-the eighteen modules, plus **57** that render the page itself and check the
+math is a pure tested module before it reaches a page — **456 tests** on
+the nineteen modules, plus **59** that render the page itself and check the
 figures it prints. And since #314 the homepage renders its shelf of those
 calculations from the SAME list the page builds its cards from, so it can
 no longer advertise a version of `/tools` that does not exist.

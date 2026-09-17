@@ -317,6 +317,33 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   and an oversized stack reports negative common equity rather than zero.
   The card's marker on the bars is `data-bar="layer"` — `data-bar="stack"`
   belongs to sources-and-uses, and its own count test caught the collision.
+- A below-market lease, and what ending it is worth: `lib/tools/lease-buyout.ts`
+  (pure). The naive answer — market less in-place, over the years left,
+  discounted, minus the cost of re-tenanting — is wrong on BOTH halves.
+  **The turnover is not avoided by waiting, only DEFERRED**: the lease ends
+  eventually and the downtime, allowance and commission are owed either
+  way, so charging their full amount against a buyout counts a cost the
+  landlord was always going to pay. **And the prize is not the spread**:
+  ending the lease hands over the downtime first, so the answer is the
+  difference between TWO STREAMS over one horizon — the lease running its
+  course against it ending today — which is all `buyoutValue` is. Two
+  consequences, each with a test. **A lease with nothing left to run is
+  worth nothing to end**, however far under market, because the spread is
+  still there on the last day; and on a modest spread the honest answer
+  FLIPS SIGN against the naive one (at $38 against a $42 market the spread
+  says pay $908,072 to end it, the streams say −$527,092 — pay them to
+  stay). Strip every friction out and `buyoutValue` equals the naive figure
+  to the dollar, which is the check that the two are one model. **The
+  spread cancels between the two sides**, so with no friction, no move and
+  one discount rate the zone of possible agreement is exactly ZERO — a
+  buyout creates no value of itself, and the two inputs that make one
+  happen are `outsideValue` (vacant possession worth more than the rent)
+  and a tenant discounting the future harder than the landlord. Shares
+  `lease-math`'s two conventions (annual steps on the lease's own
+  anniversary; commission against the GROSS rent) and runs monthly, since
+  downtime is quoted in months. Bars: `data-bar="buyout"` (a signed pair
+  from a centre line, because the two answers can point opposite ways) and
+  `data-bar="side"`.
 - An OM's unit mix table: `lib/tools/unit-mix.ts` (pure). Two rules.
   **Weight by unit count, never by row** — 200 studios at $1,200 beside 4
   penthouses at $6,000 do not average $3,600, and averaging the rows is the

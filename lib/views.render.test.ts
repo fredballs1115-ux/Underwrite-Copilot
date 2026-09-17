@@ -1442,6 +1442,25 @@ describe("the deal math tools", () => {
     expect(text).toContain("decides who can take the property");
   });
 
+  it("draws the honest answer against the spread everyone starts from", () => {
+    expect(text).toContain("What a below-market lease is worth to end");
+    expect(text).toContain("$2.93M"); // the spread over the term
+    expect(text).toContain("$1.50M"); // what ending the lease is worth
+    expect(text).toContain("$14.00 / SF"); // under market by
+    expect(text).toContain("$560,000"); // a year across the space
+    // Two rows, each drawn from the centre line as a left and a right
+    // half, so a negative answer has somewhere to go.
+    expect((html.match(/data-bar="buyout"/g) ?? []).length).toBe(4);
+  });
+
+  it("draws the bargain, and marks the tenant's floor when there is no deal", () => {
+    expect(text).toContain("$3.18M"); // least the tenant should take
+    expect(text).toContain("no deal on these terms");
+    const sides = html.match(/data-bar="side"[^>]*/g) ?? [];
+    expect(sides.length, "the ceiling and the floor").toBe(2);
+    expect(sides.filter((b) => b.includes("bg-kill")).length, "the floor is out of reach").toBe(1);
+  });
+
   it("prices a leasehold over its term rather than as a perpetuity", () => {
     // $8M NOI less $2M ground rent is $6M, which at a 5% fee-simple cap
     // looks like $120M. Over the 40 years the lease actually has, at 8%,
