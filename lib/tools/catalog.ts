@@ -64,6 +64,7 @@ export const TOOL_INDEX: readonly ToolEntry[] = [
   { id: "sources-and-uses", label: "Sources & uses", group: "Equity & returns" },
   { id: "capital-stack", label: "Capital stack", group: "Debt" },
   { id: "lease-buyout", label: "Lease buyout", group: "Leases" },
+  { id: "floating-rate", label: "Floating rate", group: "Debt" },
   { id: "prepayment", label: "Getting out early", group: "Debt" },
   { id: "unit-mix", label: "Unit mix", group: "The property" },
   { id: "the-site", label: "The site", group: "The property" },

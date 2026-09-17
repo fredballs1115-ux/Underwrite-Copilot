@@ -537,3 +537,21 @@ jobs:
           # and neither phrase was anywhere on the page before it.
           mark "#332 the index is clustered" grep -q "Equity &amp; returns" p_tools2.html
           mark "#332 and files the leases together" grep -q "Tax &amp; closing" p_tools2.html
+          # The card that every other debt tool here was pretending did not
+          # exist: a bridge loan floating over SOFR, and whether the cap the
+          # lender required reaches the covenant it is supposed to protect.
+          mark "#334 the floating-rate card is on /tools" grep -q "The bridge loan, and whether its cap protects anything" p_tools2.html
+          # The seeded loan's verdict, which is the whole point of the card
+          # and is COMPUTED on the server — so this proves the math ran, not
+          # merely that the markup shipped.
+          mark "#334 the seeded cap is on the wrong side" grep -q "The cap is on the wrong side of the covenant." p_tools2.html
+          mark "#334 the premium is a quote, not a model" grep -q "never a number this works out" p_tools2.html
+          # This one is not a deploy check. The strip renders ONLY when the
+          # service-role read of the `rates` table answered, so NOT DEPLOYED
+          # here means the live read failed on Render — which is exactly the
+          # thing the sandbox cannot test and the reason to watch it.
+          mark "#334 today's FRED rates reached the page" grep -q "Rates today" p_tools2.html
+          # And the 10-year is deliberately NOT one of the figures that
+          # fills a box: the prepayment clause wants the Treasury matched to
+          # the remaining term, and the 10-year would flatter the penalty.
+          mark "#334 the 10-year is kept out of the prepayment card" grep -q "matched to the REMAINING term" p_tools2.html

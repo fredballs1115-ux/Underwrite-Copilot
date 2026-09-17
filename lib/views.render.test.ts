@@ -1452,6 +1452,36 @@ describe("the deal math tools", () => {
     expect(linked.size).toBe(TOOL_INDEX.length);
   });
 
+  it("puts the bridge loan's cap on the wrong side of its covenant", () => {
+    // The seeded loan is the case the card exists for: a 4.00% strike that
+    // looks like it is right there, 8 bps above the point at which the loan
+    // breaks its own covenant.
+    expect(text).toContain("The bridge loan, and whether its cap protects anything");
+    expect(text).toContain("The cap is on the wrong side of the covenant.");
+    expect(text).toContain("Covenant breaks 3.92%");
+    expect(text).toContain("Cap strike 4.00%");
+    expect(text).toContain("6.64%"); // SOFR + 300 today
+    expect(text).toContain("1.25x"); // DSCR today, comfortably over the 1.20
+    expect(text).toContain("1.19x"); // and under it at the strike
+    expect(text).toContain("75 bps"); // the premium said as a rate
+    // Today, the breach and the strike on one track, plus the fill.
+    expect((html.match(/data-bar="float"/g) ?? []).length).toBe(4);
+  });
+
+  it("says the premium is a quote and not something it worked out", () => {
+    expect(text).toContain("never a number this works out");
+    expect(text).toContain("use funded at closing");
+  });
+
+  it("keeps the 10-year out of the prepayment card and says why", () => {
+    // The strip above carries today's 10-year. The clause here wants the
+    // Treasury matched to the remaining term, so the card is seeded with
+    // its worked example and the note names the direction of the error.
+    expect(html).toContain('value="4.75"');
+    expect(text).toContain("matched to the REMAINING term");
+    expect(text).toContain("understates what getting out costs");
+  });
+
   it("draws the two ways out, one of them a gain", () => {
     expect(text).toContain("What it costs to get out of the loan early");
     expect(text).toContain("$200,000"); // yield maintenance, all of it the floor
@@ -1656,5 +1686,89 @@ describe("the deal math tools", () => {
     expect((html.match(/data-bar="refi"/g) ?? []).length).toBe(2);
     // The binding test is named, as it is in the sizer.
     expect(text).toContain("Debt service coverage");
+  });
+});
+
+// ── today's rates, across the top of /tools ────────────────────────────────
+//
+// The page reads the table and hands the rows in, so this renders the strip
+// on a fixture without a database: the four series the cron writes, as the
+// Sep 16 run actually wrote them.
+import { RatesStrip } from "@/app/tools/rates-strip";
+import { readRates } from "@/lib/live-rates";
+
+describe("the rates strip", () => {
+  const NOW = new Date("2026-09-17T14:00:00Z");
+  const ROWS = [
+    { series_id: "DGS10", obs_date: "2026-09-14", value: 4.97 },
+    { series_id: "DGS10", obs_date: "2026-09-11", value: 4.84 },
+    { series_id: "SOFR", obs_date: "2026-09-15", value: 3.64 },
+    { series_id: "SOFR", obs_date: "2026-09-12", value: 3.7 },
+    { series_id: "MORTGAGE30US", obs_date: "2026-09-10", value: 6.76 },
+    { series_id: "DRCRELEXFACBS", obs_date: "2026-04-01", value: 1.53 },
+  ];
+  const rates = readRates(ROWS, NOW);
+  const html = render(
+    React.createElement(RatesStrip, { rates, seeds: ["SOFR"] }),
+  );
+  const text = visibleText(html);
+
+  it("prints each series with its own observation date", () => {
+    expect(text).toContain("4.97%");
+    expect(text).toContain("3.64%");
+    expect(text).toContain("6.76%");
+    expect(text).toContain("1.53%");
+    expect(text).toContain("10-yr Treasury as of Sep 14");
+    expect(text).toContain("CRE delinquency as of Apr 1");
+  });
+
+  it("draws the move since the observation before, signed", () => {
+    // Asserted on the markup, because the space between the figure and its
+    // unit is the thing worth checking: a number glued to a margin-spaced
+    // span is one word to a screen reader.
+    expect(html).toContain(">13</span> bps"); // the 10-year, up from 4.84
+    expect(html).toContain(">6</span> bps"); // SOFR, down from 3.70
+    expect(html).toContain("▲");
+    expect(html).toContain("▼");
+  });
+
+  it("links every figure back to FRED", () => {
+    for (const id of ["DGS10", "SOFR", "MORTGAGE30US", "DRCRELEXFACBS"]) {
+      expect(html).toContain(`https://fred.stlouisfed.org/series/${id}`);
+    }
+  });
+
+  it("marks only what actually fills a field", () => {
+    // The emphasis tracks the page, not the standing fact: SOFR is seeded
+    // and marked, the 10-year is a contract rate that nothing on the page
+    // currently takes, so it is drawn like the two benchmarks.
+    expect(text).toContain("starts a field below at today's figure");
+    expect(text).toContain("never fills a box");
+    expect((html.match(/border-brand/g) ?? []).length).toBe(1);
+  });
+
+  it("says nothing at all with an empty table", () => {
+    // No strip rather than a stale one: the claim is about today. (The
+    // render helper wraps in a provider, so the page chrome is what is
+    // left — the strip itself is absent.)
+    const none = render(React.createElement(RatesStrip, { rates: [] }));
+    expect(none).not.toContain("Rates today");
+    expect(none).not.toContain("fred.stlouisfed.org");
+  });
+
+  it("names a series that has stopped updating", () => {
+    const stale = readRates(
+      [{ series_id: "DGS10", obs_date: "2026-08-01", value: 4.2 }],
+      NOW,
+    );
+    const out = visibleText(render(React.createElement(RatesStrip, { rates: stale })));
+    expect(out).toContain("not updating");
+    // And it stops seeding, so nothing claims it fills a field.
+    expect(out).not.toContain("starts a field");
+  });
+
+  it("reads clean and names everything", () => {
+    expect(a11yIssues(html), "rates strip").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
   });
 });
