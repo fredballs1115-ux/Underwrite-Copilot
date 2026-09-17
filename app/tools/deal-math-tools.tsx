@@ -18,6 +18,7 @@ import { groupedTools } from "@/lib/tools/catalog";
 import { readResidual } from "@/lib/tools/land-residual";
 import { readLand, readSpace } from "@/lib/tools/measure-math";
 import { readStack } from "@/lib/tools/capital-stack";
+import { readTrailing } from "@/lib/tools/trailing-window";
 import { readBuyout } from "@/lib/tools/lease-buyout";
 import { readDraw } from "@/lib/tools/construction-draw";
 import { readFloating } from "@/lib/tools/floating-rate";
@@ -4270,6 +4271,182 @@ function SourcesUses() {
  * four. Each row's in-place rent sits on a track with its market rent as a
  * tick, which is loss to lease drawn per type instead of only totalled.
  */
+// ── which trailing window the memorandum chose ─────────────────────────────
+
+/**
+ * The seeded column: fifteen months of a stabilized building's NOI.
+ *
+ * Deliberately an ORDINARY deal rather than a dramatic one. The building
+ * really is growing about 3½% a year AND its last three months are its peak
+ * season — both true at once, which is the situation that makes the trap
+ * invisible. Nothing here is a mistake; the seller simply quotes the window
+ * that pays best, and the card prices that choice.
+ */
+const TRAILING_SEED = [
+  "138,000",
+  "140,000",
+  "137,000",
+  "128,000",
+  "124,000",
+  "121,000",
+  "119,000",
+  "122,000",
+  "128,000",
+  "133,000",
+  "137,000",
+  "140,000",
+  "143,000",
+  "145,000",
+  "142,000",
+].join("\n");
+
+function TrailingWindow() {
+  const [raw, setRaw] = useShared("tw", TRAILING_SEED);
+  const [kind, setKind] = useShared("twk", "noi");
+  const [cap, setCap] = useShared("twc", "5.5");
+
+  const read = useMemo(() => readStrip(raw), [raw]);
+  const r = useMemo(
+    () =>
+      readTrailing({
+        monthly: read.values,
+        kind: kind === "revenue" || kind === "expense" ? kind : "noi",
+        capPct: num(cap),
+      }),
+    [read.values, kind, cap],
+  );
+
+  // Every window drawn on one track, scaled to the largest, so the shape of
+  // the claim — a short window standing well clear of the full year — is
+  // visible before a single figure is read. The FULL YEAR is the reference
+  // line, which is the point: it is the only window holding a whole season.
+  const widest = Math.max(1, ...r.windows.map((w) => Math.abs(w.annualized)));
+  const t12Share = r.t12 !== null && widest > 0 ? (Math.abs(r.t12) / widest) * 100 : null;
+  const expense = kind === "expense";
+
+  return (
+    <Card id="trailing-window" eyebrow="The statement" title="Which trailing window">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,19rem)_minmax(0,1fr)]">
+        <div>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
+              Monthly figures — oldest first
+            </span>
+            <textarea
+              value={raw}
+              onChange={(e) => setRaw(e.target.value)}
+              rows={9}
+              spellCheck={false}
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-xs tabular-nums outline-none transition-colors focus:border-brand"
+            />
+          </label>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
+            Fifteen months lets it check the last quarter against the same
+            quarter a year earlier — the only honest short-window read.
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <Choice
+              label="This column is"
+              value={kind}
+              onChange={setKind}
+              options={[
+                { value: "noi", label: "NOI" },
+                { value: "revenue", label: "Revenue" },
+                { value: "expense", label: "Expenses" },
+              ]}
+            />
+            <Field label="Cap rate" suffix="%" value={cap} onChange={setCap} placeholder="5.5" />
+          </div>
+          {read.skipped.length > 0 && (
+            <p className="mt-2 text-xs text-caution">
+              Ignored: {read.skipped.slice(0, 4).join(", ")}
+              {read.skipped.length > 4 ? ` and ${read.skipped.length - 4} more` : ""}.
+            </p>
+          )}
+        </div>
+
+        <div>
+          {r.windows.length > 0 && (
+            <div className="space-y-2">
+              {r.windows.map((w) => {
+                const lead = r.flattering?.months === w.months && r.windows.length > 1;
+                return (
+                  <div key={w.months} className="flex items-center gap-3 text-xs">
+                    <span className="w-24 shrink-0 text-muted">{w.label}</span>
+                    <span className="relative h-3 flex-1 rounded-full bg-faint">
+                      <span
+                        data-bar="window"
+                        className={`absolute inset-y-0 left-0 rounded-full ${
+                          w.months === 12 ? "bg-sidebar" : lead ? "bg-caution" : "bg-brand/50"
+                        }`}
+                        style={{ width: `${(Math.abs(w.annualized) / widest) * 100}%` }}
+                      />
+                      {t12Share !== null && w.months !== 12 && (
+                        <span
+                          className="absolute inset-y-0 w-px bg-ink/50"
+                          style={{ left: `${t12Share}%` }}
+                        />
+                      )}
+                    </span>
+                    <span className="w-24 shrink-0 text-right font-semibold tabular-nums">
+                      {usdExact(w.annualized)}
+                    </span>
+                    <span
+                      className={`w-14 shrink-0 text-right tabular-nums ${
+                        w.months === 12 ? "text-muted" : "text-muted"
+                      }`}
+                    >
+                      {w.months === 12 ? "—" : `${w.vsT12Pct > 0 ? "+" : ""}${w.vsT12Pct}%`}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {r.flattering && r.unflattering && (
+            <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-4 sm:grid-cols-4">
+              <Stat label="Seller quotes" value={r.flattering.label} />
+              <Stat
+                label={expense ? "Understated by" : "Spread"}
+                value={usdExact(r.spread)}
+              />
+              <Stat
+                label="Worth, at that cap"
+                value={usdExact(r.valueSpread)}
+                tone={r.valueSpread === null ? "muted" : "brand"}
+              />
+              <Stat
+                label="Same quarter, a year on"
+                value={r.yoyQuarterPct === null ? "—" : pct(r.yoyQuarterPct, 1)}
+                tone={r.yoyQuarterPct === null ? "muted" : undefined}
+              />
+            </div>
+          )}
+
+          {r.note && <p className="mt-3 text-sm text-caution">{r.note}</p>}
+
+          {r.yoyQuarterPct !== null && r.flattering && r.flattering.months === 3 && (
+            <p className="mt-2 text-sm text-muted">
+              T-3 reads {r.windows.find((w) => w.months === 3)?.vsT12Pct}% above the
+              full year, but against the same three months a year earlier the
+              building is up {r.yoyQuarterPct}%. The rest is the season, not the
+              trend.
+            </p>
+          )}
+
+          <p className="mt-4 border-t border-line pt-3 text-[11px] leading-relaxed text-muted">
+            Annualizing a short window annualizes its seasonality too, and on
+            an expense column it annualizes a year that never pays the tax
+            bill — so the window a memorandum chose is an argument, not a
+            fact. Only the full year holds a whole seasonal cycle.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function UnitMix() {
   const [raw, setRaw] = useShared(
     "mix",
@@ -4891,6 +5068,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <FloatingRate sofrPct={seeds.sofrPct} sofrAsOf={seeds.sofrAsOf} />
       <ConstructionDraw />
       <Prepayment />
+      <TrailingWindow />
       <UnitMix />
       <SiteMeasures />
       <ResidualLand />

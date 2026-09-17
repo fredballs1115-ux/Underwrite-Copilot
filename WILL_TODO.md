@@ -7,8 +7,8 @@ Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 
 Ten more PRs, #307–#316, nine on `/tools` or its shop window and one on
 the photographs, all proven live by the round markers — and the table has
-kept growing since (#317, #319, #320, #322, #324, #325, #326, #328, #329, #331, #334, #336).
-**Twenty-eight calculations** there now, and
+kept growing since (#317, #319, #320, #322, #324, #325, #326, #328, #329, #331, #334, #336, #337).
+**Twenty-nine calculations** there now, and
 they cover the arithmetic an acquisitions analyst does between opening a
 memorandum and sending a letter:
 
@@ -24,6 +24,7 @@ memorandum and sending a letter:
 | **Getting out early** (#331) | The calculation that decides whether a deal can be *sold*, and the one whose answer reverses on a fact about the market rather than about the building. **Yield maintenance is cheap when rates have risen** — it makes the lender whole on interest it will not now receive, so where today's Treasury sits above your coupon there is no loss and the penalty falls to its 1% floor. On the seeded $20M at 3.75% against a 4.75% Treasury that is **$200,000 of pure floor**. Defeasance is not a penalty but a *purchase* — Treasuries replicating the remaining payments — so on the same loan that portfolio costs **$460,213 LESS** than the balance it retires: a **$385,213 gain** after $75,000 of hard costs. A penalty can never go below its floor; a portfolio can go below zero, and in a fallen-rate world the order reverses. The same move makes the loan **$1.24M below market** to a buyer who could assume it — both are worth having, only one can be had. And the open window costs nothing, so the real number is the price of closing sooner |
 | **Lease buyout** (#329) | The asset-management question everyone answers with the wrong arithmetic, in *both* directions at once. The turnover — downtime, allowance, commission — is owed either way, so charging it against a buyout counts a cost you were always going to pay; and ending the lease does not hand you market rent tomorrow, it hands you the vacancy first. So the answer is the difference between two whole cash-flow *streams*, not a spread. The seeded 40,000 feet at $28 against a $42 market: the spread says **$2.93M**, the honest figure is **$1.50M**. Drop the in-place rent to $38 and the answer **flips sign** — the spread says pay $908,072 to end it, the streams say **minus $527,092**, meaning pay them to stay. Two consequences with tests: a lease with nothing left to run is worth nothing to end, however far under market, because the spread is still there on the last day; and the spread *cancels* between landlord and tenant, so with no frictions and one discount rate there is exactly **zero** on the table. What makes a buyout happen is vacant possession being worth something the rent does not contain, or a tenant who discounts the future far harder than you do |
 | **LP / GP waterfall** (#308) | The property's IRR is not anybody's IRR: 14.1% for the building, 13.3% to the LP, 20.6% to the GP |
+| **Trailing window** (#337) | The trap on the cover page that is not an error but a *selection*. "T-3 annualized" and "T-12" are both true statements about the same building, and the seller quotes whichever is larger — nothing says a choice was made. Paste the monthly column: the seeded building's T-3 annualizes to **$1,720,000** against a T-12 of **$1,582,000**, and at the stated 5.5% cap that $138,000 is **$2,509,091 of value** riding on which window the cover quoted. Then the check a memorandum quoting T-3 almost never includes — the same three months a year earlier, where the season sits on both sides and cancels. The building is really up **3.6%**; the other five points were the summer. On an **expense** column it all runs backwards, because there the seller wants the *smallest* figure and gets it by picking a quarter that missed the tax bill: the seeded expenses read **$508,000** against a real **$803,000**, and the card names the month the lump is in and the windows that step over it |
 | **Unit mix** (#309) | Paste the OM's table. Weighted average rent, GPR both ways, loss to lease — **weighted by unit count**, which is $1,858 where averaging the rows gives $1,961 |
 | **The site** (#312) | Acres into square feet (43,560, which nobody remembers), FAR drawn *inside* the zoning limit so the unbuilt part of a site is a visible gap, units per acre, land per unit, and parking said both ways — the same car park is **1.50 spaces per unit and 1.64 per 1,000 feet** |
 | **Land residual** (#313) | The only one that solves for a price rather than judging one. What is left of the finished building after the build and the required return: **$8.29M**, which a quarter point on the exit cap takes to **$5.57M** |
@@ -41,8 +42,8 @@ memorandum and sending a letter:
 
 Three things they share: every field reads shorthand (`$20M`, `4.75%`,
 `1.25x`); every field travels in the URL, so a sizing is a link; and the
-math is a pure tested module before it reaches a page — **551 tests** on
-the twenty-two modules, plus **67** that render the page itself and check the
+math is a pure tested module before it reaches a page — **591 tests** on
+the twenty-three modules, plus **70** that render the page itself and check the
 figures it prints. And since #314 the homepage renders its shelf of those
 calculations from the SAME list the page builds its cards from, so it can
 no longer advertise a version of `/tools` that does not exist.
