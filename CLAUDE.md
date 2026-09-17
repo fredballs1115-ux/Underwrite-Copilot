@@ -1090,6 +1090,39 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   land alone is dear enough that free construction would not work. The
   developer's fee is struck on hard plus soft and never on the land. Bar:
   `data-bar="feas"` (the two rents on one track).
+- The entitlement period, and the option that avoids it:
+  `lib/tools/entitlement.ts` (pure — `land-residual` solves what the dirt is
+  worth entitled and `zoning-envelope` what the code allows; this is the
+  twelve to thirty-six months in between that a pro forma covers as month
+  zero). Four rules. **THE CARRY RUNS ON THE LAND AND NOBODY BUDGETS IT** —
+  a pro forma has one line called "land" and it is the purchase price, so
+  the seeded $6M site at 9% over 24 months carries $1,248,600, 20.8% on top
+  of the basis and $52,025 a month against any delay. Compounded, because
+  interest on land is capitalised into the basis rather than paid out of an
+  income the site does not have. **AN OPTION IS INSURANCE WITH A CLOSED
+  FORM**: `f* = (1 − p)(L − A) + C` — the carry you avoid plus the
+  probability-weighted loss on land you would be stuck with. The identity a
+  test pins at every probability: where the land is worth what you paid
+  whatever happens (`L = A`), the option is worth EXACTLY the carry. The
+  consultants pursuing the approval are paid on BOTH paths, so
+  `entitlementSpend` is reported and deliberately kept out of the
+  break-even — charging it against the option is `hold-or-sell`'s
+  selling-costs error. **THE RISK IS A PROBABILITY, NOT A CONTINGENCY**:
+  `valueIfApproved` $1,801,400 against `valueIfRefused` −$3,498,600, an
+  expectation $1,590,000 below the case a deck shows, and
+  `breakEvenProbabilityPct` inverts it into how sure you would have to be
+  before buying wins. On the seed there is no crossing at all
+  (`optionWinsAtAnyOdds`) because the fee is UNDER the carry it replaces —
+  which the probe surfaced as a bare null and is the reason land gets
+  optioned rather than bought. And **"APPLICABLE TO THE PURCHASE PRICE" IS
+  ONE WORD**: an applicable fee's break-even is `(L − A) + C/(1 − p)`,
+  strictly larger, and it runs away toward certainty because a fee you
+  always get back costs nothing — refused above `CERTAINTY_PCT` rather than
+  printed as an enormous figure, with the note saying why nobody grants
+  one. A site under water even approved (`deadEvenApproved`) says so rather
+  than naming the path that loses less. Bars: `data-bar="entitle"` (the fee
+  against its break-even) and `data-bar="path"` (the two expected outcomes,
+  signed from a centre line, because either can be negative).
 - The swap, and what it costs to get out of one: `lib/tools/swap.ts` (pure —
   the other half of `floating-rate`, which prices the CAP a bridge lender
   requires; this is the instrument every borrower who calls itself hedged

@@ -43,6 +43,7 @@ import { readHotel } from "@/lib/tools/hotel";
 import { readAssumption } from "@/lib/tools/loan-assumption";
 import { readStorage } from "@/lib/tools/storage-ecri";
 import { readSwap } from "@/lib/tools/swap";
+import { readEntitlement } from "@/lib/tools/entitlement";
 import { MIN_GROSS_FOR_WEIGHT, readGrid, readGridText } from "@/lib/tools/comp-grid";
 import {
   breakEvenOccupancyPct,
@@ -7053,6 +7054,173 @@ function Renovation() {
 }
 
 /**
+ * The entitlement period — what waiting costs, and the option that avoids
+ * it.
+ *
+ * Bar markers are named on the elements below rather than in this comment:
+ * the catalog's collision guard reads markers out of the source and files
+ * one spelled above a card function under the card before it.
+ *
+ * Two pictures. The fee against its break-even on one track, because the
+ * whole question is which side of that line the quote falls on; and the
+ * two paths' expected outcomes from a centre line, since either can be
+ * negative and a one-sided bar would hide it.
+ */
+function Entitlement() {
+  const [land, setLand] = useShared("enl", "6,000,000");
+  const [asIs, setAsIs] = useShared("ena", "4,200,000");
+  const [entitled, setEntitled] = useShared("ene", "9,500,000");
+  const [months, setMonths] = useShared("enm", "24");
+  const [carryRate, setCarryRate] = useShared("enc", "9");
+  const [holding, setHolding] = useShared("enh", "60,000");
+  const [spend, setSpend] = useShared("ens", "450,000");
+  const [odds, setOdds] = useShared("enp", "70");
+  const [fee, setFee] = useShared("enf", "300,000");
+  const [applicable, setApplicable] = useShared("enap", "no");
+
+  const r = useMemo(
+    () =>
+      readEntitlement({
+        landPrice: readFigure(land),
+        asIsValue: readFigure(asIs),
+        entitledValue: readFigure(entitled),
+        months: num(months),
+        carryRatePct: num(carryRate),
+        holdingCostsAnnual: readFigure(holding),
+        entitlementSpend: readFigure(spend),
+        approvalProbabilityPct: num(odds),
+        optionFee: readFigure(fee),
+        feeApplicable: applicable === "yes",
+      }),
+    [land, asIs, entitled, months, carryRate, holding, spend, odds, fee, applicable],
+  );
+
+  const feeNow = readFigure(fee);
+  const feeTrack = Math.max(r.breakEvenOptionFee ?? 0, feeNow ?? 0, 1);
+  const paths = [
+    { key: "Buy the land", v: r.expectedValueBuying, tone: "bg-muted/60" },
+    { key: "Take the option", v: r.expectedValueOptioning, tone: "bg-brand" },
+  ].filter((x) => x.v !== null);
+  const pathMax = Math.max(...paths.map((x) => Math.abs(x.v as number)), 1);
+
+  return (
+    <Card id="entitlement" eyebrow="Before the shovel" title="The entitlement clock">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Land price" value={land} onChange={setLand} placeholder="6,000,000" />
+          <Field label="Worth as it is" value={asIs} onChange={setAsIs} placeholder="4,200,000" />
+          <Field label="Worth entitled" value={entitled} onChange={setEntitled} placeholder="9,500,000" />
+          <Field label="Approval takes" suffix="mo" value={months} onChange={setMonths} placeholder="24" />
+          <Field label="Cost of capital" suffix="%" value={carryRate} onChange={setCarryRate} placeholder="9" />
+          <Field label="Taxes etc." suffix="/yr" value={holding} onChange={setHolding} placeholder="60,000" />
+          <Field label="Consultants" value={spend} onChange={setSpend} placeholder="450,000" />
+          <Field label="Chance of approval" suffix="%" value={odds} onChange={setOdds} placeholder="70" />
+          <Field label="Option fee" value={fee} onChange={setFee} placeholder="300,000" />
+          <div className="col-span-2">
+            <Choice
+              label="Fee applicable to the price?"
+              value={applicable}
+              onChange={setApplicable}
+              options={[
+                { value: "no", label: "No — spent either way" },
+                { value: "yes", label: "Yes — credits on exercise" },
+              ]}
+            />
+          </div>
+        </div>
+
+        <div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Stat label="Carry, the whole wait" value={usd(r.carryCost)} tone="brand" />
+            <Stat label="A month of delay" value={usd(r.carryPerMonth)} />
+            <Stat label="On top of the land" value={pct(r.carryAsPctOfLand, 1)} tone="muted" />
+            <Stat label="Option breaks even at" value={usd(r.breakEvenOptionFee)} />
+          </div>
+
+          {r.breakEvenOptionFee !== null && feeNow !== null && (
+            <div className="mt-5">
+              <p className="text-xs uppercase tracking-wide text-muted">
+                The quote against its break-even
+              </p>
+              <div className="mt-2 space-y-1.5">
+                {[
+                  { key: "Quoted fee", v: feeNow, tone: "bg-brand" },
+                  { key: "Break-even", v: r.breakEvenOptionFee, tone: "bg-muted/50" },
+                ].map((row) => (
+                  <div key={row.key} className="flex items-center gap-3 text-xs">
+                    <span className="w-24 shrink-0 text-muted">{row.key}</span>
+                    <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-faint">
+                      <div
+                        data-bar="entitle"
+                        className={`h-full ${row.tone}`}
+                        style={{ width: `${(row.v / feeTrack) * 100}%` }}
+                      />
+                    </div>
+                    <span className="w-28 shrink-0 text-right font-mono tabular-nums text-ink">
+                      {usd(row.v)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {paths.length === 2 && (
+            <div className="mt-5">
+              <p className="text-xs uppercase tracking-wide text-muted">
+                Expected outcome, across both branches
+              </p>
+              <div className="mt-2 space-y-1.5">
+                {paths.map((row) => {
+                  const v = row.v as number;
+                  return (
+                    <div key={row.key} className="flex items-center gap-3 text-xs">
+                      <span className="w-28 shrink-0 text-muted">{row.key}</span>
+                      <div className="relative h-2.5 flex-1 rounded-full bg-faint">
+                        <div className="absolute inset-y-0 left-1/2 w-px bg-line" />
+                        <div
+                          data-bar="path"
+                          className={`absolute inset-y-0 rounded-full ${v < 0 ? "bg-kill" : row.tone}`}
+                          style={
+                            v < 0
+                              ? { right: "50%", width: `${(Math.abs(v) / pathMax) * 50}%` }
+                              : { left: "50%", width: `${(v / pathMax) * 50}%` }
+                          }
+                        />
+                      </div>
+                      <span className="w-28 shrink-0 text-right font-mono tabular-nums text-ink">
+                        {usd(v)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {r.valueIfApproved !== null && r.valueIfRefused !== null && (
+            <p className="mt-4 text-sm text-muted">
+              Approved, buying is worth{" "}
+              <span className="font-semibold text-ink">{usd(r.valueIfApproved)}</span> — the figure
+              a deck shows. Refused, it is{" "}
+              <span className="font-semibold text-kill">{usd(r.valueIfRefused)}</span>. A
+              contingency percentage cannot stand in for a coin that lands one way or the other.
+            </p>
+          )}
+
+          {r.note && <p className="mt-4 text-sm text-caution">{r.note}</p>}
+          <p className="mt-3 text-xs text-muted">
+            The consultants and engineers are paid by whoever is pursuing the approval, so they
+            sit on both paths and cancel out of the break-even — charging them against the option
+            is the error the hold-or-sell card prices on selling costs.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/**
  * The swap, and what it costs to get out of one.
  *
  * Its markers are named on the elements rather than quoted here: the
@@ -8365,6 +8533,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <StorageEcri />
       <CompGrid />
       <Swap />
+      <Entitlement />
       <StraightLineRent />
       <NetEffectiveRent />
       <RentableUsable />
