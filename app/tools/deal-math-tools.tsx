@@ -22,6 +22,7 @@ import { readTrailing } from "@/lib/tools/trailing-window";
 import { readEgi } from "@/lib/tools/economic-occupancy";
 import { readHold } from "@/lib/tools/hold-or-sell";
 import { readBelow } from "@/lib/tools/below-the-line";
+import { readBid } from "@/lib/tools/max-bid";
 import { readBuyout } from "@/lib/tools/lease-buyout";
 import { readDraw } from "@/lib/tools/construction-draw";
 import { readFloating } from "@/lib/tools/floating-rate";
@@ -4460,6 +4461,189 @@ function HoldOrSell() {
 
 // ── what sits below the NOI line ───────────────────────────────────────────
 
+// ── what you can pay ───────────────────────────────────────────────────────
+
+function MaxBid() {
+  const [noi, setNoi] = useShared("mbN", "1,650,000");
+  const [growth, setGrowth] = useShared("mbG", "3");
+  const [hold, setHold] = useShared("mbH", "5");
+  const [exitCap, setExitCap] = useShared("mbX", "6");
+  const [sellCost, setSellCost] = useShared("mbS", "1.5");
+  const [target, setTarget] = useShared("mbT", "15");
+  const [ltv, setLtv] = useShared("mbL", "65");
+  const [dscr, setDscr] = useShared("mbD", "1.25");
+  const [dy, setDy] = useShared("mbY", "9");
+  const [rate, setRate] = useShared("mbR", "6.5");
+  const [amort, setAmort] = useShared("mbA", "30");
+  const [close, setClose] = useShared("mbC", "1.5");
+
+  const r = useMemo(
+    () =>
+      readBid({
+        year1Noi: num(noi) ?? 0,
+        noiGrowthPct: num(growth) ?? 0,
+        holdYears: num(hold) ?? 0,
+        exitCapPct: num(exitCap) ?? 0,
+        sellingCostPct: num(sellCost) ?? 0,
+        targetLeveredIrrPct: num(target) ?? Number.NaN,
+        maxLtvPct: num(ltv),
+        minDscr: num(dscr),
+        minDebtYieldPct: num(dy),
+        ratePct: num(rate) ?? 0,
+        amortYears: num(amort) ?? 0,
+        ioYears: 0,
+        loanFeePct: 1,
+        closingCostPct: num(close),
+      }),
+    [noi, growth, hold, exitCap, sellCost, target, ltv, dscr, dy, rate, amort, close],
+  );
+
+  // The three lender tests on one track, scaled to the largest, so the
+  // binding one is the SHORTEST bar — which is the whole reading.
+  const widestTest = Math.max(1, ...r.tests.map((t) => t.maxLoan));
+  // …and the price on the scale where the binding test changes hands, so
+  // "how close am I to that crossing" is a look rather than a subtraction.
+  const flip = r.bindingFlipPrice;
+  const scaleTop = Math.max(1, r.maxPrice ?? 0, flip ?? 0) * 1.15;
+
+  return (
+    <Card id="max-bid" eyebrow="Returns" title="What you can pay">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Year 1 NOI" value={noi} onChange={setNoi} placeholder="1,650,000" />
+          <Field label="NOI growth" suffix="%" value={growth} onChange={setGrowth} placeholder="3" />
+          <Field label="Hold" suffix="yr" value={hold} onChange={setHold} placeholder="5" />
+          <Field label="Exit cap" suffix="%" value={exitCap} onChange={setExitCap} placeholder="6" />
+          <Field label="Cost to sell" suffix="%" value={sellCost} onChange={setSellCost} placeholder="1.5" />
+          <Field label="Equity needs" suffix="%" value={target} onChange={setTarget} placeholder="15" />
+          <Field label="Max LTV" suffix="%" value={ltv} onChange={setLtv} placeholder="65" />
+          <Field label="Min DSCR" suffix="x" value={dscr} onChange={setDscr} placeholder="1.25" />
+          <Field label="Min debt yield" suffix="%" value={dy} onChange={setDy} placeholder="9" />
+          <Field label="Loan rate" suffix="%" value={rate} onChange={setRate} placeholder="6.5" />
+          <Field label="Amortisation" suffix="yr" value={amort} onChange={setAmort} placeholder="30" />
+          <Field label="Closing costs" suffix="%" value={close} onChange={setClose} placeholder="1.5" />
+        </div>
+
+        <div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Stat label="You can pay" value={usd(r.maxPrice)} tone="brand" />
+            <Stat label="Going-in cap" value={pct(r.capAtMaxPricePct, 2)} />
+            <Stat label="The cheque" value={usd(r.equity)} />
+            <Stat
+              label="Rebuilt, it returns"
+              value={pct(r.checkIrrPct, 1)}
+              tone={r.checkIrrPct === null ? "muted" : undefined}
+            />
+          </div>
+
+          {r.maxPrice !== null && flip !== null && (
+            <div className="mt-5 border-t border-line pt-4">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                Your bid, against where the lender test changes hands
+              </p>
+              <div className="mt-2 flex items-center gap-3 text-xs">
+                <span className="w-16 shrink-0 text-muted">Price</span>
+                <span className="relative h-3 flex-1 rounded-full bg-faint">
+                  <span
+                    data-bar="bid"
+                    className="absolute inset-y-0 left-0 rounded-full bg-brand"
+                    style={{ width: `${Math.min(100, (r.maxPrice / scaleTop) * 100)}%` }}
+                  />
+                  <span
+                    className="absolute inset-y-[-3px] w-0.5 bg-ink"
+                    style={{ left: `${Math.min(100, (flip / scaleTop) * 100)}%` }}
+                  />
+                </span>
+                <span className="w-24 shrink-0 text-right font-semibold tabular-nums">
+                  {usd(r.maxPrice)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {r.tests.length > 0 && (
+            <div className="mt-5 border-t border-line pt-4">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                The loan each test allows — the shortest one is the loan
+              </p>
+              <div className="mt-2 space-y-1.5">
+                {r.tests.map((t) => (
+                  <div key={t.key} className="flex items-center gap-3 text-xs">
+                    <span className="w-36 shrink-0 text-muted">
+                      {t.label} {t.setAt}
+                    </span>
+                    <span className="relative h-2.5 flex-1 rounded-full bg-faint">
+                      <span
+                        data-bar="bid"
+                        className={`absolute inset-y-0 left-0 rounded-full ${
+                          t.binding ? "bg-brand" : "bg-sidebar/40"
+                        }`}
+                        style={{ width: `${(t.maxLoan / widestTest) * 100}%` }}
+                      />
+                    </span>
+                    <span
+                      className={`w-24 shrink-0 text-right tabular-nums ${
+                        t.binding ? "font-semibold" : "text-muted"
+                      }`}
+                    >
+                      {usd(t.maxLoan)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {r.note && <p className="mt-3 text-sm text-caution">{r.note}</p>}
+
+          {r.years.length > 0 && (
+            <div className="mt-5 border-t border-line pt-4">
+              <div className="space-y-1.5">
+                {r.flows.map((f, i) => (
+                  <div key={i} className="flex items-center gap-3 text-xs">
+                    <span className="w-12 shrink-0 text-muted">{i === 0 ? "Now" : `Yr ${i}`}</span>
+                    <span className="relative h-2.5 flex-1 rounded-full bg-faint">
+                      <span className="absolute inset-y-0 left-1/2 w-px bg-line" />
+                      <span
+                        data-bar="bidflow"
+                        className={`absolute inset-y-0 rounded-full ${f >= 0 ? "bg-brand" : "bg-kill"}`}
+                        style={
+                          f >= 0
+                            ? {
+                                left: "50%",
+                                width: `${(Math.abs(f) / Math.max(1, ...r.flows.map(Math.abs))) * 50}%`,
+                              }
+                            : {
+                                right: "50%",
+                                width: `${(Math.abs(f) / Math.max(1, ...r.flows.map(Math.abs))) * 50}%`,
+                              }
+                        }
+                      />
+                    </span>
+                    <span className="w-24 shrink-0 text-right tabular-nums">{usd(f)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <p className="mt-4 border-t border-line pt-3 text-[11px] leading-relaxed text-muted">
+            The price is circular through the debt — a lower price means a
+            smaller loan at the same loan-to-value, which changes both the
+            cheque and the debt service — so it is solved rather than scaled,
+            and the answer is rebuilt and run back through the same IRR the
+            Excel export uses. This is the one card whose target is LEVERED:
+            the debt is modelled, so the number to type is what the equity
+            wants. And the cheque is not the price less the loan — closing
+            costs and the loan fee are funded at closing, so they are equity
+            at risk.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function BelowTheLine() {
   const [noi, setNoi] = useShared("blN", "2,640,000");
   const [sf, setSf] = useShared("blS", "200,000");
@@ -5576,6 +5760,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <LoanOverTime />
       <CashFlowStrip />
       <HoldOrSell />
+      <MaxBid />
       <WhatYouBelieve />
       <SourcesUses />
       <CapitalStack />

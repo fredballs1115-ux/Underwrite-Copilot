@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-17",
+      "title": "What you can pay",
+      "blurb": "Every other calculator here judges a price somebody else set. This one solves for it — the last thing an analyst does before picking up the phone, and the calculation people fudge hardest, because doing it properly is circular. A lower price means a smaller loan at the same loan-to-value, which changes both the cheque and the debt service, which changes the return, so the price cannot be scaled off a return at some other price. It is solved by bisection — the levered IRR falls as the price rises, so the root is exact — and then the whole stream is rebuilt at the answer and run back through the same IRR function the Excel export uses, which is the check the card prints beside the price. On the seeded deal, $1.65M of NOI held five years and sold at a 6.00% cap, an equity that wants 15% can pay $25.54M, a 6.46% going-in cap. Three things it gets right that a spreadsheet usually does not. Which lender test governs MOVES with the price: loan-to-value scales with the price and the coverage tests do not, so the card solves for the crossing — $26.77M here — and a bid sitting near it is a bid whose financing assumption is about to stop being true. The target is LEVERED, and this is the only card where that is right: the debt is modelled, so the number to type is what the equity actually wants. And the cheque is not the price less the loan — closing costs and the loan fee are funded at closing, so they are equity at risk, and leaving them out overstates the bid by most of a million dollars.",
+      "href": "/tools#max-bid"
+    },
+    {
+      "date": "2026-09-17",
       "title": "What sits below the NOI line",
       "blurb": "A broker's NOI and an owner's NOI are different numbers for the same building, and the difference is not a disagreement about operations — it is a disagreement about what counts as an operating expense. Three things get pushed below the line on a marketing package: the replacement reserve, the tenant improvement allowance and the leasing commission. All three are real, recurring, unavoidable cash. A lender underwrites after them; so does a buyer who intends to own the building. The cover page does not. On the seeded 200,000-foot office building offered at $48M, they come to $308,800 a year, and the advertised 5.50% cap is 4.86% to the buyer — 64 basis points, or $5,614,545 of price, which is also exactly the difference between the $48M ask and the $42.39M at which the real NOI earns the advertised cap. Two rules make it honest. Capital that recurs is an expense: replacing a twenty-fifth of a roof every year forever is a cost of doing business, whatever an accountant calls it. And leasing capital is not optional, nor is its annual cost its invoice — a building on five-year leases re-tenants a fifth of itself a year, so spending nothing this year means the cost is late rather than absent. The largest line is also the least certain: at $144,000 if every rolling tenant renews and $472,000 if none does, a 3.3× range driven by nothing but an assumption, which the card draws as a range with the blend marked on it rather than printing one figure and hoping.",
       "href": "/tools#below-the-line"
@@ -149,12 +155,6 @@
       "date": "2026-09-16",
       "title": "The measures an analyst used to Google",
       "blurb": "Two new cards on /tools. The first turns a site into everything it implies — acres into square feet (one acre is 43,560, and nobody keeps that in their head), the floor area ratio drawn INSIDE whatever the zoning allows so the unbuilt part of a site is a visible gap rather than a subtraction, units per acre, land per unit, the average unit, and parking said both ways, because the same car park is 1.50 spaces per unit and 1.64 per 1,000 feet. The second keeps apart the two figures people both call the load factor: rentable over usable less one, which is a landlord's 15%, and common area over rentable, which is the same building's 13.0%. Quoting the smaller one understates the rent every time, so the card says what the quote really is — $38.00 per rentable foot is $43.70 per foot you can furnish. That is the figure that compares two buildings, because a lower quote at a heavier load is the more expensive space.",
-      "href": "/tools"
-    },
-    {
-      "date": "2026-09-16",
-      "title": "A typo is not an instruction",
-      "blurb": "Typing 120 into a promote tier's LP share used to pay the GP negative dollars and leave everything above the last hurdle splitting at −20%; a loan term of 0.4 years ran no schedule at all while still reporting a balloon. Both now refuse and say why, rather than clamping — clamping 120 to 100 would quietly answer a different question than the one that was typed.",
       "href": "/tools"
     }
   ]
