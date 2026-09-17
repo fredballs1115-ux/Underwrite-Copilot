@@ -48,6 +48,15 @@ memorandum and sending a letter:
 | **Opex translator** | One expense per unit, per foot, as a share of income |
 | **Cap triangle · Rent converter · Build or buy** | The quick ones |
 
+**Proven live, one line each.** Since #341 live-verify tallies its own
+markers and prints a roll-up, so a round's evidence is a sentence rather
+than a scroll: #342 landed at `921757e` (`MARKER ROLL-UP: 81 present, 0
+not deployed`), #343 at `c61f570` (81), #344 at `8431fbc` (85), #345 at
+`0e8e298` (89), #346 at `9c914cd` (93), #347 at `68c3e6c` (97). Each is
+a TIMED dispatch five minutes after the merge, never the push-triggered
+run that fires while Render is still building — that one is not evidence
+and never was.
+
 Three things they share: every field reads shorthand (`$20M`, `4.75%`,
 `1.25x`); every field travels in the URL, so a sizing is a link; and the
 math is a pure tested module before it reaches a page — **817 tests** on
