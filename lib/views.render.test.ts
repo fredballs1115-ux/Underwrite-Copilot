@@ -1883,6 +1883,33 @@ describe("the deal math tools", () => {
     expect((html.match(/data-bar="walt"/g) ?? []).length).toBe(3);
     expect((html.match(/data-bar="roll"/g) ?? []).length).toBe(5);
   });
+
+  it("puts the lease-up's worst month deep into a lease-up that is going well", () => {
+    // #345, rule 4. Month 22 is the month the building FILLS — the leasing
+    // capital is due at signing and the rent it buys is six months behind.
+    expect(text).toContain("Filling an empty building");
+    expect(text).toContain(
+      "The worst month is 22, not month one: $6,200,437 of cash out before the building carries itself.",
+    );
+  });
+
+  it("shows slippage costing money the reserve cannot see", () => {
+    // Rule 1, the finding: the trough FALLS to $5,674,789 on a six-month
+    // slip, while the position at a common date is $693,442 worse. The
+    // sentence renders only when the trough moves that way, so its presence
+    // is the claim.
+    expect(text).toContain("$5,674,789");
+    expect(text).toContain("The reserve is the wrong place to look for slippage");
+    expect(text).toContain("Where the cash stands at month 36");
+    expect(text).toContain("$4,158,892"); // six months slower
+    expect(text).toContain("$3,828,910"); // 5% less rent, the smaller shock
+  });
+
+  it("draws the J-curve and the three positions", () => {
+    // One bar a month over the sixty-month horizon, and one per shock.
+    expect((html.match(/data-bar="leaseup"/g) ?? []).length).toBe(60);
+    expect((html.match(/data-bar="slip"/g) ?? []).length).toBe(3);
+  });
 });
 
 // ── today's rates, across the top of /tools ────────────────────────────────

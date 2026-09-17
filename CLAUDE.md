@@ -606,6 +606,34 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   carrying more feet than the building says the two inputs disagree rather
   than clamping quietly. Bars: `data-bar="walt"` (three terms on one track)
   and `data-bar="roll"` (one a year, with the even-roll tick).
+- Filling an empty building: `lib/tools/lease-up.ts` (pure — the months
+  between delivery and stabilization that a pro forma covers in a
+  footnote). Four rules. **The trough is not at delivery**: the allowance
+  and the commission fall due at SIGNING, ahead of the rent they buy, so
+  the seeded 120,000-foot building's worst month is month 22, the month it
+  FILLS — $6,200,437, deep into a lease-up that is going well.
+  **A slower lease-up does not show up in the reserve, and that is the
+  trap**, because the reserve is what gets stress-tested: slipping six
+  months takes the trough DOWN to $5,674,789, since a slower pace spends
+  the leasing capital slower. The cost is time, and it shows only at a
+  COMMON date — hence `compareMonth` (36, clamped to the horizon) and the
+  three `cumulative…AtCompare` figures, signed so a paid-back schedule is
+  not printed as zero: $3,465,450 out as planned against $4,158,892
+  slipped, $693,442 worse and 1.9x what a 5% rent miss costs. **An empty
+  building still pays its taxes**, so the operating expense splits — a
+  fixed share running from the certificate of occupancy (worth $656,370 of
+  trough on the seed) and a variable share following the space OCCUPIED,
+  since a tenant inside its free rent is still running the lights. And
+  **leased is not paying**: the building is full at month 22 and paid in
+  full at 28, and the concession alone is $1,314,787 of the trough.
+  Pre-leased space pays from month one — it burned its free rent during
+  construction. Unlevered unless a monthly debt service is given, because
+  a construction loan's own interest reserve is `construction-draw` and
+  counting it twice would overstate the hole. ONE `runSchedule` behind the
+  answer and both shocks: a shock re-runs the whole schedule rather than
+  scaling, since the trough moves in TIME as well as size. Bars:
+  `data-bar="leaseup"` (the J-curve, one a month from a centre line) and
+  `data-bar="slip"` (the three positions at the common date).
 - The measures on a page of an OM: `lib/tools/measure-math.ts` (pure).
   `readLand` treats acres and square feet as ONE measurement entered from
   whichever side the document stated (`SF_PER_ACRE`, 43,560), and where both

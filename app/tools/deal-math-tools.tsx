@@ -30,6 +30,7 @@ import { readPrepayment } from "@/lib/tools/prepayment";
 import { buildStack } from "@/lib/tools/sources-uses";
 import { readMix, totalMix } from "@/lib/tools/unit-mix";
 import { readRoll, readRollover } from "@/lib/tools/rollover";
+import { readLeaseUp } from "@/lib/tools/lease-up";
 import { runWaterfall } from "@/lib/tools/waterfall-math";
 import {
   breakEvenOccupancyPct,
@@ -5146,6 +5147,181 @@ function TrailingWindow() {
   );
 }
 
+// ── filling an empty building ──────────────────────────────────────────────
+
+function LeaseUp() {
+  const [sf, setSf] = useShared("lusf", "120,000");
+  const [pre, setPre] = useShared("lupre", "24,000");
+  const [stab, setStab] = useShared("lust", "92");
+  const [pace, setPace] = useShared("lupa", "4,000");
+  const [rent, setRent] = useShared("lurt", "34");
+  const [free, setFree] = useShared("lufr", "6");
+  const [ti, setTi] = useShared("luti", "65");
+  const [lc, setLc] = useShared("lulc", "18");
+  const [opex, setOpex] = useShared("luop", "11");
+  const [fixed, setFixed] = useShared("lufx", "65");
+  const [debt, setDebt] = useShared("luds", "");
+
+  const r = useMemo(
+    () =>
+      readLeaseUp({
+        buildingSf: num(sf) ?? 0,
+        preLeasedSf: num(pre),
+        stabilizedOccupancyPct: num(stab),
+        absorptionSfPerMonth: num(pace) ?? 0,
+        rentPerSf: num(rent) ?? 0,
+        freeRentMonths: num(free),
+        tiPerSf: num(ti),
+        lcPerSf: num(lc),
+        opexPerSf: num(opex),
+        fixedOpexSharePct: num(fixed),
+        monthlyDebtService: num(debt),
+        maxMonths: 60,
+      }),
+    [sf, pre, stab, pace, rent, free, ti, lc, opex, fixed, debt],
+  );
+
+  // The J-curve, drawn from a centre line: the hole the building digs and
+  // then climbs out of. One bar a month, signed, scaled to whichever side
+  // reaches further — which is the only way the depth and the recovery stay
+  // on the same scale.
+  const swing = Math.max(1, ...r.months.map((m) => Math.abs(m.cumulative)));
+
+  // Rule 1, as a picture: three positions at ONE date. The reserve comparison
+  // sits beside it, because the point is that the two disagree.
+  const shocks = [
+    { key: "base", label: "As planned", value: r.cumulativeAtCompare, tone: "bg-brand/60" },
+    { key: "slip", label: "Six months slower", value: r.cumulativeIfSixMonthsSlower, tone: "bg-caution" },
+    { key: "rent", label: "5% less rent", value: r.cumulativeIfRentFivePctLower, tone: "bg-sidebar" },
+  ].filter((x) => x.value !== null);
+  const worstShock = Math.max(1, ...shocks.map((x) => Math.abs(x.value ?? 0)));
+
+  return (
+    <Card id="lease-up" eyebrow="The plan" title="Filling an empty building">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)]">
+        <div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Building" suffix="SF" value={sf} onChange={setSf} placeholder="120,000" />
+            <Field label="Pre-leased" suffix="SF" value={pre} onChange={setPre} placeholder="24,000" />
+            <Field label="Stabilized at" suffix="%" value={stab} onChange={setStab} placeholder="92" />
+            <Field label="Absorption" suffix="SF/mo" value={pace} onChange={setPace} placeholder="4,000" />
+            <Field label="Rent" suffix="/SF" value={rent} onChange={setRent} placeholder="34" />
+            <Field label="Free rent" suffix="mo" value={free} onChange={setFree} placeholder="6" />
+            <Field label="Allowance" suffix="/SF" value={ti} onChange={setTi} placeholder="65" />
+            <Field label="Commission" suffix="/SF" value={lc} onChange={setLc} placeholder="18" />
+            <Field label="Operating cost" suffix="/SF" value={opex} onChange={setOpex} placeholder="11" />
+            <Field label="…fixed share" suffix="%" value={fixed} onChange={setFixed} placeholder="65" />
+            <Field label="Debt service" suffix="/mo" value={debt} onChange={setDebt} placeholder="none" />
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted">
+            Leave the debt service blank for the unlevered case. A construction
+            loan funds its own interest — that is the construction draw card,
+            and counting it here as well would overstate the hole.
+          </p>
+        </div>
+
+        <div>
+          {r.months.length > 0 && (
+            <>
+              <div className="flex h-28 items-center gap-px" aria-hidden="true">
+                {r.months.map((m) => {
+                  const share = (Math.abs(m.cumulative) / swing) * 50;
+                  const down = m.cumulative < 0;
+                  return (
+                    <span key={m.month} className="relative h-full flex-1">
+                      <span
+                        data-bar="leaseup"
+                        className={`absolute left-0 right-0 ${down ? "bg-caution/70 top-1/2" : "bg-brand/70 bottom-1/2"}`}
+                        style={{ height: `${share}%` }}
+                      />
+                    </span>
+                  );
+                })}
+              </div>
+              <div className="mt-1 flex justify-between text-[11px] text-muted">
+                <span>Month 1</span>
+                <span>Cumulative cash, month by month</span>
+                <span>Month {r.months.length}</span>
+              </div>
+            </>
+          )}
+
+          <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-4 sm:grid-cols-4">
+            <Stat
+              label="Full at month"
+              value={r.monthsToStabilize === null ? "—" : String(r.monthsToStabilize)}
+              tone={r.monthsToStabilize === null ? "muted" : undefined}
+            />
+            <Stat
+              label="Paid in full at"
+              value={r.monthsToFullPay === null ? "—" : `month ${r.monthsToFullPay}`}
+              tone={r.monthsToFullPay === null ? "muted" : undefined}
+            />
+            <Stat
+              label="Worst month needs"
+              value={usdExact(r.peakFunding)}
+              tone={r.peakFunding === null ? "muted" : "brand"}
+            />
+            <Stat
+              label="Cash back at"
+              value={r.paybackMonth === null ? "—" : `month ${r.paybackMonth}`}
+              tone={r.paybackMonth === null ? "muted" : undefined}
+            />
+          </div>
+
+          {r.note && <p className="mt-3 text-sm text-caution">{r.note}</p>}
+
+          {shocks.length > 1 && r.compareMonth !== null && (
+            <div className="mt-5 border-t border-line pt-4">
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted">
+                Where the cash stands at month {r.compareMonth}
+              </p>
+              <div className="space-y-2">
+                {shocks.map((x) => (
+                  <div key={x.key} className="flex items-center gap-3 text-xs">
+                    <span className="w-36 shrink-0 text-muted">{x.label}</span>
+                    <span className="h-3 flex-1 rounded-full bg-faint">
+                      <span
+                        data-bar="slip"
+                        className={`block h-full rounded-full ${x.tone}`}
+                        style={{ width: `${(Math.abs(x.value ?? 0) / worstShock) * 100}%` }}
+                      />
+                    </span>
+                    <span className="w-24 shrink-0 text-right font-semibold tabular-nums">
+                      {usdExact(Math.abs(x.value ?? 0))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {r.peakIfSixMonthsSlower !== null && r.peakFunding !== null &&
+            r.peakIfSixMonthsSlower < r.peakFunding && (
+              <p className="mt-3 text-sm text-muted">
+                Stress the absorption and the reserve looks{" "}
+                <em>better</em> — the worst month falls to{" "}
+                {usdExact(r.peakIfSixMonthsSlower)}, because a slower pace
+                spends the allowance and the commission slower. The reserve is
+                the wrong place to look for slippage.
+              </p>
+            )}
+
+          <p className="mt-4 border-t border-line pt-3 text-[11px] leading-relaxed text-muted">
+            The months between delivery and stabilization are where a plan
+            deal&rsquo;s money goes, and the pro forma covers them in a
+            footnote. An empty building still pays its taxes; a signed lease is
+            not a paying lease; and the allowance and the commission fall due
+            at signing, ahead of the rent they buy — which is why the worst
+            month is deep into a lease-up that is going well rather than at the
+            start of one that is not.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 // ── the rollover schedule ──────────────────────────────────────────────────
 
 const ROLLOVER_SEED = [
@@ -5997,6 +6173,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <BelowTheLine />
       <UnitMix />
       <Rollover />
+      <LeaseUp />
       <SiteMeasures />
       <ResidualLand />
       <Waterfall />

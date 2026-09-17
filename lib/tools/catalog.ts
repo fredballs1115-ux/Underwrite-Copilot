@@ -74,6 +74,7 @@ export const TOOL_INDEX: readonly ToolEntry[] = [
   { id: "below-the-line", label: "Below the line", group: "The property" },
   { id: "unit-mix", label: "Unit mix", group: "The property" },
   { id: "rollover", label: "When it rolls", group: "Leases" },
+  { id: "lease-up", label: "Lease-up", group: "Value & land" },
   { id: "the-site", label: "The site", group: "The property" },
   { id: "residual-land", label: "Land residual", group: "Value & land" },
   { id: "the-waterfall", label: "LP / GP split", group: "Equity & returns" },
