@@ -1967,6 +1967,43 @@ describe("the deal math tools", () => {
     expect((html.match(/data-bar="prem"/g) ?? []).length).toBe(2);
     expect((html.match(/data-bar="storm"/g) ?? []).length).toBe(2);
   });
+
+  it("separates the property's return from the LP's, before and after fees", () => {
+    // #349. Three answers about one property: 20.63% on the deck, 17.39%
+    // to the LP once the promote is taken, 15.71% once the fees are too.
+    expect(text).toContain("What the LP actually nets");
+    expect(text).toContain("The LP, before fees");
+    expect(text).toContain("20.63%");
+    expect(text).toContain("17.39%");
+    expect(text).toContain("15.71%");
+  });
+
+  it("says the acquisition fee against the cheque, not against the price", () => {
+    // Rule 1. $450,000 is 1.5% of the $30,000,000 price and 4.11% of the
+    // equity the LP actually wires — the figure no deck prints.
+    expect(text).toContain("$450,000");
+    expect(text).toContain("4.11%");
+    expect(text).toContain("15.3%");
+  });
+
+  it("puts the asset management fee on both of its bases", () => {
+    // Rule 2. One missing word in the term sheet is $110,250 a year.
+    expect(text).toContain("$164,250");
+    expect(text).toContain("$54,000");
+    expect(text).toContain("$110,250");
+  });
+
+  it("draws the sponsor's take twice, as underwritten and 10% softer", () => {
+    // Rule 4. The fee share moves 47.6% → 66.5% because the promote more
+    // than halves while the fees fall by $40,000.
+    expect(text).toContain("Exit 10% softer");
+    expect(text).toContain("48% fee");
+    expect(text).toContain("67% fee");
+    // …and the note carries the unrounded pair, which is what moves.
+    expect(text).toContain("66.5% of it is fees rather than promote");
+    expect((html.match(/data-bar="feereturn"/g) ?? []).length).toBe(3);
+    expect((html.match(/data-bar="sponsor"/g) ?? []).length).toBe(4);
+  });
 });
 
 // ── today's rates, across the top of /tools ────────────────────────────────

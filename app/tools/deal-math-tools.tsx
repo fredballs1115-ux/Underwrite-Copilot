@@ -34,6 +34,7 @@ import { readLeaseUp } from "@/lib/tools/lease-up";
 import { readLeaseback } from "@/lib/tools/sale-leaseback";
 import { readInsurance } from "@/lib/tools/insurance";
 import { runWaterfall } from "@/lib/tools/waterfall-math";
+import { DOWNSIDE_EXIT_HAIRCUT, readFeeDrag } from "@/lib/tools/fee-drag";
 import {
   breakEvenOccupancyPct,
   capRatePct,
@@ -6174,6 +6175,251 @@ function Waterfall() {
   );
 }
 
+/**
+ * What the LP nets once the sponsor has been paid.
+ *
+ * Drawn as the three returns on one track, because the argument is that
+ * they are three different answers about one property and a deck prints
+ * only the first.
+ */
+function FeeDrag() {
+  const [raw, setRaw] = useShared(
+    "fcf",
+    "-10,500,000\n700,000\n790,000\n880,000\n970,000\n21,500,000",
+  );
+  const [lpPct, setLpPct] = useShared("flp", "90");
+  const [pref, setPref] = useShared("fpref", "8");
+  const [h1, setH1] = useShared("fh1", "15");
+  const [s1, setS1] = useShared("fs1", "70");
+  const [h2, setH2] = useShared("fh2", "20");
+  const [s2, setS2] = useShared("fs2", "50");
+  const [price, setPrice] = useShared("fprice", "30,000,000");
+  const [sale, setSale] = useShared("fsale", "40,000,000");
+  const [acq, setAcq] = useShared("facq", "1.5");
+  const [am, setAm] = useShared("fam", "1.5");
+  const [amBase, setAmBase] = useShared("fbase", "equity");
+  const [egr, setEgr] = useShared("fegr", "3,600,000");
+  const [disp, setDisp] = useShared("fdisp", "1");
+
+  const read = useMemo(() => readStrip(raw), [raw]);
+  const f = useMemo(
+    () =>
+      readFeeDrag({
+        cashFlows: read.values,
+        lpEquityPct: num(lpPct),
+        prefPct: num(pref),
+        tiers: [
+          { hurdlePct: num(h1) ?? NaN, lpSharePct: num(s1) ?? NaN },
+          { hurdlePct: num(h2) ?? NaN, lpSharePct: num(s2) ?? NaN },
+        ].filter((t) => Number.isFinite(t.hurdlePct) && Number.isFinite(t.lpSharePct)),
+        purchasePrice: readFigure(price),
+        salePrice: readFigure(sale),
+        acquisitionFeePct: num(acq),
+        assetManagementFeePct: num(am),
+        assetManagementBase: amBase === "revenue" ? "revenue" : "equity",
+        effectiveGrossRevenue: readFigure(egr),
+        dispositionFeePct: num(disp),
+      }),
+    [read.values, lpPct, pref, h1, s1, h2, s2, price, sale, acq, am, amBase, egr, disp],
+  );
+
+  // The three returns share one track so the two drops are comparable by
+  // eye. Scaled to the property's own return, which is always the largest.
+  const top = Math.max(f.dealIrrPct ?? 0, 0.0001);
+  const returns: { label: string; value: number | null; tone: "muted" | "ink" | "brand" }[] = [
+    { label: "The property", value: f.dealIrrPct, tone: "muted" },
+    { label: "The LP, before fees", value: f.lpIrrBeforeFeesPct, tone: "ink" },
+    { label: "The LP, net", value: f.lpIrrPct, tone: "brand" },
+  ];
+
+  const takeTop = Math.max(f.gpTakeTotal, f.downsideGpTakeTotal ?? 0, 1);
+
+  return (
+    <Card id="fee-drag" eyebrow="Structure" title="What the LP actually nets">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+        <div>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
+              The property&apos;s cash — year 0 first
+            </span>
+            <textarea
+              value={raw}
+              onChange={(e) => setRaw(e.target.value)}
+              rows={6}
+              spellCheck={false}
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-sm tabular-nums outline-none transition-colors focus:border-brand"
+            />
+          </label>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <Field label="Price" value={price} onChange={setPrice} placeholder="30,000,000" />
+            <Field label="Sale price" value={sale} onChange={setSale} placeholder="40,000,000" />
+            <Field label="Acquisition fee" suffix="%" value={acq} onChange={setAcq} placeholder="1.5" />
+            <Field label="Disposition fee" suffix="%" value={disp} onChange={setDisp} placeholder="1" />
+            <Field label="Asset mgmt fee" suffix="%" value={am} onChange={setAm} placeholder="1.5" />
+            <Choice
+              label="Charged on"
+              value={amBase}
+              onChange={setAmBase}
+              options={[
+                { value: "equity", label: "Invested equity" },
+                { value: "revenue", label: "Gross revenue" },
+              ]}
+            />
+            <Field label="Gross revenue" value={egr} onChange={setEgr} placeholder="3,600,000" />
+            <Field label="LP equity" suffix="%" value={lpPct} onChange={setLpPct} placeholder="90" />
+            <Field label="Pref" suffix="%" value={pref} onChange={setPref} placeholder="8" />
+            <Field label="Hurdle 1" suffix="%" value={h1} onChange={setH1} placeholder="15" />
+            <Field label="LP above it" suffix="%" value={s1} onChange={setS1} placeholder="70" />
+            <Field label="Hurdle 2" suffix="%" value={h2} onChange={setH2} placeholder="20" />
+            <Field label="LP above it" suffix="%" value={s2} onChange={setS2} placeholder="50" />
+          </div>
+        </div>
+
+        <div>
+          {f.dealIrrPct !== null && (
+            <>
+              {/* Three returns, one property. The deck prints the first. */}
+              <div className="space-y-2">
+                {returns.map((r) => (
+                  <div key={r.label}>
+                    <div className="flex items-baseline justify-between gap-3 text-sm">
+                      <span className="text-muted">{r.label}</span>
+                      <span
+                        className={`font-mono tabular-nums ${r.tone === "brand" ? "font-semibold text-brand" : r.tone === "muted" ? "text-muted" : "text-ink"}`}
+                      >
+                        {pct(r.value, 2)}
+                      </span>
+                    </div>
+                    <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-faint">
+                      <div
+                        data-bar="feereturn"
+                        className={`h-full ${r.tone === "brand" ? "bg-brand" : r.tone === "muted" ? "bg-line" : "bg-sidebar"}`}
+                        style={{ width: `${Math.max(0, Math.min(100, ((r.value ?? 0) / top) * 100))}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {f.totalDragPts !== null && (
+                <p className="mt-3 text-sm text-muted">
+                  The deck&apos;s headline loses{" "}
+                  <span className="font-semibold text-ink">{f.totalDragPts} points</span> on the way
+                  to the LP — {f.promoteDragPts} to the promote, which is disclosed, and{" "}
+                  {f.feeDragPts} to fees, which are three lines in the back.
+                </p>
+              )}
+
+              <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <Stat label="Acquisition fee" value={usd(f.acquisitionFee)} />
+                <Stat
+                  label="…of the cheque"
+                  value={pct(f.acquisitionFeePctOfEquity, 2)}
+                  tone="brand"
+                />
+                <Stat label="All fees" value={usd(f.totalFees)} />
+                <Stat label="…of the cheque" value={pct(f.totalFeesPctOfEquity, 1)} tone="brand" />
+              </div>
+
+              {f.assetManagementIfEquityBase !== null && f.assetManagementIfRevenueBase !== null && (
+                <p className="mt-4 text-sm text-muted">
+                  That {trimPct(am)}% asset management fee is{" "}
+                  <span className="font-semibold text-ink">
+                    {usd(f.assetManagementIfEquityBase)}
+                  </span>{" "}
+                  a year on invested equity and{" "}
+                  <span className="font-semibold text-ink">
+                    {usd(f.assetManagementIfRevenueBase)}
+                  </span>{" "}
+                  on gross revenue — {usd(f.assetManagementBaseGap ?? 0)} apart, on one word the
+                  term sheet often leaves out.
+                </p>
+              )}
+
+              {f.downsideGpTakeTotal !== null && (
+                <div className="mt-5">
+                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
+                    What the sponsor takes, and how much of it is fee
+                  </p>
+                  <div className="space-y-2">
+                    {[
+                      {
+                        label: "As underwritten",
+                        total: f.gpTakeTotal,
+                        promote: f.gpTakePromote,
+                        share: f.feeShareOfGpTakePct,
+                      },
+                      {
+                        label: `Exit ${DOWNSIDE_EXIT_HAIRCUT}% softer`,
+                        total: f.downsideGpTakeTotal,
+                        promote: f.downsideGpTakePromote ?? 0,
+                        share: f.downsideFeeSharePct,
+                      },
+                    ].map((row) => (
+                      <div key={row.label}>
+                        <div className="flex items-baseline justify-between gap-3 text-sm">
+                          <span className="text-muted">{row.label}</span>
+                          <span className="font-mono tabular-nums">
+                            {usd(row.total)}
+                            {/* The margin is not a space: a screen reader
+                                would otherwise read "$3.51M48% fee" as one
+                                word. Spell it. */}
+                            {row.share !== null && (
+                              <>
+                                {" "}
+                                <span className="ml-1 text-muted">{pct(row.share, 0)} fee</span>
+                              </>
+                            )}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex h-2 w-full overflow-hidden rounded-full bg-faint">
+                          <div
+                            data-bar="sponsor"
+                            className="h-full bg-brand"
+                            style={{ width: `${((row.total - row.promote) / takeTop) * 100}%` }}
+                          />
+                          <div
+                            data-bar="sponsor"
+                            className="h-full bg-sidebar"
+                            style={{ width: `${(row.promote / takeTop) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted">
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block h-2.5 w-2.5 rounded-sm bg-brand" />
+                      Fees, earned either way
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block h-2.5 w-2.5 rounded-sm bg-sidebar" />
+                      Promote, earned only on performance
+                    </span>
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+
+          {f.note && <p className="mt-4 text-sm text-caution">{f.note}</p>}
+          <p className="mt-3 text-xs text-muted">
+            The fees come out before the waterfall runs, so they sit ahead of the preferred
+            return. Run the same deal weak and the promote goes to zero while every fee is still
+            paid in full.
+          </p>
+          {read.skipped.length > 0 && (
+            <p className="mt-2 text-xs text-caution">
+              Ignored: {read.skipped.slice(0, 4).join(", ")}
+              {read.skipped.length > 4 ? ` and ${read.skipped.length - 4} more` : ""}.
+            </p>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 /** A percent the user typed, shown back without its trailing zeroes. */
 const trimPct = (raw: string) => {
   const n = num(raw);
@@ -6525,6 +6771,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <SiteMeasures />
       <ResidualLand />
       <Waterfall />
+      <FeeDrag />
       <NetEffectiveRent />
       <RentableUsable />
       <AfterTax />
