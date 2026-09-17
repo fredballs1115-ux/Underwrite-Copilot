@@ -1090,6 +1090,44 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   land alone is dear enough that free construction would not work. The
   developer's fee is struck on hard plus soft and never on the land. Bar:
   `data-bar="feas"` (the two rents on one track).
+- The swap, and what it costs to get out of one: `lib/tools/swap.ts` (pure —
+  the other half of `floating-rate`, which prices the CAP a bridge lender
+  requires; this is the instrument every borrower who calls itself hedged
+  actually has). Four rules, the first two the same sentence said twice
+  because the trap is that people believe the second and not the first.
+  **A CAP IS AN OPTION; A SWAP IS AN OBLIGATION** — a cap's worst case is
+  its premium, a swap settles BOTH ways and its worst case lands on the
+  side nobody stress-tests, rates FALLING. The seeded $20M swapped at
+  4.50% against a 3.00% market is $845,849 under water; the position is
+  monotone in the rate with NO KINK at the strike, which is the difference
+  between an option and an obligation and is only visible as a shape (the
+  card draws nine positions from a centre line for exactly that reason).
+  **THE MARK-TO-MARKET IS THE BREAKAGE COST AND IT IS WHAT MAKES THE
+  BUILDING UNSELLABLE** — and it is `prepayment`'s yield-maintenance
+  finding on the opposite instrument IN THE SAME RATE DIRECTION, so a
+  borrower who chose floating-plus-swap over a fixed loan for its
+  flexibility chose an identically shaped exit problem
+  (`sameShapeAsYieldMaintenance`). A cap's whole cost is its premium
+  whatever happens, so `capWouldHaveCostLess` flips at exactly the premium
+  ($277,744 of breakage against a $300,000 quote still favours the swap).
+  **THE ALL-IN RATE IS THE SWAP RATE PLUS THE CREDIT SPREAD** — the swap
+  fixes the INDEX only, so a "3.50% swap" on SOFR plus 250 is a 6.00%
+  loan; the spread reaches the position only through the loan's
+  amortisation, which is the point: a quoting rule, not an arithmetic one.
+  And **THE NOTIONAL HAS TO FOLLOW THE BALANCE** or you are hedging debt
+  already repaid — a flat notional on the seeded loan is $654,607 over the
+  balance at the swap's end, and a swap outlasting the loan
+  (`nakedMonths`) is a rate position rather than a hedge, the larger
+  number and the one nobody models because the loan is gone by then.
+  Balances come from `readDebt` run to whichever of the loan and the swap
+  lasts longer — built only to the loan's term the notional FLATLINED at
+  the balloon and overstated the naked position, the one figure that case
+  exists to report. Two more the probe bought: `annualCostOfBeingWrong` is
+  struck on the notional outstanding today, not the original loan (it read
+  $300,000 flat on a notional that had already amortised), and an EXPIRED
+  swap says so rather than falling through to the coupon of a loan whose
+  hedge has run off. Bars: `data-bar="swap"` (the ladder, signed from a
+  centre line) and `data-bar="notional"`.
 - A grid of comps, adjusted to the subject: `lib/tools/comp-grid.ts` (pure).
   Every analyst does this and it is the one calculation on `/tools` whose
   METHOD is argued over — and the argument is worth a rounding error while

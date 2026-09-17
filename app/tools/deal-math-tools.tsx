@@ -42,6 +42,7 @@ import { readRenovation } from "@/lib/tools/renovation";
 import { readHotel } from "@/lib/tools/hotel";
 import { readAssumption } from "@/lib/tools/loan-assumption";
 import { readStorage } from "@/lib/tools/storage-ecri";
+import { readSwap } from "@/lib/tools/swap";
 import { MIN_GROSS_FOR_WEIGHT, readGrid, readGridText } from "@/lib/tools/comp-grid";
 import {
   breakEvenOccupancyPct,
@@ -7052,6 +7053,218 @@ function Renovation() {
 }
 
 /**
+ * The swap, and what it costs to get out of one.
+ *
+ * Its markers are named on the elements rather than quoted here: the
+ * catalog's collision guard reads markers out of the source and files one
+ * spelled above a card function under the card before it.
+ *
+ * Two pictures. The position across a range of market rates, drawn from a
+ * centre line, because the whole finding is that a swap has no kink — it
+ * settles both ways, where a cap is flat below its strike. And the two
+ * notionals against the loan balance at the swap's end, which is rule 4
+ * said as a picture.
+ */
+function Swap() {
+  const [loan, setLoan] = useShared("swl", "20,000,000");
+  const [spread, setSpread] = useShared("swsp", "2.50");
+  const [amort, setAmort] = useShared("swam", "30");
+  const [io, setIo] = useShared("swio", "2");
+  const [loanTerm, setLoanTerm] = useShared("swlt", "5");
+  const [struck, setStruck] = useShared("swk", "4.50");
+  const [swapTerm, setSwapTerm] = useShared("swt", "5");
+  const [elapsed, setElapsed] = useShared("swe", "24");
+  const [market, setMarket] = useShared("swm", "3.00");
+  const [capQuote, setCapQuote] = useShared("swc", "300,000");
+  const [notional, setNotional] = useShared("swn", "amortising");
+
+  const r = useMemo(
+    () =>
+      readSwap({
+        loanAmount: readFigure(loan),
+        spreadPct: num(spread),
+        amortYears: num(amort),
+        ioYears: num(io),
+        loanTermYears: num(loanTerm),
+        contractRatePct: num(struck),
+        swapTermYears: num(swapTerm),
+        monthsElapsed: num(elapsed),
+        notional: notional === "flat" ? "flat" : "amortising",
+        marketRatePct: num(market),
+        capPremium: readFigure(capQuote),
+      }),
+    [loan, spread, amort, io, loanTerm, struck, swapTerm, elapsed, notional, market, capQuote],
+  );
+
+  // Rule 1 as a picture: the position at a range of market rates around
+  // the struck one. A cap would be flat on the left of its strike; the
+  // absence of that flat stretch IS the difference between an option and
+  // an obligation, and it is only visible as a shape.
+  const strike = num(struck);
+  const ladder = useMemo(() => {
+    if (strike === null) return [];
+    return [-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2].map((d) => {
+      const at = strike + d;
+      return {
+        at,
+        mtm:
+          readSwap({
+            loanAmount: readFigure(loan),
+            spreadPct: num(spread),
+            amortYears: num(amort),
+            ioYears: num(io),
+            loanTermYears: num(loanTerm),
+            contractRatePct: strike,
+            swapTermYears: num(swapTerm),
+            monthsElapsed: num(elapsed),
+            notional: notional === "flat" ? "flat" : "amortising",
+            marketRatePct: at,
+            capPremium: null,
+          }).markToMarket ?? 0,
+      };
+    });
+  }, [strike, loan, spread, amort, io, loanTerm, swapTerm, elapsed, notional]);
+  const widest = Math.max(...ladder.map((s) => Math.abs(s.mtm)), 1);
+
+  const notionalMax = Math.max(
+    r.notionalAtHorizon ?? 0,
+    r.balanceAtHorizon ?? 0,
+    r.nakedNotional ?? 0,
+    1,
+  );
+
+  return (
+    <Card id="swap" eyebrow="Hedging" title="The swap, and getting out of one">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Loan" value={loan} onChange={setLoan} placeholder="20,000,000" />
+          <Field label="Credit spread" suffix="%" value={spread} onChange={setSpread} placeholder="2.50" />
+          <Field label="Struck at" suffix="%" value={struck} onChange={setStruck} placeholder="4.50" />
+          <Field label="Market today" suffix="%" value={market} onChange={setMarket} placeholder="3.00" />
+          <Field label="Swap term" suffix="yrs" value={swapTerm} onChange={setSwapTerm} placeholder="5" />
+          <Field label="Struck" suffix="mo ago" value={elapsed} onChange={setElapsed} placeholder="24" />
+          <Field label="Loan term" suffix="yrs" value={loanTerm} onChange={setLoanTerm} placeholder="5" />
+          <Field label="Amortisation" suffix="yrs" value={amort} onChange={setAmort} placeholder="30" />
+          <Field label="Interest only" suffix="yrs" value={io} onChange={setIo} placeholder="2" />
+          <Field label="A cap would cost" value={capQuote} onChange={setCapQuote} placeholder="300,000" />
+          <div className="col-span-2">
+            <Choice
+              label="Notional"
+              value={notional}
+              onChange={setNotional}
+              options={[
+                { value: "amortising", label: "Follows the balance" },
+                { value: "flat", label: "Flat" },
+              ]}
+            />
+          </div>
+        </div>
+
+        <div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Stat
+              label={r.markToMarket !== null && r.markToMarket < 0 ? "To get out" : "Worth, at a sale"}
+              value={usd(r.breakageCost === null ? null : Math.abs(r.breakageCost))}
+              tone={r.markToMarket !== null && r.markToMarket < 0 ? "brand" : "ink"}
+            />
+            <Stat label="Loan pays, all in" value={pct(r.allInRatePct, 2)} />
+            <Stat label="Market would fix at" value={pct(r.marketAllInRatePct, 2)} tone="muted" />
+            <Stat label="A year of the gap" value={usd(r.annualCostOfBeingWrong)} tone="muted" />
+          </div>
+
+          {ladder.length > 0 && (
+            <div className="mt-5">
+              <p className="text-xs uppercase tracking-wide text-muted">
+                The position, by where the market ends up
+              </p>
+              <div className="mt-2 space-y-1">
+                {ladder.map((s) => (
+                  <div key={s.at} className="flex items-center gap-3 text-xs">
+                    <span className="w-14 shrink-0 text-right font-mono tabular-nums text-muted">
+                      {s.at.toFixed(2)}%
+                    </span>
+                    <div className="relative h-2.5 flex-1 rounded-full bg-faint">
+                      <div className="absolute inset-y-0 left-1/2 w-px bg-line" />
+                      <div
+                        data-bar="swap"
+                        className={`absolute inset-y-0 rounded-full ${s.mtm < 0 ? "bg-kill" : "bg-pass"}`}
+                        style={
+                          s.mtm < 0
+                            ? {
+                                right: "50%",
+                                width: `${(Math.abs(s.mtm) / widest) * 50}%`,
+                              }
+                            : { left: "50%", width: `${(s.mtm / widest) * 50}%` }
+                        }
+                      />
+                    </div>
+                    <span className="w-24 shrink-0 text-right font-mono tabular-nums text-ink">
+                      {usd(s.mtm)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[11px] text-muted">
+                A cap would be FLAT across the left half of this — its worst case is the
+                premium. The swap has no such stretch, which is the whole difference between
+                an option and an obligation.
+              </p>
+            </div>
+          )}
+
+          {r.notionalAtHorizon !== null && r.balanceAtHorizon !== null && (
+            <div className="mt-5">
+              <p className="text-xs uppercase tracking-wide text-muted">
+                At the swap&rsquo;s end
+              </p>
+              <div className="mt-2 space-y-1.5">
+                {[
+                  { key: "Swap notional", v: r.notionalAtHorizon, tone: "bg-brand" },
+                  { key: "Loan balance", v: r.balanceAtHorizon, tone: "bg-muted/50" },
+                ].map((row) => (
+                  <div key={row.key} className="flex items-center gap-3 text-xs">
+                    <span className="w-28 shrink-0 text-muted">{row.key}</span>
+                    <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-faint">
+                      <div
+                        data-bar="notional"
+                        className={`h-full ${row.tone}`}
+                        style={{ width: `${(row.v / notionalMax) * 100}%` }}
+                      />
+                    </div>
+                    <span className="w-28 shrink-0 text-right font-mono tabular-nums text-ink">
+                      {usd(row.v)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {r.capWouldHaveCostLess !== null && r.capPremium !== null && (
+            <p className="mt-4 text-sm text-muted">
+              A cap to the same term was quoted at {usd(r.capPremium)}, and that is its
+              WHOLE cost whatever happens — so on today&rsquo;s market the cap would have{" "}
+              <span className={r.capWouldHaveCostLess ? "font-semibold text-kill" : "font-semibold text-ink"}>
+                {r.capWouldHaveCostLess ? "cost less" : "cost more"}
+              </span>
+              . That comparison is only available after the fact, which is why the
+              instrument gets chosen on the premium.
+            </p>
+          )}
+
+          {r.note && <p className="mt-4 text-sm text-caution">{r.note}</p>}
+          <p className="mt-3 text-xs text-muted">
+            The swap fixes the INDEX; the lender&rsquo;s spread is a term of the loan and rides
+            on top, so the struck rate is never the coupon. Positions are marked against
+            today&rsquo;s rate for the remaining period only.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/**
  * The sales comparison grid.
  *
  * Takes a pasted grid rather than thirty fields: name, price, size, months
@@ -8151,6 +8364,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <LoanAssumption />
       <StorageEcri />
       <CompGrid />
+      <Swap />
       <StraightLineRent />
       <NetEffectiveRent />
       <RentableUsable />
