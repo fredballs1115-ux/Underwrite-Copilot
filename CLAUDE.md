@@ -661,6 +661,34 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   premium, or the card calls an artifact of two assumptions a finding
   about the deal. Bars: `data-bar="slb"` (three values on one track) and
   `data-bar="coupon"` (a year each, against the coupon's dashed line).
+- The insurance line: `lib/tools/insurance.ts` (pure — the expense that
+  reprices hardest and gets read least, and structurally the same trap as
+  `tax-reassessment`). **The premium in a memorandum is the SELLER's
+  expiring policy**, bound on limits the seller chose in a market that may
+  no longer exist; nothing in it is false, it describes someone else's
+  placement, which is what makes it invisible. Insurance is a FIXED
+  expense, so the gap comes out of NOI whole — the seeded Florida
+  apartment's $420,000 against a $780,000 quote is $360,000, which at the
+  advertised 5.25% cap is **$6,857,143** and takes the buyer's cap to
+  4.60%, 65bp. **A named-storm deductible is a percentage of the INSURED
+  VALUE, not a dollar amount**: 5% of a $52M replacement cost is
+  $2,600,000 retained per event, said as `deductibleYearsOfNoi` (0.9) —
+  the figure nobody writes down, and the one the note leads with even
+  where the premium came in fine, because the premium is what people argue
+  about and this is what takes the building. Struck against the insured
+  value and never the price, which would be a different and wronger
+  number. And **raising the deductible is a priceable trade**:
+  `breakEvenYearsBetweenEvents` (16.3) is the frequency at which the
+  annual saving meets the extra per-event retention, assuming every event
+  is a full-deductible loss — the CONSERVATIVE reading, so the real
+  break-even is at or below it, never above. A LOWER alternative
+  deductible answers null: that is the opposite trade and this figure does
+  not answer it. Both premiums are inputs, because what a building is
+  quoted turns on its roof, its year built and the carrier's appetite.
+  Bars: `data-bar="prem"` (the two premiums) and `data-bar="storm"` (one
+  event's retention against a year's NOI). **"16.3 years" is deliberately
+  not a live-verify marker** — it spans an interpolated value, so React's
+  `<!-- -->` sits inside it in the served HTML.
 - The measures on a page of an OM: `lib/tools/measure-math.ts` (pure).
   `readLand` treats acres and square feet as ONE measurement entered from
   whichever side the document stated (`SF_PER_ACRE`, 43,560), and where both

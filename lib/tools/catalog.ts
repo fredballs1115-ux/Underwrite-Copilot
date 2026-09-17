@@ -72,6 +72,7 @@ export const TOOL_INDEX: readonly ToolEntry[] = [
   { id: "trailing-window", label: "Trailing window", group: "The property" },
   { id: "economic-occupancy", label: "Doors vs dollars", group: "The property" },
   { id: "below-the-line", label: "Below the line", group: "The property" },
+  { id: "insurance", label: "Insurance", group: "The property" },
   { id: "unit-mix", label: "Unit mix", group: "The property" },
   { id: "rollover", label: "When it rolls", group: "Leases" },
   { id: "lease-up", label: "Lease-up", group: "Value & land" },

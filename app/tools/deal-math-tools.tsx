@@ -32,6 +32,7 @@ import { readMix, totalMix } from "@/lib/tools/unit-mix";
 import { readRoll, readRollover } from "@/lib/tools/rollover";
 import { readLeaseUp } from "@/lib/tools/lease-up";
 import { readLeaseback } from "@/lib/tools/sale-leaseback";
+import { readInsurance } from "@/lib/tools/insurance";
 import { runWaterfall } from "@/lib/tools/waterfall-math";
 import {
   breakEvenOccupancyPct,
@@ -4825,6 +4826,173 @@ function MaxBid() {
   );
 }
 
+// ── the insurance line ─────────────────────────────────────────────────────
+
+function Insurance() {
+  const [seller, setSeller] = useShared("insp", "420,000");
+  const [quoted, setQuoted] = useShared("insq", "780,000");
+  const [noi, setNoi] = useShared("insn", "2,900,000");
+  const [cap, setCap] = useShared("insc", "5.25");
+  const [units, setUnits] = useShared("insu", "240");
+  const [sf, setSf] = useShared("inssf", "260,000");
+  const [insured, setInsured] = useShared("insv", "52,000,000");
+  const [storm, setStorm] = useShared("insd", "5");
+  const [altPct, setAltPct] = useShared("insad", "10");
+  const [altPrem, setAltPrem] = useShared("insap", "620,000");
+
+  const r = useMemo(
+    () =>
+      readInsurance({
+        sellerPremium: num(seller) ?? 0,
+        quotedPremium: num(quoted) ?? 0,
+        statedNoi: num(noi),
+        advertisedCapPct: num(cap),
+        buildingSf: num(sf),
+        units: num(units),
+        insuredValue: num(insured),
+        namedStormDeductiblePct: num(storm),
+        alternativeDeductiblePct: num(altPct),
+        alternativePremium: num(altPrem),
+      }),
+    [seller, quoted, noi, cap, units, sf, insured, storm, altPct, altPrem],
+  );
+
+  // Rule 1 as a picture: the memorandum's premium against the real one.
+  const prem = [
+    { key: "seller", label: "The memorandum", value: num(seller), tone: "bg-sidebar" },
+    { key: "quoted", label: "Your quote", value: num(quoted), tone: "bg-caution" },
+  ].filter((x) => x.value !== null && x.value > 0);
+  const dearest = Math.max(1, ...prem.map((x) => x.value ?? 0));
+
+  // Rule 3: the retained risk against one year of income, on one track —
+  // the comparison that makes a percentage into a fact.
+  const storms = [
+    { key: "ded", label: "One event retains", value: r.namedStormDeductible, tone: "bg-caution" },
+    { key: "noi", label: "A year's NOI", value: num(noi), tone: "bg-brand/60" },
+  ].filter((x) => x.value !== null && x.value > 0);
+  const biggest = Math.max(1, ...storms.map((x) => x.value ?? 0));
+
+  return (
+    <Card id="insurance" eyebrow="The expense line" title="What insurance really costs">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+        <div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Memorandum's premium" value={seller} onChange={setSeller} placeholder="420,000" />
+            <Field label="Your quote" value={quoted} onChange={setQuoted} placeholder="780,000" />
+            <Field label="Stated NOI" value={noi} onChange={setNoi} placeholder="2,900,000" />
+            <Field label="Advertised cap" suffix="%" value={cap} onChange={setCap} placeholder="5.25" />
+            <Field label="Units" value={units} onChange={setUnits} placeholder="240" />
+            <Field label="Building" suffix="SF" value={sf} onChange={setSf} placeholder="260,000" />
+            <Field label="Insured value" value={insured} onChange={setInsured} placeholder="52,000,000" />
+            <Field label="Named-storm ded." suffix="%" value={storm} onChange={setStorm} placeholder="5" />
+            <Field label="A higher ded. of" suffix="%" value={altPct} onChange={setAltPct} placeholder="10" />
+            <Field label="…would cost" value={altPrem} onChange={setAltPrem} placeholder="620,000" />
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted">
+            Both premiums are inputs. What a building is actually quoted turns
+            on its roof, its year built, its distance to the coast and the
+            carrier&rsquo;s appetite — none of which is arithmetic.
+          </p>
+        </div>
+
+        <div>
+          {prem.length > 0 && (
+            <div className="space-y-2">
+              {prem.map((x) => (
+                <div key={x.key} className="flex items-center gap-3 text-xs">
+                  <span className="w-32 shrink-0 text-muted">{x.label}</span>
+                  <span className="h-3 flex-1 rounded-full bg-faint">
+                    <span
+                      data-bar="prem"
+                      className={`block h-full rounded-full ${x.tone}`}
+                      style={{ width: `${((x.value ?? 0) / dearest) * 100}%` }}
+                    />
+                  </span>
+                  <span className="w-24 shrink-0 text-right font-semibold tabular-nums">
+                    {usdExact(x.value)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-4 sm:grid-cols-4">
+            <Stat
+              label="Per unit, quoted"
+              value={usdExact(r.quotedPerUnit)}
+              tone={r.quotedPerUnit === null ? "muted" : undefined}
+            />
+            <Stat
+              label="Cap, once it is in"
+              value={r.adjustedCapPct === null ? "—" : pct(r.adjustedCapPct, 2)}
+              tone={r.adjustedCapPct === null ? "muted" : undefined}
+            />
+            <Stat
+              label="…against advertised"
+              value={r.capGapBps === null ? "—" : `${r.capGapBps} bps`}
+              tone={r.capGapBps === null ? "muted" : undefined}
+            />
+            <Stat
+              label="Worth, at that cap"
+              value={usdExact(r.valueOfGap)}
+              tone={r.valueOfGap === null ? "muted" : "brand"}
+            />
+          </div>
+
+          {r.note && <p className="mt-3 text-sm text-caution">{r.note}</p>}
+
+          {storms.length === 2 && (
+            <div className="mt-5 border-t border-line pt-4">
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted">
+                The deductible against a year of income
+              </p>
+              <div className="space-y-2">
+                {storms.map((x) => (
+                  <div key={x.key} className="flex items-center gap-3 text-xs">
+                    <span className="w-32 shrink-0 text-muted">{x.label}</span>
+                    <span className="h-3 flex-1 rounded-full bg-faint">
+                      <span
+                        data-bar="storm"
+                        className={`block h-full rounded-full ${x.tone}`}
+                        style={{ width: `${((x.value ?? 0) / biggest) * 100}%` }}
+                      />
+                    </span>
+                    <span className="w-24 shrink-0 text-right font-semibold tabular-nums">
+                      {usdExact(x.value)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {r.breakEvenYearsBetweenEvents !== null && (
+            <p className="mt-3 text-sm text-muted">
+              Taking the deductible to {altPct}% saves{" "}
+              {usdExact(r.alternativeSaving)} a year and retains{" "}
+              {usdExact(r.alternativeExtraRisk)} more per event, so it pays
+              only if a named-storm loss arrives less often than once every{" "}
+              {r.breakEvenYearsBetweenEvents} years.
+            </p>
+          )}
+
+          <p className="mt-4 border-t border-line pt-3 text-[11px] leading-relaxed text-muted">
+            The premium in a memorandum is a fact about the seller&rsquo;s
+            placement, bound on limits the seller chose in a market that may
+            no longer exist — the same shape as the tax line, which describes
+            someone else&rsquo;s ownership. Insurance is a fixed expense, so
+            the gap is NOI dollar for dollar and the cap rate capitalises it.
+            And a named-storm deductible is a percentage of the insured value
+            rather than a dollar amount, which is why it is the number that
+            takes the building and the premium is only the one people argue
+            about.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function BelowTheLine() {
   const [noi, setNoi] = useShared("blN", "2,640,000");
   const [sf, setSf] = useShared("blS", "200,000");
@@ -6350,6 +6518,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <TrailingWindow />
       <EconomicOccupancy />
       <BelowTheLine />
+      <Insurance />
       <UnitMix />
       <Rollover />
       <LeaseUp />

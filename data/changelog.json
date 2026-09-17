@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-17",
+      "title": "What insurance really costs",
+      "blurb": "The expense line that reprices hardest and gets read least. The premium in a memorandum is the SELLER's expiring policy — bound on limits the seller chose, in a market that may no longer exist. Nothing in it is false; it is describing someone else's placement, which is exactly what makes it invisible. On the seeded Florida apartment the memorandum carries $420,000 and the quote comes back $780,000, and insurance is a fixed expense, so the whole $360,000 comes out of NOI: the advertised 5.25% cap is 4.60% to the buyer, or $6,857,143 of price. Then the figure nobody writes down. A named-storm deductible is a percentage of the INSURED VALUE, not a dollar amount — 5% of a $52M replacement cost is $2,600,000 retained per event, which is nine tenths of a year's NOI before the policy pays anything. The premium is the number people argue about; that is the number that takes the building.",
+      "href": "/tools#insurance"
+    },
+    {
+      "date": "2026-09-17",
       "title": "The sale-leaseback",
       "blurb": "A company sells the building it operates from and signs a lease back the same day. Both sides then price it wrong in the same direction. The seller writes its own lease, so the rent is the price lever — a $9 contract rent on space letting at $7.50 turns a $21.6M building into a $27M price, and $5.4M of that is the lease rather than the real estate. It is cash borrowed, not value created. And an above-market lease reverts: the buyer is really buying the term's rent plus a market-rent building afterwards, which come to $23.0M — so capitalising the contract NOI overpays by $3,973,557, and it is worse on a SHORT lease, because the reversion arrives sooner. For the seller it is borrowing, and it looks cheaper than a mortgage without being cheaper: 6.09 cents a dollar against a 6.50% coupon, true for exactly four years before the escalations pass it.",
       "href": "/tools#sale-leaseback"

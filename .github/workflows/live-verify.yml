@@ -676,6 +676,15 @@ jobs:
           mark "#346 the rent is drawn against the mortgage coupon" grep -q "Rent per dollar raised, against the mortgage coupon" p_tools2.html
           mark "#346 the reversion is priced against the contract rent" grep -q "The rent reverts at year 20, and the building does not" p_tools2.html
           mark "#346 what capitalising the contract rent overpays" grep -q "3,973,557" p_tools2.html
+          # #347 — the insurance line. The third is the decisive one: that
+          # sentence renders only once the deductible resolves against the
+          # NOI, so a `present` proves both figures computed. "16.3 years"
+          # is deliberately NOT a marker — it spans an interpolated value,
+          # so React's separator sits inside it in the served HTML.
+          mark "#347 the insurance card is on /tools" grep -q "What insurance really costs" p_tools2.html
+          mark "#347 the deductible is drawn against a year of income" grep -q "The deductible against a year of income" p_tools2.html
+          mark "#347 one event's retention is computed as years of NOI" grep -q "One named-storm event retains 0.9 years of NOI" p_tools2.html
+          mark "#347 the premium gap is capitalised at the advertised cap" grep -q "6,857,143" p_tools2.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then
