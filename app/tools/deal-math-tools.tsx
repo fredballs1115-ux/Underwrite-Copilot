@@ -42,6 +42,7 @@ import { readRenovation } from "@/lib/tools/renovation";
 import { readHotel } from "@/lib/tools/hotel";
 import { readAssumption } from "@/lib/tools/loan-assumption";
 import { readStorage } from "@/lib/tools/storage-ecri";
+import { MIN_GROSS_FOR_WEIGHT, readGrid, readGridText } from "@/lib/tools/comp-grid";
 import {
   breakEvenOccupancyPct,
   capRatePct,
@@ -7051,6 +7052,194 @@ function Renovation() {
 }
 
 /**
+ * The sales comparison grid.
+ *
+ * Takes a pasted grid rather than thirty fields: name, price, size, months
+ * since the sale, then the adjustment columns — which is how the data
+ * already exists, in a spreadsheet. Two pictures: each comp's adjusted
+ * basis against the set, and the three errors on one track so the sign
+ * convention, the missing time adjustment and the convention argument can
+ * be compared by eye, because the whole finding is that they are nothing
+ * like the same size.
+ *
+ * Its bar markers are named on the elements below rather than quoted here.
+ * The catalog's collision guard splits this file at its card functions and
+ * reads the markers out of the source, so a marker spelled in a comment
+ * ABOVE the function is filed under the card before it — which is how this
+ * comment first failed the guard, reporting a collision between two cards
+ * that share nothing.
+ */
+function CompGrid() {
+  const [raw, setRaw] = useShared(
+    "cgr",
+    [
+      "Grantham Row\t18,400,000\t184\t8\t8\t2\t6",
+      "Fielder's Walk\t12,900,000\t142\t19\t12\t-4\t5",
+      "The Harlan\t26,750,000\t244\t4\t-6\t5\t-4",
+      "Ashcroft Mill\t9,600,000\t96\t26\t10\t-6\t12",
+      "Palmer Yard\t21,300,000\t210\t2\t2\t-1\t3",
+    ].join("\n"),
+  );
+  const [size, setSize] = useShared("cgs", "200");
+  const [growth, setGrowth] = useShared("cgg", "6");
+  const [ask, setAsk] = useShared("cga", "22,000,000");
+  const [unitLabel, setUnitLabel] = useShared("cgu", "unit");
+
+  const parsed = useMemo(
+    () => readGridText(raw, ["Location", "Size", "Condition"]),
+    [raw],
+  );
+  const r = useMemo(
+    () =>
+      readGrid({
+        subjectSize: readFigure(size),
+        unitLabel,
+        marketGrowthPct: num(growth),
+        askingPrice: readFigure(ask),
+        comps: parsed.comps,
+      }),
+    [parsed, size, unitLabel, growth, ask],
+  );
+
+  const drawn = r.comps.filter((c) => c.basisAdjusted !== null);
+  const widest = Math.max(...drawn.map((c) => c.basisAdjusted as number), 1);
+  // The three errors on one track. Scaled to the largest of them, because
+  // the point is the RATIO between them and a per-bar scale would hide it.
+  const errors = [
+    { key: "The sign convention", v: r.signErrorValue, tone: "bg-kill" },
+    { key: "The time adjustment", v: r.timeAdjustmentValue, tone: "bg-brand" },
+    { key: "Sequential vs additive", v: r.conventionGap, tone: "bg-muted/50" },
+  ].filter((e) => e.v !== null);
+  const worst = Math.max(...errors.map((e) => Math.abs(e.v as number)), 1);
+
+  return (
+    <Card id="comp-grid" eyebrow="Comparables" title="The comp adjustment grid">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+        <div>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
+              One comp a line — name, price, size, months ago, then location, size and condition
+            </span>
+            <textarea
+              value={raw}
+              onChange={(e) => setRaw(e.target.value)}
+              rows={7}
+              spellCheck={false}
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-xs tabular-nums outline-none transition-colors focus:border-brand"
+            />
+          </label>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
+            Each adjustment is signed FROM THE COMP: a comp in a worse location
+            than the subject is a positive figure, because it would have sold
+            for more if it were the subject.
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <Field label="Subject size" value={size} onChange={setSize} placeholder="200" />
+            <Field label="Unit is called" value={unitLabel} onChange={setUnitLabel} placeholder="unit" />
+            <Field label="Market growth" suffix="%/yr" value={growth} onChange={setGrowth} placeholder="6" />
+            <Field label="Asking price" value={ask} onChange={setAsk} placeholder="22,000,000" />
+          </div>
+          {parsed.unreadable.length > 0 && (
+            <p className="mt-3 text-xs text-caution">
+              {parsed.unreadable.length === 1
+                ? "One line could not be read"
+                : `${parsed.unreadable.length} lines could not be read`}
+              : its commas could be separators or thousands marks and nothing
+              in the text settles it. Paste from the spreadsheet, or take the
+              thousands marks out.
+            </p>
+          )}
+        </div>
+
+        <div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Stat label="Indicated" value={usd(r.indicatedValue)} tone="brand" />
+            <Stat label={`Per ${unitLabel || "unit"}`} value={usd(r.indicatedBasis)} />
+            <Stat
+              label={r.askPremium !== null && r.askPremium > 0 ? "Ask, over" : "Ask, under"}
+              value={pct(r.askPremiumPct, 1)}
+              tone={r.askPremium !== null && r.askPremium > 0 ? "muted" : "ink"}
+            />
+            <Stat label="Straight average" value={usd(r.meanValue)} tone="muted" />
+          </div>
+
+          {drawn.length > 0 && (
+            <div className="mt-5 space-y-1.5">
+              {drawn.map((c) => (
+                <div key={c.name} className="flex items-center gap-3 text-xs">
+                  <span className="w-28 shrink-0 truncate text-muted" title={c.name}>
+                    {c.name}
+                  </span>
+                  <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-faint">
+                    <div
+                      data-bar="grid"
+                      className={`h-full ${c.flagged ? "bg-caution/60" : "bg-brand"}`}
+                      style={{ width: `${((c.basisAdjusted as number) / widest) * 100}%` }}
+                    />
+                  </div>
+                  <span className="w-20 shrink-0 text-right font-mono tabular-nums text-ink">
+                    {usd(c.basisAdjusted)}
+                  </span>
+                  <span className="hidden w-28 shrink-0 text-right font-mono tabular-nums text-muted sm:inline">
+                    {c.grossAdjustmentPct}% gross, {c.weightPct}% wt
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {errors.length > 1 && (
+            <div className="mt-5">
+              <p className="text-xs uppercase tracking-wide text-muted">
+                What each error is worth
+              </p>
+              <div className="mt-2 space-y-1.5">
+                {errors.map((e) => (
+                  <div key={e.key} className="flex items-center gap-3 text-xs">
+                    <span className="w-36 shrink-0 text-muted">{e.key}</span>
+                    <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-faint">
+                      <div
+                        data-bar="graderr"
+                        className={`h-full ${e.tone}`}
+                        style={{ width: `${(Math.abs(e.v as number) / worst) * 100}%` }}
+                      />
+                    </div>
+                    <span className="w-24 shrink-0 text-right font-mono tabular-nums text-ink">
+                      {usd(Math.abs(e.v as number))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {r.askPremiumIfSignsReversedPct !== null && r.askPremiumPct !== null && (
+            <p className="mt-4 text-sm text-muted">
+              Read the sign the other way — an inferior comp adjusted DOWN — and
+              the same five sales indicate{" "}
+              <span className="font-semibold text-ink">{usd(r.valueIfSignsReversed)}</span>, which
+              makes the ask look{" "}
+              <span className="font-semibold text-kill">
+                {pct(r.askPremiumIfSignsReversedPct, 1)}
+              </span>{" "}
+              rich rather than {pct(Math.abs(r.askPremiumPct), 1)} cheap. The convention does not
+              shade the answer; it reverses it.
+            </p>
+          )}
+
+          {r.note && <p className="mt-4 text-sm text-caution">{r.note}</p>}
+          <p className="mt-3 text-xs text-muted">
+            Weighted by the inverse of each comp&rsquo;s GROSS adjustment, floored at{" "}
+            {MIN_GROSS_FOR_WEIGHT} points — net adjustment is what a grid shows and it is not the
+            test of a comparable. Range: {usd(r.lowBasis)} to {usd(r.highBasis)}.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/**
  * The rent the statement reports against the rent the building collects.
  *
  * Drawn as a signed bar a year from a centre line, because the finding is
@@ -7961,6 +8150,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <Hotel />
       <LoanAssumption />
       <StorageEcri />
+      <CompGrid />
       <StraightLineRent />
       <NetEffectiveRent />
       <RentableUsable />

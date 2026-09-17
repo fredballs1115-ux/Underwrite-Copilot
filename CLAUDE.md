@@ -1090,6 +1090,36 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   land alone is dear enough that free construction would not work. The
   developer's fee is struck on hard plus soft and never on the land. Bar:
   `data-bar="feas"` (the two rents on one track).
+- A grid of comps, adjusted to the subject: `lib/tools/comp-grid.ts` (pure).
+  Every analyst does this and it is the one calculation on `/tools` whose
+  METHOD is argued over — and the argument is worth a rounding error while
+  two things nobody argues about are worth millions. **The adjustment is
+  applied TO THE COMP, so an inferior comp adjusts UP**: the sign convention,
+  the commonest error in a grid, and getting it backwards costs roughly twice
+  the adjustment — $2,524,284 on the seed, a ninth of the deal, which
+  REVERSES the answer rather than shading it (the ask reads defensible one
+  way and 11.4% rich the other). It hides in a grid whose adjustments point
+  both ways (5.0% there against 11.3%) and never quite cancels, because the
+  comps sit at different bases. **The time adjustment comes first and is the
+  one left out** — $743,844 against $10,668 for the sequential-versus-additive
+  argument, seventy times over, which is the finding the module exists to
+  make checkable. Both conventions are ordinary practice and no grid says
+  which it used; the sequential one is reported, because a relative statement
+  compounds and because summing can take a price to zero or below
+  (`additiveWentNegative`, the one place the convention is not taste).
+  **Gross adjustment measures comparability; net does not** — ±15% nets to
+  zero and is 30% judgement — and a flagged comp is still shown, since
+  dropping it leaves thinner evidence. **The reconciliation is weighted by
+  inverse gross**, floored at `MIN_GROSS_FOR_WEIGHT` (5) because the inverse
+  runs away near zero and made a 1%-adjusted comp worth twice a 2% one. Grades
+  a set by the same floors `lib/public-comps` uses — under three is not a
+  grid, under five is thin. `readGridText` takes the pasted table, sharing
+  `cellsOf` with `unit-mix`; a true CSV whose figures also carry grouped
+  thousands is REFUSED and handed back rather than guessed at (it collapsed
+  one line into a price of 184,000,001,848,826). Bars: `data-bar="grid"` and
+  `data-bar="graderr"` — and the catalog's collision guard files a marker
+  named in a comment ABOVE a card function under the card BEFORE it, which is
+  how that comment first reported a collision between two unrelated cards.
 - The statement's rent against the building's: `lib/tools/straight-line-rent.ts`
   (pure). GAAP does not report the rent a tenant paid — it reports the TERM'S
   TOTAL OVER THE TERM, the same figure every year — so an "NOI" read off an
