@@ -102,6 +102,7 @@ export const TOOL_INDEX: readonly ToolEntry[] = [
   { id: "storage-ecri", label: "Storage ECRI", group: "Rent & recoveries" },
   { id: "comp-grid", label: "Comp grid", group: "Value" },
   { id: "swap", label: "Rate swap", group: "Debt" },
+  { id: "entitlement", label: "Entitlement clock", group: "Development" },
   { id: "straight-line-rent", label: "Statement vs cash", group: "Leases" },
   { id: "net-effective-rent", label: "Net effective rent", group: "Leases" },
   { id: "rentable-vs-usable", label: "Rentable vs usable", group: "Leases" },

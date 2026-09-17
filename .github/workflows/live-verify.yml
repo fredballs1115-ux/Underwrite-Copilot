@@ -781,6 +781,16 @@ jobs:
           mark "#360 the position is drawn both ways from a centre line" grep -q "The position, by where the market ends up" p_tools2.html
           mark "#360 an obligation has no flat stretch, an option does" grep -q "which is the whole difference between an option and an obligation" p_tools2.html
           mark "#360 the breakage is yield maintenance in another coat" grep -q "SAME exit problem yield maintenance creates" p_tools2.html
+          # #361 — the entitlement clock, the stretch between what the code
+          # allows and what the dirt is worth. The second and third are the
+          # decisive pair: the break-even track renders only once the
+          # closed form resolves, and the fourth is the note branch that
+          # fires only where the fee sits under the carry it replaces. All
+          # four verified through renderToString first.
+          mark "#361 the entitlement card is on /tools" grep -q "The entitlement clock" p_tools2.html
+          mark "#361 the quote is drawn against its break-even" grep -q "The quote against its break-even" p_tools2.html
+          mark "#361 the option is priced as the carry plus the loss" grep -q "the carry you avoid, plus the probability-weighted loss" p_tools2.html
+          mark "#361 a cheap fee wins at every probability" grep -q "the option wins at every probability" p_tools2.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then
