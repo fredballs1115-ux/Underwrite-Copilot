@@ -1,7 +1,11 @@
 import { fredUrl, shortDate, type LiveRate } from "@/lib/live-rates";
 
 /**
- * Today's rates, across the top of the calculators.
+ * Today's rates — across the top of the calculators, and on `/market`.
+ *
+ * At the app root beside `place-band.tsx` because two pages draw it, and for
+ * the same reason that one is: a second copy is how two surfaces come to
+ * disagree about the same figure.
  *
  * Pure: the page reads the table and hands the rows in, so this renders on a
  * fixture in `lib/views.render.test.ts` without touching a database.

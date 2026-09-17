@@ -321,7 +321,8 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   (pure — the four FRED series the weekday cron writes, each figure's age,
   its move since the observation before, and the two rules) with
   `lib/live-rates-read.ts` (the `server-only` read) and
-  `app/tools/rates-strip.tsx` (the pure strip across the top of `/tools`).
+  `app/rates-strip.tsx` (the pure strip — at the app root beside
+  `place-band.tsx` because `/tools` and `/market` both draw it).
   **A benchmark is not a quote.** Only a rate a loan document NAMES may
   pre-fill a field — the Treasury and SOFR (`contractRate`). The 30-year
   mortgage survey looks seedable and is not: it is an owner-occupier
@@ -341,7 +342,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   quarterly series once the daily ones have filed a few months of rows.
   A stale figure still SHOWS with its date — a dead feed is worth seeing —
   it just stops seeding, because a date beside a figure is read and a
-  figure inside a form field is not.
+  figure inside a form field is not. `/market` had its own copy of this
+  strip and its own copy of the bug: it read through the REQUEST-scoped
+  client, so a signed-in visitor saw four live rates and everyone else
+  silently got a checked-in PMMS snapshot, with nothing on the page saying
+  which. Both pages go through this one now.
 - The floating-rate loan and its cap: `lib/tools/floating-rate.ts` (pure —
   the bridge debt every other card on `/tools` pretends is fixed, and the
   one card whose main input the site already knows, since a note

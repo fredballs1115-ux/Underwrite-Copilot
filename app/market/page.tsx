@@ -10,6 +10,8 @@ import {
   fmtBasisRange,
   type MarketGroup,
 } from "@/lib/market-memory";
+import { RatesStrip } from "@/app/rates-strip";
+import { liveRates } from "@/lib/live-rates-read";
 import { mergeBenchmarks, seedBenchmarks, seedRules } from "@/lib/research-data";
 import { linkOk } from "@/lib/link-audit";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -354,7 +356,7 @@ export default async function MarketDataPage({
       <SectorHeatGrid />
       <MidAtlanticTable />
       <SectorExplorer selected={sectorParam} />
-      <RatesStrip />
+      <LiveRatesStrip />
       <IntelDigestCard />
     </div>
   );
@@ -1256,68 +1258,21 @@ function SectorExplorer({ selected }: { selected?: string }) {
 }
 
 // ── Live rates (research build) ───────────────────────────────────────────────
-// Newest observation per FRED series from the rates table (daily cron);
-// falls back to the checked-in PMMS snapshot so the strip is never empty.
-async function RatesStrip() {
-  const supabase = await createSupabaseServerClient();
-  let rows: { series_id: string; obs_date: string; value: number; label: string | null }[] = [];
-  try {
-    const { data } = await supabase
-      .from("rates")
-      .select("series_id, obs_date, value, label")
-      .order("obs_date", { ascending: false })
-      .limit(40);
-    const newest = new Map<string, (typeof rows)[number]>();
-    for (const r of (data as typeof rows | null) ?? []) {
-      if (!newest.has(r.series_id)) newest.set(r.series_id, r);
-    }
-    rows = [...newest.values()];
-  } catch {
-    // 0023 not migrated — fall through to the snapshot
-  }
-  if (rows.length === 0) {
-    const pmms = seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed");
-    if (pmms?.low != null) {
-      rows = [
-        {
-          series_id: "MORTGAGE30US",
-          obs_date: pmms.as_of,
-          value: pmms.low,
-          label: "Freddie Mac PMMS 30-Year Fixed",
-        },
-      ];
-    }
-  }
-  if (rows.length === 0) return null;
-
-  return (
-    <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
-      <h2 className="text-sm font-semibold tracking-tight">Rates</h2>
-      <div className="mt-3 flex flex-wrap gap-x-8 gap-y-2">
-        {rows.map((r) => (
-          <div key={r.series_id}>
-            <p className="text-[11px] uppercase tracking-wide text-muted">
-              {r.label ?? r.series_id}
-            </p>
-            <p className="mt-0.5 font-mono text-base font-semibold tabular-nums">
-              {r.value}%{" "}
-              <a
-                href={`https://fred.stlouisfed.org/series/${r.series_id}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-[11px] font-normal text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
-              >
-                {r.series_id} · as of {r.obs_date}
-              </a>
-            </p>
-          </div>
-        ))}
-      </div>
-      <p className="mt-2 text-[11px] text-muted">
-        FRED, pulled daily; the screen&apos;s debt assumptions read these.
-      </p>
-    </section>
-  );
+//
+// The shared strip (app/rates-strip.tsx), fed by the shared read. This page
+// had its own copy, and that copy had a bug this page could not see: it went
+// through the request-scoped Supabase client, migration 0023 grants `select`
+// on `rates` `to authenticated`, and /market is PUBLIC. So a signed-in
+// visitor saw four live rates and everyone else silently got the checked-in
+// PMMS snapshot — one figure, dated whenever it was committed — with nothing
+// on the page to say which of the two they were looking at.
+//
+// The service-role read has no such split, and the strip renders nothing at
+// all when it comes back empty, which is the honest version of "never empty".
+async function LiveRatesStrip() {
+  const rates = await liveRates();
+  // Nothing on this page pre-fills a field from them, so no series is marked.
+  return <RatesStrip rates={rates} />;
 }
 
 // ── Daily intel digest (research build) ──────────────────────────────────────
