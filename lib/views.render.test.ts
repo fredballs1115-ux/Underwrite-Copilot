@@ -1938,6 +1938,35 @@ describe("the deal math tools", () => {
     expect((html.match(/data-bar="slb"/g) ?? []).length).toBe(3);
     expect((html.match(/data-bar="coupon"/g) ?? []).length).toBe(20);
   });
+
+  it("charges the insurance quote against the memorandum's own price", () => {
+    // #347, rules 1 and 2. The memorandum carries the seller's expiring
+    // $420,000; the quote is $780,000, which is 65bp of the advertised
+    // 5.25% cap and $6,857,143 of price.
+    expect(text).toContain("What insurance really costs");
+    expect(text).toContain("$780,000");
+    expect(text).toContain("65 bps");
+    expect(text).toContain("$6,857,143");
+  });
+
+  it("says the named-storm deductible as years of income", () => {
+    // Rule 3, and the figure the card exists to put on a page: $2,600,000
+    // retained per event against $2,900,000 of annual NOI.
+    expect(text).toContain(
+      "One named-storm event retains 0.9 years of NOI before the policy pays anything.",
+    );
+    expect(text).toContain("The deductible against a year of income");
+    expect(text).toContain("$2,600,000");
+  });
+
+  it("prices raising the deductible as a frequency", () => {
+    // Rule 4: $160,000 a year against $2,600,000 more per event is a
+    // break-even of once every 16.3 years.
+    expect(text).toContain("$160,000");
+    expect(text).toContain("16.3 years");
+    expect((html.match(/data-bar="prem"/g) ?? []).length).toBe(2);
+    expect((html.match(/data-bar="storm"/g) ?? []).length).toBe(2);
+  });
 });
 
 // ── today's rates, across the top of /tools ────────────────────────────────
