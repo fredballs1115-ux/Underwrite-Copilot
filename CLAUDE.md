@@ -634,6 +634,33 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   scaling, since the trough moves in TIME as well as size. Bars:
   `data-bar="leaseup"` (the J-curve, one a month from a centre line) and
   `data-bar="slip"` (the three positions at the common date).
+- The sale-leaseback: `lib/tools/sale-leaseback.ts` (pure — the structure
+  where both sides price it wrong in the same direction). Four rules.
+  **The rent is the price lever**, because the seller writes its own lease:
+  the seeded $9 contract rent on space letting at $7.50, at a 6.00% credit
+  cap, is a $27,000,000 price against a $21,600,000 building — $5,400,000
+  of it the LEASE, which is cash borrowed rather than value created.
+  **An above-market lease reverts to market**, so the buyer is really
+  buying the term's rent plus a market-rent building afterwards
+  ($23,026,443); capitalising the contract NOI overpays by $3,973,557, and
+  it is WORSE on a SHORT lease because the reversion arrives sooner — the
+  direction people get backwards. The identity that proves the two pieces
+  are one model: strip the premium and discount at the market cap and
+  `honestValue` equals `marketValue` to the dollar. **The credit is the
+  cap rate**, so the two caps are kept apart and neither stands in for the
+  other. And **it looks cheaper than a mortgage in year one without being
+  cheaper**: compare the rent to the COUPON, never to the constant
+  (`capital-stack`'s rule — amortisation is a transfer, not a cost, and
+  the constant is reported separately for exactly that reason). The seed
+  is 6.09 cents against 6.50%, crossing in `yearRentPassesCoupon` = 5 and
+  reaching 8.87 by the term's end, having raised $26,595,000 where
+  `sizeLoan` allows $12,816,579. One trap already paid for: with the
+  contract rent AT market and a discount rate above the market cap,
+  `overpayment` is still positive — the two inputs simply disagree about
+  the yield — so the reversion sentence is gated on there BEING a rent
+  premium, or the card calls an artifact of two assumptions a finding
+  about the deal. Bars: `data-bar="slb"` (three values on one track) and
+  `data-bar="coupon"` (a year each, against the coupon's dashed line).
 - The measures on a page of an OM: `lib/tools/measure-math.ts` (pure).
   `readLand` treats acres and square feet as ONE measurement entered from
   whichever side the document stated (`SF_PER_ACRE`, 43,560), and where both

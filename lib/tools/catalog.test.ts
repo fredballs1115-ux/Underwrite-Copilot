@@ -43,6 +43,11 @@ const WORDS = [
   "thirty-three",
   "thirty-four",
   "thirty-five",
+  "thirty-six",
+  "thirty-seven",
+  "thirty-eight",
+  "thirty-nine",
+  "forty",
 ];
 
 // Longest first, so the alternation cannot match "twenty" inside

@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-17",
+      "title": "The sale-leaseback",
+      "blurb": "A company sells the building it operates from and signs a lease back the same day. Both sides then price it wrong in the same direction. The seller writes its own lease, so the rent is the price lever — a $9 contract rent on space letting at $7.50 turns a $21.6M building into a $27M price, and $5.4M of that is the lease rather than the real estate. It is cash borrowed, not value created. And an above-market lease reverts: the buyer is really buying the term's rent plus a market-rent building afterwards, which come to $23.0M — so capitalising the contract NOI overpays by $3,973,557, and it is worse on a SHORT lease, because the reversion arrives sooner. For the seller it is borrowing, and it looks cheaper than a mortgage without being cheaper: 6.09 cents a dollar against a 6.50% coupon, true for exactly four years before the escalations pass it.",
+      "href": "/tools#sale-leaseback"
+    },
+    {
+      "date": "2026-09-17",
       "title": "Filling an empty building",
       "blurb": "The months between a building delivering and filling up are where a development's money goes, and the pro forma covers them in a footnote. Three things nobody models: an empty building still pays its taxes; a signed lease is not a paying lease, so the seeded building is full at month 22 and paid in full at month 28; and the tenant allowance and the commission fall due at signing, ahead of the rent they buy. So the worst month is month 22 — the month it fills — not month one: $6,200,437 out, deep into a lease-up that is going well. And then the part that catches people out. Stress the absorption and the reserve looks BETTER: six months slower takes the worst month down to $5,674,789, because a slower pace spends the leasing capital slower. Anyone stress-testing slippage against the lease-up reserve concludes it is survivable and is measuring the wrong thing. The cost is time, and it only shows at a common date — at month 36 the plan is $3,465,450 out and the slipped case $4,158,892, which is 1.9 times what a 5% rent miss costs on the same building.",
       "href": "/tools#lease-up"

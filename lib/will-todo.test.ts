@@ -35,6 +35,7 @@ const WORDS = [
   "twenty-two", "twenty-three", "twenty-four", "twenty-five", "twenty-six",
   "twenty-seven", "twenty-eight", "twenty-nine", "thirty", "thirty-one",
   "thirty-two", "thirty-three", "thirty-four", "thirty-five",
+  "thirty-six", "thirty-seven", "thirty-eight", "thirty-nine", "forty",
 ];
 // Longest first, so the alternation cannot match "twenty" inside
 // "twenty-one" and then fail the whole pattern on the hyphen.

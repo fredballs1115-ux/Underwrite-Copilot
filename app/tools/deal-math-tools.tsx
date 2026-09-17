@@ -31,6 +31,7 @@ import { buildStack } from "@/lib/tools/sources-uses";
 import { readMix, totalMix } from "@/lib/tools/unit-mix";
 import { readRoll, readRollover } from "@/lib/tools/rollover";
 import { readLeaseUp } from "@/lib/tools/lease-up";
+import { readLeaseback } from "@/lib/tools/sale-leaseback";
 import { runWaterfall } from "@/lib/tools/waterfall-math";
 import {
   breakEvenOccupancyPct,
@@ -2696,6 +2697,184 @@ function WhatYouBelieve() {
  * — and a reset to a share of land value can halve it without anything in
  * the lease having changed.
  */
+// ── the sale-leaseback ─────────────────────────────────────────────────────
+
+function Leaseback() {
+  const [sf, setSf] = useShared("lbsf", "180,000");
+  const [mkt, setMkt] = useShared("lbmr", "7.50");
+  const [con, setCon] = useShared("lbcr", "9.00");
+  const [term, setTerm] = useShared("lbt", "20");
+  const [esc, setEsc] = useShared("lbe", "2");
+  const [credit, setCredit] = useShared("lbcc", "6.00");
+  const [market, setMarket] = useShared("lbmc", "6.25");
+  const [disc, setDisc] = useShared("lbd", "8");
+  const [cost, setCost] = useShared("lbsc", "1.5");
+  const [rate, setRate] = useShared("lbr", "6.5");
+  const [amort, setAmort] = useShared("lba", "25");
+
+  const r = useMemo(
+    () =>
+      readLeaseback({
+        buildingSf: num(sf) ?? 0,
+        marketRentPerSf: num(mkt) ?? 0,
+        contractRentPerSf: num(con) ?? 0,
+        termYears: num(term) ?? 0,
+        escalationPct: num(esc),
+        creditCapPct: num(credit) ?? 0,
+        marketCapPct: num(market) ?? 0,
+        discountRatePct: num(disc),
+        sellingCostPct: num(cost),
+        mortgageRatePct: num(rate),
+        mortgageAmortYears: num(amort),
+        maxLtvPct: 60,
+        minDscr: 1.3,
+        minDebtYieldPct: 9,
+      }),
+    [sf, mkt, con, term, esc, credit, market, disc, cost, rate, amort],
+  );
+
+  // Rules 1 and 2 as one picture: what the buyer pays, what an ordinary
+  // owner would pay, and what the two pieces are actually worth. The gaps
+  // between the three bars are the whole card.
+  const values = [
+    { key: "price", label: "The buyer pays", value: r.price, tone: "bg-caution" },
+    { key: "honest", label: "Term + reversion", value: r.honestValue, tone: "bg-brand/60" },
+    { key: "market", label: "At market rent", value: r.marketValue, tone: "bg-sidebar" },
+  ].filter((x) => x.value !== null);
+  const widest = Math.max(1, ...values.map((x) => x.value ?? 0));
+
+  // Rule 4: the escalating rent against a coupon that never moves.
+  const coupon = num(rate);
+  const years = r.rentPerDollarRaised === null ? [] : Array.from(
+    { length: Math.min(r.yearRentPassesCoupon === null ? 20 : 20, num(term) ?? 20) },
+    (_, i) => r.rentPerDollarRaised! * Math.pow(1 + (num(esc) ?? 0) / 100, i),
+  );
+  const tallest = Math.max(1, ...years, coupon ?? 0);
+
+  return (
+    <Card id="sale-leaseback" eyebrow="The structure" title="The sale-leaseback">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+        <div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Building" suffix="SF" value={sf} onChange={setSf} placeholder="180,000" />
+            <Field label="Market rent" suffix="/SF" value={mkt} onChange={setMkt} placeholder="7.50" />
+            <Field label="Contract rent" suffix="/SF" value={con} onChange={setCon} placeholder="9.00" />
+            <Field label="Term" suffix="yrs" value={term} onChange={setTerm} placeholder="20" />
+            <Field label="Escalation" suffix="%" value={esc} onChange={setEsc} placeholder="2" />
+            <Field label="Credit cap" suffix="%" value={credit} onChange={setCredit} placeholder="6.00" />
+            <Field label="Market cap" suffix="%" value={market} onChange={setMarket} placeholder="6.25" />
+            <Field label="Discount rate" suffix="%" value={disc} onChange={setDisc} placeholder="8" />
+            <Field label="Cost of sale" suffix="%" value={cost} onChange={setCost} placeholder="1.5" />
+            <Field label="Mortgage rate" suffix="%" value={rate} onChange={setRate} placeholder="6.5" />
+            <Field label="…amortised over" suffix="yrs" value={amort} onChange={setAmort} placeholder="25" />
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted">
+            Two cap rates, deliberately. One prices the tenant&rsquo;s covenant
+            and the other prices the building, and a sale-leaseback is the one
+            deal where they are not the same number.
+          </p>
+        </div>
+
+        <div>
+          {values.length > 0 && (
+            <div className="space-y-2">
+              {values.map((x) => (
+                <div key={x.key} className="flex items-center gap-3 text-xs">
+                  <span className="w-32 shrink-0 text-muted">{x.label}</span>
+                  <span className="h-3 flex-1 rounded-full bg-faint">
+                    <span
+                      data-bar="slb"
+                      className={`block h-full rounded-full ${x.tone}`}
+                      style={{ width: `${((x.value ?? 0) / widest) * 100}%` }}
+                    />
+                  </span>
+                  <span className="w-24 shrink-0 text-right font-semibold tabular-nums">
+                    {usdExact(x.value)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-4 sm:grid-cols-4">
+            <Stat
+              label="Rent over market"
+              value={r.rentPremiumPct === null ? "—" : pct(r.rentPremiumPct, 1)}
+              tone={r.rentPremiumPct === null ? "muted" : undefined}
+            />
+            <Stat
+              label="…which buys, of price"
+              value={usdExact(r.pricePremium)}
+              tone={r.pricePremium === null ? "muted" : "brand"}
+            />
+            <Stat
+              label="Paid over the two pieces"
+              value={usdExact(r.overpayment)}
+              tone={r.overpayment === null ? "muted" : undefined}
+            />
+            <Stat
+              label="Seller raises"
+              value={usdExact(r.cashRaised)}
+              tone={r.cashRaised === null ? "muted" : undefined}
+            />
+          </div>
+
+          {r.note && <p className="mt-3 text-sm text-caution">{r.note}</p>}
+
+          {years.length > 1 && coupon !== null && (
+            <div className="mt-5 border-t border-line pt-4">
+              <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted">
+                Rent per dollar raised, against the mortgage coupon
+              </p>
+              <div className="relative flex h-16 items-end gap-px">
+                {years.map((v, i) => (
+                  <span
+                    key={i}
+                    data-bar="coupon"
+                    className={`flex-1 ${v > coupon ? "bg-caution" : "bg-brand/50"}`}
+                    style={{ height: `${(v / tallest) * 100}%` }}
+                  />
+                ))}
+                <span
+                  className="pointer-events-none absolute inset-x-0 border-t border-dashed border-ink/60"
+                  style={{ bottom: `${(coupon / tallest) * 100}%` }}
+                />
+              </div>
+              <p className="mt-1.5 text-[11px] text-muted">
+                The dashed line is the {pct(coupon, 2)} coupon, which never
+                moves. Year 1 is{" "}
+                {r.rentPerDollarRaised === null ? "—" : `${r.rentPerDollarRaised}¢`}; the
+                term&rsquo;s last year is{" "}
+                {r.rentPerDollarAtTermEnd === null ? "—" : `${r.rentPerDollarAtTermEnd}¢`}.
+              </p>
+            </div>
+          )}
+
+          {r.yearRentPassesCoupon !== null && r.mortgageProceeds !== null && (
+            <p className="mt-3 text-sm text-muted">
+              It raises {usdExact(r.extraRaised)} more than the loan the
+              building carries ({usdExact(r.mortgageProceeds)}, on{" "}
+              {r.mortgageBindingTest?.toLowerCase()}) and costs less than the
+              coupon — for four years. The rent passes it in year{" "}
+              {r.yearRentPassesCoupon} and never comes back under.
+            </p>
+          )}
+
+          <p className="mt-4 border-t border-line pt-3 text-[11px] leading-relaxed text-muted">
+            The seller writes its own lease, so the rent is the price lever
+            and the premium over a market-rent building is cash borrowed
+            rather than value created. The rent reverts at the end of the term
+            and the building does not, so a buyer capitalising the contract
+            NOI is valuing a rent that expires. And the constant on the
+            mortgage line repays principal, which the rent does not — compare
+            the rent to the coupon, never to the constant.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function GroundLease() {
   const [noi, setNoi] = useShared("gln", "8,000,000");
   const [rent, setRent] = useShared("glr", "2,000,000");
@@ -6185,6 +6364,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <PercentageRent />
       <TaxReassessment />
       <GroundLease />
+      <Leaseback />
       <Proration />
       <div className="grid gap-6 lg:grid-cols-2">
         <CapTriangle />
