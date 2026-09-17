@@ -7,6 +7,7 @@ import { readDebt, testRefi } from "@/lib/tools/debt-math";
 import { readLease, readOpex } from "@/lib/tools/lease-math";
 import { readAfterTax } from "@/lib/tools/after-tax";
 import { EXCHANGE_DAYS, IDENTIFY_DAYS, readExchange } from "@/lib/tools/exchange-1031";
+import { readRecovery } from "@/lib/tools/expense-recovery";
 import { readProration } from "@/lib/tools/proration";
 import { TOOL_INDEX } from "@/lib/tools/catalog";
 import { readResidual } from "@/lib/tools/land-residual";
@@ -1942,6 +1943,308 @@ function Exchange1031() {
   );
 }
 
+// ── 7c-iii. the operating-expense reconciliation ───────────────────────────
+
+/**
+ * What the tenant actually owes when the statement lands.
+ *
+ * The most input-heavy card here, and it earns it: a reconciliation is
+ * checked against a lease, and the lease has four separate levers in it.
+ * The fields are grouped the way the lease is — the premises, the floor,
+ * this year, the cap — rather than as one sixteen-box grid.
+ *
+ * Two pictures, because there are two questions. The two years drawn as
+ * stacked bars answer "is the comparison fair", and the gross-up segment on
+ * the base year is the whole story: on the seeded building it is $287,500
+ * against $12,553 this year, because the base year was struck at 72%. The
+ * honest share against the one-sided share answers "what is it worth to
+ * catch it".
+ */
+function Recovery() {
+  const [tenantSf, setTenantSf] = useShared("rts", "12,000");
+  const [buildingSf, setBuildingSf] = useShared("rbs", "100,000");
+  const [basis, setBasis] = useShared("rbasis", "base year");
+  const [stop, setStop] = useShared("rstop", "16.00");
+  const [baseFixed, setBaseFixed] = useShared("rbf", "640,000");
+  const [baseVar, setBaseVar] = useShared("rbv", "900,000");
+  const [baseOcc, setBaseOcc] = useShared("rbo", "72");
+  const [curFixed, setCurFixed] = useShared("rcf", "720,000");
+  const [curVar, setCurVar] = useShared("rcv", "1,180,000");
+  const [curOcc, setCurOcc] = useShared("rco", "94");
+  const [grossTo, setGrossTo] = useShared("rgu", "95");
+  const [capPct, setCapPct] = useShared("rcap", "5");
+  const [capType, setCapType] = useShared("rct", "cumulative");
+  const [controllable, setControllable] = useShared("rctrl", "60");
+  const [years, setYears] = useShared("ryr", "3");
+  const [paid, setPaid] = useShared("rpaid", "30,000");
+
+  const stopBasis = basis === "expense stop";
+
+  const r = useMemo(
+    () =>
+      readRecovery({
+        tenantSf: num(tenantSf),
+        buildingSf: num(buildingSf),
+        basis: stopBasis ? "expense stop" : "base year",
+        base: { fixed: num(baseFixed), variable: num(baseVar), occupancyPct: num(baseOcc) },
+        stopPerSf: num(stop),
+        current: { fixed: num(curFixed), variable: num(curVar), occupancyPct: num(curOcc) },
+        grossUpToPct: num(grossTo),
+        capPct: num(capPct),
+        capType:
+          capType === "none" ? "none" : capType === "non-cumulative" ? "non-cumulative" : "cumulative",
+        controllablePct: num(controllable),
+        yearsSinceBase: num(years),
+        estimatedPaid: num(paid),
+      }),
+    [
+      tenantSf, buildingSf, stopBasis, baseFixed, baseVar, baseOcc,
+      curFixed, curVar, curOcc, grossTo, capPct, capType, controllable, years, paid, stop,
+    ],
+  );
+
+  // Both years on ONE scale, so the bars are comparable rather than merely
+  // adjacent. The gross-up segment is the point of the picture.
+  const widest = Math.max(1, r.baseGrossedUp ?? 0, r.currentGrossedUp ?? 0);
+  const yearBars = [
+    {
+      label: stopBasis ? "The stop" : "Base year",
+      fixed: stopBasis ? 0 : num(baseFixed) ?? 0,
+      variable: stopBasis ? r.baseGrossedUp ?? 0 : num(baseVar) ?? 0,
+      adj: r.baseGrossUpAdj ?? 0,
+      occ: stopBasis ? null : num(baseOcc),
+    },
+    {
+      label: "This year",
+      fixed: num(curFixed) ?? 0,
+      variable: num(curVar) ?? 0,
+      adj: r.currentGrossUpAdj ?? 0,
+      occ: num(curOcc),
+    },
+  ];
+
+  const owed = (r.dueFromTenant ?? 0) > 0;
+
+  return (
+    <Card id="expense-recovery" eyebrow="Recovery" title="What the tenant actually owes">
+      <div className="space-y-4">
+        <div>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted">
+            The premises
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Field label="Tenant SF" value={tenantSf} onChange={setTenantSf} placeholder="12,000" />
+            <Field label="Building SF" value={buildingSf} onChange={setBuildingSf} placeholder="100,000" />
+            <Field label="Estimates paid" value={paid} onChange={setPaid} placeholder="30,000" />
+            <Field label="Gross up to" suffix="%" value={grossTo} onChange={setGrossTo} placeholder="95" />
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted">
+            The floor the lease gives
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Choice
+              label="Basis"
+              value={basis}
+              onChange={setBasis}
+              options={[
+                { value: "base year", label: "Base year" },
+                { value: "expense stop", label: "Expense stop" },
+              ]}
+            />
+            {stopBasis ? (
+              <Field label="Stop, $ per SF" value={stop} onChange={setStop} placeholder="16.00" />
+            ) : (
+              <>
+                <Field label="Base fixed" value={baseFixed} onChange={setBaseFixed} placeholder="640,000" />
+                <Field label="Base variable" value={baseVar} onChange={setBaseVar} placeholder="900,000" />
+                <Field label="Occupied then" suffix="%" value={baseOcc} onChange={setBaseOcc} placeholder="72" />
+              </>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted">
+            This year, and the cap
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <Field label="Fixed" value={curFixed} onChange={setCurFixed} placeholder="720,000" />
+            <Field label="Variable" value={curVar} onChange={setCurVar} placeholder="1,180,000" />
+            <Field label="Occupied now" suffix="%" value={curOcc} onChange={setCurOcc} placeholder="94" />
+            <Field label="Cap" suffix="%" value={capPct} onChange={setCapPct} placeholder="5" />
+            <Choice
+              label="Cap type"
+              value={capType}
+              onChange={setCapType}
+              options={[
+                { value: "cumulative", label: "Cumulative" },
+                { value: "non-cumulative", label: "Non-cumulative" },
+                { value: "none", label: "None" },
+              ]}
+            />
+            <Field label="Controllable" suffix="%" value={controllable} onChange={setControllable} placeholder="60" />
+          </div>
+          {!stopBasis && (
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Field label="Years since base" value={years} onChange={setYears} placeholder="3" />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {r.baseGrossedUp !== null && r.currentGrossedUp !== null && (
+        <div className="mt-6">
+          <p className="mb-3 text-sm text-muted">
+            Both years grossed up to the same occupancy, so the comparison is like
+            for like.
+          </p>
+          <div className="space-y-3">
+            {yearBars.map((y) => (
+              <div key={y.label}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="font-medium">
+                    {y.label}
+                    {y.occ !== null && (
+                      <span className="ml-2 text-xs font-normal text-muted">{y.occ}% full</span>
+                    )}
+                  </span>
+                  <span className="shrink-0 font-mono tabular-nums">
+                    {usd(y.fixed + y.variable + y.adj)}
+                  </span>
+                </div>
+                <div className="mt-1 flex h-4 overflow-hidden rounded-full bg-faint">
+                  <div
+                    data-bar="recovery-year"
+                    title={`Fixed · ${usdExact(y.fixed)}`}
+                    className="h-full bg-ink/70"
+                    style={{ width: `${(y.fixed / widest) * 100}%` }}
+                  />
+                  <div
+                    data-bar="recovery-year"
+                    title={`Variable · ${usdExact(y.variable)}`}
+                    className="h-full bg-brand"
+                    style={{ width: `${(y.variable / widest) * 100}%` }}
+                  />
+                  <div
+                    data-bar="recovery-grossup"
+                    title={`Added by gross-up · ${usdExact(y.adj)}`}
+                    className="h-full bg-brand/35"
+                    style={{ width: `${(y.adj / widest) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs">
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden="true" className="inline-block h-2.5 w-2.5 rounded-sm bg-ink/70" />
+              <span className="text-muted">Fixed</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden="true" className="inline-block h-2.5 w-2.5 rounded-sm bg-brand" />
+              <span className="text-muted">Variable, as spent</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden="true" className="inline-block h-2.5 w-2.5 rounded-sm bg-brand/35" />
+              <span className="text-muted">Added by gross-up</span>
+            </span>
+          </div>
+        </div>
+      )}
+
+      {r.tenantShare !== null && (r.oneSidedCost ?? 0) > 0 && (
+        <div className="mt-6 rounded-xl bg-faint p-4">
+          <p className="text-sm font-semibold">
+            Gross up this year and leave the base year alone, and this tenant
+            pays {usdExact(r.oneSidedCost)} it does not owe.
+          </p>
+          <div className="mt-3 space-y-2">
+            {[
+              { label: "Both years grossed up", amount: r.tenantShare, tone: "bg-brand" },
+              { label: "Only this year", amount: r.oneSidedShare ?? 0, tone: "bg-kill" },
+            ].map((row) => (
+              <div key={row.label}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="text-muted">{row.label}</span>
+                  <span className="shrink-0 font-mono font-semibold tabular-nums">
+                    {usdExact(row.amount)}
+                  </span>
+                </div>
+                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-white">
+                  <div
+                    data-bar="one-sided"
+                    className={`h-full rounded-full ${row.tone}`}
+                    style={{
+                      width: `${(row.amount / Math.max(1, r.oneSidedShare ?? 1)) * 100}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {r.dueFromTenant !== null && (
+        <>
+          <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
+            <Stat label="Pro rata share" value={pct(r.sharePct, 2)} tone="muted" />
+            <Stat label="Increase over the floor" value={usd(r.increase)} tone="muted" />
+            <Stat label="Held back by the cap" value={usd(r.capSaved)} tone="muted" />
+            <Stat label="The tenant's share" value={usdExact(r.tenantShare)} />
+          </div>
+          <p className={`mt-4 text-sm font-medium ${owed ? "text-caution" : "text-brand"}`}>
+            {owed ? (
+              <>
+                Against {usdExact(num(paid))} of estimates, the tenant owes{" "}
+                <span className="font-semibold tabular-nums">{usdExact(r.dueFromTenant)}</span>.
+              </>
+            ) : (
+              <>
+                Against {usdExact(num(paid))} of estimates, the tenant is owed{" "}
+                <span className="font-semibold tabular-nums">
+                  {usdExact(Math.abs(r.dueFromTenant))}
+                </span>{" "}
+                back.
+              </>
+            )}
+            {(r.carvedOut ?? 0) > 0 && (
+              <>
+                {" "}
+                {/* Lead with what the cap actually DID. Saying "$34,021 is
+                    outside the cap" beside a stat reading "held back $0"
+                    implies the cap bit and the carve-out blunted it, when
+                    in fact the cap never came near binding. */}
+                <span className="font-normal text-muted">
+                  {(r.capSaved ?? 0) > 0 ? (
+                    <>
+                      The cap held {usd(r.capSaved)} back, and a further{" "}
+                      {usd(r.carvedOut)} of the increase was never inside it:
+                      taxes, insurance and utilities are carved out by convention.
+                    </>
+                  ) : (
+                    <>
+                      The cap did not bind. When it does it reaches only the
+                      controllable {controllable}% — {usd((r.increase ?? 0) - (r.carvedOut ?? 0))}{" "}
+                      of an increase this size — which is why a {capPct}% cap is
+                      worth less than it sounds in a year the insurance jumps.
+                    </>
+                  )}
+                </span>
+              </>
+            )}
+          </p>
+        </>
+      )}
+
+      {r.note && <p className="mt-4 text-sm text-caution">{r.note}</p>}
+    </Card>
+  );
+}
+
 // ── 7d. rentable, usable, and the rent you actually pay ────────────────────
 
 /**
@@ -2790,6 +3093,7 @@ export function DealMathTools() {
       <RentableUsable />
       <AfterTax />
       <Exchange1031 />
+      <Recovery />
       <Proration />
       <div className="grid gap-6 lg:grid-cols-2">
         <CapTriangle />

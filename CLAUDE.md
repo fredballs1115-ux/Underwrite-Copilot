@@ -71,6 +71,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   margin-spaced `<span>` is one word to a screen reader — spell the space.
   The public pages get the same lint after every deploy:
   `scripts/lint-pages.mjs` over the HTML live-verify fetches.
+  `lib/live-verify-markers.test.ts` holds every round marker that greps
+  `/tools` to text that is really in the SERVED html: React's server
+  renderer puts `<!-- -->` between adjacent text nodes, so a marker
+  grepping prose that spans an interpolated value (`the full
+  {EXCHANGE_DAYS} days`) reads NOT DEPLOYED on a page that is perfectly
+  fine — and neither the render tests (`renderToStaticMarkup`, no
+  separators) nor `visibleText` (strips them) can see it. Grep prose with
+  no `{expression}` in it.
   `lib/a11y-source.test.ts` scans every page's source for a form control
   with no accessible name (the pages the render tests cannot reach). The
   root layout renders the one skip link (`app/skip-link.tsx`); every page's
@@ -332,6 +340,25 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   is taxed recapture-first at the higher rate, and `exchangeClock` draws
   the 45 and the 180 from the SAME day — capped by the return's due date,
   which costs a Q4 closing real weeks unless an extension is filed.
+- What the tenant actually owes: `lib/tools/expense-recovery.ts` (pure —
+  the operating-expense reconciliation). Three rules, and the first is the
+  one that moves the most money. **Gross up BOTH years, or neither** —
+  variable expenses scale with occupancy, so a base year struck in a
+  70%-leased building is artificially low and the tenant is later billed
+  for the building filling up; the error to catch is the ONE-SIDED version
+  (this year grossed up, the base year left at its actual), which
+  `oneSidedCost` prices rather than merely warns about. `grossUp` scales
+  the variable part only and never scales a building already fuller than
+  the target. **A base year is not an expense stop** — one is an outcome
+  and can drift, the other is a negotiated number and cannot, so the
+  caller says which the lease has. And **a cap is cumulative or it is
+  not**: cumulative compounds off the base year and banks unused headroom,
+  non-cumulative allows one year's worth; both are "a 5% cap" in a term
+  sheet. The cap reaches CONTROLLABLE expenses only and the carve-out is
+  reported beside it, because a 5% cap is worth little in a year the
+  insurance doubled. Every displayed figure is rounded once and the
+  differences are taken from the rounded pair (the debt schedule's rule),
+  so the card's numbers add up.
 - Who owes whom at closing: `lib/tools/proration.ts` (pure). The one
   calculation here that comes AFTER yes, and the one people get BACKWARDS
   rather than merely wrong, because two of its rules reverse a payment's

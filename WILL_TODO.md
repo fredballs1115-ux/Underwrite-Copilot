@@ -7,7 +7,7 @@ Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 
 Ten more PRs, #307–#316, nine on `/tools` or its shop window and one on
 the photographs, all proven live by the round markers — and the table has
-kept growing since (#317, #319). **Eighteen calculations** there now, and
+kept growing since (#317, #319, #320). **Nineteen calculations** there now, and
 they cover the arithmetic an acquisitions analyst does between opening a
 memorandum and sending a letter:
 
@@ -25,6 +25,7 @@ memorandum and sending a letter:
 | **Net effective rent** | Both ways — straight-line and discounted — with free rent, TI and the commission against the *gross* |
 | **Rentable vs usable** (#312) | The load factor, and what it does to a quote. **$38.00 per rentable foot is $43.70 per foot you can furnish** — and the two numbers people both call "the load factor" (15.0% and 13.0%) are the same building |
 | **After tax** (#315) | Land is never depreciable; the gain at the sale has THREE rates, not one; and depreciation is a **timing** benefit — shelter and recapture at the same rate and it nets to zero. Cost segregation lifts year-one write-off 4.5× and leaves this deal **$130,909 worse off** in raw dollars |
+| **Expense recovery** (#320) | The reconciliation statement that lands every spring and nobody checks. Gross up **both** years or neither: the seeded base year was struck at 72% occupancy, so gross-up adds **$287,500** to it against $12,553 to this year. Do it to only the current year — the commonest and costliest move in a reconciliation — and this tenant pays **$28,417** it does not owe. A base year is not an expense stop; a cumulative cap is not a non-cumulative one; and the cap reaches controllable expenses only |
 | **1031 exchange** (#319) | What rolling it forward actually defers. The seeded trade sells at $26M, buys at $30M with *more* debt — passes the price test, and still owes **$305,000**, because $1.22M of proceeds stayed in the seller's pocket and borrowing more never cures that. Debt relief is boot even with every dollar of cash reinvested; cash added to the replacement offsets it. Deferred is not forgiven: $30M of property, a **$20.5M basis**. And the clock's 45 and 180 days run from the *same* day — a November closing loses **29 of them** to the return's due date |
 | **Closing statement** (#317) | The one that comes after yes, and the one people get *backwards*: taxes in arrears mean the seller credits the buyer, in advance the reverse, so the wrong reading misses by the **sum** of the two figures. Deposits are the tenants' money and go over whole. The closing day itself is worth **$657.53** on a $240,000 bill, so the contract decides it, not a default |
 | **Opex translator** | One expense per unit, per foot, as a share of income |
@@ -32,8 +33,8 @@ memorandum and sending a letter:
 
 Three things they share: every field reads shorthand (`$20M`, `4.75%`,
 `1.25x`); every field travels in the URL, so a sizing is a link; and the
-math is a pure tested module before it reaches a page — **287 tests** on
-the twelve modules, plus **39** that render the page itself and check the
+math is a pure tested module before it reaches a page — **314 tests** on
+the thirteen modules, plus **43** that render the page itself and check the
 figures it prints. And since #314 the homepage renders its shelf of those
 calculations from the SAME list the page builds its cards from, so it can
 no longer advertise a version of `/tools` that does not exist.
@@ -42,8 +43,8 @@ no longer advertise a version of `/tools` that does not exist.
 there.
 
 **What I'd build next, when you want more:** an amortisation schedule you
-can export, a lease-abstract reader, a CAM reconciliation with a base
-year and an expense stop. Then the pieces that are not calculators at all
+can export, a lease-abstract reader, percentage rent and the natural
+breakpoint for retail. Then the pieces that are not calculators at all
 — a copy-as-table button on the deal page's comps (the pipeline already
 exports CSV and .xlsx), a print stylesheet, breadcrumbs, a keyboard
 layer.
