@@ -718,6 +718,13 @@ jobs:
           mark "#352 the rent gap is what governs, not the discount" grep -q "that gap, not the discount to replacement cost, is what keeps a competitor off the block" p_tools2.html
           mark "#352 the cost side is solved as well as the rent side" grep -q "the cost side is the one nobody models" p_tools2.html
           mark "#352 the two rents are drawn against each other" grep -q "A new building needs" p_tools2.html
+          # #353 — the index re-clustered at forty cards. Two of the six
+          # groups had hit the eight-card ceiling, so the next lease card
+          # and the next land card could not be filed. Both new headings
+          # carry an ampersand or sit beside one, and a heading serves
+          # ESCAPED, which is why "Rent &amp; recoveries" is the grep.
+          mark "#353 the leases are split from their recoveries" grep -q "Rent &amp; recoveries" p_tools2.html
+          mark "#353 and a standing building from a site" grep -q "Development" p_tools2.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

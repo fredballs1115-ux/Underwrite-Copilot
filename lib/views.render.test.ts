@@ -2068,6 +2068,24 @@ describe("the deal math tools", () => {
     expect(text).toContain("$263.37");
     expect(text).toContain("the cost side is the one nobody models");
   });
+
+  it("files forty cards into eight clusters, none of them at the ceiling", () => {
+    // #353. Two of the six clusters had reached the eight-card ceiling
+    // catalog.test.ts enforces, so the next lease card and the next land
+    // card could not be filed at all.
+    for (const heading of [
+      "Debt",
+      "Equity & returns",
+      "Leases",
+      "Rent & recoveries",
+      "The property",
+      "Value",
+      "Development",
+      "Tax & closing",
+    ]) {
+      expect(text, `the index files ${heading}`).toContain(heading);
+    }
+  });
 });
 
 // ── today's rates, across the top of /tools ────────────────────────────────

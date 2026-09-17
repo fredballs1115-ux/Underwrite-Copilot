@@ -715,9 +715,18 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   that claim went stale twice in one evening before the guard existed. The
   index is CLUSTERED, not a flat row: the page measured 187KB of HTML,
   4,165 words and 189 input fields at twenty-six cards, and a row of
-  twenty-six chips is a wall rather than a directory — six named groups
-  of three to six scan, and the shape holds as the page grows instead of
-  degrading with every addition. `groupedTools()` is the one place that
+  twenty-six chips is a wall rather than a directory. **Re-clustered at
+  forty cards** (349KB, 7,521 words, 331 input fields — nearly double the
+  first measurement): two of the six groups had reached the eight-card
+  ceiling the test enforces, so the next lease card and the next land card
+  could not be filed at all. THE GUARD REFUSING THEM IS THE SIGNAL that
+  the shape has run out — widening the ceiling answers the guard instead
+  of the reader. Eight groups of four to seven now, with headroom in each:
+  "Leases" split from "Rent & recoveries", and "Value & land" into "Value"
+  (what a standing building is worth) and "Development" (what a site could
+  become). A card's own `eyebrow` is a DESCRIPTIVE label, never a group
+  name — three cards borrowed group names when they were written and now
+  read "The statement", "The envelope", "New supply". `groupedTools()` is the one place that
   regrouping lives, and `catalog.test.ts` holds every card to exactly one
   cluster, every cluster to two through eight cards, and the order to
   `TOOL_GROUPS` — because the filter means a card with a group outside

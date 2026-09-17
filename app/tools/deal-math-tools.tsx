@@ -6225,7 +6225,7 @@ function FeasibilityRent() {
   return (
     <Card
       id="feasibility-rent"
-      eyebrow="Value &amp; land"
+      eyebrow="New supply"
       title="The rent a new building needs"
     >
       <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
@@ -6350,7 +6350,7 @@ function StraightLineRent() {
   const widest = Math.max(...s.years.map((y) => Math.abs(y.gap)), 1);
 
   return (
-    <Card id="straight-line-rent" eyebrow="Leases" title="What the statement reports, and what the building collects">
+    <Card id="straight-line-rent" eyebrow="The statement" title="What the statement reports, and what the building collects">
       <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Term" suffix="yrs" value={term} onChange={setTerm} placeholder="10" />
@@ -6493,7 +6493,7 @@ function ZoningEnvelope() {
   const widest = Math.max(...caps.map((c) => c.units ?? 0), 1);
 
   return (
-    <Card id="zoning-envelope" eyebrow="Value &amp; land" title="What the site actually holds">
+    <Card id="zoning-envelope" eyebrow="The envelope" title="What the site actually holds">
       <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Site" suffix="SF" value={site} onChange={setSite} placeholder="87,120" />
