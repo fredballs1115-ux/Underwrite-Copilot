@@ -2112,6 +2112,25 @@ describe("the deal math tools", () => {
     expect((html.match(/data-bar="lever"/g) ?? []).length).toBe(2);
   });
 
+  it("sets both positions of a loan assumption against each other", () => {
+    // #356, rule 1. The "cheap" loan is the LARGER cheque — $10.80M against
+    // $8.42M — and only the two complete positions answer it.
+    expect(text).toContain("Taking over the seller");
+    expect(text).toContain("Coverage gained");
+    expect(text).toContain("$10.80M");
+    expect(text).toContain("$8.42M");
+    expect(text).toContain("$2.38M");
+    expect((html.match(/data-bar="assume"/g) ?? []).length).toBe(2);
+  });
+
+  it("and solves what the loan is worth in price", () => {
+    // The headline: $934,223 of price, bisected rather than approximated.
+    expect(text).toContain("The premium against the asking price");
+    expect(text).toContain("$934,223");
+    expect(text).toContain("A seller who does not ask for that hands it over");
+    expect((html.match(/data-bar="premium"/g) ?? []).length).toBe(2);
+  });
+
   it("charges the hotel's reserve against revenue and prices both caps", () => {
     // Rule 3: $281,065 of reserve turns a 9.25% cap into 8.00%.
     expect(text).toContain("struck on revenue, not on NOI");

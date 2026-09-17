@@ -744,6 +744,13 @@ jobs:
           mark "#355 the penetration index is drawn against fair share" grep -q "Against the competitive set, where 100 is fair share" p_tools2.html
           mark "#355 the index is taken apart into rate and rooms" grep -q "the whole shortfall is empty rooms" p_tools2.html
           mark "#355 the lever crossing is solved, not subtracted" grep -q "the variable cost plus what the management fee and the reserve take out of it" p_tools2.html
+          # #356 — assuming the seller's loan, the other half of #348's
+          # prepayment card. The title carries an apostrophe, which React
+          # serves as &#x27;, so the grep stops short of it.
+          mark "#356 the assumption card is on /tools" grep -q "Taking over the seller" p_tools2.html
+          mark "#356 both complete positions are drawn, not either half" grep -q "Coverage gained" p_tools2.html
+          mark "#356 the premium is solved against the asking price" grep -q "The premium against the asking price" p_tools2.html
+          mark "#356 and named as the seller's to ask for" grep -q "A seller who does not ask for that hands it over" p_tools2.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then
