@@ -759,6 +759,18 @@ jobs:
           mark "#357 the increase is drawn against what it can take" grep -q "The response the increase can take before it stops paying" p_tools2.html
           mark "#357 and the runway it spends, year by year" grep -q "Put through every year, the break-even falls" p_tools2.html
           mark "#357 the street-rate case is a forecast, not a stress test" grep -q "that is not a stress test but a forecast" p_tools2.html
+          # #359 — the comp adjustment grid. The second and third are the
+          # decisive pair: the reversal sentence renders only once the whole
+          # grid has run BACKWARDS as well as forwards, and the error bars
+          # only once all three counterfactuals resolve. All four are prose
+          # with no {expression} inside them, checked through
+          # renderToString first — React puts <!-- --> between adjacent text
+          # nodes, and a marker spanning an interpolated figure reads NOT
+          # DEPLOYED on a page that is perfectly fine.
+          mark "#359 the comp grid is on /tools" grep -q "The comp adjustment grid" p_tools2.html
+          mark "#359 the sign convention is named from the comp" grep -q "an inferior comp adjusted DOWN" p_tools2.html
+          mark "#359 and getting it backwards reverses the answer" grep -q "The convention does not shade the answer; it reverses it." p_tools2.html
+          mark "#359 the three errors are drawn against each other" grep -q "What each error is worth" p_tools2.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then
