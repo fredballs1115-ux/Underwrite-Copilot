@@ -19,6 +19,7 @@ import { readResidual } from "@/lib/tools/land-residual";
 import { readLand, readSpace } from "@/lib/tools/measure-math";
 import { readStack } from "@/lib/tools/capital-stack";
 import { readTrailing } from "@/lib/tools/trailing-window";
+import { readEgi } from "@/lib/tools/economic-occupancy";
 import { readBuyout } from "@/lib/tools/lease-buyout";
 import { readDraw } from "@/lib/tools/construction-draw";
 import { readFloating } from "@/lib/tools/floating-rate";
@@ -4300,6 +4301,188 @@ const TRAILING_SEED = [
   "142,000",
 ].join("\n");
 
+// ── the doors against the dollars ──────────────────────────────────────────
+
+function EconomicOccupancy() {
+  const [units, setUnits] = useShared("eoU", "200");
+  const [market, setMarket] = useShared("eoM", "1,850");
+  const [occ, setOcc] = useShared("eoO", "95");
+  const [ltl, setLtl] = useShared("eoL", "3.5");
+  const [conc, setConc] = useShared("eoC", "1.5");
+  const [nonRev, setNonRev] = useShared("eoN", "3");
+  const [bad, setBad] = useShared("eoB", "1.2");
+  const [other, setOther] = useShared("eoI", "310,000");
+  const [opex, setOpex] = useShared("eoX", "1,950,000");
+  const [price, setPrice] = useShared("eoP", "52M");
+
+  const r = useMemo(
+    () =>
+      readEgi({
+        units: num(units) ?? 0,
+        marketRentPerUnit: num(market) ?? 0,
+        physicalOccupancyPct: num(occ) ?? -1,
+        lossToLeasePct: num(ltl),
+        concessionsPct: num(conc),
+        nonRevenueUnits: num(nonRev),
+        badDebtPct: num(bad),
+        otherIncomeAnnual: num(other),
+        opexAnnual: num(opex),
+        priceUsd: num(price),
+      }),
+    [units, market, occ, ltl, conc, nonRev, bad, other, opex, price],
+  );
+
+  // The two occupancies on ONE track, because the whole point is that they
+  // are answers to the same question and they disagree. The economic bar
+  // sits under the physical one so the overhang IS the gap.
+  const phys = r.physicalOccupancyPct;
+  const econ = r.economicOccupancyPct;
+  // Each deduction as a share of the widest one, so the bridge reads as a
+  // ranking before any figure is.
+  const widestLine = Math.max(1, ...r.lines.map((l) => l.amount));
+
+  const tone = (kind: string) =>
+    kind === "vacancy"
+      ? "bg-sidebar"
+      : kind === "below-market"
+        ? "bg-brand"
+        : kind === "concession"
+          ? "bg-caution"
+          : "bg-kill";
+
+  return (
+    <Card id="economic-occupancy" eyebrow="The statement" title="The doors against the dollars">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Units" value={units} onChange={setUnits} placeholder="200" />
+          <Field label="Market rent" suffix="/mo" value={market} onChange={setMarket} placeholder="1,850" />
+          <Field label="Occupancy" suffix="%" value={occ} onChange={setOcc} placeholder="95" />
+          <Field label="Loss to lease" suffix="%" value={ltl} onChange={setLtl} placeholder="3.5" />
+          <Field label="Concessions" suffix="%" value={conc} onChange={setConc} placeholder="1.5" />
+          <Field label="Non-revenue units" value={nonRev} onChange={setNonRev} placeholder="3" />
+          <Field label="Bad debt" suffix="%" value={bad} onChange={setBad} placeholder="1.2" />
+          <Field label="Other income" suffix="/yr" value={other} onChange={setOther} placeholder="310,000" />
+          <Field label="Operating expenses" value={opex} onChange={setOpex} placeholder="1,950,000" />
+          <Field label="Price" value={price} onChange={setPrice} placeholder="52M" />
+        </div>
+
+        <div>
+          {phys !== null && econ !== null && (
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                What the cover says, and what the building banks
+              </p>
+              <div className="mt-2 space-y-1.5">
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="w-20 shrink-0 text-muted">Doors</span>
+                  <span className="relative h-3 flex-1 rounded-full bg-faint">
+                    <span
+                      data-bar="occ"
+                      className="absolute inset-y-0 left-0 rounded-full bg-sidebar"
+                      style={{ width: `${Math.max(0, Math.min(100, phys))}%` }}
+                    />
+                  </span>
+                  <span className="w-14 shrink-0 text-right font-semibold tabular-nums">
+                    {pct(phys, 1)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="w-20 shrink-0 text-muted">Dollars</span>
+                  <span className="relative h-3 flex-1 rounded-full bg-faint">
+                    <span
+                      data-bar="occ"
+                      className="absolute inset-y-0 left-0 rounded-full bg-brand"
+                      style={{ width: `${Math.max(0, Math.min(100, econ))}%` }}
+                    />
+                    <span
+                      className="absolute inset-y-0 w-px bg-ink/50"
+                      style={{ left: `${Math.max(0, Math.min(100, phys))}%` }}
+                    />
+                  </span>
+                  <span className="w-14 shrink-0 text-right font-semibold tabular-nums text-brand">
+                    {pct(econ, 1)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {r.lines.length > 0 && (
+            <div className="mt-5 border-t border-line pt-4">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                {usdExact(r.gpr)} of gross potential rent, less
+              </p>
+              <div className="mt-2 space-y-1.5">
+                {r.lines.map((l) => (
+                  <div key={l.label} className="flex items-center gap-3 text-xs">
+                    <span className="w-32 shrink-0 text-muted">{l.label}</span>
+                    <span className="relative h-2.5 flex-1 rounded-full bg-faint">
+                      <span
+                        data-bar="egi"
+                        className={`absolute inset-y-0 left-0 rounded-full ${tone(l.kind)}`}
+                        style={{ width: `${(l.amount / widestLine) * 100}%` }}
+                      />
+                    </span>
+                    <span className="w-20 shrink-0 text-right tabular-nums">
+                      {usdExact(l.amount)}
+                    </span>
+                    <span className="w-12 shrink-0 text-right tabular-nums text-muted">
+                      {l.pctOfGpr}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-sm">
+                <span className="text-muted">Effective gross income </span>
+                <span className="font-semibold tabular-nums">{usdExact(r.egi)}</span>
+                <span className="text-muted">
+                  , of which {usdExact(r.otherIncome)} is other income — which is in the
+                  EGI and deliberately out of the ratio above.
+                </span>
+              </p>
+            </div>
+          )}
+
+          <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-4 sm:grid-cols-4">
+            <Stat label="The gap" value={r.gapPoints === null ? "—" : `${r.gapPoints} pts`} />
+            <Stat label="Rent per full unit" value={usdExact(r.collectedRentPerUnit)} />
+            <Stat label="Going-in cap" value={pct(r.capPct, 2)} tone="brand" />
+            <Stat
+              label="Cap on doors alone"
+              value={pct(r.capIfVacancyOnlyPct, 2)}
+              tone="muted"
+            />
+          </div>
+
+          {r.capOverstatementBps !== null && r.valueOfGap !== null && (
+            <p className="mt-3 text-sm">
+              <span className="text-muted">Underwrite the cover page — vacancy off the top and nothing else — and the going-in cap reads </span>
+              <span className="font-semibold tabular-nums">{pct(r.capIfVacancyOnlyPct, 2)}</span>
+              <span className="text-muted">, </span>
+              <span className="font-semibold tabular-nums text-kill">{r.capOverstatementBps}bp</span>
+              <span className="text-muted"> too high. At the cap this NOI really supports that is </span>
+              <span className="font-semibold tabular-nums text-kill">{usdExact(r.valueOfGap)}</span>
+              <span className="text-muted"> of price.</span>
+            </p>
+          )}
+
+          {r.note && <p className="mt-2 text-sm text-caution">{r.note}</p>}
+
+          <p className="mt-4 border-t border-line pt-3 text-[11px] leading-relaxed text-muted">
+            Physical occupancy counts doors and economic occupancy counts
+            dollars, and the denominator here is market rent rather than the
+            in-place rent roll — divide by the rents currently charged and
+            loss to lease disappears into the denominator. Loss to lease
+            closes as leases roll; a concession reverses when the market
+            does; bad debt does neither. A model unit is physically full and
+            pays nothing, so it gets its own line.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function TrailingWindow() {
   const [raw, setRaw] = useShared("tw", TRAILING_SEED);
   const [kind, setKind] = useShared("twk", "noi");
@@ -5069,6 +5252,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <ConstructionDraw />
       <Prepayment />
       <TrailingWindow />
+      <EconomicOccupancy />
       <UnitMix />
       <SiteMeasures />
       <ResidualLand />
