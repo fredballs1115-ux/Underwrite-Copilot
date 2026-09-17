@@ -40,6 +40,7 @@ import { readStraightLine } from "@/lib/tools/straight-line-rent";
 import { readFeasibility } from "@/lib/tools/feasibility-rent";
 import { readRenovation } from "@/lib/tools/renovation";
 import { readHotel } from "@/lib/tools/hotel";
+import { readAssumption } from "@/lib/tools/loan-assumption";
 import {
   breakEvenOccupancyPct,
   capRatePct,
@@ -6321,6 +6322,178 @@ function FeasibilityRent() {
 }
 
 
+
+/**
+ * Taking over the seller's loan.
+ *
+ * Two pictures. The two complete POSITIONS side by side — cheque, debt
+ * service, coverage, return — because the whole finding is that neither
+ * half answers it alone. And the premium as one bar against the asking
+ * price, because that is the number to negotiate with.
+ */
+function LoanAssumption() {
+  const [price, setPrice] = useShared("lap", "20,000,000");
+  const [noi, setNoi] = useShared("lan", "1,100,000");
+  const [growth, setGrowth] = useShared("lag", "3");
+  const [exitCap, setExitCap] = useShared("laec", "5.75");
+  const [hold, setHold] = useShared("lah", "5");
+  const [closing, setClosing] = useShared("lacc", "1.5");
+  const [balance, setBalance] = useShared("lab", "9,600,000");
+  const [coupon, setCoupon] = useShared("lac", "3.50");
+  const [amort, setAmort] = useShared("laam", "25");
+  const [remaining, setRemaining] = useShared("lar", "5");
+  const [fee, setFee] = useShared("laf", "1");
+  const [market, setMarket] = useShared("lam", "6.50");
+  const [ltv, setLtv] = useShared("lal", "60");
+  const [newAmort, setNewAmort] = useShared("lana", "30");
+  const [newFee, setNewFee] = useShared("lanf", "1");
+
+  const a = useMemo(
+    () =>
+      readAssumption({
+        price: readFigure(price),
+        noi: readFigure(noi),
+        noiGrowthPct: num(growth),
+        exitCapPct: num(exitCap),
+        holdYears: num(hold),
+        closingCostPct: num(closing),
+        assumedBalance: readFigure(balance),
+        assumedRatePct: num(coupon),
+        assumedAmortYears: num(amort),
+        assumedRemainingYears: num(remaining),
+        assumptionFeePct: num(fee),
+        marketRatePct: num(market),
+        newLoanLtvPct: num(ltv),
+        newLoanAmortYears: num(newAmort),
+        newLoanFeePct: num(newFee),
+      }),
+    [price, noi, growth, exitCap, hold, closing, balance, coupon, amort, remaining, fee, market, ltv, newAmort, newFee],
+  );
+
+  const irrTop = Math.max(a.assume?.irrPct ?? 0, a.newLoan?.irrPct ?? 0, 0.01);
+  const askingPrice = readFigure(price) ?? 0;
+
+  return (
+    <Card id="loan-assumption" eyebrow="Assumable debt" title="Taking over the seller's loan">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Asking price" value={price} onChange={setPrice} placeholder="20,000,000" />
+          <Field label="Year-one NOI" value={noi} onChange={setNoi} placeholder="1,100,000" />
+          <Field label="NOI growth" suffix="%" value={growth} onChange={setGrowth} placeholder="3" />
+          <Field label="Exit cap" suffix="%" value={exitCap} onChange={setExitCap} placeholder="5.75" />
+          <Field label="Hold" suffix="yrs" value={hold} onChange={setHold} placeholder="5" />
+          <Field label="Closing costs" suffix="% price" value={closing} onChange={setClosing} placeholder="1.5" />
+          <Field label="Seller's balance" value={balance} onChange={setBalance} placeholder="9,600,000" />
+          <Field label="Its coupon" suffix="%" value={coupon} onChange={setCoupon} placeholder="3.50" />
+          <Field label="Amort left" suffix="yrs" value={amort} onChange={setAmort} placeholder="25" />
+          <Field label="Term left" suffix="yrs" value={remaining} onChange={setRemaining} placeholder="5" />
+          <Field label="Assumption fee" suffix="% bal" value={fee} onChange={setFee} placeholder="1" />
+          <Field label="Market rate" suffix="%" value={market} onChange={setMarket} placeholder="6.50" />
+          <Field label="New loan LTV" suffix="%" value={ltv} onChange={setLtv} placeholder="60" />
+          <Field label="New amort" suffix="yrs" value={newAmort} onChange={setNewAmort} placeholder="30" />
+          <Field label="New loan fee" suffix="% loan" value={newFee} onChange={setNewFee} placeholder="1" />
+        </div>
+
+        <div>
+          {a.assume !== null && a.newLoan !== null && (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-hairline text-left">
+                      <th className="py-1.5 pr-3 font-medium text-muted"> </th>
+                      <th className="py-1.5 pr-3 text-right font-medium text-muted">Assume</th>
+                      <th className="py-1.5 text-right font-medium text-muted">New loan</th>
+                    </tr>
+                  </thead>
+                  <tbody className="tabular-nums">
+                    {[
+                      { label: "Loan", a: usd(a.assume.loan), n: usd(a.newLoan.loan) },
+                      { label: "Equity in", a: usd(a.assume.equity), n: usd(a.newLoan.equity) },
+                      { label: "Debt service", a: usd(a.assume.debtService), n: usd(a.newLoan.debtService) },
+                      { label: "DSCR", a: mult(a.assume.dscr), n: mult(a.newLoan.dscr) },
+                      { label: "Levered IRR", a: pct(a.assume.irrPct, 1), n: pct(a.newLoan.irrPct, 1) },
+                    ].map((row) => (
+                      <tr key={row.label} className="border-b border-hairline/50">
+                        <td className="py-1.5 pr-3 text-muted">{row.label}</td>
+                        <td className="py-1.5 pr-3 text-right font-mono text-brand">{row.a}</td>
+                        <td className="py-1.5 text-right font-mono text-ink">{row.n}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-4 space-y-2">
+                {[
+                  { label: "Assume", value: a.assume.irrPct, brand: true },
+                  { label: "New loan", value: a.newLoan.irrPct, brand: false },
+                ].map((row) => (
+                  <div key={row.label} className="flex items-center gap-3 text-xs">
+                    <span className="w-20 shrink-0 text-muted">{row.label}</span>
+                    <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-faint">
+                      <div
+                        data-bar="assume"
+                        className={`h-full ${row.brand ? "bg-brand" : "bg-sidebar"}`}
+                        style={{ width: `${Math.max(0, ((row.value ?? 0) / irrTop) * 100)}%` }}
+                      />
+                    </div>
+                    <span className="w-14 shrink-0 text-right font-mono tabular-nums text-ink">
+                      {pct(row.value, 1)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <Stat label="Extra equity" value={usd(a.extraEquity)} tone="muted" />
+                <Stat label="Debt service saved" value={usd(a.annualDebtServiceSaved)} tone="muted" />
+                <Stat label="Coverage gained" value={a.dscrGap === null ? "\u2014" : `+${a.dscrGap.toFixed(2)}x`} />
+                <Stat label="The loan is worth" value={usd(a.pricePremium)} tone="brand" />
+              </div>
+
+              {a.pricePremium !== null && askingPrice > 0 && (
+                <div className="mt-4">
+                  <p className="text-xs uppercase tracking-wide text-muted">
+                    The premium against the asking price
+                  </p>
+                  <div className="mt-2 flex h-3 w-full overflow-hidden rounded-full bg-faint">
+                    <div
+                      data-bar="premium"
+                      className="h-full bg-sidebar"
+                      style={{ width: `${(askingPrice / (askingPrice + a.pricePremium)) * 100}%` }}
+                    />
+                    <div
+                      data-bar="premium"
+                      className="h-full bg-brand"
+                      style={{ width: `${(a.pricePremium / (askingPrice + a.pricePremium)) * 100}%` }}
+                    />
+                  </div>
+                  <div className="mt-1 flex justify-between text-xs">
+                    <span className="text-muted">{usd(askingPrice)} asked</span>
+                    <span className="text-brand">
+                      {usd(a.pricePremium)} the loan is worth
+                    </span>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {a.note && <p className="mt-4 text-sm text-caution">{a.note}</p>}
+          <p className="mt-3 text-xs text-muted">
+            The seller&apos;s loan has been amortising for years and the building has appreciated
+            since, so the balance is well under what a new loan would advance. Assuming it is the
+            larger cheque, not the smaller one, and the rate on the flyer never says so. Where the
+            term ends inside the hold the balance is refinanced at today&apos;s rate for the
+            remainder.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 /**
  * What a hotel actually earns.
  *
@@ -7619,6 +7792,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <FeeDrag />
       <Renovation />
       <Hotel />
+      <LoanAssumption />
       <StraightLineRent />
       <NetEffectiveRent />
       <RentableUsable />

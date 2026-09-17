@@ -933,6 +933,39 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   took ABOVE its pro-rata share** — the only honest definition, for the
   same reason. Return OF capital is not a separate step: an 8% IRR is not
   reached until every dollar in has come back plus 8% on it.
+- Taking over the seller's loan: `lib/tools/loan-assumption.ts` (pure — the
+  other half of `prepayment`, which asks what it costs to get OUT of a loan
+  early; this asks what it is worth to step INTO one somebody else signed,
+  and in a market where a 2021 coupon sits three points under today's that
+  is the question deciding which buildings trade). Four rules. **The rate
+  benefit and the equity cost pull OPPOSITE ways and only one of them gets
+  quoted**: the seller's loan has been amortising for years and the building
+  has appreciated since, so the balance is well under what a new loan would
+  advance — assuming it is the LARGER cheque. On the seed, $2,376,000 more
+  equity against $333,460 a year of debt service, so the module runs BOTH
+  COMPLETE POSITIONS (cheque in, cash out, balance retired at the exit) and
+  reports the two levered returns rather than either half. A wonderful rate
+  on a small balance is worth almost nothing — $4M at 3.00% saves MORE debt
+  service than the seed's $9.6M at 3.50% and prices at a tenth as much,
+  because the equity swamps it. **You are buying the OVERLAP, not the
+  term**: the premium is $934,223 at five years remaining and EXACTLY THE
+  SAME at seven and at ten, because the building is sold at five either way;
+  below the hold it falls with the overlap ($130,918 at one year). The
+  obvious version of that rule — a remaining term at which assuming first
+  beats a new loan — was written first and the probe killed it: assuming
+  wins at every term on the seed, so the "break-even" was 1 and said
+  nothing. **The assumption fee is a USE funded at closing** (`sources-uses`'
+  rule), never a reduction of the loan. And **it buys coverage as well as
+  rate** — 1.91× against 1.21×, which survives a coupon that kills the IRR
+  gap, so a marginal deal can be financeable one way only and no IRR shows
+  it. The headline `pricePremium` is BISECTED (the price moves the new loan,
+  the equity and the exit together) and a test pays it back in and asserts
+  the two paths meet. A loan balloon inside the hold refinances at the
+  MARKET rate for the same balance — the minimum refinance, so the
+  comparison stays about rate rather than a second sizing decision.
+  Schedules from `readDebt`, the rate from `irr` in
+  `lib/underwrite/engine`. Bars: `data-bar="assume"` (the two returns) and
+  `data-bar="premium"` (the premium against the asking price).
 - What a hotel actually earns: `lib/tools/hotel.ts` (pure — the asset class
   forty-two cards did not speak to, although the extraction readers have
   known the word "keys" since #223). A hotel's lease is one night long and
