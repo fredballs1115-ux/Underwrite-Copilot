@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-17",
+      "title": "What sits below the NOI line",
+      "blurb": "A broker's NOI and an owner's NOI are different numbers for the same building, and the difference is not a disagreement about operations — it is a disagreement about what counts as an operating expense. Three things get pushed below the line on a marketing package: the replacement reserve, the tenant improvement allowance and the leasing commission. All three are real, recurring, unavoidable cash. A lender underwrites after them; so does a buyer who intends to own the building. The cover page does not. On the seeded 200,000-foot office building offered at $48M, they come to $308,800 a year, and the advertised 5.50% cap is 4.86% to the buyer — 64 basis points, or $5,614,545 of price, which is also exactly the difference between the $48M ask and the $42.39M at which the real NOI earns the advertised cap. Two rules make it honest. Capital that recurs is an expense: replacing a twenty-fifth of a roof every year forever is a cost of doing business, whatever an accountant calls it. And leasing capital is not optional, nor is its annual cost its invoice — a building on five-year leases re-tenants a fifth of itself a year, so spending nothing this year means the cost is late rather than absent. The largest line is also the least certain: at $144,000 if every rolling tenant renews and $472,000 if none does, a 3.3× range driven by nothing but an assumption, which the card draws as a range with the blend marked on it rather than printing one figure and hoping.",
+      "href": "/tools#below-the-line"
+    },
+    {
+      "date": "2026-09-17",
       "title": "Hold it or sell it",
       "blurb": "The question every owner eventually asks, answered almost everywhere with the wrong number. A deal's lifetime IRR is an average over the whole hold and it is dominated by what already happened — the year the market re-rated, the year the renovation landed. It says nothing about next year, and a building can be sitting at a 17% lifetime IRR while the next twelve months earn six. This card runs the decision the right way round: the return on holding for ONE more year, on the cheque you could take out today. The seeded $34M building with $18.5M of debt has $14.82M of equity in it; holding one more year earns 14.1% on that, and the decay crosses a 12.5% reinvestment rate in year five — so the answer is a year, not a verdict. The decay is the point, and it is drawn: 14.1% falling to 11.0% over ten years with nothing going wrong, because the cash flow grows with rents while the equity underneath it grows faster, the loan amortising and the value rising on top. Two other rules earn their place. The capital at stake is the net sale proceeds — not the building's value, which ignores the debt, and not what you put in, which ignores that the market moved. And the cost of selling is paid whenever you sell, so it belongs on both sides: charge it against the hold year, the commonest version of this arithmetic, and the same year reads 18.8% instead of 14.1%, which on a 12.5% hurdle reverses the answer from \"sell in five years\" to \"hold indefinitely\".",
       "href": "/tools#hold-or-sell"
@@ -149,12 +155,6 @@
       "date": "2026-09-16",
       "title": "A typo is not an instruction",
       "blurb": "Typing 120 into a promote tier's LP share used to pay the GP negative dollars and leave everything above the last hurdle splitting at −20%; a loan term of 0.4 years ran no schedule at all while still reporting a balloon. Both now refuse and say why, rather than clamping — clamping 120 to 100 would quietly answer a different question than the one that was typed.",
-      "href": "/tools"
-    },
-    {
-      "date": "2026-09-16",
-      "title": "/tools indexes itself",
-      "blurb": "Eleven calculators is more than anyone should scroll past to find one, so the page opens with a row of jump links — which is also the honest answer to \"what does this page do\". The index and the cards read one list, and a test holds the two together: every link must name a card that exists, and every card must be reachable from the index, so neither can drift. The page's own description said it had four calculators; it says eleven now, and names them.",
       "href": "/tools"
     }
   ]

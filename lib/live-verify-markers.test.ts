@@ -50,6 +50,15 @@ import { readRates } from "@/lib/live-rates";
  * from `groupedTools()` and has to grep the ESCAPED "Equity &amp;
  * returns", because React writes an ampersand that way — the same trap
  * the `/tools` index's own cluster marker hit.
+ *
+ * Reading the homepage markers back was its own problem: they print near
+ * the TOP of a long marker list, a truncated log read shows only its
+ * tail, and the full log downloads from a blob host a sandboxed reader
+ * cannot reach — so they were effectively unverifiable. The workflow's
+ * `mark()` now tallies, and its last line is a roll-up naming every
+ * marker that did NOT deploy. That makes a round's proof legible however
+ * much of the middle is out of reach, and it is why a homepage marker is
+ * worth having at all.
  */
 
 const YML = readFileSync(".github/workflows/live-verify.yml", "utf8");
