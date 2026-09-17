@@ -80,3 +80,76 @@ describe("a note's link", () => {
     }
   });
 });
+
+/**
+ * The other direction, which is the one that actually went wrong.
+ *
+ * The link check above can only catch a note pointing at a card that is
+ * not there. It cannot catch the opposite — a card shipped with no note —
+ * and that is the failure that happened twice in a row: two new
+ * calculators went live while `/whats-new` and the homepage's latest
+ * stamp still ended at the round before them. A changelog that silently
+ * stops is worse than no changelog, because the page keeps insisting the
+ * newest thing is the newest thing.
+ */
+describe("a card's note", () => {
+  /**
+   * The cards that shipped before `/whats-new` carried a note per card —
+   * they arrived in batch rounds that got one note between them.
+   *
+   * FROZEN. A new card never joins this list; that is the entire point of
+   * it. Adding an id here to make the test pass defeats the guard rather
+   * than satisfying it — write the changelog entry instead.
+   */
+  const BEFORE_THE_CONVENTION = new Set([
+    "size-the-loan",
+    "cash-flow-strip",
+    "sources-and-uses",
+    "unit-mix",
+    "the-site",
+    "residual-land",
+    "the-waterfall",
+    "net-effective-rent",
+    "rentable-vs-usable",
+    "after-tax",
+    "cap-rate-triangle",
+    "rent-converter",
+    "operating-expense",
+    "build-or-buy",
+  ]);
+
+  const noted = new Set(
+    changelogEntries(100)
+      .filter((e) => e.href?.startsWith("/tools#"))
+      .map((e) => e.href!.slice("/tools#".length)),
+  );
+
+  it("exists for every card added since the changelog started naming them", () => {
+    const missing = TOOL_INDEX.filter(
+      (t) => !BEFORE_THE_CONVENTION.has(t.id) && !noted.has(t.id),
+    ).map((t) => t.id);
+    expect(
+      missing,
+      "these cards are live with nothing on /whats-new saying so — write the note, " +
+        "do not widen BEFORE_THE_CONVENTION",
+    ).toEqual([]);
+  });
+
+  it("keeps the frozen list honest", () => {
+    // Every id on it must still be a real card, so the list cannot rot
+    // into a set of names that excuse nothing.
+    const ids = new Set(TOOL_INDEX.map((t) => t.id));
+    for (const id of BEFORE_THE_CONVENTION) {
+      expect(ids.has(id), `${id} is on the frozen list but is not a card`).toBe(true);
+    }
+    // And it never GROWS. That is the only property that matters here —
+    // the list is a majority of the page today and will shrink as a
+    // share of it, but one more entry means a card shipped silently and
+    // the guard was widened to let it. Pinning the count is what makes
+    // that a failing test rather than a one-line diff nobody questions.
+    expect(
+      BEFORE_THE_CONVENTION.size,
+      "the frozen list grew — a new card needs a changelog note, not an exemption",
+    ).toBe(14);
+  });
+});
