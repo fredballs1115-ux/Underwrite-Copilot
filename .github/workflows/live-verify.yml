@@ -482,3 +482,8 @@ jobs:
           mark "#320 the expense reconciliation is on /tools" grep -q "What the tenant actually owes" p_tools2.html
           # The claim the card exists for: the one-sided gross-up, priced.
           mark "#320 it prices the one-sided gross-up" grep -q "leave the base year alone" p_tools2.html
+          # The print layer is CSS, so the marker greps the class the page
+          # actually serves rather than prose. The byte measurement that
+          # says the rule WORKS needs a real Chromium and is run by hand.
+          mark "#321 a card never splits across a printed page" grep -q "print:break-inside-avoid" p_tools2.html
+          mark "#321 the chrome leaves the paper" grep -q "print:hidden" p_tools2.html

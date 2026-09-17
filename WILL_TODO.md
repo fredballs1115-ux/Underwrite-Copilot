@@ -39,6 +39,13 @@ figures it prints. And since #314 the homepage renders its shelf of those
 calculations from the SAME list the page builds its cards from, so it can
 no longer advertise a version of `/tools` that does not exist.
 
+It also **prints**. Every picture on this site is a background colour and
+browsers drop those when printing, so the page used to come out of a
+printer as nineteen cards of empty grey tracks — fixed in #321, measured
+at just under two kilobytes of dropped colour before and none after. The
+photograph, the site chrome, the jump index and the copy button all leave
+the paper, and a card never splits across two sheets.
+
 *Nothing on this list is yours to do.* It is here so you know what is
 there.
 

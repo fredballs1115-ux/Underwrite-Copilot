@@ -86,6 +86,22 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   whose target id is missing. Never crawl a local `next start` while a
   build runs, and never leave one running across a rebuild: an ISR page it
   re-renders overwrites the fresh build's prerender with its stale code.
+- The page on paper: `app/globals.css` ends with one `@media print` rule
+  setting `print-color-adjust: exact` page-wide, because **every picture on
+  this site is a background colour** and browsers drop those when printing
+  — "Background graphics" is an UNTICKED checkbox in Chrome's dialog, so
+  without it the default print of `/tools` is nineteen cards of empty grey
+  tracks. Measured, same page and stylesheet with the rule undone via
+  `economy`: 1,995 bytes of backgrounds dropped, against zero with it;
+  targeting `[data-bar]` alone recovered only half, since the tracks,
+  swatches and card fills are backgrounds too. Everything else a print
+  needs is a `print:` utility at its own element — the chrome
+  (`app/public-shell.tsx`), the photograph (`app/aerial-img.tsx`, so the
+  band keeps its dark scrim and white words without a page of ink), the
+  jump index, and `print:break-inside-avoid` on each card so a bar never
+  lands on a different sheet from its figure. `lib/print-styles.test.ts`
+  scans for all of it; the byte measurement needs a real Chromium and is
+  the by-hand half.
 - The documents: the memo and report PDFs are read back as text in their
   tests (`lib/memo/pdf-text-of.ts`, test tooling) — assert on what the page
   says, not on its page count. `lib/key-terms.ts` orders a "Key terms" block

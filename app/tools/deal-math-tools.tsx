@@ -314,7 +314,15 @@ function Card({
       id={id}
       // The index links here, so leave room for the header rather than
       // landing with the eyebrow under it.
-      className="scroll-mt-4 rounded-2xl border border-line bg-white p-5 sm:p-6"
+      //
+      // On paper a card must not split: the bar and the figure it belongs
+      // to would land on different sheets, which is worse than a short
+      // page. Three cards are taller than a Letter page's ~883px of
+      // content on their own (the loan schedule at 960, the exchange at
+      // 1150, the reconciliation at 1114) — a browser cannot honour
+      // break-inside on those and ignores it, which is the right
+      // degradation and the reason this is safe to apply to all of them.
+      className="scroll-mt-4 rounded-2xl border border-line bg-white p-5 sm:p-6 print:break-inside-avoid print:border-line"
     >
       <p className="text-[11px] font-semibold uppercase tracking-widest text-brand">
         {eyebrow}
@@ -3053,7 +3061,7 @@ export function DealMathTools() {
       {/* The index. Thirteen cards is more than a reader should have to
           scroll past to find one, and a list of what is here is also the
           honest answer to "what does this page do". */}
-      <nav aria-label="The calculators on this page" className="rounded-2xl border border-line bg-white p-4 sm:p-5">
+      <nav aria-label="The calculators on this page" className="rounded-2xl border border-line bg-white p-4 sm:p-5 print:hidden">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <span className="text-[11px] font-semibold uppercase tracking-widest text-muted">
             Jump to
@@ -3075,7 +3083,7 @@ export function DealMathTools() {
           link carries the whole state of every calculator — and carries
           only what was CHANGED, so an untouched page copies as a bare
           /tools rather than a paragraph of defaults. */}
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end print:hidden">
         <CopyButton
           label="Copy link to this sizing"
           text={() => window.location.href}

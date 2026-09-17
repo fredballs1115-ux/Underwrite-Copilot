@@ -576,3 +576,39 @@ body {
   .pulse-face { animation: none; opacity: 0; }
   .pulse-face:first-child { opacity: 1; }
 }
+
+/* ── the page on paper ─────────────────────────────────────────────────────
+ *
+ * Every picture on this site is a background colour: a debt sizer's three
+ * tests, a cash flow's years, a gain split into its rates, a comp's basis
+ * against the subject. Browsers DROP background colours when printing
+ * unless the page asks them not to — "Background graphics" is an unticked
+ * checkbox in Chrome's print dialog, and nobody ticks it. So the default
+ * print of /tools was nineteen cards of empty grey tracks.
+ *
+ * Measured rather than recalled. Chromium rendering /tools to a Letter PDF
+ * with backgrounds off (what Cmd-P does) against on — same page, same
+ * built stylesheet, the rule undone with `economy`, which is the spec's
+ * opposite of `exact` and therefore a clean A/B rather than two renders:
+ *
+ *     rule undone    off 314,545   on 316,540   gap 1,995
+ *     rule shipped   off 316,540   on 316,540   gap     0
+ *
+ * An earlier pass on the same page tried `[data-bar]` alone and recovered
+ * just over half — the tracks the bars sit in, the legend swatches and the
+ * card fills are backgrounds too. The page-wide rule leaves nothing behind,
+ * which is why it is page-wide.
+ *
+ * Everything else a print needs is a `print:` utility at its own element
+ * (the site chrome, the photographs, a card that must not split), because
+ * a rule that lives beside the markup it hides is a rule someone editing
+ * that markup will see.
+ */
+@media print {
+  *,
+  *::before,
+  *::after {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
