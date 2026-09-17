@@ -496,6 +496,25 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   loan balance comes from `readDebt`, run to the HORIZON rather than to
   the balloon — holding past a balloon is a refinance, which is
   `testRefi`'s question and not this one.
+- What sits below the NOI line: `lib/tools/below-the-line.ts` (pure). A
+  broker's NOI and an owner's NOI are different numbers for the same
+  building, and the difference is **not** a disagreement about operations —
+  it is a disagreement about what counts as an operating expense. Four
+  rules. **Capital that recurs is an expense**: replacing a twenty-fifth of
+  a roof every year forever is a cost of doing business, and the test is
+  recurrence rather than accounting treatment. **Leasing capital is not
+  optional and its annual cost is not its invoice** — a building on
+  five-year leases re-tenants a fifth of itself a year, so `leasingAnnual`
+  is the per-foot TI and commission over the term, on the share that
+  actually rolls; spending nothing this year means the cost is late, not
+  absent. **A renewal is cheaper than a new lease and the mix is an
+  assumption**, so the probability is an input and BOTH ends are reported
+  (`leasingIfAllRenew` / `leasingIfNoneRenew`, a 3.3× range on the seed) —
+  a memorandum quoting only the renewal cost is quoting the best case as
+  the expectation. And **the cost is said as a price**, capitalised at the
+  ADVERTISED cap because that is the rate the price was set at:
+  `valueOfTheLine` is to the dollar the ask less `priceForAdvertisedCap`,
+  which is the identity the module exists to make checkable.
 - What the building actually collects: `lib/tools/economic-occupancy.ts`
   (pure — the bridge from gross potential rent to EGI). **Physical
   occupancy counts DOORS, economic occupancy counts DOLLARS**, and "95%

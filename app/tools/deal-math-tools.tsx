@@ -21,6 +21,7 @@ import { readStack } from "@/lib/tools/capital-stack";
 import { readTrailing } from "@/lib/tools/trailing-window";
 import { readEgi } from "@/lib/tools/economic-occupancy";
 import { readHold } from "@/lib/tools/hold-or-sell";
+import { readBelow } from "@/lib/tools/below-the-line";
 import { readBuyout } from "@/lib/tools/lease-buyout";
 import { readDraw } from "@/lib/tools/construction-draw";
 import { readFloating } from "@/lib/tools/floating-rate";
@@ -4457,6 +4458,182 @@ function HoldOrSell() {
   );
 }
 
+// ── what sits below the NOI line ───────────────────────────────────────────
+
+function BelowTheLine() {
+  const [noi, setNoi] = useShared("blN", "2,640,000");
+  const [sf, setSf] = useShared("blS", "200,000");
+  const [price, setPrice] = useShared("blP", "48M");
+  const [reserve, setReserve] = useShared("blR", "0.25");
+  const [roll, setRoll] = useShared("blO", "20");
+  const [term, setTerm] = useShared("blT", "5");
+  const [newTi, setNewTi] = useShared("blA", "45");
+  const [renTi, setRenTi] = useShared("blB", "12");
+  const [newLc, setNewLc] = useShared("blC", "14");
+  const [renLc, setRenLc] = useShared("blD", "6");
+  const [renew, setRenew] = useShared("blE", "65");
+
+  const r = useMemo(
+    () =>
+      readBelow({
+        brokerNoi: num(noi) ?? 0,
+        buildingSf: num(sf) ?? 0,
+        priceUsd: num(price),
+        reservePerSf: num(reserve),
+        annualRolloverPct: num(roll),
+        leaseTermYears: num(term),
+        newTiPerSf: num(newTi),
+        renewalTiPerSf: num(renTi),
+        newLcPerSf: num(newLc),
+        renewalLcPerSf: num(renLc),
+        renewalProbabilityPct: num(renew),
+      }),
+    [noi, sf, price, reserve, roll, term, newTi, renTi, newLc, renLc, renew],
+  );
+
+  // The two NOIs on one track, the stated one full width and the owner's
+  // as the share of it that survives — so the gap IS the overhang, in the
+  // same shape as the occupancy card above.
+  const broker = r.brokerNoi ?? 0;
+  const ownerShare = broker > 0 && r.ownerNoi !== null ? (r.ownerNoi / broker) * 100 : null;
+  const widestLine = Math.max(1, ...r.lines.map((l) => l.amount));
+  // The renewal assumption drawn as a range with the blend marked on it —
+  // rule 3, because the width of that range is the size of the guess.
+  const lo = r.leasingIfAllRenew ?? 0;
+  const hi = r.leasingIfNoneRenew ?? 0;
+  const blended = r.lines.find((l) => l.label.startsWith("Tenant improvements"))?.amount ?? 0;
+  const atBlend = hi > lo ? ((blended - lo) / (hi - lo)) * 100 : null;
+
+  return (
+    <Card id="below-the-line" eyebrow="The statement" title="What sits below the NOI line">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="NOI as stated" value={noi} onChange={setNoi} placeholder="2,640,000" />
+          <Field label="Building" suffix="SF" value={sf} onChange={setSf} placeholder="200,000" />
+          <Field label="Asking price" value={price} onChange={setPrice} placeholder="48M" />
+          <Field label="Reserve" suffix="/SF" value={reserve} onChange={setReserve} placeholder="0.25" />
+          <Field label="Rolls a year" suffix="%" value={roll} onChange={setRoll} placeholder="20" />
+          <Field label="Lease term" suffix="yr" value={term} onChange={setTerm} placeholder="5" />
+          <Field label="New TI" suffix="/SF" value={newTi} onChange={setNewTi} placeholder="45" />
+          <Field label="Renewal TI" suffix="/SF" value={renTi} onChange={setRenTi} placeholder="12" />
+          <Field label="New commission" suffix="/SF" value={newLc} onChange={setNewLc} placeholder="14" />
+          <Field label="Renewal commission" suffix="/SF" value={renLc} onChange={setRenLc} placeholder="6" />
+          <Field label="They renew" suffix="%" value={renew} onChange={setRenew} placeholder="65" />
+        </div>
+
+        <div>
+          {ownerShare !== null && (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-3 text-xs">
+                <span className="w-28 shrink-0 text-muted">NOI as stated</span>
+                <span className="relative h-3 flex-1 rounded-full bg-faint">
+                  <span
+                    data-bar="line"
+                    className="absolute inset-y-0 left-0 w-full rounded-full bg-sidebar"
+                  />
+                </span>
+                <span className="w-24 shrink-0 text-right font-semibold tabular-nums">
+                  {usdExact(r.brokerNoi)}
+                </span>
+              </div>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="w-28 shrink-0 text-muted">What you would own</span>
+                <span className="relative h-3 flex-1 rounded-full bg-faint">
+                  <span
+                    data-bar="line"
+                    className="absolute inset-y-0 left-0 rounded-full bg-brand"
+                    style={{ width: `${Math.max(0, Math.min(100, ownerShare))}%` }}
+                  />
+                </span>
+                <span className="w-24 shrink-0 text-right font-semibold tabular-nums text-brand">
+                  {usdExact(r.ownerNoi)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {r.lines.length > 0 && (
+            <div className="mt-5 border-t border-line pt-4">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                What the difference is
+              </p>
+              <div className="mt-2 space-y-1.5">
+                {r.lines.map((l) => (
+                  <div key={l.label} className="flex items-center gap-3 text-xs">
+                    <span className="w-44 shrink-0 text-muted">{l.label}</span>
+                    <span className="relative h-2.5 flex-1 rounded-full bg-faint">
+                      <span
+                        data-bar="line"
+                        className="absolute inset-y-0 left-0 rounded-full bg-caution"
+                        style={{ width: `${(l.amount / widestLine) * 100}%` }}
+                      />
+                    </span>
+                    <span className="w-20 shrink-0 text-right tabular-nums">
+                      {usdExact(l.amount)}
+                    </span>
+                    <span className="w-14 shrink-0 text-right tabular-nums text-muted">
+                      ${l.perSf}/SF
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-4 sm:grid-cols-4">
+            <Stat label="Cap on the cover" value={pct(r.brokerCapPct, 2)} tone="muted" />
+            <Stat label="Cap you would earn" value={pct(r.ownerCapPct, 2)} tone="brand" />
+            <Stat
+              label="Worth, at that cap"
+              value={usdExact(r.valueOfTheLine)}
+            />
+            <Stat label="Price for the cover's cap" value={usd(r.priceForAdvertisedCap)} />
+          </div>
+
+          {r.note && <p className="mt-3 text-sm text-caution">{r.note}</p>}
+
+          {atBlend !== null && (
+            <div className="mt-5 border-t border-line pt-4">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+                And the largest line is a guess
+              </p>
+              <div className="mt-2 flex items-center gap-3 text-xs">
+                <span className="w-28 shrink-0 text-right tabular-nums text-muted">
+                  {usdExact(r.leasingIfAllRenew)}
+                </span>
+                <span className="relative h-2.5 flex-1 rounded-full bg-brand/25">
+                  <span
+                    data-bar="renew"
+                    className="absolute inset-y-0 w-1 -translate-x-1/2 rounded-full bg-ink"
+                    style={{ left: `${Math.max(0, Math.min(100, atBlend))}%` }}
+                  />
+                </span>
+                <span className="w-28 shrink-0 tabular-nums text-muted">
+                  {usdExact(r.leasingIfNoneRenew)}
+                </span>
+              </div>
+              <p className="mt-2 text-sm text-muted">
+                Everyone renews on the left, nobody on the right, and the mark is
+                where the renewal assumption puts it. Nothing about the building
+                moves between those two ends.
+              </p>
+            </div>
+          )}
+
+          <p className="mt-4 border-t border-line pt-3 text-[11px] leading-relaxed text-muted">
+            Capital that recurs is an expense: replacing a twenty-fifth of a
+            roof every year forever is a cost of doing business, whatever an
+            accountant calls it. Leasing capital is not optional either, and
+            its annual cost is not its invoice — a building on five-year
+            leases re-tenants a fifth of itself a year, so spending nothing
+            this year means the cost is late rather than absent.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function EconomicOccupancy() {
   const [units, setUnits] = useShared("eoU", "200");
   const [market, setMarket] = useShared("eoM", "1,850");
@@ -5408,6 +5585,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <Prepayment />
       <TrailingWindow />
       <EconomicOccupancy />
+      <BelowTheLine />
       <UnitMix />
       <SiteMeasures />
       <ResidualLand />
