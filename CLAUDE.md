@@ -924,6 +924,29 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   took ABOVE its pro-rata share** — the only honest definition, for the
   same reason. Return OF capital is not a separate step: an 8% IRR is not
   reached until every dollar in has come back plus 8% on it.
+- The statement's rent against the building's: `lib/tools/straight-line-rent.ts`
+  (pure). GAAP does not report the rent a tenant paid — it reports the TERM'S
+  TOTAL OVER THE TERM, the same figure every year — so an "NOI" read off an
+  audited statement is deliberately not cash, and nothing says so because to
+  an accountant it is not a discrepancy. Four rules. **The sign REVERSES**:
+  early in an escalating lease the statement is above cash, late it is below,
+  and they cross exactly once (`crossingYear`) — so "knock ten percent off for
+  straight-lining" is wrong half the time IN THE WRONG DIRECTION. On the seed
+  (20,000 SF at $32, 3% bumps, six months free) the gap runs +$381,688 in year
+  1 to −$133,367 in year 10, crossing at year 5. **Free rent is averaged in
+  too**, which is why year 1 reports $701,688 against $320,000 collected —
+  119%, the widest the gap ever gets. **The gap capitalises** ($42,488 at 6.5%
+  is $653,662 of price), and it prices capitalising THIS year's reported
+  figure against THIS year's cash without claiming either is the right year to
+  capitalise. And **the deferred rent receivable is the SELLER's** — the
+  cumulative gap, $424,177 here, written off at closing because the buyer's
+  own straight-line starts fresh. The identity the module rests on and a test
+  pins: **the cumulative gap returns to exactly zero at expiry** — straight-line
+  moves rent between years and never creates any. A flat lease with no
+  concession has NO crossing rather than one at year 1: the two lines are the
+  same line, and saying cash "overtakes" a figure it never trailed would be a
+  lie the test caught. Bar: `data-bar="sline"` (one a year, signed from a
+  centre line).
 - What the site actually holds: `lib/tools/zoning-envelope.ts` (pure). A
   development pro forma opens with a unit count that almost always comes
   from ONE line of the code — usually density, because it is the one

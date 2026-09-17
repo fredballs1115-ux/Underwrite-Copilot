@@ -702,6 +702,14 @@ jobs:
           mark "#350 the joint parking solve is the binding cap" grep -q "Parking binds: the spaces and the footprint are competing for the same 87,120 square feet" p_tools2.html
           mark "#350 a unit is charged its gross area, not its net" grep -q "units that are not there" p_tools2.html
           mark "#350 the density bonus is drawn against its break-even" grep -q "The density bonus, against what it costs" p_tools2.html
+          # #351 — the statement's rent against the cash. The third is the
+          # decisive one: that sentence renders only once the year's gap AND
+          # its capitalised value both computed, and it carries the crossing
+          # year, which needs the whole schedule to have run.
+          mark "#351 the straight-line card is on /tools" grep -q "What the statement reports, and what the building collects" p_tools2.html
+          mark "#351 the gap is drawn a year a side of the line" grep -q "Statement below cash" p_tools2.html
+          mark "#351 this year's gap is priced at the cap" grep -q "more rent than the building collects, which at the stated cap is" p_tools2.html
+          mark "#351 the receivable is named as the seller's" grep -q "Deferred rent on the books" p_tools2.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

@@ -36,6 +36,7 @@ import { readInsurance } from "@/lib/tools/insurance";
 import { runWaterfall } from "@/lib/tools/waterfall-math";
 import { DOWNSIDE_EXIT_HAIRCUT, readFeeDrag } from "@/lib/tools/fee-drag";
 import { readEnvelope } from "@/lib/tools/zoning-envelope";
+import { readStraightLine } from "@/lib/tools/straight-line-rent";
 import {
   breakEvenOccupancyPct,
   capRatePct,
@@ -6181,6 +6182,126 @@ function Waterfall() {
 }
 
 /**
+ * The rent the statement reports against the rent the building collects.
+ *
+ * Drawn as a signed bar a year from a centre line, because the finding is
+ * that the sign REVERSES and a single figure cannot show that.
+ */
+function StraightLineRent() {
+  const [term, setTerm] = useShared("slt", "10");
+  const [rent, setRent] = useShared("slr", "32");
+  const [esc, setEsc] = useShared("sle", "3");
+  const [free, setFree] = useShared("slf", "6");
+  const [area, setArea] = useShared("sla", "20,000");
+  const [year, setYear] = useShared("sly", "2");
+  const [cap, setCap] = useShared("slc", "6.5");
+
+  const s = useMemo(
+    () =>
+      readStraightLine({
+        termYears: num(term),
+        startingRentPerSf: num(rent),
+        escalationPct: num(esc),
+        freeMonths: num(free),
+        areaSf: readFigure(area),
+        currentYear: num(year),
+        capRatePct: num(cap),
+      }),
+    [term, rent, esc, free, area, year, cap],
+  );
+
+  const widest = Math.max(...s.years.map((y) => Math.abs(y.gap)), 1);
+
+  return (
+    <Card id="straight-line-rent" eyebrow="Leases" title="What the statement reports, and what the building collects">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Term" suffix="yrs" value={term} onChange={setTerm} placeholder="10" />
+          <Field label="Area" suffix="SF" value={area} onChange={setArea} placeholder="20,000" />
+          <Field label="Starting rent" suffix="/SF" value={rent} onChange={setRent} placeholder="32" />
+          <Field label="Escalation" suffix="%" value={esc} onChange={setEsc} placeholder="3" />
+          <Field label="Free rent" suffix="mo" value={free} onChange={setFree} placeholder="6" />
+          <Field label="Buying in year" value={year} onChange={setYear} placeholder="2" />
+          <Field label="Cap rate" suffix="%" value={cap} onChange={setCap} placeholder="6.5" />
+        </div>
+
+        <div>
+          {s.years.length > 0 && (
+            <>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <Stat label="The statement says" value={usd(s.straightLineRent)} tone="muted" />
+                <Stat label="The building collects" value={usd(s.cashRentThisYear)} />
+                <Stat
+                  label={s.gapThisYear >= 0 ? "Overstated by" : "Understated by"}
+                  value={usd(Math.abs(s.gapThisYear))}
+                  tone="brand"
+                />
+                <Stat label="…at the cap" value={usd(s.valueOfGap === null ? null : Math.abs(s.valueOfGap))} tone="brand" />
+              </div>
+
+              {/* A year a side of a centre line: above the line the statement
+                  flatters the building, below it the statement is behind. */}
+              <div className="mt-5">
+                <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
+                  The gap, year by year
+                </p>
+                <div className="space-y-1">
+                  {s.years.map((y) => (
+                    <div key={y.year} className="flex items-center gap-2">
+                      <span className="w-6 shrink-0 text-right text-[11px] tabular-nums text-muted">
+                        {y.year}
+                      </span>
+                      <div className="relative h-3 flex-1 rounded-sm bg-faint">
+                        <div className="absolute inset-y-0 left-1/2 w-px bg-line" />
+                        <div
+                          data-bar="sline"
+                          className={`absolute inset-y-0 ${y.gap >= 0 ? "left-1/2 bg-brand" : "right-1/2 bg-sidebar"}`}
+                          style={{ width: `${(Math.abs(y.gap) / widest) * 50}%` }}
+                        />
+                      </div>
+                      <span className="w-24 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted">
+                        {y.gap >= 0 ? "+" : "−"}
+                        {usd(Math.abs(y.gap))}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted">
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block h-2.5 w-2.5 rounded-sm bg-brand" />
+                    Statement above cash
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block h-2.5 w-2.5 rounded-sm bg-sidebar" />
+                    Statement below cash
+                  </span>
+                </p>
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
+                <Stat
+                  label="Cash overtakes in"
+                  value={s.crossingYear === null ? "—" : `Year ${s.crossingYear}`}
+                />
+                <Stat label="Deferred rent on the books" value={usd(s.deferredRentReceivable)} tone="muted" />
+                <Stat label="Term total, either way" value={usd(s.totalRent)} tone="muted" />
+              </div>
+            </>
+          )}
+
+          {s.note && <p className="mt-4 text-sm text-caution">{s.note}</p>}
+          <p className="mt-3 text-xs text-muted">
+            Straight-line accounting moves rent between years and never creates any, so the
+            cumulative gap returns to zero at expiry. The receivable it builds is the seller&apos;s,
+            not an asset the buyer acquires.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/**
  * What the site can actually hold.
  *
  * The four caps are drawn on one track so the smallest is visible rather
@@ -6966,6 +7087,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <ResidualLand />
       <Waterfall />
       <FeeDrag />
+      <StraightLineRent />
       <NetEffectiveRent />
       <RentableUsable />
       <AfterTax />

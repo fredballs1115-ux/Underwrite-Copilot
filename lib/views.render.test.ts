@@ -2032,6 +2032,24 @@ describe("the deal math tools", () => {
     expect(text).toContain("6.4%");
     expect((html.match(/data-bar="setaside"/g) ?? []).length).toBe(2);
   });
+
+  it("draws the statement against the cash, a year a side of the line", () => {
+    // #351, rule 1. The gap reverses: +$381,688 in year 1 (the concession)
+    // to −$133,367 in year 10, crossing in year 5.
+    expect(text).toContain("What the statement reports, and what the building collects");
+    expect(text).toContain("+$381,688");
+    expect(text).toContain("−$133,367");
+    expect(text).toContain("Year 5");
+    expect((html.match(/data-bar="sline"/g) ?? []).length).toBe(10);
+  });
+
+  it("prices this year's gap and names the receivable it built", () => {
+    // Rules 3 and 4: $42,488 at 6.5% is $653,662, and the cumulative gap
+    // standing on the seller's books in year 2 is $424,177.
+    expect(text).toContain("$653,662");
+    expect(text).toContain("Deferred rent on the books");
+    expect(text).toContain("$424,177");
+  });
 });
 
 // ── today's rates, across the top of /tools ────────────────────────────────
