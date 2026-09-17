@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { irr } from "../underwrite/engine";
 import {
   EXIT_CAP_SHOCK_BPS,
+  MAX_PROGRAM_YEARS,
   PREMIUM_MISS_PCT,
   PROGRAM_DISCOUNT_PCT,
   readRenovation,
@@ -65,6 +66,45 @@ describe("readRenovation — rule 1, turnover sets the pace", () => {
     expect(r.schedule.at(-1)!.doorsDone).toBe(200);
     // The last year is the remainder, not another full year's pace.
     expect(r.schedule.map((y) => y.doors)).toEqual([70, 70, 60]);
+  });
+
+  it("a pace that cannot finish the program reports that, not a truncation", () => {
+    // The schedule's row cap used to truncate silently: at a 1% turnover the
+    // card said 100 years, drew 30 bars covering 60 of 200 doors, and
+    // printed a 42% return off that truncation — three figures, none of
+    // them describing the same program.
+    const r = readRenovation({ ...SEED, annualTurnoverPct: 1, crewDoorsPerMonth: null });
+    expect(MAX_PROGRAM_YEARS).toBe(30);
+    expect(r.paceDoorsPerYear).toBe(2);
+    expect(r.yearsToComplete).toBe(100);
+    expect(r.paceTooSlow).toBe(true);
+    // No schedule, and therefore no rate read off one.
+    expect(r.schedule).toEqual([]);
+    expect(r.programIrrPct).toBeNull();
+    expect(r.irrIfPremiumMissesPct).toBeNull();
+    expect(r.irrIfExitCapWidensPct).toBeNull();
+    // The note leads with the premium split wherever there is one — that is
+    // the finding that changes the bid, and it outranks the pace. With no
+    // classic comp to split against, the unworkable pace is what it says.
+    expect(
+      readRenovation({
+        ...SEED,
+        annualTurnoverPct: 1,
+        crewDoorsPerMonth: null,
+        classicCompRent: null,
+      }).note,
+    ).toContain("a pace rather than a plan");
+    // The pace-independent figures still read — they do not need a schedule.
+    expect(r.netCostPerDoor).toBe(13_467);
+    expect(r.renovationPremium).toBe(150);
+  });
+
+  it("a program that finishes exactly at the cap still schedules", () => {
+    // 200 doors at 2% of them a year is 50 years; at 3.34% it is 30.
+    const at = readRenovation({ ...SEED, annualTurnoverPct: 100 / 30, crewDoorsPerMonth: null });
+    expect(at.paceTooSlow).toBe(false);
+    expect(at.schedule.length).toBe(MAX_PROGRAM_YEARS);
+    expect(at.programIrrPct).not.toBeNull();
   });
 
   it("with neither turnover nor a crew there is no pace and no schedule", () => {
@@ -139,6 +179,21 @@ describe("readRenovation — rule 3, the make-ready is deferred and the downtime
     });
     expect(r.netCostPerDoor).toBe(15_000);
     expect(r.downtimeCostPerDoor).toBe(0);
+  });
+
+  it("a make-ready at or above the invoice is refused, not priced", () => {
+    // It would mean being PAID to renovate, which produced a positive value
+    // per door and a NEGATIVE break-even premium — the same reasoning that
+    // already refuses a renovation shorter than a normal turn.
+    const r = readRenovation({ ...SEED, makeReadyPerDoor: 30_000 });
+    expect(r.netCostPerDoor).toBeNull();
+    expect(r.valuePerDoor).toBeNull();
+    expect(r.breakEvenPremium).toBeNull();
+    expect(r.note).toContain("nothing incremental");
+    // And the boundary: equal figures leave only the downtime, which is a
+    // real cost, so that case still computes.
+    const equal = readRenovation({ ...SEED, makeReadyPerDoor: 15_000 });
+    expect(equal.netCostPerDoor).toBe(967);
   });
 
   it("a renovation faster than a normal turn is never a rent credit", () => {

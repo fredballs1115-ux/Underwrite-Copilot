@@ -192,7 +192,11 @@ interface Run {
 }
 
 export function readFeeDrag(t: FeeTerms): FeeDragRead {
-  const flows = t.cashFlows;
+  // Typed as required and the card always passes an array, so this is a
+  // belt rather than a live bug — but it is the one reader here that
+  // dereferences an input before checking it, and a throw inside a client
+  // component is a broken page where every sibling returns a sentence.
+  const flows = Array.isArray(t.cashFlows) ? t.cashFlows : [];
   if (flows.length < 2) {
     return { ...EMPTY, note: "Paste at least two periods — the equity in, then what comes back." };
   }

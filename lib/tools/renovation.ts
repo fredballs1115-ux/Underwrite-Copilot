@@ -74,6 +74,18 @@ export const PROGRAM_DISCOUNT_PCT = 15;
 /** The premium miss the shock prices, against a 50bp move in the exit cap. */
 export const PREMIUM_MISS_PCT = 10;
 
+/**
+ * The longest program the schedule will build.
+ *
+ * It was a bare `year <= 30` guard against a thousand rows, and that quietly
+ * created a worse problem than the one it solved: at a 1% turnover the card
+ * reported `yearsToComplete` of 100, drew 30 bars covering 60 of 200 doors,
+ * and printed a 42% return computed on that truncation — three figures none
+ * of which described the same program. A pace that cannot finish inside this
+ * is the finding, so the schedule comes back EMPTY and the note says so.
+ */
+export const MAX_PROGRAM_YEARS = 30;
+
 /** The exit-cap widening the shock prices, in basis points. */
 export const EXIT_CAP_SHOCK_BPS = 50;
 
@@ -172,6 +184,8 @@ export interface RenovationRead {
   /** the same program sold the year it finishes — rule 4's clock */
   completionYear: number | null;
   irrIfSoldAtCompletionPct: number | null;
+  /** true where the pace cannot finish the program inside MAX_PROGRAM_YEARS */
+  paceTooSlow: boolean | null;
   irrIfPremiumMissesPct: number | null;
   irrIfExitCapWidensPct: number | null;
   doorsDoneByExit: number | null;
@@ -206,6 +220,7 @@ const EMPTY: RenovationRead = {
   pvFromExitPct: null,
   completionYear: null,
   irrIfSoldAtCompletionPct: null,
+  paceTooSlow: null,
   irrIfPremiumMissesPct: null,
   irrIfExitCapWidensPct: null,
   doorsDoneByExit: null,
@@ -257,6 +272,17 @@ export function readRenovation(t: RenovationTerms): RenovationRead {
   // door on the card by the door count has to land on the total the card
   // prints, and an unrounded downtime residue put those $85 apart.
   const netCostPerDoor = round(t.costPerDoor - makeReady + downtimeCost);
+  // A make-ready larger than the invoice would mean being PAID to renovate,
+  // which produced a positive value per door and a negative break-even
+  // premium — every figure downstream nonsense. The same reasoning already
+  // refuses a renovation shorter than a normal turn; this is that guard
+  // applied to the other half of rule 3.
+  if (netCostPerDoor <= 0) {
+    return {
+      ...EMPTY,
+      note: "The make-ready is at or above the renovation invoice, so the program costs nothing incremental — check the two figures rather than reading a return off them.",
+    };
+  }
   const totalCapital = units * netCostPerDoor;
 
   // Rule 1. The pace, and which of the two constraints sets it.
@@ -269,6 +295,8 @@ export function readRenovation(t: RenovationTerms): RenovationRead {
   const binding: "turnover" | "crew" | null =
     pace === null ? null : fromTurnover !== null && pace === fromTurnover ? "turnover" : "crew";
   const yearsToComplete = pace === null || pace <= 0 ? null : units / pace;
+  // A. The schedule is only built where the program can actually finish.
+  const paceTooSlow = yearsToComplete !== null && yearsToComplete > MAX_PROGRAM_YEARS;
 
   // What the memorandum's own program length would require of TURNOVER —
   // the claim restated in the one unit that can be checked against the rent
@@ -301,7 +329,9 @@ export function readRenovation(t: RenovationTerms): RenovationRead {
   // Rule 4. The schedule.
   const hold = positive(t.holdYears) ? Math.round(t.holdYears) : null;
   const schedule =
-    pace === null || pace <= 0 ? [] : buildSchedule(units, pace, netCostPerDoor, annualPremium);
+    pace === null || pace <= 0 || paceTooSlow
+      ? []
+      : buildSchedule(units, pace, netCostPerDoor, annualPremium);
 
   const run =
     hold === null || cap === null || schedule.length === 0
@@ -309,7 +339,7 @@ export function readRenovation(t: RenovationTerms): RenovationRead {
       : runProgram(schedule, hold, cap, units, annualPremium);
 
   const missed =
-    hold === null || cap === null || pace === null || pace <= 0
+    hold === null || cap === null || pace === null || pace <= 0 || paceTooSlow
       ? null
       : runProgram(
           buildSchedule(units, pace, netCostPerDoor, annualPremium * (1 - PREMIUM_MISS_PCT / 100)),
@@ -370,6 +400,7 @@ export function readRenovation(t: RenovationTerms): RenovationRead {
     programIrrPct: run === null || run.rate === null ? null : round1(run.rate * 100),
     pvFromExitPct: run === null ? null : run.pvFromExitPct,
     completionYear,
+    paceTooSlow,
     irrIfSoldAtCompletionPct:
       atCompletion === null || atCompletion.rate === null ? null : round1(atCompletion.rate * 100),
     irrIfPremiumMissesPct: missed === null || missed.rate === null ? null : round1(missed.rate * 100),
@@ -397,9 +428,10 @@ function buildSchedule(
   const rows: ProgramYear[] = [];
   let done = 0;
   let year = 1;
-  // A pace that would take longer than a working lifetime is a data-entry
-  // error rather than a program; stop rather than build a thousand rows.
-  while (done < units && year <= 30) {
+  // A pace that cannot finish inside the cap is reported as such rather than
+  // truncated — see MAX_PROGRAM_YEARS. The caller checks first; this is the
+  // belt to that brace.
+  while (done < units && year <= MAX_PROGRAM_YEARS) {
     const doors = Math.min(pace, units - done);
     const before = done;
     done += doors;
@@ -484,6 +516,9 @@ function noteFor(x: RenovationRead): string {
   }
   if (x.buildingGap !== null && x.buildingGap < 0) {
     return `The subject already out-rents the comparable's classic stock by ${usd(Math.abs(x.buildingGap))}, so the quoted premium UNDERSTATES what renovation should achieve here — ${usd(x.renovationPremium ?? 0)} a door rather than ${usd(x.quotedPremium ?? 0)}.`;
+  }
+  if (x.paceTooSlow === true && x.paceDoorsPerYear !== null && x.yearsToComplete !== null) {
+    return `At ${x.paceDoorsPerYear} doors a year the program takes ${x.yearsToComplete} years, which is a pace rather than a plan — nothing past ${MAX_PROGRAM_YEARS} years is scheduled, and no return is reported off a program that cannot finish.`;
   }
   if (x.undoneAtExit !== null && x.undoneAtExit > 0) {
     return `${x.undoneAtExit} of the ${(x.doorsDoneByExit ?? 0) + x.undoneAtExit} doors are still classic at the sale — the program outlasts the hold, so the buyer underwrites the rest as their own story and pays for it in their price rather than yours.`;
