@@ -1347,6 +1347,37 @@ describe("the deal math tools", () => {
     expect(adj.length, "one gross-up segment per year").toBe(2);
   });
 
+  it("shows a percentage-rent year that owes nothing and still collects", () => {
+    // $120,000 at 6% is a $2M natural breakpoint, a twelfth of which is
+    // $166,667. The seeded year lands at $1.92M — under the breakpoint, so
+    // nothing is owed — and November and December each clear the monthly
+    // line, which a monthly bill with no true-up keeps.
+    expect(text).toContain("Percentage rent, and the breakpoint");
+    expect(text).toContain("$2.00M"); // the natural breakpoint
+    expect(text).toContain("$166,667"); // a twelfth of it
+    expect(text).toContain("$1.92M"); // the year's sales
+    expect(text).toContain("$22,300"); // what a monthly regime collects
+    expect(text).toContain("2 months over");
+    expect(text).toContain("that the year's sales do not support");
+  });
+
+  it("draws the year against the line, and colours the months that clear it", () => {
+    const months = html.match(/data-bar="month"[^>]*/g) ?? [];
+    expect(months.length, "one bar per month pasted").toBe(12);
+    expect(months.filter((b) => b.includes("bg-kill")).length, "Nov and Dec").toBe(2);
+    expect(months.filter((b) => b.includes("bg-brand")).length).toBe(10);
+    // And the two figures the card exists to contrast.
+    expect((html.match(/data-bar="true-up"/g) ?? []).length).toBe(2);
+  });
+
+  it("says the occupancy cost, and the sales that would reach the ceiling", () => {
+    expect(text).toContain("$178,000"); // base + recoveries, no percentage rent
+    expect(text).toContain("9.27%");
+    expect(text).toContain("$1.78M"); // sales at which the ratio is 10%
+    expect(text).toContain("$40.00 a foot base");
+    expect(text).toContain("$59.33 all in");
+  });
+
   it("draws the clock, and shows the days a Q4 closing loses", () => {
     expect(text).toContain("both windows from the day you close");
     expect(text).toContain("2026-12-30"); // 45 days to identify

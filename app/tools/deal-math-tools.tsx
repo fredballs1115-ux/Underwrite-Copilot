@@ -8,6 +8,7 @@ import { readLease, readOpex } from "@/lib/tools/lease-math";
 import { readAfterTax } from "@/lib/tools/after-tax";
 import { EXCHANGE_DAYS, IDENTIFY_DAYS, readExchange } from "@/lib/tools/exchange-1031";
 import { readRecovery } from "@/lib/tools/expense-recovery";
+import { readPercentageRent } from "@/lib/tools/percentage-rent";
 import { readProration } from "@/lib/tools/proration";
 import { TOOL_INDEX } from "@/lib/tools/catalog";
 import { readResidual } from "@/lib/tools/land-residual";
@@ -2253,6 +2254,242 @@ function Recovery() {
   );
 }
 
+// ── 7c-iv. percentage rent, and what the tenant can carry ──────────────────
+
+/**
+ * The retail lease's own arithmetic.
+ *
+ * The picture is twelve months with a twelfth of the breakpoint drawn
+ * across them, because that line is the whole card: the seeded tenant's
+ * year lands UNDER the breakpoint, so nothing is owed — and two months of
+ * Christmas sail straight over the line. A landlord billing monthly with
+ * no year-end reconciliation keeps $22,300 of percentage rent on a lease
+ * whose annual figure is zero, and no single month's statement shows it.
+ *
+ * The sales column reads through `readStrip` — the same reader the cash
+ * flow card uses, so a paste out of a spreadsheet lands the same way here
+ * and the comma-as-thousands-mark trap is already solved in one place.
+ */
+function PercentageRent() {
+  const [base, setBase] = useShared("prb", "120,000");
+  const [rate, setRate] = useShared("prr", "6");
+  const [stated, setStated] = useShared("prbk", "");
+  const [recoveries, setRecoveries] = useShared("prcam", "58,000");
+  const [sf, setSf] = useShared("prsf", "3,000");
+  const [ceiling, setCeiling] = useShared("prc", "10");
+  const [raw, setRaw] = useShared(
+    "prs",
+    "90,000\n85,000\n110,000\n120,000\n130,000\n140,000\n135,000\n130,000\n125,000\n150,000\n280,000\n425,000",
+  );
+
+  const sales = useMemo(() => readStrip(raw).values, [raw]);
+  const r = useMemo(
+    () =>
+      readPercentageRent({
+        baseRent: num(base),
+        ratePct: num(rate),
+        statedBreakpoint: num(stated),
+        monthlySales: sales,
+        recoveries: num(recoveries),
+        tenantSf: num(sf),
+        healthyCeilingPct: num(ceiling),
+      }),
+    [base, rate, stated, sales, recoveries, sf, ceiling],
+  );
+
+  const monthlyBreak = (r.breakpointUsed ?? 0) / 12;
+  const tallest = Math.max(1, monthlyBreak, ...sales);
+  const MONTHS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
+
+  return (
+    <Card id="percentage-rent" eyebrow="Retail" title="Percentage rent, and the breakpoint">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <Field label="Base rent, year" value={base} onChange={setBase} placeholder="120,000" />
+        <Field label="Rate over it" suffix="%" value={rate} onChange={setRate} placeholder="6" />
+        <Field
+          label="Breakpoint, if stated"
+          value={stated}
+          onChange={setStated}
+          placeholder="natural"
+        />
+        <Field label="CAM, tax, insurance" value={recoveries} onChange={setRecoveries} placeholder="58,000" />
+        <Field label="Tenant SF" value={sf} onChange={setSf} placeholder="3,000" />
+        <Field label="Cost ceiling" suffix="%" value={ceiling} onChange={setCeiling} placeholder="10" />
+      </div>
+
+      <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
+        <label className="block">
+          <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
+            Sales, month by month
+          </span>
+          <textarea
+            value={raw}
+            onChange={(e) => setRaw(e.target.value)}
+            rows={8}
+            spellCheck={false}
+            className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-sm tabular-nums outline-none transition-colors focus:border-brand"
+          />
+          <span className="mt-1.5 block text-[11px] leading-relaxed text-muted">
+            Twelve figures in the lease year&apos;s order. The monthly shape is
+            what the year-end reconciliation exists for.
+          </span>
+        </label>
+
+        {sales.length > 0 && r.breakpointUsed !== null && (
+          <div>
+            <div className="mb-2 flex items-baseline justify-between text-sm">
+              <span className="text-muted">
+                A twelfth of the breakpoint, drawn across the year
+              </span>
+              <span className="font-semibold tabular-nums">{usdExact(monthlyBreak)}</span>
+            </div>
+            {/* The line is the point. A month above it is billed on its own
+                under a monthly regime; the months below give nothing back,
+                and that asymmetry is what the annual figure nets out. */}
+            <div className="relative h-36">
+              <div
+                aria-hidden="true"
+                className="absolute inset-x-0 border-t border-dashed border-ink/50"
+                style={{ bottom: `${(monthlyBreak / tallest) * 100}%` }}
+              />
+              <div className="flex h-full items-end gap-1">
+                {sales.map((m, i) => (
+                  <div
+                    key={i}
+                    data-bar="month"
+                    title={`Month ${i + 1} · ${usdExact(m)}`}
+                    className={`flex-1 rounded-t-sm ${m > monthlyBreak ? "bg-kill" : "bg-brand"}`}
+                    style={{ height: `${Math.max(2, (m / tallest) * 100)}%` }}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="mt-1 flex gap-1">
+              {sales.map((_, i) => (
+                <span key={i} className="flex-1 text-center text-[10px] text-muted">
+                  {MONTHS[i] ?? i + 1}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {r.percentageRent !== null && (
+        <div className="mt-6 rounded-xl bg-faint p-4">
+          <p className="text-sm font-semibold">
+            {(r.trueUpOwed ?? 0) > 0 ? (
+              <>
+                Billed monthly and never reconciled, this lease collects{" "}
+                {usdExact(r.trueUpOwed)}{" "}
+                that the year&apos;s sales do not support.
+              </>
+            ) : (
+              <>
+                The monthly bills and the year agree — no month breached the
+                line on its own, so there is nothing for a true-up to give back.
+              </>
+            )}
+          </p>
+          <div className="mt-3 space-y-2">
+            {[
+              { label: "Owed on the year's sales", amount: r.percentageRent, tone: "bg-brand" },
+              {
+                label: `Billed monthly, no true-up (${r.monthsOver} month${r.monthsOver === 1 ? "" : "s"} over)`,
+                amount: r.monthlyBasisRent ?? 0,
+                tone: "bg-kill",
+              },
+            ].map((row) => (
+              <div key={row.label}>
+                <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="text-muted">{row.label}</span>
+                  <span className="shrink-0 font-mono font-semibold tabular-nums">
+                    {usdExact(row.amount)}
+                  </span>
+                </div>
+                <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-white">
+                  <div
+                    data-bar="true-up"
+                    className={`h-full rounded-full ${row.tone}`}
+                    style={{
+                      width: `${(row.amount / Math.max(1, r.monthlyBasisRent ?? 1, r.percentageRent ?? 1)) * 100}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {r.naturalBreakpoint !== null && (
+        <p className="mt-4 text-sm text-muted">
+          The natural breakpoint is the base rent over the rate —{" "}
+          <span className="font-semibold tabular-nums text-ink">
+            {usd(r.naturalBreakpoint)}
+          </span>
+          , the sales at which the percentage rent would equal the base rent.
+          {r.artificial ? (
+            <>
+              {" "}
+              This lease states{" "}
+              <span className="font-semibold tabular-nums text-ink">
+                {usd(r.breakpointUsed)}
+              </span>{" "}
+              instead, which is an{" "}
+              <span className="font-semibold text-ink">artificial</span>{" "}
+              breakpoint and starts the landlord&apos;s participation{" "}
+              {r.favours === "landlord" ? "sooner" : "later"} — it favours the{" "}
+              <span className="font-semibold text-ink">{r.favours}</span>.
+            </>
+          ) : (
+            <> Nothing else is stated, so that is the one in use.</>
+          )}
+        </p>
+      )}
+
+      {r.occupancyCostPct !== null && (
+        <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
+          <Stat label="Sales, the year" value={usd(r.annualSales)} tone="muted" />
+          <Stat label="All-in occupancy cost" value={usd(r.totalOccupancyCost)} tone="muted" />
+          <Stat label="Of sales" value={pct(r.occupancyCostPct, 2)} />
+          <Stat
+            label={`Sales to reach ${ceiling}%`}
+            value={r.salesToClearCeiling === null ? "never" : usd(r.salesToClearCeiling)}
+            tone="muted"
+          />
+        </div>
+      )}
+
+      {r.allInPsf !== null && r.baseRentPsf !== null && (
+        <p className="mt-4 text-sm text-muted">
+          {/* Cents, not whole dollars: usdExact would round $59.33 to $59,
+              and a rent per foot is quoted to the cent everywhere it is
+              quoted at all. */}
+          ${r.baseRentPsf.toFixed(2)} a foot base, ${r.allInPsf.toFixed(2)} all in.
+          {r.salesToClearCeiling === null ? (
+            <>
+              {" "}
+              A {ceiling}% ceiling on a {rate}% lease is unreachable: above the
+              breakpoint every further dollar of sales brings {rate}c of rent
+              with it, so the ratio falls toward {rate}% and stops.
+            </>
+          ) : (
+            <>
+              {" "}
+              What counts as a healthy ratio is the tenant&apos;s category, not a
+              universal number — a jeweller and a restaurant are nowhere near
+              each other, so the ceiling above is yours to set.
+            </>
+          )}
+        </p>
+      )}
+
+      {r.note && <p className="mt-4 text-sm text-caution">{r.note}</p>}
+    </Card>
+  );
+}
+
 // ── 7d. rentable, usable, and the rent you actually pay ────────────────────
 
 /**
@@ -3102,6 +3339,7 @@ export function DealMathTools() {
       <AfterTax />
       <Exchange1031 />
       <Recovery />
+      <PercentageRent />
       <Proration />
       <div className="grid gap-6 lg:grid-cols-2">
         <CapTriangle />
