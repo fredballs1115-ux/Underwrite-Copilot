@@ -453,6 +453,28 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   downtime is quoted in months. Bars: `data-bar="buyout"` (a signed pair
   from a centre line, because the two answers can point opposite ways) and
   `data-bar="side"`.
+- Which trailing window the memorandum chose: `lib/tools/trailing-window.ts`
+  (pure). The only trap on `/tools` that is not an error but a **selection** —
+  "T-3 annualized" and "T-12" are both true statements about the same
+  building, the seller quotes whichever is larger, and nothing on the cover
+  page says a choice was made. Four rules, the first two running opposite
+  ways. **Annualizing a short window annualizes its seasonality too**, so
+  the best quarter times four is the claim that every quarter is the best
+  quarter. **The window is the argument**, and at the stated cap the spread
+  between the most and least flattering window is a dollar figure —
+  `valueSpread`, which only an NOI column gets, because a revenue line and
+  an expense line are each half of one and dividing either by a cap rate
+  states a value the building does not have. **For an expense, flattering
+  means LOWEST** (the sign trap: `better()` reverses on `kind`), so the
+  check that matters there is not the spread but whether the tax
+  instalment falls inside the window at all — `lumpOutsideShort`, a month
+  at least 2× the median sitting outside the last three. And **the honest
+  short-window read is year over year**: `priorYearQuarter` needs fifteen
+  months, which is exactly why a memorandum quoting T-3 rarely includes it.
+  On the seeded column T-3 reads +8.7% against the full year and +3.6%
+  against the same quarter a year earlier — five of those nine points are
+  the season. The column reads through `readStrip` (the cash-flow card's
+  reader), so the comma-as-thousands-mark trap stays solved in one place.
 - An OM's unit mix table: `lib/tools/unit-mix.ts` (pure). Two rules.
   **Weight by unit count, never by row** — 200 studios at $1,200 beside 4
   penthouses at $6,000 do not average $3,600, and averaging the rows is the

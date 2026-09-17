@@ -570,3 +570,17 @@ jobs:
           mark "#336 the construction draw is on /tools" grep -q "The interest reserve, run month by month" p_tools2.html
           mark "#336 equity funds the first seven months" grep -q "Equity funds the first 7 of 24 months" p_tools2.html
           mark "#336 and the shortcut's error is named, not just measured" grep -q "reads as prudence rather than as a mistake" p_tools2.html
+          # #337 — the trailing window. The middle two markers are the
+          # decisive ones: "$2,509,091" is the spread CAPITALISED at the
+          # stated cap, and the season sentence only renders when the
+          # year-over-year read came back non-null AND T-3 came out as the
+          # flattering window — so both prove the arithmetic ran on the
+          # server rather than that the markup shipped. (The sentence
+          # before it says "the building is up {value}%", which spans an
+          # interpolated figure and would grep as NOT DEPLOYED on a page
+          # that is perfectly fine — React puts <!-- --> between adjacent
+          # text nodes. Grep prose with no expression in it.)
+          mark "#337 the trailing-window card is on /tools" grep -q "Which trailing window" p_tools2.html
+          mark "#337 the window choice is priced as value, not just a spread" grep -q "2,509,091" p_tools2.html
+          mark "#337 and the season is separated from the growth" grep -q "The rest is the season, not the trend" p_tools2.html
+          mark "#337 the expense side's rule is stated on the card" grep -q "annualizes a year that never pays the tax bill" p_tools2.html

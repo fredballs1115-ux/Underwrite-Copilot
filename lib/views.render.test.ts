@@ -1706,6 +1706,34 @@ describe("the deal math tools", () => {
     // The binding test is named, as it is in the sizer.
     expect(text).toContain("Debt service coverage");
   });
+
+  it("prices the window the memorandum chose, in dollars of value", () => {
+    // #337. Fifteen months of a growing building whose last three months
+    // are its peak season: T-3 annualized reads $1,720,000 against a T-12
+    // of $1,582,000. That $138,000 at the stated 5.5% cap is $2,509,091 of
+    // value riding on which window the cover page quoted — the figure the
+    // card exists to print, and the one no memorandum ever does.
+    expect(text).toContain("Which trailing window");
+    expect(text).toContain("T-3 annualized");
+    expect(text).toContain("$1,720,000");
+    expect(text).toContain("$1,582,000");
+    expect(text).toContain("$2,509,091");
+    expect(text).toContain("Worth, at that cap");
+  });
+
+  it("separates the growth from the season rather than leaving both in one figure", () => {
+    // The whole claim in one sentence: +8.7% against the full year, +3.6%
+    // against the same three months a year earlier. The difference is the
+    // season, and only a year-over-year read can see it.
+    expect(text).toContain("the building is up 3.6%");
+    expect(text).toContain("The rest is the season, not the trend.");
+  });
+
+  it("draws every window on one track against the full year", () => {
+    // Four windows — T-12, T-6, T-3, T-1 — each a bar, so a short window
+    // standing clear of the full year is visible before a figure is read.
+    expect((html.match(/data-bar="window"/g) ?? []).length).toBe(4);
+  });
 });
 
 // ── today's rates, across the top of /tools ────────────────────────────────
