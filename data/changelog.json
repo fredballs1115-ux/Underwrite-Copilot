@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-17",
+      "title": "Hold it or sell it",
+      "blurb": "The question every owner eventually asks, answered almost everywhere with the wrong number. A deal's lifetime IRR is an average over the whole hold and it is dominated by what already happened — the year the market re-rated, the year the renovation landed. It says nothing about next year, and a building can be sitting at a 17% lifetime IRR while the next twelve months earn six. This card runs the decision the right way round: the return on holding for ONE more year, on the cheque you could take out today. The seeded $34M building with $18.5M of debt has $14.82M of equity in it; holding one more year earns 14.1% on that, and the decay crosses a 12.5% reinvestment rate in year five — so the answer is a year, not a verdict. The decay is the point, and it is drawn: 14.1% falling to 11.0% over ten years with nothing going wrong, because the cash flow grows with rents while the equity underneath it grows faster, the loan amortising and the value rising on top. Two other rules earn their place. The capital at stake is the net sale proceeds — not the building's value, which ignores the debt, and not what you put in, which ignores that the market moved. And the cost of selling is paid whenever you sell, so it belongs on both sides: charge it against the hold year, the commonest version of this arithmetic, and the same year reads 18.8% instead of 14.1%, which on a 12.5% hurdle reverses the answer from \"sell in five years\" to \"hold indefinitely\".",
+      "href": "/tools#hold-or-sell"
+    },
+    {
+      "date": "2026-09-17",
       "title": "The doors against the dollars",
       "blurb": "\"95% occupied\" is a count of doors. It is on the front of almost every multifamily memorandum, and it is the higher of the two numbers that could go there. The other one — what share of market rent the building actually banks — is routinely six or eight points lower, and every figure downstream of the NOI moves with it. This card walks the bridge a rent roll has to cross to become an operating statement. The seeded 200-unit building at $1,850 is 95% leased and collects 87.3% of market: three model units that are physically full and pay nothing, sitting tenants under market, concessions, and bad debt. Underwrite the cover page — vacancy off the top and nothing else — and the going-in cap reads 4.96% against an honest 4.30%, which at the cap this NOI really supports is $7,950,698 of price. Four rules make it honest. The denominator is market rent, never the in-place rent roll: divide by the rents currently charged and loss to lease vanishes into the denominator, and the same building reads 90.5%. Loss to lease is not a collections problem — it closes as leases roll rather than by managing anything — so the card says which bucket the largest part of the gap is in, because the buckets carry opposite instructions. A concession is rent you agreed not to collect and bad debt is rent you failed to. And other income stays out of the ratio: put the parking and the fees in the numerator and a full building prints above 100%.",
       "href": "/tools#economic-occupancy"
@@ -149,12 +155,6 @@
       "date": "2026-09-16",
       "title": "/tools indexes itself",
       "blurb": "Eleven calculators is more than anyone should scroll past to find one, so the page opens with a row of jump links — which is also the honest answer to \"what does this page do\". The index and the cards read one list, and a test holds the two together: every link must name a card that exists, and every card must be reachable from the index, so neither can drift. The page's own description said it had four calculators; it says eleven now, and names them.",
-      "href": "/tools"
-    },
-    {
-      "date": "2026-09-16",
-      "title": "Sources and uses, with the equity as the plug",
-      "blurb": "The figure everyone carries is price less loan. On the seeded deal that is $20M − $13M = $7M; the actual cheque is $11.03M, because a $3M capital budget, 2% of closing, a 1% loan fee and a $500k reserve are all equity too. /tools draws both sides as bars of the SAME LENGTH — which is what \"the sides balance\" looks like — and names the leverage twice, because 65% of the price is only 54.1% of what the deal actually costs. The equity is derived, never typed: type both a debt and an equity figure and you have stated a capital structure rather than derived one. A loan bigger than the deal's uses shows a negative equity line rather than clamping to zero, because that means the loan is oversized for the basis and hiding it is the one thing this must not do.",
       "href": "/tools"
     }
   ]

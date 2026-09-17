@@ -592,3 +592,12 @@ jobs:
           mark "#338 the cover page's 95% is 87.3% of the dollars" grep -q "7.7 pts" p_tools2.html
           mark "#338 and the gap is priced against the honest cap" grep -q "7,950,698" p_tools2.html
           mark "#338 the denominator rule is stated on the card" grep -q "loss to lease disappears into the denominator" p_tools2.html
+          # #339 — hold or sell. The second marker is the decisive one: that
+          # sentence is written from the SCHEDULE (the year numbers are
+          # computed), and it only exists at all when the decay actually
+          # crosses the hurdle inside the horizon — so a `present` proves
+          # ten years of amortisation and exit values ran on the server.
+          mark "#339 the hold-or-sell card is on /tools" grep -q "Hold it or sell it" p_tools2.html
+          mark "#339 the schedule ran and found the year to sell" grep -q "clears the hurdle for 4 more years and falls under it in year 5" p_tools2.html
+          mark "#339 the cheque you could take out today is computed" grep -q "14.82M" p_tools2.html
+          mark "#339 the decay rule is stated on the card" grep -q "the equity underneath it grows faster" p_tools2.html

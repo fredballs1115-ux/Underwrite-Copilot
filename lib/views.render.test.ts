@@ -1767,6 +1767,30 @@ describe("the deal math tools", () => {
     expect(text).toContain("Loss to lease is the largest part");
     expect(text).toContain("closes as leases roll");
   });
+
+  it("answers when to sell with a year rather than a verdict", () => {
+    // #339. A $34M building with $18.5M of debt: $14.82M of equity in it,
+    // 14.1% on holding one more year, and the decay crosses a 12.5%
+    // reinvestment rate in year five.
+    expect(text).toContain("Hold it or sell it");
+    expect(text).toContain("$14.82M");
+    expect(text).toContain("14.1%");
+    expect(text).toContain("Year 5");
+    expect(text).toContain("clears the hurdle for 4 more years and falls under it in year 5");
+  });
+
+  it("draws the decay, which is the thing a lifetime IRR cannot show", () => {
+    // Ten years, each a bar against the first, so the slope is the picture.
+    expect((html.match(/data-bar="hold"/g) ?? []).length).toBe(10);
+    expect(text).toContain("The return on holding, year by year");
+  });
+
+  it("prices the error of charging the cost of selling against the hold year", () => {
+    // 18.8% against an honest 14.1%, which on a 12.5% hurdle reverses the
+    // answer from "sell in five years" to "hold indefinitely".
+    expect(text).toContain("18.8%");
+    expect(text).toContain("You pay that cost whenever you sell");
+  });
 });
 
 // ── today's rates, across the top of /tools ────────────────────────────────
