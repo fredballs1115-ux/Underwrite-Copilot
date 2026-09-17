@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-17",
+      "title": "The interest reserve, run instead of guessed",
+      "blurb": "A construction loan funds its own interest, which makes the reserve circular — the loan pays interest on a balance that already contains the interest it has paid. A closed form needs an assumption about the shape of the draw, so every screening model in the business swaps the schedule for a constant, and this one did too: 0.55 of the loan outstanding on average, \"an S-curve draw averages a little over half\". This card runs the months instead, and the first thing it reports is how far that constant is off. On the seeded $30M project at 65% loan-to-cost the schedule says $1,357,269 and the shortcut says $1,905,738 — 40% high. The reason is a rule the constant does not know about: the lender requires the sponsor's equity fully funded first, so on a 65% loan the first seven of twenty-four months never touch the loan and the average outstanding is 42% of it, not 55%. Run the same project pari passu and the constant is roughly right, which is the point — it describes a funding order construction lenders do not actually use. And the error is the flattering kind to miss: an overstated reserve overstates cost and understates yield on cost, so it reads as prudence rather than as a mistake, and the deal it kills is killed quietly.",
+      "href": "/tools#construction-draw"
+    },
+    {
+      "date": "2026-09-17",
       "title": "Today's rates, and the loan they price",
       "blurb": "The site has pulled the 10-year Treasury, SOFR, the 30-year mortgage survey and the CRE delinquency rate off FRED every weekday for months. They are now across the top of the calculators, each with the date of the observation behind it and a link to its series — and one of them fills a field. Which one is the point. A floating-rate note references SOFR by name, so today's SOFR IS the index on the new bridge-loan card, no adjustment and no term to match. The 10-year is shown and deliberately not used: yield maintenance prices at the Treasury matched to the REMAINING term, which on a normal curve sits lower, and a lower rate makes the penalty bigger — so reaching for the 10-year would understate what getting out costs. The mortgage survey is a residential owner-occupier rate and never fills a box at all. And stale is judged per series, because the quarterly delinquency figure is five months old when it is brand new: one threshold for all four would report three working feeds as broken.",
       "href": "/tools#floating-rate"

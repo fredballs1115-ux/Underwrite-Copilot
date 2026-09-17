@@ -563,3 +563,10 @@ jobs:
           # marker can genuinely fail.
           mark "#335 /market serves today's rates to a visitor with no account" grep -q "Rates today" p_market.html
           mark "#335 and names the survey it will not quote from" grep -q "never fills a box" p_market.html
+          # The construction draw, run rather than approximated. The note is
+          # COMPUTED from the schedule — "the first 7 of 24 months" is the
+          # month the loan makes its first advance under equity-first — so a
+          # present here proves the iteration ran on the server.
+          mark "#336 the construction draw is on /tools" grep -q "The interest reserve, run month by month" p_tools2.html
+          mark "#336 equity funds the first seven months" grep -q "Equity funds the first 7 of 24 months" p_tools2.html
+          mark "#336 and the shortcut's error is named, not just measured" grep -q "reads as prudence rather than as a mistake" p_tools2.html
