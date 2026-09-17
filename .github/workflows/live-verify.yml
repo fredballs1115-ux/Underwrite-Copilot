@@ -555,3 +555,11 @@ jobs:
           # fills a box: the prepayment clause wants the Treasury matched to
           # the remaining term, and the 10-year would flatter the penalty.
           mark "#334 the 10-year is kept out of the prepayment card" grep -q "matched to the REMAINING term" p_tools2.html
+          # /market drew the same four rates through the REQUEST-scoped client
+          # against a `to authenticated` policy, so a visitor with no account
+          # silently got the checked-in PMMS snapshot instead. This curl has no
+          # session, so a present here is the anonymous read working — and the
+          # old section's heading was "Rates", never "Rates today", so the
+          # marker can genuinely fail.
+          mark "#335 /market serves today's rates to a visitor with no account" grep -q "Rates today" p_market.html
+          mark "#335 and names the survey it will not quote from" grep -q "never fills a box" p_market.html

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import React from "react";
 import { renderToStaticMarkup, renderToString } from "react-dom/server";
 import { DealMathTools } from "@/app/tools/deal-math-tools";
-import { RatesStrip } from "@/app/tools/rates-strip";
+import { RatesStrip } from "@/app/rates-strip";
 import { readRates } from "@/lib/live-rates";
 
 /**

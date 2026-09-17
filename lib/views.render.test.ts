@@ -1694,7 +1694,7 @@ describe("the deal math tools", () => {
 // The page reads the table and hands the rows in, so this renders the strip
 // on a fixture without a database: the four series the cron writes, as the
 // Sep 16 run actually wrote them.
-import { RatesStrip } from "@/app/tools/rates-strip";
+import { RatesStrip } from "@/app/rates-strip";
 import { readRates } from "@/lib/live-rates";
 
 describe("the rates strip", () => {

@@ -4,7 +4,7 @@ import { PlaceBackdrop } from "@/app/place-band";
 import { rateSeeds } from "@/lib/live-rates";
 import { liveRates } from "@/lib/live-rates-read";
 import { DealMathTools } from "./deal-math-tools";
-import { RatesStrip } from "./rates-strip";
+import { RatesStrip } from "@/app/rates-strip";
 
 export const metadata: Metadata = {
   title: "Deal math — Underwrite Copilot",
