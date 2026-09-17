@@ -725,6 +725,16 @@ jobs:
           # ESCAPED, which is why "Rent &amp; recoveries" is the grep.
           mark "#353 the leases are split from their recoveries" grep -q "Rent &amp; recoveries" p_tools2.html
           mark "#353 and a standing building from a site" grep -q "Development" p_tools2.html
+          # #354 — the value-add renovation program. Every phrase below was
+          # checked through renderToString first: "$100 a different building"
+          # and "turnover binds" both span an interpolated value, so the
+          # server's <!-- --> sits inside them and they read NOT DEPLOYED on
+          # a page that is perfectly fine. The grep is the literal text node
+          # either side of the figure, never across it.
+          mark "#354 the renovation card is on /tools" grep -q "The renovation program" p_tools2.html
+          mark "#354 only part of the quoted premium is renovation" grep -q "a different building" p_tools2.html
+          mark "#354 the pace is turnover's, not the memorandum's" grep -q "the page claims, which would need" p_tools2.html
+          mark "#354 a return on cost has no clock in it" grep -q "A return on cost has no clock in it. Sold the year the program finishes this earns" p_tools2.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

@@ -933,6 +933,40 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   took ABOVE its pro-rata share** — the only honest definition, for the
   same reason. Return OF capital is not a separate step: an 8% IRR is not
   reached until every dollar in has come back plus 8% on it.
+- The value-add renovation program: `lib/tools/renovation.ts` (pure — page 12
+  of every multifamily memorandum, quoted as one multiplication: $15,000 a
+  door times 200 doors against $250 a month times 200 times twelve, "a twenty
+  percent return on cost"). Four rules, and they do not all point the same
+  way. **Turnover sets the pace**, because interiors are renovated when the
+  resident leaves — so a "24-month program" on 200 doors is a claim that half
+  the book turns every year, and the pace is the LOWER of turnover and what
+  the crew can do with the binding one NAMED (`sizeLoan`'s convention). On the
+  seed, turnover binds at 70 doors a year and the program runs 2.9 years
+  against the 2 claimed. **The quoted premium is two numbers**: the renovated
+  comp's rent less the subject's in-place rent decomposes exactly into
+  `(renovatedComp − classicComp)`, what renovation buys, plus
+  `(classicComp − subjectInPlace)`, the gap to a different building, which
+  granite does not close — $150 and $100 of the $250 quoted, so 40% of the
+  "value-add" is the comparable being a better property. It is SIGNED: a
+  subject that already out-rents the comp's classic stock has its premium
+  UNDERSTATED. **The make-ready is deferred, not avoided** (`buyoutValue`'s
+  rule at unit scale) — paint and carpet were owed at the turn whatever
+  happened, so the incremental cost is the invoice LESS the make-ready, while
+  the extra weeks down are a real loss the cost per door never mentions; the
+  two corrections run opposite ways, which is why neither is ever made.
+  Corrected, the memorandum's 20% on cost is 13.4% and its $9.0M of value
+  created is $4.5M. And **the return on cost has no clock in it**: the same
+  program earns 63.7% sold the year it finishes and 31.4% held to a five-year
+  exit, because 90% of its present value is the RESALE rather than the rent —
+  a renovation is a transaction, not an income strategy. Both shocks are
+  computed rather than asserted (`PREMIUM_MISS_PCT`, `EXIT_CAP_SHOCK_BPS`):
+  the premium usually dominates, since it sets the rent and the exit where
+  the cap moves only the exit, but not at every hold and cap, and a card
+  asserting it would be wrong on the deals where it is not. `breakEvenPremium`
+  ($56 a month) is the honest floor — the argument is how much, not whether.
+  The rate comes from `irr` in `lib/underwrite/engine`, so the page and the
+  workbook cannot disagree. Bars: `data-bar="split"` (the premium's two
+  pieces on one track) and `data-bar="reno"` (one a year).
 - Whether anyone will build against you: `lib/tools/feasibility-rent.ts` (pure).
   "We are buying at sixty percent of replacement cost" is the most quoted
   comfort in the business and on its own it protects NOTHING — replacement
