@@ -293,6 +293,30 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   from a screening model. A loan larger than total uses reports a NEGATIVE
   equity line rather than clamping to zero: it means the loan is oversized
   for the basis, and hiding that is the one thing this must not do.
+- What each layer of that stack costs: `lib/tools/capital-stack.ts` (pure —
+  the mezzanine and preferred that sit between `sizeLoan`'s senior and
+  `runWaterfall`'s common equity). Five rules, and collapsing any of them
+  flatters the deal. **Leverage is tested at the MARGIN, never on the
+  blend**: a layer helps only if its own rate is below the unlevered yield
+  on cost, and a large cheap senior drags the average under that yield
+  while the layers above it destroy equity value — the seeded stack is
+  exactly that case (6.13% blended against 6.5%, with both upper layers
+  dilutive), and `blendHidesIt` names it. **Amortisation is a transfer,
+  not a cost** — test on the RATE, size coverage on the CONSTANT; a 5%
+  senior over 25 years has a constant above a 6.5% yield, and judging it
+  there rejects a plainly accretive loan. **An accruing preferred flatters
+  the current return**: it takes no cash, so it lifts cash-on-cash by
+  shrinking the denominator — on the seeded deal the stack takes $900,000
+  a year out and cash-on-cash still RISES 6.59% → 7.89%, which is why
+  `cashOnCashSeniorOnlyPct` is drawn beside it. **Compounding is its own
+  cost** (`accrualCost`, $1,080,465 over five years — the accrual less the
+  same rate paid current). And **three coverage ratios, not one**: the
+  senior's DSCR, combined DSCR with the mezzanine (1.68× → 1.36×, the
+  ratio that decides who can take the property), and fixed-charge coverage
+  once a current-pay preferred is counted. Equity is the plug here too,
+  and an oversized stack reports negative common equity rather than zero.
+  The card's marker on the bars is `data-bar="layer"` — `data-bar="stack"`
+  belongs to sources-and-uses, and its own count test caught the collision.
 - An OM's unit mix table: `lib/tools/unit-mix.ts` (pure). Two rules.
   **Weight by unit count, never by row** — 200 studios at $1,200 beside 4
   penthouses at $6,000 do not average $3,600, and averaging the rows is the

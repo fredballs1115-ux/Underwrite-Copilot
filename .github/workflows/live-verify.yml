@@ -512,3 +512,9 @@ jobs:
           # levered target calls every deal heroic. No apostrophe, no
           # interpolated value inside the phrase.
           mark "#326 it says the return is unlevered" grep -q "levered number typed here will make any deal look heroic" p_tools2.html
+          mark "#328 the capital stack is on /tools" grep -q "What each layer costs, and whether it earns its place" p_tools2.html
+          # The claim the card exists to make. Checked against renderToString
+          # before it was written here: the phrase sits inside one source line
+          # and carries no interpolated value, so React puts no separator in
+          # the middle of it.
+          mark "#328 leverage is tested layer by layer" grep -q "Leverage is judged layer by layer, never on the average" p_tools2.html

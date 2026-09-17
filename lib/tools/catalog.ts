@@ -32,6 +32,7 @@ export const TOOL_INDEX: readonly ToolEntry[] = [
   { id: "cash-flow-strip", label: "Cash flow" },
   { id: "what-you-believe", label: "What you believe" },
   { id: "sources-and-uses", label: "Sources & uses" },
+  { id: "capital-stack", label: "Capital stack" },
   { id: "unit-mix", label: "Unit mix" },
   { id: "the-site", label: "The site" },
   { id: "residual-land", label: "Land residual" },
