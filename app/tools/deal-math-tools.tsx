@@ -41,6 +41,7 @@ import { readFeasibility } from "@/lib/tools/feasibility-rent";
 import { readRenovation } from "@/lib/tools/renovation";
 import { readHotel } from "@/lib/tools/hotel";
 import { readAssumption } from "@/lib/tools/loan-assumption";
+import { readStorage } from "@/lib/tools/storage-ecri";
 import {
   breakEvenOccupancyPct,
   capRatePct,
@@ -6323,6 +6324,172 @@ function FeasibilityRent() {
 
 
 
+
+/**
+ * The self-storage rate increase, and the runway it spends.
+ *
+ * Two pictures. The break-even against the response assumed, as one track
+ * with the room marked — because the question on a storage deal is never
+ * whether the increase pays but how much room is left. And the runway year
+ * by year, because the finding is that each increase lowers the next one's
+ * break-even and a single figure cannot show a decay.
+ */
+function StorageEcri() {
+  const [units, setUnits] = useShared("stu", "585");
+  const [inPlace, setInPlace] = useShared("stip", "135");
+  const [street, setStreet] = useShared("stsr", "105");
+  const [ecri, setEcri] = useShared("ste", "10");
+  const [reach, setReach] = useShared("strch", "70");
+  const [moveOut, setMoveOut] = useShared("stmo", "5");
+  const [downtime, setDowntime] = useShared("stdt", "1");
+  const [stay, setStay] = useShared("stay", "11");
+  const [free, setFree] = useShared("stfr", "1");
+  const [flow, setFlow] = useShared("stfl", "90");
+  const [cap, setCap] = useShared("stcap", "5.75");
+  const [growth, setGrowth] = useShared("stg", "2");
+  const [unitOcc, setUnitOcc] = useShared("stuo", "90");
+  const [sfOcc, setSfOcc] = useShared("stso", "86");
+
+  const st = useMemo(
+    () =>
+      readStorage({
+        occupiedUnits: readFigure(units),
+        inPlaceRent: num(inPlace),
+        streetRent: num(street),
+        ecriPct: num(ecri),
+        ecriReachPct: num(reach),
+        moveOutPct: num(moveOut),
+        downtimeMonths: num(downtime),
+        averageStayMonths: num(stay),
+        freeMonths: num(free),
+        flowThroughPct: num(flow),
+        capRatePct: num(cap),
+        streetGrowthPct: num(growth),
+        yearsAhead: 5,
+        unitOccupancyPct: num(unitOcc),
+        sfOccupancyPct: num(sfOcc),
+      }),
+    [units, inPlace, street, ecri, reach, moveOut, downtime, stay, free, flow, cap, growth, unitOcc, sfOcc],
+  );
+
+  // The break-even track runs to a round number above it, so a facility
+  // with a great deal of room does not draw the same full bar as one at
+  // the edge.
+  const beTop = Math.max(40, Math.ceil((st.breakEvenMoveOutPct ?? 0) / 10) * 10);
+  const scheduleTop = Math.max(...st.schedule.map((y) => y.breakEvenMoveOutPct ?? 0), 1);
+
+  return (
+    <Card id="storage-ecri" eyebrow="Self-storage" title="The rate increase, and the runway it spends">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Units let" value={units} onChange={setUnits} placeholder="585" />
+          <Field label="In-place rent" suffix="/mo" value={inPlace} onChange={setInPlace} placeholder="135" />
+          <Field label="Street rate" suffix="/mo" value={street} onChange={setStreet} placeholder="105" />
+          <Field label="The increase" suffix="%" value={ecri} onChange={setEcri} placeholder="10" />
+          <Field label="Tenants reached" suffix="%" value={reach} onChange={setReach} placeholder="70" />
+          <Field label="Move-out response" suffix="%" value={moveOut} onChange={setMoveOut} placeholder="5" />
+          <Field label="Downtime" suffix="mo" value={downtime} onChange={setDowntime} placeholder="1" />
+          <Field label="Average stay" suffix="mo" value={stay} onChange={setStay} placeholder="11" />
+          <Field label="Free rent" suffix="mo" value={free} onChange={setFree} placeholder="1" />
+          <Field label="Flow-through" suffix="%" value={flow} onChange={setFlow} placeholder="90" />
+          <Field label="Cap rate" suffix="%" value={cap} onChange={setCap} placeholder="5.75" />
+          <Field label="Street growth" suffix="%" value={growth} onChange={setGrowth} placeholder="2" />
+          <Field label="Unit occupancy" suffix="%" value={unitOcc} onChange={setUnitOcc} placeholder="90" />
+          <Field label="SF occupancy" suffix="%" value={sfOcc} onChange={setSfOcc} placeholder="86" />
+        </div>
+
+        <div>
+          {st.breakEvenMoveOutPct !== null && (
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted">
+                The response the increase can take before it stops paying
+              </p>
+              <div className="mt-2 space-y-2">
+                {[
+                  { label: "Assumed", value: num(moveOut) ?? 0, brand: false },
+                  { label: "Break-even", value: st.breakEvenMoveOutPct, brand: true },
+                ].map((row) => (
+                  <div key={row.label} className="flex items-center gap-3 text-sm">
+                    <span className="w-24 shrink-0 text-muted">{row.label}</span>
+                    <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-faint">
+                      <div
+                        data-bar="ecri"
+                        className={`h-full ${row.brand ? "bg-brand" : "bg-sidebar"}`}
+                        style={{ width: `${Math.min(100, (row.value / beTop) * 100)}%` }}
+                      />
+                    </div>
+                    <span className="w-14 shrink-0 text-right font-mono tabular-nums text-ink">
+                      {pct(row.value, 1)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Stat label="Room left" value={st.headroomPts === null ? "\u2014" : `${st.headroomPts} pts`} tone="brand" />
+            <Stat label="Revenue gained" value={usd(st.revenueGain)} />
+            <Stat label="Worth, at the cap" value={usd(st.valueOfIncrease)} />
+            <Stat label="In-place over street" value={pct(st.rateGapPct, 1)} tone="muted" />
+          </div>
+
+          {st.schedule.length > 0 && (
+            <div className="mt-5">
+              <p className="text-xs uppercase tracking-wide text-muted">
+                Put through every year, the break-even falls
+              </p>
+              <div className="mt-2 space-y-1.5">
+                {st.schedule.map((y) => (
+                  <div key={y.year} className="flex items-center gap-3 text-xs">
+                    <span className="w-10 shrink-0 text-muted">Yr {y.year}</span>
+                    <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-faint">
+                      <div
+                        data-bar="runway"
+                        className="h-full bg-brand"
+                        style={{ width: `${((y.breakEvenMoveOutPct ?? 0) / scheduleTop) * 100}%` }}
+                      />
+                    </div>
+                    <span className="w-14 shrink-0 text-right font-mono tabular-nums text-ink">
+                      {pct(y.breakEvenMoveOutPct, 1)}
+                    </span>
+                    <span className="hidden w-20 shrink-0 text-right font-mono tabular-nums text-muted sm:inline">
+                      {pct(y.rateGapPct, 0)} gap
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {st.streetDownside !== null && (
+            <p className="mt-4 text-sm text-muted">
+              Every tenant churned to today&apos;s asking rate and the facility earns{" "}
+              <span className="font-semibold text-ink">{usd(st.revenueAtStreet)}</span> —{" "}
+              {/* The figure is signed by design: below the in-place rent on a
+                  mature facility, above it on one still leasing up. The
+                  sentence supplies the direction, so the number must not
+                  carry a second one — "-$210,600 less" is a double negative. */}
+              {usd(Math.abs(st.streetDownside))} {st.streetDownside >= 0 ? "more" : "less"}. On a
+              rent roll about to face a new competitor down the road that is not a stress test but
+              a forecast.
+            </p>
+          )}
+
+          {st.note && <p className="mt-4 text-sm text-caution">{st.note}</p>}
+          <p className="mt-3 text-xs text-muted">
+            A free month costs one month out of the whole tenancy, so the same offer is{" "}
+            {pct(st.concessionCostPct, 1)} here and {pct(st.concessionCostIfShortStayPct, 1)} in a
+            market where tenants leave a quarter sooner. Unit occupancy runs{" "}
+            {st.occupancyGapPts === null ? "\u2014" : `${st.occupancyGapPts} points`} above square-foot
+            occupancy because small units fill first, and an OM quotes whichever is higher.
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 /**
  * Taking over the seller's loan.
  *
@@ -7793,6 +7960,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <Renovation />
       <Hotel />
       <LoanAssumption />
+      <StorageEcri />
       <StraightLineRent />
       <NetEffectiveRent />
       <RentableUsable />

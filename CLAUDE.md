@@ -933,6 +933,37 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   took ABOVE its pro-rata share** — the only honest definition, for the
   same reason. Return OF capital is not a separate step: an 8% IRR is not
   reached until every dollar in has come back plus 8% on it.
+- The self-storage rate increase: `lib/tools/storage-ecri.ts` (pure — the
+  last asset class `/tools` did not speak to, and the one whose central
+  lever exists nowhere else). Storage leases month to month, so a sitting
+  tenant can be repriced whenever the operator likes — the EXISTING
+  CUSTOMER RATE INCREASE, eight to fifteen percent, once or twice a year.
+  Four rules. **The ECRI is a trade and the trade has a CLOSED FORM**:
+  setting revenue after against revenue before gives
+  `m* = e / (1 + e − k)` where `k = (street/inPlace) × (12 − downtime)/12`
+  — a 10% increase breaks even at a **25.8%** move-out on the seed, against
+  the three to eight percent an operator sees. The REACH cancels out of it
+  entirely (raising half the book and all of it break even at the same
+  rate, because both sides scale with it), which a test pins. **The ECRI
+  eats its own runway**: each increase widens the in-place-to-street gap
+  that is the whole denominator of the trade, so the break-even falls
+  25.8 → 20.7 over five years — and how fast is a RACE with the street
+  rate's own growth (9.4 points of decay over eight years at 0% growth,
+  4.3 at 4%), so it is run rather than claimed. **The street rate and the
+  in-place average are two different numbers** and which is underwritten
+  decides the deal: `revenueAtStreet` is every tenant churned to today's
+  ask, $210,600 below a rent roll that looks perfectly healthy, and on a
+  facility about to face a new competitor it is a forecast rather than a
+  stress test. And **a free month is not a fixed discount** — it costs one
+  month out of the whole tenancy, and that length is a market fact:
+  9.1% at eleven months, 12.5% at eight, 4.2% at two years
+  (`SHORTER_STAY_PCT` sets the comparison proportionally so it holds at any
+  stay). One guard the probe bought: a street rate ABOVE the raised
+  in-place rent printed a **736.4%** break-even, which reads as a figure
+  and is not one — a facility cannot lose more tenants than it has — so
+  above 100% the answer is null and the note says there is no trade to
+  make. Bars: `data-bar="ecri"` (the assumed response against the
+  break-even) and `data-bar="runway"` (one a year).
 - Taking over the seller's loan: `lib/tools/loan-assumption.ts` (pure — the
   other half of `prepayment`, which asks what it costs to get OUT of a loan
   early; this asks what it is worth to step INTO one somebody else signed,

@@ -99,6 +99,7 @@ export const TOOL_INDEX: readonly ToolEntry[] = [
   { id: "renovation-program", label: "Renovation program", group: "Value" },
   { id: "hotel-revpar", label: "Hotel RevPAR", group: "Rent & recoveries" },
   { id: "loan-assumption", label: "Assuming the loan", group: "Debt" },
+  { id: "storage-ecri", label: "Storage ECRI", group: "Rent & recoveries" },
   { id: "straight-line-rent", label: "Statement vs cash", group: "Leases" },
   { id: "net-effective-rent", label: "Net effective rent", group: "Leases" },
   { id: "rentable-vs-usable", label: "Rentable vs usable", group: "Leases" },
