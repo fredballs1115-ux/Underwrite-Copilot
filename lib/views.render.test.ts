@@ -986,7 +986,7 @@ describe("News scored feed", () => {
 // this doubles as a check that the seeded numbers actually compute rather
 // than showing a page of em dashes.
 import { DealMathTools } from "@/app/tools/deal-math-tools";
-import { TOOL_INDEX } from "@/lib/tools/catalog";
+import { TOOL_GROUPS, TOOL_INDEX } from "@/lib/tools/catalog";
 
 describe("the deal math tools", () => {
   const html = render(React.createElement(DealMathTools));
@@ -1440,6 +1440,16 @@ describe("the deal math tools", () => {
     expect(text).toContain("1.68×"); // the senior's own
     expect(text).toContain("1.36×"); // once the mezzanine is counted
     expect(text).toContain("decides who can take the property");
+  });
+
+  it("files the jump index into named clusters", () => {
+    // Twenty-six chips in a row is a wall; six clusters is a directory.
+    for (const g of TOOL_GROUPS) expect(text, g).toContain(g);
+    // And the links are all still there — grouping must not lose one.
+    const linked = new Set(
+      [...html.matchAll(/href="#([a-z0-9-]+)"/g)].map((m) => m[1]),
+    );
+    expect(linked.size).toBe(TOOL_INDEX.length);
   });
 
   it("draws the two ways out, one of them a gain", () => {
