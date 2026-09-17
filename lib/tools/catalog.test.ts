@@ -77,7 +77,16 @@ describe("the /tools catalog", () => {
   it("the homepage reads it too", () => {
     const src = read("app/page.tsx");
     expect(src).toContain('from "@/lib/tools/catalog"');
-    expect(src).toContain("TOOL_INDEX.map");
+    // Either accessor satisfies this — `groupedTools()` reads `TOOL_INDEX`
+    // one function further along, and the homepage's shelf uses it so its
+    // clusters are the same clusters `/tools` files its cards under. What
+    // this forbids is a hand-written list, which is what the shelf was
+    // before the catalog existed: it said "size a loan, or run the cap
+    // rate math" for weeks after the page had grown past four calculators.
+    expect(
+      src.includes("TOOL_INDEX.map") || src.includes("groupedTools()"),
+      "the homepage's shelf must render from the catalog, never its own list",
+    ).toBe(true);
   });
 
   it("the page's own description names the count it actually serves", () => {

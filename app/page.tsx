@@ -31,7 +31,7 @@ import { latestChange } from "@/lib/changelog";
 import { StressBench } from "./landing-stress";
 // The /tools shelf reads the SAME list /tools builds its cards from, so the
 // homepage can only ever advertise what the page actually serves.
-import { TOOL_COUNT, TOOL_INDEX } from "@/lib/tools/catalog";
+import { TOOL_COUNT, groupedTools } from "@/lib/tools/catalog";
 import metrosSeed from "@/data/research/metros.json";
 import { MARKET_COUNT } from "./markets-marquee";
 import { MarketsGallery } from "./markets-gallery";
@@ -803,21 +803,40 @@ export default function Home() {
                 serves. A count in prose would go stale; a list cannot. */}
             <Reveal delay={160}>
               <div className="mt-8 border-t border-white/15 pt-6">
+                {/* The count is CALCULATIONS, not chips — "Over the hold"
+                    answers the schedule and the refinance test off one set
+                    of inputs — so the label says which, rather than leaving
+                    a reader to count the chips and find one fewer. */}
                 <p className="text-[11px] font-semibold uppercase tracking-widest text-white/60">
-                  {TOOL_COUNT} more, with no deal behind them
+                  {TOOL_COUNT} more calculations, with no deal behind them
                 </p>
-                <ul className="mt-3 flex flex-wrap gap-2">
-                  {TOOL_INDEX.map((t) => (
-                    <li key={t.id}>
-                      <Link
-                        href={`/tools#${t.id}`}
-                        className="inline-block rounded-lg border border-white/20 px-2.5 py-1 text-xs font-medium text-white/85 transition-colors hover:border-accent hover:text-accent"
-                      >
-                        {t.label}
-                      </Link>
-                    </li>
+                {/* Clustered, not a flat row. The shelf was a single line of
+                    chips written when the list was short, and it is the same
+                    wall /tools' own index hit at twenty-six — which is why
+                    `groupedTools()` exists in the catalog rather than in the
+                    page. One grouping, read by both, so the homepage cannot
+                    present the page in a shape the page does not use. */}
+                <div className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {groupedTools().map(({ group, tools }) => (
+                    <div key={group}>
+                      <p className="text-[11px] font-semibold uppercase tracking-widest text-white/45">
+                        {group}
+                      </p>
+                      <ul className="mt-2 flex flex-wrap gap-1.5">
+                        {tools.map((t) => (
+                          <li key={t.id}>
+                            <Link
+                              href={`/tools#${t.id}`}
+                              className="inline-block rounded-lg border border-white/20 px-2.5 py-1 text-xs font-medium text-white/85 transition-colors hover:border-accent hover:text-accent"
+                            >
+                              {t.label}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   ))}
-                </ul>
+                </div>
                 <Link
                   href="/tools"
                   className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-accent underline-offset-4 transition-colors hover:underline"

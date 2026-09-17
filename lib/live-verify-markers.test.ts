@@ -42,11 +42,14 @@ import { readRates } from "@/lib/live-rates";
  * against `body.html` (the homepage) are not checked here, because the
  * homepage is a server component that fetches its own data and cannot be
  * rendered from a test the way `DealMathTools` can. Those markers carry
- * the same risk — `#314` greps "more, with no deal behind them", which is
- * safe only because the interpolated `{TOOL_COUNT}` sits just BEFORE the
- * phrase rather than inside it. Keep homepage markers to prose with no
- * `{expression}` in the middle of it, by hand, until there is a way to
- * render that page in a test.
+ * the same risk — `#314` greps "more calculations, with no deal behind
+ * them", which is safe only because the interpolated `{TOOL_COUNT}` sits
+ * just BEFORE the phrase rather than inside it. Keep homepage markers to
+ * prose with no `{expression}` in the middle of it, by hand, until there
+ * is a way to render that page in a test. `#340` greps a cluster heading
+ * from `groupedTools()` and has to grep the ESCAPED "Equity &amp;
+ * returns", because React writes an ampersand that way — the same trap
+ * the `/tools` index's own cluster marker hit.
  */
 
 const YML = readFileSync(".github/workflows/live-verify.yml", "utf8");
