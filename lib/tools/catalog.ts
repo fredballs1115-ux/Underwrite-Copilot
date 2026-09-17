@@ -86,6 +86,7 @@ export const TOOL_INDEX: readonly ToolEntry[] = [
   { id: "percentage-rent", label: "Percentage rent", group: "Leases" },
   { id: "tax-reassessment", label: "Tax reassessment", group: "Tax & closing" },
   { id: "ground-lease", label: "Ground lease", group: "Value & land" },
+  { id: "sale-leaseback", label: "Sale-leaseback", group: "Value & land" },
   { id: "closing-proration", label: "Closing", group: "Tax & closing" },
   { id: "cap-rate-triangle", label: "Cap rate", group: "Value & land" },
   { id: "rent-converter", label: "Rent, four ways", group: "The property" },

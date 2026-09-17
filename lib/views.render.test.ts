@@ -1910,6 +1910,34 @@ describe("the deal math tools", () => {
     expect((html.match(/data-bar="leaseup"/g) ?? []).length).toBe(60);
     expect((html.match(/data-bar="slip"/g) ?? []).length).toBe(3);
   });
+
+  it("says what a sale-leaseback's rent is really buying", () => {
+    // #346, rules 1 and 2. The seller writes the lease, so $5.4M of the
+    // $27M price is the lease rather than the building — and the rent
+    // reverts at year 20 while the building does not, which is $3,973,557
+    // a buyer capitalising the contract NOI has not priced at all.
+    expect(text).toContain("The sale-leaseback");
+    expect(text).toContain("$27,000,000");
+    expect(text).toContain("$5,400,000");
+    expect(text).toContain(
+      "The rent reverts at year 20, and the building does not — which is $3,973,557 of the price, 14.7% of it.",
+    );
+  });
+
+  it("sets the escalating rent against a coupon that never moves", () => {
+    // Rule 4: 6.09 cents in year one against a 6.50% coupon, 8.87 by the
+    // end, crossing in year five — and the loan sized through sizeLoan.
+    expect(text).toContain("Rent per dollar raised, against the mortgage coupon");
+    expect(text).toContain("6.09");
+    expect(text).toContain("8.87");
+    expect(text).toContain("The rent passes it in year 5 and never comes back under");
+    expect(text).toContain("$12,816,579");
+  });
+
+  it("draws the three values and a bar a year", () => {
+    expect((html.match(/data-bar="slb"/g) ?? []).length).toBe(3);
+    expect((html.match(/data-bar="coupon"/g) ?? []).length).toBe(20);
+  });
 });
 
 // ── today's rates, across the top of /tools ────────────────────────────────

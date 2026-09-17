@@ -668,6 +668,14 @@ jobs:
           mark "#345 the cumulative cash line is drawn" grep -q "Cumulative cash, month by month" p_tools2.html
           mark "#345 slippage is shown shrinking the reserve it should stress" grep -q "The reserve is the wrong place to look for slippage" p_tools2.html
           mark "#345 the slipped position at the common date is computed" grep -q "4,158,892" p_tools2.html
+          # #346 — the sale-leaseback. The third renders ONLY when the
+          # contract rent is above market AND the two pieces come to less
+          # than the price, so a `present` proves the term stream and the
+          # discounted reversion both ran; the fourth is that figure.
+          mark "#346 the sale-leaseback card is on /tools" grep -q "The sale-leaseback" p_tools2.html
+          mark "#346 the rent is drawn against the mortgage coupon" grep -q "Rent per dollar raised, against the mortgage coupon" p_tools2.html
+          mark "#346 the reversion is priced against the contract rent" grep -q "The rent reverts at year 20, and the building does not" p_tools2.html
+          mark "#346 what capitalising the contract rent overpays" grep -q "3,973,557" p_tools2.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then
