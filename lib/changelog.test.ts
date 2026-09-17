@@ -3,6 +3,7 @@
 // back untouched.
 import { describe, expect, it } from "vitest";
 import { LONG_NOTE, blurbExcerpt, changelogEntries } from "./changelog";
+import { TOOL_INDEX } from "./tools/catalog";
 
 describe("blurbExcerpt — a note's opening, in whole sentences", () => {
   it("returns a short note whole", () => {
@@ -41,5 +42,41 @@ describe("blurbExcerpt — a note's opening, in whole sentences", () => {
     expect(out.length).toBeLessThan(longest.blurb.length);
     expect(out.endsWith("…")).toBe(true);
     expect(longest.blurb.startsWith(out.slice(0, 40))).toBe(true);
+  });
+});
+
+/**
+ * Where a note points.
+ *
+ * Two surfaces link these — the pipeline's What's-new card and the
+ * homepage footer's latest-improvement stamp — and a fragment that names
+ * no element does not fail anywhere: the browser simply leaves the reader
+ * at the top of the page, reading the wrong card. This round nearly
+ * shipped `/tools#loan-schedule`, which is what the card is called and
+ * not what its id is (`the-loan-over-the-hold`).
+ *
+ * The ids are data in `lib/tools/catalog.ts`, which the page's cards and
+ * its jump index both render from, so checking against it checks against
+ * what is really on the page.
+ */
+describe("a note's link", () => {
+  const entries = changelogEntries(100);
+
+  it("is a path on this site, never bare or external", () => {
+    for (const e of entries) {
+      if (!e.href) continue;
+      expect(e.href.startsWith("/"), `${e.title}: ${e.href}`).toBe(true);
+    }
+  });
+
+  it("names a card that exists when it points into /tools", () => {
+    const ids = new Set(TOOL_INDEX.map((t) => t.id));
+    const pointed = entries.filter((e) => e.href?.startsWith("/tools#"));
+    // If this ever drops to zero the check has stopped checking anything.
+    expect(pointed.length, "no /tools anchors left to verify").toBeGreaterThan(0);
+    for (const e of pointed) {
+      const id = e.href!.slice("/tools#".length);
+      expect(ids.has(id), `${e.title} points at #${id}, which no card carries`).toBe(true);
+    }
   });
 });

@@ -439,6 +439,7 @@ jobs:
           # marker after it down with it. An `if` condition is exempt.
           mark() { if "${@:2}"; then echo "  present      $1"; else echo "  NOT DEPLOYED $1"; fi; }
           both() { grep -q "on-photo" p_why.html && grep -q "band-words" p_why.html; }
+          copies() { [ "$(grep -o "Copy as table" p_tools2.html | wc -l)" -ge 2 ]; }
           echo "ROUND MARKERS — what the live site is actually serving:"
           mark "#302 photo treatment (on-photo + band-words on /why)" both
           mark "#302 deal math reads the shorthand (seeded \$20M on /tools)" grep -q 'value="\$20M"' p_tools2.html
@@ -491,3 +492,9 @@ jobs:
           # The claim the card exists for: a year that owes nothing and is
           # billed anyway. Prose with no interpolated value in it.
           mark "#322 it prices the missing true-up" grep -q "that the year" p_tools2.html
+          # The loan schedule's own Copy-as-table. "Copy as table" alone
+          # cannot fail — the cash-flow strip has carried one since #304 —
+          # so this counts them. A marker that passes before the change it
+          # claims to prove is not a marker.
+          mark "#323 the loan schedule leaves the page as numbers" copies
+          mark "#323 a copy button is never printed" grep -q "hover:text-brand print:hidden" p_tools2.html

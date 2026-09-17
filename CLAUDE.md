@@ -78,7 +78,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   {EXCHANGE_DAYS} days`) reads NOT DEPLOYED on a page that is perfectly
   fine — and neither the render tests (`renderToStaticMarkup`, no
   separators) nor `visibleText` (strips them) can see it. Grep prose with
-  no `{expression}` in it.
+  no `{expression}` in it. The other half of a marker's job is being able
+  to fail: where the phrase is already on the page before the change (a
+  second "Copy as table"), the marker counts the matches through a
+  `grep -o … | wc -l` helper instead, and the guard reads `-o` patterns
+  alongside `-q` ones so both kinds stay honest.
   `lib/a11y-source.test.ts` scans every page's source for a form control
   with no accessible name (the pages the render tests cannot reach). The
   root layout renders the one skip link (`app/skip-link.tsx`); every page's
@@ -99,9 +103,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   (`app/public-shell.tsx`), the photograph (`app/aerial-img.tsx`, so the
   band keeps its dark scrim and white words without a page of ink), the
   jump index, and `print:break-inside-avoid` on each card so a bar never
-  lands on a different sheet from its figure. `lib/print-styles.test.ts`
-  scans for all of it; the byte measurement needs a real Chromium and is
-  the by-hand half.
+  lands on a different sheet from its figure. The exception is the copy
+  buttons: `print:hidden` lives inside `CopyButton`'s own base class, not
+  at its three call sites, because a copy button is dead ink on paper
+  under every circumstance — the per-element version of that rule was
+  written once and then missed by both "Copy as table" buttons.
+  `lib/print-styles.test.ts` scans for all of it; the byte measurement
+  needs a real Chromium and is the by-hand half.
 - The documents: the memo and report PDFs are read back as text in their
   tests (`lib/memo/pdf-text-of.ts`, test tooling) — assert on what the page
   says, not on its page count. `lib/key-terms.ts` orders a "Key terms" block

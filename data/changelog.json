@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-17",
+      "title": "The loan schedule leaves the page as numbers",
+      "blurb": "Run a loan over its hold on the deal math page and you get a row per year — opening balance, interest, principal, debt service, closing balance, and whether that year was interest-only. Useful to look at, and until now the one table there you had to retype to use. It has a Copy button now, the same one the cash flow strip has had: tab-delimited with a header row and the numbers raw, no dollar signs and no commas, so it pastes into a spreadsheet as numbers rather than as text you then have to clean a column at a time. The interest-only years come across as a plain Yes/No column, because a balance that sits flat for two years reads as a broken schedule unless something says why. Small companion fix while we were here: copy buttons no longer print. They were showing up on paper as little empty boxes — a button nobody can click on a sheet of paper is just ink.",
+      "href": "/tools#the-loan-over-the-hold"
+    },
+    {
+      "date": "2026-09-17",
       "title": "Percentage rent, and the breakpoint nobody checks",
       "blurb": "The retail lease's own arithmetic, and it opens on a year that owes nothing and still gets billed. The natural breakpoint is not negotiated — it is the base rent divided by the percentage rate, the sales level at which the two would be equal, $2.00M on the seeded lease. Anything else a lease states is an artificial breakpoint, which is a normal thing to negotiate and an easy thing to read past, so the page derives the natural one always and says which side an artificial one favours. Then the part that costs money. Percentage rent is owed on the YEAR'S sales and reconciled at year end. Bill it monthly against a twelfth of the breakpoint with no true-up and the landlord collects on every strong month while refunding nothing for the weak ones — so this seasonal tenant, whose year lands under the breakpoint and owes nothing, pays $22,300. Two months of Christmas clear the line and the ten months below it give nothing back. No single month's statement shows that, which is why the card draws all twelve with the line across them. Underneath, the occupancy cost ratio — base plus percentage plus CAM, taxes and insurance, over sales — because a rent the tenant cannot carry gets renegotiated whatever the lease says. It solves for the sales that would reach whatever ceiling you set, and tells you when there is no such figure: a 5% ceiling on a 6% lease can never be reached, and printing a number there would be a lie.",
       "href": "/tools#percentage-rent"
@@ -113,12 +119,6 @@
       "date": "2026-09-16",
       "title": "A sizing is a link, and a table is a paste",
       "blurb": "“Send me that sizing” used to mean a screenshot. Every field on /tools now writes itself into the address bar, so the whole page — all five calculators — travels as a link, and an untouched page still copies as a bare /tools rather than a paragraph of defaults. The cash-flow table copies tab-delimited with its headers and the numbers raw, so they land in a spreadsheet as numbers instead of as text somebody has to clean.",
-      "href": "/tools"
-    },
-    {
-      "date": "2026-09-16",
-      "title": "Paste a cash flow, get the IRR — and where it came from",
-      "blurb": "The most common reason an analyst leaves a screening tool mid-call is to paste a column of numbers into Excel and read the IRR off the bottom. /tools now takes that column — tabs, line breaks, (1,200), $1.2M, all of it — and answers with the rate, the multiple, the profit and the payback inside the year. Then the figure nothing else here computes: how much of the return is the sale rather than the operations. A 17% that is three-quarters residual and a 17% that is a quarter are different deals wearing the same number.",
       "href": "/tools"
     }
   ]

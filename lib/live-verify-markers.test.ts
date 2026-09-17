@@ -31,19 +31,32 @@ import { DealMathTools } from "@/app/tools/deal-math-tools";
  *
  * A marker is a claim about the live site. A marker that cannot fail, and
  * a marker that fails on a page that is fine, are the same kind of broken.
+ *
+ * SCOPE: this covers the markers that grep `p_tools2.html` only. The ones
+ * against `body.html` (the homepage) are not checked here, because the
+ * homepage is a server component that fetches its own data and cannot be
+ * rendered from a test the way `DealMathTools` can. Those markers carry
+ * the same risk — `#314` greps "more, with no deal behind them", which is
+ * safe only because the interpolated `{TOOL_COUNT}` sits just BEFORE the
+ * phrase rather than inside it. Keep homepage markers to prose with no
+ * `{expression}` in the middle of it, by hand, until there is a way to
+ * render that page in a test.
  */
 
 const YML = readFileSync(".github/workflows/live-verify.yml", "utf8");
 
-/** Every `grep -q <pattern> p_tools2.html` the markers run, unescaped. */
+/** Every `grep -q|-o <pattern> p_tools2.html` the markers run, unescaped. */
 function toolsPatterns(): string[] {
   const out: string[] = [];
+  // `-q` for a plain presence marker, `-o` where a helper counts the
+  // matches because the phrase alone appears more than once. Both are
+  // claims about the served bytes and both can go stale the same way.
   // Both quote styles appear: double for prose, single where the pattern
   // itself contains a double quote (`value="$20M"`).
-  for (const m of YML.matchAll(/grep -q "((?:[^"\\]|\\.)*)" p_tools2\.html/g)) {
+  for (const m of YML.matchAll(/grep -[qo] "((?:[^"\\]|\\.)*)" p_tools2\.html/g)) {
     out.push(m[1].replace(/\\\$/g, "$").replace(/\\"/g, '"'));
   }
-  for (const m of YML.matchAll(/grep -q '([^']*)' p_tools2\.html/g)) {
+  for (const m of YML.matchAll(/grep -[qo] '([^']*)' p_tools2\.html/g)) {
     out.push(m[1].replace(/\\\$/g, "$"));
   }
   return out;

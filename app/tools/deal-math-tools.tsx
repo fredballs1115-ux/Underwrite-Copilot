@@ -200,7 +200,11 @@ function CopyButton({
           setDone(false);
         }
       }}
-      className={`rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:border-brand hover:text-brand ${className}`}
+      // `print:hidden` belongs here rather than at each call site: a copy
+      // button on paper is dead ink under every circumstance, and a rule
+      // that has to be remembered three times is a rule that gets missed
+      // the fourth time.
+      className={`rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:border-brand hover:text-brand print:hidden ${className}`}
     >
       {done ? "Copied" : label}
     </button>
@@ -3161,17 +3165,49 @@ function LoanOverTime() {
                 );
               })}
             </div>
-            <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted">
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded-sm bg-brand/30" />
-                Interest
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded-sm bg-brand" />
-                Principal — equity, returned at sale
-              </span>
-              <span>Each column is one year of debt service.</span>
-            </p>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+              <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted">
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block h-2.5 w-2.5 rounded-sm bg-brand/30" />
+                  Interest
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block h-2.5 w-2.5 rounded-sm bg-brand" />
+                  Principal — equity, returned at sale
+                </span>
+                <span>Each column is one year of debt service.</span>
+              </p>
+              {/* The schedule is the one table here a reader most often wants
+                  OUT of the page: it goes into a model, a lender's file or a
+                  memo. Tab-delimited with headers and the numbers RAW — no
+                  dollar signs, no commas, no compacting to "$11.02M" — so a
+                  paste lands in a spreadsheet as numbers rather than as text
+                  somebody then has to clean. The same rule as the cash-flow
+                  strip's button, and the reason both exist.
+                  `io` ships as a plain Yes/No column because "was this year
+                  interest-only" is the fact that explains a flat balance,
+                  and a schedule that does not say so reads as broken. */}
+              <CopyButton
+                label="Copy as table"
+                text={() =>
+                  ["Year\tOpening\tInterest\tPrincipal\tDebt service\tClosing\tInterest-only"]
+                    .concat(
+                      d.years.map((y) =>
+                        [
+                          y.year,
+                          y.opening,
+                          y.interest,
+                          y.principal,
+                          y.debtService,
+                          y.closing,
+                          y.io ? "Yes" : "No",
+                        ].join("\t"),
+                      ),
+                    )
+                    .join("\n")
+                }
+              />
+            </div>
           </div>
 
           <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
