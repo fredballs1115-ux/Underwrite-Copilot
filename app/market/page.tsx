@@ -13,6 +13,8 @@ import {
 import { RatesStrip } from "@/app/rates-strip";
 import { liveMetroRates, liveRates } from "@/lib/live-rates-read";
 import { MetroLive } from "./metro-live";
+import { liveZori } from "@/lib/zori-read";
+import { ZoriLine } from "./zori-line";
 import { mergeBenchmarks, seedBenchmarks, seedRules } from "@/lib/research-data";
 import { linkOk } from "@/lib/link-audit";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -525,6 +527,9 @@ async function MetroExplorer({ selected }: { selected?: string }) {
   // permits and house prices, read the way the rates strip is and cached
   // per metro. A metro FRED does not publish for gets no panel.
   const live = await liveMetroRates(active.id);
+  // What landlords are asking this month (Zillow's index, monthly), set
+  // against what HUD will pay — two different numbers, both shown.
+  const zori = await liveZori(active.name);
   const fmr = active.fmr_fy2026 as {
     "0br"?: number | null;
     "1br"?: number | null;
@@ -729,6 +734,8 @@ async function MetroExplorer({ selected }: { selected?: string }) {
             {fmr?.note ?? "queued in the research gaps."}
           </p>
         )}
+
+        <ZoriLine z={zori} fmr2br={typeof fmr?.["2br"] === "number" ? fmr["2br"] : null} />
 
         <MetroLive rates={live} metroId={active.id} metroName={active.name} />
 

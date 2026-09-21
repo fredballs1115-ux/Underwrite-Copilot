@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-21",
+      "title": "What landlords are asking, against what HUD pays",
+      "href": "/market",
+      "blurb": "Each covered market's brief now shows this month's asking rent from Zillow's Observed Rent Index — all home types, refreshed monthly, with its change from a year ago and Zillow's credit — drawn on one scale against the two-bedroom fair market rent HUD pays, with the gap said in words. They are different numbers about different things: the fair market rent is set once a year from survey data two years old by the time it applies, the asking rent is this month's listings before concessions, and an underwrite that mistakes either for the other is wrong in a known direction. A suburb that shares its metro area's figure says so. Pulled on the 20th of each month from Zillow Research's public file; the file's shape and every metro's name in it were checked from the runner before a number was trusted."
+    },
+    {
+      "date": "2026-09-21",
       "title": "Each market's own figures, live",
       "href": "/market",
       "blurb": "Every covered market's brief now carries the four things FRED publishes for it that a screen actually turns on, pulled every weekday and dated: the metro's unemployment rate, its nonfarm payrolls against a year ago, a year of building permits, and the FHFA house price index against a year ago — each with its recent path and a link to its series. Two rules do the work. A metro's permits arrive as one month's count, not seasonally adjusted, so a month is mostly the season; the panel sums the trailing twelve and sets them against the twelve before, and says nothing rather than scaling up a partial year. And borrowed is said: a suburb has its own unemployment rate and nothing else at this cadence, so where the figure is the metro area's the tile wears the area's name and the note says so — passing an MSA figure off as a county's flatters whichever county is weaker. Every one of the fifty-eight ids was verified from the runner against FRED's own title before it was trusted, which is how the table learned that the Richmond prefix nobody would guess is RICH051, that Boston's obvious unemployment series is the discontinued NECTA one, and that the Washington and Atlanta house price series stopped at 2024 Q4 under the new delineations — so those two tiles are left out rather than shown stale."
