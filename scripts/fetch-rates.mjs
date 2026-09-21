@@ -22,8 +22,12 @@
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-/** @type {{ historyRows: number; series: Array<{ id: string; fred?: string; units?: string; label: string }> }} */
-const { series: SERIES, historyRows } = require("../data/fred-series.json");
+/** @type {{ historyRows: number; series: Array<{ id: string; fred?: string; units?: string; label: string }>; metroSeries?: Array<{ id: string; fred?: string; units?: string; label: string }> }} */
+const { series: STRIP, metroSeries = [], historyRows } = require("../data/fred-series.json");
+// The strip's series and every covered metro's own, one list: a series two
+// suburbs share is fetched once, since the table is keyed by id.
+const seenId = new Set();
+const SERIES = [...STRIP, ...metroSeries].filter((s) => !seenId.has(s.id) && seenId.add(s.id));
 
 // The last few dozen observations, not the last one: the strip draws each
 // series' recent path, and one run backfills it. Idempotent — the upsert is
