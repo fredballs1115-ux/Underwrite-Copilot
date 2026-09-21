@@ -1,54 +1,123 @@
 #!/usr/bin/env node
-// Daily FRED pull → rates table. The deal screen's debt assumptions read the
-// newest row per series instead of hardcoded numbers.
+// Weekday FRED pull → the `rates` table. Every figure on the site that
+// changes with the market — the Treasury curve, SOFR, the credit spreads,
+// the mortgage survey, inflation, the supply pipeline — comes through here,
+// so the pages read today's number rather than one somebody typed.
 //
 //   FRED_API_KEY=... SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
 //     node scripts/fetch-rates.mjs
 //
-// Series list mirrors data/research/capital_markets.json#fred_series.
+//   DRY_RUN=1 FRED_API_KEY=... node scripts/fetch-rates.mjs
+//     — fetch and print, write nothing. Also asks FRED for each series' own
+//     title, frequency and units, which is how a candidate id is verified
+//     BEFORE it is trusted: the sandbox cannot reach FRED, so the only proof
+//     that "WPUSI012011" is the construction-materials index is this run's
+//     log saying so. A series goes into data/fred-series.json only after a
+//     dry run has printed it.
+//
+// The series list is data/fred-series.json — the same file lib/live-rates.ts
+// reads, so the cron and the page cannot disagree about what a series is.
 // FRED's API needs a (free) key: https://fred.stlouisfed.org/docs/api/api_key.html
 
-import { createClient } from "@supabase/supabase-js";
+import { createRequire } from "node:module";
 
-const SERIES = [
-  { id: "DGS10", label: "10-Year Treasury Constant Maturity" },
-  { id: "SOFR", label: "Secured Overnight Financing Rate" },
-  { id: "MORTGAGE30US", label: "Freddie Mac PMMS 30-Year Fixed" },
-  { id: "DRCRELEXFACBS", label: "CRE Loan Delinquency Rate, All Commercial Banks" },
-];
+const require = createRequire(import.meta.url);
+/** @type {{ series: Array<{ id: string; fred?: string; units?: string; label: string }> }} */
+const { series: SERIES } = require("../data/fred-series.json");
 
+// The last few dozen observations, not the last one: the strip draws each
+// series' recent path, and one run backfills it. Idempotent — the upsert is
+// on (series_id, obs_date), so re-pulling the same days changes nothing.
+const OBSERVATIONS = 40;
+// FRED allows 120 requests a minute; a short pause keeps a dry run (two
+// requests a series) well inside it.
+const PACE_MS = 150;
+
+const dryRun = process.env.DRY_RUN === "1";
 const fredKey = process.env.FRED_API_KEY;
 const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!fredKey || !url || !key) {
-  console.error("FRED_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY are required.");
+if (!fredKey || (!dryRun && (!url || !key))) {
+  console.error(
+    dryRun
+      ? "FRED_API_KEY is required."
+      : "FRED_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY are required.",
+  );
   process.exit(1);
 }
-const supabase = createClient(url, key, { auth: { persistSession: false } });
 
-let failures = 0;
-for (const s of SERIES) {
-  try {
-    const api = new URL("https://api.stlouisfed.org/fred/series/observations");
-    api.searchParams.set("series_id", s.id);
-    api.searchParams.set("api_key", fredKey);
-    api.searchParams.set("file_type", "json");
-    api.searchParams.set("sort_order", "desc");
-    api.searchParams.set("limit", "8"); // last few obs — some series post "." placeholders
-    const res = await fetch(api);
-    if (!res.ok) throw new Error(`FRED ${s.id}: HTTP ${res.status}`);
-    const body = await res.json();
-    const obs = (body.observations ?? []).find((o) => o.value && o.value !== ".");
-    if (!obs) throw new Error(`FRED ${s.id}: no numeric observation`);
-    const { error } = await supabase.from("rates").upsert(
-      [{ series_id: s.id, obs_date: obs.date, value: Number(obs.value), label: s.label }],
-      { onConflict: "series_id,obs_date" }
-    );
-    if (error) throw new Error(`rates upsert ${s.id}: ${error.message}`);
-    console.log(`${s.id}: ${obs.value} (${obs.date})`);
-  } catch (err) {
-    failures += 1;
-    console.error(String(err));
-  }
+let supabase = null;
+if (!dryRun) {
+  const { createClient } = await import("@supabase/supabase-js");
+  supabase = createClient(url, key, { auth: { persistSession: false } });
 }
-process.exit(failures === SERIES.length ? 1 : 0); // partial success is success
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function fred(path, params) {
+  const api = new URL(`https://api.stlouisfed.org/fred/${path}`);
+  for (const [k, v] of Object.entries(params)) api.searchParams.set(k, v);
+  api.searchParams.set("api_key", fredKey);
+  api.searchParams.set("file_type", "json");
+  const res = await fetch(api, { signal: AbortSignal.timeout(30000) });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}${body.error_message ? ` — ${body.error_message}` : ""}`);
+  }
+  return body;
+}
+
+const failed = [];
+const wrote = [];
+for (const s of SERIES) {
+  const fredId = s.fred ?? s.id;
+  try {
+    if (dryRun) {
+      // The series' own description, from FRED — the check that the id is
+      // the series the JSON says it is.
+      const meta = await fred("series", { series_id: fredId });
+      const m = meta.seriess?.[0];
+      if (m) {
+        console.log(
+          `  ${fredId}: "${m.title}" · ${m.frequency} · ${m.units} · ` +
+            `${m.seasonal_adjustment_short ?? ""} · last updated ${m.last_updated}`,
+        );
+      }
+      await sleep(PACE_MS);
+    }
+    const params = {
+      series_id: fredId,
+      sort_order: "desc",
+      limit: String(OBSERVATIONS),
+    };
+    if (s.units) params.units = s.units;
+    const body = await fred("series/observations", params);
+    const obs = (body.observations ?? [])
+      .filter((o) => o.value && o.value !== "." && Number.isFinite(Number(o.value)))
+      .map((o) => ({ series_id: s.id, obs_date: o.date, value: Number(o.value), label: s.label }));
+    if (obs.length === 0) throw new Error("no numeric observation");
+    const newest = obs[0];
+    if (supabase) {
+      const { error } = await supabase
+        .from("rates")
+        .upsert(obs, { onConflict: "series_id,obs_date" });
+      if (error) throw new Error(`rates upsert: ${error.message}`);
+    }
+    wrote.push(s.id);
+    console.log(
+      `${s.id}: ${newest.value} (${newest.obs_date}) · ${obs.length} obs` +
+        `${s.units ? ` · units=${s.units}` : ""}${dryRun ? " · dry run, not written" : ""}`,
+    );
+  } catch (err) {
+    failed.push(s.id);
+    console.error(`${s.id}: FAILED — ${err instanceof Error ? err.message : String(err)}`);
+  }
+  await sleep(PACE_MS);
+}
+
+// One line to read the run by, in the shape live-verify's roll-up uses.
+console.log(
+  `RATES ROLL-UP: ${wrote.length} of ${SERIES.length} series answered` +
+    (failed.length ? `; failed: ${failed.join(", ")}` : ""),
+);
+process.exit(wrote.length === 0 ? 1 : 0); // partial success is success
