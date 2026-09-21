@@ -22,13 +22,14 @@
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-/** @type {{ series: Array<{ id: string; fred?: string; units?: string; label: string }> }} */
-const { series: SERIES } = require("../data/fred-series.json");
+/** @type {{ historyRows: number; series: Array<{ id: string; fred?: string; units?: string; label: string }> }} */
+const { series: SERIES, historyRows } = require("../data/fred-series.json");
 
 // The last few dozen observations, not the last one: the strip draws each
 // series' recent path, and one run backfills it. Idempotent — the upsert is
-// on (series_id, obs_date), so re-pulling the same days changes nothing.
-const OBSERVATIONS = 40;
+// on (series_id, obs_date), so re-pulling the same days changes nothing. The
+// count is the table's own, so the page reads back exactly what is written.
+const OBSERVATIONS = historyRows;
 // FRED allows 120 requests a minute; a short pause keeps a dry run (two
 // requests a series) well inside it.
 const PACE_MS = 150;

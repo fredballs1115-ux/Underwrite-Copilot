@@ -70,6 +70,15 @@ function round(n: number, places = 0): number {
   return r === 0 ? 0 : r;
 }
 
+/**
+ * The card's worked example: months left on the seeded loan. Exported
+ * because the page seeds the card's Treasury from the live tenor NEAREST
+ * this term (`treasuryForTerm` in `lib/live-rates.ts`), and the strip marks
+ * that tenor as the one filling a field — one number, so the card, the seed
+ * and the mark cannot name three different terms.
+ */
+export const SEED_MONTHS_REMAINING = 30;
+
 export interface PrepayTerms {
   /** what is outstanding today */
   balance: number | null;

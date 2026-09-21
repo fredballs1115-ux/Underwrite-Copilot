@@ -42,9 +42,9 @@ export const SLIDER_SWEEP_BPS = 400;
 // itself (lib/public-comps/core.ts COVERAGE_SUMMARY, derived from configured
 // providers) so marketing copy can never claim coverage the code doesn't have.
 export { COVERAGE_SUMMARY as COMPS_JURISDICTIONS } from "@/lib/public-comps/core";
-// The rates cron tracks 4 FRED series (scripts/fetch-rates.mjs SERIES):
-// 10Y Treasury, SOFR, 30-year mortgage survey, CRE loan delinquency.
-export const RATE_SERIES = 4;
+// The FRED series the weekday cron tracks are counted from the one table
+// both the cron and the page read (data/fred-series.json via
+// lib/live-rates.ts SERIES) — nothing here restates the number.
 
 // ── The four deeper tools (beyond the six-stage screen) ─────────────────────
 // ONE source for the homepage toolkit grid AND the sample screen's "what comes

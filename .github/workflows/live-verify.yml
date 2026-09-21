@@ -791,6 +791,21 @@ jobs:
           mark "#361 the quote is drawn against its break-even" grep -q "The quote against its break-even" p_tools2.html
           mark "#361 the option is priced as the carry plus the loss" grep -q "the carry you avoid, plus the probability-weighted loss" p_tools2.html
           mark "#361 a cheap fee wins at every probability" grep -q "the option wins at every probability" p_tools2.html
+          # #362 — every market figure on the site is today's. The strip
+          # draws the whole Treasury curve (eleven tenors, each id verified
+          # against FRED's own title from this runner's dry run) and folds
+          # forty-odd series into groups; /tools and /market share the one
+          # component, so the same markers hit both pages. Like #334, these
+          # are not deploy checks alone: the strip renders only when the
+          # service-role read answered, so NOT DEPLOYED here means the live
+          # read failed on Render.
+          mark "#362 the Treasury curve is drawn on /tools" grep -q "The Treasury curve" p_tools2.html
+          mark "#362 the curve is today's, dated" grep -q "Solid is today" p_tools2.html
+          mark "#362 the folded groups reached the page" grep -q "Inflation &amp; cost" p_tools2.html
+          mark "#362 the supply pipeline is on the page" grep -q "Supply &amp; vacancy" p_tools2.html
+          mark "#362 an index is never shown as a level" grep -q "never as a level" p_tools2.html
+          mark "#362 the prepayment card is seeded from the tenor nearest its term" grep -q "the Treasury tenor nearest the remaining term" p_tools2.html
+          mark "#362 /market draws the same curve" grep -q "The Treasury curve" p_market.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then
