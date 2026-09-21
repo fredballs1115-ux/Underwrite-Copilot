@@ -370,8 +370,9 @@ jobs:
           echo "PHOTOGRAPHS: $live live, $dead dead — a DEAD market is showing an aerial, not a skyline"
 
           # The markets that keep an overhead ON PURPOSE — a suburban
-          # submarket has no skyline, so PG County and Montgomery County are
-          # deliberately out of lib/skyline.ts. That left them probed by
+          # submarket has no skyline, so Montgomery County is deliberately
+          # out of lib/skyline.ts (PG County was too, until National
+          # Harbor's wheel turned out to be its picture). That left them probed by
           # nothing at all: the loop above only walks the skyline table, so
           # the two markets whose ONLY picture is the aerial were the least
           # observed on the site. If that route breaks they have no fallback

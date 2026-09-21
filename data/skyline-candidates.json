@@ -12,16 +12,25 @@
         "Skyline of Washington, D.C.",
         "Views of Washington, D.C.",
         "Aerial photographs of Washington, D.C.",
-        "Panoramics of Washington, D.C."
+        "Panoramics of Washington, D.C.",
+        "Skylines of Washington, D.C.",
+        "Washington, D.C. skyline",
+        "Views of Washington, D.C. from Virginia"
       ],
       "queries": [
         "Washington DC skyline panorama",
-        "Washington DC cityscape from Arlington"
+        "Washington DC cityscape from Arlington",
+        "Washington DC skyline from Potomac Georgetown Kennedy Center",
+        "Washington Monument Lincoln Memorial panorama Potomac"
       ],
       "candidates": [
         {
+          "file": "2011 - The View from Arlington National Cemetery (6103435717).jpg",
+          "note": "The Lincoln Memorial and Memorial Bridge from Arlington — Arlington National Cemetery, public domain. The chosen file, in lib/skyline.ts."
+        },
+        {
           "file": "Aerial view National Mall 12 2014 DC 711.JPG",
-          "note": "The National Mall, Washington — Mariordo (Mario Roberto Durán Ortiz)"
+          "note": "The National Mall from the air — Mariordo (Mario Roberto Durán Ortiz), CC BY-SA 4.0. The previous choice: an overhead, kept as a fallback candidate."
         }
       ]
     },
@@ -41,7 +50,16 @@
         "National Harbor Maryland waterfront",
         "National Harbor Capital Wheel"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Capital Wheel at National Harbor, Maryland, USA.jpg",
+          "note": "The Capital Wheel at National Harbor at dusk — MamaGeek, CC BY-SA 4.0. The chosen file, in lib/skyline.ts."
+        },
+        {
+          "file": "NationalHarborPanorama.jpg",
+          "note": "The National Harbor marina panorama, 7208x1787 — MamaGeek, CC BY-SA 3.0. The runner-up: fits the band's shape, says less."
+        }
+      ]
     },
     {
       "metroId": "montgomery_county",
@@ -49,17 +67,24 @@
       "wikipedia": [
         "Bethesda, Maryland",
         "Silver Spring, Maryland",
-        "Rockville, Maryland"
+        "Rockville, Maryland",
+        "Downtown Silver Spring",
+        "Downtown Bethesda"
       ],
       "categories": [
         "Bethesda, Maryland",
         "Downtown Silver Spring",
         "Skyline of Bethesda, Maryland",
-        "Rockville, Maryland"
+        "Rockville, Maryland",
+        "Skyline of Silver Spring, Maryland",
+        "Silver Spring, Maryland",
+        "Downtown Bethesda"
       ],
       "queries": [
         "Bethesda Maryland skyline",
-        "Silver Spring Maryland downtown skyline"
+        "Silver Spring Maryland downtown skyline",
+        "Silver Spring Maryland skyline downtown",
+        "Bethesda Maryland downtown skyline Wisconsin Avenue"
       ],
       "candidates": []
     },
@@ -142,8 +167,16 @@
       ],
       "candidates": [
         {
+          "file": "A downtown view of Richmond, VA.jpg",
+          "note": "Downtown Richmond, 5424x3484 — Bruce Emmerling, CC BY-SA 4.0. The chosen file, in lib/skyline.ts."
+        },
+        {
           "file": "Skyline of Richmond, Virginia.jpg",
-          "note": "Richmond — Jim"
+          "note": "Richmond over the James in autumn, 1600x960 — Jim, CC BY-SA 2.0. The previous choice, kept as a fallback candidate."
+        },
+        {
+          "file": "Richmond, Virginia skyline 01.jpg",
+          "note": "The skyline over the James with a crane, 5585x4000 — Ɱ, CC BY-SA 4.0. The runner-up."
         }
       ]
     },
@@ -165,8 +198,12 @@
       ],
       "candidates": [
         {
+          "file": "Downtown Norfolk during the day.jpg",
+          "note": "Downtown Norfolk from the Elizabeth River, 5436x3352 — Bruce Emmerling, CC BY-SA 4.0. The chosen file, in lib/skyline.ts."
+        },
+        {
           "file": "Downtown Norfolk at Dusk.jpg",
-          "note": "Downtown Norfolk — Bruce Emmerling"
+          "note": "A street corner at dusk, 5247x3052 — Bruce Emmerling, CC BY-SA 4.0. The previous choice, kept as a fallback candidate."
         }
       ]
     },
