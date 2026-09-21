@@ -121,4 +121,39 @@ console.log(
   `RATES ROLL-UP: ${wrote.length} of ${SERIES.length} series answered` +
     (failed.length ? `; failed: ${failed.join(", ")}` : ""),
 );
+
+// PROBE_IDS — candidate ids that are NOT in the table yet, printed with
+// FRED's own title, cadence, units and newest observation so a list drafted
+// from memory can be checked against what the series actually is before
+// any of it is trusted. A dry-run facility only: nothing here is written.
+const probe = (process.env.PROBE_IDS ?? "").split(/\s+/).filter(Boolean);
+if (probe.length > 0) {
+  if (!dryRun) {
+    console.error("PROBE_IDS is a dry-run facility: set DRY_RUN=1.");
+    process.exit(1);
+  }
+  console.log(`\nPROBE: ${probe.length} candidate ids, written nowhere`);
+  for (const id of probe) {
+    try {
+      const meta = await fred("series", { series_id: id });
+      const m = meta.seriess?.[0];
+      await sleep(PACE_MS);
+      const body = await fred("series/observations", {
+        series_id: id,
+        sort_order: "desc",
+        limit: "3",
+      });
+      const o = (body.observations ?? []).find((x) => x.value && x.value !== ".");
+      console.log(
+        `  ${id}: "${m?.title ?? "?"}" · ${m?.frequency ?? "?"} · ${m?.units ?? "?"} · ` +
+          `${m?.seasonal_adjustment_short ?? ""} · newest ${o ? `${o.value} (${o.date})` : "none"}` +
+          ` · last updated ${m?.last_updated ?? "?"}`,
+      );
+    } catch (err) {
+      console.log(`  ${id}: NOT FOUND — ${err instanceof Error ? err.message : String(err)}`);
+    }
+    await sleep(PACE_MS);
+  }
+}
+
 process.exit(wrote.length === 0 ? 1 : 0); // partial success is success
