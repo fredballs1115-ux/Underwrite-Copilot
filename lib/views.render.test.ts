@@ -2327,3 +2327,90 @@ describe("the rates strip", () => {
     expect(gluedWords(text)).toEqual([]);
   });
 });
+
+// ── a metro's own figures, live from FRED, under the market brief ─────────
+//
+// The market page reads the metro's rows and hands them in, so this renders
+// the panel on a fixture: the Washington MSA's newest figures as the runner's
+// probes printed them, with a synthetic path behind the permits so the
+// trailing year has twelve months to sum.
+import { MetroLive } from "@/app/market/metro-live";
+import { readMetroRates } from "@/lib/live-rates";
+
+describe("a metro's own figures, live", () => {
+  const permits: RateRow[] = [];
+  for (let i = 0; i < 24; i++) {
+    const d = new Date(Date.UTC(2026, 6 - i, 1)).toISOString().slice(0, 10);
+    // July 2026 is the real figure (1,844); the months behind it are a path.
+    permits.push({ series_id: "WASH911BPPRIV", obs_date: d, value: i === 0 ? 1844 : 1500 + (i % 5) * 40 });
+  }
+  const ROWS: RateRow[] = [
+    { series_id: "WASH911URN", obs_date: "2026-07-01", value: 4.0 },
+    { series_id: "WASH911URN", obs_date: "2026-06-01", value: 3.8 },
+    { series_id: "WASH911NA_YOY", obs_date: "2026-08-01", value: 1.2 },
+    { series_id: "MDPRIN5URN", obs_date: "2026-07-01", value: 4.7 },
+    ...permits,
+  ];
+  const dc = render(
+    React.createElement(MetroLive, {
+      rates: readMetroRates("dc", ROWS, FIXTURE_NOW),
+      metroId: "dc",
+      metroName: "Washington DC",
+    }),
+  );
+  const dcText = visibleText(dc);
+
+  it("draws the metro's own figures with their dates and links", () => {
+    expect(dcText).toContain("Live from FRED");
+    expect(dcText).toContain("Washington MSA");
+    expect(dcText).toContain("4.0%");
+    expect(dcText).toContain("Unemployment as of Jul 1");
+    expect(dcText).toContain("1.2%");
+    expect(dc).toContain("https://fred.stlouisfed.org/series/WASH911URN\"");
+    // The jobs figure links to the LEVEL's page, since the y/y is FRED's transform.
+    expect(dc).toContain("https://fred.stlouisfed.org/series/WASH911NA\"");
+    // Nothing borrowed, so no note about the metro area.
+    expect(dcText).not.toContain("publishes nothing");
+    // No house price index for Washington — the tile is absent, not stale.
+    expect(dcText).not.toContain("House prices");
+  });
+
+  it("says a year of permits, against the year before, as units", () => {
+    expect(dcText).toContain("Permits, 12 months");
+    // 1,844 + eleven months of the path: the sum, with its thousands.
+    const year = 1844 + [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].reduce((a, i) => a + 1500 + (i % 5) * 40, 0);
+    expect(dcText).toContain(`${year.toLocaleString("en-US")} units`);
+    expect(dcText).toContain("on the year before");
+    // The permits' path draws; unemployment has two observations, which is
+    // a move and not yet a path.
+    expect((dc.match(/data-spark/g) ?? []).length).toBe(1);
+  });
+
+  it("names the MSA on a suburb's borrowed tiles, and says so", () => {
+    const pg = render(
+      React.createElement(MetroLive, {
+        rates: readMetroRates("pg_county", ROWS, FIXTURE_NOW),
+        metroId: "pg_county",
+        metroName: "Prince George's County MD",
+      }),
+    );
+    const text = visibleText(pg);
+    expect(text).toContain("4.7%"); // the county's own unemployment
+    expect(text).toContain("Prince George's County · Washington MSA");
+    expect(text).toContain("Permits, 12 months · Washington MSA");
+    expect(text).toContain("Jobs y/y · Washington MSA");
+    expect(text).toContain("Where FRED publishes nothing for Prince George's County MD itself");
+  });
+
+  it("renders nothing for a metro with no rows", () => {
+    const none = render(
+      React.createElement(MetroLive, { rates: [], metroId: "tulsa", metroName: "Tulsa" }),
+    );
+    expect(none).not.toContain("Live from FRED");
+  });
+
+  it("reads clean and names everything", () => {
+    expect(a11yIssues(dc), "metro panel").toEqual([]);
+    expect(gluedWords(dcText)).toEqual([]);
+  });
+});

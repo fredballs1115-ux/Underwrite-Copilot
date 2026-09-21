@@ -22,17 +22,24 @@
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-/** @type {{ historyRows: number; series: Array<{ id: string; fred?: string; units?: string; label: string }> }} */
-const { series: SERIES, historyRows } = require("../data/fred-series.json");
+/** @type {{ historyRows: number; series: Array<{ id: string; fred?: string; units?: string; label: string }>; metroSeries?: Array<{ id: string; fred?: string; units?: string; label: string }> }} */
+const { series: STRIP, metroSeries = [], historyRows } = require("../data/fred-series.json");
+// The strip's series and every covered metro's own, one list: a series two
+// suburbs share is fetched once, since the table is keyed by id.
+const seenId = new Set();
+const SERIES = [...STRIP, ...metroSeries].filter((s) => !seenId.has(s.id) && seenId.add(s.id));
 
 // The last few dozen observations, not the last one: the strip draws each
 // series' recent path, and one run backfills it. Idempotent — the upsert is
 // on (series_id, obs_date), so re-pulling the same days changes nothing. The
 // count is the table's own, so the page reads back exactly what is written.
 const OBSERVATIONS = historyRows;
-// FRED allows 120 requests a minute; a short pause keeps a dry run (two
-// requests a series) well inside it.
-const PACE_MS = 150;
+// FRED allows 120 requests a minute. A dry run makes two requests a series
+// and a probe two a candidate, so the pace has to hold the whole run under
+// two a second — at 150 ms the first probe of eighty ids collected 429s
+// from the sixtieth onward, which read as "series does not exist" for
+// twenty ids that exist perfectly well.
+const PACE_MS = 350;
 
 const dryRun = process.env.DRY_RUN === "1";
 const fredKey = process.env.FRED_API_KEY;
@@ -55,13 +62,19 @@ if (!dryRun) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function fred(path, params) {
+async function fred(path, params, retried = false) {
   const api = new URL(`https://api.stlouisfed.org/fred/${path}`);
   for (const [k, v] of Object.entries(params)) api.searchParams.set(k, v);
   api.searchParams.set("api_key", fredKey);
   api.searchParams.set("file_type", "json");
   const res = await fetch(api, { signal: AbortSignal.timeout(30000) });
   const body = await res.json().catch(() => ({}));
+  if (res.status === 429 && !retried) {
+    // The limit is per minute; wait most of one out and ask once more,
+    // so a burst reads as a pause rather than as a missing series.
+    await sleep(20_000);
+    return fred(path, params, true);
+  }
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}${body.error_message ? ` — ${body.error_message}` : ""}`);
   }
@@ -121,4 +134,71 @@ console.log(
   `RATES ROLL-UP: ${wrote.length} of ${SERIES.length} series answered` +
     (failed.length ? `; failed: ${failed.join(", ")}` : ""),
 );
+
+// PROBE_IDS — candidate ids that are NOT in the table yet, printed with
+// FRED's own title, cadence, units and newest observation so a list drafted
+// from memory can be checked against what the series actually is before
+// any of it is trusted. A dry-run facility only: nothing here is written.
+const probe = (process.env.PROBE_IDS ?? "").split(/\s+/).filter(Boolean);
+if (probe.length > 0) {
+  if (!dryRun) {
+    console.error("PROBE_IDS is a dry-run facility: set DRY_RUN=1.");
+    process.exit(1);
+  }
+  console.log(`\nPROBE: ${probe.length} candidate ids, written nowhere`);
+  for (const id of probe) {
+    try {
+      const meta = await fred("series", { series_id: id });
+      const m = meta.seriess?.[0];
+      await sleep(PACE_MS);
+      const body = await fred("series/observations", {
+        series_id: id,
+        sort_order: "desc",
+        limit: "3",
+      });
+      const o = (body.observations ?? []).find((x) => x.value && x.value !== ".");
+      console.log(
+        `  ${id}: "${m?.title ?? "?"}" · ${m?.frequency ?? "?"} · ${m?.units ?? "?"} · ` +
+          `${m?.seasonal_adjustment_short ?? ""} · newest ${o ? `${o.value} (${o.date})` : "none"}` +
+          ` · last updated ${m?.last_updated ?? "?"}`,
+      );
+    } catch (err) {
+      console.log(`  ${id}: NOT FOUND — ${err instanceof Error ? err.message : String(err)}`);
+    }
+    await sleep(PACE_MS);
+  }
+}
+
+// PROBE_SEARCH — FRED's own full-text search, one query per line, for the
+// case a remembered id is simply wrong and the right one has to be found:
+// prints the top matches with their ids, titles and newest observation.
+// A dry-run facility, like PROBE_IDS.
+const searches = (process.env.PROBE_SEARCH ?? "").split("|").map((s) => s.trim()).filter(Boolean);
+if (searches.length > 0) {
+  if (!dryRun) {
+    console.error("PROBE_SEARCH is a dry-run facility: set DRY_RUN=1.");
+    process.exit(1);
+  }
+  for (const q of searches) {
+    console.log(`\nSEARCH: ${q}`);
+    try {
+      const body = await fred("series/search", {
+        search_text: q,
+        limit: "10",
+        order_by: "popularity",
+        sort_order: "desc",
+      });
+      for (const s of body.seriess ?? []) {
+        console.log(
+          `  ${s.id}: "${s.title}" · ${s.frequency_short ?? s.frequency} · ${s.units_short ?? s.units}` +
+            ` · ${s.seasonal_adjustment_short ?? ""} · through ${s.observation_end} · last updated ${s.last_updated}`,
+        );
+      }
+    } catch (err) {
+      console.log(`  search failed — ${err instanceof Error ? err.message : String(err)}`);
+    }
+    await sleep(PACE_MS);
+  }
+}
+
 process.exit(wrote.length === 0 ? 1 : 0); // partial success is success

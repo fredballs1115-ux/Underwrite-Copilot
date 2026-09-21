@@ -25,6 +25,14 @@ on:
         description: "Fetch and print every series, write nothing (verifies the ids against FRED's own titles)"
         type: boolean
         default: false
+      probe_ids:
+        description: "Candidate FRED ids not in the table yet, space-separated: printed with FRED's own title and newest observation, written nowhere (implies dry_run)"
+        required: false
+        default: ""
+      probe_search:
+        description: "FRED full-text searches, separated by |: the top matches with their ids, written nowhere (implies dry_run)"
+        required: false
+        default: ""
 jobs:
   rates:
     runs-on: ubuntu-latest
@@ -38,7 +46,9 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-          DRY_RUN: ${{ inputs.dry_run == true && '1' || '' }}
+          DRY_RUN: ${{ (inputs.dry_run == true || inputs.probe_ids != '' || inputs.probe_search != '') && '1' || '' }}
+          PROBE_IDS: ${{ inputs.probe_ids }}
+          PROBE_SEARCH: ${{ inputs.probe_search }}
         run: |
           if [ -z "$FRED_API_KEY" ]; then
             echo "FRED_API_KEY not set. Get a free key at https://fred.stlouisfed.org/docs/api/api_key.html and add it as an Actions secret. Skipping."

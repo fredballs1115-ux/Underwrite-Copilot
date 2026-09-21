@@ -1,0 +1,51 @@
+name: skyline-sheet
+# A contact sheet of skyline candidates, chosen by eye.
+#
+# The skyline search (scripts/probe-skylines.mjs --search) prints what a
+# photograph is called, who took it and how big it is — everything needed to
+# credit it, and nothing that says whether it is any good. A skyline has to
+# be looked at. The sandbox that chooses cannot fetch one (Commons answers
+# 403 to its proxy), but it can fetch a branch of this repository. So this
+# runs the search from the runner with small copies saved, and pushes them
+# to their own branch, `skyline-sheet`, force-pushed each run and never
+# merged: fetch it, look, choose, and credit the file from what the sheet's
+# README says Commons returned — never from memory.
+#
+# Dispatch with `markets` to keep a run inside the search's time budget
+# (six or so at a time).
+on:
+  workflow_dispatch:
+    inputs:
+      markets:
+        description: "Space-separated metro ids (blank sweeps every market — mind the search's time budget)"
+        required: false
+        default: ""
+permissions:
+  contents: write
+jobs:
+  sheet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Search, with thumbnails
+        env:
+          SKYLINE_MARKETS: ${{ inputs.markets }}
+        run: node scripts/probe-skylines.mjs --search --thumbs=sheet $SKYLINE_MARKETS
+      - name: Publish the sheet to its own branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ ! -f sheet/index.json ]; then
+            echo "No thumbnails were saved — nothing to publish."
+            exit 0
+          fi
+          cd sheet
+          git init -q -b skyline-sheet
+          git config user.name "skyline-sheet"
+          git config user.email "skyline-sheet@users.noreply.github.com"
+          git add -A
+          git commit -q -m "skyline contact sheet $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
+          git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" skyline-sheet
+          echo "Pushed $(git ls-files | wc -l) files to the skyline-sheet branch."

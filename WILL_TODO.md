@@ -23,9 +23,17 @@ is the CREDIT-CARD one. The prepayment card now starts from the Treasury
 tenor nearest its remaining term (the 2-year, 27 bps under the 10-year that
 would flatter the penalty). Cap rates have no free daily source — CBRE,
 Green Street and RCA are all licensed — so they stay dated, sourced
-research, and the page says so. **Whose move: mine, next** — the same
-pattern per metro (permits, unemployment and house prices by MSA from
-FRED, Zillow's ZORI rent index), verified from the runner the same way.
+research, and the page says so. Then #363, the same
+pattern per metro: each covered market's brief carries its own
+unemployment, payrolls y/y, a year of permits and the FHFA house price
+index y/y — fifty-eight more series, every id verified by a probe against
+FRED's own title (Richmond is `RICH051`, not the `RICH951` memory offers;
+Boston's obvious series is the discontinued NECTA one; Washington's and
+Atlanta's house price series stopped at 2024 Q4 and are left out rather
+than shown stale). A suburb keeps its own unemployment rate and borrows
+the MSA's rest, named as the MSA's. **Whose move: mine, next** — Zillow's
+ZORI rent index per metro (a monthly CSV, from the runner) beside the FMR
+row, and the pictures.
 
 ## 🟢 2026-09-16 into 09-17 — `/tools` becomes the reason not to open Excel
 

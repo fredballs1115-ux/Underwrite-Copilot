@@ -41,7 +41,8 @@
 // lib/skyline.ts is deliberate and human-read, because that is where the
 // licence obligation is taken on.
 
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 const UA =
   "UnderwriteCopilot/1.0 (+https://underwrite-copilot.onrender.com; commercial real estate deal screening)";
@@ -380,6 +381,25 @@ async function searchMode(markets) {
     }
     if (terse) console.log("");
 
+    // For the sheet: the market's current choice first, so the alternatives
+    // are seen against it.
+    if (thumbsDir) {
+      let n = 0;
+      for (const cand of market.candidates ?? []) {
+        const meta = await metadata(cand.file);
+        if (!meta.ok) continue;
+        n++;
+        await saveThumb(cand.file, market.metroId, `00-current-${n}`, {
+          from: "current choice",
+          artist: meta.artist,
+          license: meta.license,
+          licenseUrl: meta.licenseUrl,
+          width: meta.width,
+          height: meta.height,
+        });
+      }
+    }
+
     // Now spend the metadata calls, best-named first.
     const ordered = [...found.entries()].sort((a, b) => nameScore(b[0]) - nameScore(a[0]));
     let usable = 0;
@@ -394,6 +414,14 @@ async function searchMode(markets) {
         continue;
       }
       usable++;
+      await saveThumb(file, market.metroId, String(usable).padStart(2, "0"), {
+        from,
+        artist: meta.artist,
+        license: meta.license,
+        licenseUrl: meta.licenseUrl,
+        width: meta.width,
+        height: meta.height,
+      });
       const shape = `${meta.width}x${meta.height} (${(meta.width / meta.height).toFixed(2)}:1)`;
       const type = (meta.mime ?? "").replace("image/", "");
       if (terse) {
@@ -420,6 +448,7 @@ async function searchMode(markets) {
       console.log(`   (nothing usable of ${checked} checked — run without --terse to see why)`);
     }
   }
+  writeSheet();
   console.log(`\nSKYLINE SEARCH: done in ${((Date.now() - startedAt) / 1000).toFixed(0)}s`);
 }
 
@@ -470,7 +499,67 @@ async function verifyMode(markets) {
 
 const args = process.argv.slice(2);
 const doSearch = args.includes("--search");
+// --thumbs=<dir>: a CONTACT SHEET. The search prints what a photograph is
+// called, who took it and how big it is, and none of that says whether it
+// is any good — a skyline has to be looked at, and the sandbox that
+// chooses cannot fetch one. So the search can also save a small copy of
+// every usable candidate (and of the market's current choice, first, for
+// comparison) under <dir>/<metroId>/, with index.json and a README naming
+// each file's author and licence beside it. The skyline-sheet workflow
+// pushes that directory to its own branch, which the sandbox CAN fetch and
+// look at — so a picture is chosen by eye, and still credited from what
+// Commons said and not from memory.
+const thumbsDir = args.find((a) => a.startsWith("--thumbs="))?.slice("--thumbs=".length) ?? null;
+const THUMB_WIDTH = 640;
+const sheet = [];
 const wanted = new Set(args.filter((a) => !a.startsWith("--")));
+
+async function saveThumb(file, metroId, name, entry) {
+  if (!thumbsDir) return;
+  const url = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=${THUMB_WIDTH}`;
+  await paced();
+  try {
+    const res = await fetch(url, {
+      headers: { "user-agent": UA, accept: "image/*" },
+      redirect: "follow",
+      signal: AbortSignal.timeout(25_000),
+    });
+    const type = res.headers.get("content-type") ?? "";
+    if (!res.ok || !type.startsWith("image/")) {
+      console.log(`   (no thumbnail for ${file}: HTTP ${res.status} ${type})`);
+      return;
+    }
+    const bytes = Buffer.from(await res.arrayBuffer());
+    const ext = type.includes("png") ? "png" : type.includes("webp") ? "webp" : "jpg";
+    const dir = join(thumbsDir, metroId);
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, `${name}.${ext}`);
+    writeFileSync(path, bytes);
+    sheet.push({ metroId, path: `${metroId}/${name}.${ext}`, file, ...entry, thumbBytes: bytes.length });
+  } catch (err) {
+    console.log(`   (no thumbnail for ${file}: ${String(err?.message ?? err).slice(0, 80)})`);
+  }
+}
+
+function writeSheet() {
+  if (!thumbsDir || sheet.length === 0) return;
+  mkdirSync(thumbsDir, { recursive: true });
+  writeFileSync(join(thumbsDir, "index.json"), JSON.stringify(sheet, null, 2) + "\n");
+  const byMetro = new Map();
+  for (const e of sheet) {
+    if (!byMetro.has(e.metroId)) byMetro.set(e.metroId, []);
+    byMetro.get(e.metroId).push(e);
+  }
+  let md = `# Skyline contact sheet\n\nEvery file below was resolved from Commons by the runner; the author and licence are what Commons returned. ${THUMB_WIDTH}px copies, for choosing by eye.\n`;
+  for (const [metroId, entries] of byMetro) {
+    md += `\n## ${metroId}\n\n`;
+    for (const e of entries) {
+      md += `- \`${e.path}\` — **${e.file}** · ${e.width}x${e.height} · ${e.artist} · ${e.license}${e.licenseUrl ? ` · ${e.licenseUrl}` : ""}${e.from ? ` · from ${e.from}` : ""}\n`;
+    }
+  }
+  writeFileSync(join(thumbsDir, "README.md"), md);
+  console.log(`\nCONTACT SHEET: ${sheet.length} thumbnails under ${thumbsDir}`);
+}
 let candidates;
 try {
   candidates = JSON.parse(readFileSync("data/skyline-candidates.json", "utf8"));

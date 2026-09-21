@@ -806,6 +806,16 @@ jobs:
           mark "#362 an index is never shown as a level" grep -q "never as a level" p_tools2.html
           mark "#362 the prepayment card is seeded from the tenor nearest its term" grep -q "the Treasury tenor nearest the remaining term" p_tools2.html
           mark "#362 /market draws the same curve" grep -q "The Treasury curve" p_market.html
+          # #363 — each covered metro's own figures, live from FRED, under
+          # the market brief: unemployment, payrolls, a year of permits and
+          # the house price index, each id verified by a probe against
+          # FRED's own title. /market opens on Washington, whose permits
+          # tile needs twelve months of history to say a year — the first
+          # real run backfills forty, so a NOT DEPLOYED on the second
+          # marker means the cron has not written the metro rows yet.
+          mark "#363 the metro's own figures are on /market" grep -q "Live from FRED" p_market.html
+          mark "#363 a year of permits is summed, not a month" grep -q "Permits, 12 months" p_market.html
+          mark "#363 each metro figure links to its series" grep -q "each figure links to its series" p_market.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

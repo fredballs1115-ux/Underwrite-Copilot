@@ -11,7 +11,8 @@ import {
   type MarketGroup,
 } from "@/lib/market-memory";
 import { RatesStrip } from "@/app/rates-strip";
-import { liveRates } from "@/lib/live-rates-read";
+import { liveMetroRates, liveRates } from "@/lib/live-rates-read";
+import { MetroLive } from "./metro-live";
 import { mergeBenchmarks, seedBenchmarks, seedRules } from "@/lib/research-data";
 import { linkOk } from "@/lib/link-audit";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -520,6 +521,10 @@ async function MetroExplorer({ selected }: { selected?: string }) {
       // migration 0028 not run — no line
     }
   }
+  // The metro's own figures, live from FRED — its unemployment, jobs,
+  // permits and house prices, read the way the rates strip is and cached
+  // per metro. A metro FRED does not publish for gets no panel.
+  const live = await liveMetroRates(active.id);
   const fmr = active.fmr_fy2026 as {
     "0br"?: number | null;
     "1br"?: number | null;
@@ -724,6 +729,8 @@ async function MetroExplorer({ selected }: { selected?: string }) {
             {fmr?.note ?? "queued in the research gaps."}
           </p>
         )}
+
+        <MetroLive rates={live} metroId={active.id} metroName={active.name} />
 
         <div>
           <h3 className="text-[11px] uppercase tracking-wide text-muted">

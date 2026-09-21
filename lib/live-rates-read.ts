@@ -4,9 +4,12 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   HISTORY_ROWS,
   SERIES,
+  metroSeriesFor,
+  readMetroRates,
   readRates,
   type LiveRate,
   type RateRow,
+  type SeriesMeta,
 } from "@/lib/live-rates";
 
 /**
@@ -67,7 +70,27 @@ export async function liveRates(now: Date = new Date()): Promise<LiveRate[]> {
   return readRates(await cachedRows(), now);
 }
 
-async function readAllSeries(): Promise<RateRow[]> {
+/**
+ * A covered metro's own series, read the same way and cached the same way
+ * — per metro, since the market page shows one at a time and a visitor to
+ * Baltimore should not pay for Dallas.
+ */
+const cachedMetroRows = unstable_cache(
+  (metroId: string) => readSeries(metroSeriesFor(metroId).series),
+  ["live-metro-rows"],
+  { revalidate: 3600, tags: ["rates"] },
+);
+
+export async function liveMetroRates(metroId: string, now: Date = new Date()): Promise<LiveRate[]> {
+  return readMetroRates(metroId, await cachedMetroRows(metroId), now);
+}
+
+function readAllSeries(): Promise<RateRow[]> {
+  return readSeries(SERIES);
+}
+
+async function readSeries(metas: readonly SeriesMeta[]): Promise<RateRow[]> {
+  if (metas.length === 0) return [];
   let supabase: ReturnType<typeof createSupabaseAdminClient>;
   try {
     supabase = createSupabaseAdminClient();
@@ -78,7 +101,7 @@ async function readAllSeries(): Promise<RateRow[]> {
   }
 
   const perSeries = await Promise.all(
-    SERIES.map(async (s): Promise<RateRow[]> => {
+    metas.map(async (s): Promise<RateRow[]> => {
       try {
         const { data, error } = await supabase
           .from("rates")
