@@ -165,4 +165,36 @@ if (probe.length > 0) {
   }
 }
 
+// PROBE_SEARCH — FRED's own full-text search, one query per line, for the
+// case a remembered id is simply wrong and the right one has to be found:
+// prints the top matches with their ids, titles and newest observation.
+// A dry-run facility, like PROBE_IDS.
+const searches = (process.env.PROBE_SEARCH ?? "").split("|").map((s) => s.trim()).filter(Boolean);
+if (searches.length > 0) {
+  if (!dryRun) {
+    console.error("PROBE_SEARCH is a dry-run facility: set DRY_RUN=1.");
+    process.exit(1);
+  }
+  for (const q of searches) {
+    console.log(`\nSEARCH: ${q}`);
+    try {
+      const body = await fred("series/search", {
+        search_text: q,
+        limit: "10",
+        order_by: "popularity",
+        sort_order: "desc",
+      });
+      for (const s of body.seriess ?? []) {
+        console.log(
+          `  ${s.id}: "${s.title}" · ${s.frequency_short ?? s.frequency} · ${s.units_short ?? s.units}` +
+            ` · ${s.seasonal_adjustment_short ?? ""} · through ${s.observation_end} · last updated ${s.last_updated}`,
+        );
+      }
+    } catch (err) {
+      console.log(`  search failed — ${err instanceof Error ? err.message : String(err)}`);
+    }
+    await sleep(PACE_MS);
+  }
+}
+
 process.exit(wrote.length === 0 ? 1 : 0); // partial success is success
