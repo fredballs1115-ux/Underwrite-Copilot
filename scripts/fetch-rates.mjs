@@ -30,9 +30,12 @@ const { series: SERIES, historyRows } = require("../data/fred-series.json");
 // on (series_id, obs_date), so re-pulling the same days changes nothing. The
 // count is the table's own, so the page reads back exactly what is written.
 const OBSERVATIONS = historyRows;
-// FRED allows 120 requests a minute; a short pause keeps a dry run (two
-// requests a series) well inside it.
-const PACE_MS = 150;
+// FRED allows 120 requests a minute. A dry run makes two requests a series
+// and a probe two a candidate, so the pace has to hold the whole run under
+// two a second — at 150 ms the first probe of eighty ids collected 429s
+// from the sixtieth onward, which read as "series does not exist" for
+// twenty ids that exist perfectly well.
+const PACE_MS = 350;
 
 const dryRun = process.env.DRY_RUN === "1";
 const fredKey = process.env.FRED_API_KEY;
@@ -55,13 +58,19 @@ if (!dryRun) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function fred(path, params) {
+async function fred(path, params, retried = false) {
   const api = new URL(`https://api.stlouisfed.org/fred/${path}`);
   for (const [k, v] of Object.entries(params)) api.searchParams.set(k, v);
   api.searchParams.set("api_key", fredKey);
   api.searchParams.set("file_type", "json");
   const res = await fetch(api, { signal: AbortSignal.timeout(30000) });
   const body = await res.json().catch(() => ({}));
+  if (res.status === 429 && !retried) {
+    // The limit is per minute; wait most of one out and ask once more,
+    // so a burst reads as a pause rather than as a missing series.
+    await sleep(20_000);
+    return fred(path, params, true);
+  }
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}${body.error_message ? ` — ${body.error_message}` : ""}`);
   }
