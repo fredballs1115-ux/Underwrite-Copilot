@@ -318,35 +318,85 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   The card's marker on the bars is `data-bar="layer"` — `data-bar="stack"`
   belongs to sources-and-uses, and its own count test caught the collision.
 - Today's rates, and which may become a number in a box: `lib/live-rates.ts`
-  (pure — the four FRED series the weekday cron writes, each figure's age,
-  its move since the observation before, and the two rules) with
-  `lib/live-rates-read.ts` (the `server-only` read) and
-  `app/rates-strip.tsx` (the pure strip — at the app root beside
-  `place-band.tsx` because `/tools` and `/market` both draw it).
-  **A benchmark is not a quote.** Only a rate a loan document NAMES may
-  pre-fill a field — the Treasury and SOFR (`contractRate`). The 30-year
-  mortgage survey looks seedable and is not: it is an owner-occupier
-  RESIDENTIAL rate, which is why `lib/leverage.ts` already treats it as a
-  one-sided floor rather than a price, so it is shown and never seeded. And
-  **stale is per series, because the cadence is**: a quarterly observation
-  is dated the quarter's FIRST day and published about two months after
-  that quarter ENDS, so the April figure is the newest one available until
-  late November and is eight months old while current — a one-quarter
-  threshold (the obvious number, and the one written here first) reports a
-  working feed as broken, while a five-day one marks three of the four
-  permanently dead. Two more traps, both paid for: migration 0023 grants
-  `select` on `rates` `to authenticated`, so a PUBLIC page reads it with
-  the service role (a migration would be inert until the operator ran it,
-  and FRED data is public anyway); and the read is ONE QUERY PER SERIES,
+  (pure — the FRED series the weekday cron writes, each figure's age, its
+  move since the observation before in its own unit, its recent path, the
+  shape of the curve, and the two rules) with `lib/live-rates-read.ts`
+  (the `server-only` read) and `app/rates-strip.tsx` (the pure strip — at
+  the app root beside `place-band.tsx` because `/tools` and `/market` both
+  draw it). **The series list is `data/fred-series.json` and nowhere
+  else**: the cron script and the module both import it, so the two cannot
+  disagree about what a series is, and `readSeriesTable` REFUSES a
+  malformed entry rather than skipping it (a skipped entry is a series the
+  cron keeps writing and the page silently stops showing). Forty-six
+  series in seven groups: the whole Treasury curve (eleven tenors, the
+  breakeven, the real yield), the money market (SOFR, its 30-day average,
+  fed funds, prime), credit spreads, mortgage and bank lending (the two
+  PMMS surveys, bank CRE loans y/y, delinquency, the three SLOOS
+  standards series), inflation and cost (CPI, core, rent, OER, core PCE,
+  three construction PPIs, construction wages, nonres spending), jobs and
+  output, and the supply pipeline (starts, permits and completions in 5+
+  unit buildings, total starts, rental vacancy). **Every id was verified
+  from the runner, never from memory**: the sandbox cannot reach FRED, so
+  the workflow's `dry_run` input fetches each series' own title beside its
+  id and writes nothing, and a series goes into the JSON only once a dry
+  run has printed it — the first list paid for the rule at once, because
+  `DRTSCLCC`, remembered as the old CRE-standards series, is "Net
+  Percentage of Domestic Banks Tightening Standards for CREDIT CARD
+  Loans". **An index never reaches the page as a level**: the cron asks
+  FRED for its own percent-change-from-a-year-ago transform (`units:
+  pc1`) and stores it under a `_YOY` id, so nobody reads 3.4 as an index
+  level, and the module refuses a transformed series stored under FRED's
+  own id. **What a figure IS is a property of the series** (`unit`): a
+  rate is a percent and moves in bps, a spread is quoted by ICE in percent
+  points and shown as bps, a share or a change (CPI y/y, the net share of
+  banks tightening — negative when they are EASING, and shown signed) is a
+  percent that moves in points, and a count of housing units moves in
+  percent. **A benchmark is not a quote.** Only a rate a loan document
+  NAMES may pre-fill a field (`contractRate`): the Treasury tenors, SOFR
+  and its 30-day average, prime. The 30-year mortgage survey looks
+  seedable and is not: it is an owner-occupier RESIDENTIAL rate, which is
+  why `lib/leverage.ts` already treats it as a one-sided floor rather than
+  a price, so it is shown and never seeded. The prepayment card is seeded
+  from `treasuryForTerm` — the tenor NEAREST the remaining term, which is
+  what a yield-maintenance clause names (the 2-year on the worked example,
+  27 bps under the 10-year the strip leads with, and so a larger penalty;
+  a tie breaks toward the shorter tenor for the same reason) — and the
+  strip marks exactly the tiles that fill a field, from the page's own
+  list. And **stale is per series, because the cadence is**: a monthly
+  index is dated the FIRST of its month and published two to eight weeks
+  after that month ends (core PCE was 82 days old and current on the day
+  this shipped — a 80-day threshold, written here first, would have marked
+  it dead), and a quarterly observation is dated the quarter's FIRST day
+  and published about two months after that quarter ENDS, so the April
+  figure is the newest one available until late November and is eight
+  months old while current — a one-quarter threshold reports a working
+  feed as broken, while a five-day one marks half the table permanently
+  dead. **The picture is the curve** (`yieldCurve`): every fresh tenor,
+  today solid and a week earlier dashed, with the 10-yr-less-2-yr slope
+  taken from the DRAWN points and never from FRED's own `T10Y2Y`, which
+  posts a day apart from the tenors and would put two slopes on one card;
+  a stale tenor is left off rather than drawn, and under four points there
+  is no curve. Each tile draws its recent path (`HISTORY_ROWS` per series,
+  the table's own number, so the read returns exactly what the cron
+  backfilled), and the groups past the curve and the money market fold
+  into `<details>` whose summary line already carries the headline
+  figures. Two more traps, both paid for: migration 0023 grants `select`
+  on `rates` `to authenticated`, so a PUBLIC page reads it with the
+  service role (a migration would be inert until the operator ran it, and
+  FRED data is public anyway); and the read is ONE QUERY PER SERIES,
   because a single `order by obs_date desc limit N` silently drops the
   quarterly series once the daily ones have filed a few months of rows.
   A stale figure still SHOWS with its date — a dead feed is worth seeing —
   it just stops seeding, because a date beside a figure is read and a
   figure inside a form field is not. `/market` had its own copy of this
   strip and its own copy of the bug: it read through the REQUEST-scoped
-  client, so a signed-in visitor saw four live rates and everyone else
+  client, so a signed-in visitor saw the live rates and everyone else
   silently got a checked-in PMMS snapshot, with nothing on the page saying
-  which. Both pages go through this one now.
+  which. Both pages go through this one now. The fixture every test draws
+  the strip on (`lib/live-rates.fixture.ts`) is the runner's own dry-run
+  output, figure for figure. Cap rates have NO free daily source (CBRE,
+  Green Street and RCA are all licensed), so they stay dated, sourced
+  research in `data/research/` and the page says so.
 - The construction loan's interest reserve, run rather than approximated:
   `lib/tools/construction-draw.ts` (pure). A construction loan funds its own
   interest, so the reserve is CIRCULAR — the loan pays interest on a balance

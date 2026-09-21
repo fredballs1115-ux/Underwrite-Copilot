@@ -4,7 +4,9 @@ import React from "react";
 import { renderToStaticMarkup, renderToString } from "react-dom/server";
 import { DealMathTools } from "@/app/tools/deal-math-tools";
 import { RatesStrip } from "@/app/rates-strip";
-import { readRates } from "@/lib/live-rates";
+import { rateSeeds, readRates, treasuryForTerm } from "@/lib/live-rates";
+import { FIXTURE_NOW, REAL_ROWS } from "@/lib/live-rates.fixture";
+import { SEED_MONTHS_REMAINING } from "@/lib/tools/prepayment";
 
 /**
  * Every live-verify marker that greps `/tools` must grep text that is
@@ -83,25 +85,22 @@ function toolsPatterns(): string[] {
 /**
  * What `/tools` serves, as one string.
  *
- * The page is the strip plus the cards. The strip is fed the four series
- * the weekday cron actually writes, because a marker greping it is a claim
- * about the page as it stands with a live table behind it.
+ * The page is the strip plus the cards. The strip is fed every series the
+ * weekday cron actually writes, as the runner printed them, and the cards
+ * are fed the seeds that read produces — the same way `app/tools/page.tsx`
+ * wires them — because a marker greping either is a claim about the page
+ * as it stands with a live table behind it.
  */
+const rates = readRates(REAL_ROWS, FIXTURE_NOW);
+const seeds = rateSeeds(rates);
+const tenor = treasuryForTerm(seeds.curve, SEED_MONTHS_REMAINING);
 const page = (r: (n: React.ReactElement) => string) =>
   r(
     React.createElement(RatesStrip, {
-      rates: readRates(
-        [
-          { series_id: "DGS10", obs_date: "2026-09-14", value: 4.97 },
-          { series_id: "SOFR", obs_date: "2026-09-15", value: 3.64 },
-          { series_id: "MORTGAGE30US", obs_date: "2026-09-10", value: 6.76 },
-          { series_id: "DRCRELEXFACBS", obs_date: "2026-04-01", value: 1.53 },
-        ],
-        new Date("2026-09-17T14:00:00Z"),
-      ),
-      seeds: ["SOFR"],
+      rates,
+      seeds: ["SOFR", ...(tenor ? [tenor.id] : [])],
     }),
-  ) + r(React.createElement(DealMathTools));
+  ) + r(React.createElement(DealMathTools, { seeds }));
 
 describe("the /tools round markers", () => {
   const hydration = page(renderToString);

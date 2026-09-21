@@ -2188,59 +2188,118 @@ describe("the deal math tools", () => {
 // ── today's rates, across the top of /tools ────────────────────────────────
 //
 // The page reads the table and hands the rows in, so this renders the strip
-// on a fixture without a database: the four series the cron writes, as the
-// Sep 16 run actually wrote them.
+// on a fixture without a database: every series the cron writes, as the
+// runner's Sep 21 dry run actually printed them (lib/live-rates.fixture.ts).
 import { RatesStrip } from "@/app/rates-strip";
-import { readRates } from "@/lib/live-rates";
+import { SERIES, readRates, type RateRow } from "@/lib/live-rates";
+import { FIXTURE_NOW, REAL_ROWS } from "@/lib/live-rates.fixture";
 
 describe("the rates strip", () => {
-  const NOW = new Date("2026-09-17T14:00:00Z");
-  const ROWS = [
-    { series_id: "DGS10", obs_date: "2026-09-14", value: 4.97 },
-    { series_id: "DGS10", obs_date: "2026-09-11", value: 4.84 },
-    { series_id: "SOFR", obs_date: "2026-09-15", value: 3.64 },
-    { series_id: "SOFR", obs_date: "2026-09-12", value: 3.7 },
-    { series_id: "MORTGAGE30US", obs_date: "2026-09-10", value: 6.76 },
-    { series_id: "DRCRELEXFACBS", obs_date: "2026-04-01", value: 1.53 },
-  ];
-  const rates = readRates(ROWS, NOW);
+  const rates = readRates(REAL_ROWS, FIXTURE_NOW);
+  // The two the page actually seeds: SOFR into the floating-rate card, the
+  // 2-year into the prepayment card (the tenor nearest its thirty months).
   const html = render(
-    React.createElement(RatesStrip, { rates, seeds: ["SOFR"] }),
+    React.createElement(RatesStrip, { rates, seeds: ["SOFR", "DGS2"] }),
   );
   const text = visibleText(html);
 
-  it("prints each series with its own observation date", () => {
-    expect(text).toContain("4.97%");
-    expect(text).toContain("3.64%");
-    expect(text).toContain("6.76%");
-    expect(text).toContain("1.53%");
-    expect(text).toContain("10-yr Treasury as of Sep 14");
+  it("prints every series in its own unit, with its own observation date", () => {
+    expect(rates).toHaveLength(SERIES.length);
+    expect(text).toContain("4.94%"); // the 10-year
+    expect(text).toContain("3.85%"); // SOFR
+    expect(text).toContain("6.95%"); // the survey
+    expect(text).toContain("77 bps"); // IG corporate: a spread, said as bps
+    expect(text).toContain("3.4%"); // CPI y/y: a change, to one place
+    expect(text).toContain("−5.7%"); // banks EASING on multifamily, signed
+    expect(text).toContain("344k"); // starts, 5+ units: a count
+    expect(text).toContain("10-yr Treasury as of Sep 17");
     expect(text).toContain("CRE delinquency as of Apr 1");
+    expect(text).toContain("CPI y/y as of Aug 1");
+  });
+
+  it("draws the curve as a picture, today against the tenors, with its slope named", () => {
+    expect((html.match(/data-curve/g) ?? []).length).toBe(1);
+    expect(html).toContain('role="img"');
+    expect(html).toContain("The Treasury curve as of Sep 17: 1-mo 3.97%, 3-mo 4.12%");
+    expect(text).toContain("10-yr less 2-yr +27 bps");
+    expect(text).toContain("a normal curve, long money dearer than short");
+    // With one observation per tenor there is no week-ago line, and the
+    // caption does not claim one.
+    expect(text).toContain("Solid is today, as of Sep 17");
+    expect(text).not.toContain("dashed a week earlier");
+    // Every tenor's figure is written on the picture.
+    for (const v of ["3.97", "4.67", "4.94", "5.32", "5.29"]) expect(html).toContain(`>${v}</text>`);
+  });
+
+  it("draws last week's curve once the history reaches back", () => {
+    const rows: RateRow[] = [];
+    for (const id of ["DGS1", "DGS2", "DGS5", "DGS10", "DGS30"]) {
+      for (let i = 0; i <= 7; i++) {
+        const d = new Date(Date.UTC(2026, 8, 17) - i * 86_400_000).toISOString().slice(0, 10);
+        rows.push({ series_id: id, obs_date: d, value: 4 + i * 0.02 });
+      }
+    }
+    const out = render(React.createElement(RatesStrip, { rates: readRates(rows, FIXTURE_NOW) }));
+    expect(visibleText(out)).toContain("Solid is today, dashed a week earlier");
+    expect(out).toContain('stroke-dasharray="3 3"');
+    // And each tile now carries its recent path — the 2-year and the
+    // 10-year have tiles under the picture; the other tenors are the
+    // picture alone.
+    expect((out.match(/data-spark/g) ?? []).length).toBe(2);
+  });
+
+  it("draws no curve under four fresh tenors, and says so", () => {
+    const few = readRates(
+      REAL_ROWS.filter((r) => ["DGS2", "DGS10", "SOFR"].includes(r.series_id)),
+      FIXTURE_NOW,
+    );
+    const out = render(React.createElement(RatesStrip, { rates: few }));
+    expect(out).not.toContain("data-curve");
+    expect(visibleText(out)).toContain("Too few of the Treasury tenors");
   });
 
   it("draws the move since the observation before, signed", () => {
     // Asserted on the markup, because the space between the figure and its
     // unit is the thing worth checking: a number glued to a margin-spaced
     // span is one word to a screen reader.
-    expect(html).toContain(">13</span> bps"); // the 10-year, up from 4.84
-    expect(html).toContain(">6</span> bps"); // SOFR, down from 3.70
+    expect(html).toContain(">3</span> bps"); // the 10-year, down from 4.97
+    expect(html).toContain(">21</span> bps"); // SOFR, up from 3.64
     expect(html).toContain("▲");
     expect(html).toContain("▼");
+    // No path with one or two observations behind a figure.
+    expect(html).not.toContain("data-spark");
   });
 
-  it("links every figure back to FRED", () => {
-    for (const id of ["DGS10", "SOFR", "MORTGAGE30US", "DRCRELEXFACBS"]) {
-      expect(html).toContain(`https://fred.stlouisfed.org/series/${id}`);
+  it("folds the rest into groups whose summary already carries the figures", () => {
+    for (const g of ["Credit spreads", "Mortgage &amp; bank lending", "Inflation &amp; cost", "Jobs &amp; output", "Supply &amp; vacancy"]) {
+      expect(html).toContain(g);
     }
+    expect((html.match(/<details/g) ?? []).length).toBe(5);
+    expect(text).toContain("CPI y/y 3.4%");
+    expect(text).toContain("Starts, 5+ units 344k");
+    // The money market stands beside the curve, not in a fold.
+    expect(text).toContain("Money market");
+    expect(text).toContain("30-day avg SOFR");
+  });
+
+  it("links every figure back to FRED — a transform to the level's page", () => {
+    for (const id of ["DGS10", "SOFR", "MORTGAGE30US", "DRCRELEXFACBS", "HOUST5F"]) {
+      expect(html).toContain(`https://fred.stlouisfed.org/series/${id}"`);
+    }
+    expect(html).toContain("https://fred.stlouisfed.org/series/CPIAUCSL\"");
+    expect(html).not.toContain("series/CPIAUCSL_YOY");
   });
 
   it("marks only what actually fills a field", () => {
-    // The emphasis tracks the page, not the standing fact: SOFR is seeded
-    // and marked, the 10-year is a contract rate that nothing on the page
-    // currently takes, so it is drawn like the two benchmarks.
-    expect(text).toContain("starts a field below at today's figure");
+    // The emphasis tracks the page, not the standing fact: SOFR and the
+    // 2-year are seeded and marked; the 10-year and prime are contract
+    // rates nothing on the page currently takes, so they are drawn like the
+    // benchmarks.
+    expect(text).toContain("2-yr and SOFR");
+    expect(text).toContain("start fields below at today's figure");
     expect(text).toContain("never fills a box");
-    expect((html.match(/border-brand/g) ?? []).length).toBe(1);
+    expect(text).toContain("never as a level");
+    expect((html.match(/border-brand/g) ?? []).length).toBe(2);
   });
 
   it("says nothing at all with an empty table", () => {
@@ -2255,7 +2314,7 @@ describe("the rates strip", () => {
   it("names a series that has stopped updating", () => {
     const stale = readRates(
       [{ series_id: "DGS10", obs_date: "2026-08-01", value: 4.2 }],
-      NOW,
+      FIXTURE_NOW,
     );
     const out = visibleText(render(React.createElement(RatesStrip, { rates: stale })));
     expect(out).toContain("not updating");

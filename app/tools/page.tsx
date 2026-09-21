@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PlaceBackdrop } from "@/app/place-band";
-import { rateSeeds } from "@/lib/live-rates";
+import { rateSeeds, treasuryForTerm } from "@/lib/live-rates";
 import { liveRates } from "@/lib/live-rates-read";
+import { SEED_MONTHS_REMAINING } from "@/lib/tools/prepayment";
 import { DealMathTools } from "./deal-math-tools";
 import { RatesStrip } from "@/app/rates-strip";
 
@@ -28,11 +29,15 @@ export const metadata: Metadata = {
 export default async function ToolsPage() {
   const rates = await liveRates();
   const seeds = rateSeeds(rates);
-  // Only the series that actually pre-fill a field are marked in the strip.
-  // Today that is SOFR alone: the floating-rate card references it by name.
-  // The 10-year is shown and not seeded — the prepayment card wants the
-  // Treasury matched to the remaining term, and the 10-year would flatter it.
-  const seeded = seeds.sofrPct !== null ? ["SOFR"] : [];
+  // Only the series that actually pre-fill a field are marked in the strip:
+  // SOFR, which the floating-rate card references by name, and the Treasury
+  // tenor nearest the prepayment card's remaining term — the 2-year on the
+  // worked example, never the 10-year, which would flatter the penalty.
+  const tenor = treasuryForTerm(seeds.curve, SEED_MONTHS_REMAINING);
+  const seeded = [
+    ...(seeds.sofrPct !== null ? ["SOFR"] : []),
+    ...(tenor ? [tenor.id] : []),
+  ];
 
   return (
     <div className="space-y-8">

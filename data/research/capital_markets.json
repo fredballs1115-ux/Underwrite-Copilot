@@ -1,12 +1,7 @@
 {
   "$schema_note": "Rates snapshot + the FRED series contract the live rates service (scripts/fetch-rates.mjs) pulls daily. Snapshot values here are seed/fallback only — the app prefers the rates table. status labels per project convention.",
   "as_of": "2026-08-21",
-  "fred_series": [
-    { "series_id": "DGS10", "label": "10-Year Treasury Constant Maturity", "unit": "pct", "cadence": "daily" },
-    { "series_id": "SOFR", "label": "Secured Overnight Financing Rate", "unit": "pct", "cadence": "daily" },
-    { "series_id": "MORTGAGE30US", "label": "Freddie Mac PMMS 30-Year Fixed", "unit": "pct", "cadence": "weekly" },
-    { "series_id": "DRCRELEXFACBS", "label": "CRE Loan Delinquency Rate, All Commercial Banks", "unit": "pct", "cadence": "quarterly" }
-  ],
+  "fred_series_note": "The live list is data/fred-series.json — the one table both scripts/fetch-rates.mjs and lib/live-rates.ts read. Forty-six series as of 2026-09-21, every id verified from the runner against FRED's own title.",
   "snapshot": {
     "mortgage_30y_pmms": {
       "value": 6.65,

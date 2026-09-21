@@ -3,6 +3,30 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
+## 🟢 2026-09-21 — every market figure on the site is today's (#362)
+
+The rates strip on `/tools` and `/market` carried four FRED figures. It now
+carries **forty-six**, pulled every weekday and dated, from ONE series table
+(`data/fred-series.json`) that the cron script and the page both read: the
+whole Treasury curve drawn as a picture (today solid, a week earlier
+dashed, the 10-yr-less-2-yr slope named), the money market beside it —
+SOFR, its 30-day average, fed funds, prime — and, folded into groups whose
+summary line already carries the figures, credit spreads, the mortgage
+surveys, bank CRE lending and the three SLOOS standards series, inflation
+and the cost of building (construction materials are running **10% above a
+year ago**), jobs and output, and the multifamily supply pipeline. Every
+tile draws its recent path; every figure links to its series. **Every id
+was verified from the runner against FRED's own title before it was
+trusted** (the workflow's new `dry_run` input) — which caught the first
+list naming `DRTSCLCC`, remembered as the old CRE-standards series, when it
+is the CREDIT-CARD one. The prepayment card now starts from the Treasury
+tenor nearest its remaining term (the 2-year, 27 bps under the 10-year that
+would flatter the penalty). Cap rates have no free daily source — CBRE,
+Green Street and RCA are all licensed — so they stay dated, sourced
+research, and the page says so. **Whose move: mine, next** — the same
+pattern per metro (permits, unemployment and house prices by MSA from
+FRED, Zillow's ZORI rent index), verified from the runner the same way.
+
 ## 🟢 2026-09-16 into 09-17 — `/tools` becomes the reason not to open Excel
 
 Ten more PRs, #307–#316, nine on `/tools` or its shop window and one on

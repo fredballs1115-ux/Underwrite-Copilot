@@ -1,7 +1,13 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { SERIES, readRates, type LiveRate, type RateRow } from "@/lib/live-rates";
+import {
+  HISTORY_ROWS,
+  SERIES,
+  readRates,
+  type LiveRate,
+  type RateRow,
+} from "@/lib/live-rates";
 
 /**
  * The `rates` table, read for a page that may have no one signed in.
@@ -14,18 +20,21 @@ import { SERIES, readRates, type LiveRate, type RateRow } from "@/lib/live-rates
  * Rather than widen the policy in a migration — which would be inert until
  * the operator runs it, and would loosen a table's grant for one page's sake
  * — this reads with the service role and hands out only what FRED already
- * publishes for nothing. No row here is anybody's data: four public series,
+ * publishes for nothing. No row here is anybody's data: public series,
  * pulled on a cron, republished with their dates and a link back to the
  * source.
  *
  * ONE QUERY PER SERIES, which is not the obvious shape. A single
  * `order by obs_date desc limit N` across the whole table looks equivalent
- * and quietly stops working: the two daily series file a row every business
- * day, so within a few months the newest sixty dates are all Treasury and
- * SOFR and the QUARTERLY series — whose current observation is months old by
- * design — drops off the end and vanishes from the strip. Each series is
- * asked for its own two newest rows instead, which the primary key
- * (series_id, obs_date) answers as an index scan.
+ * and quietly stops working: the daily series file a row every business
+ * day, so within a few months the newest few hundred dates are all Treasury
+ * tenors and SOFR and the QUARTERLY series — whose current observation is
+ * months old by design — drops off the end and vanishes from the strip.
+ * Each series is asked for its own newest rows instead, which the primary
+ * key (series_id, obs_date) answers as an index scan. `HISTORY_ROWS` of
+ * them, not two: the strip draws each series' recent path and the curve a
+ * week earlier, and the count is the table's own so the read returns
+ * exactly what the cron backfilled.
  *
  * A series that fails answers nothing and the others still show; a total
  * failure means no strip, no seeds, and every field keeps its worked
@@ -34,9 +43,9 @@ import { SERIES, readRates, type LiveRate, type RateRow } from "@/lib/live-rates
  *
  * WRAPPED IN `unstable_cache`, because `/tools` is a server-rendered route
  * (it already was before the strip — checked against the build output, not
- * assumed) and four queries on every visit to a calculator page would be
- * paid by everyone for a table the cron writes once a weekday. An hour is
- * the right window: nothing here changes faster than that.
+ * assumed) and forty-odd queries on every visit to a calculator page would
+ * be paid by everyone for a table the cron writes once a weekday. An hour
+ * is the right window: nothing here changes faster than that.
  *
  * The wrapping is around the ROWS rather than the finished read, and that
  * is not cosmetic. The ages and the freshness flags come from `now`, so a
@@ -74,10 +83,11 @@ async function readAllSeries(): Promise<RateRow[]> {
         const { data, error } = await supabase
           .from("rates")
           .select("series_id, obs_date, value")
-          // Two: the newest, and the one before it for the move.
+          // The newest first: the figure, the one before it for the move,
+          // and the path behind them for the sparkline and the week-ago curve.
           .eq("series_id", s.id)
           .order("obs_date", { ascending: false })
-          .limit(2);
+          .limit(HISTORY_ROWS);
         if (error) throw new Error(error.message);
         return (data as RateRow[] | null) ?? [];
       } catch (err) {

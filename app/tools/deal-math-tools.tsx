@@ -13,7 +13,13 @@ import { readProration } from "@/lib/tools/proration";
 import { readGroundLease } from "@/lib/tools/ground-lease";
 import { readBelief } from "@/lib/tools/what-you-believe";
 import { readReassessment } from "@/lib/tools/tax-reassessment";
-import { NO_SEEDS, type RateSeeds } from "@/lib/live-rates";
+import {
+  NO_SEEDS,
+  shortDate,
+  treasuryForTerm,
+  type CurveSeed,
+  type RateSeeds,
+} from "@/lib/live-rates";
 import { groupedTools } from "@/lib/tools/catalog";
 import { readResidual } from "@/lib/tools/land-residual";
 import { readLand, readSpace } from "@/lib/tools/measure-math";
@@ -26,7 +32,7 @@ import { readBid } from "@/lib/tools/max-bid";
 import { readBuyout } from "@/lib/tools/lease-buyout";
 import { readDraw } from "@/lib/tools/construction-draw";
 import { readFloating } from "@/lib/tools/floating-rate";
-import { readPrepayment } from "@/lib/tools/prepayment";
+import { SEED_MONTHS_REMAINING, readPrepayment } from "@/lib/tools/prepayment";
 import { buildStack } from "@/lib/tools/sources-uses";
 import { readMix, totalMix } from "@/lib/tools/unit-mix";
 import { readRoll, readRollover } from "@/lib/tools/rollover";
@@ -3415,19 +3421,25 @@ function FloatingRate({
   );
 }
 
-function Prepayment() {
+function Prepayment({ curve = [] }: { curve?: readonly CurveSeed[] }) {
   const [bal, setBal] = useShared("ppb", "20,000,000");
   const [rate, setRate] = useShared("ppr", "3.75");
-  const [months, setMonths] = useShared("ppm", "30");
+  const [months, setMonths] = useShared("ppm", String(SEED_MONTHS_REMAINING));
   const [amort, setAmort] = useShared("ppa", "30");
-  // Deliberately NOT seeded from the live 10-year, although the strip above
-  // has it. The clause prices at the Treasury matched to the REMAINING term
-  // — thirty months here, not ten years — and on a normal curve that sits
-  // below the 10-year. A lower discount rate makes the present value of the
-  // remaining payments larger, so the penalty is larger: filling this with
-  // the 10-year would understate what it costs to get out, quietly, in the
-  // direction that flatters the deal. The note under the card says so.
-  const [tsy, setTsy] = useShared("ppt", "4.75");
+  // Seeded from the live curve — but from the tenor NEAREST THE REMAINING
+  // TERM, never the 10-year the strip leads with. The clause prices at the
+  // Treasury matched to the remaining term — thirty months here, so the
+  // 2-year, not ten years — and on a normal curve that sits below the
+  // 10-year. A lower discount rate makes the present value of the remaining
+  // payments larger, so the penalty is larger: filling this with the 10-year
+  // would understate what it costs to get out, quietly, in the direction
+  // that flatters the deal. While the strip carried only the 10-year, this
+  // field was deliberately left unseeded for exactly that reason; now the
+  // whole curve is there, the right tenor is. The seed follows the worked
+  // example's term, and the note under the card names the tenor it used —
+  // an analyst who changes the months checks the tenor still matches.
+  const seed = treasuryForTerm(curve, SEED_MONTHS_REMAINING);
+  const [tsy, setTsy] = useShared("ppt", seed ? String(seed.pct) : "4.75");
   const [floor, setFloor] = useShared("ppf", "1");
   const [costs, setCosts] = useShared("ppc", "75,000");
   const [open, setOpen] = useShared("ppo", "24");
@@ -3546,6 +3558,9 @@ function Prepayment() {
         not the 10-year in the strip above — on a normal curve it sits
         lower, and a lower rate makes the penalty bigger, so reaching for
         the 10-year understates what getting out costs.
+        {seed
+          ? ` The field starts at the ${seed.short} as of ${shortDate(seed.asOf)}: the Treasury tenor nearest the remaining term is what the clause names, so change the months and check the tenor still matches.`
+          : ""}
       </p>
     </Card>
   );
@@ -8513,7 +8528,7 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
       <LeaseBuyout />
       <FloatingRate sofrPct={seeds.sofrPct} sofrAsOf={seeds.sofrAsOf} />
       <ConstructionDraw />
-      <Prepayment />
+      <Prepayment curve={seeds.curve} />
       <TrailingWindow />
       <EconomicOccupancy />
       <BelowTheLine />
