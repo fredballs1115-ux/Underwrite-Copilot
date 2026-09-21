@@ -396,7 +396,49 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   the strip on (`lib/live-rates.fixture.ts`) is the runner's own dry-run
   output, figure for figure. Cap rates have NO free daily source (CBRE,
   Green Street and RCA are all licensed), so they stay dated, sourced
-  research in `data/research/` and the page says so.
+  research in `data/research/` and the page says so. **Each covered
+  metro's own figures** are the same table's `metroSeries` (`metro`,
+  `metric`: unemployment / jobs_yoy / permits / hpi_yoy, `area` — what
+  FRED's title calls the place), read by `readMetroRates` and drawn by
+  `app/market/metro-live.tsx` (`MetroLive`, pure) under the market brief,
+  cached per metro in `liveMetroRates`. Four rules. **A metro's permits
+  arrive as one month's count, not seasonally adjusted**, so a month is
+  mostly the season: `permitsTrailingYear` sums twelve and sets them
+  against the twelve before, and answers null for a partial year rather
+  than scaling it (a `units` unit — a plain count, moving in percent —
+  beside `count`, which is the national thousands at an annual rate).
+  **Borrowed is said**: a suburb has its own unemployment rate and nothing
+  else at this cadence, so `metroAliases` names the MSA whose figures fill
+  the metrics it lacks, metric by metric (`metroSeriesFor`), and a
+  borrowed series keeps the MSA's `metro` and `area` so the tile wears
+  the MSA's name — passing an MSA figure off as a county's flatters
+  whichever county is weaker. Newark borrows New York's jobs and keeps its
+  own house prices. **A metro's monthly figure lags two months** (July's
+  unemployment publishes in early September and is the newest until
+  October, ninety-odd days old and current), so metro monthly `freshDays`
+  is 110. And **a stopped series is left out, not shown stale**: FRED's
+  Washington and Atlanta MSA house price series end at 2024 Q4 under the
+  new delineations, so neither has an `hpi_yoy` tile; the divisions
+  (Philadelphia, Newark, New York, Boston, Chicago, Los Angeles, San
+  Francisco, Seattle, Miami, Dallas) and the smaller MSAs are current.
+  Three probes bought the table: `RICH951` does not exist (Richmond is
+  `RICH051`), Boston's `BOST625URN` is the DISCONTINUED NECTA series (the
+  MSA's is the BLS-shaped `LAUMT251446000000003`, its payrolls
+  `SMS25144600000000001`), Los Angeles's `LOSA106NA` stopped in 2014 (the
+  MSA's payrolls are `SMS06310800000000001`), and an un-paced probe of
+  eighty ids collected 429s from the sixtieth onward that printed as
+  "series does not exist" — the workflow's `probe_ids` and
+  `probe_search` inputs are how a candidate is checked before it is
+  trusted, and the pace is 350 ms with one retry after a 429. One more
+  the full dry run bought: FRED REFUSES ITS OWN `pc1` TRANSFORM on
+  Boston's payrolls ("units is not one of: ch1, chg, lin"), so that one
+  series is stored as the LEVEL under FRED's own id with `derived:
+  "yoy"`, and `yearOverYear` works the change out on read — each month
+  against the same month a year earlier, never the nearest, and a point
+  with no partner a year back is dropped rather than compared to
+  whatever is closest. The validator holds a derived series to the
+  level's own id and no transform, for the same reason a transformed one
+  must carry a `_YOY` id: the table row is what it says it is.
 - The construction loan's interest reserve, run rather than approximated:
   `lib/tools/construction-draw.ts` (pure). A construction loan funds its own
   interest, so the reserve is CIRCULAR — the loan pays interest on a balance

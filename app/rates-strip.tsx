@@ -161,6 +161,31 @@ export function RatesStrip({
 // ── one figure ─────────────────────────────────────────────────────────────
 
 function Tile({ r, seeded }: { r: LiveRate; seeded: boolean }) {
+  return <RateTile r={r} seeded={seeded} />;
+}
+
+/**
+ * One live figure: its name, the figure in its own unit, its recent path,
+ * the move since the observation before, and the link to its series with
+ * the observation's date. Exported because a metro's own figures on
+ * `/market` are the same thing filed under a place — a second drawing of
+ * "a figure with its date" is how two surfaces come to say it differently.
+ * `value` and `sub` override the figure and the move line for a derived
+ * figure (a year of permits summed) that is still one series.
+ */
+export function RateTile({
+  r,
+  seeded = false,
+  value,
+  sub,
+  short,
+}: {
+  r: LiveRate;
+  seeded?: boolean;
+  value?: string;
+  sub?: React.ReactNode;
+  short?: string;
+}) {
   const move = formatMove(r);
   return (
     <div className={`border-l-2 pl-3 ${seeded ? "border-brand" : "border-line"}`}>
@@ -168,34 +193,37 @@ function Tile({ r, seeded }: { r: LiveRate; seeded: boolean }) {
         className="text-[11px] uppercase tracking-wide text-muted"
         title={r.meta.label}
       >
-        {r.meta.short}
+        {short ?? r.meta.short}
       </p>
       <div className="mt-0.5 flex items-end justify-between gap-2">
         <p className="font-mono text-xl font-semibold tabular-nums text-ink">
-          {formatValue(r)}
+          {value ?? formatValue(r)}
         </p>
         <Sparkline history={r.history} />
       </div>
       <p className="mt-0.5 text-[11px] text-muted">
-        {r.move !== null && move !== null && (
-          <>
-            <span aria-hidden="true">
-              {r.move > 0 ? "▲" : r.move < 0 ? "▼" : "•"}
-            </span>
-            <span className="sr-only">
-              {r.move > 0 ? "up " : r.move < 0 ? "down " : "unchanged, "}
-            </span>
-            <span className="tabular-nums">{move.split(" ")[0]}</span>
-            {move.includes(" ") ? ` ${move.split(" ")[1]} ` : " "}
-          </>
-        )}
+        {sub !== undefined
+          ? sub
+          : r.move !== null &&
+            move !== null && (
+              <>
+                <span aria-hidden="true">
+                  {r.move > 0 ? "▲" : r.move < 0 ? "▼" : "•"}
+                </span>
+                <span className="sr-only">
+                  {r.move > 0 ? "up " : r.move < 0 ? "down " : "unchanged, "}
+                </span>
+                <span className="tabular-nums">{move.split(" ")[0]}</span>
+                {move.includes(" ") ? ` ${move.split(" ")[1]} ` : " "}
+              </>
+            )}
         <a
           href={fredUrl(r.meta.id)}
           target="_blank"
           rel="noreferrer"
           className="underline decoration-dotted underline-offset-2 hover:text-ink"
         >
-          {r.meta.short} as of {shortDate(r.obsDate)}
+          {short ?? r.meta.short} as of {shortDate(r.obsDate)}
         </a>
         {!r.fresh && <span className="ml-1 text-amber-700">· not updating</span>}
       </p>
@@ -208,7 +236,7 @@ function Tile({ r, seeded }: { r: LiveRate; seeded: boolean }) {
  * figure and its move are the accessible text — so it is hidden from the
  * tree rather than given a name it would only repeat.
  */
-function Sparkline({ history }: { history: readonly Observation[] }) {
+export function Sparkline({ history }: { history: readonly Observation[] }) {
   if (history.length < 3) return null;
   const W = 64;
   const H = 20;

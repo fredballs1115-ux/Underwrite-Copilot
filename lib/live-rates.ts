@@ -73,8 +73,12 @@ import table from "@/data/fred-series.json";
 
 export type Cadence = "daily" | "weekly" | "monthly" | "quarterly";
 
-/** What the stored figure is — which decides how it is shown and how it moves. */
-export type Unit = "pct" | "spread" | "pts" | "count";
+/**
+ * What the stored figure is — which decides how it is shown and how it
+ * moves. `count` is thousands at an annual rate (the national starts);
+ * `units` is a plain count of things (a metro's permits in a month).
+ */
+export type Unit = "pct" | "spread" | "pts" | "count" | "units";
 
 export type GroupId =
   | "curve"
@@ -83,7 +87,11 @@ export type GroupId =
   | "mortgage"
   | "inflation"
   | "economy"
-  | "housing";
+  | "housing"
+  | "metro";
+
+/** The four things FRED publishes for a metro that a screen turns on. */
+export type MetroMetric = "unemployment" | "jobs_yoy" | "permits" | "hpi_yoy";
 
 export interface SeriesMeta {
   /** The key in the `rates` table. */
@@ -92,6 +100,14 @@ export interface SeriesMeta {
   fred: string;
   /** FRED's transform, where the stored figure is not the level (`pc1`). */
   units: string | null;
+  /**
+   * A figure derived on READ from the stored level: `yoy` is the change
+   * from the observation twelve months earlier, for a series FRED refuses
+   * its own transform on (Boston's payrolls answer "units is not one of
+   * ch1, chg, lin" to `pc1`). The table holds the level under FRED's own
+   * id, since it IS the level; the page shows the change.
+   */
+  derived: "yoy" | null;
   /** What the strip calls it. */
   short: string;
   /** Roughly what FRED calls it, for the title attribute. */
@@ -117,13 +133,76 @@ export interface SeriesMeta {
   tenorMonths: number | null;
 }
 
+/**
+ * A covered metro's own series — the same row shape, filed under the metro
+ * rather than a strip group, with the area FRED publishes it for (which is
+ * an MSA, and for a county that has no series of its own, the MSA it sits
+ * in — said on the page rather than passed off as the county's).
+ */
+export interface MetroSeriesMeta extends SeriesMeta {
+  /** The `id` in data/research/metros.json. */
+  metro: string;
+  metric: MetroMetric;
+  /** What FRED's own title calls the area. */
+  area: string;
+}
+
 export interface SeriesGroup {
   id: GroupId;
   label: string;
 }
 
 const CADENCES: readonly Cadence[] = ["daily", "weekly", "monthly", "quarterly"];
-const UNITS: readonly Unit[] = ["pct", "spread", "pts", "count"];
+const UNITS: readonly Unit[] = ["pct", "spread", "pts", "count", "units"];
+const METRO_METRICS: readonly MetroMetric[] = ["unemployment", "jobs_yoy", "permits", "hpi_yoy"];
+
+/** One entry's shape, held; the two lists differ only in what files it. */
+function readSeriesEntry(o: Record<string, unknown>, where: string, groupIds: Set<string>): SeriesMeta {
+  if (typeof o.id !== "string" || !o.id) throw new Error(`${where}: needs an id`);
+  if (typeof o.short !== "string" || typeof o.label !== "string") {
+    throw new Error(`${where}: needs short and label`);
+  }
+  if (typeof o.group !== "string" || !groupIds.has(o.group)) {
+    throw new Error(`${where}: group must be one of the table's groups`);
+  }
+  if (!CADENCES.includes(o.cadence as Cadence)) throw new Error(`${where}: bad cadence`);
+  if (!UNITS.includes(o.unit as Unit)) throw new Error(`${where}: bad unit`);
+  if (typeof o.freshDays !== "number" || o.freshDays <= 0) {
+    throw new Error(`${where}: freshDays must be positive`);
+  }
+  if (typeof o.contractRate !== "boolean") throw new Error(`${where}: contractRate must be boolean`);
+  if (o.fred !== undefined && typeof o.fred !== "string") throw new Error(`${where}: fred must be a string`);
+  if (o.units !== undefined && typeof o.units !== "string") throw new Error(`${where}: units must be a string`);
+  if (o.tenorMonths !== undefined && (typeof o.tenorMonths !== "number" || o.tenorMonths <= 0)) {
+    throw new Error(`${where}: tenorMonths must be positive`);
+  }
+  // A transformed figure must carry its own id: storing FRED's percent
+  // change under FRED's own id is how a reader of the table mistakes 3.4
+  // for an index level.
+  if (typeof o.units === "string" && (o.fred === undefined || o.fred === o.id)) {
+    throw new Error(`${where}: a transformed series needs its own id, distinct from its FRED id`);
+  }
+  if (o.derived !== undefined && o.derived !== "yoy") throw new Error(`${where}: derived must be "yoy"`);
+  // A derived figure is computed from the stored LEVEL, so the table row is
+  // the level and must be filed under the level's own id, untransformed.
+  if (o.derived === "yoy" && (typeof o.units === "string" || (o.fred !== undefined && o.fred !== o.id))) {
+    throw new Error(`${where}: a derived series stores the level under FRED's own id, with no transform`);
+  }
+  return {
+    id: o.id,
+    fred: typeof o.fred === "string" ? o.fred : o.id,
+    units: typeof o.units === "string" ? o.units : null,
+    derived: o.derived === "yoy" ? "yoy" : null,
+    short: o.short,
+    label: o.label,
+    group: o.group as GroupId,
+    cadence: o.cadence as Cadence,
+    freshDays: o.freshDays,
+    unit: o.unit as Unit,
+    contractRate: o.contractRate,
+    tenorMonths: typeof o.tenorMonths === "number" ? o.tenorMonths : null,
+  };
+}
 
 /**
  * The table, read with its shape held.
@@ -137,6 +216,9 @@ export function readSeriesTable(raw: unknown): {
   historyRows: number;
   groups: SeriesGroup[];
   series: SeriesMeta[];
+  metroSeries: MetroSeriesMeta[];
+  /** A metro with no series of its own, and the metro whose figures it shows. */
+  metroAliases: Record<string, string>;
 } {
   if (!raw || typeof raw !== "object") throw new Error("fred-series: not an object");
   const t = raw as Record<string, unknown>;
@@ -154,52 +236,51 @@ export function readSeriesTable(raw: unknown): {
     }
     return { id: o.id as GroupId, label: o.label };
   });
-  const groupIds = new Set(groups.map((g) => g.id));
+  const groupIds = new Set<string>(groups.map((g) => g.id));
   const seen = new Set<string>();
   const series: SeriesMeta[] = t.series.map((s, i) => {
     const o = (s ?? {}) as Record<string, unknown>;
     const where = `fred-series: series ${i} (${String(o.id ?? "?")})`;
-    if (typeof o.id !== "string" || !o.id) throw new Error(`${where}: needs an id`);
-    if (seen.has(o.id)) throw new Error(`${where}: duplicate id`);
-    seen.add(o.id);
-    if (typeof o.short !== "string" || typeof o.label !== "string") {
-      throw new Error(`${where}: needs short and label`);
-    }
-    if (typeof o.group !== "string" || !groupIds.has(o.group as GroupId)) {
-      throw new Error(`${where}: group must be one of the table's groups`);
-    }
-    if (!CADENCES.includes(o.cadence as Cadence)) throw new Error(`${where}: bad cadence`);
-    if (!UNITS.includes(o.unit as Unit)) throw new Error(`${where}: bad unit`);
-    if (typeof o.freshDays !== "number" || o.freshDays <= 0) {
-      throw new Error(`${where}: freshDays must be positive`);
-    }
-    if (typeof o.contractRate !== "boolean") throw new Error(`${where}: contractRate must be boolean`);
-    if (o.fred !== undefined && typeof o.fred !== "string") throw new Error(`${where}: fred must be a string`);
-    if (o.units !== undefined && typeof o.units !== "string") throw new Error(`${where}: units must be a string`);
-    if (o.tenorMonths !== undefined && (typeof o.tenorMonths !== "number" || o.tenorMonths <= 0)) {
-      throw new Error(`${where}: tenorMonths must be positive`);
-    }
-    // A transformed figure must carry its own id: storing FRED's percent
-    // change under FRED's own id is how a reader of the table mistakes 3.4
-    // for an index level.
-    if (typeof o.units === "string" && (o.fred === undefined || o.fred === o.id)) {
-      throw new Error(`${where}: a transformed series needs its own id, distinct from its FRED id`);
-    }
-    return {
-      id: o.id,
-      fred: typeof o.fred === "string" ? o.fred : o.id,
-      units: typeof o.units === "string" ? o.units : null,
-      short: o.short,
-      label: o.label,
-      group: o.group as GroupId,
-      cadence: o.cadence as Cadence,
-      freshDays: o.freshDays,
-      unit: o.unit as Unit,
-      contractRate: o.contractRate,
-      tenorMonths: typeof o.tenorMonths === "number" ? o.tenorMonths : null,
-    };
+    const m = readSeriesEntry(o, where, groupIds);
+    if (seen.has(m.id)) throw new Error(`${where}: duplicate id`);
+    seen.add(m.id);
+    if (m.group === "metro") throw new Error(`${where}: a metro series belongs in metroSeries`);
+    return m;
   });
-  return { historyRows, groups, series };
+  // The metro list is optional and filed by (metro, metric) rather than by
+  // id: two suburbs of one MSA legitimately read the same series.
+  const metroRaw = t.metroSeries === undefined ? [] : t.metroSeries;
+  if (!Array.isArray(metroRaw)) throw new Error("fred-series: metroSeries must be an array");
+  const seenMetro = new Set<string>();
+  const metroSeries: MetroSeriesMeta[] = metroRaw.map((s, i) => {
+    const o = (s ?? {}) as Record<string, unknown>;
+    const where = `fred-series: metro series ${i} (${String(o.id ?? "?")})`;
+    if (typeof o.metro !== "string" || !o.metro) throw new Error(`${where}: needs a metro`);
+    if (!METRO_METRICS.includes(o.metric as MetroMetric)) throw new Error(`${where}: bad metric`);
+    if (typeof o.area !== "string" || !o.area) throw new Error(`${where}: needs the area FRED names`);
+    const m = readSeriesEntry({ ...o, group: "metro", contractRate: false }, where, new Set(["metro"]));
+    const k = `${o.metro}|${o.metric}`;
+    if (seenMetro.has(k)) throw new Error(`${where}: ${o.metro} already has a ${o.metric} series`);
+    seenMetro.add(k);
+    if (seen.has(m.id)) throw new Error(`${where}: id is already a strip series`);
+    return { ...m, metro: o.metro, metric: o.metric as MetroMetric, area: o.area };
+  });
+  const aliasesRaw = t.metroAliases === undefined ? {} : t.metroAliases;
+  if (!aliasesRaw || typeof aliasesRaw !== "object" || Array.isArray(aliasesRaw)) {
+    throw new Error("fred-series: metroAliases must be an object");
+  }
+  const metroAliases: Record<string, string> = {};
+  for (const [from, to] of Object.entries(aliasesRaw as Record<string, unknown>)) {
+    if (typeof to !== "string") throw new Error(`fred-series: alias ${from} must name a metro`);
+    if (!metroSeries.some((m) => m.metro === to)) {
+      throw new Error(`fred-series: alias ${from} → ${to}, but ${to} has no series`);
+    }
+    if (metroAliases[to] !== undefined || to === from) {
+      throw new Error(`fred-series: alias ${from} → ${to} must name a metro with its own series`);
+    }
+    metroAliases[from] = to;
+  }
+  return { historyRows, groups, series, metroSeries, metroAliases };
 }
 
 const TABLE = readSeriesTable(table);
@@ -208,6 +289,8 @@ const TABLE = readSeriesTable(table);
 export const SERIES: readonly SeriesMeta[] = TABLE.series;
 /** The strip's groups, in order. */
 export const GROUPS: readonly SeriesGroup[] = TABLE.groups;
+/** Each covered metro's own series. */
+export const METRO_SERIES: readonly MetroSeriesMeta[] = TABLE.metroSeries;
 /**
  * How many observations per series the cron writes and the read fetches —
  * one number, so the page reads back exactly the path the cron backfilled.
@@ -215,7 +298,36 @@ export const GROUPS: readonly SeriesGroup[] = TABLE.groups;
 export const HISTORY_ROWS: number = TABLE.historyRows;
 
 export function seriesMeta(id: string): SeriesMeta | null {
-  return SERIES.find((s) => s.id === id) ?? null;
+  return SERIES.find((s) => s.id === id) ?? METRO_SERIES.find((s) => s.id === id) ?? null;
+}
+
+const METRO_METRIC_ORDER: readonly MetroMetric[] = METRO_METRICS;
+
+/**
+ * A metro's series, metric by metric: its own where FRED publishes for it,
+ * and for the metrics it lacks, the MSA it sits in — a suburb has its own
+ * unemployment rate and nothing else at this cadence, Newark its own house
+ * price index and nothing else. A borrowed series keeps the MSA's `metro`
+ * and `area`, so the page can name whose figure it is rather than passing
+ * it off as the county's. Empty for a metro the table does not cover.
+ */
+export function metroSeriesFor(metroId: string): {
+  metro: string;
+  series: MetroSeriesMeta[];
+  /** The metrics shown from the MSA rather than the metro's own series. */
+  borrowed: MetroMetric[];
+} {
+  const own = METRO_SERIES.filter((m) => m.metro === metroId);
+  const alias = TABLE.metroAliases[metroId];
+  const fromAlias = alias
+    ? METRO_SERIES.filter(
+        (m) => m.metro === alias && !own.some((o) => o.metric === m.metric),
+      )
+    : [];
+  const series = [...own, ...fromAlias].sort(
+    (a, b) => METRO_METRIC_ORDER.indexOf(a.metric) - METRO_METRIC_ORDER.indexOf(b.metric),
+  );
+  return { metro: metroId, series, borrowed: fromAlias.map((m) => m.metric) };
 }
 
 /** A row as the `rates` table stores it. */
@@ -278,6 +390,7 @@ export function moveUnitOf(unit: Unit): MoveUnit {
     case "pts":
       return "pt";
     case "count":
+    case "units":
       return "pct";
   }
 }
@@ -306,8 +419,17 @@ export function moveBetween(unit: Unit, now: number, prior: number): number {
  * unlabelled row.
  */
 export function readRates(rows: readonly RateRow[], now: Date): LiveRate[] {
+  return readRatesOf(SERIES, rows, now);
+}
+
+/** A metro's series read the same way, in the table's order. */
+export function readMetroRates(metroId: string, rows: readonly RateRow[], now: Date): LiveRate[] {
+  return readRatesOf(metroSeriesFor(metroId).series, rows, now);
+}
+
+function readRatesOf(metas: readonly SeriesMeta[], rows: readonly RateRow[], now: Date): LiveRate[] {
   const out: LiveRate[] = [];
-  for (const meta of SERIES) {
+  for (const meta of metas) {
     const mine = rows
       .filter(
         (r) =>
@@ -321,25 +443,90 @@ export function readRates(rows: readonly RateRow[], now: Date): LiveRate[] {
     // One observation per date: the cron upserts on (series_id, obs_date),
     // so a duplicate should be impossible — but if one arrived, comparing
     // a day against itself would report a flat market on every series.
-    const byDate: Observation[] = [];
+    let byDate: Observation[] = [];
     for (const r of mine) {
       if (byDate.length && byDate[byDate.length - 1].obsDate === r.obs_date) continue;
       byDate.push({ obsDate: r.obs_date, value: r.value });
     }
+    if (meta.derived === "yoy") {
+      byDate = yearOverYear(byDate);
+      if (byDate.length === 0) continue;
+    }
+    const head = byDate[0];
     const prior = byDate[1];
-    const age = ageDays(newest.obs_date, now);
+    const age = ageDays(head.obsDate, now);
     out.push({
       meta,
-      obsDate: newest.obs_date,
-      value: newest.value,
+      obsDate: head.obsDate,
+      value: head.value,
       ageDays: age,
       fresh: age <= meta.freshDays,
-      move: prior ? moveBetween(meta.unit, newest.value, prior.value) : null,
+      move: prior ? moveBetween(meta.unit, head.value, prior.value) : null,
       moveUnit: moveUnitOf(meta.unit),
       history: byDate.slice(0, HISTORY_ROWS).reverse(),
     });
   }
   return out;
+}
+
+/** The first of the month twelve months before a first-of-the-month date. */
+function yearBefore(obsDate: string): string {
+  const at = new Date(`${obsDate}T00:00:00Z`);
+  at.setUTCFullYear(at.getUTCFullYear() - 1);
+  return at.toISOString().slice(0, 10);
+}
+
+/**
+ * Each observation's percent change from the one dated exactly a year
+ * earlier — what FRED's `pc1` would have said, computed here for a series
+ * it refuses the transform on. Newest first in, newest first out; a point
+ * with no partner a year back is dropped rather than compared to whatever
+ * is nearest, and a zero or negative base cannot be a percentage of.
+ */
+export function yearOverYear(newestFirst: readonly Observation[]): Observation[] {
+  const byDate = new Map(newestFirst.map((o) => [o.obsDate, o.value]));
+  const out: Observation[] = [];
+  for (const o of newestFirst) {
+    const base = byDate.get(yearBefore(o.obsDate));
+    if (base === undefined || base <= 0) continue;
+    out.push({ obsDate: o.obsDate, value: Math.round(((o.value / base) - 1) * 100_000) / 1000 });
+  }
+  return out;
+}
+
+/** Twelve months of monthly permits summed — one year, so the seasons cancel. */
+export const PERMIT_WINDOW_MONTHS = 12;
+
+/**
+ * Building permits over the trailing twelve months, against the twelve
+ * before them.
+ *
+ * FRED publishes a metro's permits as one month's count, not seasonally
+ * adjusted, so a single month is mostly the season: March is not a supply
+ * signal against February. A year of them is, and a year against the year
+ * before is the pipeline's direction. Null where the history does not
+ * reach — a partial year is not a year, and saying so beats scaling it.
+ */
+export function permitsTrailingYear(
+  r: Pick<LiveRate, "history">,
+): { units: number; priorUnits: number | null; changePct: number | null; from: string; to: string } | null {
+  const h = r.history;
+  if (h.length < PERMIT_WINDOW_MONTHS) return null;
+  const last = h.slice(-PERMIT_WINDOW_MONTHS);
+  const units = Math.round(last.reduce((a, o) => a + o.value, 0));
+  const prior =
+    h.length >= 2 * PERMIT_WINDOW_MONTHS
+      ? Math.round(
+          h.slice(-2 * PERMIT_WINDOW_MONTHS, -PERMIT_WINDOW_MONTHS).reduce((a, o) => a + o.value, 0),
+        )
+      : null;
+  return {
+    units,
+    priorUnits: prior,
+    changePct: prior === null || prior === 0 ? null : Math.round(((units - prior) / prior) * 1000) / 10,
+    from: last[0].obsDate,
+    to: last[last.length - 1].obsDate,
+  };
 }
 
 /** The rates by the strip's groups, in order, empty groups left out. */
@@ -376,6 +563,8 @@ export function formatValue(r: Pick<LiveRate, "value" | "meta">): string {
       return `${signed(r.value, 1)}%`;
     case "count":
       return `${Math.round(r.value).toLocaleString("en-US")}k`;
+    case "units":
+      return Math.round(r.value).toLocaleString("en-US");
   }
 }
 

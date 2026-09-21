@@ -25,6 +25,15 @@ import {
 } from "./live-rates";
 import { FIXTURE_NOW as NOW, REAL_ROWS as REAL } from "./live-rates.fixture";
 import table from "@/data/fred-series.json";
+import metrosSeed from "@/data/research/metros.json";
+import {
+  METRO_SERIES,
+  PERMIT_WINDOW_MONTHS,
+  metroSeriesFor,
+  permitsTrailingYear,
+  readMetroRates,
+  yearOverYear,
+} from "./live-rates";
 
 const read = readRates(REAL, NOW);
 const of = (id: string) => read.find((r) => r.meta.id === id)!;
@@ -584,5 +593,204 @@ describe("the Treasury a clause names", () => {
     expect(treasuryForTerm(curve, null)).toBeNull();
     expect(treasuryForTerm(curve, 0)).toBeNull();
     expect(treasuryForTerm([], 30)).toBeNull();
+  });
+});
+
+describe("a covered metro's own series", () => {
+  const COVERED = (metrosSeed.metros ?? []).map((m) => m.id);
+
+  it("gives every covered metro something to show", () => {
+    expect(COVERED.length).toBe(18);
+    for (const id of COVERED) {
+      expect(metroSeriesFor(id).series.length, id).toBeGreaterThan(0);
+    }
+    // Filed under the metro group, never a contract rate, each with the
+    // area FRED's own title names.
+    expect(METRO_SERIES.length).toBeGreaterThan(50);
+    for (const m of METRO_SERIES) {
+      expect(m.group).toBe("metro");
+      expect(m.contractRate).toBe(false);
+      expect(m.area.length, m.id).toBeGreaterThan(3);
+      expect(COVERED, m.id).toContain(m.metro);
+    }
+  });
+
+  it("refuses a metro entry filed wrong", () => {
+    const good = {
+      historyRows: 40,
+      groups: [{ id: "curve", label: "x" }],
+      series: [],
+      metroSeries: [
+        { id: "WASH911URN", metro: "dc", metric: "unemployment", area: "Washington MSA", short: "u", label: "l", cadence: "monthly", freshDays: 110, unit: "pts" },
+      ],
+      metroAliases: { pg_county: "dc" },
+    };
+    expect(() => readSeriesTable(good)).not.toThrow();
+    const entry = good.metroSeries[0];
+    expect(() => readSeriesTable({ ...good, metroSeries: [entry, entry] })).toThrow(/already has/);
+    expect(() => readSeriesTable({ ...good, metroSeries: [{ ...entry, metric: "rent" }] })).toThrow(/metric/);
+    expect(() => readSeriesTable({ ...good, metroSeries: [{ ...entry, area: "" }] })).toThrow(/area/);
+    expect(() => readSeriesTable({ ...good, metroAliases: { pg_county: "tulsa" } })).toThrow(/no series/);
+    expect(() => readSeriesTable({ ...good, metroAliases: { dc: "dc" } })).toThrow(/own series/);
+    // A metro series is never also a strip series under the same id.
+    expect(() =>
+      readSeriesTable({
+        ...good,
+        series: [{ ...entry, group: "curve", contractRate: false }],
+      }),
+    ).toThrow(/already a strip series/);
+  });
+
+  it("gives a suburb its own unemployment and the MSA's everything else, named", () => {
+    // Prince George's County has an unemployment rate of its own on FRED
+    // and nothing else at this cadence; the permits and the payrolls are
+    // the Washington MSA's, and they stay filed under dc so the page can
+    // say whose they are.
+    const pg = metroSeriesFor("pg_county");
+    expect(pg.series.map((s) => s.metric)).toEqual(["unemployment", "jobs_yoy", "permits"]);
+    expect(pg.series[0].id).toBe("MDPRIN5URN");
+    expect(pg.series[0].metro).toBe("pg_county");
+    expect(pg.series[1].metro).toBe("dc");
+    expect(pg.borrowed).toEqual(["jobs_yoy", "permits"]);
+  });
+
+  it("gives Newark its own house prices and New York's jobs", () => {
+    const nj = metroSeriesFor("newark_jc");
+    expect(nj.series.map((s) => s.metric)).toEqual(["unemployment", "jobs_yoy", "permits", "hpi_yoy"]);
+    expect(nj.series.at(-1)!.id).toBe("ATNHPIUS35084Q_YOY");
+    expect(nj.series.at(-1)!.metro).toBe("newark_jc");
+    expect(nj.borrowed).toEqual(["unemployment", "jobs_yoy", "permits"]);
+  });
+
+  it("leaves out a house price index FRED stopped publishing", () => {
+    // Washington's and Atlanta's MSA series end at 2024 Q4 under the new
+    // delineations: a tile reading "not updating" forever is worse than no
+    // tile, so neither is filed.
+    expect(metroSeriesFor("dc").series.map((s) => s.metric)).not.toContain("hpi_yoy");
+    expect(metroSeriesFor("atlanta").series.map((s) => s.metric)).not.toContain("hpi_yoy");
+    expect(metroSeriesFor("baltimore").series.map((s) => s.metric)).toContain("hpi_yoy");
+  });
+
+  it("answers nothing for a metro the table does not cover", () => {
+    expect(metroSeriesFor("tulsa")).toEqual({ metro: "tulsa", series: [], borrowed: [] });
+    expect(readMetroRates("tulsa", REAL, NOW)).toEqual([]);
+  });
+
+  it("reads a metro's rows in metric order, fresh through the two-month lag", () => {
+    // Metro unemployment for July is published in early September and stays
+    // the newest figure until October: eighty-odd days old and current.
+    const rows: RateRow[] = [
+      { series_id: "WASH911BPPRIV", obs_date: "2026-07-01", value: 1844 },
+      { series_id: "WASH911URN", obs_date: "2026-07-01", value: 4.0 },
+      { series_id: "WASH911URN", obs_date: "2026-06-01", value: 3.8 },
+      { series_id: "WASH911NA_YOY", obs_date: "2026-08-01", value: 1.2 },
+    ];
+    const read = readMetroRates("dc", rows, NOW);
+    expect(read.map((r) => r.meta.id)).toEqual(["WASH911URN", "WASH911NA_YOY", "WASH911BPPRIV"]);
+    expect(read[0].ageDays).toBe(82);
+    expect(read.every((r) => r.fresh)).toBe(true);
+    expect(read[0].move).toBeCloseTo(0.2, 9);
+    expect(read[0].moveUnit).toBe("pt");
+    // And a suburb reads the MSA's rows under its own id.
+    const pg = readMetroRates("pg_county", rows.concat({ series_id: "MDPRIN5URN", obs_date: "2026-07-01", value: 4.7 }), NOW);
+    expect(pg.map((r) => r.meta.id)).toEqual(["MDPRIN5URN", "WASH911NA_YOY", "WASH911BPPRIV"]);
+  });
+
+  it("says a plain count of permits as units, moving in percent", () => {
+    const rows: RateRow[] = [
+      { series_id: "WASH911BPPRIV", obs_date: "2026-07-01", value: 1844 },
+      { series_id: "WASH911BPPRIV", obs_date: "2026-06-01", value: 1600 },
+    ];
+    const r = readMetroRates("dc", rows, NOW).find((x) => x.meta.id === "WASH911BPPRIV")!;
+    expect(formatValue(r)).toBe("1,844");
+    expect(r.moveUnit).toBe("pct");
+    expect(r.move).toBeCloseTo(15.3, 9);
+    expect(formatMove(r)).toBe("15.3%");
+  });
+});
+
+describe("a year of permits", () => {
+  const monthly = (n: number, at: (i: number) => number): RateRow[] => {
+    const rows: RateRow[] = [];
+    for (let i = 0; i < n; i++) {
+      // i months before July 2026, dated the first of the month.
+      const d = new Date(Date.UTC(2026, 6 - i, 1)).toISOString().slice(0, 10);
+      rows.push({ series_id: "WASH911BPPRIV", obs_date: d, value: at(i) });
+    }
+    return rows;
+  };
+  const permits = (rows: RateRow[]) =>
+    readMetroRates("dc", rows, NOW).find((x) => x.meta.id === "WASH911BPPRIV")!;
+
+  it("sums the trailing twelve months and sets them against the twelve before", () => {
+    // A metro's permits arrive as one month's count, not seasonally
+    // adjusted, so a single month is mostly the season. A year of them is
+    // the pipeline; the year before is its direction.
+    const r = permits(monthly(24, (i) => (i < 12 ? 1000 : 800)));
+    const y = permitsTrailingYear(r)!;
+    expect(y.units).toBe(12_000);
+    expect(y.priorUnits).toBe(9_600);
+    expect(y.changePct).toBeCloseTo(25, 9);
+    expect(y.to).toBe("2026-07-01");
+    expect(y.from).toBe("2025-08-01");
+    expect(PERMIT_WINDOW_MONTHS).toBe(12);
+  });
+
+  it("is null without a full year, and has no comparison without two", () => {
+    // A partial year is not a year; scaling it up would say the season.
+    expect(permitsTrailingYear(permits(monthly(11, () => 1000)))).toBeNull();
+    const one = permitsTrailingYear(permits(monthly(15, () => 1000)))!;
+    expect(one.units).toBe(12_000);
+    expect(one.priorUnits).toBeNull();
+    expect(one.changePct).toBeNull();
+  });
+});
+
+describe("a change from a year ago derived from the level", () => {
+  // Boston's payrolls: FRED refuses its own pc1 transform on the series
+  // ("units is not one of: ch1, chg, lin"), so the level is stored and the
+  // change is worked out here — exactly what pc1 would have said.
+  const level = (months: number, at: (i: number) => number): RateRow[] => {
+    const rows: RateRow[] = [];
+    for (let i = 0; i < months; i++) {
+      const d = new Date(Date.UTC(2026, 7 - i, 1)).toISOString().slice(0, 10);
+      rows.push({ series_id: "SMS25144600000000001", obs_date: d, value: at(i) });
+    }
+    return rows;
+  };
+
+  it("stores the level under FRED's own id and shows the change", () => {
+    const meta = seriesMeta("SMS25144600000000001")!;
+    expect(meta.derived).toBe("yoy");
+    expect(meta.units).toBeNull();
+    expect(meta.fred).toBe("SMS25144600000000001");
+    expect(fredUrl(meta.id)).toBe("https://fred.stlouisfed.org/series/SMS25144600000000001");
+  });
+
+  it("compares each month to the same month a year earlier, never to the nearest", () => {
+    // 2,731.8 thousand in August 2026 against 2,700 a year before: +1.178%.
+    const rows = level(14, (i) => (i === 0 ? 2731.8 : i === 12 ? 2700 : 2650));
+    const r = readMetroRates("boston", rows, NOW).find((x) => x.meta.id === "SMS25144600000000001")!;
+    expect(r.obsDate).toBe("2026-08-01");
+    expect(r.value).toBeCloseTo(1.178, 3);
+    expect(formatValue(r)).toBe("1.2%");
+    // Two derivable points (August and July), so a move exists — in points.
+    expect(r.history).toHaveLength(2);
+    expect(r.move).not.toBeNull();
+    expect(r.moveUnit).toBe("pt");
+  });
+
+  it("says nothing without a year of history behind the newest month", () => {
+    const rows = level(12, () => 2700);
+    expect(readMetroRates("boston", rows, NOW).some((x) => x.meta.id === "SMS25144600000000001")).toBe(false);
+    expect(yearOverYear([])).toEqual([]);
+  });
+
+  it("refuses a derived series filed with a transform, or under another id", () => {
+    const good = { historyRows: 40, groups: [{ id: "economy", label: "x" }], series: [] };
+    const base = { id: "SMS25144600000000001", short: "j", label: "l", group: "economy", cadence: "monthly", freshDays: 110, unit: "pts", contractRate: false, derived: "yoy" };
+    expect(() => readSeriesTable({ ...good, series: [base] })).not.toThrow();
+    expect(() => readSeriesTable({ ...good, series: [{ ...base, units: "pc1", fred: "X" }] })).toThrow(/level/);
+    expect(() => readSeriesTable({ ...good, series: [{ ...base, derived: "mom" }] })).toThrow(/derived/);
   });
 });
