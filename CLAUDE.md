@@ -439,6 +439,27 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   whatever is closest. The validator holds a derived series to the
   level's own id and no transform, for the same reason a transformed one
   must carry a `_YOY` id: the table row is what it says it is.
+- What landlords are asking this month: `lib/zori.ts` (pure — a metro's
+  Zillow Observed Rent Index and its change from a year ago, read out of
+  the two `benchmarks` rows the MONTHLY pull writes, `scripts/fetch-zori.mjs`
+  via `zori.yml` on the 20th, from Zillow Research's public metro CSV),
+  `lib/zori-read.ts` (the `server-only` read, admin client, cached per
+  metro) and `app/market/zori-line.tsx` (`ZoriLine`, pure — the asking rent
+  drawn against the 2BR fair market rent on ONE scale, with the gap said).
+  **The FMR is what HUD will PAY, the ZORI is what landlords are ASKING**:
+  one is set once a year from survey data two years old by the time it
+  applies, the other is this month's listings across all home types
+  before concessions, and the page shows both and lets neither stand in
+  for the other — an underwrite that takes the FMR for the market rent is
+  a year or two behind, one that takes the asking rent for the achievable
+  rent has not priced the concessions. **Zillow's condition for use is
+  attribution**, so `ZORI_CREDIT` is part of the component, not the
+  page's to forget. The pull matches Zillow's MSA rows BY NAME
+  ("Washington, DC"), the way the FMR pull matches HUD's areas; the four
+  Washington suburbs and Newark share their MSA's row and the row's note
+  says so (`shared`). Like every other feed, the CSV's URL, its column
+  shape and each metro's RegionName are claims until the workflow's
+  `dry_run` prints them from the runner.
 - The construction loan's interest reserve, run rather than approximated:
   `lib/tools/construction-draw.ts` (pure). A construction loan funds its own
   interest, so the reserve is CIRCULAR — the loan pays interest on a balance

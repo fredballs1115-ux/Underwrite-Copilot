@@ -816,6 +816,14 @@ jobs:
           mark "#363 the metro's own figures are on /market" grep -q "Live from FRED" p_market.html
           mark "#363 a year of permits is summed, not a month" grep -q "Permits, 12 months" p_market.html
           mark "#363 each metro figure links to its series" grep -q "each figure links to its series" p_market.html
+          # #364 — what landlords are asking this month, from Zillow's
+          # index, against the FMR HUD pays. The rows come from a MONTHLY
+          # pull (zori.yml) into `benchmarks`, so NOT DEPLOYED here means
+          # the pull has not written Washington's rows yet, not that the
+          # page is wrong — run zori.yml and look again.
+          mark "#364 the asking rent is on the market brief" grep -q "Asking rent, all homes" p_market.html
+          mark "#364 and carries Zillow's credit" grep -q "Data: Zillow Research" p_market.html
+          mark "#364 the asking rent is drawn against the FMR" grep -q "neither is the other" p_market.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

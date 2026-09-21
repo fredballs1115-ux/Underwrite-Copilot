@@ -2414,3 +2414,53 @@ describe("a metro's own figures, live", () => {
     expect(gluedWords(dcText)).toEqual([]);
   });
 });
+
+// ── the asking rent against the fair market rent ──────────────────────────
+import { ZoriLine } from "@/app/market/zori-line";
+
+describe("a metro's asking rent, against the FMR", () => {
+  const z = {
+    rent: 2412,
+    yoyPct: 2.3,
+    asOf: "2026-08-31",
+    note: "Zillow Observed Rent Index (ZORI), all homes, smoothed, Washington, DC metro area, month ending 2026-08-31. Data: Zillow Research.",
+    shared: false,
+  };
+  const html = render(React.createElement(ZoriLine, { z, fmr2br: 2100 }));
+  const text = visibleText(html);
+
+  it("prints the asking rent, its change, its month and Zillow's credit", () => {
+    expect(text).toContain("Asking rent, all homes");
+    expect(text).toContain("$2,412");
+    expect(text).toContain("2.3%");
+    expect(text).toContain("on a year ago");
+    expect(text).toContain("Aug 2026");
+    expect(text).toContain("Data: Zillow Research");
+    expect(html).toContain("https://www.zillow.com/research/data/");
+  });
+
+  it("draws the asking rent against the 2BR fair market rent on one scale, and says the gap", () => {
+    expect((html.match(/data-bar="zori"/g) ?? []).length).toBe(2);
+    expect(text).toContain("HUD 2BR");
+    // (2412 − 2100) / 2100 = 14.857…%
+    expect(text).toContain("runs 14.9% above the fair market rent");
+    expect(text).toContain("neither is the other");
+  });
+
+  it("says when the figure is the metro area's, shared with a suburb", () => {
+    const out = visibleText(render(React.createElement(ZoriLine, { z: { ...z, shared: true }, fmr2br: null })));
+    expect(out).toContain("shared across the MSA");
+    // No FMR to draw against: no bars, no gap sentence.
+    expect(out).not.toContain("HUD 2BR");
+    expect(out).not.toContain("above the fair market rent");
+  });
+
+  it("renders nothing with no figure", () => {
+    expect(render(React.createElement(ZoriLine, { z: null, fmr2br: 2100 }))).not.toContain("Asking rent");
+  });
+
+  it("reads clean and names everything", () => {
+    expect(a11yIssues(html), "zori line").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+});

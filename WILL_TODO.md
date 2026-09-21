@@ -31,9 +31,15 @@ FRED's own title (Richmond is `RICH051`, not the `RICH951` memory offers;
 Boston's obvious series is the discontinued NECTA one; Washington's and
 Atlanta's house price series stopped at 2024 Q4 and are left out rather
 than shown stale). A suburb keeps its own unemployment rate and borrows
-the MSA's rest, named as the MSA's. **Whose move: mine, next** — Zillow's
-ZORI rent index per metro (a monthly CSV, from the runner) beside the FMR
-row, and the pictures.
+the MSA's rest, named as the MSA's. Then #364: Zillow's
+Observed Rent Index per metro — this month's asking rent, all home types,
+with its change from a year ago and Zillow's credit — drawn against the
+two-bedroom FMR HUD pays, on one scale, with the gap said (`zori.yml`,
+monthly on the 20th, dry-run first). **Whose move: mine, next** — the
+pictures: the skyline contact sheet (`skyline-sheet.yml` pushes 640px
+copies of every candidate to its own branch, so a photograph is chosen by
+eye and still credited from what Commons returned), then the operator's
+own ground-level files for `public/photos/`.
 
 ## 🟢 2026-09-16 into 09-17 — `/tools` becomes the reason not to open Excel
 

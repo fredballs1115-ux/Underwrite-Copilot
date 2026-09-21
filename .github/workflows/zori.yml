@@ -1,0 +1,39 @@
+name: zori
+# Monthly Zillow Observed Rent Index pull → the `benchmarks` table: each
+# covered metro's asking rent and its change from a year ago, from Zillow
+# Research's public metro CSV, refreshed monthly and free to use with
+# attribution. Runs a few days after Zillow's mid-month release.
+#
+# Dispatch it with `dry_run` ticked to fetch, match and print without
+# writing: the sandbox cannot reach Zillow, so the file's shape and the
+# RegionName each metro goes by are verified here first.
+#
+# No-ops with instructions until the Supabase Actions secrets exist.
+on:
+  schedule:
+    - cron: "37 13 20 * *" # the 20th of each month, after Zillow's mid-month refresh
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Fetch, match and print every metro, write nothing"
+        type: boolean
+        default: false
+jobs:
+  zori:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --omit=dev
+      - name: Pull ZORI
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DRY_RUN: ${{ inputs.dry_run == true && '1' || '' }}
+        run: |
+          if [ "$DRY_RUN" != "1" ] && { [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; }; then
+            echo "Supabase Actions secrets not set (repo Settings → Secrets → Actions: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY). Skipping."
+            exit 0
+          fi
+          node scripts/fetch-zori.mjs
