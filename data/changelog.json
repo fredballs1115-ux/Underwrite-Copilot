@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-22",
+      "title": "The for-sale market, under the rent",
+      "href": "/market?metro=dc",
+      "blurb": "Each market's brief now carries this month's for-sale market from Realtor.com's inventory file: the median list price, the active listings and the median days on market, each against a year ago. The rent lines above it say what a renter pays and what a home costs in years of it; this says the flow behind that price — a market where listings pile up and sit longer is loosening, and a loosening market is one a renter can buy into, while fewer and faster keeps them renting. The call is made only when both flow figures agree and never from the price alone, and the line says plainly that a list price is what sellers are asking, not what buyers paid. Matched by CBSA code and checked by name from the runner before it was trusted; Realtor.com's condition for use is attribution, and the line carries it."
+    },
+    {
+      "date": "2026-09-22",
       "title": "The apartment asking rent, and what a home costs in years of it",
       "href": "/market?metro=dc",
       "blurb": "Zillow's all-homes asking rent runs over houses, condos and apartments together, so in a market of dear houses it sits well above what an apartment actually lets for. Each market's brief now shows the same index over apartment listings alone — the figure an apartment underwrite should be reading — as a third bar beside the all-homes rent and the fair market rent HUD pays, with the gap said. And beside it the typical home value, said against a year of asking rent as the price-to-rent ratio in years, which is the arithmetic that keeps a renter renting. Both come from two more of Zillow's monthly files, read by the same pull and verified from the runner before they were trusted; a figure the pull does not have is simply absent, never a zero."
