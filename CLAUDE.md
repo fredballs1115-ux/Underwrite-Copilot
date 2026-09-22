@@ -536,6 +536,33 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   for. A file that fails is a loud line and the others still write; a
   figure the pull did not have is null on the page, never zero, and the
   line simply lacks it.
+- The for-sale market this month: `lib/realtor.ts` (pure — a metro's
+  median list price, active listings and median days on market, each
+  against a year ago, out of the `benchmarks` rows the MONTHLY pull
+  writes, `scripts/fetch-realtor.mjs` via `realtor.yml` on the 8th, from
+  Realtor.com's public metro CSV), `lib/realtor-read.ts` (the
+  `server-only` read) and `app/market/realtor-line.tsx` (`RealtorLine`,
+  pure, under the Zillow line). **The for-sale market is the other side
+  of the renter's decision**: the Zillow line says the price side (a
+  typical home in years of rent) and this says the FLOW — a market
+  where listings pile up and sit longer is loosening, and a loosening
+  market is one a renter can buy into; fewer and faster keeps them
+  renting. `marketDirection` calls it only with BOTH flow changes and
+  never from the price, because half the evidence is not a call, and
+  the line says the list price is what sellers are ASKING, not what
+  buyers paid. **Matched by CBSA code, checked by name**: the file is
+  one month per file with the year-ago change already in it as a
+  fraction (stored as a percent), and the dry run prints each metro's
+  title beside its code so a wrong code is visible rather than silently
+  another city; columns are read by the header's own names, never by
+  position. **The first probe of a feed is `zori.yml`'s `probe_url`**
+  (`scripts/probe-url.mjs`): fetch any candidate file from the runner
+  and print its status, type, size, header, first and last rows and the
+  rows naming a place — or, for a page, the links to data files on it.
+  It is how Realtor.com's file was found to be real (run 35782501160)
+  and Apartment List's not to be — its download is gated and its static
+  host does not resolve — so that feed was dropped rather than guessed
+  at. Realtor.com's condition for use is attribution (`REALTOR_CREDIT`).
 - The construction loan's interest reserve, run rather than approximated:
   `lib/tools/construction-draw.ts` (pure). A construction loan funds its own
   interest, so the reserve is CIRCULAR — the loan pays interest on a balance

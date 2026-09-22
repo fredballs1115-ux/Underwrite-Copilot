@@ -841,6 +841,14 @@ jobs:
           mark "#368 the apartment asking rent is on the market brief" grep -q "Asking rent, apartments" p_market.html
           mark "#368 the home value is said in years of rent" grep -q "years of the all-homes asking rent" p_market.html
           mark "#368 the apartment figure is set against the all-homes one" grep -q "multifamily listings alone" p_market.html
+          # #369 — the for-sale market this month, from Realtor.com's
+          # monthly metro file: the list price, the listings and the days
+          # on market, and the call the flow supports. The rows arrive with
+          # realtor.yml's run — NOT DEPLOYED here means the pull has not
+          # written them yet; run realtor.yml and look again.
+          mark "#369 the for-sale market is on the market brief" grep -q "For sale, median list" p_market.html
+          mark "#369 and carries Realtor.com's credit" grep -q "Data: Realtor.com" p_market.html
+          mark "#369 the list price is named as an ask" grep -q "what sellers are asking, not what buyers paid" p_market.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

@@ -15,6 +15,8 @@ import { liveMetroRates, liveRates } from "@/lib/live-rates-read";
 import { MetroLive } from "./metro-live";
 import { liveZori } from "@/lib/zori-read";
 import { ZoriLine } from "./zori-line";
+import { liveRealtor } from "@/lib/realtor-read";
+import { RealtorLine } from "./realtor-line";
 import { mergeBenchmarks, seedBenchmarks, seedRules } from "@/lib/research-data";
 import { linkOk } from "@/lib/link-audit";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -530,6 +532,9 @@ async function MetroExplorer({ selected }: { selected?: string }) {
   // What landlords are asking this month (Zillow's index, monthly), set
   // against what HUD will pay — two different numbers, both shown.
   const zori = await liveZori(active.name);
+  // The for-sale market this month (Realtor.com's inventory, monthly) —
+  // the demand side an apartment underwrite is quietly assuming.
+  const realtor = await liveRealtor(active.name);
   const fmr = active.fmr_fy2026 as {
     "0br"?: number | null;
     "1br"?: number | null;
@@ -736,6 +741,8 @@ async function MetroExplorer({ selected }: { selected?: string }) {
         )}
 
         <ZoriLine z={zori} fmr2br={typeof fmr?.["2br"] === "number" ? fmr["2br"] : null} />
+
+        <RealtorLine r={realtor} />
 
         <MetroLive rates={live} metroId={active.id} metroName={active.name} />
 

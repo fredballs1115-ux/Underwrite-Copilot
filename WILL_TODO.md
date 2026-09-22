@@ -59,15 +59,24 @@ rent (the multifamily index, a third bar beside all-homes and the FMR,
 $80 to $270 a month under all-homes everywhere) and the typical home
 value, said as years of asking rent — three files, each dry-run from the
 runner (18 of 18 in each).
+Then #369: the for-sale market under the rent — Realtor.com's monthly
+metro inventory (median list price, active listings, days on market,
+each with its y/y), matched by CBSA code and checked by name from the
+runner, with the loosening/tightening call made only from both flow
+figures. The step before it was `zori.yml`'s new `probe_url`, which
+found Realtor.com's file real (text/csv, 936 metros, one month a file)
+and Apartment List's not (a gated download; its static host does not
+resolve) — so the metro VACANCY index the site still lacks has no free
+programmatic source yet, like cap rates (CBRE, Green Street and RCA are
+all licensed).
 **Whose move: the operator's** — the ground-level files for
 `public/photos/`; optionally a free `BLS_API_KEY` Actions secret so the
-dry run prints the BLS series' titles. **Mine, next** — more inputs
-with a free, attributable source: Apartment List's monthly VACANCY
-index per metro (the one apartment figure the site still lacks at the
-metro level) and its rent estimates; Realtor.com's monthly inventory,
-days on market and median list price per metro (the for-sale side).
-Cap rates stay dated research: CBRE, Green Street and RCA are all
-licensed, and there is no free daily source.
+dry run prints the BLS series' titles. **Mine, next** — after #369
+merges, its dry run on main, then the real pull and the live-verify;
+then more inputs where a free, attributable source exists: FRED's
+regional rental vacancy (the Census HVS, quarterly, Northeast / South /
+Midwest / West — borrowed and named, since no metro series exists), and
+the Realtor.com "hotness" file the probe listed beside the inventory.
 
 ## 🟢 2026-09-16 into 09-17 — `/tools` becomes the reason not to open Excel
 

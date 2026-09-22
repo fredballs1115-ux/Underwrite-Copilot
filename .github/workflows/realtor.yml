@@ -1,0 +1,41 @@
+name: realtor
+# Monthly Realtor.com inventory pull → the `benchmarks` table: each covered
+# metro's median list price, active listings and median days on market,
+# each with its change from a year ago, from Realtor.com's public metro CSV
+# — one month per file, refreshed early in the month for the month before,
+# free to use with attribution.
+#
+# Dispatch it with `dry_run` ticked to fetch, match and print without
+# writing: the sandbox cannot reach Realtor.com, so the file's shape and
+# each metro's row are verified here first (the first probe of the file
+# was zori.yml's probe_url, run 35782501160).
+#
+# No-ops with instructions until the Supabase Actions secrets exist.
+on:
+  schedule:
+    - cron: "17 14 8 * *" # the 8th of each month, after Realtor.com's early-month release
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Fetch, match and print every metro, write nothing"
+        type: boolean
+        default: false
+jobs:
+  realtor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --omit=dev
+      - name: Pull Realtor.com inventory
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DRY_RUN: ${{ inputs.dry_run == true && '1' || '' }}
+        run: |
+          if [ "$DRY_RUN" != "1" ] && { [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; }; then
+            echo "Supabase Actions secrets not set (repo Settings → Secrets → Actions: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY). Skipping."
+            exit 0
+          fi
+          node scripts/fetch-realtor.mjs

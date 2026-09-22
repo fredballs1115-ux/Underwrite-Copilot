@@ -2520,3 +2520,65 @@ describe("a metro's asking rent, against the FMR", () => {
     expect(gluedWords(text)).toEqual([]);
   });
 });
+
+// ── the for-sale market this month ─────────────────────────────────────────
+import { RealtorLine } from "@/app/market/realtor-line";
+import { realtorFor } from "@/lib/realtor";
+
+describe("a metro's for-sale market, from Realtor.com", () => {
+  // Washington's August 2026 row, as the runner printed it: list price
+  // $565,000 (−5.8%), 15,290 listings (+13.8%), 43 days (+10.3%).
+  const rows = [
+    { metric: "rdc_median_list_price", metro: "Washington DC", low: 565000, as_of: "2026-08-01", note: "Realtor.com inventory, Washington-Arlington-Alexandria, DC-VA-MD-WV metro area, August 2026. Data: Realtor.com." },
+    { metric: "rdc_median_list_price_yoy", metro: "Washington DC", low: -5.8, as_of: "2026-08-01", note: null },
+    { metric: "rdc_active_listings", metro: "Washington DC", low: 15290, as_of: "2026-08-01", note: null },
+    { metric: "rdc_active_listings_yoy", metro: "Washington DC", low: 13.8, as_of: "2026-08-01", note: null },
+    { metric: "rdc_days_on_market", metro: "Washington DC", low: 43, as_of: "2026-08-01", note: null },
+    { metric: "rdc_days_on_market_yoy", metro: "Washington DC", low: 10.3, as_of: "2026-08-01", note: null },
+  ];
+  const html = render(React.createElement(RealtorLine, { r: realtorFor(rows, "Washington DC") }));
+  const text = visibleText(html);
+
+  it("prints the list price, the listings, the days on market and the credit", () => {
+    expect(text).toContain("For sale, median list");
+    expect(text).toContain("$565,000");
+    expect(text).toContain("5.8%");
+    // The figure is its own styled span, so the visible text splits there.
+    expect(text).toContain("15,290");
+    expect(text).toContain("active listings");
+    expect(text).toContain("13.8%");
+    expect(text).toContain("43");
+    expect(text).toContain("days on market");
+    expect(text).toContain("Aug 2026");
+    expect(text).toContain("Data: Realtor.com");
+    expect(html).toContain("https://www.realtor.com/research/data/");
+  });
+
+  it("calls the direction from the flow, and says what the list price is not", () => {
+    expect(text).toContain("the for-sale market is loosening");
+    expect(text).toContain("what sellers are asking, not what buyers paid");
+    // Fewer listings, faster to sell: tightening. And one of each: no call.
+    const tight = visibleText(render(React.createElement(RealtorLine, {
+      r: realtorFor(rows.map((x) => (x.metric.endsWith("_yoy") && x.metric !== "rdc_median_list_price_yoy" ? { ...x, low: -3 } : x)), "Washington DC"),
+    })));
+    expect(tight).toContain("the for-sale market is tightening");
+    const mixed = visibleText(render(React.createElement(RealtorLine, {
+      r: realtorFor(rows.map((x) => (x.metric === "rdc_days_on_market_yoy" ? { ...x, low: -3 } : x)), "Washington DC"),
+    })));
+    expect(mixed).toContain("not clearly loosening or tightening");
+    expect(mixed).not.toContain("is loosening");
+  });
+
+  it("renders nothing with no figure, and only what the pull had", () => {
+    expect(render(React.createElement(RealtorLine, { r: null }))).not.toContain("For sale");
+    const priceOnly = visibleText(render(React.createElement(RealtorLine, { r: realtorFor(rows.slice(0, 2), "Washington DC") })));
+    expect(priceOnly).toContain("$565,000");
+    expect(priceOnly).not.toContain("active listings");
+    expect(priceOnly).not.toContain("loosening");
+  });
+
+  it("reads clean and names everything", () => {
+    expect(a11yIssues(html), "realtor line").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+});
