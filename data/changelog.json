@@ -2,6 +2,12 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-09-22",
+      "title": "Los Angeles opens on the mountains, Dallas on its green tower",
+      "href": "/market?metro=los_angeles",
+      "blurb": "Los Angeles's opening picture was a tight cluster of downtown towers under a blue sky — sharp, and it could have been any city. It is now downtown against the snow on the San Gabriels, the view the city is known by. Dallas's was a hazy aerial from a plane window; it is now downtown at dusk with the green outline of Bank of America Plaza and Reunion Tower behind it. Finding the Dallas picture took a change to the search itself: a run for one market now checks four times as many files as a run for all eighteen, because the narrow run is the one that wants depth. San Francisco, Seattle, Miami and Atlanta keep their pictures, each the best on its sheet. Montgomery County keeps its overhead: two searches found an aerial, an interstate and a category of berries, and a suburb shaped by its land is more honestly photographed from above."
+    },
+    {
       "date": "2026-09-21",
       "title": "Four markets get the photograph they are known by",
       "href": "/market?metro=dc",

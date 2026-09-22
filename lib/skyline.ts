@@ -222,15 +222,18 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
   },
-  // The better-looking Dallas candidate is a 6000px PNG, and a PNG
-  // photograph at 1600px is megabytes where a JPEG is hundreds of
-  // kilobytes. Page weight wins on a tile nobody stops to admire.
+  // Fourth sheet (skyline-sheet run 35752500514, the first one-market run,
+  // thirty-six files deep): the hazy plane-window aerial gives way to the
+  // picture Dallas is actually known by — downtown at dusk with the green
+  // outline of Bank of America Plaza and the ball of Reunion Tower behind
+  // it. The Wikipedia article's own lead for downtown, a JPEG, where the
+  // city article's lead was a 6000px PNG that would have weighed megabytes.
   dallas: {
-    file: "IMAG2591-dallas-downtown.jpg",
-    place: "Downtown Dallas",
-    credit: "alfred twu",
-    license: "CC0",
-    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    file: "Dallas view.jpg",
+    place: "Downtown Dallas at dusk",
+    credit: "Robert Hensley",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
   },
 };
 

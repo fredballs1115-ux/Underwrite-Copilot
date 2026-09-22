@@ -485,8 +485,12 @@
       ],
       "candidates": [
         {
+          "file": "Dallas view.jpg",
+          "note": "Downtown at dusk, the green-lit Bank of America Plaza and Reunion Tower, 5951x3669 — Robert Hensley, CC BY 2.0. The chosen file, in lib/skyline.ts; the lead of the Downtown Dallas article, found by the first one-market search."
+        },
+        {
           "file": "IMAG2591-dallas-downtown.jpg",
-          "note": "Downtown Dallas from a plane window, hazy, 2460x1276 — alfred twu, CC0. The current choice, kept for want of a JPEG alternative."
+          "note": "Downtown Dallas from a plane window, hazy, 2460x1276 — alfred twu, CC0. The previous choice."
         },
         {
           "file": "Dallas Texas skyline from Reunion Tower September 2025 (cropped).png",
