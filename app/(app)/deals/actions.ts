@@ -12,6 +12,8 @@ import {
   modelTmpPath,
   omStoragePath,
 } from "@/lib/storage";
+import type { DealVisualCache } from "@/lib/deal-location";
+import { MAX_PICTURE_BYTES, clearOmPicture, picturePaths, storePicture } from "@/lib/deal-picture";
 import { getBilling } from "@/lib/billing";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
@@ -756,7 +758,7 @@ export async function deleteDeal(formData: FormData) {
 
   const { data: deal } = await supabase
     .from("deals")
-    .select("id, user_id, om_storage_path, supplements")
+    .select("id, user_id, om_storage_path, supplements, photo")
     .eq("id", dealId)
     .maybeSingle();
   if (!deal) redirect("/deals");
@@ -765,7 +767,7 @@ export async function deleteDeal(formData: FormData) {
   // deal's own shapes before the service role removes it — a path on the row
   // that names another deal's object is skipped, never swept.
   const scope = { kind: "deal", dealId } as const;
-  const paths: string[] = [];
+  const paths: string[] = [...picturePaths((deal.photo as DealVisualCache | null) ?? null)];
   if (deal.om_storage_path) {
     paths.push(deal.om_storage_path as string);
     // A worker-mode reconcile may have parked a model file here; removing a
@@ -885,7 +887,7 @@ export async function replaceOm(formData: FormData) {
   // RLS scopes this read — a deal the caller can't see comes back null.
   const { data: deal } = await supabase
     .from("deals")
-    .select("id, om_storage_path, user_id, team_id, is_sample")
+    .select("id, om_storage_path, user_id, team_id, is_sample, photo")
     .eq("id", dealId)
     .maybeSingle();
   if (!deal) redirect("/deals");
@@ -983,6 +985,10 @@ export async function replaceOm(formData: FormData) {
   if (!deal.om_storage_path) {
     await supabase.from("deals").update({ om_storage_path: path }).eq("id", dealId);
   }
+  // A new deck may have a new cover: forget the picture lifted from the old
+  // one, so the next view finds this one's. A picture the reader uploaded
+  // is theirs and stays.
+  await clearOmPicture(supabase, dealId, (deal.photo as DealVisualCache | null) ?? null);
 
   // Only diff against results from a COMPLETED previous run — snapshotting
   // after a failed run would pair a half-new extraction with an old verdict.
@@ -998,6 +1004,48 @@ export async function replaceOm(formData: FormData) {
   } else {
     after(() => runAnalysis(dealId, { snapshotPrior: claim.priorStatus === "done" }));
   }
+  redirect(`/deals/${dealId}`);
+}
+
+/**
+ * The reader's own photograph of the building — "that's not the building",
+ * or "I have a better shot". Replaces whatever the deal shows first: the
+ * cover lifted from the memorandum, or an earlier upload. The bytes never
+ * serve as uploaded; sharp re-encodes them into the two stored sizes
+ * (lib/deal-picture), which is also what refuses a file that is not a
+ * picture. Anyone who can read the deal can put a picture on it — a
+ * teammate correcting the photo is help, not harm, and the cover it
+ * replaces came out of a file they can already open.
+ */
+export async function replacePicture(formData: FormData) {
+  const dealId = String(formData.get("dealId") ?? "");
+  if (!dealId) redirect("/deals");
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: deal } = await supabase
+    .from("deals")
+    .select("id, photo, is_sample")
+    .eq("id", dealId)
+    .maybeSingle();
+  if (!deal) redirect("/deals");
+  if (deal.is_sample) redirect(`/deals/${dealId}`);
+
+  const file = formData.get("picture");
+  if (!(file instanceof File) || file.size === 0) redirect(`/deals/${dealId}?error=picture`);
+  if (file.size > MAX_PICTURE_BYTES) redirect(`/deals/${dealId}?error=picturesize`);
+  const bytes = Buffer.from(await file.arrayBuffer());
+  try {
+    await storePicture(supabase, dealId, (deal.photo as DealVisualCache | null) ?? null, bytes, "upload");
+  } catch {
+    redirect(`/deals/${dealId}?error=picture`);
+  }
+  revalidatePath(`/deals/${dealId}`);
+  revalidatePath("/deals");
   redirect(`/deals/${dealId}`);
 }
 

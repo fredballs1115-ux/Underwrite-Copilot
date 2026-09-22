@@ -32,6 +32,24 @@ export interface DealVisualCache {
   geoV?: number;
   /** a geocode that definitively found nothing, so we stop re-asking */
   geoMiss?: boolean;
+  /** the building's own photograph, stored as two derivatives (lib/deal-picture) */
+  picture?: DealPicture;
+  /** when the memorandum was last searched for one and none was found */
+  pictureCheckedAt?: string;
+}
+
+/** The building's own photograph — where it came from and where its two sizes live. */
+export interface DealPicture {
+  /** `photos/<dealId>/<stamp>-hero.jpg`, up to 1600px on the long side */
+  hero: string;
+  /** `photos/<dealId>/<stamp>-thumb.jpg`, a 240px square crop for a list row */
+  thumb: string;
+  /** the hero's pixel size */
+  width: number;
+  height: number;
+  /** lifted from the memorandum's cover, or uploaded by the reader */
+  source: "om" | "upload";
+  at: string;
 }
 
 // Precision now lives with the framing rules it drives (lib/imagery-plan),

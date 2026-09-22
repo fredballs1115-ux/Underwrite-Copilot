@@ -563,6 +563,16 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   and Apartment List's not to be — its download is gated and its static
   host does not resolve — so that feed was dropped rather than guessed
   at. Realtor.com's condition for use is attribution (`REALTOR_CREDIT`).
+  **A dry run never upserts, so it cannot see the table refuse a row**:
+  the first real pull (run 35785192214) failed on `benchmarks_unit_check`
+  — migration 0023 admits `usd`, `pct`, `ratio`, `months`, `count` and
+  `usd_month`, and the dry run had happily printed rows in `listings` and
+  `days`. Both are `count` now (a listing is counted, so is a day; the
+  reader reads by metric and never by unit), the script holds its own
+  units to that list before it fetches anything, and
+  `lib/benchmark-units.test.ts` reads the list out of the migration and
+  holds every `unit:` literal in every script that writes the table to it
+  — so the next new unit fails in CI, not on the 8th of the month.
 - The construction loan's interest reserve, run rather than approximated:
   `lib/tools/construction-draw.ts` (pure). A construction loan funds its own
   interest, so the reserve is CIRCULAR — the loan pays interest on a balance
@@ -1506,6 +1516,38 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   inverts the **binding** test only — a target to work toward, not a
   promise, since pushing NOI past it hands the job to whichever test binds
   next.
+- Each building's own photograph: `lib/om-photo.ts` (pure) reads the JPEG
+  image objects out of the deal's memorandum — a `/DCTDecode` stream IS the
+  JPEG's bytes, verbatim, and `jpegInfo` reads its width, height and
+  component count off the SOF marker — and `pickCover` takes the largest
+  one of a photograph's shape (`COVER_MIN` 480×320, an aspect between 0.5
+  and 2.6, three or four components because a one-component image is a
+  mask), with a 1.5× bonus on AREA for an image in the first 30% of the
+  file, where a cover sits. Only what the file states: a Flate-then-DCT
+  stream, a form object, a stream that is not a JPEG are all skipped, never
+  decoded. `lib/deal-picture.ts` (`server-only`) makes the two derivatives
+  with sharp — a hero inside 1600px and a 240px cover-crop by attention for
+  the pipeline thumbnail — stores them at `photos/<dealId>/<stamp>-hero.jpg`
+  and `-thumb.jpg` (`dealPhotoPath`; storage kind `photo`, scope-checked
+  like every other object; migration 0034's row assertion does not cover
+  the `photo` column, so the classifier is the gate), caches the pair in
+  `deals.photo.picture` and `ensureDealPicture` runs the extraction on the
+  deal's FIRST VIEW: never on the sample deal, never twice inside thirty
+  days of a memorandum that had no photograph (`pictureCheckedAt`), at
+  most two in flight per process, and the page reads whatever is cached
+  rather than waiting. `/api/deals/[id]/picture?size=hero|thumb` serves
+  it; `/api/deals/[id]/image` (the pipeline row) and `PropertyVisual` both
+  put it FIRST (`imagePlan`'s `hasPicture`, the Photo tab), and the credit
+  follows the source — `PICTURE_CREDIT`: "From the offering memorandum" or
+  "Photograph added to the deal" — so a memorandum's picture is never
+  credited to Google or to USGS. A replaced memorandum drops the picture
+  taken from the old one; a picture the reader added ("Replace photo" /
+  "Add photo" on the deal page, `replacePicture`, 12 MB, never on the
+  sample) survives a reissue. **A building's photograph is never fetched
+  from a listing portal or an image search**: the memorandum's cover was
+  sent to the reader to evaluate this deal, which is exactly this use, and
+  a portal's photograph is under that portal's terms. The Street View
+  photograph remains the operator's `GOOGLE_MAPS_API_KEY` path.
 - The homepage's photographs: `lib/photos.ts` (pure — the four slots with
   their file names, briefs, sizes and alt text; `presentPhotos` over an
   `exists` callback; `stripPhotos`; `HERO_AERIAL`) and `lib/photos-fs.ts`

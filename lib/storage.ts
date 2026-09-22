@@ -6,6 +6,7 @@ export {
   StoragePathError,
   brandingLogoPath,
   classifyDealPath,
+  dealPhotoPath,
   documentPath,
   isScopedPath,
   modelTmpPath,
@@ -62,6 +63,20 @@ export async function downloadOmPdf(path: string, scope: StorageScope): Promise<
     throw new Error(`Storage download failed: ${error?.message ?? "no data"}`);
   }
   return Buffer.from(await data.arrayBuffer());
+}
+
+/** Store one of the building's photograph derivatives — always a JPEG the
+ *  server itself encoded (`lib/deal-picture.ts`), never the user's bytes. */
+export async function uploadDealPhoto(path: string, body: Buffer, scope: StorageScope): Promise<void> {
+  const target = scopedPath(path, scope);
+  const admin = createSupabaseAdminClient();
+  const { error } = await admin.storage.from(BUCKET).upload(target, body, {
+    contentType: "image/jpeg",
+    upsert: true,
+  });
+  if (error) {
+    throw new Error(`Photo upload failed: ${error.message}`);
+  }
 }
 
 /** Download any file in the bucket as a Buffer (model source documents, a
