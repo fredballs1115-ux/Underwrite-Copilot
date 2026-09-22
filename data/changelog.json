@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-22",
+      "title": "Each market's rental vacancy, from the Census region it sits in",
+      "href": "/market?metro=dc",
+      "blurb": "Every covered market's live panel now carries a rental vacancy rate — the Census Bureau's Housing Vacancy Survey, quarterly, pulled through FRED every weekday. The survey publishes it for the four Census regions and never for a metro, so the tile carries the region's figure and says so in its label (\"Rental vacancy · South Census region\") rather than passing a region's number off as a city's; the South sits near 9.5% where the West is near 5.3%, which is the spread an underwriter's vacancy assumption should at least know about. Each of the four series was printed from the runner with its own title before it was trusted."
+    },
+    {
+      "date": "2026-09-22",
       "title": "The model's area, when the memorandum states none",
       "href": "/deals",
       "blurb": "An apartment memorandum often states its unit count and never its square footage. The Excel model used to run its per-square-foot lines on a flat 100,000 SF in that case — a placeholder marked as an assumption, but a made-up figure all the same. It now runs on the unit count times the deal type's typical size (850 SF an apartment, 550 a hotel key, 350 a student bed), and the Sources column says exactly that — \"248 units × 850 SF typical — enter the rentable SF\" — so the number is yours to correct rather than one to discover. Only a deal with no count at all still falls to the placeholder."

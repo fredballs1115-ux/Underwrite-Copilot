@@ -96,7 +96,16 @@ export type GroupId =
  * residence — what sitting tenants pay across the area's leases, the in-place
  * rent the asking rent on the same page is set against.
  */
-export type MetroMetric = "unemployment" | "jobs_yoy" | "permits" | "hpi_yoy" | "rent_cpi_yoy";
+export type MetroMetric =
+  | "unemployment"
+  | "jobs_yoy"
+  | "permits"
+  | "hpi_yoy"
+  | "rent_cpi_yoy"
+  /** the Housing Vacancy Survey's rental vacancy — published for the four
+   *  Census regions and never for a metro, so every metro borrows its
+   *  region's and the tile says so */
+  | "rental_vacancy";
 
 /**
  * Where a series is pulled from. FRED for nearly everything; the BLS's own
@@ -172,7 +181,14 @@ export interface SeriesGroup {
 
 const CADENCES: readonly Cadence[] = ["daily", "weekly", "monthly", "quarterly"];
 const UNITS: readonly Unit[] = ["pct", "spread", "pts", "count", "units"];
-const METRO_METRICS: readonly MetroMetric[] = ["unemployment", "jobs_yoy", "permits", "hpi_yoy", "rent_cpi_yoy"];
+const METRO_METRICS: readonly MetroMetric[] = [
+  "unemployment",
+  "jobs_yoy",
+  "permits",
+  "hpi_yoy",
+  "rent_cpi_yoy",
+  "rental_vacancy",
+];
 
 /** One entry's shape, held; the two lists differ only in what files it. */
 function readSeriesEntry(o: Record<string, unknown>, where: string, groupIds: Set<string>): SeriesMeta {
@@ -246,6 +262,12 @@ export function readSeriesTable(raw: unknown): {
   metroSeries: MetroSeriesMeta[];
   /** A metro with no series of its own, and the metro whose figures it shows. */
   metroAliases: Record<string, string>;
+  /** The Census regions' series — `metro` is the region's id, never a
+   *  covered metro's — for the figures the survey publishes at no finer
+   *  grain, borrowed by every metro in the region and named as the region's. */
+  regionSeries: MetroSeriesMeta[];
+  /** Each covered metro's Census region. */
+  metroRegions: Record<string, string>;
 } {
   if (!raw || typeof raw !== "object") throw new Error("fred-series: not an object");
   const t = raw as Record<string, unknown>;
@@ -307,7 +329,39 @@ export function readSeriesTable(raw: unknown): {
     }
     metroAliases[from] = to;
   }
-  return { historyRows, groups, series, metroSeries, metroAliases };
+  // The regions' series, the same shape filed under a region rather than a
+  // metro; a region series is never also a strip or a metro series.
+  const regionRaw = t.regionSeries === undefined ? [] : t.regionSeries;
+  if (!Array.isArray(regionRaw)) throw new Error("fred-series: regionSeries must be an array");
+  const seenRegion = new Set<string>();
+  const regionSeries: MetroSeriesMeta[] = regionRaw.map((s, i) => {
+    const o = (s ?? {}) as Record<string, unknown>;
+    const where = `fred-series: region series ${i} (${String(o.id ?? "?")})`;
+    if (typeof o.metro !== "string" || !o.metro) throw new Error(`${where}: needs a region`);
+    if (!METRO_METRICS.includes(o.metric as MetroMetric)) throw new Error(`${where}: bad metric`);
+    if (typeof o.area !== "string" || !o.area) throw new Error(`${where}: needs the area FRED names`);
+    const m = readSeriesEntry({ ...o, group: "metro", contractRate: false }, where, new Set(["metro"]));
+    const k = `${o.metro}|${o.metric}`;
+    if (seenRegion.has(k)) throw new Error(`${where}: ${o.metro} already has a ${o.metric} series`);
+    seenRegion.add(k);
+    if (seen.has(m.id) || metroSeries.some((x) => x.id === m.id)) {
+      throw new Error(`${where}: id is already a strip or metro series`);
+    }
+    return { ...m, metro: o.metro, metric: o.metric as MetroMetric, area: o.area };
+  });
+  const regionsRaw = t.metroRegions === undefined ? {} : t.metroRegions;
+  if (!regionsRaw || typeof regionsRaw !== "object" || Array.isArray(regionsRaw)) {
+    throw new Error("fred-series: metroRegions must be an object");
+  }
+  const metroRegions: Record<string, string> = {};
+  for (const [metro, region] of Object.entries(regionsRaw as Record<string, unknown>)) {
+    if (typeof region !== "string") throw new Error(`fred-series: region of ${metro} must name a region`);
+    if (!regionSeries.some((r) => r.metro === region)) {
+      throw new Error(`fred-series: ${metro} → ${region}, but ${region} has no series`);
+    }
+    metroRegions[metro] = region;
+  }
+  return { historyRows, groups, series, metroSeries, metroAliases, regionSeries, metroRegions };
 }
 
 const TABLE = readSeriesTable(table);
@@ -318,6 +372,8 @@ export const SERIES: readonly SeriesMeta[] = TABLE.series;
 export const GROUPS: readonly SeriesGroup[] = TABLE.groups;
 /** Each covered metro's own series. */
 export const METRO_SERIES: readonly MetroSeriesMeta[] = TABLE.metroSeries;
+/** The Census regions' series, borrowed by every metro in the region. */
+export const REGION_SERIES: readonly MetroSeriesMeta[] = TABLE.regionSeries;
 /**
  * How many observations per series the cron writes and the read fetches —
  * one number, so the page reads back exactly the path the cron backfilled.
@@ -325,7 +381,12 @@ export const METRO_SERIES: readonly MetroSeriesMeta[] = TABLE.metroSeries;
 export const HISTORY_ROWS: number = TABLE.historyRows;
 
 export function seriesMeta(id: string): SeriesMeta | null {
-  return SERIES.find((s) => s.id === id) ?? METRO_SERIES.find((s) => s.id === id) ?? null;
+  return (
+    SERIES.find((s) => s.id === id) ??
+    METRO_SERIES.find((s) => s.id === id) ??
+    REGION_SERIES.find((s) => s.id === id) ??
+    null
+  );
 }
 
 const METRO_METRIC_ORDER: readonly MetroMetric[] = METRO_METRICS;
@@ -351,10 +412,22 @@ export function metroSeriesFor(metroId: string): {
         (m) => m.metro === alias && !own.some((o) => o.metric === m.metric),
       )
     : [];
-  const series = [...own, ...fromAlias].sort(
+  // The Census region's, for what the survey publishes at no finer grain:
+  // filed under the region's id, so the tile wears the region's name and
+  // a metro's row never claims a figure it does not have.
+  const region = TABLE.metroRegions[metroId];
+  const fromRegion = region
+    ? REGION_SERIES.filter(
+        (m) =>
+          m.metro === region &&
+          !own.some((o) => o.metric === m.metric) &&
+          !fromAlias.some((o) => o.metric === m.metric),
+      )
+    : [];
+  const series = [...own, ...fromAlias, ...fromRegion].sort(
     (a, b) => METRO_METRIC_ORDER.indexOf(a.metric) - METRO_METRIC_ORDER.indexOf(b.metric),
   );
-  return { metro: metroId, series, borrowed: fromAlias.map((m) => m.metric) };
+  return { metro: metroId, series, borrowed: [...fromAlias, ...fromRegion].map((m) => m.metric) };
 }
 
 /** A row as the `rates` table stores it. */

@@ -109,6 +109,11 @@ Then #373: the model's area when the OM states none — a counted
 building runs on units × the class's typical size, said as the
 assumption it is ("248 units × 850 SF typical"), and only a deal with
 no count at all falls to the flat placeholder.
+Then #374: the region's rental vacancy on every metro's panel — the
+Housing Vacancy Survey's four regional series, each printed from the
+runner first (run 35790692228), borrowed by every metro from its
+region and named as the region's on the tile; and a job cap on the
+three pull workflows after a probe run stalled.
 **Mine, next** — the buy box's square-feet-only size band; then more
 inputs where a free, attributable source exists: FRED's regional rental vacancy (the Census HVS, quarterly,
 Northeast / South / Midwest / West — borrowed and named, since no metro

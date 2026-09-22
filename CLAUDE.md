@@ -569,7 +569,27 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   says where the figure came from: a figure is never credited to a
   source that does not publish it. Richmond and Hampton Roads have no
   CPI area and a region's figure is not a metro's, so their tile is
-  absent rather than borrowed.
+  absent rather than borrowed. **The sixth metric is the region's rental
+  vacancy** (`rental_vacancy`): the Census Bureau's Housing Vacancy
+  Survey publishes it for the four Census regions and never for a metro,
+  so it is the one figure every metro BORROWS from its region — filed in
+  `regionSeries` under the REGION's id (northeast / midwest / south /
+  west, never a covered metro's, so the metro test's "every series is a
+  covered metro's" holds), mapped by `metroRegions`, appended last by
+  `metroSeriesFor` and named on the tile ("Rental vacancy · South Census
+  region") with the note saying the survey's grain; the "the metro
+  area's" sentence is about MSA borrowing and leaves the region out. The
+  four ids were printed from the runner before they were trusted (rates
+  run 35790692228: "Rental Vacancy Rate in the South Census Region",
+  quarterly, percent, newest 2026-04-01 — the South at 9.5% against the
+  West's 5.3%). It contradicts the rent-index rule above on its face
+  ("a region's figure is not a metro's"): the difference is that the rent
+  index HAS metro figures for most metros, so a region's would be passing
+  as one, where the vacancy rate has none at any finer grain and is said
+  to be the region's. That probe run also bought the job cap: the run
+  before it sat ten minutes on a two-minute step, and `timeout-minutes`
+  on the three pull workflows now ends a stall instead of holding a
+  runner for six hours.
 - What landlords are asking this month: `lib/zori.ts` (pure — a metro's
   Zillow Observed Rent Index and its change from a year ago, read out of
   the two `benchmarks` rows the MONTHLY pull writes, `scripts/fetch-zori.mjs`
