@@ -29,6 +29,8 @@ import type {
 } from "@/lib/anthropic/types";
 import { inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { keyTermRows } from "@/lib/key-terms";
+import { assetClassLabel } from "@/lib/asset-class";
+import { shownAssetClass } from "@/lib/pipeline-slots";
 
 const C = {
   brand: "#114e54",
@@ -342,7 +344,8 @@ export function buildMemoData(
   return {
     name: str(deal.name) || "Deal",
     market: str(extraction?.market),
-    assetClass: str(deal.asset_class),
+    // On a deal filed "Auto-detect", what the deck turned out to be.
+    assetClass: shownAssetClass(str(deal.asset_class), extraction ?? null),
     strategyLine: pdfSafe(strategyLineFor(extraction ?? null)),
     dateStr,
     verdictWord: vmeta?.word ?? null,
@@ -736,7 +739,9 @@ export function MemoDocument({ data }: { data: MemoData }) {
 
 /** The memo's single page, exported so the full report can lead with it. */
 export function MemoPage({ data }: { data: MemoData }) {
-  const subParts = [data.market, cap(data.assetClass), data.strategyLine ?? ""].filter(Boolean);
+  // The class as the label map says it — a stored "self_storage" reads
+  // "Self-storage" on paper, never "Self_storage".
+  const subParts = [data.market, assetClassLabel(data.assetClass), data.strategyLine ?? ""].filter(Boolean);
   const b = data.branding;
   const branded = !!(b && (b.firmName || b.logoDataUri || b.footerText));
   return (
@@ -1051,6 +1056,3 @@ export function MemoPage({ data }: { data: MemoData }) {
   );
 }
 
-function cap(str: string): string {
-  return str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
-}

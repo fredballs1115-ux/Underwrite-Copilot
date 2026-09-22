@@ -9,6 +9,7 @@ import type {
   VerdictScenario,
 } from "@/lib/anthropic/types";
 import { assetClassLabel } from "@/lib/asset-class";
+import { assetWords } from "@/lib/asset-words";
 import { inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { keyTermRows } from "@/lib/key-terms";
 import { SharePlan } from "./plan-facts";
@@ -296,7 +297,7 @@ export function ShareView({
         )}
       </section>
 
-      <SharePlan strategy={strategy} plan={plan} />
+      <SharePlan strategy={strategy} plan={plan} noun={assetWords(assetClass).noun?.one} />
 
       {ranges.length > 0 && (
         <section className="mt-6 rounded-2xl border border-line bg-surface p-5 shadow-sm">

@@ -34,6 +34,8 @@ import {
   unitCountFromMetrics,
 } from "@/lib/deal-strategy";
 import type { ExtractionResult } from "@/lib/anthropic/types";
+import { assetClassKey } from "@/lib/asset-words";
+import { assetClassLabel } from "@/lib/asset-class";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { UnderwriteInputs } from "./engine";
 
@@ -88,6 +90,23 @@ const CLASS_DEFAULTS: Record<string, { expenseRatio: number; vacancy: number; re
   office: { expenseRatio: 0.45, vacancy: 0.1, reservesPsf: 0.2 },
   industrial: { expenseRatio: 0.28, vacancy: 0.05, reservesPsf: 0.15 },
   retail: { expenseRatio: 0.32, vacancy: 0.07, reservesPsf: 0.15 },
+  // A single tenant on a net lease: the landlord's expense load is a
+  // sliver, and the vacancy is the lease's own risk rather than a market's.
+  net_lease: { expenseRatio: 0.06, vacancy: 0.02, reservesPsf: 0.05 },
+  medical_office: { expenseRatio: 0.42, vacancy: 0.08, reservesPsf: 0.2 },
+  mixed_use: { expenseRatio: 0.4, vacancy: 0.07, reservesPsf: 0.2 },
+  sfr_btr: { expenseRatio: 0.38, vacancy: 0.06, reservesPsf: 0.3 },
+  student_housing: { expenseRatio: 0.45, vacancy: 0.06, reservesPsf: 0.3 },
+  // Licensed care carries its labor inside the expense line.
+  senior_housing: { expenseRatio: 0.68, vacancy: 0.12, reservesPsf: 0.3 },
+  manufactured_housing: { expenseRatio: 0.35, vacancy: 0.06, reservesPsf: 0.1 },
+  self_storage: { expenseRatio: 0.35, vacancy: 0.12, reservesPsf: 0.15 },
+  // A hotel's "vacancy" is its unsold rooms, and its expense load is the
+  // whole operation — housekeeping, the fee stack, the FF&E reserve.
+  hospitality_str: { expenseRatio: 0.65, vacancy: 0.32, reservesPsf: 0.5 },
+  data_center: { expenseRatio: 0.45, vacancy: 0.1, reservesPsf: 0.5 },
+  parking: { expenseRatio: 0.4, vacancy: 0.15, reservesPsf: 0.1 },
+  land_infill: { expenseRatio: 0.4, vacancy: 0.07, reservesPsf: 0.2 },
   auto: { expenseRatio: 0.4, vacancy: 0.07, reservesPsf: 0.2 },
 };
 
@@ -97,10 +116,13 @@ const CLASS_DEFAULTS: Record<string, { expenseRatio: number; vacancy: number; re
 const pageOf = (m: unknown): string | undefined =>
   m && typeof m === "object" && "page" in m ? (m as { page?: string }).page : undefined;
 
-const normalizeClass = (c: string): keyof typeof CLASS_DEFAULTS =>
-  (["multifamily", "office", "industrial", "retail"] as const).includes(c as never)
-    ? (c as keyof typeof CLASS_DEFAULTS)
-    : "auto";
+// Every class the site files has its own defaults; a phrase the model wrote
+// ("boutique hotel") is filed by its words (lib/asset-words), and only a
+// class nothing resolves falls to the generic row.
+const normalizeClass = (c: string): keyof typeof CLASS_DEFAULTS => {
+  const key = assetClassKey(c);
+  return key && CLASS_DEFAULTS[key] ? key : "auto";
+};
 
 export function deriveUnderwriteInputs(
   extraction: ExtractionResult | null,
@@ -110,6 +132,10 @@ export function deriveUnderwriteInputs(
   const metrics = extraction?.metrics ?? [];
   const assetClass = normalizeClass(extraction?.assetClass ?? "auto");
   const cd = CLASS_DEFAULTS[assetClass];
+  // The class as a page says it, for the notes and the workbook's cover —
+  // "Self-storage default", never "self_storage default", and "generic"
+  // where nothing has read the deck.
+  const classWord = assetClassLabel(assetClass) || "generic";
   const sources: DerivedModel["sources"] = {};
 
   // ── Property actuals (guarded) ──────────────────────────────────────────
@@ -385,7 +411,7 @@ export function deriveUnderwriteInputs(
       (occupancyRow(metrics) as { page?: string } | null)?.page,
     );
   } else {
-    mark("vacancyPct", "assumption", `${assetClass} default (${Math.round(cd.vacancy * 100)}%)`);
+    mark("vacancyPct", "assumption", `${classWord} default (${Math.round(cd.vacancy * 100)}%)`);
   }
   mark("rentGrowthPct", "assumption", "Default 3.0%/yr — set your view");
   mark("expenseGrowthPct", "assumption", "Default 3.0%/yr — set your view");
@@ -398,10 +424,10 @@ export function deriveUnderwriteInputs(
         // Derived when the NOI it ties to came from the OM; an assumption when
         // the NOI itself was assumed.
         provenance: sources.inPlaceRentAnnual?.provenance === "derived" ? "derived" : "assumption",
-        note: `Total opex to tie NOI (${Math.round(cd.expenseRatio * 100)}% of EGI ${assetClass} default) — break out from a T-12`,
+        note: `Total opex to tie NOI (${Math.round(cd.expenseRatio * 100)}% of EGI ${classWord} default) — break out from a T-12`,
       };
   mark("mgmtFeePct", "assumption", "Folded into operating expenses — split out if you track it");
-  mark("reservesPsf", "assumption", `${assetClass} default $${cd.reservesPsf.toFixed(2)}/SF/yr`);
+  mark("reservesPsf", "assumption", `${classWord} default $${cd.reservesPsf.toFixed(2)}/SF/yr`);
   if (budgetRead) {
     mark(
       "capitalImprovementsYr1",
@@ -451,7 +477,8 @@ export function deriveUnderwriteInputs(
       dealName: extraction?.dealName || fallbackName || "Deal",
       address: extraction?.address ?? "",
       market: extraction?.market ?? "",
-      assetClass,
+      // The workbook's cover prints this: the label, never a key or "auto".
+      assetClass: assetClassLabel(extraction?.assetClass) || "—",
       // Rent-roll actual occupancy outranks the OM's stated figure.
       occupancyPct: rrOcc ?? (occPct != null ? occPct / 100 : null),
       rsf,

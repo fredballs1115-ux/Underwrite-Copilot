@@ -7,12 +7,27 @@
  * same field names so results map straight onto these types with no renaming.)
  */
 
+/** The asset class a deal is filed under — a key of `ASSET_CLASS_LABEL`
+ *  (`lib/asset-class`), or "auto" for a deal the extraction is to read.
+ *  The words each one is spoken in are `lib/asset-words`. */
 export type AssetClass =
   | "auto"
   | "multifamily"
   | "office"
   | "industrial"
-  | "retail";
+  | "retail"
+  | "net_lease"
+  | "medical_office"
+  | "mixed_use"
+  | "sfr_btr"
+  | "student_housing"
+  | "senior_housing"
+  | "manufactured_housing"
+  | "self_storage"
+  | "hospitality_str"
+  | "data_center"
+  | "parking"
+  | "land_infill";
 
 export type Severity = "high" | "medium" | "low";
 export type CompSupport = "supports" | "favorable" | "stretched";

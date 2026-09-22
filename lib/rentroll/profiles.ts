@@ -1,3 +1,4 @@
+import { assetWords } from "@/lib/asset-words";
 /**
  * Market leasing assumptions (MLA) — the reusable profile that prices what
  * happens when a lease rolls: does the tenant renew, at what rent, with how
@@ -110,8 +111,12 @@ export const PROFILE_DEFAULTS: Record<string, ProfileDraft> = {
 
 export const DEFAULT_PROFILE: ProfileDraft = PROFILE_DEFAULTS.office;
 
+/** The profile a class leases like (lib/asset-words): a hotel, a storage
+ *  facility or a park leases month to month, so it starts from the
+ *  multifamily profile and never from the office one's $32 and five years;
+ *  a medical office starts from office, a net lease from retail. */
 export function defaultProfileFor(assetClass: string): ProfileDraft {
-  return PROFILE_DEFAULTS[assetClass] ?? DEFAULT_PROFILE;
+  return PROFILE_DEFAULTS[assetClass] ?? PROFILE_DEFAULTS[assetWords(assetClass).profile] ?? DEFAULT_PROFILE;
 }
 
 /** Clamp a user-entered profile into physically sensible bounds without

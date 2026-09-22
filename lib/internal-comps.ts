@@ -14,6 +14,7 @@ import {
   unitCountFromMetrics,
 } from "@/lib/deal-strategy";
 import type { ExtractionResult } from "@/lib/anthropic/types";
+import { assetWords, perSuffix } from "@/lib/asset-words";
 
 /**
  * Internal comps memory: every deal the user screens leaves extracted figures
@@ -90,8 +91,12 @@ function deriveBasis(
 
   // The branch on asset class comes FIRST, as in lib/market-memory: a stray
   // "per unit" row on an office deal must never flip its $/SF column to a
-  // unit basis.
-  if (assetClass === "multifamily") {
+  // unit basis. The class says the basis and the noun (lib/asset-words):
+  // a hotel's is "/key", a park's "/pad"; land trades per acre, which this
+  // column has no reader for.
+  const words = assetWords(assetClass);
+  if (words.basis === "acre") return null;
+  if (words.basis === "unit") {
     if (!allIn) {
       // The shared per-unit reader: the price over the units, never a rent
       // or an expense per unit.
@@ -100,14 +105,14 @@ function deriveBasis(
     }
     if (price == null) return null;
     // The shared count reader: "312 units" parses, a "Unit mix" row ahead
-    // of "Units" never shadows it.
+    // of "Units" never shadows it — and "212 keys" counts the same way.
     const n = unitCountFromMetrics(metrics);
-    if (n != null && n > 0) return `${fmtCompact(price / n)}/unit${suffix}`;
+    if (n != null && n > 0) return `${fmtCompact(price / n)}${perSuffix(words)}${suffix}`;
     return null;
   }
   if (price == null) return null;
-  // Office / industrial / retail: dollars per square foot, over the
-  // building's size — the shared reader, never the land's or a unit's.
+  // Priced per SF: dollars per square foot, over the building's size — the
+  // shared reader, never the land's or a unit's.
   const n = buildingSfFromMetrics(metrics);
   if (n != null && n > 0) return `$${Math.round(price / n)}/SF${suffix}`;
   return null;

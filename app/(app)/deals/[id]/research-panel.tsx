@@ -31,6 +31,7 @@ import { linkOk } from "@/lib/link-audit";
 import { coveredState, metroForAddress } from "@/lib/market-match";
 import { parsePct } from "@/lib/criteria";
 import { leverageRead } from "@/lib/leverage";
+import { assetClassKey, assetWords } from "@/lib/asset-words";
 import Link from "next/link";
 import type { StructuredAddress } from "@/lib/address";
 
@@ -215,7 +216,17 @@ export async function ResearchPanel({
     // seeds already loaded
   }
 
-  const subject = buildSubject({ address, sizeText, yearBuilt, sectorFields });
+  // What the deal IS decides which rules can reach it (lib/asset-words): an
+  // office or a hotel is commercial property to the rent-control regimes;
+  // a class nothing has read yet keeps the rules' questions open.
+  const words = assetWords(assetClass);
+  const subject = buildSubject({
+    address,
+    sizeText,
+    yearBuilt,
+    sectorFields,
+    residential: assetClassKey(assetClass) ? words.residential : undefined,
+  });
   const evals = address?.state ? evaluateRules(rules, subject) : [];
   const shown = evals.filter((e) => e.outcome !== "not_applicable");
   const metro = address ? metroForAddress(address) : null;
@@ -224,13 +235,7 @@ export async function ResearchPanel({
   // "New York City" FMR row), raw city as the fallback. Same-sector rows
   // (office_vacancy_pct on an office deal) sort ahead of the cross-sector
   // context — stable, so within each group the research order holds.
-  const dealSector = (() => {
-    const cls = (assetClass ?? "").toLowerCase();
-    if (cls === "office" || cls === "industrial") return cls;
-    if (cls === "multifamily" || cls === "sfr_btr" || cls === "student_housing")
-      return "multifamily";
-    return null;
-  })();
+  const dealSector = words.researchSector;
   const metroBench = benchmarksForDeal(
     benchmarks,
     address?.city,

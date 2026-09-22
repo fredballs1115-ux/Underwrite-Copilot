@@ -14,6 +14,7 @@
  */
 
 import { parseMoney, parsePct } from "@/lib/criteria";
+import { assetWords } from "@/lib/asset-words";
 import type {
   ExtractionResult,
   ExtractedMetric,
@@ -140,18 +141,23 @@ export function buildManualExtraction(facts: ManualDealFacts): ExtractionResult 
     basis: ExtractedMetric["basis"] = "na",
   ) => metrics.push({ label, value, flagged: false, page: "", basis });
 
+  // The class's own noun (lib/asset-words): a hotel's count is its keys and
+  // its price is per key; the labels stay the shapes METRIC_FIND and the
+  // count reader know ("Keys", "Price per key").
+  const words = assetWords(facts.assetClass);
+  const noun = words.noun ?? { one: "unit", many: "units" };
   if (price != null) add("Asking price", money(price));
   if (capPct != null) add("Going-in cap rate", pct(capPct), "in_place");
   if (noi != null) add("Net operating income (annual)", money(noi), "in_place");
   if (facts.units != null)
-    add("Units", `${facts.units} ${facts.units === 1 ? "unit" : "units"}`);
+    add(words.noun ? words.countLabel : "Units", `${facts.units} ${facts.units === 1 ? noun.one : noun.many}`);
   if (price != null && facts.units != null && facts.units > 0)
-    add("Price per unit", `${money(price / facts.units)}/unit`);
+    add(`Price per ${noun.one}`, `${money(price / facts.units)}/${noun.one}`);
   if (facts.sf != null) add("Building size", `${Math.round(facts.sf).toLocaleString("en-US")} SF`);
   if (price != null && facts.sf != null && facts.sf > 0)
     add("Price per SF", `${money(price / facts.sf)}/SF`);
   if (facts.avgRentMo != null)
-    add("Average in-place rent", `${money(facts.avgRentMo)}/unit/mo`, "in_place");
+    add("Average in-place rent", `${money(facts.avgRentMo)}/${noun.one}/mo`, "in_place");
   if (facts.occupancyPct != null)
     add("Occupancy", pct(Math.min(100, facts.occupancyPct), 1), "in_place");
   if (facts.yearBuilt != null) add("Year built", String(facts.yearBuilt));

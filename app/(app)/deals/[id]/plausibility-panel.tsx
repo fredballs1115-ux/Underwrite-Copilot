@@ -12,13 +12,16 @@ import { planFacts } from "@/lib/plan-facts";
 export function PlanStrip({
   strategy,
   plan,
+  noun = "unit",
 }: {
   strategy: DealStrategy;
   plan: PlanSummary | null;
+  /** what one of the finished product is called — "key" on a hotel plan */
+  noun?: string;
 }) {
   if (!plan) return null;
   // The same five facts the shared screen shows — one source for both.
-  const cells = planFacts(plan);
+  const cells = planFacts(plan, noun);
   return (
     <section
       aria-label="The plan"

@@ -43,6 +43,7 @@ import {
   type YocGrid,
 } from "@/lib/plan-sensitivity";
 import { planFacts } from "@/lib/plan-facts";
+import { assetWords } from "@/lib/asset-words";
 import { inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { basisScale, fmtBasis, subjectBasis } from "@/lib/comp-detail";
 import { gapScale } from "@/lib/gap-detail";
@@ -619,6 +620,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // citation validates, and none prints (the rule in lib/facts.ts).
   const totalPages = input.totalPages ?? null;
   const dealName = memo.name;
+  // The plan's finished product in the class's own noun (lib/asset-words):
+  // a hotel development is costed per key, never per unit.
+  const planNoun = assetWords(memo.assetClass).noun ?? { one: "unit", many: "units" };
   const extraction = deal.extraction as ExtractionResult | null;
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
@@ -712,7 +716,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             {/* The same reader as the deal page's plan strip and the shared
                 screen (lib/plan-facts.ts) — one set of labels, one money
                 format, one blank rule — so the three never disagree. */}
-            {planFacts(plan.plan).map(([label, value], _i, all) => (
+            {planFacts(plan.plan, planNoun.one).map(([label, value], _i, all) => (
               <View key={label} style={{ width: `${100 / all.length}%` }}>
                 <Text style={{ fontSize: 6.5, letterSpacing: 0.6, color: C.muted }}>{str(label).toUpperCase()}</Text>
                 <Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold", color: C.brand, marginTop: 1 }}>
@@ -729,7 +733,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                   : "Timeline to stabilization: not stated."
               }${
                 plan.plan.costPerUnit != null && plan.plan.units != null
-                  ? ` The all-in basis is total cost over the ${plan.plan.units.toLocaleString("en-US")} planned units.`
+                  ? ` The all-in basis is total cost over the ${plan.plan.units.toLocaleString("en-US")} planned ${planNoun.many}.`
                   : ""
               }`,
             )}

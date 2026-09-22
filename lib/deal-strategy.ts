@@ -25,6 +25,7 @@
  */
 
 import type { ExtractionResult } from "@/lib/anthropic/types";
+import { assetWords } from "@/lib/asset-words";
 import {
   LATER_YEAR,
   METRIC_FIND,
@@ -770,23 +771,29 @@ export function assessPlausibility(
   const units = unitCountFromMetrics(metrics);
   const sf = buildingSfFromMetrics(metrics);
   const cls = (extraction.assetClass ?? "").toLowerCase();
+  // The class says the basis and the noun (lib/asset-words): a hotel is
+  // held to a per-key band, a park to a per-pad one, an office to per SF —
+  // and the finding names the class as a page would, never a stored key.
+  const words = assetWords(cls);
+  const noun = words.noun ?? { one: "unit", many: "units" };
+  const clsWord = words.label ? words.label.toLowerCase() : "such";
   const basisTotal = planDeal ? (planSummary(extraction, strategy)?.totalCost ?? null) : price;
   const basisNoun = planDeal ? "total cost" : "price";
   const misread = (other: string) =>
     planDeal
-      ? `No ${cls} market delivers there. The total cost or the ${other} was most likely misread — check both against their source pages before the all-in basis is used anywhere.`
-      : `No ${cls} market trades there. The price or the ${other} was most likely misread — check both against their source pages before the basis is used anywhere.`;
-  if (basisTotal != null && cls === "multifamily" && units != null && units >= 1 && units <= 50_000) {
+      ? `No ${clsWord} market delivers there. The total cost or the ${other} was most likely misread — check both against their source pages before the all-in basis is used anywhere.`
+      : `No ${clsWord} market trades there. The price or the ${other} was most likely misread — check both against their source pages before the basis is used anywhere.`;
+  if (basisTotal != null && cls && words.basis === "unit" && units != null && units >= 1 && units <= 50_000) {
     const perUnit = basisTotal / units;
     if (perUnit < 15_000 || perUnit > 2_500_000) {
       findings.push({
         code: "basis_out_of_band",
         severity: "medium",
-        title: `${money(basisTotal)} of ${basisNoun} over ${Math.round(units).toLocaleString("en-US")} units is ${money(perUnit)} per unit`,
-        detail: misread("unit count"),
+        title: `${money(basisTotal)} of ${basisNoun} over ${Math.round(units).toLocaleString("en-US")} ${noun.many} is ${money(perUnit)} per ${noun.one}`,
+        detail: misread(`${noun.one} count`),
       });
     }
-  } else if (basisTotal != null && cls && cls !== "multifamily" && sf != null && sf > 100) {
+  } else if (basisTotal != null && cls && words.basis === "sf" && sf != null && sf > 100) {
     const perSf = basisTotal / sf;
     if (perSf < 5 || perSf > 3_000) {
       findings.push({

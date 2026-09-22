@@ -17,44 +17,90 @@
  */
 
 import type { AssetClass } from "./types";
+import { assetWords } from "@/lib/asset-words";
 
 /** Shared persona/guardrails prepended to every analysis call. */
 export const ANALYST_SYSTEM = `You are a sharp, skeptical commercial real estate acquisitions analyst helping a buyer screen a deal. You are precise with numbers, you name the specific figure when you critique it, and you know sell-side assumptions tend to run optimistic, so you verify pro forma figures rather than take them at face value. When you are uncertain, say so rather than inventing detail.`;
 
-/** A small helper so each step handles "auto-detect" vs. a chosen asset class. */
+/** A small helper so each step handles "auto-detect" vs. a chosen asset
+ *  class — named as a page names it, in its own noun and basis
+ *  (lib/asset-words), never as a stored key like "hospitality_str". */
 function assetClassClause(assetClass: AssetClass): string {
-  return assetClass === "auto"
-    ? "Detect the asset class from the document."
-    : `The asset class is ${assetClass}; apply its norms.`;
+  if (assetClass === "auto") return "Detect the asset class from the document.";
+  const w = assetWords(assetClass);
+  const measure = w.noun
+    ? `it is counted in ${w.noun.many} and priced per ${w.noun.one}${w.basis === "sf" ? " and per SF" : ""}`
+    : "it is measured in square feet and priced per SF";
+  const income = w.income ? `its income is quoted as ${w.income}` : "it has no operating income";
+  return `The asset class is ${w.label}: ${measure}, and ${income}; apply its norms.`;
 }
 
-/** Sector-specific pro-forma traps for the challenger. The base prompt's
- *  named traps (tax reset, opex ratio vs GPR, loss-to-lease burn-off, legacy
- *  insurance) ARE the multifamily list, so multifamily adds nothing here —
- *  office / industrial / retail get the diligence points that die deals in
- *  THEIR sector. "auto" carries all three, gated on what the document turns
- *  out to be. */
+/** Sector-specific pro-forma traps for the challenger — the diligence
+ *  points that die deals in EACH class, by name. The base prompt keeps the
+ *  two traps every property type shares (the tax reset, the legacy
+ *  insurance premium); everything a class does to itself is here, and a
+ *  hotel is never grilled about loss-to-lease. "auto" carries every list,
+ *  gated on what the document turns out to be. */
+const MULTIFAMILY_TRAPS = `MULTIFAMILY TRAPS, checked by name where the OM gives the inputs: (a) an operating-expense ratio under roughly 30% of gross potential rent — a near-certain sign of understated R&M, an excluded management fee, or deferred maintenance; (b) aggressive loss-to-lease or concession burn-off inflating year-one effective gross income beyond what the in-place rent roll supports; (c) a stabilized-occupancy assumption above roughly 95%, which is presumptively optimistic; (d) the renovation premium — the renovated comp's rent less this building's in-place rent is TWO numbers, what the renovation buys and the gap to a better building, and only the first is the plan's; (e) rent regulation — where the jurisdiction regulates rents or turnover, the loss-to-lease is not the buyer's to capture and the pro forma must say so.`;
+
+const HOTEL_TRAPS = `HOTEL-SPECIFIC TRAPS, checked by name where the OM gives the inputs: (a) REVPAR IS TWO LEVERS — split every RevPAR claim into occupancy and ADR, hold each against the STR comp set's own figures (the occupancy, ADR and RevPAR indices), and treat a pro forma that grows both at once as two bets, not one; (b) THE FEE STACK — management, franchise and marketing fees on their two bases (rooms revenue and total revenue) come before NOI, and a 4% FF&E reserve is real cash; an "NOI" quoted before them is a different number; (c) THE PIP — the property improvement plan the brand will require at sale, its cost and its downtime, is the buyer's; (d) DEMAND CONCENTRATION — group, contract and one-employer demand, and the seasonality inside the trailing twelve; (e) SHORT-TERM RENTAL — where the plan is STR, the permit, the registration cap and the platform's own rules decide whether the income exists at all.`;
+
+const STORAGE_TRAPS = `SELF-STORAGE TRAPS, checked by name where the OM gives the inputs: (a) STREET RATE VS IN-PLACE — the rent roll's average is a history of increases and the street rate is today's ask; a pro forma that lifts every tenant to street ignores the move-outs the increase causes; (b) PHYSICAL VS ECONOMIC OCCUPANCY — a facility 92% occupied and collecting 82% of gross potential is the second figure; (c) NEW SUPPLY — storage is the easiest asset class to overbuild; check permitted and under-construction square feet inside a three-mile ring against the OM's supply claim; (d) LEASE-UP — a facility under roughly 85% occupied is a lease-up deal priced on stabilized figures it has not reached; (e) THE MISSING LINES — marketing and pay-per-click, the property-tax reassessment, and third-party management at 6%.`;
+
+const MH_TRAPS = `MANUFACTURED-HOUSING TRAPS, checked by name where the OM gives the inputs: (a) PAD RENT VS HOME RENT — separate the land-lease pad income from park-owned-home rental income, which carries the capital and turnover of a house; (b) INFRASTRUCTURE — private water, sewer and septic are the capital item that kills these deals; ask who owns the utilities and how old the systems are; (c) RENT CONTROL — mobile-home park rent regulation is its own body of law in several states; (d) PAD OCCUPANCY — a vacant pad needs a home moved on before it earns, so the lease-up is slower than an apartment's; (e) AGE-RESTRICTED STATUS and the compliance behind it.`;
+
+const SFR_TRAPS = `SFR / BTR TRAPS, checked by name where the OM gives the inputs: (a) PER-HOME EXPENSES — turnover, repairs, HOA dues and property tax on scattered homes run higher per unit than a mid-rise's, and a pro forma at apartment ratios is wrong; (b) THE EXIT — a scattered portfolio sells house by house or to another aggregator, and the two prices differ; (c) HOUSE-SCALE CAPITAL — roofs, HVAC and insurance across many addresses; (d) LENGTH OF STAY — the claim behind the turnover assumption.`;
+
+const STUDENT_TRAPS = `STUDENT-HOUSING TRAPS, checked by name where the OM gives the inputs: (a) PRE-LEASING — the year's income is decided by the pre-lease pace against last year's at the same date, and by the walk to campus; (b) BY THE BED — rent is per bed with parental guarantees, occupancy is by bed, and a twelve-month lease at 100% is not the norm everywhere; (c) ENROLLMENT AND ON-CAMPUS SUPPLY — the university's own beds and its enrollment trend are the market; (d) THE TURN — the whole building turns in August, and the cost of that turn is real.`;
+
+const SENIOR_TRAPS = `SENIOR-HOUSING TRAPS, checked by name where the OM gives the inputs: (a) THE CARE MARGIN — independent living, assisted living and memory care are three businesses with three margins; labor is the largest line and agency staffing the largest surprise; (b) OCCUPANCY BY CARE LEVEL — and the private-pay versus Medicaid mix behind the rent; (c) THE OPERATOR — the manager's record is the investment; (d) LICENSING — the license, its survey history and its deficiencies.`;
+
+const MEDICAL_OFFICE_TRAPS = `MEDICAL-OFFICE TRAPS, checked by name where the OM gives the inputs: (a) HEALTH-SYSTEM AFFILIATION — on- or off-campus, the system's own strategy, and whose credit stands behind the leases; (b) THE BUILD-OUT — medical tenant improvements run multiples of office and the specialty decides them; (c) RECOVERIES — the expense stops and the reimbursement structure; (d) THE REGULATORY OVERLAY — Stark and anti-kickback rules constrain who may own and lease what.`;
+
+const MIXED_USE_TRAPS = `MIXED-USE TRAPS, checked by name where the OM gives the inputs: (a) TWO CAP RATES — the residential and the retail components trade at different caps to different buyers, and a blended cap flatters the retail; (b) GROUND-FLOOR VACANCY — retail under apartments sits vacant longer than the pro forma allows; (c) ALLOCATED EXPENSES — the split of taxes, insurance and common-area cost between the uses.`;
+
+const NET_LEASE_TRAPS = `NET-LEASE TRAPS, checked by name where the OM gives the inputs: (a) THE CREDIT IS THE DEAL — the tenant's credit, its guarantee (corporate or franchisee) and its financial reporting; (b) TERM AND OPTIONS — the remaining term against the hold, and renewal options at the tenant's election; (c) DARK VALUE — what the box is worth vacant, which is the downside and is rarely in the OM; (d) RENT BUMPS — flat rent over a long term is a bond carrying real-estate risk; (e) LANDLORD OBLIGATIONS — roof, structure and parking hiding under a "NNN" label.`;
+
+const DATA_CENTER_TRAPS = `DATA-CENTER TRAPS, checked by name where the OM gives the inputs: (a) POWER — the utility's committed capacity and the cost and timing of the next megawatt are the asset; (b) THE LEASE — rent per kW, the term and the tenant's credit; (c) OBSOLESCENCE — cooling density and the capital to keep pace; (d) POWERED SHELL VERSUS TURNKEY — which is being sold.`;
+
+const PARKING_TRAPS = `PARKING TRAPS, checked by name where the OM gives the inputs: (a) DEMAND — the office, event and residential demand the garage serves, and what happens to it; (b) THE OPERATOR AGREEMENT — the management contract's terms and the revenue split; (c) STRUCTURE — a garage's deck and post-tension repairs are the capital item; (d) SUBSTITUTION — pricing and access technology, and the demand a transit line or a policy change removes.`;
+
+const LAND_TRAPS = `LAND TRAPS, checked by name where the OM gives the inputs: (a) ENTITLEMENTS — what the site is entitled for today, what the plan needs, and the probability and the time of getting there; (b) CARRY — taxes, insurance and interest on land with no income, compounding into the basis; (c) RESIDUAL VALUE — the finished building's value less the cost of building it and the developer's return is the land's value, and it swings a third for every five percent on cost; (d) SITE CONDITIONS — environmental, geotechnical, utilities to the site and offsite obligations; (e) ABSORPTION — the market's take-up of what the plan delivers.`;
+
 const OFFICE_TRAPS = `OFFICE-SPECIFIC TRAPS, checked by name where the OM gives the inputs: (a) ROLLOVER — weighted average lease term (WALT) shorter than the hold period means tenants roll inside the deal; name which tenants expire in which years, and treat a pro forma that renews everyone at higher rent as a story, not a plan; (b) RE-LEASING COST REALITY — tenant improvements, leasing commissions, free rent, and downtime priced at TODAY'S market packages, not the legacy deal's, and actually carried in a below-NOI reserve; (c) FACE VS EFFECTIVE — concessions and free-rent burn-off can make year-one income read far above what tenants actually pay; ask for effective rents; (d) CREDIT AND SHADOW SPACE — weak-credit or shrinking tenants, and submarket sublease availability, undercut both the rent roll and the exit story.`;
 
 const INDUSTRIAL_TRAPS = `INDUSTRIAL-SPECIFIC TRAPS, checked by name where the OM gives the inputs: (a) FUNCTIONAL FIT — clear height, dock-door count, truck-court depth, and power against what modern tenants require; a low-clear older box priced like Class A logistics is the classic trap; (b) MARK-TO-MARKET CLAIMS — "below-market rents" must be proven against actual current submarket asking, not the prior peak; several big-port submarkets have repriced double digits off peak; (c) TENANT CONCENTRATION — a single-tenant or 3PL-heavy roll carries binary renewal risk; check renewal options, termination rights, and credit; (d) EXCESS-LAND AND OUTDOOR-STORAGE STORIES — value ascribed to yard or excess land needs zoning evidence, not a site plan sketch; (e) ROOF AND SLAB — age and condition against the capital reserve.`;
 
 const RETAIL_TRAPS = `RETAIL-SPECIFIC TRAPS, checked by name where the OM gives the inputs: (a) ANCHOR DEPENDENCE — co-tenancy clauses can let inline tenants cut rent or leave if an anchor goes dark; read them before believing the rent roll; (b) OCCUPANCY-COST RATIO — inline rents are only durable if rent-to-sales stays healthy; where the OM omits tenant sales, say plainly that this check cannot be run; (c) RECOVERY AND PERCENTAGE RENT — how much income depends on reimbursements or percentage rent, and whether the recovery math survives a vacancy; (d) TENANT-MIX CLAIMS — "internet-resistant" is an assertion; judge the actual tenant list.`;
 
+/** Each class's lists — a mixed-use building is grilled as apartments AND
+ *  retail, a medical office as an office with its own overlay. */
+const TRAPS_BY_CLASS: Record<Exclude<AssetClass, "auto">, readonly string[]> = {
+  multifamily: [MULTIFAMILY_TRAPS],
+  office: [OFFICE_TRAPS],
+  industrial: [INDUSTRIAL_TRAPS],
+  retail: [RETAIL_TRAPS],
+  net_lease: [NET_LEASE_TRAPS],
+  medical_office: [OFFICE_TRAPS, MEDICAL_OFFICE_TRAPS],
+  mixed_use: [MULTIFAMILY_TRAPS, RETAIL_TRAPS, MIXED_USE_TRAPS],
+  sfr_btr: [SFR_TRAPS],
+  student_housing: [MULTIFAMILY_TRAPS, STUDENT_TRAPS],
+  senior_housing: [SENIOR_TRAPS],
+  manufactured_housing: [MH_TRAPS],
+  self_storage: [STORAGE_TRAPS],
+  hospitality_str: [HOTEL_TRAPS],
+  data_center: [DATA_CENTER_TRAPS],
+  parking: [PARKING_TRAPS],
+  land_infill: [LAND_TRAPS],
+};
+
 function sectorTrapsClause(assetClass: AssetClass): string {
-  switch (assetClass) {
-    case "office":
-      return `\n\n${OFFICE_TRAPS}`;
-    case "industrial":
-      return `\n\n${INDUSTRIAL_TRAPS}`;
-    case "retail":
-      return `\n\n${RETAIL_TRAPS}`;
-    case "auto":
-      return `\n\nIf the document turns out to be office, industrial, or retail rather than multifamily, ALSO apply that sector's trap list. ${OFFICE_TRAPS} ${INDUSTRIAL_TRAPS} ${RETAIL_TRAPS}`;
-    case "multifamily":
-    default:
-      // The base prompt's four named traps are the multifamily list.
-      return "";
+  if (assetClass === "auto") {
+    const all = [...new Set(Object.values(TRAPS_BY_CLASS).flat())].join(" ");
+    return `\n\nApply the trap list of whichever asset class the document turns out to be — that class's list and no other's. ${all}`;
   }
+  const lists = TRAPS_BY_CLASS[assetClass] ?? [];
+  return lists.length ? `\n\n${lists.join(" ")}` : "";
 }
 
 /** Step 0 — First signal: the 30-second headline read, before the deep pass. */
@@ -76,11 +122,11 @@ export function extractionInstruction(assetClass: AssetClass): string {
     assetClass,
   )}
 
-First say what KIND of deal this is — \`strategy.kind\`: "stabilized" (an operating asset bought for its in-place income), "value_add" (in-place income plus a renovation or repositioning program), "lease_up" (largely vacant space still to be leased), "conversion" (a change of use — office to residential and the like — with construction and downtime before any stabilized income), "development" (ground-up or to-be-built), or "unknown" only if the OM truly does not say. Give \`strategy.summary\` (one sentence, the plan in the OM's own terms; "" if it states none), \`strategy.capitalBudget\` (the renovation or construction budget as stated, hard and soft; "" if none) and \`strategy.timeline\` (construction, downtime and lease-up timing to stabilization as stated; "" if none). For a value-add, lease-up, conversion or development, also capture the plan's own figures as metrics — each with its page — labelled exactly so the screen can read them: "Total project cost" (the all-in figure, when the OM states one), "Construction budget" or "Renovation budget" (hard and soft, excluding the price), on a development "Land cost" (the land or site acquisition, when that is what is being bought — never an appraised land value), "Units (proposed)" or "SF (proposed)" for the finished product, "Construction period", "Lease-up period", and "Stabilized in" (the year or date the plan stabilizes). Never restate the price as a cost line, and never write 0 for a figure the OM does not state.
+First say what KIND of deal this is — \`strategy.kind\`: "stabilized" (an operating asset bought for its in-place income), "value_add" (in-place income plus a renovation or repositioning program), "lease_up" (largely vacant space still to be leased), "conversion" (a change of use — office to residential and the like — with construction and downtime before any stabilized income), "development" (ground-up or to-be-built), or "unknown" only if the OM truly does not say. Give \`strategy.summary\` (one sentence, the plan in the OM's own terms; "" if it states none), \`strategy.capitalBudget\` (the renovation or construction budget as stated, hard and soft; "" if none) and \`strategy.timeline\` (construction, downtime and lease-up timing to stabilization as stated; "" if none). For a value-add, lease-up, conversion or development, also capture the plan's own figures as metrics — each with its page — labelled exactly so the screen can read them: "Total project cost" (the all-in figure, when the OM states one), "Construction budget" or "Renovation budget" (hard and soft, excluding the price), on a development "Land cost" (the land or site acquisition, when that is what is being bought — never an appraised land value), "Units (proposed)" — or "Keys (proposed)", "Beds (proposed)", "Pads (proposed)" in the OM's own noun — or "SF (proposed)" for the finished product, "Construction period", "Lease-up period", and "Stabilized in" (the year or date the plan stabilizes). Never restate the price as a cost line, and never write 0 for a figure the OM does not state.
 
-Capture: asking price (and per-unit / per-SF if given), NOI, going-in and pro forma cap rates, occupancy, in-place and pro forma rents, expense ratio, exit cap, IRR, financing (LTV, rate, lender), hold period, unit count and/or total SF, year built / renovated, seller, and broker.
+Capture: asking price (and the per-unit, per-key, per-bed, per-pad, per-SF or per-acre figure if given), NOI, going-in and pro forma cap rates, occupancy (and on a hotel the ADR and RevPAR), in-place and pro forma rents in the OM's own terms (per unit, key, bed or pad per month, or per SF per year), expense ratio, exit cap, IRR, financing (LTV, rate, lender), hold period, the count in the OM's own noun and/or total SF (on land: the acreage, the zoning and the entitlements), year built / renovated, seller, and broker.
 
-Label the headline rows exactly, so the screen reads them the same way every time: "Asking price" for the whole-asset ask (a per-unit or per-SF figure under its own label, "Price per unit" or "Price per SF"; a prior trade under "Last sale price"); "Units" for the whole unit count (a subset — vacant, renovated, affordable, a phase — under its own label); "Total SF" for the building's rentable area (the land under "Land area", a unit's average under "Average unit size"); "Occupancy" for today's physical occupancy as of the OM's date (a stabilized or projected figure under "Stabilized occupancy"); and "Going-in cap rate" for the cap on today's income (a stabilized or pro forma cap under "Stabilized cap rate"). Put the number alone in the value — "42,000,000", "312", "250,000 SF", "94%" — with the unit and nothing else.
+Label the headline rows exactly, so the screen reads them the same way every time: "Asking price" for the whole-asset ask (a per-unit or per-SF figure under its own label — "Price per unit", or per key, bed, pad, home or space in the OM's own noun, or "Price per SF"; a prior trade under "Last sale price"); the whole count under the OM's own noun — "Units" for apartments or storage units, "Keys" for a hotel, "Beds" for student or senior housing, "Pads" for a manufactured-housing community, "Homes" for a scattered-site or build-to-rent portfolio, "Spaces" for a garage, "Acres" for land — (a subset — vacant, renovated, affordable, a phase — under its own label); "Total SF" for the building's rentable area (the land under "Land area", a unit's average under "Average unit size"); "Occupancy" for today's physical occupancy as of the OM's date (a stabilized or projected figure under "Stabilized occupancy"); and "Going-in cap rate" for the cap on today's income (a stabilized or pro forma cap under "Stabilized cap rate"). Put the number alone in the value — "42,000,000", "312", "250,000 SF", "94%" — with the unit and nothing else.
 
 Every NOI must say WHICH NOI it is. Label each one exactly: "NOI (in-place)" for what the property produces today (a T-12 or current run-rate), "NOI (Year 1)" for the sponsor's first-year forward figure on the building as it stands, or "NOI (stabilized, pro forma)" for the projected figure after the plan completes. NEVER label a stabilized pro forma as Year 1. On a conversion or development the building produces little or no income during the works — when the OM states only a stabilized figure, give it the stabilized label and do not invent a Year 1 NOI; a figure the OM does not state is absent, not zero. Also capture the property / deal name if present, the \`market\` — the submarket and metro the property sits in, as a short string like "North Dallas, TX" (empty string if you can't tell) — and the \`address\`: the property's full street address (street, city, state; empty string if the OM never states it). The screen anchors on the address, not the deck's narrative.
 
@@ -99,7 +145,7 @@ export function challengerInstruction(assetClass: AssetClass): string {
     assetClass,
   )}
 
-Grill the deal in the order deals die: (1) BASIS — is the asking price per unit / per SF defensible against the OM's own comps and any replacement-cost logic, or is the buyer overpaying going in; (2) EXIT — exit cap vs. going-in cap (compression is a red flag) and how much of the return the residual carries; (3) DEBT — financing assumptions at current rates, DSCR headroom, and refinance risk; when the going-in cap sits below the likely debt rate, name the NEGATIVE LEVERAGE outright — the deal loses money on every borrowed dollar until growth bails it out. Then the supporting assumptions, checking the four documented pro-forma traps by name where the OM gives you the inputs: real-estate taxes NOT reset to the sale price (compare the tax line against the asking price at a plausible assessment ratio and millage — the most common pro forma gap); an operating-expense ratio under roughly 30% of gross potential rent (a near-certain sign of understated R&M, an excluded management fee, or deferred maintenance); aggressive loss-to-lease or concession burn-off inflating year-one effective gross income beyond what the in-place rent roll supports; and insurance carried at the seller's legacy premium instead of a realistic new-owner quote. Plus the perennials: pro forma rent growth vs. realistic market growth, vacancy and lease-up optimism (a stabilized-occupancy assumption above roughly 95% is presumptively optimistic — challenge it), and renovation / value-add premium claims.
+Grill the deal in the order deals die: (1) BASIS — is the asking price per unit / per SF defensible against the OM's own comps and any replacement-cost logic, or is the buyer overpaying going in; (2) EXIT — exit cap vs. going-in cap (compression is a red flag) and how much of the return the residual carries; (3) DEBT — financing assumptions at current rates, DSCR headroom, and refinance risk; when the going-in cap sits below the likely debt rate, name the NEGATIVE LEVERAGE outright — the deal loses money on every borrowed dollar until growth bails it out. Then the supporting assumptions, checking the two traps every property type shares by name where the OM gives you the inputs: real-estate taxes NOT reset to the sale price (compare the tax line against the asking price at a plausible assessment ratio and millage — the most common pro forma gap); and insurance carried at the seller's legacy premium instead of a realistic new-owner quote. Plus the perennials: pro forma income growth vs. realistic market growth, vacancy or lease-up optimism judged against the asset class's own norm (a full apartment building is 95% occupied; a full hotel is 70%), and renovation / value-add premium claims. The traps of the asset class itself follow at the end, by name — apply them.
 
 Overlay the down-cycle discipline the industry keeps re-learning in every crash: leasing and rent assumptions must come from today's market, not from what the pro forma needs to pencil; when the market is softening, treat this quarter's worst case as a candidate for next quarter's base case; judge the deal on the cash it actually throws off, not on appraisal values or exit hopes — a return that lives mostly in the residual is a warning, not a plan; and "other buyers are circling" is never underwriting support. A stated exit value is a snapshot, not a movie: if it presumes a ready buyer at a cap rate no market evidence supports, with no allowance for selling costs, say so — when an owner most needs to sell, the bid is thinnest. Where headline rents come from weak-credit tenants, the rent roll is worth less than it reads. And where an assumption exists only to make the deal work on paper, say exactly that.
 
@@ -287,7 +333,7 @@ export function verdictInstruction(): string {
 Choose a verdict: \`pass\` (worth deeper work), \`caution\` (proceed only with named conditions), or \`pass_on\` (kill it). Give a two-sentence rationale, the top risks, and — if pursuing — the 2–3 concrete next steps.
 
 Then produce the pre-model \`screen\` — the part that makes this reproducible instead of a coin flip:
-- \`ranges\`: the deal-defining inputs as RANGES, never single hero numbers. Always include market rent (per unit/mo or per SF), the expense load (ratio or per-unit), and the exit cap; add basis (price per unit/SF — on a plan deal named in the brief, TOTAL COST per unit or per SF, never the shell's or the land's price alone) and any other input that swings the deal. For each give a \`low\`, \`base\`, and \`high\` (low = conservative, base = your defensible pick, high = the sponsor's optimistic end), the \`source\` it traces to (name it explicitly — a public/market norm, a comp, or the OM page; if it's only the sponsor's claim, say so), a one-line \`basis\` for what drives the spread, and a \`confidence\`. A 10% drift hides inside a single number — the range is the honesty.
+- \`ranges\`: the deal-defining inputs as RANGES, never single hero numbers. Always include the market rent in the class's own terms (per unit, key, bed, pad or home per month; per SF per year; the ADR and occupancy for a hotel; land has no rent, so give its residual value and its carry instead), the expense load (ratio or per-unit), and the exit cap; add basis (price per unit, key, bed, pad, SF or acre — on a plan deal named in the brief, TOTAL COST per unit or per SF, never the shell's or the land's price alone) and any other input that swings the deal. For each give a \`low\`, \`base\`, and \`high\` (low = conservative, base = your defensible pick, high = the sponsor's optimistic end), the \`source\` it traces to (name it explicitly — a public/market norm, a comp, or the OM page; if it's only the sponsor's claim, say so), a one-line \`basis\` for what drives the spread, and a \`confidence\`. A 10% drift hides inside a single number — the range is the honesty.
 - \`dealKillers\`: stress the three that kill deals first, in this order — \`basis\` (are you buying right?), \`exit\` (does the exit cap hold — and does the plan survive a slow sale? "there is always a buyer" is the assumption that fails first), \`debt\` (does the financing pencil and survive a shock?). For each give the current \`read\` and the \`risk\` that would break it. When the brief names a deal strategy with a plan (conversion, development, lease-up, value-add), read the three on the plan's terms: basis is total cost per unit or per SF, exit is the stabilized NOI at the exit cap against that total cost, debt is the construction or bridge financing and the carry through the works — and the stabilized pro forma is the finished project's figure to be tested for conservatism, never a misread and never a going-in cap on the price.
 - \`sensitivity\`: how the call moves across the ranges — at the \`conservative\` end (low rents, high expenses, soft exit), at your \`base\`, and at the \`sponsor\`'s optimistic end. Give all three; for each, the resulting \`call\` (pass / caution / pass_on) and a one-line \`note\` on what drives it. This is the honest answer to "where does this deal flip?"
 

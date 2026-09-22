@@ -78,21 +78,40 @@ row's thumbnail — credited to the memorandum, replaceable by hand from
 the deal page, never on the sample deal, and NEVER fetched from a
 listing portal or an image search, whose terms forbid exactly that use;
 the memorandum's cover is the licensed picture of the building.
+Proven live (run 35787411268): 165 markers present, 0 not deployed —
+the apartment rent, the home value in years of rent and the for-sale
+line all on the market brief; the Realtor pull's first real run had
+failed on the table's unit check after a clean dry run, and the fix
+(#370) holds every writer's units to migration 0023's list in CI.
+Then #371, the deal-type audit: a survey of every surface found the
+deal header printing "Self_storage", a hotel's keys relabelled "units",
+a development's land cost labelled "Price" beside a cap it should not
+have, the Excel cover saying "auto", rent-control rules run against
+offices and hotels, and the challenger grilling every class about
+loss-to-lease. One table now (`lib/asset-words.ts`: each class's noun,
+basis, income, count label, whether the rent rules reach it, whether it
+operates at all) and every one of those surfaces reads it; seven more
+classes can be filed (net lease, medical office, mixed-use, student,
+senior, data center, parking) and the challenger has a trap list per
+class.
 **Whose move: the operator's** — the ground-level files for
 `public/photos/`; optionally a free `BLS_API_KEY` Actions secret so the
 dry run prints the BLS series' titles; `GOOGLE_MAPS_API_KEY` for the
-Street View photograph of a deal whose memorandum carries none.
-**Mine, next** — after #370 merges, the live-verify for the #368/#369
-markers (the real Realtor pull was dispatched once its dry run printed
-18 of 18); then the deal-type audit — every surface's words and figures
-held to the asset class the deal is (keys, pads, beds, acres, a plan
-deal's yield on cost), with a test per type, because a site that is
-wrong about a hotel or a land deal is wrong; then more inputs where a
-free, attributable source exists: FRED's regional rental vacancy (the
-Census HVS, quarterly, Northeast / South / Midwest / West — borrowed and
-named, since no metro series exists), the Census HVS's own MSA rental
-vacancy table (an xlsx a quarter), and the Realtor.com "hotness" file
-the probe listed beside the inventory.
+Street View photograph of a deal whose memorandum carries none; and a
+look at one real deal of each kind on the deployed site, because the
+signed-in pages are the one surface live-verify cannot reach.
+**Mine, next** — the rest of the audit: the buy box per class (it still
+says "Basis / unit" and sizes in k SF), the workbook's per-unit row
+labels in the class's noun, the model's 100,000 SF placeholder for a
+deal that states no area (marked an assumption, still a made-up
+figure — a unit-basis class should reserve per unit instead), the comps
+page's bar captions passing the noun, and a hotel and a land fixture in
+the render tests; then more inputs where a free, attributable source
+exists: FRED's regional rental vacancy (the Census HVS, quarterly,
+Northeast / South / Midwest / West — borrowed and named, since no metro
+series exists), the Census HVS's own MSA rental vacancy table (an xlsx
+a quarter), and the Realtor.com "hotness" file the probe listed beside
+the inventory.
 
 ## 🟢 2026-09-16 into 09-17 — `/tools` becomes the reason not to open Excel
 

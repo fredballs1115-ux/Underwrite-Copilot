@@ -321,6 +321,11 @@ export function buildSubject(input: {
   sectorFields?: Record<string, string | number | boolean> | null;
   /** injected for deterministic tests; defaults to the wall-clock year */
   currentYear?: number;
+  /** the deal is rental housing (lib/asset-words); false files it as
+   *  commercial property, which the rent-control, TOPA and just-cause rules
+   *  are written not to reach; undefined (nothing read yet) keeps the
+   *  rental-housing default so their questions stay open */
+  residential?: boolean;
 }): RuleSubject {
   const units =
     input.sizeText && /\b(units?|doors)\b/i.test(input.sizeText) ? num(input.sizeText) : undefined;
@@ -355,6 +360,12 @@ export function buildSubject(input: {
     owner_total_rental_units_in_state: (otherUnits ?? 0) + (units ?? 0),
     ...(otherUnits !== undefined ? { owner_other_rental_units_in_dc: otherUnits } : {}),
     transaction: "sale_of_rental_housing_accommodation",
+    // An office, a hotel, a storage facility: the rules conditioned on
+    // rental housing evaluate to "does not apply" rather than asking a
+    // buyer of a warehouse whether they will live in one unit.
+    ...(input.residential === false
+      ? { property_type: "commercial_property", transaction: "sale_of_commercial_property" }
+      : {}),
   };
 }
 

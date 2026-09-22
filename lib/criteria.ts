@@ -168,7 +168,9 @@ export const METRIC_FIND = {
   // the same KPI table prints per unit: "Avg SF / unit", "Parking spaces
   // per unit", "Beds per unit" (which would pass it at $912/unit).
   perUnit: {
-    inc: /^(?:(?:avg\.?|average|asking|total|implied|blended|going[- ]?in)\s+)*(?:price|basis|\$)\s*(?:per|\/)\s*(?:unit|door|key|pad|bed|site)s?\b|\bunit price\b|\bprice\s*(?:per|\/)\s*unit\b/i,
+    // Every noun a class counts in (lib/asset-words): a hotel's price per
+    // key, a park's per pad, a portfolio's per home, a garage's per space.
+    inc: /^(?:(?:avg\.?|average|asking|total|implied|blended|going[- ]?in)\s+)*(?:price|basis|\$)\s*(?:per|\/)\s*(?:unit|door|key|pad|bed|site|home|space|room)s?\b|\bunit price\b|\bprice\s*(?:per|\/)\s*unit\b/i,
     exc: /noi|income|rent\b|rents\b|cost|budget|expense|tax|reserve|revenue|insurance|utilit|payroll|debt|loan|equity|value|\begi\b|replacement|capex|capital|management|repairs?|maintenance|marketing|admin|contract|\bopex\b|operating|concession|turnover|\br ?& ?m\b|renovation|spend|fees?\b|\bg ?& ?a\b|payment|deposit|exit|reversion|terminal|residual|disposition|projected|pro ?forma|\b(last|prior|previous|historical|original)\b/i,
   },
   // The going-in cap is today's income against the price. A stabilized, pro
