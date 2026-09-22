@@ -247,6 +247,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   handsome, and aerials). The second sheet showed that Norfolk's file
   was a street corner at dusk — a hotel and a garage — and swapped it for
   the same photographer's daytime waterfront from the Elizabeth River.
+  The third gave Los Angeles its downtown against the snow on the San
+  Gabriels over a tight tower cluster that could have been any city, and
+  kept San Francisco, Seattle, Miami and Atlanta. Dallas took a fourth,
+  ONE-MARKET run: the probe shares a check budget across the markets
+  asked for (`CHECK_BUDGET`, nine a market on a full sweep, thirty-six
+  for one), because the two-market run had checked nine names, found
+  seven too small, and never opened the search door — which opens only
+  when the first two doors gathered fewer than the budget. Thirty-six
+  deep, the Downtown Dallas article's own lead was the dusk skyline with
+  the green-lit Bank of America Plaza, a JPEG; the city article's lead
+  was a 6000px PNG, and a PNG photograph at 1600px is megabytes where a
+  JPEG is hundreds of kilobytes, so it stays a candidate the probe
+  weighs and is never served. A one-market run is how to look harder.
 - Deal math without a deal: `lib/tools/deal-math.ts` (pure — the cap rate
   triangle, the mortgage constant, `sizeLoan` against whichever of LTV /
   DSCR / debt yield were set with the **binding one named**, break-even

@@ -54,9 +54,12 @@ export interface SkylineShot {
  * WHAT IS NOT HERE, and why. Montgomery County has no entry: it is a
  * suburban submarket, and a submarket does not have a skyline the way a
  * city does — the overhead frame is the more honest picture of a place
- * whose shape is the shape of its land, and the one search that has been
- * run for it turned up a high-altitude aerial of Bethesda and a category
- * full of berries and blue jays. Prince George's County and Northern
+ * whose shape is the shape of its land, and the two searches that have been
+ * run for it turned up a high-altitude aerial of Bethesda, an interstate
+ * seen from a Rockville overpass, and a category full of berries and blue
+ * jays (skyline-sheet runs 35660646197 and 35752022571 — the second with
+ * Silver Spring and Rockville's articles and categories added, so the
+ * doors are exhausted, not merely unopened). Prince George's County and Northern
  * Virginia were once left out on the same reasoning and each turned out to
  * have a picture it is actually known by: Rosslyn's towers across the
  * Potomac, and National Harbor's wheel on the river. The rule is the
@@ -178,12 +181,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
   },
+  // Third sheet (skyline-sheet run 35661336976): the 6000px file it
+  // replaces was a tight cluster of downtown towers under a blue sky —
+  // sharp, and it could have been any city. This is the picture Los
+  // Angeles is known by: downtown against the snow on the San Gabriels.
   los_angeles: {
-    file: "Skyline of Los Angeles, Downtown Los Angeles, California 13.jpg",
-    place: "Downtown Los Angeles",
-    credit: "Levi Clancy",
-    license: "CC BY-SA 4.0",
-    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    file: "LA Skyline Mountains2.jpg",
+    place: "Downtown Los Angeles against the San Gabriel Mountains",
+    credit: "Nserrano",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
   },
   san_francisco: {
     file: "SF From Marin Highlands3.jpg",
@@ -215,15 +222,18 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
   },
-  // The better-looking Dallas candidate is a 6000px PNG, and a PNG
-  // photograph at 1600px is megabytes where a JPEG is hundreds of
-  // kilobytes. Page weight wins on a tile nobody stops to admire.
+  // Fourth sheet (skyline-sheet run 35752500514, the first one-market run,
+  // thirty-six files deep): the hazy plane-window aerial gives way to the
+  // picture Dallas is actually known by — downtown at dusk with the green
+  // outline of Bank of America Plaza and the ball of Reunion Tower behind
+  // it. The Wikipedia article's own lead for downtown, a JPEG, where the
+  // city article's lead was a 6000px PNG that would have weighed megabytes.
   dallas: {
-    file: "IMAG2591-dallas-downtown.jpg",
-    place: "Downtown Dallas",
-    credit: "alfred twu",
-    license: "CC0",
-    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    file: "Dallas view.jpg",
+    place: "Downtown Dallas at dusk",
+    credit: "Robert Hensley",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
   },
 };
 
