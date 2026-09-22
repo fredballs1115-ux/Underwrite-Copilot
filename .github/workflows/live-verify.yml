@@ -850,13 +850,19 @@ jobs:
           mark "#369 and carries Realtor.com's credit" grep -q "Data: Realtor.com" p_market.html
           mark "#369 the list price is named as an ask" grep -q "what sellers are asking, not what buyers paid" p_market.html
           # #374 — the Census region's rental vacancy on each metro's panel:
-          # the Housing Vacancy Survey publishes no metro figure, so the
-          # tile carries the region's and names it. The tile's label and
-          # the note are each one text node (no interpolation inside the
-          # phrase). Absent on a fresh deploy until rates.yml has written
-          # the four regional rows — run it and look again.
+          # the Housing Vacancy Survey's regional rate, the steadier figure
+          # beside the metro area's own (#378), named on the tile as the
+          # region's. The tile's label and the note's sentence are each one
+          # JS string (no interpolation inside the phrase, and no apostrophe
+          # in it — React serves one as &#x27;, so "the region's" would read
+          # NOT DEPLOYED on a page that is fine). Until #378 the note said the
+          # survey "publishes no metro figure"; that sentence now renders only
+          # for a metro with no survey row of its own, and every covered metro
+          # has one, so the marker reads the sentence the page actually
+          # serves. Absent on a fresh deploy until rates.yml has written the
+          # four regional rows — run it and look again.
           mark "#374 the region's rental vacancy is on the market brief" grep -q "Census region" p_market.html
-          mark "#374 and the survey's grain is said" grep -q "publishes no metro figure" p_market.html
+          mark "#374 and the region's figure is named as the region's" grep -q "from FRED, named as the region" p_market.html
           # #377 — Realtor.com's hotness rank on the market brief: the rank of
           # the 300 largest metros, its move on the year and its two parts
           # against the U.S. Each phrase is one JS string. Absent until
