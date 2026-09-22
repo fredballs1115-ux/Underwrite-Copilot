@@ -1,8 +1,8 @@
 import {
   formatMove,
   formatValue,
-  fredUrl,
   groupRates,
+  seriesUrl,
   shortDate,
   yieldCurve,
   type LiveRate,
@@ -218,12 +218,12 @@ export function RateTile({
               </>
             )}
         <a
-          href={fredUrl(r.meta.id)}
+          href={seriesUrl(r.meta.id)}
           target="_blank"
           rel="noreferrer"
           className="underline decoration-dotted underline-offset-2 hover:text-ink"
         >
-          {short ?? r.meta.short} as of {shortDate(r.obsDate)}
+          {`${short ?? r.meta.short} as of ${shortDate(r.obsDate)}${r.meta.source === "bls" ? " · BLS" : ""}`}
         </a>
         {!r.fresh && <span className="ml-1 text-amber-700">· not updating</span>}
       </p>

@@ -2344,12 +2344,21 @@ describe("a metro's own figures, live", () => {
     // July 2026 is the real figure (1,844); the months behind it are a path.
     permits.push({ series_id: "WASH911BPPRIV", obs_date: d, value: i === 0 ? 1844 : 1500 + (i % 5) * 40 });
   }
+  // The rent index arrives as the LEVEL (from the BLS, for Washington) and
+  // the page derives the change: 420 in August 2026 against 400 a year
+  // earlier is +5.0%.
+  const rentIndex: RateRow[] = [];
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(Date.UTC(2026, 7 - i, 1)).toISOString().slice(0, 10);
+    rentIndex.push({ series_id: "CUURS35ASEHA", obs_date: d, value: i === 0 ? 420 : i === 12 ? 400 : 410 });
+  }
   const ROWS: RateRow[] = [
     { series_id: "WASH911URN", obs_date: "2026-07-01", value: 4.0 },
     { series_id: "WASH911URN", obs_date: "2026-06-01", value: 3.8 },
     { series_id: "WASH911NA_YOY", obs_date: "2026-08-01", value: 1.2 },
     { series_id: "MDPRIN5URN", obs_date: "2026-07-01", value: 4.7 },
     ...permits,
+    ...rentIndex,
   ];
   const dc = render(
     React.createElement(MetroLive, {
@@ -2382,8 +2391,21 @@ describe("a metro's own figures, live", () => {
     expect(dcText).toContain(`${year.toLocaleString("en-US")} units`);
     expect(dcText).toContain("on the year before");
     // The permits' path draws; unemployment has two observations, which is
-    // a move and not yet a path.
+    // a move and not yet a path, and the rent index derives two.
     expect((dc.match(/data-spark/g) ?? []).length).toBe(1);
+  });
+
+  it("draws the rent index as a change, credited to the BLS where FRED does not carry it", () => {
+    expect(dcText).toContain("Rent CPI y/y");
+    expect(dcText).toContain("5.0%");
+    // Washington's comes from the BLS's own API, and the panel says so
+    // three ways: the heading, the tile's link, and the note.
+    expect(dcText).toContain("Live from FRED and the BLS");
+    expect(dcText).toContain("Rent CPI y/y as of Aug 1 · BLS");
+    expect(dc).toContain("https://data.bls.gov/timeseries/CUURS35ASEHA\"");
+    expect(dcText).toContain("comes from the BLS directly");
+    // And what the figure IS, against the asking rent above it.
+    expect(dcText).toContain("what sitting tenants pay");
   });
 
   it("names the MSA on a suburb's borrowed tiles, and says so", () => {
@@ -2399,6 +2421,7 @@ describe("a metro's own figures, live", () => {
     expect(text).toContain("Prince George's County · Washington MSA");
     expect(text).toContain("Permits, 12 months · Washington MSA");
     expect(text).toContain("Jobs y/y · Washington MSA");
+    expect(text).toContain("Rent CPI y/y · Washington MSA");
     expect(text).toContain("Where FRED publishes nothing for Prince George's County MD itself");
   });
 
