@@ -11,6 +11,7 @@ import {
   formatMove,
   formatValue,
   fredUrl,
+  seriesUrl,
   groupRates,
   moveBetween,
   rateSeeds,
@@ -647,19 +648,20 @@ describe("a covered metro's own series", () => {
     // the Washington MSA's, and they stay filed under dc so the page can
     // say whose they are.
     const pg = metroSeriesFor("pg_county");
-    expect(pg.series.map((s) => s.metric)).toEqual(["unemployment", "jobs_yoy", "permits"]);
+    expect(pg.series.map((s) => s.metric)).toEqual(["unemployment", "jobs_yoy", "permits", "rent_cpi_yoy"]);
     expect(pg.series[0].id).toBe("MDPRIN5URN");
     expect(pg.series[0].metro).toBe("pg_county");
     expect(pg.series[1].metro).toBe("dc");
-    expect(pg.borrowed).toEqual(["jobs_yoy", "permits"]);
+    expect(pg.borrowed).toEqual(["jobs_yoy", "permits", "rent_cpi_yoy"]);
   });
 
   it("gives Newark its own house prices and New York's jobs", () => {
     const nj = metroSeriesFor("newark_jc");
-    expect(nj.series.map((s) => s.metric)).toEqual(["unemployment", "jobs_yoy", "permits", "hpi_yoy"]);
-    expect(nj.series.at(-1)!.id).toBe("ATNHPIUS35084Q_YOY");
-    expect(nj.series.at(-1)!.metro).toBe("newark_jc");
-    expect(nj.borrowed).toEqual(["unemployment", "jobs_yoy", "permits"]);
+    expect(nj.series.map((s) => s.metric)).toEqual(["unemployment", "jobs_yoy", "permits", "hpi_yoy", "rent_cpi_yoy"]);
+    const hpi = nj.series.find((s) => s.metric === "hpi_yoy")!;
+    expect(hpi.id).toBe("ATNHPIUS35084Q_YOY");
+    expect(hpi.metro).toBe("newark_jc");
+    expect(nj.borrowed).toEqual(["unemployment", "jobs_yoy", "permits", "rent_cpi_yoy"]);
   });
 
   it("leaves out a house price index FRED stopped publishing", () => {
@@ -786,11 +788,100 @@ describe("a change from a year ago derived from the level", () => {
     expect(yearOverYear([])).toEqual([]);
   });
 
+  it("refuses a BLS series filed with a FRED transform, or under a FRED id", () => {
+    const good = { historyRows: 40, groups: [{ id: "inflation", label: "x" }], series: [] };
+    const base = { id: "CUURS35ASEHA", source: "bls", short: "r", label: "l", group: "inflation", cadence: "monthly", freshDays: 110, unit: "pts", contractRate: false, derived: "yoy" };
+    expect(() => readSeriesTable({ ...good, series: [base] })).not.toThrow();
+    expect(() => readSeriesTable({ ...good, series: [{ ...base, derived: undefined, units: "pc1", id: "X_YOY", fred: "X" }] })).toThrow(/untransformed/);
+    expect(() => readSeriesTable({ ...good, series: [{ ...base, fred: "CUURA311SEHA" }] })).toThrow(/untransformed/);
+    expect(() => readSeriesTable({ ...good, series: [{ ...base, source: "census" }] })).toThrow(/source/);
+    // Unsaid, the source is FRED.
+    const read = readSeriesTable({ ...good, series: [{ ...base, source: undefined }] });
+    expect(read.series[0].source).toBe("fred");
+  });
+
   it("refuses a derived series filed with a transform, or under another id", () => {
     const good = { historyRows: 40, groups: [{ id: "economy", label: "x" }], series: [] };
     const base = { id: "SMS25144600000000001", short: "j", label: "l", group: "economy", cadence: "monthly", freshDays: 110, unit: "pts", contractRate: false, derived: "yoy" };
     expect(() => readSeriesTable({ ...good, series: [base] })).not.toThrow();
     expect(() => readSeriesTable({ ...good, series: [{ ...base, units: "pc1", fred: "X" }] })).toThrow(/level/);
     expect(() => readSeriesTable({ ...good, series: [{ ...base, derived: "mom" }] })).toThrow(/derived/);
+  });
+});
+
+describe("each metro's rent index, from FRED or from the BLS", () => {
+  // The CPI's rent of primary residence: what SITTING tenants pay across
+  // the area's leases, where the asking rent on the same page is this
+  // month's new ones. FRED carries it for eight metros under the BLS's
+  // pre-2018 area codes (New York is A101, San Francisco A422 — found by
+  // FRED's own search from the runner, rates runs 35752361935 and
+  // 35752980803). It does not carry the areas the BLS redrew in 2018:
+  // Washington, Baltimore and Los Angeles come from the BLS's API, and
+  // their S-coded areas were pinned from FRED's average-price series for
+  // the same places (APUS35A…, APUS35E…, APUS49A…).
+  const rentOf = (metro: string) => metroSeriesFor(metro).series.find((s) => s.metric === "rent_cpi_yoy") ?? null;
+
+  it("files a rent index for every metro that has one, and none for the two that do not", () => {
+    for (const id of ["dc", "baltimore", "philadelphia", "nyc", "boston", "chicago", "los_angeles", "san_francisco", "seattle", "miami", "atlanta", "dallas"]) {
+      const r = rentOf(id);
+      expect(r, id).not.toBeNull();
+      expect(r!.metro, id).toBe(id);
+      expect(r!.derived, id).toBe("yoy");
+      expect(r!.units, id).toBeNull();
+      expect(r!.cadence, id).toBe("monthly");
+      expect(r!.unit, id).toBe("pts");
+    }
+    // Richmond and Hampton Roads have no CPI area of their own, and a
+    // region's figure is not a metro's — the tile is absent, not borrowed.
+    expect(rentOf("richmond")).toBeNull();
+    expect(rentOf("norfolk_hampton_roads")).toBeNull();
+    // The Washington suburbs and Newark read their MSA's, named as such.
+    for (const id of ["pg_county", "montgomery_county", "nova"]) {
+      expect(rentOf(id)!.id, id).toBe("CUURS35ASEHA");
+      expect(metroSeriesFor(id).borrowed, id).toContain("rent_cpi_yoy");
+    }
+    expect(rentOf("newark_jc")!.id).toBe("CUURA101SEHA");
+  });
+
+  it("knows which three come from the BLS, and links each to its own source", () => {
+    expect(rentOf("dc")!.source).toBe("bls");
+    expect(rentOf("baltimore")!.source).toBe("bls");
+    expect(rentOf("los_angeles")!.source).toBe("bls");
+    expect(rentOf("san_francisco")!.source).toBe("fred");
+    expect(rentOf("nyc")!.source).toBe("fred");
+    expect(seriesUrl("CUURS35ASEHA")).toBe("https://data.bls.gov/timeseries/CUURS35ASEHA");
+    expect(seriesUrl("CUURA422SEHA")).toBe("https://fred.stlouisfed.org/series/CUURA422SEHA");
+    // A FRED series' url is unchanged by the second source existing.
+    expect(seriesUrl("DGS10")).toBe(fredUrl("DGS10"));
+    expect(seriesUrl("CPIAUCSL_YOY")).toBe("https://fred.stlouisfed.org/series/CPIAUCSL");
+    // Every other series in the table is FRED's.
+    for (const s of SERIES) expect(s.source, s.id).toBe("fred");
+    expect(METRO_SERIES.filter((s) => s.source === "bls").map((s) => s.id).sort()).toEqual(["CUURS35ASEHA", "CUURS35ESEHA", "CUURS49ASEHA"]);
+  });
+
+  it("reads the level and shows the change from a year earlier, whichever source wrote it", () => {
+    const level = (id: string, months: number, at: (i: number) => number): RateRow[] => {
+      const rows: RateRow[] = [];
+      for (let i = 0; i < months; i++) {
+        const d = new Date(Date.UTC(2026, 7 - i, 1)).toISOString().slice(0, 10);
+        rows.push({ series_id: id, obs_date: d, value: at(i) });
+      }
+      return rows;
+    };
+    // 420 in August 2026 against 400 a year before: +5.000%, in points.
+    const dc = readMetroRates("dc", level("CUURS35ASEHA", 14, (i) => (i === 0 ? 420 : i === 12 ? 400 : 410)), NOW);
+    const r = dc.find((x) => x.meta.id === "CUURS35ASEHA")!;
+    expect(r.obsDate).toBe("2026-08-01");
+    expect(r.value).toBeCloseTo(5, 6);
+    expect(formatValue(r)).toBe("5.0%");
+    expect(r.moveUnit).toBe("pt");
+    expect(r.fresh).toBe(true);
+    // And a suburb reads the same rows under the MSA's id.
+    const pg = readMetroRates("pg_county", level("CUURS35ASEHA", 14, () => 400), NOW);
+    expect(pg.map((x) => x.meta.id)).toEqual(["CUURS35ASEHA"]);
+    expect(pg[0].value).toBe(0);
+    // The FRED copy reads identically.
+    const ny = readMetroRates("nyc", level("CUURA101SEHA", 14, (i) => (i === 0 ? 412 : 400)), NOW);
+    expect(ny.find((x) => x.meta.id === "CUURA101SEHA")!.value).toBeCloseTo(3, 6);
   });
 });

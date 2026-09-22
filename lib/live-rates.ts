@@ -90,14 +90,32 @@ export type GroupId =
   | "housing"
   | "metro";
 
-/** The four things FRED publishes for a metro that a screen turns on. */
-export type MetroMetric = "unemployment" | "jobs_yoy" | "permits" | "hpi_yoy";
+/**
+ * The five things published for a metro that a screen turns on: the four
+ * FRED carries for every covered market, and the CPI's rent of primary
+ * residence — what sitting tenants pay across the area's leases, the in-place
+ * rent the asking rent on the same page is set against.
+ */
+export type MetroMetric = "unemployment" | "jobs_yoy" | "permits" | "hpi_yoy" | "rent_cpi_yoy";
+
+/**
+ * Where a series is pulled from. FRED for nearly everything; the BLS's own
+ * API for the CPI areas the BLS redrew in 2018 — Washington, Baltimore, Los
+ * Angeles, San Francisco — which FRED does not carry: its search returns only
+ * the DISCONTINUED pre-2018 series for them, and the S-coded ids answer "does
+ * not exist" (both from the runner, rates run 35751861027 and 35752361935).
+ * A BLS series is stored under its BLS id, as the level, untransformed; the
+ * page derives the change, as it does for Boston's payrolls.
+ */
+export type SeriesSource = "fred" | "bls";
 
 export interface SeriesMeta {
   /** The key in the `rates` table. */
   id: string;
   /** The FRED series it is fetched from — the same as `id` unless transformed. */
   fred: string;
+  /** FRED, or the BLS for a series FRED does not carry. */
+  source: SeriesSource;
   /** FRED's transform, where the stored figure is not the level (`pc1`). */
   units: string | null;
   /**
@@ -154,7 +172,7 @@ export interface SeriesGroup {
 
 const CADENCES: readonly Cadence[] = ["daily", "weekly", "monthly", "quarterly"];
 const UNITS: readonly Unit[] = ["pct", "spread", "pts", "count", "units"];
-const METRO_METRICS: readonly MetroMetric[] = ["unemployment", "jobs_yoy", "permits", "hpi_yoy"];
+const METRO_METRICS: readonly MetroMetric[] = ["unemployment", "jobs_yoy", "permits", "hpi_yoy", "rent_cpi_yoy"];
 
 /** One entry's shape, held; the two lists differ only in what files it. */
 function readSeriesEntry(o: Record<string, unknown>, where: string, groupIds: Set<string>): SeriesMeta {
@@ -183,6 +201,14 @@ function readSeriesEntry(o: Record<string, unknown>, where: string, groupIds: Se
     throw new Error(`${where}: a transformed series needs its own id, distinct from its FRED id`);
   }
   if (o.derived !== undefined && o.derived !== "yoy") throw new Error(`${where}: derived must be "yoy"`);
+  if (o.source !== undefined && o.source !== "fred" && o.source !== "bls") {
+    throw new Error(`${where}: source must be "fred" or "bls"`);
+  }
+  // FRED's transforms cannot apply to a series FRED does not have: a BLS
+  // series is the level, under the BLS id, and the page derives the change.
+  if (o.source === "bls" && (typeof o.units === "string" || (o.fred !== undefined && o.fred !== o.id))) {
+    throw new Error(`${where}: a BLS series is stored under its own id, untransformed`);
+  }
   // A derived figure is computed from the stored LEVEL, so the table row is
   // the level and must be filed under the level's own id, untransformed.
   if (o.derived === "yoy" && (typeof o.units === "string" || (o.fred !== undefined && o.fred !== o.id))) {
@@ -191,6 +217,7 @@ function readSeriesEntry(o: Record<string, unknown>, where: string, groupIds: Se
   return {
     id: o.id,
     fred: typeof o.fred === "string" ? o.fred : o.id,
+    source: o.source === "bls" ? "bls" : "fred",
     units: typeof o.units === "string" ? o.units : null,
     derived: o.derived === "yoy" ? "yoy" : null,
     short: o.short,
@@ -767,4 +794,14 @@ export function shortDate(obsDate: string): string {
 /** The series' own page on FRED — the level's page for a transformed series. */
 export function fredUrl(id: string): string {
   return `https://fred.stlouisfed.org/series/${seriesMeta(id)?.fred ?? id}`;
+}
+
+/**
+ * The series' own page at its source: FRED's, or the BLS's for a series FRED
+ * does not carry. What every tile links to, so a figure is never credited to
+ * a source that does not publish it.
+ */
+export function seriesUrl(id: string): string {
+  if (seriesMeta(id)?.source === "bls") return `https://data.bls.gov/timeseries/${id}`;
+  return fredUrl(id);
 }

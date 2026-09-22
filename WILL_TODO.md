@@ -40,10 +40,22 @@ the skyline contact sheet (`skyline-sheet.yml` pushes 640px copies of
 every candidate to its own branch, so a photograph is chosen BY EYE and
 still credited from what Commons returned) — first sheet: Washington's
 overhead of the Mall became the Lincoln Memorial from Arlington, Richmond
-went from 1,600 to 5,400 pixels, PG County got National Harbor's wheel.
-**Whose move: mine, next** — the remaining twelve markets' sheets, a
-second search for Montgomery County (the first found berries and blue
-jays), then the operator's own ground-level files for `public/photos/`.
+went from 1,600 to 5,400 pixels, PG County got National Harbor's wheel,
+Norfolk's street corner became its waterfront. Then #366: Los Angeles
+opens on downtown against the snow on the San Gabriels and Dallas on its
+green-lit tower at dusk — the Dallas picture needed the search itself to
+change (a one-market run now checks thirty-six files, not nine), and
+Montgomery County's second search found an aerial and an interstate, so
+its overhead stays and its doors are marked exhausted. Then #367: each
+market's rent index — the CPI's rent of primary residence, y/y, what
+sitting tenants pay — beside the asking rent, twelve metros, eight from
+FRED and three from the BLS's own API (FRED does not carry the areas the
+BLS redrew in 2018; their codes were pinned from FRED's average-price
+series and probed with the workflow's new `probe_bls`).
+**Whose move: the operator's** — the ground-level files for
+`public/photos/`; optionally a free `BLS_API_KEY` Actions secret so the
+dry run prints the BLS series' titles. **Mine, next** — more inputs:
+Zillow's apartment-only asking rent and its home value index per metro.
 
 ## 🟢 2026-09-16 into 09-17 — `/tools` becomes the reason not to open Excel
 

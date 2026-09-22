@@ -29,6 +29,15 @@ import {
  *   direction. Drawn as the monthly path, said as the year.
  * - **House prices, y/y** — FHFA's all-transactions index against a year
  *   ago, quarterly.
+ * - **Rent CPI, y/y** — the CPI's rent of primary residence for the area
+ *   against a year ago: what SITTING tenants pay, across every lease the
+ *   survey reaches, where the asking rent drawn above it is this month's
+ *   new leases. The two are different numbers about different tenants, and
+ *   an underwrite needs both — the in-place rent is what a rent roll grows
+ *   at, the asking rent is what a vacant unit re-lets at. Eight metros'
+ *   come from FRED; Washington's, Baltimore's, Los Angeles's and San
+ *   Francisco's come from the BLS's own API, because FRED does not carry
+ *   the CPI areas the BLS redrew in 2018 — and the tile says so.
  *
  * BORROWED IS SAID. A suburb of Washington has its own unemployment rate
  * and nothing else at this cadence — permits, payrolls and house prices
@@ -54,16 +63,18 @@ export function MetroLive({
   // The areas FRED names, for the heading — the metro's own, then the MSA
   // whose figures fill in.
   const areas = Array.from(new Set(metas.map((m) => m.area)));
+  const fromBls = metas.some((m) => m.source === "bls");
+  const hasRentIndex = metas.some((m) => m.metric === "rent_cpi_yoy");
 
   return (
     <div>
       <h3 className="text-[11px] uppercase tracking-wide text-muted">
-        Live from FRED
+        {fromBls ? "Live from FRED and the BLS" : "Live from FRED"}
         <span className="ml-1.5 font-normal normal-case tracking-normal">
           · {areas.join(" · ")}
         </span>
       </h3>
-      <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+      <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-5">
         {rates.map((r) => {
           const meta = r.meta as MetroSeriesMeta;
           // A borrowed figure wears the MSA's name on its own tile.
@@ -110,6 +121,10 @@ export function MetroLive({
       </div>
       <p className="mt-2 text-[11px] text-muted">
         Pulled every weekday; each figure links to its series.
+        {hasRentIndex &&
+          " The rent index is what sitting tenants pay across the area's leases; the asking rent above is this month's new ones."}
+        {fromBls &&
+          " Where FRED does not carry the area, the rent index comes from the BLS directly."}
         {borrowed.length > 0 &&
           ` Where FRED publishes nothing for ${metroName} itself, the figure is the metro area's, named on the tile.`}
       </p>

@@ -33,6 +33,10 @@ on:
         description: "FRED full-text searches, separated by |: the top matches with their ids, written nowhere (implies dry_run)"
         required: false
         default: ""
+      probe_bls:
+        description: "Candidate BLS series ids, space-separated: fetched from api.bls.gov and printed with the newest observation (and the title, if BLS_API_KEY is set), written nowhere (implies dry_run)"
+        required: false
+        default: ""
 jobs:
   rates:
     runs-on: ubuntu-latest
@@ -46,9 +50,13 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-          DRY_RUN: ${{ (inputs.dry_run == true || inputs.probe_ids != '' || inputs.probe_search != '') && '1' || '' }}
+          # Optional: the BLS's free registration key lifts its API allowance
+          # and adds the catalog (each series' own title) to a dry run.
+          BLS_API_KEY: ${{ secrets.BLS_API_KEY }}
+          DRY_RUN: ${{ (inputs.dry_run == true || inputs.probe_ids != '' || inputs.probe_search != '' || inputs.probe_bls != '') && '1' || '' }}
           PROBE_IDS: ${{ inputs.probe_ids }}
           PROBE_SEARCH: ${{ inputs.probe_search }}
+          PROBE_BLS: ${{ inputs.probe_bls }}
         run: |
           if [ -z "$FRED_API_KEY" ]; then
             echo "FRED_API_KEY not set. Get a free key at https://fred.stlouisfed.org/docs/api/api_key.html and add it as an Actions secret. Skipping."

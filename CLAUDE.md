@@ -474,6 +474,34 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   whatever is closest. The validator holds a derived series to the
   level's own id and no transform, for the same reason a transformed one
   must carry a `_YOY` id: the table row is what it says it is.
+  **The fifth metric is the rent index** (`rent_cpi_yoy`): the CPI's rent
+  of primary residence against a year ago — what SITTING tenants pay
+  across the area's leases, where the asking rent above it on the page is
+  this month's new ones; an underwrite needs both, since a rent roll
+  grows at the first and a vacant unit re-lets at the second. **FRED
+  carries it for eight metros under the BLS's PRE-2018 area codes** (New
+  York is `CUURA101SEHA`, San Francisco `CUURA422SEHA` — found by FRED's
+  own search from the runner, because the S-coded ids memory offers,
+  `CUURS35ASEHA` and its kin, all answer "does not exist" there), **and
+  not at all for the areas the BLS redrew in 2018**: Washington,
+  Baltimore and Los Angeles have only DISCONTINUED pre-2018 series on
+  FRED, so those three come from the BLS's own API (`source: "bls"` in
+  the table; one POST a run to `api.bls.gov`, inside the unregistered
+  allowance; `BLS_API_KEY` is optional and adds the catalog so a dry run
+  prints the title). Their area codes were pinned from FRED's
+  average-price series for the same places (`APUS35A…` is
+  Washington-Arlington-Alexandria, `APUS35E…` Baltimore, `APUS49A…` Los
+  Angeles), and the rates workflow's `probe_bls` input prints a BLS id's
+  newest observation before it is trusted. A BLS series is stored under
+  its BLS id as the level with `derived: "yoy"` — FRED's transforms
+  cannot apply to a series FRED does not have — and the eight FRED copies
+  are stored the same way so the twelve read alike. `seriesUrl` links a
+  tile to whichever source publishes it, the tile's link says "· BLS",
+  the panel's heading reads "Live from FRED and the BLS", and the note
+  says where the figure came from: a figure is never credited to a
+  source that does not publish it. Richmond and Hampton Roads have no
+  CPI area and a region's figure is not a metro's, so their tile is
+  absent rather than borrowed.
 - What landlords are asking this month: `lib/zori.ts` (pure — a metro's
   Zillow Observed Rent Index and its change from a year ago, read out of
   the two `benchmarks` rows the MONTHLY pull writes, `scripts/fetch-zori.mjs`

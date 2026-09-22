@@ -825,6 +825,15 @@ jobs:
           mark "#364 the asking rent is on the market brief" grep -q "Asking rent, all homes" p_market.html
           mark "#364 and carries Zillow's credit" grep -q "Data: Zillow Research" p_market.html
           mark "#364 the asking rent is drawn against the FMR" grep -q "neither is the other" p_market.html
+          # #367 — each metro's rent index: the CPI's rent of primary
+          # residence against a year ago, what SITTING tenants pay, beside
+          # the asking rent. Washington's comes from the BLS's own API
+          # (FRED does not carry the areas the BLS redrew in 2018), so the
+          # default metro's panel says so. Absent until the weekday pull has
+          # written the rows — run rates.yml and look again.
+          mark "#367 the rent index is on the market brief" grep -q "Rent CPI y/y" p_market.html
+          mark "#367 sitting tenants against new leases, said" grep -q "what sitting tenants pay" p_market.html
+          mark "#367 a BLS-sourced figure says so" grep -q "comes from the BLS directly" p_market.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

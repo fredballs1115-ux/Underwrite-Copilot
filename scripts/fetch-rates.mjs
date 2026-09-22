@@ -22,12 +22,16 @@
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-/** @type {{ historyRows: number; series: Array<{ id: string; fred?: string; units?: string; label: string }>; metroSeries?: Array<{ id: string; fred?: string; units?: string; label: string }> }} */
+/** @type {{ historyRows: number; series: Array<{ id: string; fred?: string; units?: string; source?: string; label: string }>; metroSeries?: Array<{ id: string; fred?: string; units?: string; source?: string; label: string }> }} */
 const { series: STRIP, metroSeries = [], historyRows } = require("../data/fred-series.json");
 // The strip's series and every covered metro's own, one list: a series two
 // suburbs share is fetched once, since the table is keyed by id.
 const seenId = new Set();
 const SERIES = [...STRIP, ...metroSeries].filter((s) => !seenId.has(s.id) && seenId.add(s.id));
+// Nearly all of it is FRED's. The rest is the BLS's own — see the BLS block
+// below for why a series would be.
+const FROM_FRED = SERIES.filter((s) => (s.source ?? "fred") === "fred");
+const FROM_BLS = SERIES.filter((s) => s.source === "bls");
 
 // The last few dozen observations, not the last one: the strip draws each
 // series' recent path, and one run backfills it. Idempotent — the upsert is
@@ -83,7 +87,7 @@ async function fred(path, params, retried = false) {
 
 const failed = [];
 const wrote = [];
-for (const s of SERIES) {
+for (const s of FROM_FRED) {
   const fredId = s.fred ?? s.id;
   try {
     if (dryRun) {
@@ -129,11 +133,119 @@ for (const s of SERIES) {
   await sleep(PACE_MS);
 }
 
+// ── The BLS's own API, for the series FRED does not carry ──────────────────
+//
+// The BLS redrew its CPI metro areas in 2018 and FRED never picked up the
+// re-coded ones: its search for Washington-Arlington-Alexandria returns only
+// the DISCONTINUED Washington-Baltimore series, and the S-coded ids answer
+// "does not exist" (rates runs 35751861027 and 35752361935). The BLS
+// publishes them itself, so those rent indices come from api.bls.gov — ONE
+// POST for all of them, well inside the unregistered allowance of 25 queries
+// a day and 25 series a query. A key (free, https://data.bls.gov/registrationEngine/)
+// lifts the allowance and adds the catalog, which is how a dry run prints
+// each series' own title; without one the dry run prints the data and says
+// the title was not asked for. The row stored is the LEVEL under the BLS id;
+// the page derives the change from a year earlier, as it does for Boston's
+// payrolls.
+const blsKey = process.env.BLS_API_KEY;
+async function bls(ids) {
+  const year = new Date().getUTCFullYear();
+  const body = { seriesid: ids, startyear: String(year - 4), endyear: String(year) };
+  if (blsKey) {
+    body.registrationkey = blsKey;
+    body.catalog = true;
+  }
+  const res = await fetch("https://api.bls.gov/publicAPI/v2/timeseries/data/", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30000),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || json.status !== "REQUEST_SUCCEEDED") {
+    const said = Array.isArray(json.message) && json.message.length ? ` — ${json.message.join("; ")}` : "";
+    throw new Error(`BLS HTTP ${res.status} ${json.status ?? ""}${said}`);
+  }
+  return json;
+}
+/** A BLS series' monthly rows, newest first, dated the first of the month; M13 (the annual average) dropped. */
+function blsObservations(series) {
+  return (series?.data ?? [])
+    .filter((d) => /^M(0[1-9]|1[0-2])$/.test(String(d.period)) && Number.isFinite(Number(d.value)))
+    .map((d) => ({ obs_date: `${d.year}-${String(d.period).slice(1)}-01`, value: Number(d.value) }))
+    .sort((a, b) => (a.obs_date < b.obs_date ? 1 : a.obs_date > b.obs_date ? -1 : 0));
+}
+
+if (FROM_BLS.length > 0) {
+  try {
+    const json = await bls(FROM_BLS.map((s) => s.id));
+    for (const m of json.message ?? []) console.log(`  BLS: ${m}`);
+    const byId = new Map((json.Results?.series ?? []).map((s) => [s.seriesID, s]));
+    for (const s of FROM_BLS) {
+      const got = byId.get(s.id);
+      const obs = blsObservations(got)
+        .slice(0, OBSERVATIONS)
+        .map((o) => ({ series_id: s.id, obs_date: o.obs_date, value: o.value, label: s.label }));
+      if (obs.length === 0) {
+        failed.push(s.id);
+        console.error(`${s.id}: FAILED — the BLS returned no monthly observation`);
+        continue;
+      }
+      if (dryRun) {
+        console.log(
+          got?.catalog
+            ? `  ${s.id}: "${got.catalog.series_title}" · ${got.catalog.survey_name ?? ""} · ${got.catalog.seasonality ?? ""}`
+            : `  ${s.id}: (title not asked for — the BLS catalog needs BLS_API_KEY)`,
+        );
+      }
+      if (supabase) {
+        const { error } = await supabase.from("rates").upsert(obs, { onConflict: "series_id,obs_date" });
+        if (error) throw new Error(`rates upsert: ${error.message}`);
+      }
+      wrote.push(s.id);
+      console.log(
+        `${s.id}: ${obs[0].value} (${obs[0].obs_date}) · ${obs.length} obs · from the BLS` +
+          `${dryRun ? " · dry run, not written" : ""}`,
+      );
+    }
+  } catch (err) {
+    for (const s of FROM_BLS) if (!wrote.includes(s.id) && !failed.includes(s.id)) failed.push(s.id);
+    console.error(`BLS: FAILED — ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 // One line to read the run by, in the shape live-verify's roll-up uses.
 console.log(
   `RATES ROLL-UP: ${wrote.length} of ${SERIES.length} series answered` +
     (failed.length ? `; failed: ${failed.join(", ")}` : ""),
 );
+
+// PROBE_BLS — candidate BLS ids, fetched from the BLS and printed with the
+// newest observation (and the title, with a key), written nowhere. The
+// same rule as PROBE_IDS: an id drafted from memory is a claim until the
+// runner prints what it is.
+const probeBls = (process.env.PROBE_BLS ?? "").split(/\s+/).filter(Boolean);
+if (probeBls.length > 0) {
+  if (!dryRun) {
+    console.error("PROBE_BLS is a dry-run facility: set DRY_RUN=1.");
+    process.exit(1);
+  }
+  console.log(`\nPROBE BLS: ${probeBls.length} candidate ids, written nowhere`);
+  try {
+    const json = await bls(probeBls);
+    for (const m of json.message ?? []) console.log(`  BLS: ${m}`);
+    for (const id of probeBls) {
+      const got = (json.Results?.series ?? []).find((s) => s.seriesID === id);
+      const obs = blsObservations(got);
+      console.log(
+        `  ${id}: ${got?.catalog ? `"${got.catalog.series_title}" · ` : ""}` +
+          (obs.length ? `newest ${obs[0].value} (${obs[0].obs_date}) · ${obs.length} obs` : "NOT FOUND — no monthly data"),
+      );
+    }
+  } catch (err) {
+    console.log(`  BLS probe failed — ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
 
 // PROBE_IDS — candidate ids that are NOT in the table yet, printed with
 // FRED's own title, cadence, units and newest observation so a list drafted
