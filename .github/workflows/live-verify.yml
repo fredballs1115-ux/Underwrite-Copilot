@@ -863,6 +863,13 @@ jobs:
           # realtor.yml has written the hotness rows — run it and look again.
           mark "#377 the hotness rank is on the market brief" grep -q "of 300 metros" p_market.html
           mark "#377 and what the rank is made of is said" grep -q "ranks the 300 largest metros" p_market.html
+          # #378 — the metro area's own rental vacancy from the Housing
+          # Vacancy Survey's workbook, with the survey's margin of error on
+          # the tile and the note saying what a margin means. Both phrases
+          # are one JS string. Absent until hvs.yml has written the rows —
+          # run it and look again.
+          mark "#378 the metro area's rental vacancy carries its margin" grep -q "pts margin of error" p_market.html
+          mark "#378 and the note says what the margin means" grep -q "margin of error beside it" p_market.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

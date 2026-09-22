@@ -587,7 +587,38 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   says where the figure came from: a figure is never credited to a
   source that does not publish it. Richmond and Hampton Roads have no
   CPI area and a region's figure is not a metro's, so their tile is
-  absent rather than borrowed. **The sixth metric is the region's rental
+  absent rather than borrowed.
+  **The sixth metric is the metro area's own rental vacancy** (#378,
+  `rental_vacancy_msa`), from the Housing Vacancy Survey's 75-largest-MSA
+  tables, which the Census Bureau publishes as .xlsx and nothing else
+  (FRED carries only the four regions): `scripts/fetch-hvs.mjs` reads
+  the current year's table and the eleven-year history with exceljs on a
+  quarterly cron (`hvs.yml`, the 6th of Feb / May / Aug / Nov), after
+  `probe-url.mjs` printed both workbooks' shape from the runner (run
+  35794270430 — a header block naming each quarter with "Margin of Error"
+  beside it, the area names padded with dot leaders and carrying footnote
+  digits, a few spelt differently between the two tables: "Dallas-Fort
+  Worth" against "Dallas-Ft. Worth", the Virginia Beach area retitled).
+  Three rules. **The year and the quarter columns are read from each
+  header row**, never assumed, so a block's rows are dated by the header
+  above them. **An area is matched by a name PREFIX** (`census` on the
+  entry, `source: census`), kept short of where the spellings diverge,
+  and the dry run prints the row each metro matched — a wrong prefix is a
+  loud "no row", never a silent figure for another city. And **the
+  margin of error is stored**, in a companion series named by `moe`
+  (`HVS_RVR_<cbsa>_MOE`, read beside its figure for the SAME date —
+  `LiveRate.moe`), because a sample's quarterly figure for one metro is
+  wide (Richmond's ±5 points on a 7% rate) and a figure shown without it
+  reads as more than it is: the tile prints "±2.2 pts margin of error"
+  under the move, the link says "· Census" and goes to the survey's
+  page (`HVS_RATES_URL`), the heading reads "Live from FRED, the BLS and
+  the Census Bureau", and the note says a quarter's move inside the
+  margin is noise. The region's tile stays beside it as the steadier
+  figure, so the two vacancy metrics keep different names and
+  `metroSeriesFor` shows both; a suburb borrows the MSA's and wears its
+  name. A companion is nobody's series: `readSeriesTable` refuses a
+  `moe` id that is also a series, and the server read fetches it with
+  its figure (one index scan a series still). **The sixth metric is the region's rental
   vacancy** (`rental_vacancy`): the Census Bureau's Housing Vacancy
   Survey publishes it for the four Census regions and never for a metro,
   so it is the one figure every metro BORROWS from its region — filed in

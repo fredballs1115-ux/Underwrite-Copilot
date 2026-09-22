@@ -223,7 +223,7 @@ export function RateTile({
           rel="noreferrer"
           className="underline decoration-dotted underline-offset-2 hover:text-ink"
         >
-          {`${short ?? r.meta.short} as of ${shortDate(r.obsDate)}${r.meta.source === "bls" ? " · BLS" : ""}`}
+          {`${short ?? r.meta.short} as of ${shortDate(r.obsDate)}${r.meta.source === "bls" ? " · BLS" : r.meta.source === "census" ? " · Census" : ""}`}
         </a>
         {!r.fresh && <span className="ml-1 text-amber-700">· not updating</span>}
       </p>

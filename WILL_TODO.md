@@ -130,10 +130,15 @@ of the 300 largest metros with the rank a year earlier read out of the
 history file (the move is our own subtraction, a smaller rank is
 hotter), and its two parts against the U.S. in plain units; and the
 probe script describes a workbook, the step before the Census HVS feed.
-**Mine, next** — the Census HVS's own MSA rental vacancy table (the
-rates page lists tab4_msa_26_rvr.xlsx and tab4b_msa_15_25_rvr.xlsx;
-probe them from the runner first, then decide the grain and the margin
-of error's place on the tile).
+Then #378: each metro area's own rental vacancy from the Housing
+Vacancy Survey's workbooks, quarterly, with the survey's margin of
+error on the tile — the probe printed both tables from the runner
+(35794270430), the parser reads the year and the quarter off each
+header block, matches an area by a name prefix and prints the row it
+matched, and stores the margin as a companion series.
+**Mine, next** — a look at one real deal of each kind on the deployed
+site (the signed-in pages are the one surface live-verify cannot
+reach), and the operator items below.
 
 ## 🟢 2026-09-16 into 09-17 — `/tools` becomes the reason not to open Excel
 

@@ -1,0 +1,44 @@
+name: hvs
+# Quarterly Census pull → the `rates` table: each covered metro area's own
+# rental vacancy rate from the Housing Vacancy Survey's 75-largest-MSA
+# tables, with the survey's margin of error beside it. The survey publishes
+# them as .xlsx on census.gov and nowhere else (FRED carries only the four
+# regions), so scripts/fetch-hvs.mjs reads the workbooks with exceljs.
+#
+# The survey releases a quarter's figures late in the month after it ends
+# (January, April, July, October); this runs early the month after that, so
+# the newest quarter is in the table within weeks of its release. Dispatch
+# it with `dry_run` ticked to fetch, match and print without writing: the
+# log names the row each metro matched, which is how a name prefix is
+# verified before it is trusted (the sandbox cannot reach census.gov).
+#
+# No-ops with instructions until the Supabase Actions secrets exist.
+on:
+  schedule:
+    - cron: "23 13 6 2,5,8,11 *" # the 6th of Feb / May / Aug / Nov, after the survey's release
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Fetch both workbooks, match every metro and print, write nothing"
+        type: boolean
+        default: false
+jobs:
+  hvs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --omit=dev
+      - name: Pull the Housing Vacancy Survey's metro tables
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DRY_RUN: ${{ inputs.dry_run == true && '1' || '' }}
+        run: |
+          if [ "$DRY_RUN" != "1" ] && { [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; }; then
+            echo "Supabase Actions secrets not set (repo Settings → Secrets → Actions: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY). Skipping."
+            exit 0
+          fi
+          node scripts/fetch-hvs.mjs

@@ -28,6 +28,7 @@ import { FIXTURE_NOW as NOW, REAL_ROWS as REAL } from "./live-rates.fixture";
 import table from "@/data/fred-series.json";
 import metrosSeed from "@/data/research/metros.json";
 import {
+  HVS_RATES_URL,
   METRO_SERIES,
   REGION_SERIES,
   PERMIT_WINDOW_MONTHS,
@@ -654,12 +655,13 @@ describe("a covered metro's own series", () => {
       "jobs_yoy",
       "permits",
       "rent_cpi_yoy",
+      "rental_vacancy_msa",
       "rental_vacancy",
     ]);
     expect(pg.series[0].id).toBe("MDPRIN5URN");
     expect(pg.series[0].metro).toBe("pg_county");
     expect(pg.series[1].metro).toBe("dc");
-    expect(pg.borrowed).toEqual(["jobs_yoy", "permits", "rent_cpi_yoy", "rental_vacancy"]);
+    expect(pg.borrowed).toEqual(["jobs_yoy", "permits", "rent_cpi_yoy", "rental_vacancy_msa", "rental_vacancy"]);
   });
 
   it("gives Newark its own house prices and New York's jobs", () => {
@@ -670,12 +672,13 @@ describe("a covered metro's own series", () => {
       "permits",
       "hpi_yoy",
       "rent_cpi_yoy",
+      "rental_vacancy_msa",
       "rental_vacancy",
     ]);
     const hpi = nj.series.find((s) => s.metric === "hpi_yoy")!;
     expect(hpi.id).toBe("ATNHPIUS35084Q_YOY");
     expect(hpi.metro).toBe("newark_jc");
-    expect(nj.borrowed).toEqual(["unemployment", "jobs_yoy", "permits", "rent_cpi_yoy", "rental_vacancy"]);
+    expect(nj.borrowed).toEqual(["unemployment", "jobs_yoy", "permits", "rent_cpi_yoy", "rental_vacancy_msa", "rental_vacancy"]);
   });
 
   it("leaves out a house price index FRED stopped publishing", () => {
@@ -808,7 +811,9 @@ describe("a change from a year ago derived from the level", () => {
     expect(() => readSeriesTable({ ...good, series: [base] })).not.toThrow();
     expect(() => readSeriesTable({ ...good, series: [{ ...base, derived: undefined, units: "pc1", id: "X_YOY", fred: "X" }] })).toThrow(/untransformed/);
     expect(() => readSeriesTable({ ...good, series: [{ ...base, fred: "CUURA311SEHA" }] })).toThrow(/untransformed/);
-    expect(() => readSeriesTable({ ...good, series: [{ ...base, source: "census" }] })).toThrow(/source/);
+    expect(() => readSeriesTable({ ...good, series: [{ ...base, source: "opendata" }] })).toThrow(/source/);
+    // A Census source is a different shape again: it needs a name to match.
+    expect(() => readSeriesTable({ ...good, series: [{ ...base, source: "census" }] })).toThrow(/name prefix/);
     // Unsaid, the source is FRED.
     const read = readSeriesTable({ ...good, series: [{ ...base, source: undefined }] });
     expect(read.series[0].source).toBe("fred");
@@ -968,5 +973,112 @@ describe("the region's rental vacancy, borrowed and named", () => {
     expect(() =>
       readSeriesTable({ ...good, regionSeries: [{ ...good.regionSeries[0], id: "WASH911URN" }] }),
     ).toThrow(/already a strip or metro series/);
+  });
+});
+
+describe("the metro area's own rental vacancy, from the survey's workbook, with its margin", () => {
+  // The Housing Vacancy Survey publishes a quarterly rate for the 75
+  // largest metro areas as .xlsx and nothing else (zori.yml probe_url, run
+  // 35794270430, printed both tables from the runner: Washington 5.9 ±2.2
+  // then 6.2 ±2.2 for 2026, Richmond 7.0 ±4.7 then 6.2 ±5.1). The figure is
+  // stored under an id of ours with the survey's margin of error in a
+  // companion series, and a sample's margin for one metro is wide enough
+  // that the figure is never shown without it.
+  const COVERED = (metrosSeed.metros ?? []).map((m) => m.id);
+  const CENSUS = METRO_SERIES.filter((s) => s.source === "census");
+
+  it("files fourteen metro areas under one metric, each with a name prefix and a margin companion", () => {
+    expect(CENSUS).toHaveLength(14);
+    for (const s of CENSUS) {
+      expect(s.metric, s.id).toBe("rental_vacancy_msa");
+      expect(s.id).toMatch(/^HVS_RVR_\d{5}$/);
+      expect(s.moe).toBe(`${s.id}_MOE`);
+      expect(s.census, s.id).toBeTruthy();
+      expect(s.cadence).toBe("quarterly");
+      expect(s.unit).toBe("pts");
+      expect(s.area).toMatch(/ MSA$/);
+      expect(s.units).toBeNull();
+      expect(s.derived).toBeNull();
+      expect(s.fred).toBe(s.id);
+      expect(COVERED).toContain(s.metro);
+      // A companion is read beside its figure, never as a series of its own.
+      expect(seriesMeta(s.moe!)).toBeNull();
+    }
+    // Nothing outside the survey's workbook carries a margin or a name to match.
+    for (const s of [...SERIES, ...METRO_SERIES, ...REGION_SERIES]) {
+      if (s.source === "census") continue;
+      expect(s.moe, s.id).toBeNull();
+      expect(s.census, s.id).toBeNull();
+    }
+  });
+
+  it("gives every covered metro the survey's metro figure ahead of the region's, borrowed where a suburb has none", () => {
+    for (const id of COVERED) {
+      const { series } = metroSeriesFor(id);
+      const msa = series.findIndex((s) => s.metric === "rental_vacancy_msa");
+      const region = series.findIndex((s) => s.metric === "rental_vacancy");
+      expect(msa, id).toBeGreaterThanOrEqual(0);
+      expect(region, id).toBeGreaterThan(msa);
+    }
+    expect(metroSeriesFor("dc").borrowed).not.toContain("rental_vacancy_msa");
+    const pg = metroSeriesFor("pg_county");
+    expect(pg.borrowed).toContain("rental_vacancy_msa");
+    expect(pg.series.find((s) => s.metric === "rental_vacancy_msa")!.area).toBe("Washington MSA");
+    expect(metroSeriesFor("newark_jc").series.find((s) => s.metric === "rental_vacancy_msa")!.area).toBe("New York MSA");
+  });
+
+  it("reads the figure with the margin for the SAME date, and links it to the survey's page", () => {
+    const rows: RateRow[] = [
+      { series_id: "HVS_RVR_47900", obs_date: "2026-04-01", value: 6.2 },
+      { series_id: "HVS_RVR_47900", obs_date: "2026-01-01", value: 5.9 },
+      { series_id: "HVS_RVR_47900_MOE", obs_date: "2026-04-01", value: 2.2 },
+      { series_id: "HVS_RVR_47900_MOE", obs_date: "2026-01-01", value: 2.1 },
+    ];
+    const r = readMetroRates("dc", rows, NOW).find((x) => x.meta.id === "HVS_RVR_47900")!;
+    expect(r.value).toBe(6.2);
+    expect(r.moe).toBe(2.2);
+    expect(r.move).toBe(0.3);
+    expect(r.moveUnit).toBe("pt");
+    expect(formatValue(r)).toBe("6.2%");
+    // No margin for the newest quarter: null — never the quarter before's.
+    const noMargin = readMetroRates(
+      "dc",
+      rows.filter((x) => !(x.series_id.endsWith("_MOE") && x.obs_date === "2026-04-01")),
+      NOW,
+    ).find((x) => x.meta.id === "HVS_RVR_47900")!;
+    expect(noMargin.moe).toBeNull();
+    // The companion never surfaces as a tile of its own.
+    expect(readMetroRates("dc", rows, NOW).some((x) => x.meta.id === "HVS_RVR_47900_MOE")).toBe(false);
+    // A FRED figure states no margin, and a Census one links to the survey.
+    expect(readMetroRates("dc", [{ series_id: "WASH911URN", obs_date: "2026-07-01", value: 4.0 }], NOW)[0].moe).toBeNull();
+    expect(seriesUrl("HVS_RVR_47900")).toBe(HVS_RATES_URL);
+    expect(seriesUrl("HVS_RVR_47900")).toMatch(/^https:\/\/www\.census\.gov\//);
+  });
+
+  it("holds a Census entry to its shape, and a margin companion to being nobody's series", () => {
+    const base = {
+      id: "HVS_RVR_00000", source: "census", census: "Nowhere-", moe: "HVS_RVR_00000_MOE",
+      short: "r", label: "l", cadence: "quarterly", freshDays: 300, unit: "pts",
+    };
+    const tableOf = (entry: Record<string, unknown>, series: unknown[] = []) => ({
+      historyRows: 2,
+      groups: [{ id: "metro", label: "m" }, { id: "curve", label: "c" }],
+      series,
+      metroSeries: [{ ...entry, metro: "dc", metric: "rental_vacancy_msa", area: "Nowhere MSA" }],
+    });
+    expect(() => readSeriesTable(tableOf(base))).not.toThrow();
+    expect(() => readSeriesTable(tableOf({ ...base, census: undefined }))).toThrow(/name prefix/);
+    expect(() => readSeriesTable(tableOf({ ...base, census: "  " }))).toThrow(/name prefix/);
+    // A transform trips the table's older rule first (a transformed figure
+    // needs an id of its own) or this one; either way it is refused.
+    expect(() => readSeriesTable(tableOf({ ...base, units: "pc1" }))).toThrow(/own id|untransformed/);
+    expect(() => readSeriesTable(tableOf({ ...base, units: "pc1", fred: "OTHER" }))).toThrow(/untransformed/);
+    expect(() => readSeriesTable(tableOf({ ...base, fred: "OTHER" }))).toThrow(/untransformed/);
+    expect(() => readSeriesTable(tableOf({ ...base, derived: "yoy" }))).toThrow(/untransformed/);
+    expect(() => readSeriesTable(tableOf({ ...base, moe: base.id }))).toThrow(/companion/);
+    expect(() => readSeriesTable(tableOf({ ...base, source: "fred", census: "Nowhere-", moe: undefined }))).toThrow(/only a Census series/);
+    // A margin id that is already a series of the table's own is refused.
+    const strip = { id: "HVS_RVR_00000_MOE", short: "x", label: "x", group: "curve", cadence: "daily", freshDays: 6, unit: "pct", contractRate: false };
+    expect(() => readSeriesTable(tableOf(base, [strip]))).toThrow(/already a series/);
   });
 });

@@ -2362,6 +2362,13 @@ describe("a metro's own figures, live", () => {
     // quarter behind it for the move — two observations, not yet a path.
     { series_id: "RRVRSOQ156N", obs_date: "2026-04-01", value: 9.5 },
     { series_id: "RRVRSOQ156N", obs_date: "2026-01-01", value: 8.9 },
+    // The metro area's own rental vacancy out of the survey's workbook
+    // (the runner's probe: Washington 5.9 ±2.2 for 2026 Q1, 6.2 ±2.2 for
+    // Q2), the margin a companion series for the same dates.
+    { series_id: "HVS_RVR_47900", obs_date: "2026-04-01", value: 6.2 },
+    { series_id: "HVS_RVR_47900", obs_date: "2026-01-01", value: 5.9 },
+    { series_id: "HVS_RVR_47900_MOE", obs_date: "2026-04-01", value: 2.2 },
+    { series_id: "HVS_RVR_47900_MOE", obs_date: "2026-01-01", value: 2.2 },
     ...permits,
     ...rentIndex,
   ];
@@ -2405,7 +2412,7 @@ describe("a metro's own figures, live", () => {
     expect(dcText).toContain("5.0%");
     // Washington's comes from the BLS's own API, and the panel says so
     // three ways: the heading, the tile's link, and the note.
-    expect(dcText).toContain("Live from FRED and the BLS");
+    expect(dcText).toContain("Live from FRED, the BLS and the Census Bureau");
     expect(dcText).toContain("Rent CPI y/y as of Aug 1 · BLS");
     expect(dc).toContain("https://data.bls.gov/timeseries/CUURS35ASEHA\"");
     expect(dcText).toContain("comes from the BLS directly");
@@ -2418,9 +2425,23 @@ describe("a metro's own figures, live", () => {
     expect(dcText).toContain("9.5%");
     expect(dcText).toContain("as of Apr 1");
     expect(dc).toContain("https://fred.stlouisfed.org/series/RRVRSOQ156N\"");
-    expect(dcText).toContain("publishes no metro figure");
+    expect(dcText).toContain("named as the region's");
     // The heading lists the region beside the MSA.
     expect(dcText).toContain("South Census region");
+  });
+
+  it("carries the metro area's own rental vacancy with the survey's margin, linked to the survey", () => {
+    expect(dcText).toContain("6.2%");
+    // The figure of the move is its own styled span, so the visible text
+    // splits there; the phrase after it is one string.
+    expect(dcText).toContain("0.3");
+    expect(dcText).toContain("pt on the quarter before · ±2.2 pts margin of error");
+    expect(dcText).toContain("Rental vacancy as of Apr 1 · Census");
+    expect(dc).toContain("https://www.census.gov/housing/hvs/data/rates.html\"");
+    expect(dcText).toContain("survey's margin of error beside it");
+    // The region's tile still stands beside it, as the steadier figure.
+    expect(dcText).toContain("Rental vacancy · South Census region");
+    expect(dcText).not.toContain("publishes no metro figure");
   });
 
   it("names the MSA on a suburb's borrowed tiles, and says so", () => {
@@ -2437,6 +2458,9 @@ describe("a metro's own figures, live", () => {
     expect(text).toContain("Permits, 12 months · Washington MSA");
     expect(text).toContain("Jobs y/y · Washington MSA");
     expect(text).toContain("Rent CPI y/y · Washington MSA");
+    // The survey's metro figure is the MSA's too, worn as such.
+    expect(text).toContain("Rental vacancy · Washington MSA");
+    expect(text).toContain("±2.2 pts margin of error");
     expect(text).toContain("Where FRED publishes nothing for Prince George's County MD itself");
   });
 
