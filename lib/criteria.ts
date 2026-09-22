@@ -5,6 +5,8 @@
 // mandate's bound, the deal's figure, and the call in plain English.
 // (Universal module: used by server pages and the background pipeline.)
 
+import { assetWords } from "@/lib/asset-words";
+
 export interface GeoTarget {
   /** display label, e.g. "Dallas, TX" or "Tarrant County, TX" */
   label: string;
@@ -968,27 +970,31 @@ export function evaluateBuyBox(
     const metric = findMetric(metrics, METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc);
     const dollars = metric ? parseMoney(metric.value) : null;
     const max = box.maxPerUnitK * 1e3;
+    // The deal's own noun (lib/asset-words): a hotel is held to the mandate
+    // per key, a park per pad — the figure the OM quotes is the one tested.
+    const noun = assetWords(dealAssetClass).noun?.one ?? "unit";
+    const label = `Basis / ${noun}`;
     if (dollars == null) {
       checks.push({
-        label: "Basis / unit",
+        label,
         status: "unknown",
-        detail: `Mandate caps basis at ${fmtM(max)}/unit; no parseable per-unit figure yet.`,
+        detail: `Mandate caps basis at ${fmtM(max)}/${noun}; no parseable per-${noun} figure yet.`,
       });
     } else if (dollars <= max) {
       checks.push({
-        label: "Basis / unit",
+        label,
         status: "pass",
-        detail: `Mandate caps basis at ${fmtM(max)}/unit — this is ${fmtM(dollars)}/unit. Inside.`,
+        detail: `Mandate caps basis at ${fmtM(max)}/${noun} — this is ${fmtM(dollars)}/${noun}. Inside.`,
       });
     } else {
       const off = (dollars - max) / max;
       const near = off <= NEAR_REL;
       checks.push({
-        label: "Basis / unit",
+        label,
         status: near ? "near" : "miss",
         detail: near
-          ? `Mandate caps basis at ${fmtM(max)}/unit — this is ${fmtM(dollars)}/unit, ${Math.round(off * 100)}% over. Within negotiating range.`
-          : `Mandate caps basis at ${fmtM(max)}/unit — this is ${fmtM(dollars)}/unit. Rich for the mandate.`,
+          ? `Mandate caps basis at ${fmtM(max)}/${noun} — this is ${fmtM(dollars)}/${noun}, ${Math.round(off * 100)}% over. Within negotiating range.`
+          : `Mandate caps basis at ${fmtM(max)}/${noun} — this is ${fmtM(dollars)}/${noun}. Rich for the mandate.`,
       });
     }
   }

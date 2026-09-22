@@ -34,7 +34,7 @@ import {
   unitCountFromMetrics,
 } from "@/lib/deal-strategy";
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { assetClassKey } from "@/lib/asset-words";
+import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { assetClassLabel } from "@/lib/asset-class";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { UnderwriteInputs } from "./engine";
@@ -61,6 +61,9 @@ export interface WorkbookMeta {
   address: string;
   market: string;
   assetClass: string;
+  /** what one of the building is called (lib/asset-words) — the workbook's
+   *  per-unit rows read "Price / Key" on a hotel, "Price / Pad" on a park */
+  unitNoun?: { one: string; many: string };
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -479,6 +482,7 @@ export function deriveUnderwriteInputs(
       market: extraction?.market ?? "",
       // The workbook's cover prints this: the label, never a key or "auto".
       assetClass: assetClassLabel(extraction?.assetClass) || "—",
+      unitNoun: assetWords(extraction?.assetClass).noun ?? { one: "unit", many: "units" },
       // Rent-roll actual occupancy outranks the OM's stated figure.
       occupancyPct: rrOcc ?? (occPct != null ? occPct / 100 : null),
       rsf,

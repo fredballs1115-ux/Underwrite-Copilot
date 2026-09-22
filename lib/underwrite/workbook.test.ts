@@ -542,3 +542,27 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
     expect(Number(named(hf, "TotalUses"))).toBeCloseTo(planEngine.sourcesUses.totalUses, 0);
   });
 });
+
+describe("the per-unit rows in the class's own noun (lib/asset-words)", () => {
+  it("a hotel's workbook prices per key, off its Keys row, and never says unit", async () => {
+    const hotel: ExtractionResult = {
+      ...extraction,
+      assetClass: "hospitality_str",
+      metrics: [...extraction.metrics, { label: "Keys", value: "120", flagged: false, page: "p. 4" }],
+    };
+    const m = deriveUnderwriteInputs(hotel, "fallback");
+    expect(m.meta.units).toBe(120);
+    expect(m.meta.unitNoun).toEqual({ one: "key", many: "keys" });
+    expect(m.meta.assetClass).toBe("Hospitality / STR");
+    const buf = await buildUnderwriteWorkbook(m);
+    const { wb } = await loadIntoHf(buf);
+    const ws = wb.getWorksheet("Operating Metrics")!;
+    const labels: string[] = [];
+    for (let r = 1; r <= ws.rowCount; r++) labels.push(String(ws.getCell(r, 1).value ?? ""));
+    expect(labels).toContain("Keys");
+    expect(labels).toContain("Price / Key");
+    expect(labels).toContain("All-in Basis / Key (price + capital plan)");
+    expect(labels).toContain("Year-1 Rent / Key / Month");
+    expect(labels.some((l) => /\/ Unit\b|^Units$/.test(l))).toBe(false);
+  });
+});

@@ -100,14 +100,16 @@ dry run prints the BLS series' titles; `GOOGLE_MAPS_API_KEY` for the
 Street View photograph of a deal whose memorandum carries none; and a
 look at one real deal of each kind on the deployed site, because the
 signed-in pages are the one surface live-verify cannot reach.
-**Mine, next** — the rest of the audit: the buy box per class (it still
-says "Basis / unit" and sizes in k SF), the workbook's per-unit row
-labels in the class's noun, the model's 100,000 SF placeholder for a
-deal that states no area (marked an assumption, still a made-up
-figure — a unit-basis class should reserve per unit instead), the comps
-page's bar captions passing the noun, and a hotel and a land fixture in
-the render tests; then more inputs where a free, attributable source
-exists: FRED's regional rental vacancy (the Census HVS, quarterly,
+Then #372, the rest of it: the buy box offers every class and checks
+"Basis / key" on a hotel, the workbook's per-unit rows read "Price /
+Key", the comps captions carry the noun, each new class asks its own
+facts, and a hotel development renders on the shared screen in the
+tests ("Basis per key (all-in)", "Land cost").
+**Mine, next** — the model's 100,000 SF placeholder for a deal that
+states no area (marked an assumption, still a made-up figure — a
+unit-basis class with a count should reserve per unit instead) and the
+buy box's square-feet-only size band; then more inputs where a free,
+attributable source exists: FRED's regional rental vacancy (the Census HVS, quarterly,
 Northeast / South / Midwest / West — borrowed and named, since no metro
 series exists), the Census HVS's own MSA rental vacancy table (an xlsx
 a quarter), and the Realtor.com "hotness" file the probe listed beside

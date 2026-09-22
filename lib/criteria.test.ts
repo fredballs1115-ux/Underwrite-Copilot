@@ -1051,3 +1051,25 @@ describe("the sixth review's per-unit, cap, price, size and occupancy cases", ()
     expect(check(evaluateBuyBox("multifamily", ex([["Acres", "12"]]), { maxPriceM: 3 }), "Price")?.detail).toContain("no parseable asking price");
   });
 });
+
+describe("evaluateBuyBox — the basis check in the deal's own noun (lib/asset-words)", () => {
+  const box = { maxPerUnitK: 200 };
+  const ex = (rows: [string, string][]) => ({
+    metrics: rows.map(([label, value]) => ({ label, value, flagged: false, page: "" })),
+  });
+  const check = (r: ReturnType<typeof evaluateBuyBox>, label: string) => r.find((c) => c.label === label);
+
+  it("holds a hotel to the mandate per key, reading the OM's 'Price per key'", () => {
+    const r = evaluateBuyBox("hospitality_str", ex([["Price per key", "$252,000"]]), box);
+    expect(check(r, "Basis / unit")).toBeUndefined();
+    expect(check(r, "Basis / key")?.status).toBe("miss");
+    expect(check(r, "Basis / key")?.detail).toContain("$252k/key");
+  });
+
+  it("a park per pad, an apartment building per unit", () => {
+    const park = evaluateBuyBox("manufactured_housing", ex([["Price per pad", "$60,000"]]), box);
+    expect(check(park, "Basis / pad")?.status).toBe("pass");
+    const apts = evaluateBuyBox("multifamily", ex([["Price per unit", "$150,000"]]), box);
+    expect(check(apts, "Basis / unit")?.status).toBe("pass");
+  });
+});

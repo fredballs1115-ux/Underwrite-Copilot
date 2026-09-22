@@ -204,12 +204,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   what the deck turns out to be. `lib/asset-words.test.ts` holds the
   table to the label map's keys and every class to a noun, a basis and a
   rules verdict; the manual-deal and internal-comps tests pin a hotel's
-  "$200k/key" and a park's "$60k/pad". **Not yet on the table**: the buy
-  box (`lib/criteria.ts` still says "Basis / unit" and sizes in k SF), the
-  workbook's per-unit row labels, the model's 100,000 SF placeholder for
-  a deal that states no area (marked an assumption, still a made-up
-  figure), and the comps page's bar captions (`fmtBasis` takes the noun;
-  its callers do not pass one yet).
+  "$200k/key" and a park's "$60k/pad". The second round (#372) put the
+  rest on the table: the buy box's basis check is "Basis / key" on a
+  hotel (the mandate's own field stays "per unit" — a box spans classes)
+  and its class list is the whole label map; the workbook's per-unit rows
+  read "Price / Key" and "Year-1 Rent / Pad / Month" off `meta.unitNoun`
+  while the named range stays `UnitsCount`; the comps page's and the
+  report's bar captions carry `BasisScale.noun`; and each new class asks
+  its own facts in `SECTOR_FIELDS` (a net lease's credit and bumps, an
+  MOB's campus, a data center's committed megawatts). **Still not on
+  it**: the model's 100,000 SF placeholder for a deal that states no
+  area — marked an assumption, still a made-up figure; a unit-basis
+  class with a count should reserve per unit instead — and the buy box's
+  size band, which is square feet only.
 - A market's photograph: `lib/skyline.ts` (pure — one verified Wikimedia
   Commons file per metro with its photographer and licence, plus
   `commonsUrl` / `creditLine`), served by `app/api/imagery/skyline/[id]`

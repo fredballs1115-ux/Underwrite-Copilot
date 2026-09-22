@@ -13,6 +13,7 @@ import type {
   FirstSignal,
 } from "@/lib/anthropic/types";
 import { assetClassLabel } from "@/lib/asset-class";
+import { assetWords } from "@/lib/asset-words";
 import type { BuyBoxCheck } from "@/lib/criteria";
 import type { MandateScore, MandateVerdict } from "@/lib/mandate";
 import {
@@ -1263,6 +1264,7 @@ function AnalysesPanel({
           active={active}
           isPro={isPro}
           subject={compSubject}
+          noun={assetWords(results.extraction?.assetClass).noun?.one}
           mapContext={{
             subjectLabel:
               results.extraction?.address || results.extraction?.market || "",
