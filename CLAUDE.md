@@ -258,8 +258,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   deep, the Downtown Dallas article's own lead was the dusk skyline with
   the green-lit Bank of America Plaza, a JPEG; the city article's lead
   was a 6000px PNG, and a PNG photograph at 1600px is megabytes where a
-  JPEG is hundreds of kilobytes, so it stays a candidate the probe
-  weighs and is never served. A one-market run is how to look harder.
+  JPEG is hundreds of kilobytes (the probe measured it: 3,110 KB
+  against the JPEG's 736 KB), so it stays a candidate the probe weighs
+  and is never served. A one-market run is how to look harder.
 - Deal math without a deal: `lib/tools/deal-math.ts` (pure — the cap rate
   triangle, the mortgage constant, `sizeLoan` against whichever of LTV /
   DSCR / debt yield were set with the **binding one named**, break-even

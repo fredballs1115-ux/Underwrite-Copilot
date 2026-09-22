@@ -15,8 +15,10 @@
 // goes by are claims until the runner prints them. The dry run prints, per
 // file, the header, the newest month, and every match — or every miss — by
 // name. The all-homes file was verified this way on 2026-09-21 (zori run
-// 35661419542); the other two are verified the same way before they are
-// trusted, and a file that fails is a loud line, never a guessed number.
+// 35661419542) and all three on 2026-09-22 (run 35781778991: 18 of 18
+// metros matched in each; the apartment index ran $80 to $270 a month
+// under the all-homes one, Washington $2,281 against $2,433). A file that
+// fails is a loud line, never a guessed number.
 //
 // THE FILES, all the same shape: RegionID, SizeRank, RegionName, RegionType,
 // StateName, then one column per month, oldest first, dated the month's

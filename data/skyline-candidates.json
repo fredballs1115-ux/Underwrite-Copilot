@@ -494,7 +494,7 @@
         },
         {
           "file": "Dallas Texas skyline from Reunion Tower September 2025 (cropped).png",
-          "note": "The better picture — downtown from Reunion Tower, 6002x3058, IcedCowboyCoffee, CC0 — but a PNG, and a PNG photograph at 1600px is megabytes. Not served; here so the probe reports what it would weigh."
+          "note": "Downtown from Reunion Tower, 6002x3058, IcedCowboyCoffee, CC0 — a PNG, which the probe weighed at 3,110 KB at 1600px against the chosen JPEG's 736 KB (live-verify run 35781910084). Not served; kept so the probe keeps reporting the weight."
         }
       ]
     }
