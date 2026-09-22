@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-22",
+      "title": "A mandate stated in units, keys or pads",
+      "href": "/criteria",
+      "blurb": "The buy box's size band was square feet only, and an apartment buyer's mandate is not — it is \"100 to 400 units\". The box now takes a count band beside the square-feet one, and every screened deal is checked against it in its own noun: \"Keys\" on a hotel, \"Pads\" on a manufactured-housing community, \"Beds\" on a student deal, read from the memorandum's own count row. A memorandum that states its unit count and never its area — most apartment decks — is judged on the count rather than parked on a blank, and the fit score's size dimension folds the two bands the way the checks do: a miss on either is a miss, a near-miss on either earns partial credit. The public sample's mandate carries one now, so the demo's buy-box tab shows the check at 248 units."
+    },
+    {
+      "date": "2026-09-22",
       "title": "Each market's rental vacancy, from the Census region it sits in",
       "href": "/market?metro=dc",
       "blurb": "Every covered market's live panel now carries a rental vacancy rate — the Census Bureau's Housing Vacancy Survey, quarterly, pulled through FRED every weekday. The survey publishes it for the four Census regions and never for a metro, so the tile carries the region's figure and says so in its label (\"Rental vacancy · South Census region\") rather than passing a region's number off as a city's; the South sits near 9.5% where the West is near 5.3%, which is the spread an underwriter's vacancy assumption should at least know about. Each of the four series was printed from the runner with its own title before it was trusted."

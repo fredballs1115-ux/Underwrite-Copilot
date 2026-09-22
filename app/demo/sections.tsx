@@ -117,7 +117,7 @@ export function DemoSections({ data }: { data: DemoData }) {
           <div className="flex flex-col gap-3">
             <BuyBoxPanel data={data.buyBox} />
             <p className="text-xs text-muted">
-              A sample mandate (multifamily · ≥5.75% going-in · ≥13% IRR · ≥5% cash-on-cash). Signed in, it&apos;s yours.
+              A sample mandate (multifamily · 100–400 units · ≥5.75% going-in · ≥13% IRR · ≥5% cash-on-cash). Signed in, it&apos;s yours.
             </p>
           </div>
         )}

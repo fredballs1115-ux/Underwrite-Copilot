@@ -221,8 +221,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   SF" in the workbook's Sources column, and only a deal with no count at
   all falls to the flat 100,000 SF, because a per-SF figure struck on
   100,000 SF for a 40-unit building is a made-up number wearing a decimal
-  point. **Still not on it**: the buy box's size band, which is square
-  feet only.
+  point. The fourth round (#375) took the buy box's size band, which was
+  square feet only: `unitsMin` / `unitsMax` beside `sfMin` / `sfMax`,
+  checked as its own row in the deal's noun (`countNoun` — "Keys" on a
+  hotel, "Pads" on a park, the OM's own count label first) and folded
+  into the fit score's ONE `size` dimension (a miss on either band is a
+  miss, a near-miss on either is partial with the smaller credit, a band
+  with no figure is left out, so a counted building that states no area
+  is scored on its count rather than parked on the blank). The count
+  reader (`isCountLabel`, `parseCount`, `unitCountRow`,
+  `unitCountFromMetrics`) moved beside the size reader in
+  `lib/criteria.ts`, and `lib/deal-strategy.ts` re-exports it under the
+  names every surface imports — the buy box reads it, and `lib/criteria`
+  cannot import from `lib/deal-strategy`.
 - A market's photograph: `lib/skyline.ts` (pure — one verified Wikimedia
   Commons file per metro with its photographer and licence, plus
   `commonsUrl` / `creditLine`), served by `app/api/imagery/skyline/[id]`

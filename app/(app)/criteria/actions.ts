@@ -48,6 +48,8 @@ function buildBox(formData: FormData): BuyBox {
 
   const [priceMinM, priceMaxM] = range(formData, "priceMinM", "priceMaxM");
   const [sfMinK, sfMaxK] = range(formData, "sfMinK", "sfMaxK");
+  // A count is whole — a mandate of 99.5 units is a typo, not a band.
+  const [unitsMin, unitsMax] = range(formData, "unitsMin", "unitsMax");
 
   const dealbreakers: Dealbreakers = {};
   if (formData.get("db_requireAssetClass") === "on") dealbreakers.requireAssetClass = true;
@@ -64,6 +66,8 @@ function buildBox(formData: FormData): BuyBox {
     geos: sanitizeGeoTargets(formData.get("geos")),
     sfMin: sfMinK != null ? sfMinK * 1e3 : undefined,
     sfMax: sfMaxK != null ? sfMaxK * 1e3 : undefined,
+    unitsMin: unitsMin != null ? Math.round(unitsMin) : undefined,
+    unitsMax: unitsMax != null ? Math.round(unitsMax) : undefined,
     priceMinM,
     priceMaxM,
     maxPerUnitK: num(formData, "maxPerUnitK"),

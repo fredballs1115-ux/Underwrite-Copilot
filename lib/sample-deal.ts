@@ -22,10 +22,14 @@ import type { BuyBox } from "@/lib/criteria";
 
 /** The hypothetical mandate the PUBLIC sample screen judges the deal
  *  against — chosen so the fit lands WATCH beside the Caution verdict (a
- *  consistent story: in scope, but short of the return floors). Logged-in
- *  users see their OWN box here instead. */
+ *  consistent story: in scope and the right size, but short of the return
+ *  floors — the count band passes at 248 units and the cap misses its
+ *  floor, 25 of 40 points, still WATCH). Logged-in users see their OWN box
+ *  here instead. */
 export const SAMPLE_DEMO_BOX: BuyBox = {
   assetClasses: ["multifamily"],
+  unitsMin: 100,
+  unitsMax: 400,
   minCapPct: 5.75,
   minIrrPct: 13,
   minCoCPct: 5,

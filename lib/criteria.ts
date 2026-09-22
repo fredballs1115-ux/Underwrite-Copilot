@@ -5,7 +5,7 @@
 // mandate's bound, the deal's figure, and the call in plain English.
 // (Universal module: used by server pages and the background pipeline.)
 
-import { assetWords } from "@/lib/asset-words";
+import { assetWords, countNoun } from "@/lib/asset-words";
 
 export interface GeoTarget {
   /** display label, e.g. "Dallas, TX" or "Tarrant County, TX" */
@@ -29,6 +29,14 @@ export interface BuyBox {
   /** building size band, square feet */
   sfMin?: number;
   sfMax?: number;
+  /** count band — units, keys, pads, beds, homes or spaces, whatever the
+   *  deal counts in. A box spans classes, so the mandate says "units" and
+   *  the check speaks the deal's own noun ("Keys" on a hotel). The two
+   *  bands are independent: an apartment mandate is stated in units and
+   *  an office mandate in square feet, and a memorandum that states the
+   *  one and not the other is judged on the one it states. */
+  unitsMin?: number;
+  unitsMax?: number;
   /** total purchase price band, $ millions */
   priceMinM?: number;
   priceMaxM?: number;
@@ -260,6 +268,8 @@ export function isEmptyBuyBox(box: BuyBox | null | undefined): boolean {
     !box.markets?.trim() &&
     box.sfMin == null &&
     box.sfMax == null &&
+    box.unitsMin == null &&
+    box.unitsMax == null &&
     box.priceMinM == null &&
     box.priceMaxM == null &&
     box.maxPriceM == null &&
@@ -406,6 +416,9 @@ const fmtSf = (sf: number) =>
   sf >= 1e6
     ? `${(sf / 1e6).toFixed(2).replace(/\.?0+$/, "")}M SF`
     : `${Math.round(sf / 1e3)}k SF`;
+
+const fmtCount = (n: number) => Math.round(n).toLocaleString("en-US");
+const capWord = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 interface MetricLike {
   label: string;
@@ -588,6 +601,123 @@ export function buildingSfRow(metrics: MetricLike[]): MetricLike | null {
 export function buildingSfFromMetrics(metrics: MetricLike[]): number | null {
   const row = buildingSfRow(metrics);
   return row ? parseSf(row.value) : null;
+}
+
+// ── The unit count ───────────────────────────────────────────────────────
+//
+// The size reader's sibling, and kept beside it for the same reason: the
+// buy box's count band, the mandate score, the plan summary, the comp and
+// market memories, the plausibility check and the Excel model all divide by
+// this one number, so there is one reader. (lib/deal-strategy re-exports
+// these under the names every surface already imports.)
+//
+// A row COUNTS the units only when its label, read whole, has the shape of
+// a count label: an optional "total" / "number of" / "#" prefix, an
+// optional physical qualifier (residential, apartment, rental, guest,
+// storage, student …), the noun (units, doors, keys, rooms, beds, pads,
+// sites, suites, apartments, homes, lots, spaces) and nothing after it but
+// "count" / "total" / "proposed" / "planned". Everything that merely
+// mentions units — "Unit mix", "Unit sizes", "Units per acre", a price per
+// unit — and every PARTIAL count — "Vacant units", "Affordable units",
+// "Units under renovation", "Units offline", "Units (Phase I)" — is not the
+// count, and reading one as the count puts a wrong basis on every per-unit
+// surface. Whitelisting the shape beats blacklisting adjectives: the next
+// OM's "Units delivered" needs no new word.
+const COUNT_LABEL =
+  /^(?:(?:total|net rentable|rentable|gross|overall)\s+)?(?:(?:number|no\.?|count|#)\s+(?:of\s+)?)?(?:total\s+)?(?:(?:proposed|planned|existing|current|as[- ]built|approved|entitled|zoned|permitted)\s+)?(?:(?:residential|apartment|apt\.?|rental|multi[- ]?family|dwelling|leasable|rentable|living|guest|hotel|storage|self[- ]storage|student|mobile[- ]home|manufactured[- ]home|mh|rv|senior(?: living)?)\s+)?(?:units?|doors?|keys?|rooms?|guest ?rooms?|beds?|pads?|sites?|home ?sites?|suites?|apartments?|apartment homes?|homes?|lots?|spaces?)(?:\s+(?:count|total|proposed|planned))?$/i;
+// A parenthetical naming a subset — "(Phase I)", "(Building A)", "(of 312)"
+// — keeps the row from being the count; any other ("(proposed)", "(per
+// OM)", "(IL/AL/MC)") is dropped before the shape is read.
+const SUBSET_PAREN = /phase|bldg|building|tower|wing|floor|\bof\b|\d/i;
+
+/** Whether a metric label is the row that counts the units (or keys, beds,
+ *  pads, sites …) — the whole count, never a subset or a row about them. */
+export function isCountLabel(label: string): boolean {
+  let s = label.toLowerCase().replace(FOOTNOTE_MARK, "").trim();
+  for (const p of s.match(/\([^)]*\)/g) ?? []) {
+    if (FOOTNOTE_PAREN.test(p)) continue; // "Units (1)" — a footnote, not a subset
+    if (SUBSET_PAREN.test(p)) return false;
+  }
+  s = s
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[—–-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[:.]+$/, "")
+    .trim();
+  // "Keys / Rooms", "Units / Keys", "Total Beds / Units": two count nouns
+  // either side of a slash are one count label; "Units / SF" is not.
+  if (s.includes("/")) return s.split("/").every((part) => COUNT_LABEL.test(part.trim()));
+  return COUNT_LABEL.test(s);
+}
+
+// A count is a whole number, on its own or with what it counts — "312",
+// "312 units", "248-unit", "312 (proposed)", "approx. 300 apartments",
+// "248 total". Anything else ("40% studio / 60% 1BR", "650–1,200 SF",
+// "312 / 285,000 SF", "248 (of 312)") is not the whole count, and reading
+// its first digits as one puts a wrong basis on every per-unit surface.
+// The value can repeat the label's own qualifier — "312 residential units",
+// "150 guest rooms", "240 rental units" — so the qualifiers COUNT_LABEL
+// admits are stripped here too.
+const COUNT_WORD =
+  /\b(units?|keys?|doors?|apartments?|apts?\.?|homes?|residences?|beds?|pads?|rooms?|sites?|lots?|spaces?|suites?|total|residential|rental|multi[- ]?family|dwelling|leasable|rentable|living|guest|hotel|storage|self[- ]storage|student|senior|manufactured|mobile[- ]home|mh|rv)\b/gi;
+// A footnote marker on a label or a value — "Units*", "312¹", "Units (1)"
+// — is not part of the count.
+const FOOTNOTE_MARK = /[*†‡¹²³⁴]+/g;
+const FOOTNOTE_PAREN = /^\(\s*\d{1,2}\s*\)$/;
+const COUNT_PREFIX = /^(approx(imately|\.)?|about|circa|c\.|~|≈|±)\s*/i;
+
+/** A whole-number count from a metric's value, or null when the value is
+ *  not one (a zero is not a count — a blank is null, never zero). Exported
+ *  so every surface that needs a count reads it the same way. */
+export function parseCount(value: string): number | null {
+  // "248 (of 312)" is a subset of a count, and "312 units (Phase I)" or
+  // "120 units (Building A)" a part's, not the count; "312 units (285
+  // market-rate, 27 affordable)" and "312 units (2 buildings)" — a
+  // parenthetical that opens with a figure — are the count with its
+  // breakdown.
+  for (const p of value.match(/\([^)]*\)/g) ?? []) {
+    if (/^\(\s*\d/.test(p)) continue;
+    if (/\bof\b|out of|\/|phase|bldg|building|tower|wing|floor/i.test(p)) return null;
+  }
+  const s = value
+    .replace(FOOTNOTE_MARK, " ") // "312*", "312¹"
+    .replace(/^[a-z][a-z .#]*:\s*/i, "") // "Units: 248"
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/(\d)[-–](?=[a-z])/gi, "$1 ") // "248-unit"
+    .replace(COUNT_WORD, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(COUNT_PREFIX, "")
+    .replace(/\+$/, "")
+    .replace(/\.0+$/, "")
+    .trim();
+  if (!/^(\d{1,3}(,\d{3})+|\d+)$/.test(s)) return null;
+  const n = Number(s.replace(/,/g, ""));
+  return Number.isFinite(n) && n >= 1 ? n : null;
+}
+
+/** The row that counts the units — the first row that IS a count, so a
+ *  "Unit mix" row ahead of "Units" never shadows it — or null. For surfaces
+ *  that show the OM's own wording ("248 units", "612 (proposed)") or cite
+ *  its page. */
+export function unitCountRow<M extends MetricLike>(metrics: readonly M[]): M | null {
+  for (const m of metrics) {
+    if (!isCountLabel(m.label)) continue;
+    const n = parseCount(m.value);
+    if (n != null && n >= 1 && n <= 50_000) return m;
+  }
+  return null;
+}
+
+/** The unit count — on a plan deal the finished product's ("Units
+ *  (proposed)") — as a positive number, or null when no row parses. One
+ *  reader for the plan summary, analytics, the deal context, the comp and
+ *  market memories, the plausibility check and the Excel model, so every
+ *  per-unit figure divides by the same count. */
+export function unitCountFromMetrics(metrics: MetricLike[]): number | null {
+  const row = unitCountRow(metrics);
+  return row ? parseCount(row.value) : null;
 }
 
 // ── Today's occupancy ────────────────────────────────────────────────────
@@ -799,15 +929,18 @@ export function evaluateBuyBox(
 ): BuyBoxCheck[] {
   const checks: BuyBoxCheck[] = [];
   const metrics = extraction?.metrics ?? [];
+  // The deal's class: the explicit override, else what the screen read —
+  // the noun the count and basis checks speak comes from it.
+  const cls =
+    dealAssetClass && dealAssetClass !== "auto"
+      ? dealAssetClass
+      : (extraction?.assetClass ?? "");
 
   // ---- Asset class -------------------------------------------------------
   if (box.assetClasses && box.assetClasses.length) {
     const wanted = box.assetClasses.map((a) => a.toLowerCase());
     const mandate = box.assetClasses.join(" or ");
-    const actual =
-      dealAssetClass && dealAssetClass !== "auto"
-        ? dealAssetClass
-        : (extraction?.assetClass ?? "");
+    const actual = cls;
     if (!actual) {
       checks.push({
         label: "Asset class",
@@ -913,6 +1046,51 @@ export function evaluateBuyBox(
     }
   }
 
+  // ---- Count (units, keys, pads …) ---------------------------------------
+  if (box.unitsMin != null || box.unitsMax != null) {
+    // The shared count reader: the whole count, never a subset or a row
+    // about the units — and the OM's own noun where it stated one, the
+    // class's where it did not, so a hotel is held to the band in keys.
+    const row = unitCountRow(metrics);
+    const n = row ? parseCount(row.value) : null;
+    const noun = countNoun(row?.label, cls);
+    const label = capWord(noun);
+    const bandText = [
+      box.unitsMin != null ? `${fmtCount(box.unitsMin)} ${noun} min` : null,
+      box.unitsMax != null ? `${fmtCount(box.unitsMax)} ${noun} max` : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+    if (n == null) {
+      checks.push({
+        label,
+        status: "unknown",
+        detail: `Mandate is ${bandText}; no parseable ${noun} count in the screen yet.`,
+      });
+    } else {
+      const belowMin = box.unitsMin != null && n < box.unitsMin;
+      const aboveMax = box.unitsMax != null && n > box.unitsMax;
+      if (!belowMin && !aboveMax) {
+        checks.push({
+          label,
+          status: "pass",
+          detail: `Mandate is ${bandText} — this is ${fmtCount(n)} ${noun}. Inside the band.`,
+        });
+      } else {
+        const bound = belowMin ? box.unitsMin! : box.unitsMax!;
+        const off = Math.abs(n - bound) / bound;
+        const near = off <= NEAR_REL;
+        checks.push({
+          label,
+          status: near ? "near" : "miss",
+          detail: near
+            ? `Mandate is ${bandText} — this is ${fmtCount(n)} ${noun}, ${Math.round(off * 100)}% ${belowMin ? "under" : "over"}. A near-miss, not a dealbreaker.`
+            : `Mandate is ${bandText} — this is ${fmtCount(n)} ${noun}. ${belowMin ? "Too few" : "Too many"} for the mandate.`,
+        });
+      }
+    }
+  }
+
   // ---- Price band --------------------------------------------------------
   const band = priceBand(box);
   if (band.min != null || band.max != null) {
@@ -972,7 +1150,7 @@ export function evaluateBuyBox(
     const max = box.maxPerUnitK * 1e3;
     // The deal's own noun (lib/asset-words): a hotel is held to the mandate
     // per key, a park per pad — the figure the OM quotes is the one tested.
-    const noun = assetWords(dealAssetClass).noun?.one ?? "unit";
+    const noun = assetWords(cls).noun?.one ?? "unit";
     const label = `Basis / ${noun}`;
     if (dollars == null) {
       checks.push({
@@ -1075,6 +1253,14 @@ export function buyBoxLines(box: BuyBox): string[] {
       `Size: ${box.sfMin != null ? `${fmtSf(box.sfMin)} min` : ""}${
         box.sfMin != null && box.sfMax != null ? ", " : ""
       }${box.sfMax != null ? `${fmtSf(box.sfMax)} max` : ""}`,
+    );
+  // The mandate's own noun is "units" — a box spans classes; the check
+  // speaks the deal's (keys, pads, beds) once there is a deal.
+  if (box.unitsMin != null || box.unitsMax != null)
+    lines.push(
+      `Count: ${box.unitsMin != null ? `${fmtCount(box.unitsMin)} units min` : ""}${
+        box.unitsMin != null && box.unitsMax != null ? ", " : ""
+      }${box.unitsMax != null ? `${fmtCount(box.unitsMax)} units max` : ""}`,
     );
   const band = priceBand(box);
   if (band.min != null || band.max != null)
