@@ -29,6 +29,7 @@ import table from "@/data/fred-series.json";
 import metrosSeed from "@/data/research/metros.json";
 import {
   METRO_SERIES,
+  REGION_SERIES,
   PERMIT_WINDOW_MONTHS,
   metroSeriesFor,
   permitsTrailingYear,
@@ -648,20 +649,33 @@ describe("a covered metro's own series", () => {
     // the Washington MSA's, and they stay filed under dc so the page can
     // say whose they are.
     const pg = metroSeriesFor("pg_county");
-    expect(pg.series.map((s) => s.metric)).toEqual(["unemployment", "jobs_yoy", "permits", "rent_cpi_yoy"]);
+    expect(pg.series.map((s) => s.metric)).toEqual([
+      "unemployment",
+      "jobs_yoy",
+      "permits",
+      "rent_cpi_yoy",
+      "rental_vacancy",
+    ]);
     expect(pg.series[0].id).toBe("MDPRIN5URN");
     expect(pg.series[0].metro).toBe("pg_county");
     expect(pg.series[1].metro).toBe("dc");
-    expect(pg.borrowed).toEqual(["jobs_yoy", "permits", "rent_cpi_yoy"]);
+    expect(pg.borrowed).toEqual(["jobs_yoy", "permits", "rent_cpi_yoy", "rental_vacancy"]);
   });
 
   it("gives Newark its own house prices and New York's jobs", () => {
     const nj = metroSeriesFor("newark_jc");
-    expect(nj.series.map((s) => s.metric)).toEqual(["unemployment", "jobs_yoy", "permits", "hpi_yoy", "rent_cpi_yoy"]);
+    expect(nj.series.map((s) => s.metric)).toEqual([
+      "unemployment",
+      "jobs_yoy",
+      "permits",
+      "hpi_yoy",
+      "rent_cpi_yoy",
+      "rental_vacancy",
+    ]);
     const hpi = nj.series.find((s) => s.metric === "hpi_yoy")!;
     expect(hpi.id).toBe("ATNHPIUS35084Q_YOY");
     expect(hpi.metro).toBe("newark_jc");
-    expect(nj.borrowed).toEqual(["unemployment", "jobs_yoy", "permits", "rent_cpi_yoy"]);
+    expect(nj.borrowed).toEqual(["unemployment", "jobs_yoy", "permits", "rent_cpi_yoy", "rental_vacancy"]);
   });
 
   it("leaves out a house price index FRED stopped publishing", () => {
@@ -883,5 +897,76 @@ describe("each metro's rent index, from FRED or from the BLS", () => {
     // The FRED copy reads identically.
     const ny = readMetroRates("nyc", level("CUURA101SEHA", 14, (i) => (i === 0 ? 412 : 400)), NOW);
     expect(ny.find((x) => x.meta.id === "CUURA101SEHA")!.value).toBeCloseTo(3, 6);
+  });
+});
+
+describe("the region's rental vacancy, borrowed and named", () => {
+  // The Census Bureau's Housing Vacancy Survey publishes a rental vacancy
+  // rate for the four Census regions and never for a metro (rates run
+  // 35790692228 printed the four titles from the runner: "Rental Vacancy
+  // Rate in the Northeast Census Region", Midwest, South, West —
+  // quarterly, percent, newest 2026-04-01). Every covered metro borrows
+  // its region's, filed under the REGION's id so the tile wears the
+  // region's name and no metro's row ever claims a figure it lacks.
+  const COVERED = (metrosSeed.metros ?? []).map((m) => m.id);
+  const REGIONS = ["northeast", "midwest", "south", "west"];
+
+  it("files one series per region, under the region and never a covered metro", () => {
+    expect(REGION_SERIES.map((r) => r.metro).sort()).toEqual([...REGIONS].sort());
+    for (const r of REGION_SERIES) {
+      expect(COVERED, r.id).not.toContain(r.metro);
+      expect(r.metric).toBe("rental_vacancy");
+      expect(r.cadence).toBe("quarterly");
+      expect(r.unit).toBe("pts");
+      expect(r.area).toMatch(/Census region$/);
+      expect(r.group).toBe("metro");
+      expect(r.contractRate).toBe(false);
+    }
+  });
+
+  it("gives every covered metro its region's figure, borrowed, last in the order", () => {
+    for (const id of COVERED) {
+      const { series, borrowed } = metroSeriesFor(id);
+      const v = series.find((s) => s.metric === "rental_vacancy");
+      expect(v, id).toBeDefined();
+      expect(REGIONS, id).toContain(v!.metro);
+      expect(borrowed, id).toContain("rental_vacancy");
+      expect(series[series.length - 1].metric, id).toBe("rental_vacancy");
+    }
+    // Washington and its suburbs are the South; New York and Newark the
+    // Northeast; Chicago the Midwest; the three Pacific metros the West.
+    expect(metroSeriesFor("dc").series.at(-1)!.metro).toBe("south");
+    expect(metroSeriesFor("nova").series.at(-1)!.metro).toBe("south");
+    expect(metroSeriesFor("newark_jc").series.at(-1)!.metro).toBe("northeast");
+    expect(metroSeriesFor("chicago").series.at(-1)!.metro).toBe("midwest");
+    expect(metroSeriesFor("seattle").series.at(-1)!.metro).toBe("west");
+  });
+
+  it("links a region series to its FRED page like any other", () => {
+    const south = REGION_SERIES.find((r) => r.metro === "south")!;
+    expect(seriesMeta(south.id)).toBe(south);
+    expect(seriesUrl(south.id)).toBe(`https://fred.stlouisfed.org/series/${south.id}`);
+  });
+
+  it("refuses a region filed wrong", () => {
+    const good = {
+      historyRows: 40,
+      groups: [{ id: "curve", label: "x" }],
+      series: [],
+      metroSeries: [
+        { id: "WASH911URN", metro: "dc", metric: "unemployment", area: "Washington MSA", short: "u", label: "l", cadence: "monthly", freshDays: 110, unit: "pts" },
+      ],
+      regionSeries: [
+        { id: "RRVRSOQ156N", metro: "south", metric: "rental_vacancy", area: "South Census region", short: "v", label: "l", cadence: "quarterly", freshDays: 300, unit: "pts" },
+      ],
+      metroRegions: { dc: "south" },
+    };
+    expect(() => readSeriesTable(good)).not.toThrow();
+    expect(() => readSeriesTable({ ...good, metroRegions: { dc: "north" } })).toThrow(/no series/);
+    expect(() => readSeriesTable({ ...good, regionSeries: [{ ...good.regionSeries[0], area: "" }] })).toThrow(/area/);
+    // A region series is never also a metro series under the same id.
+    expect(() =>
+      readSeriesTable({ ...good, regionSeries: [{ ...good.regionSeries[0], id: "WASH911URN" }] }),
+    ).toThrow(/already a strip or metro series/);
   });
 });

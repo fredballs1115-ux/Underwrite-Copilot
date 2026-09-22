@@ -2358,6 +2358,10 @@ describe("a metro's own figures, live", () => {
     { series_id: "WASH911URN", obs_date: "2026-06-01", value: 3.8 },
     { series_id: "WASH911NA_YOY", obs_date: "2026-08-01", value: 1.2 },
     { series_id: "MDPRIN5URN", obs_date: "2026-07-01", value: 4.7 },
+    // The South's rental vacancy (the runner's probe: 9.5 for 2026 Q2), a
+    // quarter behind it for the move — two observations, not yet a path.
+    { series_id: "RRVRSOQ156N", obs_date: "2026-04-01", value: 9.5 },
+    { series_id: "RRVRSOQ156N", obs_date: "2026-01-01", value: 8.9 },
     ...permits,
     ...rentIndex,
   ];
@@ -2407,6 +2411,16 @@ describe("a metro's own figures, live", () => {
     expect(dcText).toContain("comes from the BLS directly");
     // And what the figure IS, against the asking rent above it.
     expect(dcText).toContain("what sitting tenants pay");
+  });
+
+  it("carries the region's rental vacancy, named as the region's, with the survey's grain said", () => {
+    expect(dcText).toContain("Rental vacancy · South Census region");
+    expect(dcText).toContain("9.5%");
+    expect(dcText).toContain("as of Apr 1");
+    expect(dc).toContain("https://fred.stlouisfed.org/series/RRVRSOQ156N\"");
+    expect(dcText).toContain("publishes no metro figure");
+    // The heading lists the region beside the MSA.
+    expect(dcText).toContain("South Census region");
   });
 
   it("names the MSA on a suburb's borrowed tiles, and says so", () => {

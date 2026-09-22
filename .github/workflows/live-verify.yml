@@ -849,6 +849,14 @@ jobs:
           mark "#369 the for-sale market is on the market brief" grep -q "For sale, median list" p_market.html
           mark "#369 and carries Realtor.com's credit" grep -q "Data: Realtor.com" p_market.html
           mark "#369 the list price is named as an ask" grep -q "what sellers are asking, not what buyers paid" p_market.html
+          # #374 — the Census region's rental vacancy on each metro's panel:
+          # the Housing Vacancy Survey publishes no metro figure, so the
+          # tile carries the region's and names it. The tile's label and
+          # the note are each one text node (no interpolation inside the
+          # phrase). Absent on a fresh deploy until rates.yml has written
+          # the four regional rows — run it and look again.
+          mark "#374 the region's rental vacancy is on the market brief" grep -q "Census region" p_market.html
+          mark "#374 and the survey's grain is said" grep -q "publishes no metro figure" p_market.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

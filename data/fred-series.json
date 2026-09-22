@@ -1,5 +1,5 @@
 {
-  "$schema_note": "The ONE list of FRED series the site pulls every weekday (scripts/fetch-rates.mjs → the `rates` table) and reads back (lib/live-rates.ts → the rates strip on /tools and /market, and the seeds that pre-fill a calculator field). Both sides import this file, so the cron and the page cannot disagree about what a series is. `id` is the key in the `rates` table; `fred` is the FRED series it is fetched from where that differs (a `_YOY` id stores FRED's own percent-change-from-a-year-ago transform, `units: pc1`, so an index never reaches the page as a level). `unit` says what the stored figure is: `pct` a rate (shown 4.94%, moves in bps), `spread` a spread quoted in percent points (shown as bps), `pts` a share or a change (shown 2.9%, moves in points), `count` thousands of units at an annual rate (moves in percent). `freshDays` is one full publication cycle plus its release lag plus margin — see lib/live-rates.ts for why it is per series. `contractRate` is the standing fact that a loan document names this rate; whether a card currently takes it is the page's own list. Every entry here was verified from the runner: a series is added only once a dry run of the rates workflow has printed its FRED title and a current observation. `metroSeries` files the same shape under a covered metro (`metro` is the id in data/research/metros.json; `metric` one of unemployment / jobs_yoy / permits / hpi_yoy / rent_cpi_yoy; `area` what FRED's own title calls the place, short); `metroAliases` names, for a metro FRED publishes little for, the MSA whose figures fill the metrics it lacks — shown as the MSA's, never as the county's. A metro's house price index is the FHFA division series where FRED carries one; Washington's and Atlanta's stopped at 2024 Q4 under the new delineations and are left out rather than shown stale. `source: bls` marks a series pulled from the BLS's own API rather than FRED — the CPI rent index for the areas the BLS redrew in 2018 (Washington, Baltimore, Los Angeles, San Francisco), which FRED does not carry; such a series is stored under its BLS id as the level, with `derived: yoy`, and never carries a FRED transform. The other metros' rent index is FRED's copy under the BLS's pre-2018 area code (A101 New York and so on), stored the same way so the two read alike.",
+  "$schema_note": "The ONE list of FRED series the site pulls every weekday (scripts/fetch-rates.mjs → the `rates` table) and reads back (lib/live-rates.ts → the rates strip on /tools and /market, and the seeds that pre-fill a calculator field). Both sides import this file, so the cron and the page cannot disagree about what a series is. `id` is the key in the `rates` table; `fred` is the FRED series it is fetched from where that differs (a `_YOY` id stores FRED's own percent-change-from-a-year-ago transform, `units: pc1`, so an index never reaches the page as a level). `unit` says what the stored figure is: `pct` a rate (shown 4.94%, moves in bps), `spread` a spread quoted in percent points (shown as bps), `pts` a share or a change (shown 2.9%, moves in points), `count` thousands of units at an annual rate (moves in percent). `freshDays` is one full publication cycle plus its release lag plus margin — see lib/live-rates.ts for why it is per series. `contractRate` is the standing fact that a loan document names this rate; whether a card currently takes it is the page's own list. Every entry here was verified from the runner: a series is added only once a dry run of the rates workflow has printed its FRED title and a current observation. `metroSeries` files the same shape under a covered metro (`metro` is the id in data/research/metros.json; `metric` one of unemployment / jobs_yoy / permits / hpi_yoy / rent_cpi_yoy; `area` what FRED's own title calls the place, short); `metroAliases` names, for a metro FRED publishes little for, the MSA whose figures fill the metrics it lacks — shown as the MSA's, never as the county's. `regionSeries` files the same shape under a Census region (`metro` is the region's id — northeast / midwest / south / west — never a covered metro's) for what the Housing Vacancy Survey publishes at no finer grain, and `metroRegions` names each covered metro's region, so every metro borrows its region's rental vacancy and the tile names the region. A metro's house price index is the FHFA division series where FRED carries one; Washington's and Atlanta's stopped at 2024 Q4 under the new delineations and are left out rather than shown stale. `source: bls` marks a series pulled from the BLS's own API rather than FRED — the CPI rent index for the areas the BLS redrew in 2018 (Washington, Baltimore, Los Angeles, San Francisco), which FRED does not carry; such a series is stored under its BLS id as the level, with `derived: yoy`, and never carries a FRED transform. The other metros' rent index is FRED's copy under the BLS's pre-2018 area code (A101 New York and so on), stored the same way so the two read alike.",
   "historyRows": 40,
   "groups": [
     { "id": "curve", "label": "The Treasury curve" },
@@ -135,5 +135,31 @@
     "montgomery_county": "dc",
     "nova": "dc",
     "newark_jc": "nyc"
+  },
+  "regionSeries": [
+    { "id": "RRVRNEQ156N", "metro": "northeast", "metric": "rental_vacancy", "area": "Northeast Census region", "short": "Rental vacancy", "label": "Rental Vacancy Rate in the Northeast Census Region", "cadence": "quarterly", "freshDays": 300, "unit": "pts" },
+    { "id": "RRVRMWQ156N", "metro": "midwest", "metric": "rental_vacancy", "area": "Midwest Census region", "short": "Rental vacancy", "label": "Rental Vacancy Rate in the Midwest Census Region", "cadence": "quarterly", "freshDays": 300, "unit": "pts" },
+    { "id": "RRVRSOQ156N", "metro": "south", "metric": "rental_vacancy", "area": "South Census region", "short": "Rental vacancy", "label": "Rental Vacancy Rate in the South Census Region", "cadence": "quarterly", "freshDays": 300, "unit": "pts" },
+    { "id": "RRVRWEQ156N", "metro": "west", "metric": "rental_vacancy", "area": "West Census region", "short": "Rental vacancy", "label": "Rental Vacancy Rate in the West Census Region", "cadence": "quarterly", "freshDays": 300, "unit": "pts" }
+  ],
+  "metroRegions": {
+    "dc": "south",
+    "pg_county": "south",
+    "montgomery_county": "south",
+    "nova": "south",
+    "baltimore": "south",
+    "richmond": "south",
+    "norfolk_hampton_roads": "south",
+    "miami": "south",
+    "atlanta": "south",
+    "dallas": "south",
+    "philadelphia": "northeast",
+    "newark_jc": "northeast",
+    "nyc": "northeast",
+    "boston": "northeast",
+    "chicago": "midwest",
+    "los_angeles": "west",
+    "san_francisco": "west",
+    "seattle": "west"
   }
 }

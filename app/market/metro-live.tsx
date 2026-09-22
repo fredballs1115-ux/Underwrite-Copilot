@@ -59,12 +59,15 @@ export function MetroLive({
 }) {
   if (rates.length === 0) return null;
   const metas = rates.map((r) => r.meta as MetroSeriesMeta);
-  const borrowed = metas.filter((m) => m.metro !== metroId);
+  // Borrowed from the MSA — the region's rental vacancy is borrowed too, and
+  // said in its own sentence, since "the metro area's" would be wrong of it.
+  const borrowed = metas.filter((m) => m.metro !== metroId && m.metric !== "rental_vacancy");
   // The areas FRED names, for the heading — the metro's own, then the MSA
   // whose figures fill in.
   const areas = Array.from(new Set(metas.map((m) => m.area)));
   const fromBls = metas.some((m) => m.source === "bls");
   const hasRentIndex = metas.some((m) => m.metric === "rent_cpi_yoy");
+  const hasRegionVacancy = metas.some((m) => m.metric === "rental_vacancy");
 
   return (
     <div>
@@ -127,6 +130,8 @@ export function MetroLive({
           " Where FRED does not carry the area, the rent index comes from the BLS directly."}
         {borrowed.length > 0 &&
           ` Where FRED publishes nothing for ${metroName} itself, the figure is the metro area's, named on the tile.`}
+        {hasRegionVacancy &&
+          " The rental vacancy is the Census Bureau's Housing Vacancy Survey, which publishes no metro figure: the tile carries the region's and names it."}
       </p>
     </div>
   );
