@@ -120,6 +120,11 @@ square-feet band, checked in the deal's own noun ("Keys" on a hotel,
 counted building whose memorandum states no area is judged on its
 count rather than parked on the blank; the count reader moved beside
 the size reader in lib/criteria.
+Then #376: Chicago's photograph — the fifth contact sheet kept
+Philadelphia, Jersey City, New York and Boston and showed Chicago's
+soft daytime strip to be the weakest; a Chicago-only sheet found the
+sunrise frame from the lakefront (NorbertNagel, CC BY-SA 4.0), served
+now and proven by live-verify's PHOTOGRAPHS line.
 **Mine, next** — more inputs where a free, attributable source exists:
 the Census HVS's own MSA rental vacancy table (an xlsx a quarter), and
 the Realtor.com "hotness" file the probe listed beside the inventory.
