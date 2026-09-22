@@ -23,7 +23,7 @@ function PickButton({ hasPicture }: { hasPicture: boolean }) {
         accept="image/jpeg,image/png,image/webp"
         className="sr-only"
         tabIndex={-1}
-        aria-hidden
+        aria-label="Photograph file"
         onChange={(e) => {
           const f = e.currentTarget.files?.[0];
           if (!f) return;

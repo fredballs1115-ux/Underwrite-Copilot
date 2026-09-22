@@ -39,6 +39,7 @@ vi.mock("../app/(app)/deals/actions", () => {
     reconcileWithModel: noop,
     addDealNote: noop,
     deleteDealNote: noop,
+    replacePicture: noop,
   };
 });
 
@@ -2580,5 +2581,57 @@ describe("a metro's for-sale market, from Realtor.com", () => {
   it("reads clean and names everything", () => {
     expect(a11yIssues(html), "realtor line").toEqual([]);
     expect(gluedWords(text)).toEqual([]);
+  });
+});
+
+// ── The deal page's picture ─────────────────────────────────────────────────
+import { PropertyVisual } from "@/app/(app)/deals/[id]/property-visual";
+
+describe("PropertyVisual — the building's own photograph leads, then the overhead", () => {
+  const base = {
+    dealId: "d1",
+    label: "1200 N 31st St, Philadelphia, PA",
+    hasStreetAddress: true,
+    googleEnabled: false,
+  };
+
+  it("leads with the Photo tab and credits the memorandum when the deal has its own picture", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(PropertyVisual, {
+        ...base,
+        picture: { credit: "From the offering memorandum", source: "om" as const },
+      }),
+    );
+    dumpView("property-visual-photo", html);
+    expect(a11yIssues(html), "a11y property-visual").toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(html).toContain('src="/api/deals/d1/picture?size=hero"');
+    expect(html).toContain("Photograph of 1200 N 31st St, Philadelphia, PA");
+    expect(text).toContain("From the offering memorandum");
+    expect(text).toContain("Replace photo");
+    // The Photo tab is the pressed one; the aerial and the map are still offered.
+    expect(html).toMatch(/aria-pressed="true"[^>]*>Photo</);
+    expect(text).toContain("Aerial");
+    expect(text).toContain("Map");
+  });
+
+  it("without a picture, the aerial leads and the button offers to add one", () => {
+    const html = renderToStaticMarkup(React.createElement(PropertyVisual, { ...base, picture: null }));
+    expect(a11yIssues(html), "a11y property-visual-none").toEqual([]);
+    const text = visibleText(html);
+    expect(html).not.toContain("/picture?size=hero");
+    expect(text).toContain("Add photo");
+    expect(text).not.toContain("Replace photo");
+    expect(html).toMatch(/aria-pressed="true"[^>]*>Aerial</);
+  });
+
+  it("never offers to replace the sample deal's picture", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(PropertyVisual, { ...base, picture: null, canReplace: false }),
+    );
+    const text = visibleText(html);
+    expect(text).not.toContain("Add photo");
+    expect(text).not.toContain("Replace photo");
   });
 });
