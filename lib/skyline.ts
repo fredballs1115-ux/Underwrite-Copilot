@@ -227,7 +227,9 @@ export const SKYLINES: Record<string, SkylineShot> = {
   // picture Dallas is actually known by — downtown at dusk with the green
   // outline of Bank of America Plaza and the ball of Reunion Tower behind
   // it. The Wikipedia article's own lead for downtown, a JPEG, where the
-  // city article's lead was a 6000px PNG that would have weighed megabytes.
+  // city article's lead was a 6000px PNG — measured by the probe at
+  // 3,110 KB at 1600px against this file's 736 KB (live-verify run
+  // 35781910084), which is the whole argument in two numbers.
   dallas: {
     file: "Dallas view.jpg",
     place: "Downtown Dallas at dusk",

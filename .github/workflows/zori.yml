@@ -1,12 +1,20 @@
 name: zori
-# Monthly Zillow Observed Rent Index pull → the `benchmarks` table: each
-# covered metro's asking rent and its change from a year ago, from Zillow
-# Research's public metro CSV, refreshed monthly and free to use with
+# Monthly Zillow pull → the `benchmarks` table: each covered metro's asking
+# rent (the Observed Rent Index, all homes), its APARTMENT asking rent (the
+# same index over multifamily listings alone), its typical home value (the
+# Home Value Index), and each one's change from a year ago — three public
+# metro CSVs from Zillow Research, refreshed monthly and free to use with
 # attribution. Runs a few days after Zillow's mid-month release.
 #
 # Dispatch it with `dry_run` ticked to fetch, match and print without
-# writing: the sandbox cannot reach Zillow, so the file's shape and the
+# writing: the sandbox cannot reach Zillow, so each file's shape and the
 # RegionName each metro goes by are verified here first.
+#
+# `probe_url` is the step BEFORE a feed exists: fetch any candidate file
+# from this runner and print its status, type, size, header and the rows
+# that name a place (`probe_match`, |-separated), written nowhere — so the
+# next feed is designed against the file rather than against memory of it.
+# With it set, nothing is pulled.
 #
 # No-ops with instructions until the Supabase Actions secrets exist.
 on:
@@ -15,9 +23,17 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Fetch, match and print every metro, write nothing"
+        description: "Fetch, match and print every metro from all three files, write nothing"
         type: boolean
         default: false
+      probe_url:
+        description: "Candidate data-file URLs, space-separated: fetched from this runner and described (status, type, size, header, rows), written nowhere; nothing is pulled"
+        required: false
+        default: ""
+      probe_match:
+        description: "With probe_url: place names to look for in the file's rows, separated by |"
+        required: false
+        default: ""
 jobs:
   zori:
     runs-on: ubuntu-latest
@@ -26,7 +42,14 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: npm install --omit=dev
-      - name: Pull ZORI
+      - name: Probe a candidate file
+        if: ${{ inputs.probe_url != '' }}
+        env:
+          PROBE_URL: ${{ inputs.probe_url }}
+          PROBE_MATCH: ${{ inputs.probe_match }}
+        run: node scripts/probe-url.mjs
+      - name: Pull Zillow
+        if: ${{ inputs.probe_url == '' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

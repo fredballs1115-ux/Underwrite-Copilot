@@ -834,6 +834,13 @@ jobs:
           mark "#367 the rent index is on the market brief" grep -q "Rent CPI y/y" p_market.html
           mark "#367 sitting tenants against new leases, said" grep -q "what sitting tenants pay" p_market.html
           mark "#367 a BLS-sourced figure says so" grep -q "comes from the BLS directly" p_market.html
+          # #368 — Zillow's apartment-only asking rent and its home value,
+          # from two more monthly files the same pull reads. The rows
+          # arrive with the next zori.yml run, so NOT DEPLOYED here means
+          # the pull has not written them yet — run zori.yml and look again.
+          mark "#368 the apartment asking rent is on the market brief" grep -q "Asking rent, apartments" p_market.html
+          mark "#368 the home value is said in years of rent" grep -q "years of the all-homes asking rent" p_market.html
+          mark "#368 the apartment figure is set against the all-homes one" grep -q "multifamily listings alone" p_market.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

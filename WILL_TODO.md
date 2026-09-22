@@ -52,10 +52,22 @@ sitting tenants pay — beside the asking rent, twelve metros, eight from
 FRED and three from the BLS's own API (FRED does not carry the areas the
 BLS redrew in 2018; their codes were pinned from FRED's average-price
 series and probed with the workflow's new `probe_bls`).
+Proven live (run 35781910084): 159 markers present, seventeen skyline
+routes serving JPEGs, the Dallas PNG candidate weighed at 3,110 KB
+against the chosen file's 736 KB. Then #368: Zillow's APARTMENT asking
+rent (the multifamily index, a third bar beside all-homes and the FMR,
+$80 to $270 a month under all-homes everywhere) and the typical home
+value, said as years of asking rent — three files, each dry-run from the
+runner (18 of 18 in each).
 **Whose move: the operator's** — the ground-level files for
 `public/photos/`; optionally a free `BLS_API_KEY` Actions secret so the
-dry run prints the BLS series' titles. **Mine, next** — more inputs:
-Zillow's apartment-only asking rent and its home value index per metro.
+dry run prints the BLS series' titles. **Mine, next** — more inputs
+with a free, attributable source: Apartment List's monthly VACANCY
+index per metro (the one apartment figure the site still lacks at the
+metro level) and its rent estimates; Realtor.com's monthly inventory,
+days on market and median list price per metro (the for-sale side).
+Cap rates stay dated research: CBRE, Green Street and RCA are all
+licensed, and there is no free daily source.
 
 ## 🟢 2026-09-16 into 09-17 — `/tools` becomes the reason not to open Excel
 

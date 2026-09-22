@@ -258,8 +258,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   deep, the Downtown Dallas article's own lead was the dusk skyline with
   the green-lit Bank of America Plaza, a JPEG; the city article's lead
   was a 6000px PNG, and a PNG photograph at 1600px is megabytes where a
-  JPEG is hundreds of kilobytes, so it stays a candidate the probe
-  weighs and is never served. A one-market run is how to look harder.
+  JPEG is hundreds of kilobytes (the probe measured it: 3,110 KB
+  against the JPEG's 736 KB), so it stays a candidate the probe weighs
+  and is never served. A one-market run is how to look harder.
 - Deal math without a deal: `lib/tools/deal-math.ts` (pure — the cap rate
   triangle, the mortgage constant, `sizeLoan` against whichever of LTV /
   DSCR / debt yield were set with the **binding one named**, break-even
@@ -522,7 +523,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   Washington suburbs and Newark share their MSA's row and the row's note
   says so (`shared`). Like every other feed, the CSV's URL, its column
   shape and each metro's RegionName are claims until the workflow's
-  `dry_run` prints them from the runner.
+  `dry_run` prints them from the runner. **The same pull reads two more
+  of Zillow's files** (`FILES` in the script, one shape, each verified
+  by its own dry run): the index over MULTIFAMILY listings alone —
+  the apartment asking rent, the figure an apartment underwrite should
+  be reading, which runs under the all-homes one wherever houses are
+  dear, drawn as a third bar with the gap said — and the Home Value
+  Index (mid-tier, seasonally adjusted), said against a year of the
+  all-homes asking rent as the price-to-rent ratio in years
+  (`priceToRentYears`), the arithmetic that keeps a renter renting.
+  `ZILLOW_METRICS` is the one list the pull writes and the read asks
+  for. A file that fails is a loud line and the others still write; a
+  figure the pull did not have is null on the page, never zero, and the
+  line simply lacks it.
 - The construction loan's interest reserve, run rather than approximated:
   `lib/tools/construction-draw.ts` (pure). A construction loan funds its own
   interest, so the reserve is CIRCULAR — the loan pays interest on a balance
