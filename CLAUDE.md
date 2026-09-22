@@ -588,7 +588,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   source that does not publish it. Richmond and Hampton Roads have no
   CPI area and a region's figure is not a metro's, so their tile is
   absent rather than borrowed.
-  **The sixth metric is the metro area's own rental vacancy** (#378,
+  **The seventh metric is the metro area's own rental vacancy** (#378,
   `rental_vacancy_msa`), from the Housing Vacancy Survey's 75-largest-MSA
   tables, which the Census Bureau publishes as .xlsx and nothing else
   (FRED carries only the four regions): `scripts/fetch-hvs.mjs` reads
@@ -618,7 +618,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   `metroSeriesFor` shows both; a suburb borrows the MSA's and wears its
   name. A companion is nobody's series: `readSeriesTable` refuses a
   `moe` id that is also a series, and the server read fetches it with
-  its figure (one index scan a series still). **The sixth metric is the region's rental
+  its figure (one index scan a series still). It came after the region's
+  (below, #374), which is why the numbering runs the other way from the
+  order on the page. **The sixth metric is the region's rental
   vacancy** (`rental_vacancy`): the Census Bureau's Housing Vacancy
   Survey publishes it for the four Census regions and never for a metro,
   so it is the one figure every metro BORROWS from its region — filed in
