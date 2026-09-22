@@ -88,8 +88,22 @@ export interface DerivedModel {
 
 /** Default operating-expense ratio (share of EGI) and vacancy by asset class —
  *  screening placeholders the user overrides, never presented as fact. */
-const CLASS_DEFAULTS: Record<string, { expenseRatio: number; vacancy: number; reservesPsf: number }> = {
-  multifamily: { expenseRatio: 0.42, vacancy: 0.05, reservesPsf: 0.25 },
+const CLASS_DEFAULTS: Record<
+  string,
+  {
+    expenseRatio: number;
+    vacancy: number;
+    reservesPsf: number;
+    /** gross square feet a typical one of the class's units carries, for a
+     *  deal that states a count and no area — the model's per-SF lines
+     *  then run on "248 units × 850 SF typical", marked as the assumption
+     *  it is, instead of a flat placeholder; absent where the class is
+     *  measured by its area (an OM always states an office's SF) or has no
+     *  building to measure (a park's pads) */
+    sfPerUnit?: number;
+  }
+> = {
+  multifamily: { expenseRatio: 0.42, vacancy: 0.05, reservesPsf: 0.25, sfPerUnit: 850 },
   office: { expenseRatio: 0.45, vacancy: 0.1, reservesPsf: 0.2 },
   industrial: { expenseRatio: 0.28, vacancy: 0.05, reservesPsf: 0.15 },
   retail: { expenseRatio: 0.32, vacancy: 0.07, reservesPsf: 0.15 },
@@ -97,18 +111,18 @@ const CLASS_DEFAULTS: Record<string, { expenseRatio: number; vacancy: number; re
   // sliver, and the vacancy is the lease's own risk rather than a market's.
   net_lease: { expenseRatio: 0.06, vacancy: 0.02, reservesPsf: 0.05 },
   medical_office: { expenseRatio: 0.42, vacancy: 0.08, reservesPsf: 0.2 },
-  mixed_use: { expenseRatio: 0.4, vacancy: 0.07, reservesPsf: 0.2 },
-  sfr_btr: { expenseRatio: 0.38, vacancy: 0.06, reservesPsf: 0.3 },
-  student_housing: { expenseRatio: 0.45, vacancy: 0.06, reservesPsf: 0.3 },
+  mixed_use: { expenseRatio: 0.4, vacancy: 0.07, reservesPsf: 0.2, sfPerUnit: 900 },
+  sfr_btr: { expenseRatio: 0.38, vacancy: 0.06, reservesPsf: 0.3, sfPerUnit: 1_600 },
+  student_housing: { expenseRatio: 0.45, vacancy: 0.06, reservesPsf: 0.3, sfPerUnit: 350 },
   // Licensed care carries its labor inside the expense line.
-  senior_housing: { expenseRatio: 0.68, vacancy: 0.12, reservesPsf: 0.3 },
+  senior_housing: { expenseRatio: 0.68, vacancy: 0.12, reservesPsf: 0.3, sfPerUnit: 600 },
   manufactured_housing: { expenseRatio: 0.35, vacancy: 0.06, reservesPsf: 0.1 },
-  self_storage: { expenseRatio: 0.35, vacancy: 0.12, reservesPsf: 0.15 },
+  self_storage: { expenseRatio: 0.35, vacancy: 0.12, reservesPsf: 0.15, sfPerUnit: 100 },
   // A hotel's "vacancy" is its unsold rooms, and its expense load is the
   // whole operation — housekeeping, the fee stack, the FF&E reserve.
-  hospitality_str: { expenseRatio: 0.65, vacancy: 0.32, reservesPsf: 0.5 },
+  hospitality_str: { expenseRatio: 0.65, vacancy: 0.32, reservesPsf: 0.5, sfPerUnit: 550 },
   data_center: { expenseRatio: 0.45, vacancy: 0.1, reservesPsf: 0.5 },
-  parking: { expenseRatio: 0.4, vacancy: 0.15, reservesPsf: 0.1 },
+  parking: { expenseRatio: 0.4, vacancy: 0.15, reservesPsf: 0.1, sfPerUnit: 350 },
   land_infill: { expenseRatio: 0.4, vacancy: 0.07, reservesPsf: 0.2 },
   auto: { expenseRatio: 0.4, vacancy: 0.07, reservesPsf: 0.2 },
 };
@@ -322,17 +336,38 @@ export function deriveUnderwriteInputs(
     budgetFromText(extraction?.strategy?.capitalBudget, statedPrice, !priceIsLand);
   const capitalBudget = budgetRead?.budget ?? 0;
 
+  // Unit count, same precedence as occupancy: rent-roll actual first, then
+  // the OM's stated metric through the shared count reader (a whole number
+  // from a row that counts units — never a "Unit mix" or a "Vacant units"
+  // row, never a dollar figure). Nothing plausible → null, never a guess.
+  const omUnits = unitCountFromMetrics(metrics);
+  const units = rr?.unitCount && rr.unitCount > 0 ? rr.unitCount : omUnits;
+
   // ── RSF ────────────────────────────────────────────────────────────────
   // The rent roll's summed SF outranks the OM's stated building size. The
   // shared size reader: the building, never the land's area or a unit's.
+  // With neither stated, a deal that counts its units runs on the count
+  // times the class's typical size — "248 units × 850 SF typical", marked
+  // an assumption — and only a deal with no count at all falls to the
+  // placeholder, because a per-SF figure struck on 100,000 SF for a
+  // 40-unit building is a made-up number wearing a decimal point.
   const sfMetric = buildingSfRow(metrics);
   const sfParsed = sfMetric ? parseSf(sfMetric.value) : null;
-  const rsf = rrSf ?? (sfParsed && sfParsed > 100 ? Math.round(sfParsed) : 100_000);
+  const unitNoun = assetWords(extraction?.assetClass).noun ?? { one: "unit", many: "units" };
+  const typicalSf = units != null && units > 0 && cd.sfPerUnit ? Math.round(units * cd.sfPerUnit) : null;
+  const rsf = rrSf ?? (sfParsed && sfParsed > 100 ? Math.round(sfParsed) : (typicalSf ?? 100_000));
   if (rrSf != null) {
     mark("rsf", "extracted", `Rent roll total SF${rrAsOf ? ` (as of ${rrAsOf})` : ""}`);
+  } else if (sfParsed && sfParsed > 100) {
+    mark("rsf", "extracted", "OM building size", pageOf(sfMetric));
+  } else if (typicalSf != null) {
+    mark(
+      "rsf",
+      "assumption",
+      `${units!.toLocaleString("en-US")} ${units === 1 ? unitNoun.one : unitNoun.many} × ${cd.sfPerUnit} SF typical — enter the rentable SF`,
+    );
   } else {
-    mark("rsf", sfParsed && sfParsed > 100 ? "extracted" : "assumption",
-      sfParsed && sfParsed > 100 ? "OM building size" : "Enter rentable SF", pageOf(sfMetric));
+    mark("rsf", "assumption", "Enter rentable SF");
   }
 
   // ── NOI-anchored income reconstruction ──────────────────────────────────
@@ -465,13 +500,6 @@ export function deriveUnderwriteInputs(
     capPct ? "Defaulted to the going-in cap — set your exit view" : "Default 6.0% — set your exit view",
     capPct ? pageOf(capMetric) : undefined);
   mark("saleCostPct", "assumption", "Default 2.0% of sale price");
-
-  // Unit count, same precedence as occupancy: rent-roll actual first, then
-  // the OM's stated metric through the shared count reader (a whole number
-  // from a row that counts units — never a "Unit mix" or a "Vacant units"
-  // row, never a dollar figure). Nothing plausible → null, never a guess.
-  const omUnits = unitCountFromMetrics(metrics);
-  const units = rr?.unitCount && rr.unitCount > 0 ? rr.unitCount : omUnits;
 
   return {
     inputs,

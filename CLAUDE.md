@@ -212,11 +212,17 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   while the named range stays `UnitsCount`; the comps page's and the
   report's bar captions carry `BasisScale.noun`; and each new class asks
   its own facts in `SECTOR_FIELDS` (a net lease's credit and bumps, an
-  MOB's campus, a data center's committed megawatts). **Still not on
-  it**: the model's 100,000 SF placeholder for a deal that states no
-  area — marked an assumption, still a made-up figure; a unit-basis
-  class with a count should reserve per unit instead — and the buy box's
-  size band, which is square feet only.
+  MOB's campus, a data center's committed megawatts). The third round
+  (#373) took the model's area placeholder: a deal that states a count
+  and no area runs on the count times the class's typical size
+  (`CLASS_DEFAULTS[cls].sfPerUnit` — 850 for an apartment, 550 a key,
+  350 a bed, none for a park's pads or for a class an OM always states
+  the area of), marked "248 units × 850 SF typical — enter the rentable
+  SF" in the workbook's Sources column, and only a deal with no count at
+  all falls to the flat 100,000 SF, because a per-SF figure struck on
+  100,000 SF for a 40-unit building is a made-up number wearing a decimal
+  point. **Still not on it**: the buy box's size band, which is square
+  feet only.
 - A market's photograph: `lib/skyline.ts` (pure — one verified Wikimedia
   Commons file per metro with its photographer and licence, plus
   `commonsUrl` / `creditLine`), served by `app/api/imagery/skyline/[id]`
