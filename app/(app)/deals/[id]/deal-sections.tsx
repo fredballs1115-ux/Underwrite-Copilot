@@ -860,8 +860,12 @@ export function BrokerComps({
   publicDemo = false,
   mapContext = null,
   subject = null,
+  noun = "unit",
 }: {
   result: BrokerCompsResult;
+  /** what a unit is called on this deal (lib/asset-words) — "key", "pad";
+   *  printed in the bars' captions, never computed on */
+  noun?: string;
   dealId: string;
   compSearch: CompSearchResult | null;
   active: boolean;
@@ -956,7 +960,7 @@ export function BrokerComps({
         </div>
       )}
       {saleComps.length > 0 && (
-        <CompTable title="Sale comps" comps={saleComps} subject={subject ?? null} />
+        <CompTable title="Sale comps" comps={saleComps} subject={subject ?? null} noun={noun} />
       )}
       {leaseComps.length > 0 && (
         <CompTable title="Lease comps" comps={leaseComps} />
@@ -1108,10 +1112,10 @@ function PublicWebComps({
 function CompBasisBar({ scale, index }: { scale: BasisScale; index: number }) {
   const share = scale.shares[index];
   if (share == null) return null;
-  const own = fmtBasis(share * scale.max, scale.unit);
+  const own = fmtBasis(share * scale.max, scale.unit, scale.noun);
   const words =
     scale.subjectValue != null
-      ? `${own} against the subject's ${fmtBasis(scale.subjectValue, scale.unit)}`
+      ? `${own} against the subject's ${fmtBasis(scale.subjectValue, scale.unit, scale.noun)}`
       : `${own}, scaled to the widest in the set`;
   return (
     <span data-comp-bar className="relative mt-1.5 block h-1 w-24 rounded-full bg-faint" title={words}>
@@ -1137,9 +1141,12 @@ function CompTable({
   title,
   comps,
   subject,
+  noun = "unit",
 }: {
   title: string;
   comps: BrokerComp[];
+  /** what a unit is called on this deal — the bars' captions say "/key" */
+  noun?: string;
   /** sale comps carry the subject (null when it has no basis) and draw their
    *  stated basis as a bar against it; lease comps pass nothing and draw none */
   subject?: SubjectBasis | null;
@@ -1155,7 +1162,7 @@ function CompTable({
   // Every comp's stated basis on one track, the subject's as a tick — read
   // once from the detail lines (lib/comp-detail), never inferred. Indexed
   // against `ordered`, of which `shown` is a prefix.
-  const scale = subject === undefined ? null : basisScale(ordered, subject);
+  const scale = subject === undefined ? null : basisScale(ordered, subject, noun);
   const counts = { stretched: 0, favorable: 0, supports: 0 };
   for (const c of comps) counts[c.support] = (counts[c.support] ?? 0) + 1;
   return (
@@ -1243,8 +1250,8 @@ function CompTable({
         // The legend for the bars: one line, so the tick needs no guessing.
         <p className="mt-1.5 text-[11px] text-muted">
           {scale.subjectValue != null
-            ? `Bars: each comp's basis per ${scale.unit === "unit" ? "unit" : "SF"}; the tick is the subject at ${fmtBasis(scale.subjectValue, scale.unit)}.`
-            : `Bars: each comp's basis per ${scale.unit === "unit" ? "unit" : "SF"}, scaled to the widest in the set.`}
+            ? `Bars: each comp's basis per ${scale.unit === "unit" ? scale.noun : "SF"}; the tick is the subject at ${fmtBasis(scale.subjectValue, scale.unit, scale.noun)}.`
+            : `Bars: each comp's basis per ${scale.unit === "unit" ? scale.noun : "SF"}, scaled to the widest in the set.`}
         </p>
       )}
       {comps.length > INITIAL && (

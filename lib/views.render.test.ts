@@ -2635,3 +2635,58 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
     expect(text).not.toContain("Replace photo");
   });
 });
+
+// ── A deal of another kind on the shared screen ─────────────────────────────
+describe("ShareView — a hotel development is spoken in keys", () => {
+  it("names the class as the label map does and costs the plan per key", () => {
+    const hotel: ExtractionResult = {
+      dealName: "Harbor Point Hotel — Ground-up Select Service",
+      assetClass: "hospitality_str",
+      market: "Norfolk, VA",
+      address: "300 Waterside Dr, Norfolk, VA",
+      strategy: {
+        kind: "development",
+        summary: "Build a 160-key select-service hotel on the waterfront site.",
+        capitalBudget: "$42M hard and soft costs",
+        timeline: "20 months of construction, 18 months of ramp",
+      },
+      metrics: [
+        { label: "Land cost", value: "$6,000,000", flagged: false, page: "p. 3" },
+        { label: "NOI (stabilized, pro forma)", value: "$4,200,000", flagged: true, page: "p. 12" },
+        { label: "Total project cost", value: "$48,000,000", flagged: false, page: "p. 14" },
+        { label: "Keys (proposed)", value: "160", flagged: false, page: "p. 4" },
+      ],
+    };
+    const verdict: VerdictResult = {
+      verdict: "caution",
+      reason: "An 8.75% yield on cost against a 7.5% exit cap, before the ramp.",
+      topRisks: ["The brand's PIP terms are not in the deck."],
+      nextSteps: [],
+      screen: { ranges: [], dealKillers: [], sensitivity: [] },
+    };
+    const html = renderToStaticMarkup(
+      React.createElement(ShareView, {
+        dealName: hotel.dealName ?? "",
+        assetClass: "hospitality_str",
+        expiresAt: "2026-10-05T12:00:00Z",
+        verdictStale: false,
+        aerial: null,
+        extraction: hotel,
+        comps: null,
+        market: null,
+        verdict,
+      }),
+    );
+    dumpView("share-hotel", html);
+    expect(a11yIssues(html), "a11y share-hotel").toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toContain("Hospitality / STR");
+    expect(text).not.toContain("hospitality_str");
+    // The plan's all-in basis is per key, and the price row is the land.
+    expect(text).toContain("Basis per key (all-in)");
+    expect(text).toContain("$300k");
+    expect(text).toContain("Land cost");
+    expect(text).not.toContain("Basis per unit");
+  });
+});

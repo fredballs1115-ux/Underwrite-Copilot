@@ -52,3 +52,22 @@ describe("parseSectorFields", () => {
     expect((out.tenant_credit as string).length).toBe(200);
   });
 });
+
+describe("the classes added with lib/asset-words", () => {
+  it("each asks its own facts, and the rental-housing ones inherit the regulatory questions", () => {
+    expect(fieldsForAssetClass("net_lease").map((f) => f.key)).toContain("tenant_credit");
+    expect(fieldsForAssetClass("medical_office").map((f) => f.key)).toContain("on_campus");
+    expect(fieldsForAssetClass("senior_housing").map((f) => f.key)).toContain("care_levels");
+    expect(fieldsForAssetClass("data_center").map((f) => f.key)).toContain("power_mw");
+    expect(fieldsForAssetClass("parking").map((f) => f.key)).toContain("spaces");
+    // Rental housing: the rent-control questions ride along.
+    for (const cls of ["student_housing", "mixed_use"]) {
+      const keys = fieldsForAssetClass(cls).map((f) => f.key);
+      expect(keys, cls).toContain("building_permit_year");
+    }
+    // Lodging and care are not rental housing to the regimes.
+    for (const cls of ["hospitality_str", "senior_housing", "net_lease", "data_center", "parking"]) {
+      expect(fieldsForAssetClass(cls).map((f) => f.key), cls).not.toContain("building_permit_year");
+    }
+  });
+});

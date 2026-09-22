@@ -652,6 +652,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
       metrics.map((m) => ({ label: str(m?.label), value: str(m?.value) })),
       inferStrategy(extraction).kind,
     ),
+    planNoun.one,
   );
   const checks = list(market?.checks) as NonNullable<MarketResult["checks"]>;
   const rows = list(reconciliation?.rows) as NonNullable<
@@ -1066,8 +1067,8 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                 {g.label === "Sale comps" && compScale ? (
                   <Text style={{ fontSize: 6.5, color: C.muted, marginTop: 3 }}>
                     {compScale.subjectValue != null
-                      ? `Bars: each comp's basis per ${compScale.unit === "unit" ? "unit" : "SF"}; the tick is the subject at ${fmtBasis(compScale.subjectValue, compScale.unit)}.`
-                      : `Bars: each comp's basis per ${compScale.unit === "unit" ? "unit" : "SF"}, scaled to the widest in the set.`}
+                      ? `Bars: each comp's basis per ${compScale.unit === "unit" ? compScale.noun : "SF"}; the tick is the subject at ${fmtBasis(compScale.subjectValue, compScale.unit, compScale.noun)}.`
+                      : `Bars: each comp's basis per ${compScale.unit === "unit" ? compScale.noun : "SF"}, scaled to the widest in the set.`}
                   </Text>
                 ) : null}
               </View>

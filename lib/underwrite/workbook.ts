@@ -1117,34 +1117,40 @@ function buildOperatingMetrics(
   };
 
   const units = model.meta.units;
+  // The per-unit rows in the class's own noun (lib/asset-words): "Price /
+  // Key" on a hotel, "Price / Pad" on a park. The named range stays
+  // UnitsCount, so every formula reads the same cell whatever it is called.
+  const capWord = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
+  const nounOne = capWord(model.meta.unitNoun?.one ?? "unit");
+  const nounMany = capWord(model.meta.unitNoun?.many ?? "units");
   let zebra = false;
   if (units && units > 0) {
-    label(ws.getCell(r, 1), "Units");
+    label(ws.getCell(r, 1), nounMany);
     const u = ws.getCell(r, 2);
     u.value = units;
     u.name = "UnitsCount";
     styleLink(u, FMT.int);
     u.alignment = { horizontal: "right" };
     r++;
-    twoCol("Price / Unit", "PurchasePrice/UnitsCount", FMT.usd, (zebra = !zebra));
+    twoCol(`Price / ${nounOne}`, "PurchasePrice/UnitsCount", FMT.usd, (zebra = !zebra));
     // What a finished unit costs all-in — the basis a comp is held against
     // on a plan deal; on a stabilized asset with no capital plan it equals
     // the price per unit. Live: it moves with the capital plan input.
     twoCol(
-      "All-in Basis / Unit (price + capital plan)",
+      `All-in Basis / ${nounOne} (price + capital plan)`,
       "(PurchasePrice+CapImprovements)/UnitsCount",
       FMT.usd,
       (zebra = !zebra),
     );
     twoCol(
-      "Year-1 Rent / Unit / Month",
+      `Year-1 Rent / ${nounOne} / Month`,
       `${at("rent", 0)}/UnitsCount/12`,
       FMT.usd,
       (zebra = !zebra),
     );
-    twoCol("Year-1 NOI / Unit", `${at("noi", 0)}/UnitsCount`, FMT.usd, (zebra = !zebra));
+    twoCol(`Year-1 NOI / ${nounOne}`, `${at("noi", 0)}/UnitsCount`, FMT.usd, (zebra = !zebra));
     twoCol(
-      "Year-1 OpEx / Unit",
+      `Year-1 OpEx / ${nounOne}`,
       `-${at("opex", 0)}/UnitsCount`,
       FMT.usd,
       (zebra = !zebra),
@@ -1152,7 +1158,7 @@ function buildOperatingMetrics(
   } else {
     label(
       ws.getCell(r, 1),
-      "Unit count not stated in the OM or rent roll — per-unit yardsticks omitted rather than guessed.",
+      `${nounOne} count not stated in the OM or rent roll — per-${nounOne.toLowerCase()} yardsticks omitted rather than guessed.`,
       { color: MUTED, size: 9 },
     );
     r++;

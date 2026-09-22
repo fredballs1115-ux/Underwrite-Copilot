@@ -91,6 +91,9 @@ export function subjectBasis(metrics: MetricLike[], kind: StrategyKind): Subject
 export interface BasisScale {
   /** the yardstick the set is drawn on — per unit when any comp states one */
   unit: "unit" | "sf";
+  /** what a unit is called on this deal (lib/asset-words) — "key", "pad";
+   *  printed in the captions, never computed on */
+  noun: string;
   /** the largest basis in the set, the subject's included — the full track */
   max: number;
   /** each comp's basis as a share of the track; null for a comp that states none */
@@ -109,6 +112,7 @@ export interface BasisScale {
 export function basisScale(
   comps: ReadonlyArray<{ detail?: string | null }>,
   subject: SubjectBasis | null,
+  noun = "unit",
 ): BasisScale | null {
   const figures = comps.map((c) => compFigures(c.detail));
   const unit: "unit" | "sf" | null = figures.some((f) => f.perUnit != null)
@@ -123,6 +127,7 @@ export function basisScale(
   if (max <= 0) return null;
   return {
     unit,
+    noun,
     max,
     shares: values.map((v) => (v != null ? Math.min(1, v / max) : null)),
     subjectShare: subjectValue != null ? Math.min(1, subjectValue / max) : null,

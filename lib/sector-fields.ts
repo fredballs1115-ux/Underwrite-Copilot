@@ -91,6 +91,39 @@ export const SECTOR_FIELDS: Record<string, SectorFieldDef[]> = {
     { key: "beds", label: "Bedrooms", type: "number" },
     { key: "year_built", label: "Year built", type: "number" },
   ],
+  // The classes added with lib/asset-words (2026-09-22): each asks the two
+  // or three facts its underwriting turns on, all optional.
+  net_lease: [
+    { key: "lease_term_years", label: "Remaining lease term", type: "number", unit: "yrs" },
+    { key: "tenant_credit", label: "Tenant credit", type: "text", help: "e.g. investment-grade corporate, franchisee guarantee, local" },
+    { key: "rent_bumps", label: "Rent bumps", type: "text", help: "e.g. 10% every 5 yrs, flat" },
+  ],
+  medical_office: [
+    { key: "walt_years", label: "WALT", type: "number", unit: "yrs" },
+    { key: "on_campus", label: "On a hospital campus", type: "boolean", help: "On-campus MOB holds its tenants; off-campus competes with retail conversions." },
+    { key: "health_system_share_pct", label: "Health-system tenancy", type: "percent" },
+  ],
+  mixed_use: [
+    { key: "residential_units", label: "Apartments", type: "number" },
+    { key: "commercial_sf", label: "Commercial SF", type: "number", unit: "SF" },
+  ],
+  student_housing: [
+    { key: "beds", label: "Beds", type: "number" },
+    { key: "distance_to_campus_mi", label: "Distance to campus", type: "number", unit: "mi" },
+    { key: "preleased_pct", label: "Pre-leased for the coming year", type: "percent" },
+  ],
+  senior_housing: [
+    { key: "care_levels", label: "Care levels", type: "text", help: "e.g. IL / AL / MC — three businesses with three margins" },
+    { key: "private_pay_pct", label: "Private-pay share", type: "percent" },
+  ],
+  data_center: [
+    { key: "power_mw", label: "Committed power", type: "number", unit: "MW" },
+    { key: "powered_shell", label: "Powered shell (not turnkey)", type: "boolean" },
+  ],
+  parking: [
+    { key: "spaces", label: "Spaces", type: "number" },
+    { key: "operator_contract", label: "Operator agreement", type: "text", help: "e.g. management contract, lease, self-operated" },
+  ],
 };
 
 /** Classes whose deals should also show the multifamily regulatory fields:

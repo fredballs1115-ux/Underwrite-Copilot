@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getActiveBuyBox, saveBuyBoxStore } from "@/lib/criteria-server";
+import { ASSET_CLASS_KEYS } from "@/lib/asset-words";
 import {
   hasNoDealbreakers,
   sanitizeGeoTargets,
@@ -12,7 +13,8 @@ import {
   type Dealbreakers,
 } from "@/lib/criteria";
 
-const ASSET_CLASSES = ["multifamily", "office", "industrial", "retail"];
+// Every class the site files (lib/asset-class) — the same list the form offers.
+const ASSET_CLASSES: readonly string[] = ASSET_CLASS_KEYS;
 
 function num(formData: FormData, key: string): number | undefined {
   const raw = String(formData.get(key) ?? "").trim();

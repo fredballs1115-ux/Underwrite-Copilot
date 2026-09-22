@@ -12,15 +12,14 @@ import {
 import { PendingButton } from "../pending-button";
 import { GeoPicker } from "./geo-picker";
 import { coveredMarketGeoTargets } from "@/lib/market-match";
+import { ASSET_CLASS_OPTIONS } from "@/lib/asset-class";
 
 export const metadata: Metadata = { title: "Buy box" };
 
-const ASSET_CLASSES: [string, string][] = [
-  ["multifamily", "Multifamily"],
-  ["office", "Office"],
-  ["industrial", "Industrial"],
-  ["retail", "Retail"],
-];
+// Every class the site files (lib/asset-class), so a hotel or a storage
+// buyer can set a mandate — the four this list once named were the four
+// the app was born with.
+const ASSET_CLASSES = ASSET_CLASS_OPTIONS;
 
 const inputCls =
   "w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40";
