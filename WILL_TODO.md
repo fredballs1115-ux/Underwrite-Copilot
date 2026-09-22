@@ -114,12 +114,15 @@ Housing Vacancy Survey's four regional series, each printed from the
 runner first (run 35790692228), borrowed by every metro from its
 region and named as the region's on the tile; and a job cap on the
 three pull workflows after a probe run stalled.
-**Mine, next** — the buy box's square-feet-only size band; then more
-inputs where a free, attributable source exists: FRED's regional rental vacancy (the Census HVS, quarterly,
-Northeast / South / Midwest / West — borrowed and named, since no metro
-series exists), the Census HVS's own MSA rental vacancy table (an xlsx
-a quarter), and the Realtor.com "hotness" file the probe listed beside
-the inventory.
+Then #375: the buy box's count band — "100 to 400 units" beside the
+square-feet band, checked in the deal's own noun ("Keys" on a hotel,
+"Pads" on a park) and folded into the fit score's size dimension, so a
+counted building whose memorandum states no area is judged on its
+count rather than parked on the blank; the count reader moved beside
+the size reader in lib/criteria.
+**Mine, next** — more inputs where a free, attributable source exists:
+the Census HVS's own MSA rental vacancy table (an xlsx a quarter), and
+the Realtor.com "hotness" file the probe listed beside the inventory.
 
 ## 🟢 2026-09-16 into 09-17 — `/tools` becomes the reason not to open Excel
 

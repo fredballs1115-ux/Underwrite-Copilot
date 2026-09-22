@@ -162,6 +162,71 @@ describe("isEmptyBuyBox — new fields count as content", () => {
   });
 });
 
+// The count band: "100 to 300 units" beside the square-feet band. A box
+// spans classes, so the mandate is stated in units and the check speaks
+// the deal's own noun — the OM's count label first, the class's where the
+// OM stated none.
+describe("the count band — units, keys, pads, in the deal's own noun", () => {
+  const box: BuyBox = { unitsMin: 100, unitsMax: 300 };
+
+  it("reads the whole count, never a row about the units, and speaks the OM's noun", () => {
+    const r = evaluateBuyBox(
+      "multifamily",
+      ex([
+        ["Unit mix", "40% studio / 60% 1BR"],
+        ["Avg SF / unit", "850"],
+        ["Units", "248"],
+      ]),
+      box,
+    );
+    const c = check(r, "Units")!;
+    expect(c.status).toBe("pass");
+    expect(c.detail).toBe("Mandate is 100 units min, 300 units max — this is 248 units. Inside the band.");
+  });
+
+  it("a hotel is held to the band in keys, a park in pads", () => {
+    const hotel = check(evaluateBuyBox("hospitality_str", ex([["Keys", "150"]]), box), "Keys")!;
+    expect(hotel.status).toBe("pass");
+    expect(hotel.detail).toContain("this is 150 keys");
+    const park = check(evaluateBuyBox("manufactured_housing", ex([["Pads", "480"]]), box), "Pads")!;
+    expect(park.status).toBe("miss");
+    expect(park.detail).toContain("this is 480 pads. Too many for the mandate");
+  });
+
+  it("the class's noun stands in where the OM stated no count, and the check is unknown", () => {
+    const c = check(evaluateBuyBox("hospitality_str", ex([["Total SF", "120,000 SF"]]), box), "Keys")!;
+    expect(c.status).toBe("unknown");
+    expect(c.detail).toContain("no parseable keys count");
+    // "auto" defers to the class the screen read.
+    expect(check(evaluateBuyBox("auto", ex([], { assetClass: "hospitality_str" }), box), "Keys")?.status).toBe("unknown");
+    expect(check(evaluateBuyBox("auto", ex([]), box), "Units")?.status).toBe("unknown");
+  });
+
+  it("within 10% past a bound is a near-miss, further is a miss, and a one-sided band binds one way", () => {
+    const near = check(evaluateBuyBox("multifamily", ex([["Units", "320"]]), box), "Units")!;
+    expect(near.status).toBe("near");
+    expect(near.detail).toContain("320 units, 7% over");
+    expect(check(evaluateBuyBox("multifamily", ex([["Units", "80"]]), box), "Units")?.status).toBe("miss");
+    const floorOnly: BuyBox = { unitsMin: 100 };
+    expect(check(evaluateBuyBox("multifamily", ex([["Units", "1,200"]]), floorOnly), "Units")?.status).toBe("pass");
+    expect(check(evaluateBuyBox("multifamily", ex([["Units", "95"]]), floorOnly), "Units")?.status).toBe("near");
+  });
+
+  it("is its own check beside the square-feet band — a counted building with no area is judged on its count", () => {
+    const both: BuyBox = { sfMin: 100_000, sfMax: 300_000, unitsMin: 100, unitsMax: 300 };
+    const r = evaluateBuyBox("multifamily", ex([["Units", "248"]]), both);
+    expect(check(r, "Size")?.status).toBe("unknown");
+    expect(check(r, "Units")?.status).toBe("pass");
+    expect(foldBuyBoxChecks(r)).toBe("fits");
+  });
+
+  it("counts as content, and reaches the synthesizer in the mandate's own noun", () => {
+    expect(isEmptyBuyBox({ unitsMax: 300 })).toBe(false);
+    expect(buyBoxLines({ unitsMin: 100, unitsMax: 300 })).toContain("Count: 100 units min, 300 units max");
+    expect(buyBoxLines({ unitsMax: 1_200 })).toContain("Count: 1,200 units max");
+  });
+});
+
 describe("buyBoxLines — surfaces CoC and dealbreakers to the synthesizer", () => {
   it("includes the cash-on-cash floor and the active red lines", () => {
     const lines = buyBoxLines({

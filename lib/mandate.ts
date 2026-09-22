@@ -18,11 +18,13 @@
 // in the screen yet) are excluded from the denominator, never counted as a
 // pass or a fail. Any tripped dealbreaker caps the verdict at PASS.
 
+import { countNoun } from "@/lib/asset-words";
 import {
   type BuyBox,
   buildingSfFromMetrics,
   findMetric,
   findPriceRow,
+  parseCount,
   parseMoney,
   parsePct,
   findGoingInCap,
@@ -32,6 +34,7 @@ import {
   NEAR_REL,
   NEAR_CAP_PT,
   NEAR_IRR_PT,
+  unitCountRow,
 } from "./criteria";
 
 export type MandateVerdict = "PURSUE" | "WATCH" | "PASS";
@@ -313,26 +316,75 @@ export function scoreMandateFit(
     dims.push({ key: "market", label: "Market", weight: WEIGHTS.market, earned, status, detail });
   }
 
-  // ---- Size (banded) ----------------------------------------------------
-  if (box.sfMin != null || box.sfMax != null) {
-    // The shared size reader: the building, never the land or a unit.
-    const sf = buildingSfFromMetrics(metrics);
-    const s = scoreBand(sf, box.sfMin, box.sfMax, WEIGHTS.size);
-    const bandText = [
-      box.sfMin != null ? `${Math.round(box.sfMin / 1e3)}k SF min` : null,
-      box.sfMax != null ? `${Math.round(box.sfMax / 1e3)}k SF max` : null,
-    ]
-      .filter(Boolean)
-      .join(", ");
-    const detail =
-      s.status === "unknown"
-        ? `Mandate is ${bandText}; no parseable square footage in the screen yet.`
-        : s.status === "pass"
-          ? `Mandate is ${bandText} — inside the band.`
-          : s.status === "partial"
-            ? `Mandate is ${bandText} — a near-miss on size, partial credit.`
-            : `Mandate is ${bandText} — outside the size band.`;
-    dims.push({ key: "size", label: "Size", weight: WEIGHTS.size, earned: s.earned, status: s.status, detail });
+  // ---- Size (banded): the area band, the count band, or both ------------
+  //
+  // One dimension for the two bands, because "100k–300k SF" and "100–300
+  // units" are one statement about size and the seven weights sum to 100.
+  // The fold is the check's (foldBuyBoxChecks): a miss on either band is a
+  // miss, else a near-miss on either is partial with the smaller credit,
+  // else a pass. A band with no figure yet is left out of the fold — a
+  // counted building whose memorandum states no area is scored on its
+  // count rather than parked on the blank — and only when NEITHER band can
+  // be read is the dimension unknown.
+  if (box.sfMin != null || box.sfMax != null || box.unitsMin != null || box.unitsMax != null) {
+    const bands: { s: Scored; mandate: string; figure: string | null; missing: string }[] = [];
+    if (box.sfMin != null || box.sfMax != null) {
+      // The shared size reader: the building, never the land or a unit.
+      const sf = buildingSfFromMetrics(metrics);
+      bands.push({
+        s: scoreBand(sf, box.sfMin, box.sfMax, WEIGHTS.size),
+        mandate: [
+          box.sfMin != null ? `${Math.round(box.sfMin / 1e3)}k SF min` : null,
+          box.sfMax != null ? `${Math.round(box.sfMax / 1e3)}k SF max` : null,
+        ]
+          .filter(Boolean)
+          .join(", "),
+        figure: sf == null ? null : `${Math.round(sf / 1e3)}k SF`,
+        missing: "square footage",
+      });
+    }
+    if (box.unitsMin != null || box.unitsMax != null) {
+      // The shared count reader, in the OM's own noun — the same row and
+      // the same word the buy-box check shows.
+      const row = unitCountRow(metrics);
+      const n = row ? parseCount(row.value) : null;
+      const noun = countNoun(row?.label, resolveAssetClass(dealAssetClass, extraction));
+      const count = (v: number) => Math.round(v).toLocaleString("en-US");
+      bands.push({
+        s: scoreBand(n, box.unitsMin, box.unitsMax, WEIGHTS.size),
+        mandate: [
+          box.unitsMin != null ? `${count(box.unitsMin)} ${noun} min` : null,
+          box.unitsMax != null ? `${count(box.unitsMax)} ${noun} max` : null,
+        ]
+          .filter(Boolean)
+          .join(", "),
+        figure: n == null ? null : `${count(n)} ${noun}`,
+        missing: `${noun} count`,
+      });
+    }
+    const rank: Record<DimensionStatus, number> = { miss: 0, partial: 1, pass: 2, unknown: 3 };
+    const known = bands.filter((b) => b.s.status !== "unknown");
+    const worst = known
+      .slice()
+      .sort((a, b) => rank[a.s.status] - rank[b.s.status] || a.s.earned - b.s.earned)[0];
+    const mandate = bands.map((b) => b.mandate).join("; ");
+    let status: DimensionStatus, earned: number, detail: string;
+    if (!worst) {
+      status = "unknown";
+      earned = 0;
+      detail = `Mandate is ${mandate}; no parseable ${bands.map((b) => b.missing).join(" or ")} in the screen yet.`;
+    } else {
+      status = worst.s.status;
+      earned = worst.s.earned;
+      const figures = known.map((b) => b.figure).join(", ");
+      detail =
+        status === "pass"
+          ? `Mandate is ${mandate} — this is ${figures}. Inside the band.`
+          : status === "partial"
+            ? `Mandate is ${mandate} — this is ${figures}, a near-miss on size. Partial credit.`
+            : `Mandate is ${mandate} — this is ${figures}. Outside the size band.`;
+    }
+    dims.push({ key: "size", label: "Size", weight: WEIGHTS.size, earned, status, detail });
   }
 
   // ---- Going-in cap (floor) ---------------------------------------------

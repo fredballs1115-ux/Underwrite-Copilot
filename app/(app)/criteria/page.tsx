@@ -281,6 +281,18 @@ export default async function CriteriaPage({
                   </div>
                 </div>
                 <div>
+                  <p className="text-sm font-medium">Unit count</p>
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    <input aria-label="Minimum unit count" name="unitsMin" type="number" min="0" step="1" defaultValue={box.unitsMin ?? ""} placeholder="100" className={inputCls} />
+                    <span className="text-sm text-muted">–</span>
+                    <input aria-label="Maximum unit count" name="unitsMax" type="number" min="0" step="1" defaultValue={box.unitsMax ?? ""} placeholder="400" className={inputCls} />
+                    <span className="text-sm text-muted">units</span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted">
+                    Keys, pads, beds or homes on a deal that counts in them.
+                  </p>
+                </div>
+                <div>
                   <label htmlFor="maxPerUnitK" className="text-sm font-medium">
                     Max basis / unit
                   </label>

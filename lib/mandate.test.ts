@@ -298,3 +298,53 @@ describe("scoreMandateFit — a plan deal's stabilized cap never earns cap credi
     expect(dim(scoreMandateFit("multifamily", withGoingIn, box), "cap")!.status).toBe("partial");
   });
 });
+
+// The count band joins the SIZE dimension rather than adding an eighth —
+// "100k–300k SF" and "100–300 units" are one statement about size, and the
+// seven weights sum to 100. The fold is the check's.
+describe("scoreMandateFit — the size dimension folds the area band and the count band", () => {
+  it("a count-only band is the size dimension, in the OM's noun", () => {
+    const r = scoreMandateFit("multifamily", ex([["Units", "248"]]), { unitsMin: 100, unitsMax: 300 });
+    const size = dim(r, "size")!;
+    expect(size.status).toBe("pass");
+    expect(size.earned).toBe(WEIGHTS.size);
+    expect(size.detail).toBe("Mandate is 100 units min, 300 units max — this is 248 units. Inside the band.");
+    expect(r.score).toBe(100);
+  });
+
+  it("a counted building whose memorandum states no area is scored on its count, not parked on the blank", () => {
+    const box: BuyBox = { sfMin: 100_000, sfMax: 300_000, unitsMin: 100, unitsMax: 300 };
+    const r = scoreMandateFit("multifamily", ex([["Units", "248"]]), box);
+    const size = dim(r, "size")!;
+    expect(size.status).toBe("pass");
+    expect(size.earned).toBe(WEIGHTS.size);
+    expect(size.detail).toContain("100k SF min, 300k SF max; 100 units min, 300 units max");
+    expect(size.detail).toContain("this is 248 units");
+  });
+
+  it("a near-miss on either band is partial with the smaller credit; a miss on either is a miss", () => {
+    const box: BuyBox = { sfMin: 100_000, sfMax: 300_000, unitsMin: 100, unitsMax: 300 };
+    const near = scoreMandateFit("multifamily", ex([["Total SF", "200,000 SF"], ["Units", "315"]]), box);
+    expect(dim(near, "size")?.status).toBe("partial");
+    // 315 is 5% over 300: 10 × (1 − 0.05 / 0.10) = 5, and the area's full
+    // 10 does not lift it.
+    expect(dim(near, "size")?.earned).toBeCloseTo(5, 5);
+    expect(dim(near, "size")?.detail).toContain("this is 200k SF, 315 units");
+    const miss = scoreMandateFit("multifamily", ex([["Total SF", "200,000 SF"], ["Units", "480"]]), box);
+    expect(dim(miss, "size")?.status).toBe("miss");
+    expect(dim(miss, "size")?.earned).toBe(0);
+  });
+
+  it("is unknown only when neither band can be read, and names the figures it lacks in the deal's noun", () => {
+    const box: BuyBox = { sfMax: 300_000, unitsMax: 300 };
+    const r = scoreMandateFit("hospitality_str", ex([["Going-in cap rate", "6.00%"]]), box);
+    const size = dim(r, "size")!;
+    expect(size.status).toBe("unknown");
+    expect(size.detail).toContain("no parseable square footage or keys count");
+    expect(r.score).toBeNull();
+  });
+
+  it("stays seven dimensions", () => {
+    expect(Object.keys(WEIGHTS)).toHaveLength(7);
+  });
+});

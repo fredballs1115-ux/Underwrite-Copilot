@@ -1095,9 +1095,11 @@ export function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
         <MandateScoreHeader
           mandate={data.mandate}
           // Criteria the fold checks below but the 0–100 score doesn't weigh.
+          // The basis check wears the deal's noun ("Basis / key" on a hotel),
+          // so it is matched by its prefix, never by one spelling.
           unscored={data.checks
-            .filter((c) => c.label === "Price" || c.label === "Basis / unit")
-            .map((c) => (c.label === "Basis / unit" ? "basis / unit" : "price"))}
+            .filter((c) => c.label === "Price" || c.label.startsWith("Basis / "))
+            .map((c) => (c.label === "Price" ? "price" : c.label.toLowerCase()))}
         />
       )}
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
