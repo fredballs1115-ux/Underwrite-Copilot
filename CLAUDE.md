@@ -338,7 +338,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   was a 6000px PNG, and a PNG photograph at 1600px is megabytes where a
   JPEG is hundreds of kilobytes (the probe measured it: 3,110 KB
   against the JPEG's 736 KB), so it stays a candidate the probe weighs
-  and is never served. A one-market run is how to look harder.
+  and is never served. A one-market run is how to look harder. The fifth
+  sheet (five markets, 2026-09-22) kept Philadelphia, Jersey City, New
+  York and Boston on their current files — each was the strongest frame
+  on its own sheet — and showed Chicago's to be the weakest of the five,
+  a soft daytime strip 795px tall; the sixth, a Chicago-only run
+  (35792083388), opened the search door and found NorbertNagel's sunrise
+  frame from the lakefront, 4000px and the band's own 2.4:1 shape, which
+  now serves.
 - Deal math without a deal: `lib/tools/deal-math.ts` (pure — the cap rate
   triangle, the mortgage constant, `sizeLoan` against whichever of LTV /
   DSCR / debt yield were set with the **binding one named**, break-even

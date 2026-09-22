@@ -174,10 +174,18 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
   },
+  // Sixth sheet (skyline-sheet run 35792083388, a one-market run — the
+  // five-market sheet before it had shown six files for Chicago and the
+  // search door never opened): the daytime pano it replaces was 3127px
+  // across and soft, the whole skyline in a strip 795px tall. This is the
+  // same view at first light — Willis to the Hancock across the water,
+  // every tower lit, a sky going blue — 4000px and 2.4:1, which is the
+  // band's own shape. Chosen by eye over the darker frame taken minutes
+  // earlier by the same photographer ("- 01").
   chicago: {
-    file: "Chicago Skyline in September 2023 pano.jpg",
-    place: "Chicago",
-    credit: "TheWxResearcher",
+    file: "Chicago Skyline Sunrise March 15 2026 - 02.jpg",
+    place: "The Chicago skyline at sunrise, from the lakefront",
+    credit: "NorbertNagel",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
   },

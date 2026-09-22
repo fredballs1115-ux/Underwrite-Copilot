@@ -324,8 +324,20 @@
       ],
       "candidates": [
         {
+          "file": "Chicago Skyline Sunrise March 15 2026 - 02.jpg",
+          "note": "The skyline at first light from the lakefront, 4000x1668 — NorbertNagel, CC BY-SA 4.0. The chosen file, in lib/skyline.ts; from the Panoramics of Chicago category on the one-market sheet (run 35792083388)."
+        },
+        {
+          "file": "Chicago Skyline Sunrise March 15 2026 - 01.jpg",
+          "note": "The same dawn a few minutes darker, 4000x1481 — NorbertNagel, CC BY-SA 4.0. The runner-up."
+        },
+        {
           "file": "Chicago Skyline in September 2023 pano.jpg",
-          "note": "Chicago — TheWxResearcher"
+          "note": "The daytime pano, 3127x795 — TheWxResearcher, CC BY-SA 4.0. The previous choice, kept as a fallback candidate."
+        },
+        {
+          "file": "Chicago from Adler Planetarium.jpg",
+          "note": "The classic Adler view, 10525x2781 and public domain — Buphoff at English Wikipedia. Muted and two decades old; kept so the probe keeps proving it."
         }
       ]
     },
