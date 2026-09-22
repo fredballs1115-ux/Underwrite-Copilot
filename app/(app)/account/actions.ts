@@ -254,18 +254,21 @@ export async function deleteAccount(formData: FormData) {
   //    to before the service role removes anything.
   const { data: deals } = await admin
     .from("deals")
-    .select("id, om_storage_path, supplements")
+    .select("id, om_storage_path, supplements, photo")
     .eq("user_id", user.id);
   const dealRows = (deals ?? []) as {
     id: string;
     om_storage_path: string | null;
     supplements: Record<string, { files?: { path: string }[] }> | null;
+    photo: { picture?: { hero: string; thumb: string } } | null;
   }[];
   const byDeal = new Map<string, string[]>();
   for (const d of dealRows) {
     // Worker-mode reconciles park a model file next to the OM — sweep that
-    // slot too (removing a nonexistent path is a no-op).
+    // slot too (removing a nonexistent path is a no-op). The building's
+    // photograph, both sizes, goes with the deal.
     const paths: string[] = [modelTmpPath(omStoragePath(user.id, d.id))];
+    if (d.photo?.picture) paths.push(d.photo.picture.hero, d.photo.picture.thumb);
     if (d.om_storage_path) {
       paths.push(d.om_storage_path);
       paths.push(modelTmpPath(d.om_storage_path));

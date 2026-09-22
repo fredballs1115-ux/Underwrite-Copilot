@@ -10,6 +10,7 @@
  *   <userId>/<dealId>.model-tmp                       a worker-mode reconcile's parked model
  *   documents/<dealId>/<uuid>-<name>                  source documents (deal_documents)
  *   supplements/<dealId>/<uuid>-<name>                tab attachments (deals.supplements)
+ *   photos/<dealId>/<stamp>-<hero|thumb>.jpg          the building's own photograph (deals.photo)
  *   <teamId|userId>/branding-logo-<suffix>.<png|jpg>  report branding
  *
  * Why a gate: the paths are read back off ordinary database columns that the
@@ -23,7 +24,7 @@
  * at the row, so the two layers agree.
  */
 
-export type DealObjectKind = "om" | "model-tmp" | "document" | "supplement";
+export type DealObjectKind = "om" | "model-tmp" | "document" | "supplement" | "photo";
 
 export type StorageScope =
   | { kind: "deal"; dealId: string; only?: readonly DealObjectKind[] }
@@ -79,9 +80,13 @@ export function classifyDealPath(path: string, dealId: string): DealObjectKind |
   if (parts.length === 3 && parts[1] === dealId) {
     if (parts[0] === "documents") return "document";
     if (parts[0] === "supplements") return "supplement";
+    if (parts[0] === "photos" && PHOTO_FILE.test(parts[2])) return "photo";
   }
   return null;
 }
+
+/** A photograph derivative's file name: a stamp and which size it is. */
+const PHOTO_FILE = /^[a-z0-9]+-(hero|thumb)\.jpg$/;
 
 /** True when the path is a branding logo in the account's or team's folder. */
 export function isBrandingPath(
@@ -144,6 +149,11 @@ export function documentPath(dealId: string, id: string, fileName: string, fallb
 /** A tab attachment: `supplements/<dealId>/<id>-<name>`. */
 export function supplementPath(dealId: string, id: string, fileName: string): string {
   return `supplements/${dealId}/${id}-${safeFileName(fileName)}`;
+}
+
+/** The building's photograph at one of its two sizes: `photos/<dealId>/<stamp>-hero.jpg`. */
+export function dealPhotoPath(dealId: string, stamp: string, size: "hero" | "thumb"): string {
+  return `photos/${dealId}/${stamp}-${size}.jpg`;
 }
 
 /** A report-branding logo in its account's or team's folder. */

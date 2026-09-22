@@ -10,11 +10,26 @@ import {
   type ImageSource,
 } from "./imagery-plan";
 
-const ALL: ImageSource[] = ["streetview", "satellite", "aerial"];
+const ALL: ImageSource[] = ["photo", "streetview", "satellite", "aerial"];
 const CONFIGS = [true, false];
 
 describe("imagePlan", () => {
-  it("prefers the building's own photograph when a key and street address exist", () => {
+  it("leads with the building's own photograph wherever the deal has one", () => {
+    // The cover of its memorandum, or the reader's own upload: ahead of
+    // every fetched source, whatever keys exist.
+    expect(imagePlan({ hasStreetAddress: true, googleConfigured: true, hasPicture: true })).toEqual([
+      "photo",
+      "streetview",
+      "satellite",
+      "aerial",
+    ]);
+    expect(imagePlan({ hasStreetAddress: false, googleConfigured: false, hasPicture: true })).toEqual([
+      "photo",
+      "aerial",
+    ]);
+  });
+
+  it("prefers the Street View photograph when a key and street address exist and no picture is stored", () => {
     expect(imagePlan({ hasStreetAddress: true, googleConfigured: true })).toEqual([
       "streetview",
       "satellite",
@@ -59,8 +74,8 @@ describe("imagePlan", () => {
     }
   });
 
-  it("offers no fourth source — no stock, AI or scraped imagery path exists", () => {
-    expect(ALL).toHaveLength(3);
+  it("offers nothing beyond the deal's own file and the three map sources — no stock, AI or scraped imagery path exists", () => {
+    expect(ALL).toHaveLength(4);
     expect(Object.keys(IMAGE_CREDIT).sort()).toEqual([...ALL].sort());
   });
 });
@@ -208,9 +223,10 @@ describe("IMAGE_CREDIT", () => {
     for (const s of ALL) expect(IMAGE_CREDIT[s]?.trim().length).toBeGreaterThan(0);
   });
 
-  it("names Google on both Google sources and USGS on the aerial", () => {
+  it("names Google on both Google sources and USGS on the aerial, and the memorandum on its own picture", () => {
     expect(IMAGE_CREDIT.streetview).toContain("Google");
     expect(IMAGE_CREDIT.satellite).toContain("Google");
     expect(IMAGE_CREDIT.aerial).toContain("USGS");
+    expect(IMAGE_CREDIT.photo).toContain("memorandum");
   });
 });

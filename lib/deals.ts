@@ -29,6 +29,9 @@ export interface DealRow {
   model: unknown;
   // Public-web comp search results (unverified fallback). Migration 0004.
   comp_search: unknown;
+  // The building's imagery cache (DealVisualCache): its geocode, and the
+  // picture lifted out of its memorandum or added by hand. Migration 0027.
+  photo?: unknown;
   created_at: string;
   updated_at: string;
 }

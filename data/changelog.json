@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-22",
+      "title": "A picture of each building, from its own memorandum",
+      "href": "/deals",
+      "blurb": "Every deal on the signed-in site now opens on a photograph of its building: the cover picture out of the offering memorandum you uploaded, lifted from the file the first time the deal is opened, sized once for the deal page and again for the pipeline's thumbnail, and credited to the memorandum. Where a memorandum carries no photograph — a scanned deck, a text-only teaser — the overhead stays, as before, and the deal page's Add photo button takes a picture of your own (Replace photo, once there is one). A reissued memorandum drops the picture taken from the old one; a picture you added survives it. The picture is never fetched from a listing portal or an image search: the memorandum's cover was sent to you to evaluate the deal, which is exactly this use, and a portal's photograph is under that portal's terms. The sample deal keeps its overhead."
+    },
+    {
+      "date": "2026-09-22",
       "title": "The for-sale market, under the rent",
       "href": "/market?metro=dc",
       "blurb": "Each market's brief now carries this month's for-sale market from Realtor.com's inventory file: the median list price, the active listings and the median days on market, each against a year ago. The rent lines above it say what a renter pays and what a home costs in years of it; this says the flow behind that price — a market where listings pile up and sit longer is loosening, and a loosening market is one a renter can buy into, while fewer and faster keeps them renting. The call is made only when both flow figures agree and never from the price alone, and the line says plainly that a list price is what sellers are asking, not what buyers paid. Matched by CBSA code and checked by name from the runner before it was trusted; Realtor.com's condition for use is attribution, and the line carries it."

@@ -16,6 +16,7 @@ import {
   imagePlan,
   type ImageSource,
 } from "@/lib/imagery-plan";
+import { pictureSizeFor, readPictureBytes } from "@/lib/deal-picture";
 
 // The ordering rule and the credits are pure, so they live in a universal
 // module the client can import too — re-exported here so server callers have
@@ -244,6 +245,26 @@ export interface BestImage {
   source: ImageSource;
 }
 
+/**
+ * The building's own photograph, from the bucket: the square crop for a
+ * row-sized ask, the hero otherwise. Null when the deal has none stored —
+ * the caller (`ensureDealPicture`) is what puts one there.
+ */
+async function fetchStoredPicture(
+  dealId: string,
+  cache: DealVisualCache | null,
+  size: { width: number; height: number },
+): Promise<Response | null> {
+  const pic = cache?.picture;
+  if (!pic) return null;
+  try {
+    const bytes = await readPictureBytes(dealId, pic, pictureSizeFor(size));
+    return new Response(new Uint8Array(bytes), { headers: { "content-type": "image/jpeg" } });
+  } catch {
+    return null;
+  }
+}
+
 /** Fetch one named source. Null when it is unavailable or fails. */
 async function fetchOneRaw(
   source: ImageSource,
@@ -253,6 +274,9 @@ async function fetchOneRaw(
   cache: DealVisualCache | null,
   size: { width: number; height: number; zoom?: number },
 ): Promise<Response | null> {
+  if (source === "photo") {
+    return fetchStoredPicture(dealId, cache, size);
+  }
   if (source === "streetview") {
     return fetchStreetViewImage(supabase, dealId, address, cache, size);
   }
@@ -297,10 +321,11 @@ async function runPlan(
 }
 
 /**
- * The best real picture of this building we can get right now: the Street
- * View photograph, else the sharp Google satellite frame, else the USGS
- * aerial. Null when the deal has no address, nothing geocodes, or every
- * source failed — callers then render nothing.
+ * The best real picture of this building we can get right now: its own
+ * photograph where one is stored, else the Street View photograph, else
+ * the sharp Google satellite frame, else the USGS aerial. Null when the
+ * deal has no address, nothing geocodes, or every source failed — callers
+ * then render nothing.
  */
 export async function fetchBestBuildingImage(
   supabase: SupabaseClient,
@@ -313,6 +338,7 @@ export async function fetchBestBuildingImage(
     imagePlan({
       hasStreetAddress: !!address?.street?.trim(),
       googleConfigured: googleConfigured(),
+      hasPicture: !!cache?.picture,
     }),
     supabase,
     dealId,

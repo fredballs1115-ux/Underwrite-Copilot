@@ -69,14 +69,30 @@ and Apartment List's not (a gated download; its static host does not
 resolve) — so the metro VACANCY index the site still lacks has no free
 programmatic source yet, like cap rates (CBRE, Green Street and RCA are
 all licensed).
+Then #370, the signed-in site's own pictures: each deal opens on the
+cover photograph out of its memorandum, lifted from the file on the
+deal's first view (a `/DCTDecode` image stream IS the JPEG's bytes;
+`pickCover` takes the largest photograph-shaped one, early in the file
+preferred), sized twice by sharp — the deal page's hero and the pipeline
+row's thumbnail — credited to the memorandum, replaceable by hand from
+the deal page, never on the sample deal, and NEVER fetched from a
+listing portal or an image search, whose terms forbid exactly that use;
+the memorandum's cover is the licensed picture of the building.
 **Whose move: the operator's** — the ground-level files for
 `public/photos/`; optionally a free `BLS_API_KEY` Actions secret so the
-dry run prints the BLS series' titles. **Mine, next** — after #369
-merges, its dry run on main, then the real pull and the live-verify;
-then more inputs where a free, attributable source exists: FRED's
-regional rental vacancy (the Census HVS, quarterly, Northeast / South /
-Midwest / West — borrowed and named, since no metro series exists), and
-the Realtor.com "hotness" file the probe listed beside the inventory.
+dry run prints the BLS series' titles; `GOOGLE_MAPS_API_KEY` for the
+Street View photograph of a deal whose memorandum carries none.
+**Mine, next** — after #370 merges, the live-verify for the #368/#369
+markers (the real Realtor pull was dispatched once its dry run printed
+18 of 18); then the deal-type audit — every surface's words and figures
+held to the asset class the deal is (keys, pads, beds, acres, a plan
+deal's yield on cost), with a test per type, because a site that is
+wrong about a hotel or a land deal is wrong; then more inputs where a
+free, attributable source exists: FRED's regional rental vacancy (the
+Census HVS, quarterly, Northeast / South / Midwest / West — borrowed and
+named, since no metro series exists), the Census HVS's own MSA rental
+vacancy table (an xlsx a quarter), and the Realtor.com "hotness" file
+the probe listed beside the inventory.
 
 ## 🟢 2026-09-16 into 09-17 — `/tools` becomes the reason not to open Excel
 

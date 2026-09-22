@@ -65,9 +65,22 @@ const METROS = [
 /** The columns the table takes, by the header's own names. */
 const COLUMNS = [
   { col: "median_listing_price", yy: "median_listing_price_yy", metric: "rdc_median_list_price", unit: "usd", say: (v) => `$${Math.round(v).toLocaleString("en-US")}` },
-  { col: "active_listing_count", yy: "active_listing_count_yy", metric: "rdc_active_listings", unit: "listings", say: (v) => `${Math.round(v).toLocaleString("en-US")} listings` },
-  { col: "median_days_on_market", yy: "median_days_on_market_yy", metric: "rdc_days_on_market", unit: "days", say: (v) => `${Math.round(v)} days` },
+  { col: "active_listing_count", yy: "active_listing_count_yy", metric: "rdc_active_listings", unit: "count", say: (v) => `${Math.round(v).toLocaleString("en-US")} listings` },
+  { col: "median_days_on_market", yy: "median_days_on_market_yy", metric: "rdc_days_on_market", unit: "count", say: (v) => `${Math.round(v)} days` },
 ];
+
+/** The units the benchmarks table accepts — migration 0023's check, which
+ *  Postgres enforces on the real run and a dry run never reaches (the first
+ *  real run failed on "listings" and "days" after a clean dry run). A unit
+ *  outside the list stops the pull here, dry or not; lib/benchmark-units.test.ts
+ *  holds this copy to the migration's. */
+const BENCHMARK_UNITS = new Set(["usd", "pct", "ratio", "months", "count", "usd_month"]);
+for (const unit of [...COLUMNS.map((c) => c.unit), "pct"]) {
+  if (!BENCHMARK_UNITS.has(unit)) {
+    console.error(`unit "${unit}" is not in the benchmarks table's check (${[...BENCHMARK_UNITS].join(", ")})`);
+    process.exit(1);
+  }
+}
 
 /** A CSV line's cells, quotes honoured — a cbsa_title always carries a comma inside its quotes. */
 function cells(line) {

@@ -5,6 +5,8 @@ import { SectorFieldsForm } from "./sector-fields-form";
 import type { SectorFieldValues } from "@/lib/sector-fields";
 import { PublicCompsPanel } from "./public-comps-panel";
 import { PropertyVisual } from "./property-visual";
+import { PICTURE_CREDIT, ensureDealPicture } from "@/lib/deal-picture";
+import type { DealVisualCache } from "@/lib/deal-location";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
@@ -258,6 +260,14 @@ export default async function DealPage({
   };
   const rawSupp = (deal.supplements as Record<string, RawSupp> | null) ?? {};
   // Signed link so the user can re-open the OM they uploaded (1-hour expiry).
+  // The building's own photograph — the cover of its memorandum, lifted out
+  // on the first view and stored — leads the visual below. Null means the
+  // overhead leads, as before.
+  const picture = await ensureDealPicture(supabase, id, {
+    omPath: (deal.om_storage_path as string | null) ?? null,
+    isSample: !!(deal as { is_sample?: boolean }).is_sample,
+    cache: (deal.photo as DealVisualCache | null) ?? null,
+  });
   const omUrlPromise = deal.om_storage_path
     ? signedSupplementUrl(deal.om_storage_path, { kind: "deal", dealId: id })
     : Promise.resolve(null);
@@ -932,12 +942,15 @@ export default async function DealPage({
           so something real renders for every deal with an address; the Street
           and Satellite tabs need GOOGLE_MAPS_API_KEY (two separate Google
           APIs on the one key) and are where the sharp imagery comes from. */}
-      {dealAddress?.label && (
+      {(dealAddress?.label || picture) && (
         <PropertyVisual
           dealId={id}
-          label={dealAddress.label}
-          hasStreetAddress={!!dealAddress.street}
+          label={dealAddress?.label ?? (deal.name as string)}
+          hasStreetAddress={!!dealAddress?.street}
           googleEnabled={!!process.env.GOOGLE_MAPS_API_KEY}
+          hasAddress={!!dealAddress?.label}
+          picture={picture ? { credit: PICTURE_CREDIT[picture.source], source: picture.source } : null}
+          canReplace={!(deal as { is_sample?: boolean }).is_sample}
         />
       )}
 

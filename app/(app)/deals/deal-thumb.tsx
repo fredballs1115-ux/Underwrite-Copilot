@@ -7,11 +7,15 @@ import { useState } from "react";
  * that every deal is recognisable by the place it actually is.
  *
  * Served by /api/deals/[id]/image, which returns the BEST real picture
- * available: the Street View photograph of the building front where there's
- * a key and Google has coverage, the USGS aerial of the site otherwise. So
- * this row upgrades from an overhead shot to a photo of the actual building
- * the moment GOOGLE_MAPS_API_KEY is configured — no code change, no
- * re-import of the deal.
+ * available: the building's own photograph first — the cover of its
+ * memorandum, lifted out of the file on the deal's first view, or the
+ * picture the reader put on the deal — then the Street View photograph of
+ * the building front where there's a key and Google has coverage, the USGS
+ * aerial of the site otherwise. So a row shows the building the moment its
+ * memorandum is read, and an overhead upgrades to a street photograph the
+ * moment GOOGLE_MAPS_API_KEY is configured — no code change, no re-import.
+ * The route answers a revalidation with a 304, so a replaced picture shows
+ * on the next view rather than after a day of the old one.
  *
  * The slot is always the same size from `sm` up: a deal with no address, or
  * one whose picture 404s (nothing geocodes, every source failed), shows a

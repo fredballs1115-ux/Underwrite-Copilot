@@ -166,6 +166,9 @@ const MODEL_ERRORS: Record<string, string> = {
     "The upload didn’t complete — the stored OM is unchanged. Please try again.",
   ompermission:
     "Only the deal’s creator or the team owner can replace its OM.",
+  picture:
+    "That file couldn’t be read as a picture — try a JPEG, PNG or WebP of the building.",
+  picturesize: "That picture is larger than 12 MB — please try a smaller one.",
   busy: "A screen is already running on this deal — let it finish first.",
   memoempty: "Run the analysis first — the memo needs a verdict to export.",
   memofail: "Couldn’t build the memo just now — please try again in a moment.",

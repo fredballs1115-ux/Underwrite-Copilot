@@ -4,18 +4,24 @@
 // the right attribution. Fetching lives in lib/imagery.ts, which re-exports
 // all of this.
 
-export type ImageSource = "streetview" | "satellite" | "aerial";
+export type ImageSource = "photo" | "streetview" | "satellite" | "aerial";
 
 export interface ImagePlanInput {
   /** a street-level address; anything vaguer can't be photographed honestly */
   hasStreetAddress: boolean;
   /** GOOGLE_MAPS_API_KEY is set in this deployment */
   googleConfigured: boolean;
+  /** the deal has its own photograph — the cover of its memorandum, or one the reader uploaded */
+  hasPicture?: boolean;
 }
 
 /**
  * Sources to try, best first.
  *
+ *  0. THE BUILDING'S OWN PHOTOGRAPH — the cover of the deal's memorandum,
+ *     lifted out of the file the reader already uploaded (lib/om-photo), or
+ *     a picture the reader put there themselves. The one picture taken by
+ *     someone paid to make the building look its best.
  *  1. STREET VIEW — an actual photograph of the building's front. Needs a key
  *     AND a street-level address, since Street View at a neighborhood
  *     centroid returns some arbitrary block.
@@ -25,12 +31,14 @@ export interface ImagePlanInput {
  *     real. But NAIP is natively 0.6-1.0 m/px, so it can frame a site and not
  *     much tighter (see MAX_SOURCE_ZOOM). It is the floor, not the goal.
  *
- * There is deliberately no fourth entry. A stock photo, an AI-generated
+ * There is deliberately nothing else. A stock photo, an AI-generated
  * building or a scraped listing shot are all pictures of something that is
- * not this property, which is worse than no picture.
+ * not this property, which is worse than no picture — and the deal's own
+ * photograph is the opposite case: it came out of the deal's own file.
  */
 export function imagePlan(opts: ImagePlanInput): ImageSource[] {
   const plan: ImageSource[] = [];
+  if (opts.hasPicture) plan.push("photo");
   if (opts.hasStreetAddress && opts.googleConfigured) plan.push("streetview");
   if (opts.googleConfigured) plan.push("satellite");
   plan.push("aerial");
@@ -75,6 +83,8 @@ export const FRAME_METRES: Record<LocationPrecision, number> = {
 
 /** The deepest zoom each source can actually serve without inventing detail. */
 export const MAX_SOURCE_ZOOM: Record<ImageSource, number> = {
+  // Not a map source at all; present so the record is total.
+  photo: 20,
   // Google's satellite runs ~0.15 m/px in cities.
   satellite: 20,
   // USGS is fetched through the National Map's bbox EXPORT endpoint, which
@@ -136,6 +146,7 @@ export function frameZoom(opts: {
 
 /** Attribution that must travel with each source, wherever it is rendered. */
 export const IMAGE_CREDIT: Record<ImageSource, string> = {
+  photo: "From the offering memorandum",
   streetview: "Street View imagery © Google",
   satellite: "Satellite imagery © Google",
   aerial: "Imagery: USGS The National Map",
