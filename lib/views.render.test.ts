@@ -2550,9 +2550,31 @@ describe("a metro's for-sale market, from Realtor.com", () => {
     { metric: "rdc_active_listings_yoy", metro: "Washington DC", low: 13.8, as_of: "2026-08-01", note: null },
     { metric: "rdc_days_on_market", metro: "Washington DC", low: 43, as_of: "2026-08-01", note: null },
     { metric: "rdc_days_on_market_yoy", metro: "Washington DC", low: 10.3, as_of: "2026-08-01", note: null },
+    // The hotness rows: rank 154 of 300 against 142 a year earlier, 0.649
+    // views per property against the U.S., 17 fewer days on market.
+    { metric: "rdc_hotness_rank", metro: "Washington DC", low: 154, as_of: "2026-08-01", note: "Realtor.com hotness rank of the 300 largest metros, Washington-Arlington-Alexandria, DC-VA-MD-WV metro area, August 2026. Data: Realtor.com." },
+    { metric: "rdc_hotness_rank_prior", metro: "Washington DC", low: 142, as_of: "2025-08-01", note: null },
+    { metric: "rdc_views_per_listing_vs_us", metro: "Washington DC", low: 0.649, as_of: "2026-08-01", note: null },
+    { metric: "rdc_days_on_market_vs_us", metro: "Washington DC", low: -17, as_of: "2026-08-01", note: null },
   ];
   const html = render(React.createElement(RealtorLine, { r: realtorFor(rows, "Washington DC") }));
   const text = visibleText(html);
+
+  it("prints the hotness rank, its move the right way round, and its two parts against the U.S.", () => {
+    expect(text).toContain("Hotness #154 of 300 metros");
+    expect(text).toContain("12 places cooler than a year ago");
+    expect(text).toContain("listing views per property 35% under the U.S.");
+    expect(text).toContain("sells 17 days faster than the U.S.");
+    expect(text).toContain("ranks the 300 largest metros");
+    // A rank that climbed, a market that sells slower, the same month said once.
+    const hotter = visibleText(render(React.createElement(RealtorLine, {
+      r: realtorFor(rows.map((x) => (x.metric === "rdc_hotness_rank" ? { ...x, low: 120 } : x.metric === "rdc_days_on_market_vs_us" ? { ...x, low: 9 } : x)), "Washington DC"),
+    })));
+    expect(hotter).toContain("Hotness #120 of 300 metros");
+    expect(hotter).toContain("22 places hotter than a year ago");
+    expect(hotter).toContain("sells 9 days slower than the U.S.");
+    expect(hotter).not.toContain("Aug 2026 · Aug 2026");
+  });
 
   it("prints the list price, the listings, the days on market and the credit", () => {
     expect(text).toContain("For sale, median list");
@@ -2590,6 +2612,7 @@ describe("a metro's for-sale market, from Realtor.com", () => {
     expect(priceOnly).toContain("$565,000");
     expect(priceOnly).not.toContain("active listings");
     expect(priceOnly).not.toContain("loosening");
+    expect(priceOnly).not.toContain("Hotness");
   });
 
   it("reads clean and names everything", () => {

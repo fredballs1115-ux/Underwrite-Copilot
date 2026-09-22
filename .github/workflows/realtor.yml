@@ -3,7 +3,10 @@ name: realtor
 # metro's median list price, active listings and median days on market,
 # each with its change from a year ago, from Realtor.com's public metro CSV
 # — one month per file, refreshed early in the month for the month before,
-# free to use with attribution.
+# free to use with attribution. The same pull reads Realtor.com's hotness
+# HISTORY file (every month since 2017, the 300 largest metros): the rank,
+# the rank the same month a year earlier, and the two parts against the
+# U.S. — probed first by zori.yml's probe_url, run 35793378647.
 #
 # Dispatch it with `dry_run` ticked to fetch, match and print without
 # writing: the sandbox cannot reach Realtor.com, so the file's shape and

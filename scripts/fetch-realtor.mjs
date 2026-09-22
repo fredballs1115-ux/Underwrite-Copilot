@@ -24,10 +24,31 @@
 // MATCHING BY CODE, NAMED. The four DMV suburbs share Washington's row — an
 // MSA figure, filed under each and said so in the note — and Newark shares
 // New York's. An unmatched metro is a loud log line, never a guessed number.
+//
+// THE HOTNESS FILE, the second read (zori.yml probe_url, run 35793378647,
+// 2026-09-22): RDC_Inventory_Hotness_Metrics_Metro_History.csv is text/csv,
+// 8,636 KB, 32,701 lines — EVERY month back to 201708, newest first, the
+// 300 largest metros a month — header month_date_yyyymm, cbsa_code,
+// cbsa_title, hh_rank, hotness_rank, hotness_rank_mm, hotness_rank_yy,
+// hotness_score, supply_score, demand_score, median_days_on_market, …,
+// median_dom_vs_us, page_view_count_per_property_mm, …_yy, …_vs_us,
+// median_listing_price, …, quality_flag; Washington's 202608 row ranked
+// 154 with 0.649 views per property against the U.S. and 17 fewer days on
+// market, Dallas's 183 with 0.910 and 2 fewer. What is stored: the RANK
+// (of 300), the rank the SAME MONTH A YEAR EARLIER read out of the history
+// (so the move is our own subtraction of two printed figures, never a sign
+// inferred from a column called _yy — the dry run prints whether the file's
+// own column agrees), and the two components in plain units — listing
+// views per property as a ratio to the U.S., days on market as days
+// against the U.S. The composite score is not stored: it is the mean of
+// two percentile ranks and says nothing the rank and its parts do not.
 
 import { createClient } from "@supabase/supabase-js";
 
 const URL = "https://econdata.s3-us-west-2.amazonaws.com/Reports/Core/RDC_Inventory_Core_Metrics_Metro.csv";
+const HOTNESS_URL = "https://econdata.s3-us-west-2.amazonaws.com/Reports/Hotness/RDC_Inventory_Hotness_Metrics_Metro_History.csv";
+/** The file ranks this many metros; a covered metro outside them has no row, and says so. */
+const HOTNESS_METROS = 300;
 const SOURCE = "https://www.realtor.com/research/data/";
 
 const dryRun = process.env.DRY_RUN === "1";
@@ -75,7 +96,9 @@ const COLUMNS = [
  *  outside the list stops the pull here, dry or not; lib/benchmark-units.test.ts
  *  holds this copy to the migration's. */
 const BENCHMARK_UNITS = new Set(["usd", "pct", "ratio", "months", "count", "usd_month"]);
-for (const unit of [...COLUMNS.map((c) => c.unit), "pct"]) {
+/** The hotness rows' units: a rank and a day count are counts, views against the U.S. is a ratio. */
+const HOTNESS_UNITS = ["count", "count", "ratio", "count"];
+for (const unit of [...COLUMNS.map((c) => c.unit), "pct", ...HOTNESS_UNITS]) {
   if (!BENCHMARK_UNITS.has(unit)) {
     console.error(`unit "${unit}" is not in the benchmarks table's check (${[...BENCHMARK_UNITS].join(", ")})`);
     process.exit(1);
@@ -180,6 +203,115 @@ for (const m of METROS) {
 }
 for (const miss of missed) console.error(`${miss}: no Realtor.com row`);
 
+// ── The hotness file ────────────────────────────────────────────────────
+//
+// A file that fails is a loud line and the inventory rows still write.
+let hotMatched = 0;
+const hotMissed = [];
+try {
+  const hres = await fetch(HOTNESS_URL, {
+    headers: { "user-agent": "UnderwriteCopilot/1.0 (+https://underwrite-copilot.onrender.com)" },
+    signal: AbortSignal.timeout(90_000),
+  });
+  if (!hres.ok) throw new Error(`HTTP ${hres.status}`);
+  const htext = await hres.text();
+  const hlines = htext.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  const hheader = cells(hlines[0]);
+  const hix = (name) => hheader.indexOf(name);
+  const hneeded = ["month_date_yyyymm", "cbsa_code", "cbsa_title", "hotness_rank", "hotness_rank_yy", "page_view_count_per_property_vs_us", "median_dom_vs_us"];
+  const hmissing = hneeded.filter((n) => hix(n) < 0);
+  if (hmissing.length) throw new Error(`header lacks ${hmissing.join(", ")}; header: ${hheader.slice(0, 12).join(", ")}`);
+  // The newest month in the file, found rather than assumed, and the same
+  // month a year earlier — yyyymm arithmetic, so 202601 − 100 is 202501.
+  let hmonth = "";
+  for (const line of hlines.slice(1)) {
+    const mm = line.slice(0, 6);
+    if (/^\d{6}$/.test(mm) && mm > hmonth) hmonth = mm;
+  }
+  if (!hmonth) throw new Error("no month in the file");
+  const prior = String(Number(hmonth) - 100);
+  const wanted = new Set(METROS.map((m) => m.cbsa));
+  const byKey = new Map();
+  for (const line of hlines.slice(1)) {
+    const mm = line.slice(0, 6);
+    if (mm !== hmonth && mm !== prior) continue;
+    const c = cells(line);
+    if (!wanted.has(c[hix("cbsa_code")])) continue;
+    byKey.set(`${c[hix("cbsa_code")]}:${mm}`, c);
+  }
+  const hAsOf = `${hmonth.slice(0, 4)}-${hmonth.slice(4, 6)}-01`;
+  const priorAsOf = `${prior.slice(0, 4)}-${prior.slice(4, 6)}-01`;
+  const hMonthName = new Date(`${hAsOf}T00:00:00Z`).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+  console.log(
+    `HOTNESS: ${Math.round(htext.length / 1024)} KB, ${hlines.length - 1} rows, newest month ${hmonth}, the year before ${prior}` +
+      (dryRun ? " · dry run, not written" : ""),
+  );
+  for (const m of METROS) {
+    const c = byKey.get(`${m.cbsa}:${hmonth}`);
+    if (!c) {
+      hotMissed.push(`${m.id} (cbsa ${m.cbsa})`);
+      continue;
+    }
+    const rank = Number(c[hix("hotness_rank")]);
+    if (!Number.isInteger(rank) || rank < 1 || rank > HOTNESS_METROS) {
+      hotMissed.push(`${m.id} (cbsa ${m.cbsa}: rank ${c[hix("hotness_rank")]})`);
+      continue;
+    }
+    const title = c[hix("cbsa_title")];
+    const where = m.shared ? ` — the ${title} metro area's figure, shared with the MSA` : "";
+    const credit = ` Data: Realtor.com.`;
+    const p = byKey.get(`${m.cbsa}:${prior}`);
+    const priorRank = p ? Number(p[hix("hotness_rank")]) : NaN;
+    const views = Number(c[hix("page_view_count_per_property_vs_us")]);
+    const dom = Number(c[hix("median_dom_vs_us")]);
+    out.push({
+      sector: "multifamily", metro: m.name, metric: "rdc_hotness_rank",
+      low: rank, high: rank, unit: "count",
+      source: SOURCE, as_of: hAsOf, status: "verified",
+      note: `Realtor.com hotness rank of the ${HOTNESS_METROS} largest metros, ${title} metro area, ${hMonthName}${where}.${credit}`,
+    });
+    const said = [`#${rank} of ${HOTNESS_METROS}`];
+    if (Number.isInteger(priorRank) && priorRank >= 1) {
+      out.push({
+        sector: "multifamily", metro: m.name, metric: "rdc_hotness_rank_prior",
+        low: priorRank, high: priorRank, unit: "count",
+        source: SOURCE, as_of: priorAsOf, status: "verified",
+        note: `Realtor.com hotness rank a year earlier, ${title} metro area, ${prior.slice(0, 4)}-${prior.slice(4, 6)}.${credit}`,
+      });
+      // The file's own year-ago column, checked against our subtraction and
+      // printed — the stored figures are the two ranks, never its sign.
+      const fileYy = Number(c[hix("hotness_rank_yy")]);
+      const ours = rank - priorRank;
+      said.push(`${priorRank} a year ago${Number.isFinite(fileYy) ? (fileYy === ours ? " (the file's _yy agrees)" : ` (the file's _yy says ${fileYy}, ours ${ours})`) : ""}`);
+    }
+    if (Number.isFinite(views) && views > 0) {
+      const ratio = Math.round(views * 1000) / 1000;
+      out.push({
+        sector: "multifamily", metro: m.name, metric: "rdc_views_per_listing_vs_us",
+        low: ratio, high: ratio, unit: "ratio",
+        source: SOURCE, as_of: hAsOf, status: "verified",
+        note: `Realtor.com listing views per property as a ratio to the U.S., ${title} metro area, ${hMonthName}.${credit}`,
+      });
+      said.push(`views ${ratio}× the U.S.`);
+    }
+    if (Number.isFinite(dom)) {
+      const days = Math.round(dom);
+      out.push({
+        sector: "multifamily", metro: m.name, metric: "rdc_days_on_market_vs_us",
+        low: days, high: days, unit: "count",
+        source: SOURCE, as_of: hAsOf, status: "verified",
+        note: `Realtor.com median days on market against the U.S., in days, ${title} metro area, ${hMonthName}.${credit}`,
+      });
+      said.push(`${days > 0 ? "+" : ""}${days} days vs the U.S.`);
+    }
+    hotMatched++;
+    console.log(`${m.id}: hotness ${said.join(" · ")} — ${title}, ${hmonth}`);
+  }
+  for (const miss of hotMissed) console.error(`${miss}: no hotness row`);
+} catch (err) {
+  console.error(`HOTNESS: FAILED — ${err instanceof Error ? err.message : String(err)}; the inventory rows still write`);
+}
+
 if (supabase && out.length > 0) {
   const { error } = await supabase.from("benchmarks").upsert(out, { onConflict: "sector,metro,metric" });
   if (error) {
@@ -188,5 +320,8 @@ if (supabase && out.length > 0) {
   }
   console.log(`benchmarks: upserted ${out.length} rows`);
 }
-console.log(`REALTOR ROLL-UP: ${matched} of ${METROS.length} metros matched${missed.length ? `; missed: ${missed.join(", ")}` : ""}`);
+console.log(
+  `REALTOR ROLL-UP: ${matched} of ${METROS.length} metros matched${missed.length ? `; missed: ${missed.join(", ")}` : ""}` +
+    `; hotness ${hotMatched} of ${METROS.length}${hotMissed.length ? `; missed: ${hotMissed.join(", ")}` : ""}`,
+);
 process.exit(matched === 0 ? 1 : 0);

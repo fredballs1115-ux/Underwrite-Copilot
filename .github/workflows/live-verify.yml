@@ -857,6 +857,12 @@ jobs:
           # the four regional rows — run it and look again.
           mark "#374 the region's rental vacancy is on the market brief" grep -q "Census region" p_market.html
           mark "#374 and the survey's grain is said" grep -q "publishes no metro figure" p_market.html
+          # #377 — Realtor.com's hotness rank on the market brief: the rank of
+          # the 300 largest metros, its move on the year and its two parts
+          # against the U.S. Each phrase is one JS string. Absent until
+          # realtor.yml has written the hotness rows — run it and look again.
+          mark "#377 the hotness rank is on the market brief" grep -q "of 300 metros" p_market.html
+          mark "#377 and what the rank is made of is said" grep -q "ranks the 300 largest metros" p_market.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

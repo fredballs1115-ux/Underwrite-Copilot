@@ -1,4 +1,4 @@
-import { REALTOR_CREDIT, REALTOR_SOURCE_URL, type RealtorRead } from "@/lib/realtor";
+import { HOTNESS_METROS, REALTOR_CREDIT, REALTOR_SOURCE_URL, type HotnessRead, type RealtorRead } from "@/lib/realtor";
 import { monthOf } from "@/lib/zori";
 
 /**
@@ -63,7 +63,57 @@ export function RealtorLine({ r }: { r: RealtorRead | null }) {
           )}
         </div>
       )}
-      <p className="mt-1 text-[11px] leading-relaxed text-muted">{sentence}</p>
+      {r.hotness && <HotnessRow h={r.hotness} sameMonth={r.hotness.asOf === r.asOf} />}
+      <p className="mt-1 text-[11px] leading-relaxed text-muted">
+        {sentence}
+        {r.hotness ? ` ${HOTNESS_SENTENCE}` : ""}
+      </p>
+    </div>
+  );
+}
+
+/** What the rank is, said once, in one string, so live-verify can grep it. */
+const HOTNESS_SENTENCE =
+  `Hotness ranks the ${HOTNESS_METROS} largest metros by how many buyers look at each listing and how fast homes sell, each against the country; ` +
+  "a hot for-sale market is one where buyers compete for homes, and the ones who lose out keep renting.";
+
+/**
+ * The rank, its move on the year and its two parts, each phrase one JS
+ * string: "Hotness #154 of 300 metros · 12 places cooler than a year ago ·
+ * listing views per property 35% under the U.S. · sells 17 days faster
+ * than the U.S." A part the pull did not have is simply absent.
+ */
+function HotnessRow({ h, sameMonth }: { h: HotnessRead; sameMonth: boolean }) {
+  const parts: string[] = [];
+  if (h.move) {
+    parts.push(
+      h.move.direction === "unchanged"
+        ? "the same rank as a year ago"
+        : `${Math.abs(h.move.places)} place${Math.abs(h.move.places) === 1 ? "" : "s"} ${h.move.direction} than a year ago`,
+    );
+  }
+  if (h.viewsVsUs !== null) {
+    const pct = Math.round(Math.abs(1 - h.viewsVsUs) * 100);
+    parts.push(
+      pct === 0
+        ? "listing views per property at the U.S. average"
+        : `listing views per property ${pct}% ${h.viewsVsUs < 1 ? "under" : "over"} the U.S.`,
+    );
+  }
+  if (h.domVsUsDays !== null) {
+    const d = Math.abs(h.domVsUsDays);
+    parts.push(
+      h.domVsUsDays === 0
+        ? "sells as fast as the U.S."
+        : `sells ${d} day${d === 1 ? "" : "s"} ${h.domVsUsDays < 0 ? "faster" : "slower"} than the U.S.`,
+    );
+  }
+  const head = `Hotness #${h.rank} of ${HOTNESS_METROS} metros`;
+  return (
+    <div className="mt-0.5 text-xs text-muted">
+      <span className="font-semibold text-ink">{head}</span>
+      {parts.length > 0 ? ` · ${parts.join(" · ")}` : ""}
+      {!sameMonth ? ` · ${monthOf(h.asOf)}` : ""}
     </div>
   );
 }
