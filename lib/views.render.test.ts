@@ -2448,9 +2448,18 @@ describe("a metro's asking rent, against the FMR", () => {
     asOf: "2026-08-31",
     note: "Zillow Observed Rent Index (ZORI), all homes, smoothed, Washington, DC metro area, month ending 2026-08-31. Data: Zillow Research.",
     shared: false,
+    mfrRent: null,
+    mfrYoyPct: null,
+    homeValue: null,
+    homeValueYoyPct: null,
+    priceToRentYears: null,
   };
   const html = render(React.createElement(ZoriLine, { z, fmr2br: 2100 }));
   const text = visibleText(html);
+  // With the two further files: the apartment rent and the home value.
+  const full = { ...z, mfrRent: 2150, mfrYoyPct: 1.1, homeValue: 612_300, homeValueYoyPct: -0.4, priceToRentYears: 21.2 };
+  const fullHtml = render(React.createElement(ZoriLine, { z: full, fmr2br: 2100 }));
+  const fullText = visibleText(fullHtml);
 
   it("prints the asking rent, its change, its month and Zillow's credit", () => {
     expect(text).toContain("Asking rent, all homes");
@@ -2468,6 +2477,30 @@ describe("a metro's asking rent, against the FMR", () => {
     // (2412 − 2100) / 2100 = 14.857…%
     expect(text).toContain("runs 14.9% above the fair market rent");
     expect(text).toContain("neither is the other");
+  });
+
+  it("draws the apartment rent as a third bar and says the home value in years of rent", () => {
+    expect(fullText).toContain("Asking rent, apartments");
+    expect(fullText).toContain("$2,150");
+    expect(fullText).toContain("1.1%");
+    // The all-homes figure keeps its own line and label.
+    expect(fullText).toContain("Asking rent, all homes");
+    expect(fullText).toContain("$2,412");
+    expect(fullText).toContain("Home value, typical");
+    expect(fullText).toContain("$612,300");
+    expect(fullText).toContain("0.4%");
+    expect(fullText).toContain("21.2 years of rent");
+    expect((fullHtml.match(/data-bar="zori"/g) ?? []).length).toBe(3);
+    expect(fullText).toContain("Apartments");
+    // (2150 − 2412) / 2412 = −10.86…% — the apartment figure runs under.
+    expect(fullText).toContain("10.9% under the all-homes one");
+    expect(fullText).toContain("A typical home costs 21.2 years of the all-homes asking rent");
+    // Without them, none of it: no third bar, no home value, no sentence.
+    expect(text).not.toContain("Asking rent, apartments");
+    expect(text).not.toContain("Home value");
+    expect(text).not.toContain("years of rent");
+    expect(a11yIssues(fullHtml), "full zori line").toEqual([]);
+    expect(gluedWords(fullText)).toEqual([]);
   });
 
   it("says when the figure is the metro area's, shared with a suburb", () => {

@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-22",
+      "title": "The apartment asking rent, and what a home costs in years of it",
+      "href": "/market?metro=dc",
+      "blurb": "Zillow's all-homes asking rent runs over houses, condos and apartments together, so in a market of dear houses it sits well above what an apartment actually lets for. Each market's brief now shows the same index over apartment listings alone — the figure an apartment underwrite should be reading — as a third bar beside the all-homes rent and the fair market rent HUD pays, with the gap said. And beside it the typical home value, said against a year of asking rent as the price-to-rent ratio in years, which is the arithmetic that keeps a renter renting. Both come from two more of Zillow's monthly files, read by the same pull and verified from the runner before they were trusted; a figure the pull does not have is simply absent, never a zero."
+    },
+    {
+      "date": "2026-09-22",
       "title": "Each market's rent index, beside its asking rent",
       "href": "/market?metro=dc",
       "blurb": "Every covered market's brief now carries the CPI's rent of primary residence against a year ago — what sitting tenants pay across the area's leases — drawn on the same panel as its unemployment, jobs, permits and house prices, and read against the asking rent above it, which is this month's new leases. The two are different numbers about different tenants, and an underwrite needs both: a rent roll grows at the first, a vacant unit re-lets at the second. Eight markets' figures come from FRED. Washington's, Baltimore's and Los Angeles's come from the Bureau of Labor Statistics directly, because FRED does not carry the areas the BLS redrew in 2018 — and the tile, the heading and the note all say so, since a figure is never credited to a source that does not publish it. Richmond and Hampton Roads have no CPI area of their own, and a region's figure is not a metro's, so their panel simply has no such tile."
