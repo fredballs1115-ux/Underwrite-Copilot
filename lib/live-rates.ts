@@ -102,9 +102,14 @@ export type MetroMetric =
   | "permits"
   | "hpi_yoy"
   | "rent_cpi_yoy"
-  /** the Housing Vacancy Survey's rental vacancy — published for the four
-   *  Census regions and never for a metro, so every metro borrows its
-   *  region's and the tile says so */
+  /** the Housing Vacancy Survey's own rental vacancy for the metro area —
+   *  one of the 75 largest MSAs, quarterly, from the survey's workbook,
+   *  with the survey's margin of error beside it, because a sample's
+   *  quarterly figure for one metro is wide */
+  | "rental_vacancy_msa"
+  /** the same survey's rate for the Census region the metro sits in —
+   *  the steadier figure, shown beside the metro's own and named as the
+   *  region's */
   | "rental_vacancy";
 
 /**
@@ -115,16 +120,34 @@ export type MetroMetric =
  * not exist" (both from the runner, rates run 35751861027 and 35752361935).
  * A BLS series is stored under its BLS id, as the level, untransformed; the
  * page derives the change, as it does for Boston's payrolls.
+ *
+ * And the Census Bureau's own workbooks for what neither carries: the
+ * Housing Vacancy Survey's quarterly rental vacancy for the 75 largest
+ * metro areas, published as .xlsx on census.gov and nowhere else
+ * (`scripts/fetch-hvs.mjs`). A Census series is stored under an id of ours
+ * (`HVS_RVR_<cbsa>`), as the rate, with a companion series for the survey's
+ * margin of error (`moe`), and the row is matched in the workbook by the
+ * metro area's name (`census`, a prefix) — printed by the dry run beside
+ * each metro, so a wrong name is visible rather than silently another city.
  */
-export type SeriesSource = "fred" | "bls";
+export type SeriesSource = "fred" | "bls" | "census";
+
+/** Where the Census Bureau publishes the Housing Vacancy Survey's rate tables. */
+export const HVS_RATES_URL = "https://www.census.gov/housing/hvs/data/rates.html";
 
 export interface SeriesMeta {
   /** The key in the `rates` table. */
   id: string;
   /** The FRED series it is fetched from — the same as `id` unless transformed. */
   fred: string;
-  /** FRED, or the BLS for a series FRED does not carry. */
+  /** FRED, the BLS for a series FRED does not carry, or the Census Bureau's workbook. */
   source: SeriesSource;
+  /** A companion series holding the figure's margin of error (a Census
+   *  survey figure), read beside it; null where the source states none. */
+  moe: string | null;
+  /** For a Census workbook series: the prefix of the metro area's name the
+   *  pull matches a row by ("Washington-Arlington-Alexandria"). */
+  census: string | null;
   /** FRED's transform, where the stored figure is not the level (`pc1`). */
   units: string | null;
   /**
@@ -187,6 +210,7 @@ const METRO_METRICS: readonly MetroMetric[] = [
   "permits",
   "hpi_yoy",
   "rent_cpi_yoy",
+  "rental_vacancy_msa",
   "rental_vacancy",
 ];
 
@@ -217,13 +241,29 @@ function readSeriesEntry(o: Record<string, unknown>, where: string, groupIds: Se
     throw new Error(`${where}: a transformed series needs its own id, distinct from its FRED id`);
   }
   if (o.derived !== undefined && o.derived !== "yoy") throw new Error(`${where}: derived must be "yoy"`);
-  if (o.source !== undefined && o.source !== "fred" && o.source !== "bls") {
-    throw new Error(`${where}: source must be "fred" or "bls"`);
+  if (o.source !== undefined && o.source !== "fred" && o.source !== "bls" && o.source !== "census") {
+    throw new Error(`${where}: source must be "fred", "bls" or "census"`);
   }
   // FRED's transforms cannot apply to a series FRED does not have: a BLS
   // series is the level, under the BLS id, and the page derives the change.
   if (o.source === "bls" && (typeof o.units === "string" || (o.fred !== undefined && o.fred !== o.id))) {
     throw new Error(`${where}: a BLS series is stored under its own id, untransformed`);
+  }
+  // A Census workbook series is matched by the metro area's name and has
+  // no FRED id to transform; its margin of error, where it carries one, is
+  // a series of its own.
+  if (o.source === "census") {
+    if (typeof o.census !== "string" || !o.census.trim()) {
+      throw new Error(`${where}: a Census series needs the metro area's name prefix (census)`);
+    }
+    if (typeof o.units === "string" || (o.fred !== undefined && o.fred !== o.id) || o.derived !== undefined) {
+      throw new Error(`${where}: a Census series is stored under its own id, untransformed`);
+    }
+  } else if (o.census !== undefined) {
+    throw new Error(`${where}: only a Census series names a metro area to match`);
+  }
+  if (o.moe !== undefined && (typeof o.moe !== "string" || !o.moe || o.moe === o.id)) {
+    throw new Error(`${where}: moe must name a companion series of its own`);
   }
   // A derived figure is computed from the stored LEVEL, so the table row is
   // the level and must be filed under the level's own id, untransformed.
@@ -233,7 +273,9 @@ function readSeriesEntry(o: Record<string, unknown>, where: string, groupIds: Se
   return {
     id: o.id,
     fred: typeof o.fred === "string" ? o.fred : o.id,
-    source: o.source === "bls" ? "bls" : "fred",
+    source: o.source === "bls" ? "bls" : o.source === "census" ? "census" : "fred",
+    moe: typeof o.moe === "string" ? o.moe : null,
+    census: typeof o.census === "string" ? o.census.trim() : null,
     units: typeof o.units === "string" ? o.units : null,
     derived: o.derived === "yoy" ? "yoy" : null,
     short: o.short,
@@ -361,6 +403,17 @@ export function readSeriesTable(raw: unknown): {
     }
     metroRegions[metro] = region;
   }
+  // A margin-of-error series is a companion, never a series of the table's
+  // own: its id collides with nothing, and two figures never share one.
+  const everyId = new Set([...series, ...metroSeries, ...regionSeries].map((m) => m.id));
+  const seenMoe = new Set<string>();
+  for (const m of [...series, ...metroSeries, ...regionSeries]) {
+    if (m.moe === null) continue;
+    if (everyId.has(m.moe) || seenMoe.has(m.moe)) {
+      throw new Error(`fred-series: ${m.id}: moe ${m.moe} is already a series`);
+    }
+    seenMoe.add(m.moe);
+  }
   return { historyRows, groups, series, metroSeries, metroAliases, regionSeries, metroRegions };
 }
 
@@ -463,6 +516,13 @@ export interface LiveRate {
   moveUnit: MoveUnit;
   /** The observations on hand, OLDEST first, the newest last. */
   history: readonly Observation[];
+  /**
+   * The newest figure's margin of error, in the series' own unit, read
+   * from its companion series for the same date — a Census survey figure
+   * carries one; everything else is null, which is "none stated", never
+   * "none".
+   */
+  moe: number | null;
 }
 
 const DAY = 86_400_000;
@@ -555,6 +615,11 @@ function readRatesOf(metas: readonly SeriesMeta[], rows: readonly RateRow[], now
     const head = byDate[0];
     const prior = byDate[1];
     const age = ageDays(head.obsDate, now);
+    // The companion's row for the SAME date, or nothing — a margin from
+    // another quarter is not this figure's.
+    const moeRow = meta.moe
+      ? rows.find((r) => r.series_id === meta.moe && r.obs_date === head.obsDate && Number.isFinite(r.value))
+      : undefined;
     out.push({
       meta,
       obsDate: head.obsDate,
@@ -564,6 +629,7 @@ function readRatesOf(metas: readonly SeriesMeta[], rows: readonly RateRow[], now
       move: prior ? moveBetween(meta.unit, head.value, prior.value) : null,
       moveUnit: moveUnitOf(meta.unit),
       history: byDate.slice(0, HISTORY_ROWS).reverse(),
+      moe: moeRow ? moeRow.value : null,
     });
   }
   return out;
@@ -875,6 +941,8 @@ export function fredUrl(id: string): string {
  * a source that does not publish it.
  */
 export function seriesUrl(id: string): string {
-  if (seriesMeta(id)?.source === "bls") return `https://data.bls.gov/timeseries/${id}`;
+  const source = seriesMeta(id)?.source;
+  if (source === "bls") return `https://data.bls.gov/timeseries/${id}`;
+  if (source === "census") return HVS_RATES_URL;
   return fredUrl(id);
 }

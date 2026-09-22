@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-22",
+      "title": "Each metro area's own rental vacancy, with its margin of error",
+      "href": "/market?metro=dc",
+      "blurb": "Every covered market's live panel now carries the Housing Vacancy Survey's own quarterly rental vacancy rate for the metro area — the figure the Census Bureau publishes only as a spreadsheet, for the 75 largest metros — beside the region's rate it already showed. It comes with the survey's margin of error printed under it, because a sample's figure for one metro is wide (Richmond's ±5 points on a 7% rate) and a rate shown without its margin reads as more than it is: a quarter's move inside the margin is noise, and the region's figure beside it is the steadier one. Pulled each quarter after the survey's release, matched by the metro area's name and checked from the runner before it was trusted."
+    },
+    {
+      "date": "2026-09-22",
       "title": "How hot the for-sale market is, against the country",
       "href": "/market?metro=dc",
       "blurb": "Each market's for-sale line now carries Realtor.com's hotness rank — where the metro sits among the 300 largest by how many buyers look at each listing and how fast homes sell, each against the U.S. — with the rank it held the same month a year earlier, so the move on the year is said the right way round (a smaller number is hotter), and the two parts in plain units: listing views per property as a share above or below the U.S., days on market as days faster or slower. A hot for-sale market is one where buyers compete for homes, and the ones who lose out keep renting — the demand side an apartment underwrite is quietly assuming. Read from Realtor.com's own history file, credited as its terms require."

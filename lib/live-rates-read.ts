@@ -90,7 +90,10 @@ function readAllSeries(): Promise<RateRow[]> {
 }
 
 async function readSeries(metas: readonly SeriesMeta[]): Promise<RateRow[]> {
-  if (metas.length === 0) return [];
+  // A series with a margin-of-error companion is read with it: the same
+  // query per id, so the read stays one index scan a series.
+  const ids = metas.flatMap((s) => (s.moe ? [s.id, s.moe] : [s.id]));
+  if (ids.length === 0) return [];
   let supabase: ReturnType<typeof createSupabaseAdminClient>;
   try {
     supabase = createSupabaseAdminClient();
@@ -101,21 +104,21 @@ async function readSeries(metas: readonly SeriesMeta[]): Promise<RateRow[]> {
   }
 
   const perSeries = await Promise.all(
-    metas.map(async (s): Promise<RateRow[]> => {
+    ids.map(async (id): Promise<RateRow[]> => {
       try {
         const { data, error } = await supabase
           .from("rates")
           .select("series_id, obs_date, value")
           // The newest first: the figure, the one before it for the move,
           // and the path behind them for the sparkline and the week-ago curve.
-          .eq("series_id", s.id)
+          .eq("series_id", id)
           .order("obs_date", { ascending: false })
           .limit(HISTORY_ROWS);
         if (error) throw new Error(error.message);
         return (data as RateRow[] | null) ?? [];
       } catch (err) {
         console.warn(
-          `live rates: ${s.id} unavailable:`,
+          `live rates: ${id} unavailable:`,
           err instanceof Error ? err.message : err,
         );
         return [];
