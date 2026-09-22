@@ -60,8 +60,21 @@ const WIDTH = 1600;
  */
 const terse = process.argv.includes("--terse");
 
-/** How many candidates a market's metadata is actually fetched for. */
-const PER_MARKET = 9;
+/**
+ * How many candidates a market's metadata is actually fetched for.
+ *
+ * A budget for the whole run, shared out: eighteen markets at once get nine
+ * each, which is the sweep live-verify can carry, and a run asked for ONE
+ * market digs thirty-six deep — because the second Dallas sheet checked nine
+ * names, found seven of them too small, and never opened the search door
+ * at all (it opens only when the first two doors gathered fewer than the
+ * budget). A narrow run is the one that wants depth, not the wide one.
+ */
+const CHECK_BUDGET = 54;
+const PER_MARKET_FLOOR = 9;
+const PER_MARKET_CEILING = 36;
+const perMarketFor = (n) =>
+  Math.min(PER_MARKET_CEILING, Math.max(PER_MARKET_FLOOR, Math.floor(CHECK_BUDGET / Math.max(1, n))));
 /** The whole search pass gives up here, so live-verify stays quick. */
 const DEADLINE_MS = 240_000;
 const startedAt = Date.now();
@@ -314,7 +327,11 @@ function categoryGuesses(city) {
 // ---------------------------------------------------------------------------
 
 async function searchMode(markets) {
-  console.log(`SKYLINE SEARCH: ${markets.length} markets, Commons and Wikipedia from this runner`);
+  const PER_MARKET = perMarketFor(markets.length);
+  console.log(
+    `SKYLINE SEARCH: ${markets.length} markets, Commons and Wikipedia from this runner, ` +
+      `up to ${PER_MARKET} files checked per market`,
+  );
 
   for (const market of markets) {
     console.log(`\n== ${market.metroId} (${market.city ?? ""})`);

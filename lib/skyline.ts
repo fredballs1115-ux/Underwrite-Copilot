@@ -54,9 +54,12 @@ export interface SkylineShot {
  * WHAT IS NOT HERE, and why. Montgomery County has no entry: it is a
  * suburban submarket, and a submarket does not have a skyline the way a
  * city does — the overhead frame is the more honest picture of a place
- * whose shape is the shape of its land, and the one search that has been
- * run for it turned up a high-altitude aerial of Bethesda and a category
- * full of berries and blue jays. Prince George's County and Northern
+ * whose shape is the shape of its land, and the two searches that have been
+ * run for it turned up a high-altitude aerial of Bethesda, an interstate
+ * seen from a Rockville overpass, and a category full of berries and blue
+ * jays (skyline-sheet runs 35660646197 and 35752022571 — the second with
+ * Silver Spring and Rockville's articles and categories added, so the
+ * doors are exhausted, not merely unopened). Prince George's County and Northern
  * Virginia were once left out on the same reasoning and each turned out to
  * have a picture it is actually known by: Rosslyn's towers across the
  * Potomac, and National Harbor's wheel on the river. The rule is the
