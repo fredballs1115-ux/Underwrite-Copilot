@@ -125,9 +125,15 @@ Philadelphia, Jersey City, New York and Boston and showed Chicago's
 soft daytime strip to be the weakest; a Chicago-only sheet found the
 sunrise frame from the lakefront (NorbertNagel, CC BY-SA 4.0), served
 now and proven by live-verify's PHOTOGRAPHS line.
-**Mine, next** — more inputs where a free, attributable source exists:
-the Census HVS's own MSA rental vacancy table (an xlsx a quarter), and
-the Realtor.com "hotness" file the probe listed beside the inventory.
+Then #377: Realtor.com's hotness rank on every market brief — the rank
+of the 300 largest metros with the rank a year earlier read out of the
+history file (the move is our own subtraction, a smaller rank is
+hotter), and its two parts against the U.S. in plain units; and the
+probe script describes a workbook, the step before the Census HVS feed.
+**Mine, next** — the Census HVS's own MSA rental vacancy table (the
+rates page lists tab4_msa_26_rvr.xlsx and tab4b_msa_15_25_rvr.xlsx;
+probe them from the runner first, then decide the grain and the margin
+of error's place on the tile).
 
 ## 🟢 2026-09-16 into 09-17 — `/tools` becomes the reason not to open Excel
 

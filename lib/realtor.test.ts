@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { REALTOR_CREDIT, REALTOR_METRICS, marketDirection, realtorFor } from "./realtor";
+import { HOTNESS_METROS, REALTOR_CREDIT, REALTOR_METRICS, hotnessFor, hotnessMove, marketDirection, realtorFor } from "./realtor";
 import type { BenchRow } from "./zori";
 
 /** Rows as scripts/fetch-realtor.mjs writes them — Dallas's August 2026 figures, from the runner's probe. */
@@ -66,6 +66,55 @@ describe("a metro's for-sale market", () => {
       "rdc_active_listings_yoy",
       "rdc_days_on_market",
       "rdc_days_on_market_yoy",
+      "rdc_hotness_rank",
+      "rdc_hotness_rank_prior",
+      "rdc_views_per_listing_vs_us",
+      "rdc_days_on_market_vs_us",
     ]);
+  });
+});
+
+/** The hotness rows as the pull writes them — Washington's August 2026 row
+ *  from the runner's probe: rank 154, 0.649 views per property against the
+ *  U.S., 17 fewer days on market; the rank a year earlier is the history's. */
+const HOT: BenchRow[] = [
+  { metric: "rdc_median_list_price", metro: "Washington DC", low: 565000, as_of: "2026-08-01", note: "Realtor.com inventory, Washington-Arlington-Alexandria, DC-VA-MD-WV metro area, August 2026. Data: Realtor.com." },
+  { metric: "rdc_hotness_rank", metro: "Washington DC", low: 154, as_of: "2026-08-01", note: "Realtor.com hotness rank of the 300 largest metros, Washington-Arlington-Alexandria, DC-VA-MD-WV metro area, August 2026. Data: Realtor.com." },
+  { metric: "rdc_hotness_rank_prior", metro: "Washington DC", low: 142, as_of: "2025-08-01", note: null },
+  { metric: "rdc_views_per_listing_vs_us", metro: "Washington DC", low: 0.649, as_of: "2026-08-01", note: null },
+  { metric: "rdc_days_on_market_vs_us", metro: "Washington DC", low: -17, as_of: "2026-08-01", note: null },
+];
+
+describe("a metro's hotness rank, and which way it moved", () => {
+  it("reads the rank, the year-ago rank and the two parts, and subtracts the move itself", () => {
+    const h = hotnessFor(HOT, "Washington DC")!;
+    expect(h.rank).toBe(154);
+    expect(h.priorRank).toBe(142);
+    // 142 → 154 is twelve places DOWN the ranking: cooler.
+    expect(h.move).toEqual({ places: -12, direction: "cooler" });
+    expect(h.viewsVsUs).toBe(0.649);
+    expect(h.domVsUsDays).toBe(-17);
+    expect(h.asOf).toBe("2026-08-01");
+    expect(realtorFor(HOT, "Washington DC")?.hotness?.rank).toBe(154);
+  });
+
+  it("a smaller rank is hotter, which is the easy thing to get backwards", () => {
+    expect(hotnessMove(120, 142)).toEqual({ places: 22, direction: "hotter" });
+    expect(hotnessMove(142, 142)).toEqual({ places: 0, direction: "unchanged" });
+    expect(hotnessMove(154, null)).toBeNull();
+    expect(hotnessMove(null, 142)).toBeNull();
+  });
+
+  it("answers null with no rank, and only what the pull had otherwise", () => {
+    expect(hotnessFor(HOT.filter((x) => x.metric !== "rdc_hotness_rank"), "Washington DC")).toBeNull();
+    expect(hotnessFor(HOT.map((x) => (x.metric === "rdc_hotness_rank" ? { ...x, low: HOTNESS_METROS + 1 } : x)), "Washington DC")).toBeNull();
+    expect(hotnessFor(HOT.map((x) => (x.metric === "rdc_hotness_rank" ? { ...x, as_of: null } : x)), "Washington DC")).toBeNull();
+    const rankOnly = hotnessFor(HOT.filter((x) => x.metric === "rdc_hotness_rank"), "Washington DC")!;
+    expect(rankOnly.priorRank).toBeNull();
+    expect(rankOnly.move).toBeNull();
+    expect(rankOnly.viewsVsUs).toBeNull();
+    expect(rankOnly.domVsUsDays).toBeNull();
+    // The for-sale read still stands without a rank.
+    expect(realtorFor(HOT.slice(0, 1), "Washington DC")?.hotness).toBeNull();
   });
 });

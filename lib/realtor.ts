@@ -42,7 +42,45 @@ export interface RealtorRead {
   shared: boolean;
   /** What the two flow figures say together, where both have a change. */
   direction: "loosening" | "tightening" | "mixed" | null;
+  /** Realtor.com's hotness — the rank among the 300 largest metros and what
+   *  it is made of — where the pull had a row for the metro. */
+  hotness: HotnessRead | null;
 }
+
+/**
+ * THE HOTNESS RANK IS THE COUNTRY'S FOR-SALE MARKETS SET AGAINST EACH
+ * OTHER: Realtor.com ranks the 300 largest metros each month by how many
+ * buyers look at each listing (demand) and how fast homes sell (supply),
+ * each measured against the U.S. A hot market is one where buyers
+ * compete for homes, and the ones who lose out keep renting — which is
+ * the demand side an apartment underwrite is quietly assuming, said as a
+ * place in a ranking rather than as a level.
+ *
+ * Two rules. THE MOVE IS TWO PRINTED RANKS SUBTRACTED, never a sign read
+ * off a column: the pull stores the rank and the rank the same month a
+ * year earlier, and `hotnessMove` says which way that is — a smaller
+ * number is hotter, which is the easy thing to get backwards. And THE
+ * COMPONENTS ARE STATED IN PLAIN UNITS against the U.S. — views per
+ * listing as a ratio, days on market as days — because a composite score
+ * out of 100 says nothing the rank and its parts do not.
+ */
+export interface HotnessRead {
+  /** 1 is the hottest of the 300. */
+  rank: number;
+  /** The rank the same month a year earlier, or null where the pull had none. */
+  priorRank: number | null;
+  /** Places moved on the year: positive is hotter (a smaller rank). */
+  move: { places: number; direction: "hotter" | "cooler" | "unchanged" } | null;
+  /** Listing views per property as a ratio to the U.S. (0.65 is 35% under). */
+  viewsVsUs: number | null;
+  /** Median days on market against the U.S., in days: negative sells faster. */
+  domVsUsDays: number | null;
+  /** The month the rank is for. */
+  asOf: string;
+}
+
+/** How many metros the hotness file ranks — a covered metro outside them has no rank. */
+export const HOTNESS_METROS = 300;
 
 /** Realtor.com's condition for using the data: say where it came from. */
 export const REALTOR_CREDIT = "Data: Realtor.com";
@@ -56,11 +94,42 @@ export const REALTOR_METRICS = [
   "rdc_active_listings_yoy",
   "rdc_days_on_market",
   "rdc_days_on_market_yoy",
+  "rdc_hotness_rank",
+  "rdc_hotness_rank_prior",
+  "rdc_views_per_listing_vs_us",
+  "rdc_days_on_market_vs_us",
 ] as const;
 
 function figure(rows: readonly BenchRow[], metroName: string, metric: string): number | null {
   const r = rows.find((x) => x.metro === metroName && x.metric === metric);
   return r && typeof r.low === "number" && Number.isFinite(r.low) ? r.low : null;
+}
+
+/** The move between two ranks, said the right way round: a rank that
+ *  fell from 142 to 154 is 12 places COOLER. Null without both. */
+export function hotnessMove(rank: number | null, priorRank: number | null): HotnessRead["move"] {
+  if (rank === null || priorRank === null) return null;
+  const places = priorRank - rank;
+  return { places, direction: places > 0 ? "hotter" : places < 0 ? "cooler" : "unchanged" };
+}
+
+/** A metro's hotness, or null where the pull wrote no rank for it. */
+export function hotnessFor(rows: readonly BenchRow[], metroName: string): HotnessRead | null {
+  const rankRow = rows.find((r) => r.metro === metroName && r.metric === "rdc_hotness_rank");
+  const rank = rankRow && typeof rankRow.low === "number" ? Math.round(rankRow.low) : NaN;
+  if (!rankRow || !Number.isFinite(rank) || rank < 1 || rank > HOTNESS_METROS || !rankRow.as_of) return null;
+  const priorRaw = figure(rows, metroName, "rdc_hotness_rank_prior");
+  const priorRank = priorRaw !== null && priorRaw >= 1 && priorRaw <= HOTNESS_METROS ? Math.round(priorRaw) : null;
+  const views = figure(rows, metroName, "rdc_views_per_listing_vs_us");
+  const dom = figure(rows, metroName, "rdc_days_on_market_vs_us");
+  return {
+    rank,
+    priorRank,
+    move: hotnessMove(rank, priorRank),
+    viewsVsUs: views !== null && views > 0 ? views : null,
+    domVsUsDays: dom !== null ? Math.round(dom) : null,
+    asOf: rankRow.as_of,
+  };
 }
 
 /**
@@ -98,5 +167,6 @@ export function realtorFor(rows: readonly BenchRow[], metroName: string): Realto
     note: price.note ?? "",
     shared: /shared with the MSA/i.test(price.note ?? ""),
     direction: marketDirection(listingsYoy, domYoy),
+    hotness: hotnessFor(rows, metroName),
   };
 }

@@ -29,6 +29,60 @@ if (urls.length === 0) {
 const HEADER_CLIP = Number(process.env.PROBE_CLIP ?? "2000");
 const ROW_CLIP = Math.min(HEADER_CLIP, 600);
 const clip = (s, n = ROW_CLIP) => (s.length > n ? `${s.slice(0, n)}…` : s);
+// How many of a sheet's leading rows to print: a Census table carries a
+// title block and a two-row header before its first place, so a dozen
+// shows the shape; overridable for a deeper look.
+const SHEET_ROWS = Number(process.env.PROBE_SHEET_ROWS ?? "12");
+
+/** A cell as the row line prints it: a date as ISO, a formula by its
+ *  result, a rich-text run by its text, a blank as nothing. */
+function cellText(v) {
+  if (v == null) return "";
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (typeof v === "object") {
+    if ("result" in v) return cellText(v.result);
+    if ("richText" in v) return v.richText.map((r) => r.text).join("");
+    if ("text" in v) return String(v.text);
+    if ("error" in v) return String(v.error);
+    return JSON.stringify(v);
+  }
+  return String(v);
+}
+
+/** Every sheet of a workbook, described: its name, its dimensions, its
+ *  first rows (cells joined by " | "), and the rows that name a place. */
+async function describeWorkbook(buf, match) {
+  let ExcelJS;
+  try {
+    ExcelJS = (await import("exceljs")).default;
+  } catch {
+    console.log("  exceljs is not installed here — cannot open the workbook");
+    return;
+  }
+  const wb = new ExcelJS.Workbook();
+  try {
+    await wb.xlsx.load(buf);
+  } catch (err) {
+    console.log(`  not a workbook exceljs can open — ${err instanceof Error ? err.message : String(err)}`);
+    return;
+  }
+  for (const ws of wb.worksheets) {
+    const rows = [];
+    ws.eachRow({ includeEmpty: false }, (row, n) => {
+      const cells = [];
+      row.eachCell({ includeEmpty: true }, (cell) => cells.push(cellText(cell.value).trim()));
+      rows.push({ n, line: cells.join(" | ").replace(/(?: \| )+$/, "") });
+    });
+    console.log(`  sheet "${ws.name}": ${rows.length} non-empty rows · ${ws.columnCount} columns`);
+    for (const r of rows.slice(0, SHEET_ROWS)) console.log(`    ${r.n}: ${clip(r.line)}`);
+    if (rows.length > SHEET_ROWS) console.log(`    … last: ${rows[rows.length - 1].n}: ${clip(rows[rows.length - 1].line)}`);
+    for (const m of match) {
+      const hits = rows.filter((r) => r.line.includes(m));
+      console.log(`    rows containing "${m}": ${hits.length}`);
+      for (const h of hits.slice(0, 3)) console.log(`      ${h.n}: ${clip(h.line)}`);
+    }
+  }
+}
 
 for (const url of urls) {
   console.log(`\nPROBE ${url}`);
@@ -47,6 +101,16 @@ for (const url of urls) {
   const length = res.headers.get("content-length");
   console.log(`  HTTP ${res.status}${res.redirected ? ` (redirected to ${res.url})` : ""} · ${type}${length ? ` · ${Math.round(Number(length) / 1024)} KB declared` : ""}`);
   if (!res.ok) continue;
+  // A workbook is a zip, and reading it as text prints noise: open it with
+  // exceljs instead and print each sheet's name, its row count, its first
+  // rows and the rows that name a place — the Census Bureau publishes its
+  // Housing Vacancy Survey tables as .xlsx and nothing else.
+  if (/spreadsheetml|officedocument|\.xlsx(?:\?|$)/i.test(`${type} ${url}`)) {
+    const buf = Buffer.from(await res.arrayBuffer());
+    console.log(`  ${Math.round(buf.length / 1024)} KB · a workbook`);
+    await describeWorkbook(buf, match);
+    continue;
+  }
   const text = await res.text();
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
   console.log(`  ${Math.round(text.length / 1024)} KB · ${lines.length} non-empty lines`);

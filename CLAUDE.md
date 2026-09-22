@@ -668,6 +668,28 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   and Apartment List's not to be — its download is gated and its static
   host does not resolve — so that feed was dropped rather than guessed
   at. Realtor.com's condition for use is attribution (`REALTOR_CREDIT`).
+  **The same pull reads Realtor.com's hotness file** (#377 — the metro
+  HISTORY file, every month back to 2017 for the 300 largest metros,
+  8.6 MB, probed by run 35793378647): the rank among the 300 is stored
+  (`rdc_hotness_rank`), and beside it the rank THE SAME MONTH A YEAR
+  EARLIER read out of the history (`rdc_hotness_rank_prior`), so the move
+  on the year is `hotnessMove`'s subtraction of two printed figures and
+  never a sign inferred from the file's `_yy` column — the dry run prints
+  whether that column agrees. A smaller rank is hotter, which is the
+  easy thing to get backwards, and the test pins it. The two components
+  are stored in plain units against the U.S. — listing views per
+  property as a ratio (`rdc_views_per_listing_vs_us`), days on market as
+  days (`rdc_days_on_market_vs_us`, negative sells faster) — and the
+  composite score is not, because the mean of two percentile ranks says
+  nothing the rank and its parts do not. `HotnessRow` in the for-sale
+  line prints "Hotness #154 of 300 metros · 12 places cooler than a year
+  ago · listing views per property 35% under the U.S. · sells 17 days
+  faster than the U.S.", each phrase one JS string. A file that fails is
+  a loud line and the inventory rows still write. The probe script
+  (`scripts/probe-url.mjs`) also describes a WORKBOOK now — each sheet's
+  name, its first rows and the rows naming a place, through exceljs —
+  because the Census Bureau publishes its Housing Vacancy Survey tables
+  as .xlsx and nothing else, and reading one as text printed noise.
   **A dry run never upserts, so it cannot see the table refuse a row**:
   the first real pull (run 35785192214) failed on `benchmarks_unit_check`
   — migration 0023 admits `usd`, `pct`, `ratio`, `months`, `count` and
