@@ -348,8 +348,12 @@
       ],
       "candidates": [
         {
+          "file": "LA Skyline Mountains2.jpg",
+          "note": "Downtown against the snow-capped San Gabriels, 2816x1880 — Nserrano, CC BY-SA 3.0. The chosen file, in lib/skyline.ts."
+        },
+        {
           "file": "Skyline of Los Angeles, Downtown Los Angeles, California 13.jpg",
-          "note": "Downtown Los Angeles — Levi Clancy"
+          "note": "Downtown Los Angeles, a tight cluster of towers, 6016x3862 — Levi Clancy. The previous choice."
         }
       ]
     },
@@ -466,12 +470,20 @@
       ],
       "queries": [
         "Dallas skyline Reunion Tower",
-        "Dallas Texas downtown skyline"
+        "Dallas Texas downtown skyline",
+        "Dallas skyline from Reunion Tower jpg",
+        "Dallas skyline Margaret Hunt Hill Bridge",
+        "Dallas skyline Trinity River sunset",
+        "Dallas skyline Klyde Warren Park"
       ],
       "candidates": [
         {
           "file": "IMAG2591-dallas-downtown.jpg",
-          "note": "Downtown Dallas — alfred twu"
+          "note": "Downtown Dallas from a plane window, hazy, 2460x1276 — alfred twu, CC0. The current choice, kept for want of a JPEG alternative."
+        },
+        {
+          "file": "Dallas Texas skyline from Reunion Tower September 2025 (cropped).png",
+          "note": "The better picture — downtown from Reunion Tower, 6002x3058, IcedCowboyCoffee, CC0 — but a PNG, and a PNG photograph at 1600px is megabytes. Not served; here so the probe reports what it would weigh."
         }
       ]
     }

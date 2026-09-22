@@ -178,12 +178,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
   },
+  // Third sheet (skyline-sheet run 35661336976): the 6000px file it
+  // replaces was a tight cluster of downtown towers under a blue sky —
+  // sharp, and it could have been any city. This is the picture Los
+  // Angeles is known by: downtown against the snow on the San Gabriels.
   los_angeles: {
-    file: "Skyline of Los Angeles, Downtown Los Angeles, California 13.jpg",
-    place: "Downtown Los Angeles",
-    credit: "Levi Clancy",
-    license: "CC BY-SA 4.0",
-    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    file: "LA Skyline Mountains2.jpg",
+    place: "Downtown Los Angeles against the San Gabriel Mountains",
+    credit: "Nserrano",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
   },
   san_francisco: {
     file: "SF From Marin Highlands3.jpg",
