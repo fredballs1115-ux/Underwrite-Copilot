@@ -23,7 +23,12 @@ if (urls.length === 0) {
   process.exit(1);
 }
 
-const clip = (s, n = 300) => (s.length > n ? `${s.slice(0, n)}…` : s);
+// A wide CSV's header is the thing being asked for, so it is clipped long;
+// a row is clipped shorter, since its shape is what matters. Both are
+// overridable when a file is wider still.
+const HEADER_CLIP = Number(process.env.PROBE_CLIP ?? "2000");
+const ROW_CLIP = Math.min(HEADER_CLIP, 600);
+const clip = (s, n = ROW_CLIP) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
 for (const url of urls) {
   console.log(`\nPROBE ${url}`);
@@ -56,7 +61,7 @@ for (const url of urls) {
     for (const l of unique.slice(0, 25)) console.log(`    ${clip(l, 200)}`);
     continue;
   }
-  console.log(`  header: ${clip(lines[0])}`);
+  console.log(`  header: ${clip(lines[0], HEADER_CLIP)}`);
   if (lines.length > 1) console.log(`  first row: ${clip(lines[1])}`);
   if (lines.length > 2) console.log(`  last row: ${clip(lines[lines.length - 1])}`);
   for (const m of match) {
