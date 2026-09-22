@@ -40,6 +40,9 @@ on:
 jobs:
   rates:
     runs-on: ubuntu-latest
+    # A FRED rate-limit stall costs 20 s a series; a run past this is a hang,
+    # not a pull, and the next weekday's run is the retry.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

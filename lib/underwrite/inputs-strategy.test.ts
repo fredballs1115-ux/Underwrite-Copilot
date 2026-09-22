@@ -327,3 +327,47 @@ describe("the seventh review's derivation cases", () => {
     expect(stabilizedOnly.sources.vacancyPct?.provenance).toBe("assumption");
   });
 });
+
+describe("the area a deal states none of", () => {
+  it("runs a counted building on units × the class's typical size, and says so", () => {
+    const m = deriveUnderwriteInputs(
+      ex([metric("Asking price", "$42,000,000"), metric("NOI (in-place)", "$2,500,000"), metric("Units", "248")], {
+        assetClass: "multifamily",
+      }),
+      "fallback",
+    );
+    expect(m.meta.units).toBe(248);
+    expect(m.meta.rsf).toBe(248 * 850);
+    expect(m.sources.rsf?.provenance).toBe("assumption");
+    expect(m.sources.rsf?.note).toBe("248 units × 850 SF typical — enter the rentable SF");
+  });
+
+  it("speaks a hotel's count in keys", () => {
+    const m = deriveUnderwriteInputs(
+      ex([metric("Asking price", "$24,000,000"), metric("NOI (in-place)", "$2,000,000"), metric("Keys", "120")], {
+        assetClass: "hospitality_str",
+      }),
+      "fallback",
+    );
+    expect(m.meta.rsf).toBe(120 * 550);
+    expect(m.sources.rsf?.note).toBe("120 keys × 550 SF typical — enter the rentable SF");
+  });
+
+  it("falls to the placeholder only with no count at all, and a stated area still wins", () => {
+    const none = deriveUnderwriteInputs(
+      ex([metric("Asking price", "$30,000,000"), metric("NOI (in-place)", "$1,800,000")], { assetClass: "office" }),
+      "fallback",
+    );
+    expect(none.meta.rsf).toBe(100_000);
+    expect(none.sources.rsf?.note).toBe("Enter rentable SF");
+    const stated = deriveUnderwriteInputs(
+      ex(
+        [metric("Asking price", "$42,000,000"), metric("NOI (in-place)", "$2,500,000"), metric("Units", "248"), metric("Total SF", "220,000 SF")],
+        { assetClass: "multifamily" },
+      ),
+      "fallback",
+    );
+    expect(stated.meta.rsf).toBe(220_000);
+    expect(stated.sources.rsf?.provenance).toBe("extracted");
+  });
+});

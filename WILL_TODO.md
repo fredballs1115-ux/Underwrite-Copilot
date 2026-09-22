@@ -105,11 +105,12 @@ Then #372, the rest of it: the buy box offers every class and checks
 Key", the comps captions carry the noun, each new class asks its own
 facts, and a hotel development renders on the shared screen in the
 tests ("Basis per key (all-in)", "Land cost").
-**Mine, next** — the model's 100,000 SF placeholder for a deal that
-states no area (marked an assumption, still a made-up figure — a
-unit-basis class with a count should reserve per unit instead) and the
-buy box's square-feet-only size band; then more inputs where a free,
-attributable source exists: FRED's regional rental vacancy (the Census HVS, quarterly,
+Then #373: the model's area when the OM states none — a counted
+building runs on units × the class's typical size, said as the
+assumption it is ("248 units × 850 SF typical"), and only a deal with
+no count at all falls to the flat placeholder.
+**Mine, next** — the buy box's square-feet-only size band; then more
+inputs where a free, attributable source exists: FRED's regional rental vacancy (the Census HVS, quarterly,
 Northeast / South / Midwest / West — borrowed and named, since no metro
 series exists), the Census HVS's own MSA rental vacancy table (an xlsx
 a quarter), and the Realtor.com "hotness" file the probe listed beside
