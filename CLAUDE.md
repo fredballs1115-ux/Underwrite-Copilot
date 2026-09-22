@@ -218,13 +218,35 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   `headerSafe` in `lib/skyline.ts` percent-encodes what a header cannot
   carry, and `lib/skyline.test.ts` puts every market's credit through a
   real `Headers`.
-  PG County and Montgomery County
-  are deliberately absent: a suburban submarket has no skyline, and the
-  overhead is the more honest picture of a place shaped by its land. **NoVA
-  is the exception** (added 2026-09-16, from the runner's own search):
-  Rosslyn is a real high-rise cluster, zoned tall because it stands across
-  the Potomac from a height-limited Washington, so there is a skyline to
-  photograph and an aerial was answering a question nobody asked.
+  Montgomery County
+  is deliberately absent: a suburban submarket has no skyline, and the
+  overhead is the more honest picture of a place shaped by its land — the
+  one search run for it so far surfaced a high-altitude aerial of Bethesda
+  and a category of berries and blue jays. **NoVA and PG County are the
+  exceptions**: Rosslyn is a real high-rise cluster, zoned tall because it
+  stands across the Potomac from a height-limited Washington (added
+  2026-09-16), and National Harbor's Capital Wheel on the river is the
+  picture Prince George's County is actually known by (added 2026-09-21).
+  The rule is the photograph a place is known by, not a skyline for its
+  own sake. **A photograph is chosen BY EYE, from a contact sheet**
+  (2026-09-21): the probe's search prints a file's name, author and size,
+  and none of that says whether it is any good, so
+  `scripts/probe-skylines.mjs --search --thumbs=<dir>` saves 640px copies
+  of every usable candidate (the market's current choice first, for
+  comparison) with `index.json` and a README naming each file's author
+  and licence, and `skyline-sheet.yml` pushes that directory to its own
+  branch, `skyline-sheet` — force-pushed each run, never merged — which
+  the sandbox CAN fetch (`git fetch origin skyline-sheet`, `git archive`
+  into the scratchpad) and look at with the Read tool. Six markets at a
+  time keeps a run inside the search's budget. What the first sheet
+  changed: Washington's overhead of the Mall became the Lincoln Memorial
+  from Arlington at ground level, Richmond's 1600px file became a
+  5424px one, and PG County got the wheel; Baltimore's harbour panorama
+  and Rosslyn from Georgetown were kept over their alternatives (a sunset
+  drone shot of Fell's Point, an oblique aerial of Rosslyn's towers —
+  handsome, and aerials). The second sheet showed that Norfolk's file
+  was a street corner at dusk — a hotel and a garage — and swapped it for
+  the same photographer's daytime waterfront from the Elizabeth River.
 - Deal math without a deal: `lib/tools/deal-math.ts` (pure — the cap rate
   triangle, the mortgage constant, `sizeLoan` against whichever of LTV /
   DSCR / debt yield were set with the **binding one named**, break-even

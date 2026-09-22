@@ -51,20 +51,45 @@ export interface SkylineShot {
  * with a name attached, which is why this is the one table in the codebase
  * that may never be edited from the sandbox alone.
  *
- * WHAT IS NOT HERE, and why. Prince George's County, Montgomery County and
- * Northern Virginia have no entry: they are suburban submarkets, and a
- * submarket does not have a skyline the way a city does. The overhead frame
- * is the more honest picture of a place whose shape is the shape of its
- * land, so those three keep it rather than being given a photograph of some
- * arbitrary building that happens to stand there.
+ * WHAT IS NOT HERE, and why. Montgomery County has no entry: it is a
+ * suburban submarket, and a submarket does not have a skyline the way a
+ * city does — the overhead frame is the more honest picture of a place
+ * whose shape is the shape of its land, and the one search that has been
+ * run for it turned up a high-altitude aerial of Bethesda and a category
+ * full of berries and blue jays. Prince George's County and Northern
+ * Virginia were once left out on the same reasoning and each turned out to
+ * have a picture it is actually known by: Rosslyn's towers across the
+ * Potomac, and National Harbor's wheel on the river. The rule is the
+ * photograph a place is known by, not a skyline for its own sake.
+ *
+ * HOW A PHOTOGRAPH IS CHOSEN NOW. The probe's search prints what a file is
+ * called, who took it and how big it is, and none of that says whether it
+ * is any good. `skyline-sheet.yml` runs the same search from the runner
+ * with 640px copies saved and pushes them to their own branch, which the
+ * sandbox CAN fetch and look at — so a picture is chosen by eye, and still
+ * credited from what Commons returned, never from memory.
  */
 export const SKYLINES: Record<string, SkylineShot> = {
   // The Height Act means Washington's skyline is the Mall, not a wall of
   // towers — so this is the picture the city is actually known by.
+  // Chosen by eye from the contact sheet (skyline-sheet run 35660646197,
+  // 2026-09-21): the Lincoln Memorial and Memorial Bridge from Arlington,
+  // at ground level, in place of an overhead of the Mall — the overhead
+  // said where the city is; this says what it looks like.
   dc: {
-    file: "Aerial view National Mall 12 2014 DC 711.JPG",
-    place: "The National Mall, Washington",
-    credit: "Mariordo (Mario Roberto Durán Ortiz)",
+    file: "2011 - The View from Arlington National Cemetery (6103435717).jpg",
+    place: "The Lincoln Memorial and Memorial Bridge, seen from Arlington",
+    credit: "Arlington National Cemetery",
+    license: "Public domain",
+    licenseUrl: "",
+  },
+  // The one suburban market with a waterfront that IS its picture: National
+  // Harbor's Capital Wheel at dusk, from the same sheet. Chosen over the
+  // 4:1 marina panorama, which fits the band better and says less.
+  pg_county: {
+    file: "Capital Wheel at National Harbor, Maryland, USA.jpg",
+    place: "The Capital Wheel at National Harbor, Prince George's County",
+    credit: "MamaGeek",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
   },
@@ -97,16 +122,22 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
   },
+  // From the same sheet: 5424px across against the 1600px file it replaces,
+  // the towers sharp against a clear sky rather than soft behind autumn
+  // trees. The old file stays a candidate so the probe keeps proving both.
   richmond: {
-    file: "Skyline of Richmond, Virginia.jpg",
-    place: "Richmond",
-    credit: "Jim",
-    license: "CC BY-SA 2.0",
-    licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0",
+    file: "A downtown view of Richmond, VA.jpg",
+    place: "Downtown Richmond",
+    credit: "Bruce Emmerling",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
   },
+  // Second sheet (skyline-sheet run 2, 2026-09-21): the file it replaces was
+  // a street corner at dusk — a hotel and a garage — and this is the
+  // waterfront the city is known by, from the same photographer.
   norfolk_hampton_roads: {
-    file: "Downtown Norfolk at Dusk.jpg",
-    place: "Downtown Norfolk",
+    file: "Downtown Norfolk during the day.jpg",
+    place: "Downtown Norfolk from the Elizabeth River",
     credit: "Bruce Emmerling",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
