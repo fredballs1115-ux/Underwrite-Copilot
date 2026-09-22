@@ -130,10 +130,11 @@ export function basisScale(
   };
 }
 
-/** "$274k/unit" or "$410/SF" — the caption a bar's tooltip uses. */
-export function fmtBasis(value: number, unit: "unit" | "sf"): string {
+/** "$274k/unit", "$410/SF" or, given the class's noun, "$274k/key" — the
+ *  caption a bar's tooltip uses. */
+export function fmtBasis(value: number, unit: "unit" | "sf", noun = "unit"): string {
   if (unit === "sf") return `$${Math.round(value).toLocaleString("en-US")}/SF`;
   return value >= 1_000_000
-    ? `$${(value / 1_000_000).toFixed(2).replace(/\.?0+$/, "")}M/unit`
-    : `$${Math.round(value / 1_000).toLocaleString("en-US")}k/unit`;
+    ? `$${(value / 1_000_000).toFixed(2).replace(/\.?0+$/, "")}M/${noun}`
+    : `$${Math.round(value / 1_000).toLocaleString("en-US")}k/${noun}`;
 }

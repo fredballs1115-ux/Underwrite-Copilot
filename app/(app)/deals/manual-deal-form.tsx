@@ -10,6 +10,7 @@ import {
 import { AddressAutocomplete } from "../address-autocomplete";
 import type { StructuredAddress } from "@/lib/address";
 import { ASSET_CLASS_OPTIONS } from "@/lib/asset-class";
+import { assetWords } from "@/lib/asset-words";
 import { NOTES_MAX, type ManualDealFacts } from "@/lib/manual-deal";
 
 /**
@@ -40,6 +41,10 @@ export function ManualDealForm({
       ? initial.assetClass
       : "multifamily",
   );
+  // The form's labels follow the class picked (lib/asset-words): a hotel is
+  // asked for its keys and its rent per key, a park for its pads.
+  const words = assetWords(assetClass);
+  const nounOne = words.noun?.one ?? "unit";
   const [price, setPrice] = useState(fmtNum(initial?.price));
   const [cap, setCap] = useState(fmtPlain(initial?.capPct));
   const [noi, setNoi] = useState(fmtNum(initial?.noiAnnual));
@@ -150,14 +155,14 @@ export function ManualDealForm({
             className={field}
           />
         </Labeled>
-        <Labeled label="Units">
+        <Labeled label={words.noun ? words.countLabel : "Units"}>
           <input
             name="units"
             value={units}
             onChange={(e) => setUnits(e.target.value)}
             inputMode="numeric"
             placeholder="4"
-            aria-label="Unit count"
+            aria-label={`${nounOne.charAt(0).toUpperCase()}${nounOne.slice(1)} count`}
             className={field}
           />
         </Labeled>
@@ -194,14 +199,14 @@ export function ManualDealForm({
             className={field}
           />
         </Labeled>
-        <Labeled label="Avg rent ($/unit/mo)">
+        <Labeled label={`Avg rent ($/${nounOne}/mo)`}>
           <input
             name="avgRent"
             value={avgRent}
             onChange={(e) => setAvgRent(e.target.value)}
             inputMode="decimal"
             placeholder="1,450"
-            aria-label="Average in-place rent per unit per month"
+            aria-label={`Average in-place rent per ${nounOne} per month`}
             className={field}
           />
         </Labeled>

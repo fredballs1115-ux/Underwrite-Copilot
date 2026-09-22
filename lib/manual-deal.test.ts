@@ -252,3 +252,37 @@ describe("pipeline artifacts", () => {
     expect(stub.summary).toMatch(/entered by hand/i);
   });
 });
+
+describe("buildManualExtraction — the class's own noun (lib/asset-words)", () => {
+  it("a hotel typed in by hand counts keys and prices per key, in labels the readers know", () => {
+    const { metrics } = buildManualExtraction({
+      ...QUAD,
+      name: "The Harbor Inn",
+      assetClass: "hospitality_str",
+      price: 24_000_000,
+      units: 120,
+      sf: null,
+      avgRentMo: null,
+    });
+    expect(metrics.find((x) => x.label === "Keys")?.value).toBe("120 keys");
+    expect(metrics.some((x) => x.label === "Units")).toBe(false);
+    expect(findMetric(metrics, METRIC_FIND.perUnit.inc)?.value).toBe("$200,000/key");
+  });
+
+  it("a park counts pads and quotes its rent per pad", () => {
+    const { metrics } = buildManualExtraction({
+      ...QUAD,
+      assetClass: "manufactured_housing",
+      price: 9_000_000,
+      units: 150,
+      avgRentMo: 550,
+    });
+    expect(metrics.find((x) => x.label === "Pads")?.value).toBe("150 pads");
+    expect(metrics.find((x) => x.label === "Average in-place rent")?.value).toBe("$550/pad/mo");
+  });
+
+  it("an office keeps its units row as units — the class has no noun of its own", () => {
+    const { metrics } = buildManualExtraction({ ...QUAD, assetClass: "office", units: 12 });
+    expect(metrics.find((x) => x.label === "Units")?.value).toBe("12 units");
+  });
+});

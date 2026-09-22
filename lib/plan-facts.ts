@@ -16,7 +16,7 @@ export const moneyCompact = (n: number): string =>
  * for a figure the OM should have carried and "—" for one that is only
  * derived from others; never zero.
  */
-export function planFacts(plan: PlanSummary): [string, string][] {
+export function planFacts(plan: PlanSummary, noun = "unit"): [string, string][] {
   return [
     [
       "Stabilized NOI",
@@ -39,9 +39,10 @@ export function planFacts(plan: PlanSummary): [string, string][] {
       plan.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : "—",
     ],
     // The basis a comp is held against on a plan deal — what a finished
-    // unit costs all-in. Only when the OM states the planned unit count.
+    // unit costs all-in, in the class's own noun (a hotel's per key). Only
+    // when the OM states the planned count.
     ...(plan.costPerUnit != null
-      ? [["Basis per unit (all-in)", moneyCompact(plan.costPerUnit)] as [string, string]]
+      ? [[`Basis per ${noun} (all-in)`, moneyCompact(plan.costPerUnit)] as [string, string]]
       : []),
   ];
 }

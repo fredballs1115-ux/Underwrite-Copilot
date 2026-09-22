@@ -220,12 +220,51 @@ describe("the market check names the shape of its figures", () => {
 });
 
 describe("sector-aware challenger traps", () => {
-  it("keeps the base four traps for every asset class", () => {
-    for (const cls of ["multifamily", "office", "industrial", "retail", "auto"] as const) {
+  it("keeps the two traps every property type shares, for every asset class", () => {
+    for (const cls of [
+      "multifamily",
+      "office",
+      "industrial",
+      "retail",
+      "hospitality_str",
+      "self_storage",
+      "land_infill",
+      "auto",
+    ] as const) {
       const p = challengerInstruction(cls);
       expect(p, cls).toContain("taxes NOT reset to the sale price");
-      expect(p, cls).toContain("loss-to-lease");
       expect(p, cls).toContain("legacy premium");
+    }
+  });
+
+  it("names the class as a page does, in its own noun and basis — never a stored key", () => {
+    const hotel = challengerInstruction("hospitality_str");
+    expect(hotel).toContain(
+      "The asset class is Hospitality / STR: it is counted in keys and priced per key, and its income is quoted as ADR",
+    );
+    expect(hotel).not.toContain("hospitality_str");
+    expect(challengerInstruction("land_infill")).toContain(
+      "it is counted in acres and priced per acre, and it has no operating income",
+    );
+    expect(challengerInstruction("office")).toContain("it is measured in square feet and priced per SF");
+    expect(challengerInstruction("self_storage")).toContain("counted in units and priced per unit and per SF");
+  });
+
+  it("grills the multifamily traps only where the class is rental housing", () => {
+    for (const cls of ["multifamily", "mixed_use", "student_housing"] as const) {
+      expect(challengerInstruction(cls), cls).toContain("loss-to-lease");
+    }
+    for (const cls of [
+      "office",
+      "industrial",
+      "retail",
+      "hospitality_str",
+      "self_storage",
+      "land_infill",
+      "net_lease",
+      "senior_housing",
+    ] as const) {
+      expect(challengerInstruction(cls), cls).not.toContain("loss-to-lease");
     }
   });
 
@@ -249,19 +288,52 @@ describe("sector-aware challenger traps", () => {
     expect(p).toContain("OCCUPANCY-COST RATIO");
   });
 
-  it("multifamily stays exactly the base grill — no sector suffix", () => {
+  it("multifamily carries its own list and no other sector's", () => {
     const p = challengerInstruction("multifamily");
+    expect(p).toContain("MULTIFAMILY TRAPS");
     expect(p).not.toContain("WALT");
     expect(p).not.toContain("clear height");
     expect(p).not.toContain("co-tenancy");
+    expect(p).not.toContain("REVPAR");
   });
 
-  it("auto carries all three sector lists, gated on detection", () => {
+  it("every other class has its own list, by name", () => {
+    expect(challengerInstruction("hospitality_str")).toContain("REVPAR IS TWO LEVERS");
+    expect(challengerInstruction("self_storage")).toContain("STREET RATE VS IN-PLACE");
+    expect(challengerInstruction("manufactured_housing")).toContain("PAD RENT VS HOME RENT");
+    expect(challengerInstruction("sfr_btr")).toContain("PER-HOME EXPENSES");
+    expect(challengerInstruction("student_housing")).toContain("PRE-LEASING");
+    expect(challengerInstruction("senior_housing")).toContain("THE CARE MARGIN");
+    // A medical office is an office with an overlay; a mixed-use building
+    // is apartments AND retail.
+    expect(challengerInstruction("medical_office")).toContain("HEALTH-SYSTEM AFFILIATION");
+    expect(challengerInstruction("medical_office")).toContain("WALT");
+    expect(challengerInstruction("mixed_use")).toContain("TWO CAP RATES");
+    expect(challengerInstruction("mixed_use")).toContain("co-tenancy");
+    expect(challengerInstruction("net_lease")).toContain("DARK VALUE");
+    expect(challengerInstruction("data_center")).toContain("POWER");
+    expect(challengerInstruction("parking")).toContain("OPERATOR AGREEMENT");
+    expect(challengerInstruction("land_infill")).toContain("RESIDUAL VALUE");
+  });
+
+  it("auto carries every class's list once, gated on what the document turns out to be", () => {
     const p = challengerInstruction("auto");
-    expect(p).toContain("If the document turns out to be office, industrial, or retail");
-    expect(p).toContain("OFFICE-SPECIFIC TRAPS");
-    expect(p).toContain("INDUSTRIAL-SPECIFIC TRAPS");
-    expect(p).toContain("RETAIL-SPECIFIC TRAPS");
+    expect(p).toContain("whichever asset class the document turns out to be");
+    for (const name of [
+      "MULTIFAMILY TRAPS",
+      "OFFICE-SPECIFIC TRAPS",
+      "INDUSTRIAL-SPECIFIC TRAPS",
+      "RETAIL-SPECIFIC TRAPS",
+      "HOTEL-SPECIFIC TRAPS",
+      "SELF-STORAGE TRAPS",
+      "MANUFACTURED-HOUSING TRAPS",
+      "NET-LEASE TRAPS",
+      "LAND TRAPS",
+    ]) {
+      expect(p).toContain(name);
+      // Once each, however many classes share a list.
+      expect(p.split(name).length - 1, name).toBe(1);
+    }
   });
 });
 

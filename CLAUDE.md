@@ -153,9 +153,63 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   re-read as pages, and the checkpoint payload's `omPages` makes a resumed
   attempt read the pages from the start.
 - An asset class's words: `lib/asset-class.ts` (`ASSET_CLASS_LABEL`,
-  `assetClassLabel`, the forms' option list) — every surface that prints
-  one goes through it, so a stored `self_storage` never reaches a page
-  raw; the pipeline row's slots and its "Auto" rule are `lib/pipeline-slots.ts`.
+  `assetClassLabel`, the forms' option list — sixteen classes: the four
+  the app was born with, then net lease, medical office, mixed-use, SFR /
+  BTR, student housing, senior housing, manufactured housing,
+  self-storage, hospitality / STR, data center, parking and land) — every
+  surface that prints one goes through it, so a stored `self_storage`
+  never reaches a page raw; the pipeline row's slots and its "Auto" rule
+  are `lib/pipeline-slots.ts` (`shownAssetClass`: a deal filed
+  "Auto-detect" shows what the deck turned out to be). **What each class
+  is spoken in is `lib/asset-words.ts`** (pure): per class, what one is
+  called (`noun` — unit, key, pad, bed, home, space, acre; null for a
+  class measured by its area alone), the `basis` its price is quoted on
+  (unit / sf / acre) and its `basisLabel`, how its `income` is quoted
+  (rent / unit / mo, ADR, rent / SF / yr; null for land), the
+  `countLabel` the extraction is asked for ("Keys", "Pads", "Total SF",
+  "Acres"), whether it is `residential` (rental housing the rent-control,
+  TOPA and just-cause rules can reach — lodging, licensed care and
+  commercial are not), whether it is `operating` (land is not: no NOI, no
+  cap, no occupancy), the rent-roll `profile` family it leases like and
+  the research tables' `researchSector`. `assetClassKey` files a phrase
+  the model wrote ("boutique hotel", "NNN retail") by its words;
+  `countNoun` reads a count row's OWN noun ahead of the class's, because
+  the OM's word wins wherever the screen read one. The survey that
+  bought the table (2026-09-22) found the deal header printing
+  "Self_storage", a hotel's keys relabelled "units", a development's
+  land cost labelled "Price" beside a cap it should not have, the Excel
+  cover saying "auto", rent-control rules run against offices and
+  hotels, and the challenger grilling every class about loss-to-lease.
+  Every one of those reads the table now: the deal page's header and
+  Size / Price / Going-in-cap-or-Yield-on-cost slots, the memo and the
+  report, the workbook's cover and the model's per-class defaults
+  (`CLASS_DEFAULTS` in `lib/underwrite/inputs.ts`, every class), the
+  comp and market memories' basis (`/key`, `/pad`, per SF for storage,
+  none for land), the plausibility band (per-unit for a unit-basis
+  class, per-SF otherwise), the rules panel (`buildSubject`'s
+  `residential` — an office is commercial property to the regimes, and a
+  class nothing has read yet keeps their questions open), the rent-roll
+  profile default, the manual deal form's labels and metrics ("Keys",
+  "Price per key" — `METRIC_FIND.perUnit` reads key / pad / bed / home /
+  space / room), the plan's "Basis per key (all-in)" on the deal page,
+  the shared screen and the report, and the prompts: the class is named
+  as a page names it with its noun, basis and income, the extraction asks
+  for the count under the OM's own noun, the verdict's ranges are asked
+  for in the class's terms, and the challenger keeps the two traps every
+  property shares (the tax reset, the legacy insurance premium) and
+  appends each class's OWN list — RevPAR's two levers and the fee stack
+  on a hotel, street rate against in-place on storage, pad rent against
+  home rent on a park, the entitlement odds and the carry on land, dark
+  value on a net lease — with "auto" carrying every list once, gated on
+  what the deck turns out to be. `lib/asset-words.test.ts` holds the
+  table to the label map's keys and every class to a noun, a basis and a
+  rules verdict; the manual-deal and internal-comps tests pin a hotel's
+  "$200k/key" and a park's "$60k/pad". **Not yet on the table**: the buy
+  box (`lib/criteria.ts` still says "Basis / unit" and sizes in k SF), the
+  workbook's per-unit row labels, the model's 100,000 SF placeholder for
+  a deal that states no area (marked an assumption, still a made-up
+  figure), and the comps page's bar captions (`fmtBasis` takes the noun;
+  its callers do not pass one yet).
 - A market's photograph: `lib/skyline.ts` (pure — one verified Wikimedia
   Commons file per metro with its photographer and licence, plus
   `commonsUrl` / `creditLine`), served by `app/api/imagery/skyline/[id]`

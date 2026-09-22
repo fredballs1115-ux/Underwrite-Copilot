@@ -2,6 +2,8 @@
 // adding a sector = adding rows here; the form, storage, and rule-subject
 // mapping all read this. PURE — unit-tested. (Universal module.)
 
+import { isResidentialClass } from "@/lib/asset-words";
+
 export type SectorFieldType = "number" | "text" | "boolean" | "percent";
 
 export interface SectorFieldDef {
@@ -91,14 +93,16 @@ export const SECTOR_FIELDS: Record<string, SectorFieldDef[]> = {
   ],
 };
 
-/** Classes whose deals should also show the multifamily regulatory fields
- *  (any residential rental evaluates against the same rules). */
-const RESIDENTIAL_CLASSES = new Set(["auto", "multifamily", "sfr_btr", "student_housing"]);
+/** Classes whose deals should also show the multifamily regulatory fields:
+ *  any rental housing evaluates against the same rules (`lib/asset-words`
+ *  says which classes are rental housing), and a deal filed "auto" shows
+ *  them too — the deck may turn out to be one, and every field is optional. */
+const showsResidentialFields = (cls: string): boolean => cls === "auto" || isResidentialClass(cls);
 
 export function fieldsForAssetClass(assetClass: string | null | undefined): SectorFieldDef[] {
   const cls = (assetClass ?? "auto").toLowerCase();
   const own = SECTOR_FIELDS[cls] ?? [];
-  if (cls !== "multifamily" && RESIDENTIAL_CLASSES.has(cls)) {
+  if (cls !== "multifamily" && showsResidentialFields(cls)) {
     return [...SECTOR_FIELDS.multifamily, ...own.filter((f) => !SECTOR_FIELDS.multifamily.some((m) => m.key === f.key))];
   }
   return own;

@@ -188,3 +188,41 @@ describe("deriveInternalComps — what never becomes a comp figure", () => {
     ).toEqual([]);
   });
 });
+
+describe("deriveInternalComps — every class in its own noun and basis (lib/asset-words)", () => {
+  it("a hotel sibling is priced per key, counted off its Keys row", () => {
+    const [c] = deriveInternalComps("current", "hospitality_str", { assetClass: "hospitality_str" }, [
+      sib("s1", "The Harbor Inn", "hospitality_str", {
+        dealName: "The Harbor Inn",
+        assetClass: "hospitality_str",
+        market: "Norfolk, VA",
+        metrics: [m("Asking price", "$24,000,000"), m("Keys", "120")],
+      }),
+    ]);
+    expect(c.basisLabel).toBe("$200k/key");
+  });
+
+  it("a manufactured-housing sibling is priced per pad", () => {
+    const [c] = deriveInternalComps("current", "manufactured_housing", { assetClass: "manufactured_housing" }, [
+      sib("s1", "Pine Grove MHC", "manufactured_housing", {
+        dealName: "Pine Grove MHC",
+        assetClass: "manufactured_housing",
+        market: "Richmond, VA",
+        metrics: [m("Asking price", "$9,000,000"), m("Pads", "150")],
+      }),
+    ]);
+    expect(c.basisLabel).toBe("$60k/pad");
+  });
+
+  it("a storage sibling is priced per SF, never per unit, whatever its unit count says", () => {
+    const [c] = deriveInternalComps("current", "self_storage", { assetClass: "self_storage" }, [
+      sib("s1", "StoreMore", "self_storage", {
+        dealName: "StoreMore",
+        assetClass: "self_storage",
+        market: "Dallas, TX",
+        metrics: [m("Asking price", "$12,000,000"), m("Units", "640"), m("Total SF", "80,000 SF")],
+      }),
+    ]);
+    expect(c.basisLabel).toBe("$150/SF");
+  });
+});

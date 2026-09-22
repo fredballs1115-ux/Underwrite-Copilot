@@ -11,9 +11,12 @@ import { planFacts } from "@/lib/plan-facts";
 export function SharePlan({
   strategy,
   plan,
+  noun = "unit",
 }: {
   strategy: DealStrategy;
   plan: PlanSummary | null;
+  /** what one of the finished product is called — "key" on a hotel plan */
+  noun?: string;
 }) {
   if (!plan) return null;
   const kind = strategy.label.toLowerCase();
@@ -32,7 +35,7 @@ export function SharePlan({
         <p className="mt-1 text-sm leading-relaxed text-muted">{strategy.summary}</p>
       )}
       <dl className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        {planFacts(plan).map(([label, value]) => (
+        {planFacts(plan, noun).map(([label, value]) => (
           <div key={label}>
             <dt className="text-xs uppercase tracking-wider text-muted">{label}</dt>
             <dd className="mt-0.5 font-semibold tabular-nums">{value}</dd>

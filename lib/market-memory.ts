@@ -17,6 +17,7 @@ import {
   METRIC_FIND,
 } from "@/lib/criteria";
 import { findPriceMetric, inferStrategy, planSummary, unitCountFromMetrics } from "@/lib/deal-strategy";
+import { assetWords } from "@/lib/asset-words";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
 export interface MarketComp {
@@ -107,7 +108,13 @@ function deriveBasis(
    *  line, which is the shell's price over the units, not the basis */
   allIn = false,
 ): { value: number; basis: "unit" | "sf" } | null {
-  if (assetClass === "multifamily") {
+  // The class says the basis (lib/asset-words): apartments, hotels, parks,
+  // student beds and garages trade per unit, key, pad, bed or space — one
+  // "unit" track, whatever the noun; office, industrial, retail, storage and
+  // the rest per SF; land per acre, which this memory has no track for.
+  const basis = assetWords(assetClass).basis;
+  if (basis === "acre") return null;
+  if (basis === "unit") {
     const direct = allIn ? null : findMetric(metrics, METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc);
     if (direct) {
       const n = parseMoney(direct.value);
@@ -115,12 +122,12 @@ function deriveBasis(
     }
     if (price == null) return null;
     // The shared count reader: "312 units" parses, a "Unit mix" row ahead
-    // of "Units" never shadows it.
+    // of "Units" never shadows it — and "212 keys" counts the same way.
     const n = unitCountFromMetrics(metrics);
     if (n != null && n > 0) return { value: price / n, basis: "unit" };
     return null;
   }
-  // Office / industrial / retail are priced per SF — never per unit.
+  // Priced per SF — never per unit, whatever stray per-unit row the OM has.
   if (price == null) return null;
   // The shared size reader: the building, never the land or a unit.
   const n = buildingSfFromMetrics(metrics);

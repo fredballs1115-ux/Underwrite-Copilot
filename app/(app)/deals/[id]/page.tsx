@@ -6,6 +6,9 @@ import type { SectorFieldValues } from "@/lib/sector-fields";
 import { PublicCompsPanel } from "./public-comps-panel";
 import { PropertyVisual } from "./property-visual";
 import { PICTURE_CREDIT, ensureDealPicture } from "@/lib/deal-picture";
+import { assetClassLabel } from "@/lib/asset-class";
+import { assetWords, countNoun } from "@/lib/asset-words";
+import { shownAssetClass } from "@/lib/pipeline-slots";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
@@ -564,12 +567,15 @@ export default async function DealPage({
   // The shared count reader: the row that counts the units, never a "Unit
   // mix" row ahead of it.
   const sizeUnits = unitCountRow(metrics)?.value ?? null;
-  // A bare unit count ("248") reads wrong in a Size slot — say what it counts.
+  // A bare count ("248") reads wrong in a Size slot — say what it counts, in
+  // the row's own noun (a hotel's "Keys" row says keys) or the class's.
+  const shownClass = shownAssetClass(deal.asset_class as string | null, extraction);
+  const sizeUnitsRow = unitCountRow(metrics);
   const summarySize =
     sizeSf ??
     (sizeUnits
       ? /^[\d,]+$/.test(sizeUnits.trim())
-        ? `${sizeUnits.trim()} units`
+        ? `${sizeUnits.trim()} ${countNoun(sizeUnitsRow?.label, shownClass)}`
         : sizeUnits
       : null) ??
     (firstSignal?.size.trim() || null);
@@ -587,8 +593,12 @@ export default async function DealPage({
     signalCapPct > 0.5 &&
     signalCapPct <= IMPLIED_CAP_CEILING * 100;
   // The shared going-in cap reader — the same call the buy box, the mandate
-  // and the memories make.
-  const summaryCap = findGoingInCap(metrics)?.value ?? (signalCapPlausible ? signalCap : null);
+  // and the memories make. A plan deal has no going-in cap (the pipeline
+  // row's rule, `pickSlots`): its slot carries the yield on total cost.
+  const summaryCap = plan
+    ? null
+    : (findGoingInCap(metrics)?.value ?? (signalCapPlausible ? signalCap : null));
+  const summaryYoc = plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null;
   // Year built feeds the rules engine's age-based coverage tests (NYC
   // pre-1974, JC pre-1987, LA pre-1979, MoCo's rolling-age exemption). The
   // plausibility window guards against a mis-matched metric value.
@@ -708,7 +718,10 @@ export default async function DealPage({
             </div>
             <p className="mt-0.5 truncate text-sm text-muted">
               {addressLine ? <>{addressLine} · </> : null}
-              <span className="capitalize">{deal.asset_class}</span>
+              {/* The class as the label map says it — never a stored
+                  "self_storage" or a form's "auto" — and, on a deal filed
+                  "Auto-detect", what the deck turned out to be. */}
+              {assetClassLabel(shownClass) || "Asset class not read yet"}
             </p>
           </div>
           {/* min-w-0 (not shrink-0): the cluster must be allowed to shrink
@@ -902,9 +915,12 @@ export default async function DealPage({
         <dl className="mt-4 flex flex-wrap gap-x-10 gap-y-2">
           {(
             [
-              ["Price", summaryPrice],
+              // A development's price row is its land cost, and a plan
+              // deal's cap slot is its yield on total cost — the same
+              // words the pipeline row and the meeting .xlsx use.
+              [plan?.priceLabel ?? "Price", summaryPrice],
               ["Size", summarySize],
-              ["Going-in cap", summaryCap],
+              ...(plan ? [["Yield on cost", summaryYoc] as const] : [["Going-in cap", summaryCap] as const]),
               ["Deal type", summaryStrategy],
             ] as const
           ).map(([label, value]) => (
@@ -927,7 +943,7 @@ export default async function DealPage({
         {/* The plan, as the OM states it, when the deal is not a stabilized
             asset — it changes what every figure below means. Then anything
             that genuinely does not tie. */}
-        <PlanStrip strategy={strategy} plan={plan} />
+        <PlanStrip strategy={strategy} plan={plan} noun={assetWords(shownClass).noun?.one} />
         <PlausibilityPanel findings={plausibility} strategy={strategy} />
         <PlanSensitivity plan={plan} refCap={refCap} />
 
@@ -1041,7 +1057,7 @@ export default async function DealPage({
           sectorFields={
             ((deal as { sector_fields?: SectorFieldValues | null }).sector_fields) ?? null
           }
-          assetClass={(deal.asset_class as string) ?? null}
+          assetClass={shownClass || null}
         />
       </div>
     </div>

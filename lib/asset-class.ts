@@ -12,10 +12,17 @@ export const ASSET_CLASS_LABEL: Record<string, string> = {
   office: "Office",
   industrial: "Industrial",
   retail: "Retail",
+  net_lease: "Net lease",
+  medical_office: "Medical office",
+  mixed_use: "Mixed-use",
   sfr_btr: "SFR / BTR",
-  self_storage: "Self-storage",
+  student_housing: "Student housing",
+  senior_housing: "Senior housing",
   manufactured_housing: "Manufactured housing",
+  self_storage: "Self-storage",
   hospitality_str: "Hospitality / STR",
+  data_center: "Data center",
+  parking: "Parking",
   land_infill: "Land / infill",
 };
 

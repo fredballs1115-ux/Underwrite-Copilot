@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-22",
+      "title": "Every deal in its own words",
+      "href": "/deals",
+      "blurb": "A hotel is counted in keys and priced per key, a manufactured-housing community in pads, a student deal in beds, a site in acres — and the screen now says so everywhere: the deal page's header and size, the memo and the report, the Excel model's cover, the comp memories, the plan's all-in basis, the manual deal form and the challenger all read one table of each deal type's words. Seven more types can be filed: net lease, medical office, mixed-use, student housing, senior housing, data center and parking. An office, a hotel or a storage facility is no longer told the city's rent-control rules cover it, a development's land cost is no longer labelled a price beside a cap it does not have, and the challenger grills each type on its own traps — RevPAR's two levers and the fee stack on a hotel, street rate against in-place on storage, the entitlement odds and the carry on land, dark value on a net lease — instead of asking every building about loss-to-lease."
+    },
+    {
+      "date": "2026-09-22",
       "title": "A picture of each building, from its own memorandum",
       "href": "/deals",
       "blurb": "Every deal on the signed-in site now opens on a photograph of its building: the cover picture out of the offering memorandum you uploaded, lifted from the file the first time the deal is opened, sized once for the deal page and again for the pipeline's thumbnail, and credited to the memorandum. Where a memorandum carries no photograph — a scanned deck, a text-only teaser — the overhead stays, as before, and the deal page's Add photo button takes a picture of your own (Replace photo, once there is one). A reissued memorandum drops the picture taken from the old one; a picture you added survives it. The picture is never fetched from a listing portal or an image search: the memorandum's cover was sent to you to evaluate the deal, which is exactly this use, and a portal's photograph is under that portal's terms. The sample deal keeps its overhead."

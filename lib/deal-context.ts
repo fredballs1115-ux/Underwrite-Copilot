@@ -1,5 +1,6 @@
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { inferStrategy, planSummary } from "@/lib/deal-strategy";
+import { assetWords } from "@/lib/asset-words";
 
 const compact = (n: number): string =>
   n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
@@ -33,8 +34,11 @@ export function dealContextFor(extraction: ExtractionResult | null): string | nu
     // The basis a comp or a per-unit norm is held against on a plan deal:
     // what a finished unit costs all-in — never the shell's or the land's
     // price over apartments that do not exist yet.
+    // In the class's own noun (lib/asset-words): a hotel's plan is costed
+    // per key, a student deal's per bed.
+    const noun = assetWords(extraction?.assetClass).noun ?? { one: "unit", many: "units" };
     lines.push(
-      `Total cost is ${compact(plan.costPerUnit)} per planned unit (${plan.units.toLocaleString("en-US")} units) — the basis to hold sale comps and per-unit norms against, never the ${
+      `Total cost is ${compact(plan.costPerUnit)} per planned ${noun.one} (${plan.units.toLocaleString("en-US")} ${noun.many}) — the basis to hold sale comps and per-${noun.one} norms against, never the ${
         plan.kind === "development" ? "land" : "shell's"
       } price.`,
     );
