@@ -1852,7 +1852,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   the check reasons from typical ranges alone, as before, and the aside
   still says "not pulled comps". The pipeline test's fake database answers
   `rates` and `benchmarks` for a Washington deal and pins the text the
-  check was handed.
+  check was handed. **The figures are stored as values too**
+  (`liveBrief.figures`, keyed by metric and dated), and **the deal page
+  says what moved since** (#382, `lib/brief-delta.ts`, pure): the page
+  reads the same metro's figures today through the cached readers and
+  `briefDelta` compares by key in each figure's own unit — a share in
+  points, a dollar figure and a count in percent, days in days, a rank in
+  places with a smaller rank hotter — and keeps three things apart that
+  must never read the same: a newer observation that moved, a newer
+  observation that did not ("unchanged at 41 days", a fact), and a figure
+  the publisher has not updated since the screen ("no newer figure"). A
+  figure read then and unreadable now is left out rather than shown as a
+  move to nothing. `SinceThisScreen` under the folded brief prints the
+  day, the counts and one sentence per move (`moveSentence`).
 - The pipeline's failure modes: `lib/anthropic/failure.ts` turns any failure
   into one sentence the analyst can act on (the raw text goes to the server
   log, never the page), and its `structured()` wraps every structured-output

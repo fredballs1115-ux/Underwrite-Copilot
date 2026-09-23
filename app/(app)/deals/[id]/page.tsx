@@ -70,6 +70,12 @@ import type { ActualsData } from "./property-actuals";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { constructionSeed, type DealRateSeeds } from "@/lib/debt-index";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
+import { metroForAddress } from "@/lib/market-match";
+import { liveMetroRates } from "@/lib/live-rates-read";
+import { liveZori } from "@/lib/zori-read";
+import { liveRealtor } from "@/lib/realtor-read";
+import { liveMarketBrief } from "@/lib/live-market-brief";
+import { briefDelta, type BriefDelta } from "@/lib/brief-delta";
 import { snapshotVersion } from "@/lib/bridge/versions";
 import { listSubmarkets } from "@/lib/market/store";
 import { dealSubmarketCheck } from "@/lib/market/deal-checks";
@@ -341,6 +347,32 @@ export default async function DealPage({
     buyBox && checkSource
       ? scoreMandateFit(deal.asset_class, checkSource, buyBox)
       : null;
+
+  // Since this screen (lib/brief-delta): the figures the market check read
+  // on the day it ran, against the same figures read today through the
+  // page's cached readers — so a check opened weeks later says whether the
+  // asking rent, the metro's vacancy or the permits year moved since. Only
+  // where the check stored figures and the deal still maps to a covered
+  // market; a read that fails leaves the check as it was.
+  let marketSince: BriefDelta | null = null;
+  const storedBrief = market?.liveBrief ?? null;
+  if (storedBrief?.figures && storedBrief.figures.length > 0) {
+    const metro = metroForAddress(dealAddress ?? {});
+    if (metro) {
+      try {
+        const now = new Date();
+        const [rates, zori, realtor] = await Promise.all([
+          liveMetroRates(metro.id, now),
+          liveZori(metro.name),
+          liveRealtor(metro.name),
+        ]);
+        const today = liveMarketBrief({ metro, rates, zori, realtor, now });
+        marketSince = briefDelta(storedBrief.readOn, storedBrief.figures, today?.figures ?? []);
+      } catch (err) {
+        console.warn("since-this-screen read failed:", err instanceof Error ? err.message : err);
+      }
+    }
+  }
 
   // The three summary-bar figures — a 5-second read, nothing more. The full
   // metric set lives one click away in Financials.
@@ -1001,6 +1033,7 @@ export default async function DealPage({
         dealId={id}
         dealName={deal.name}
         rateSeeds={rateSeeds}
+        marketSince={marketSince}
         initialTab={tab ?? null}
         initialAnalysis={analysisParam ?? null}
         hasOm={!!deal.om_storage_path}

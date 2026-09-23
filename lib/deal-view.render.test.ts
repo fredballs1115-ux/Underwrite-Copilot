@@ -150,10 +150,35 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(text).toMatch(/2 published figures as of Sep 23, 2026/);
     expect(text).toMatch(/Unemployment 4\.1% \(Jul 2026, Philadelphia MSA; FRED\)/);
     expect(text).toMatch(/read beside the metro's published figures/);
+    // Nothing read today → no "since" block at all.
+    expect(text).not.toMatch(/Since this check ran/);
     // The sample itself was checked on typical ranges alone, and its aside still says so.
     const plain = textOf(render(p));
     expect(plain).toMatch(/rules-of-thumb, not pulled comps/);
     expect(plain).not.toMatch(/Read beside the/);
+
+    // Opened weeks later, with the same figures read today: what moved, in each figure's unit.
+    const later: Props = {
+      ...withBrief,
+      marketSince: {
+        since: "2026-09-02",
+        newer: 2,
+        moved: 1,
+        moves: [
+          { key: "unemployment", label: "Unemployment", unit: "pts", from: 4.1, to: 4.4, fromAsOf: "2026-07-01", toAsOf: "2026-08-01", move: 0.3, moveUnit: "pts", kind: "moved" },
+          { key: "zori_rent", label: "Asking rent, all home types", unit: "usd", from: 1890, to: 1890, fromAsOf: "2026-08-31", toAsOf: "2026-09-30", move: 0, moveUnit: "pct", kind: "unchanged" },
+          { key: "rental_vacancy_msa", label: "Rental vacancy, metro area", unit: "pts", from: 6.6, to: 6.6, fromAsOf: "2026-04-01", toAsOf: "2026-04-01", move: 0, moveUnit: "pts", kind: "no_newer" },
+        ],
+      },
+    };
+    const laterHtml = render(later);
+    expect(a11yIssues(laterHtml)).toEqual([]);
+    const laterText = textOf(laterHtml);
+    expect(gluedWords(laterText)).toEqual([]);
+    expect(laterText).toMatch(/Since this check ran on Sep 2, 2026/);
+    expect(laterText).toMatch(/2 of the 3 figures the check read have a newer observation; 1 moved\./);
+    expect(laterText).toMatch(/Unemployment: \+0\.3 pt to 4\.4%/);
+    expect(laterText).not.toMatch(/Asking rent, all home types: unchanged/);
   });
 
   it("a screen that failed midway names the results it never reached, in the open", () => {

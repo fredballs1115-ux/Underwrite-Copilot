@@ -29,6 +29,7 @@ import type { InternalComp } from "@/lib/internal-comps";
 import { DebtSizer } from "./debt-sizer";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { DealRateSeeds } from "@/lib/debt-index";
+import type { BriefDelta } from "@/lib/brief-delta";
 import { DecisionLog } from "./decision-log";
 import { SampleGuide } from "./sample-guide";
 import { DealTasks } from "./deal-tasks";
@@ -314,6 +315,7 @@ export function DealView({
   todayIso = "",
   staleResults = [],
   rateSeeds = null,
+  marketSince = null,
 }: {
   dealId: string;
   dealName: string;
@@ -330,6 +332,8 @@ export function DealView({
    *  debt panels — the permanent loan's is the screening model's own
    *  seeded rate, so the sizer starts where the workbook does */
   rateSeeds?: DealRateSeeds | null;
+  /** what moved since the market check read its figures (lib/brief-delta) */
+  marketSince?: BriefDelta | null;
   supplements: SupplementsMap;
   model: UnderwritingModel | null;
   documents: DealDocument[];
@@ -811,6 +815,7 @@ export function DealView({
             supplements={supplements}
             internalComps={internalComps}
             omUrl={omUrl}
+            marketSince={marketSince}
             staleVerdict={staleResults.includes("verdict")}
             compSubject={subjectBasis(
               results.extraction?.metrics ?? [],
@@ -1191,6 +1196,7 @@ function AnalysesPanel({
   omUrl,
   staleVerdict = false,
   compSubject = null,
+  marketSince = null,
 }: {
   analysis: AnalysisKey;
   onSelect: (key: AnalysisKey) => void;
@@ -1212,6 +1218,8 @@ function AnalysesPanel({
   /** the subject's own basis, read where the first signal is in scope, so
    *  the comps table's tick and the deal header agree on the deal's kind */
   compSubject?: SubjectBasis | null;
+  /** what moved since the market check read its figures (lib/brief-delta) */
+  marketSince?: BriefDelta | null;
 }) {
   const STEP_FOR: Record<AnalysisKey, string> = {
     verdict: "verdict",
@@ -1285,7 +1293,7 @@ function AnalysesPanel({
           }}
         />
       ) : (
-        <MarketCheck result={results.market!} />
+        <MarketCheck result={results.market!} since={marketSince} />
       );
   } else if (running || pending) {
     content = analysis === "verdict" ? <VerdictSkeleton /> : <CardListSkeleton />;
