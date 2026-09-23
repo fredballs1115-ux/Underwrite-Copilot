@@ -6,11 +6,17 @@ import { buildReportData, ReportDocument } from "@/lib/memo/report-document";
 import type { MemoData } from "@/lib/memo/memo-document";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { getBrandingForDeal, brandingLogoDataUri } from "@/lib/branding-server";
-import { buyBoxCheckSource, evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
+import { buyBoxCheckSource, evaluateBuyBox, findGoingInCap, parsePct, type BuyBoxCheck } from "@/lib/criteria";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import type { StructuredAddress } from "@/lib/address";
-import { inferStrategy } from "@/lib/deal-strategy";
+import { inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
+import { shownAssetClass } from "@/lib/pipeline-slots";
+import { metroForAddress } from "@/lib/market-match";
+import { liveMetroRates, liveRates } from "@/lib/live-rates-read";
+import { liveZori } from "@/lib/zori-read";
+import { modelVsMarket, type ModelVsMarket } from "@/lib/model-vs-market";
+import type { LiveRate } from "@/lib/live-rates";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
 import { staleAfterFailure } from "@/lib/screen-run";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
@@ -143,6 +149,7 @@ export async function GET(
   // The plan page (conversion / development / lease-up / value-add): yield on
   // total cost stressed, against the same derived model's exit cap.
   let plan: PlanReport | null = null;
+  let assumptions: ModelVsMarket | null = null;
   try {
     const extraction = (deal.extraction as ExtractionResult | null) ?? null;
     if (extraction) {
@@ -188,6 +195,37 @@ export async function GET(
         pct: derived.inputs.exitCapPct,
         provenance: derived.sources.exitCapPct?.provenance ?? "assumption",
       });
+
+      // The model's assumptions against the published figures — the same
+      // read the deal page's card makes (lib/model-vs-market), through the
+      // same cached readers, so the report says what the page says. Its
+      // own try: a failed live read leaves the grids in place.
+      try {
+        const metro = metroForAddress((deal.address as StructuredAddress | null) ?? {});
+        const now = new Date();
+        const [rates, zori, national] = await Promise.all([
+          metro ? liveMetroRates(metro.id, now) : Promise.resolve([] as LiveRate[]),
+          metro ? liveZori(metro.name) : Promise.resolve(null),
+          liveRates(now),
+        ]);
+        const planDeal = isPlanDeal(inferStrategy(extraction).kind);
+        const capText = planDeal ? null : (findGoingInCap(extraction.metrics)?.value ?? null);
+        assumptions = modelVsMarket({
+          inputs: derived.inputs,
+          sources: derived.sources,
+          assetClass: shownAssetClass(deal.asset_class as string | null, extraction) || null,
+          plan: planDeal,
+          goingInCapPct: capText ? parsePct(capText) : null,
+          metro,
+          rates,
+          zori,
+          national,
+          now,
+        });
+      } catch (err) {
+        console.warn(`report assumptions read failed for ${id}:`, err instanceof Error ? err.message : err);
+        assumptions = null;
+      }
     }
   } catch (err) {
     console.error(`report heatmap build failed for ${id}:`, err);
@@ -234,7 +272,7 @@ export async function GET(
       (deal.address as StructuredAddress | null) ?? null,
       ((deal as unknown as { photo?: DealVisualCache | null }).photo ?? null),
     );
-    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover);
+    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions);
     const element = React.createElement(ReportDocument, {
       input,
     }) as unknown as Parameters<typeof renderToBuffer>[0];
