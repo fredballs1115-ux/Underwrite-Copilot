@@ -690,7 +690,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   before (one-sided, an owner-occupier rate) and then against today's
   index plus the class spread, printing the seed's own note so the
   assumption half is named; the compare table gets a signed "Cap over
-  10-yr Treasury" row beside its leverage row.
+  10-yr Treasury" row beside its leverage row. **The survey rides with
+  the seeds** (#387): `DebtSeeds.survey30` carries the 30-year mortgage
+  survey off the same cached read — shown with its date whatever its age,
+  flagged when the table is stale, never a seed — and `benchmark30` picks
+  it over the research layer's checked-in snapshot with the SOURCE saying
+  which ("FRED · MORTGAGE30US" / "FRED PMMS, the checked-in snapshot"),
+  so the deal page's research panel, the compare table and the demo read
+  one table through one read; each had queried the row for itself, and
+  the demo read the August snapshot on the one page a visitor sees
+  without signing in. The demo's card is `app/demo/leverage-card.tsx`
+  (`SampleLeverageCard`, pure, rendered in `lib/views.render.test.ts`
+  with the marker's phrase checked against `renderToString`), and it
+  prints the cap over today's 10-year beside the survey read.
 - What landlords are asking this month: `lib/zori.ts` (pure — a metro's
   Zillow Observed Rent Index and its change from a year ago, read out of
   the two `benchmarks` rows the MONTHLY pull writes, `scripts/fetch-zori.mjs`

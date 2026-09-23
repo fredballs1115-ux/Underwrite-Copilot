@@ -11,6 +11,7 @@ import { metroForAddress } from "@/lib/market-match";
 import type { StructuredAddress } from "@/lib/address";
 import type { FirstSignal } from "@/lib/anthropic/types";
 import { capSpreadRead, leverageRead } from "@/lib/leverage";
+import { benchmark30 } from "@/lib/debt-index";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { seedBenchmarks } from "@/lib/research-data";
@@ -138,34 +139,17 @@ export default async function ComparePage({
   );
   const boxByScope = new Map(boxEntries);
 
-  // The freshest 30-yr fixed, one fetch for the whole table — same source
-  // order as the deal page: live rates table when reachable, seeded PMMS
-  // snapshot otherwise.
-  let bench30: { value: number; asOf: string } | null = null;
-  try {
-    const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
-    const admin = createSupabaseAdminClient();
-    const { data: rate } = await admin
-      .from("rates")
-      .select("value, obs_date")
-      .eq("series_id", "MORTGAGE30US")
-      .order("obs_date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (rate?.value != null)
-      bench30 = { value: Number(rate.value), asOf: String(rate.obs_date) };
-  } catch {
-    // no admin env — the seeded snapshot below still serves
-  }
-  if (!bench30) {
-    const row = seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed");
-    if (row && typeof row.low === "number")
-      bench30 = { value: row.low, asOf: row.as_of };
-  }
-
-  // Today's 10-year, off the same cached rates read the deal page's leverage
-  // check and the strip draw from; nothing fresh means no row.
-  const tenYearPct = (await liveDebtSeeds(HOLD_MONTHS)).tenYear?.pct ?? null;
+  // The week's 30-yr fixed and today's 10-year, one cached read for the
+  // whole table (lib/debt-index-read) — the same read the deal page's
+  // leverage check makes, the research layer's snapshot only where the
+  // table has no survey, and the note says which. Nothing fresh on the
+  // 10-year means no spread row.
+  const debt = await liveDebtSeeds(HOLD_MONTHS);
+  const bench30 = benchmark30(
+    debt.survey30,
+    seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed"),
+  );
+  const tenYearPct = debt.tenYear?.pct ?? null;
 
   const cols = (rows as Scoped[]).map((d) =>
     toCol(d, boxByScope.get(scopeKey(d)) ?? null, bench30?.value ?? null, tenYearPct),
@@ -209,9 +193,9 @@ export default async function ComparePage({
       {bench30 && cols.some((c) => c.leverage) && (
         <p className="text-xs leading-relaxed text-muted">
           Leverage row: each deal&apos;s going-in cap against the 30-yr fixed
-          ({bench30.value}%, {bench30.asOf}) — an owner-occupier benchmark;
-          investor debt usually prices above it, so a thin spread here is
-          thinner in practice.
+          ({bench30.value}%, {bench30.source}, as of {bench30.asOf}) — an
+          owner-occupier benchmark; investor debt usually prices above it, so
+          a thin spread here is thinner in practice.
         </p>
       )}
 

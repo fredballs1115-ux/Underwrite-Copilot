@@ -177,6 +177,14 @@ the 10-year (a fact, dated, no verdict) and leverage at the index plus
 the class spread the model was seeded with (the assumption named in the
 seed's own note), on the deal page under the mortgage-survey read and as
 a signed row on the compare table.
+Then #387: the survey rides with the seeds — the 30-year mortgage survey
+comes off the same cached rates read as the 10-year and the model's
+index, shown with its date and flagged when stale, and the checked-in
+snapshot serves only where the table has nothing, named as the
+snapshot; the deal page, the compare table and the demo read it through
+one read, and the demo's leverage check (which printed the August
+snapshot on a public page) reads the week's survey and the cap over
+today's 10-year.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.
