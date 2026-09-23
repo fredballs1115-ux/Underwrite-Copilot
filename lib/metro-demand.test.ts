@@ -78,6 +78,30 @@ describe("metroDemand — the metro area's payrolls by sector as a picture's row
     expect(metroDemand(rates, "boutique hotel")!.mine).toBe("Leisure & hospitality");
   });
 
+  it("a state's rows are the state's, and every sentence says so rather than calling them a metro area's", () => {
+    const pa = readMetroRates(
+      "state:PA",
+      [
+        { series_id: "PANA_YOY", obs_date: "2026-08-01", value: 0.9 },
+        { series_id: "PAPBSV_YOY", obs_date: "2026-08-01", value: 1.1 },
+        { series_id: "PALEIH_YOY", obs_date: "2026-08-01", value: 2.0 },
+      ],
+      FIXTURE_NOW,
+    );
+    const office = metroDemand(pa, "office")!;
+    expect(office.grain).toBe("state");
+    expect(office.area).toBe("Pennsylvania");
+    expect(office.intro).toBe(
+      "Professional & business services is the sector that fills this building's kind, drawn full; the state's other sectors are beside it, faded, and all payrolls first.",
+    );
+    expect(metroDemand(pa, "multifamily")!.intro).toBe("Rental housing runs on all payrolls, drawn first; the sectors beneath say where the state's jobs are growing.");
+    expect(metroDemand(pa, "medical_office")!.intro).toBe(
+      "The state has no figure for education and health services, the sector that fills medical offices, so nothing is drawn full: all payrolls first, then the sectors it does have.",
+    );
+    expect(metroDemand(pa, "self_storage")!.intro).toContain("where the state's jobs are growing");
+    expect(metroDemand(readMetroRates("dc", ROWS, FIXTURE_NOW), "office")!.grain).toBe("metro");
+  });
+
   it("carries the supply side for rental housing only, and only where both permit series are on hand", () => {
     const monthsBack = (n: number): string => new Date(Date.UTC(2026, 6 - n, 1)).toISOString().slice(0, 10);
     const permits: RateRow[] = [

@@ -210,6 +210,7 @@ describe("DealView — the sample deal renders every section without a runtime e
       ...p,
       metroDemand: {
         area: "Philadelphia MSA",
+        grain: "metro",
         newestMonth: "Aug 2026",
         mine: "Professional & business services",
         intro: "Professional & business services is the sector that fills this building's kind, drawn full; the metro area's other sectors are beside it, faded, and all payrolls first.",

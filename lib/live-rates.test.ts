@@ -1186,6 +1186,10 @@ describe("the states' series — the fallback grain for a deal outside the cover
   it("files every state with the same eleven metrics under its own market id, and resolves the id like a metro's", () => {
     const states = new Set(STATE_SERIES.map((s) => s.metro));
     expect(states.size).toBe(51);
+    // The branch's dry run (rates run 35933147137) answered 557 of 561:
+    // FRED carries no short education-and-health id for the District,
+    // Mississippi, Tennessee or Wyoming, so those four read four sectors.
+    const noEduHealth = new Set(["state:DC", "state:MS", "state:TN", "state:WY"]);
     for (const id of states) {
       expect(id).toMatch(/^state:[A-Z]{2}$/);
       const own = marketSeriesFor(id);
@@ -1193,13 +1197,15 @@ describe("the states' series — the fallback grain for a deal outside the cover
       expect(own.series.map((s) => s.metric), id).toEqual([
         "unemployment",
         "jobs_yoy",
-        ...SECTOR_JOBS_METRICS,
+        ...SECTOR_JOBS_METRICS.filter((m) => m !== "jobs_eduhealth_yoy" || !noEduHealth.has(id)),
         "permits",
         "permits_1unit",
         "hpi_yoy",
         "rental_vacancy_state",
       ]);
     }
+    expect(STATE_SERIES.filter((s) => s.metric === "jobs_eduhealth_yoy").map((s) => s.metro).filter((m) => noEduHealth.has(m))).toEqual([]);
+    expect(STATE_SERIES.length).toBe(557);
     // The ids the probe of 2026-09-23 printed for Pennsylvania (rates run
     // 35931065205), and the BLS-shaped ones for retail and transport.
     const pa = marketSeriesFor("state:PA");

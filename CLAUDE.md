@@ -2143,8 +2143,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   `…43…` for retail and transport alone — `<ST>TRAD` is the combined
   trade-transport-utilities supersector and is not used; probed 2026-09-23,
   run 35931065205). They are `stateSeries` in `data/fred-series.json`
-  (561 entries, generated from the address table's state list, verified
-  by the branch's dry run), filed by `readSeriesTable` under the market id
+  (557 entries, generated from the address table's state list; the
+  branch's dry run 35933147137 answered 557 of 561 — FRED carries no
+  short education-and-health id for the District, Mississippi, Tennessee
+  or Wyoming, so those four read four sectors and the demand card names
+  the missing one), filed by `readSeriesTable` under the market id
   `state:PA` in the SAME shape as a metro's, so `metroSeriesFor`,
   `readMetroRates`, `liveMetroRates`, `metroDemand`, `metroSupply` and the
   brief work unchanged — but kept in `STATE_SERIES`, apart from

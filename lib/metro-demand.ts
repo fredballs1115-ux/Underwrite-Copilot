@@ -51,8 +51,12 @@ export interface MetroDemandRow {
 }
 
 export interface MetroDemand {
-  /** what FRED's title calls the area ("Washington MSA") */
+  /** what FRED's title calls the area ("Washington MSA", or "Pennsylvania" for a state) */
   area: string;
+  /** whose rows these are: a covered metro's, or the state's for a deal
+   *  outside the covered metros — every sentence that names the grain
+   *  reads it, so a state's figures are never called a metro area's */
+  grain: "metro" | "state";
   /** the newest sector month, "Aug 2026" */
   newestMonth: string;
   rows: MetroDemandRow[];
@@ -72,20 +76,26 @@ export interface MetroDemand {
   supply: MetroSupply | null;
 }
 
-function introFor(mine: string | null, sector: SectorJobs | null, words: AssetWords): string {
+/** "the metro area" or "the state" — the grain the rows are, said in every sentence that names it. */
+function grainWord(grain: MetroDemand["grain"]): string {
+  return grain === "state" ? "the state" : "the metro area";
+}
+
+function introFor(mine: string | null, sector: SectorJobs | null, words: AssetWords, grain: MetroDemand["grain"]): string {
+  const g = grainWord(grain);
   if (mine) {
-    return `${mine} is the sector that fills this building's kind, drawn full; the metro area's other sectors are beside it, faded, and all payrolls first.`;
+    return `${mine} is the sector that fills this building's kind, drawn full; ${g}'s other sectors are beside it, faded, and all payrolls first.`;
   }
   if (sector) {
-    return `The metro area has no figure for ${sector.sector}, ${sector.fills}, so nothing is drawn full: all payrolls first, then the sectors it does have.`;
+    return `${g.charAt(0).toUpperCase()}${g.slice(1)} has no figure for ${sector.sector}, ${sector.fills}, so nothing is drawn full: all payrolls first, then the sectors it does have.`;
   }
   if (words.residential) {
-    return "Rental housing runs on all payrolls, drawn first; the sectors beneath say where the metro area's jobs are growing.";
+    return `Rental housing runs on all payrolls, drawn first; the sectors beneath say where ${g}'s jobs are growing.`;
   }
   if (words.label) {
-    return `${words.label} reads no single sector — a sector picked for it would be a guess wearing a figure — so all payrolls are drawn first; the sectors beneath say where the metro area's jobs are growing.`;
+    return `${words.label} reads no single sector — a sector picked for it would be a guess wearing a figure — so all payrolls are drawn first; the sectors beneath say where ${g}'s jobs are growing.`;
   }
-  return "No sector is singled out until the deal's kind is read; all payrolls are drawn first, and the sectors beneath say where the metro area's jobs are growing.";
+  return `No sector is singled out until the deal's kind is read; all payrolls are drawn first, and the sectors beneath say where ${g}'s jobs are growing.`;
 }
 
 export function metroDemand(rates: readonly LiveRate[], assetClass: string | null | undefined): MetroDemand | null {
@@ -117,13 +127,15 @@ export function metroDemand(rates: readonly LiveRate[], assetClass: string | nul
     .filter((r) => !r.fresh)
     .map((r) => `${SECTOR_JOBS_LABEL[(r.meta as MetroSeriesMeta).metric as SectorJobsMetric]} as of ${shortDate(r.obsDate)}`);
   const mine = rows.find((x) => x.mine)?.label ?? null;
+  const grain: MetroDemand["grain"] = (sectors[0].meta as MetroSeriesMeta).metro.startsWith("state:") ? "state" : "metro";
   return {
     area: (sectors[0].meta as MetroSeriesMeta).area,
+    grain,
     newestMonth: monthOf(newest),
     rows,
     stale,
     mine,
-    intro: introFor(mine, sector, words),
+    intro: introFor(mine, sector, words, grain),
     supply: words.residential ? metroSupply(rates) : null,
   };
 }
