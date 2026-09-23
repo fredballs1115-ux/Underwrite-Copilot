@@ -11,6 +11,7 @@ import {
   challengerInstruction,
   extractionInstruction,
   firstSignalInstruction,
+  liveMarketClause,
   marketCheckInstruction,
   reconcilerInstruction,
   reconciliationInstruction,
@@ -367,5 +368,36 @@ describe("first signal — the going-in cap is today's income against the price,
       // The take names the kind of deal in the plan vocabulary.
       expect(p, cls).toContain("(stabilized, value-add, lease-up, conversion, development)");
     }
+  });
+});
+
+// The market check reads the metro's published figures where the deal sits
+// in a covered market (lib/live-market-brief) — handed in AFTER the deal
+// context, so the cached document prefix never moves.
+describe("market check — the metro's published figures ride last, and only where there are any", () => {
+  const brief = "Published figures for the Washington, DC market the deal sits in, read on 2026-09-23.\n- Unemployment 3.4% (Jul 2026, Washington MSA; FRED)";
+
+  it("wraps the figures in <live_market> with the rules for reading them", () => {
+    const clause = liveMarketClause(brief);
+    expect(clause).toContain(`<live_market>\n${brief}\n</live_market>`);
+    expect(clause).toContain("cite the figure with its date in the note");
+    expect(clause).toContain("State a metro figure as the metro's, never as the submarket's or the building's");
+    expect(clause).toContain("a figure narrows the range, it does not replace the OM's own numbers");
+  });
+
+  it("nothing to hand over is an empty clause, and the instruction is byte-for-byte the old one", () => {
+    expect(liveMarketClause(null)).toBe("");
+    expect(liveMarketClause("  ")).toBe("");
+    expect(marketCheckInstruction("multifamily", null, null)).toBe(marketCheckInstruction("multifamily"));
+    expect(marketCheckInstruction("office", "ctx", "")).toBe(marketCheckInstruction("office", "ctx"));
+  });
+
+  it("the figures come after the deal context, and the document-side text before both is unchanged", () => {
+    const ctx = "Deal type: Stabilized.";
+    const p = marketCheckInstruction("multifamily", ctx, brief);
+    const plain = marketCheckInstruction("multifamily", ctx);
+    expect(p.startsWith(plain)).toBe(true);
+    expect(p.indexOf("<deal_context>")).toBeLessThan(p.indexOf("<live_market>"));
+    expect(p).toContain("You do NOT have a live comps feed");
   });
 });

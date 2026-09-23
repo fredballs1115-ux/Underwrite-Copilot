@@ -123,6 +123,39 @@ describe("DealView — the sample deal renders every section without a runtime e
     });
   }
 
+  it("a market check that read the metro's published figures folds them open under the summary", () => {
+    const p = sampleProps("analyses", "market");
+    const withBrief: Props = {
+      ...p,
+      results: {
+        ...p.results,
+        market: {
+          ...p.results.market!,
+          liveBrief: {
+            metro: "Philadelphia, PA",
+            readOn: "2026-09-23",
+            lines: [
+              "Unemployment 4.1% (Jul 2026, Philadelphia MSA; FRED), +0.1 pt on the month before",
+              "Asking rent, all home types: $1,890/mo, +2.4% from a year ago (Aug 2026; Zillow Research — listings, before concessions)",
+            ],
+          },
+        },
+      },
+    };
+    const html = render(withBrief);
+    expect(a11yIssues(html)).toEqual([]);
+    const text = textOf(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toMatch(/Read beside the Philadelphia, PA market’s own figures/);
+    expect(text).toMatch(/2 published figures as of Sep 23, 2026/);
+    expect(text).toMatch(/Unemployment 4\.1% \(Jul 2026, Philadelphia MSA; FRED\)/);
+    expect(text).toMatch(/read beside the metro's published figures/);
+    // The sample itself was checked on typical ranges alone, and its aside still says so.
+    const plain = textOf(render(p));
+    expect(plain).toMatch(/rules-of-thumb, not pulled comps/);
+    expect(plain).not.toMatch(/Read beside the/);
+  });
+
   it("a screen that failed midway names the results it never reached, in the open", () => {
     // The ninth review's first finding: a comps-step failure left this run's
     // extraction beside the previous screen's verdict, shown as "5/5" with

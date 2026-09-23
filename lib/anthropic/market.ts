@@ -43,6 +43,9 @@ export async function checkMarket(
   /** what the screen established — the deal's kind and, on a plan deal, the
    *  plan's figures and timeline — so the norms are applied to the right thing */
   context?: string | null,
+  /** the metro's published figures, dated (lib/live-market-brief's `text`),
+   *  where the deal sits in a covered market; null outside them */
+  liveMarket?: string | null,
 ): Promise<MarketResult> {
   const client = getAnthropic();
 
@@ -55,9 +58,10 @@ export async function checkMarket(
         role: "user",
         content: [
           // Reads the OM from the prompt cache the extraction step wrote; the
-          // context rides after it so the cached prefix stays identical.
+          // context and the figures ride after it so the cached prefix stays
+          // identical.
           omDocument(om),
-          { type: "text", text: marketCheckInstruction(assetClass, context) },
+          { type: "text", text: marketCheckInstruction(assetClass, context, liveMarket) },
         ],
       },
     ],

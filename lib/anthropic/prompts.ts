@@ -200,7 +200,14 @@ Finish with a one-sentence takeaway: does the buyer's model support or undercut 
 }
 
 /** Step 5 — Market plausibility check */
-export function marketCheckInstruction(assetClass: AssetClass, context?: string | null): string {
+export function marketCheckInstruction(
+  assetClass: AssetClass,
+  context?: string | null,
+  /** the metro's published figures, where the deal sits in a covered
+   *  market (lib/live-market-brief's `text`) — appended after the deal
+   *  context, so the cached document prefix stays byte-identical */
+  liveMarket?: string | null,
+): string {
   return `Sanity-check the offering memorandum's key assumptions against general market norms for the asset class and submarket. ${assetClassClause(
     assetClass,
   )}
@@ -213,7 +220,27 @@ If the OM describes a plan (a conversion, development, lease-up or heavy value-a
 
 Be clear throughout that these are rules-of-thumb, not pulled comps, and must be verified against real market data.${sectorNormsClause(
     assetClass,
-  )}${dealContextClause(context)}`;
+  )}${dealContextClause(context)}${liveMarketClause(liveMarket)}`;
+}
+
+/**
+ * The metro's own published figures — this month's asking rent, the rent
+ * sitting tenants pay, the metro's rental vacancy with its margin, a year
+ * of permits, payrolls, house prices and the for-sale market — where the
+ * deal sits in a covered market (see lib/live-market-brief). Appended LAST,
+ * after the deal context, so the cached document prefix stays identical.
+ * "" when there is nothing to hand over: the check then reasons from typical
+ * ranges alone, as it always did, and says so.
+ */
+export function liveMarketClause(liveMarket?: string | null): string {
+  if (!liveMarket?.trim()) return "";
+  return `
+
+The deal sits in a market the site tracks, and the metro's own published figures follow — each dated, each with its publisher. Where one answers an OM assumption, check the assumption against the FIGURE and cite the figure with its date in the note: rent growth against the rent index and the asking-rent change, occupancy and vacancy against the metro's rental vacancy (and its margin — a move inside the margin is noise), supply claims against the year of permits, an exit story against the for-sale market's direction and its hotness rank. State a metro figure as the metro's, never as the submarket's or the building's, and keep the typical range in \`typicalRange\` as the norm the figure is read beside — a figure narrows the range, it does not replace the OM's own numbers. Where no figure answers, the typical range stands on its own.
+
+<live_market>
+${liveMarket.trim()}
+</live_market>`;
 }
 
 /** Compact sector norms for the market check — the era-calibration each

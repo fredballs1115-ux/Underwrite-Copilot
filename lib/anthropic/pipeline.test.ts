@@ -23,6 +23,10 @@ interface State {
   writes: { table: string; op: string; patch: Row }[];
   /** simulate a pre-0016 schema: reading `payload` errors (never throws) */
   payloadReadFails?: boolean;
+  /** the `rates` table, for the market check's live figures */
+  rates?: Row[];
+  /** the `benchmarks` table, likewise */
+  benchmarks?: Row[];
 }
 
 /** A chainable, thenable query like supabase-js's, over an in-memory store. */
@@ -119,6 +123,16 @@ class FakeQuery {
       }
       if (this.op === "update") for (const j of rows) Object.assign(j, this.patch);
       return { data: this.wantsRows ? rows.map((j) => ({ id: j.id })) : null, error: null };
+    }
+    // The two public-figure tables the market check reads, filtered the one
+    // way the read filters them: a series by its id, a metro by its name.
+    if (table === "rates") {
+      const id = this.where("series_id");
+      return { data: (state.rates ?? []).filter((r) => r.series_id === id), error: null };
+    }
+    if (table === "benchmarks") {
+      const metro = this.where("metro");
+      return { data: (state.benchmarks ?? []).filter((r) => r.metro === metro), error: null };
     }
     return { data: null, error: null };
   }
@@ -326,11 +340,63 @@ describe("runAnalysis — the happy path", () => {
     expect(state.deals.d1.extraction).toEqual(EXTRACTION);
     expect(state.deals.d1.challenges).toEqual(CHALLENGES);
     expect(state.deals.d1.comps).toEqual(COMPS);
-    expect(state.deals.d1.market).toEqual(MARKET);
+    // A deal with no address sits in no covered market: the check ran on
+    // typical ranges alone and the result says so with a null brief.
+    expect(state.deals.d1.market).toEqual({ ...MARKET, liveBrief: null });
+    expect(vi.mocked(checkMarket).mock.calls[0][3]).toBeNull();
     expect(state.deals.d1.verdict).toMatchObject({ verdict: "caution" });
     expect(staleAfterFailure(job()).size).toBe(0);
     // A pipeline step never sees the provider's raw error on this path.
     expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  it("a deal in a covered market hands the market check the metro's published figures, dated, and stores what it read", async () => {
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    state.rates = [
+      { series_id: "WASH911URN", obs_date: "2026-07-01", value: 3.4 },
+      { series_id: "WASH911URN", obs_date: "2026-06-01", value: 3.2 },
+      { series_id: "HVS_RVR_47900", obs_date: "2026-04-01", value: 6.2 },
+      { series_id: "HVS_RVR_47900_MOE", obs_date: "2026-04-01", value: 2.2 },
+    ];
+    // The Zillow pull keys its rows by the covered metro's own name (data/research/metros.json).
+    state.benchmarks = [
+      { metric: "zori_rent", metro: "Washington DC", low: 2310, as_of: "2026-08-31", note: "Washington, DC", source: "Zillow" },
+      { metric: "zori_rent_yoy", metro: "Washington DC", low: 2.1, as_of: "2026-08-31", note: "", source: "Zillow" },
+    ];
+    // Freshness is judged against today, so pin the clock to the day the fixture's figures are current on.
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    const handed = vi.mocked(checkMarket).mock.calls[0][3];
+    expect(handed).toContain("Published figures for the Washington DC market the deal sits in, read on 2026-09-23");
+    expect(handed).toContain("- Unemployment 3.4% (Jul 2026, Washington MSA; FRED), +0.2 pt on the month before");
+    expect(handed).toContain("- Rental vacancy, metro area, Washington MSA: 6.2% with a ±2.2 pt margin of error");
+    expect(handed).toContain("- Asking rent, all home types: $2,310/mo, +2.1% from a year ago (Aug 2026; Zillow Research");
+    const stored = state.deals.d1.market as {
+      liveBrief?: { metro: string; readOn: string; lines: string[]; figures: { key: string; value: number }[] } | null;
+    };
+    expect(stored.liveBrief?.metro).toBe("Washington DC");
+    expect(stored.liveBrief?.readOn).toBe("2026-09-23");
+    expect(stored.liveBrief?.lines).toHaveLength(3);
+    expect(stored.liveBrief?.figures.map((f) => [f.key, f.value])).toEqual([
+      ["unemployment", 3.4],
+      ["rental_vacancy_msa", 6.2],
+      ["zori_rent", 2310],
+    ]);
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  it("a covered-market deal whose tables hold nothing fresh gets a check on typical ranges alone, never a failed screen", async () => {
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    state.rates = [{ series_id: "WASH911URN", obs_date: "2019-07-01", value: 3.4 }];
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect(vi.mocked(checkMarket).mock.calls[0][3]).toBeNull();
+    expect((state.deals.d1.market as { liveBrief?: unknown }).liveBrief).toBeNull();
   });
 });
 

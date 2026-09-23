@@ -178,6 +178,30 @@ export interface MarketCheck {
 export interface MarketResult {
   checks: MarketCheck[];
   summary: string;
+  /** The metro's published figures the check was handed, where the deal
+   *  sits in a covered market (lib/live-market-brief): the metro, the day
+   *  they were read and one dated line a figure — stored with the result
+   *  so the page can say what the check read, and absent (or null) on a
+   *  deal outside the covered markets or a check run before this existed. */
+  liveBrief?: LiveBriefRecord | null;
+}
+
+export interface LiveBriefRecord {
+  metro: string;
+  readOn: string;
+  lines: string[];
+  /** the same figures as values (lib/live-market-brief `LiveFigure`), so a
+   *  later screen can say what moved since; absent on a record written
+   *  before they were stored */
+  figures?: LiveBriefFigure[];
+}
+
+export interface LiveBriefFigure {
+  key: string;
+  label: string;
+  value: number;
+  unit: "pct" | "pts" | "usd" | "count" | "days" | "rank" | "years";
+  asOf: string;
 }
 
 /**
