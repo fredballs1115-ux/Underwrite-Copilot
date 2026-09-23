@@ -141,7 +141,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   Zillow, Realtor.com — from the same cached reads the public pages
   draw, and names the stale series rather than averaging them away; the
   per-metro feeds are judged on `SAMPLE_METRO` (Washington DC, the one
-  market every source covers) and the card says so. The nightly
+  market every source covers) and the card says so; the states' series
+  (#400) on `SAMPLE_STATE` (Pennsylvania, under its `state:PA` market
+  id), a row of their own, because they are the last and longest part of
+  the pull and a stall there is invisible from the metros' rows. The nightly
   steward's whole-table rule ("no `rates` row newer than five days")
   cannot see a dead monthly pull behind fresh daily rows, and this can;
   a feed with no rows says "no rows", never "current".

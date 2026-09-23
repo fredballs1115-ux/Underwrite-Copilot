@@ -5,7 +5,7 @@ import { hoursSince } from "@/lib/research";
 import { liveMetroRates, liveRates } from "@/lib/live-rates-read";
 import { liveZori } from "@/lib/zori-read";
 import { liveRealtor } from "@/lib/realtor-read";
-import { SAMPLE_METRO, feedHealth, type FeedStatus } from "@/lib/feed-health";
+import { SAMPLE_METRO, SAMPLE_STATE, feedHealth, type FeedStatus } from "@/lib/feed-health";
 import { CostCard, type UsageRow } from "./cost-card";
 import { FeedsCard } from "./feeds-card";
 
@@ -142,13 +142,15 @@ export default async function DataHealthPage() {
   let feeds: FeedStatus[] = [];
   try {
     const now = new Date();
-    const [rates, metro, zori, realtor] = await Promise.all([
+    const [rates, metro, state, zori, realtor] = await Promise.all([
       liveRates(now),
       liveMetroRates(SAMPLE_METRO.id, now),
+      // The states' series, judged on one state's rows under its market id.
+      liveMetroRates(SAMPLE_STATE.id, now),
       liveZori(SAMPLE_METRO.name),
       liveRealtor(SAMPLE_METRO.name),
     ]);
-    feeds = feedHealth({ rates, metro, zori, realtor, now });
+    feeds = feedHealth({ rates, metro, state, zori, realtor, now });
   } catch (err) {
     console.warn("feed health unavailable:", err instanceof Error ? err.message : err);
   }

@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { FeedsCard } from "@/app/(app)/data-health/feeds-card";
-import { SAMPLE_METRO, feedHealth } from "@/lib/feed-health";
+import { SAMPLE_METRO, SAMPLE_STATE, feedHealth } from "@/lib/feed-health";
 import { readMetroRates, readRates, type RateRow } from "@/lib/live-rates";
 import { FIXTURE_NOW, REAL_ROWS } from "@/lib/live-rates.fixture";
 import type { ZoriRead } from "@/lib/zori";
@@ -20,10 +20,20 @@ const DC_ROWS: RateRow[] = [
   { series_id: "HVS_RVR_47900", obs_date: "2026-04-01", value: 6.2 },
 ];
 
+// Pennsylvania's own rows, as the branch's dry run printed them on
+// 2026-09-23 (rates run 35933147137): the unemployment rate, a month of
+// permits and the survey's annual vacancy.
+const PA_ROWS: RateRow[] = [
+  { series_id: "PAUR", obs_date: "2026-08-01", value: 3.7 },
+  { series_id: "PABPPRIV", obs_date: "2026-07-01", value: 2519 },
+  { series_id: "PARVAC", obs_date: "2025-01-01", value: 6.6 },
+];
+
 function render(now: Date, zori: ZoriRead | null, realtor: RealtorRead | null): string {
   const feeds = feedHealth({
     rates: readRates(REAL_ROWS, now),
     metro: readMetroRates(SAMPLE_METRO.id, DC_ROWS, now),
+    state: readMetroRates(SAMPLE_STATE.id, PA_ROWS, now),
     zori,
     realtor,
     now,
@@ -40,6 +50,9 @@ describe("FeedsCard — every feed's row, current or named stale", () => {
     expect(gluedWords(text)).toEqual([]);
     expect(text).toMatch(/Every feed is current for its own cadence/);
     expect(text).toMatch(/judged on Washington DC/);
+    // The states' pull has a row of its own, judged on Pennsylvania's rows and named.
+    expect(text).toMatch(/and the states' series on Pennsylvania/);
+    expect(text).toMatch(/State series/);
     expect(text).toMatch(/Rates — daily series/);
     expect(text).toMatch(/2026-09-21 · today/);
     expect(text).toMatch(/Asking rents and home values/);

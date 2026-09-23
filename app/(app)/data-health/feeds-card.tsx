@@ -10,6 +10,8 @@ import { feedStatusWord, type FeedStatus } from "@/lib/feed-health";
  */
 export function FeedsCard({ feeds, sample }: { feeds: readonly FeedStatus[]; sample: string }) {
   const stale = feeds.filter((f) => feedStatusWord(f) !== "current");
+  // The states' series are judged on one state's rows, named beside the metro.
+  const stateSample = feeds.find((f) => f.spec.id === "state_fred")?.sample ?? null;
   return (
     <section
       className={`rounded-xl border p-4 ${stale.length ? "border-amber-500/40 bg-amber-500/5" : "border-line bg-surface"}`}
@@ -20,8 +22,8 @@ export function FeedsCard({ feeds, sample }: { feeds: readonly FeedStatus[]; sam
         {feeds.length === 0
           ? "The rates and benchmarks tables could not be read just now, so nothing here can be judged."
           : stale.length === 0
-            ? `Every feed is current for its own cadence. Per-metro feeds are judged on ${sample}, the one market every source covers.`
-            : `${stale.length} of ${feeds.length} feeds ${stale.length === 1 ? "is" : "are"} not current — the series are named below. Per-metro feeds are judged on ${sample}, the one market every source covers.`}
+            ? `Every feed is current for its own cadence. Per-metro feeds are judged on ${sample}, the one market every source covers${stateSample ? `, and the states' series on ${stateSample}` : ""}.`
+            : `${stale.length} of ${feeds.length} feeds ${stale.length === 1 ? "is" : "are"} not current — the series are named below. Per-metro feeds are judged on ${sample}, the one market every source covers${stateSample ? `, and the states' series on ${stateSample}` : ""}.`}
       </p>
       {feeds.length > 0 && (
         <div className="mt-3 overflow-x-auto">

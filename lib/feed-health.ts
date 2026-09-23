@@ -35,6 +35,10 @@ export interface FeedSpec {
 }
 
 export const SAMPLE_METRO = { id: "dc", name: "Washington DC" } as const;
+/** The state the states' series are judged on — the sample deal's own,
+ *  read under its market id the way a deal outside the covered metros
+ *  reads it, so the card sees the state pull die the way it sees a metro's. */
+export const SAMPLE_STATE = { id: "state:PA", name: "Pennsylvania" } as const;
 
 export const FEEDS: readonly FeedSpec[] = [
   { id: "fred_daily", name: "Rates — daily series", publisher: "FRED", schedule: "weekdays, after the morning release", workflow: "rates.yml" },
@@ -42,6 +46,7 @@ export const FEEDS: readonly FeedSpec[] = [
   { id: "fred_monthly", name: "Rates — monthly series", publisher: "FRED", schedule: "weekdays; each series on its release day", workflow: "rates.yml" },
   { id: "fred_quarterly", name: "Rates — quarterly series", publisher: "FRED", schedule: "weekdays; about two months after the quarter ends", workflow: "rates.yml" },
   { id: "metro_fred", name: "Metro series", publisher: "FRED", schedule: "weekdays, with the rates pull", workflow: "rates.yml" },
+  { id: "state_fred", name: "State series", publisher: "FRED", schedule: "weekdays, last in the rates pull", workflow: "rates.yml" },
   { id: "bls", name: "Metro rent index", publisher: "the BLS", schedule: "weekdays, with the rates pull", workflow: "rates.yml" },
   { id: "census_hvs", name: "Metro rental vacancy", publisher: "the Census Bureau", schedule: "the 6th of Feb, May, Aug and Nov", workflow: "hvs.yml" },
   { id: "zillow", name: "Asking rents and home values", publisher: "Zillow Research", schedule: "the 20th of each month", workflow: "zori.yml" },
@@ -77,6 +82,9 @@ export interface FeedHealthInput {
   rates: readonly LiveRate[];
   /** the sample metro's series (`liveMetroRates(SAMPLE_METRO.id)`) */
   metro: readonly LiveRate[];
+  /** the sample state's series (`liveMetroRates(SAMPLE_STATE.id)`) — the
+   *  states' pull, judged on one state's rows; absent reads as no rows */
+  state?: readonly LiveRate[];
   zori: ZoriRead | null;
   realtor: RealtorRead | null;
   now: Date;
@@ -114,7 +122,7 @@ const cadenceOf = (r: LiveRate): Cadence => r.meta.cadence;
 const sourceOf = (r: LiveRate): SeriesSource => (r.meta as { source?: SeriesSource }).source ?? "fred";
 
 export function feedHealth(input: FeedHealthInput): FeedStatus[] {
-  const { rates, metro, zori, realtor, now } = input;
+  const { rates, metro, state = [], zori, realtor, now } = input;
   const sample = SAMPLE_METRO.name;
   return [
     ofSeries(spec("fred_daily"), rates.filter((r) => cadenceOf(r) === "daily"), null),
@@ -122,6 +130,7 @@ export function feedHealth(input: FeedHealthInput): FeedStatus[] {
     ofSeries(spec("fred_monthly"), rates.filter((r) => cadenceOf(r) === "monthly"), null),
     ofSeries(spec("fred_quarterly"), rates.filter((r) => cadenceOf(r) === "quarterly"), null),
     ofSeries(spec("metro_fred"), metro.filter((r) => sourceOf(r) === "fred"), sample),
+    ofSeries(spec("state_fred"), state.filter((r) => sourceOf(r) === "fred"), SAMPLE_STATE.name),
     ofSeries(spec("bls"), metro.filter((r) => sourceOf(r) === "bls"), sample),
     ofSeries(spec("census_hvs"), metro.filter((r) => sourceOf(r) === "census"), sample),
     ofBench(spec("zillow"), zori?.asOf ?? null, ZILLOW_FRESH_DAYS, "asking rent", now, sample),
