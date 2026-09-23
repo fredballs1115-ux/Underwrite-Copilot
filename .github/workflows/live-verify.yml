@@ -900,6 +900,13 @@ jobs:
           # and absent for a metro with no sector snapshot — the default
           # metro has one.
           mark "#392 the sector panel reads the national lessor rent index" grep -q "Rents lessors charge, national (BLS producer price index" p_market.html
+          # #393 — the metro's payrolls by sector, one picture under the
+          # tiles, and the sector panel's own line reading the sector that
+          # fills each kind of building. Both draw from rows the rates pull
+          # writes (five sector series a metro), so both read NOT DEPLOYED
+          # until the first pull after the deploy — see #390.
+          mark "#393 the metro's jobs by sector are one picture on the market brief" grep -q "Jobs by sector, on a year ago" p_market.html
+          mark "#393 the sector panel reads the metro's own sector payrolls" grep -q "Payrolls in professional and business services, Washington MSA" p_market.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

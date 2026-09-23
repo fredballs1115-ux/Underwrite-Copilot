@@ -43,8 +43,15 @@ const OBSERVATIONS = historyRows;
 // and a probe two a candidate, so the pace has to hold the whole run under
 // two a second — at 150 ms the first probe of eighty ids collected 429s
 // from the sixtieth onward, which read as "series does not exist" for
-// twenty ids that exist perfectly well.
-const PACE_MS = 350;
+// twenty ids that exist perfectly well. The sector payrolls (five a metro,
+// fourteen metros) took the table past two hundred series, so the pace is
+// 520 ms — 115 a minute, under the limit on its own, with the retry as the
+// margin rather than the plan. And the limit is per KEY, not per run: a
+// probe dispatched while the weekday pull was running cost that pull the
+// 7-year and the 10-year real yield (run 35919413352, "failed: DGS7,
+// DFII10"), and three probes dispatched together lost each other a series
+// apiece to 429s — run them one after another, never beside the pull.
+const PACE_MS = 520;
 
 const dryRun = process.env.DRY_RUN === "1";
 const fredKey = process.env.FRED_API_KEY;

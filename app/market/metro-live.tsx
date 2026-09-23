@@ -1,12 +1,17 @@
 import { RateTile } from "@/app/rates-strip";
 import {
+  SECTOR_JOBS_LABEL,
   formatMove,
   formatValue,
+  isSectorJobsMetric,
   permitsTrailingYear,
+  seriesUrl,
   shortDate,
   type LiveRate,
   type MetroSeriesMeta,
+  type SectorJobsMetric,
 } from "@/lib/live-rates";
+import { monthOf } from "@/lib/zori";
 
 /**
  * A covered metro's own figures, live from FRED — the four things a metro
@@ -48,6 +53,19 @@ import {
  *   it — and the same survey's rate for the Census region the metro sits
  *   in, the steadier figure, named as the region's.
  *
+ * - **Jobs by sector** — the same payroll count taken apart: the BLS's
+ *   supersector employment for the MSA, five sectors against a year ago,
+ *   drawn as ONE PICTURE (signed bars from a centre line, beside all
+ *   payrolls) rather than five more tiles, because the reading is the
+ *   comparison — which sectors are growing — and a tile a sector would
+ *   hide it in a grid. Each sector is the one that fills a kind of
+ *   building: professional and business services fill offices,
+ *   transportation and warehousing fill warehouses, retail trade fills
+ *   stores, leisure and hospitality run hotels, education and health
+ *   staff clinics. The market check reads the deal's own sector from the
+ *   same rows (`sectorJobsFor`), so a visitor sees what a screen is
+ *   handed.
+ *
  * BORROWED IS SAID. A suburb of Washington has its own unemployment rate
  * and nothing else at this cadence — permits, payrolls and house prices
  * are published for the MSA — so those tiles carry the MSA's name in
@@ -68,6 +86,10 @@ export function MetroLive({
 }) {
   if (rates.length === 0) return null;
   const metas = rates.map((r) => r.meta as MetroSeriesMeta);
+  // The sector payrolls are one picture under the tiles, not five tiles.
+  const sectors = rates.filter((r) => isSectorJobsMetric((r.meta as MetroSeriesMeta).metric));
+  const tiles = rates.filter((r) => !isSectorJobsMetric((r.meta as MetroSeriesMeta).metric));
+  const allJobs = rates.find((r) => (r.meta as MetroSeriesMeta).metric === "jobs_yoy") ?? null;
   // Borrowed from the MSA — the region's rental vacancy is borrowed too, and
   // said in its own sentence, since "the metro area's" would be wrong of it.
   const borrowed = metas.filter((m) => m.metro !== metroId && m.metric !== "rental_vacancy");
@@ -97,7 +119,7 @@ export function MetroLive({
         </span>
       </h3>
       <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-5">
-        {rates.map((r) => {
+        {tiles.map((r) => {
           const meta = r.meta as MetroSeriesMeta;
           // A borrowed figure wears the MSA's name on its own tile.
           const owner = meta.metro === metroId ? "" : ` · ${meta.area}`;
@@ -151,8 +173,11 @@ export function MetroLive({
           return <RateTile key={r.meta.id} r={r} short={`${r.meta.short}${owner}`} />;
         })}
       </div>
+      {sectors.length > 0 && <SectorJobsPicture sectors={sectors} allJobs={allJobs} metroId={metroId} />}
       <p className="mt-2 text-[11px] text-muted">
         Pulled every weekday; each figure links to its series.
+        {sectors.length > 0 &&
+          " Jobs by sector are the BLS's payroll counts for the metro area by supersector, each against a year ago beside all payrolls: the sector that fills a building's kind is the demand an underwrite of it is assuming, and a screen of a deal here is handed that sector's line."}
         {hasRentIndex &&
           " The rent index is what sitting tenants pay across the area's leases; the asking rent above is this month's new ones."}
         {fromBls &&
@@ -165,6 +190,74 @@ export function MetroLive({
           (hasMsaVacancy
             ? " The region's rental vacancy is the same survey's, from FRED, named as the region's."
             : " The rental vacancy is the Census Bureau's Housing Vacancy Survey, which publishes no metro figure: the tile carries the region's and names it.")}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The metro's payrolls by sector, on a year ago — five signed bars from a
+ * centre line on one scale, with all payrolls drawn first as the figure
+ * each sector is read against. The widths are the real changes
+ * (aria-hidden: each row's label and figure read as text, and the figure
+ * links to its series). A stale sector is drawn with its date said, as the
+ * strip shows a stale figure, so a dead series is worth seeing rather
+ * than silently absent; the caption carries the newest month.
+ */
+function SectorJobsPicture({
+  sectors,
+  allJobs,
+  metroId,
+}: {
+  sectors: readonly LiveRate[];
+  allJobs: LiveRate | null;
+  metroId: string;
+}) {
+  const first = sectors[0].meta as MetroSeriesMeta;
+  const owner = first.metro === metroId ? "" : ` · ${first.area}`;
+  const rows: { label: string; r: LiveRate; tone: string }[] = [
+    ...(allJobs ? [{ label: "All payrolls", r: allJobs, tone: "bg-ink/40" }] : []),
+    ...sectors.map((r) => ({
+      label: SECTOR_JOBS_LABEL[(r.meta as MetroSeriesMeta).metric as SectorJobsMetric],
+      r,
+      tone: "bg-brand",
+    })),
+  ];
+  const widest = Math.max(0.1, ...rows.map((x) => Math.abs(x.r.value)));
+  const newest = sectors.map((r) => r.obsDate).sort().at(-1) ?? sectors[0].obsDate;
+  const stale = sectors.filter((r) => !r.fresh);
+  return (
+    <div className="mt-4">
+      <h4 className="text-[11px] uppercase tracking-wide text-muted">{`Jobs by sector, on a year ago${owner}`}</h4>
+      <div className="mt-1.5 max-w-xl space-y-1">
+        {rows.map(({ label, r, tone }) => (
+          <div key={r.meta.id} className="flex items-center gap-2">
+            <span className="w-40 shrink-0 truncate text-[11px] text-muted sm:w-56" title={r.meta.label}>
+              {label}
+            </span>
+            <div className="relative h-3 flex-1 rounded-sm bg-faint" aria-hidden="true">
+              <div className="absolute inset-y-0 left-1/2 w-px bg-line" />
+              <div
+                data-bar="sectorjobs"
+                className={`absolute inset-y-0 ${r.value >= 0 ? "left-1/2" : "right-1/2"} ${tone}`}
+                style={{ width: `${(Math.abs(r.value) / widest) * 50}%` }}
+              />
+            </div>
+            <a
+              href={seriesUrl(r.meta.id)}
+              target="_blank"
+              rel="noreferrer"
+              className="w-16 shrink-0 text-right font-mono text-[11px] tabular-nums text-ink underline decoration-dotted underline-offset-2 hover:text-brand"
+              title={`${label}: ${r.meta.label}`}
+            >
+              {formatValue(r)}
+            </a>
+          </div>
+        ))}
+      </div>
+      <p className="mt-1 text-[11px] text-muted">
+        {`${monthOf(newest)} · BLS payrolls via FRED · each figure links to its series`}
+        {stale.length > 0 && ` · ${stale.length === 1 ? "one sector's figure is stale" : `${stale.length} sectors' figures are stale`}: ${stale.map((r) => `${SECTOR_JOBS_LABEL[(r.meta as MetroSeriesMeta).metric as SectorJobsMetric]} as of ${shortDate(r.obsDate)}`).join(", ")}`}
       </p>
     </div>
   );

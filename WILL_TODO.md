@@ -210,6 +210,19 @@ route read it through one function pair — `todayReads` and
 Then #392: the market brief's "By asset type" panel draws each
 commercial sector's national lessor rent index under its tracker
 fundamentals — the nation's figure, said so, dated, the series linked.
+Then #393: each metro's payrolls BY SECTOR — the BLS's supersector
+employment for the MSA, five sectors against a year ago, seventy series
+verified id by id from the runner (probes 35920921683, 35920930790 and
+35921989451: the short ids carry three sectors for twelve metros, the
+BLS-shaped `SMU…SA` ids the other two, Los Angeles all five in that
+form, Boston's only not seasonally adjusted) — drawn as ONE picture
+under the metro tiles (signed bars beside all payrolls), read into the
+market check as the ONE sector that fills the deal's kind of building
+(professional and business services for an office, transportation and
+warehousing for a warehouse, retail trade for a store, leisure and
+hospitality for a hotel, education and health for a clinic; rental
+housing reads all payrolls, a net lease or a data centre none), and
+said under each commercial sector's fundamentals on the market brief.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.

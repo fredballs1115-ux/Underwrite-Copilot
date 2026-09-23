@@ -32,6 +32,9 @@ import {
   METRO_SERIES,
   REGION_SERIES,
   PERMIT_WINDOW_MONTHS,
+  SECTOR_JOBS_LABEL,
+  SECTOR_JOBS_METRICS,
+  isSectorJobsMetric,
   metroSeriesFor,
   permitsTrailingYear,
   readMetroRates,
@@ -653,6 +656,7 @@ describe("a covered metro's own series", () => {
     expect(pg.series.map((s) => s.metric)).toEqual([
       "unemployment",
       "jobs_yoy",
+      ...SECTOR_JOBS_METRICS,
       "permits",
       "rent_cpi_yoy",
       "rental_vacancy_msa",
@@ -661,7 +665,7 @@ describe("a covered metro's own series", () => {
     expect(pg.series[0].id).toBe("MDPRIN5URN");
     expect(pg.series[0].metro).toBe("pg_county");
     expect(pg.series[1].metro).toBe("dc");
-    expect(pg.borrowed).toEqual(["jobs_yoy", "permits", "rent_cpi_yoy", "rental_vacancy_msa", "rental_vacancy"]);
+    expect(pg.borrowed).toEqual(["jobs_yoy", ...SECTOR_JOBS_METRICS, "permits", "rent_cpi_yoy", "rental_vacancy_msa", "rental_vacancy"]);
   });
 
   it("gives Newark its own house prices and New York's jobs", () => {
@@ -669,6 +673,7 @@ describe("a covered metro's own series", () => {
     expect(nj.series.map((s) => s.metric)).toEqual([
       "unemployment",
       "jobs_yoy",
+      ...SECTOR_JOBS_METRICS,
       "permits",
       "hpi_yoy",
       "rent_cpi_yoy",
@@ -678,7 +683,71 @@ describe("a covered metro's own series", () => {
     const hpi = nj.series.find((s) => s.metric === "hpi_yoy")!;
     expect(hpi.id).toBe("ATNHPIUS35084Q_YOY");
     expect(hpi.metro).toBe("newark_jc");
-    expect(nj.borrowed).toEqual(["unemployment", "jobs_yoy", "permits", "rent_cpi_yoy", "rental_vacancy_msa", "rental_vacancy"]);
+    expect(nj.borrowed).toEqual(["unemployment", "jobs_yoy", ...SECTOR_JOBS_METRICS, "permits", "rent_cpi_yoy", "rental_vacancy_msa", "rental_vacancy"]);
+  });
+
+  it("files each metro's payrolls by sector after its jobs, as FRED's own change from a year ago, only where the runner found the series", () => {
+    // The probes of 2026-09-23 (rates runs 35920921683, 35920930790 and
+    // 35921989451): FRED's short ids carry professional and business
+    // services, education and health, and leisure and hospitality for
+    // twelve metros (WASH911PBSV, …EDUH, …LEIH); retail trade and
+    // transportation, warehousing and utilities exist only under the
+    // BLS-shaped SMU…SA ids (SMU11479004200000001SA); Los Angeles has all
+    // five in the SMU…SA form and no short ids; and Boston's exist only NOT
+    // seasonally adjusted (SMU25144606000000001, no suffix — the SA form
+    // and the SMS form both answered "does not exist"), which a change
+    // against the same month a year earlier reads the same way.
+    const dc = metroSeriesFor("dc").series.filter((s) => isSectorJobsMetric(s.metric));
+    expect(dc.map((s) => s.metric)).toEqual(SECTOR_JOBS_METRICS);
+    expect(dc.map((s) => s.id)).toEqual([
+      "WASH911PBSV_YOY",
+      "WASH911EDUH_YOY",
+      "SMU11479004300000001SA_YOY",
+      "SMU11479004200000001SA_YOY",
+      "WASH911LEIH_YOY",
+    ]);
+    expect(metroSeriesFor("los_angeles").series.filter((s) => isSectorJobsMetric(s.metric)).map((s) => s.fred)).toEqual([
+      "SMU06310806000000001SA",
+      "SMU06310806500000001SA",
+      "SMU06310804300000001SA",
+      "SMU06310804200000001SA",
+      "SMU06310807000000001SA",
+    ]);
+    expect(metroSeriesFor("boston").series.filter((s) => isSectorJobsMetric(s.metric)).map((s) => s.fred)).toEqual([
+      "SMU25144606000000001",
+      "SMU25144606500000001",
+      "SMU25144604300000001",
+      "SMU25144604200000001",
+      "SMU25144607000000001",
+    ]);
+    // Every sector series is a transform of the level, a change in points,
+    // monthly, on the metro lag — and its label is FRED's own title.
+    for (const m of METRO_SERIES.filter((s) => isSectorJobsMetric(s.metric))) {
+      expect(m.units, m.id).toBe("pc1");
+      expect(m.id, m.id).toMatch(/_YOY$/);
+      expect(m.unit, m.id).toBe("pts");
+      expect(m.cadence, m.id).toBe("monthly");
+      expect(m.freshDays, m.id).toBe(110);
+      expect(m.label, m.id).toMatch(/^All Employees: .* — change from a year ago$/);
+      expect(SECTOR_JOBS_LABEL[m.metric as keyof typeof SECTOR_JOBS_LABEL], m.id).toBeTruthy();
+    }
+    // Every MSA carries all five: fourteen pictures, seventy series.
+    const sectorSeries = METRO_SERIES.filter((s) => isSectorJobsMetric(s.metric));
+    expect(new Set(sectorSeries.map((s) => s.metro)).size).toBe(14);
+    expect(sectorSeries.length).toBe(70);
+    // And a read hands them back in the table's order, between the jobs and the permits.
+    const rows: RateRow[] = [
+      { series_id: "WASH911NA_YOY", obs_date: "2026-08-01", value: 1.2 },
+      { series_id: "SMU11479004200000001SA_YOY", obs_date: "2026-08-01", value: -0.4 },
+      { series_id: "WASH911PBSV_YOY", obs_date: "2026-08-01", value: 1.3 },
+      { series_id: "WASH911BPPRIV", obs_date: "2026-07-01", value: 1844 },
+    ];
+    expect(readMetroRates("dc", rows, NOW).map((r) => r.meta.id)).toEqual([
+      "WASH911NA_YOY",
+      "WASH911PBSV_YOY",
+      "SMU11479004200000001SA_YOY",
+      "WASH911BPPRIV",
+    ]);
   });
 
   it("leaves out a house price index FRED stopped publishing", () => {

@@ -2888,3 +2888,108 @@ describe("LessorRentLine — the rents a sector's lessors charge, nationally, un
     expect(render(React.createElement(LessorRentLine, { national: stale, sector: "office" }))).not.toContain("Rents lessors charge");
   });
 });
+
+// ── The metro's payrolls by sector: one picture under the tiles, and the
+// sector panel's own line ─────────────────────────────────────────────────
+import { SectorJobsLine } from "@/app/market/sector-jobs-line";
+
+describe("MetroLive — jobs by sector, one picture beside all payrolls", () => {
+  // Washington's five sector series as the table files them, with all
+  // payrolls to read them against; one row each — a figure, not yet a path.
+  const ROWS: RateRow[] = [
+    { series_id: "WASH911URN", obs_date: "2026-07-01", value: 4.0 },
+    { series_id: "WASH911NA_YOY", obs_date: "2026-08-01", value: 1.2 },
+    { series_id: "WASH911PBSV_YOY", obs_date: "2026-08-01", value: 1.31234 },
+    { series_id: "WASH911EDUH_YOY", obs_date: "2026-08-01", value: 3.4 },
+    { series_id: "SMU11479004300000001SA_YOY", obs_date: "2026-08-01", value: 0.6 },
+    { series_id: "SMU11479004200000001SA_YOY", obs_date: "2026-08-01", value: -0.4 },
+    { series_id: "WASH911LEIH_YOY", obs_date: "2026-08-01", value: 2.9 },
+  ];
+  const html = render(
+    React.createElement(MetroLive, { rates: readMetroRates("dc", ROWS, FIXTURE_NOW), metroId: "dc", metroName: "Washington DC" }),
+  );
+  const text = visibleText(html);
+
+  it("draws the five sectors and all payrolls as signed bars from a centre line, each figure linked to its series", () => {
+    expect(text).toContain("Jobs by sector, on a year ago");
+    for (const label of ["All payrolls", "Professional & business services", "Education & health services", "Transportation, warehousing & utilities", "Retail trade", "Leisure & hospitality"]) {
+      expect(text, label).toContain(label);
+    }
+    // The strip's own convention for a change in points: unsigned when
+    // positive (the bar carries the direction), a typographic minus when not.
+    expect(text).toContain("1.3%");
+    expect(text).toContain("\u22120.4%");
+    // Six bars: the five sectors and the figure they are read against.
+    expect((html.match(/data-bar="sectorjobs"/g) ?? []).length).toBe(6);
+    // A negative change draws leftward from the centre line.
+    expect(html).toContain('data-bar="sectorjobs" class="absolute inset-y-0 right-1/2 bg-brand"');
+    expect(html).toContain("https://fred.stlouisfed.org/series/WASH911PBSV\"");
+    expect(html).toContain("https://fred.stlouisfed.org/series/SMU11479004200000001SA\"");
+    expect(text).toContain("Aug 2026 · BLS payrolls via FRED");
+    // The sectors are not tiles: no sector's strip label is a heading here.
+    expect(text).toContain("Jobs y/y");
+    expect(text).not.toContain("Prof. & business services jobs y/y");
+    expect(text).not.toContain("Retail trade jobs y/y");
+    expect(text).toContain("the sector that fills a building's kind is the demand an underwrite of it is assuming");
+    expect(a11yIssues(html), "sector jobs picture").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("wears the MSA's name on a suburb's panel, and draws nothing for a metro with no sector rows", () => {
+    const pg = visibleText(
+      render(
+        React.createElement(MetroLive, {
+          rates: readMetroRates("pg_county", ROWS.concat({ series_id: "MDPRIN5URN", obs_date: "2026-07-01", value: 4.7 }), FIXTURE_NOW),
+          metroId: "pg_county",
+          metroName: "Prince George's County",
+        }),
+      ),
+    );
+    expect(pg).toContain("Jobs by sector, on a year ago · Washington MSA");
+    const none = render(
+      React.createElement(MetroLive, { rates: readMetroRates("dc", ROWS.slice(0, 2), FIXTURE_NOW), metroId: "dc", metroName: "Washington DC" }),
+    );
+    expect(none).not.toContain("Jobs by sector");
+    expect(none).not.toContain("sectorjobs");
+  });
+
+  it("says which sector's figure is stale rather than dropping it", () => {
+    // Read at the year's end: October's figures are ninety days old and
+    // current on the metro lag; a series stuck at May is not.
+    const later = new Date("2026-12-30T00:00:00Z");
+    const rows = ROWS.map((r) => ({ ...r, obs_date: r.series_id === "WASH911LEIH_YOY" ? "2026-05-01" : "2026-10-01" }));
+    const stale = visibleText(render(React.createElement(MetroLive, { rates: readMetroRates("dc", rows, later), metroId: "dc", metroName: "Washington DC" })));
+    expect(stale).toContain("Oct 2026 · BLS payrolls via FRED");
+    expect(stale).toContain("one sector's figure is stale: Leisure & hospitality as of May 1");
+  });
+});
+
+describe("SectorJobsLine — the metro's payrolls in the sector that fills this kind of building", () => {
+  const rates = readMetroRates(
+    "dc",
+    [
+      { series_id: "WASH911PBSV_YOY", obs_date: "2026-08-01", value: 1.31234 },
+      { series_id: "SMU11479004200000001SA_YOY", obs_date: "2026-08-01", value: -0.4 },
+    ],
+    FIXTURE_NOW,
+  );
+
+  it("the office panel reads professional and business services, dated, named as the metro area's, linked", () => {
+    const html = render(React.createElement(SectorJobsLine, { rates, sector: "office" }));
+    const text = visibleText(html);
+    expect(text).toContain("Payrolls in professional and business services, Washington MSA (the sector that fills offices):");
+    expect(text).toContain("1.3%");
+    expect(text).toContain("on a year ago, Aug 2026");
+    expect(html).toContain("https://fred.stlouisfed.org/series/WASH911PBSV\"");
+    expect(a11yIssues(html), "sector jobs line").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("retail reads retail trade; apartments, a sector with no row, and a stale row read nothing", () => {
+    expect(visibleText(render(React.createElement(SectorJobsLine, { rates, sector: "retail" })))).toContain("Payrolls in retail trade, Washington MSA (the sector that fills stores): \u22120.4%");
+    expect(render(React.createElement(SectorJobsLine, { rates, sector: "multifamily" }))).not.toContain("Payrolls in");
+    expect(render(React.createElement(SectorJobsLine, { rates, sector: "industrial" }))).not.toContain("Payrolls in");
+    const stale = readMetroRates("dc", [{ series_id: "WASH911PBSV_YOY", obs_date: "2026-08-01", value: 1.3 }], new Date("2027-06-01T00:00:00Z"));
+    expect(render(React.createElement(SectorJobsLine, { rates: stale, sector: "office" }))).not.toContain("Payrolls in");
+  });
+});

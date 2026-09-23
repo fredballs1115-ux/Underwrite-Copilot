@@ -15,6 +15,7 @@ import { liveMetroRates, liveRates } from "@/lib/live-rates-read";
 import type { LiveRate } from "@/lib/live-rates";
 import { MetroLive } from "./metro-live";
 import { LessorRentLine } from "./lessor-rent-line";
+import { SectorJobsLine } from "./sector-jobs-line";
 import { liveZori } from "@/lib/zori-read";
 import { ZoriLine } from "./zori-line";
 import { liveRealtor } from "@/lib/realtor-read";
@@ -92,6 +93,7 @@ function SectorSnapshotPanel({
   snapshot,
   metroId,
   national = [],
+  metroRates = [],
 }: {
   snapshot: Record<string, unknown> | null;
   metroId?: string;
@@ -99,6 +101,10 @@ function SectorSnapshotPanel({
    *  lessor rent index line — the nation's figure, said so, under the
    *  metro's tracker fundamentals */
   national?: readonly LiveRate[];
+  /** the metro's own rows (`liveMetroRates`), for each commercial sector's
+   *  payrolls line — the metro's figure in the sector that fills its kind
+   *  of building, the one the market check reads for a deal of that kind */
+  metroRates?: readonly LiveRate[];
 }) {
   const entries = Object.entries(snapshot ?? {}).filter(
     (e): e is [string, SnapBlock] => e[0] !== "as_of" && typeof e[1] === "object",
@@ -182,6 +188,7 @@ function SectorSnapshotPanel({
                     </a>
                   )}
                 </div>
+                <SectorJobsLine rates={metroRates} sector={sector} />
                 <LessorRentLine national={national} sector={sector} />
                 {b.note && (
                   <Fold
@@ -660,6 +667,7 @@ async function MetroExplorer({ selected }: { selected?: string }) {
           }
           metroId={active.id}
           national={national}
+          metroRates={live}
         />
 
         {typeof fmr?.["2br"] === "number" ? (
