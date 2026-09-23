@@ -894,6 +894,12 @@ jobs:
           # run after the deploy reads NOT DEPLOYED here: run the pull and
           # look again.
           mark "#390 the lessor rent indexes are on the strip" grep -q "Office rents y/y" p_tools2.html
+          # #392 — each commercial sector's lessor rent index under its
+          # fundamentals on the market brief: the phrase is one JS string
+          # ahead of the figure. Absent until the same rows exist (see #390),
+          # and absent for a metro with no sector snapshot — the default
+          # metro has one.
+          mark "#392 the sector panel reads the national lessor rent index" grep -q "Rents lessors charge, national (BLS producer price index" p_market.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

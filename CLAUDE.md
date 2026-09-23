@@ -472,7 +472,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   each year over year; a commercial deal's one rent figure of its own
   kind, national and said so, read by `rentIndexFor` in
   `lib/live-market-brief.ts` for the market check's brief and the
-  model's rent check; probe run 35917247236 printed the ids, dry run
+  model's rent check, and drawn under each commercial sector's tracker
+  fundamentals on `/market` by `app/market/lessor-rent-line.tsx`
+  (`LessorRentLine`, pure — #392 — the nation's figure, said so, with
+  the series linked); probe run 35917247236 printed the ids, dry run
   35917848391 the transformed figures the fixture holds — core PCE,
   three construction PPIs, construction wages, nonres spending), jobs and
   output, and the supply pipeline (starts, permits and completions in 5+

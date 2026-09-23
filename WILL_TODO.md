@@ -207,6 +207,9 @@ beside Assumptions (data, one row a published figure, absent with
 nothing read), and the deal page, the report route and the workbook
 route read it through one function pair — `todayReads` and
 `modelVsMarketFor` — so the three cannot disagree.
+Then #392: the market brief's "By asset type" panel draws each
+commercial sector's national lessor rent index under its tracker
+fundamentals — the nation's figure, said so, dated, the series linked.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.

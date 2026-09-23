@@ -2856,3 +2856,35 @@ describe("SampleLeverageCard — the sample's cap against the week's survey and 
     expect(gluedWords(text)).toEqual([]);
   });
 });
+
+// ── A sector's national lessor rent index on the market brief ───────────────
+import { LessorRentLine } from "@/app/market/lessor-rent-line";
+import { readRates as readNationalRates } from "@/lib/live-rates";
+import { FIXTURE_NOW as NATIONAL_NOW, REAL_ROWS as NATIONAL_ROWS } from "@/lib/live-rates.fixture";
+
+describe("LessorRentLine — the rents a sector's lessors charge, nationally, under its fundamentals", () => {
+  const national = readNationalRates(NATIONAL_ROWS, NATIONAL_NOW);
+
+  it("says the office index against a year ago, dated, as the nation's, with a link to FRED", () => {
+    const html = render(React.createElement(LessorRentLine, { national, sector: "office" }));
+    const text = visibleText(html);
+    expect(text).toContain("Rents lessors charge, national (BLS producer price index, lessors of professional and office buildings):");
+    expect(text).toContain("+7.2%");
+    expect(text).toContain("on a year ago, Aug 2026");
+    expect(text).toContain("the nation's lessors, not the metro's");
+    expect(html).toContain("https://fred.stlouisfed.org/series/PCU5311205311202");
+    expect(a11yIssues(html), "lessor rent line").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("retail reads its own index, and industrial its own", () => {
+    expect(visibleText(render(React.createElement(LessorRentLine, { national, sector: "retail" })))).toContain("shopping centers and retail stores): -0.3%");
+    expect(visibleText(render(React.createElement(LessorRentLine, { national, sector: "industrial" })))).toContain("manufacturing and industrial buildings): +3.2%");
+  });
+
+  it("renders nothing for apartments, which have the metro's own rents, and nothing on a stale table", () => {
+    expect(render(React.createElement(LessorRentLine, { national, sector: "multifamily" }))).not.toContain("Rents lessors charge");
+    const stale = readNationalRates(NATIONAL_ROWS, new Date("2027-06-01T00:00:00Z"));
+    expect(render(React.createElement(LessorRentLine, { national: stale, sector: "office" }))).not.toContain("Rents lessors charge");
+  });
+});
