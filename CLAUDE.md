@@ -707,7 +707,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   three probes dispatched together lost each other one apiece (run them
   one after another, never beside the pull), and the pace is 520 ms now
   the table passes two hundred series. **The sector page ranks the
-  markets by the same figure** (#394, `app/market/sector-jobs-rank.tsx`,
+  markets by the same figure** (the second commit of #393, `app/market/sector-jobs-rank.tsx`,
   `SectorJobsRank`, pure): under the vacancy leaderboard, the covered
   markets ranked by their payrolls in the sector that fills that kind of
   building (`sectorPayrollMetric` — the sector's own metric, all
@@ -720,7 +720,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   agree. The read is `liveMetricRates` in `lib/live-rates-read.ts` — ONE
   metric across the metros (`metricSeries`, `readMetricRates`), cached
   per metric — never every metro's whole panel for one figure apiece.
-  **And the whole board over the demand side** (#395,
+  **And the whole board over the demand side** (#393's third commit,
   `app/market/sector-jobs-board.tsx`, `SectorJobsBoard`, pure): under
   the vacancy board on `/market`, every metro area × all payrolls and
   the five sectors, each against a year ago, shaded within its column
@@ -827,7 +827,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   the deal is a plan, the page's own cap where it passes one and the
   extraction's otherwise), so the page, the report and the workbook
   cannot disagree about what was checked against what. **The research
-  tracker rides beside the feeds** (#396, `lib/tracker-read.ts`, pure):
+  tracker rides beside the feeds** (#394, `lib/tracker-read.ts`, pure):
   `trackerFor` reads the metro's sector snapshot (`data/research/metros.json`,
   the blocks the market brief's "By asset type" panel and the vacancy
   board draw) for the deal's kind of building — `trackerSectorFor`:

@@ -225,19 +225,19 @@ warehousing for a warehouse, retail trade for a store, leisure and
 hospitality for a hotel, education and health for a clinic; rental
 housing reads all payrolls, a net lease or a data centre none), and
 said under each commercial sector's fundamentals on the market brief.
-Then #394: the sector page ranks the covered markets by that sector's
+Then, in the same PR (#393), the sector page ranks the covered markets by that sector's
 payrolls under the vacancy leaderboard — the demand side beside the
 supply side, "Where retail trade jobs are growing", fastest first,
 signed bars, a suburb reading its MSA's figure and saying so, a market
 with no fresh figure listed unranked with the reason; the apartment
 page ranks by all payrolls. One cached read per metric across the
 metros (`liveMetricRates`), never every metro's whole panel.
-Then #395: the whole board over the demand side — every metro area ×
+Then, also in #393, the whole board over the demand side — every metro area ×
 every sector's payrolls against a year ago, under the vacancy board on
 `/market`, shaded within each column fastest first (the one shade both
 boards use, `heatShade`), a suburb reading its MSA's row, a stale cell
 shown with its date and left unranked, a missing series a dash.
-Then #396: the model's checks read the research tracker too
+Then #394: the model's checks read the research tracker too
 (`lib/tracker-read.ts`, the sector snapshots behind the market brief's
 "By asset type" panel): a commercial deal's stabilized vacancy — which
 had no row, since the Census survey counts rental housing only — is set
