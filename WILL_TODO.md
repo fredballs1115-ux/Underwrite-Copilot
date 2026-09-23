@@ -191,6 +191,9 @@ expense growth against consumer prices, vacancy against the survey's
 metro figure inside its margin, the exit cap's spread over today's
 10-year beside the going-in cap's (a compression named as one) — a
 card under the debt sizer, each figure dated and sourced, no verdict.
+Then #389: the full report prints the same read under its sensitivity
+grids (under the plan's grid on a plan deal), so the document says what
+the page says.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.

@@ -43,6 +43,7 @@ import {
   type YocGrid,
 } from "@/lib/plan-sensitivity";
 import { planFacts } from "@/lib/plan-facts";
+import type { ModelVsMarket } from "@/lib/model-vs-market";
 import { assetWords } from "@/lib/asset-words";
 import { inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { basisScale, fmtBasis, subjectBasis } from "@/lib/comp-detail";
@@ -247,6 +248,35 @@ const s = StyleSheet.create({
 /** A page (or in-page) heading with the memo's brand tick, plus an optional
  *  count pill derived from the data on the page ("31 figures · 4 flagged") —
  *  the reader knows the page's weight before reading a row. */
+/**
+ * The model's assumptions against the published figures (lib/model-vs-market)
+ * as the deal page's card prints them: one line an assumption — the model's
+ * figure, where it came from, which way it runs — and the sentence naming
+ * every figure with its date and publisher. Nothing with no read.
+ */
+function AssumptionsBlock({ read }: { read: ModelVsMarket | null | undefined }) {
+  if (!read || read.checks.length === 0) return null;
+  const scope = read.metro
+    ? `The model's growth, vacancy and exit cap, set against what the ${read.metro} market and the national series have actually done, read on ${read.readOn}.`
+    : `The model's expense growth and exit cap, set against the national series, read on ${read.readOn}.`;
+  return (
+    <View style={{ marginTop: 12 }} wrap={false}>
+      <TitleRow title="Assumptions against the published figures" marginTop={0} />
+      <Text style={s.sub}>
+        {`${scope} A trailing year is what an assumption is being asked to beat, not a forecast; a metro figure is the metro area's, not the submarket's or the building's.`}
+      </Text>
+      {read.checks.map((c) => (
+        <View key={c.key} style={{ marginTop: 3 }}>
+          <Text style={{ fontSize: 8.5, color: C.ink }}>
+            {`${c.title} ${c.model} (${c.modelSource}) — ${c.toneLabel}`}
+          </Text>
+          <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 1 }}>{c.read}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function TitleRow({
   title,
   count,
@@ -345,6 +375,11 @@ export interface ReportInput {
    *  when it falls inside it (lib/facts.ts: never an unvalidated page);
    *  null when the count is unknown, and then no page prints */
   totalPages: number | null;
+  /** the model's assumptions against the published figures
+   *  (lib/model-vs-market), read when the report was built — printed under
+   *  the sensitivity grids, or under the plan's grid on a plan deal; null
+   *  where there was no model or nothing fresh to read it against */
+  modelVsMarket?: ModelVsMarket | null;
 }
 
 /** Everything the deal screen produced, shaped for the multi-page report. */
@@ -357,10 +392,12 @@ export function buildReportData(
   plan?: PlanReport | null,
   overrides?: string[] | null,
   cover?: MemoData["cover"],
+  modelVsMarket?: ModelVsMarket | null,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
   return {
+    modelVsMarket: modelVsMarket ?? null,
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
@@ -615,7 +652,7 @@ function HeatGrid({
 }
 
 export function ReportDocument({ input }: { input: ReportInput }) {
-  const { deal, memo, sensitivity, plan } = input;
+  const { deal, memo, sensitivity, plan, modelVsMarket } = input;
   // Older callers built the input by hand without a page count: then no
   // citation validates, and none prints (the rule in lib/facts.ts).
   const totalPages = input.totalPages ?? null;
@@ -808,6 +845,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               )}. Figures are the OM's as extracted; the challenger's page tests whether the stabilized NOI is as conservative as the deck presents it. The IRR sensitivity page is omitted on a plan deal: the annual screening model books the budget in year 1 and anchors year 1 on in-place income, so its IRR grid is not the plan's return - this grid is.`,
             )}
           </Text>
+
+          {/* The plan deal has no sensitivity page, so its assumptions read
+              lands here, under the grid it is judged on. */}
+          {!sensitivity && <AssumptionsBlock read={modelVsMarket} />}
         </PageChrome>
       )}
 
@@ -899,6 +940,8 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             engine behind the Excel workbook and the on-screen playground.
             Re-export after changing assumptions.
           </Text>
+
+          <AssumptionsBlock read={modelVsMarket} />
         </PageChrome>
       )}
 

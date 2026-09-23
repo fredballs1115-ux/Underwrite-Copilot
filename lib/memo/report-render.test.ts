@@ -117,6 +117,50 @@ describe("ReportDocument (full report)", () => {
     expect(briefedText).toContain("10-year Treasury 4.94%");
     expect(await pdfTextOf(buf)).not.toContain("Figures the check read");
 
+    // The model's assumptions against the published figures land under the
+    // sensitivity grids when the route read them; the plain report has no
+    // such block rather than an empty one.
+    const assumed = await renderToBuffer(
+      React.createElement(ReportDocument, {
+        input: buildReportData(deal, "August 24, 2026", checks, sensitivity, undefined, null, null, undefined, {
+          readOn: "2026-09-21",
+          metro: "Philadelphia",
+          checks: [
+            {
+              key: "rent_growth",
+              title: "Rent growth",
+              model: "3.0%/yr",
+              modelSource: "a screening default",
+              published: [{ label: "Asking rent, all home types", text: "+2.3% over the year to Aug 2026", value: 2.3, asOf: "2026-08-31", publisher: "Zillow Research" }],
+              tone: "ahead",
+              toneLabel: "ahead of the published figures",
+              read: "The model grows rents 3.0%/yr. Over the past year the metro's asking rents moved +2.3% over the year to Aug 2026 (Zillow). The model runs ahead of every published figure, by 0.7 points. A trailing year is what the assumption is being asked to beat, not a forecast.",
+            },
+            {
+              key: "exit_cap",
+              title: "Exit cap",
+              model: "6.00%",
+              modelSource: "derived from the documents",
+              published: [{ label: "10-year Treasury", text: "4.94% on Sep 17, 2026", value: 4.94, asOf: "2026-09-17", publisher: "FRED" }],
+              tone: "widens",
+              toneLabel: "spread widens at the exit",
+              read: "The exit cap 6.00% is 106 bps over today's 10-year (4.94%, Sep 17, 2026; FRED). The going-in cap 5.45% is 51 bps over it, so the exit assumes the spread widens 55 bps with the 10-year where it is today - the conservative direction.",
+            },
+          ],
+        }),
+      }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    // The PDF's text comes back a line at a time, so a sentence is read
+    // with its line breaks folded — the wrap is the page's, not the words'.
+    const assumedText = (await pdfTextOf(assumed)).replace(/\s+/g, " ");
+    expect(assumedText).toContain("Assumptions against the published figures");
+    expect(assumedText).toContain("Philadelphia market and the national series have actually done, read on 2026-09-21");
+    expect(assumedText).toContain("Rent growth 3.0%/yr (a screening default)");
+    expect(assumedText).toContain("ahead of the published figures");
+    expect(assumedText).toContain("Exit cap 6.00% (derived from the documents)");
+    expect(assumedText).toContain("spread widens 55 bps with the 10-year where it is today");
+    expect(await pdfTextOf(buf)).not.toContain("Assumptions against the published figures");
+
     // The comp page draws each sale comp's stated basis on one track with
     // the subject's tick — a track, the fill and the tick, three fills a
     // comp — so the same report with comps that state no basis draws nine

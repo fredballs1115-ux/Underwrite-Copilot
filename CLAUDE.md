@@ -726,6 +726,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   both checks (`todayReads`), whether or not the market check stored any.
   The submarket card (`lib/market/checks.ts`) is the same idea against
   the analyst's OWN loaded series; this runs on what every deal gets.
+  The full report prints the same read (#389): the route makes the same
+  reads in its own try (a failed live read leaves the grids in place)
+  and `ReportInput.modelVsMarket` lands as `AssumptionsBlock` under the
+  sensitivity grids, or under the plan's grid on a plan deal, which has
+  no sensitivity page; `report-render.test.ts` reads it back with the
+  PDF's line breaks folded, because the extracted text wraps where the
+  page does.
 - What landlords are asking this month: `lib/zori.ts` (pure — a metro's
   Zillow Observed Rent Index and its change from a year ago, read out of
   the two `benchmarks` rows the MONTHLY pull writes, `scripts/fetch-zori.mjs`
