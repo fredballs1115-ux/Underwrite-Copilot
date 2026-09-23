@@ -34,11 +34,11 @@ import {
 import { dealContextFor } from "@/lib/deal-context";
 import { parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { metroForAddress } from "@/lib/market-match";
-import { metroSeriesFor, readMetroRates } from "@/lib/live-rates";
+import { SERIES, metroSeriesFor, readMetroRates, readRates } from "@/lib/live-rates";
 import { fetchBenchRows, fetchSeriesRows } from "@/lib/live-rates-query";
 import { ZILLOW_METRICS, zoriFor } from "@/lib/zori";
 import { REALTOR_METRICS, realtorFor } from "@/lib/realtor";
-import { liveMarketBrief, type LiveMarketBrief } from "@/lib/live-market-brief";
+import { DEBT_MARKET_IDS, liveMarketBrief, type LiveMarketBrief } from "@/lib/live-market-brief";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxLines } from "@/lib/criteria";
 import { notifyAnalysisReady } from "@/lib/email";
@@ -158,7 +158,11 @@ async function liveMarketFromDb(
   now: Date = new Date(),
 ): Promise<LiveMarketBrief | null> {
   try {
-    const { data } = await admin.from("deals").select("address").eq("id", dealId).single();
+    const { data } = await admin
+      .from("deals")
+      .select("address, asset_class, extraction")
+      .eq("id", dealId)
+      .single();
     // The column holds the structured object the deal form saved (the deals
     // list and the compare page read it the same way); a row that still
     // carries the form's JSON string is parsed the form's way.
@@ -171,9 +175,16 @@ async function liveMarketFromDb(
           : null;
     const metro = metroForAddress(address ?? {});
     if (!metro) return null;
-    const [rateRows, bench] = await Promise.all([
+    // The debt-market lines read the class the deck turned out to be, and
+    // whether the deal is a plan, so the lending-standards series is the
+    // one a bank reports for this kind of loan.
+    const ex = (data?.extraction as ExtractionResult | null) ?? null;
+    const assetClass = ex?.assetClass || (data?.asset_class as string | null) || null;
+    const plan = isPlanDeal(inferStrategy(ex).kind);
+    const [rateRows, bench, nationalRows] = await Promise.all([
       fetchSeriesRows(admin, metroSeriesFor(metro.id).series),
       fetchBenchRows(admin, metro.name, [...ZILLOW_METRICS, ...REALTOR_METRICS]),
+      fetchSeriesRows(admin, SERIES.filter((s) => (DEBT_MARKET_IDS as readonly string[]).includes(s.id))),
     ]);
     return liveMarketBrief({
       metro,
@@ -181,6 +192,9 @@ async function liveMarketFromDb(
       zori: zoriFor(bench, metro.name),
       realtor: realtorFor(bench, metro.name),
       now,
+      national: readRates(nationalRows, now),
+      assetClass,
+      plan,
     });
   } catch (err) {
     console.warn(`[pipeline] live market figures unavailable for deal ${dealId}:`, err instanceof Error ? err.message : err);

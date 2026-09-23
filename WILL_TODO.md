@@ -161,6 +161,12 @@ has not updated since apart from one that did not move.
 Then #383: the Feeds card on `/data-health` — each pull judged on its
 own cadence with the stale series named, so a dead monthly pull behind
 fresh daily rows is visible to the operator before a visitor meets it.
+Then #384: the market check reads the debt market too — the 10-year,
+the banks' own lending standards for this kind of loan (multifamily,
+nonresidential, construction for a plan), CRE delinquency and bank CRE
+lending against a year ago — national, dated, for every deal, so the
+exit cap and the debt assumptions are checked against the capital side
+and not only the metro's income side.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.

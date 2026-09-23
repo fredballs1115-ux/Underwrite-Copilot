@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-23",
+      "title": "The market check reads the debt market too",
+      "href": "/deals",
+      "blurb": "Beside the metro's rents, vacancy and permits, the market check is now handed the capital side of the deal, national and dated: the 10-year Treasury that the exit cap and the permanent quote key off, what banks say about their own lending standards for this kind of loan — multifamily for rental housing, nonresidential for everything else, construction for a plan — as the Fed's quarterly survey reports it, CRE delinquency at commercial banks, and bank CRE lending against a year ago. The check is asked to test the exit cap and the debt assumptions against them and cite the figure with its date, and the figures it read fold open on the deal page with the rest."
+    },
+    {
+      "date": "2026-09-23",
       "title": "Every feed, judged on its own cadence",
       "href": "/data-health",
       "blurb": "The data-health page now shows what each feed last wrote — FRED's daily, weekly, monthly and quarterly series apart, the metro series, the BLS rent index, the Census survey, Zillow and Realtor.com — with the newest observation, its age, and whether every series in it is current for its own cadence, the stale ones named. The nightly steward could only ask whether the rates table as a whole had anything newer than five days, which a dead monthly pull passes as long as the Treasury curve keeps arriving; this cannot be fooled that way. A feed with no rows says no rows, never current."

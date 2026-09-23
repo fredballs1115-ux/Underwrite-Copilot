@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { readMetroRates, type RateRow } from "./live-rates";
-import { liveMarketBrief, periodLabel } from "./live-market-brief";
+import { readMetroRates, readRates, type RateRow } from "./live-rates";
+import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
+import { DEBT_MARKET_IDS, lendingStandardsFor, liveMarketBrief, periodLabel } from "./live-market-brief";
 import type { ZoriRead } from "./zori";
 import type { RealtorRead } from "./realtor";
 
@@ -144,6 +145,59 @@ describe("liveMarketBrief — the metro's published figures, dated and sourced, 
     })!;
     expect(pg.text).toContain("Prince George's County, MD market");
     expect(pg.lines.some((l) => l.includes("Rental vacancy, metro area, Washington MSA"))).toBe(true);
+  });
+});
+
+describe("the debt market — national, for every deal, after the metro's lines", () => {
+  // The runner's own table (lib/live-rates.fixture.ts), the debt-market series only.
+  const national = readRates(REAL_ROWS, FIXTURE_NOW).filter((r) => (DEBT_MARKET_IDS as readonly string[]).includes(r.meta.id));
+  const metro = { id: "dc", name: "Washington DC" };
+  const base = { metro, rates: [], zori: null, realtor: null, now: FIXTURE_NOW, national };
+
+  it("an apartment deal reads the 10-year, the multifamily standards, delinquency and lending", () => {
+    const b = liveMarketBrief({ ...base, assetClass: "multifamily" })!;
+    expect(b.lines).toEqual([
+      "Debt market — 10-year Treasury 4.94% (Sep 17, 2026; FRED), -3 bps on the day before",
+      "Debt market — banks tightening standards for multifamily loans: a net -5.7% of banks (Q3 2026; Fed SLOOS via FRED; negative is a net share easing)",
+      "Debt market — CRE loan delinquency at commercial banks 1.53% (Q2 2026; FRED)",
+      "Debt market — bank CRE lending +3.6% from a year ago (Sep 9, 2026; FRED, from the Fed's H.8)",
+    ]);
+    expect(b.figures.map((f) => [f.key, f.value, f.unit])).toEqual([
+      ["dgs10", 4.94, "pct"],
+      ["sloos_multifamily", -5.7, "pts"],
+      ["cre_delinquency", 1.53, "pct"],
+      ["cre_loans_yoy", 3.56389, "pts"],
+    ]);
+  });
+
+  it("an office deal reads the nonresidential standards; a development adds construction; land reads construction alone", () => {
+    expect(lendingStandardsFor("office", false)).toEqual(["SUBLPDRCSN"]);
+    expect(lendingStandardsFor("multifamily", true)).toEqual(["SUBLPDRCSM", "SUBLPDRCSC"]);
+    expect(lendingStandardsFor("land_infill", false)).toEqual(["SUBLPDRCSC"]);
+    expect(lendingStandardsFor(null, false)).toEqual(["SUBLPDRCSN"]);
+    const office = liveMarketBrief({ ...base, assetClass: "office" })!;
+    expect(office.lines[1]).toContain("nonfarm nonresidential loans: a net -11.3% of banks");
+    const dev = liveMarketBrief({ ...base, assetClass: "multifamily", plan: true })!;
+    expect(dev.lines.filter((l) => l.includes("tightening")).map((l) => l.split(":")[0])).toEqual([
+      "Debt market — banks tightening standards for multifamily loans",
+      "Debt market — banks tightening standards for construction and land development loans",
+    ]);
+    expect(dev.lines[2]).toContain("a net -3.7% of banks");
+  });
+
+  it("the debt-market lines come after the metro's, and none without the national series", () => {
+    const withMetro = liveMarketBrief({ ...base, rates: readMetroRates("dc", DC_ROWS, NOW), now: NOW, assetClass: "multifamily" })!;
+    const firstDebt = withMetro.lines.findIndex((l) => l.startsWith("Debt market"));
+    expect(firstDebt).toBeGreaterThan(0);
+    expect(withMetro.lines.slice(firstDebt).every((l) => l.startsWith("Debt market"))).toBe(true);
+    expect(liveMarketBrief({ ...base, national: [] })).toBeNull();
+    expect(liveMarketBrief({ ...base, national: undefined })).toBeNull();
+  });
+
+  it("a stale national series is left out like any other", () => {
+    const later = new Date("2027-06-01T00:00:00Z");
+    const stale = readRates(REAL_ROWS, later).filter((r) => (DEBT_MARKET_IDS as readonly string[]).includes(r.meta.id));
+    expect(liveMarketBrief({ ...base, now: later, national: stale, assetClass: "multifamily" })).toBeNull();
   });
 });
 

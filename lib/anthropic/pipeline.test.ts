@@ -357,6 +357,9 @@ describe("runAnalysis — the happy path", () => {
       { series_id: "WASH911URN", obs_date: "2026-06-01", value: 3.2 },
       { series_id: "HVS_RVR_47900", obs_date: "2026-04-01", value: 6.2 },
       { series_id: "HVS_RVR_47900_MOE", obs_date: "2026-04-01", value: 2.2 },
+      // The debt market, national: the 10-year and the multifamily standards.
+      { series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 },
+      { series_id: "SUBLPDRCSM", obs_date: "2026-07-01", value: -5.7 },
     ];
     // The Zillow pull keys its rows by the covered metro's own name (data/research/metros.json).
     state.benchmarks = [
@@ -376,16 +379,21 @@ describe("runAnalysis — the happy path", () => {
     expect(handed).toContain("- Unemployment 3.4% (Jul 2026, Washington MSA; FRED), +0.2 pt on the month before");
     expect(handed).toContain("- Rental vacancy, metro area, Washington MSA: 6.2% with a ±2.2 pt margin of error");
     expect(handed).toContain("- Asking rent, all home types: $2,310/mo, +2.1% from a year ago (Aug 2026; Zillow Research");
+    // The debt market rides last: the 10-year, and the standards for a multifamily loan (the deal is an apartment).
+    expect(handed).toContain("- Debt market — 10-year Treasury 4.90% (Sep 22, 2026; FRED)");
+    expect(handed).toContain("- Debt market — banks tightening standards for multifamily loans: a net -5.7% of banks (Q3 2026;");
     const stored = state.deals.d1.market as {
       liveBrief?: { metro: string; readOn: string; lines: string[]; figures: { key: string; value: number }[] } | null;
     };
     expect(stored.liveBrief?.metro).toBe("Washington DC");
     expect(stored.liveBrief?.readOn).toBe("2026-09-23");
-    expect(stored.liveBrief?.lines).toHaveLength(3);
+    expect(stored.liveBrief?.lines).toHaveLength(5);
     expect(stored.liveBrief?.figures.map((f) => [f.key, f.value])).toEqual([
       ["unemployment", 3.4],
       ["rental_vacancy_msa", 6.2],
       ["zori_rent", 2310],
+      ["dgs10", 4.9],
+      ["sloos_multifamily", -5.7],
     ]);
     expect(errSpy).not.toHaveBeenCalled();
   });
