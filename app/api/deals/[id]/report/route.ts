@@ -13,7 +13,8 @@ import type { StructuredAddress } from "@/lib/address";
 import { inferStrategy } from "@/lib/deal-strategy";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
 import { staleAfterFailure } from "@/lib/screen-run";
-import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { buildSensitivityData, type SensitivityData } from "@/lib/underwrite/report-grid";
 import { buildPlanReport, type PlanReport } from "@/lib/plan-sensitivity";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
@@ -161,20 +162,27 @@ export async function GET(
           .limit(1)
           .maybeSingle(),
       ]);
-      const derived = deriveUnderwriteInputs(extraction, deal.name, {
-        rentRoll: rrRes.data?.summary
-          ? {
-              summary: rrRes.data.summary as RentRollSummary,
-              asOf: (rrRes.data.as_of_date as string | null) ?? null,
-            }
-          : null,
-        t12: t12Res.data?.summary
-          ? {
-              summary: t12Res.data.summary as T12Summary,
-              periodEnd: (t12Res.data.period_end_date as string | null) ?? null,
-            }
-          : null,
-      });
+      // The same rate read as the deal page and the workbook route.
+      const debt = await liveDebtSeeds(HOLD_MONTHS);
+      const derived = deriveUnderwriteInputs(
+        extraction,
+        deal.name,
+        {
+          rentRoll: rrRes.data?.summary
+            ? {
+                summary: rrRes.data.summary as RentRollSummary,
+                asOf: (rrRes.data.as_of_date as string | null) ?? null,
+              }
+            : null,
+          t12: t12Res.data?.summary
+            ? {
+                summary: t12Res.data.summary as T12Summary,
+                periodEnd: (t12Res.data.period_end_date as string | null) ?? null,
+              }
+            : null,
+        },
+        { debtIndex: debt.permanent },
+      );
       sensitivity = buildSensitivityData(derived.inputs, hurdlePct);
       plan = buildPlanReport(extraction, {
         pct: derived.inputs.exitCapPct,

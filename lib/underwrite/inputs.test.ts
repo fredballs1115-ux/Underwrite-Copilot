@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { deriveUnderwriteInputs } from "./inputs";
+import { HOLD_MONTHS, deriveUnderwriteInputs } from "./inputs";
 import { computeUnderwrite } from "./engine";
 import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { DebtIndex } from "@/lib/debt-index";
 
 const extraction: ExtractionResult = {
   dealName: "Test Industrial Portfolio",
@@ -278,5 +279,64 @@ describe("deriveUnderwriteInputs — the In-Place Occupancy cell reads today's f
       "x",
     );
     expect(meta.occupancyPct).toBeNull();
+  });
+});
+
+describe("deriveUnderwriteInputs — the rate starts from today's curve", () => {
+  // The 5-year Treasury as the runner's own table printed it (lib/live-rates.fixture.ts).
+  const five: DebtIndex = { id: "DGS5", short: "5-yr", pct: 4.78, asOf: "2026-09-17", kind: "treasury" };
+  const withClass = (cls: string): ExtractionResult => ({
+    ...extraction,
+    assetClass: cls as ExtractionResult["assetClass"],
+  });
+
+  it("with the day's index, the rate is the tenor nearest the hold plus the class spread, and the note names both with the date", () => {
+    const { inputs, sources, meta } = deriveUnderwriteInputs(extraction, "x", undefined, { debtIndex: five });
+    // Industrial: 4.78 + 225 bps.
+    expect(inputs.allInRatePct).toBeCloseTo(0.0703, 6);
+    expect(inputs.holdMonths).toBe(HOLD_MONTHS);
+    expect(sources.allInRatePct?.provenance).toBe("assumption");
+    expect(sources.allInRatePct?.note).toBe(
+      "5-yr Treasury 4.78% (FRED, Sep 17, 2026) + 225 bps industrial spread, a screening default — enter your quote",
+    );
+    // The seed rides in meta so the deal page's sizer starts where the workbook does.
+    expect(meta.rateSeed).toEqual({ pct: 7.03, note: sources.allInRatePct?.note });
+  });
+
+  it("each class carries its own spread — an apartment prices tighter than a hotel", () => {
+    const rate = (cls: string) =>
+      deriveUnderwriteInputs(withClass(cls), "x", undefined, { debtIndex: five }).inputs.allInRatePct;
+    expect(rate("multifamily")).toBeCloseTo(0.0678, 6);
+    expect(rate("office")).toBeCloseTo(0.0778, 6);
+    expect(rate("hospitality_str")).toBeCloseTo(0.0803, 6);
+    expect(deriveUnderwriteInputs(withClass("multifamily"), "x", undefined, { debtIndex: five }).sources.allInRatePct?.note).toContain(
+      "+ 200 bps multifamily spread",
+    );
+  });
+
+  it("without an index the flat default stays, and the note never claims the market was consulted", () => {
+    const { inputs, sources, meta } = deriveUnderwriteInputs(extraction, "x");
+    expect(inputs.allInRatePct).toBe(0.06);
+    expect(sources.allInRatePct?.note).toBe("Enter your all-in rate (index + spread)");
+    expect(meta.rateSeed).toBeNull();
+    expect(deriveUnderwriteInputs(extraction, "x", undefined, { debtIndex: null }).inputs.allInRatePct).toBe(0.06);
+    expect(deriveUnderwriteInputs(extraction, "x", undefined, {}).sources.allInRatePct?.note).toBe(
+      "Enter your all-in rate (index + spread)",
+    );
+  });
+
+  it("land carries no permanent loan to seed a rate from, and says so", () => {
+    const land = deriveUnderwriteInputs(withClass("land_infill"), "x", undefined, { debtIndex: five });
+    expect(land.inputs.allInRatePct).toBe(0.06);
+    expect(land.sources.allInRatePct?.note).toMatch(/^Land carries no permanent loan/);
+    expect(land.meta.rateSeed).toBeNull();
+  });
+
+  it("the seeded rate is what the engine runs on — the debt service moves with the curve", () => {
+    const flat = computeUnderwrite(deriveUnderwriteInputs(extraction, "x").inputs);
+    const seeded = computeUnderwrite(
+      deriveUnderwriteInputs(extraction, "x", undefined, { debtIndex: five }).inputs,
+    );
+    expect(seeded.cashFlow[0].debtService).toBeGreaterThan(flat.cashFlow[0].debtService);
   });
 });

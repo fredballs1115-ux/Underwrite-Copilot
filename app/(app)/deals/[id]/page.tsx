@@ -67,7 +67,9 @@ import { PlanSensitivity } from "./plan-sensitivity";
 import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { ActualsData } from "./property-actuals";
-import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { constructionSeed, type DealRateSeeds } from "@/lib/debt-index";
+import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { snapshotVersion } from "@/lib/bridge/versions";
 import { listSubmarkets } from "@/lib/market/store";
 import { dealSubmarketCheck } from "@/lib/market/deal-checks";
@@ -438,16 +440,31 @@ export default async function DealPage({
   // Sensitivity playground (Feature 2 of the competitive spec): the deal's
   // base underwriting model — actuals folded in — computed once server-side;
   // the sliders recompute it in the browser via the same pure engine.
+  // Today's debt indices off the rates table (lib/debt-index-read): the
+  // model's rate starts from the Treasury tenor nearest its hold plus the
+  // class spread, the construction panel's from 30-day SOFR plus its own —
+  // the same read the workbook and report routes make, so no two surfaces
+  // print a different rate for one deal on one day.
+  const debt = await liveDebtSeeds(HOLD_MONTHS);
   const derived = extraction
-    ? deriveUnderwriteInputs(extraction, deal.name, {
-        rentRoll: actuals.rentRoll
-          ? { summary: actuals.rentRoll.summary, asOf: actuals.rentRoll.asOf }
-          : null,
-        t12: actuals.t12
-          ? { summary: actuals.t12.summary, periodEnd: actuals.t12.periodEnd }
-          : null,
-      })
+    ? deriveUnderwriteInputs(
+        extraction,
+        deal.name,
+        {
+          rentRoll: actuals.rentRoll
+            ? { summary: actuals.rentRoll.summary, asOf: actuals.rentRoll.asOf }
+            : null,
+          t12: actuals.t12
+            ? { summary: actuals.t12.summary, periodEnd: actuals.t12.periodEnd }
+            : null,
+        },
+        { debtIndex: debt.permanent },
+      )
     : null;
+  const rateSeeds: DealRateSeeds = {
+    permanent: derived?.meta.rateSeed ?? null,
+    construction: constructionSeed(debt),
+  };
   const playground: PlaygroundData | null = derived
     ? {
         inputs: derived.inputs,
@@ -983,6 +1000,7 @@ export default async function DealPage({
       <DealView
         dealId={id}
         dealName={deal.name}
+        rateSeeds={rateSeeds}
         initialTab={tab ?? null}
         initialAnalysis={analysisParam ?? null}
         hasOm={!!deal.om_storage_path}

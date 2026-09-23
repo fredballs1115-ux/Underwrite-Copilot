@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { parseMoney } from "@/lib/criteria";
 import type { PlanSummary } from "@/lib/deal-strategy";
+import type { RateSeed } from "@/lib/debt-index";
 import { sizeConstructionDebt, worksYearsFromTimeline } from "@/lib/construction-debt";
 
 const fmtUsd = (n: number) =>
@@ -37,6 +38,7 @@ export function ConstructionDebtPanel({
   minDebtYieldPct,
   maxLtvPct,
   numCls,
+  rateSeed = null,
 }: {
   plan: PlanSummary;
   planLabel: string;
@@ -48,12 +50,17 @@ export function ConstructionDebtPanel({
   minDebtYieldPct: number;
   maxLtvPct: number;
   numCls: string;
+  /** today's floating index plus the construction spread (lib/debt-index),
+   *  with the sentence that says so; null keeps the flat 8% placeholder */
+  rateSeed?: RateSeed | null;
 }) {
   const seededYears = worksYearsFromTimeline(plan.timeline);
   const [budgetRaw, setBudgetRaw] = useState(plan.budget ? fmtInput(plan.budget.budget) : "");
   const [noiRaw, setNoiRaw] = useState(plan.stabilizedNoi ? fmtInput(plan.stabilizedNoi.value) : "");
   const [worksYears, setWorksYears] = useState(seededYears ?? 2);
-  const [ratePct, setRatePct] = useState(8);
+  // The construction rate starts from the day's index plus a spread, never
+  // from a flat figure, wherever the rates table could seed one.
+  const [ratePct, setRatePct] = useState(rateSeed?.pct ?? 8);
   const [maxLtcPct, setMaxLtcPct] = useState(60);
   const [exitCap, setExitCap] = useState(exitCapPct ?? 6);
 
@@ -122,6 +129,9 @@ export function ConstructionDebtPanel({
           <input type="number" step={0.05} min={0} max={25} value={exitCap} onChange={(e) => setExitCap(Number(e.target.value))} aria-label="Exit cap rate percent" className={numCls} />
         </label>
       </div>
+      {rateSeed && (
+        <p className="mt-1.5 text-xs text-muted">Construction rate seeded from the live index: {rateSeed.note}</p>
+      )}
 
       {r ? (
         <>

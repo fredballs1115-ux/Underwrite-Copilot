@@ -14,6 +14,7 @@ import { ConstructionDebtPanel } from "./construction-debt-panel";
 import type { UnderwritingModel } from "@/lib/model/types";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { DealRateSeeds, RateSeed } from "@/lib/debt-index";
 
 /**
  * Debt & financing — every loan number a screen needs, all deterministic
@@ -140,11 +141,21 @@ interface Seed {
   ratePct: number;
   amortYears: number;
   seededFrom: "model" | "extraction" | "defaults";
+  /** the sentence behind a rate that came off today's curve — null where
+   *  the generated model's own loan set it, or nothing could seed one */
+  rateNote: string | null;
 }
+
+/** The rate a sizer starts from when the documents state none: today's
+ *  index plus the class spread where the table could seed one (the same
+ *  figure the screening model runs on, so the two agree), else the old
+ *  flat placeholder. */
+const FLAT_RATE_PCT = 6.5;
 
 function deriveSeed(
   model: UnderwritingModel | null,
   extraction: ExtractionResult | null,
+  today: RateSeed | null,
 ): Seed {
   // An NOI at or above a quarter of the price is not the building's income —
   // it is a stabilized pro forma (the finished conversion) or a misread. A
@@ -154,12 +165,16 @@ function deriveSeed(
     noi != null && noi > 0 && (price == null || noi / price < IMPLIED_CAP_CEILING) ? noi : null;
   if (model?.inputs) {
     const price = model.inputs.purchasePrice || null;
+    // A loan the documents state outranks the day's index: a term sheet's
+    // rate is a quote, and a quote beats a benchmark.
+    const stated = model.inputs.loan?.ratePct ?? null;
     return {
       price,
       noi: plausible(model.cashFlow?.[0]?.noi ?? null, price),
-      ratePct: model.inputs.loan?.ratePct ?? 6.5,
+      ratePct: stated ?? today?.pct ?? FLAT_RATE_PCT,
       amortYears: model.inputs.loan?.amortYears ?? 30,
       seededFrom: "model",
+      rateNote: stated == null && today ? today.note : null,
     };
   }
   const metrics = extraction?.metrics ?? [];
@@ -173,9 +188,10 @@ function deriveSeed(
   return {
     price,
     noi,
-    ratePct: 6.5,
+    ratePct: today?.pct ?? FLAT_RATE_PCT,
     amortYears: 30,
     seededFrom: price != null || noi != null ? "extraction" : "defaults",
+    rateNote: today ? today.note : null,
   };
 }
 
@@ -191,14 +207,22 @@ export function DebtSizer({
   model,
   extraction,
   underwrite = null,
+  rateSeeds = null,
 }: {
   model: UnderwritingModel | null;
   extraction: ExtractionResult | null;
   /** the derived screening model — carries the capital plan (reserves, TI,
    *  LC, year-1 capex) that rounds out the FINANCING & CAPITAL card */
   underwrite?: UnderwriteInputs | null;
+  /** today's starting rates off the rates table (lib/debt-index): the
+   *  permanent loan's, which is the screening model's own seeded rate, and
+   *  the construction loan's; null keeps the flat placeholders */
+  rateSeeds?: DealRateSeeds | null;
 }) {
-  const seed = useMemo(() => deriveSeed(model, extraction), [model, extraction]);
+  const seed = useMemo(
+    () => deriveSeed(model, extraction, rateSeeds?.permanent ?? null),
+    [model, extraction, rateSeeds],
+  );
   const omTerms = useMemo(() => omLoanTerms(extraction), [extraction]);
   // A plan deal's debt is construction or bridge debt sized to cost, paid off
   // at stabilization: the plan block above the permanent sizer, seeded from
@@ -431,6 +455,7 @@ export function DebtSizer({
               minDebtYieldPct={minDebtYieldPct}
               maxLtvPct={maxLtvPct}
               numCls={numCls}
+              rateSeed={rateSeeds?.construction ?? null}
             />
           </>
         )}
@@ -482,6 +507,9 @@ export function DebtSizer({
             <span className="text-sm">Interest-only</span>
           </label>
         </div>
+        {seed.rateNote && (
+          <p className="mt-1.5 text-xs text-muted">Rate seeded from the live curve: {seed.rateNote}</p>
+        )}
 
         <ul className="mt-4 space-y-1.5">
           {rows.map((r) => (

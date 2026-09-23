@@ -136,6 +136,14 @@ error on the tile — the probe printed both tables from the runner
 (35794270430), the parser reads the year and the quarter off each
 header block, matches an area by a name prefix and prints the row it
 matched, and stores the margin as a companion series.
+Then #380: the deal's own model reads the rates table. Its all-in rate
+was a flat 6.00% on every deal on every day (the debt sizer's 6.50%, the
+construction panel's 8.00%); it is now the Treasury tenor nearest the
+hold plus a class spread — the index a fact with its date, the spread
+named as the assumption it is — on every surface that derives the model
+(the deal page, the workbook, the report, the assumption bridge), and
+30-day SOFR plus a construction spread on the plan's debt. A stale table
+seeds nothing and the old note stays.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.

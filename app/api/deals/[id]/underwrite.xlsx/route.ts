@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
-import { deriveUnderwriteInputs, type ActualsForModel } from "@/lib/underwrite/inputs";
+import { HOLD_MONTHS, deriveUnderwriteInputs, type ActualsForModel } from "@/lib/underwrite/inputs";
+import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { buildUnderwriteWorkbook } from "@/lib/underwrite/workbook";
 import { getBrandingForDeal } from "@/lib/branding-server";
 import type { ExportBranding } from "@/lib/excel-branding";
@@ -103,7 +104,10 @@ export async function GET(
   }
 
   try {
-    const model = deriveUnderwriteInputs(extraction, deal.name, actuals);
+    // The same rate read as the deal page, so the workbook's All-in Rate
+    // cell and its Sources note match the page the download came from.
+    const debt = await liveDebtSeeds(HOLD_MONTHS);
+    const model = deriveUnderwriteInputs(extraction, deal.name, actuals, { debtIndex: debt.permanent });
     const buffer = await buildUnderwriteWorkbook(model, branding);
     const safe =
       (deal.name || "deal").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() ||
