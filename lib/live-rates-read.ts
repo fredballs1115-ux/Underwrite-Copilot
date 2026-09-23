@@ -9,6 +9,7 @@ import {
   readMetricRates,
   readMetroRates,
   readRates,
+  seriesMeta,
   type LiveRate,
   type MetroMetric,
   type RateRow,
@@ -63,29 +64,37 @@ import {
  * on for the whole project, which changes how every route renders and is
  * not a change one page gets to make.)
  */
-const cachedRows = unstable_cache(
-  () => readAllSeries(),
-  ["live-rates-rows"],
+/**
+ * ONE cached read, keyed by the LIST OF SERIES IDS it is asked for — the
+ * key is the argument, so a series added to the table is a different
+ * entry and is read the day it arrives. Keyed by the metro alone, the
+ * entry a build made before the pull wrote a new series served the old
+ * rows for an hour, and the page said nothing of it (2026-09-23: the demo
+ * drew the demand bars and no supply line while the market page, on a
+ * different entry, drew both). The ids come back to metas through
+ * `seriesMeta`, which knows the strip's, the metros', the regions' and the
+ * states' series alike.
+ */
+const cachedSeriesRows = unstable_cache(
+  (ids: string[]) => readSeries(ids.map((id) => seriesMeta(id)).filter((m): m is SeriesMeta => m !== null)),
+  ["live-series-rows"],
   { revalidate: 3600, tags: ["rates"] },
 );
 
+const idsOf = (series: readonly { id: string }[]): string[] => series.map((s) => s.id);
+
 export async function liveRates(now: Date = new Date()): Promise<LiveRate[]> {
-  return readRates(await cachedRows(), now);
+  return readRates(await cachedSeriesRows(idsOf(SERIES)), now);
 }
 
 /**
- * A covered metro's own series, read the same way and cached the same way
- * — per metro, since the market page shows one at a time and a visitor to
- * Baltimore should not pay for Dallas.
+ * A covered metro's own series — or a state's, under its `state:PA` id —
+ * read the same way and cached the same way, per market, since the market
+ * page shows one at a time and a visitor to Baltimore should not pay for
+ * Dallas.
  */
-const cachedMetroRows = unstable_cache(
-  (metroId: string) => readSeries(metroSeriesFor(metroId).series),
-  ["live-metro-rows"],
-  { revalidate: 3600, tags: ["rates"] },
-);
-
 export async function liveMetroRates(metroId: string, now: Date = new Date()): Promise<LiveRate[]> {
-  return readMetroRates(metroId, await cachedMetroRows(metroId), now);
+  return readMetroRates(metroId, await cachedSeriesRows(idsOf(metroSeriesFor(metroId).series)), now);
 }
 
 /**
@@ -94,18 +103,8 @@ export async function liveMetroRates(metroId: string, now: Date = new Date()): P
  * fourteen series, one query each, once an hour, rather than every metro's
  * whole panel read for one figure apiece.
  */
-const cachedMetricRows = unstable_cache(
-  (metric: string) => readSeries(metricSeries(metric as MetroMetric)),
-  ["live-metric-rows"],
-  { revalidate: 3600, tags: ["rates"] },
-);
-
 export async function liveMetricRates(metric: MetroMetric, now: Date = new Date()): Promise<LiveRate[]> {
-  return readMetricRates(metric, await cachedMetricRows(metric), now);
-}
-
-function readAllSeries(): Promise<RateRow[]> {
-  return readSeries(SERIES);
+  return readMetricRates(metric, await cachedSeriesRows(idsOf(metricSeries(metric))), now);
 }
 
 async function readSeries(metas: readonly SeriesMeta[]): Promise<RateRow[]> {

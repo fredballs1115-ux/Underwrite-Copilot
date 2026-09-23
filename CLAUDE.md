@@ -530,6 +530,15 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   FRED data is public anyway); and the read is ONE QUERY PER SERIES,
   because a single `order by obs_date desc limit N` silently drops the
   quarterly series once the daily ones have filed a few months of rows.
+  A third (#399's second commit): **the cached read is keyed by the list
+  of series ids it is asked for** (`cachedSeriesRows` in
+  `lib/live-rates-read.ts`, one function behind `liveRates`,
+  `liveMetroRates` and `liveMetricRates`), so a series added to the
+  table is a different cache entry and is read the day it arrives —
+  keyed by the metro alone, the entry a build made before the pull wrote
+  the single-family permits served the old rows for an hour, and the
+  demo drew the demand bars and no supply line while the market page, on
+  another entry, drew both; nothing on either page said so.
   A stale figure still SHOWS with its date — a dead feed is worth seeing —
   it just stops seeding, because a date beside a figure is read and a
   figure inside a form field is not. `/market` had its own copy of this
