@@ -720,6 +720,18 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   agree. The read is `liveMetricRates` in `lib/live-rates-read.ts` — ONE
   metric across the metros (`metricSeries`, `readMetricRates`), cached
   per metric — never every metro's whole panel for one figure apiece.
+  **And the whole board over the demand side** (#395,
+  `app/market/sector-jobs-board.tsx`, `SectorJobsBoard`, pure): under
+  the vacancy board on `/market`, every metro area × all payrolls and
+  the five sectors, each against a year ago, shaded within its column
+  fastest first by the one shade both boards use (`heatShade` in
+  `app/market/heat-shade.ts`, so office-using jobs compare to
+  office-using jobs); rows are the metro areas with series of their own
+  (a suburb reads its MSA's row, said in the note, rather than one figure
+  printed under three names); a stale cell keeps its figure and date,
+  dashed and unranked; a series FRED does not carry is a dash. Six cached
+  reads (`BOARD_METRICS` through `liveMetricRates`), and a failed read
+  leaves the board out rather than half-drawn.
 - **The deal's own model reads the same table** (#380): `lib/debt-index.ts`
   (pure) picks the index a loan is quoted over off today's rates — the
   Treasury tenor NEAREST the hold for the permanent loan (`treasuryForTerm`,

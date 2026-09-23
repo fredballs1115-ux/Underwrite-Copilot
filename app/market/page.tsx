@@ -15,6 +15,8 @@ import { liveMetricRates, liveMetroRates, liveRates } from "@/lib/live-rates-rea
 import type { LiveRate } from "@/lib/live-rates";
 import { sectorPayrollMetric } from "@/lib/live-market-brief";
 import { SectorJobsRank } from "./sector-jobs-rank";
+import { BOARD_METRICS, SectorJobsBoard } from "./sector-jobs-board";
+import { heatShade } from "./heat-shade";
 import { MetroLive } from "./metro-live";
 import { LessorRentLine } from "./lessor-rent-line";
 import { SectorJobsLine } from "./sector-jobs-line";
@@ -376,6 +378,9 @@ export default async function MarketDataPage({
       <MarketCompare metros={COMPARE_METROS} />
       {/* The research layer at a glance — every market × every asset class. */}
       <SectorHeatGrid />
+      {/* The same board over the demand side: every metro area × every
+          sector's payrolls against a year ago, live from FRED. */}
+      <SectorJobsBoardLive />
       <MidAtlanticTable />
       <SectorExplorer selected={sectorParam} />
       <LiveRatesStrip />
@@ -904,15 +909,9 @@ function SectorHeatGrid() {
   }
   const filled = ranks.size;
   const total = metros.length * HEAT_SECTORS.length;
-  // Emerald (tight) → amber (loose), low alpha so the figure stays readable.
-  const shade = (t: number) => {
-    const c = [
-      Math.round(16 + (217 - 16) * t),
-      Math.round(185 + (119 - 185) * t),
-      Math.round(129 + (6 - 129) * t),
-    ];
-    return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${(0.10 + 0.14 * (1 - Math.abs(0.5 - t) * 2) + 0.08 * t).toFixed(3)})`;
-  };
+  // Emerald (tight) → amber (loose), low alpha so the figure stays readable
+  // — the one shade every board on this page uses (app/market/heat-shade).
+  const shade = heatShade;
 
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
@@ -1003,6 +1002,29 @@ function SectorHeatGrid() {
       </p>
     </section>
   );
+}
+
+// ── Payroll growth board (every metro area × every sector) ──────────────────
+// Six cached reads, one a metric across the metros; a failed read leaves the
+// board out rather than half-drawn, and the pure board draws nothing until
+// a pull has written a fresh row.
+async function SectorJobsBoardLive() {
+  const rates: Partial<Record<(typeof BOARD_METRICS)[number], LiveRate[]>> = {};
+  try {
+    const reads = await Promise.all(BOARD_METRICS.map((metric) => liveMetricRates(metric)));
+    BOARD_METRICS.forEach((metric, i) => {
+      rates[metric] = reads[i];
+    });
+  } catch (err) {
+    console.warn("payroll board read failed:", err instanceof Error ? err.message : err);
+    return null;
+  }
+  const markets = (metrosSeed.metros ?? []).map((m) => ({
+    id: m.id,
+    name: m.name,
+    region: (m as { region?: string }).region,
+  }));
+  return <SectorJobsBoard markets={markets} rates={rates} />;
 }
 
 // ── Sector leaderboard (cross-metro) ─────────────────────────────────────────
