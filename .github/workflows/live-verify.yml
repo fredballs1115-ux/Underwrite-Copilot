@@ -935,6 +935,11 @@ jobs:
           # the deploy reads NOT DEPLOYED here: run the pull and look again.
           mark "#397 the supply picture is on the market brief" grep -q "units permitted, single-family and in buildings of two or more" p_market.html
           mark "#397 the demo says the sample market's supply side" grep -q "units in buildings of two or more, twelve months to" p_demo.html
+          # #398 — the insurance premium index on the strip's inflation fold:
+          # the tile's label is the series table's own short name, one JS
+          # expression, inside a closed <details>. Absent until the pull has
+          # written the series (see #390).
+          mark "#398 the insurance premium index is on the strip" grep -q "Property insurance premiums y/y" p_tools2.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

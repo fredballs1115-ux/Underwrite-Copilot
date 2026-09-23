@@ -4,7 +4,7 @@ import { monthOf, type ZoriRead } from "@/lib/zori";
 import type { DerivedModel, InputSource } from "@/lib/underwrite/inputs";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
-import { periodLabel, rentIndexFor } from "@/lib/live-market-brief";
+import { INSURANCE_INDEX_ID, periodLabel, rentIndexFor } from "@/lib/live-market-brief";
 import { datedLong } from "@/lib/debt-index";
 import { inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { findGoingInCap, parsePct } from "@/lib/criteria";
@@ -359,6 +359,9 @@ function expenseGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
   if (core) {
     published.push({ label: "Core CPI", text: `${signed(core.value)}% over the year to ${periodLabel(core.obsDate, core.meta.cadence)}`, value: core.value, asOf: core.obsDate, publisher: "BLS via FRED" });
   }
+  // The tone is read against the price indexes alone: the insurance index
+  // below is one line's repricing, not the expense base's, and folding it
+  // into the range would let a 3% model read "inside" a 3–8% band.
   const values = published.map((p) => p.value);
   const tone = rangeTone(e, values);
   const clause =
@@ -367,6 +370,23 @@ function expenseGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
       : tone === "behind"
         ? `The model runs behind the index, ${byPoints(e, values)}.`
         : "The model sits inside the published range.";
+  // The one line that reprices hardest: what commercial property insurance
+  // costs nationally against a year ago. A memorandum's premium is the
+  // seller's expiring policy, and the index says how far a new quote has
+  // moved — shown beside the price indexes, never averaged into them.
+  const insurance = fresh(input.national, (r) => r.meta.id === INSURANCE_INDEX_ID);
+  if (insurance) {
+    published.push({
+      label: "Commercial property insurance premiums (PPI, commercial multiple peril)",
+      text: `${signed(insurance.value)}% over the year to ${periodLabel(insurance.obsDate, insurance.meta.cadence)}`,
+      value: insurance.value,
+      asOf: insurance.obsDate,
+      publisher: "BLS via FRED",
+    });
+  }
+  const insuranceClause = insurance
+    ? ` Insurance is the line that reprices hardest: commercial property premiums are ${signed(insurance.value)}% nationally over the year to ${periodLabel(insurance.obsDate, insurance.meta.cadence)} (the BLS's index of commercial multiple peril premiums), and a memorandum's premium is the seller's expiring policy, so the index is the floor for the other lines and this is the one to re-quote.`
+    : " Insurance and taxes reprice on their own cycles, so the index is the floor for the other lines, not the whole answer.";
   return {
     key: "expense_growth",
     title: "Expense growth",
@@ -376,7 +396,7 @@ function expenseGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
     tone,
     toneLabel: TONE_LABEL[tone],
     scope: "national",
-    read: `The model grows expenses ${e.toFixed(1)}%/yr against consumer prices ${signed(cpi.value)}% over the year to ${when}${core ? ` (core ${signed(core.value)}%)` : ""}; BLS via FRED. ${clause} Insurance and taxes reprice on their own cycles, so the index is the floor for the other lines, not the whole answer.`,
+    read: `The model grows expenses ${e.toFixed(1)}%/yr against consumer prices ${signed(cpi.value)}% over the year to ${when}${core ? ` (core ${signed(core.value)}%)` : ""}; BLS via FRED. ${clause}${insuranceClause}`,
   };
 }
 
