@@ -38,6 +38,7 @@ import type {
   VerdictScenario,
 } from "@/lib/anthropic/types";
 import { moveSentence, type BriefDelta } from "@/lib/brief-delta";
+import type { MetroDemand } from "@/lib/metro-demand";
 
 /* ================================================================== */
 /* Icons — minimal inline SVGs (stroke, currentColor). No dependency. */
@@ -1491,12 +1492,17 @@ const TONE = {
 export function MarketCheck({
   result,
   since = null,
+  demand = null,
 }: {
   result: MarketResult;
   /** what moved since the check read its figures (lib/brief-delta), read
    *  by the page today; null where the check stored none or nothing could
    *  be read */
   since?: BriefDelta | null;
+  /** the metro area's payrolls by sector today (lib/metro-demand), with the
+   *  sector that fills this building's kind marked; null outside the
+   *  covered markets or before the pull has written the rows */
+  demand?: MetroDemand | null;
 }) {
   // Aggressive first — that's where the risk is.
   const order = { aggressive: 0, conservative: 1, "in-line": 2 } as const;
@@ -1516,6 +1522,7 @@ export function MarketCheck({
       />
       {result.summary && <Callout>{result.summary}</Callout>}
       {brief && brief.lines.length > 0 && <LiveBriefRead brief={brief} />}
+      {demand && <MetroDemandCard demand={demand} />}
       {since && <SinceThisScreen since={since} />}
       <div>
         <RevealList
@@ -1572,6 +1579,63 @@ function SinceThisScreen({ since }: { since: BriefDelta }) {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/**
+ * The demand side of the deal's market as a picture: the metro area's
+ * payrolls by sector against a year ago (the same rows the market brief
+ * draws under its tiles), read today, with the sector that fills this
+ * building's kind drawn full and the others faded — an office reads
+ * professional and business services, a warehouse transportation and
+ * warehousing, a store retail trade, a hotel leisure and hospitality;
+ * rental housing reads all payrolls, so nothing is singled out. Nothing
+ * renders outside the covered markets or before the pull has written the
+ * rows.
+ */
+function MetroDemandCard({ demand }: { demand: MetroDemand }) {
+  const widest = Math.max(0.1, ...demand.rows.map((r) => Math.abs(r.valuePct)));
+  return (
+    <div className="rounded-xl border border-line bg-surface px-4 py-3 text-sm" data-qa="metro-demand">
+      <p className="font-medium">{`The demand side today — payrolls by sector, ${demand.area}`}</p>
+      <p className="mt-0.5 text-xs text-muted">
+        {demand.mine
+          ? `${demand.mine} is the sector that fills this building's kind, drawn full; the metro area's other sectors are beside it, faded, and all payrolls first.`
+          : "Rental housing runs on all payrolls, drawn first; the sectors beneath say where the metro area's jobs are growing."}
+      </p>
+      <div className="mt-2 max-w-xl space-y-1">
+        {demand.rows.map((r) => {
+          const tone = r.all ? "bg-ink/40" : demand.mine === null || r.mine ? "bg-brand" : "bg-brand/35";
+          return (
+            <div key={r.key} className="flex items-center gap-2">
+              <span className={`w-40 shrink-0 truncate text-[11px] sm:w-56 ${r.mine ? "font-medium text-ink" : "text-muted"}`}>
+                {r.mine ? `${r.label} · this building's sector` : r.label}
+              </span>
+              <div className="relative h-3 flex-1 rounded-sm bg-faint" aria-hidden="true">
+                <div className="absolute inset-y-0 left-1/2 w-px bg-line" />
+                <div
+                  data-bar="demand"
+                  className={`absolute inset-y-0 ${r.valuePct >= 0 ? "left-1/2" : "right-1/2"} ${tone}`}
+                  style={{ width: `${(Math.abs(r.valuePct) / widest) * 50}%` }}
+                />
+              </div>
+              <a
+                href={r.href}
+                target="_blank"
+                rel="noreferrer"
+                className="w-16 shrink-0 text-right font-mono text-[11px] tabular-nums text-ink underline decoration-dotted underline-offset-2 hover:text-brand"
+              >
+                {r.text}
+              </a>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-1.5 text-[11px] text-muted">
+        {`${demand.newestMonth} · BLS payrolls via FRED, against the same month a year earlier · each figure links to its series`}
+        {demand.stale.length > 0 && ` · ${demand.stale.length === 1 ? "one sector's figure is stale" : `${demand.stale.length} sectors' figures are stale`}: ${demand.stale.join(", ")}`}
+      </p>
     </div>
   );
 }

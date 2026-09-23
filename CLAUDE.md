@@ -2045,7 +2045,21 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   the publisher has not updated since the screen ("no newer figure"). A
   figure read then and unreadable now is left out rather than shown as a
   move to nothing. `SinceThisScreen` under the folded brief prints the
-  day, the counts and one sentence per move (`moveSentence`). **The debt
+  day, the counts and one sentence per move (`moveSentence`). **And the
+  demand side is a picture there** (#395, `lib/metro-demand.ts`, pure):
+  `metroDemand` turns the metro's rows read today into a picture's rows —
+  all payrolls first, then each sector against a year ago, the sector
+  that fills this building's kind marked by the same map the market
+  check reads (`sectorJobsFor`), a stale sector kept and named with its
+  date — as PLAIN DATA, because `deal-view.tsx` and `deal-sections.tsx`
+  are client components and handing them the rows rather than the series
+  keeps the series table out of the browser bundle. `MetroDemandCard`
+  (deal-sections.tsx, `data-bar="demand"`) draws it under the folded
+  brief: the building's own sector full, the others faded, rental
+  housing singling nothing out, each figure linked; the page threads it
+  through `DealView` and the analyses panel as one prop, off the figures
+  it already reads for the model's checks, and nothing renders outside
+  the covered markets or before the pull has written a sector row. **The debt
   market rides after the metro's lines, for every deal** (#384,
   `DEBT_MARKET_IDS`): the 10-year Treasury, what banks say about their
   standards for THIS kind of loan (`lendingStandardsFor` — rental housing

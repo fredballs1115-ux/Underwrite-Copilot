@@ -248,6 +248,13 @@ tracker has a cap range, the exit cap is set against it as well as
 against the 10-year — over its high end the conservative direction,
 under its low end compression on top of the spread read. The deal page,
 the report and the workbook read it through the same one function.
+Then #395: the deal page's market section draws the demand side — the
+metro area's payrolls by sector today, the same bars the market brief
+draws under its tiles, with the sector that fills this building's kind
+drawn full and the others faded (rental housing singles nothing out),
+a stale sector kept and named, each figure linked; handed to the client
+view as plain rows (`lib/metro-demand.ts`) so the series table stays
+out of the browser bundle.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.
