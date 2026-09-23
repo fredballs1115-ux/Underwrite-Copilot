@@ -2866,6 +2866,7 @@ describe("SampleDemandCard — the sample market's payrolls by sector, read toda
   // apartment building, so no sector is marked.
   const demand = {
     area: "Philadelphia MSA",
+    grain: "metro" as const,
     newestMonth: "Aug 2026",
     mine: null,
     intro: "Rental housing runs on all payrolls, drawn first; the sectors beneath say where the metro area's jobs are growing.",
