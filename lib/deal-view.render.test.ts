@@ -181,6 +181,44 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(laterText).not.toMatch(/Asking rent, all home types: unchanged/);
   });
 
+  it("the market section draws the metro area's payrolls by sector, with this building's sector drawn full", () => {
+    const p = sampleProps("analyses", "market");
+    const withDemand: Props = {
+      ...p,
+      metroDemand: {
+        area: "Philadelphia MSA",
+        newestMonth: "Aug 2026",
+        mine: "Professional & business services",
+        stale: ["Leisure & hospitality as of Aug 1"],
+        rows: [
+          { key: "PHIL942NA_YOY", label: "All payrolls", valuePct: 0.30686, text: "0.3%", href: "https://fred.stlouisfed.org/series/PHIL942NA", obsDate: "2026-08-01", fresh: true, all: true, mine: false },
+          { key: "PHIL942PBSV_YOY", label: "Professional & business services", valuePct: 1.7451, text: "1.7%", href: "https://fred.stlouisfed.org/series/PHIL942PBSV", obsDate: "2026-08-01", fresh: true, all: false, mine: true },
+          { key: "SMU42379804200000001SA_YOY", label: "Retail trade", valuePct: -1.85854, text: "\u22121.9%", href: "https://fred.stlouisfed.org/series/SMU42379804200000001SA", obsDate: "2026-08-01", fresh: true, all: false, mine: false },
+          { key: "PHIL942LEIH_YOY", label: "Leisure & hospitality", valuePct: 2.65475, text: "2.7%", href: "https://fred.stlouisfed.org/series/PHIL942LEIH", obsDate: "2025-08-01", fresh: false, all: false, mine: false },
+        ],
+      },
+    };
+    const html = render(withDemand);
+    expect(a11yIssues(html)).toEqual([]);
+    const text = textOf(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toMatch(/The demand side today — payrolls by sector, Philadelphia MSA/);
+    expect(text).toMatch(/Professional & business services is the sector that fills this building's kind, drawn full/);
+    expect(text).toMatch(/Professional & business services · this building's sector/);
+    expect(text).toMatch(/Aug 2026 · BLS payrolls via FRED, against the same month a year earlier/);
+    expect(text).toMatch(/one sector's figure is stale: Leisure & hospitality as of Aug 1/);
+    // Four bars, the deal's own full and the others faded; a negative change draws leftward.
+    expect((html.match(/data-bar="demand"/g) ?? []).length).toBe(4);
+    expect(html).toContain('data-bar="demand" class="absolute inset-y-0 left-1/2 bg-brand"');
+    expect(html).toContain('data-bar="demand" class="absolute inset-y-0 right-1/2 bg-brand/35"');
+    expect(html).toContain("https://fred.stlouisfed.org/series/PHIL942PBSV\"");
+    // Rental housing singles nothing out, and the sample without a read draws nothing.
+    const apt = textOf(render({ ...withDemand, metroDemand: { ...withDemand.metroDemand!, mine: null, rows: withDemand.metroDemand!.rows.map((r) => ({ ...r, mine: false })) } }));
+    expect(apt).toMatch(/Rental housing runs on all payrolls, drawn first/);
+    expect(apt).not.toMatch(/this building's sector/);
+    expect(textOf(render(p))).not.toMatch(/The demand side today/);
+  });
+
   it("a screen that failed midway names the results it never reached, in the open", () => {
     // The ninth review's first finding: a comps-step failure left this run's
     // extraction beside the previous screen's verdict, shown as "5/5" with

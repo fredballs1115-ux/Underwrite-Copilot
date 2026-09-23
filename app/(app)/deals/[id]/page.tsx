@@ -71,7 +71,8 @@ import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { constructionSeed, type DealRateSeeds } from "@/lib/debt-index";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { metroForAddress } from "@/lib/market-match";
-import { BRIEF_NATIONAL_IDS, liveMarketBrief } from "@/lib/live-market-brief";
+import { BRIEF_NATIONAL_IDS, liveMarketBrief, sectorJobsFor } from "@/lib/live-market-brief";
+import { metroDemand } from "@/lib/metro-demand";
 import { briefDelta, type BriefDelta } from "@/lib/brief-delta";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { todayReads, type TodayReads } from "@/lib/model-vs-market-read";
@@ -1063,6 +1064,11 @@ export default async function DealPage({
         rateSeeds={rateSeeds}
         marketSince={marketSince}
         modelVsMarket={modelRead}
+        metroDemand={
+          reads && coveredMetro
+            ? metroDemand(reads.rates, sectorJobsFor(extraction?.assetClass || (deal.asset_class as string | null) || null)?.metric ?? null)
+            : null
+        }
         initialTab={tab ?? null}
         initialAnalysis={analysisParam ?? null}
         hasOm={!!deal.om_storage_path}

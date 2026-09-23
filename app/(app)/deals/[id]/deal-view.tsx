@@ -32,6 +32,7 @@ import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { DealRateSeeds } from "@/lib/debt-index";
 import type { BriefDelta } from "@/lib/brief-delta";
 import type { ModelVsMarket } from "@/lib/model-vs-market";
+import type { MetroDemand } from "@/lib/metro-demand";
 import { DecisionLog } from "./decision-log";
 import { SampleGuide } from "./sample-guide";
 import { DealTasks } from "./deal-tasks";
@@ -319,6 +320,7 @@ export function DealView({
   rateSeeds = null,
   marketSince = null,
   modelVsMarket = null,
+  metroDemand = null,
 }: {
   dealId: string;
   dealName: string;
@@ -339,6 +341,9 @@ export function DealView({
   marketSince?: BriefDelta | null;
   /** the model's assumptions against the published figures (lib/model-vs-market) */
   modelVsMarket?: ModelVsMarket | null;
+  /** the metro area's payrolls by sector today, with this building's
+   *  sector marked (lib/metro-demand); null outside the covered markets */
+  metroDemand?: MetroDemand | null;
   supplements: SupplementsMap;
   model: UnderwritingModel | null;
   documents: DealDocument[];
@@ -822,6 +827,7 @@ export function DealView({
             internalComps={internalComps}
             omUrl={omUrl}
             marketSince={marketSince}
+            metroDemand={metroDemand}
             staleVerdict={staleResults.includes("verdict")}
             compSubject={subjectBasis(
               results.extraction?.metrics ?? [],
@@ -1210,6 +1216,7 @@ function AnalysesPanel({
   staleVerdict = false,
   compSubject = null,
   marketSince = null,
+  metroDemand = null,
 }: {
   analysis: AnalysisKey;
   onSelect: (key: AnalysisKey) => void;
@@ -1233,6 +1240,8 @@ function AnalysesPanel({
   compSubject?: SubjectBasis | null;
   /** what moved since the market check read its figures (lib/brief-delta) */
   marketSince?: BriefDelta | null;
+  /** the metro area's payrolls by sector today (lib/metro-demand) */
+  metroDemand?: MetroDemand | null;
 }) {
   const STEP_FOR: Record<AnalysisKey, string> = {
     verdict: "verdict",
@@ -1306,7 +1315,7 @@ function AnalysesPanel({
           }}
         />
       ) : (
-        <MarketCheck result={results.market!} since={marketSince} />
+        <MarketCheck result={results.market!} since={marketSince} demand={metroDemand} />
       );
   } else if (running || pending) {
     content = analysis === "verdict" ? <VerdictSkeleton /> : <CardListSkeleton />;
