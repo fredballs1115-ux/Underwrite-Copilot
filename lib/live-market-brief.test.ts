@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readMetroRates, readRates, type RateRow } from "./live-rates";
 import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
-import { BRIEF_NATIONAL_IDS, DEBT_MARKET_IDS, lendingStandardsFor, liveMarketBrief, periodLabel, rentIndexFor } from "./live-market-brief";
+import { BRIEF_NATIONAL_IDS, DEBT_MARKET_IDS, lendingStandardsFor, liveMarketBrief, periodLabel, rentIndexFor, sectorJobsFor } from "./live-market-brief";
 import type { ZoriRead } from "./zori";
 import type { RealtorRead } from "./realtor";
 
@@ -198,6 +198,88 @@ describe("the debt market — national, for every deal, after the metro's lines"
     const later = new Date("2027-06-01T00:00:00Z");
     const stale = readRates(REAL_ROWS, later).filter((r) => (DEBT_MARKET_IDS as readonly string[]).includes(r.meta.id));
     expect(liveMarketBrief({ ...base, now: later, national: stale, assetClass: "multifamily" })).toBeNull();
+  });
+});
+
+describe("the sector that fills the deal's kind of building — which payroll count a deal reads", () => {
+  // Washington's sector payrolls as the table files them (WASH911PBSV_YOY
+  // and the SMU…SA retail series, both FRED's own change from a year ago).
+  const SECTOR_ROWS: RateRow[] = [
+    ...DC_ROWS,
+    { series_id: "WASH911PBSV_YOY", obs_date: "2026-08-01", value: 1.31234 },
+    { series_id: "SMU11479004200000001SA_YOY", obs_date: "2026-08-01", value: -0.4 },
+    { series_id: "WASH911LEIH_YOY", obs_date: "2026-08-01", value: 2.9 },
+  ];
+  const metro = { id: "dc", name: "Washington DC" };
+  const base = { metro, rates: readMetroRates("dc", SECTOR_ROWS, NOW), zori: null, realtor: null, now: NOW };
+
+  it("an office deal is handed the office-using sector's line and no other sector's, after the jobs line", () => {
+    const office = liveMarketBrief({ ...base, assetClass: "office" })!;
+    const line = office.lines.find((l) => l.startsWith("Payrolls in"))!;
+    expect(line).toBe(
+      "Payrolls in professional and business services, the sector that fills offices: +1.3% from a year ago (Aug 2026, Washington MSA; FRED)",
+    );
+    expect(office.lines.filter((l) => l.startsWith("Payrolls in"))).toHaveLength(1);
+    expect(office.lines.indexOf(line)).toBe(office.lines.findIndex((l) => l.startsWith("Nonfarm payrolls")) + 1);
+    expect(office.figures.find((f) => f.key === "sector_jobs_yoy")).toEqual({
+      key: "sector_jobs_yoy",
+      label: "Payrolls, professional and business services",
+      value: 1.31234,
+      unit: "pts",
+      asOf: "2026-08-01",
+    });
+    expect(office.text).toContain("- Payrolls in professional and business services, the sector that fills offices: +1.3%");
+  });
+
+  it("a store reads retail trade, a hotel leisure and hospitality, and one key serves every class so a later screen compares like with like", () => {
+    const store = liveMarketBrief({ ...base, assetClass: "retail" })!;
+    expect(store.lines.filter((l) => l.startsWith("Payrolls in"))).toEqual([
+      "Payrolls in retail trade, the sector that fills stores: -0.4% from a year ago (Aug 2026, Washington MSA; FRED)",
+    ]);
+    const hotel = liveMarketBrief({ ...base, assetClass: "hospitality_str" })!;
+    expect(hotel.lines.filter((l) => l.startsWith("Payrolls in"))).toEqual([
+      "Payrolls in leisure and hospitality, the sector that runs hotels: +2.9% from a year ago (Aug 2026, Washington MSA; FRED)",
+    ]);
+    expect(store.figures.find((f) => f.key === "sector_jobs_yoy")?.value).toBe(-0.4);
+    expect(hotel.figures.find((f) => f.key === "sector_jobs_yoy")?.value).toBe(2.9);
+  });
+
+  it("an apartment deal reads all payrolls and no sector; a warehouse whose sector the table has no row for reads none rather than another's", () => {
+    const apartments = liveMarketBrief({ ...base, assetClass: "multifamily" })!;
+    expect(apartments.lines.some((l) => l.startsWith("Payrolls in"))).toBe(false);
+    expect(apartments.lines.some((l) => l.startsWith("Nonfarm payrolls"))).toBe(true);
+    expect(apartments.figures.some((f) => f.key === "sector_jobs_yoy")).toBe(false);
+    // No transportation row in the fixture: the warehouse's brief has no sector line, not the office's.
+    const warehouse = liveMarketBrief({ ...base, assetClass: "industrial" })!;
+    expect(warehouse.lines.some((l) => l.startsWith("Payrolls in"))).toBe(false);
+    // A stale sector row is left out like any other.
+    const later = new Date("2027-06-01T00:00:00Z");
+    const stale = liveMarketBrief({ ...base, rates: readMetroRates("dc", SECTOR_ROWS, later), now: later, assetClass: "office" });
+    expect(stale?.lines.some((l) => l.startsWith("Payrolls in")) ?? false).toBe(false);
+  });
+
+  it("maps each class to its sector, and a class no one sector fills to none", () => {
+    expect(sectorJobsFor("office")).toEqual({
+      metric: "jobs_pbs_yoy",
+      sector: "professional and business services",
+      fills: "the sector that fills offices",
+    });
+    expect(sectorJobsFor("medical_office")?.metric).toBe("jobs_eduhealth_yoy");
+    expect(sectorJobsFor("senior_housing")?.metric).toBe("jobs_eduhealth_yoy");
+    expect(sectorJobsFor("senior_housing")?.fills).toBe("the sector that staffs senior housing");
+    expect(sectorJobsFor("industrial")?.metric).toBe("jobs_transport_yoy");
+    expect(sectorJobsFor("retail")?.metric).toBe("jobs_retail_yoy");
+    expect(sectorJobsFor("hospitality_str")?.metric).toBe("jobs_leisure_yoy");
+    // Rental housing reads all payrolls (on every brief already); a net
+    // lease's tenant may be a store or a depot; storage, a data centre,
+    // parking and land have no sector that fills them.
+    for (const cls of ["multifamily", "mixed_use", "sfr_btr", "student_housing", "manufactured_housing", "net_lease", "self_storage", "data_center", "parking", "land_infill", "auto", null, undefined, ""]) {
+      expect(sectorJobsFor(cls), String(cls)).toBeNull();
+    }
+    // A phrase the model wrote files by its words, like every other class read.
+    expect(sectorJobsFor("Class A office tower")?.metric).toBe("jobs_pbs_yoy");
+    expect(sectorJobsFor("boutique hotel")?.metric).toBe("jobs_leisure_yoy");
+    expect(sectorJobsFor("bulk distribution warehouse")?.metric).toBe("jobs_transport_yoy");
   });
 });
 

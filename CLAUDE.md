@@ -664,6 +664,42 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   before it sat ten minutes on a two-minute step, and `timeout-minutes`
   on the three pull workflows now ends a stall instead of holding a
   runner for six hours.
+  **Payrolls by sector** (#393, five metrics: `jobs_pbs_yoy`,
+  `jobs_eduhealth_yoy`, `jobs_transport_yoy`, `jobs_retail_yoy`,
+  `jobs_leisure_yoy` — `SECTOR_JOBS_METRICS`): the BLS's supersector
+  employment for each MSA, each FRED's own change from a year ago, five
+  a metro for all fourteen, seventy series. All payrolls is what rental
+  housing reads; a commercial deal reads the ONE sector that fills its
+  kind of building — `sectorJobsFor` in `lib/live-market-brief.ts`:
+  professional and business services for an office, education and
+  health for a medical office or senior housing, transportation,
+  warehousing and utilities for a warehouse, retail trade for a store,
+  leisure and hospitality for a hotel; a net lease (whose tenant may be
+  a store or a depot), a data centre, storage, parking and land read
+  none, because a sector picked for them would be a guess wearing a
+  figure — and the brief carries that one line (figure key
+  `sector_jobs_yoy`, one key so a later screen compares the same
+  sector) after the jobs line, with the prompt naming it as what a
+  lease-up or absorption claim is checked against. On `/market` the five
+  are ONE picture under the metro's tiles, never five more tiles
+  (`SectorJobsPicture` in `app/market/metro-live.tsx`: signed bars from
+  a centre line beside all payrolls, each figure linked, a stale sector
+  named rather than dropped; `data-bar="sectorjobs"`), and each
+  commercial sector's own line under its fundamentals
+  (`app/market/sector-jobs-line.tsx`, the same map). **Every id was
+  printed by the runner** (probes 35920921683, 35920930790 and
+  35921989451): FRED's short ids carry three sectors for twelve metros
+  (`WASH911PBSV`, `…EDUH`, `…LEIH`), retail trade and transportation
+  exist only under the BLS-shaped `SMU…SA` ids
+  (`SMU11479004200000001SA`), Los Angeles has all five in that form and
+  no short ids, Boston's exist only NOT seasonally adjusted
+  (`SMU25144606000000001`, no suffix — the `SA` and `SMS` forms both
+  "do not exist"), and the `SMS` form exists for no supersector
+  anywhere. Two rules the probes bought: FRED's limit is per KEY, so a
+  probe dispatched beside the weekday pull cost the pull two series and
+  three probes dispatched together lost each other one apiece (run them
+  one after another, never beside the pull), and the pace is 520 ms now
+  the table passes two hundred series.
 - **The deal's own model reads the same table** (#380): `lib/debt-index.ts`
   (pure) picks the index a loan is quoted over off today's rates — the
   Treasury tenor NEAREST the hold for the permanent loan (`treasuryForTerm`,

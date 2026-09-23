@@ -1,4 +1,4 @@
-import { permitsTrailingYear, type LiveRate, type SeriesSource } from "@/lib/live-rates";
+import { isSectorJobsMetric, permitsTrailingYear, type LiveRate, type SectorJobsMetric, type SeriesSource } from "@/lib/live-rates";
 import { monthOf, type ZoriRead } from "@/lib/zori";
 import { HOTNESS_METROS, type RealtorRead } from "@/lib/realtor";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
@@ -129,6 +129,47 @@ export function rentIndexFor(assetClass: string | null | undefined): RentIndex |
   }
 }
 
+/**
+ * The metro's payrolls in the sector that fills the deal's kind of building
+ * — the BLS's supersector employment for the MSA, which the table holds
+ * for every covered metro (five sectors a metro), against a year ago. Total
+ * nonfarm is on every brief already and is what rental housing reads; a
+ * commercial deal reads ITS sector and no other, so the check is handed
+ * the payrolls that fill offices for an office and never the retail trade
+ * count beside them. A class no one sector fills — a net lease, whose
+ * tenant may be a store or a distribution centre; a data centre; storage;
+ * parking; land — reads none, because a sector picked for it would be a
+ * guess wearing a figure.
+ */
+export interface SectorJobs {
+  metric: SectorJobsMetric;
+  /** "professional and business services" — how a sentence names the sector */
+  sector: string;
+  /** "the sector that fills offices" — why the deal reads it */
+  fills: string;
+}
+
+export function sectorJobsFor(assetClass: string | null | undefined): SectorJobs | null {
+  const key = assetClassKey(assetClass);
+  if (!key) return null;
+  switch (key) {
+    case "office":
+      return { metric: "jobs_pbs_yoy", sector: "professional and business services", fills: "the sector that fills offices" };
+    case "medical_office":
+      return { metric: "jobs_eduhealth_yoy", sector: "education and health services", fills: "the sector that fills medical offices" };
+    case "senior_housing":
+      return { metric: "jobs_eduhealth_yoy", sector: "education and health services", fills: "the sector that staffs senior housing" };
+    case "industrial":
+      return { metric: "jobs_transport_yoy", sector: "transportation, warehousing and utilities", fills: "the sector that fills warehouses" };
+    case "retail":
+      return { metric: "jobs_retail_yoy", sector: "retail trade", fills: "the sector that fills stores" };
+    case "hospitality_str":
+      return { metric: "jobs_leisure_yoy", sector: "leisure and hospitality", fills: "the sector that runs hotels" };
+    default:
+      return null;
+  }
+}
+
 /** One figure the check read, as a value: what a later screen compares
  *  today's read against ("since this screen: asking rent +1.2%, the metro's
  *  vacancy +0.4 pt"). The sentences are for the model and the reader; the
@@ -186,7 +227,7 @@ interface Said {
   figures: LiveFigure[];
 }
 
-function rateLine(r: LiveRate): Said | null {
+function rateLine(r: LiveRate, sector: SectorJobs | null): Said | null {
   if (!r.fresh || !Number.isFinite(r.value)) return null;
   const meta = r.meta as LiveRate["meta"] & { metric?: string; area?: string; source?: SeriesSource };
   const when = periodLabel(r.obsDate, meta.cadence);
@@ -195,6 +236,17 @@ function rateLine(r: LiveRate): Said | null {
   const fig = (key: string, label: string, unit: LiveFigure["unit"], value = r.value, asOf = r.obsDate): LiveFigure[] => [
     { key, label, value, unit, asOf },
   ];
+  // A sector's payrolls are said for the deal that reads that sector, and
+  // for no other: the office deal gets the office-using sector's line, not
+  // the four beside it. One figure key, so a later screen of the same deal
+  // compares the same sector.
+  if (meta.metric && isSectorJobsMetric(meta.metric)) {
+    if (!sector || sector.metric !== meta.metric) return null;
+    return {
+      line: `Payrolls in ${sector.sector}, ${sector.fills}: ${signed(r.value)}% from a year ago (${when}${where}; ${via})`,
+      figures: fig("sector_jobs_yoy", `Payrolls, ${sector.sector}`, "pts"),
+    };
+  }
   switch (meta.metric) {
     case "unemployment":
       return {
@@ -362,8 +414,9 @@ function debtMarketLines(
 
 export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null {
   const said: Said[] = [];
+  const sector = sectorJobsFor(input.assetClass);
   for (const r of input.rates) {
-    const s = rateLine(r);
+    const s = rateLine(r, sector);
     if (s) said.push(s);
   }
   const z = zoriLine(input.zori);

@@ -96,9 +96,28 @@ export type GroupId =
  * residence — what sitting tenants pay across the area's leases, the in-place
  * rent the asking rent on the same page is set against.
  */
+/**
+ * Payrolls in the supersector that fills each kind of building, against a
+ * year ago — the BLS's state-and-area employment for the MSA, by
+ * supersector: professional and business services (the office-using
+ * sector), education and health services (medical offices, senior
+ * housing), transportation, warehousing and utilities (warehouses), retail
+ * trade (stores), leisure and hospitality (hotels). Total nonfarm is what
+ * an apartment reads; a commercial deal reads the sector that fills ITS
+ * kind, and the market check says which (`sectorJobsFor` in
+ * lib/live-market-brief).
+ */
+export type SectorJobsMetric =
+  | "jobs_pbs_yoy"
+  | "jobs_eduhealth_yoy"
+  | "jobs_transport_yoy"
+  | "jobs_retail_yoy"
+  | "jobs_leisure_yoy";
+
 export type MetroMetric =
   | "unemployment"
   | "jobs_yoy"
+  | SectorJobsMetric
   | "permits"
   | "hpi_yoy"
   | "rent_cpi_yoy"
@@ -204,9 +223,37 @@ export interface SeriesGroup {
 
 const CADENCES: readonly Cadence[] = ["daily", "weekly", "monthly", "quarterly"];
 const UNITS: readonly Unit[] = ["pct", "spread", "pts", "count", "units"];
+/**
+ * The sector payroll metrics, in the order a panel draws them — one
+ * picture (five signed bars against total nonfarm) rather than five tiles,
+ * and the market check reads the one that fills the deal's kind of
+ * building (`sectorJobsFor` in lib/live-market-brief).
+ */
+export const SECTOR_JOBS_METRICS: readonly SectorJobsMetric[] = [
+  "jobs_pbs_yoy",
+  "jobs_eduhealth_yoy",
+  "jobs_transport_yoy",
+  "jobs_retail_yoy",
+  "jobs_leisure_yoy",
+];
+
+export function isSectorJobsMetric(metric: string): metric is SectorJobsMetric {
+  return (SECTOR_JOBS_METRICS as readonly string[]).includes(metric);
+}
+
+/** What each sector metric's payroll count is called, for a bar's label. */
+export const SECTOR_JOBS_LABEL: Record<SectorJobsMetric, string> = {
+  jobs_pbs_yoy: "Professional & business services",
+  jobs_eduhealth_yoy: "Education & health services",
+  jobs_transport_yoy: "Transportation, warehousing & utilities",
+  jobs_retail_yoy: "Retail trade",
+  jobs_leisure_yoy: "Leisure & hospitality",
+};
+
 const METRO_METRICS: readonly MetroMetric[] = [
   "unemployment",
   "jobs_yoy",
+  ...SECTOR_JOBS_METRICS,
   "permits",
   "hpi_yoy",
   "rent_cpi_yoy",
