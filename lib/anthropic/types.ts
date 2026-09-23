@@ -190,6 +190,18 @@ export interface LiveBriefRecord {
   metro: string;
   readOn: string;
   lines: string[];
+  /** the same figures as values (lib/live-market-brief `LiveFigure`), so a
+   *  later screen can say what moved since; absent on a record written
+   *  before they were stored */
+  figures?: LiveBriefFigure[];
+}
+
+export interface LiveBriefFigure {
+  key: string;
+  label: string;
+  value: number;
+  unit: "pct" | "pts" | "usd" | "count" | "days" | "rank" | "years";
+  asOf: string;
 }
 
 /**

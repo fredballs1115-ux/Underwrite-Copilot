@@ -35,6 +35,21 @@ export interface LiveMarketInput {
   now: Date;
 }
 
+/** One figure the check read, as a value: what a later screen compares
+ *  today's read against ("since this screen: asking rent +1.2%, the metro's
+ *  vacancy +0.4 pt"). The sentences are for the model and the reader; the
+ *  values are for the arithmetic, and a value is never re-parsed out of a
+ *  sentence. */
+export interface LiveFigure {
+  /** the series' metric or the benchmark's metric id — "unemployment", "permits_ttm", "zori_rent", "rdc_hotness_rank" */
+  key: string;
+  label: string;
+  value: number;
+  unit: "pct" | "pts" | "usd" | "count" | "days" | "rank" | "years";
+  /** the observation's own date */
+  asOf: string;
+}
+
 export interface LiveMarketBrief {
   /** the covered metro's name */
   metro: string;
@@ -42,6 +57,8 @@ export interface LiveMarketBrief {
   readOn: string;
   /** one figure a line, dated and sourced */
   lines: string[];
+  /** the same figures as values, one per line at most, for a later comparison */
+  figures: LiveFigure[];
   /** the block handed to the model */
   text: string;
 }
@@ -70,49 +87,80 @@ export function periodLabel(obsDate: string, cadence: LiveRate["meta"]["cadence"
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
 
-function rateLine(r: LiveRate): string | null {
+interface Said {
+  line: string;
+  figures: LiveFigure[];
+}
+
+function rateLine(r: LiveRate): Said | null {
   if (!r.fresh || !Number.isFinite(r.value)) return null;
   const meta = r.meta as LiveRate["meta"] & { metric?: string; area?: string; source?: SeriesSource };
   const when = periodLabel(r.obsDate, meta.cadence);
   const where = meta.area ? `, ${meta.area}` : "";
   const via = publisher(meta.source);
+  const fig = (key: string, label: string, unit: LiveFigure["unit"], value = r.value, asOf = r.obsDate): LiveFigure[] => [
+    { key, label, value, unit, asOf },
+  ];
   switch (meta.metric) {
     case "unemployment":
-      return `Unemployment ${r.value.toFixed(1)}% (${when}${where}; ${via})${
-        r.move !== null ? `, ${signed(r.move)} pt on the month before` : ""
-      }`;
+      return {
+        line: `Unemployment ${r.value.toFixed(1)}% (${when}${where}; ${via})${
+          r.move !== null ? `, ${signed(r.move)} pt on the month before` : ""
+        }`,
+        figures: fig("unemployment", "Unemployment", "pts"),
+      };
     case "jobs_yoy":
-      return `Nonfarm payrolls ${signed(r.value)}% from a year ago (${when}${where}; ${via})`;
+      return {
+        line: `Nonfarm payrolls ${signed(r.value)}% from a year ago (${when}${where}; ${via})`,
+        figures: fig("jobs_yoy", "Payrolls y/y", "pts"),
+      };
     case "permits": {
       // A month of permits is mostly the season; a year of them is the pipeline.
       const year = permitsTrailingYear(r);
       if (!year) return null;
-      return `Housing units permitted, twelve months to ${monthOf(year.to)}${where}: ${whole(year.units)}${
-        year.changePct !== null ? ` (${signed(year.changePct)}% against the twelve months before)` : ""
-      }; ${via}`;
+      return {
+        line: `Housing units permitted, twelve months to ${monthOf(year.to)}${where}: ${whole(year.units)}${
+          year.changePct !== null ? ` (${signed(year.changePct)}% against the twelve months before)` : ""
+        }; ${via}`,
+        figures: fig("permits_ttm", "Units permitted, trailing year", "count", year.units, year.to),
+      };
     }
     case "hpi_yoy":
-      return `House prices (FHFA index) ${signed(r.value)}% from a year ago (${when}${where}; ${via})`;
+      return {
+        line: `House prices (FHFA index) ${signed(r.value)}% from a year ago (${when}${where}; ${via})`,
+        figures: fig("hpi_yoy", "House prices y/y", "pts"),
+      };
     case "rent_cpi_yoy":
-      return `Rent paid by sitting tenants (CPI rent of primary residence) ${signed(r.value)}% from a year ago (${when}${where}; ${via})`;
+      return {
+        line: `Rent paid by sitting tenants (CPI rent of primary residence) ${signed(r.value)}% from a year ago (${when}${where}; ${via})`,
+        figures: fig("rent_cpi_yoy", "Rent CPI y/y", "pts"),
+      };
     case "rental_vacancy_msa":
-      return `Rental vacancy, metro area${where}: ${r.value.toFixed(1)}%${
-        r.moe !== null ? ` with a ±${r.moe} pt margin of error (a sample — a move inside the margin is noise)` : ""
-      } (${when}; ${via})`;
+      return {
+        line: `Rental vacancy, metro area${where}: ${r.value.toFixed(1)}%${
+          r.moe !== null ? ` with a ±${r.moe} pt margin of error (a sample — a move inside the margin is noise)` : ""
+        } (${when}; ${via})`,
+        figures: fig("rental_vacancy_msa", "Rental vacancy, metro area", "pts"),
+      };
     case "rental_vacancy":
-      return `Rental vacancy${where}: ${r.value.toFixed(1)}% (${when}; ${via})`;
+      return {
+        line: `Rental vacancy${where}: ${r.value.toFixed(1)}% (${when}; ${via})`,
+        figures: fig("rental_vacancy", "Rental vacancy, Census region", "pts"),
+      };
     default:
       return null;
   }
 }
 
-function zoriLine(z: ZoriRead | null): string | null {
+function zoriLine(z: ZoriRead | null): Said | null {
   if (!z) return null;
   const parts = [
     `Asking rent, all home types: $${whole(z.rent)}/mo${z.yoyPct !== null ? `, ${signed(z.yoyPct)}% from a year ago` : ""}`,
   ];
+  const figures: LiveFigure[] = [{ key: "zori_rent", label: "Asking rent, all home types", value: z.rent, unit: "usd", asOf: z.asOf }];
   if (z.mfrRent !== null) {
     parts.push(`apartments alone $${whole(z.mfrRent)}/mo${z.mfrYoyPct !== null ? ` (${signed(z.mfrYoyPct)}%)` : ""}`);
+    figures.push({ key: "zori_mfr_rent", label: "Asking rent, apartments", value: z.mfrRent, unit: "usd", asOf: z.asOf });
   }
   if (z.homeValue !== null) {
     parts.push(
@@ -120,20 +168,26 @@ function zoriLine(z: ZoriRead | null): string | null {
         z.priceToRentYears !== null ? `, ${z.priceToRentYears} years of asking rent` : ""
       }`,
     );
+    figures.push({ key: "zhvi", label: "Typical home value", value: z.homeValue, unit: "usd", asOf: z.asOf });
   }
-  return `${parts.join("; ")} (${monthOf(z.asOf)}; Zillow Research — listings, before concessions)`;
+  return { line: `${parts.join("; ")} (${monthOf(z.asOf)}; Zillow Research — listings, before concessions)`, figures };
 }
 
-function realtorLine(m: RealtorRead | null): string | null {
+function realtorLine(m: RealtorRead | null): Said | null {
   if (!m) return null;
   const parts = [
     `median list price $${whole(m.medianListPrice)}${m.medianListPriceYoyPct !== null ? ` (${signed(m.medianListPriceYoyPct)}% from a year ago)` : ""}`,
   ];
+  const figures: LiveFigure[] = [
+    { key: "rdc_median_list_price", label: "Median list price", value: m.medianListPrice, unit: "usd", asOf: m.asOf },
+  ];
   if (m.activeListings !== null) {
     parts.push(`${whole(m.activeListings)} active listings${m.activeListingsYoyPct !== null ? ` (${signed(m.activeListingsYoyPct)}%)` : ""}`);
+    figures.push({ key: "rdc_active_listings", label: "Active listings", value: m.activeListings, unit: "count", asOf: m.asOf });
   }
   if (m.daysOnMarket !== null) {
     parts.push(`median ${whole(m.daysOnMarket)} days on market${m.daysOnMarketYoyPct !== null ? ` (${signed(m.daysOnMarketYoyPct)}%)` : ""}`);
+    figures.push({ key: "rdc_days_on_market", label: "Median days on market", value: m.daysOnMarket, unit: "days", asOf: m.asOf });
   }
   if (m.direction) parts.push(`${m.direction} on both flow figures`);
   if (m.hotness) {
@@ -144,25 +198,28 @@ function realtorLine(m: RealtorRead | null): string | null {
           : ""
       }`,
     );
+    figures.push({ key: "rdc_hotness_rank", label: "Hotness rank", value: m.hotness.rank, unit: "rank", asOf: m.hotness.asOf });
   }
-  return `For-sale market: ${parts.join(", ")} (${monthOf(m.asOf)}; Realtor.com — list prices are asks, not sales)`;
+  return { line: `For-sale market: ${parts.join(", ")} (${monthOf(m.asOf)}; Realtor.com — list prices are asks, not sales)`, figures };
 }
 
 export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null {
-  const lines: string[] = [];
+  const said: Said[] = [];
   for (const r of input.rates) {
-    const line = rateLine(r);
-    if (line) lines.push(line);
+    const s = rateLine(r);
+    if (s) said.push(s);
   }
   const z = zoriLine(input.zori);
-  if (z) lines.push(z);
+  if (z) said.push(z);
   const m = realtorLine(input.realtor);
-  if (m) lines.push(m);
-  if (lines.length === 0) return null;
+  if (m) said.push(m);
+  if (said.length === 0) return null;
+  const lines = said.map((s) => s.line);
+  const figures = said.flatMap((s) => s.figures);
   const readOn = input.now.toISOString().slice(0, 10);
   const text = [
     `Published figures for the ${input.metro.name} market the deal sits in, read on ${readOn} from FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com. Each is dated, and each is the metro area's — not the submarket's and not the building's.`,
     ...lines.map((l) => `- ${l}`),
   ].join("\n");
-  return { metro: input.metro.name, readOn, lines, text };
+  return { metro: input.metro.name, readOn, lines, figures, text };
 }

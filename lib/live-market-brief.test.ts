@@ -84,6 +84,22 @@ describe("liveMarketBrief — the metro's published figures, dated and sourced, 
     );
   });
 
+  it("the same figures are kept as values, keyed and dated, for a later screen to compare against", () => {
+    const byKey = Object.fromEntries(brief.figures.map((f) => [f.key, f]));
+    expect(byKey.unemployment).toEqual({ key: "unemployment", label: "Unemployment", value: 3.4, unit: "pts", asOf: "2026-07-01" });
+    expect(byKey.permits_ttm).toEqual({ key: "permits_ttm", label: "Units permitted, trailing year", value: 12_000, unit: "count", asOf: "2026-08-01" });
+    expect(byKey.rental_vacancy_msa).toMatchObject({ value: 6.2, unit: "pts", asOf: "2026-04-01" });
+    expect(byKey.zori_rent).toMatchObject({ value: 2_310, unit: "usd", asOf: "2026-08-31" });
+    expect(byKey.zori_mfr_rent).toMatchObject({ value: 2_080, unit: "usd" });
+    expect(byKey.zhvi).toMatchObject({ value: 560_000, unit: "usd" });
+    expect(byKey.rdc_median_list_price).toMatchObject({ value: 599_000, unit: "usd", asOf: "2026-08-01" });
+    expect(byKey.rdc_active_listings).toMatchObject({ value: 12_400, unit: "count" });
+    expect(byKey.rdc_days_on_market).toMatchObject({ value: 41, unit: "days" });
+    expect(byKey.rdc_hotness_rank).toMatchObject({ value: 40, unit: "rank" });
+    // One key each — a value is never stored twice under one name.
+    expect(new Set(brief.figures.map((f) => f.key)).size).toBe(brief.figures.length);
+  });
+
   it("the block is the header and one dash a line", () => {
     expect(brief.text.split("\n").length).toBe(1 + brief.lines.length);
     expect(brief.text.split("\n").slice(1).every((l) => l.startsWith("- "))).toBe(true);

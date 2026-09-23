@@ -376,10 +376,17 @@ describe("runAnalysis — the happy path", () => {
     expect(handed).toContain("- Unemployment 3.4% (Jul 2026, Washington MSA; FRED), +0.2 pt on the month before");
     expect(handed).toContain("- Rental vacancy, metro area, Washington MSA: 6.2% with a ±2.2 pt margin of error");
     expect(handed).toContain("- Asking rent, all home types: $2,310/mo, +2.1% from a year ago (Aug 2026; Zillow Research");
-    const stored = state.deals.d1.market as { liveBrief?: { metro: string; readOn: string; lines: string[] } | null };
+    const stored = state.deals.d1.market as {
+      liveBrief?: { metro: string; readOn: string; lines: string[]; figures: { key: string; value: number }[] } | null;
+    };
     expect(stored.liveBrief?.metro).toBe("Washington DC");
     expect(stored.liveBrief?.readOn).toBe("2026-09-23");
     expect(stored.liveBrief?.lines).toHaveLength(3);
+    expect(stored.liveBrief?.figures.map((f) => [f.key, f.value])).toEqual([
+      ["unemployment", 3.4],
+      ["rental_vacancy_msa", 6.2],
+      ["zori_rent", 2310],
+    ]);
     expect(errSpy).not.toHaveBeenCalled();
   });
 

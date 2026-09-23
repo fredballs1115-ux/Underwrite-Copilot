@@ -709,7 +709,9 @@ async function runAnalysisSteps(
       const checked = await checkMarket(om(), assetClass, dealContext, brief?.text ?? null);
       const market: MarketResult = {
         ...checked,
-        liveBrief: brief ? { metro: brief.metro, readOn: brief.readOn, lines: brief.lines } : null,
+        liveBrief: brief
+          ? { metro: brief.metro, readOn: brief.readOn, lines: brief.lines, figures: brief.figures }
+          : null,
       };
       await admin
         .from("deals")
