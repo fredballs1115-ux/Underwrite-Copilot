@@ -465,3 +465,26 @@ describe("the tracker inside the model's checks", () => {
     expect(office.read).not.toContain("cap range");
   });
 });
+
+// ── A deal outside the covered metros: the state's annual vacancy ───────────
+describe("a deal outside the covered metros anchors its vacancy check on the state's annual figure, and says so", () => {
+  const paRates = readMetroRates("state:PA", [{ series_id: "PARVAC", obs_date: "2025-01-01", value: 6.6 }], FIXTURE_NOW);
+  const pa: ModelVsMarketInput = { ...base, metro: { id: "state:PA", name: "Pennsylvania" }, rates: paRates, zori: null };
+
+  it("publishes the state's figure by its year, reads it as the state's rental stock, and reaches no tracker", () => {
+    const c = check(pa, "vacancy")!;
+    expect(c.published).toEqual([
+      { label: "Rental vacancy, Pennsylvania (annual)", text: "6.6% (2025)", value: 6.6, asOf: "2025-01-01", publisher: "FRED" },
+    ]);
+    expect(c.read).toContain(
+      "The state's rental vacancy is 6.6% (2025, the survey's annual figure for the whole of Pennsylvania; FRED) — the deal lies outside the metros the site tracks, so no metro figure is read",
+    );
+    expect(c.read).toContain("the state's rental stock as a whole");
+    expect(c.read).not.toContain("metro's rental stock");
+    expect(c.read).not.toContain("research tracker");
+    // The metro's rents and the tracker are absent for a state, so the
+    // rent-growth check is left out rather than read against nothing.
+    expect(modelVsMarket(pa)!.checks.map((x) => x.key)).toEqual(["expense_growth", "vacancy", "exit_cap"]);
+    expect(modelVsMarket(pa)!.metro).toBe("Pennsylvania");
+  });
+});

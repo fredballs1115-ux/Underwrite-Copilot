@@ -4,7 +4,7 @@
 // (Universal module: server components and tests import it.)
 
 import metrosSeed from "@/data/research/metros.json";
-import { abbrevState } from "@/lib/address";
+import { US_STATE_ABBREV, abbrevState } from "@/lib/address";
 import type { GeoTarget } from "@/lib/criteria";
 
 export interface CoveredMetro {
@@ -72,6 +72,45 @@ export function metroForAddress(addr: {
 /** Is the deal's state one that contains covered markets at all? */
 export function coveredState(state?: string | null): boolean {
   return COVERED_STATES.has(abbrevState(state ?? "").toUpperCase());
+}
+
+/** "Pennsylvania", "District of Columbia" — the address table's names, cased for a page. */
+const STATE_NAME_BY_CODE: Record<string, string> = Object.fromEntries(
+  Object.entries(US_STATE_ABBREV).map(([name, code]) => [
+    code,
+    name
+      .split(" ")
+      .map((w) => (w === "of" ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+      .join(" "),
+  ]),
+);
+
+/** The prefix a state's market id wears, so every reader can tell the grain. */
+export const STATE_MARKET_PREFIX = "state:";
+
+/**
+ * The state a deal address falls in, as a market of its own grain — the
+ * fallback where no covered metro matches, because a deal in Pittsburgh,
+ * Phoenix or Nashville is a deal all the same and its state publishes
+ * unemployment, payrolls, permits, house prices and rental vacancy of its
+ * own. The id is `state:PA`, so the series table can file a state's series
+ * under it and every sentence can say the figure is the state's, never the
+ * metro's. Null for an address whose state the table does not know.
+ */
+export function stateForAddress(addr: { state?: string | null }): CoveredMetro | null {
+  const code = abbrevState((addr.state ?? "").trim()).trim().toUpperCase();
+  const name = STATE_NAME_BY_CODE[code];
+  return name ? { id: `${STATE_MARKET_PREFIX}${code}`, name } : null;
+}
+
+/** Whether a market id is a state's rather than a covered metro's. */
+export function isStateMarket(id: string | null | undefined): boolean {
+  return typeof id === "string" && id.startsWith(STATE_MARKET_PREFIX);
+}
+
+/** The two-letter code inside a state market id, or null. */
+export function stateOfMarket(id: string | null | undefined): string | null {
+  return isStateMarket(id) ? (id as string).slice(STATE_MARKET_PREFIX.length) : null;
 }
 
 export interface MarketNavEntry {

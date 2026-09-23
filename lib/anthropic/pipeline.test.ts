@@ -406,6 +406,38 @@ describe("runAnalysis — the happy path", () => {
     expect(vi.mocked(checkMarket).mock.calls[0][3]).toBeNull();
     expect((state.deals.d1.market as { liveBrief?: unknown }).liveBrief).toBeNull();
   });
+
+  it("a deal outside the covered metros is handed its state's figures, said as the state's, and stores the grain", async () => {
+    // Pittsburgh is in no covered metro; Pennsylvania's own series are filed under state:PA.
+    state.deals.d1.address = { city: "Pittsburgh", state: "PA" };
+    state.rates = [
+      { series_id: "PAUR", obs_date: "2026-08-01", value: 3.7 },
+      { series_id: "PAUR", obs_date: "2026-07-01", value: 3.6 },
+      { series_id: "PARVAC", obs_date: "2025-01-01", value: 6.6 },
+      { series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 },
+    ];
+    state.benchmarks = [];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    const handed = vi.mocked(checkMarket).mock.calls[0][3];
+    expect(handed).toContain(
+      "Published figures for the state of Pennsylvania the deal sits in — the address lies outside the metros the site tracks, so these are the state's own figures — read on 2026-09-23",
+    );
+    expect(handed).toContain("- Unemployment 3.7% (Aug 2026, Pennsylvania; FRED), +0.1 pt on the month before");
+    expect(handed).toContain("- Rental vacancy, Pennsylvania, the state's annual figure: 6.6% (2025;");
+    expect(handed).toContain("- Debt market — 10-year Treasury 4.90% (Sep 22, 2026; FRED)");
+    expect(handed).not.toContain("metro area's");
+    const stored = state.deals.d1.market as { liveBrief?: { metro: string; grain?: string; lines: string[] } | null };
+    expect(stored.liveBrief?.metro).toBe("Pennsylvania");
+    expect(stored.liveBrief?.grain).toBe("state");
+    expect(stored.liveBrief?.lines).toHaveLength(3);
+    expect(errSpy).not.toHaveBeenCalled();
+  });
 });
 
 describe("runAnalysis — what a failure leaves behind, and what it tells the analyst", () => {

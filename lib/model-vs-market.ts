@@ -5,6 +5,7 @@ import type { DerivedModel, InputSource } from "@/lib/underwrite/inputs";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { INSURANCE_INDEX_ID, periodLabel, rentIndexFor } from "@/lib/live-market-brief";
+import { isStateMarket } from "@/lib/market-match";
 import { datedLong } from "@/lib/debt-index";
 import { inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { findGoingInCap, parsePct } from "@/lib/criteria";
@@ -102,8 +103,12 @@ export interface ModelCheck {
 export interface ModelVsMarket {
   /** ISO date the figures were read */
   readOn: string;
-  /** the covered metro's name, where the metro figures were read */
+  /** the covered metro's name, where the metro figures were read — or the state's, for a deal outside the covered metros */
   metro: string | null;
+  /** whose figures the market rows are: a covered metro's, or the state's —
+   *  null where none were read; optional so a fixture built before states
+   *  could be read stays a metro's */
+  grain?: "metro" | "state" | null;
   checks: ModelCheck[];
 }
 
@@ -407,7 +412,11 @@ function vacancyCheck(input: ModelVsMarketInput): ModelCheck | null {
   if (!words.residential) return trackerVacancyCheck(input, v);
   const metro = fresh(input.rates, (r) => metricOf(r) === "rental_vacancy_msa");
   const region = fresh(input.rates, (r) => metricOf(r) === "rental_vacancy");
-  const anchor = metro ?? region;
+  // A deal outside the covered metros reads its state's annual figure —
+  // the survey's own, a year's rate for the whole state — and nothing
+  // finer; the anchor is whichever grain the read has, finest first.
+  const state = fresh(input.rates, (r) => metricOf(r) === "rental_vacancy_state");
+  const anchor = metro ?? region ?? state;
   if (!anchor) return null;
   const published: PublishedFigure[] = [];
   const parts: string[] = [];
@@ -434,10 +443,20 @@ function vacancyCheck(input: ModelVsMarketInput): ModelCheck | null {
     published.push({ label: `Rental vacancy, ${name}`, text: `${region.value.toFixed(1)}% (${when})`, value: region.value, asOf: region.obsDate, publisher: publisherOf(region) });
     parts.push(metro ? `the ${name}'s ${region.value.toFixed(1)}%` : `The ${name}'s rental vacancy is ${region.value.toFixed(1)}% (${when}; ${publisherOf(region)})`);
   }
+  if (!metro && !region && state) {
+    const when = periodLabel(state.obsDate, state.meta.cadence);
+    const name = areaOf(state) ?? "the state";
+    published.push({ label: `Rental vacancy, ${name} (annual)`, text: `${state.value.toFixed(1)}% (${when})`, value: state.value, asOf: state.obsDate, publisher: publisherOf(state) });
+    parts.push(`The state's rental vacancy is ${state.value.toFixed(1)}% (${when}, the survey's annual figure for the whole of ${name}; ${publisherOf(state)}) — the deal lies outside the metros the site tracks, so no metro figure is read`);
+  }
   const tolerance = anchor.moe !== null ? anchor.moe : SAME;
   const gap = anchor.value - v;
   const tone: CheckTone = gap > tolerance ? "tighter" : gap < -tolerance ? "looser" : "inside";
-  const stock = metro ? "the metro's rental stock as a whole" : "the region's rental stock as a whole";
+  const stock = metro
+    ? "the metro's rental stock as a whole"
+    : region
+      ? "the region's rental stock as a whole"
+      : "the state's rental stock as a whole";
   const clause =
     tone === "tighter"
       ? `The building would run ${pts(gap)} tighter than ${stock} — usual for a managed asset, and the figure to hold the rent roll to.`
@@ -557,6 +576,7 @@ export function modelVsMarket(input: ModelVsMarketInput): ModelVsMarket | null {
   return {
     readOn: input.now.toISOString().slice(0, 10),
     metro: metroRead ? (input.metro?.name ?? null) : null,
+    grain: metroRead && input.metro ? (isStateMarket(input.metro.id) ? "state" : "metro") : null,
     checks,
   };
 }

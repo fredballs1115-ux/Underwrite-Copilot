@@ -148,6 +148,29 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(gluedWords(text)).toEqual([]);
     expect(text).toMatch(/Read beside the Philadelphia, PA market’s own figures/);
     expect(text).toMatch(/2 published figures as of Sep 23, 2026/);
+    expect(text).toMatch(/rules of thumb, read beside the metro's published figures/);
+    // A deal outside the covered metros reads its state's figures, and the
+    // section says so wherever it would have said "the metro's".
+    const stateBrief: Props = {
+      ...withBrief,
+      results: {
+        ...withBrief.results,
+        market: {
+          ...withBrief.results.market!,
+          liveBrief: {
+            metro: "Pennsylvania",
+            grain: "state",
+            readOn: "2026-09-23",
+            lines: ["Unemployment 3.7% (Aug 2026, Pennsylvania; FRED), +0.1 pt on the month before"],
+          },
+        },
+      },
+    };
+    const stateText = textOf(render(stateBrief));
+    expect(stateText).toMatch(/Read beside the state of Pennsylvania’s own figures/);
+    expect(stateText).toMatch(/each the state’s rather than any metro’s — the address lies outside the metros the site tracks/);
+    expect(stateText).toMatch(/rules of thumb, read beside the state's published figures/);
+    expect(stateText).not.toMatch(/market’s own figures/);
     expect(text).toMatch(/Unemployment 4\.1% \(Jul 2026, Philadelphia MSA; FRED\)/);
     expect(text).toMatch(/read beside the metro's published figures/);
     // Nothing read today → no "since" block at all.

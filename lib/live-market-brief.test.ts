@@ -77,7 +77,7 @@ describe("liveMarketBrief — the metro's published figures, dated and sourced, 
 
   it("a year of permits is summed against the year before it — a month alone is the season — with the multi-unit part said as the total less the single-family series", () => {
     expect(brief.lines).toContain(
-      "Housing units permitted, twelve months to Aug 2026, Washington MSA: 12,000 (-20.0% against the twelve months before), of which 7,200 in buildings of two or more units (-29.4%) — the total less the single-family series, the only split published for a metro; FRED",
+      "Housing units permitted, twelve months to Aug 2026, Washington MSA: 12,000 (-20.0% against the twelve months before), of which 7,200 in buildings of two or more units (-29.4%) — the total less the single-family series, the only split published for a metro or a state; FRED",
     );
     // The single-family series is never a line of its own.
     expect(brief.lines.filter((l) => l.startsWith("Housing units permitted"))).toHaveLength(1);
@@ -398,5 +398,47 @@ describe("the rents each kind of commercial lessor charges — national, said so
     // Without the series on hand, nothing claims a figure.
     const without = liveMarketBrief({ ...base, assetClass: "office", national: national.filter((r) => r.meta.id !== "PCU9241269241265_YOY") })!;
     expect(without.lines.some((l) => l.startsWith("Commercial property insurance premiums"))).toBe(false);
+  });
+});
+
+// ── A deal outside the covered metros reads its state's figures ─────────────
+describe("a deal outside the covered metros reads its state's figures, said as the state's", () => {
+  // Pennsylvania's own series as the table files them (state:PA): the ids
+  // the probe of 2026-09-23 printed (rates run 35931065205).
+  const rows: RateRow[] = [
+    { series_id: "PAUR", obs_date: "2026-08-01", value: 3.7 },
+    { series_id: "PAUR", obs_date: "2026-07-01", value: 3.6 },
+    { series_id: "PANA_YOY", obs_date: "2026-08-01", value: 0.9 },
+    { series_id: "PARVAC", obs_date: "2025-01-01", value: 6.6 },
+  ];
+  const pa = liveMarketBrief({
+    metro: { id: "state:PA", name: "Pennsylvania" },
+    assetClass: "multifamily",
+    rates: readMetroRates("state:PA", rows, NOW),
+    zori: null,
+    realtor: null,
+    national: [],
+    now: NOW,
+  })!;
+
+  it("opens by naming the grain, and every line carries the state's name", () => {
+    expect(pa.text).toContain(
+      "Published figures for the state of Pennsylvania the deal sits in — the address lies outside the metros the site tracks, so these are the state's own figures — read on 2026-09-23 from FRED and the Census Bureau. Each is dated, and each is the state's — not the metro's, not the submarket's and not the building's.",
+    );
+    expect(pa.text).not.toContain("metro area's");
+    expect(pa.lines).toContain("Unemployment 3.7% (Aug 2026, Pennsylvania; FRED), +0.1 pt on the month before");
+    expect(pa.lines).toContain("Nonfarm payrolls +0.9% from a year ago (Aug 2026, Pennsylvania; FRED)");
+    expect(pa.lines).toContain(
+      "Rental vacancy, Pennsylvania, the state's annual figure: 6.6% (2025; the Census Bureau's Housing Vacancy Survey via FRED — a year's rate for the whole state, not a quarter's for a metro)",
+    );
+    expect(pa.figures.find((f) => f.key === "rental_vacancy_state")).toMatchObject({ value: 6.6, unit: "pts", asOf: "2025-01-01" });
+    expect(pa.metro).toBe("Pennsylvania");
+    expect(pa.grain).toBe("state");
+  });
+
+  it("a covered metro's brief keeps the metro's grain", () => {
+    const dc = liveMarketBrief({ metro: { id: "dc", name: "Washington DC" }, assetClass: "multifamily", rates: readMetroRates("dc", DC_ROWS, NOW), zori: null, realtor: null, national: [], now: NOW })!;
+    expect(dc.grain).toBe("metro");
+    expect(dc.text).toContain("each is the metro area's");
   });
 });

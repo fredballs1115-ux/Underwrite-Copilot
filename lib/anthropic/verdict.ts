@@ -186,10 +186,14 @@ export function buildBrief(input: VerdictInputs): string {
   const live = input.market?.liveBrief;
   if (live && live.lines.length > 0) {
     sections.push(
-      `## The ${live.metro} market's published figures the market check read on ${live.readOn}`,
+      live.grain === "state"
+        ? `## The state of ${live.metro}'s published figures the market check read on ${live.readOn} — the deal lies outside the metros the site tracks`
+        : `## The ${live.metro} market's published figures the market check read on ${live.readOn}`,
       [
         ...live.lines.map((l) => `- ${l}`),
-        "Each is dated and is the metro's, not the submarket's or the building's. Where a screen range, a risk or a next step turns on one of these, name the figure and its date as its source.",
+        live.grain === "state"
+          ? "Each is dated and is the state's, not any metro's, the submarket's or the building's. Where a screen range, a risk or a next step turns on one of these, name the figure and its date as its source, and say it is the state's."
+          : "Each is dated and is the metro's, not the submarket's or the building's. Where a screen range, a risk or a next step turns on one of these, name the figure and its date as its source.",
       ].join("\n"),
     );
   }

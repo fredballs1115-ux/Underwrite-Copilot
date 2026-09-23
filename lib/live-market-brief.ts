@@ -10,6 +10,7 @@ import { monthOf, type ZoriRead } from "@/lib/zori";
 import { metroSupply, type MetroSupply } from "@/lib/metro-supply";
 import { HOTNESS_METROS, type RealtorRead } from "@/lib/realtor";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
+import { isStateMarket } from "@/lib/market-match";
 
 /**
  * The metro's published figures, written out for the market check — the
@@ -220,8 +221,13 @@ export interface LiveFigure {
 }
 
 export interface LiveMarketBrief {
-  /** the covered metro's name */
+  /** the covered metro's name — or the state's, for a deal outside the covered metros */
   metro: string;
+  /** whose figures these are: a covered metro's, or the state's for a deal
+   *  outside the metros the site tracks — every surface that prints the
+   *  brief says which, because a state figure passed off as a metro's is
+   *  a figure for a market the deal is not in */
+  grain: "metro" | "state";
   /** ISO date the figures were read */
   readOn: string;
   /** one figure a line, dated and sourced */
@@ -252,6 +258,7 @@ export function periodLabel(obsDate: string, cadence: LiveRate["meta"]["cadence"
   if (!Number.isFinite(at)) return obsDate;
   const d = new Date(at);
   if (cadence === "quarterly") return `Q${Math.floor(d.getUTCMonth() / 3) + 1} ${d.getUTCFullYear()}`;
+  if (cadence === "annual") return String(d.getUTCFullYear());
   if (cadence === "monthly") return monthOf(obsDate);
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
@@ -305,7 +312,7 @@ function rateLine(r: LiveRate, sector: SectorJobs | null, supply: MetroSupply | 
         supply && supply.fresh && supply.to === year.to
           ? `, of which ${whole(supply.multi)} in buildings of two or more units${
               supply.multiChangePct !== null ? ` (${signed(supply.multiChangePct)}%)` : ""
-            } — the total less the single-family series, the only split published for a metro`
+            } — the total less the single-family series, the only split published for a metro or a state`
           : "";
       return {
         line: `Housing units permitted, twelve months to ${monthOf(year.to)}${where}: ${whole(year.units)}${
@@ -320,6 +327,13 @@ function rateLine(r: LiveRate, sector: SectorJobs | null, supply: MetroSupply | 
     case "permits_1unit":
       // Never a line of its own: it is the other half of the permits line.
       return null;
+    case "rental_vacancy_state":
+      // The survey's annual figure for the whole state: a year's rate, not
+      // a quarter's, and the state's, not any metro's inside it.
+      return {
+        line: `Rental vacancy${where}, the state's annual figure: ${r.value.toFixed(1)}% (${when}; the Census Bureau's Housing Vacancy Survey via FRED — a year's rate for the whole state, not a quarter's for a metro)`,
+        figures: fig("rental_vacancy_state", "Rental vacancy, state (annual)", "pts"),
+      };
     case "hpi_yoy":
       return {
         line: `House prices (FHFA index) ${signed(r.value)}% from a year ago (${when}${where}; ${via})`,
@@ -501,9 +515,14 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
   const lines = said.map((s) => s.line);
   const figures = said.flatMap((s) => s.figures);
   const readOn = input.now.toISOString().slice(0, 10);
-  const text = [
-    `Published figures for the ${input.metro.name} market the deal sits in, read on ${readOn} from FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com. Each is dated, and each is the metro area's — not the submarket's and not the building's.`,
-    ...lines.map((l) => `- ${l}`),
-  ].join("\n");
-  return { metro: input.metro.name, readOn, lines, figures, text };
+  // The grain is said first: a deal outside the metros the site tracks
+  // reads its STATE's figures, and a state figure passed off as a metro's
+  // flatters or damns a market the deal is not in.
+  const grain: LiveMarketBrief["grain"] = isStateMarket(input.metro.id) ? "state" : "metro";
+  const header =
+    grain === "state"
+      ? `Published figures for the state of ${input.metro.name} the deal sits in — the address lies outside the metros the site tracks, so these are the state's own figures — read on ${readOn} from FRED and the Census Bureau. Each is dated, and each is the state's — not the metro's, not the submarket's and not the building's.`
+      : `Published figures for the ${input.metro.name} market the deal sits in, read on ${readOn} from FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com. Each is dated, and each is the metro area's — not the submarket's and not the building's.`;
+  const text = [header, ...lines.map((l) => `- ${l}`)].join("\n");
+  return { metro: input.metro.name, grain, readOn, lines, figures, text };
 }
