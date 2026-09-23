@@ -57,9 +57,12 @@ export interface DebtSeeds {
   /** 30-day average SOFR (overnight SOFR where the average is not fresh) —
    *  a floating construction or bridge loan's index */
   floating: DebtIndex | null;
+  /** the 10-year Treasury — the benchmark a cap rate's spread is quoted
+   *  over, whatever tenor the loan prices off */
+  tenYear: DebtIndex | null;
 }
 
-export const NO_DEBT_SEEDS: DebtSeeds = { permanent: null, floating: null };
+export const NO_DEBT_SEEDS: DebtSeeds = { permanent: null, floating: null, tenYear: null };
 
 /** The construction lender's spread over its floating index — a screening
  *  default (bank construction debt has priced at SOFR + 300 to 400 through
@@ -72,7 +75,11 @@ export function debtSeeds(rates: readonly LiveRate[], holdMonths: number): DebtS
   const permanent: DebtIndex | null = tenor
     ? { id: tenor.id, short: tenor.short, pct: tenor.pct, asOf: tenor.asOf, kind: "treasury" }
     : null;
-  return { permanent, floating: floatingIndex(rates) };
+  const ten = seeds.curve.find((c) => c.id === "DGS10");
+  const tenYear: DebtIndex | null = ten
+    ? { id: ten.id, short: ten.short, pct: ten.pct, asOf: ten.asOf, kind: "treasury" }
+    : null;
+  return { permanent, floating: floatingIndex(rates), tenYear };
 }
 
 function floatingIndex(rates: readonly LiveRate[]): DebtIndex | null {

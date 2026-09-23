@@ -680,7 +680,17 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   tests. The hold is `HOLD_MONTHS` (60), one constant, because the caller
   that reads the tenor must ask for the hold the model runs on. Before
   this the model's rate was 6.00% on every deal on every day, the sizer's
-  6.50% and the construction panel's 8.00%.
+  6.50% and the construction panel's 8.00%. **The leverage check reads
+  the same curve** (#386): `DebtSeeds.tenYear` carries the 10-year beside
+  the tenor, `capSpreadRead` in `lib/leverage.ts` says the cap's spread
+  over it — a fact with a direction and a date, no verdict, because what
+  a normal spread is depends on the class and the year and is not the
+  module's to assert — and `leverageRead` takes the benchmark's NAME, so
+  the deal page's research panel reads the cap against the 30-yr fixed as
+  before (one-sided, an owner-occupier rate) and then against today's
+  index plus the class spread, printing the seed's own note so the
+  assumption half is named; the compare table gets a signed "Cap over
+  10-yr Treasury" row beside its leverage row.
 - What landlords are asking this month: `lib/zori.ts` (pure — a metro's
   Zillow Observed Rent Index and its change from a year ago, read out of
   the two `benchmarks` rows the MONTHLY pull writes, `scripts/fetch-zori.mjs`
