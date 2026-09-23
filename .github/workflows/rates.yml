@@ -42,7 +42,11 @@ jobs:
     runs-on: ubuntu-latest
     # A FRED rate-limit stall costs 20 s a series; a run past this is a hang,
     # not a pull, and the next weekday's run is the retry.
-    timeout-minutes: 25
+    # A stall guard, not a budget: the real pull of 785 series runs about
+    # eleven minutes, and a DRY RUN — two requests a series, the title
+    # beside the figure — took twenty-three (run 35933147137) once the
+    # states' series went in, one short of the old cap.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -48,6 +48,8 @@ describe("feedHealth — each feed judged on its own cadence, the stale series n
 
   it("the per-metro feeds are judged on the sample metro's rows and say so", () => {
     expect(byId.metro_fred).toMatchObject({ fresh: true, seriesTotal: 3, sample: "Washington DC", newest: "2026-07-01" });
+    // The states' pull is judged on Pennsylvania's rows; handed none, it says "no rows", never "current".
+    expect(byId.state_fred).toMatchObject({ fresh: null, seriesTotal: 0, sample: "Pennsylvania", newest: null });
     expect(byId.bls).toMatchObject({ fresh: true, seriesTotal: 1, newest: "2026-08-01" });
     expect(byId.census_hvs).toMatchObject({ fresh: true, seriesTotal: 1, newest: "2026-04-01" });
   });

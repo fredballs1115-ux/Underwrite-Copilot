@@ -284,6 +284,16 @@ under `state:PA` in the metro series' own shape so every reader works
 unchanged, with every sentence saying the figure is the state's: the
 market check's brief, the prompt clause, the deal page's aside, the
 shared screen, the verdict and the vacancy check.
+Then #400: the states' pull has a row of its own on the data-health
+feeds card, judged on Pennsylvania under its `state:PA` market id, and
+the rates workflow's stall guard is 45 minutes (a dry run of 785 series
+took 23). A state's ASKING RENT is not to be had from Zillow's public
+files — the state ZORI paths all 404 from the runner (zori runs
+35935704689 and 35935874458) and the research page links metro files
+only; the state HOME VALUE file is real
+(`zhvi/State_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv`, 52 rows,
+RegionName the state's name) and could ride the Zillow pull for a
+price-side line on a state deal, without a rent to set it against.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.
