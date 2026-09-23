@@ -3054,3 +3054,56 @@ describe("SectorJobsRank — the covered markets ranked by a sector's payrolls, 
     expect(render(React.createElement(SectorJobsRank, { metric: "jobs_pbs_yoy", markets, rates: [] }))).not.toContain("Where ");
   });
 });
+
+// ── The whole board over the demand side: every metro area × every sector ──
+import { SectorJobsBoard, BOARD_METRICS } from "@/app/market/sector-jobs-board";
+import { heatShade } from "@/app/market/heat-shade";
+import metrosSeedForBoard from "@/data/research/metros.json";
+
+describe("SectorJobsBoard — payroll growth by market and sector, shaded within each column", () => {
+  const markets = (metrosSeedForBoard.metros ?? []).map((m) => ({ id: m.id, name: m.name, region: (m as { region?: string }).region }));
+  // All payrolls for three metro areas and the office-using sector for two;
+  // Richmond's office figure is a year old and no retail row exists anywhere.
+  const rows: RateRow[] = [
+    { series_id: "WASH911NA_YOY", obs_date: "2026-08-01", value: 1.2 },
+    { series_id: "DALL148NA_YOY", obs_date: "2026-08-01", value: 1.08887 },
+    { series_id: "RICH051NA_YOY", obs_date: "2026-08-01", value: -1.02319 },
+    { series_id: "WASH911PBSV_YOY", obs_date: "2026-08-01", value: 1.31234 },
+    { series_id: "DALL148PBSV_YOY", obs_date: "2026-08-01", value: 3.13231 },
+    { series_id: "RICH051PBSV_YOY", obs_date: "2025-08-01", value: 0.9 },
+  ];
+  const rates = Object.fromEntries(BOARD_METRICS.map((metric) => [metric, readMetricRates(metric, rows, FIXTURE_NOW)]));
+  const html = render(React.createElement(SectorJobsBoard, { markets, rates }));
+  const text = visibleText(html);
+
+  it("draws every metro area with a series of its own, one column a sector, the fastest cell shaded emerald", () => {
+    expect(text).toContain("The whole board — payroll growth by market and sector");
+    expect(text).toContain("5 of 84 cells carry a fresh figure");
+    for (const label of ["All payrolls", "Professional & business services", "Education & health services", "Transportation, warehousing & utilities", "Retail trade", "Leisure & hospitality"]) {
+      expect(text, label).toContain(label);
+    }
+    // Fourteen metro areas, grouped by region; a suburb is not a row of its own.
+    expect(text).toContain("Washington DC");
+    expect(text).not.toContain("Prince George");
+    expect(text).toContain("Mid-Atlantic");
+    // Dallas leads the office-using column, Washington the all-payrolls one.
+    expect(html).toContain(`style="background-color:${heatShade(0)}"`);
+    expect(html).toContain(`style="background-color:${heatShade(1)}"`);
+    expect(text).toContain("3.1%");
+    expect(text).toContain("−1.0%");
+    // Richmond's stale office figure is shown with its date, not ranked; a missing series is a dash.
+    expect(text).toContain("0.9% · Aug 1");
+    expect(html).toContain("not updating: the newest figure is for Aug 1");
+    expect(html).toContain("No series on FRED for this market and sector");
+    expect(text).toContain("newest Aug 2026");
+    expect(html).toContain('href="/market?sector=office"');
+    expect(a11yIssues(html), "payroll board").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("renders nothing until a fresh row exists", () => {
+    const stale = Object.fromEntries(BOARD_METRICS.map((metric) => [metric, readMetricRates(metric, rows, new Date("2027-06-01T00:00:00Z"))]));
+    expect(render(React.createElement(SectorJobsBoard, { markets, rates: stale }))).not.toContain("payroll growth by market");
+    expect(render(React.createElement(SectorJobsBoard, { markets, rates: {} }))).not.toContain("payroll growth by market");
+  });
+});

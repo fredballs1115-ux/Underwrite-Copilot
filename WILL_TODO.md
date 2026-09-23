@@ -232,6 +232,11 @@ signed bars, a suburb reading its MSA's figure and saying so, a market
 with no fresh figure listed unranked with the reason; the apartment
 page ranks by all payrolls. One cached read per metric across the
 metros (`liveMetricRates`), never every metro's whole panel.
+Then #395: the whole board over the demand side — every metro area ×
+every sector's payrolls against a year ago, under the vacancy board on
+`/market`, shaded within each column fastest first (the one shade both
+boards use, `heatShade`), a suburb reading its MSA's row, a stale cell
+shown with its date and left unranked, a missing series a dash.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.
