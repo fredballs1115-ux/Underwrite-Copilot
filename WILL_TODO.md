@@ -223,6 +223,13 @@ warehousing for a warehouse, retail trade for a store, leisure and
 hospitality for a hotel, education and health for a clinic; rental
 housing reads all payrolls, a net lease or a data centre none), and
 said under each commercial sector's fundamentals on the market brief.
+Then #394: the sector page ranks the covered markets by that sector's
+payrolls under the vacancy leaderboard — the demand side beside the
+supply side, "Where retail trade jobs are growing", fastest first,
+signed bars, a suburb reading its MSA's figure and saying so, a market
+with no fresh figure listed unranked with the reason; the apartment
+page ranks by all payrolls. One cached read per metric across the
+metros (`liveMetricRates`), never every metro's whole panel.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.

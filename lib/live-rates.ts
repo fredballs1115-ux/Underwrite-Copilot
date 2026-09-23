@@ -634,6 +634,20 @@ export function readMetroRates(metroId: string, rows: readonly RateRow[], now: D
   return readRatesOf(metroSeriesFor(metroId).series, rows, now);
 }
 
+/**
+ * One metric across every metro that has it — the sector leaderboard's
+ * read (`liveSectorRates`): the fourteen MSAs' payrolls in one sector, or
+ * their total nonfarm, read the same way as everything else.
+ */
+export function readMetricRates(metric: MetroMetric, rows: readonly RateRow[], now: Date): LiveRate[] {
+  return readRatesOf(metricSeries(metric), rows, now);
+}
+
+/** The metro series filed under one metric, every metro's own (never a borrowed copy). */
+export function metricSeries(metric: MetroMetric): MetroSeriesMeta[] {
+  return METRO_SERIES.filter((s) => s.metric === metric);
+}
+
 function readRatesOf(metas: readonly SeriesMeta[], rows: readonly RateRow[], now: Date): LiveRate[] {
   const out: LiveRate[] = [];
   for (const meta of metas) {

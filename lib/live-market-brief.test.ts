@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readMetroRates, readRates, type RateRow } from "./live-rates";
 import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
-import { BRIEF_NATIONAL_IDS, DEBT_MARKET_IDS, lendingStandardsFor, liveMarketBrief, periodLabel, rentIndexFor, sectorJobsFor } from "./live-market-brief";
+import { BRIEF_NATIONAL_IDS, DEBT_MARKET_IDS, lendingStandardsFor, liveMarketBrief, periodLabel, rentIndexFor, sectorJobsFor, sectorPayrollMetric } from "./live-market-brief";
 import type { ZoriRead } from "./zori";
 import type { RealtorRead } from "./realtor";
 
@@ -280,6 +280,17 @@ describe("the sector that fills the deal's kind of building — which payroll co
     expect(sectorJobsFor("Class A office tower")?.metric).toBe("jobs_pbs_yoy");
     expect(sectorJobsFor("boutique hotel")?.metric).toBe("jobs_leisure_yoy");
     expect(sectorJobsFor("bulk distribution warehouse")?.metric).toBe("jobs_transport_yoy");
+  });
+
+  it("a sector page ranks by its sector's payrolls, the apartment page by all payrolls, and a page no count speaks to by none", () => {
+    expect(sectorPayrollMetric("office")).toBe("jobs_pbs_yoy");
+    expect(sectorPayrollMetric("industrial")).toBe("jobs_transport_yoy");
+    expect(sectorPayrollMetric("retail")).toBe("jobs_retail_yoy");
+    expect(sectorPayrollMetric("multifamily")).toBe("jobs_yoy");
+    expect(sectorPayrollMetric("sfr_btr")).toBe("jobs_yoy");
+    for (const s of ["net_lease", "self_storage", "land_infill", "data_center", "auto", null, undefined, ""]) {
+      expect(sectorPayrollMetric(s), String(s)).toBeNull();
+    }
   });
 });
 
