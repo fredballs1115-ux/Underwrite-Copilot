@@ -1825,6 +1825,34 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   (`ScoredFeedView`: the law strip, the sector chips, the day groups
   highest relevance first, the one quiet line) takes the two tables'
   rows from the page and renders on a fixture in the same test.
+- **The market check reads the metro's published figures** (#381): where
+  a deal's address sits in a covered market (`metroForAddress`), the
+  pipeline reads the same rows the market brief draws for a visitor — the
+  metro's FRED / BLS / Census series (`metroSeriesFor`, `readMetroRates`),
+  Zillow's and Realtor.com's `benchmarks` rows — bare, through
+  `lib/live-rates-query.ts` (the one copy of each query; the page readers
+  wrap the same functions in `unstable_cache`, the pipeline cannot, since
+  the worker has no Next cache), and `lib/live-market-brief.ts` (pure)
+  writes them out one dated, sourced line a figure ("Unemployment 3.4% (Jul
+  2026, Washington MSA; FRED), +0.2 pt on the month before"; the year of
+  permits summed against the year before, never a month; the metro's
+  vacancy with its margin; Zillow's asking rents "before concessions";
+  Realtor.com's list prices "asks, not sales"). `liveMarketClause` appends
+  the block LAST, after the deal context, so the cached document prefix
+  never moves, and tells the model to check an OM assumption against the
+  FIGURE where one answers, cite it with its date, keep `typicalRange` as
+  the norm the figure is read beside, and state a metro figure as the
+  metro's, never the submarket's or the building's. Three rules: only a
+  FRESH figure is said (a stale series is left out, the strip's own
+  freshness); a blank is absent, never zero; and a read that fails is a
+  check without figures, never a failed screen. The figures handed in are
+  stored on the result (`MarketResult.liveBrief`: metro, the day read, the
+  lines) so the deal page's market section can fold them open under the
+  summary — a check's evidence is never hidden. Outside the covered markets
+  the check reasons from typical ranges alone, as before, and the aside
+  still says "not pulled comps". The pipeline test's fake database answers
+  `rates` and `benchmarks` for a Washington deal and pins the text the
+  check was handed.
 - The pipeline's failure modes: `lib/anthropic/failure.ts` turns any failure
   into one sentence the analyst can act on (the raw text goes to the server
   log, never the page), and its `structured()` wraps every structured-output

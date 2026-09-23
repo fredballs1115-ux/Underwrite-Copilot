@@ -32,6 +32,13 @@ import {
   plausibilityNote,
 } from "@/lib/deal-strategy";
 import { dealContextFor } from "@/lib/deal-context";
+import { parseStructuredAddress, type StructuredAddress } from "@/lib/address";
+import { metroForAddress } from "@/lib/market-match";
+import { metroSeriesFor, readMetroRates } from "@/lib/live-rates";
+import { fetchBenchRows, fetchSeriesRows } from "@/lib/live-rates-query";
+import { ZILLOW_METRICS, zoriFor } from "@/lib/zori";
+import { REALTOR_METRICS, realtorFor } from "@/lib/realtor";
+import { liveMarketBrief, type LiveMarketBrief } from "@/lib/live-market-brief";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxLines } from "@/lib/criteria";
 import { notifyAnalysisReady } from "@/lib/email";
@@ -131,6 +138,52 @@ async function dealContextFromDb(
     const { data } = await admin.from("deals").select("extraction").eq("id", dealId).single();
     return dealContextFor((data?.extraction as ExtractionResult | null) ?? null);
   } catch {
+    return null;
+  }
+}
+
+/**
+ * The metro's published figures for the market check, where the deal's
+ * address sits in a covered market (lib/live-market-brief): the same rows
+ * the market brief draws for a visitor, read bare — one screen reads them
+ * once, from the web process or the worker, and the worker has no Next
+ * cache to wrap them in — and written out dated and sourced. Null outside
+ * the covered markets, or when nothing fresh could be read: the check then
+ * reasons from typical ranges alone, as it always did, and says so. A read
+ * that fails is a check without figures, never a failed screen.
+ */
+async function liveMarketFromDb(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  dealId: string,
+  now: Date = new Date(),
+): Promise<LiveMarketBrief | null> {
+  try {
+    const { data } = await admin.from("deals").select("address").eq("id", dealId).single();
+    // The column holds the structured object the deal form saved (the deals
+    // list and the compare page read it the same way); a row that still
+    // carries the form's JSON string is parsed the form's way.
+    const raw = data?.address;
+    const address: Partial<StructuredAddress> | null =
+      raw && typeof raw === "object"
+        ? (raw as Partial<StructuredAddress>)
+        : typeof raw === "string"
+          ? parseStructuredAddress(raw)
+          : null;
+    const metro = metroForAddress(address ?? {});
+    if (!metro) return null;
+    const [rateRows, bench] = await Promise.all([
+      fetchSeriesRows(admin, metroSeriesFor(metro.id).series),
+      fetchBenchRows(admin, metro.name, [...ZILLOW_METRICS, ...REALTOR_METRICS]),
+    ]);
+    return liveMarketBrief({
+      metro,
+      rates: readMetroRates(metro.id, rateRows, now),
+      zori: zoriFor(bench, metro.name),
+      realtor: realtorFor(bench, metro.name),
+      now,
+    });
+  } catch (err) {
+    console.warn(`[pipeline] live market figures unavailable for deal ${dealId}:`, err instanceof Error ? err.message : err);
     return null;
   }
 }
@@ -646,10 +699,18 @@ async function runAnalysisSteps(
       await markDone("comps");
     }
 
-    // Step 4 — market plausibility check (rules-of-thumb, no live comps feed)
+    // Step 4 — market plausibility check: rules of thumb, no live comps feed,
+    // and — where the deal sits in a covered market — the metro's own
+    // published figures, dated, handed in and stored with the result so the
+    // page can say what the check read.
     if (!completed.has("market")) {
       await patchJob(dealId, { status: "running", step: "market", progress: 70 });
-      const market = await checkMarket(om(), assetClass, dealContext);
+      const brief = await liveMarketFromDb(admin, dealId);
+      const checked = await checkMarket(om(), assetClass, dealContext, brief?.text ?? null);
+      const market: MarketResult = {
+        ...checked,
+        liveBrief: brief ? { metro: brief.metro, readOn: brief.readOn, lines: brief.lines } : null,
+      };
       await admin
         .from("deals")
         .update({ market, updated_at: new Date().toISOString() })

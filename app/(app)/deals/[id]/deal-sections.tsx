@@ -1493,17 +1493,19 @@ export function MarketCheck({ result }: { result: MarketResult }) {
   const ordered = [...(result.checks ?? [])].sort(
     (a, b) => order[a.assessment] - order[b.assessment],
   );
+  const brief = result.liveBrief ?? null;
   return (
     <section className="space-y-4">
       <SectionHeader
         title="Market plausibility check"
         aside={
           <span className="text-xs text-muted">
-            rules-of-thumb, not pulled comps
+            {brief ? "rules of thumb, read beside the metro's published figures" : "rules-of-thumb, not pulled comps"}
           </span>
         }
       />
       {result.summary && <Callout>{result.summary}</Callout>}
+      {brief && brief.lines.length > 0 && <LiveBriefRead brief={brief} />}
       <div>
         <RevealList
           initial={3}
@@ -1514,6 +1516,35 @@ export function MarketCheck({ result }: { result: MarketResult }) {
         />
       </div>
     </section>
+  );
+}
+
+/**
+ * The figures the check was handed (lib/live-market-brief), folded: the
+ * first line of the summary says which market and which day, the list is
+ * one click away — and every line stays in the HTML for the lints and a
+ * screen reader. A check's evidence is never hidden; it is just not the
+ * headline.
+ */
+function LiveBriefRead({ brief }: { brief: NonNullable<MarketResult["liveBrief"]> }) {
+  const readOn = (() => {
+    const at = Date.parse(`${brief.readOn}T00:00:00Z`);
+    return Number.isFinite(at)
+      ? new Date(at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
+      : brief.readOn;
+  })();
+  return (
+    <details className="rounded-xl border border-line bg-paper px-4 py-3 text-sm">
+      <summary className="cursor-pointer list-none text-muted [&::-webkit-details-marker]:hidden">
+        <span className="font-medium text-ink">Read beside the {brief.metro} market&rsquo;s own figures</span>
+        <span> — {brief.lines.length} published figures as of {readOn}, each dated, each the metro&rsquo;s rather than the submarket&rsquo;s. Open to see them.</span>
+      </summary>
+      <ul className="mt-3 space-y-1.5 text-muted">
+        {brief.lines.map((line) => (
+          <li key={line} className="leading-relaxed">{line}</li>
+        ))}
+      </ul>
+    </details>
   );
 }
 

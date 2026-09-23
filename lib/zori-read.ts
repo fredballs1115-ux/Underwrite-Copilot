@@ -1,6 +1,7 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { fetchBenchRows } from "@/lib/live-rates-query";
 import { ZILLOW_METRICS, zoriFor, type BenchRow, type ZoriRead } from "@/lib/zori";
 
 /**
@@ -20,18 +21,9 @@ const cachedRows = unstable_cache(
       console.warn("zori unavailable:", err instanceof Error ? err.message : err);
       return [];
     }
-    try {
-      const { data, error } = await supabase
-        .from("benchmarks")
-        .select("metric, metro, low, as_of, note, source")
-        .eq("metro", metroName)
-        .in("metric", [...ZILLOW_METRICS]);
-      if (error) throw new Error(error.message);
-      return (data as BenchRow[] | null) ?? [];
-    } catch (err) {
-      console.warn(`zori: ${metroName} unavailable:`, err instanceof Error ? err.message : err);
-      return [];
-    }
+    // The query lives in lib/live-rates-query.ts, shared with the analysis
+    // pipeline's uncached read.
+    return fetchBenchRows(supabase, metroName, ZILLOW_METRICS);
   },
   ["zori-rows"],
   { revalidate: 3600, tags: ["benchmarks"] },

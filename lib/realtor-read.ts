@@ -1,6 +1,7 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { fetchBenchRows } from "@/lib/live-rates-query";
 import { REALTOR_METRICS, realtorFor, type RealtorRead } from "@/lib/realtor";
 import type { BenchRow } from "@/lib/zori";
 
@@ -20,18 +21,9 @@ const cachedRows = unstable_cache(
       console.warn("realtor unavailable:", err instanceof Error ? err.message : err);
       return [];
     }
-    try {
-      const { data, error } = await supabase
-        .from("benchmarks")
-        .select("metric, metro, low, as_of, note, source")
-        .eq("metro", metroName)
-        .in("metric", [...REALTOR_METRICS]);
-      if (error) throw new Error(error.message);
-      return (data as BenchRow[] | null) ?? [];
-    } catch (err) {
-      console.warn(`realtor: ${metroName} unavailable:`, err instanceof Error ? err.message : err);
-      return [];
-    }
+    // The query lives in lib/live-rates-query.ts, shared with the analysis
+    // pipeline's uncached read.
+    return fetchBenchRows(supabase, metroName, REALTOR_METRICS);
   },
   ["realtor-rows"],
   { revalidate: 3600, tags: ["benchmarks"] },

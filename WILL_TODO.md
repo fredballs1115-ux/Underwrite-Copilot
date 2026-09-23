@@ -144,6 +144,15 @@ named as the assumption it is — on every surface that derives the model
 (the deal page, the workbook, the report, the assumption bridge), and
 30-day SOFR plus a construction spread on the plan's debt. A stale table
 seeds nothing and the old note stays.
+Then #381: the market check reads the metro's published figures. For a
+deal inside a covered market the screen's market step is handed the same
+dated figures the market brief shows a visitor — this month's asking
+rents, the rent sitting tenants pay, the metro's rental vacancy with its
+margin, a year of permits, payrolls, house prices, the for-sale market —
+told to check the OM's assumptions against the figure where one answers
+and to cite it with its date, and the figures it read are stored with the
+result and folded open on the deal page. Outside the covered markets the
+check reasons from typical ranges alone, as before.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.
