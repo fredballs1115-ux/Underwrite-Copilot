@@ -826,7 +826,30 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   `lib/model-vs-market.ts`: the class the deck turned out to be, whether
   the deal is a plan, the page's own cap where it passes one and the
   extraction's otherwise), so the page, the report and the workbook
-  cannot disagree about what was checked against what.
+  cannot disagree about what was checked against what. **The research
+  tracker rides beside the feeds** (#396, `lib/tracker-read.ts`, pure):
+  `trackerFor` reads the metro's sector snapshot (`data/research/metros.json`,
+  the blocks the market brief's "By asset type" panel and the vacancy
+  board draw) for the deal's kind of building — `trackerSectorFor`:
+  office, industrial, retail and multifamily read their own tracker; a
+  medical office, a net lease, storage, a hotel and the rest read none,
+  since a neighbour's figure is not theirs — as a vacancy BAND (a spread
+  is never averaged into a printed number: a band is two published
+  figures, a point one), the cap range where the tracker has one, the
+  snapshot's day and the first source's host. It is dated research, not a
+  feed, and every sentence says so ("on the research tracker (as of Aug
+  25, 2026; colliers.com) — a quarterly print, not a feed"). Three reads:
+  a commercial deal's stabilized vacancy — which had no row, the Census
+  survey counting rental housing only — is set against the band (under
+  its low end tighter, over its high end looser and conservative, inside
+  inside); an apartment deal's survey check carries the tracker's
+  apartment read beside the survey, shown and never the anchor; and where
+  the tracker has a cap range the exit-cap check adds it to the 10-year
+  read (over its high end the conservative direction for an exit, under
+  its low end "cap compression on top of the spread read") and its scope
+  becomes the metro's. `modelVsMarketFor` reads it, so the page, the
+  report and the workbook agree; `modelVsMarket` takes it as `tracker`,
+  and a read without one is exactly as before.
 - What landlords are asking this month: `lib/zori.ts` (pure — a metro's
   Zillow Observed Rent Index and its change from a year ago, read out of
   the two `benchmarks` rows the MONTHLY pull writes, `scripts/fetch-zori.mjs`

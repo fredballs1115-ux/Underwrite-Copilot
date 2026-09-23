@@ -237,6 +237,17 @@ every sector's payrolls against a year ago, under the vacancy board on
 `/market`, shaded within each column fastest first (the one shade both
 boards use, `heatShade`), a suburb reading its MSA's row, a stale cell
 shown with its date and left unranked, a missing series a dash.
+Then #396: the model's checks read the research tracker too
+(`lib/tracker-read.ts`, the sector snapshots behind the market brief's
+"By asset type" panel): a commercial deal's stabilized vacancy — which
+had no row, since the Census survey counts rental housing only — is set
+against the tracker's band for its sector in its metro, dated and
+sourced as a quarterly print; an apartment deal's survey check carries
+the tracker's read beside the survey, never in its place; and where the
+tracker has a cap range, the exit cap is set against it as well as
+against the 10-year — over its high end the conservative direction,
+under its low end compression on top of the spread read. The deal page,
+the report and the workbook read it through the same one function.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.
