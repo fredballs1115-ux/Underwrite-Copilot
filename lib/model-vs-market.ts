@@ -9,6 +9,7 @@ import { datedLong } from "@/lib/debt-index";
 import { inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { findGoingInCap, parsePct } from "@/lib/criteria";
 import { shownAssetClass } from "@/lib/pipeline-slots";
+import { bandText, trackerFor, type TrackerRead } from "@/lib/tracker-read";
 
 /**
  * The model's assumptions against the published figures — pure, no model
@@ -122,7 +123,78 @@ export interface ModelVsMarketInput {
   zori?: ZoriRead | null;
   /** the national table (`readRates`) — consumer prices and the 10-year read off it */
   national?: readonly LiveRate[];
+  /**
+   * The research tracker's read for the deal's kind of building in its
+   * metro (`trackerFor`): the sector's vacancy band and, where the tracker
+   * has one, its cap range — dated research, said with its date and its
+   * source. A commercial deal's vacancy is read against it (the survey
+   * reaches rental housing only); an apartment deal's survey check carries
+   * it beside the survey; and the exit cap is set against the range as
+   * well as against the 10-year.
+   */
+  tracker?: TrackerRead | null;
   now: Date;
+}
+
+/** "as of Aug 25, 2026; colliers.com" — how a tracker figure is dated and sourced in a sentence. */
+function trackerWhen(t: TrackerRead): string {
+  const parts = [t.asOf ? `as of ${datedLong(t.asOf)}` : "undated", t.source ?? "the research tracker"];
+  return parts.join("; ");
+}
+
+function trackerPublisher(t: TrackerRead): string {
+  return `research tracker${t.source ? ` (${t.source})` : ""}`;
+}
+
+/** The tracker's vacancy band as published figures — one for a point, the low and the high for a band. */
+function trackerVacancyFigures(t: TrackerRead): PublishedFigure[] {
+  if (t.vacancyLow === null) return [];
+  const hi = t.vacancyHigh ?? t.vacancyLow;
+  const asOf = t.asOf ?? "";
+  const publisher = trackerPublisher(t);
+  const label = `${t.sectorLabel[0].toUpperCase()}${t.sectorLabel.slice(1)} vacancy, metro (tracker)`;
+  if (Math.abs(hi - t.vacancyLow) < 0.005) {
+    return [{ label, text: `${t.vacancyLow.toFixed(1)}%${t.asOf ? ` (as of ${datedLong(t.asOf)})` : ""}`, value: t.vacancyLow, asOf, publisher }];
+  }
+  const suffix = t.asOf ? ` (as of ${datedLong(t.asOf)})` : "";
+  return [
+    { label: `${label}, low read`, text: `${t.vacancyLow.toFixed(1)}%${suffix}`, value: t.vacancyLow, asOf, publisher },
+    { label: `${label}, high read`, text: `${hi.toFixed(1)}%${suffix}`, value: hi, asOf, publisher },
+  ];
+}
+
+/**
+ * A commercial deal's vacancy against the tracker's band for its sector in
+ * its metro — the one vacancy figure of its own kind the site holds for an
+ * office, a warehouse or a store, since the Census survey counts rental
+ * housing and nothing else. A band is read as a band: inside it is inside,
+ * under its low end is tighter, over its high end is looser.
+ */
+function trackerVacancyCheck(input: ModelVsMarketInput, v: number): ModelCheck | null {
+  const t = input.tracker;
+  if (!t || t.sector === "multifamily" || t.vacancyLow === null) return null;
+  const hi = t.vacancyHigh ?? t.vacancyLow;
+  const published = trackerVacancyFigures(t);
+  const band = bandText(t.vacancyLow, hi);
+  const tone: CheckTone = v < t.vacancyLow - SAME ? "tighter" : v > hi + SAME ? "looser" : "inside";
+  const stock = `the metro's ${t.sectorLabel} stock`;
+  const clause =
+    tone === "tighter"
+      ? `The building would run ${pts(t.vacancyLow - v)} tighter than ${stock} — a leased building against a market average, and the figure to hold the rent roll and the rollover to.`
+      : tone === "looser"
+        ? `The model runs ${pts(v - hi)} looser than ${stock} — conservative against the tracker.`
+        : "The model sits inside the tracker's band.";
+  return {
+    key: "vacancy",
+    title: "Stabilized vacancy",
+    model: `${v.toFixed(1)}%`,
+    modelSource: sourceWords(input.sources?.vacancyPct),
+    published,
+    tone,
+    toneLabel: TONE_LABEL[tone],
+    scope: "metro",
+    read: `The model holds ${v.toFixed(1)}% vacancy. The metro's ${t.sectorLabel} vacancy reads ${band} on the research tracker (${trackerWhen(t)}) — a quarterly print, not a feed. ${clause}`,
+  };
 }
 
 const signed = (v: number, dp = 1): string => `${v > 0 ? "+" : v < 0 ? "-" : ""}${Math.abs(v).toFixed(dp)}`;
@@ -310,15 +382,21 @@ function expenseGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
 
 function vacancyCheck(input: ModelVsMarketInput): ModelCheck | null {
   const words = assetWords(input.assetClass ?? undefined);
-  if (!words.residential) return null;
   const v = input.inputs.vacancyPct * 100;
   if (!Number.isFinite(v)) return null;
+  if (!words.residential) return trackerVacancyCheck(input, v);
   const metro = fresh(input.rates, (r) => metricOf(r) === "rental_vacancy_msa");
   const region = fresh(input.rates, (r) => metricOf(r) === "rental_vacancy");
   const anchor = metro ?? region;
   if (!anchor) return null;
   const published: PublishedFigure[] = [];
   const parts: string[] = [];
+  // The tracker's apartment read rides beside the survey, dated and
+  // sourced — a different construct (a house's survey of managed stock
+  // against the Census Bureau's of every rental), so it is shown, never
+  // the anchor.
+  const t = input.tracker && input.tracker.sector === "multifamily" && input.tracker.vacancyLow !== null ? input.tracker : null;
+  const trackerTail = t ? ` The research tracker's apartment read for the metro is ${bandText(t.vacancyLow!, t.vacancyHigh)} (${trackerWhen(t)}) — a house's survey of managed stock, shown beside the Census figure rather than in its place.` : "";
   if (metro) {
     const when = periodLabel(metro.obsDate, metro.meta.cadence);
     published.push({
@@ -353,11 +431,46 @@ function vacancyCheck(input: ModelVsMarketInput): ModelCheck | null {
     title: "Stabilized vacancy",
     model: `${v.toFixed(1)}%`,
     modelSource: sourceWords(input.sources?.vacancyPct),
-    published,
+    published: t ? [...published, ...trackerVacancyFigures(t)] : published,
     tone,
     toneLabel: TONE_LABEL[tone],
     scope: "metro",
-    read: `The model holds ${v.toFixed(1)}% vacancy. ${parts.length === 2 ? `${parts[0]}, ${parts[1]}` : parts[0]}. ${clause}`,
+    read: `The model holds ${v.toFixed(1)}% vacancy. ${parts.length === 2 ? `${parts[0]}, ${parts[1]}` : parts[0]}. ${clause}${trackerTail}`,
+  };
+}
+
+/**
+ * The tracker's cap range for the sector in the metro, where it has one,
+ * beside the 10-year read: the published figures it adds and the sentence
+ * that sets the exit cap against the range — over its high end is the
+ * conservative direction for an exit, under its low end is a cap tighter
+ * than the market's own range.
+ */
+function capBandTail(input: ModelVsMarketInput, x: number): { figures: PublishedFigure[]; sentence: string } {
+  const t = input.tracker;
+  if (!t || t.capLow === null) return { figures: [], sentence: "" };
+  const hi = t.capHigh ?? t.capLow;
+  const asOf = t.asOf ?? "";
+  const publisher = trackerPublisher(t);
+  const label = `${t.sectorLabel[0].toUpperCase()}${t.sectorLabel.slice(1)} cap range, metro (tracker)`;
+  const suffix = t.asOf ? ` (as of ${datedLong(t.asOf)})` : "";
+  const figures: PublishedFigure[] =
+    Math.abs(hi - t.capLow) < 0.005
+      ? [{ label, text: `${t.capLow.toFixed(2)}%${suffix}`, value: t.capLow, asOf, publisher }]
+      : [
+          { label: `${label}, low end`, text: `${t.capLow.toFixed(2)}%${suffix}`, value: t.capLow, asOf, publisher },
+          { label: `${label}, high end`, text: `${hi.toFixed(2)}%${suffix}`, value: hi, asOf, publisher },
+        ];
+  const band = bandText(t.capLow, hi, 2);
+  const position =
+    x > hi + SAME
+      ? `the exit cap sits ${Math.round((x - hi) * 100)} bps over its high end — the conservative direction for an exit.`
+      : x < t.capLow - SAME
+        ? `the exit cap sits ${Math.round((t.capLow - x) * 100)} bps under its low end — an exit priced tighter than the market's own range today, which is cap compression on top of the spread read.`
+        : "the exit cap sits inside it.";
+  return {
+    figures,
+    sentence: ` The research tracker's ${t.sectorLabel} cap range for the metro is ${band} (${trackerWhen(t)}), and ${position}`,
   };
 }
 
@@ -375,6 +488,11 @@ function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
   ];
   const g = input.goingInCapPct;
   const head = `The exit cap ${x.toFixed(2)}% is ${Math.abs(exitSpread)} bps ${exitSpread >= 0 ? "over" : "under"} today's 10-year (${ten.value.toFixed(2)}%, ${when}; FRED).`;
+  const band = capBandTail(input, x);
+  published.push(...band.figures);
+  // The tracker's range is the metro's figure; with it the check reads the
+  // metro as well as the nation, and the scope says so.
+  const scope: ModelCheck["scope"] = band.figures.length > 0 ? "metro" : "national";
   if (g == null || !Number.isFinite(g) || g <= 0 || input.plan) {
     return {
       key: "exit_cap",
@@ -384,8 +502,8 @@ function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
       published,
       tone: "stated",
       toneLabel: TONE_LABEL.stated,
-      scope: "national",
-      read: `${head} ${input.plan ? "A plan deal has no going-in cap to set it against; the spread is the claim, and the finished building's yield on cost is what it is bought at." : "No going-in cap to set it against; the spread is the claim."}`,
+      scope,
+      read: `${head} ${input.plan ? "A plan deal has no going-in cap to set it against; the spread is the claim, and the finished building's yield on cost is what it is bought at." : "No going-in cap to set it against; the spread is the claim."}${band.sentence}`,
     };
   }
   const inSpread = Math.round((g - ten.value) * 100);
@@ -405,8 +523,8 @@ function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
     published,
     tone,
     toneLabel: TONE_LABEL[tone],
-    scope: "national",
-    read: `${head} The going-in cap ${g.toFixed(2)}% is ${Math.abs(inSpread)} bps ${inSpread >= 0 ? "over" : "under"} it, ${clause}`,
+    scope,
+    read: `${head} The going-in cap ${g.toFixed(2)}% is ${Math.abs(inSpread)} bps ${inSpread >= 0 ? "over" : "under"} it, ${clause}${band.sentence}`,
   };
 }
 
@@ -462,16 +580,20 @@ export function modelVsMarketFor(args: {
       : planDeal
         ? null
         : (findGoingInCap(extraction?.metrics ?? [])?.value ?? null);
+  const assetClass = shownAssetClass(storedAssetClass ?? null, extraction) || null;
   return modelVsMarket({
     inputs: derived.inputs,
     sources: derived.sources,
-    assetClass: shownAssetClass(storedAssetClass ?? null, extraction) || null,
+    assetClass,
     plan: planDeal,
     goingInCapPct: capText ? parsePct(capText) : null,
     metro,
     rates: reads.rates,
     zori: reads.zori,
     national: reads.national,
+    // The tracker's read for this kind of building in this metro — the
+    // research layer, dated, beside the feeds.
+    tracker: metro ? trackerFor(metro.id, assetClass) : null,
     now: reads.now,
   });
 }
