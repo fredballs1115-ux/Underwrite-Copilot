@@ -12,7 +12,9 @@ import {
 } from "@/lib/market-memory";
 import { RatesStrip } from "@/app/rates-strip";
 import { liveMetroRates, liveRates } from "@/lib/live-rates-read";
+import type { LiveRate } from "@/lib/live-rates";
 import { MetroLive } from "./metro-live";
+import { LessorRentLine } from "./lessor-rent-line";
 import { liveZori } from "@/lib/zori-read";
 import { ZoriLine } from "./zori-line";
 import { liveRealtor } from "@/lib/realtor-read";
@@ -89,9 +91,14 @@ function Fold({ text, className = "" }: { text: string; className?: string }) {
 function SectorSnapshotPanel({
   snapshot,
   metroId,
+  national = [],
 }: {
   snapshot: Record<string, unknown> | null;
   metroId?: string;
+  /** the national rates table (`liveRates`), for each commercial sector's
+   *  lessor rent index line — the nation's figure, said so, under the
+   *  metro's tracker fundamentals */
+  national?: readonly LiveRate[];
 }) {
   const entries = Object.entries(snapshot ?? {}).filter(
     (e): e is [string, SnapBlock] => e[0] !== "as_of" && typeof e[1] === "object",
@@ -175,6 +182,7 @@ function SectorSnapshotPanel({
                     </a>
                   )}
                 </div>
+                <LessorRentLine national={national} sector={sector} />
                 {b.note && (
                   <Fold
                     text={b.note}
@@ -529,6 +537,9 @@ async function MetroExplorer({ selected }: { selected?: string }) {
   // permits and house prices, read the way the rates strip is and cached
   // per metro. A metro FRED does not publish for gets no panel.
   const live = await liveMetroRates(active.id);
+  // The national table too (the strip's own cached read): each commercial
+  // sector's lessor rent index rides under its tracker fundamentals.
+  const national = await liveRates();
   // What landlords are asking this month (Zillow's index, monthly), set
   // against what HUD will pay — two different numbers, both shown.
   const zori = await liveZori(active.name);
@@ -648,6 +659,7 @@ async function MetroExplorer({ selected }: { selected?: string }) {
             }).sector_snapshot ?? null
           }
           metroId={active.id}
+          national={national}
         />
 
         {typeof fmr?.["2br"] === "number" ? (
