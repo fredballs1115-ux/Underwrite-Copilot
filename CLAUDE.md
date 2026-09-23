@@ -695,7 +695,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   no short ids, Boston's exist only NOT seasonally adjusted
   (`SMU25144606000000001`, no suffix — the `SA` and `SMS` forms both
   "do not exist"), and the `SMS` form exists for no supersector
-  anywhere. Two rules the probes bought: FRED's limit is per KEY, so a
+  anywhere. The dry run on the branch (35922719610) then found FRED
+  REFUSES its own transform on three of Boston's five ("Value of units
+  is not one of: ch1, chg, lin", the refusal Boston's total nonfarm
+  already had) while accepting it on the other two, so those three are
+  stored as the level under FRED's own id with `derived: "yoy"` and the
+  page works the change out on read — which is why a series goes in only
+  after a dry run has printed it, not after a probe has. Two rules the
+  probes bought: FRED's limit is per KEY, so a
   probe dispatched beside the weekday pull cost the pull two series and
   three probes dispatched together lost each other one apiece (run them
   one after another, never beside the pull), and the pace is 520 ms now

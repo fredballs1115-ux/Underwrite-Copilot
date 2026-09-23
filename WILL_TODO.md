@@ -215,7 +215,9 @@ employment for the MSA, five sectors against a year ago, seventy series
 verified id by id from the runner (probes 35920921683, 35920930790 and
 35921989451: the short ids carry three sectors for twelve metros, the
 BLS-shaped `SMU…SA` ids the other two, Los Angeles all five in that
-form, Boston's only not seasonally adjusted) — drawn as ONE picture
+form, Boston's only not seasonally adjusted, and three of Boston's
+refusing FRED's transform, so stored as levels and derived on read) —
+drawn as ONE picture
 under the metro tiles (signed bars beside all payrolls), read into the
 market check as the ONE sector that fills the deal's kind of building
 (professional and business services for an office, transportation and
