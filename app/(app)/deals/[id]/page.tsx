@@ -71,10 +71,10 @@ import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { constructionSeed, type DealRateSeeds } from "@/lib/debt-index";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { metroForAddress } from "@/lib/market-match";
-import { liveMetroRates } from "@/lib/live-rates-read";
+import { liveMetroRates, liveRates } from "@/lib/live-rates-read";
 import { liveZori } from "@/lib/zori-read";
 import { liveRealtor } from "@/lib/realtor-read";
-import { liveMarketBrief } from "@/lib/live-market-brief";
+import { DEBT_MARKET_IDS, liveMarketBrief } from "@/lib/live-market-brief";
 import { briefDelta, type BriefDelta } from "@/lib/brief-delta";
 import { snapshotVersion } from "@/lib/bridge/versions";
 import { listSubmarkets } from "@/lib/market/store";
@@ -361,12 +361,22 @@ export default async function DealPage({
     if (metro) {
       try {
         const now = new Date();
-        const [rates, zori, realtor] = await Promise.all([
+        const [rates, zori, realtor, national] = await Promise.all([
           liveMetroRates(metro.id, now),
           liveZori(metro.name),
           liveRealtor(metro.name),
+          liveRates(now),
         ]);
-        const today = liveMarketBrief({ metro, rates, zori, realtor, now });
+        const today = liveMarketBrief({
+          metro,
+          rates,
+          zori,
+          realtor,
+          now,
+          national: national.filter((r) => (DEBT_MARKET_IDS as readonly string[]).includes(r.meta.id)),
+          assetClass: extraction?.assetClass || (deal.asset_class as string | null) || null,
+          plan: isPlanDeal(inferStrategy(extraction, firstSignal).kind),
+        });
         marketSince = briefDelta(storedBrief.readOn, storedBrief.figures, today?.figures ?? []);
       } catch (err) {
         console.warn("since-this-screen read failed:", err instanceof Error ? err.message : err);

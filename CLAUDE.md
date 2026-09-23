@@ -1876,7 +1876,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   the publisher has not updated since the screen ("no newer figure"). A
   figure read then and unreadable now is left out rather than shown as a
   move to nothing. `SinceThisScreen` under the folded brief prints the
-  day, the counts and one sentence per move (`moveSentence`).
+  day, the counts and one sentence per move (`moveSentence`). **The debt
+  market rides after the metro's lines, for every deal** (#384,
+  `DEBT_MARKET_IDS`): the 10-year Treasury, what banks say about their
+  standards for THIS kind of loan (`lendingStandardsFor` — rental housing
+  is a multifamily loan, everything else that operates a nonfarm
+  nonresidential one, a plan deal adds construction and land, land reads
+  construction alone; the Fed's SLOOS net share, negative when easing,
+  said so), CRE delinquency at commercial banks and bank CRE lending
+  against a year ago — the capital side beside the income side, since a
+  check that reads one without the other reads half the deal. The
+  pipeline reads the six national series bare; the page's
+  since-this-screen reads them through `liveRates`; the prompt clause
+  names the exit cap and the debt assumptions as what they answer.
 - The pipeline's failure modes: `lib/anthropic/failure.ts` turns any failure
   into one sentence the analyst can act on (the raw text goes to the server
   log, never the page), and its `structured()` wraps every structured-output

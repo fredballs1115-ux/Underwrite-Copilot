@@ -1,6 +1,7 @@
 import { permitsTrailingYear, type LiveRate, type SeriesSource } from "@/lib/live-rates";
 import { monthOf, type ZoriRead } from "@/lib/zori";
 import { HOTNESS_METROS, type RealtorRead } from "@/lib/realtor";
+import { assetWords } from "@/lib/asset-words";
 
 /**
  * The metro's published figures, written out for the market check — the
@@ -33,6 +34,43 @@ export interface LiveMarketInput {
   realtor: RealtorRead | null;
   /** the day the figures were read, for the header */
   now: Date;
+  /** the national series the debt-market lines read (`DEBT_MARKET_IDS`,
+   *  through `readRates`); absent or empty, no debt-market lines */
+  national?: readonly LiveRate[];
+  /** the deal's asset class, which picks the lending-standards series a
+   *  bank reports for its kind of loan */
+  assetClass?: string | null;
+  /** a plan deal (development, conversion) also reads the construction
+   *  lenders' standards */
+  plan?: boolean;
+}
+
+/**
+ * The debt market, national, for every deal — the four figures a lender
+ * would name first: the 10-year Treasury (what the exit cap and the
+ * permanent quote key off), what banks say about their own standards for
+ * this KIND of loan (the Fed's quarterly SLOOS: a net share tightening,
+ * negative when they are easing), CRE delinquency at commercial banks, and
+ * bank CRE lending against a year ago. The metro's figures are the
+ * income side; these are the capital side, and a check that reads one
+ * without the other reads half the deal.
+ */
+export const DEBT_MARKET_IDS = [
+  "DGS10",
+  "SUBLPDRCSC",
+  "SUBLPDRCSM",
+  "SUBLPDRCSN",
+  "DRCRELEXFACBS",
+  "CREACBW027SBOG_YOY",
+] as const;
+
+/** The SLOOS series a bank reports for this kind of loan: rental housing
+ *  is a multifamily loan, everything else that operates is a nonfarm
+ *  nonresidential loan, and a plan deal adds construction and land. */
+export function lendingStandardsFor(assetClass: string | null | undefined, plan: boolean): string[] {
+  const words = assetWords(assetClass ?? undefined);
+  const own = !words.operating ? [] : words.residential ? ["SUBLPDRCSM"] : ["SUBLPDRCSN"];
+  return plan || !words.operating ? [...own, "SUBLPDRCSC"] : own;
 }
 
 /** One figure the check read, as a value: what a later screen compares
@@ -203,6 +241,55 @@ function realtorLine(m: RealtorRead | null): Said | null {
   return { line: `For-sale market: ${parts.join(", ")} (${monthOf(m.asOf)}; Realtor.com — list prices are asks, not sales)`, figures };
 }
 
+const SLOOS_LABEL: Record<string, { key: string; loan: string }> = {
+  SUBLPDRCSM: { key: "sloos_multifamily", loan: "multifamily loans" },
+  SUBLPDRCSN: { key: "sloos_nonres", loan: "nonfarm nonresidential loans" },
+  SUBLPDRCSC: { key: "sloos_construction", loan: "construction and land development loans" },
+};
+
+function debtMarketLines(
+  national: readonly LiveRate[] | undefined,
+  assetClass: string | null | undefined,
+  plan: boolean,
+): Said[] {
+  if (!national || national.length === 0) return [];
+  const by = new Map(national.filter((r) => r.fresh && Number.isFinite(r.value)).map((r) => [r.meta.id, r]));
+  const out: Said[] = [];
+  const ten = by.get("DGS10");
+  if (ten) {
+    out.push({
+      line: `Debt market — 10-year Treasury ${ten.value.toFixed(2)}% (${periodLabel(ten.obsDate, ten.meta.cadence)}; FRED)${
+        ten.move !== null ? `, ${signed(ten.move, 0)} bps on the day before` : ""
+      }`,
+      figures: [{ key: "dgs10", label: "10-year Treasury", value: ten.value, unit: "pct", asOf: ten.obsDate }],
+    });
+  }
+  for (const id of lendingStandardsFor(assetClass, plan)) {
+    const r = by.get(id);
+    const meta = SLOOS_LABEL[id];
+    if (!r || !meta) continue;
+    out.push({
+      line: `Debt market — banks tightening standards for ${meta.loan}: a net ${signed(r.value)}% of banks (${periodLabel(r.obsDate, r.meta.cadence)}; Fed SLOOS via FRED; negative is a net share easing)`,
+      figures: [{ key: meta.key, label: `Banks tightening, ${meta.loan}`, value: r.value, unit: "pts", asOf: r.obsDate }],
+    });
+  }
+  const dq = by.get("DRCRELEXFACBS");
+  if (dq) {
+    out.push({
+      line: `Debt market — CRE loan delinquency at commercial banks ${dq.value.toFixed(2)}% (${periodLabel(dq.obsDate, dq.meta.cadence)}; FRED)`,
+      figures: [{ key: "cre_delinquency", label: "CRE loan delinquency", value: dq.value, unit: "pct", asOf: dq.obsDate }],
+    });
+  }
+  const loans = by.get("CREACBW027SBOG_YOY");
+  if (loans) {
+    out.push({
+      line: `Debt market — bank CRE lending ${signed(loans.value)}% from a year ago (${periodLabel(loans.obsDate, loans.meta.cadence)}; FRED, from the Fed's H.8)`,
+      figures: [{ key: "cre_loans_yoy", label: "Bank CRE lending y/y", value: loans.value, unit: "pts", asOf: loans.obsDate }],
+    });
+  }
+  return out;
+}
+
 export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null {
   const said: Said[] = [];
   for (const r of input.rates) {
@@ -213,6 +300,7 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
   if (z) said.push(z);
   const m = realtorLine(input.realtor);
   if (m) said.push(m);
+  said.push(...debtMarketLines(input.national, input.assetClass, input.plan ?? false));
   if (said.length === 0) return null;
   const lines = said.map((s) => s.line);
   const figures = said.flatMap((s) => s.figures);
