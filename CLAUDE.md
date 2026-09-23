@@ -641,6 +641,34 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   before it sat ten minutes on a two-minute step, and `timeout-minutes`
   on the three pull workflows now ends a stall instead of holding a
   runner for six hours.
+- **The deal's own model reads the same table** (#380): `lib/debt-index.ts`
+  (pure) picks the index a loan is quoted over off today's rates — the
+  Treasury tenor NEAREST the hold for the permanent loan (`treasuryForTerm`,
+  the prepayment card's rule; a five-year hold prices off the 5-year),
+  30-day average SOFR for construction debt (overnight SOFR only where the
+  average is not fresh; Term SOFR is CME's and not on FRED) — and
+  `lib/debt-index-read.ts` (`server-only`, `liveDebtSeeds`) hands it to
+  EVERY surface that derives the model: the deal page, the workbook route,
+  the report route and the bridge's current-assumptions read, so the page
+  and the workbook cannot print two rates for one deal on one day.
+  `deriveUnderwriteInputs` takes it as a fourth argument (`MarketForModel`)
+  and sets `allInRatePct` to index + `CLASS_DEFAULTS[cls].spreadBps` — the
+  index is the fact, the spread is the assumption, and the note says both
+  with the date: "5-yr Treasury 4.78% (FRED, Sep 17, 2026) + 200 bps
+  multifamily spread, a screening default — enter your quote". The seed
+  rides in `meta.rateSeed` so the deal page's debt sizer starts where the
+  workbook does (a loan the documents state still outranks it: a quote
+  beats a benchmark), and the construction panel starts from SOFR + 350
+  instead of a flat 8%. **A benchmark is not a quote** holds here as on
+  `/tools`: only a `contractRate` series that is fresh and plausible seeds
+  (`seedRate`), a stale table seeds nothing and every surface keeps its old
+  flat default with the OLD note — never a sentence claiming the market
+  was consulted — land carries no permanent loan and says so, and the
+  sample deal is never seeded, since its figures are pinned in the demo's
+  tests. The hold is `HOLD_MONTHS` (60), one constant, because the caller
+  that reads the tenor must ask for the hold the model runs on. Before
+  this the model's rate was 6.00% on every deal on every day, the sizer's
+  6.50% and the construction panel's 8.00%.
 - What landlords are asking this month: `lib/zori.ts` (pure — a metro's
   Zillow Observed Rent Index and its change from a year ago, read out of
   the two `benchmarks` rows the MONTHLY pull writes, `scripts/fetch-zori.mjs`

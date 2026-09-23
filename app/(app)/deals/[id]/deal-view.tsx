@@ -28,6 +28,7 @@ import { type StageChange } from "@/lib/stages";
 import type { InternalComp } from "@/lib/internal-comps";
 import { DebtSizer } from "./debt-sizer";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
+import type { DealRateSeeds } from "@/lib/debt-index";
 import { DecisionLog } from "./decision-log";
 import { SampleGuide } from "./sample-guide";
 import { DealTasks } from "./deal-tasks";
@@ -312,6 +313,7 @@ export function DealView({
   taskAssignees = [],
   todayIso = "",
   staleResults = [],
+  rateSeeds = null,
 }: {
   dealId: string;
   dealName: string;
@@ -324,6 +326,10 @@ export function DealView({
   /** results a FAILED latest screen never reached — they belong to the
    *  previous screen and every surface here says so (lib/screen-run.ts) */
   staleResults?: ResultKey[];
+  /** today's starting rates off the rates table (lib/debt-index) for the
+   *  debt panels — the permanent loan's is the screening model's own
+   *  seeded rate, so the sizer starts where the workbook does */
+  rateSeeds?: DealRateSeeds | null;
   supplements: SupplementsMap;
   model: UnderwritingModel | null;
   documents: DealDocument[];
@@ -782,6 +788,7 @@ export function DealView({
             facts={facts}
             omUrl={omUrl}
             underwrite={playground?.inputs ?? null}
+            rateSeeds={rateSeeds}
           />
         )}
 
@@ -865,6 +872,7 @@ function FinancialsPanel({
   facts = {},
   omUrl = null,
   underwrite = null,
+  rateSeeds = null,
 }: {
   results: Results;
   active: boolean;
@@ -878,6 +886,7 @@ function FinancialsPanel({
   facts?: Record<string, DealFact>;
   omUrl?: string | null;
   underwrite?: UnderwriteInputs | null;
+  rateSeeds?: DealRateSeeds | null;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -900,6 +909,7 @@ function FinancialsPanel({
         model={model}
         extraction={results.extraction}
         underwrite={underwrite}
+        rateSeeds={rateSeeds}
       />
 
       <details

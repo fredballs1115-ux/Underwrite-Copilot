@@ -2,6 +2,12 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-09-23",
+      "title": "The model's interest rate is today's, not a placeholder",
+      "href": "/deals",
+      "blurb": "Every deal's screening model ran on a flat 6.00% all-in rate, whatever the market was doing that day, and the deal page's debt sizer and construction panel on flat figures of their own. The rate now starts the way a lender quotes one: the Treasury tenor nearest the hold — the 5-year on a five-year hold — as published on FRED that morning, plus a screening spread for the asset class, with the note naming both halves and the date (\"5-yr Treasury 4.78% (FRED, Sep 17, 2026) + 200 bps multifamily spread, a screening default — enter your quote\"). The construction loan starts from 30-day average SOFR plus a construction spread. The deal page, the Excel model, the report and the assumption bridge all read the same figure, so no two of them print a different rate for one deal on one day; a loan the documents state still wins, because a quote beats a benchmark; and on a day the table cannot be trusted the old placeholder stays, with a note that never claims the market was consulted."
+    },
+    {
       "date": "2026-09-22",
       "title": "Each metro area's own rental vacancy, with its margin of error",
       "href": "/market?metro=dc",

@@ -2,7 +2,8 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
-import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { liveDebtSeeds } from "@/lib/debt-index-read";
 import type { Assumptions } from "./model";
 
 /**
@@ -22,7 +23,11 @@ export async function currentDealAssumptions(
 ): Promise<Assumptions | null> {
   if (!extraction) return null;
 
-  const [rrRes, t12Res] = await Promise.all([
+  // The same rate read as the deal page: the current set's all-in rate is
+  // today's index plus the class spread, so a version saved last month and
+  // the set on the page today differ by the rate the market moved — which
+  // the bridge then names as a driver, as it should.
+  const [rrRes, t12Res, debt] = await Promise.all([
     supabase
       .from("deal_rent_rolls")
       .select("as_of_date, summary")
@@ -37,17 +42,23 @@ export async function currentDealAssumptions(
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    liveDebtSeeds(HOLD_MONTHS),
   ]);
 
   const rrSummary = (rrRes.data?.summary as RentRollSummary | null) ?? null;
   const t12Summary = (t12Res.data?.summary as T12Summary | null) ?? null;
 
-  return deriveUnderwriteInputs(extraction, dealName, {
-    rentRoll: rrSummary
-      ? { summary: rrSummary, asOf: (rrRes.data?.as_of_date as string | null) ?? null }
-      : null,
-    t12: t12Summary
-      ? { summary: t12Summary, periodEnd: (t12Res.data?.period_end_date as string | null) ?? null }
-      : null,
-  }).inputs;
+  return deriveUnderwriteInputs(
+    extraction,
+    dealName,
+    {
+      rentRoll: rrSummary
+        ? { summary: rrSummary, asOf: (rrRes.data?.as_of_date as string | null) ?? null }
+        : null,
+      t12: t12Summary
+        ? { summary: t12Summary, periodEnd: (t12Res.data?.period_end_date as string | null) ?? null }
+        : null,
+    },
+    { debtIndex: debt.permanent },
+  ).inputs;
 }

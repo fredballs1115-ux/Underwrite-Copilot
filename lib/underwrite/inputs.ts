@@ -36,6 +36,7 @@ import {
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { assetClassLabel } from "@/lib/asset-class";
+import { allInPct, debtRateNote, type DebtIndex, type RateSeed } from "@/lib/debt-index";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { UnderwriteInputs } from "./engine";
 
@@ -46,6 +47,19 @@ export interface ActualsForModel {
   rentRoll?: { summary: RentRollSummary; asOf?: string | null } | null;
   t12?: { summary: T12Summary; periodEnd?: string | null } | null;
 }
+
+/** What the day's market lends the model (lib/debt-index): the index a
+ *  permanent loan is quoted over, read off the rates table by the caller.
+ *  Absent or null, the rate keeps its flat default and the old note — the
+ *  sample deal, a test, a read that failed. */
+export interface MarketForModel {
+  debtIndex?: DebtIndex | null;
+}
+
+/** The model's hold, months — one constant, because the tenor the rate is
+ *  seeded from is the one nearest the hold, and the caller that reads the
+ *  index needs the same figure the model runs on. */
+export const HOLD_MONTHS = 60;
 
 export type Provenance = "extracted" | "derived" | "assumption";
 export interface InputSource {
@@ -78,6 +92,10 @@ export interface WorkbookMeta {
    *  puts it over total cost as the yield the plan is judged on. Null when
    *  the OM states none, or on a stabilized asset. */
   stabilizedNoi?: { value: number; page?: string } | null;
+  /** the rate the model was seeded with off today's curve, with its note,
+   *  so the deal page's debt sizer starts where the workbook does; null
+   *  where no index was given or the class carries no permanent loan */
+  rateSeed?: RateSeed | null;
 }
 
 export interface DerivedModel {
@@ -101,30 +119,36 @@ const CLASS_DEFAULTS: Record<
      *  measured by its area (an OM always states an office's SF) or has no
      *  building to measure (a park's pads) */
     sfPerUnit?: number;
+    /** the permanent lender's spread over the Treasury tenor nearest the
+     *  hold, basis points — the assumption half of a seeded rate, beside
+     *  the index half the rates table supplies (lib/debt-index); the
+     *  agency-eligible residential classes price tightest, lodging and
+     *  parking widest, and land carries no permanent loan to seed */
+    spreadBps?: number;
   }
 > = {
-  multifamily: { expenseRatio: 0.42, vacancy: 0.05, reservesPsf: 0.25, sfPerUnit: 850 },
-  office: { expenseRatio: 0.45, vacancy: 0.1, reservesPsf: 0.2 },
-  industrial: { expenseRatio: 0.28, vacancy: 0.05, reservesPsf: 0.15 },
-  retail: { expenseRatio: 0.32, vacancy: 0.07, reservesPsf: 0.15 },
+  multifamily: { expenseRatio: 0.42, vacancy: 0.05, reservesPsf: 0.25, sfPerUnit: 850, spreadBps: 200 },
+  office: { expenseRatio: 0.45, vacancy: 0.1, reservesPsf: 0.2, spreadBps: 300 },
+  industrial: { expenseRatio: 0.28, vacancy: 0.05, reservesPsf: 0.15, spreadBps: 225 },
+  retail: { expenseRatio: 0.32, vacancy: 0.07, reservesPsf: 0.15, spreadBps: 250 },
   // A single tenant on a net lease: the landlord's expense load is a
   // sliver, and the vacancy is the lease's own risk rather than a market's.
-  net_lease: { expenseRatio: 0.06, vacancy: 0.02, reservesPsf: 0.05 },
-  medical_office: { expenseRatio: 0.42, vacancy: 0.08, reservesPsf: 0.2 },
-  mixed_use: { expenseRatio: 0.4, vacancy: 0.07, reservesPsf: 0.2, sfPerUnit: 900 },
-  sfr_btr: { expenseRatio: 0.38, vacancy: 0.06, reservesPsf: 0.3, sfPerUnit: 1_600 },
-  student_housing: { expenseRatio: 0.45, vacancy: 0.06, reservesPsf: 0.3, sfPerUnit: 350 },
+  net_lease: { expenseRatio: 0.06, vacancy: 0.02, reservesPsf: 0.05, spreadBps: 200 },
+  medical_office: { expenseRatio: 0.42, vacancy: 0.08, reservesPsf: 0.2, spreadBps: 250 },
+  mixed_use: { expenseRatio: 0.4, vacancy: 0.07, reservesPsf: 0.2, sfPerUnit: 900, spreadBps: 250 },
+  sfr_btr: { expenseRatio: 0.38, vacancy: 0.06, reservesPsf: 0.3, sfPerUnit: 1_600, spreadBps: 225 },
+  student_housing: { expenseRatio: 0.45, vacancy: 0.06, reservesPsf: 0.3, sfPerUnit: 350, spreadBps: 225 },
   // Licensed care carries its labor inside the expense line.
-  senior_housing: { expenseRatio: 0.68, vacancy: 0.12, reservesPsf: 0.3, sfPerUnit: 600 },
-  manufactured_housing: { expenseRatio: 0.35, vacancy: 0.06, reservesPsf: 0.1 },
-  self_storage: { expenseRatio: 0.35, vacancy: 0.12, reservesPsf: 0.15, sfPerUnit: 100 },
+  senior_housing: { expenseRatio: 0.68, vacancy: 0.12, reservesPsf: 0.3, sfPerUnit: 600, spreadBps: 275 },
+  manufactured_housing: { expenseRatio: 0.35, vacancy: 0.06, reservesPsf: 0.1, spreadBps: 200 },
+  self_storage: { expenseRatio: 0.35, vacancy: 0.12, reservesPsf: 0.15, sfPerUnit: 100, spreadBps: 250 },
   // A hotel's "vacancy" is its unsold rooms, and its expense load is the
   // whole operation — housekeeping, the fee stack, the FF&E reserve.
-  hospitality_str: { expenseRatio: 0.65, vacancy: 0.32, reservesPsf: 0.5, sfPerUnit: 550 },
-  data_center: { expenseRatio: 0.45, vacancy: 0.1, reservesPsf: 0.5 },
-  parking: { expenseRatio: 0.4, vacancy: 0.15, reservesPsf: 0.1, sfPerUnit: 350 },
+  hospitality_str: { expenseRatio: 0.65, vacancy: 0.32, reservesPsf: 0.5, sfPerUnit: 550, spreadBps: 325 },
+  data_center: { expenseRatio: 0.45, vacancy: 0.1, reservesPsf: 0.5, spreadBps: 250 },
+  parking: { expenseRatio: 0.4, vacancy: 0.15, reservesPsf: 0.1, sfPerUnit: 350, spreadBps: 325 },
   land_infill: { expenseRatio: 0.4, vacancy: 0.07, reservesPsf: 0.2 },
-  auto: { expenseRatio: 0.4, vacancy: 0.07, reservesPsf: 0.2 },
+  auto: { expenseRatio: 0.4, vacancy: 0.07, reservesPsf: 0.2, spreadBps: 250 },
 };
 
 /** Read a page ref off a found metric — findMetric returns the structural
@@ -145,6 +169,7 @@ export function deriveUnderwriteInputs(
   extraction: ExtractionResult | null,
   fallbackName: string,
   actuals?: ActualsForModel,
+  market?: MarketForModel,
 ): DerivedModel {
   const metrics = extraction?.metrics ?? [];
   const assetClass = normalizeClass(extraction?.assetClass ?? "auto");
@@ -353,7 +378,8 @@ export function deriveUnderwriteInputs(
   // 40-unit building is a made-up number wearing a decimal point.
   const sfMetric = buildingSfRow(metrics);
   const sfParsed = sfMetric ? parseSf(sfMetric.value) : null;
-  const unitNoun = assetWords(extraction?.assetClass).noun ?? { one: "unit", many: "units" };
+  const words = assetWords(extraction?.assetClass);
+  const unitNoun = words.noun ?? { one: "unit", many: "units" };
   const typicalSf = units != null && units > 0 && cd.sfPerUnit ? Math.round(units * cd.sfPerUnit) : null;
   const rsf = rrSf ?? (sfParsed && sfParsed > 100 ? Math.round(sfParsed) : (typicalSf ?? 100_000));
   if (rrSf != null) {
@@ -391,9 +417,27 @@ export function deriveUnderwriteInputs(
   const inPlaceRentAnnual = pgr;
   const operatingExpenses = egr - noi; // = expenseRatio × EGR
 
+  // ── The rate ──────────────────────────────────────────────────────────
+  // The index is a fact and the spread is a judgment (lib/debt-index): with
+  // the day's index given, the rate is the Treasury tenor nearest the hold
+  // plus the class's screening spread, and the note names both halves with
+  // the index's date. Land carries no permanent loan, so nothing is seeded
+  // on it; with no index at all — the sample deal, a read that failed — the
+  // flat default stays and the note says only that it is the analyst's to
+  // enter, never that the market was consulted.
+  const debtIndex = market?.debtIndex ?? null;
+  const spreadBps = cd.spreadBps ?? null;
+  const rateSeed: RateSeed | null =
+    debtIndex && spreadBps !== null && words.operating
+      ? {
+          pct: allInPct(debtIndex, spreadBps),
+          note: debtRateNote(debtIndex, spreadBps, `${classWord.toLowerCase()} spread`),
+        }
+      : null;
+
   const inputs: UnderwriteInputs = {
     purchasePrice: price,
-    holdMonths: 60,
+    holdMonths: HOLD_MONTHS,
     acqFeePct: 0,
     acqFeeCap: 0,
 
@@ -424,7 +468,7 @@ export function deriveUnderwriteInputs(
     amFeePctEquity: 0.005,
 
     ltc: 0.6,
-    allInRatePct: 0.06,
+    allInRatePct: rateSeed ? rateSeed.pct / 100 : 0.06,
     ioMonths: 0,
     amortMonths: 360,
     financingCostPct: 0.01,
@@ -491,7 +535,15 @@ export function deriveUnderwriteInputs(
   }
   mark("amFeePctEquity", "assumption", "Default 0.5% of equity/yr");
   mark("ltc", "assumption", "Default 60% loan-to-cost — enter your quote");
-  mark("allInRatePct", "assumption", "Enter your all-in rate (index + spread)");
+  mark(
+    "allInRatePct",
+    "assumption",
+    rateSeed
+      ? rateSeed.note
+      : debtIndex && !words.operating
+        ? "Land carries no permanent loan to seed a rate from — enter the land loan's rate"
+        : "Enter your all-in rate (index + spread)",
+  );
   mark("ioMonths", "assumption", "Default fully amortizing (0 = no IO; 999 = full-term IO)");
   mark("amortMonths", "assumption", "Default 30-year amortization");
   mark("financingCostPct", "assumption", "Default 1.0% of loan");
@@ -520,6 +572,7 @@ export function deriveUnderwriteInputs(
         isPlanDeal(strategy.kind) && stabilizedFig && stabilizedFig.value > 0
           ? { value: stabilizedFig.value, page: stabilizedFig.page }
           : null,
+      rateSeed,
     },
   };
 }
