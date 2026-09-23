@@ -153,6 +153,11 @@ told to check the OM's assumptions against the figure where one answers
 and to cite it with its date, and the figures it read are stored with the
 result and folded open on the deal page. Outside the covered markets the
 check reasons from typical ranges alone, as before.
+Then #382: since this screen. The figures the check read are stored as
+values as well as sentences, and a deal page opened weeks later reads
+the same metro's figures today and says what moved — "+0.4 pt to 3.8%",
+"+1.1% to $2,335", "12 places hotter" — keeping a figure the publisher
+has not updated since apart from one that did not move.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.

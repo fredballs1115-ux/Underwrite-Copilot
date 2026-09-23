@@ -37,6 +37,7 @@ import type {
   DealKiller,
   VerdictScenario,
 } from "@/lib/anthropic/types";
+import { moveSentence, type BriefDelta } from "@/lib/brief-delta";
 
 /* ================================================================== */
 /* Icons — minimal inline SVGs (stroke, currentColor). No dependency. */
@@ -1487,7 +1488,16 @@ const TONE = {
   conservative: { badge: "bg-brand/10 text-brand", label: "Conservative" },
 } as const;
 
-export function MarketCheck({ result }: { result: MarketResult }) {
+export function MarketCheck({
+  result,
+  since = null,
+}: {
+  result: MarketResult;
+  /** what moved since the check read its figures (lib/brief-delta), read
+   *  by the page today; null where the check stored none or nothing could
+   *  be read */
+  since?: BriefDelta | null;
+}) {
   // Aggressive first — that's where the risk is.
   const order = { aggressive: 0, conservative: 1, "in-line": 2 } as const;
   const ordered = [...(result.checks ?? [])].sort(
@@ -1506,6 +1516,7 @@ export function MarketCheck({ result }: { result: MarketResult }) {
       />
       {result.summary && <Callout>{result.summary}</Callout>}
       {brief && brief.lines.length > 0 && <LiveBriefRead brief={brief} />}
+      {since && <SinceThisScreen since={since} />}
       <div>
         <RevealList
           initial={3}
@@ -1526,13 +1537,47 @@ export function MarketCheck({ result }: { result: MarketResult }) {
  * screen reader. A check's evidence is never hidden; it is just not the
  * headline.
  */
+/** "Sep 23, 2026" from an ISO day; the day as it came where it is not one. */
+function longDate(iso: string): string {
+  const at = Date.parse(`${iso}T00:00:00Z`);
+  return Number.isFinite(at)
+    ? new Date(at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
+    : iso;
+}
+
+/**
+ * What moved since the check read its figures (lib/brief-delta): the day,
+ * how many of the figures have a newer observation and how many moved, and
+ * one sentence per figure that moved, in its own unit. A figure the
+ * publisher has not updated since is counted as such, never as unchanged.
+ */
+function SinceThisScreen({ since }: { since: BriefDelta }) {
+  const moved = since.moves.filter((m) => m.kind === "moved");
+  const n = since.moves.length;
+  const figures = n === 1 ? "figure" : "figures";
+  const summary =
+    since.newer === 0
+      ? `None of the ${n} ${figures} the check read has a newer observation yet.`
+      : since.moved === 0
+        ? `${since.newer} of the ${n} ${figures} the check read have a newer observation, and none moved.`
+        : `${since.newer} of the ${n} ${figures} the check read have a newer observation; ${since.moved} moved.`;
+  return (
+    <div className="rounded-xl border border-line bg-surface px-4 py-3 text-sm" data-qa="since-this-screen">
+      <p className="font-medium">Since this check ran on {longDate(since.since)}</p>
+      <p className="mt-0.5 text-xs text-muted">{summary}</p>
+      {moved.length > 0 && (
+        <ul className="mt-2 space-y-1 text-muted">
+          {moved.map((m) => (
+            <li key={m.key} className="leading-relaxed">{moveSentence(m)}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function LiveBriefRead({ brief }: { brief: NonNullable<MarketResult["liveBrief"]> }) {
-  const readOn = (() => {
-    const at = Date.parse(`${brief.readOn}T00:00:00Z`);
-    return Number.isFinite(at)
-      ? new Date(at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
-      : brief.readOn;
-  })();
+  const readOn = longDate(brief.readOn);
   return (
     <details className="rounded-xl border border-line bg-paper px-4 py-3 text-sm">
       <summary className="cursor-pointer list-none text-muted [&::-webkit-details-marker]:hidden">
