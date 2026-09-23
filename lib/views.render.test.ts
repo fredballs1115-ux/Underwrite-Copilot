@@ -689,6 +689,37 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     // Nothing editable, nothing of the buyer's.
     expect(text).not.toMatch(/Buy box|Notes|Documents/);
     expect(html).not.toMatch(/<(button|input|textarea|select)\b/);
+    // The sample's market check read no published figures, so the market
+    // read says nothing about any.
+    expect(text).not.toContain("Checked beside");
+  });
+
+  it("a market read that was checked beside the metro's published figures says so, counted and dated", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ShareView, {
+        dealName: SAMPLE_DEAL.name,
+        assetClass: SAMPLE_DEAL.asset_class,
+        expiresAt: "2026-09-30T12:00:00Z",
+        verdictStale: false,
+        aerial: null,
+        extraction: SAMPLE_DEAL.extraction,
+        comps: SAMPLE_DEAL.comps,
+        market: {
+          ...SAMPLE_DEAL.market,
+          liveBrief: {
+            metro: "Philadelphia, PA",
+            readOn: "2026-09-23",
+            lines: ["Unemployment 4.1% (Jul 2026, Philadelphia MSA; FRED)", "Debt market — 10-year Treasury 4.94% (Sep 17, 2026; FRED)"],
+            figures: [],
+          },
+        },
+        verdict: SAMPLE_DEAL.verdict,
+      }),
+    );
+    expect(a11yIssues(html)).toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toContain("Checked beside 2 published figures for the Philadelphia, PA market, read on 2026-09-23");
   });
 
   it("renders a conversion with the plan block and a stale verdict, and the expired state", () => {

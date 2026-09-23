@@ -59,8 +59,9 @@ export interface VerdictInputs {
   buyBox?: string[] | null;
 }
 
-/** Roll the gathered analysis up into one readable brief for the synthesizer. */
-function buildBrief(input: VerdictInputs): string {
+/** Roll the gathered analysis up into one readable brief for the synthesizer.
+ *  Exported for its test; the pipeline calls `synthesizeVerdict`. */
+export function buildBrief(input: VerdictInputs): string {
   const sections: string[] = [];
 
   // Deal identity first — the ranges must be grounded in the actual asset,
@@ -177,6 +178,21 @@ function buildBrief(input: VerdictInputs): string {
         ].join("\n")
       : "Not available.",
   );
+
+  // The published figures the market check read (lib/live-market-brief),
+  // dated — the metro's income side and the national debt market — so a
+  // screen range or a next step that turns on one of them can name the
+  // figure and its date as its source rather than a rule of thumb.
+  const live = input.market?.liveBrief;
+  if (live && live.lines.length > 0) {
+    sections.push(
+      `## The ${live.metro} market's published figures the market check read on ${live.readOn}`,
+      [
+        ...live.lines.map((l) => `- ${l}`),
+        "Each is dated and is the metro's, not the submarket's or the building's. Where a screen range, a risk or a next step turns on one of these, name the figure and its date as its source.",
+      ].join("\n"),
+    );
+  }
 
   return sections.join("\n\n");
 }

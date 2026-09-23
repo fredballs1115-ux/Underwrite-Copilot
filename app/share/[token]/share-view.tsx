@@ -444,6 +444,11 @@ export function ShareView({
             <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
               <h2 className="text-sm font-semibold tracking-tight">Market read</h2>
               <Fold text={market.summary} className="mt-2 text-sm leading-relaxed text-muted" />
+              {market.liveBrief && market.liveBrief.lines.length > 0 && (
+                <p className="mt-2 text-xs text-muted">
+                  {`Checked beside ${market.liveBrief.lines.length} published figures for the ${market.liveBrief.metro} market, read on ${market.liveBrief.readOn} — each the metro's, not the building's.`}
+                </p>
+              )}
             </div>
           )}
         </section>

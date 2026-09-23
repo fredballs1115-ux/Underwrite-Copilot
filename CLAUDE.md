@@ -1888,7 +1888,16 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   check that reads one without the other reads half the deal. The
   pipeline reads the six national series bare; the page's
   since-this-screen reads them through `liveRates`; the prompt clause
-  names the exit cap and the debt assumptions as what they answer.
+  names the exit cap and the debt assumptions as what they answer. **The
+  figures follow the check into the verdict and the documents** (#385):
+  `buildBrief` in `lib/anthropic/verdict.ts` (exported for its test)
+  gives the stored lines their own dated section after the market check
+  and tells the synthesizer to name a figure and its date as a screen
+  range's or a next step's source; the report's market page prints them
+  under the checks ("Figures the check read beside the rules of thumb",
+  Standard Helvetica, so the lines carry WinAnsi text only); the shared
+  screen's Market read says how many were read, for which metro, on
+  which day. A check that read none leaves all three exactly as before.
 - The pipeline's failure modes: `lib/anthropic/failure.ts` turns any failure
   into one sentence the analyst can act on (the raw text goes to the server
   log, never the page), and its `structured()` wraps every structured-output
