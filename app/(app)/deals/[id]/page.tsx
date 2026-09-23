@@ -70,7 +70,7 @@ import type { ActualsData } from "./property-actuals";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { constructionSeed, type DealRateSeeds } from "@/lib/debt-index";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
-import { metroForAddress } from "@/lib/market-match";
+import { metroForAddress, stateForAddress } from "@/lib/market-match";
 import { BRIEF_NATIONAL_IDS, liveMarketBrief } from "@/lib/live-market-brief";
 import { metroDemand } from "@/lib/metro-demand";
 import { briefDelta, type BriefDelta } from "@/lib/brief-delta";
@@ -361,17 +361,21 @@ export default async function DealPage({
   let marketSince: BriefDelta | null = null;
   const storedBrief = market?.liveBrief ?? null;
   const coveredMetro = metroForAddress(dealAddress ?? {});
+  // The market the live figures are read for: the covered metro where the
+  // address sits in one, the state's own series otherwise (the same table,
+  // filed under `state:PA`), every surface saying which grain it read.
+  const liveMarket = coveredMetro ?? stateForAddress(dealAddress ?? {});
   let reads: TodayReads | null = null;
   if (extraction || (storedBrief?.figures && storedBrief.figures.length > 0)) {
     try {
-      reads = await todayReads(coveredMetro);
+      reads = await todayReads(liveMarket);
     } catch (err) {
       console.warn("live figures read failed:", err instanceof Error ? err.message : err);
     }
   }
-  if (storedBrief?.figures && storedBrief.figures.length > 0 && coveredMetro && reads) {
+  if (storedBrief?.figures && storedBrief.figures.length > 0 && liveMarket && reads) {
     const today = liveMarketBrief({
-      metro: coveredMetro,
+      metro: liveMarket,
       rates: reads.rates,
       zori: reads.zori,
       realtor: reads.realtor,
@@ -672,7 +676,7 @@ export default async function DealPage({
           extraction,
           firstSignal,
           storedAssetClass: deal.asset_class as string | null,
-          metro: coveredMetro,
+          metro: liveMarket,
           reads,
           goingInCapText: summaryCap,
         })
@@ -1065,7 +1069,7 @@ export default async function DealPage({
         marketSince={marketSince}
         modelVsMarket={modelRead}
         metroDemand={
-          reads && coveredMetro
+          reads && liveMarket
             ? metroDemand(reads.rates, extraction?.assetClass || (deal.asset_class as string | null) || null)
             : null
         }

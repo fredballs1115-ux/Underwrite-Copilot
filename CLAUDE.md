@@ -2124,7 +2124,38 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   band would let a 3% model read "inside" a 3–8% range. The read says
   why: a memorandum's premium is the seller's expiring policy, bound on
   limits the seller chose in a market that may no longer exist, and the
-  index says how far a new owner's quote has moved. **The debt
+  index says how far a new owner's quote has moved. **A deal outside the
+  covered metros reads its STATE's figures** (#399): every state and the
+  District publish unemployment, payrolls, permits (and the single-family
+  split), house prices, the survey's annual rental vacancy and the five
+  sector payrolls, and FRED carries them under one pattern a state
+  (`<ST>UR`, `<ST>NA`, `<ST>BPPRIV`, `<ST>BP1FH`, `<ST>STHPI`, `<ST>RVAC`,
+  `<ST>PBSV` / `EDUH` / `LEIH`, and the BLS-shaped `SMS<fips>0000042…` and
+  `…43…` for retail and transport alone — `<ST>TRAD` is the combined
+  trade-transport-utilities supersector and is not used; probed 2026-09-23,
+  run 35931065205). They are `stateSeries` in `data/fred-series.json`
+  (561 entries, generated from the address table's state list, verified
+  by the branch's dry run), filed by `readSeriesTable` under the market id
+  `state:PA` in the SAME shape as a metro's, so `metroSeriesFor`,
+  `readMetroRates`, `liveMetroRates`, `metroDemand`, `metroSupply` and the
+  brief work unchanged — but kept in `STATE_SERIES`, apart from
+  `METRO_SERIES`, so the market page's boards and ranks never carry a
+  state as a row. `stateForAddress` (`lib/market-match.ts`) is the
+  fallback the pipeline and the deal page take where `metroForAddress` is
+  null; `isStateMarket` / `stateOfMarket` tell the grain. **Every sentence
+  says whose figure it is**: the brief carries `grain: "metro" | "state"`
+  (stored with the result; an older stored brief has none and reads as a
+  metro's), its header opens "Published figures for the state of
+  Pennsylvania the deal sits in — the address lies outside the metros the
+  site tracks, so these are the state's own figures", the prompt clause
+  tells the model to state a state figure as the state's, the deal page's
+  market aside, the shared screen and the verdict's brief say "the
+  state's", and the vacancy check anchors on the state's annual figure
+  (`rental_vacancy_state`, cadence `annual`, `freshDays` 800 — dated the
+  first of its year, published the March after, current until the next
+  March) only where no metro or region figure exists, saying so. A state
+  has no Zillow, Realtor.com or tracker rows, so those lines and checks
+  are simply absent. **The debt
   market rides after the metro's lines, for every deal** (#384,
   `DEBT_MARKET_IDS`): the 10-year Treasury, what banks say about their
   standards for THIS kind of loan (`lendingStandardsFor` — rental housing

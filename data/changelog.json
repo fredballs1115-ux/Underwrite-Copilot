@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-23",
+      "title": "A deal anywhere in the country gets live figures: its state's own",
+      "href": "/deals",
+      "blurb": "The market check and the deal page read a covered metro's published figures; a deal in Pittsburgh, Phoenix or Nashville got none. Now a deal outside the tracked metros reads its state's own series — unemployment, payrolls by sector, permits with the single-family split, house prices and the survey's annual rental vacancy — pulled every weekday from FRED under one pattern a state, and every sentence says the figure is the state's rather than any metro's. The demand and supply pictures, the since-this-screen moves and the model's vacancy check all draw from the same rows."
+    },
+    {
+      "date": "2026-09-23",
       "title": "The insurance line gets a published figure",
       "href": "/tools",
       "blurb": "Insurance is the expense that reprices hardest and gets read least: a memorandum's premium is the seller's expiring policy. The BLS's index of commercial property insurance premiums (commercial multiple peril, the policy a building carries) now rides with the other feeds — against a year ago on the rates strip's inflation fold, on every operating deal's market check as the nation's carriers rather than this building's quote, in the market check's instructions as what the insurance line is checked against, and in the model's expense-growth check beside consumer prices, shown and never averaged into them."

@@ -71,7 +71,10 @@
 
 import table from "@/data/fred-series.json";
 
-export type Cadence = "daily" | "weekly" | "monthly" | "quarterly";
+/** How often a series publishes; `annual` is the Housing Vacancy Survey's
+ *  state figure, dated the first of its year and published the March after
+ *  the year ends — current for a year after that. */
+export type Cadence = "daily" | "weekly" | "monthly" | "quarterly" | "annual";
 
 /**
  * What the stored figure is — which decides how it is shown and how it
@@ -132,6 +135,9 @@ export type MetroMetric =
    *  with the survey's margin of error beside it, because a sample's
    *  quarterly figure for one metro is wide */
   | "rental_vacancy_msa"
+  /** the same survey's ANNUAL figure for a state — the grain a deal
+   *  outside the covered metros reads, filed under the state's market id */
+  | "rental_vacancy_state"
   /** the same survey's rate for the Census region the metro sits in —
    *  the steadier figure, shown beside the metro's own and named as the
    *  region's */
@@ -227,7 +233,7 @@ export interface SeriesGroup {
   label: string;
 }
 
-const CADENCES: readonly Cadence[] = ["daily", "weekly", "monthly", "quarterly"];
+const CADENCES: readonly Cadence[] = ["daily", "weekly", "monthly", "quarterly", "annual"];
 const UNITS: readonly Unit[] = ["pct", "spread", "pts", "count", "units"];
 /**
  * The sector payroll metrics, in the order a panel draws them — one
@@ -265,6 +271,7 @@ const METRO_METRICS: readonly MetroMetric[] = [
   "hpi_yoy",
   "rent_cpi_yoy",
   "rental_vacancy_msa",
+  "rental_vacancy_state",
   "rental_vacancy",
 ];
 
@@ -364,6 +371,10 @@ export function readSeriesTable(raw: unknown): {
   regionSeries: MetroSeriesMeta[];
   /** Each covered metro's Census region. */
   metroRegions: Record<string, string>;
+  /** Each state's own series — `metro` is the state's market id
+   *  (`state:PA`), never a covered metro's — the grain a deal outside the
+   *  covered metros reads, said as the state's. */
+  stateSeries: MetroSeriesMeta[];
 } {
   if (!raw || typeof raw !== "object") throw new Error("fred-series: not an object");
   const t = raw as Record<string, unknown>;
@@ -457,18 +468,39 @@ export function readSeriesTable(raw: unknown): {
     }
     metroRegions[metro] = region;
   }
+  // The states' series: the same shape, filed by (state, metric) under the
+  // state's market id, so a reader that takes a market id works unchanged.
+  // A state series is never also a strip, a metro or a region series.
+  const stateRaw = t.stateSeries === undefined ? [] : t.stateSeries;
+  if (!Array.isArray(stateRaw)) throw new Error("fred-series: stateSeries must be an array");
+  const seenState = new Set<string>();
+  const stateSeries: MetroSeriesMeta[] = stateRaw.map((s, i) => {
+    const o = (s ?? {}) as Record<string, unknown>;
+    const where = `fred-series: state series ${i} (${String(o.id ?? "?")})`;
+    if (typeof o.state !== "string" || !/^[A-Z]{2}$/.test(o.state)) throw new Error(`${where}: needs a two-letter state`);
+    if (!METRO_METRICS.includes(o.metric as MetroMetric)) throw new Error(`${where}: bad metric`);
+    if (typeof o.area !== "string" || !o.area) throw new Error(`${where}: needs the area FRED names`);
+    const m = readSeriesEntry({ ...o, group: "metro", contractRate: false }, where, new Set(["metro"]));
+    const k = `${o.state}|${o.metric}`;
+    if (seenState.has(k)) throw new Error(`${where}: ${o.state} already has a ${o.metric} series`);
+    seenState.add(k);
+    if (seen.has(m.id) || metroSeries.some((x) => x.id === m.id) || regionSeries.some((x) => x.id === m.id)) {
+      throw new Error(`${where}: id is already a strip, metro or region series`);
+    }
+    return { ...m, metro: `state:${o.state}`, metric: o.metric as MetroMetric, area: o.area };
+  });
   // A margin-of-error series is a companion, never a series of the table's
   // own: its id collides with nothing, and two figures never share one.
-  const everyId = new Set([...series, ...metroSeries, ...regionSeries].map((m) => m.id));
+  const everyId = new Set([...series, ...metroSeries, ...regionSeries, ...stateSeries].map((m) => m.id));
   const seenMoe = new Set<string>();
-  for (const m of [...series, ...metroSeries, ...regionSeries]) {
+  for (const m of [...series, ...metroSeries, ...regionSeries, ...stateSeries]) {
     if (m.moe === null) continue;
     if (everyId.has(m.moe) || seenMoe.has(m.moe)) {
       throw new Error(`fred-series: ${m.id}: moe ${m.moe} is already a series`);
     }
     seenMoe.add(m.moe);
   }
-  return { historyRows, groups, series, metroSeries, metroAliases, regionSeries, metroRegions };
+  return { historyRows, groups, series, metroSeries, metroAliases, regionSeries, metroRegions, stateSeries };
 }
 
 const TABLE = readSeriesTable(table);
@@ -482,6 +514,14 @@ export const METRO_SERIES: readonly MetroSeriesMeta[] = TABLE.metroSeries;
 /** The Census regions' series, borrowed by every metro in the region. */
 export const REGION_SERIES: readonly MetroSeriesMeta[] = TABLE.regionSeries;
 /**
+ * Each state's own series, filed under the state's market id (`state:PA`)
+ * — the grain a deal outside the covered metros reads. The same shape as
+ * a metro's, so every reader that takes a market id works unchanged; a
+ * state has no alias and borrows nothing, and it is never a row on the
+ * market page's boards, which rank the covered metros alone.
+ */
+export const STATE_SERIES: readonly MetroSeriesMeta[] = TABLE.stateSeries;
+/**
  * How many observations per series the cron writes and the read fetches —
  * one number, so the page reads back exactly the path the cron backfilled.
  */
@@ -492,9 +532,13 @@ export function seriesMeta(id: string): SeriesMeta | null {
     SERIES.find((s) => s.id === id) ??
     METRO_SERIES.find((s) => s.id === id) ??
     REGION_SERIES.find((s) => s.id === id) ??
+    STATE_SERIES.find((s) => s.id === id) ??
     null
   );
 }
+
+/** The prefix a state's market id wears (`state:PA`) — lib/market-match's. */
+const STATE_ID_PREFIX = "state:";
 
 const METRO_METRIC_ORDER: readonly MetroMetric[] = METRO_METRICS;
 
@@ -512,6 +556,13 @@ export function metroSeriesFor(metroId: string): {
   /** The metrics shown from the MSA rather than the metro's own series. */
   borrowed: MetroMetric[];
 } {
+  // A state's market: its own series, nothing borrowed, in the same order.
+  if (metroId.startsWith(STATE_ID_PREFIX)) {
+    const series = STATE_SERIES.filter((m) => m.metro === metroId).sort(
+      (a, b) => METRO_METRIC_ORDER.indexOf(a.metric) - METRO_METRIC_ORDER.indexOf(b.metric),
+    );
+    return { metro: metroId, series, borrowed: [] };
+  }
   const own = METRO_SERIES.filter((m) => m.metro === metroId);
   const alias = TABLE.metroAliases[metroId];
   const fromAlias = alias

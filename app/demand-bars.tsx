@@ -79,7 +79,7 @@ export function SupplyLine({ supply }: { supply: MetroSupply }) {
       <a href={supply.hrefSingle} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2 hover:text-brand">
         single-family
       </a>
-      {", the only split published for a metro"}
+      {", the only split published for a metro or a state"}
     </p>
   );
 }

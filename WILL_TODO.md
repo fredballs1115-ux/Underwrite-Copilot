@@ -276,6 +276,14 @@ runner, in the strip's inflation fold, on the market brief for every
 operating class (the nation's carriers, never this building's quote), in
 the prompt clause, and in the model's expense-growth check beside CPI and
 core, shown and never averaged in.
+Then #399: a deal outside the covered metros reads its state's figures —
+every state's unemployment, payrolls, permits with the single-family
+split, house prices, annual rental vacancy and five sector payrolls (561
+series, one pattern a state, verified by the branch's dry run), filed
+under `state:PA` in the metro series' own shape so every reader works
+unchanged, with every sentence saying the figure is the state's: the
+market check's brief, the prompt clause, the deal page's aside, the
+shared screen, the verdict and the vacancy check.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.

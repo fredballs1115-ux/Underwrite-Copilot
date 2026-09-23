@@ -1517,7 +1517,9 @@ export function MarketCheck({
         title="Market plausibility check"
         aside={
           <span className="text-xs text-muted">
-            {brief ? "rules of thumb, read beside the metro's published figures" : "rules-of-thumb, not pulled comps"}
+            {brief
+              ? `rules of thumb, read beside ${brief.grain === "state" ? "the state's" : "the metro's"} published figures`
+              : "rules-of-thumb, not pulled comps"}
           </span>
         }
       />
@@ -1610,8 +1612,18 @@ function LiveBriefRead({ brief }: { brief: NonNullable<MarketResult["liveBrief"]
   return (
     <details className="rounded-xl border border-line bg-paper px-4 py-3 text-sm">
       <summary className="cursor-pointer list-none text-muted [&::-webkit-details-marker]:hidden">
-        <span className="font-medium text-ink">Read beside the {brief.metro} market&rsquo;s own figures</span>
-        <span> — {brief.lines.length} published figures as of {readOn}, each dated, each the metro&rsquo;s rather than the submarket&rsquo;s. Open to see them.</span>
+        <span className="font-medium text-ink">
+          {brief.grain === "state"
+            ? `Read beside the state of ${brief.metro}’s own figures`
+            : `Read beside the ${brief.metro} market’s own figures`}
+        </span>
+        <span>
+          {` — ${brief.lines.length} published figures as of ${readOn}, each dated, each ${
+            brief.grain === "state"
+              ? "the state’s rather than any metro’s — the address lies outside the metros the site tracks"
+              : "the metro’s rather than the submarket’s"
+          }. Open to see them.`}
+        </span>
       </summary>
       <ul className="mt-3 space-y-1.5 text-muted">
         {brief.lines.map((line) => (

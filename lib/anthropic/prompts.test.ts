@@ -381,7 +381,9 @@ describe("market check — the metro's published figures ride last, and only whe
     const clause = liveMarketClause(brief);
     expect(clause).toContain(`<live_market>\n${brief}\n</live_market>`);
     expect(clause).toContain("cite the figure with its date in the note");
-    expect(clause).toContain("State a metro figure as the metro's, never as the submarket's or the building's");
+    expect(clause).toContain(
+      "State a metro figure as the metro's and a state figure as the state's (a deal outside the tracked metros is handed its state's figures, and the block says so), never as the submarket's or the building's",
+    );
     expect(clause).toContain("a figure narrows the range, it does not replace the OM's own numbers");
   });
 

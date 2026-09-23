@@ -446,7 +446,9 @@ export function ShareView({
               <Fold text={market.summary} className="mt-2 text-sm leading-relaxed text-muted" />
               {market.liveBrief && market.liveBrief.lines.length > 0 && (
                 <p className="mt-2 text-xs text-muted">
-                  {`Checked beside ${market.liveBrief.lines.length} published figures for the ${market.liveBrief.metro} market, read on ${market.liveBrief.readOn} — each the metro's, not the building's.`}
+                  {market.liveBrief.grain === "state"
+                    ? `Checked beside ${market.liveBrief.lines.length} published figures for the state of ${market.liveBrief.metro}, read on ${market.liveBrief.readOn} — each the state's, not any metro's and not the building's.`
+                    : `Checked beside ${market.liveBrief.lines.length} published figures for the ${market.liveBrief.metro} market, read on ${market.liveBrief.readOn} — each the metro's, not the building's.`}
                 </p>
               )}
             </div>

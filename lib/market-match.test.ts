@@ -46,3 +46,32 @@ describe("coveredMarketGeoTargets", () => {
     expect(philly?.aliases).toContain("wilmington");
   });
 });
+
+// ── The state a deal falls in, as a market of its own grain ─────────────────
+import { isStateMarket, stateForAddress, stateOfMarket } from "./market-match";
+
+describe("stateForAddress — the fallback grain for a deal outside the covered metros", () => {
+  it("files a state by its code with the address table's own name, however the state was written", () => {
+    expect(stateForAddress({ state: "PA" })).toEqual({ id: "state:PA", name: "Pennsylvania" });
+    expect(stateForAddress({ state: "pennsylvania" })).toEqual({ id: "state:PA", name: "Pennsylvania" });
+    expect(stateForAddress({ state: " tx " })).toEqual({ id: "state:TX", name: "Texas" });
+    expect(stateForAddress({ state: "District of Columbia" })).toEqual({ id: "state:DC", name: "District of Columbia" });
+    expect(stateForAddress({ state: "NC" })?.name).toBe("North Carolina");
+  });
+
+  it("answers null for no state or one the table does not know, never a guess", () => {
+    expect(stateForAddress({})).toBeNull();
+    expect(stateForAddress({ state: null })).toBeNull();
+    expect(stateForAddress({ state: "" })).toBeNull();
+    expect(stateForAddress({ state: "Ontario" })).toBeNull();
+    expect(stateForAddress({ state: "PR" })).toBeNull();
+  });
+
+  it("tells a state market from a covered metro by its id", () => {
+    expect(isStateMarket("state:PA")).toBe(true);
+    expect(isStateMarket("philadelphia")).toBe(false);
+    expect(isStateMarket(null)).toBe(false);
+    expect(stateOfMarket("state:PA")).toBe("PA");
+    expect(stateOfMarket("dc")).toBeNull();
+  });
+});

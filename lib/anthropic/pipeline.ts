@@ -33,7 +33,7 @@ import {
 } from "@/lib/deal-strategy";
 import { dealContextFor } from "@/lib/deal-context";
 import { parseStructuredAddress, type StructuredAddress } from "@/lib/address";
-import { metroForAddress } from "@/lib/market-match";
+import { metroForAddress, stateForAddress } from "@/lib/market-match";
 import { SERIES, metroSeriesFor, readMetroRates, readRates } from "@/lib/live-rates";
 import { fetchBenchRows, fetchSeriesRows } from "@/lib/live-rates-query";
 import { ZILLOW_METRICS, zoriFor } from "@/lib/zori";
@@ -173,7 +173,11 @@ async function liveMarketFromDb(
         : typeof raw === "string"
           ? parseStructuredAddress(raw)
           : null;
-    const metro = metroForAddress(address ?? {});
+    // A covered metro's figures where the address sits in one; the state's
+    // own otherwise (lib/market-match's stateForAddress — the same series
+    // table, filed under `state:PA`), said as the state's. A deal with no
+    // readable state reads nothing, as before.
+    const metro = metroForAddress(address ?? {}) ?? stateForAddress(address ?? {});
     if (!metro) return null;
     // The debt-market lines read the class the deck turned out to be, and
     // whether the deal is a plan, so the lending-standards series is the
@@ -724,7 +728,7 @@ async function runAnalysisSteps(
       const market: MarketResult = {
         ...checked,
         liveBrief: brief
-          ? { metro: brief.metro, readOn: brief.readOn, lines: brief.lines, figures: brief.figures }
+          ? { metro: brief.metro, grain: brief.grain, readOn: brief.readOn, lines: brief.lines, figures: brief.figures }
           : null,
       };
       await admin

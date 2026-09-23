@@ -187,7 +187,11 @@ export interface MarketResult {
 }
 
 export interface LiveBriefRecord {
+  /** the covered metro's name — or the state's, for a deal outside the covered metros */
   metro: string;
+  /** whose figures these are; absent on a record written before a state
+   *  could be read, which is a covered metro's */
+  grain?: "metro" | "state";
   readOn: string;
   lines: string[];
   /** the same figures as values (lib/live-market-brief `LiveFigure`), so a

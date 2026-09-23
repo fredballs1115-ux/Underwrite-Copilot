@@ -103,7 +103,10 @@ describe("the series table", () => {
     // month would be stale for the weeks between the month's end and its
     // release — core PCE takes eight of them, and the fixture's July print
     // is 82 days old and current.
-    const floor = { daily: 4, weekly: 8, monthly: 90, quarterly: 250 } as const;
+    // An annual figure (a state's rental vacancy) is dated the first of its
+    // year and published the March after the year ends, so it is fourteen
+    // months old on arrival and twenty-six when the next one lands.
+    const floor = { daily: 4, weekly: 8, monthly: 90, quarterly: 250, annual: 700 } as const;
     for (const s of SERIES) {
       expect(s.freshDays, s.id).toBeGreaterThanOrEqual(floor[s.cadence]);
     }
@@ -1172,5 +1175,69 @@ describe("the metro area's own rental vacancy, from the survey's workbook, with 
     // A margin id that is already a series of the table's own is refused.
     const strip = { id: "HVS_RVR_00000_MOE", short: "x", label: "x", group: "curve", cadence: "daily", freshDays: 6, unit: "pct", contractRate: false };
     expect(() => readSeriesTable(tableOf(base, [strip]))).toThrow(/already a series/);
+  });
+});
+
+// ── The states' series: the fallback grain for a deal outside the covered metros ──
+import { STATE_SERIES, metricSeries as metricSeriesOf, metroSeriesFor as marketSeriesFor, readMetroRates as readMarketRates } from "./live-rates";
+import { FIXTURE_NOW } from "./live-rates.fixture";
+
+describe("the states' series — the fallback grain for a deal outside the covered metros", () => {
+  it("files every state with the same eleven metrics under its own market id, and resolves the id like a metro's", () => {
+    const states = new Set(STATE_SERIES.map((s) => s.metro));
+    expect(states.size).toBe(51);
+    for (const id of states) {
+      expect(id).toMatch(/^state:[A-Z]{2}$/);
+      const own = marketSeriesFor(id);
+      expect(own.borrowed).toEqual([]);
+      expect(own.series.map((s) => s.metric), id).toEqual([
+        "unemployment",
+        "jobs_yoy",
+        ...SECTOR_JOBS_METRICS,
+        "permits",
+        "permits_1unit",
+        "hpi_yoy",
+        "rental_vacancy_state",
+      ]);
+    }
+    // The ids the probe of 2026-09-23 printed for Pennsylvania (rates run
+    // 35931065205), and the BLS-shaped ones for retail and transport.
+    const pa = marketSeriesFor("state:PA");
+    expect(pa.series.map((s) => s.id)).toEqual([
+      "PAUR",
+      "PANA_YOY",
+      "PAPBSV_YOY",
+      "PAEDUH_YOY",
+      "SMS42000004300000001_YOY",
+      "SMS42000004200000001_YOY",
+      "PALEIH_YOY",
+      "PABPPRIV",
+      "PABP1FH",
+      "PASTHPI_YOY",
+      "PARVAC",
+    ]);
+    expect(pa.series.every((s) => s.area === "Pennsylvania")).toBe(true);
+    expect(marketSeriesFor("state:DC").series[0].area).toBe("District of Columbia");
+    // A state is never a covered metro's row: the boards rank METRO_SERIES alone.
+    expect(METRO_SERIES.some((s) => s.metro.startsWith("state:"))).toBe(false);
+    expect(metricSeriesOf("jobs_yoy").every((s) => !s.metro.startsWith("state:"))).toBe(true);
+    expect(marketSeriesFor("state:ZZ").series).toEqual([]);
+  });
+
+  it("reads a state's rows the way it reads a metro's, the annual vacancy dated by its year and current for a year after it publishes", () => {
+    const rows: RateRow[] = [
+      { series_id: "PAUR", obs_date: "2026-08-01", value: 3.7 },
+      { series_id: "PARVAC", obs_date: "2025-01-01", value: 6.6 },
+    ];
+    const r = readMarketRates("state:PA", rows, FIXTURE_NOW);
+    expect(r.map((x) => [x.meta.id, x.value, x.fresh])).toEqual([
+      ["PAUR", 3.7, true],
+      ["PARVAC", 6.6, true],
+    ]);
+    // The 2025 figure publishes in March 2026 and is the newest until March
+    // 2027; read in the June after that, it is stale.
+    const later = readMarketRates("state:PA", rows, new Date("2027-06-01T00:00:00Z"));
+    expect(later.find((x) => x.meta.id === "PARVAC")!.fresh).toBe(false);
+    expect(later.find((x) => x.meta.id === "PARVAC")!.meta.cadence).toBe("annual");
   });
 });

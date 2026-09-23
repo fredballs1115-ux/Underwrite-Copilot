@@ -32,9 +32,17 @@ export function ModelVsMarketCard({ read }: { read: ModelVsMarket | null }) {
   if (!read || read.checks.length === 0) return null;
   const readOn = datedLong(read.readOn);
   const what = checkTitles(read);
+  // A deal outside the covered metros reads its state's rows, and the
+  // sentence says so rather than calling a state a market.
   const scope = read.metro
-    ? `The model's ${what}, set against what the ${read.metro} market and the national series have actually done, read on ${readOn}.`
+    ? read.grain === "state"
+      ? `The model's ${what}, set against what the state of ${read.metro} and the national series have actually done, read on ${readOn} — the address lies outside the metros the site tracks, so the state's figures stand in for a metro's.`
+      : `The model's ${what}, set against what the ${read.metro} market and the national series have actually done, read on ${readOn}.`
     : `The model's ${what}, set against the national series, read on ${readOn}.`;
+  const grainNote =
+    read.grain === "state"
+      ? "a state figure is the state's, not any metro's, the submarket's or the building's."
+      : "a metro figure is the metro area's, not the submarket's or the building's.";
   return (
     <section
       className="rounded-2xl border border-line bg-surface shadow-card"
@@ -46,7 +54,7 @@ export function ModelVsMarketCard({ read }: { read: ModelVsMarket | null }) {
           Assumptions against the published figures
         </h2>
         <p className="mt-1 text-xs leading-relaxed text-muted">
-          {`${scope} A trailing year is what an assumption is being asked to beat, not a forecast; a metro figure is the metro area's, not the submarket's or the building's.`}
+          {`${scope} A trailing year is what an assumption is being asked to beat, not a forecast; ${grainNote}`}
         </p>
       </div>
       <ul className="divide-y divide-line">
