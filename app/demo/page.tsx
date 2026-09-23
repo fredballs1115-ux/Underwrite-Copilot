@@ -6,7 +6,9 @@ import { FREE_DEALS, DEEP_TOOLS } from "@/lib/marketing-constants";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { buildingSfRow, evaluateBuyBox, findGoingInCap, parsePct } from "@/lib/criteria";
-import { leverageRead } from "@/lib/leverage";
+import { benchmark30 } from "@/lib/debt-index";
+import { liveDebtSeeds } from "@/lib/debt-index-read";
+import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { seedBenchmarks } from "@/lib/research-data";
 import { sectorLeaderboard } from "@/lib/sector-leaderboard";
 import { sampleLegal } from "@/lib/sample-legal";
@@ -15,6 +17,7 @@ import { findPriceMetric, inferStrategy, unitCountRow } from "@/lib/deal-strateg
 import { DemoSections, type DemoData } from "./sections";
 import { ModelSlideshow } from "./model-slideshow";
 import { BrokerQuestions } from "./broker-questions";
+import { SampleLeverageCard } from "./leverage-card";
 import { PlaceBand } from "@/app/place-band";
 
 // ISR, five-minute window: without a revalidate this page is fully static
@@ -120,7 +123,7 @@ function LegalPanel() {
   );
 }
 
-export default function DemoPage() {
+export default async function DemoPage() {
   // Everything below is computed by the SAME functions the logged-in app
   // runs — evaluateBuyBox, scoreMandateFit, deriveUnderwriteInputs — over
   // the sample fixture, so the demo can never drift from the product.
@@ -201,14 +204,18 @@ export default function DemoPage() {
   const cap = findGoingInCap(metrics)?.value ?? null;
 
   // Leverage check on the SAMPLE — the same lib/leverage code path every
-  // real deal page runs, against the same sourced PMMS snapshot, so the
-  // demo can never show a check the product doesn't do.
-  const pmmsRow = seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed");
+  // real deal page runs, on the same benchmark read (lib/debt-index): the
+  // week's 30-year survey off the rates table, the research layer's
+  // snapshot only where the table has nothing (named as the snapshot), and
+  // today's 10-year beside it — so the demo can never show a check the
+  // product doesn't do, nor an August figure as this week's. The page is
+  // ISR, so the read is at most its window behind the table.
+  const debt = await liveDebtSeeds(HOLD_MONTHS);
+  const bench30 = benchmark30(
+    debt.survey30,
+    seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed"),
+  );
   const sampleCapPct = cap ? parsePct(cap) : null;
-  const sampleLeverage =
-    sampleCapPct != null && pmmsRow && typeof pmmsRow.low === "number"
-      ? leverageRead(sampleCapPct, pmmsRow.low)
-      : null;
 
   // The sample's metro through the sector-fundamentals generator — the same
   // rows deal pages benchmark against. Formats a band or a point honestly.
@@ -546,37 +553,7 @@ export default function DemoPage() {
               )}
             </div>
           </div>
-          {sampleLeverage && pmmsRow && sampleCapPct != null && (
-            <div className="mt-4 rounded-xl border border-line bg-surface p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[11px] uppercase tracking-wide text-muted">
-                  Leverage check — computed, not opined
-                </p>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                    sampleLeverage.tone === "negative"
-                      ? "bg-kill/10 text-kill"
-                      : sampleLeverage.tone === "thin"
-                        ? "bg-caution/10 text-caution"
-                        : "bg-pass/10 text-pass"
-                  }`}
-                >
-                  {sampleLeverage.tone === "negative"
-                    ? "negative leverage"
-                    : sampleLeverage.tone === "thin"
-                      ? "thin spread"
-                      : "positive at benchmark"}
-                </span>
-              </div>
-              <p className="mt-2 text-sm leading-relaxed">
-                {sampleLeverage.label} — going-in cap {sampleCapPct}% vs{" "}
-                <span className="font-mono font-semibold tabular-nums">
-                  {pmmsRow.low}%
-                </span>{" "}
-                30-yr fixed (FRED, {pmmsRow.as_of}).
-              </p>
-            </div>
-          )}
+          <SampleLeverageCard capPct={sampleCapPct} bench30={bench30} tenYear={debt.tenYear} />
         </div>
       </section>
 

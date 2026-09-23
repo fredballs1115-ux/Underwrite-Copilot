@@ -51,6 +51,28 @@ export interface DebtIndex {
   kind: IndexKind;
 }
 
+/**
+ * The 30-year mortgage survey (Freddie Mac PMMS, weekly) — the one series
+ * here that is SHOWN and never seeded: an owner-occupier rate, so
+ * `lib/leverage.ts` reads a cap against it one-sided and no field starts
+ * from it. It rides with the seeds because every surface that runs the
+ * leverage check needs it beside the 10-year, off the same cached table
+ * read — the deal page's research panel, the compare table and the demo
+ * each used to query the row for themselves, the demo from a checked-in
+ * snapshot on a public page. A stale survey still comes back, flagged,
+ * with its date: a figure printed beside its date is read, and a stale
+ * one silently swapped for an older snapshot is not.
+ */
+export interface SurveyRate {
+  id: "MORTGAGE30US";
+  /** percent, as published */
+  pct: number;
+  /** the survey week's observation date, ISO */
+  asOf: string;
+  /** young enough for the survey's weekly cadence */
+  fresh: boolean;
+}
+
 export interface DebtSeeds {
   /** the Treasury tenor nearest the hold — a fixed-rate permanent loan's index */
   permanent: DebtIndex | null;
@@ -60,9 +82,12 @@ export interface DebtSeeds {
   /** the 10-year Treasury — the benchmark a cap rate's spread is quoted
    *  over, whatever tenor the loan prices off */
   tenYear: DebtIndex | null;
+  /** the 30-year mortgage survey — the leverage check's benchmark, shown
+   *  with its date whatever its age and never a seed */
+  survey30: SurveyRate | null;
 }
 
-export const NO_DEBT_SEEDS: DebtSeeds = { permanent: null, floating: null, tenYear: null };
+export const NO_DEBT_SEEDS: DebtSeeds = { permanent: null, floating: null, tenYear: null, survey30: null };
 
 /** The construction lender's spread over its floating index — a screening
  *  default (bank construction debt has priced at SOFR + 300 to 400 through
@@ -79,7 +104,56 @@ export function debtSeeds(rates: readonly LiveRate[], holdMonths: number): DebtS
   const tenYear: DebtIndex | null = ten
     ? { id: ten.id, short: ten.short, pct: ten.pct, asOf: ten.asOf, kind: "treasury" }
     : null;
-  return { permanent, floating: floatingIndex(rates), tenYear };
+  // Not through seedRate: the survey is no contract rate and is never
+  // seeded, and a stale one is still shown — flagged, with its date.
+  const survey = rates.find((r) => r.meta.id === "MORTGAGE30US");
+  const survey30: SurveyRate | null =
+    survey && Number.isFinite(survey.value)
+      ? { id: "MORTGAGE30US", pct: survey.value, asOf: survey.obsDate, fresh: survey.fresh }
+      : null;
+  return { permanent, floating: floatingIndex(rates), tenYear, survey30 };
+}
+
+/**
+ * The leverage check's benchmark: the week's survey where the table has
+ * it, else the research layer's checked-in snapshot — and the SOURCE says
+ * which, so a page never prints a snapshot from August as if it were the
+ * week's survey. Null where neither states a figure: a blank is null,
+ * never zero.
+ */
+export interface Benchmark30 {
+  /** percent */
+  value: number;
+  /** ISO date of the figure — the survey week, or the snapshot's own as-of */
+  asOf: string;
+  /** "FRED · MORTGAGE30US" for the live survey (", stale" appended where
+   *  the table has not been written for the survey's cadence), "FRED PMMS,
+   *  the checked-in snapshot" for the research layer's row */
+  source: string;
+  live: boolean;
+}
+
+export function benchmark30(
+  survey: SurveyRate | null | undefined,
+  snapshot: { low: number | null; as_of: string } | null | undefined,
+): Benchmark30 | null {
+  if (survey) {
+    return {
+      value: survey.pct,
+      asOf: survey.asOf,
+      source: survey.fresh ? "FRED · MORTGAGE30US" : "FRED · MORTGAGE30US, stale",
+      live: true,
+    };
+  }
+  if (snapshot && typeof snapshot.low === "number" && Number.isFinite(snapshot.low)) {
+    return {
+      value: snapshot.low,
+      asOf: snapshot.as_of,
+      source: "FRED PMMS, the checked-in snapshot",
+      live: false,
+    };
+  }
+  return null;
 }
 
 function floatingIndex(rates: readonly LiveRate[]): DebtIndex | null {

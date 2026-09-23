@@ -1121,6 +1121,7 @@ export default async function DealPage({
           assetClass={shownClass || null}
           rateSeed={rateSeeds.permanent}
           tenYear={debt.tenYear}
+          survey30={debt.survey30}
         />
       </div>
     </div>

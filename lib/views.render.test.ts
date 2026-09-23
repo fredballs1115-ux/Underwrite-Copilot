@@ -2789,3 +2789,70 @@ describe("ShareView — a hotel development is spoken in keys", () => {
     expect(text).not.toContain("Basis per unit");
   });
 });
+
+// ── The sample screen's leverage check ──────────────────────────────────────
+import { renderToString } from "react-dom/server";
+import { SampleLeverageCard } from "@/app/demo/leverage-card";
+
+describe("SampleLeverageCard — the sample's cap against the week's survey and today's 10-year", () => {
+  // The runner's own table (lib/live-rates.fixture): the survey at 6.95%
+  // on Sep 17, the 10-year at 4.94% the same day; the sample's cap is 5.45%.
+  const bench30 = { value: 6.95, asOf: "2026-09-17", source: "FRED · MORTGAGE30US", live: true };
+  const tenYear = { id: "DGS10", short: "10-yr Treasury", pct: 4.94, asOf: "2026-09-17", kind: "treasury" as const };
+  const html = render(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30, tenYear }));
+  const text = visibleText(html);
+
+  it("reads the cap against the survey one-sided, dated and named as the series", () => {
+    expect(text).toContain("Negative leverage: going-in cap sits 150 bps below the 30-yr fixed");
+    expect(text).toContain("going-in cap 5.45% vs");
+    // The figure is its own styled span, so the visible text splits there.
+    expect(text).toContain("6.95%");
+    expect(text).toContain("30-yr fixed (FRED · MORTGAGE30US, as of 2026-09-17)");
+    expect(text).toContain("negative leverage");
+    expect(text).toContain("Leverage check — computed, not opined");
+  });
+
+  it("says the cap's spread over the 10-year as a fact with its date, and no verdict", () => {
+    expect(text).toContain("curve: the cap is 51 bps over the 10-year Treasury (4.94% on Sep 17, 2026, FRED).");
+  });
+
+  it("the phrase the live-verify marker greps is in the markup a curl receives", () => {
+    // The marker greps p_demo.html for "the 10-year Treasury (" — inside one
+    // template literal, so React's <!-- --> separator never lands in it.
+    const served = renderToString(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30, tenYear }));
+    expect(served).toContain("the 10-year Treasury (");
+  });
+
+  it("the snapshot is named as the snapshot, and no 10-year means no second line", () => {
+    const fallback = visibleText(render(React.createElement(SampleLeverageCard, {
+      capPct: 5.45,
+      bench30: { value: 6.65, asOf: "2026-08-20", source: "FRED PMMS, the checked-in snapshot", live: false },
+      tenYear: null,
+    })));
+    expect(fallback).toContain("Negative leverage: going-in cap sits 120 bps below the 30-yr fixed");
+    expect(fallback).toContain("30-yr fixed (FRED PMMS, the checked-in snapshot, as of 2026-08-20)");
+    expect(fallback).not.toContain("10-year");
+  });
+
+  it("a stale survey says so beside its date, and the tone follows the spread", () => {
+    const stale = visibleText(render(React.createElement(SampleLeverageCard, {
+      capPct: 7.9,
+      bench30: { ...bench30, source: "FRED · MORTGAGE30US, stale" },
+      tenYear,
+    })));
+    expect(stale).toContain("Positive leverage at the benchmark: 95 bps above the 30-yr fixed");
+    expect(stale).toContain("(FRED · MORTGAGE30US, stale, as of 2026-09-17)");
+    expect(stale).toContain("positive at benchmark");
+    expect(stale).toContain("296 bps over the 10-year Treasury");
+  });
+
+  it("renders nothing with no cap or no benchmark", () => {
+    expect(render(React.createElement(SampleLeverageCard, { capPct: null, bench30, tenYear }))).not.toContain("Leverage check");
+    expect(render(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30: null, tenYear }))).not.toContain("Leverage check");
+  });
+
+  it("reads clean and names everything", () => {
+    expect(a11yIssues(html), "sample leverage card").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+});

@@ -31,7 +31,13 @@ import { linkOk } from "@/lib/link-audit";
 import { coveredState, metroForAddress } from "@/lib/market-match";
 import { parsePct } from "@/lib/criteria";
 import { capSpreadRead, leverageRead } from "@/lib/leverage";
-import { datedLong, type DebtIndex, type RateSeed } from "@/lib/debt-index";
+import {
+  benchmark30,
+  datedLong,
+  type DebtIndex,
+  type RateSeed,
+  type SurveyRate,
+} from "@/lib/debt-index";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import Link from "next/link";
 import type { StructuredAddress } from "@/lib/address";
@@ -181,6 +187,7 @@ export async function ResearchPanel({
   planLabel,
   rateSeed = null,
   tenYear = null,
+  survey30 = null,
 }: {
   address: StructuredAddress | null;
   sizeText?: string | null;
@@ -193,6 +200,9 @@ export async function ResearchPanel({
   rateSeed?: RateSeed | null;
   /** today's 10-year Treasury, the benchmark a cap spread is quoted over */
   tenYear?: DebtIndex | null;
+  /** the week's 30-year mortgage survey off the same read — the leverage
+   *  check's benchmark; the research layer's snapshot serves where null */
+  survey30?: SurveyRate | null;
   /** the strategy label when the deal is a plan (Conversion, Development …):
    *  with no going-in cap to spread against debt, the leverage check says
    *  why instead of going silent */
@@ -263,42 +273,14 @@ export async function ResearchPanel({
   const ppu = pricePerUnit(priceText, sizeText);
 
   // Leverage check (deterministic code, not a model call): the going-in cap
-  // against the freshest 30-yr fixed on hand — the rates table when the
-  // nightly FRED pull has run, else the benchmark row's sourced snapshot.
+  // against the week's 30-yr fixed — the survey off the same cached rates
+  // read the model's seed and the 10-year come from (lib/debt-index), else
+  // the benchmark row's checked-in snapshot, the source saying which.
   const capPct = capText ? parsePct(capText) : null;
-  let bench30: { value: number; asOf: string; source: string } | null = null;
-  if (capPct != null) {
-    try {
-      const { createSupabaseAdminClient } = await import("@/lib/supabase/admin");
-      const { data: rate } = await createSupabaseAdminClient()
-        .from("rates")
-        .select("value, obs_date")
-        .eq("series_id", "MORTGAGE30US")
-        .order("obs_date", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (rate?.value != null) {
-        bench30 = {
-          value: Number(rate.value),
-          asOf: String(rate.obs_date),
-          source: "FRED · MORTGAGE30US",
-        };
-      }
-    } catch {
-      // No admin key / table in this environment — the seeded snapshot below
-      // still serves, with its own as-of.
-    }
-    if (!bench30) {
-      const row = benchmarks.find((b) => b.metric === "pmms_30y_fixed");
-      if (row && typeof row.low === "number") {
-        bench30 = {
-          value: row.low,
-          asOf: row.as_of,
-          source: row.source || "FRED PMMS",
-        };
-      }
-    }
-  }
+  const bench30 =
+    capPct != null
+      ? benchmark30(survey30, benchmarks.find((b) => b.metric === "pmms_30y_fixed"))
+      : null;
   const leverage =
     capPct != null && bench30 ? leverageRead(capPct, bench30.value) : null;
   // Against today's curve (lib/debt-index): the cap's spread over the

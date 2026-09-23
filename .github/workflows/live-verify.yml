@@ -876,6 +876,16 @@ jobs:
           # run it and look again.
           mark "#378 the metro area's rental vacancy carries its margin" grep -q "pts margin of error" p_market.html
           mark "#378 and the note says what the margin means" grep -q "margin of error beside it" p_market.html
+          # #387 — the sample screen's leverage check reads the cap against
+          # the week's survey and today's 10-year off the rates table (it
+          # printed a checked-in August snapshot as the benchmark, on the one
+          # page a visitor reads without signing in). The phrase sits inside
+          # one JS string ahead of the figure, so no separator or apostrophe
+          # lands in it, and it renders ONLY when the live read answered: a
+          # NOT DEPLOYED here on a deployed build means the card fell back to
+          # the snapshot, which it names. /demo is ISR (five minutes), so the
+          # first run after a deploy may read the build-time copy — run again.
+          mark "#387 the sample leverage check reads the cap against today's 10-year" grep -q "the 10-year Treasury (" p_demo.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then
