@@ -294,6 +294,7 @@ describe("DealView — the sample deal renders every section without a runtime e
             published: [{ label: "Asking rent, all home types", text: "+2.3% over the year to Aug 2026", value: 2.3, asOf: "2026-08-31", publisher: "Zillow Research" }],
             tone: "ahead",
             toneLabel: "ahead of the published figures",
+            scope: "metro",
             read: "The model grows rents 3.0%/yr. Over the past year the metro's asking rents moved +2.3% over the year to Aug 2026 (Zillow). The model runs ahead of every published figure, by 0.7 points. A trailing year is what the assumption is being asked to beat, not a forecast.",
           },
           {
@@ -304,6 +305,7 @@ describe("DealView — the sample deal renders every section without a runtime e
             published: [{ label: "10-year Treasury", text: "4.94% on Sep 17, 2026", value: 4.94, asOf: "2026-09-17", publisher: "FRED" }],
             tone: "compresses",
             toneLabel: "assumes cap compression",
+            scope: "national",
             read: "The exit cap 6.00% is 106 bps over today's 10-year (4.94%, Sep 17, 2026; FRED). The going-in cap 6.50% is 156 bps over it, so the exit assumes the spread narrows 50 bps with the 10-year where it is today. Cap compression is not a plan: a return that needs the exit to price tighter than the entry is a bet on the market rather than the building.",
           },
         ],

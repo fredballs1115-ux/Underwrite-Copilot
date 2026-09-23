@@ -460,12 +460,20 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   else**: the cron script and the module both import it, so the two cannot
   disagree about what a series is, and `readSeriesTable` REFUSES a
   malformed entry rather than skipping it (a skipped entry is a series the
-  cron keeps writing and the page silently stops showing). Forty-six
+  cron keeps writing and the page silently stops showing). Fifty-one
   series in seven groups: the whole Treasury curve (eleven tenors, the
   breakeven, the real yield), the money market (SOFR, its 30-day average,
   fed funds, prime), credit spreads, mortgage and bank lending (the two
   PMMS surveys, bank CRE loans y/y, delinquency, the three SLOOS
-  standards series), inflation and cost (CPI, core, rent, OER, core PCE,
+  standards series), inflation and cost (CPI, core, rent, OER, the five
+  lessor rent indexes — #390: the BLS producer price indexes for the
+  rents lessors of nonresidential buildings charge, by the building let —
+  office, retail, industrial, self-storage operators and the aggregate,
+  each year over year; a commercial deal's one rent figure of its own
+  kind, national and said so, read by `rentIndexFor` in
+  `lib/live-market-brief.ts` for the market check's brief and the
+  model's rent check; probe run 35917247236 printed the ids, dry run
+  35917848391 the transformed figures the fixture holds — core PCE,
   three construction PPIs, construction wages, nonres spending), jobs and
   output, and the supply pipeline (starts, permits and completions in 5+
   unit buildings, total starts, rental vacancy). **Every id was verified
@@ -717,9 +725,15 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   only a fresh figure is read and a check with nothing fresh is omitted;
   a figure is set against an assumption of its own kind (rental housing's
   rents and vacancy reach a `residential` class only, prices and the
-  10-year every `operating` one, land none); the survey's margin is the
-  tolerance; and nothing is a verdict — the sentence says a trailing year
-  is what the assumption is being asked to beat, not a forecast. The card
+  10-year every `operating` one, land none — and a commercial class's
+  rents reach the national index of its own kind of lessor, #390:
+  `rentIndexFor`, said as the nation's lessors and never the metro's,
+  with lodging and licensed care reading none, since they sell nights and
+  care rather than leases); the survey's margin is the tolerance; and
+  nothing is a verdict — the sentence says a trailing year is what the
+  assumption is being asked to beat, not a forecast. Each check carries
+  its `scope` (metro / national) and the card's and the report's scope
+  sentence names the rows the read has rather than a fixed three. The card
   is `app/(app)/deals/[id]/model-vs-market-card.tsx` (pure, under the
   debt sizer on the Financials tab; rendered and linted in
   `lib/model-vs-market.test.ts`); the page reads the figures once for
@@ -1940,7 +1954,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   check that reads one without the other reads half the deal. The
   pipeline reads the six national series bare; the page's
   since-this-screen reads them through `liveRates`; the prompt clause
-  names the exit cap and the debt assumptions as what they answer. **The
+  names the exit cap and the debt assumptions as what they answer. **A
+  commercial deal's rents ride just ahead of them** (#390): the national
+  index of rents its kind of lessor charges (`rentIndexFor`,
+  `RENT_INDEX_IDS`), one line said as the nation's lessors and never the
+  metro's, and `BRIEF_NATIONAL_IDS` is the one list the pipeline reads
+  and the page reads, so the two cannot differ. **The
   figures follow the check into the verdict and the documents** (#385):
   `buildBrief` in `lib/anthropic/verdict.ts` (exported for its test)
   gives the stored lines their own dated section after the market check

@@ -170,13 +170,57 @@ describe("modelVsMarket — the model's four assumptions against the published f
     expect(noCap.read).toContain("No going-in cap to set it against; the spread is the claim.");
   });
 
-  it("a figure is set against an assumption of its own kind: an office keeps its rent and vacancy rows blank, land has none", () => {
+  it("a figure is set against an assumption of its own kind: an office reads the national office rent index and no metro row, a hotel has no lessor's rent, land has none", () => {
     const office = modelVsMarket({ ...base, assetClass: "office" })!;
-    expect(office.checks.map((c) => c.key)).toEqual(["expense_growth", "exit_cap"]);
+    expect(office.checks.map((c) => [c.key, c.scope])).toEqual([
+      ["rent_growth", "national"],
+      ["expense_growth", "national"],
+      ["exit_cap", "national"],
+    ]);
     expect(office.metro).toBeNull();
     const hotel = modelVsMarket({ ...base, assetClass: "hospitality_str" })!;
     expect(hotel.checks.map((c) => c.key)).toEqual(["expense_growth", "exit_cap"]);
+    expect(modelVsMarket({ ...base, assetClass: "senior_housing" })!.checks.map((c) => c.key)).toEqual(["expense_growth", "exit_cap"]);
     expect(modelVsMarket({ ...base, assetClass: "land_infill" })).toBeNull();
+    // The apartment deal's rent and vacancy rows are the metro's.
+    expect(read.checks.map((c) => c.scope)).toEqual(["metro", "national", "metro", "national"]);
+  });
+
+  it("a commercial deal's rents against the rents its kind of lessor charges, nationally, said as the nation's — the runner's August figures", () => {
+    // Office: +7.2% on the year, the model's 3.0% well behind it.
+    const office = check({ ...base, assetClass: "office" }, "rent_growth")!;
+    expect(office.published).toEqual([
+      { label: "Rents charged by lessors of professional and office buildings, national (PPI)", text: "+7.2% over the year to Aug 2026", value: 7.18581, asOf: "2026-08-01", publisher: "BLS via FRED" },
+    ]);
+    expect(office.tone).toBe("behind");
+    expect(office.read).toBe(
+      "The model grows rents 3.0%/yr. Over the year to Aug 2026 the rents lessors of professional and office buildings charge moved +7.2% nationally (BLS producer price index, via FRED) — the nation's lessors, not the metro's. The model runs behind the index, by 4.2 points. A trailing year is what the assumption is being asked to beat, not a forecast.",
+    );
+    // A medical office reads the office index too.
+    expect(check({ ...base, assetClass: "medical_office" }, "rent_growth")!.published[0].value).toBe(7.18581);
+    // Retail: rents fell 0.3% on the year, so 3.0% is ahead by 3.3 points.
+    const retail = check({ ...base, assetClass: "retail" }, "rent_growth")!;
+    expect(retail.tone).toBe("ahead");
+    expect(retail.read).toContain("the rents lessors of shopping centers and retail stores charge moved -0.3% nationally");
+    expect(retail.read).toContain("The model runs ahead of the index, by 3.3 points.");
+    // Industrial: +3.2%, the model a shade behind.
+    const industrial = check({ ...base, assetClass: "industrial" }, "rent_growth")!;
+    expect(industrial.tone).toBe("behind");
+    expect(industrial.read).toContain("lessors of manufacturing and industrial buildings charge moved +3.2% nationally");
+    expect(industrial.read).toContain("by 0.2 points");
+    // Self-storage: its own operators' index, -0.2%.
+    const storage = check({ ...base, assetClass: "self_storage" }, "rent_growth")!;
+    expect(storage.read).toContain("the rents miniwarehouse and self-storage operators charge moved -0.2% nationally");
+    expect(storage.read).toContain("by 3.2 points");
+    // A net lease, a data center and a parking structure read the aggregate.
+    for (const cls of ["net_lease", "data_center", "parking"]) {
+      const c = check({ ...base, assetClass: cls }, "rent_growth")!;
+      expect(c.read, cls).toContain("the rents lessors of nonresidential buildings charge moved +3.5% nationally");
+      expect(c.read, cls).toContain("The model runs behind the index, by 0.5 points.");
+    }
+    // A stale national table leaves the row out rather than reading a dead index.
+    const stale = new Date("2027-03-01T00:00:00Z");
+    expect(check({ ...base, assetClass: "office", national: readRates(REAL_ROWS, stale), now: stale }, "rent_growth")).toBeNull();
   });
 
   it("outside the covered markets the national rows still read; a stale table reads nothing", () => {
@@ -219,10 +263,13 @@ describe("ModelVsMarketCard — the card on the deal page", () => {
     expect(text).toContain("106 bps over today");
   });
 
-  it("says the national scope where no metro figure was read, and renders nothing with nothing to say", () => {
+  it("says the national scope where no metro figure was read, names the rows it has, and renders nothing with nothing to say", () => {
     const national = visibleText(renderToStaticMarkup(React.createElement(ModelVsMarketCard, { read: modelVsMarket({ ...base, assetClass: "office" }) })));
-    expect(national).toContain("set against the national series, read on Sep 21, 2026.");
-    expect(national).not.toContain("Rent growth");
+    expect(national).toContain("The model's rent growth, expense growth and exit cap, set against the national series, read on Sep 21, 2026.");
+    expect(national).toContain("Rent growth");
+    expect(national).toContain("the nation's lessors, not the metro's");
+    expect(national).not.toContain("Stabilized vacancy");
+    expect(text).toContain("The model's rent growth, expense growth, stabilized vacancy and exit cap, set against what the Washington DC market and the national series have actually done, read on Sep 21, 2026.");
     expect(renderToStaticMarkup(React.createElement(ModelVsMarketCard, { read: null }))).toBe("");
   });
 

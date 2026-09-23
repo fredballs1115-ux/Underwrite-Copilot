@@ -1,7 +1,7 @@
 import { permitsTrailingYear, type LiveRate, type SeriesSource } from "@/lib/live-rates";
 import { monthOf, type ZoriRead } from "@/lib/zori";
 import { HOTNESS_METROS, type RealtorRead } from "@/lib/realtor";
-import { assetWords } from "@/lib/asset-words";
+import { assetClassKey, assetWords } from "@/lib/asset-words";
 
 /**
  * The metro's published figures, written out for the market check — the
@@ -71,6 +71,62 @@ export function lendingStandardsFor(assetClass: string | null | undefined, plan:
   const words = assetWords(assetClass ?? undefined);
   const own = !words.operating ? [] : words.residential ? ["SUBLPDRCSM"] : ["SUBLPDRCSN"];
   return plan || !words.operating ? [...own, "SUBLPDRCSC"] : own;
+}
+
+/**
+ * The rents each kind of commercial lessor charges, nationally — the BLS
+ * producer price indexes for lessors of nonresidential buildings, by the
+ * building let: professional and office buildings, shopping centers and
+ * retail stores, manufacturing and industrial buildings, miniwarehouse and
+ * self-storage operators, and the aggregate for a net lease, a data center
+ * or a parking structure. A residential deal has the metro's own rents
+ * (Zillow's asking rents, the CPI rent) and reads none of these; lodging
+ * sells nights and licensed care sells care, neither a lessor's rent; land
+ * has no rent. Every id was printed by the runner (rates run 35917247236)
+ * before it was trusted, and the figure is said as the nation's, never the
+ * metro's — the one national figure on the income side of the brief.
+ */
+export const RENT_INDEX_IDS = [
+  "PCU531120531120_YOY",
+  "PCU5311205311202_YOY",
+  "PCU5311205311201_YOY",
+  "PCU5311205311203_YOY",
+  "PCU531130531130_YOY",
+] as const;
+
+/** The national series the brief reads for a deal: the debt market's, and
+ *  the rent index for the deal's kind of lessor. One list, so the pipeline's
+ *  read and the page's cannot differ. */
+export const BRIEF_NATIONAL_IDS: readonly string[] = [...DEBT_MARKET_IDS, ...RENT_INDEX_IDS];
+
+export interface RentIndex {
+  id: (typeof RENT_INDEX_IDS)[number];
+  /** "lessors of professional and office buildings" — how a sentence names the index */
+  lessor: string;
+}
+
+export function rentIndexFor(assetClass: string | null | undefined): RentIndex | null {
+  const key = assetClassKey(assetClass);
+  if (!key) return null;
+  const words = assetWords(key);
+  if (words.residential || !words.operating) return null;
+  switch (key) {
+    case "office":
+    case "medical_office":
+      return { id: "PCU5311205311202_YOY", lessor: "lessors of professional and office buildings" };
+    case "retail":
+      return { id: "PCU5311205311201_YOY", lessor: "lessors of shopping centers and retail stores" };
+    case "industrial":
+      return { id: "PCU5311205311203_YOY", lessor: "lessors of manufacturing and industrial buildings" };
+    case "self_storage":
+      return { id: "PCU531130531130_YOY", lessor: "miniwarehouse and self-storage operators" };
+    case "net_lease":
+    case "data_center":
+    case "parking":
+      return { id: "PCU531120531120_YOY", lessor: "lessors of nonresidential buildings" };
+    default:
+      return null;
+  }
 }
 
 /** One figure the check read, as a value: what a later screen compares
@@ -241,6 +297,20 @@ function realtorLine(m: RealtorRead | null): Said | null {
   return { line: `For-sale market: ${parts.join(", ")} (${monthOf(m.asOf)}; Realtor.com — list prices are asks, not sales)`, figures };
 }
 
+/** The rents the deal's kind of lessor charges, nationally — one line, said as the nation's. */
+function rentIndexLine(national: readonly LiveRate[] | undefined, assetClass: string | null | undefined): Said | null {
+  const idx = rentIndexFor(assetClass);
+  if (!idx || !national) return null;
+  const r = national.find((x) => x.meta.id === idx.id && x.fresh && Number.isFinite(x.value));
+  if (!r) return null;
+  return {
+    line: `Rents charged by ${idx.lessor}, national (BLS producer price index): ${signed(r.value)}% from a year ago (${periodLabel(r.obsDate, r.meta.cadence)}; BLS via FRED) — the nation's lessors, not the metro's`,
+    figures: [
+      { key: "rent_index_yoy", label: `Rents charged by ${idx.lessor}, national`, value: r.value, unit: "pts", asOf: r.obsDate },
+    ],
+  };
+}
+
 const SLOOS_LABEL: Record<string, { key: string; loan: string }> = {
   SUBLPDRCSM: { key: "sloos_multifamily", loan: "multifamily loans" },
   SUBLPDRCSN: { key: "sloos_nonres", loan: "nonfarm nonresidential loans" },
@@ -300,6 +370,10 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
   if (z) said.push(z);
   const m = realtorLine(input.realtor);
   if (m) said.push(m);
+  // A commercial deal's rents are national: the income side's one national
+  // figure, ahead of the debt market's.
+  const ri = rentIndexLine(input.national, input.assetClass);
+  if (ri) said.push(ri);
   said.push(...debtMarketLines(input.national, input.assetClass, input.plan ?? false));
   if (said.length === 0) return null;
   const lines = said.map((s) => s.line);

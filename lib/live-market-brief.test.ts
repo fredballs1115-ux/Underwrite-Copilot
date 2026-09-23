@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readMetroRates, readRates, type RateRow } from "./live-rates";
 import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
-import { DEBT_MARKET_IDS, lendingStandardsFor, liveMarketBrief, periodLabel } from "./live-market-brief";
+import { BRIEF_NATIONAL_IDS, DEBT_MARKET_IDS, lendingStandardsFor, liveMarketBrief, periodLabel, rentIndexFor } from "./live-market-brief";
 import type { ZoriRead } from "./zori";
 import type { RealtorRead } from "./realtor";
 
@@ -208,5 +208,46 @@ describe("periodLabel", () => {
     expect(periodLabel("2026-10-01", "quarterly")).toBe("Q4 2026");
     expect(periodLabel("2026-09-17", "daily")).toBe("Sep 17, 2026");
     expect(periodLabel("junk", "monthly")).toBe("junk");
+  });
+});
+
+describe("the rents each kind of commercial lessor charges — national, said so, ahead of the debt market", () => {
+  // The runner's own table: the debt-market series and the five lessor
+  // rent indexes the dry run of 2026-09-23 printed for August.
+  const national = readRates(REAL_ROWS, FIXTURE_NOW).filter((r) => BRIEF_NATIONAL_IDS.includes(r.meta.id));
+  const base = { metro: { id: "dc", name: "Washington DC" }, rates: [], zori: null, realtor: null, now: FIXTURE_NOW, national };
+
+  it("maps each class to the index of its own kind of lessor, and a residential class, lodging, care and land to none", () => {
+    expect(rentIndexFor("office")?.id).toBe("PCU5311205311202_YOY");
+    expect(rentIndexFor("medical_office")?.id).toBe("PCU5311205311202_YOY");
+    expect(rentIndexFor("retail")?.id).toBe("PCU5311205311201_YOY");
+    expect(rentIndexFor("industrial")?.id).toBe("PCU5311205311203_YOY");
+    expect(rentIndexFor("self_storage")?.id).toBe("PCU531130531130_YOY");
+    for (const cls of ["net_lease", "data_center", "parking"]) expect(rentIndexFor(cls)?.id, cls).toBe("PCU531120531120_YOY");
+    for (const cls of ["multifamily", "mixed_use", "sfr_btr", "student_housing", "manufactured_housing", "hospitality_str", "senior_housing", "land_infill", "auto", null, undefined, ""]) {
+      expect(rentIndexFor(cls), String(cls)).toBeNull();
+    }
+    // A phrase the model wrote files by its words, like every other class read.
+    expect(rentIndexFor("Class A office tower")?.id).toBe("PCU5311205311202_YOY");
+  });
+
+  it("an office deal's brief opens its national lines with the office rent index, dated and named as the nation's", () => {
+    const office = liveMarketBrief({ ...base, assetClass: "office" })!;
+    expect(office.lines[0]).toBe(
+      "Rents charged by lessors of professional and office buildings, national (BLS producer price index): +7.2% from a year ago (Aug 2026; BLS via FRED) — the nation's lessors, not the metro's",
+    );
+    expect(office.lines[1]).toContain("Debt market — 10-year Treasury 4.94%");
+    expect(office.figures[0]).toEqual({ key: "rent_index_yoy", label: "Rents charged by lessors of professional and office buildings, national", value: 7.18581, unit: "pts", asOf: "2026-08-01" });
+    const storage = liveMarketBrief({ ...base, assetClass: "self_storage" })!;
+    expect(storage.lines[0]).toContain("Rents charged by miniwarehouse and self-storage operators, national (BLS producer price index): -0.2% from a year ago");
+  });
+
+  it("an apartment deal has the metro's rents and reads no lessor index; a stale index is left out", () => {
+    const apartments = liveMarketBrief({ ...base, assetClass: "multifamily" })!;
+    expect(apartments.lines.some((l) => l.startsWith("Rents charged by"))).toBe(false);
+    expect(apartments.figures.some((f) => f.key === "rent_index_yoy")).toBe(false);
+    const later = new Date("2027-06-01T00:00:00Z");
+    const stale = readRates(REAL_ROWS, later).filter((r) => BRIEF_NATIONAL_IDS.includes(r.meta.id));
+    expect(liveMarketBrief({ ...base, now: later, national: stale, assetClass: "office" })).toBeNull();
   });
 });
