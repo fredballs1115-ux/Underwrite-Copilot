@@ -696,7 +696,12 @@ describe("a covered metro's own series", () => {
     // five in the SMU…SA form and no short ids; and Boston's exist only NOT
     // seasonally adjusted (SMU25144606000000001, no suffix — the SA form
     // and the SMS form both answered "does not exist"), which a change
-    // against the same month a year earlier reads the same way.
+    // against the same month a year earlier reads the same way. The dry
+    // run on the branch (35922719610) then found FRED REFUSES its own
+    // transform on three of Boston's five ("Value of units is not one of:
+    // ch1, chg, lin" — the refusal Boston's total nonfarm already had),
+    // while accepting it on the other two, so those three are stored as
+    // the level under FRED's own id and derived on read.
     const dc = metroSeriesFor("dc").series.filter((s) => isSectorJobsMetric(s.metric));
     expect(dc.map((s) => s.metric)).toEqual(SECTOR_JOBS_METRICS);
     expect(dc.map((s) => s.id)).toEqual([
@@ -713,22 +718,38 @@ describe("a covered metro's own series", () => {
       "SMU06310804200000001SA",
       "SMU06310807000000001SA",
     ]);
-    expect(metroSeriesFor("boston").series.filter((s) => isSectorJobsMetric(s.metric)).map((s) => s.fred)).toEqual([
+    const boston = metroSeriesFor("boston").series.filter((s) => isSectorJobsMetric(s.metric));
+    expect(boston.map((s) => s.fred)).toEqual([
       "SMU25144606000000001",
       "SMU25144606500000001",
       "SMU25144604300000001",
       "SMU25144604200000001",
       "SMU25144607000000001",
     ]);
-    // Every sector series is a transform of the level, a change in points,
-    // monthly, on the metro lag — and its label is FRED's own title.
+    expect(boston.map((s) => [s.id, s.units, s.derived])).toEqual([
+      ["SMU25144606000000001", null, "yoy"],
+      ["SMU25144606500000001", null, "yoy"],
+      ["SMU25144604300000001_YOY", "pc1", null],
+      ["SMU25144604200000001_YOY", "pc1", null],
+      ["SMU25144607000000001", null, "yoy"],
+    ]);
+    // Every sector series is a change from a year ago — FRED's own
+    // transform under a _YOY id, or the level derived on read where FRED
+    // refuses it — in points, monthly, on the metro lag, labelled by
+    // FRED's own title.
     for (const m of METRO_SERIES.filter((s) => isSectorJobsMetric(s.metric))) {
-      expect(m.units, m.id).toBe("pc1");
-      expect(m.id, m.id).toMatch(/_YOY$/);
+      if (m.derived === "yoy") {
+        expect(m.units, m.id).toBeNull();
+        expect(m.fred, m.id).toBe(m.id);
+        expect(m.label, m.id).toContain("derived from the level");
+      } else {
+        expect(m.units, m.id).toBe("pc1");
+        expect(m.id, m.id).toMatch(/_YOY$/);
+      }
       expect(m.unit, m.id).toBe("pts");
       expect(m.cadence, m.id).toBe("monthly");
       expect(m.freshDays, m.id).toBe(110);
-      expect(m.label, m.id).toMatch(/^All Employees: .* — change from a year ago$/);
+      expect(m.label, m.id).toMatch(/^All Employees: .* — change from a year ago/);
       expect(SECTOR_JOBS_LABEL[m.metric as keyof typeof SECTOR_JOBS_LABEL], m.id).toBeTruthy();
     }
     // Every MSA carries all five: fourteen pictures, seventy series.
