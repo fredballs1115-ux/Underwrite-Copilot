@@ -566,3 +566,108 @@ describe("the per-unit rows in the class's own noun (lib/asset-words)", () => {
     expect(labels.some((l) => /\/ Unit\b|^Units$/.test(l))).toBe(false);
   });
 });
+
+// ── The Market Read tab ─────────────────────────────────────────────────────
+import type { ModelVsMarket } from "@/lib/model-vs-market";
+
+describe("the Market Read tab — the assumptions against the published figures, as built", () => {
+  const read: ModelVsMarket = {
+    readOn: "2026-09-21",
+    metro: "Washington DC",
+    checks: [
+      {
+        key: "rent_growth",
+        title: "Rent growth",
+        model: "3.0%/yr",
+        modelSource: "a screening default",
+        published: [
+          { label: "Asking rent, all home types", text: "+2.3% over the year to Aug 2026", value: 2.3, asOf: "2026-08-31", publisher: "Zillow Research" },
+          { label: "Rent paid by sitting tenants (CPI rent)", text: "+5.0% over the year to Aug 2026", value: 5, asOf: "2026-08-01", publisher: "BLS" },
+        ],
+        tone: "inside",
+        toneLabel: "inside the published range",
+        scope: "metro",
+        read: "The model grows rents 3.0%/yr. Over the past year the metro's asking rents moved +2.3% over the year to Aug 2026 (Zillow) and sitting tenants' rents +5.0% over the year to Aug 2026 (CPI rent, BLS). The model sits inside the published range. A trailing year is what the assumption is being asked to beat, not a forecast.",
+      },
+      {
+        key: "exit_cap",
+        title: "Exit cap",
+        model: "6.00%",
+        modelSource: "derived from the documents",
+        published: [{ label: "10-year Treasury", text: "4.94% on Sep 17, 2026", value: 4.94, asOf: "2026-09-17", publisher: "FRED" }],
+        tone: "widens",
+        toneLabel: "spread widens at the exit",
+        scope: "national",
+        read: "The exit cap 6.00% is 106 bps over today's 10-year (4.94%, Sep 17, 2026; FRED). The going-in cap 5.45% is 51 bps over it, so the exit assumes the spread widens 55 bps with the 10-year where it is today — the conservative direction.",
+      },
+    ],
+  };
+
+  async function load(buf: Buffer): Promise<ExcelJS.Workbook> {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    return wb;
+  }
+
+  it("sits beside Assumptions, one row a published figure, the sentence on the first — data, never a formula", async () => {
+    const wb = await load(await buildUnderwriteWorkbook(model, null, read));
+    const names = wb.worksheets.map((ws) => ws.name);
+    expect(names.indexOf("Market Read")).toBe(names.indexOf("Assumptions") + 1);
+    const ws = wb.getWorksheet("Market Read")!;
+    expect(ws.getCell(1, 1).value).toBe("Assumptions against the published figures");
+    expect(String(ws.getCell(2, 1).value)).toBe(
+      "The model's rent growth and exit cap, set against what the Washington DC market and the national series have actually done, read on 2026-09-21.",
+    );
+    expect(String(ws.getCell(3, 1).value)).toContain("not a forecast");
+    expect(ws.getCell(5, 1).value).toBe("ASSUMPTION");
+    expect(ws.getCell(5, 9).value).toBe("WHAT THE FIGURES SAY");
+    // The first check: its first row carries the assumption and the sentence,
+    // its second row the second figure alone.
+    expect(ws.getCell(6, 1).value).toBe("Rent growth");
+    expect(ws.getCell(6, 2).value).toBe("3.0%/yr");
+    expect(ws.getCell(6, 3).value).toBe("a screening default");
+    expect(ws.getCell(6, 4).value).toBe("Asking rent, all home types: +2.3% over the year to Aug 2026");
+    expect(ws.getCell(6, 5).value).toBe(2.3);
+    expect(ws.getCell(6, 6).value).toBe("2026-08-31");
+    expect(ws.getCell(6, 7).value).toBe("Zillow Research");
+    expect(ws.getCell(6, 8).value).toBe("inside the published range");
+    expect(String(ws.getCell(6, 9).value)).toContain("The model grows rents 3.0%/yr.");
+    expect(ws.getCell(7, 1).value).toBeNull();
+    expect(ws.getCell(7, 4).value).toBe("Rent paid by sitting tenants (CPI rent): +5.0% over the year to Aug 2026");
+    expect(ws.getCell(7, 5).value).toBe(5);
+    expect(ws.getCell(7, 9).value).toBeNull();
+    // The second check starts on the next row.
+    expect(ws.getCell(8, 1).value).toBe("Exit cap");
+    expect(ws.getCell(8, 5).value).toBe(4.94);
+    expect(ws.getCell(8, 8).value).toBe("spread widens at the exit");
+    // A data tab: nothing on it is a formula.
+    ws.eachRow((row) => {
+      row.eachCell((cell) => {
+        const v = cell.value;
+        expect(v && typeof v === "object" && "formula" in v, cell.address).toBe(false);
+      });
+    });
+  });
+
+  it("is absent with nothing read, rather than an empty tab", async () => {
+    expect((await load(await buildUnderwriteWorkbook(model))).getWorksheet("Market Read")).toBeUndefined();
+    expect(
+      (await load(await buildUnderwriteWorkbook(model, null, { readOn: "2026-09-21", metro: null, checks: [] }))).getWorksheet("Market Read"),
+    ).toBeUndefined();
+  });
+
+  it("leaves the live model as it was: zero formula errors with the tab in the book", async () => {
+    const { hf } = await loadIntoHf(await buildUnderwriteWorkbook(model, null, read));
+    const errors: string[] = [];
+    for (const name of hf.getSheetNames()) {
+      const id = hf.getSheetId(name)!;
+      (hf.getSheetValues(id) as unknown[][]).forEach((row, ri) =>
+        row.forEach((v, ci) => {
+          if (isErr(v)) errors.push(`${name}[${ri},${ci}]`);
+        }),
+      );
+    }
+    expect(errors).toEqual([]);
+    expect(named(hf, "CheckSU")).toBe(true);
+  });
+});

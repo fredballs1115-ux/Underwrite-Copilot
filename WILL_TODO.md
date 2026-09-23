@@ -202,6 +202,11 @@ series verified from the runner (probe 35917247236, dry run
 has a rent-growth figure of its own kind: in the model's rent check
 (said as the nation's, never the metro's), in the market check's brief
 ahead of the debt-market lines, and on the rates strip.
+Then #391: the workbook carries the same read as a Market Read tab
+beside Assumptions (data, one row a published figure, absent with
+nothing read), and the deal page, the report route and the workbook
+route read it through one function pair — `todayReads` and
+`modelVsMarketFor` — so the three cannot disagree.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.

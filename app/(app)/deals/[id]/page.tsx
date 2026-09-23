@@ -16,7 +16,7 @@ import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import { SiteFlagsCard } from "./site-flags-card";
 import { PublicRecordCard } from "./public-record-card";
-import { buildingSfRow, findGoingInCap, parseMoney, parsePct } from "@/lib/criteria";
+import { buildingSfRow, findGoingInCap, parseMoney } from "@/lib/criteria";
 import { after } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { signedSupplementUrl } from "@/lib/storage";
@@ -71,15 +71,10 @@ import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { constructionSeed, type DealRateSeeds } from "@/lib/debt-index";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { metroForAddress } from "@/lib/market-match";
-import { liveMetroRates, liveRates } from "@/lib/live-rates-read";
-import { liveZori } from "@/lib/zori-read";
-import { liveRealtor } from "@/lib/realtor-read";
 import { BRIEF_NATIONAL_IDS, liveMarketBrief } from "@/lib/live-market-brief";
 import { briefDelta, type BriefDelta } from "@/lib/brief-delta";
-import { modelVsMarket, type ModelVsMarket } from "@/lib/model-vs-market";
-import type { LiveRate } from "@/lib/live-rates";
-import type { ZoriRead } from "@/lib/zori";
-import type { RealtorRead } from "@/lib/realtor";
+import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
+import { todayReads, type TodayReads } from "@/lib/model-vs-market-read";
 import { snapshotVersion } from "@/lib/bridge/versions";
 import { listSubmarkets } from "@/lib/market/store";
 import { dealSubmarketCheck } from "@/lib/market/deal-checks";
@@ -365,35 +360,22 @@ export default async function DealPage({
   let marketSince: BriefDelta | null = null;
   const storedBrief = market?.liveBrief ?? null;
   const coveredMetro = metroForAddress(dealAddress ?? {});
-  let todayReads: {
-    rates: LiveRate[];
-    zori: ZoriRead | null;
-    realtor: RealtorRead | null;
-    national: LiveRate[];
-    now: Date;
-  } | null = null;
+  let reads: TodayReads | null = null;
   if (extraction || (storedBrief?.figures && storedBrief.figures.length > 0)) {
     try {
-      const now = new Date();
-      const [rates, zori, realtor, national] = await Promise.all([
-        coveredMetro ? liveMetroRates(coveredMetro.id, now) : Promise.resolve([] as LiveRate[]),
-        coveredMetro ? liveZori(coveredMetro.name) : Promise.resolve(null),
-        coveredMetro ? liveRealtor(coveredMetro.name) : Promise.resolve(null),
-        liveRates(now),
-      ]);
-      todayReads = { rates, zori, realtor, national, now };
+      reads = await todayReads(coveredMetro);
     } catch (err) {
       console.warn("live figures read failed:", err instanceof Error ? err.message : err);
     }
   }
-  if (storedBrief?.figures && storedBrief.figures.length > 0 && coveredMetro && todayReads) {
+  if (storedBrief?.figures && storedBrief.figures.length > 0 && coveredMetro && reads) {
     const today = liveMarketBrief({
       metro: coveredMetro,
-      rates: todayReads.rates,
-      zori: todayReads.zori,
-      realtor: todayReads.realtor,
-      now: todayReads.now,
-      national: todayReads.national.filter((r) => BRIEF_NATIONAL_IDS.includes(r.meta.id)),
+      rates: reads.rates,
+      zori: reads.zori,
+      realtor: reads.realtor,
+      now: reads.now,
+      national: reads.national.filter((r) => BRIEF_NATIONAL_IDS.includes(r.meta.id)),
       assetClass: extraction?.assetClass || (deal.asset_class as string | null) || null,
       plan: isPlanDeal(inferStrategy(extraction, firstSignal).kind),
     });
@@ -683,18 +665,15 @@ export default async function DealPage({
   // the same cap the summary bar shows, no model call. Null where there is
   // no model or nothing fresh to read it against.
   const modelRead: ModelVsMarket | null =
-    derived && todayReads
-      ? modelVsMarket({
-          inputs: derived.inputs,
-          sources: derived.sources,
-          assetClass: shownClass || null,
-          plan: isPlanDeal(strategy.kind),
-          goingInCapPct: summaryCap ? parsePct(summaryCap) : null,
+    derived && reads
+      ? modelVsMarketFor({
+          derived,
+          extraction,
+          firstSignal,
+          storedAssetClass: deal.asset_class as string | null,
           metro: coveredMetro,
-          rates: todayReads.rates,
-          zori: todayReads.zori,
-          national: todayReads.national,
-          now: todayReads.now,
+          reads,
+          goingInCapText: summaryCap,
         })
       : null;
   // Year built feeds the rules engine's age-based coverage tests (NYC

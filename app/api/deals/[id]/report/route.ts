@@ -6,17 +6,14 @@ import { buildReportData, ReportDocument } from "@/lib/memo/report-document";
 import type { MemoData } from "@/lib/memo/memo-document";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { getBrandingForDeal, brandingLogoDataUri } from "@/lib/branding-server";
-import { buyBoxCheckSource, evaluateBuyBox, findGoingInCap, parsePct, type BuyBoxCheck } from "@/lib/criteria";
+import { buyBoxCheckSource, evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import type { StructuredAddress } from "@/lib/address";
-import { inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
-import { shownAssetClass } from "@/lib/pipeline-slots";
+import { inferStrategy } from "@/lib/deal-strategy";
 import { metroForAddress } from "@/lib/market-match";
-import { liveMetroRates, liveRates } from "@/lib/live-rates-read";
-import { liveZori } from "@/lib/zori-read";
-import { modelVsMarket, type ModelVsMarket } from "@/lib/model-vs-market";
-import type { LiveRate } from "@/lib/live-rates";
+import { todayReads } from "@/lib/model-vs-market-read";
+import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
 import { staleAfterFailure } from "@/lib/screen-run";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
@@ -197,30 +194,17 @@ export async function GET(
       });
 
       // The model's assumptions against the published figures — the same
-      // read the deal page's card makes (lib/model-vs-market), through the
-      // same cached readers, so the report says what the page says. Its
-      // own try: a failed live read leaves the grids in place.
+      // read the deal page's card and the workbook make (lib/model-vs-market,
+      // one function, the same cached readers), so the report says what the
+      // page says. Its own try: a failed live read leaves the grids in place.
       try {
         const metro = metroForAddress((deal.address as StructuredAddress | null) ?? {});
-        const now = new Date();
-        const [rates, zori, national] = await Promise.all([
-          metro ? liveMetroRates(metro.id, now) : Promise.resolve([] as LiveRate[]),
-          metro ? liveZori(metro.name) : Promise.resolve(null),
-          liveRates(now),
-        ]);
-        const planDeal = isPlanDeal(inferStrategy(extraction).kind);
-        const capText = planDeal ? null : (findGoingInCap(extraction.metrics)?.value ?? null);
-        assumptions = modelVsMarket({
-          inputs: derived.inputs,
-          sources: derived.sources,
-          assetClass: shownAssetClass(deal.asset_class as string | null, extraction) || null,
-          plan: planDeal,
-          goingInCapPct: capText ? parsePct(capText) : null,
+        assumptions = modelVsMarketFor({
+          derived,
+          extraction,
+          storedAssetClass: deal.asset_class as string | null,
           metro,
-          rates,
-          zori,
-          national,
-          now,
+          reads: await todayReads(metro),
         });
       } catch (err) {
         console.warn(`report assumptions read failed for ${id}:`, err instanceof Error ? err.message : err);

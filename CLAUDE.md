@@ -746,7 +746,16 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   sensitivity grids, or under the plan's grid on a plan deal, which has
   no sensitivity page; `report-render.test.ts` reads it back with the
   PDF's line breaks folded, because the extracted text wraps where the
-  page does.
+  page does. **And the workbook carries it** (#391) as a "Market Read"
+  tab beside Assumptions — one row a published figure, the value raw so
+  it sorts, data only so the live model is untouched; absent with
+  nothing read, never an empty tab. The three surfaces read through ONE
+  function: `todayReads` (`lib/model-vs-market-read.ts`, `server-only`,
+  the cached readers once) and `modelVsMarketFor` (pure, in
+  `lib/model-vs-market.ts`: the class the deck turned out to be, whether
+  the deal is a plan, the page's own cap where it passes one and the
+  extraction's otherwise), so the page, the report and the workbook
+  cannot disagree about what was checked against what.
 - What landlords are asking this month: `lib/zori.ts` (pure — a metro's
   Zillow Observed Rent Index and its change from a year ago, read out of
   the two `benchmarks` rows the MONTHLY pull writes, `scripts/fetch-zori.mjs`

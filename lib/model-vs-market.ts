@@ -1,10 +1,14 @@
 import type { LiveRate, SeriesSource } from "@/lib/live-rates";
 import { assetWords } from "@/lib/asset-words";
 import { monthOf, type ZoriRead } from "@/lib/zori";
-import type { InputSource } from "@/lib/underwrite/inputs";
+import type { DerivedModel, InputSource } from "@/lib/underwrite/inputs";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { periodLabel, rentIndexFor } from "@/lib/live-market-brief";
 import { datedLong } from "@/lib/debt-index";
+import { inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
+import { findGoingInCap, parsePct } from "@/lib/criteria";
+import { shownAssetClass } from "@/lib/pipeline-slots";
 
 /**
  * The model's assumptions against the published figures — pure, no model
@@ -417,4 +421,57 @@ export function modelVsMarket(input: ModelVsMarketInput): ModelVsMarket | null {
     metro: metroRead ? (input.metro?.name ?? null) : null,
     checks,
   };
+}
+
+/** The figures a surface read today (lib/model-vs-market-read's `todayReads`,
+ *  or a test's fixtures): the metro's own series, Zillow's rents, the
+ *  national table, and the clock they were read on. */
+export interface MarketReads {
+  rates: readonly LiveRate[];
+  zori: ZoriRead | null;
+  national: readonly LiveRate[];
+  now: Date;
+}
+
+/**
+ * The read for a deal, from what every surface already holds — the derived
+ * model, the extraction, the stored class, the covered metro and today's
+ * figures — so the deal page, the report route and the workbook route call
+ * ONE function and cannot disagree about the class the deck turned out to
+ * be (`shownAssetClass`), whether the deal is a plan (`inferStrategy`), or
+ * which cap is the going-in cap (the page's own summary figure where it
+ * passes one, else the extraction's, and none on a plan deal).
+ */
+export function modelVsMarketFor(args: {
+  derived: Pick<DerivedModel, "inputs" | "sources">;
+  extraction: ExtractionResult | null;
+  firstSignal?: FirstSignal | null;
+  /** the deal row's own class column — "auto" shows what the deck turned out to be */
+  storedAssetClass: string | null | undefined;
+  metro: { id: string; name: string } | null;
+  reads: MarketReads;
+  /** the going-in cap as the page shows it; leave undefined to read the
+   *  extraction's, pass null for none */
+  goingInCapText?: string | null;
+}): ModelVsMarket | null {
+  const { derived, extraction, storedAssetClass, metro, reads } = args;
+  const planDeal = isPlanDeal(inferStrategy(extraction, args.firstSignal ?? null).kind);
+  const capText =
+    args.goingInCapText !== undefined
+      ? args.goingInCapText
+      : planDeal
+        ? null
+        : (findGoingInCap(extraction?.metrics ?? [])?.value ?? null);
+  return modelVsMarket({
+    inputs: derived.inputs,
+    sources: derived.sources,
+    assetClass: shownAssetClass(storedAssetClass ?? null, extraction) || null,
+    plan: planDeal,
+    goingInCapPct: capText ? parsePct(capText) : null,
+    metro,
+    rates: reads.rates,
+    zori: reads.zori,
+    national: reads.national,
+    now: reads.now,
+  });
 }

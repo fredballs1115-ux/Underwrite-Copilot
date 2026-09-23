@@ -278,3 +278,60 @@ describe("ModelVsMarketCard — the card on the deal page", () => {
     expect(gluedWords(text)).toEqual([]);
   });
 });
+
+// ── One read for every surface ──────────────────────────────────────────────
+import { modelVsMarketFor } from "./model-vs-market";
+import { deriveUnderwriteInputs } from "./underwrite/inputs";
+import type { ExtractionResult } from "@/lib/anthropic/types";
+
+describe("modelVsMarketFor — the deal page, the report and the workbook call one function", () => {
+  const extraction: ExtractionResult = {
+    dealName: "Meridian Logistics Center",
+    assetClass: "industrial",
+    market: "Inland Empire, CA",
+    address: "1 Distribution Dr, Fontana, CA",
+    metrics: [
+      { label: "Asking price", value: "$50,000,000", flagged: false, page: "p. 5" },
+      { label: "Going-in cap rate", value: "6.0%", flagged: true, page: "p. 6" },
+      { label: "Net operating income", value: "$3,000,000", flagged: false, page: "p. 7" },
+      { label: "Rentable square feet", value: "300,000", flagged: false, page: "p. 4" },
+    ],
+  };
+  const derived = deriveUnderwriteInputs(extraction, extraction.dealName!);
+  const reads = { rates, zori, national, now: FIXTURE_NOW };
+
+  it("reads the class the deck turned out to be, the extraction's going-in cap and today's figures", () => {
+    const r = modelVsMarketFor({ derived, extraction, storedAssetClass: "auto", metro: { id: "dc", name: "Washington DC" }, reads })!;
+    expect(r.checks.map((c) => c.key)).toEqual(["rent_growth", "expense_growth", "exit_cap"]);
+    // A warehouse's rents are the nation's lessors', so no metro row and no metro name.
+    expect(r.metro).toBeNull();
+    expect(r.checks[0].read).toContain("lessors of manufacturing and industrial buildings");
+    // The exit cap is derived from the going-in cap, so the spread is held.
+    expect(r.checks[2].tone).toBe("level");
+    expect(r.checks[2].read).toContain("The going-in cap 6.00% is 106 bps over it, so the exit holds the spread");
+  });
+
+  it("takes the page's own cap where it passes one, and none where it passes null", () => {
+    const own = modelVsMarketFor({ derived, extraction, storedAssetClass: "industrial", metro: null, reads, goingInCapText: "5.5%" })!;
+    expect(own.checks[2].read).toContain("The going-in cap 5.50% is 56 bps over it, so the exit assumes the spread widens 50 bps");
+    const none = modelVsMarketFor({ derived, extraction, storedAssetClass: "industrial", metro: null, reads, goingInCapText: null })!;
+    expect(none.checks[2].tone).toBe("stated");
+  });
+
+  it("a plan deal reads no going-in cap, whatever the extraction states", () => {
+    const plan: ExtractionResult = {
+      ...extraction,
+      assetClass: "multifamily",
+      metrics: [
+        ...extraction.metrics,
+        { label: "Strategy", value: "Ground-up development", flagged: false, page: "p. 2" },
+        { label: "Total project cost", value: "$180,000,000", flagged: false, page: "p. 14" },
+        { label: "NOI (stabilized, pro forma)", value: "$21,000,000", flagged: false, page: "p. 12" },
+      ],
+    };
+    const r = modelVsMarketFor({ derived: deriveUnderwriteInputs(plan, "plan"), extraction: plan, storedAssetClass: "auto", metro: { id: "dc", name: "Washington DC" }, reads });
+    const exit = r?.checks.find((c) => c.key === "exit_cap");
+    expect(exit?.tone).toBe("stated");
+    expect(exit?.read).toContain("A plan deal has no going-in cap to set it against");
+  });
+});
