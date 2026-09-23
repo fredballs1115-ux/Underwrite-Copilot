@@ -45,6 +45,11 @@ describe("debtSeeds — the index a loan is quoted over, off today's table", () 
     expect(debtSeeds(withoutAvg, 60).floating?.pct).toBe(3.85);
   });
 
+  it("the 10-year rides beside the tenor, whatever the hold, as the benchmark a cap spread is quoted over", () => {
+    expect(debtSeeds(rates, 60).tenYear).toEqual({ id: "DGS10", short: "10-yr Treasury", pct: 4.94, asOf: "2026-09-17", kind: "treasury" });
+    expect(debtSeeds(rates, 120).tenYear?.pct).toBe(4.94);
+  });
+
   it("a stale table seeds nothing — a benchmark that cannot be backed is not made", () => {
     const stale = readRates(REAL_ROWS, new Date("2027-03-01T00:00:00Z"));
     expect(debtSeeds(stale, 60)).toEqual(NO_DEBT_SEEDS);

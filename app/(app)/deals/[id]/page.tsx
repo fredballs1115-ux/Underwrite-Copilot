@@ -1119,6 +1119,8 @@ export default async function DealPage({
             ((deal as { sector_fields?: SectorFieldValues | null }).sector_fields) ?? null
           }
           assetClass={shownClass || null}
+          rateSeed={rateSeeds.permanent}
+          tenYear={debt.tenYear}
         />
       </div>
     </div>

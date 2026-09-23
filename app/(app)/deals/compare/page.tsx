@@ -10,7 +10,9 @@ import { CompareTable, usd, type Col } from "./compare-table";
 import { metroForAddress } from "@/lib/market-match";
 import type { StructuredAddress } from "@/lib/address";
 import type { FirstSignal } from "@/lib/anthropic/types";
-import { leverageRead } from "@/lib/leverage";
+import { capSpreadRead, leverageRead } from "@/lib/leverage";
+import { liveDebtSeeds } from "@/lib/debt-index-read";
+import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { seedBenchmarks } from "@/lib/research-data";
 import { findPriceMetric, inferStrategy, isPlanDeal, noiFigures } from "@/lib/deal-strategy";
 
@@ -26,7 +28,7 @@ function goingInNoiText(ex: ExtractionResult | null): string | null {
   return going ? ex.metrics.find((m) => m.label === going.label)?.value ?? null : null;
 }
 
-function toCol(deal: DealRow, box: BuyBox | null, bench30: number | null): Col {
+function toCol(deal: DealRow, box: BuyBox | null, bench30: number | null, tenYearPct: number | null): Col {
   const ex = (deal.extraction as ExtractionResult | null) ?? null;
   const verdict = (deal.verdict as VerdictResult | null) ?? null;
   const model = (deal.model as UnderwritingModel | null) ?? null;
@@ -86,6 +88,12 @@ function toCol(deal: DealRow, box: BuyBox | null, bench30: number | null): Col {
     leverage:
       !planDeal && r?.goingInCapPct != null && bench30 != null
         ? leverageRead(r.goingInCapPct, bench30)
+        : null,
+    // The same cap over today's 10-year (lib/debt-index reads it off the
+    // rates table the strip draws from) — a fact with a date, no verdict.
+    capOverTenYear:
+      !planDeal && r?.goingInCapPct != null && tenYearPct != null
+        ? capSpreadRead(r.goingInCapPct, tenYearPct)
         : null,
     // The shared price reader — never a per-unit price or a prior trade; a
     // development's land cost is its price.
@@ -155,8 +163,12 @@ export default async function ComparePage({
       bench30 = { value: row.low, asOf: row.as_of };
   }
 
+  // Today's 10-year, off the same cached rates read the deal page's leverage
+  // check and the strip draw from; nothing fresh means no row.
+  const tenYearPct = (await liveDebtSeeds(HOLD_MONTHS)).tenYear?.pct ?? null;
+
   const cols = (rows as Scoped[]).map((d) =>
-    toCol(d, boxByScope.get(scopeKey(d)) ?? null, bench30?.value ?? null),
+    toCol(d, boxByScope.get(scopeKey(d)) ?? null, bench30?.value ?? null, tenYearPct),
   );
 
   const backLink = (

@@ -49,7 +49,7 @@ import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table"
 import { ToastProvider } from "@/app/(app)/toaster";
 import { ScoredFeedView, type AlertRow, type ItemRow } from "@/app/(app)/news/scored-feed";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
-import { leverageRead } from "@/lib/leverage";
+import { capSpreadRead, leverageRead } from "@/lib/leverage";
 import { a11yIssues, dumpView, gluedWords, visibleText } from "./render-lint";
 
 function render(node: React.ReactElement): string {
@@ -238,9 +238,9 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     ...over,
   });
   const COLS: Col[] = [
-    col({ id: "a", name: "The Maddox at Brewerytown", reason: "Rents assume a premium the submarket has not printed.", fit: "near", fitNote: "Near on basis / unit", irr: 14.2, em: 1.82, coc: 6.1, cap: 5.6, leverage: leverageRead(5.6, 6.2), price: "$68,000,000", noi: "$3,808,000" }),
+    col({ id: "a", name: "The Maddox at Brewerytown", reason: "Rents assume a premium the submarket has not printed.", fit: "near", fitNote: "Near on basis / unit", irr: 14.2, em: 1.82, coc: 6.1, cap: 5.6, leverage: leverageRead(5.6, 6.2), capOverTenYear: capSpreadRead(5.6, 4.94), price: "$68,000,000", noi: "$3,808,000" }),
     col({ id: "b", name: "1400 Market — office to residential", verdict: "pass", reason: "The plan holds a 567 bps spread in the worst corner.", fit: "fits", strategy: "Conversion", planDeal: true, irr: 18.9, em: 2.1, coc: null, cap: null, yoc: 11.7, price: "$20,000,000", noi: "$21,000,000", market: "Center City, Philadelphia, PA", coveredMarket: "Philadelphia" }),
-    col({ id: "c", name: "Tysons Corner Plaza", assetClass: "office", verdict: "pass_on", reason: "Vacancy above 20% with no leasing story.", fit: "outside", fitNote: "Misses: size, price", irr: 22.0, em: 2.4, coc: 8.0, cap: 8.1, leverage: leverageRead(8.1, 6.2), price: "$60,000,000", noi: "$4,860,000", market: "Tysons, VA", coveredMarket: "Northern Virginia" }),
+    col({ id: "c", name: "Tysons Corner Plaza", assetClass: "office", verdict: "pass_on", reason: "Vacancy above 20% with no leasing story.", fit: "outside", fitNote: "Misses: size, price", irr: 22.0, em: 2.4, coc: 8.0, cap: 8.1, leverage: leverageRead(8.1, 6.2), capOverTenYear: capSpreadRead(8.1, 4.94), price: "$60,000,000", noi: "$4,860,000", market: "Tysons, VA", coveredMarket: "Northern Virginia" }),
     col({ id: "d", name: "Riverbend Site — 240 units", hasModel: false, verdict: null, strategy: "Development", planDeal: true, price: "$4,000,000", market: "Frisco, TX", coveredMarket: null }),
   ];
 
@@ -266,10 +266,17 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     // The leverage row's spread is signed, so its bar runs from a centre
     // line: the Maddox's −60 bps to the left, scaled to the Tysons' +190
     // (the row's widest), the Tysons' the full half to the right — once per
-    // layout; the two plan deals, judged on yield on cost, draw none.
-    expect((html.match(/data-signed-bar/g) ?? []).length).toBe(4);
+    // layout; the two plan deals, judged on yield on cost, draw none. The
+    // cap-over-10-year row is signed the same way: the Maddox's +66 bps
+    // against the Tysons' +316, both to the right.
+    expect((html.match(/data-signed-bar/g) ?? []).length).toBe(8);
     expect((html.match(/right:50%;width:16%/g) ?? []).length).toBe(2);
-    expect((html.match(/left:50%;width:50%/g) ?? []).length).toBe(2);
+    expect((html.match(/left:50%;width:50%/g) ?? []).length).toBe(4);
+    // A signed bar's width is its share of the half-track: 66 of 316 is a fifth of 50%.
+    expect((html.match(/left:50%;width:10%/g) ?? []).length).toBe(2);
+    expect(text).toContain("Cap over 10-yr Treasury");
+    expect(text).toContain("+66 bps");
+    expect(text).toContain("+316 bps");
     // The phone layout: a card per deal, the table hidden below `sm`.
     expect(html).toContain('aria-label="Deals compared"');
     expect((html.match(/<li /g) ?? []).length).toBe(COLS.length);

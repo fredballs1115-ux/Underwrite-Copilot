@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { assetClassLabel } from "@/lib/asset-class";
-import type { LeverageRead } from "@/lib/leverage";
+import type { CapSpreadRead, LeverageRead } from "@/lib/leverage";
 
 export const VERDICT_PILL: Record<string, { label: string; cls: string }> = {
   pass: { label: "Go", cls: "bg-pass/15 text-pass" },
@@ -43,6 +43,10 @@ export type Col = {
   yoc: number | null;
   /** cap vs the freshest 30-yr fixed — same arithmetic as the deal page */
   leverage: LeverageRead | null;
+  /** cap over today's 10-year Treasury (lib/leverage `capSpreadRead`) —
+   *  the spread every buyer quotes a cap against; absent on a plan deal or
+   *  when the table holds no fresh 10-year */
+  capOverTenYear?: CapSpreadRead | null;
   price: string | null;
   noi: string | null;
 };
@@ -191,6 +195,21 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       // The spread is signed, so its picture is a bar from a centre line in
       // the read's colour; a plan deal has no cap to spread, so no bar.
       num: (c) => (c.planDeal || !c.leverage ? null : c.leverage.spreadBps),
+      signed: true,
+    },
+    // The cap over today's 10-year — the spread a cap is quoted against, a
+    // fact with no verdict, so the cell carries no tone; signed, like the
+    // row above, because a cap can sit under the Treasury.
+    {
+      label: "Cap over 10-yr Treasury",
+      get: (c) =>
+        c.planDeal
+          ? "judged on yield on cost"
+          : c.capOverTenYear
+            ? `${c.capOverTenYear.spreadBps > 0 ? "+" : ""}${c.capOverTenYear.spreadBps} bps`
+            : null,
+      mono: true,
+      num: (c) => (c.planDeal || !c.capOverTenYear ? null : c.capOverTenYear.spreadBps),
       signed: true,
     },
     { label: "Purchase price", get: (c) => c.price, mono: true },

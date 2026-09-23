@@ -172,6 +172,11 @@ them as their own dated section and is told to name a figure and its
 date as a source, the report's market page prints them under the
 checks, and the shared screen's market read says how many were read,
 for which metro, on which day.
+Then #386: the leverage check reads today's curve — the cap's spread over
+the 10-year (a fact, dated, no verdict) and leverage at the index plus
+the class spread the model was seeded with (the assumption named in the
+seed's own note), on the deal page under the mortgage-survey read and as
+a signed row on the compare table.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.

@@ -30,7 +30,8 @@ import { sectorLeaderboard } from "@/lib/sector-leaderboard";
 import { linkOk } from "@/lib/link-audit";
 import { coveredState, metroForAddress } from "@/lib/market-match";
 import { parsePct } from "@/lib/criteria";
-import { leverageRead } from "@/lib/leverage";
+import { capSpreadRead, leverageRead } from "@/lib/leverage";
+import { datedLong, type DebtIndex, type RateSeed } from "@/lib/debt-index";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import Link from "next/link";
 import type { StructuredAddress } from "@/lib/address";
@@ -178,12 +179,20 @@ export async function ResearchPanel({
   sectorFields,
   assetClass,
   planLabel,
+  rateSeed = null,
+  tenYear = null,
 }: {
   address: StructuredAddress | null;
   sizeText?: string | null;
   priceText?: string | null;
   /** the deal's going-in cap as displayed (e.g. "5.8%") — for the leverage check */
   capText?: string | null;
+  /** the screening rate the model was seeded with off today's curve
+   *  (lib/debt-index): the index a fact, the class spread an assumption,
+   *  the note naming both — the leverage check reads the cap against it */
+  rateSeed?: RateSeed | null;
+  /** today's 10-year Treasury, the benchmark a cap spread is quoted over */
+  tenYear?: DebtIndex | null;
   /** the strategy label when the deal is a plan (Conversion, Development …):
    *  with no going-in cap to spread against debt, the leverage check says
    *  why instead of going silent */
@@ -292,6 +301,13 @@ export async function ResearchPanel({
   }
   const leverage =
     capPct != null && bench30 ? leverageRead(capPct, bench30.value) : null;
+  // Against today's curve (lib/debt-index): the cap's spread over the
+  // 10-year, a fact with a date; and leverage at the index plus the class
+  // spread the model was seeded with — the index a fact, the spread an
+  // assumption, both named in the seed's own note.
+  const capSpread = capPct != null && tenYear ? capSpreadRead(capPct, tenYear.pct) : null;
+  const seededLeverage =
+    capPct != null && rateSeed ? leverageRead(capPct, rateSeed.pct, "today's index plus the class spread") : null;
 
   const hasRegulation = shown.length > 0;
   const hasBenchmarks = metroBench.length > 0;
@@ -377,6 +393,28 @@ export async function ResearchPanel({
             owner-occupier rate; investor debt usually prices above it, so a
             thin spread here is thinner in practice.
           </p>
+          {(capSpread || seededLeverage) && (
+            <div className="mt-2 border-t border-line/60 pt-2" data-qa="leverage-today">
+              {capSpread && tenYear && (
+                <p className="text-xs leading-relaxed text-muted">
+                  {`Against today's curve: the cap is ${capSpread.label} (${tenYear.pct.toFixed(2)}% on ${datedLong(tenYear.asOf)}, FRED).`}
+                </p>
+              )}
+              {seededLeverage && rateSeed && (
+                <p
+                  className={`mt-1 text-xs leading-relaxed ${
+                    seededLeverage.tone === "negative"
+                      ? "text-red-600"
+                      : seededLeverage.tone === "thin"
+                        ? "text-amber-600"
+                        : "text-emerald-600"
+                  }`}
+                >
+                  {`${seededLeverage.label} (${rateSeed.pct.toFixed(2)}%): ${rateSeed.note}.`}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
       {/* A plan deal with no going-in cap: a dark building has nothing to
