@@ -275,4 +275,49 @@ describe("DealView — the sample deal renders every section without a runtime e
     const buybox = textOf(render(sampleProps("buybox")));
     expect(buybox).toMatch(/Basis \/ unit|Going-in cap|mandate/i);
   });
+
+  it("the financials carry the model's assumptions against the published figures when the page read them", () => {
+    // Nothing read → no card, not an empty one.
+    const bare = textOf(render(sampleProps("financials")));
+    expect(bare).not.toMatch(/Assumptions against the published figures/);
+    const withRead: Props = {
+      ...sampleProps("financials"),
+      modelVsMarket: {
+        readOn: "2026-09-21",
+        metro: "Philadelphia",
+        checks: [
+          {
+            key: "rent_growth",
+            title: "Rent growth",
+            model: "3.0%/yr",
+            modelSource: "a screening default",
+            published: [{ label: "Asking rent, all home types", text: "+2.3% over the year to Aug 2026", value: 2.3, asOf: "2026-08-31", publisher: "Zillow Research" }],
+            tone: "ahead",
+            toneLabel: "ahead of the published figures",
+            read: "The model grows rents 3.0%/yr. Over the past year the metro's asking rents moved +2.3% over the year to Aug 2026 (Zillow). The model runs ahead of every published figure, by 0.7 points. A trailing year is what the assumption is being asked to beat, not a forecast.",
+          },
+          {
+            key: "exit_cap",
+            title: "Exit cap",
+            model: "6.00%",
+            modelSource: "derived from the documents",
+            published: [{ label: "10-year Treasury", text: "4.94% on Sep 17, 2026", value: 4.94, asOf: "2026-09-17", publisher: "FRED" }],
+            tone: "compresses",
+            toneLabel: "assumes cap compression",
+            read: "The exit cap 6.00% is 106 bps over today's 10-year (4.94%, Sep 17, 2026; FRED). The going-in cap 6.50% is 156 bps over it, so the exit assumes the spread narrows 50 bps with the 10-year where it is today. Cap compression is not a plan: a return that needs the exit to price tighter than the entry is a bet on the market rather than the building.",
+          },
+        ],
+      },
+    };
+    const html = render(withRead);
+    const text = textOf(html);
+    expect(text).toMatch(/Assumptions against the published figures/);
+    expect(text).toMatch(/set against what the Philadelphia market and the national series have actually done, read on Sep 21, 2026\./);
+    expect(text).toMatch(/Rent growth/);
+    expect(text).toMatch(/ahead of the published figures/);
+    expect(text).toMatch(/assumes cap compression/);
+    expect(text).toMatch(/Cap compression is not a plan/);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
 });

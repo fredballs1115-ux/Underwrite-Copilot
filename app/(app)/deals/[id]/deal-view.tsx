@@ -27,9 +27,11 @@ import { SensitivityPlayground, type PlaygroundData } from "./sensitivity-playgr
 import { type StageChange } from "@/lib/stages";
 import type { InternalComp } from "@/lib/internal-comps";
 import { DebtSizer } from "./debt-sizer";
+import { ModelVsMarketCard } from "./model-vs-market-card";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { DealRateSeeds } from "@/lib/debt-index";
 import type { BriefDelta } from "@/lib/brief-delta";
+import type { ModelVsMarket } from "@/lib/model-vs-market";
 import { DecisionLog } from "./decision-log";
 import { SampleGuide } from "./sample-guide";
 import { DealTasks } from "./deal-tasks";
@@ -316,6 +318,7 @@ export function DealView({
   staleResults = [],
   rateSeeds = null,
   marketSince = null,
+  modelVsMarket = null,
 }: {
   dealId: string;
   dealName: string;
@@ -334,6 +337,8 @@ export function DealView({
   rateSeeds?: DealRateSeeds | null;
   /** what moved since the market check read its figures (lib/brief-delta) */
   marketSince?: BriefDelta | null;
+  /** the model's assumptions against the published figures (lib/model-vs-market) */
+  modelVsMarket?: ModelVsMarket | null;
   supplements: SupplementsMap;
   model: UnderwritingModel | null;
   documents: DealDocument[];
@@ -793,6 +798,7 @@ export function DealView({
             omUrl={omUrl}
             underwrite={playground?.inputs ?? null}
             rateSeeds={rateSeeds}
+            modelVsMarket={modelVsMarket}
           />
         )}
 
@@ -878,6 +884,7 @@ function FinancialsPanel({
   omUrl = null,
   underwrite = null,
   rateSeeds = null,
+  modelVsMarket = null,
 }: {
   results: Results;
   active: boolean;
@@ -892,6 +899,7 @@ function FinancialsPanel({
   omUrl?: string | null;
   underwrite?: UnderwriteInputs | null;
   rateSeeds?: DealRateSeeds | null;
+  modelVsMarket?: ModelVsMarket | null;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -916,6 +924,11 @@ function FinancialsPanel({
         underwrite={underwrite}
         rateSeeds={rateSeeds}
       />
+
+      {/* The model's four decisive assumptions against the published
+          figures — the debt story, then what the growth and the exit are
+          being asked to beat. Renders nothing with no model or nothing fresh. */}
+      <ModelVsMarketCard read={modelVsMarket} />
 
       <details
         className="rounded-2xl border border-line bg-surface shadow-card"

@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-23",
+      "title": "The model's assumptions, set against the published figures",
+      "href": "/deals",
+      "blurb": "The screening model runs on four numbers that decide its return more than any others — rent growth, expense growth, stabilized vacancy and the exit cap — and two of them start as flat defaults on every deal. A new card under the debt sizer sets each against the published figure that speaks to it: rent growth against the metro's asking rents from Zillow and the rent its sitting tenants pay from the BLS, expense growth against consumer prices, vacancy against the Census survey's metro figure inside its margin of error, and the exit cap's spread over today's 10-year Treasury beside the going-in cap's, so an exit that assumes cap compression is named as one. Every figure is dated with its publisher, nothing is a verdict — a trailing year is what an assumption is being asked to beat, not a forecast — and a figure is only ever set against an assumption of its own kind: an office is never read against apartment rents."
+    },
+    {
+      "date": "2026-09-23",
       "title": "The sample screen's leverage check reads the week's survey",
       "href": "/demo",
       "blurb": "The sample screen's leverage check compared the sample's cap with a 30-year mortgage survey figure checked in on August 20 — so the one page a visitor reads without signing in showed a benchmark five weeks old as if it were the week's. It now reads the survey the rates pull writes every week, dated and named as FRED's series, falls back to the checked-in snapshot only where the table has nothing and says so, and prints the cap's spread over today's 10-year Treasury beside it, the way a deal page does. The deal page and the compare table read the same survey through the same cached read, so no two surfaces can print a different benchmark for one day, and a survey the pull has stopped writing is shown as stale beside its date rather than swapped for something older."
