@@ -158,6 +158,9 @@ values as well as sentences, and a deal page opened weeks later reads
 the same metro's figures today and says what moved — "+0.4 pt to 3.8%",
 "+1.1% to $2,335", "12 places hotter" — keeping a figure the publisher
 has not updated since apart from one that did not move.
+Then #383: the Feeds card on `/data-health` — each pull judged on its
+own cadence with the stale series named, so a dead monthly pull behind
+fresh daily rows is visible to the operator before a visitor meets it.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.

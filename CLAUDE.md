@@ -134,7 +134,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   know: the prompt cache is per model, so the OM-reading steps move
   together or not at all. The operator's picture is the pure
   `app/(app)/data-health/cost-card.tsx`, rendered on fixtures in
-  `lib/cost-card.render.test.ts`.
+  `lib/cost-card.render.test.ts`. **Beside it, what each feed last
+  wrote** (#383): `lib/feed-health.ts` (pure) judges every pull on ITS
+  OWN cadence — FRED's daily, weekly, monthly and quarterly series
+  apart, the metro series, the BLS rent index, the Census survey,
+  Zillow, Realtor.com — from the same cached reads the public pages
+  draw, and names the stale series rather than averaging them away; the
+  per-metro feeds are judged on `SAMPLE_METRO` (Washington DC, the one
+  market every source covers) and the card says so. The nightly
+  steward's whole-table rule ("no `rates` row newer than five days")
+  cannot see a dead monthly pull behind fresh daily rows, and this can;
+  a feed with no rows says "no rows", never "current".
+  `app/(app)/data-health/feeds-card.tsx` draws it, rendered on the
+  runner's fixture in `lib/feeds-card.render.test.ts`.
 - How the OM reaches the model: `lib/anthropic/om-source.ts` — the deck's
   own text layer, page-tagged (`lib/pdf-text.ts`, pdfjs in-process), when
   it is dense enough to stand in for the pages (`isDenseLayer`: four

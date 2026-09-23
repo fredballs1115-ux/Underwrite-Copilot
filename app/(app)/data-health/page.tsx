@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { hoursSince } from "@/lib/research";
+import { liveMetroRates, liveRates } from "@/lib/live-rates-read";
+import { liveZori } from "@/lib/zori-read";
+import { liveRealtor } from "@/lib/realtor-read";
+import { SAMPLE_METRO, feedHealth, type FeedStatus } from "@/lib/feed-health";
 import { CostCard, type UsageRow } from "./cost-card";
+import { FeedsCard } from "./feeds-card";
 
 export const metadata: Metadata = { title: "Data health" };
 
@@ -131,6 +136,23 @@ export default async function DataHealthPage() {
     usageColumn = false;
   }
 
+  // What each feed last wrote (lib/feed-health): the same cached reads the
+  // public pages draw from, judged feed by feed on each one's own cadence.
+  // A read that fails leaves an empty card that says so.
+  let feeds: FeedStatus[] = [];
+  try {
+    const now = new Date();
+    const [rates, metro, zori, realtor] = await Promise.all([
+      liveRates(now),
+      liveMetroRates(SAMPLE_METRO.id, now),
+      liveZori(SAMPLE_METRO.name),
+      liveRealtor(SAMPLE_METRO.name),
+    ]);
+    feeds = feedHealth({ rates, metro, zori, realtor, now });
+  } catch (err) {
+    console.warn("feed health unavailable:", err instanceof Error ? err.message : err);
+  }
+
   return (
     <div className="space-y-6">
       <header>
@@ -164,6 +186,8 @@ export default async function DataHealthPage() {
           ))}
         </ul>
       </section>
+
+      <FeedsCard feeds={feeds} sample={SAMPLE_METRO.name} />
 
       <CostCard screens={screens} usageColumn={usageColumn} />
 
