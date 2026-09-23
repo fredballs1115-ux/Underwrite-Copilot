@@ -263,6 +263,13 @@ card and the demo's server card draw one picture; the sentence under
 the heading is the deal's own class's (a storage or land deal is never
 called rental housing, a missing sector row is named); a failed read
 leaves the card out, never the page down; a live-verify marker on /demo.
+Then #397: the supply side beside it — the units each metro permitted in
+buildings of two or more over twelve months against the twelve before,
+the total less FRED's single-family series (the only split it publishes
+for a metro; no metro or state has a 5-unit series, probed), as a
+stacked-bar picture on `/market`, the split on the market brief's
+permits line with its own figure key, and one line under the demand
+card for rental housing on the deal page and the demo.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.

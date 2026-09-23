@@ -7,6 +7,7 @@ import {
   type SeriesSource,
 } from "@/lib/live-rates";
 import { monthOf, type ZoriRead } from "@/lib/zori";
+import { metroSupply, type MetroSupply } from "@/lib/metro-supply";
 import { HOTNESS_METROS, type RealtorRead } from "@/lib/realtor";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 
@@ -247,7 +248,7 @@ interface Said {
   figures: LiveFigure[];
 }
 
-function rateLine(r: LiveRate, sector: SectorJobs | null): Said | null {
+function rateLine(r: LiveRate, sector: SectorJobs | null, supply: MetroSupply | null = null): Said | null {
   if (!r.fresh || !Number.isFinite(r.value)) return null;
   const meta = r.meta as LiveRate["meta"] & { metric?: string; area?: string; source?: SeriesSource };
   const when = periodLabel(r.obsDate, meta.cadence);
@@ -284,13 +285,28 @@ function rateLine(r: LiveRate, sector: SectorJobs | null): Said | null {
       // A month of permits is mostly the season; a year of them is the pipeline.
       const year = permitsTrailingYear(r);
       if (!year) return null;
+      // The multi-unit part of the same year, where the single-family series
+      // is on hand: the total less it, said as such, with its own figure key
+      // so a later screen compares the pipeline an apartment competes with.
+      const split =
+        supply && supply.fresh && supply.to === year.to
+          ? `, of which ${whole(supply.multi)} in buildings of two or more units${
+              supply.multiChangePct !== null ? ` (${signed(supply.multiChangePct)}%)` : ""
+            } — the total less the single-family series, the only split published for a metro`
+          : "";
       return {
         line: `Housing units permitted, twelve months to ${monthOf(year.to)}${where}: ${whole(year.units)}${
           year.changePct !== null ? ` (${signed(year.changePct)}% against the twelve months before)` : ""
-        }; ${via}`,
-        figures: fig("permits_ttm", "Units permitted, trailing year", "count", year.units, year.to),
+        }${split}; ${via}`,
+        figures: [
+          ...fig("permits_ttm", "Units permitted, trailing year", "count", year.units, year.to),
+          ...(split ? fig("permits_multi_ttm", "Units permitted in 2+ unit buildings, trailing year", "count", supply!.multi, supply!.to) : []),
+        ],
       };
     }
+    case "permits_1unit":
+      // Never a line of its own: it is the other half of the permits line.
+      return null;
     case "hpi_yoy":
       return {
         line: `House prices (FHFA index) ${signed(r.value)}% from a year ago (${when}${where}; ${via})`,
@@ -435,8 +451,9 @@ function debtMarketLines(
 export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null {
   const said: Said[] = [];
   const sector = sectorJobsFor(input.assetClass);
+  const supply = metroSupply(input.rates);
   for (const r of input.rates) {
-    const s = rateLine(r, sector);
+    const s = rateLine(r, sector, supply);
     if (s) said.push(s);
   }
   const z = zoriLine(input.zori);

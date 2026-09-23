@@ -12,6 +12,7 @@ import {
   type SectorJobsMetric,
 } from "@/lib/live-rates";
 import { monthOf } from "@/lib/zori";
+import { metroSupply, type MetroSupply } from "@/lib/metro-supply";
 
 /**
  * A covered metro's own figures, live from FRED — the four things a metro
@@ -88,8 +89,15 @@ export function MetroLive({
   const metas = rates.map((r) => r.meta as MetroSeriesMeta);
   // The sector payrolls are one picture under the tiles, not five tiles.
   const sectors = rates.filter((r) => isSectorJobsMetric((r.meta as MetroSeriesMeta).metric));
-  const tiles = rates.filter((r) => !isSectorJobsMetric((r.meta as MetroSeriesMeta).metric));
+  // The single-family permits feed the supply picture, never a tile of
+  // their own: a month of permits is the season, and the figure that
+  // matters is the multi-unit remainder over a year.
+  const tiles = rates.filter((r) => {
+    const metric = (r.meta as MetroSeriesMeta).metric;
+    return !isSectorJobsMetric(metric) && metric !== "permits_1unit";
+  });
   const allJobs = rates.find((r) => (r.meta as MetroSeriesMeta).metric === "jobs_yoy") ?? null;
+  const supply = metroSupply(rates);
   // Borrowed from the MSA — the region's rental vacancy is borrowed too, and
   // said in its own sentence, since "the metro area's" would be wrong of it.
   const borrowed = metas.filter((m) => m.metro !== metroId && m.metric !== "rental_vacancy");
@@ -174,10 +182,13 @@ export function MetroLive({
         })}
       </div>
       {sectors.length > 0 && <SectorJobsPicture sectors={sectors} allJobs={allJobs} metroId={metroId} />}
+      {supply && <SupplyPicture supply={supply} metroId={metroId} />}
       <p className="mt-2 text-[11px] text-muted">
         Pulled every weekday; each figure links to its series.
         {sectors.length > 0 &&
           " Jobs by sector are the BLS's payroll counts for the metro area by supersector, each against a year ago beside all payrolls: the sector that fills a building's kind is the demand an underwrite of it is assuming, and a screen of a deal here is handed that sector's line."}
+        {supply &&
+          " Housing supply is the Census Bureau's building permits for the metro area, twelve months against the twelve before, because a month of permits is the season: the units in buildings of two or more are the total less the single-family series, the only split FRED publishes for a metro or a state, and they are the pipeline an apartment underwrite competes with."}
         {hasRentIndex &&
           " The rent index is what sitting tenants pay across the area's leases; the asking rent above is this month's new ones."}
         {fromBls &&
@@ -258,6 +269,70 @@ function SectorJobsPicture({
       <p className="mt-1 text-[11px] text-muted">
         {`${monthOf(newest)} · BLS payrolls via FRED · each figure links to its series`}
         {stale.length > 0 && ` · ${stale.length === 1 ? "one sector's figure is stale" : `${stale.length} sectors' figures are stale`}: ${stale.map((r) => `${SECTOR_JOBS_LABEL[(r.meta as MetroSeriesMeta).metric as SectorJobsMetric]} as of ${shortDate(r.obsDate)}`).join(", ")}`}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The supply side: the units the metro area permitted over the last twelve
+ * months against the twelve before, each year one stacked bar on one scale
+ * — single-family in the neutral tone, the units in buildings of two or
+ * more in the brand tone, since those are the pipeline a rental underwrite
+ * competes with — with the figures beside them and both counts linked to
+ * their series. The multi-unit figure is the total less the single-family
+ * series, and the caption says so: FRED publishes no other split for a
+ * metro. A metro with one year and no year before draws one bar.
+ */
+function SupplyPicture({ supply, metroId }: { supply: MetroSupply; metroId: string }) {
+  // A borrowed count wears the MSA's name on the heading, as a tile does.
+  const owner = supply.metro === metroId ? "" : ` · ${supply.area}`;
+  const years: { label: string; single: number; multi: number; total: number; changePct: number | null }[] = [
+    { label: `Twelve months to ${supply.toMonth}`, single: supply.single, multi: supply.multi, total: supply.total, changePct: supply.multiChangePct },
+    ...(supply.totalPrior !== null && supply.multiPrior !== null && supply.singlePrior !== null
+      ? [{ label: "The twelve before", single: supply.singlePrior, multi: supply.multiPrior, total: supply.totalPrior, changePct: null }]
+      : []),
+  ];
+  const widest = Math.max(1, ...years.map((y) => y.total));
+  return (
+    <div className="mt-4">
+      <h4 className="text-[11px] uppercase tracking-wide text-muted">{`Housing supply — units permitted, single-family and in buildings of two or more${owner}`}</h4>
+      <div className="mt-1.5 max-w-xl space-y-1">
+        {years.map((y) => (
+          <div key={y.label} className="flex items-center gap-2">
+            <span className="w-40 shrink-0 truncate text-[11px] text-muted sm:w-56">{y.label}</span>
+            <div className="relative flex h-3 flex-1 overflow-hidden rounded-sm bg-faint" aria-hidden="true">
+              <div data-bar="supply" className="h-full bg-ink/30" style={{ width: `${(Math.max(0, y.single) / widest) * 100}%` }} />
+              <div data-bar="supply" className="h-full bg-brand" style={{ width: `${(Math.max(0, y.multi) / widest) * 100}%` }} />
+            </div>
+            <span className="w-28 shrink-0 text-right font-mono text-[11px] tabular-nums text-ink">
+              {`${y.multi.toLocaleString("en-US")} of ${y.total.toLocaleString("en-US")}`}
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-1 text-[11px] text-muted">
+        {`${supply.multi.toLocaleString("en-US")} units in buildings of two or more, twelve months to ${supply.toMonth}`}
+        {supply.multiChangePct !== null && (
+          <>
+            {" ("}
+            <span aria-hidden="true">{supply.multiChangePct > 0 ? "▲" : supply.multiChangePct < 0 ? "▼" : "•"}</span>
+            <span className="sr-only">{supply.multiChangePct > 0 ? "up " : supply.multiChangePct < 0 ? "down " : "unchanged, "}</span>
+            <span className="tabular-nums">{Math.abs(supply.multiChangePct).toFixed(1)}%</span>
+            {" on the twelve months before)"}
+          </>
+        )}
+        {supply.multiSharePct !== null && ` · ${supply.multiSharePct.toFixed(1)}% of the units permitted`}
+        {supply.fresh ? "" : " · a stale figure: the pull has not updated it on its cadence"}
+        {" · Census Bureau permits via FRED: "}
+        <a href={supply.hrefTotal} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2 hover:text-brand">
+          all units
+        </a>
+        {" less "}
+        <a href={supply.hrefSingle} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2 hover:text-brand">
+          single-family
+        </a>
+        {", the only split published for a metro"}
       </p>
     </div>
   );

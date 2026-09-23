@@ -77,4 +77,20 @@ describe("metroDemand — the metro area's payrolls by sector as a picture's row
     // A phrase the model wrote is filed by its words, as every other surface files it.
     expect(metroDemand(rates, "boutique hotel")!.mine).toBe("Leisure & hospitality");
   });
+
+  it("carries the supply side for rental housing only, and only where both permit series are on hand", () => {
+    const monthsBack = (n: number): string => new Date(Date.UTC(2026, 6 - n, 1)).toISOString().slice(0, 10);
+    const permits: RateRow[] = [
+      ...Array.from({ length: 24 }, (_, i) => ({ series_id: "WASH911BPPRIV", obs_date: monthsBack(i), value: 1200 })),
+      ...Array.from({ length: 24 }, (_, i) => ({ series_id: "WASH911BP1FH", obs_date: monthsBack(i), value: 500 })),
+    ];
+    const withPermits = readMetroRates("dc", [...ROWS, ...permits], FIXTURE_NOW);
+    const apt = metroDemand(withPermits, "multifamily")!;
+    expect(apt.supply?.multi).toBe(8_400);
+    expect(apt.supply?.area).toBe("Washington MSA");
+    // An office does not compete with new apartments.
+    expect(metroDemand(withPermits, "office")!.supply).toBeNull();
+    // Without the single-family series there is no split to say.
+    expect(metroDemand(readMetroRates("dc", ROWS, FIXTURE_NOW), "multifamily")!.supply).toBeNull();
+  });
 });

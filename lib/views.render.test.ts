@@ -2869,6 +2869,7 @@ describe("SampleDemandCard — the sample market's payrolls by sector, read toda
     newestMonth: "Aug 2026",
     mine: null,
     intro: "Rental housing runs on all payrolls, drawn first; the sectors beneath say where the metro area's jobs are growing.",
+    supply: null,
     stale: ["Leisure & hospitality as of Aug 1"],
     rows: [
       { key: "PHIL942NA_YOY", label: "All payrolls", valuePct: 0.30686, text: "0.3%", href: "https://fred.stlouisfed.org/series/PHIL942NA", obsDate: "2026-08-01", fresh: true, all: true, mine: false },
@@ -2912,6 +2913,104 @@ describe("SampleDemandCard — the sample market's payrolls by sector, read toda
   it("reads clean and names everything", () => {
     expect(a11yIssues(html), "sample demand card").toEqual([]);
     expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("carries the supply side as one line under the bars, the split named as the total less the single-family series", () => {
+    const supply = {
+      metro: "philadelphia",
+      area: "Philadelphia MSA",
+      to: "2026-07-01",
+      toMonth: "Jul 2026",
+      total: 14_400,
+      totalPrior: 12_000,
+      totalChangePct: 20,
+      single: 6_000,
+      singlePrior: 6_000,
+      multi: 8_400,
+      multiPrior: 6_000,
+      multiChangePct: 40,
+      multiSharePct: 58.3,
+      hrefTotal: "https://fred.stlouisfed.org/series/PHIL942BPPRIV",
+      hrefSingle: "https://fred.stlouisfed.org/series/PHIL942BP1FH",
+      fresh: true,
+      months: [],
+    };
+    const withSupply = render(React.createElement(SampleDemandCard, { demand: { ...demand, supply } }));
+    const t = visibleText(withSupply);
+    // The label is its own styled span, so the visible text splits after it.
+    expect(t).toContain("The supply side ·");
+    expect(t).toContain("8,400 units in buildings of two or more, twelve months to Jul 2026 (+40.0% on the twelve months before), 58.3% of the 14,400 permitted");
+    // The two counts are links, so the visible text splits around them.
+    expect(t).toContain("Census Bureau building permits via FRED,");
+    expect(t).toContain("all units");
+    expect(t).toContain("single-family");
+    expect(t).toContain(", the only split published for a metro");
+    expect(withSupply).toContain("https://fred.stlouisfed.org/series/PHIL942BP1FH\"");
+    expect(a11yIssues(withSupply), "sample demand card with supply").toEqual([]);
+    expect(gluedWords(t)).toEqual([]);
+    // The marker's phrase is one JS string in the served markup.
+    expect(renderToString(React.createElement(SampleDemandCard, { demand: { ...demand, supply } }))).toContain("units in buildings of two or more, twelve months to");
+    // A stale read says so rather than passing as current.
+    expect(visibleText(render(React.createElement(SampleDemandCard, { demand: { ...demand, supply: { ...supply, fresh: false } } })))).toContain("a stale figure");
+  });
+});
+
+// ── The market page's supply picture ────────────────────────────────────────
+describe("MetroLive — the supply side, twelve months against the twelve before", () => {
+  const monthsBack = (n: number): string => new Date(Date.UTC(2026, 6 - n, 1)).toISOString().slice(0, 10);
+  const ROWS: RateRow[] = [
+    { series_id: "WASH911URN", obs_date: "2026-07-01", value: 4.0 },
+    ...Array.from({ length: 24 }, (_, i) => ({ series_id: "WASH911BPPRIV", obs_date: monthsBack(i), value: i < 12 ? 1200 : 1000 })),
+    ...Array.from({ length: 24 }, (_, i) => ({ series_id: "WASH911BP1FH", obs_date: monthsBack(i), value: 500 })),
+  ];
+  const html = render(
+    React.createElement(MetroLive, { rates: readMetroRates("dc", ROWS, FIXTURE_NOW), metroId: "dc", metroName: "Washington DC" }),
+  );
+  const text = visibleText(html);
+
+  it("draws each year as one stacked bar, single-family and the multi-unit remainder, with the counts linked", () => {
+    expect(text).toContain("Housing supply — units permitted, single-family and in buildings of two or more");
+    expect(text).toContain("Twelve months to Jul 2026");
+    expect(text).toContain("The twelve before");
+    expect(text).toContain("8,400 of 14,400");
+    expect(text).toContain("6,000 of 12,000");
+    // Two years, two segments each.
+    expect((html.match(/data-bar="supply"/g) ?? []).length).toBe(4);
+    expect(text).toContain("8,400 units in buildings of two or more, twelve months to Jul 2026 (");
+    expect(text).toContain("40.0%");
+    expect(text).toContain("on the twelve months before)");
+    expect(text).toContain("58.3% of the units permitted");
+    expect(text).toContain("the only split published for a metro");
+    expect(html).toContain("https://fred.stlouisfed.org/series/WASH911BPPRIV\"");
+    expect(html).toContain("https://fred.stlouisfed.org/series/WASH911BP1FH\"");
+    // The single-family series is not a tile of its own; the total's tile stays.
+    expect(text).toContain("Permits, 12 months");
+    expect(text).not.toContain("Single-family permits");
+    expect(text).toContain("the pipeline an apartment underwrite competes with");
+    expect(a11yIssues(html), "supply picture").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("wears the MSA's name on a suburb's heading, and draws nothing without the single-family series", () => {
+    const pg = visibleText(
+      render(
+        React.createElement(MetroLive, {
+          rates: readMetroRates("pg_county", ROWS.concat({ series_id: "MDPRIN5URN", obs_date: "2026-07-01", value: 4.7 }), FIXTURE_NOW),
+          metroId: "pg_county",
+          metroName: "Prince George's County",
+        }),
+      ),
+    );
+    expect(pg).toContain("in buildings of two or more · Washington MSA");
+    const none = render(
+      React.createElement(MetroLive, {
+        rates: readMetroRates("dc", ROWS.filter((r) => r.series_id !== "WASH911BP1FH"), FIXTURE_NOW),
+        metroId: "dc",
+        metroName: "Washington DC",
+      }),
+    );
+    expect(none).not.toContain("Housing supply");
+    expect(none).not.toContain('data-bar="supply"');
   });
 });
 

@@ -658,6 +658,7 @@ describe("a covered metro's own series", () => {
       "jobs_yoy",
       ...SECTOR_JOBS_METRICS,
       "permits",
+      "permits_1unit",
       "rent_cpi_yoy",
       "rental_vacancy_msa",
       "rental_vacancy",
@@ -665,7 +666,7 @@ describe("a covered metro's own series", () => {
     expect(pg.series[0].id).toBe("MDPRIN5URN");
     expect(pg.series[0].metro).toBe("pg_county");
     expect(pg.series[1].metro).toBe("dc");
-    expect(pg.borrowed).toEqual(["jobs_yoy", ...SECTOR_JOBS_METRICS, "permits", "rent_cpi_yoy", "rental_vacancy_msa", "rental_vacancy"]);
+    expect(pg.borrowed).toEqual(["jobs_yoy", ...SECTOR_JOBS_METRICS, "permits", "permits_1unit", "rent_cpi_yoy", "rental_vacancy_msa", "rental_vacancy"]);
   });
 
   it("gives Newark its own house prices and New York's jobs", () => {
@@ -675,6 +676,7 @@ describe("a covered metro's own series", () => {
       "jobs_yoy",
       ...SECTOR_JOBS_METRICS,
       "permits",
+      "permits_1unit",
       "hpi_yoy",
       "rent_cpi_yoy",
       "rental_vacancy_msa",
@@ -683,7 +685,7 @@ describe("a covered metro's own series", () => {
     const hpi = nj.series.find((s) => s.metric === "hpi_yoy")!;
     expect(hpi.id).toBe("ATNHPIUS35084Q_YOY");
     expect(hpi.metro).toBe("newark_jc");
-    expect(nj.borrowed).toEqual(["unemployment", "jobs_yoy", ...SECTOR_JOBS_METRICS, "permits", "rent_cpi_yoy", "rental_vacancy_msa", "rental_vacancy"]);
+    expect(nj.borrowed).toEqual(["unemployment", "jobs_yoy", ...SECTOR_JOBS_METRICS, "permits", "permits_1unit", "rent_cpi_yoy", "rental_vacancy_msa", "rental_vacancy"]);
   });
 
   it("files each metro's payrolls by sector after its jobs, as FRED's own change from a year ago, only where the runner found the series", () => {
