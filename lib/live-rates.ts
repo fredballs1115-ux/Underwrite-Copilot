@@ -119,6 +119,12 @@ export type MetroMetric =
   | "jobs_yoy"
   | SectorJobsMetric
   | "permits"
+  /** the single-family part of the same count (FRED's 1-unit series) —
+   *  the total less this is the units in buildings of two or more, which
+   *  FRED publishes for no metro or state directly (probed 2026-09-23:
+   *  `BP5FH` and `BP24FH` exist for none), so the multi-unit figure is
+   *  computed on read from the two published counts and said as such */
+  | "permits_1unit"
   | "hpi_yoy"
   | "rent_cpi_yoy"
   /** the Housing Vacancy Survey's own rental vacancy for the metro area —
@@ -255,6 +261,7 @@ const METRO_METRICS: readonly MetroMetric[] = [
   "jobs_yoy",
   ...SECTOR_JOBS_METRICS,
   "permits",
+  "permits_1unit",
   "hpi_yoy",
   "rent_cpi_yoy",
   "rental_vacancy_msa",

@@ -1,4 +1,5 @@
 import type { MetroDemand } from "@/lib/metro-demand";
+import { supplySentence, type MetroSupply } from "@/lib/metro-supply";
 
 /**
  * The demand side of a market as bars: a metro area's payrolls by sector
@@ -51,6 +52,34 @@ export function DemandBars({ demand }: { demand: MetroDemand }) {
         {demand.stale.length > 0 &&
           ` · ${demand.stale.length === 1 ? "one sector's figure is stale" : `${demand.stale.length} sectors' figures are stale`}: ${demand.stale.join(", ")}`}
       </p>
+      {demand.supply && <SupplyLine supply={demand.supply} />}
     </>
+  );
+}
+
+/**
+ * The supply side under the demand bars, one line: the units the metro
+ * area permitted in buildings of two or more over the last twelve months
+ * against the twelve before, the share of everything permitted, and where
+ * the two counts came from — the total less the single-family series,
+ * which is the only split FRED publishes for a metro. The sentence is one
+ * JS string, so the phrase live-verify greps has no separator inside it.
+ */
+export function SupplyLine({ supply }: { supply: MetroSupply }) {
+  return (
+    <p className="mt-2 text-xs text-muted" data-qa="metro-supply">
+      <span className="font-medium text-ink">{"The supply side · "}</span>
+      {supplySentence(supply)}
+      {supply.fresh ? "" : " (a stale figure: the pull has not updated it on its cadence)"}
+      {" · Census Bureau building permits via FRED, "}
+      <a href={supply.hrefTotal} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2 hover:text-brand">
+        all units
+      </a>
+      {" less "}
+      <a href={supply.hrefSingle} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2 hover:text-brand">
+        single-family
+      </a>
+      {", the only split published for a metro"}
+    </p>
   );
 }

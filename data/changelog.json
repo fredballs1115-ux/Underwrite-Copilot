@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-23",
+      "title": "The supply side beside the demand side: the apartments each metro is permitting",
+      "href": "/market",
+      "blurb": "Every covered market now shows the units it permitted in buildings of two or more over the last twelve months against the twelve before — the pipeline an apartment underwrite competes with — as one stacked bar a year under the jobs picture, single-family beside it, both counts linked to their series. FRED publishes no multi-unit permit series for a metro, so the figure is the total less the single-family series and the page says so. The market check's permits line carries the same split with its own figure, and a rental-housing deal's page and the demo say it in one line under the demand bars."
+    },
+    {
+      "date": "2026-09-23",
       "title": "The demo shows the sample market's demand side, live",
       "href": "/demo",
       "blurb": "The demo's market section — the one page a visitor reads without signing in — now draws the Philadelphia area's payrolls by sector against a year ago, off the same rows a screened deal's market section reads today: all payrolls first, then the five sectors that fill each kind of building, dated, each figure linked to its series. The sample is an apartment building, so nothing is singled out; a screened office, warehouse, store or hotel gets its own sector drawn full, and the sentence under the bars is the deal's own kind's — a storage or land deal is never called rental housing. A read that fails leaves the card out rather than something stale on the page."

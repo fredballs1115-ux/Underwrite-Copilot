@@ -190,6 +190,7 @@ describe("DealView — the sample deal renders every section without a runtime e
         newestMonth: "Aug 2026",
         mine: "Professional & business services",
         intro: "Professional & business services is the sector that fills this building's kind, drawn full; the metro area's other sectors are beside it, faded, and all payrolls first.",
+        supply: null,
         stale: ["Leisure & hospitality as of Aug 1"],
         rows: [
           { key: "PHIL942NA_YOY", label: "All payrolls", valuePct: 0.30686, text: "0.3%", href: "https://fred.stlouisfed.org/series/PHIL942NA", obsDate: "2026-08-01", fresh: true, all: true, mine: false },

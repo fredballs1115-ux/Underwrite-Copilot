@@ -8,7 +8,9 @@ import type { RateRow } from "./live-rates";
  * Every newest observation here is what the dry run of the rates workflow
  * printed on 2026-09-21 (run 35644763044), beside FRED's own title for the
  * series — and the five lessor rent indexes what the dry run of 2026-09-23
- * printed (run 35917848391), the same figures for the same August. The
+ * printed (run 35917848391), the same figures for the same August, the
+ * insurance premium index what the branch's dry run the same day printed
+ * (run 35929534333). The
  * earlier observations behind the 10-year and SOFR are what the Sep 16
  * cron wrote, read out of that run's log. Nothing here was typed from
  * memory: the sandbox cannot reach FRED, and a fixture that guesses a figure
@@ -65,6 +67,9 @@ export const REAL_ROWS: RateRow[] = [
   { series_id: "PCU5311205311201_YOY", obs_date: "2026-08-01", value: -0.2998 },
   { series_id: "PCU5311205311203_YOY", obs_date: "2026-08-01", value: 3.23191 },
   { series_id: "PCU531130531130_YOY", obs_date: "2026-08-01", value: -0.18053 },
+  // The commercial property insurance premium index, what the dry run of
+  // 2026-09-23 printed on the branch (run 35929534333), the same August.
+  { series_id: "PCU9241269241265_YOY", obs_date: "2026-08-01", value: 4.83683 },
   { series_id: "PCEPILFE_YOY", obs_date: "2026-07-01", value: 3.34414 },
   { series_id: "WPUSI012011_YOY", obs_date: "2026-08-01", value: 10.08909 },
   { series_id: "WPUIP2311001_YOY", obs_date: "2026-08-01", value: 7.78375 },

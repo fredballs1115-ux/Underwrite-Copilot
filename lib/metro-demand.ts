@@ -10,6 +10,7 @@ import {
   type MetroSeriesMeta,
   type SectorJobsMetric,
 } from "@/lib/live-rates";
+import { metroSupply, type MetroSupply } from "@/lib/metro-supply";
 import { monthOf } from "@/lib/zori";
 
 /**
@@ -61,6 +62,14 @@ export interface MetroDemand {
   mine: string | null;
   /** the one sentence under the heading: what is drawn full, or why nothing is */
   intro: string;
+  /**
+   * The supply side, for rental housing only: the units the metro area
+   * permitted in buildings of two or more over the last twelve months
+   * against the twelve before (lib/metro-supply). Null for a class that
+   * does not compete with new apartments, and where the pull has not
+   * written both permit series.
+   */
+  supply: MetroSupply | null;
 }
 
 function introFor(mine: string | null, sector: SectorJobs | null, words: AssetWords): string {
@@ -115,5 +124,6 @@ export function metroDemand(rates: readonly LiveRate[], assetClass: string | nul
     stale,
     mine,
     intro: introFor(mine, sector, words),
+    supply: words.residential ? metroSupply(rates) : null,
   };
 }

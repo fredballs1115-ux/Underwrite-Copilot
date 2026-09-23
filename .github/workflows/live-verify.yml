@@ -926,6 +926,15 @@ jobs:
           # so the first run after a deploy may read the build-time copy —
           # run again.
           mark "#396 the demo reads the sample market's payrolls by sector" grep -q "payrolls by sector, Philadelphia MSA" p_demo.html
+          # #397 — the supply side: each metro's units permitted in buildings
+          # of two or more, the total less FRED's single-family series, as a
+          # stacked-bar picture on the market brief and one line under the
+          # demo's demand bars. Both headings are one JS string. Absent until
+          # the rates pull has written the fourteen single-family series —
+          # the weekday cron, or a dispatched run — so the first run after
+          # the deploy reads NOT DEPLOYED here: run the pull and look again.
+          mark "#397 the supply picture is on the market brief" grep -q "units permitted, single-family and in buildings of two or more" p_market.html
+          mark "#397 the demo says the sample market's supply side" grep -q "units in buildings of two or more, twelve months to" p_demo.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

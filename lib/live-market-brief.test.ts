@@ -17,6 +17,11 @@ const DC_ROWS: RateRow[] = [
     const d = new Date(Date.UTC(2026, 7 - i, 1));
     return { series_id: "WASH911BPPRIV", obs_date: d.toISOString().slice(0, 10), value: i < 12 ? 1_000 : 1_250 };
   }),
+  // And the single-family part of the same months, so the split can be said.
+  ...Array.from({ length: 24 }, (_, i) => {
+    const d = new Date(Date.UTC(2026, 7 - i, 1));
+    return { series_id: "WASH911BP1FH", obs_date: d.toISOString().slice(0, 10), value: 400 };
+  }),
   { series_id: "HVS_RVR_47900", obs_date: "2026-04-01", value: 6.2 },
   { series_id: "HVS_RVR_47900", obs_date: "2026-01-01", value: 5.9 },
   { series_id: "HVS_RVR_47900_MOE", obs_date: "2026-04-01", value: 2.2 },
@@ -70,10 +75,27 @@ describe("liveMarketBrief — the metro's published figures, dated and sourced, 
     expect(brief.lines).toContain("Rental vacancy, South Census region: 9.5% (Q2 2026; FRED)");
   });
 
-  it("a year of permits is summed against the year before it — a month alone is the season", () => {
+  it("a year of permits is summed against the year before it — a month alone is the season — with the multi-unit part said as the total less the single-family series", () => {
     expect(brief.lines).toContain(
+      "Housing units permitted, twelve months to Aug 2026, Washington MSA: 12,000 (-20.0% against the twelve months before), of which 7,200 in buildings of two or more units (-29.4%) — the total less the single-family series, the only split published for a metro; FRED",
+    );
+    // The single-family series is never a line of its own.
+    expect(brief.lines.filter((l) => l.startsWith("Housing units permitted"))).toHaveLength(1);
+    expect(brief.lines.some((l) => /single-family permits/i.test(l))).toBe(false);
+    // Without it, the line is the total alone.
+    const totalOnly = liveMarketBrief({
+      metro: { id: "dc", name: "Washington, DC" },
+      assetClass: "multifamily",
+      rates: readMetroRates("dc", DC_ROWS.filter((r) => r.series_id !== "WASH911BP1FH"), NOW),
+      zori: null,
+      realtor: null,
+      national: [],
+      now: NOW,
+    })!;
+    expect(totalOnly.lines).toContain(
       "Housing units permitted, twelve months to Aug 2026, Washington MSA: 12,000 (-20.0% against the twelve months before); FRED",
     );
+    expect(totalOnly.figures.some((f) => f.key === "permits_multi_ttm")).toBe(false);
   });
 
   it("the asking rent and the for-sale market are said with their months and their publishers", () => {
@@ -89,6 +111,13 @@ describe("liveMarketBrief — the metro's published figures, dated and sourced, 
     const byKey = Object.fromEntries(brief.figures.map((f) => [f.key, f]));
     expect(byKey.unemployment).toEqual({ key: "unemployment", label: "Unemployment", value: 3.4, unit: "pts", asOf: "2026-07-01" });
     expect(byKey.permits_ttm).toEqual({ key: "permits_ttm", label: "Units permitted, trailing year", value: 12_000, unit: "count", asOf: "2026-08-01" });
+    expect(byKey.permits_multi_ttm).toEqual({
+      key: "permits_multi_ttm",
+      label: "Units permitted in 2+ unit buildings, trailing year",
+      value: 7_200,
+      unit: "count",
+      asOf: "2026-08-01",
+    });
     expect(byKey.rental_vacancy_msa).toMatchObject({ value: 6.2, unit: "pts", asOf: "2026-04-01" });
     expect(byKey.zori_rent).toMatchObject({ value: 2_310, unit: "usd", asOf: "2026-08-31" });
     expect(byKey.zori_mfr_rent).toMatchObject({ value: 2_080, unit: "usd" });

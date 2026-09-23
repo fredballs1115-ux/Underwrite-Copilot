@@ -2080,7 +2080,35 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   read answered — so a NOT DEPLOYED on its marker after a deploy means
   the read had nothing, not that the build is old. `lib/views.render.test.ts`
   draws it on a fixture and checks the marker's phrase against
-  `renderToString`. **The debt
+  `renderToString`. **The supply side rides beside the demand side**
+  (#397, `lib/metro-supply.ts`, pure): the units the metro area permitted
+  in buildings of two or more over the last twelve months against the
+  twelve before — the pipeline an apartment underwrite competes with.
+  **FRED publishes no multi-unit permit series for any metro or state**
+  (probe 35928492801: `BP5FH` and `BP24FH` "do not exist" for every
+  metro tried and for Pennsylvania; only the nation has `PERMIT5`), but
+  it carries each metro's SINGLE-FAMILY permits (`<CITY><NNN>BP1FH`,
+  fourteen series, metric `permits_1unit`), so the multi-unit figure is
+  the total less the single-family series, month by month, and every
+  surface says so ("the total less the single-family series, the only
+  split published for a metro"). Three rules: the two series are aligned
+  by their own dates and a month one of them lacks leaves BOTH sums, so
+  the subtraction never runs across different months; a month of permits
+  is the season, so the figure is twelve months against the twelve before
+  (`permitsTrailingYear`) and a partial year is null, never scaled; and
+  the share is of the same window. The single-family series is never a
+  tile or a line of its own — it feeds the picture. Where it shows: the
+  market brief's permits line carries the split with its own figure key
+  (`permits_multi_ttm`, so since-this-screen compares the pipeline), and
+  the prompt clause names it as what a supply claim on rental housing is
+  checked against; `/market` draws each year as one stacked bar under the
+  sector picture (`SupplyPicture` in `metro-live.tsx`, `data-bar="supply"`,
+  single-family in the neutral tone, the remainder in the brand tone, a
+  suburb's heading wearing the MSA's name); and `MetroDemand.supply`
+  carries it to the deal page's demand card and the demo's for RENTAL
+  HOUSING ONLY (`SupplyLine` in `app/demand-bars.tsx`) — an office does
+  not compete with new apartments. The Census counts are not seasonally
+  adjusted, which is why the window is a year. **The debt
   market rides after the metro's lines, for every deal** (#384,
   `DEBT_MARKET_IDS`): the 10-year Treasury, what banks say about their
   standards for THIS kind of loan (`lendingStandardsFor` — rental housing
