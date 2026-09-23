@@ -38,7 +38,7 @@ import { SERIES, metroSeriesFor, readMetroRates, readRates } from "@/lib/live-ra
 import { fetchBenchRows, fetchSeriesRows } from "@/lib/live-rates-query";
 import { ZILLOW_METRICS, zoriFor } from "@/lib/zori";
 import { REALTOR_METRICS, realtorFor } from "@/lib/realtor";
-import { DEBT_MARKET_IDS, liveMarketBrief, type LiveMarketBrief } from "@/lib/live-market-brief";
+import { BRIEF_NATIONAL_IDS, liveMarketBrief, type LiveMarketBrief } from "@/lib/live-market-brief";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxLines } from "@/lib/criteria";
 import { notifyAnalysisReady } from "@/lib/email";
@@ -184,7 +184,7 @@ async function liveMarketFromDb(
     const [rateRows, bench, nationalRows] = await Promise.all([
       fetchSeriesRows(admin, metroSeriesFor(metro.id).series),
       fetchBenchRows(admin, metro.name, [...ZILLOW_METRICS, ...REALTOR_METRICS]),
-      fetchSeriesRows(admin, SERIES.filter((s) => (DEBT_MARKET_IDS as readonly string[]).includes(s.id))),
+      fetchSeriesRows(admin, SERIES.filter((s) => BRIEF_NATIONAL_IDS.includes(s.id))),
     ]);
     return liveMarketBrief({
       metro,

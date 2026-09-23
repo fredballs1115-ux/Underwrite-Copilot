@@ -7,8 +7,10 @@ import type { RateRow } from "./live-rates";
  *
  * Every newest observation here is what the dry run of the rates workflow
  * printed on 2026-09-21 (run 35644763044), beside FRED's own title for the
- * series. The earlier observations behind the 10-year and SOFR are what the
- * Sep 16 cron wrote, read out of that run's log. Nothing here was typed from
+ * series — and the five lessor rent indexes what the dry run of 2026-09-23
+ * printed (run 35917848391), the same figures for the same August. The
+ * earlier observations behind the 10-year and SOFR are what the Sep 16
+ * cron wrote, read out of that run's log. Nothing here was typed from
  * memory: the sandbox cannot reach FRED, and a fixture that guesses a figure
  * is a test that passes on a page that is wrong.
  */
@@ -54,6 +56,15 @@ export const REAL_ROWS: RateRow[] = [
   { series_id: "CPILFESL_YOY", obs_date: "2026-08-01", value: 2.44616 },
   { series_id: "CUSR0000SEHA_YOY", obs_date: "2026-08-01", value: 2.75032 },
   { series_id: "CUSR0000SEHC_YOY", obs_date: "2026-08-01", value: 3.07976 },
+  // The rents each kind of commercial lessor charges, nationally (BLS
+  // producer price indexes, FRED's own year-over-year transform), as the
+  // dry run of 2026-09-23 printed them: the aggregate, office, retail,
+  // industrial and self-storage operators, all for August 2026.
+  { series_id: "PCU531120531120_YOY", obs_date: "2026-08-01", value: 3.50281 },
+  { series_id: "PCU5311205311202_YOY", obs_date: "2026-08-01", value: 7.18581 },
+  { series_id: "PCU5311205311201_YOY", obs_date: "2026-08-01", value: -0.2998 },
+  { series_id: "PCU5311205311203_YOY", obs_date: "2026-08-01", value: 3.23191 },
+  { series_id: "PCU531130531130_YOY", obs_date: "2026-08-01", value: -0.18053 },
   { series_id: "PCEPILFE_YOY", obs_date: "2026-07-01", value: 3.34414 },
   { series_id: "WPUSI012011_YOY", obs_date: "2026-08-01", value: 10.08909 },
   { series_id: "WPUIP2311001_YOY", obs_date: "2026-08-01", value: 7.78375 },

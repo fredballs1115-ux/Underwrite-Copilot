@@ -886,6 +886,14 @@ jobs:
           # the snapshot, which it names. /demo is ISR (five minutes), so the
           # first run after a deploy may read the build-time copy — run again.
           mark "#387 the sample leverage check reads the cap against today's 10-year" grep -q "the 10-year Treasury (" p_demo.html
+          # #390 — the five lessor rent indexes on the strip's inflation fold:
+          # a tile's label is the series table's own short name, one JS
+          # expression, and a closed <details> still carries its tiles in
+          # the served HTML. Absent until rates.yml has written the five
+          # series — the weekday cron, or a dispatched run — so the first
+          # run after the deploy reads NOT DEPLOYED here: run the pull and
+          # look again.
+          mark "#390 the lessor rent indexes are on the strip" grep -q "Office rents y/y" p_tools2.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

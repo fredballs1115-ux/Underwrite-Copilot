@@ -3,7 +3,7 @@ import { assetWords } from "@/lib/asset-words";
 import { monthOf, type ZoriRead } from "@/lib/zori";
 import type { InputSource } from "@/lib/underwrite/inputs";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
-import { periodLabel } from "@/lib/live-market-brief";
+import { periodLabel, rentIndexFor } from "@/lib/live-market-brief";
 import { datedLong } from "@/lib/debt-index";
 
 /**
@@ -86,6 +86,10 @@ export interface ModelCheck {
   published: PublishedFigure[];
   tone: CheckTone;
   toneLabel: string;
+  /** whether the published figures are the metro's or the nation's — a
+   *  commercial deal's rent index and every deal's prices and 10-year are
+   *  national, and the card's scope sentence says which it read */
+  scope: "metro" | "national";
   /** the one sentence */
   read: string;
 }
@@ -179,11 +183,53 @@ function byPoints(model: number, published: readonly number[]): string {
   return `by ${near.toFixed(1)} to ${pts(far)}`;
 }
 
+/**
+ * A commercial deal's rents against the national index of rents its kind
+ * of lessor charges (the BLS producer price index, `rentIndexFor`) — the
+ * one figure of its own kind the feeds hold for an office, a shop, a
+ * warehouse or a storage facility. Said as the nation's, never the
+ * metro's. Lodging and licensed care have no lessor's rent and get no row.
+ */
+function commercialRentCheck(input: ModelVsMarketInput, g: number): ModelCheck | null {
+  const idx = rentIndexFor(input.assetClass);
+  if (!idx) return null;
+  const r = fresh(input.national, (x) => x.meta.id === idx.id);
+  if (!r) return null;
+  const when = periodLabel(r.obsDate, r.meta.cadence);
+  const published: PublishedFigure[] = [
+    {
+      label: `Rents charged by ${idx.lessor}, national (PPI)`,
+      text: `${signed(r.value)}% over the year to ${when}`,
+      value: r.value,
+      asOf: r.obsDate,
+      publisher: "BLS via FRED",
+    },
+  ];
+  const tone = rangeTone(g, [r.value]);
+  const clause =
+    tone === "ahead"
+      ? `The model runs ahead of the index, ${byPoints(g, [r.value])}.`
+      : tone === "behind"
+        ? `The model runs behind the index, ${byPoints(g, [r.value])}.`
+        : "The model sits at the index.";
+  return {
+    key: "rent_growth",
+    title: "Rent growth",
+    model: `${g.toFixed(1)}%/yr`,
+    modelSource: sourceWords(input.sources?.rentGrowthPct),
+    published,
+    tone,
+    toneLabel: TONE_LABEL[tone],
+    scope: "national",
+    read: `The model grows rents ${g.toFixed(1)}%/yr. Over the year to ${when} the rents ${idx.lessor} charge moved ${signed(r.value)}% nationally (BLS producer price index, via FRED) — the nation's lessors, not the metro's. ${clause} A trailing year is what the assumption is being asked to beat, not a forecast.`,
+  };
+}
+
 function rentGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
   const words = assetWords(input.assetClass ?? undefined);
-  if (!words.residential) return null;
   const g = input.inputs.rentGrowthPct * 100;
   if (!Number.isFinite(g)) return null;
+  if (!words.residential) return commercialRentCheck(input, g);
   const published: PublishedFigure[] = [];
   const phrases: string[] = [];
   const z = input.zori ?? null;
@@ -217,6 +263,7 @@ function rentGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
     published,
     tone,
     toneLabel: TONE_LABEL[tone],
+    scope: "metro",
     read: `The model grows rents ${g.toFixed(1)}%/yr. Over the past year ${joinWords(phrases)}. ${clause} A trailing year is what the assumption is being asked to beat, not a forecast.`,
   };
 }
@@ -252,6 +299,7 @@ function expenseGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
     published,
     tone,
     toneLabel: TONE_LABEL[tone],
+    scope: "national",
     read: `The model grows expenses ${e.toFixed(1)}%/yr against consumer prices ${signed(cpi.value)}% over the year to ${when}${core ? ` (core ${signed(core.value)}%)` : ""}; BLS via FRED. ${clause} Insurance and taxes reprice on their own cycles, so the index is the floor for the other lines, not the whole answer.`,
   };
 }
@@ -304,6 +352,7 @@ function vacancyCheck(input: ModelVsMarketInput): ModelCheck | null {
     published,
     tone,
     toneLabel: TONE_LABEL[tone],
+    scope: "metro",
     read: `The model holds ${v.toFixed(1)}% vacancy. ${parts.length === 2 ? `${parts[0]}, ${parts[1]}` : parts[0]}. ${clause}`,
   };
 }
@@ -331,6 +380,7 @@ function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
       published,
       tone: "stated",
       toneLabel: TONE_LABEL.stated,
+      scope: "national",
       read: `${head} ${input.plan ? "A plan deal has no going-in cap to set it against; the spread is the claim, and the finished building's yield on cost is what it is bought at." : "No going-in cap to set it against; the spread is the claim."}`,
     };
   }
@@ -351,6 +401,7 @@ function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
     published,
     tone,
     toneLabel: TONE_LABEL[tone],
+    scope: "national",
     read: `${head} The going-in cap ${g.toFixed(2)}% is ${Math.abs(inSpread)} bps ${inSpread >= 0 ? "over" : "under"} it, ${clause}`,
   };
 }
@@ -360,7 +411,7 @@ export function modelVsMarket(input: ModelVsMarketInput): ModelVsMarket | null {
     (c): c is ModelCheck => c !== null,
   );
   if (checks.length === 0) return null;
-  const metroRead = checks.some((c) => c.key === "rent_growth" || c.key === "vacancy");
+  const metroRead = checks.some((c) => c.scope === "metro");
   return {
     readOn: input.now.toISOString().slice(0, 10),
     metro: metroRead ? (input.metro?.name ?? null) : null,

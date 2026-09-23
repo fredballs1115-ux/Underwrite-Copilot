@@ -21,12 +21,20 @@ const TONE_CLASS: Record<CheckTone, string> = {
   stated: "bg-faint text-muted",
 };
 
+/** "rent growth, expense growth, stabilized vacancy and exit cap" — the rows the read has, so the scope sentence never names a row it lacks. */
+export function checkTitles(read: ModelVsMarket): string {
+  const titles = read.checks.map((c) => c.title.toLowerCase());
+  if (titles.length <= 1) return titles[0] ?? "";
+  return `${titles.slice(0, -1).join(", ")} and ${titles[titles.length - 1]}`;
+}
+
 export function ModelVsMarketCard({ read }: { read: ModelVsMarket | null }) {
   if (!read || read.checks.length === 0) return null;
   const readOn = datedLong(read.readOn);
+  const what = checkTitles(read);
   const scope = read.metro
-    ? `The model's growth, vacancy and exit cap, set against what the ${read.metro} market and the national series have actually done, read on ${readOn}.`
-    : `The model's expense growth and exit cap, set against the national series, read on ${readOn}.`;
+    ? `The model's ${what}, set against what the ${read.metro} market and the national series have actually done, read on ${readOn}.`
+    : `The model's ${what}, set against the national series, read on ${readOn}.`;
   return (
     <section
       className="rounded-2xl border border-line bg-surface shadow-card"

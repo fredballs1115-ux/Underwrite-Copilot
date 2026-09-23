@@ -194,6 +194,14 @@ card under the debt sizer, each figure dated and sourced, no verdict.
 Then #389: the full report prints the same read under its sensitivity
 grids (under the plan's grid on a plan deal), so the document says what
 the page says.
+Then #390: the rents each kind of commercial lessor charges, nationally
+— the BLS producer price indexes for lessors of office, retail and
+industrial buildings, self-storage operators and the aggregate, five
+series verified from the runner (probe 35917247236, dry run
+35917848391) — so an office, a shop, a warehouse or a storage facility
+has a rent-growth figure of its own kind: in the model's rent check
+(said as the nation's, never the metro's), in the market check's brief
+ahead of the debt-market lines, and on the rates strip.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.

@@ -74,7 +74,7 @@ import { metroForAddress } from "@/lib/market-match";
 import { liveMetroRates, liveRates } from "@/lib/live-rates-read";
 import { liveZori } from "@/lib/zori-read";
 import { liveRealtor } from "@/lib/realtor-read";
-import { DEBT_MARKET_IDS, liveMarketBrief } from "@/lib/live-market-brief";
+import { BRIEF_NATIONAL_IDS, liveMarketBrief } from "@/lib/live-market-brief";
 import { briefDelta, type BriefDelta } from "@/lib/brief-delta";
 import { modelVsMarket, type ModelVsMarket } from "@/lib/model-vs-market";
 import type { LiveRate } from "@/lib/live-rates";
@@ -393,7 +393,7 @@ export default async function DealPage({
       zori: todayReads.zori,
       realtor: todayReads.realtor,
       now: todayReads.now,
-      national: todayReads.national.filter((r) => (DEBT_MARKET_IDS as readonly string[]).includes(r.meta.id)),
+      national: todayReads.national.filter((r) => BRIEF_NATIONAL_IDS.includes(r.meta.id)),
       assetClass: extraction?.assetClass || (deal.asset_class as string | null) || null,
       plan: isPlanDeal(inferStrategy(extraction, firstSignal).kind),
     });

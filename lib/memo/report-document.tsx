@@ -256,9 +256,11 @@ const s = StyleSheet.create({
  */
 function AssumptionsBlock({ read }: { read: ModelVsMarket | null | undefined }) {
   if (!read || read.checks.length === 0) return null;
+  const titles = read.checks.map((c) => c.title.toLowerCase());
+  const what = titles.length <= 1 ? (titles[0] ?? "") : `${titles.slice(0, -1).join(", ")} and ${titles[titles.length - 1]}`;
   const scope = read.metro
-    ? `The model's growth, vacancy and exit cap, set against what the ${read.metro} market and the national series have actually done, read on ${read.readOn}.`
-    : `The model's expense growth and exit cap, set against the national series, read on ${read.readOn}.`;
+    ? `The model's ${what}, set against what the ${read.metro} market and the national series have actually done, read on ${read.readOn}.`
+    : `The model's ${what}, set against the national series, read on ${read.readOn}.`;
   return (
     <View style={{ marginTop: 12 }} wrap={false}>
       <TitleRow title="Assumptions against the published figures" marginTop={0} />
