@@ -8,6 +8,10 @@ import type { ExportBranding } from "@/lib/excel-branding";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
+import type { StructuredAddress } from "@/lib/address";
+import { metroForAddress } from "@/lib/market-match";
+import { todayReads } from "@/lib/model-vs-market-read";
+import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 
 export const runtime = "nodejs";
 
@@ -108,7 +112,24 @@ export async function GET(
     // cell and its Sources note match the page the download came from.
     const debt = await liveDebtSeeds(HOLD_MONTHS);
     const model = deriveUnderwriteInputs(extraction, deal.name, actuals, { debtIndex: debt.permanent });
-    const buffer = await buildUnderwriteWorkbook(model, branding);
+    // The model's assumptions against the published figures — the same
+    // read the deal page's card and the report make, so the workbook's
+    // Market Read tab says what the page says. Its own try: a failed live
+    // read leaves the tab out, never the workbook.
+    let marketRead: ModelVsMarket | null = null;
+    try {
+      const metro = metroForAddress((deal.address as StructuredAddress | null) ?? {});
+      marketRead = modelVsMarketFor({
+        derived: model,
+        extraction,
+        storedAssetClass: deal.asset_class as string | null,
+        metro,
+        reads: await todayReads(metro),
+      });
+    } catch (err) {
+      console.warn(`workbook market read failed for ${id}:`, err instanceof Error ? err.message : err);
+    }
+    const buffer = await buildUnderwriteWorkbook(model, branding, marketRead);
     const safe =
       (deal.name || "deal").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() ||
       "deal";

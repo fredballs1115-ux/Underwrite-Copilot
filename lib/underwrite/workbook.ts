@@ -6,6 +6,7 @@ import { defaultIncrements } from "./sensitivity";
 import type { DerivedModel, InputSource } from "./inputs";
 import { applyWorkbookBranding, type ExportBranding } from "@/lib/excel-branding";
 import { STRATEGY_LABEL, STRATEGY_READING, isPlanDeal } from "@/lib/deal-strategy";
+import type { ModelVsMarket } from "@/lib/model-vs-market";
 
 /**
  * The institutional acquisition-template workbook (Feature 1). Visible tabs:
@@ -126,6 +127,10 @@ function printSetup(ws: ExcelJS.Worksheet, landscape = true) {
 export async function buildUnderwriteWorkbook(
   model: DerivedModel,
   branding?: ExportBranding | null,
+  /** the model's assumptions against the published figures, read when the
+   *  workbook was built (lib/model-vs-market) — a data tab beside the
+   *  Assumptions it reads; no tab at all with nothing read */
+  marketRead?: ModelVsMarket | null,
 ): Promise<Buffer> {
   const { inputs } = model;
   const result = computeUnderwrite(inputs);
@@ -138,6 +143,10 @@ export async function buildUnderwriteWorkbook(
   const wsCover = wb.addWorksheet("Cover", { views: [{ showGridLines: false }] });
   const wsSummary = wb.addWorksheet("Deal Summary", { views: [{ showGridLines: false }] });
   const wsAssum = wb.addWorksheet("Assumptions", { views: [{ showGridLines: false }] });
+  const wsRead =
+    marketRead && marketRead.checks.length > 0
+      ? wb.addWorksheet("Market Read", { views: [{ showGridLines: false }] })
+      : null;
   const wsCf = wb.addWorksheet("Cash Flow", {
     views: [{ state: "frozen", xSplit: 1, ySplit: 2, showGridLines: false }],
   });
@@ -159,6 +168,7 @@ export async function buildUnderwriteWorkbook(
 
   buildCover(wsCover, model, branding);
   buildAssumptions(wsAssum, inputs, model.sources, model.meta.strategy);
+  if (wsRead && marketRead) buildMarketRead(wsRead, marketRead);
   const cf = buildCashFlow(wsCf, inputs, holdYears);
   buildDealSummary(wsSummary, model, cf, holdYears);
   buildMonthlyCashFlow(wsMonthly, cf, inputs, holdYears);
@@ -166,7 +176,7 @@ export async function buildUnderwriteWorkbook(
   buildOperatingMetrics(wsOps, cf, model, holdYears);
   buildSensitivity(wsSens, wsEng, inputs);
 
-  const visible = [wsCover, wsSummary, wsAssum, wsCf, wsMonthly, wsDebt, wsOps, wsSens];
+  const visible = [wsCover, wsSummary, wsAssum, ...(wsRead ? [wsRead] : []), wsCf, wsMonthly, wsDebt, wsOps, wsSens];
   visible.forEach((ws) => printSetup(ws, ws !== wsCover && ws !== wsAssum));
   // Monthly is 60+ columns — fitting it to one page width prints a smear.
   // Paginate across pages instead, repeating the line labels on each page.
@@ -418,6 +428,68 @@ interface CfMap {
   fwdCol: number;
   y0Col: number;
   rows: Record<string, number>;
+}
+
+/**
+ * The Market Read tab — the model's assumptions against the published
+ * figures as the deal page's card and the report print them, one row a
+ * published figure: the assumption, the model's figure and where it came
+ * from, the figure with its date and publisher (the value raw, so it sorts
+ * and computes), the read, and the sentence. Data only, no formulas: it
+ * says what the assumptions were checked against on the day the workbook
+ * was built, and the Assumptions tab stays the live model.
+ */
+function buildMarketRead(ws: ExcelJS.Worksheet, read: ModelVsMarket) {
+  [24, 12, 26, 56, 10, 12, 18, 30, 110].forEach((w, i) => {
+    ws.getColumn(i + 1).width = w;
+  });
+  titleRow(ws, "Assumptions against the published figures");
+  const titles = read.checks.map((c) => c.title.toLowerCase());
+  const what = titles.length <= 1 ? (titles[0] ?? "") : `${titles.slice(0, -1).join(", ")} and ${titles[titles.length - 1]}`;
+  const scope = read.metro
+    ? `The model's ${what}, set against what the ${read.metro} market and the national series have actually done, read on ${read.readOn}.`
+    : `The model's ${what}, set against the national series, read on ${read.readOn}.`;
+  label(ws.getCell(2, 1), scope, { color: MUTED, size: 9 });
+  label(
+    ws.getCell(3, 1),
+    "A trailing year is what an assumption is being asked to beat, not a forecast; a metro figure is the metro area's, not the submarket's or the building's. The model's figures are the Assumptions tab's as built; change them there.",
+    { color: MUTED, size: 9 },
+  );
+  const headers = ["Assumption", "Model", "Model source", "Published figure", "Figure", "As of", "Publisher", "Read", "What the figures say"];
+  sectionHeader(ws, 5, headers[0], 1, headers.length);
+  headers.forEach((h, i) => {
+    if (i === 0) return;
+    const c = ws.getCell(5, i + 1);
+    c.value = h.toUpperCase();
+    c.font = { name: ARIAL, size: 10, bold: true, color: WHITE };
+  });
+  let r = 6;
+  for (const c of read.checks) {
+    const figures = c.published.length > 0 ? c.published : [null];
+    figures.forEach((p, i) => {
+      if (i === 0) {
+        label(ws.getCell(r, 1), c.title, { bold: true });
+        label(ws.getCell(r, 2), c.model);
+        label(ws.getCell(r, 3), c.modelSource, { color: MUTED, size: 9 });
+        label(ws.getCell(r, 8), c.toneLabel);
+        const s = ws.getCell(r, 9);
+        s.value = c.read;
+        s.font = { name: ARIAL, size: 9, color: MUTED };
+        s.alignment = { wrapText: true, vertical: "top" };
+      }
+      if (p) {
+        label(ws.getCell(r, 4), `${p.label}: ${p.text}`, { size: 9 });
+        const v = ws.getCell(r, 5);
+        v.value = p.value;
+        v.numFmt = "0.00";
+        v.font = { name: ARIAL, size: 10, color: INK };
+        label(ws.getCell(r, 6), p.asOf, { size: 9 });
+        label(ws.getCell(r, 7), p.publisher, { size: 9, color: MUTED });
+      }
+      r++;
+    });
+    bottomBorder(ws, r - 1, 1, headers.length);
+  }
 }
 
 function buildCashFlow(ws: ExcelJS.Worksheet, inp: UnderwriteInputs, holdYears: number): CfMap {
