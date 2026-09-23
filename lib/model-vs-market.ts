@@ -1,0 +1,369 @@
+import type { LiveRate, SeriesSource } from "@/lib/live-rates";
+import { assetWords } from "@/lib/asset-words";
+import { monthOf, type ZoriRead } from "@/lib/zori";
+import type { InputSource } from "@/lib/underwrite/inputs";
+import type { UnderwriteInputs } from "@/lib/underwrite/engine";
+import { periodLabel } from "@/lib/live-market-brief";
+import { datedLong } from "@/lib/debt-index";
+
+/**
+ * The model's assumptions against the published figures — pure, no model
+ * call. The screening model runs on four numbers that decide its return
+ * more than any others: rent growth, expense growth, stabilized vacancy
+ * and the exit cap. Two of them are flat defaults on every deal (3.0%/yr,
+ * "set your view"), and the market brief beside the deal shows what the
+ * metro has actually done — so this sets each assumption against the
+ * figure that speaks to it, dated and sourced, and says which way the
+ * assumption runs. It does NOT say the assumption is wrong: a trailing
+ * year is what the assumption is being asked to beat, not a forecast, and
+ * the sentence says so.
+ *
+ * The submarket card (`lib/market/checks.ts`) does the same job against
+ * the analyst's OWN submarket data — a rent series they loaded, a pipeline
+ * they keyed. This runs on the feeds every deal gets for nothing, so a
+ * deal with no submarket linked still has its growth read against
+ * something real.
+ *
+ * Four rules. **Only a fresh figure is read** (the brief's rule): a stale
+ * series is left out and the check is omitted rather than made against a
+ * figure its publisher has stopped updating. **A figure is set against an
+ * assumption of its own kind**: rental housing's asking rents and the
+ * survey's rental vacancy speak to a residential deal and to nothing else,
+ * so an office keeps its rent and vacancy rows blank instead of being read
+ * against apartments; consumer prices and the 10-year speak to every
+ * operating deal; land has no operating assumptions. **The survey's margin
+ * is the tolerance**: a vacancy assumption inside ±2.2 points of a 6.2%
+ * figure is inside the figure, not tighter than it. And **the exit cap is
+ * read against the entry**, not against a norm: the exit's spread over
+ * today's 10-year beside the going-in cap's, so the assumption is named as
+ * a widening (the conservative direction) or a compression (a bet on the
+ * market rather than the building), with the 10-year where it is today.
+ */
+export type CheckKey = "rent_growth" | "expense_growth" | "vacancy" | "exit_cap";
+
+export type CheckTone =
+  | "ahead"
+  | "inside"
+  | "behind"
+  | "tighter"
+  | "looser"
+  | "widens"
+  | "compresses"
+  | "level"
+  | "stated";
+
+export const TONE_LABEL: Record<CheckTone, string> = {
+  ahead: "ahead of the published figures",
+  inside: "inside the published range",
+  behind: "behind the published figures",
+  tighter: "tighter than the metro",
+  looser: "looser than the metro",
+  widens: "spread widens at the exit",
+  compresses: "assumes cap compression",
+  level: "spread held at the exit",
+  stated: "spread stated",
+};
+
+export interface PublishedFigure {
+  /** "Asking rent, apartments" */
+  label: string;
+  /** "+1.1% over the year to Aug 2026" */
+  text: string;
+  /** the figure in its own unit — a percent change, or a level in percent */
+  value: number;
+  asOf: string;
+  /** "Zillow Research", "BLS via FRED", "Census Bureau" */
+  publisher: string;
+}
+
+export interface ModelCheck {
+  key: CheckKey;
+  title: string;
+  /** the model's figure as a sentence fragment — "3.0%/yr", "5.0%", "6.00%" */
+  model: string;
+  /** where the model's figure came from — "a screening default", "from the documents" */
+  modelSource: string;
+  published: PublishedFigure[];
+  tone: CheckTone;
+  toneLabel: string;
+  /** the one sentence */
+  read: string;
+}
+
+export interface ModelVsMarket {
+  /** ISO date the figures were read */
+  readOn: string;
+  /** the covered metro's name, where the metro figures were read */
+  metro: string | null;
+  checks: ModelCheck[];
+}
+
+type AssumptionKey = "rentGrowthPct" | "expenseGrowthPct" | "vacancyPct" | "exitCapPct";
+
+export interface ModelVsMarketInput {
+  inputs: Pick<UnderwriteInputs, AssumptionKey>;
+  /** provenance of each assumption (deriveUnderwriteInputs' sources) — a default is named as one */
+  sources?: Partial<Record<AssumptionKey, InputSource>>;
+  assetClass?: string | null;
+  plan?: boolean;
+  /** the going-in cap, percent, as the page shows it — null on a plan deal */
+  goingInCapPct?: number | null;
+  metro?: { id: string; name: string } | null;
+  /** the metro's own series (`readMetroRates`) */
+  rates?: readonly LiveRate[];
+  zori?: ZoriRead | null;
+  /** the national table (`readRates`) — consumer prices and the 10-year read off it */
+  national?: readonly LiveRate[];
+  now: Date;
+}
+
+const signed = (v: number, dp = 1): string => `${v > 0 ? "+" : v < 0 ? "-" : ""}${Math.abs(v).toFixed(dp)}`;
+const pts = (n: number): string => `${n.toFixed(1)} point${Math.abs(n - 1) < 0.05 ? "" : "s"}`;
+
+/** A tolerance under which two percent figures are the same figure. */
+const SAME = 0.05;
+
+function sourceWords(s: InputSource | undefined): string {
+  switch (s?.provenance) {
+    case "extracted":
+      return "from the documents";
+    case "derived":
+      return "derived from the documents";
+    case "assumption":
+      return "a screening default";
+    default:
+      return "as set";
+  }
+}
+
+function fresh(rates: readonly LiveRate[] | undefined, pick: (r: LiveRate) => boolean): LiveRate | null {
+  return rates?.find((r) => pick(r) && r.fresh && Number.isFinite(r.value)) ?? null;
+}
+
+type MetroMeta = LiveRate["meta"] & { metric?: string; area?: string; source?: SeriesSource };
+const metricOf = (r: LiveRate): string | undefined => (r.meta as MetroMeta).metric;
+const areaOf = (r: LiveRate): string | undefined => (r.meta as MetroMeta).area;
+
+function publisherOf(r: LiveRate): string {
+  switch ((r.meta as MetroMeta).source) {
+    case "bls":
+      return "BLS";
+    case "census":
+      return "Census Bureau";
+    default:
+      return "FRED";
+  }
+}
+
+/** The list "a, b and c" — or "a and b", or "a". */
+function joinWords(parts: string[]): string {
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+/** ahead / inside / behind, against the published figures' range. */
+function rangeTone(model: number, published: readonly number[]): CheckTone {
+  const hi = Math.max(...published);
+  const lo = Math.min(...published);
+  if (model > hi + SAME) return "ahead";
+  if (model < lo - SAME) return "behind";
+  return "inside";
+}
+
+/** "by 0.7 points" or "by 0.7 to 2.6 points" — the gap to the nearest and the farthest published figure. */
+function byPoints(model: number, published: readonly number[]): string {
+  const gaps = published.map((p) => Math.abs(model - p)).sort((a, b) => a - b);
+  const near = gaps[0];
+  const far = gaps[gaps.length - 1];
+  if (gaps.length === 1 || Math.abs(far - near) < SAME) return `by ${pts(near)}`;
+  return `by ${near.toFixed(1)} to ${pts(far)}`;
+}
+
+function rentGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
+  const words = assetWords(input.assetClass ?? undefined);
+  if (!words.residential) return null;
+  const g = input.inputs.rentGrowthPct * 100;
+  if (!Number.isFinite(g)) return null;
+  const published: PublishedFigure[] = [];
+  const phrases: string[] = [];
+  const z = input.zori ?? null;
+  if (z && z.yoyPct !== null) {
+    published.push({ label: "Asking rent, all home types", text: `${signed(z.yoyPct)}% over the year to ${monthOf(z.asOf)}`, value: z.yoyPct, asOf: z.asOf, publisher: "Zillow Research" });
+    phrases.push(`the metro's asking rents moved ${signed(z.yoyPct)}%${z.mfrYoyPct !== null ? ` (apartments alone ${signed(z.mfrYoyPct)}%)` : ""} over the year to ${monthOf(z.asOf)} (Zillow)`);
+    if (z.mfrYoyPct !== null) {
+      published.push({ label: "Asking rent, apartments", text: `${signed(z.mfrYoyPct)}% over the year to ${monthOf(z.asOf)}`, value: z.mfrYoyPct, asOf: z.asOf, publisher: "Zillow Research" });
+    }
+  }
+  const cpiRent = fresh(input.rates, (r) => metricOf(r) === "rent_cpi_yoy");
+  if (cpiRent) {
+    const when = periodLabel(cpiRent.obsDate, cpiRent.meta.cadence);
+    published.push({ label: "Rent paid by sitting tenants (CPI rent)", text: `${signed(cpiRent.value)}% over the year to ${when}`, value: cpiRent.value, asOf: cpiRent.obsDate, publisher: `${publisherOf(cpiRent)}` });
+    phrases.push(`sitting tenants' rents ${signed(cpiRent.value)}% over the year to ${when} (CPI rent, ${publisherOf(cpiRent)})`);
+  }
+  if (published.length === 0) return null;
+  const values = published.map((p) => p.value);
+  const tone = rangeTone(g, values);
+  const clause =
+    tone === "ahead"
+      ? `The model runs ahead of every published figure, ${byPoints(g, values)}.`
+      : tone === "behind"
+        ? `The model runs behind every published figure, ${byPoints(g, values)}.`
+        : "The model sits inside the published range.";
+  return {
+    key: "rent_growth",
+    title: "Rent growth",
+    model: `${g.toFixed(1)}%/yr`,
+    modelSource: sourceWords(input.sources?.rentGrowthPct),
+    published,
+    tone,
+    toneLabel: TONE_LABEL[tone],
+    read: `The model grows rents ${g.toFixed(1)}%/yr. Over the past year ${joinWords(phrases)}. ${clause} A trailing year is what the assumption is being asked to beat, not a forecast.`,
+  };
+}
+
+function expenseGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
+  const words = assetWords(input.assetClass ?? undefined);
+  if (!words.operating) return null;
+  const e = input.inputs.expenseGrowthPct * 100;
+  if (!Number.isFinite(e)) return null;
+  const cpi = fresh(input.national, (r) => r.meta.id === "CPIAUCSL_YOY");
+  if (!cpi) return null;
+  const core = fresh(input.national, (r) => r.meta.id === "CPILFESL_YOY");
+  const when = periodLabel(cpi.obsDate, cpi.meta.cadence);
+  const published: PublishedFigure[] = [
+    { label: "Consumer prices (CPI, all items)", text: `${signed(cpi.value)}% over the year to ${when}`, value: cpi.value, asOf: cpi.obsDate, publisher: "BLS via FRED" },
+  ];
+  if (core) {
+    published.push({ label: "Core CPI", text: `${signed(core.value)}% over the year to ${periodLabel(core.obsDate, core.meta.cadence)}`, value: core.value, asOf: core.obsDate, publisher: "BLS via FRED" });
+  }
+  const values = published.map((p) => p.value);
+  const tone = rangeTone(e, values);
+  const clause =
+    tone === "ahead"
+      ? `The model runs ahead of the index, ${byPoints(e, values)}.`
+      : tone === "behind"
+        ? `The model runs behind the index, ${byPoints(e, values)}.`
+        : "The model sits inside the published range.";
+  return {
+    key: "expense_growth",
+    title: "Expense growth",
+    model: `${e.toFixed(1)}%/yr`,
+    modelSource: sourceWords(input.sources?.expenseGrowthPct),
+    published,
+    tone,
+    toneLabel: TONE_LABEL[tone],
+    read: `The model grows expenses ${e.toFixed(1)}%/yr against consumer prices ${signed(cpi.value)}% over the year to ${when}${core ? ` (core ${signed(core.value)}%)` : ""}; BLS via FRED. ${clause} Insurance and taxes reprice on their own cycles, so the index is the floor for the other lines, not the whole answer.`,
+  };
+}
+
+function vacancyCheck(input: ModelVsMarketInput): ModelCheck | null {
+  const words = assetWords(input.assetClass ?? undefined);
+  if (!words.residential) return null;
+  const v = input.inputs.vacancyPct * 100;
+  if (!Number.isFinite(v)) return null;
+  const metro = fresh(input.rates, (r) => metricOf(r) === "rental_vacancy_msa");
+  const region = fresh(input.rates, (r) => metricOf(r) === "rental_vacancy");
+  const anchor = metro ?? region;
+  if (!anchor) return null;
+  const published: PublishedFigure[] = [];
+  const parts: string[] = [];
+  if (metro) {
+    const when = periodLabel(metro.obsDate, metro.meta.cadence);
+    published.push({
+      label: "Rental vacancy, metro area",
+      text: `${metro.value.toFixed(1)}%${metro.moe !== null ? ` ±${metro.moe} pts` : ""} (${when})`,
+      value: metro.value,
+      asOf: metro.obsDate,
+      publisher: publisherOf(metro),
+    });
+    parts.push(`The metro area's rental vacancy is ${metro.value.toFixed(1)}%${metro.moe !== null ? ` ±${metro.moe} pts` : ""} (${when}; ${publisherOf(metro)})`);
+  }
+  if (region) {
+    const when = periodLabel(region.obsDate, region.meta.cadence);
+    const name = areaOf(region) ?? "Census region";
+    published.push({ label: `Rental vacancy, ${name}`, text: `${region.value.toFixed(1)}% (${when})`, value: region.value, asOf: region.obsDate, publisher: publisherOf(region) });
+    parts.push(metro ? `the ${name}'s ${region.value.toFixed(1)}%` : `The ${name}'s rental vacancy is ${region.value.toFixed(1)}% (${when}; ${publisherOf(region)})`);
+  }
+  const tolerance = anchor.moe !== null ? anchor.moe : SAME;
+  const gap = anchor.value - v;
+  const tone: CheckTone = gap > tolerance ? "tighter" : gap < -tolerance ? "looser" : "inside";
+  const stock = metro ? "the metro's rental stock as a whole" : "the region's rental stock as a whole";
+  const clause =
+    tone === "tighter"
+      ? `The building would run ${pts(gap)} tighter than ${stock} — usual for a managed asset, and the figure to hold the rent roll to.`
+      : tone === "looser"
+        ? `The model runs ${pts(-gap)} looser than ${stock} — conservative against the survey.`
+        : anchor.moe !== null
+          ? "The model sits inside the survey's margin of the published figure."
+          : "The model sits at the published figure.";
+  return {
+    key: "vacancy",
+    title: "Stabilized vacancy",
+    model: `${v.toFixed(1)}%`,
+    modelSource: sourceWords(input.sources?.vacancyPct),
+    published,
+    tone,
+    toneLabel: TONE_LABEL[tone],
+    read: `The model holds ${v.toFixed(1)}% vacancy. ${parts.length === 2 ? `${parts[0]}, ${parts[1]}` : parts[0]}. ${clause}`,
+  };
+}
+
+function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
+  const words = assetWords(input.assetClass ?? undefined);
+  if (!words.operating) return null;
+  const x = input.inputs.exitCapPct * 100;
+  if (!Number.isFinite(x) || x <= 0) return null;
+  const ten = fresh(input.national, (r) => r.meta.id === "DGS10");
+  if (!ten) return null;
+  const exitSpread = Math.round((x - ten.value) * 100);
+  const when = datedLong(ten.obsDate);
+  const published: PublishedFigure[] = [
+    { label: "10-year Treasury", text: `${ten.value.toFixed(2)}% on ${when}`, value: ten.value, asOf: ten.obsDate, publisher: "FRED" },
+  ];
+  const g = input.goingInCapPct;
+  const head = `The exit cap ${x.toFixed(2)}% is ${Math.abs(exitSpread)} bps ${exitSpread >= 0 ? "over" : "under"} today's 10-year (${ten.value.toFixed(2)}%, ${when}; FRED).`;
+  if (g == null || !Number.isFinite(g) || g <= 0 || input.plan) {
+    return {
+      key: "exit_cap",
+      title: "Exit cap",
+      model: `${x.toFixed(2)}%`,
+      modelSource: sourceWords(input.sources?.exitCapPct),
+      published,
+      tone: "stated",
+      toneLabel: TONE_LABEL.stated,
+      read: `${head} ${input.plan ? "A plan deal has no going-in cap to set it against; the spread is the claim, and the finished building's yield on cost is what it is bought at." : "No going-in cap to set it against; the spread is the claim."}`,
+    };
+  }
+  const inSpread = Math.round((g - ten.value) * 100);
+  const delta = exitSpread - inSpread;
+  const tone: CheckTone = delta > 0 ? "widens" : delta < 0 ? "compresses" : "level";
+  const clause =
+    tone === "widens"
+      ? `so the exit assumes the spread widens ${delta} bps with the 10-year where it is today — the conservative direction.`
+      : tone === "compresses"
+        ? `so the exit assumes the spread narrows ${-delta} bps with the 10-year where it is today. Cap compression is not a plan: a return that needs the exit to price tighter than the entry is a bet on the market rather than the building.`
+        : "so the exit holds the spread with the 10-year where it is today.";
+  return {
+    key: "exit_cap",
+    title: "Exit cap",
+    model: `${x.toFixed(2)}%`,
+    modelSource: sourceWords(input.sources?.exitCapPct),
+    published,
+    tone,
+    toneLabel: TONE_LABEL[tone],
+    read: `${head} The going-in cap ${g.toFixed(2)}% is ${Math.abs(inSpread)} bps ${inSpread >= 0 ? "over" : "under"} it, ${clause}`,
+  };
+}
+
+export function modelVsMarket(input: ModelVsMarketInput): ModelVsMarket | null {
+  const checks = [rentGrowthCheck(input), expenseGrowthCheck(input), vacancyCheck(input), exitCapCheck(input)].filter(
+    (c): c is ModelCheck => c !== null,
+  );
+  if (checks.length === 0) return null;
+  const metroRead = checks.some((c) => c.key === "rent_growth" || c.key === "vacancy");
+  return {
+    readOn: input.now.toISOString().slice(0, 10),
+    metro: metroRead ? (input.metro?.name ?? null) : null,
+    checks,
+  };
+}

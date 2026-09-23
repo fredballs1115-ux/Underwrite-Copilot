@@ -185,6 +185,12 @@ snapshot; the deal page, the compare table and the demo read it through
 one read, and the demo's leverage check (which printed the August
 snapshot on a public page) reads the week's survey and the cap over
 today's 10-year.
+Then #388: the model's assumptions against the published figures — rent
+growth against the metro's asking rents and its sitting tenants' rents,
+expense growth against consumer prices, vacancy against the survey's
+metro figure inside its margin, the exit cap's spread over today's
+10-year beside the going-in cap's (a compression named as one) — a
+card under the debt sizer, each figure dated and sourced, no verdict.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.

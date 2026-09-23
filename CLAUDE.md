@@ -703,6 +703,29 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   (`SampleLeverageCard`, pure, rendered in `lib/views.render.test.ts`
   with the marker's phrase checked against `renderToString`), and it
   prints the cap over today's 10-year beside the survey read.
+- The model's assumptions against the published figures:
+  `lib/model-vs-market.ts` (pure, no model call — #388). The four
+  numbers that decide the model's return (rent growth, expense growth,
+  stabilized vacancy, the exit cap), each set against the figure that
+  speaks to it from the same cached reads the deal page makes for "since
+  this screen": rent growth against Zillow's asking rents (all homes and
+  apartments alone) and the CPI rent sitting tenants pay, expense growth
+  against CPI and core, vacancy against the survey's metro figure INSIDE
+  ITS MARGIN and then the region's, and the exit cap's spread over
+  today's 10-year beside the going-in cap's (a widening is the
+  conservative direction; a compression "is not a plan"). Four rules:
+  only a fresh figure is read and a check with nothing fresh is omitted;
+  a figure is set against an assumption of its own kind (rental housing's
+  rents and vacancy reach a `residential` class only, prices and the
+  10-year every `operating` one, land none); the survey's margin is the
+  tolerance; and nothing is a verdict — the sentence says a trailing year
+  is what the assumption is being asked to beat, not a forecast. The card
+  is `app/(app)/deals/[id]/model-vs-market-card.tsx` (pure, under the
+  debt sizer on the Financials tab; rendered and linted in
+  `lib/model-vs-market.test.ts`); the page reads the figures once for
+  both checks (`todayReads`), whether or not the market check stored any.
+  The submarket card (`lib/market/checks.ts`) is the same idea against
+  the analyst's OWN loaded series; this runs on what every deal gets.
 - What landlords are asking this month: `lib/zori.ts` (pure — a metro's
   Zillow Observed Rent Index and its change from a year ago, read out of
   the two `benchmarks` rows the MONTHLY pull writes, `scripts/fetch-zori.mjs`

@@ -16,7 +16,7 @@ import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import { SiteFlagsCard } from "./site-flags-card";
 import { PublicRecordCard } from "./public-record-card";
-import { buildingSfRow, findGoingInCap, parseMoney } from "@/lib/criteria";
+import { buildingSfRow, findGoingInCap, parseMoney, parsePct } from "@/lib/criteria";
 import { after } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { signedSupplementUrl } from "@/lib/storage";
@@ -76,6 +76,10 @@ import { liveZori } from "@/lib/zori-read";
 import { liveRealtor } from "@/lib/realtor-read";
 import { DEBT_MARKET_IDS, liveMarketBrief } from "@/lib/live-market-brief";
 import { briefDelta, type BriefDelta } from "@/lib/brief-delta";
+import { modelVsMarket, type ModelVsMarket } from "@/lib/model-vs-market";
+import type { LiveRate } from "@/lib/live-rates";
+import type { ZoriRead } from "@/lib/zori";
+import type { RealtorRead } from "@/lib/realtor";
 import { snapshotVersion } from "@/lib/bridge/versions";
 import { listSubmarkets } from "@/lib/market/store";
 import { dealSubmarketCheck } from "@/lib/market/deal-checks";
@@ -354,34 +358,46 @@ export default async function DealPage({
   // asking rent, the metro's vacancy or the permits year moved since. Only
   // where the check stored figures and the deal still maps to a covered
   // market; a read that fails leaves the check as it was.
+  // The figures are read ONCE, through the page's cached readers, for two
+  // checks: this one, and the model's assumptions against the published
+  // figures further down (lib/model-vs-market), which needs the national
+  // table for every deal and the metro's own series inside a covered market.
   let marketSince: BriefDelta | null = null;
   const storedBrief = market?.liveBrief ?? null;
-  if (storedBrief?.figures && storedBrief.figures.length > 0) {
-    const metro = metroForAddress(dealAddress ?? {});
-    if (metro) {
-      try {
-        const now = new Date();
-        const [rates, zori, realtor, national] = await Promise.all([
-          liveMetroRates(metro.id, now),
-          liveZori(metro.name),
-          liveRealtor(metro.name),
-          liveRates(now),
-        ]);
-        const today = liveMarketBrief({
-          metro,
-          rates,
-          zori,
-          realtor,
-          now,
-          national: national.filter((r) => (DEBT_MARKET_IDS as readonly string[]).includes(r.meta.id)),
-          assetClass: extraction?.assetClass || (deal.asset_class as string | null) || null,
-          plan: isPlanDeal(inferStrategy(extraction, firstSignal).kind),
-        });
-        marketSince = briefDelta(storedBrief.readOn, storedBrief.figures, today?.figures ?? []);
-      } catch (err) {
-        console.warn("since-this-screen read failed:", err instanceof Error ? err.message : err);
-      }
+  const coveredMetro = metroForAddress(dealAddress ?? {});
+  let todayReads: {
+    rates: LiveRate[];
+    zori: ZoriRead | null;
+    realtor: RealtorRead | null;
+    national: LiveRate[];
+    now: Date;
+  } | null = null;
+  if (extraction || (storedBrief?.figures && storedBrief.figures.length > 0)) {
+    try {
+      const now = new Date();
+      const [rates, zori, realtor, national] = await Promise.all([
+        coveredMetro ? liveMetroRates(coveredMetro.id, now) : Promise.resolve([] as LiveRate[]),
+        coveredMetro ? liveZori(coveredMetro.name) : Promise.resolve(null),
+        coveredMetro ? liveRealtor(coveredMetro.name) : Promise.resolve(null),
+        liveRates(now),
+      ]);
+      todayReads = { rates, zori, realtor, national, now };
+    } catch (err) {
+      console.warn("live figures read failed:", err instanceof Error ? err.message : err);
     }
+  }
+  if (storedBrief?.figures && storedBrief.figures.length > 0 && coveredMetro && todayReads) {
+    const today = liveMarketBrief({
+      metro: coveredMetro,
+      rates: todayReads.rates,
+      zori: todayReads.zori,
+      realtor: todayReads.realtor,
+      now: todayReads.now,
+      national: todayReads.national.filter((r) => (DEBT_MARKET_IDS as readonly string[]).includes(r.meta.id)),
+      assetClass: extraction?.assetClass || (deal.asset_class as string | null) || null,
+      plan: isPlanDeal(inferStrategy(extraction, firstSignal).kind),
+    });
+    marketSince = briefDelta(storedBrief.readOn, storedBrief.figures, today?.figures ?? []);
   }
 
   // The three summary-bar figures — a 5-second read, nothing more. The full
@@ -658,6 +674,29 @@ export default async function DealPage({
     ? null
     : (findGoingInCap(metrics)?.value ?? (signalCapPlausible ? signalCap : null));
   const summaryYoc = plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null;
+
+  // The model's assumptions against the published figures (lib/model-vs-market):
+  // rent growth against the metro's asking rents and its sitting tenants'
+  // rents, expense growth against consumer prices, vacancy against the
+  // survey's metro figure inside its margin, and the exit cap's spread over
+  // today's 10-year beside the going-in cap's — the same reads as above,
+  // the same cap the summary bar shows, no model call. Null where there is
+  // no model or nothing fresh to read it against.
+  const modelRead: ModelVsMarket | null =
+    derived && todayReads
+      ? modelVsMarket({
+          inputs: derived.inputs,
+          sources: derived.sources,
+          assetClass: shownClass || null,
+          plan: isPlanDeal(strategy.kind),
+          goingInCapPct: summaryCap ? parsePct(summaryCap) : null,
+          metro: coveredMetro,
+          rates: todayReads.rates,
+          zori: todayReads.zori,
+          national: todayReads.national,
+          now: todayReads.now,
+        })
+      : null;
   // Year built feeds the rules engine's age-based coverage tests (NYC
   // pre-1974, JC pre-1987, LA pre-1979, MoCo's rolling-age exemption). The
   // plausibility window guards against a mis-matched metric value.
@@ -1044,6 +1083,7 @@ export default async function DealPage({
         dealName={deal.name}
         rateSeeds={rateSeeds}
         marketSince={marketSince}
+        modelVsMarket={modelRead}
         initialTab={tab ?? null}
         initialAnalysis={analysisParam ?? null}
         hasOm={!!deal.om_storage_path}
