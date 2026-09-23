@@ -699,7 +699,20 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   probe dispatched beside the weekday pull cost the pull two series and
   three probes dispatched together lost each other one apiece (run them
   one after another, never beside the pull), and the pace is 520 ms now
-  the table passes two hundred series.
+  the table passes two hundred series. **The sector page ranks the
+  markets by the same figure** (#394, `app/market/sector-jobs-rank.tsx`,
+  `SectorJobsRank`, pure): under the vacancy leaderboard, the covered
+  markets ranked by their payrolls in the sector that fills that kind of
+  building (`sectorPayrollMetric` — the sector's own metric, all
+  payrolls on the apartment page, none for a page no count speaks to),
+  fastest first, signed bars, a suburb reading its MSA's series and
+  saying so (two suburbs of one MSA share a bar, which is the truth), a
+  market with no fresh figure listed unranked with the reason. It is a
+  second ranking and named as one: the table says where the space is
+  tight, this where the demand for it is growing, and the two need not
+  agree. The read is `liveMetricRates` in `lib/live-rates-read.ts` — ONE
+  metric across the metros (`metricSeries`, `readMetricRates`), cached
+  per metric — never every metro's whole panel for one figure apiece.
 - **The deal's own model reads the same table** (#380): `lib/debt-index.ts`
   (pure) picks the index a loan is quoted over off today's rates — the
   Treasury tenor NEAREST the hold for the permanent loan (`treasuryForTerm`,

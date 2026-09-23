@@ -1,4 +1,11 @@
-import { isSectorJobsMetric, permitsTrailingYear, type LiveRate, type SectorJobsMetric, type SeriesSource } from "@/lib/live-rates";
+import {
+  isSectorJobsMetric,
+  permitsTrailingYear,
+  type LiveRate,
+  type MetroMetric,
+  type SectorJobsMetric,
+  type SeriesSource,
+} from "@/lib/live-rates";
 import { monthOf, type ZoriRead } from "@/lib/zori";
 import { HOTNESS_METROS, type RealtorRead } from "@/lib/realtor";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
@@ -168,6 +175,19 @@ export function sectorJobsFor(assetClass: string | null | undefined): SectorJobs
     default:
       return null;
   }
+}
+
+/**
+ * The payroll count a sector PAGE ranks the covered markets by: the sector
+ * that fills that kind of building, and for rental housing all payrolls —
+ * the same figure the apartment brief reads. Null for a sector page no
+ * payroll count speaks to.
+ */
+export function sectorPayrollMetric(sector: string | null | undefined): MetroMetric | null {
+  const own = sectorJobsFor(sector);
+  if (own) return own.metric;
+  const words = assetWords(sector ?? undefined);
+  return words.residential && words.operating ? "jobs_yoy" : null;
 }
 
 /** One figure the check read, as a value: what a later screen compares

@@ -11,8 +11,10 @@ import {
   type MarketGroup,
 } from "@/lib/market-memory";
 import { RatesStrip } from "@/app/rates-strip";
-import { liveMetroRates, liveRates } from "@/lib/live-rates-read";
+import { liveMetricRates, liveMetroRates, liveRates } from "@/lib/live-rates-read";
 import type { LiveRate } from "@/lib/live-rates";
+import { sectorPayrollMetric } from "@/lib/live-market-brief";
+import { SectorJobsRank } from "./sector-jobs-rank";
 import { MetroLive } from "./metro-live";
 import { LessorRentLine } from "./lessor-rent-line";
 import { SectorJobsLine } from "./sector-jobs-line";
@@ -1010,10 +1012,23 @@ function SectorHeatGrid() {
 // (the homepage sector-lens strip derives from the same function). Only the
 // four snapshot-tracked classes produce rows; other sector tabs render the
 // research doc alone.
-function SectorLeaderboard({ sector }: { sector: string }) {
+async function SectorLeaderboard({ sector }: { sector: string }) {
   const { rows, heldOpen } = sectorLeaderboard(sector);
   if (rows.length === 0 && heldOpen.length === 0) return null;
   const label = SECTOR_LABEL[sector] ?? sector;
+  // The demand side, live: the same markets ranked by their payrolls in the
+  // sector that fills this kind of building (all payrolls for apartments),
+  // one cached read of that metric across the metros. A failed read leaves
+  // the vacancy table as it was.
+  const payrollMetric = sectorPayrollMetric(sector);
+  let payrolls: LiveRate[] = [];
+  if (payrollMetric) {
+    try {
+      payrolls = await liveMetricRates(payrollMetric);
+    } catch (err) {
+      console.warn("sector payrolls read failed:", err instanceof Error ? err.message : err);
+    }
+  }
   const anyRent = rows.some((r) => r.rent !== null);
   const anyCap = rows.some((r) => r.capLow !== null);
   const band = (lo: number, hi: number | null) =>
@@ -1101,6 +1116,13 @@ function SectorLeaderboard({ sector }: { sector: string }) {
           Direction on file, numeric level held open: {heldOpen.join(" · ")} —
           the metro pages carry the sourced notes.
         </p>
+      )}
+      {payrollMetric && payrolls.length > 0 && (
+        <SectorJobsRank
+          metric={payrollMetric}
+          markets={rows.map((r) => ({ id: r.id, name: r.name }))}
+          rates={payrolls}
+        />
       )}
     </div>
   );

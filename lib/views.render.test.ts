@@ -2993,3 +2993,64 @@ describe("SectorJobsLine — the metro's payrolls in the sector that fills this 
     expect(render(React.createElement(SectorJobsLine, { rates: stale, sector: "office" }))).not.toContain("Payrolls in");
   });
 });
+
+// ── Where a sector's jobs are growing: the sector page's ranking ──────────
+import { SectorJobsRank } from "@/app/market/sector-jobs-rank";
+import { readMetricRates } from "@/lib/live-rates";
+
+describe("SectorJobsRank — the covered markets ranked by a sector's payrolls, under the vacancy leaderboard", () => {
+  // Professional and business services across four metro areas, as the
+  // pull would write them; Richmond's row is stale, Boston has no row.
+  const ROWS: RateRow[] = [
+    { series_id: "WASH911PBSV_YOY", obs_date: "2026-08-01", value: 1.31234 },
+    { series_id: "DALL148PBSV_YOY", obs_date: "2026-08-01", value: 2.4 },
+    { series_id: "PHIL942PBSV_YOY", obs_date: "2026-08-01", value: -0.8 },
+    { series_id: "RICH051PBSV_YOY", obs_date: "2025-08-01", value: 0.9 },
+  ];
+  const rates = readMetricRates("jobs_pbs_yoy", ROWS, FIXTURE_NOW);
+  const markets = [
+    { id: "dc", name: "Washington DC" },
+    { id: "philadelphia", name: "Philadelphia" },
+    { id: "dallas", name: "Dallas–Fort Worth" },
+    { id: "richmond", name: "Richmond" },
+    { id: "boston", name: "Boston" },
+    { id: "nova", name: "Northern Virginia" },
+  ];
+  const html = render(React.createElement(SectorJobsRank, { metric: "jobs_pbs_yoy", markets, rates }));
+  const text = visibleText(html);
+
+  it("ranks fastest first, draws a signed bar a market, links each figure, and names a suburb's borrowed figure", () => {
+    expect(text).toContain("Where professional & business services jobs are growing");
+    expect(text).toContain("Professional & business services, on a year ago · ranked fastest first · Aug 2026 · BLS payrolls via FRED");
+    // Dallas, then Washington and its suburb on the same figure, then Philadelphia.
+    const order = ["Dallas–Fort Worth", "Washington DC", "Northern Virginia", "Philadelphia"].map((n) => text.indexOf(n));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    // The suburb's name is a link and the MSA's name a muted span after it, so
+    // the visible text splits there; the served markup carries the pair.
+    expect(text).toContain("· Washington MSA");
+    expect(html).toContain("Northern Virginia</a><span class=\"text-muted\"");
+    expect((html.match(/data-bar="sectorrank"/g) ?? []).length).toBe(4);
+    expect(html).toContain('data-bar="sectorrank" class="absolute inset-y-0 right-1/2 bg-brand"');
+    expect(html).toContain("https://fred.stlouisfed.org/series/DALL148PBSV\"");
+    expect(html).toContain('href="/market?metro=dallas"');
+    expect(text).toContain("2.4%");
+    expect(text).toContain("−0.8%");
+    // Richmond's figure is a year old and Boston has no row: listed, unranked, with the reason.
+    expect(text).toContain("Not ranked — Richmond (stale figure), Boston (no row yet).");
+    expect(text).toContain("the two need not agree");
+    expect(a11yIssues(html), "sector jobs rank").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("ranks the apartment page by all payrolls, and renders nothing with no fresh figure", () => {
+    const all = readMetricRates("jobs_yoy", [{ series_id: "WASH911NA_YOY", obs_date: "2026-08-01", value: 1.2 }], FIXTURE_NOW);
+    const apartments = visibleText(render(React.createElement(SectorJobsRank, { metric: "jobs_yoy", markets: markets.slice(0, 1), rates: all })));
+    expect(apartments).toContain("Where payrolls are growing");
+    expect(apartments).toContain("All payrolls, on a year ago");
+    expect(apartments).toContain("the demand side a rental market runs on");
+    const stale = readMetricRates("jobs_pbs_yoy", ROWS, new Date("2027-06-01T00:00:00Z"));
+    expect(render(React.createElement(SectorJobsRank, { metric: "jobs_pbs_yoy", markets, rates: stale }))).not.toContain("sector-jobs-rank");
+    expect(render(React.createElement(SectorJobsRank, { metric: "jobs_pbs_yoy", markets, rates: [] }))).not.toContain("Where ");
+  });
+});

@@ -4,10 +4,13 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { fetchSeriesRows } from "@/lib/live-rates-query";
 import {
   SERIES,
+  metricSeries,
   metroSeriesFor,
+  readMetricRates,
   readMetroRates,
   readRates,
   type LiveRate,
+  type MetroMetric,
   type RateRow,
   type SeriesMeta,
 } from "@/lib/live-rates";
@@ -83,6 +86,22 @@ const cachedMetroRows = unstable_cache(
 
 export async function liveMetroRates(metroId: string, now: Date = new Date()): Promise<LiveRate[]> {
   return readMetroRates(metroId, await cachedMetroRows(metroId), now);
+}
+
+/**
+ * One metric across the covered metros — the sector page's ranking of
+ * where a sector's payrolls are growing — cached per metric the same way:
+ * fourteen series, one query each, once an hour, rather than every metro's
+ * whole panel read for one figure apiece.
+ */
+const cachedMetricRows = unstable_cache(
+  (metric: string) => readSeries(metricSeries(metric as MetroMetric)),
+  ["live-metric-rows"],
+  { revalidate: 3600, tags: ["rates"] },
+);
+
+export async function liveMetricRates(metric: MetroMetric, now: Date = new Date()): Promise<LiveRate[]> {
+  return readMetricRates(metric, await cachedMetricRows(metric), now);
 }
 
 function readAllSeries(): Promise<RateRow[]> {

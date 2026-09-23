@@ -907,6 +907,11 @@ jobs:
           # until the first pull after the deploy — see #390.
           mark "#393 the metro's jobs by sector are one picture on the market brief" grep -q "Jobs by sector, on a year ago" p_market.html
           mark "#393 the sector panel reads the metro's own sector payrolls" grep -q "Payrolls in professional and business services, Washington MSA" p_market.html
+          # #394 — the sector page ranks the covered markets by the sector's
+          # payrolls under the vacancy leaderboard; the retail page is the
+          # one live-verify already fetches. The heading is one JS string.
+          # Absent until the rows exist, as #393's are.
+          mark "#394 the sector page ranks the markets by the sector's payrolls" grep -q "Where retail trade jobs are growing" p_market_retail.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then
