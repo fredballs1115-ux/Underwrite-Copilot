@@ -270,6 +270,12 @@ for a metro; no metro or state has a 5-unit series, probed), as a
 stacked-bar picture on `/market`, the split on the market brief's
 permits line with its own figure key, and one line under the demand
 card for rental housing on the deal page and the demo.
+Then #398: the insurance line's published figure — the BLS index of
+commercial multiple peril premiums against a year ago, verified from the
+runner, in the strip's inflation fold, on the market brief for every
+operating class (the nation's carriers, never this building's quote), in
+the prompt clause, and in the model's expense-growth check beside CPI and
+core, shown and never averaged in.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.

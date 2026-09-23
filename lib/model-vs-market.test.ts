@@ -97,15 +97,26 @@ describe("modelVsMarket — the model's four assumptions against the published f
     expect(one.read).toContain("Over the past year the metro's asking rents moved +2.3% over the year to Aug 2026 (Zillow). The model runs ahead of every published figure, by 1.7 points.");
   });
 
-  it("expense growth against consumer prices and core, BLS via FRED", () => {
+  it("expense growth against consumer prices and core, BLS via FRED, with the insurance premium index beside them and never averaged in", () => {
     const c = check(base, "expense_growth")!;
-    expect(c.published.map((p) => p.label)).toEqual(["Consumer prices (CPI, all items)", "Core CPI"]);
+    expect(c.published.map((p) => p.label)).toEqual([
+      "Consumer prices (CPI, all items)",
+      "Core CPI",
+      "Commercial property insurance premiums (PPI, commercial multiple peril)",
+    ]);
+    expect(c.published[2]).toMatchObject({ text: "+4.8% over the year to Aug 2026", value: 4.83683, asOf: "2026-08-01", publisher: "BLS via FRED" });
+    // The tone is read against the price indexes alone: 3.0% is inside
+    // 2.4–3.4, and the 4.8% premium index does not widen the band.
     expect(c.tone).toBe("inside");
     expect(c.read).toBe(
-      "The model grows expenses 3.0%/yr against consumer prices +3.4% over the year to Aug 2026 (core +2.4%); BLS via FRED. The model sits inside the published range. Insurance and taxes reprice on their own cycles, so the index is the floor for the other lines, not the whole answer.",
+      "The model grows expenses 3.0%/yr against consumer prices +3.4% over the year to Aug 2026 (core +2.4%); BLS via FRED. The model sits inside the published range. Insurance is the line that reprices hardest: commercial property premiums are +4.8% nationally over the year to Aug 2026 (the BLS's index of commercial multiple peril premiums), and a memorandum's premium is the seller's expiring policy, so the index is the floor for the other lines and this is the one to re-quote.",
     );
     const ahead = check({ ...base, inputs: { ...base.inputs, expenseGrowthPct: 0.05 } }, "expense_growth")!;
     expect(ahead.read).toContain("The model runs ahead of the index, by 1.6 to 2.6 points.");
+    // Without the index the sentence is the old one, and nothing claims a figure.
+    const without = check({ ...base, national: (base.national ?? []).filter((r) => r.meta.id !== "PCU9241269241265_YOY") }, "expense_growth")!;
+    expect(without.published.map((p) => p.label)).toEqual(["Consumer prices (CPI, all items)", "Core CPI"]);
+    expect(without.read).toContain("Insurance and taxes reprice on their own cycles, so the index is the floor for the other lines, not the whole answer.");
   });
 
   it("vacancy: inside the survey's margin is inside the figure; past it is tighter or looser, said in points", () => {

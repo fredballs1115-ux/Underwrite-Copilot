@@ -2108,7 +2108,23 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   carries it to the deal page's demand card and the demo's for RENTAL
   HOUSING ONLY (`SupplyLine` in `app/demand-bars.tsx`) — an office does
   not compete with new apartments. The Census counts are not seasonally
-  adjusted, which is why the window is a year. **The debt
+  adjusted, which is why the window is a year. **And the insurance line
+  has a published figure** (#398, `INSURANCE_INDEX_ID` in
+  `lib/live-market-brief.ts`): the BLS producer price index for premiums
+  for commercial multiple peril insurance — the policy a building carries
+  — against a year ago (`PCU9241269241265_YOY`, printed by the runner in
+  run 35929534333 before it was trusted), in the strip's inflation fold
+  ("Property insurance premiums y/y"), on the market brief for every
+  operating class as the nation's carriers and never this building's
+  quote (figure key `insurance_index_yoy`; land reads none), in the
+  prompt clause as what the insurance line is checked against, and in
+  the model's expense-growth check beside CPI and core — SHOWN beside the
+  price indexes and never averaged into them, because the tone reads the
+  expense base against prices and folding one line's repricing into the
+  band would let a 3% model read "inside" a 3–8% range. The read says
+  why: a memorandum's premium is the seller's expiring policy, bound on
+  limits the seller chose in a market that may no longer exist, and the
+  index says how far a new owner's quote has moved. **The debt
   market rides after the metro's lines, for every deal** (#384,
   `DEBT_MARKET_IDS`): the 10-year Treasury, what banks say about their
   standards for THIS kind of loan (`lendingStandardsFor` — rental housing

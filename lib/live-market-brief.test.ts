@@ -358,7 +358,9 @@ describe("the rents each kind of commercial lessor charges — national, said so
     expect(office.lines[0]).toBe(
       "Rents charged by lessors of professional and office buildings, national (BLS producer price index): +7.2% from a year ago (Aug 2026; BLS via FRED) — the nation's lessors, not the metro's",
     );
-    expect(office.lines[1]).toContain("Debt market — 10-year Treasury 4.94%");
+    // The insurance premium index follows it, then the debt market.
+    expect(office.lines[1]).toContain("Commercial property insurance premiums, national");
+    expect(office.lines[2]).toContain("Debt market — 10-year Treasury 4.94%");
     expect(office.figures[0]).toEqual({ key: "rent_index_yoy", label: "Rents charged by lessors of professional and office buildings, national", value: 7.18581, unit: "pts", asOf: "2026-08-01" });
     const storage = liveMarketBrief({ ...base, assetClass: "self_storage" })!;
     expect(storage.lines[0]).toContain("Rents charged by miniwarehouse and self-storage operators, national (BLS producer price index): -0.2% from a year ago");
@@ -371,5 +373,30 @@ describe("the rents each kind of commercial lessor charges — national, said so
     const later = new Date("2027-06-01T00:00:00Z");
     const stale = readRates(REAL_ROWS, later).filter((r) => BRIEF_NATIONAL_IDS.includes(r.meta.id));
     expect(liveMarketBrief({ ...base, now: later, national: stale, assetClass: "office" })).toBeNull();
+  });
+
+  it("the insurance premium index is said for every class that carries a policy, as the nation's carriers, and not for land", () => {
+    const line =
+      "Commercial property insurance premiums, national (BLS producer price index, commercial multiple peril): +4.8% from a year ago (Aug 2026; BLS via FRED) — the nation's carriers, not this building's quote; a memorandum's premium is the seller's expiring policy";
+    for (const cls of ["office", "multifamily", "self_storage", "hospitality_str", "senior_housing", "data_center"]) {
+      const b = liveMarketBrief({ ...base, assetClass: cls })!;
+      expect(b.lines, cls).toContain(line);
+      expect(b.figures.find((f) => f.key === "insurance_index_yoy"), cls).toEqual({
+        key: "insurance_index_yoy",
+        label: "Commercial property insurance premiums, national",
+        value: 4.83683,
+        unit: "pts",
+        asOf: "2026-08-01",
+      });
+    }
+    const land = liveMarketBrief({ ...base, assetClass: "land_infill" })!;
+    expect(land.lines.some((l) => l.startsWith("Commercial property insurance premiums"))).toBe(false);
+    // It rides after the income side's national line and ahead of the debt market's.
+    const office = liveMarketBrief({ ...base, assetClass: "office" })!;
+    expect(office.lines.findIndex((l) => l.startsWith("Rents charged by"))).toBeLessThan(office.lines.indexOf(line));
+    expect(office.lines.indexOf(line)).toBeLessThan(office.lines.findIndex((l) => l.startsWith("Debt market")));
+    // Without the series on hand, nothing claims a figure.
+    const without = liveMarketBrief({ ...base, assetClass: "office", national: national.filter((r) => r.meta.id !== "PCU9241269241265_YOY") })!;
+    expect(without.lines.some((l) => l.startsWith("Commercial property insurance premiums"))).toBe(false);
   });
 });

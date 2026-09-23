@@ -102,10 +102,23 @@ export const RENT_INDEX_IDS = [
   "PCU531130531130_YOY",
 ] as const;
 
-/** The national series the brief reads for a deal: the debt market's, and
- *  the rent index for the deal's kind of lessor. One list, so the pipeline's
- *  read and the page's cannot differ. */
-export const BRIEF_NATIONAL_IDS: readonly string[] = [...DEBT_MARKET_IDS, ...RENT_INDEX_IDS];
+/**
+ * What commercial property insurance costs, nationally — the BLS producer
+ * price index for premiums for commercial multiple peril insurance, the
+ * policy a building carries, against a year ago. The insurance line is the
+ * expense that reprices hardest and gets read least: a memorandum's premium
+ * is the seller's expiring policy, bound on limits the seller chose in a
+ * market that may no longer exist, and this index says how far a new
+ * owner's quote has moved since. Every operating class carries one; land
+ * does not. Printed by the runner (rates run 35929534333) before it was
+ * trusted, and said as the nation's carriers, never this building's quote.
+ */
+export const INSURANCE_INDEX_ID = "PCU9241269241265_YOY";
+
+/** The national series the brief reads for a deal: the debt market's, the
+ *  rent index for the deal's kind of lessor, and the insurance premium
+ *  index. One list, so the pipeline's read and the page's cannot differ. */
+export const BRIEF_NATIONAL_IDS: readonly string[] = [...DEBT_MARKET_IDS, ...RENT_INDEX_IDS, INSURANCE_INDEX_ID];
 
 export interface RentIndex {
   id: (typeof RENT_INDEX_IDS)[number];
@@ -399,6 +412,21 @@ function rentIndexLine(national: readonly LiveRate[] | undefined, assetClass: st
   };
 }
 
+/** The insurance premium index, for every class that carries a policy. */
+function insuranceLine(national: readonly LiveRate[] | undefined, assetClass: string | null | undefined): Said | null {
+  if (!national) return null;
+  const words = assetWords(assetClass ?? undefined);
+  if (!words.operating) return null;
+  const r = national.find((x) => x.meta.id === INSURANCE_INDEX_ID && x.fresh && Number.isFinite(x.value));
+  if (!r) return null;
+  return {
+    line: `Commercial property insurance premiums, national (BLS producer price index, commercial multiple peril): ${signed(r.value)}% from a year ago (${periodLabel(r.obsDate, r.meta.cadence)}; BLS via FRED) — the nation's carriers, not this building's quote; a memorandum's premium is the seller's expiring policy`,
+    figures: [
+      { key: "insurance_index_yoy", label: "Commercial property insurance premiums, national", value: r.value, unit: "pts", asOf: r.obsDate },
+    ],
+  };
+}
+
 const SLOOS_LABEL: Record<string, { key: string; loan: string }> = {
   SUBLPDRCSM: { key: "sloos_multifamily", loan: "multifamily loans" },
   SUBLPDRCSN: { key: "sloos_nonres", loan: "nonfarm nonresidential loans" },
@@ -464,6 +492,10 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
   // figure, ahead of the debt market's.
   const ri = rentIndexLine(input.national, input.assetClass);
   if (ri) said.push(ri);
+  // And the one national figure on the expense side: what the policy a
+  // building carries costs this year against last.
+  const ins = insuranceLine(input.national, input.assetClass);
+  if (ins) said.push(ins);
   said.push(...debtMarketLines(input.national, input.assetClass, input.plan ?? false));
   if (said.length === 0) return null;
   const lines = said.map((s) => s.line);
