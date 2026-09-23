@@ -2857,6 +2857,64 @@ describe("SampleLeverageCard — the sample's cap against the week's survey and 
   });
 });
 
+// ── The sample screen's demand side ─────────────────────────────────────────
+import { SampleDemandCard } from "@/app/demo/demand-card";
+
+describe("SampleDemandCard — the sample market's payrolls by sector, read today", () => {
+  // Philadelphia's rows as lib/metro-demand hands them over: all payrolls
+  // first, three sectors, the leisure figure a year old. The sample is an
+  // apartment building, so no sector is marked.
+  const demand = {
+    area: "Philadelphia MSA",
+    newestMonth: "Aug 2026",
+    mine: null,
+    intro: "Rental housing runs on all payrolls, drawn first; the sectors beneath say where the metro area's jobs are growing.",
+    stale: ["Leisure & hospitality as of Aug 1"],
+    rows: [
+      { key: "PHIL942NA_YOY", label: "All payrolls", valuePct: 0.30686, text: "0.3%", href: "https://fred.stlouisfed.org/series/PHIL942NA", obsDate: "2026-08-01", fresh: true, all: true, mine: false },
+      { key: "PHIL942PBSV_YOY", label: "Professional & business services", valuePct: 1.7451, text: "1.7%", href: "https://fred.stlouisfed.org/series/PHIL942PBSV", obsDate: "2026-08-01", fresh: true, all: false, mine: false },
+      { key: "SMU42379804200000001SA_YOY", label: "Retail trade", valuePct: -1.85854, text: "−1.9%", href: "https://fred.stlouisfed.org/series/SMU42379804200000001SA", obsDate: "2026-08-01", fresh: true, all: false, mine: false },
+      { key: "PHIL942LEIH_YOY", label: "Leisure & hospitality", valuePct: 2.65475, text: "2.7%", href: "https://fred.stlouisfed.org/series/PHIL942LEIH", obsDate: "2025-08-01", fresh: false, all: false, mine: false },
+    ],
+  };
+  const html = render(React.createElement(SampleDemandCard, { demand }));
+  const text = visibleText(html);
+
+  it("draws all payrolls first and the sectors beneath, dated, each figure linked, nothing singled out", () => {
+    expect(text).toContain("Demand check — read today, not opined");
+    expect(text).toContain("The demand side today — payrolls by sector, Philadelphia MSA");
+    expect(text).toContain("Rental housing runs on all payrolls, drawn first");
+    expect(text).not.toContain("this building's sector");
+    expect(text).toContain("Aug 2026 · BLS payrolls via FRED, against the same month a year earlier");
+    expect(text).toContain("one sector's figure is stale: Leisure & hospitality as of Aug 1");
+    expect(text).toContain("Every screened deal in a covered market gets this picture");
+    // Four bars: all payrolls in the neutral tone, every sector full (nothing is faded
+    // when nothing is marked), and the retail fall drawn leftward from the centre line.
+    expect((html.match(/data-bar="demand"/g) ?? []).length).toBe(4);
+    expect((html.match(/bg-ink\/40/g) ?? []).length).toBe(1);
+    expect(html).not.toContain("bg-brand/35");
+    expect(html).toContain('data-bar="demand" class="absolute inset-y-0 right-1/2 bg-brand"');
+    expect(html).toContain("https://fred.stlouisfed.org/series/PHIL942PBSV\"");
+    expect(html).toContain("https://fred.stlouisfed.org/series/SMU42379804200000001SA\"");
+  });
+
+  it("the phrase the live-verify marker greps is in the markup a curl receives", () => {
+    // The marker greps p_demo.html for "payrolls by sector, Philadelphia MSA" —
+    // inside one template literal, so React's <!-- --> separator never lands in it.
+    const served = renderToString(React.createElement(SampleDemandCard, { demand }));
+    expect(served).toContain("payrolls by sector, Philadelphia MSA");
+  });
+
+  it("renders nothing without a read, so the demo never shows a stale picture", () => {
+    expect(render(React.createElement(SampleDemandCard, { demand: null }))).not.toContain("demand side");
+  });
+
+  it("reads clean and names everything", () => {
+    expect(a11yIssues(html), "sample demand card").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+});
+
 // ── A sector's national lessor rent index on the market brief ───────────────
 import { LessorRentLine } from "@/app/market/lessor-rent-line";
 import { readRates as readNationalRates } from "@/lib/live-rates";

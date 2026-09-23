@@ -189,6 +189,7 @@ describe("DealView — the sample deal renders every section without a runtime e
         area: "Philadelphia MSA",
         newestMonth: "Aug 2026",
         mine: "Professional & business services",
+        intro: "Professional & business services is the sector that fills this building's kind, drawn full; the metro area's other sectors are beside it, faded, and all payrolls first.",
         stale: ["Leisure & hospitality as of Aug 1"],
         rows: [
           { key: "PHIL942NA_YOY", label: "All payrolls", valuePct: 0.30686, text: "0.3%", href: "https://fred.stlouisfed.org/series/PHIL942NA", obsDate: "2026-08-01", fresh: true, all: true, mine: false },
@@ -213,7 +214,15 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(html).toContain('data-bar="demand" class="absolute inset-y-0 right-1/2 bg-brand/35"');
     expect(html).toContain("https://fred.stlouisfed.org/series/PHIL942PBSV\"");
     // Rental housing singles nothing out, and the sample without a read draws nothing.
-    const apt = textOf(render({ ...withDemand, metroDemand: { ...withDemand.metroDemand!, mine: null, rows: withDemand.metroDemand!.rows.map((r) => ({ ...r, mine: false })) } }));
+    const apt = textOf(render({
+      ...withDemand,
+      metroDemand: {
+        ...withDemand.metroDemand!,
+        mine: null,
+        intro: "Rental housing runs on all payrolls, drawn first; the sectors beneath say where the metro area's jobs are growing.",
+        rows: withDemand.metroDemand!.rows.map((r) => ({ ...r, mine: false })),
+      },
+    }));
     expect(apt).toMatch(/Rental housing runs on all payrolls, drawn first/);
     expect(apt).not.toMatch(/this building's sector/);
     expect(textOf(render(p))).not.toMatch(/The demand side today/);

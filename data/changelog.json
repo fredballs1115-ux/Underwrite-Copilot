@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-23",
+      "title": "The demo shows the sample market's demand side, live",
+      "href": "/demo",
+      "blurb": "The demo's market section — the one page a visitor reads without signing in — now draws the Philadelphia area's payrolls by sector against a year ago, off the same rows a screened deal's market section reads today: all payrolls first, then the five sectors that fill each kind of building, dated, each figure linked to its series. The sample is an apartment building, so nothing is singled out; a screened office, warehouse, store or hotel gets its own sector drawn full, and the sentence under the bars is the deal's own kind's — a storage or land deal is never called rental housing. A read that fails leaves the card out rather than something stale on the page."
+    },
+    {
+      "date": "2026-09-23",
       "title": "The deal page draws the demand side of its market",
       "href": "/deals",
       "blurb": "Under the market check's folded figures, a deal in a covered market now carries a picture of the demand side: the metro area's payrolls by sector against a year ago — all payrolls first, then the five sectors that fill each kind of building — read today from the same rows the market brief draws, with the sector that fills this building's kind drawn full and the others faded. An office reads professional and business services, a warehouse transportation and warehousing, a store retail trade, a hotel leisure and hospitality; rental housing singles nothing out. A sector whose figure has stopped updating is kept and named rather than dropped, and every figure links to its series."

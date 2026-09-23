@@ -2059,7 +2059,28 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   housing singling nothing out, each figure linked; the page threads it
   through `DealView` and the analyses panel as one prop, off the figures
   it already reads for the model's checks, and nothing renders outside
-  the covered markets or before the pull has written a sector row. **The debt
+  the covered markets or before the pull has written a sector row. **The
+  demo draws the same picture on the sample** (#396,
+  `app/demo/demand-card.tsx`, `SampleDemandCard`, pure): the metro the
+  sample's own address falls in through `metroForAddress`, read through
+  `liveMetroRates`, beside the leverage card — the one page a visitor
+  reads without signing in showing what a screened deal gets; the sample
+  is an apartment building, so nothing is singled out. The bars are
+  `app/demand-bars.tsx` (`DemandBars`), the ONE picture the deal page's
+  client card and the demo's server card both draw, so it takes plain
+  rows and imports nothing but a type. **`metroDemand` takes the deal's
+  CLASS, not a sector, and writes the sentence under the heading itself**
+  (`intro`), because the sentence is the class's: rental housing runs on
+  all payrolls; a class that reads no sector — storage, land, a net
+  lease, parking, a data centre — says so, where the first cut called
+  every deal without a sector rental housing, which a self-storage
+  facility is not; a sector the metro has no row for is named as
+  missing; a kind nothing has read yet is said to be unread. A failed read leaves
+  the card out, never the page down, and the card renders only when the
+  read answered — so a NOT DEPLOYED on its marker after a deploy means
+  the read had nothing, not that the build is old. `lib/views.render.test.ts`
+  draws it on a fixture and checks the marker's phrase against
+  `renderToString`. **The debt
   market rides after the metro's lines, for every deal** (#384,
   `DEBT_MARKET_IDS`): the 10-year Treasury, what banks say about their
   standards for THIS kind of loan (`lendingStandardsFor` — rental housing
