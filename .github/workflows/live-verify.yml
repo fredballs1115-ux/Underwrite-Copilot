@@ -917,6 +917,15 @@ jobs:
           # string (the dash is a real em dash in the source, served as
           # itself). Absent until the rows exist, as #393's are.
           mark "#393 the payroll growth board is on the market page" grep -q "payroll growth by market and sector" p_market.html
+          # #396 — the demo's sample market reads its demand side live: the
+          # Philadelphia MSA's payrolls by sector off the rows the weekday
+          # pull writes, the picture a screened deal's market section draws
+          # (#395 — signed in, where live-verify cannot reach; this is the
+          # public copy of it). The heading is one JS string, and the card
+          # renders ONLY when the read answered. /demo is ISR (five minutes),
+          # so the first run after a deploy may read the build-time copy —
+          # run again.
+          mark "#396 the demo reads the sample market's payrolls by sector" grep -q "payrolls by sector, Philadelphia MSA" p_demo.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

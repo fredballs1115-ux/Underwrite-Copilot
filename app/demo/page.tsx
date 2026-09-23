@@ -18,6 +18,10 @@ import { DemoSections, type DemoData } from "./sections";
 import { ModelSlideshow } from "./model-slideshow";
 import { BrokerQuestions } from "./broker-questions";
 import { SampleLeverageCard } from "./leverage-card";
+import { SampleDemandCard } from "./demand-card";
+import { liveMetroRates } from "@/lib/live-rates-read";
+import { metroDemand, type MetroDemand } from "@/lib/metro-demand";
+import { metroForAddress } from "@/lib/market-match";
 import { PlaceBand } from "@/app/place-band";
 
 // ISR, five-minute window: without a revalidate this page is fully static
@@ -216,6 +220,22 @@ export default async function DemoPage() {
     seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed"),
   );
   const sampleCapPct = cap ? parsePct(cap) : null;
+
+  // The sample market's demand side — the same rows a screened deal in
+  // Philadelphia reads for its market section (lib/metro-demand): the metro
+  // the sample's own address falls in, through the same matcher and the
+  // same cached reader. The sample is an apartment building, so nothing is
+  // singled out. A failed read leaves the card out rather than the page
+  // down — the demo is the one page a visitor reads without signing in.
+  const sampleMetro = metroForAddress(SAMPLE_DEAL.address);
+  let demand: MetroDemand | null = null;
+  if (sampleMetro) {
+    try {
+      demand = metroDemand(await liveMetroRates(sampleMetro.id), SAMPLE_DEAL.asset_class);
+    } catch (err) {
+      console.warn("sample demand unavailable:", err instanceof Error ? err.message : err);
+    }
+  }
 
   // The sample's metro through the sector-fundamentals generator — the same
   // rows deal pages benchmark against. Formats a band or a point honestly.
@@ -554,6 +574,7 @@ export default async function DemoPage() {
             </div>
           </div>
           <SampleLeverageCard capPct={sampleCapPct} bench30={bench30} tenYear={debt.tenYear} />
+          <SampleDemandCard demand={demand} />
         </div>
       </section>
 

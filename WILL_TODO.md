@@ -255,6 +255,14 @@ drawn full and the others faded (rental housing singles nothing out),
 a stale sector kept and named, each figure linked; handed to the client
 view as plain rows (`lib/metro-demand.ts`) so the series table stays
 out of the browser bundle.
+Then #396: the demo draws the same picture on the sample — the metro the
+sample's own address falls in, read through the same cached reader,
+beside the leverage card on the one page a visitor reads without signing
+in; the bars moved to `app/demand-bars.tsx` so the deal page's client
+card and the demo's server card draw one picture; the sentence under
+the heading is the deal's own class's (a storage or land deal is never
+called rental housing, a missing sector row is named); a failed read
+leaves the card out, never the page down; a live-verify marker on /demo.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.
