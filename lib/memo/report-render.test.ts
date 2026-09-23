@@ -8,7 +8,7 @@ import { describe, it, expect } from "vitest";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { buildReportData, rangeRead, ReportDocument } from "./report-document";
-import { pdfFillCountOf } from "./pdf-text-of";
+import { pdfFillCountOf, pdfTextOf } from "./pdf-text-of";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
@@ -86,6 +86,36 @@ describe("ReportDocument (full report)", () => {
       }) as unknown as Parameters<typeof renderToBuffer>[0],
     );
     expect(pdfFillCountOf(buf) - pdfFillCountOf(plain)).toBe(checksCount * 3);
+
+    // A check that read the metro's published figures prints them under the
+    // checks, dated and named as the metro's — the report carries the
+    // check's evidence as the deal page does. The sample read none.
+    const withBrief = {
+      ...deal,
+      market: {
+        ...SAMPLE_DEAL.market,
+        liveBrief: {
+          metro: "Philadelphia, PA",
+          readOn: "2026-09-23",
+          lines: [
+            "Unemployment 4.1% (Jul 2026, Philadelphia MSA; FRED), +0.1 pt on the month before",
+            "Debt market — 10-year Treasury 4.94% (Sep 17, 2026; FRED), -3 bps on the day before",
+          ],
+          figures: [],
+        },
+      },
+    } as unknown as DealRow;
+    const briefed = await renderToBuffer(
+      React.createElement(ReportDocument, {
+        input: buildReportData(withBrief, "August 24, 2026", checks, sensitivity),
+      }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const briefedText = await pdfTextOf(briefed);
+    expect(briefedText).toContain("Figures the check read beside the rules of thumb");
+    expect(briefedText).toContain("Philadelphia, PA market's, as published, read on 2026-09-23");
+    expect(briefedText).toContain("Unemployment 4.1% (Jul 2026, Philadelphia MSA; FRED)");
+    expect(briefedText).toContain("10-year Treasury 4.94%");
+    expect(await pdfTextOf(buf)).not.toContain("Figures the check read");
 
     // The comp page draws each sale comp's stated basis on one track with
     // the subject's tick — a track, the fill and the tick, three fills a

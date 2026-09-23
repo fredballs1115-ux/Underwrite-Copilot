@@ -167,6 +167,11 @@ nonresidential, construction for a plan), CRE delinquency and bank CRE
 lending against a year ago — national, dated, for every deal, so the
 exit cap and the debt assumptions are checked against the capital side
 and not only the metro's income side.
+Then #385: the figures follow the check — the verdict's brief carries
+them as their own dated section and is told to name a figure and its
+date as a source, the report's market page prints them under the
+checks, and the shared screen's market read says how many were read,
+for which metro, on which day.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.

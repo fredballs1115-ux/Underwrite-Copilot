@@ -655,6 +655,11 @@ export function ReportDocument({ input }: { input: ReportInput }) {
     planNoun.one,
   );
   const checks = list(market?.checks) as NonNullable<MarketResult["checks"]>;
+  // The published figures the check read (lib/live-market-brief), printed
+  // under the checks so the report carries the check's evidence as the
+  // deal page does. Standard Helvetica: the lines carry only WinAnsi text.
+  const liveBrief = market?.liveBrief ?? null;
+  const liveLines = list(liveBrief?.lines).map(str).filter(Boolean);
   const rows = list(reconciliation?.rows) as NonNullable<
     ReconciliationResult["rows"]
   >;
@@ -1183,6 +1188,18 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           {str(market?.summary) ? (
             <View style={s.summaryBox} wrap={false}>
               <Text style={s.summaryText}>{str(market?.summary)}</Text>
+            </View>
+          ) : null}
+          {liveBrief && liveLines.length > 0 ? (
+            <View style={{ marginTop: 8 }}>
+              <Text style={s.sub}>
+                {`Figures the check read beside the rules of thumb: the ${str(liveBrief.metro)} market's, as published, read on ${str(liveBrief.readOn)}. Each is the metro's, not the submarket's or the building's.`}
+              </Text>
+              {liveLines.map((l, i) => (
+                <Text key={i} style={{ fontSize: 7.5, color: C.muted, marginTop: 2 }}>
+                  {`• ${l}`}
+                </Text>
+              ))}
             </View>
           ) : null}
         </PageChrome>
