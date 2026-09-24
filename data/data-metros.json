@@ -26,6 +26,6 @@
     { "id": "riverside", "name": "Riverside-San Bernardino CA", "states": ["CA"], "keywords": ["riverside", "san bernardino", "inland empire", "ontario", "rancho cucamonga", "fontana", "moreno valley", "corona", "temecula", "murrieta", "victorville", "palm springs"], "region": "west", "cbsa": "40140", "zillow": "Riverside, CA", "census": "Riverside" },
     { "id": "detroit", "name": "Detroit MI", "states": ["MI"], "keywords": ["detroit", "wayne county", "oakland county", "macomb", "dearborn", "warren", "livonia", "troy", "southfield", "sterling heights", "pontiac", "novi"], "region": "midwest", "cbsa": "19820", "zillow": "Detroit, MI", "census": "Detroit" },
     { "id": "portland", "name": "Portland OR", "states": ["OR", "WA"], "keywords": ["portland", "multnomah", "washington county", "clackamas", "beaverton", "hillsboro", "gresham", "tigard", "lake oswego", "vancouver", "clark county"], "region": "west", "cbsa": "38900", "zillow": "Portland, OR", "census": "Portland-Vancouver" },
-    { "id": "cleveland", "name": "Cleveland OH", "states": ["OH"], "keywords": ["cleveland", "cuyahoga", "lorain", "elyria", "lake county", "medina county", "parma", "lakewood"], "region": "midwest", "cbsa": "17460", "zillow": "Cleveland, OH", "census": "Cleveland" }
+    { "id": "cleveland", "name": "Cleveland OH", "states": ["OH"], "keywords": ["cleveland", "cuyahoga", "lorain", "elyria", "lake county", "medina county", "parma", "lakewood"], "region": "midwest", "cbsa": "17410", "zillow": "Cleveland, OH", "census": "Cleveland" }
   ]
 }
