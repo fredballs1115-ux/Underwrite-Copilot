@@ -668,7 +668,12 @@
         "Houston skyline panorama",
         "Houston downtown cityscape"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Downtown Houston, TX Skyline - 2018.jpg",
+          "note": "Downtown Houston from Buffalo Bayou — David Daniel Turner, CC BY 4.0. The chosen file, in lib/skyline.ts (contact sheet 8)."
+        }
+      ]
     },
     {
       "metroId": "minneapolis",
@@ -688,7 +693,12 @@
         "Minneapolis skyline panorama",
         "Minneapolis downtown cityscape"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Minneapolis Skyline looking south.jpg",
+          "note": "Downtown Minneapolis over the Mississippi, looking south — BpA9543, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (contact sheet 8)."
+        }
+      ]
     },
     {
       "metroId": "san_diego",
@@ -728,7 +738,12 @@
         "Las Vegas skyline panorama",
         "Las Vegas downtown cityscape"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Night aerial view, Las Vegas, Nevada, 04649u.jpg",
+          "note": "The Las Vegas Strip at night, from the air — Carol M. Highsmith, Public domain. The chosen file, in lib/skyline.ts (contact sheet 8)."
+        }
+      ]
     },
     {
       "metroId": "tampa",
@@ -748,7 +763,12 @@
         "Tampa skyline panorama",
         "Tampa downtown cityscape"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Downtown Tampa, Florida.jpg",
+          "note": "Downtown Tampa across the Hillsborough River — Clément Bardot, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (contact sheet 8)."
+        }
+      ]
     },
     {
       "metroId": "orlando",
