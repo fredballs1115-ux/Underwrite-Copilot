@@ -292,6 +292,10 @@ if (probe.length > 0) {
           `${m?.seasonal_adjustment_short ?? ""} · newest ${o ? `${o.value} (${o.date})` : "none"}` +
           ` · last updated ${m?.last_updated ?? "?"}`,
       );
+      // The notes carry the source and any copyright — a series FRED shows
+      // may still be a licensed index (Case-Shiller is S&P's), so a
+      // candidate is judged on this line as much as on its title.
+      if (m?.notes) console.log(`      notes: ${String(m.notes).replace(/\s+/g, " ").slice(0, 600)}`);
     } catch (err) {
       console.log(`  ${id}: NOT FOUND — ${err instanceof Error ? err.message : String(err)}`);
     }
