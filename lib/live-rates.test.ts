@@ -27,6 +27,7 @@ import {
 import { FIXTURE_NOW as NOW, REAL_ROWS as REAL } from "./live-rates.fixture";
 import table from "@/data/fred-series.json";
 import metrosSeed from "@/data/research/metros.json";
+import { DATA_METROS } from "@/lib/market-match";
 import {
   HVS_RATES_URL,
   METRO_SERIES,
@@ -607,6 +608,9 @@ describe("the Treasury a clause names", () => {
 
 describe("a covered metro's own series", () => {
   const COVERED = (metrosSeed.metros ?? []).map((m) => m.id);
+  // The metro areas the site reads without a brief file their series under
+  // the same list, by their own ids (data/data-metros.json).
+  const READ_ONLY = DATA_METROS.map((m) => m.id);
 
   it("gives every covered metro something to show", () => {
     expect(COVERED.length).toBe(18);
@@ -614,13 +618,32 @@ describe("a covered metro's own series", () => {
       expect(metroSeriesFor(id).series.length, id).toBeGreaterThan(0);
     }
     // Filed under the metro group, never a contract rate, each with the
-    // area FRED's own title names.
+    // area FRED's own title names, under a briefed market or a metro read
+    // without one.
     expect(METRO_SERIES.length).toBeGreaterThan(50);
     for (const m of METRO_SERIES) {
       expect(m.group).toBe("metro");
       expect(m.contractRate).toBe(false);
       expect(m.area.length, m.id).toBeGreaterThan(3);
-      expect(COVERED, m.id).toContain(m.metro);
+      expect([...COVERED, ...READ_ONLY], m.id).toContain(m.metro);
+    }
+  });
+
+  it("gives every metro read without a brief its own survey vacancy, its region's figure borrowed and named, and no alias", () => {
+    expect(READ_ONLY.length).toBe(26);
+    for (const m of DATA_METROS) {
+      const got = metroSeriesFor(m.id);
+      const own = got.series.filter((s) => s.metro === m.id);
+      expect(own.length, m.id).toBeGreaterThan(0);
+      const hvs = own.find((s) => s.metric === "rental_vacancy_msa");
+      expect(hvs?.id, m.id).toBe(`HVS_RVR_${m.cbsa}`);
+      expect(hvs?.census, m.id).toBe(m.census);
+      expect(hvs?.moe, m.id).toBe(`HVS_RVR_${m.cbsa}_MOE`);
+      const region = got.series.find((s) => s.metric === "rental_vacancy");
+      expect(region?.metro, m.id).toBe(m.region);
+      expect(got.borrowed, m.id).toEqual(["rental_vacancy"]);
+      // The order is the metric order, the region's figure last.
+      expect(got.series.at(-1)?.metric, m.id).toBe("rental_vacancy");
     }
   });
 
@@ -757,10 +780,18 @@ describe("a covered metro's own series", () => {
       expect(m.label, m.id).toMatch(/^All Employees: .* — change from a year ago/);
       expect(SECTOR_JOBS_LABEL[m.metric as keyof typeof SECTOR_JOBS_LABEL], m.id).toBeTruthy();
     }
-    // Every MSA carries all five: fourteen pictures, seventy series.
+    // Every MSA that carries them carries all five: the fourteen briefed
+    // MSAs, and each metro read without a brief whose sector ids the runner
+    // printed (Cleveland's broke at the 2023 redraw and waits on its probe).
     const sectorSeries = METRO_SERIES.filter((s) => isSectorJobsMetric(s.metric));
-    expect(new Set(sectorSeries.map((s) => s.metro)).size).toBe(14);
-    expect(sectorSeries.length).toBe(70);
+    const withSectors = new Set(sectorSeries.map((s) => s.metro));
+    const readOnlyWithSectors = DATA_METROS.filter((m) => withSectors.has(m.id));
+    expect(withSectors.size).toBe(14 + readOnlyWithSectors.length);
+    expect(readOnlyWithSectors.length).toBeGreaterThanOrEqual(25);
+    for (const metro of withSectors) {
+      expect(sectorSeries.filter((s) => s.metro === metro).length, metro).toBe(5);
+    }
+    expect(sectorSeries.length).toBe(5 * withSectors.size);
     // And a read hands them back in the table's order, between the jobs and the permits.
     const rows: RateRow[] = [
       { series_id: "WASH911NA_YOY", obs_date: "2026-08-01", value: 1.2 },
@@ -1080,10 +1111,13 @@ describe("the metro area's own rental vacancy, from the survey's workbook, with 
   // companion series, and a sample's margin for one metro is wide enough
   // that the figure is never shown without it.
   const COVERED = (metrosSeed.metros ?? []).map((m) => m.id);
+  // The metro areas read without a brief have the survey's figure too — the
+  // 75-largest-metro tables carry every one of them.
+  const READ_ONLY = DATA_METROS.map((m) => m.id);
   const CENSUS = METRO_SERIES.filter((s) => s.source === "census");
 
-  it("files fourteen metro areas under one metric, each with a name prefix and a margin companion", () => {
-    expect(CENSUS).toHaveLength(14);
+  it("files forty metro areas under one metric — fourteen briefed and twenty-six read without a brief — each with a name prefix and a margin companion", () => {
+    expect(CENSUS).toHaveLength(14 + 26);
     for (const s of CENSUS) {
       expect(s.metric, s.id).toBe("rental_vacancy_msa");
       expect(s.id).toMatch(/^HVS_RVR_\d{5}$/);
@@ -1095,7 +1129,7 @@ describe("the metro area's own rental vacancy, from the survey's workbook, with 
       expect(s.units).toBeNull();
       expect(s.derived).toBeNull();
       expect(s.fred).toBe(s.id);
-      expect(COVERED).toContain(s.metro);
+      expect([...COVERED, ...READ_ONLY]).toContain(s.metro);
       // A companion is read beside its figure, never as a series of its own.
       expect(seriesMeta(s.moe!)).toBeNull();
     }

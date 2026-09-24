@@ -28,7 +28,7 @@ import {
 } from "@/lib/research-data";
 import { sectorLeaderboard } from "@/lib/sector-leaderboard";
 import { linkOk } from "@/lib/link-audit";
-import { coveredState, metroForAddress } from "@/lib/market-match";
+import { coveredState, dataMetroForAddress, metroForAddress } from "@/lib/market-match";
 import { parsePct } from "@/lib/criteria";
 import { capSpreadRead, leverageRead } from "@/lib/leverage";
 import {
@@ -249,6 +249,9 @@ export async function ResearchPanel({
   const evals = address?.state ? evaluateRules(rules, subject) : [];
   const shown = evals.filter((e) => e.outcome !== "not_applicable");
   const metro = address ? metroForAddress(address) : null;
+  // A metro area the site reads without a brief: its published figures are
+  // under the market check, and the honest sentence here says that is all.
+  const dataMetro = address && !metro ? dataMetroForAddress(address) : null;
 
   // vs-market: covered-market name first (a Brooklyn deal must find the
   // "New York City" FMR row), raw city as the fallback. Same-sector rows
@@ -326,10 +329,27 @@ export async function ResearchPanel({
           <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
           Covered market: {metro.name} — open the market brief →
         </Link>
+      ) : dataMetro ? (
+        // A metro the site reads but does not brief — Pittsburgh, Phoenix,
+        // Houston: the market check reads its published figures (jobs,
+        // permits, prices, rents, vacancy) and nothing else is on file for it.
+        <p className="mt-2 text-[11px] text-muted">
+          {`${dataMetro.name} is read, not briefed — its published figures sit under the market check; no brief, comps pull or tracker here`}
+          {coveredState(address.state)
+            ? "; statewide rules still evaluate below."
+            : "."}{" "}
+          <Link
+            href="/market"
+            className="underline decoration-dotted underline-offset-2 hover:text-brand"
+          >
+            See the briefed markets
+          </Link>
+        </p>
       ) : (
-        // Keyed off the MARKET match, not the state: a Pittsburgh or Roanoke
-        // deal sits in a covered STATE but outside every covered market, and
-        // must say so — statewide rules below still evaluate.
+        // Keyed off the MARKET match, not the state: a Roanoke or Harrisburg
+        // deal sits in a covered STATE but outside every covered market and
+        // every metro the site reads, and must say so — statewide rules
+        // below still evaluate.
         <p className="mt-2 text-[11px] text-muted">
           Not in a covered market — market-level coverage here is unscreened,
           not unregulated

@@ -41,6 +41,9 @@
 // line, never a guessed number.
 
 import { createClient } from "@supabase/supabase-js";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 
 const SOURCE = "https://www.zillow.com/research/data/";
 const FILES = [
@@ -105,6 +108,12 @@ const METROS = [
   { id: "atlanta", name: "Atlanta", region: "Atlanta, GA" },
   { id: "dallas", name: "Dallas-Fort Worth", region: "Dallas, TX" },
 ];
+// The metro areas the site reads without a brief (data/data-metros.json):
+// the same rows, filed under each one's own name, matched by the Zillow
+// RegionName the list carries — a claim until this pull's dry run prints
+// the row it matched.
+const { metros: DATA_METROS } = require("../data/data-metros.json");
+for (const m of DATA_METROS) METROS.push({ id: m.id, name: m.name, region: m.zillow });
 
 /** A CSV line's cells, quotes honoured (a RegionName never has a comma inside quotes today, but a StateName might one day). */
 function cells(line) {

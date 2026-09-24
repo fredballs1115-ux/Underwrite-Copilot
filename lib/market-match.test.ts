@@ -79,11 +79,65 @@ describe("stateForAddress — the fallback grain for a deal outside the covered 
 // ── The market the live figures are read for ────────────────────────────────
 import { marketForAddress } from "./market-match";
 
-describe("marketForAddress — the covered metro where there is one, the state otherwise, one function for every live read", () => {
-  it("answers the covered metro for an address inside one, the state outside, and nothing with no state", () => {
+describe("marketForAddress — the briefed market where there is one, the metro read without a brief where there is one of those, the state otherwise: one function for every live read", () => {
+  it("answers the briefed market first, then the data metro, then the state, and nothing with no state", () => {
     expect(marketForAddress({ city: "Philadelphia", state: "PA" })).toEqual({ id: "philadelphia", name: expect.any(String) });
-    expect(marketForAddress({ city: "Pittsburgh", state: "PA" })).toEqual({ id: "state:PA", name: "Pennsylvania" });
-    expect(marketForAddress({ city: "Phoenix", state: "Arizona" })).toEqual({ id: "state:AZ", name: "Arizona" });
+    expect(marketForAddress({ city: "Pittsburgh", state: "PA" })).toEqual({ id: "pittsburgh", name: "Pittsburgh PA" });
+    expect(marketForAddress({ city: "Phoenix", state: "Arizona" })).toEqual({ id: "phoenix", name: "Phoenix AZ" });
+    expect(marketForAddress({ city: "Harrisburg", state: "PA" })).toEqual({ id: "state:PA", name: "Pennsylvania" });
     expect(marketForAddress({ city: "Toronto" })).toBeNull();
+  });
+});
+
+// ── The metro areas read without a brief ────────────────────────────────────
+import { DATA_METROS, dataMetroForAddress, isDataMetro } from "./market-match";
+
+describe("dataMetroForAddress — the metro areas the site reads but does not brief", () => {
+  it("holds the list's shape: an id no briefed market uses, a name, states, lowercase keywords, a region, a CBSA and the pulls' keys", () => {
+    expect(DATA_METROS.length).toBe(26);
+    const briefed = new Set(coveredMarketGeoTargets().map((t) => t.label));
+    for (const m of DATA_METROS) {
+      expect(m.id, m.id).toMatch(/^[a-z_]+$/);
+      expect(briefed.has(m.name), m.id).toBe(false);
+      expect(m.states.length, m.id).toBeGreaterThan(0);
+      expect(m.keywords.every((k) => k === k.toLowerCase()), m.id).toBe(true);
+      expect(["northeast", "midwest", "south", "west"], m.id).toContain(m.region);
+      expect(m.cbsa, m.id).toMatch(/^\d{5}$/);
+      expect(m.zillow, m.id).toMatch(/, [A-Z]{2}$/);
+      expect(m.census.length, m.id).toBeGreaterThan(3);
+    }
+    expect(new Set(DATA_METROS.map((m) => m.id)).size).toBe(DATA_METROS.length);
+    expect(new Set(DATA_METROS.map((m) => m.cbsa)).size).toBe(DATA_METROS.length);
+  });
+
+  it("matches by city, county or submarket inside the metro's own state, and never across a state line", () => {
+    expect(dataMetroForAddress({ city: "Pittsburgh", state: "PA" })?.id).toBe("pittsburgh");
+    expect(dataMetroForAddress({ city: "Scottsdale", state: "AZ" })?.id).toBe("phoenix");
+    expect(dataMetroForAddress({ city: "Aurora", county: "Arapahoe County", state: "CO" })?.id).toBe("denver");
+    expect(dataMetroForAddress({ city: "Sugar Land", state: "Texas" })?.id).toBe("houston");
+    expect(dataMetroForAddress({ city: "Round Rock", state: "TX" })?.id).toBe("austin");
+    expect(dataMetroForAddress({ city: "Overland Park", state: "KS" })?.id).toBe("kansas_city");
+    expect(dataMetroForAddress({ city: "Belleville", state: "IL" })?.id).toBe("st_louis");
+    expect(dataMetroForAddress({ city: "Covington", state: "KY" })?.id).toBe("cincinnati");
+    expect(dataMetroForAddress({ city: "Vancouver", state: "WA" })?.id).toBe("portland");
+    expect(dataMetroForAddress({ city: "Ontario", state: "CA" })?.id).toBe("riverside");
+    expect(dataMetroForAddress({ submarket: "Inland Empire", state: "CA" })?.id).toBe("riverside");
+    // Aurora IL is Chicago's suburb, not Denver's; Lakewood OH is Cleveland's, not Denver's.
+    expect(dataMetroForAddress({ city: "Aurora", state: "IL" })).toBeNull();
+    expect(dataMetroForAddress({ city: "Lakewood", state: "OH" })?.id).toBe("cleveland");
+    expect(dataMetroForAddress({ city: "Lakewood", state: "CO" })?.id).toBe("denver");
+    // Vancouver BC is no one's; Harrisburg is Pennsylvania's own.
+    expect(dataMetroForAddress({ city: "Vancouver", state: "BC" })).toBeNull();
+    expect(dataMetroForAddress({ city: "Harrisburg", state: "PA" })).toBeNull();
+    expect(dataMetroForAddress({ state: "PA" })).toBeNull();
+    expect(dataMetroForAddress({})).toBeNull();
+  });
+
+  it("never claims a briefed market: Philadelphia stays the research matcher's, and a briefed market's id is not a data metro", () => {
+    expect(dataMetroForAddress({ city: "Philadelphia", state: "PA" })).toBeNull();
+    expect(isDataMetro("pittsburgh")).toBe(true);
+    expect(isDataMetro("philadelphia")).toBe(false);
+    expect(isDataMetro("state:PA")).toBe(false);
+    expect(isDataMetro(null)).toBe(false);
   });
 });

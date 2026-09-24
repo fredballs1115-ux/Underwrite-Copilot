@@ -44,6 +44,9 @@
 // two percentile ranks and says nothing the rank and its parts do not.
 
 import { createClient } from "@supabase/supabase-js";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 
 const URL = "https://econdata.s3-us-west-2.amazonaws.com/Reports/Core/RDC_Inventory_Core_Metrics_Metro.csv";
 const HOTNESS_URL = "https://econdata.s3-us-west-2.amazonaws.com/Reports/Hotness/RDC_Inventory_Hotness_Metrics_Metro_History.csv";
@@ -82,6 +85,12 @@ const METROS = [
   { id: "atlanta", name: "Atlanta", cbsa: "12060" },
   { id: "dallas", name: "Dallas-Fort Worth", cbsa: "19100" },
 ];
+// The metro areas the site reads without a brief (data/data-metros.json):
+// the same rows, filed under each one's own name, keyed by the CBSA the
+// list carries — a claim until this pull's dry run prints the title beside
+// the code.
+const { metros: DATA_METROS } = require("../data/data-metros.json");
+for (const m of DATA_METROS) METROS.push({ id: m.id, name: m.name, cbsa: m.cbsa });
 
 /** The columns the table takes, by the header's own names. */
 const COLUMNS = [

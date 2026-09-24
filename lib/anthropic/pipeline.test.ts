@@ -407,9 +407,41 @@ describe("runAnalysis — the happy path", () => {
     expect((state.deals.d1.market as { liveBrief?: unknown }).liveBrief).toBeNull();
   });
 
-  it("a deal outside the covered metros is handed its state's figures, said as the state's, and stores the grain", async () => {
-    // Pittsburgh is in no covered metro; Pennsylvania's own series are filed under state:PA.
+  it("a deal in a metro area the site reads without a brief is handed the metro's figures, as the metro's, with the header saying there is no brief behind them", async () => {
     state.deals.d1.address = { city: "Pittsburgh", state: "PA" };
+    state.rates = [
+      { series_id: "PITT342URN", obs_date: "2026-07-01", value: 4.1 },
+      { series_id: "PITT342URN", obs_date: "2026-06-01", value: 4.3 },
+      { series_id: "PITT342NA_YOY", obs_date: "2026-08-01", value: 0.6 },
+      { series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 },
+      // Pennsylvania's own row must NOT be read: the deal sits in a metro the table covers.
+      { series_id: "PAUR", obs_date: "2026-08-01", value: 3.7 },
+    ];
+    state.benchmarks = [];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    const handed = vi.mocked(checkMarket).mock.calls[0][3];
+    expect(handed).toContain(
+      "Published figures for the Pittsburgh PA metro area the deal sits in — a market the site reads but does not brief, so these figures are all it holds for it — read on 2026-09-23",
+    );
+    expect(handed).toContain("- Unemployment 4.1% (Jul 2026, Pittsburgh MSA; FRED), -0.2 pt on the month before");
+    expect(handed).toContain("- Nonfarm payrolls +0.6% from a year ago (Aug 2026, Pittsburgh MSA; FRED)");
+    expect(handed).not.toContain("Pennsylvania");
+    const stored = state.deals.d1.market as { liveBrief?: { metro: string; grain?: string; lines: string[] } | null };
+    expect(stored.liveBrief?.metro).toBe("Pittsburgh PA");
+    expect(stored.liveBrief?.grain).toBe("metro");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  it("a deal outside the covered metros is handed its state's figures, said as the state's, and stores the grain", async () => {
+    // Harrisburg is in no briefed market and no metro the site reads without
+    // one; Pennsylvania's own series are filed under state:PA.
+    state.deals.d1.address = { city: "Harrisburg", state: "PA" };
     state.rates = [
       { series_id: "PAUR", obs_date: "2026-08-01", value: 3.7 },
       { series_id: "PAUR", obs_date: "2026-07-01", value: 3.6 },
