@@ -360,7 +360,23 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   a soft daytime strip 795px tall; the sixth, a Chicago-only run
   (35792083388), opened the search door and found NorbertNagel's sunrise
   frame from the lakefront, 4000px and the band's own 2.4:1 shape, which
-  now serves.
+  now serves. **The twenty-six metro areas read without a brief** (#407)
+  took five six-market sheets (runs 35943054619, 35943350787,
+  35943520435, 35943694349, 35943831078) and a one-market run each for
+  the six whose sheet held nothing (Phoenix 35944782635, Charlotte
+  35944863842, San Diego 35944937703, Orlando 35944984991, Indianapolis
+  35945058692, Riverside 35945179705) — every file's comment in
+  `lib/skyline.ts` names its run, and **every candidate was judged
+  through the band's own crop, not the thumbnail**: a scratchpad script
+  (sharp) crops each file as `object-cover` at 50% / 42% to 1064×336 and
+  302×240 and paints the caption scrim over it, because a 1.5:1 frame
+  that looks superb on a contact sheet loses its tallest tower's top in
+  a 4:1 band. That is how Cleveland's sunrise panorama, gorgeous on the
+  sheet, lost to the Lakewood Park frame whose towers stand above the
+  words. Riverside has no skyline and keeps a real view from Box Springs
+  Mountain rather than an overhead; Salt Lake City's city sits at the
+  foot of its frame under the Wasatch, and its own one-market run
+  (35945126660) found nothing better.
 - Deal math without a deal: `lib/tools/deal-math.ts` (pure — the cap rate
   triangle, the mortgage constant, `sizeLoan` against whichever of LTV /
   DSCR / debt yield were set with the **binding one named**, break-even
@@ -2009,7 +2025,17 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   opaque, i.e. an eighth of the picture, and nothing caught it. A tier
   like `text-white/75` reads at 10:1 on a flat teal band and far less on
   the same band with a photograph behind it, so every tier a band uses is
-  measured too.
+  measured too. **A market's own band on `/market` is `MarketBand`**
+  (#409 — one component for the briefed markets and the ones read without
+  a brief) under a third shape, `"caption"`: the proportional "band"
+  scrim is 85% opaque at 55% of the height because a page's opening
+  words can reach 60% up, and on a 256px card band that veiled the lower
+  half of every photograph. `CAPTION_SCRIM` is anchored in PIXELS to the
+  tallest words the band holds (an eyebrow over a name wrapped to two
+  lines on a phone, 110px), clear by 208px, and the band is 15rem / 21rem
+  so everything above that is picture; the contrast test imports the
+  stops and holds white to AAA and the accent eyebrow to AA at every
+  point the words reach, against the same pure-white frame.
 - The News page's live layer: `lib/news/feeds.ts` (pure: the sources with
   their fallbacks, parsing, ranking) and `lib/news/live.ts` (the network:
   a fresh copy per process, a wall-clock deadline per source, the

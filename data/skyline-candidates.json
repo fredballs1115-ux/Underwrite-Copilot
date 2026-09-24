@@ -561,7 +561,12 @@
         "Phoenix skyline from Piestewa Peak",
         "Phoenix Arizona skyline night"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Downtown Phoenix Aerial Looking Northeast (cropped).jpg",
+          "note": "Downtown Phoenix from the air, looking northeast to the mountains — DPPed, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (one-market sheet, run 35944782635)."
+        }
+      ]
     },
     {
       "metroId": "denver",
@@ -638,7 +643,12 @@
         "Charlotte North Carolina skyline night",
         "Charlotte skyline sunset"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Charlotte night skyline 2016.jpg",
+          "note": "Uptown Charlotte's towers lit at night — Nan Palmero, CC BY 2.0. The chosen file, in lib/skyline.ts (one-market sheet, run 35944863842)."
+        }
+      ]
     },
     {
       "metroId": "austin",
@@ -741,7 +751,12 @@
         "San Diego bay skyline",
         "San Diego skyline night Coronado"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "San Diego skyline at dusk from Coronado 2015.jpg",
+          "note": "Downtown San Diego at dusk, across the bay from Coronado — russellstreet, CC BY-SA 2.0. The chosen file, in lib/skyline.ts (one-market sheet, run 35944937703)."
+        }
+      ]
     },
     {
       "metroId": "las_vegas",
@@ -817,7 +832,12 @@
         "Orlando Florida skyline night",
         "Orlando downtown skyline"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "High-rises in Orlando from Lake Eola Park (May 2023) - 5 (cropped).JPG",
+          "note": "Downtown Orlando over Lake Eola and its fountain — Benoît Prieur, CC0. The chosen file, in lib/skyline.ts (one-market sheet, run 35944984991)."
+        }
+      ]
     },
     {
       "metroId": "raleigh",
@@ -977,7 +997,12 @@
         "Indianapolis skyline sunset",
         "Indianapolis Indiana skyline"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Downtown Indianapolis panorama, 2015.jpg",
+          "note": "Downtown Indianapolis and the Soldiers' and Sailors' Monument at sunset — reddit user MikeSanborn, CC BY 4.0. The chosen file, in lib/skyline.ts (one-market sheet, run 35945058692)."
+        }
+      ]
     },
     {
       "metroId": "kansas_city",
@@ -1103,7 +1128,12 @@
         "Riverside California downtown",
         "Inland Empire skyline"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Riverside, California view from Box Springs.jpg",
+          "note": "Riverside from Box Springs Mountain, over the UC Riverside campus — vlasta2, CC BY 2.0. The chosen file, in lib/skyline.ts (one-market sheet, run 35945179705)."
+        }
+      ]
     },
     {
       "metroId": "detroit",

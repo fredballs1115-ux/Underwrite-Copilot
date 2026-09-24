@@ -953,6 +953,11 @@ jobs:
           mark "#405 the survey vacancy board ranks every metro area the site reads" grep -q "two metro areas whose whiskers overlap are not ordered by it" p_market.html
           # #408 — the rent board (one JS string in its note):
           mark "#408 the rent board ranks every metro area the site reads" grep -q "a suburb shares its metro area's row and is not listed twice" p_market.html
+          # #409 — the market band's caption scrim, anchored in px to its words.
+          # The style string exists only since the change, so this can fail;
+          # the photographs themselves are proven by the PHOTOGRAPHS lines
+          # (a credit renders whether or not its picture resolves).
+          mark "#409 the market band paints the caption scrim" grep -q "var(--color-sidebar) 80%, transparent) 120px" p_market.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

@@ -328,6 +328,8 @@ export const SKYLINES: Record<string, SkylineShot> = {
   },
   // salt_lake_city: chosen by eye from contact sheet 9 (skyline-sheet run
   // 35943520435, 2026-09-24) — the article's lead, the skyline under the snow on the Wasatch at 3000px — over a rooftop view from the Church Office Building and four airport aerials.
+  // Its own one-market run (skyline-sheet run 35945126660) found nothing better:
+  // the view from Ensign Peak is a grid under a haze and the Capitol a building.
   salt_lake_city: {
     file: "SLC Skyline 2024.jpg",
     place: "Downtown Salt Lake City against the Wasatch",
@@ -423,6 +425,60 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Erik Drost",
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+  },
+  // phoenix: chosen by eye from its own one-market sheet (skyline-sheet run
+  // 35944782635, 2026-09-24), through the market band's own crop — the article's lead, an oblique aerial of the towers with the mountains beyond them — over a street corner and the airport's control tower, which are what the six-market sheet held, a hazy dusk from South Mountain and two night frames the band turns black.
+  phoenix: {
+    file: "Downtown Phoenix Aerial Looking Northeast (cropped).jpg",
+    place: "Downtown Phoenix from the air, looking northeast to the mountains",
+    credit: "DPPed",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+  },
+  // charlotte: chosen by eye from its own one-market sheet (skyline-sheet run
+  // 35944863842, 2026-09-24), through the market band's own crop — the Duke Energy Center's violet and the Bank of America crown filling the band — over the article's daytime lead, whose crop loses its tallest tower's top, a monochrome strip too short for the band and a stadium aerial.
+  charlotte: {
+    file: "Charlotte night skyline 2016.jpg",
+    place: "Uptown Charlotte's towers lit at night",
+    credit: "Nan Palmero",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+  },
+  // san_diego: chosen by eye from its own one-market sheet (skyline-sheet run
+  // 35944937703, 2026-09-24), through the market band's own crop — the view the city is known by, from its own tallest-buildings article — over a hazy night panorama, a sunrise panorama whose towers vanish under the words and two daytime frames that lose their tops.
+  san_diego: {
+    file: "San Diego skyline at dusk from Coronado 2015.jpg",
+    place: "Downtown San Diego at dusk, across the bay from Coronado",
+    credit: "russellstreet",
+    license: "CC BY-SA 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0",
+  },
+  // orlando: chosen by eye from its own one-market sheet (skyline-sheet run
+  // 35944984991, 2026-09-24), through the market band's own crop — Lake Eola, the picture the city is known by, with the fountain and the towers reflected — over a high aerial, a rooftop over a car park and the same lake under a storm sky.
+  orlando: {
+    file: "High-rises in Orlando from Lake Eola Park (May 2023) - 5 (cropped).JPG",
+    place: "Downtown Orlando over Lake Eola and its fountain",
+    credit: "Benoît Prieur",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  },
+  // indianapolis: chosen by eye from its own one-market sheet (skyline-sheet run
+  // 35945058692, 2026-09-24), through the market band's own crop — the monument at the city's centre against a sunset — over two midday panoramas where the city is a strip under the words and the stadium and reservoir aerials the six-market sheet held; the credit is the name the runner printed, without the permission link printed after it.
+  indianapolis: {
+    file: "Downtown Indianapolis panorama, 2015.jpg",
+    place: "Downtown Indianapolis and the Soldiers' and Sailors' Monument at sunset",
+    credit: "reddit user MikeSanborn",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+  },
+  // riverside: chosen by eye from its own one-market sheet (skyline-sheet run
+  // 35945179705, 2026-09-24), through the market band's own crop — a real view of the place from the mountain over the campus — there is no skyline to photograph, and the convention-centre aerial and the San Bernardino station and airport frames were the alternatives.
+  riverside: {
+    file: "Riverside, California view from Box Springs.jpg",
+    place: "Riverside from Box Springs Mountain, over the UC Riverside campus",
+    credit: "vlasta2",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
   },
 };
 
