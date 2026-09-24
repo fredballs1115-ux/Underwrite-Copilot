@@ -281,6 +281,42 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
   },
+  // houston: chosen by eye from contact sheet 8 (skyline-sheet run
+  // 35943357716, 2026-09-24) — the article's lead, the tower cluster over the bayou's trees at 4320px — over a 3587×1202 strip and street-level frames of the aquarium and the transit centre.
+  houston: {
+    file: "Downtown Houston, TX Skyline - 2018.jpg",
+    place: "Downtown Houston from Buffalo Bayou",
+    credit: "David Daniel Turner",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+  },
+  // minneapolis: chosen by eye from contact sheet 8 (skyline-sheet run
+  // 35943357716, 2026-09-24) — the article's lead, the skyline over the river at 4828px — over St. Anthony Falls at dusk, which is the falls rather than the city, and a 5168×1528 strip.
+  minneapolis: {
+    file: "Minneapolis Skyline looking south.jpg",
+    place: "Downtown Minneapolis over the Mississippi, looking south",
+    credit: "BpA9543",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+  },
+  // las_vegas: chosen by eye from contact sheet 8 (skyline-sheet run
+  // 35943357716, 2026-09-24) — the Strip lit at night from above at 6144px, the picture the place is known by — over a daytime aerial of downtown and the mountains, which is a city rather than Las Vegas.
+  las_vegas: {
+    file: "Night aerial view, Las Vegas, Nevada, 04649u.jpg",
+    place: "The Las Vegas Strip at night, from the air",
+    credit: "Carol M. Highsmith",
+    license: "Public domain",
+    licenseUrl: "",
+  },
+  // tampa: chosen by eye from contact sheet 8 (skyline-sheet run
+  // 35943357716, 2026-09-24) — the article's lead, the towers across the river under a blue sky at 4810px — over two Gasparilla-festival frames from 2002 and a 1913 photograph.
+  tampa: {
+    file: "Downtown Tampa, Florida.jpg",
+    place: "Downtown Tampa across the Hillsborough River",
+    credit: "Clément Bardot",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+  },
 };
 
 export function skylineFor(id: string): SkylineShot | null {
