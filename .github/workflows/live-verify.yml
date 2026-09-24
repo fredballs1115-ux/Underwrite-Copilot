@@ -940,6 +940,9 @@ jobs:
           # expression, inside a closed <details>. Absent until the pull has
           # written the series (see #390).
           mark "#398 the insurance premium index is on the strip" grep -q "Property insurance premiums y/y" p_tools2.html
+          # #403 — the payroll board's block for the metro areas read without a
+          # brief (one JS string in the board's note, no interpolation inside it):
+          mark "#403 the payroll board reads the metro areas without a brief" grep -q "reads without a brief: the same series, ranked in the same columns" p_market.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

@@ -30,11 +30,20 @@ import { heatShade } from "./heat-shade";
  * and left out of the shading (a dead series is worth seeing, not worth
  * ranking); a metro with no series for a sector is a dash, never a zero;
  * and nothing renders until a pull has written a fresh row.
+ *
+ * The metro areas the site reads without a brief (#403) are rows too,
+ * in their own block after the briefed markets and ranked in the same
+ * columns — Phoenix's office-using jobs against Washington's is the
+ * comparison the board exists for — with the name unlinked, because there
+ * is no market page behind it, and the note saying what the block is.
  */
 export interface BoardMarket {
   id: string;
   name: string;
   region?: string;
+  /** False for a metro area the site reads without a brief (data/data-metros.json):
+   *  the same series and the same shading, no market page to link to. */
+  briefed?: boolean;
 }
 
 export const BOARD_METRICS: readonly MetroMetric[] = ["jobs_yoy", ...SECTOR_JOBS_METRICS];
@@ -133,13 +142,22 @@ export function SectorJobsBoard({
                   .map((m) => (
                     <tr key={m.id} className="border-b border-line/60">
                       <td className="py-1.5 pr-3">
-                        <Link
-                          href={`/market?metro=${m.id}`}
-                          prefetch={false}
-                          className="text-xs font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
-                        >
-                          {m.name}
-                        </Link>
+                        {m.briefed === false ? (
+                          <span
+                            className="text-xs font-medium text-ink"
+                            title="Read without a brief — the same published series, no market page, comps pull or tracker behind it"
+                          >
+                            {m.name}
+                          </span>
+                        ) : (
+                          <Link
+                            href={`/market?metro=${m.id}`}
+                            prefetch={false}
+                            className="text-xs font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
+                          >
+                            {m.name}
+                          </Link>
+                        )}
                       </td>
                       {BOARD_METRICS.map((metric) => {
                         const r = cell(m.id, metric);
@@ -190,6 +208,9 @@ export function SectorJobsBoard({
       </div>
       <p className="mt-3 text-[11px] leading-relaxed text-muted">
         {`BLS payrolls for each metro area by supersector, each against the same month a year earlier${newest ? `, newest ${monthOf(newest)}` : ""}, via FRED, pulled every weekday; a suburb reads its metro area's row. A dashed figure with a date is a series that stopped updating, shown rather than ranked; a dash is a series FRED does not carry. Each column is the sector that fills a kind of building — offices, warehouses, stores, hotels, clinics — and all payrolls is what rental housing runs on.`}
+        {rows.some((m) => m.briefed === false)
+          ? " The last block is the metro areas the site reads without a brief: the same series, ranked in the same columns, with no research brief, comps pull or tracker behind them and no market page to open."
+          : ""}
       </p>
     </section>
   );
