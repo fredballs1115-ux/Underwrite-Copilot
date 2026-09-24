@@ -310,12 +310,18 @@ Realtor.com's rows, on the market check, the deal page, the report and
 the workbook as the metro's, with the header saying there is no brief
 behind them. Then #403: the payroll board on `/market` carries the
 metro areas read without a brief as a block of their own, ranked in
-the same columns, unlinked, the note saying what the block is. **Open
-after it**: a metro page for each of them (`/market/<id>` without a
-brief — the tiles, the demand and supply pictures, the asking rent and
-the for-sale lines, and nothing the site has not read), and the vacancy
-leaderboard's rank picture, which stays paired with the briefed markets
-for now.
+the same columns, unlinked, the note saying what the block is. Then #404: each of
+them has a market page (`/market?metro=<id>` — the place, one sentence
+saying what the page is and is not, the asking rent and for-sale lines,
+the tiles with the demand and supply pictures, and nothing the site has
+not read), reached from a folded chip row on the explorer. **Open after
+it**: the twenty-six frames are business-district coordinates written
+from knowledge and checked by eye on the deployed page — look at each
+once (`/market?metro=<id>`) and correct any that frames the wrong
+blocks; a photograph for each (the skyline probe's Wikipedia door, six
+markets a run) would take the band from an overhead to the picture the
+place is known by; and the vacancy leaderboard's rank picture stays
+paired with the briefed markets for now.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.

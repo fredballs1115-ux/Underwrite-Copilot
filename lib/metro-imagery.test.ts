@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import metrosSeed from "@/data/research/metros.json";
+import { DATA_METROS } from "@/lib/market-match";
 import {
   METRO_FRAME_METRES,
   METRO_VIEWS,
@@ -8,18 +9,21 @@ import {
 } from "./metro-imagery";
 
 const metroIds = (metrosSeed.metros ?? []).map((m) => (m as { id: string }).id);
+// The metro areas read without a brief have a frame too (#404): their
+// market page opens on it the way a briefed market's does.
+const readOnlyIds = DATA_METROS.map((m) => m.id);
 
 describe("metro coverage", () => {
   it("has a view for every metro in the research seed", () => {
     // The failure this catches: someone adds a metro to metros.json and the
     // homepage silently renders a card with no picture in it.
-    const missing = metroIds.filter((id) => !(id in METRO_VIEWS));
-    expect(missing, `metros.json ids with no METRO_VIEWS entry: ${missing.join(", ")}`).toEqual([]);
+    const missing = [...metroIds, ...readOnlyIds].filter((id) => !(id in METRO_VIEWS));
+    expect(missing, `metro ids with no METRO_VIEWS entry: ${missing.join(", ")}`).toEqual([]);
   });
 
   it("has no view for a metro that no longer exists", () => {
-    const orphans = Object.keys(METRO_VIEWS).filter((id) => !metroIds.includes(id));
-    expect(orphans, `METRO_VIEWS ids absent from metros.json: ${orphans.join(", ")}`).toEqual([]);
+    const orphans = Object.keys(METRO_VIEWS).filter((id) => !metroIds.includes(id) && !readOnlyIds.includes(id));
+    expect(orphans, `METRO_VIEWS ids absent from metros.json and data-metros.json: ${orphans.join(", ")}`).toEqual([]);
   });
 
   it("covers a non-trivial number of markets", () => {
