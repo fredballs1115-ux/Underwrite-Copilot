@@ -282,7 +282,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
   },
   // houston: chosen by eye from contact sheet 8 (skyline-sheet run
-  // 35943357716, 2026-09-24) — the article's lead, the tower cluster over the bayou's trees at 4320px — over a 3587×1202 strip and street-level frames of the aquarium and the transit centre.
+  // 35943350787, 2026-09-24) — the article's lead, the tower cluster over the bayou's trees at 4320px — over a 3587×1202 strip and street-level frames of the aquarium and the transit centre.
   houston: {
     file: "Downtown Houston, TX Skyline - 2018.jpg",
     place: "Downtown Houston from Buffalo Bayou",
@@ -291,7 +291,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
   },
   // minneapolis: chosen by eye from contact sheet 8 (skyline-sheet run
-  // 35943357716, 2026-09-24) — the article's lead, the skyline over the river at 4828px — over St. Anthony Falls at dusk, which is the falls rather than the city, and a 5168×1528 strip.
+  // 35943350787, 2026-09-24) — the article's lead, the skyline over the river at 4828px — over St. Anthony Falls at dusk, which is the falls rather than the city, and a 5168×1528 strip.
   minneapolis: {
     file: "Minneapolis Skyline looking south.jpg",
     place: "Downtown Minneapolis over the Mississippi, looking south",
@@ -300,7 +300,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
   },
   // las_vegas: chosen by eye from contact sheet 8 (skyline-sheet run
-  // 35943357716, 2026-09-24) — the Strip lit at night from above at 6144px, the picture the place is known by — over a daytime aerial of downtown and the mountains, which is a city rather than Las Vegas.
+  // 35943350787, 2026-09-24) — the Strip lit at night from above at 6144px, the picture the place is known by — over a daytime aerial of downtown and the mountains, which is a city rather than Las Vegas.
   las_vegas: {
     file: "Night aerial view, Las Vegas, Nevada, 04649u.jpg",
     place: "The Las Vegas Strip at night, from the air",
@@ -309,13 +309,58 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "",
   },
   // tampa: chosen by eye from contact sheet 8 (skyline-sheet run
-  // 35943357716, 2026-09-24) — the article's lead, the towers across the river under a blue sky at 4810px — over two Gasparilla-festival frames from 2002 and a 1913 photograph.
+  // 35943350787, 2026-09-24) — the article's lead, the towers across the river under a blue sky at 4810px — over two Gasparilla-festival frames from 2002 and a 1913 photograph.
   tampa: {
     file: "Downtown Tampa, Florida.jpg",
     place: "Downtown Tampa across the Hillsborough River",
     credit: "Clément Bardot",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+  },
+  // raleigh: chosen by eye from contact sheet 9 (skyline-sheet run
+  // 35943520435, 2026-09-24) — the article's lead, the tower cluster and the amphitheatre lit low from the west at 4000px — over two panoramio street views, a Fayetteville Street frame and, from the search, a photograph of Kyiv by a Raleigh photographer.
+  raleigh: {
+    file: "Raleigh Skyline.jpg",
+    place: "Downtown Raleigh at golden hour, from the air",
+    credit: "Abhiram Juvvadi",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+  },
+  // salt_lake_city: chosen by eye from contact sheet 9 (skyline-sheet run
+  // 35943520435, 2026-09-24) — the article's lead, the skyline under the snow on the Wasatch at 3000px — over a rooftop view from the Church Office Building and four airport aerials.
+  salt_lake_city: {
+    file: "SLC Skyline 2024.jpg",
+    place: "Downtown Salt Lake City against the Wasatch",
+    credit: "Invictus323",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+  },
+  // san_antonio: chosen by eye from contact sheet 9 (skyline-sheet run
+  // 35943520435, 2026-09-24) — the city from its own observation tower at 4032px, the Grand Hyatt in the foreground — over a 2000×735 strip and a campus frame.
+  san_antonio: {
+    file: "Downtown San Antonio view from The Tower of the Americas.jpg",
+    place: "Downtown San Antonio from the Tower of the Americas",
+    credit: "Jouaienttoi",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+  },
+  // sacramento: chosen by eye from contact sheet 9 (skyline-sheet run
+  // 35943520435, 2026-09-24) — the article's lead, the gold Tower Bridge with the skyline behind at 7967px — over a ballpark frame and two aerials.
+  sacramento: {
+    file: "Sacramento, CA skyline (cropped).jpg",
+    place: "The Tower Bridge and downtown Sacramento over the Sacramento River",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+  },
+  // columbus: chosen by eye from contact sheet 9 (skyline-sheet run
+  // 35943520435, 2026-09-24) — the article's lead, the LeVeque Tower and the river at 6188px, public domain — over the same view in two other crops and a rooftop frame from the tower.
+  columbus: {
+    file: "Downtown Columbus View from Main St Bridge - edit1.jpg",
+    place: "Downtown Columbus from the Main Street Bridge over the Scioto",
+    credit: "Paul Wasneski",
+    license: "Public domain",
+    licenseUrl: "",
   },
 };
 
