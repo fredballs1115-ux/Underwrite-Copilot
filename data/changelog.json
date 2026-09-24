@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-24",
+      "title": "Where rental vacancy is lowest, forty metro areas, each with its margin",
+      "href": "/market",
+      "blurb": "The Census Bureau's Housing Vacancy Survey publishes a rental vacancy rate for the 75 largest metro areas each quarter, and it is the one vacancy figure every metro the site reads has on the same basis. The market page now ranks all forty — the briefed markets and the ones read without a brief alike — tightest first, each bar carrying the survey's own margin of error as a whisker and the national rate as a line, because a quarter's figure for one metro is a sample: two metro areas whose whiskers overlap are not ordered by it, whatever the ranking says."
+    },
+    {
+      "date": "2026-09-24",
       "title": "A market page for each metro area read without a brief",
       "href": "/market?metro=pittsburgh",
       "blurb": "The twenty-six metro areas the site reads without a brief each open on the market page now — the place, one sentence saying what the page is and is not, Zillow's asking rents, Realtor.com's for-sale market, and the metro's own published figures with the demand and supply pictures — drawn by the same components a briefed market's page uses, and nothing the site has not read: no research note, no sector tracker, no fair market rent, no comps, no rules. They sit folded under the explorer's regions, twenty-six chips in a fold rather than a wall."

@@ -949,6 +949,8 @@ jobs:
           # note is one JS string; the chip row's fold is on /market itself):
           mark "#404 a metro read without a brief has its own market page" grep -q "A market the site reads but does not brief: the published figures below" p_market_pitt.html
           mark "#404 the explorer folds the metro areas read without a brief" grep -q "metro areas with live figures and no research note" p_market.html
+          # #405 — the survey vacancy board, forty metro areas with their margins (one JS string):
+          mark "#405 the survey vacancy board ranks every metro area the site reads" grep -q "two metro areas whose whiskers overlap are not ordered by it" p_market.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

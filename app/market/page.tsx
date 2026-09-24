@@ -16,6 +16,7 @@ import type { LiveRate } from "@/lib/live-rates";
 import { sectorPayrollMetric } from "@/lib/live-market-brief";
 import { SectorJobsRank } from "./sector-jobs-rank";
 import { BOARD_METRICS, SectorJobsBoard } from "./sector-jobs-board";
+import { SurveyVacancyBoard } from "./survey-vacancy-board";
 import { DATA_METROS } from "@/lib/market-match";
 import { heatShade } from "./heat-shade";
 import { MetroLive } from "./metro-live";
@@ -383,6 +384,7 @@ export default async function MarketDataPage({
       {/* The same board over the demand side: every metro area × every
           sector's payrolls against a year ago, live from FRED. */}
       <SectorJobsBoardLive />
+      <SurveyVacancyBoardLive />
       <MidAtlanticTable />
       <SectorExplorer selected={sectorParam} />
       <LiveRatesStrip />
@@ -1071,6 +1073,27 @@ async function SectorJobsBoardLive() {
     ...DATA_METROS.map((m) => ({ id: m.id, name: m.name, region: "Read without a brief", briefed: false })),
   ];
   return <SectorJobsBoard markets={markets} rates={rates} />;
+}
+
+// ── Survey vacancy board (every metro area the site reads) ──────────────────
+// One cached read across the metros and the strip's own for the national
+// rate; a failed read leaves the board out rather than half-drawn.
+async function SurveyVacancyBoardLive() {
+  let rates: LiveRate[];
+  let us: LiveRate | null = null;
+  try {
+    const [r, national] = await Promise.all([liveMetricRates("rental_vacancy_msa"), liveRates()]);
+    rates = r;
+    us = national.find((x) => x.meta.id === "RRVRUSQ156N") ?? null;
+  } catch (err) {
+    console.warn("survey vacancy board read failed:", err instanceof Error ? err.message : err);
+    return null;
+  }
+  const markets = [
+    ...(metrosSeed.metros ?? []).map((m) => ({ id: m.id, name: m.name })),
+    ...DATA_METROS.map((m) => ({ id: m.id, name: m.name, briefed: false })),
+  ];
+  return <SurveyVacancyBoard markets={markets} rates={rates} us={us} />;
 }
 
 // ── Sector leaderboard (cross-metro) ─────────────────────────────────────────
