@@ -13,8 +13,14 @@ import {
 import { gluedWords } from "./render-lint";
 import metrosSeed from "@/data/research/metros.json";
 import candidateFile from "@/data/skyline-candidates.json";
+import { DATA_METROS } from "@/lib/market-match";
 
-const METRO_IDS = new Set((metrosSeed.metros ?? []).map((m) => (m as { id: string }).id));
+const METRO_IDS = new Set([
+  ...(metrosSeed.metros ?? []).map((m) => (m as { id: string }).id),
+  // The metro areas read without a brief have a market page that opens on
+  // the place too (#404), so a photograph may serve one of them.
+  ...DATA_METROS.map((m) => m.id),
+]);
 
 describe("the market photograph table", () => {
   it("only names markets the research layer actually covers", () => {

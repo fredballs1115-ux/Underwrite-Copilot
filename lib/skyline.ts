@@ -245,6 +245,42 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 2.0",
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
   },
+  // pittsburgh: chosen by eye from contact sheet 7 (skyline-sheet run
+  // 35943054619, 2026-09-24) — the golden-hour view over the Monongahela with PPG Place lit, the picture the city is known by — over a winter overlook framed by a bare tree and two night panoramas too short for the band.
+  pittsburgh: {
+    file: "Downtown Pittsburgh seen from Mt. Washington.jpg",
+    place: "Downtown Pittsburgh at the Point, from Mount Washington",
+    credit: "EEJCC",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+  },
+  // denver: chosen by eye from contact sheet 7 (skyline-sheet run
+  // 35943054619, 2026-09-24) — the article's own lead, the towers against the snow on the Front Range at 6782px — over a 2048×580 midnight panorama and a stadium aerial.
+  denver: {
+    file: "Denver, Colorado skyline (cropped 3x5).jpg",
+    place: "Downtown Denver against the Front Range",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+  },
+  // nashville: chosen by eye from contact sheet 7 (skyline-sheet run
+  // 35943054619, 2026-09-24) — the article's lead, downtown over the Cumberland with the river bridges in the frame at 6850px — over three drone aerials of the riverfront.
+  nashville: {
+    file: "Nashville, Tennessee (cropped).jpg",
+    place: "Downtown Nashville over the Cumberland River",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+  },
+  // austin: chosen by eye from contact sheet 7 (skyline-sheet run
+  // 35943054619, 2026-09-24) — the article's lead, the tower cluster over Lady Bird Lake at 10242px — over the pedestrian-bridge view and a sunset frame from 2011.
+  austin: {
+    file: "Skyline of Austin, Texas (cropped).jpg",
+    place: "Downtown Austin over Lady Bird Lake",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+  },
 };
 
 export function skylineFor(id: string): SkylineShot | null {
