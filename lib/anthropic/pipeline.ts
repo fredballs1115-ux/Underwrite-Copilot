@@ -32,6 +32,7 @@ import {
   plausibilityNote,
 } from "@/lib/deal-strategy";
 import { dealContextFor } from "@/lib/deal-context";
+import { portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { marketForAddress } from "@/lib/market-match";
 import { SERIES, metroSeriesFor, readMetroRates, readRates } from "@/lib/live-rates";
@@ -198,6 +199,7 @@ async function liveMarketFromDb(
       now,
       national: readRates(nationalRows, now),
       assetClass,
+      portfolio: portfolioFor(ex, metro.id),
       plan,
     });
   } catch (err) {
@@ -672,6 +674,12 @@ async function runAnalysisSteps(
           planSummary(ex, strategy),
         );
         if (plausibility) notes.push(plausibility);
+
+        // A portfolio: what the extraction established about the properties
+        // (the markets, the income's concentration, the allocation against
+        // the ask) and the portfolio traps by name — lib/portfolio.
+        const portfolio = readPortfolio(ex);
+        if (portfolio) notes.push(portfolioNote(portfolio));
 
         if (flagged.length) {
           notes.push(

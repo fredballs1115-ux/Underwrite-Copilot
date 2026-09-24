@@ -331,7 +331,14 @@ instead of veiling half the frame. Then #410: the Fed's commercial
 property price index (`BOGZ1FL010000386Q`, quarterly, against a year
 ago) on the rates strip and in the market check's national lines for a
 building that trades on its income — the value side the debt market's
-lines left out. **Open after it**: the twenty-six
+lines left out. Then #411: portfolio deals — the extraction lists each
+property a memorandum offers, `lib/portfolio` reads their shares, the
+income's concentration, the markets and the allocation against the ask,
+the challenger gets the portfolio traps, the deal context and the market
+check's header say what the portfolio spans, and the deal page draws a
+card a property; the report, the shared screen and the workbook do not
+carry it yet, and the market check still reads one market's figures (the
+address on file) and says so. **Open after it**: the twenty-six
 overhead frames are now only the fallback, but they are still
 business-district coordinates written from knowledge — look at each once
 on the deployed page if a photograph ever 404s; Salt Lake City's city

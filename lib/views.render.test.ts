@@ -3458,3 +3458,52 @@ describe("RentBoard — where apartment asking rents are moving, every metro are
     expect(render(React.createElement(RentBoard, { markets, reads: new Map() }))).not.toContain("Where apartment asking rents");
   });
 });
+
+// ── A portfolio OM's properties on the deal page (#411) ────────────────────
+import { PortfolioCard } from "@/app/(app)/deals/[id]/portfolio-card";
+import { readPortfolio } from "@/lib/portfolio";
+
+describe("PortfolioCard — a portfolio OM's properties, one row each", () => {
+  const prop = (name: string, address: string, count: string, noi: string, occupancy: string, allocatedPrice: string, page: string) => ({
+    name, address, count, area: "", noi, occupancy, yearBuilt: "", allocatedPrice, page,
+  });
+  const extraction = {
+    dealName: "Rust Belt Residential Portfolio",
+    assetClass: "multifamily",
+    properties: [
+      prop("Liberty Lofts", "1200 Liberty Ave, Pittsburgh, PA 15222", "128", "$1,420,000", "95%", "$28,000,000", "p. 14"),
+      prop("Ohio City Commons", "1850 W 25th St, Cleveland, OH 44113", "210", "$2,050,000", "94%", "$38,000,000", "p. 22"),
+      prop("Marion Gardens", "400 Barks Rd, Marion, OH 43302", "60", "$310,000", "82%", "$4,000,000", "p. 30"),
+    ],
+    metrics: [{ label: "Asking price", value: "$75,000,000", flagged: false, page: "p. 3" }],
+  };
+
+  it("draws each property's share of the units and of the NOI, links the markets the site reads, and says what does not add up", () => {
+    const html = render(React.createElement(PortfolioCard, { portfolio: readPortfolio(extraction), assetClass: "multifamily" }));
+    const text = visibleText(html);
+    expect(text).toContain("The portfolio — 3 properties");
+    expect(html.match(/data-qa="portfolio-property"/g)).toHaveLength(3);
+    expect(html.match(/data-bar="portfolio"/g)).toHaveLength(3);
+    expect(html.match(/data-bar="portfolio-noi"/g)).toHaveLength(3);
+    // The markets: two the site reads, linked; the state, not.
+    expect(html).toContain('href="/market?metro=pittsburgh"');
+    expect(html).toContain('href="/market?metro=cleveland"');
+    expect(html).not.toContain("metro=state");
+    expect(text).toContain("Ohio · 1");
+    // The allocation sums to $70M against the $75M ask.
+    expect(text).toContain("The allocated prices sum to $70.0M against the $75.0M ask (-6.7%) — the memorandum does not add up.");
+    // Ohio City Commons carries 54% of the stated NOI.
+    expect(text).toContain("Ohio City Commons carries 54% of the stated NOI");
+    expect(text).toContain("210 units · 94% occupied · NOI $2.1M · allocated $38.0M ($181k per unit), a 5.4% cap on the allocation");
+    expect(a11yIssues(html), "portfolio card").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("draws no income bar from a partial set, and nothing at all for a single property", () => {
+    const partial = { ...extraction, properties: extraction.properties.map((x, i) => (i === 1 ? { ...x, noi: "" } : x)) };
+    const html = render(React.createElement(PortfolioCard, { portfolio: readPortfolio(partial), assetClass: "multifamily" }));
+    expect(html).not.toContain('data-bar="portfolio-noi"');
+    expect(visibleText(html)).toContain("2 of the 3 properties state an NOI of their own, so the income's split is not drawn.");
+    expect(render(React.createElement(PortfolioCard, { portfolio: readPortfolio({ ...extraction, properties: [extraction.properties[0]] }) }))).not.toContain("The portfolio");
+  });
+});

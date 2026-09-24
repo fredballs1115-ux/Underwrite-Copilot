@@ -5,6 +5,8 @@ import { SectorFieldsForm } from "./sector-fields-form";
 import type { SectorFieldValues } from "@/lib/sector-fields";
 import { PublicCompsPanel } from "./public-comps-panel";
 import { PropertyVisual } from "./property-visual";
+import { PortfolioCard } from "./portfolio-card";
+import { readPortfolio } from "@/lib/portfolio";
 import { PICTURE_CREDIT, ensureDealPicture } from "@/lib/deal-picture";
 import { assetClassLabel } from "@/lib/asset-class";
 import { assetWords, countNoun } from "@/lib/asset-words";
@@ -1050,6 +1052,13 @@ export default async function DealPage({
           canReplace={!(deal as { is_sample?: boolean }).is_sample}
         />
       )}
+
+      {/* A portfolio OM's properties, one row each (lib/portfolio): absent
+          for a single-property memorandum. */}
+      <PortfolioCard
+        portfolio={readPortfolio(extraction)}
+        assetClass={extraction?.assetClass || (deal.asset_class as string | null) || null}
+      />
 
       {/* Submarket supply (Phase 4): the deal's rent growth, exit cap and
           vacancy, checked against what the linked submarket has actually
