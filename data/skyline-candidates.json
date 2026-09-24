@@ -509,6 +509,527 @@
           "note": "Downtown from Reunion Tower, 6002x3058, IcedCowboyCoffee, CC0 — a PNG, which the probe weighed at 3,110 KB at 1600px against the chosen JPEG's 736 KB (live-verify run 35781910084). Not served; kept so the probe keeps reporting the weight."
         }
       ]
+    },
+    {
+      "metroId": "pittsburgh",
+      "city": "Pittsburgh",
+      "wikipedia": [
+        "Pittsburgh",
+        "Downtown Pittsburgh"
+      ],
+      "categories": [
+        "Skylines of Pittsburgh",
+        "Pittsburgh skyline",
+        "Views of Pittsburgh",
+        "Panoramics of Pittsburgh",
+        "Aerial photographs of Pittsburgh"
+      ],
+      "queries": [
+        "Pittsburgh skyline panorama",
+        "Pittsburgh downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "phoenix",
+      "city": "Phoenix, Arizona",
+      "wikipedia": [
+        "Phoenix, Arizona",
+        "Downtown Phoenix"
+      ],
+      "categories": [
+        "Skylines of Phoenix, Arizona",
+        "Phoenix, Arizona skyline",
+        "Views of Phoenix, Arizona",
+        "Panoramics of Phoenix, Arizona",
+        "Aerial photographs of Phoenix, Arizona"
+      ],
+      "queries": [
+        "Phoenix skyline panorama",
+        "Phoenix downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "denver",
+      "city": "Denver",
+      "wikipedia": [
+        "Denver",
+        "Downtown Denver"
+      ],
+      "categories": [
+        "Skylines of Denver",
+        "Denver skyline",
+        "Views of Denver",
+        "Panoramics of Denver",
+        "Aerial photographs of Denver"
+      ],
+      "queries": [
+        "Denver skyline panorama",
+        "Denver downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "nashville",
+      "city": "Nashville, Tennessee",
+      "wikipedia": [
+        "Nashville, Tennessee",
+        "Downtown Nashville"
+      ],
+      "categories": [
+        "Skylines of Nashville, Tennessee",
+        "Nashville, Tennessee skyline",
+        "Views of Nashville, Tennessee",
+        "Panoramics of Nashville, Tennessee",
+        "Aerial photographs of Nashville, Tennessee"
+      ],
+      "queries": [
+        "Nashville skyline panorama",
+        "Nashville downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "charlotte",
+      "city": "Charlotte, North Carolina",
+      "wikipedia": [
+        "Charlotte, North Carolina",
+        "Uptown Charlotte"
+      ],
+      "categories": [
+        "Skylines of Charlotte, North Carolina",
+        "Charlotte, North Carolina skyline",
+        "Views of Charlotte, North Carolina",
+        "Panoramics of Charlotte, North Carolina",
+        "Aerial photographs of Charlotte, North Carolina"
+      ],
+      "queries": [
+        "Charlotte skyline panorama",
+        "Charlotte downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "austin",
+      "city": "Austin, Texas",
+      "wikipedia": [
+        "Austin, Texas",
+        "Downtown Austin"
+      ],
+      "categories": [
+        "Skylines of Austin, Texas",
+        "Austin, Texas skyline",
+        "Views of Austin, Texas",
+        "Panoramics of Austin, Texas",
+        "Aerial photographs of Austin, Texas"
+      ],
+      "queries": [
+        "Austin skyline panorama",
+        "Austin downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "houston",
+      "city": "Houston",
+      "wikipedia": [
+        "Houston",
+        "Downtown Houston"
+      ],
+      "categories": [
+        "Skylines of Houston",
+        "Houston skyline",
+        "Views of Houston",
+        "Panoramics of Houston",
+        "Aerial photographs of Houston"
+      ],
+      "queries": [
+        "Houston skyline panorama",
+        "Houston downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "minneapolis",
+      "city": "Minneapolis",
+      "wikipedia": [
+        "Minneapolis",
+        "Downtown Minneapolis"
+      ],
+      "categories": [
+        "Skylines of Minneapolis",
+        "Minneapolis skyline",
+        "Views of Minneapolis",
+        "Panoramics of Minneapolis",
+        "Aerial photographs of Minneapolis"
+      ],
+      "queries": [
+        "Minneapolis skyline panorama",
+        "Minneapolis downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "san_diego",
+      "city": "San Diego",
+      "wikipedia": [
+        "San Diego",
+        "Downtown San Diego"
+      ],
+      "categories": [
+        "Skylines of San Diego",
+        "San Diego skyline",
+        "Views of San Diego",
+        "Panoramics of San Diego",
+        "Aerial photographs of San Diego"
+      ],
+      "queries": [
+        "San Diego skyline panorama",
+        "San Diego downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "las_vegas",
+      "city": "Las Vegas",
+      "wikipedia": [
+        "Las Vegas",
+        "Las Vegas Strip"
+      ],
+      "categories": [
+        "Skylines of Las Vegas",
+        "Las Vegas skyline",
+        "Views of Las Vegas",
+        "Panoramics of Las Vegas",
+        "Aerial photographs of Las Vegas"
+      ],
+      "queries": [
+        "Las Vegas skyline panorama",
+        "Las Vegas downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "tampa",
+      "city": "Tampa, Florida",
+      "wikipedia": [
+        "Tampa, Florida",
+        "Downtown Tampa"
+      ],
+      "categories": [
+        "Skylines of Tampa, Florida",
+        "Tampa, Florida skyline",
+        "Views of Tampa, Florida",
+        "Panoramics of Tampa, Florida",
+        "Aerial photographs of Tampa, Florida"
+      ],
+      "queries": [
+        "Tampa skyline panorama",
+        "Tampa downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "orlando",
+      "city": "Orlando, Florida",
+      "wikipedia": [
+        "Orlando, Florida",
+        "Downtown Orlando"
+      ],
+      "categories": [
+        "Skylines of Orlando, Florida",
+        "Orlando, Florida skyline",
+        "Views of Orlando, Florida",
+        "Panoramics of Orlando, Florida",
+        "Aerial photographs of Orlando, Florida"
+      ],
+      "queries": [
+        "Orlando skyline panorama",
+        "Orlando downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "raleigh",
+      "city": "Raleigh, North Carolina",
+      "wikipedia": [
+        "Raleigh, North Carolina",
+        "Downtown Raleigh"
+      ],
+      "categories": [
+        "Skylines of Raleigh, North Carolina",
+        "Raleigh, North Carolina skyline",
+        "Views of Raleigh, North Carolina",
+        "Panoramics of Raleigh, North Carolina",
+        "Aerial photographs of Raleigh, North Carolina"
+      ],
+      "queries": [
+        "Raleigh skyline panorama",
+        "Raleigh downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "salt_lake_city",
+      "city": "Salt Lake City",
+      "wikipedia": [
+        "Salt Lake City",
+        "Downtown Salt Lake City"
+      ],
+      "categories": [
+        "Skylines of Salt Lake City",
+        "Salt Lake City skyline",
+        "Views of Salt Lake City",
+        "Panoramics of Salt Lake City",
+        "Aerial photographs of Salt Lake City"
+      ],
+      "queries": [
+        "Salt Lake City skyline panorama",
+        "Salt Lake City downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "san_antonio",
+      "city": "San Antonio",
+      "wikipedia": [
+        "San Antonio",
+        "Downtown San Antonio"
+      ],
+      "categories": [
+        "Skylines of San Antonio",
+        "San Antonio skyline",
+        "Views of San Antonio",
+        "Panoramics of San Antonio",
+        "Aerial photographs of San Antonio"
+      ],
+      "queries": [
+        "San Antonio skyline panorama",
+        "San Antonio downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "sacramento",
+      "city": "Sacramento, California",
+      "wikipedia": [
+        "Sacramento, California",
+        "Downtown Sacramento"
+      ],
+      "categories": [
+        "Skylines of Sacramento, California",
+        "Sacramento, California skyline",
+        "Views of Sacramento, California",
+        "Panoramics of Sacramento, California",
+        "Aerial photographs of Sacramento, California"
+      ],
+      "queries": [
+        "Sacramento skyline panorama",
+        "Sacramento downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "columbus",
+      "city": "Columbus, Ohio",
+      "wikipedia": [
+        "Columbus, Ohio",
+        "Downtown Columbus, Ohio"
+      ],
+      "categories": [
+        "Skylines of Columbus, Ohio",
+        "Columbus, Ohio skyline",
+        "Views of Columbus, Ohio",
+        "Panoramics of Columbus, Ohio",
+        "Aerial photographs of Columbus, Ohio"
+      ],
+      "queries": [
+        "Columbus skyline panorama",
+        "Columbus downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "indianapolis",
+      "city": "Indianapolis",
+      "wikipedia": [
+        "Indianapolis",
+        "Downtown Indianapolis"
+      ],
+      "categories": [
+        "Skylines of Indianapolis",
+        "Indianapolis skyline",
+        "Views of Indianapolis",
+        "Panoramics of Indianapolis",
+        "Aerial photographs of Indianapolis"
+      ],
+      "queries": [
+        "Indianapolis skyline panorama",
+        "Indianapolis downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "kansas_city",
+      "city": "Kansas City, Missouri",
+      "wikipedia": [
+        "Kansas City, Missouri",
+        "Downtown Kansas City"
+      ],
+      "categories": [
+        "Skylines of Kansas City, Missouri",
+        "Kansas City, Missouri skyline",
+        "Views of Kansas City, Missouri",
+        "Panoramics of Kansas City, Missouri",
+        "Aerial photographs of Kansas City, Missouri"
+      ],
+      "queries": [
+        "Kansas City skyline panorama",
+        "Kansas City downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "st_louis",
+      "city": "St. Louis",
+      "wikipedia": [
+        "St. Louis",
+        "Downtown St. Louis"
+      ],
+      "categories": [
+        "Skylines of St. Louis",
+        "St. Louis skyline",
+        "Views of St. Louis",
+        "Panoramics of St. Louis",
+        "Aerial photographs of St. Louis"
+      ],
+      "queries": [
+        "St. Louis skyline panorama",
+        "St. Louis downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cincinnati",
+      "city": "Cincinnati",
+      "wikipedia": [
+        "Cincinnati",
+        "Downtown Cincinnati"
+      ],
+      "categories": [
+        "Skylines of Cincinnati",
+        "Cincinnati skyline",
+        "Views of Cincinnati",
+        "Panoramics of Cincinnati",
+        "Aerial photographs of Cincinnati"
+      ],
+      "queries": [
+        "Cincinnati skyline panorama",
+        "Cincinnati downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "jacksonville",
+      "city": "Jacksonville, Florida",
+      "wikipedia": [
+        "Jacksonville, Florida",
+        "Downtown Jacksonville"
+      ],
+      "categories": [
+        "Skylines of Jacksonville, Florida",
+        "Jacksonville, Florida skyline",
+        "Views of Jacksonville, Florida",
+        "Panoramics of Jacksonville, Florida",
+        "Aerial photographs of Jacksonville, Florida"
+      ],
+      "queries": [
+        "Jacksonville skyline panorama",
+        "Jacksonville downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "riverside",
+      "city": "Riverside, California",
+      "wikipedia": [
+        "Riverside, California",
+        "Downtown Riverside",
+        "San Bernardino, California"
+      ],
+      "categories": [
+        "Skylines of Riverside, California",
+        "Riverside, California skyline",
+        "Views of Riverside, California",
+        "Panoramics of Riverside, California",
+        "Aerial photographs of Riverside, California"
+      ],
+      "queries": [
+        "Riverside skyline panorama",
+        "Riverside downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "detroit",
+      "city": "Detroit",
+      "wikipedia": [
+        "Detroit",
+        "Downtown Detroit"
+      ],
+      "categories": [
+        "Skylines of Detroit",
+        "Detroit skyline",
+        "Views of Detroit",
+        "Panoramics of Detroit",
+        "Aerial photographs of Detroit"
+      ],
+      "queries": [
+        "Detroit skyline panorama",
+        "Detroit downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "portland",
+      "city": "Portland, Oregon",
+      "wikipedia": [
+        "Portland, Oregon",
+        "Downtown Portland, Oregon"
+      ],
+      "categories": [
+        "Skylines of Portland, Oregon",
+        "Portland, Oregon skyline",
+        "Views of Portland, Oregon",
+        "Panoramics of Portland, Oregon",
+        "Aerial photographs of Portland, Oregon"
+      ],
+      "queries": [
+        "Portland skyline panorama",
+        "Portland downtown cityscape"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cleveland",
+      "city": "Cleveland",
+      "wikipedia": [
+        "Cleveland",
+        "Downtown Cleveland"
+      ],
+      "categories": [
+        "Skylines of Cleveland",
+        "Cleveland skyline",
+        "Views of Cleveland",
+        "Panoramics of Cleveland",
+        "Aerial photographs of Cleveland"
+      ],
+      "queries": [
+        "Cleveland skyline panorama",
+        "Cleveland downtown cityscape"
+      ],
+      "candidates": []
     }
   ]
 }
