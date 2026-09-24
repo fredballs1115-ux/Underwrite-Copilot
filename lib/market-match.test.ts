@@ -75,3 +75,15 @@ describe("stateForAddress — the fallback grain for a deal outside the covered 
     expect(stateOfMarket("dc")).toBeNull();
   });
 });
+
+// ── The market the live figures are read for ────────────────────────────────
+import { marketForAddress } from "./market-match";
+
+describe("marketForAddress — the covered metro where there is one, the state otherwise, one function for every live read", () => {
+  it("answers the covered metro for an address inside one, the state outside, and nothing with no state", () => {
+    expect(marketForAddress({ city: "Philadelphia", state: "PA" })).toEqual({ id: "philadelphia", name: expect.any(String) });
+    expect(marketForAddress({ city: "Pittsburgh", state: "PA" })).toEqual({ id: "state:PA", name: "Pennsylvania" });
+    expect(marketForAddress({ city: "Phoenix", state: "Arizona" })).toEqual({ id: "state:AZ", name: "Arizona" });
+    expect(marketForAddress({ city: "Toronto" })).toBeNull();
+  });
+});

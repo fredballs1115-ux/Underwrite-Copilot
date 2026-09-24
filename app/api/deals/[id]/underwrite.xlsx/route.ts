@@ -9,7 +9,7 @@ import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { StructuredAddress } from "@/lib/address";
-import { metroForAddress } from "@/lib/market-match";
+import { marketForAddress } from "@/lib/market-match";
 import { todayReads } from "@/lib/model-vs-market-read";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 
@@ -118,7 +118,9 @@ export async function GET(
     // read leaves the tab out, never the workbook.
     let marketRead: ModelVsMarket | null = null;
     try {
-      const metro = metroForAddress((deal.address as StructuredAddress | null) ?? {});
+      // The covered metro, or the state's own series outside one — the same
+      // market the page and the report read.
+      const metro = marketForAddress((deal.address as StructuredAddress | null) ?? {});
       marketRead = modelVsMarketFor({
         derived: model,
         extraction,
