@@ -21,7 +21,7 @@ export interface MetroView extends Point {
   place: string;
 }
 
-/** Keyed by the `id` in data/research/metros.json — the test enforces that. */
+/** Keyed by the `id` in data/research/metros.json, or in data/data-metros.json for a metro read without a brief — the test enforces that. */
 export const METRO_VIEWS: Record<string, MetroView> = {
   dc: { lat: 38.9007, lng: -77.033, place: "Downtown Washington, DC" },
   pg_county: { lat: 38.7808, lng: -77.0169, place: "National Harbor, MD" },
@@ -41,6 +41,36 @@ export const METRO_VIEWS: Record<string, MetroView> = {
   miami: { lat: 25.7686, lng: -80.1918, place: "Downtown Miami, FL" },
   atlanta: { lat: 33.759, lng: -84.388, place: "Downtown Atlanta, GA" },
   dallas: { lat: 32.7791, lng: -96.7987, place: "Downtown Dallas, TX" },
+  // The metro areas read without a brief (data/data-metros.json, #404):
+  // the same rule, the business district each is known by. A frame is
+  // checked by eye on the deployed page, never assumed — a coordinate here
+  // is a claim about a place until someone has looked at the picture.
+  pittsburgh: { lat: 40.4406, lng: -79.9959, place: "Golden Triangle, Pittsburgh, PA" },
+  phoenix: { lat: 33.4484, lng: -112.074, place: "Downtown Phoenix, AZ" },
+  denver: { lat: 39.7473, lng: -104.9943, place: "Downtown Denver, CO" },
+  nashville: { lat: 36.1627, lng: -86.7816, place: "Downtown Nashville, TN" },
+  charlotte: { lat: 35.2271, lng: -80.8431, place: "Uptown Charlotte, NC" },
+  austin: { lat: 30.2672, lng: -97.7431, place: "Downtown Austin, TX" },
+  houston: { lat: 29.7589, lng: -95.3677, place: "Downtown Houston, TX" },
+  minneapolis: { lat: 44.9778, lng: -93.265, place: "Downtown Minneapolis, MN" },
+  san_diego: { lat: 32.7157, lng: -117.1611, place: "Downtown San Diego, CA" },
+  las_vegas: { lat: 36.1699, lng: -115.1398, place: "Downtown Las Vegas, NV" },
+  tampa: { lat: 27.9478, lng: -82.4584, place: "Downtown Tampa, FL" },
+  orlando: { lat: 28.5421, lng: -81.379, place: "Downtown Orlando, FL" },
+  raleigh: { lat: 35.7796, lng: -78.6382, place: "Downtown Raleigh, NC" },
+  salt_lake_city: { lat: 40.7608, lng: -111.891, place: "Downtown Salt Lake City, UT" },
+  san_antonio: { lat: 29.4252, lng: -98.4946, place: "Downtown San Antonio, TX" },
+  sacramento: { lat: 38.5816, lng: -121.4944, place: "Downtown Sacramento, CA" },
+  columbus: { lat: 39.9612, lng: -82.9988, place: "Downtown Columbus, OH" },
+  indianapolis: { lat: 39.7684, lng: -86.1581, place: "Downtown Indianapolis, IN" },
+  kansas_city: { lat: 39.0997, lng: -94.5786, place: "Downtown Kansas City, MO" },
+  st_louis: { lat: 38.627, lng: -90.1994, place: "Downtown St. Louis, MO" },
+  cincinnati: { lat: 39.1031, lng: -84.512, place: "Downtown Cincinnati, OH" },
+  jacksonville: { lat: 30.3244, lng: -81.6557, place: "Downtown Jacksonville, FL" },
+  riverside: { lat: 33.9806, lng: -117.3755, place: "Downtown Riverside, CA" },
+  detroit: { lat: 42.3314, lng: -83.0458, place: "Downtown Detroit, MI" },
+  portland: { lat: 45.5202, lng: -122.6742, place: "Downtown Portland, OR" },
+  cleveland: { lat: 41.4993, lng: -81.6944, place: "Downtown Cleveland, OH" },
 };
 
 /**

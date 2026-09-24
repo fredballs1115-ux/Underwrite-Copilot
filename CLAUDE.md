@@ -751,7 +751,22 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   board exists for — while leaving the name unlinked (no market page
   behind it) and saying in its note what the block is. The rank picture
   under each sector's leaderboard stays paired with the leaderboard's own
-  markets, since the two rankings are of the same list by design.
+  markets, since the two rankings are of the same list by design. **And
+  each has a market page** (#404, `app/market/read-only-metro.tsx`,
+  `ReadOnlyMetroView`, pure): `/market?metro=pittsburgh` opens on the
+  place (`METRO_VIEWS` carries each one's business district, checked by
+  eye on the deploy, never assumed — `lib/metro-imagery.test.ts` holds
+  the table to both lists), says in one string what the page is and is
+  not, and draws exactly what the site holds — Zillow's asking rents with
+  no fair market rent beside them, Realtor.com's for-sale market, the
+  metro's own tiles with the demand and supply pictures — through the
+  same components a briefed market's page uses, and nothing else: no
+  research note, sector snapshot, comps line or rules. The explorer's
+  chip rows are `MetroChips`, shared by both page bodies, with the
+  twenty-six folded under "Read without a brief" (open where one is the
+  page), because a row of twenty-six chips is a wall rather than a
+  directory. Live-verify fetches Pittsburgh's page (`p_market_pitt.html`)
+  and greps the note; the fold's line is grepped on `/market` itself.
 - **The deal's own model reads the same table** (#380): `lib/debt-index.ts`
   (pure) picks the index a loan is quoted over off today's rates — the
   Treasury tenor NEAREST the hold for the permanent loan (`treasuryForTerm`,

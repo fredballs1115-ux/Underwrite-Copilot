@@ -125,6 +125,8 @@ jobs:
           grep -q "biggest industrial build" p_market_dfw.html && echo "/market?metro=dallas: full-coverage sector data serves (Aug 25)" || echo "/market?metro=dallas: batch 2-5 sector data not yet deployed"
           # DMV office fills: NoVA's brief must carry the Newmark/CBRE spread note.
           curl -sS -o p_market_nova.html --max-time 60 "https://underwrite-copilot.onrender.com/market?metro=nova" || true
+          # A metro area read without a brief (#404): its own page body.
+          curl -sS -o p_market_pitt.html --max-time 60 "https://underwrite-copilot.onrender.com/market?metro=pittsburgh" || true
           grep -q "tightening while the District" p_market_nova.html && echo "NOVA OFFICE SPREAD (Aug 25): present" || echo "NOVA OFFICE SPREAD (Aug 25): not yet deployed"
           # Each brief's sector rows carry a rank chip into the cross-metro
           # ranking (the chip's title text is count-independent).
@@ -943,6 +945,10 @@ jobs:
           # #403 — the payroll board's block for the metro areas read without a
           # brief (one JS string in the board's note, no interpolation inside it):
           mark "#403 the payroll board reads the metro areas without a brief" grep -q "reads without a brief: the same series, ranked in the same columns" p_market.html
+          # #404 — a metro read without a brief has a market page of its own (the
+          # note is one JS string; the chip row's fold is on /market itself):
+          mark "#404 a metro read without a brief has its own market page" grep -q "A market the site reads but does not brief: the published figures below" p_market_pitt.html
+          mark "#404 the explorer folds the metro areas read without a brief" grep -q "metro areas with live figures and no research note" p_market.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

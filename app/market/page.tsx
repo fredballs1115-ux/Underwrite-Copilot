@@ -19,6 +19,7 @@ import { BOARD_METRICS, SectorJobsBoard } from "./sector-jobs-board";
 import { DATA_METROS } from "@/lib/market-match";
 import { heatShade } from "./heat-shade";
 import { MetroLive } from "./metro-live";
+import { ReadOnlyMetroView } from "./read-only-metro";
 import { LessorRentLine } from "./lessor-rent-line";
 import { SectorJobsLine } from "./sector-jobs-line";
 import { liveZori } from "@/lib/zori-read";
@@ -515,8 +516,79 @@ const REGION_ORDER = [
   "More markets",
 ] as const;
 
+function MetroChips({ active }: { active: string }) {
+  const metros = metrosSeed.metros ?? [];
+  const chip = (id: string, name: string) => (
+    <Link
+      key={id}
+      href={`/market?metro=${id}`}
+      prefetch={false}
+      className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+        id === active
+          ? "border-brand bg-brand text-white"
+          : "border-line text-muted hover:border-brand hover:text-brand"
+      }`}
+    >
+      {name}
+    </Link>
+  );
+  const readOnlyOpen = DATA_METROS.some((m) => m.id === active);
+  return (
+    <div className="mt-3 space-y-3">
+      {REGION_ORDER.map((region) => {
+        const group = metros.filter(
+          (m) => ((m as { region?: string }).region ?? "More markets") === region
+        );
+        if (group.length === 0) return null;
+        return (
+          <div key={region}>
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+              {region}{" "}
+              <span className="ml-1 font-normal normal-case tracking-normal">
+                · {group.length} metro{group.length === 1 ? "" : "s"}
+              </span>
+            </h3>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">{group.map((m) => chip(m.id, m.name))}</div>
+          </div>
+        );
+      })}
+      {/* The metro areas read without a brief (#404), folded: the same
+          live figures, none of the research, and a row of twenty-six chips
+          is a wall rather than a directory. Open where one is the page. */}
+      <details open={readOnlyOpen || undefined} className="group">
+        <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wider text-muted [&::-webkit-details-marker]:hidden">
+          Read without a brief{" "}
+          <span className="ml-1 font-normal normal-case tracking-normal">
+            {`· ${DATA_METROS.length} metro areas with live figures and no research note — `}
+            <span className="underline decoration-dotted underline-offset-2 group-open:hidden">show</span>
+            <span className="hidden underline decoration-dotted underline-offset-2 group-open:inline">hide</span>
+          </span>
+        </summary>
+        <div className="mt-1.5 flex flex-wrap gap-1.5">{DATA_METROS.map((m) => chip(m.id, m.name))}</div>
+      </details>
+    </div>
+  );
+}
+
 async function MetroExplorer({ selected }: { selected?: string }) {
   const metros = metrosSeed.metros ?? [];
+  // A metro area read without a brief (#404) gets its own page body: the
+  // same live pictures, none of the research a briefed market carries.
+  const readOnly = metros.some((m) => m.id === selected) ? null : (DATA_METROS.find((m) => m.id === selected) ?? null);
+  if (readOnly) {
+    const [rates, zori, realtor] = await Promise.all([
+      liveMetroRates(readOnly.id),
+      liveZori(readOnly.name),
+      liveRealtor(readOnly.name),
+    ]);
+    return (
+      <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
+        <h2 className="text-sm font-semibold tracking-tight">Metro explorer</h2>
+        <MetroChips active={readOnly.id} />
+        <ReadOnlyMetroView metro={readOnly} rates={rates} zori={zori} realtor={realtor} />
+      </section>
+    );
+  }
   const active =
     metros.find((m) => m.id === selected) ?? metros[0];
   if (!active) return null;
@@ -610,40 +682,7 @@ async function MetroExplorer({ selected }: { selected?: string }) {
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
       <h2 className="text-sm font-semibold tracking-tight">Metro explorer</h2>
-      <div className="mt-3 space-y-3">
-        {REGION_ORDER.map((region) => {
-          const group = metros.filter(
-            (m) => ((m as { region?: string }).region ?? "More markets") === region
-          );
-          if (group.length === 0) return null;
-          return (
-            <div key={region}>
-              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted">
-                {region}{" "}
-                <span className="ml-1 font-normal normal-case tracking-normal">
-                  · {group.length} metro{group.length === 1 ? "" : "s"}
-                </span>
-              </h3>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {group.map((m) => (
-                  <Link
-                    key={m.id}
-                    href={`/market?metro=${m.id}`}
-                    prefetch={false}
-                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                      m.id === active.id
-                        ? "border-brand bg-brand text-white"
-                        : "border-line text-muted hover:border-brand hover:text-brand"
-                    }`}
-                  >
-                    {m.name}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <MetroChips active={active.id} />
 
       <div className="mt-4 space-y-4">
         {/* The brief opens on the market itself — its own skyline where one

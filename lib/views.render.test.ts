@@ -3282,3 +3282,52 @@ describe("SectorJobsBoard — payroll growth by market and sector, shaded within
     expect(render(React.createElement(SectorJobsBoard, { markets, rates: {} }))).not.toContain("payroll growth by market");
   });
 });
+
+// ── A metro area read without a brief: its own market page body (#404) ──────
+import { ReadOnlyMetroView } from "@/app/market/read-only-metro";
+import { DATA_METROS as READ_ONLY_METROS } from "@/lib/market-match";
+
+describe("ReadOnlyMetroView — the market page for a metro read without a brief", () => {
+  const pittsburgh = READ_ONLY_METROS.find((m) => m.id === "pittsburgh")!;
+  // Pittsburgh's own rows, the ids the runner printed (probe runs
+  // 35937200224 and 35937859807), plus the region's vacancy it borrows.
+  const rows: RateRow[] = [
+    { series_id: "PITT342URN", obs_date: "2026-07-01", value: 4.1 },
+    { series_id: "PITT342URN", obs_date: "2026-06-01", value: 4.3 },
+    { series_id: "PITT342NA_YOY", obs_date: "2026-08-01", value: 0.6 },
+    { series_id: "PITT342PBSV_YOY", obs_date: "2026-08-01", value: 1.4 },
+    { series_id: "PITT342BPPRIV", obs_date: "2026-07-01", value: 594 },
+    { series_id: "HVS_RVR_38300", obs_date: "2026-04-01", value: 5.9 },
+    { series_id: "HVS_RVR_38300_MOE", obs_date: "2026-04-01", value: 3.5 },
+    { series_id: "RRVRNEQ156N", obs_date: "2026-04-01", value: 5.9 },
+  ];
+  const rates = readMetroRates("pittsburgh", rows, FIXTURE_NOW);
+  const html = render(React.createElement(ReadOnlyMetroView, { metro: pittsburgh, rates, zori: null, realtor: null }));
+  const text = visibleText(html);
+
+  it("opens on the place, says what the page is and is not, and draws the metro's own figures with nothing the site has not read", () => {
+    expect(text).toContain("Read without a brief");
+    expect(text).toContain("Pittsburgh PA");
+    expect(text).toContain("A market the site reads but does not brief: the published figures below");
+    expect(text).toContain("No research note, no sector tracker, no fair market rent, no comps pull and no metro rules on file");
+    // The tiles: the metro's own unemployment and jobs, the survey's vacancy with its margin.
+    expect(text).toContain("4.1%");
+    expect(text).toContain("Pittsburgh MSA");
+    expect(text).toContain("margin of error");
+    // Nothing a briefed market's page carries beyond the figures.
+    expect(text).not.toContain("fair market rent $");
+    expect(text).not.toContain("Rules in force here");
+    expect(text).not.toContain("Recorded-sales comps");
+    expect(html).toContain('href="/market"');
+    expect(a11yIssues(html), "read-only metro page").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("every metro read without a brief has a frame to open on", () => {
+    for (const m of READ_ONLY_METROS) {
+      const page = render(React.createElement(ReadOnlyMetroView, { metro: m, rates: [], zori: null, realtor: null }));
+      expect(page, m.id).toContain("Read without a brief");
+      expect(page, m.id).toContain(m.name);
+    }
+  });
+});
