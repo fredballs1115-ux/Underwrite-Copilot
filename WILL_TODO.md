@@ -308,11 +308,14 @@ and the state fallback, their FRED series verified from the runner (the
 four probes are named in CLAUDE.md), the survey's vacancy, Zillow's and
 Realtor.com's rows, on the market check, the deal page, the report and
 the workbook as the metro's, with the header saying there is no brief
-behind them. **Open after it**: the boards on `/market` rank the
-briefed markets alone — a second block for the metros read without a
-brief ("and the markets the site reads") is the obvious next picture,
-since the payroll and vacancy figures are the same rows; and a metro
-page for each (`/market/<id>` without a brief) is the one after that.
+behind them. Then #403: the payroll board on `/market` carries the
+metro areas read without a brief as a block of their own, ranked in
+the same columns, unlinked, the note saying what the block is. **Open
+after it**: a metro page for each of them (`/market/<id>` without a
+brief — the tiles, the demand and supply pictures, the asking rent and
+the for-sale lines, and nothing the site has not read), and the vacancy
+leaderboard's rank picture, which stays paired with the briefed markets
+for now.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.

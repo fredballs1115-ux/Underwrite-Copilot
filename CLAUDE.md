@@ -743,7 +743,15 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   printed under three names); a stale cell keeps its figure and date,
   dashed and unranked; a series FRED does not carry is a dash. Six cached
   reads (`BOARD_METRICS` through `liveMetricRates`), and a failed read
-  leaves the board out rather than half-drawn.
+  leaves the board out rather than half-drawn. **The metro areas read
+  without a brief are rows too** (#403): the page appends `DATA_METROS`
+  after the briefed markets under one heading, "Read without a brief",
+  with `briefed: false`, and the board ranks them in the same columns —
+  Phoenix's office-using jobs against Washington's is the comparison the
+  board exists for — while leaving the name unlinked (no market page
+  behind it) and saying in its note what the block is. The rank picture
+  under each sector's leaderboard stays paired with the leaderboard's own
+  markets, since the two rankings are of the same list by design.
 - **The deal's own model reads the same table** (#380): `lib/debt-index.ts`
   (pure) picks the index a loan is quoted over off today's rates — the
   Treasury tenor NEAREST the hold for the permanent loan (`treasuryForTerm`,
@@ -2211,7 +2219,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   35938949231), all six stored as the LEVEL with `derived: "yoy"` the
   way Boston's are, since FRED refuses its own transform on that form,
   and it carries no permits (`CLEV439BPPRIV` stopped 2023-12) and no
-  index (`ATNHPIUS17460Q` stopped 2024-10, `…17410Q` does not exist). The survey's
+  index (`ATNHPIUS17460Q` stopped 2024-10, `…17410Q` does not exist);
+  its `cbsa` is the redrawn 17410, because Realtor.com's file has no
+  17460 row (the branch's first dry run missed Cleveland alone), and
+  the survey id is `HVS_RVR_17410` with it. The three pulls' dry runs
+  on the branch printed every row: the survey 40 of 40 (each metro's
+  area named, the two tables' spellings both matched — "Phoenix-Mesa-
+  Chandler" / "Phoenix-Mesa-Scottsdale"), Zillow 44 of 44 in all three
+  files, Realtor.com 44 of 44. The survey's
   vacancy is matched by name prefix like the others (`census`), Zillow
   by RegionName (`zillow`) and Realtor.com by CBSA (`cbsa`) — the two
   monthly pulls append the list to their own (`require("../data/data-

@@ -16,6 +16,7 @@ import type { LiveRate } from "@/lib/live-rates";
 import { sectorPayrollMetric } from "@/lib/live-market-brief";
 import { SectorJobsRank } from "./sector-jobs-rank";
 import { BOARD_METRICS, SectorJobsBoard } from "./sector-jobs-board";
+import { DATA_METROS } from "@/lib/market-match";
 import { heatShade } from "./heat-shade";
 import { MetroLive } from "./metro-live";
 import { LessorRentLine } from "./lessor-rent-line";
@@ -1019,11 +1020,17 @@ async function SectorJobsBoardLive() {
     console.warn("payroll board read failed:", err instanceof Error ? err.message : err);
     return null;
   }
-  const markets = (metrosSeed.metros ?? []).map((m) => ({
-    id: m.id,
-    name: m.name,
-    region: (m as { region?: string }).region,
-  }));
+  // The briefed markets by region, then the metro areas read without a
+  // brief as one block of their own (#403) — the same series, ranked in
+  // the same columns, no market page behind the name.
+  const markets = [
+    ...(metrosSeed.metros ?? []).map((m) => ({
+      id: m.id,
+      name: m.name,
+      region: (m as { region?: string }).region,
+    })),
+    ...DATA_METROS.map((m) => ({ id: m.id, name: m.name, region: "Read without a brief", briefed: false })),
+  ];
   return <SectorJobsBoard markets={markets} rates={rates} />;
 }
 

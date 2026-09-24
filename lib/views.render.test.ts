@@ -3217,11 +3217,17 @@ describe("SectorJobsRank — the covered markets ranked by a sector's payrolls, 
 import { SectorJobsBoard, BOARD_METRICS } from "@/app/market/sector-jobs-board";
 import { heatShade } from "@/app/market/heat-shade";
 import metrosSeedForBoard from "@/data/research/metros.json";
+import { DATA_METROS } from "@/lib/market-match";
 
 describe("SectorJobsBoard — payroll growth by market and sector, shaded within each column", () => {
-  const markets = (metrosSeedForBoard.metros ?? []).map((m) => ({ id: m.id, name: m.name, region: (m as { region?: string }).region }));
+  const markets = [
+    ...(metrosSeedForBoard.metros ?? []).map((m) => ({ id: m.id, name: m.name, region: (m as { region?: string }).region })),
+    // The metro areas read without a brief, as the page hands them in (#403).
+    ...DATA_METROS.map((m) => ({ id: m.id, name: m.name, region: "Read without a brief", briefed: false })),
+  ];
   // All payrolls for three metro areas and the office-using sector for two;
   // Richmond's office figure is a year old and no retail row exists anywhere.
+  // Phoenix — read without a brief — leads the office-using column.
   const rows: RateRow[] = [
     { series_id: "WASH911NA_YOY", obs_date: "2026-08-01", value: 1.2 },
     { series_id: "DALL148NA_YOY", obs_date: "2026-08-01", value: 1.08887 },
@@ -3229,6 +3235,7 @@ describe("SectorJobsBoard — payroll growth by market and sector, shaded within
     { series_id: "WASH911PBSV_YOY", obs_date: "2026-08-01", value: 1.31234 },
     { series_id: "DALL148PBSV_YOY", obs_date: "2026-08-01", value: 3.13231 },
     { series_id: "RICH051PBSV_YOY", obs_date: "2025-08-01", value: 0.9 },
+    { series_id: "PHOE004PBSV_YOY", obs_date: "2026-08-01", value: 3.9 },
   ];
   const rates = Object.fromEntries(BOARD_METRICS.map((metric) => [metric, readMetricRates(metric, rows, FIXTURE_NOW)]));
   const html = render(React.createElement(SectorJobsBoard, { markets, rates }));
@@ -3236,7 +3243,8 @@ describe("SectorJobsBoard — payroll growth by market and sector, shaded within
 
   it("draws every metro area with a series of its own, one column a sector, the fastest cell shaded emerald", () => {
     expect(text).toContain("The whole board — payroll growth by market and sector");
-    expect(text).toContain("5 of 84 cells carry a fresh figure");
+    // Fourteen briefed metro areas and twenty-six read without a brief, six columns each.
+    expect(text).toContain("6 of 240 cells carry a fresh figure");
     for (const label of ["All payrolls", "Professional & business services", "Education & health services", "Transportation, warehousing & utilities", "Retail trade", "Leisure & hospitality"]) {
       expect(text, label).toContain(label);
     }
@@ -3244,10 +3252,19 @@ describe("SectorJobsBoard — payroll growth by market and sector, shaded within
     expect(text).toContain("Washington DC");
     expect(text).not.toContain("Prince George");
     expect(text).toContain("Mid-Atlantic");
-    // Dallas leads the office-using column, Washington the all-payrolls one.
+    // Phoenix leads the office-using column, Washington the all-payrolls one —
+    // a metro read without a brief ranks in the same column as the briefed ones.
     expect(html).toContain(`style="background-color:${heatShade(0)}"`);
     expect(html).toContain(`style="background-color:${heatShade(1)}"`);
     expect(text).toContain("3.1%");
+    expect(text).toContain("3.9%");
+    // The read-without-a-brief block: its heading, its rows unlinked, the note saying what it is.
+    expect(text).toContain("Read without a brief");
+    expect(text).toContain("Phoenix AZ");
+    expect(text).toContain("Cleveland OH");
+    expect(html).not.toContain('href="/market?metro=phoenix"');
+    expect(html).toContain('href="/market?metro=dc"');
+    expect(text).toContain("The last block is the metro areas the site reads without a brief: the same series, ranked in the same columns");
     expect(text).toContain("−1.0%");
     // Richmond's stale office figure is shown with its date, not ranked; a missing series is a dash.
     expect(text).toContain("0.9% · Aug 1");
