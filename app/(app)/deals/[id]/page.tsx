@@ -70,7 +70,7 @@ import type { ActualsData } from "./property-actuals";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { constructionSeed, type DealRateSeeds } from "@/lib/debt-index";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
-import { metroForAddress, stateForAddress } from "@/lib/market-match";
+import { marketForAddress } from "@/lib/market-match";
 import { BRIEF_NATIONAL_IDS, liveMarketBrief } from "@/lib/live-market-brief";
 import { metroDemand } from "@/lib/metro-demand";
 import { briefDelta, type BriefDelta } from "@/lib/brief-delta";
@@ -360,11 +360,10 @@ export default async function DealPage({
   // table for every deal and the metro's own series inside a covered market.
   let marketSince: BriefDelta | null = null;
   const storedBrief = market?.liveBrief ?? null;
-  const coveredMetro = metroForAddress(dealAddress ?? {});
   // The market the live figures are read for: the covered metro where the
   // address sits in one, the state's own series otherwise (the same table,
   // filed under `state:PA`), every surface saying which grain it read.
-  const liveMarket = coveredMetro ?? stateForAddress(dealAddress ?? {});
+  const liveMarket = marketForAddress(dealAddress ?? {});
   let reads: TodayReads | null = null;
   if (extraction || (storedBrief?.figures && storedBrief.figures.length > 0)) {
     try {

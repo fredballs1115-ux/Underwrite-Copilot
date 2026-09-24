@@ -11,7 +11,7 @@ import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import type { StructuredAddress } from "@/lib/address";
 import { inferStrategy } from "@/lib/deal-strategy";
-import { metroForAddress } from "@/lib/market-match";
+import { marketForAddress } from "@/lib/market-match";
 import { todayReads } from "@/lib/model-vs-market-read";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
@@ -198,7 +198,9 @@ export async function GET(
       // one function, the same cached readers), so the report says what the
       // page says. Its own try: a failed live read leaves the grids in place.
       try {
-        const metro = metroForAddress((deal.address as StructuredAddress | null) ?? {});
+        // The covered metro, or the state's own series outside one — the
+        // same market the page reads, so the report cannot disagree with it.
+        const metro = marketForAddress((deal.address as StructuredAddress | null) ?? {});
         assumptions = modelVsMarketFor({
           derived,
           extraction,

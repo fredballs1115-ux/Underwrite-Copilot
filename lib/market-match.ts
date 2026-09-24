@@ -113,6 +113,23 @@ export function stateOfMarket(id: string | null | undefined): string | null {
   return isStateMarket(id) ? (id as string).slice(STATE_MARKET_PREFIX.length) : null;
 }
 
+/**
+ * The market the LIVE figures are read for: the covered metro where the
+ * address sits in one, the state's own series otherwise. One function, so
+ * the pipeline's market check, the deal page, the report and the workbook
+ * read the same market for one deal — `metroForAddress` alone stays the
+ * research question ("is this a covered market, with a brief and comps"),
+ * which a state never answers.
+ */
+export function marketForAddress(addr: {
+  city?: string | null;
+  county?: string | null;
+  state?: string | null;
+  submarket?: string | null;
+}): CoveredMetro | null {
+  return metroForAddress(addr) ?? stateForAddress(addr);
+}
+
 export interface MarketNavEntry {
   id: string;
   name: string;
