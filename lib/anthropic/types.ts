@@ -95,6 +95,27 @@ export interface ExtractedStrategy {
   /** construction, downtime and lease-up timing to stabilization as stated ("" if none) */
   timeline: string;
 }
+/** One property of a portfolio OM, as the extraction states it — every
+ *  figure a string, "" when the OM states none for THIS property. Read by
+ *  lib/portfolio. */
+export interface PortfolioProperty {
+  name: string;
+  /** street, city, state as the OM prints it */
+  address: string;
+  /** the count in the OM's own noun, as a bare figure ("128") */
+  count: string;
+  /** rentable area ("104,000 SF") */
+  area: string;
+  /** in-place NOI for this property */
+  noi: string;
+  /** today's occupancy ("94%") */
+  occupancy: string;
+  yearBuilt: string;
+  /** the price the OM allocates to this property */
+  allocatedPrice: string;
+  /** "p. 12" or "" */
+  page: string;
+}
 export interface ExtractionResult {
   dealName: string | null;
   assetClass: string;
@@ -114,6 +135,11 @@ export interface ExtractionResult {
    *  tenancy, the story. Never set by the OM extraction; rendered as prose,
    *  not a metric, and fed verbatim to the analysis fact sheet. */
   buyerNotes?: string;
+  /** Each property of a portfolio OM (two or more separately addressed
+   *  buildings or sites), in the OM's order; empty or absent for a
+   *  single-property OM and for extractions saved before portfolios were
+   *  read. The whole portfolio's figures stay in `metrics`. */
+  properties?: PortfolioProperty[];
   metrics: ExtractedMetric[];
 }
 

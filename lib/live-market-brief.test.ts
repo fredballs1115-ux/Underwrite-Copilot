@@ -499,3 +499,25 @@ describe("a deal in a metro area the site reads without a brief gets the metro's
     expect(dc.text).not.toContain("does not brief");
   });
 });
+
+// ── A portfolio across several markets ──────────────────────────────────────
+describe("a portfolio across several markets: the header says whose figures these are", () => {
+  const base = { metro: { id: "dc", name: "Washington DC" }, assetClass: "multifamily", rates: readMetroRates("dc", DC_ROWS, NOW), zori: null, realtor: null, national: [], now: NOW };
+
+  it("names the portfolio, the markets and the properties the figures speak for", () => {
+    const b = liveMarketBrief({ ...base, portfolio: { properties: 5, here: 2, markets: "3 markets — Washington DC (2), Baltimore MD (2) and Virginia (1)" } })!;
+    expect(b.text.split("\n")[0]).toContain(
+      " The deal is a portfolio of 5 properties across 3 markets — Washington DC (2), Baltimore MD (2) and Virginia (1); these figures are for the 2 properties in Washington DC — the other markets' properties are not read here, and a figure below is never the portfolio's.",
+    );
+    const one = liveMarketBrief({ ...base, portfolio: { properties: 3, here: 1, markets: "2 markets — Washington DC (1) and Baltimore MD (2)" } })!;
+    expect(one.text).toContain("these figures are for the 1 property in Washington DC");
+  });
+
+  it("says so when the address on file is none of the listed properties', and nothing without a portfolio", () => {
+    const none = liveMarketBrief({ ...base, portfolio: { properties: 2, here: 0, markets: "2 markets — Baltimore MD (1) and Virginia (1)" } })!;
+    expect(none.text).toContain("these figures are for the address on file in Washington DC, where none of the listed properties' own addresses sits");
+    const single = liveMarketBrief({ ...base })!;
+    expect(single.text).not.toContain("portfolio");
+    expect(liveMarketBrief({ ...base, portfolio: null })!.text).toBe(single.text);
+  });
+});

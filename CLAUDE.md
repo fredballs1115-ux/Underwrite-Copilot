@@ -51,6 +51,28 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   direction (`gapScale`) — never across units, never inferring a sign from
   the words. The deal page's Reconciliation table and the report's
   reconciliation page both draw from it.
+- A portfolio — one OM, several properties (#411): the extraction lists
+  each property in `ExtractionResult.properties` (name, address, count,
+  area, NOI, occupancy, year built, the allocated price and the page, each
+  as the OM states it for THAT property and "" where it states none; a
+  one-entry list is dropped as a single property restated), and
+  `lib/portfolio.ts` (pure) reads them: each property's share of the whole
+  in ONE unit for the set (the count when every property states one, else
+  the area, never a mix), its share of the NOI only when EVERY property
+  states one (four of five stated is no concentration — the fifth could be
+  the largest), the markets from each property's own address through the
+  market check's matcher (`placeOf` reads the OM's address line; a
+  two-letter state counts only in capitals, so "Oak Ct" is not
+  Connecticut), and the allocation's total against the ask — the
+  allocation is the seller's split, so a per-property cap on it is "a cap
+  on the allocation". Four readers: the deal context gets a
+  `portfolioContextLine` (whatever the strategy), the challenger's notes
+  get `portfolioNote` (the facts, then five PORTFOLIO TRAPS by name), the
+  market check's header says whose figures they are when the properties
+  span markets (`portfolioFor`), and the deal page draws
+  `PortfolioCard` under the property visual (a bar a property for its
+  share, a second for its NOI share, the markets as chips linking to their
+  market pages, the facts that do not add up).
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`

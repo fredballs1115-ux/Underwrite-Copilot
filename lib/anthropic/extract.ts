@@ -29,6 +29,23 @@ const ExtractionSchema = z.object({
     capitalBudget: z.string(),
     timeline: z.string(),
   }),
+  // Each property of a PORTFOLIO OM (two or more separately addressed
+  // buildings or sites), with what the OM states for THAT property and ""
+  // where it states nothing; an empty list for a single-property OM. The
+  // whole portfolio's figures stay in `metrics`. Read by lib/portfolio.
+  properties: z.array(
+    z.object({
+      name: z.string(),
+      address: z.string(),
+      count: z.string(),
+      area: z.string(),
+      noi: z.string(),
+      occupancy: z.string(),
+      yearBuilt: z.string(),
+      allocatedPrice: z.string(),
+      page: z.string(),
+    }),
+  ),
   metrics: z.array(
     z.object({
       label: z.string(),
@@ -89,6 +106,21 @@ export async function extractTerms(
       capitalBudget: out.strategy.capitalBudget.trim(),
       timeline: out.strategy.timeline.trim(),
     },
+    // A one-entry list is a single property restated, not a portfolio.
+    properties:
+      (out.properties ?? []).length >= 2
+        ? out.properties.map((p) => ({
+            name: p.name.trim(),
+            address: p.address.trim(),
+            count: p.count.trim(),
+            area: p.area.trim(),
+            noi: p.noi.trim(),
+            occupancy: p.occupancy.trim(),
+            yearBuilt: p.yearBuilt.trim(),
+            allocatedPrice: p.allocatedPrice.trim(),
+            page: p.page.trim(),
+          }))
+        : [],
     metrics: out.metrics.map((m) => ({
       ...m,
       // Guard the ≤10-word cap even if the model over-quotes.

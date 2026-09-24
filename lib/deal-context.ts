@@ -1,6 +1,7 @@
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { assetWords } from "@/lib/asset-words";
+import { portfolioContextLine, readPortfolio } from "@/lib/portfolio";
 
 const compact = (n: number): string =>
   n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
@@ -12,13 +13,19 @@ const compact = (n: number): string =>
  * strategy and, on a plan deal, the plan's headline figures, the all-in
  * basis per planned unit and the stated timeline. So an answer about "the
  * NOI", or a comp held against "the price", names which figure the OM's
- * number is. Null when the strategy is unknown: nothing established,
- * nothing asserted. Pure — no I/O — so it is testable and the worker can
+ * number is. A portfolio OM adds a line naming its properties, the markets
+ * they sit in and the largest (lib/portfolio). Null when the strategy is
+ * unknown and the OM offers one property: nothing established, nothing
+ * asserted. Pure — no I/O — so it is testable and the worker can
  * use it.
  */
 export function dealContextFor(extraction: ExtractionResult | null): string | null {
   const strategy = inferStrategy(extraction);
-  if (strategy.kind === "unknown") return null;
+  // A portfolio is said whatever the strategy: several properties in one
+  // OM change what every whole-deal figure means (lib/portfolio).
+  const portfolio = readPortfolio(extraction);
+  const tail = portfolio ? [portfolioContextLine(portfolio)] : [];
+  if (strategy.kind === "unknown") return tail.length ? tail.join(" ") : null;
   const plan = planSummary(extraction, strategy);
   const lines = [`Deal type: ${strategy.label}${strategy.summary ? ` — ${strategy.summary}` : "."}`];
   if (plan?.stabilizedNoi) {
@@ -44,5 +51,5 @@ export function dealContextFor(extraction: ExtractionResult | null): string | nu
     );
   }
   if (plan?.timeline) lines.push(`Timeline as stated: ${plan.timeline.replace(/\.\s*$/, "")}.`);
-  return lines.join(" ");
+  return [...lines, ...tail].join(" ");
 }

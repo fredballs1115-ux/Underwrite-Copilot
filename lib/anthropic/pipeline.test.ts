@@ -398,6 +398,39 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("a portfolio across two markets: the challenger gets the portfolio traps, and the market check's header says whose figures it read", async () => {
+    const prop = (name: string, address: string, count: string) => ({
+      name, address, count, area: "", noi: "", occupancy: "", yearBuilt: "", allocatedPrice: "", page: "",
+    });
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      properties: [
+        prop("Navy Yard Flats", "1100 First St SE, Washington, DC 20003", "180"),
+        prop("Canton Square", "2800 Boston St, Baltimore, MD 21224", "120"),
+      ],
+    } as unknown as ExtractionResult);
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    state.rates = [{ series_id: "WASH911URN", obs_date: "2026-07-01", value: 3.4 }];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("This OM offers a portfolio of 2 properties across 2 markets — Washington DC (1) and Baltimore MD (1).");
+    expect(note).toContain("PORTFOLIO TRAPS, checked by name");
+    expect(note).toContain("No property states an NOI of its own");
+    const handed = vi.mocked(checkMarket).mock.calls[0][3] ?? "";
+    expect(handed).toContain(
+      "The deal is a portfolio of 2 properties across 2 markets — Washington DC (1) and Baltimore MD (1); these figures are for the 1 property in Washington DC",
+    );
+    // The deal context names it too, for the comp scrutiny and the market check.
+    expect(vi.mocked(checkMarket).mock.calls[0][2]).toContain("Portfolio: 2 properties across 2 markets");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
   it("a covered-market deal whose tables hold nothing fresh gets a check on typical ranges alone, never a failed screen", async () => {
     state.deals.d1.address = { city: "Washington", state: "DC" };
     state.rates = [{ series_id: "WASH911URN", obs_date: "2019-07-01", value: 3.4 }];

@@ -76,3 +76,37 @@ describe("dealContextFor — what the screen established, for every step that re
     expect(dealContextFor(null)).toBeNull();
   });
 });
+
+describe("dealContextFor — a portfolio OM says what it offers", () => {
+  const property = (name: string, address: string, count: string) => ({
+    name,
+    address,
+    count,
+    area: "",
+    noi: "",
+    occupancy: "",
+    yearBuilt: "",
+    allocatedPrice: "",
+    page: "",
+  });
+  const PORTFOLIO: ExtractionResult = {
+    dealName: "Two-City Apartment Portfolio",
+    assetClass: "multifamily",
+    strategy: { kind: "stabilized", summary: "", capitalBudget: "", timeline: "" },
+    properties: [
+      property("Liberty Lofts", "1200 Liberty Ave, Pittsburgh, PA 15222", "128"),
+      property("Ohio City Commons", "1850 W 25th St, Cleveland, OH 44113", "210"),
+    ],
+    metrics: [m("Asking price", "$66,000,000"), m("Units", "338")],
+  };
+
+  it("adds the portfolio's line after the strategy's, and says it even when the strategy is unknown", () => {
+    const ctx = dealContextFor(PORTFOLIO)!;
+    expect(ctx.startsWith("Deal type: Stabilized")).toBe(true);
+    expect(ctx).toContain("Portfolio: 2 properties across 2 markets — Pittsburgh PA (1) and Cleveland OH (1); the largest by count is Ohio City Commons at 62% of the whole.");
+    const unknown = dealContextFor({ ...PORTFOLIO, strategy: undefined, metrics: [] })!;
+    expect(unknown.startsWith("Portfolio: 2 properties")).toBe(true);
+    // One property is not a portfolio, and an unknown single asset says nothing.
+    expect(dealContextFor({ ...PORTFOLIO, strategy: undefined, metrics: [], properties: [PORTFOLIO.properties![0]] })).toBeNull();
+  });
+});

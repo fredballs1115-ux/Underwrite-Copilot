@@ -52,6 +52,10 @@ export interface LiveMarketInput {
   /** a plan deal (development, conversion) also reads the construction
    *  lenders' standards */
   plan?: boolean;
+  /** a portfolio OM spanning more than one market (lib/portfolio): how
+   *  many properties, how many of them sit in THIS market, and the markets
+   *  phrase — so the header says whose figures these are */
+  portfolio?: { properties: number; here: number; markets: string } | null;
 }
 
 /**
@@ -553,6 +557,13 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
       : isDataMetro(input.metro.id)
         ? `Published figures for the ${input.metro.name} metro area the deal sits in — a market the site reads but does not brief, so these figures are all it holds for it — read on ${readOn} from FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com. Each is dated, and each is the metro area's — not the submarket's and not the building's.`
         : `Published figures for the ${input.metro.name} market the deal sits in, read on ${readOn} from FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com. Each is dated, and each is the metro area's — not the submarket's and not the building's.`;
-  const text = [header, ...lines.map((l) => `- ${l}`)].join("\n");
+  // A portfolio across several markets: these are one market's figures,
+  // and the header says which properties they speak for.
+  const pf = input.portfolio;
+  const portfolioSentence =
+    pf && pf.properties >= 2
+      ? ` The deal is a portfolio of ${pf.properties} properties across ${pf.markets}; these figures are for ${pf.here > 0 ? `the ${pf.here} ${pf.here === 1 ? "property" : "properties"} in ${input.metro.name}` : `the address on file in ${input.metro.name}, where none of the listed properties' own addresses sits`} — the other markets' properties are not read here, and a figure below is never the portfolio's.`
+      : "";
+  const text = [header + portfolioSentence, ...lines.map((l) => `- ${l}`)].join("\n");
   return { metro: input.metro.name, grain, readOn, lines, figures, text };
 }
