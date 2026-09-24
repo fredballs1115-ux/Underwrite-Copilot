@@ -35,8 +35,9 @@ const UNIT_SUFFIX =
 
 /** Glued words a reader would trip on: a digit run into a word ("9real"),
  *  a word doubled ("aboutabout"), a doubled article or preposition ("the
- *  the"). Words that legitimately double ("that that", "had had") are rare
- *  in product copy and are flagged so a human decides. */
+ *  the"), an article the figure or word after it does not take. Words that
+ *  legitimately double ("that that", "had had") are rare in product copy
+ *  and are flagged so a human decides. */
 export function gluedWords(text: string): string[] {
   const out = new Set<string>();
   for (const m of text.matchAll(/\b(\d+)([a-z]{3,})\b/g)) {
@@ -49,7 +50,41 @@ export function gluedWords(text: string): string[] {
   // "From verdict to to-do list" is fine: the doubled word must not be the
   // start of a hyphenated one.
   for (const m of text.matchAll(/\b(a|an|the|of|to|in|on|for|and|or|with|at|by|from|is|it)\s+\1\b(?!-)/gi)) out.add(m[0]);
+  // An article the figure after it does not take ("a 8.0% cap", "a 18%
+  // return", "an 20% share"): a generated sentence puts an article before
+  // whatever number arrives, and the number decides. A capital "A"
+  // mid-sentence is a label ("Class A 8% cap", "Tranche A 18% pref"), not an
+  // article, so a capital is read only where a sentence opens.
+  for (const m of text.matchAll(/(?<![\w$.,'’-])(a|an|A|An)\s+(\$?(\d[\d,]*)\S*)/g)) {
+    const want = figureOpensOnVowel(m[3]) ? "an" : "a";
+    if (m[1].toLowerCase() === want) continue;
+    const before = text.slice(0, m.index).replace(/[ \t]+$/, "");
+    if (m[1][0] === "A" && before !== "" && !/[\n.!?:;—–]$/.test(before)) continue;
+    out.add(m[0]);
+  }
+  // …and a lowercase article before a word: "a office", "an building". The
+  // vowel letters that sound as consonants (one, European, unit, usual) and
+  // the silent h (an hour, an honest) are left alone.
+  for (const m of text.matchAll(/(?<![\w$.,'’-])a\s+(?:[aio]|e(?!u))(?!ne\b|ne-|nce\b)[a-z]+/g)) out.add(m[0]);
+  for (const m of text.matchAll(/(?<![\w$.,'’-])an\s+(?![aeiou]|h(?:our|onest|onou?r|eir))[a-z]+/g)) out.add(m[0]);
   return [...out];
+}
+
+// Whether a figure's first spoken word opens on a vowel sound — eight,
+// eleven, eighteen, eighty, and the hundreds, thousands and millions they
+// lead. A copy of lib/article.ts's `figureTakesAn`, held to it by
+// lib/article.test.ts: this file loads under plain Node from
+// scripts/lint-pages.mjs, where an extensionless import does not resolve.
+function figureOpensOnVowel(digits: string): boolean {
+  const int = digits.replace(/,/g, "");
+  const lead = digits.includes(",")
+    ? digits.slice(0, digits.indexOf(","))
+    : int.length === 4
+      ? int.slice(0, 2)
+      : int.length > 4
+        ? int.slice(0, int.length % 3 || 3)
+        : int;
+  return lead.startsWith("8") || lead === "11" || lead === "18";
 }
 
 const attr = (tag: string, name: string): string | null => {

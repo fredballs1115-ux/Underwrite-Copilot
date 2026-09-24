@@ -3,6 +3,8 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { getAnthropic } from "./client";
 import { describeRunFailure } from "./failure";
 import { MODELS } from "./models";
+import { withArticle } from "@/lib/article";
+import { assetClassLabel } from "@/lib/asset-class";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { ExtractionResult } from "./types";
 
@@ -47,13 +49,15 @@ export async function findPublicComps(subject: {
   const client = getAnthropic();
 
   const where = subject.market ? ` in ${subject.market}` : "";
-  const asset = subject.assetClass && subject.assetClass !== "auto"
-    ? `${subject.assetClass} `
-    : "";
+  // The class as a page names it ("self-storage", never the stored key
+  // "self_storage"), with the article its sound takes: "an office
+  // property", "an SFR / BTR property".
+  const cls = subject.assetClass && subject.assetClass !== "auto" ? assetClassLabel(subject.assetClass) : "";
+  const kind = cls ? `${/^[A-Z]{2,}/.test(cls) ? cls : cls[0].toLowerCase() + cls.slice(1)} property` : "property";
   const at = subject.address ? `, ${subject.address}` : "";
   const prompt = `Use web search to find PUBLICLY-REPORTED comparable sale transactions for this commercial real estate property.
 
-Subject: ${subject.name}${at} — a ${asset}property${where}. Anchor the search on the property's actual address and submarket, not the deal's marketing name.
+Subject: ${subject.name}${at} — ${withArticle(kind)}${where}. Anchor the search on the property's actual address and submarket, not the deal's marketing name.
 
 Rules:
 - Search ONLY publicly available sources: news articles, press releases, public county records, brokerage marketing pages, and trade publications.

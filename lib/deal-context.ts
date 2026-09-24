@@ -1,6 +1,8 @@
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { inferStrategy, planSummary } from "@/lib/deal-strategy";
+import { withArticle } from "@/lib/article";
+import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { assetWords } from "@/lib/asset-words";
+import { interestContextLine, readInterest } from "@/lib/interest";
 import { portfolioContextLine, readPortfolio } from "@/lib/portfolio";
 
 const compact = (n: number): string =>
@@ -24,15 +26,19 @@ export function dealContextFor(extraction: ExtractionResult | null): string | nu
   // A portfolio is said whatever the strategy: several properties in one
   // OM change what every whole-deal figure means (lib/portfolio).
   const portfolio = readPortfolio(extraction);
-  const tail = portfolio ? [portfolioContextLine(portfolio)] : [];
-  if (strategy.kind === "unknown") return tail.length ? tail.join(" ") : null;
+  // What is being sold is said FIRST whatever the strategy (#414): a note's
+  // price or a share's changes what every figure after it means.
+  const interest = readInterest(extraction, askingPriceOf(extraction));
+  const head = interest ? [interestContextLine(interest)] : [];
+  const tail = [...(portfolio ? [portfolioContextLine(portfolio)] : [])];
+  if (strategy.kind === "unknown") return head.length || tail.length ? [...head, ...tail].join(" ") : null;
   const plan = planSummary(extraction, strategy);
   const lines = [`Deal type: ${strategy.label}${strategy.summary ? ` — ${strategy.summary}` : "."}`];
   if (plan?.stabilizedNoi) {
     lines.push(
       `The OM's stabilized NOI of ${compact(plan.stabilizedNoi.value)} is the finished project's figure${
         plan.totalCost != null && plan.yieldOnCost != null
-          ? ` — over ${compact(plan.totalCost)} of total cost it is a ${(plan.yieldOnCost * 100).toFixed(1)}% yield on cost`
+          ? ` — over ${compact(plan.totalCost)} of total cost it is ${withArticle(`${(Math.round(plan.yieldOnCost * 1000) / 10).toFixed(1)}%`)} yield on cost`
           : ""
       }, not today's income and not a cap rate on the price.`,
     );
@@ -51,5 +57,5 @@ export function dealContextFor(extraction: ExtractionResult | null): string | nu
     );
   }
   if (plan?.timeline) lines.push(`Timeline as stated: ${plan.timeline.replace(/\.\s*$/, "")}.`);
-  return [...lines, ...tail].join(" ");
+  return [...head, ...lines, ...tail].join(" ");
 }

@@ -26,6 +26,7 @@ import {
   seedBenchmarks,
   seedRules,
 } from "@/lib/research-data";
+import { withArticle } from "@/lib/article";
 import { sectorLeaderboard } from "@/lib/sector-leaderboard";
 import { linkOk } from "@/lib/link-audit";
 import { coveredState, dataMetroForAddress, metroForAddress } from "@/lib/market-match";
@@ -426,7 +427,7 @@ export async function ResearchPanel({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-semibold">Leverage check</p>
             <span className="rounded-full bg-faint px-2 py-0.5 text-[11px] font-medium text-muted">
-              n/a on a {planLabel.toLowerCase()}
+              n/a on {withArticle(planLabel.toLowerCase())}
             </span>
           </div>
           <p className="mt-1 text-xs leading-relaxed text-muted">

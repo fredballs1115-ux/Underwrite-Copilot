@@ -49,6 +49,7 @@
  * Runs monthly, as `debt-math` and `prepayment` do. Pure, no I/O.
  */
 
+import { withArticle } from "@/lib/article";
 import { readDebt } from "./debt-math";
 
 /** A swap longer than this is a typo rather than a term. */
@@ -207,7 +208,7 @@ export function readSwap(t: SwapTerms): SwapRead {
   if (t.swapTermYears > MAX_TERM_YEARS) {
     return {
       ...EMPTY,
-      note: `A ${t.swapTermYears}-year swap is a typo rather than a term — nothing past ${MAX_TERM_YEARS} years is run.`,
+      note: `${withArticle(String(t.swapTermYears), true)}-year swap is a typo rather than a term — nothing past ${MAX_TERM_YEARS} years is run.`,
     };
   }
 

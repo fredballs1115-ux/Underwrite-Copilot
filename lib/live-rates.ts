@@ -69,6 +69,7 @@
  * wrong every quarter, with nothing to catch it.
  */
 
+import { withArticle } from "@/lib/article";
 import table from "@/data/fred-series.json";
 
 /** How often a series publishes; `annual` is the Housing Vacancy Survey's
@@ -416,7 +417,7 @@ export function readSeriesTable(raw: unknown): {
     if (typeof o.area !== "string" || !o.area) throw new Error(`${where}: needs the area FRED names`);
     const m = readSeriesEntry({ ...o, group: "metro", contractRate: false }, where, new Set(["metro"]));
     const k = `${o.metro}|${o.metric}`;
-    if (seenMetro.has(k)) throw new Error(`${where}: ${o.metro} already has a ${o.metric} series`);
+    if (seenMetro.has(k)) throw new Error(`${where}: ${o.metro} already has ${withArticle(String(o.metric))} series`);
     seenMetro.add(k);
     if (seen.has(m.id)) throw new Error(`${where}: id is already a strip series`);
     return { ...m, metro: o.metro, metric: o.metric as MetroMetric, area: o.area };
@@ -449,7 +450,7 @@ export function readSeriesTable(raw: unknown): {
     if (typeof o.area !== "string" || !o.area) throw new Error(`${where}: needs the area FRED names`);
     const m = readSeriesEntry({ ...o, group: "metro", contractRate: false }, where, new Set(["metro"]));
     const k = `${o.metro}|${o.metric}`;
-    if (seenRegion.has(k)) throw new Error(`${where}: ${o.metro} already has a ${o.metric} series`);
+    if (seenRegion.has(k)) throw new Error(`${where}: ${o.metro} already has ${withArticle(String(o.metric))} series`);
     seenRegion.add(k);
     if (seen.has(m.id) || metroSeries.some((x) => x.id === m.id)) {
       throw new Error(`${where}: id is already a strip or metro series`);
@@ -482,7 +483,7 @@ export function readSeriesTable(raw: unknown): {
     if (typeof o.area !== "string" || !o.area) throw new Error(`${where}: needs the area FRED names`);
     const m = readSeriesEntry({ ...o, group: "metro", contractRate: false }, where, new Set(["metro"]));
     const k = `${o.state}|${o.metric}`;
-    if (seenState.has(k)) throw new Error(`${where}: ${o.state} already has a ${o.metric} series`);
+    if (seenState.has(k)) throw new Error(`${where}: ${o.state} already has ${withArticle(String(o.metric))} series`);
     seenState.add(k);
     if (seen.has(m.id) || metroSeries.some((x) => x.id === m.id) || regionSeries.some((x) => x.id === m.id)) {
       throw new Error(`${where}: id is already a strip, metro or region series`);

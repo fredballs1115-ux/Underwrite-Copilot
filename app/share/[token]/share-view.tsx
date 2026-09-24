@@ -10,7 +10,9 @@ import type {
 } from "@/lib/anthropic/types";
 import { assetClassLabel } from "@/lib/asset-class";
 import { assetWords } from "@/lib/asset-words";
-import { inferStrategy, planSummary } from "@/lib/deal-strategy";
+import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
+import { readInterest } from "@/lib/interest";
+import { InterestPanel } from "@/app/interest-panel";
 import { keyTermRows } from "@/lib/key-terms";
 import { readPortfolio } from "@/lib/portfolio";
 import { PortfolioCard } from "@/app/portfolio-card";
@@ -271,6 +273,10 @@ export function ShareView({
           .filter(Boolean)
           .join(" · ")}
       </p>
+
+      {/* What is being sold (#414) — a note, a share, a leasehold changes
+          what every figure below means; nothing for a plain fee simple. */}
+      <InterestPanel interest={readInterest(safeExtraction, askingPriceOf(safeExtraction))} />
 
       {aerial && <ShareAerial src={aerial.src} place={aerial.place} />}
 

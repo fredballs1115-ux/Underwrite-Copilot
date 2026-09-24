@@ -49,6 +49,8 @@
  * Pure, no I/O. Rents are monthly per unit; rates are percentages.
  */
 
+import { withArticle } from "@/lib/article";
+
 /** Months in the year the downtime and the tenancy are measured against. */
 const MONTHS = 12;
 
@@ -346,7 +348,7 @@ function noteFor(x: StorageRead, t: StorageTerms): string {
       x.breakEvenDecayPts !== null && x.breakEvenDecayPts > 0 && end !== null
         ? ` Put the same increase through every year and that break-even falls to ${end}% by year ${x.schedule.length} — each increase widens the gap the next one is traded against.`
         : "";
-    return `A ${t.ecriPct}% increase breaks even at a ${x.breakEvenMoveOutPct}% move-out, against the ${nonNegative(t.moveOutPct) ? t.moveOutPct : 0}% assumed — ${x.headroomPts} points of room.${decay}`;
+    return `${withArticle(`${t.ecriPct}%`, true)} increase breaks even at ${withArticle(`${x.breakEvenMoveOutPct}%`)} move-out, against the ${nonNegative(t.moveOutPct) ? t.moveOutPct : 0}% assumed — ${x.headroomPts} points of room.${decay}`;
   }
   if (x.breakEvenMoveOutPct === null) {
     return `The street rate is high enough against the in-place rent that a leaver's unit re-lets for more than the raised tenant was paying, so there is no trade to make — every move-out is a gain.`;

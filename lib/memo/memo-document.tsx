@@ -27,7 +27,8 @@ import type {
   MarketResult,
   VerdictResult,
 } from "@/lib/anthropic/types";
-import { inferStrategy, planSummary } from "@/lib/deal-strategy";
+import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
+import { interestShortLine, readInterest } from "@/lib/interest";
 import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
 import { shownAssetClass } from "@/lib/pipeline-slots";
@@ -103,6 +104,13 @@ function strategyLineFor(extraction: ExtractionResult | null): string {
   return strategy.label;
 }
 
+/** What is being sold, in one line for the memo's header (lib/interest):
+ *  "" for a plain fee simple, whose memo reads as it always did. */
+function interestLineFor(extraction: ExtractionResult | null): string {
+  const r = readInterest(extraction, askingPriceOf(extraction));
+  return r ? interestShortLine(r) : "";
+}
+
 export type MemoData = {
   name: string;
   market: string;
@@ -110,6 +118,9 @@ export type MemoData = {
   /** deal type and, for a plan deal, the plan's headline figures ("" for a
    *  stabilized asset). Optional for callers built before it existed. */
   strategyLine?: string;
+  /** what is being sold (lib/interest, #414) — a note, a share, a
+   *  leasehold, in one line; "" for a plain fee simple */
+  interestLine?: string;
   dateStr: string;
   verdictWord: string | null;
   verdictColor: string;
@@ -347,6 +358,7 @@ export function buildMemoData(
     // On a deal filed "Auto-detect", what the deck turned out to be.
     assetClass: shownAssetClass(str(deal.asset_class), extraction ?? null),
     strategyLine: pdfSafe(strategyLineFor(extraction ?? null)),
+    interestLine: pdfSafe(interestLineFor(extraction ?? null)),
     dateStr,
     verdictWord: vmeta?.word ?? null,
     verdictColor: vmeta?.color ?? C.muted,
@@ -781,6 +793,11 @@ export function MemoPage({ data }: { data: MemoData }) {
             <Text style={s.title}>{data.name}</Text>
             {subParts.length > 0 && (
               <Text style={s.sub}>{subParts.join("  ·  ")}</Text>
+            )}
+            {/* What is being sold (#414) — a note, a share, a leasehold, said
+                under the title before any figure is read. */}
+            {data.interestLine && (
+              <Text style={[s.sub, { color: "#114e54", fontFamily: "Helvetica-Bold" }]}>{data.interestLine}</Text>
             )}
           </View>
           {data.verdictWord ? (

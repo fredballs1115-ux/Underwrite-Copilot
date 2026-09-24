@@ -6,6 +6,9 @@ import type { SectorFieldValues } from "@/lib/sector-fields";
 import { PublicCompsPanel } from "./public-comps-panel";
 import { PropertyVisual } from "./property-visual";
 import { PortfolioCard } from "@/app/portfolio-card";
+import { InterestPanel } from "@/app/interest-panel";
+import { withArticle } from "@/lib/article";
+import { readInterest } from "@/lib/interest";
 import { readPortfolio } from "@/lib/portfolio";
 import { PICTURE_CREDIT, ensureDealPicture } from "@/lib/deal-picture";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -57,6 +60,7 @@ import { OM_NOI_BASIS_LABEL, compareNoi, pickOmNoi } from "@/lib/actuals/analyze
 import {
   IMPLIED_CAP_CEILING,
   assessPlausibility,
+  askingPriceOf,
   findPriceMetric,
   inferStrategy,
   isPlanDeal,
@@ -402,6 +406,7 @@ export default async function DealPage({
   const strategy = inferStrategy(extraction, firstSignal);
   const plan = planSummary(extraction, strategy);
   const plausibility = assessPlausibility(extraction, strategy);
+  const interest = readInterest(extraction, askingPriceOf(extraction));
   const summaryStrategy = strategy.kind === "unknown" ? null : strategy.label;
 
   // Property actuals (Feature 1), deal tasks (Feature 7), and the team
@@ -455,9 +460,9 @@ export default async function DealPage({
   const omNoi = omPick?.noi ?? null;
   const noiNote = isPlanDeal(strategy.kind)
     ? omPick
-      ? `A ${strategy.label.toLowerCase()}: the T-12 is held against the OM's ${OM_NOI_BASIS_LABEL[omPick.basis]}. The stabilized pro forma describes the finished project and is judged on yield on cost, never against today's actuals.`
+      ? `${withArticle(strategy.label.toLowerCase(), true)}: the T-12 is held against the OM's ${OM_NOI_BASIS_LABEL[omPick.basis]}. The stabilized pro forma describes the finished project and is judged on yield on cost, never against today's actuals.`
       : t12Summary
-        ? `A ${strategy.label.toLowerCase()}: the OM states only the finished project's NOI, so there is nothing to hold the T-12 against until an in-place figure is stated. The stabilized pro forma is judged on yield on cost.`
+        ? `${withArticle(strategy.label.toLowerCase(), true)}: the OM states only the finished project's NOI, so there is nothing to hold the T-12 against until an in-place figure is stated. The stabilized pro forma is judged on yield on cost.`
         : null
     : null;
   const actuals: ActualsData = {
@@ -1027,6 +1032,10 @@ export default async function DealPage({
             asset — it changes what every figure below means. Then anything
             that genuinely does not tie. */}
         <PlanStrip strategy={strategy} plan={plan} noun={assetWords(shownClass).noun?.one} />
+        {/* What is being sold (#414): a note, a share, a leasehold — said
+            before any figure is believed, since it changes what the price
+            buys (lib/interest). Nothing for a plain fee simple. */}
+        <InterestPanel interest={interest} />
         <PlausibilityPanel findings={plausibility} strategy={strategy} />
         <PlanSensitivity plan={plan} refCap={refCap} />
 

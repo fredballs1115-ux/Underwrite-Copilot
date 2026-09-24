@@ -3584,3 +3584,54 @@ describe("PortfolioCard — a portfolio OM's properties, one row each", () => {
     expect(render(React.createElement(PortfolioCard, { portfolio: readPortfolio({ ...extraction, properties: [extraction.properties[0]] }) }))).not.toContain("The portfolio");
   });
 });
+
+// ── What is being sold (#414) ───────────────────────────────────────────────
+import { InterestPanel } from "@/app/interest-panel";
+import { readInterest as readInterestFor } from "@/lib/interest";
+
+describe("InterestPanel — what the price buys, said before any figure is believed", () => {
+  const base = (interest: NonNullable<ExtractionResult["interest"]>, metrics: ExtractionResult["metrics"] = []) =>
+    ({
+      dealName: "Harbor View Apartments",
+      assetClass: "multifamily",
+      interest,
+      totalPages: 40,
+      metrics: [{ label: "Asking price", value: "$20,000,000", flagged: false, page: "p. 2" }, ...metrics],
+    }) as ExtractionResult;
+  const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+
+  it("a note: the balance as the track, the price filled, and the model named as the collateral's", () => {
+    const ex = base(
+      { ...blank, kind: "note", loan: "$24.4M UPB, 5.25% coupon, 90 days delinquent", page: "p. 5" },
+      [{ label: "Unpaid principal balance", value: "$24,400,000", flagged: false, page: "p. 5" }],
+    );
+    const html = render(React.createElement(InterestPanel, { interest: readInterestFor(ex, 20_000_000) }));
+    const text = visibleText(html);
+    expect(text).toContain("What is being sold");
+    expect(text).toContain("A loan secured by the property");
+    expect(text).toContain("The $20.0M price is an 18.0% discount to the $24.4M unpaid balance.");
+    expect(text).toContain("Price $20.0M");
+    expect(text).toContain("Unpaid balance $24.4M");
+    expect(text).toContain("The loan as stated: $24.4M UPB, 5.25% coupon, 90 days delinquent");
+    expect(text).toContain("not the note's return");
+    expect(html.match(/data-bar="interest"/g)).toHaveLength(1);
+    expect(text).toContain("p. 5");
+    expect(a11yIssues(html), "interest panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("a share: the whole as the track, the share filled; a leasehold links the ground lease calculator; a fee simple draws nothing", () => {
+    const share = visibleText(
+      render(React.createElement(InterestPanel, { interest: readInterestFor(base({ ...blank, kind: "partial_interest", share: "49% LP interest" }), 20_000_000) })),
+    );
+    expect(share).toContain("The share $20.0M");
+    expect(share).toContain("The whole, grossed up $40.8M");
+    const leaseHtml = render(
+      React.createElement(InterestPanel, { interest: readInterestFor(base({ ...blank, kind: "leasehold", groundLease: "62 years remaining; $310,000 a year" }), 20_000_000) }),
+    );
+    expect(leaseHtml).toContain('href="/tools#ground-lease"');
+    expect(leaseHtml).not.toContain('data-bar="interest"');
+    expect(visibleText(leaseHtml)).toContain("The ground lease as stated: 62 years remaining; $310,000 a year");
+    expect(render(React.createElement(InterestPanel, { interest: readInterestFor(base({ ...blank, kind: "fee_simple" }), 20_000_000) }))).not.toContain("What is being sold");
+  });
+});

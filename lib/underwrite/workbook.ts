@@ -279,6 +279,19 @@ function buildCover(
     ws.getRow(r).height = isPlanDeal(dealKind) ? 54 : 28;
     r++;
   }
+  // What is being sold (#414): a note, a share, a leasehold — and what this
+  // model is and is not on it, before anyone reads a return off it.
+  if (meta.interest) {
+    fact("What is being sold", meta.interest.line);
+    if (meta.interest.modelCaveat) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.interest.modelCaveat;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 40;
+      r++;
+    }
+  }
   r++;
 
   sectionHeader(ws, r, "Contents", 2, 3);

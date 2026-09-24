@@ -15,7 +15,7 @@ describe("askInstruction — ask-the-deal's prompt", () => {
 
   it("carries the screen's context so the answer names which figure the OM's number is", () => {
     const ctx =
-      "Deal type: Conversion — convert the vacant office building into 320 apartments. The OM's stabilized NOI of $21.0M is the finished project's figure — over $180.0M of total cost it is a 11.7% yield on cost, not today's income and not a cap rate on the price.";
+      "Deal type: Conversion — convert the vacant office building into 320 apartments. The OM's stabilized NOI of $21.0M is the finished project's figure — over $180.0M of total cost it is an 11.7% yield on cost, not today's income and not a cap rate on the price.";
     const text = askInstruction(q, ctx);
     expect(text).toContain(`<deal_context>\n${ctx}\n</deal_context>`);
     expect(text).toMatch(/never overrides what the OM states/);
@@ -52,7 +52,7 @@ describe("dealContextFor — what the screen established, for the answerer", () 
     const ctx = dealContextFor(conversion)!;
     expect(ctx).toContain("Deal type: Conversion — Convert the vacant office building into 320 apartments.");
     expect(ctx).toContain("stabilized NOI of $21.0M is the finished project's figure");
-    expect(ctx).toContain("over $180.0M of total cost it is a 11.7% yield on cost");
+    expect(ctx).toContain("over $180.0M of total cost it is an 11.7% yield on cost");
     expect(ctx).toContain("not a cap rate on the price");
   });
 

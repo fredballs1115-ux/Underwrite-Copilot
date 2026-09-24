@@ -66,6 +66,7 @@ import { ManualDealForm } from "../manual-deal-form";
 import { factsFromExtraction, type ManualDealFacts } from "@/lib/manual-deal";
 import { findPricedMetric, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { subjectBasis, type SubjectBasis } from "@/lib/comp-detail";
+import { interestOf } from "@/lib/interest";
 import type { ResultKey } from "@/lib/screen-run";
 import { useToast } from "../../toaster";
 import type { UnderwritingModel } from "@/lib/model/types";
@@ -832,6 +833,7 @@ export function DealView({
             compSubject={subjectBasis(
               results.extraction?.metrics ?? [],
               inferStrategy(results.extraction, firstSignal).kind,
+              interestOf(results.extraction),
             )}
           />
         )}

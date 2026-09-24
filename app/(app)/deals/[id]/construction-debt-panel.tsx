@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { withArticle } from "@/lib/article";
 import { parseMoney } from "@/lib/criteria";
 import type { PlanSummary } from "@/lib/deal-strategy";
 import type { RateSeed } from "@/lib/debt-index";
@@ -97,8 +98,8 @@ export function ConstructionDebtPanel({
     <section aria-label="Construction and take-out debt" className="mt-2">
       <p className="text-sm text-muted">
         {plan.kind === "value_add" || plan.kind === "lease_up"
-          ? `A ${planLabel.toLowerCase()} is usually financed with bridge debt sized to total cost — price plus the works, carry included — and refinanced into permanent debt once the plan stabilizes. The take-out uses the lender terms in the sizer below.`
-          : `A ${planLabel.toLowerCase()} borrows against what it costs, not against income it does not have yet: a construction or bridge loan sized to total cost — carry included — paid off at stabilization by permanent debt sized on the finished NOI. The take-out uses the lender terms in the sizer below.`}
+          ? `${withArticle(planLabel.toLowerCase(), true)} is usually financed with bridge debt sized to total cost — price plus the works, carry included — and refinanced into permanent debt once the plan stabilizes. The take-out uses the lender terms in the sizer below.`
+          : `${withArticle(planLabel.toLowerCase(), true)} borrows against what it costs, not against income it does not have yet: a construction or bridge loan sized to total cost — carry included — paid off at stabilization by permanent debt sized on the finished NOI. The take-out uses the lender terms in the sizer below.`}
         {seededYears == null && (
           <span> The OM states no timeline, so the road to take-out defaults to 2 years — set it.</span>
         )}
@@ -143,7 +144,7 @@ export function ConstructionDebtPanel({
                 [
                   "Take-out the finished NOI carries",
                   fmtUsd(r.takeOut.loan),
-                  `${BINDING_LABEL[r.takeOut.binding]}${r.stabilizedValue != null ? ` · ${fmtUsd(r.stabilizedValue)} value at a ${exitCap}% cap` : ""}`,
+                  `${BINDING_LABEL[r.takeOut.binding]}${r.stabilizedValue != null ? ` · ${fmtUsd(r.stabilizedValue)} value at ${withArticle(`${exitCap}%`)} cap` : ""}`,
                 ],
                 [
                   r.refinanceGap > 0 ? "Cash-in refinance at take-out" : "Take-out headroom",

@@ -783,3 +783,25 @@ describe("the Portfolio tab — each property as the memorandum states it, the s
     expect(wb.getWorksheet("Portfolio")).toBeUndefined();
   });
 });
+
+// ── What is being sold, on the cover (#414) ────────────────────────────────
+describe("the cover says what is being sold, and what the model is and is not on it", () => {
+  it("a note: the line and the caveat under the deal type; a fee simple: neither", async () => {
+    const note = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        interest: { kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "" },
+        metrics: [...extraction.metrics, { label: "Unpaid principal balance", value: "$62,500,000", flagged: false, page: "p. 3" }],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(note));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "What is being sold");
+    expect(r).toBeGreaterThan(0);
+    expect(cover.getCell(r, 3).value).toBe("A loan secured by the property, not the property — the $50.0M price is a 20.0% discount to the $62.5M balance");
+    expect(String(cover.getCell(r + 1, 3).value)).toContain("not the note's return");
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "What is being sold")).toThrow();
+  });
+});
