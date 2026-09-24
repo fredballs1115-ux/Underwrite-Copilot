@@ -10,7 +10,7 @@ import { monthOf, type ZoriRead } from "@/lib/zori";
 import { metroSupply, type MetroSupply } from "@/lib/metro-supply";
 import { HOTNESS_METROS, type RealtorRead } from "@/lib/realtor";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
-import { isStateMarket } from "@/lib/market-match";
+import { isDataMetro, isStateMarket } from "@/lib/market-match";
 
 /**
  * The metro's published figures, written out for the market check — the
@@ -519,10 +519,15 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
   // reads its STATE's figures, and a state figure passed off as a metro's
   // flatters or damns a market the deal is not in.
   const grain: LiveMarketBrief["grain"] = isStateMarket(input.metro.id) ? "state" : "metro";
+  // A metro area the site reads without a brief says so in the header: the
+  // figures are the metro's own, and there is no brief, comps pull or
+  // tracker behind them for the model to lean on.
   const header =
     grain === "state"
       ? `Published figures for the state of ${input.metro.name} the deal sits in — the address lies outside the metros the site tracks, so these are the state's own figures — read on ${readOn} from FRED and the Census Bureau. Each is dated, and each is the state's — not the metro's, not the submarket's and not the building's.`
-      : `Published figures for the ${input.metro.name} market the deal sits in, read on ${readOn} from FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com. Each is dated, and each is the metro area's — not the submarket's and not the building's.`;
+      : isDataMetro(input.metro.id)
+        ? `Published figures for the ${input.metro.name} metro area the deal sits in — a market the site reads but does not brief, so these figures are all it holds for it — read on ${readOn} from FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com. Each is dated, and each is the metro area's — not the submarket's and not the building's.`
+        : `Published figures for the ${input.metro.name} market the deal sits in, read on ${readOn} from FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com. Each is dated, and each is the metro area's — not the submarket's and not the building's.`;
   const text = [header, ...lines.map((l) => `- ${l}`)].join("\n");
   return { metro: input.metro.name, grain, readOn, lines, figures, text };
 }

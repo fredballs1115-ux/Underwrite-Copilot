@@ -2170,7 +2170,57 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   first of its year, published the March after, current until the next
   March) only where no metro or region figure exists, saying so. A state
   has no Zillow, Realtor.com or tracker rows, so those lines and checks
-  are simply absent. **The debt
+  are simply absent. **Between the briefed markets and the state sit the
+  metro areas the site READS but does not brief** (#402,
+  `data/data-metros.json`, 26 of them: Pittsburgh, Phoenix, Denver,
+  Nashville, Charlotte, Austin, Houston, Minneapolis-St. Paul, San Diego,
+  Las Vegas, Tampa, Orlando, Raleigh, Salt Lake City, San Antonio,
+  Sacramento, Columbus, Indianapolis, Kansas City, St. Louis, Cincinnati,
+  Jacksonville, Riverside-San Bernardino, Detroit, Portland, Cleveland).
+  A deal in one gets the metro's OWN figures everywhere a briefed
+  market's deal does — the market check, the deal page's brief, demand
+  and supply pictures and since-this-screen, the model's read, the
+  report, the workbook — and nothing else: no research brief, no comps
+  pull, no tracker, and no row on `/market`'s boards, which rank the
+  briefed markets alone. `marketForAddress` is briefed market ?? data
+  metro ?? state (`dataMetroForAddress`, the same keyword-by-state rule,
+  a metro spanning two states listing both — Kansas City's Kansas side,
+  St. Louis's Illinois side, Cincinnati's Kentucky side, Portland's
+  Vancouver); `metroForAddress` stays the research question and answers
+  null for these, so the pipeline list, the compare table and the comps
+  page keep saying "not a covered market", and the research panel says
+  "read, not briefed" (`isDataMetro`). The series ride in `metroSeries`
+  under the metro's own id (the boards filter by the research list, so
+  they never draw one), each verified from the runner before it went in
+  (probes 35937200224, 35937859807, 35938586038 and 35938785892): FRED's
+  own prefixes (`PITT342`, `PHOE004`, `STL`, `DETR826`, `PORT941` …) for
+  unemployment, payrolls, the three short sectors and both permit
+  series; the BLS-shaped `SMU<fips><cbsa>42…SA` / `43…SA` for retail and
+  transport; `ATNHPIUS<cbsa>Q` for house prices — Detroit's is the
+  DIVISION's (`19804`; the MSA's does not exist), Tampa's stopped at
+  2024 Q4 like Washington's and is left out; a CPI rent series exists for
+  Houston (`CUURA318SEHA`) and Detroit (`CUURA208SEHA`) alone, every
+  other pre-2018 area code answering "does not exist". **Cleveland is
+  the one the 2023 redraw broke**: every `CLEV439` series stopped at
+  2024-12 (its permits at 2023-12), the MSA is 17410 now and FRED files
+  the new series under the BLS-shaped ids (`LAUMT391741000000003`,
+  `SMS39174100000000001` — the `SMS` form, which exists for no other
+  metro's payrolls — and the five sectors NOT seasonally adjusted under
+  `SMU39174106000000001`, `…06500…`, `…07000…`, `…04200…`, `…04300…`, no
+  `SA` suffix, the `SA` and `SMS` forms both "do not exist"; probe run
+  35938949231), all six stored as the LEVEL with `derived: "yoy"` the
+  way Boston's are, since FRED refuses its own transform on that form,
+  and it carries no permits (`CLEV439BPPRIV` stopped 2023-12) and no
+  index (`ATNHPIUS17460Q` stopped 2024-10, `…17410Q` does not exist). The survey's
+  vacancy is matched by name prefix like the others (`census`), Zillow
+  by RegionName (`zillow`) and Realtor.com by CBSA (`cbsa`) — the two
+  monthly pulls append the list to their own (`require("../data/data-
+  metros.json")`), and the HVS pull reads the entries out of the series
+  table as before; each key is a claim until that pull's dry run prints
+  the row it matched. `metroRegions` carries each one's Census region so
+  the regional vacancy is borrowed and named as before. The weekday pull
+  now walks about a thousand series and the stall guard is 45 minutes.
+  **The debt
   market rides after the metro's lines, for every deal** (#384,
   `DEBT_MARKET_IDS`): the 10-year Treasury, what banks say about their
   standards for THIS kind of loan (`lendingStandardsFor` — rental housing

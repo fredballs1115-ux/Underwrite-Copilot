@@ -442,3 +442,44 @@ describe("a deal outside the covered metros reads its state's figures, said as t
     expect(dc.text).toContain("each is the metro area's");
   });
 });
+
+// ── A metro area the site reads without a brief ─────────────────────────────
+describe("a deal in a metro area the site reads without a brief gets the metro's own figures, and the header says what is behind them", () => {
+  // Pittsburgh's series as the table files them, the ids the runner printed
+  // (probe runs 35937200224 and 35937859807).
+  const rows: RateRow[] = [
+    { series_id: "PITT342URN", obs_date: "2026-07-01", value: 4.1 },
+    { series_id: "PITT342URN", obs_date: "2026-06-01", value: 4.3 },
+    { series_id: "PITT342NA_YOY", obs_date: "2026-08-01", value: 0.6 },
+    { series_id: "HVS_RVR_38300", obs_date: "2026-04-01", value: 7.4 },
+    { series_id: "HVS_RVR_38300_MOE", obs_date: "2026-04-01", value: 3.1 },
+  ];
+  const pitt = liveMarketBrief({
+    metro: { id: "pittsburgh", name: "Pittsburgh PA" },
+    assetClass: "multifamily",
+    rates: readMetroRates("pittsburgh", rows, NOW),
+    zori: null,
+    realtor: null,
+    national: [],
+    now: NOW,
+  })!;
+
+  it("opens by saying the market is read but not briefed, and every line is the metro area's", () => {
+    expect(pitt.text).toContain(
+      "Published figures for the Pittsburgh PA metro area the deal sits in — a market the site reads but does not brief, so these figures are all it holds for it — read on 2026-09-23 from FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com. Each is dated, and each is the metro area's — not the submarket's and not the building's.",
+    );
+    expect(pitt.grain).toBe("metro");
+    expect(pitt.metro).toBe("Pittsburgh PA");
+    expect(pitt.lines).toContain("Unemployment 4.1% (Jul 2026, Pittsburgh MSA; FRED), -0.2 pt on the month before");
+    expect(pitt.lines).toContain("Nonfarm payrolls +0.6% from a year ago (Aug 2026, Pittsburgh MSA; FRED)");
+    expect(pitt.lines).toContain(
+      "Rental vacancy, metro area, Pittsburgh MSA: 7.4% with a ±3.1 pt margin of error (a sample — a move inside the margin is noise) (Q2 2026; the Census Bureau's Housing Vacancy Survey)",
+    );
+    expect(pitt.text).not.toContain("state's");
+  });
+
+  it("a briefed market's header says nothing of the kind", () => {
+    const dc = liveMarketBrief({ metro: { id: "dc", name: "Washington DC" }, assetClass: "multifamily", rates: readMetroRates("dc", DC_ROWS, NOW), zori: null, realtor: null, national: [], now: NOW })!;
+    expect(dc.text).not.toContain("does not brief");
+  });
+});

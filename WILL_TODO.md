@@ -294,6 +294,25 @@ only; the state HOME VALUE file is real
 (`zhvi/State_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv`, 52 rows,
 RegionName the state's name) and could ride the Zillow pull for a
 price-side line on a state deal, without a rent to set it against.
+Then #401: a probe on its own no longer walks the whole table
+(`PROBE_ONLY`, about a minute instead of twenty-five), and the report
+and the workbook read the same market as the page (`marketForAddress`,
+one function for every live read). Then #402: the metro areas the site
+READS but does not brief — twenty-six of the next tier (Pittsburgh,
+Phoenix, Denver, Nashville, Charlotte, Austin, Houston, Minneapolis,
+San Diego, Las Vegas, Tampa, Orlando, Raleigh, Salt Lake City, San
+Antonio, Sacramento, Columbus, Indianapolis, Kansas City, St. Louis,
+Cincinnati, Jacksonville, Riverside, Detroit, Portland, Cleveland) in
+`data/data-metros.json`, matched by address between the briefed markets
+and the state fallback, their FRED series verified from the runner (the
+four probes are named in CLAUDE.md), the survey's vacancy, Zillow's and
+Realtor.com's rows, on the market check, the deal page, the report and
+the workbook as the metro's, with the header saying there is no brief
+behind them. **Open after it**: the boards on `/market` rank the
+briefed markets alone — a second block for the metros read without a
+brief ("and the markets the site reads") is the obvious next picture,
+since the payroll and vacancy figures are the same rows; and a metro
+page for each (`/market/<id>` without a brief) is the one after that.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.

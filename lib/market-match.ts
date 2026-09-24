@@ -4,6 +4,7 @@
 // (Universal module: server components and tests import it.)
 
 import metrosSeed from "@/data/research/metros.json";
+import dataMetrosSeed from "@/data/data-metros.json";
 import { US_STATE_ABBREV, abbrevState } from "@/lib/address";
 import type { GeoTarget } from "@/lib/criteria";
 
@@ -11,6 +12,69 @@ export interface CoveredMetro {
   id: string;
   name: string;
 }
+
+/**
+ * A metro area the site READS but does not brief (data/data-metros.json):
+ * its published figures reach every surface a briefed market's do — the
+ * market check, the deal page, the report, the workbook — and nothing else
+ * does: no research brief, no comps pull, no tracker. Matched after the
+ * briefed markets and before the state fallback.
+ */
+export interface DataMetro extends CoveredMetro {
+  /** The states it spans, two-letter; an address matches inside one of them. */
+  states: readonly string[];
+  /** Substrings of the deal's city, county or submarket that place it here. */
+  keywords: readonly string[];
+  /** Its Census region — northeast / midwest / south / west. */
+  region: string;
+  /** The CBSA code Realtor.com's file keys on. */
+  cbsa: string;
+  /** The RegionName in Zillow Research's metro files. */
+  zillow: string;
+  /** The prefix of the area's name in the Housing Vacancy Survey's tables. */
+  census: string;
+}
+
+/** The list, its shape held: a malformed entry is refused rather than
+ *  skipped, because a skipped metro silently reads as its state. */
+function readDataMetros(raw: unknown): DataMetro[] {
+  const list = (raw as { metros?: unknown })?.metros;
+  if (!Array.isArray(list)) throw new Error("data-metros: metros must be an array");
+  const ids = new Set<string>();
+  const research = new Set((metrosSeed.metros ?? []).map((m) => m.id));
+  return list.map((m, i) => {
+    const o = (m ?? {}) as Record<string, unknown>;
+    const where = `data-metros: metro ${i} (${String(o.id ?? "?")})`;
+    for (const k of ["id", "name", "region", "cbsa", "zillow", "census"] as const) {
+      if (typeof o[k] !== "string" || !(o[k] as string).trim()) throw new Error(`${where}: needs ${k}`);
+    }
+    if (!Array.isArray(o.states) || o.states.length === 0 || !o.states.every((s) => typeof s === "string" && /^[A-Z]{2}$/.test(s))) {
+      throw new Error(`${where}: states must be two-letter codes`);
+    }
+    if (!Array.isArray(o.keywords) || o.keywords.length === 0 || !o.keywords.every((k) => typeof k === "string" && k === k.toLowerCase() && k.trim())) {
+      throw new Error(`${where}: keywords must be lowercase, and there must be some`);
+    }
+    if (!["northeast", "midwest", "south", "west"].includes(o.region as string)) throw new Error(`${where}: bad region`);
+    if (!/^\d{5}$/.test(o.cbsa as string)) throw new Error(`${where}: cbsa must be five digits`);
+    const id = o.id as string;
+    if (ids.has(id)) throw new Error(`${where}: duplicate id`);
+    if (research.has(id)) throw new Error(`${where}: ${id} is a briefed market`);
+    ids.add(id);
+    return {
+      id,
+      name: o.name as string,
+      states: o.states as string[],
+      keywords: o.keywords as string[],
+      region: o.region as string,
+      cbsa: o.cbsa as string,
+      zillow: o.zillow as string,
+      census: o.census as string,
+    };
+  });
+}
+
+/** The metro areas read without a brief, in the file's order. */
+export const DATA_METROS: readonly DataMetro[] = readDataMetros(dataMetrosSeed);
 
 // Keyword → metro id, guarded by state. Keywords are matched against the
 // deal's city, county, and submarket strings (lowercased, substring). Order
@@ -114,12 +178,43 @@ export function stateOfMarket(id: string | null | undefined): string | null {
 }
 
 /**
- * The market the LIVE figures are read for: the covered metro where the
- * address sits in one, the state's own series otherwise. One function, so
- * the pipeline's market check, the deal page, the report and the workbook
- * read the same market for one deal — `metroForAddress` alone stays the
- * research question ("is this a covered market, with a brief and comps"),
- * which a state never answers.
+ * The metro area read without a brief that a deal address falls in, or
+ * null — the same rule as the briefed markets (keywords against the city,
+ * county and submarket, guarded by state), consulted after them.
+ */
+export function dataMetroForAddress(addr: {
+  city?: string | null;
+  county?: string | null;
+  state?: string | null;
+  submarket?: string | null;
+}): CoveredMetro | null {
+  const state = abbrevState((addr.state ?? "").trim()).trim().toUpperCase();
+  if (!state) return null;
+  const hay = [addr.city, addr.county, addr.submarket]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (!hay) return null;
+  for (const m of DATA_METROS) {
+    if (!m.states.includes(state)) continue;
+    if (m.keywords.some((k) => hay.includes(k))) return { id: m.id, name: m.name };
+  }
+  return null;
+}
+
+/** Whether a market id is a metro area's read without a brief. */
+export function isDataMetro(id: string | null | undefined): boolean {
+  return typeof id === "string" && DATA_METROS.some((m) => m.id === id);
+}
+
+/**
+ * The market the LIVE figures are read for: the briefed market where the
+ * address sits in one, the metro area read without a brief where it sits
+ * in one of those, the state's own series otherwise. One function, so the
+ * pipeline's market check, the deal page, the report and the workbook read
+ * the same market for one deal — `metroForAddress` alone stays the
+ * research question ("is this a briefed market, with comps and a tracker"),
+ * which a data metro and a state never answer.
  */
 export function marketForAddress(addr: {
   city?: string | null;
@@ -127,7 +222,7 @@ export function marketForAddress(addr: {
   state?: string | null;
   submarket?: string | null;
 }): CoveredMetro | null {
-  return metroForAddress(addr) ?? stateForAddress(addr);
+  return metroForAddress(addr) ?? dataMetroForAddress(addr) ?? stateForAddress(addr);
 }
 
 export interface MarketNavEntry {
