@@ -320,7 +320,9 @@ board — tightest first, each bar with the survey's margin as a whisker,
 the national rate as a line, and the note saying that two metros whose
 whiskers overlap are not ordered by it. Then #406: the pipeline
 list's row and the compare table say "read, not briefed" for a deal in
-one of them, rather than nothing. **Open after
+one of them, rather than nothing. Then #408: Zillow's apartment
+asking rent against a year ago for every metro area the site reads, a
+board under the survey's, one query for all forty-four. **Open after
 it**: the twenty-six frames are business-district coordinates written
 from knowledge and checked by eye on the deployed page — look at each
 once (`/market?metro=<id>`) and correct any that frames the wrong

@@ -781,6 +781,18 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   are a different measure and the note says that too. One cached read
   (`liveMetricRates("rental_vacancy_msa")`) plus `liveRates()`; a
   suburb has no series of its own and is not a row; `data-bar="surveyvac"`.
+  **And the rents** (#408, `app/market/rent-board.tsx`, `RentBoard`,
+  pure, under it): Zillow's apartment asking rent against a year ago for
+  every metro area the site reads, ranked fastest first with signed bars
+  from a centre line and the typical home's price in years of the
+  all-homes rent beside each; a suburb shares its MSA's row (`shared`)
+  and is not listed twice; a metro with no apartment row this month is
+  listed after with its all-homes change, never ranked on a different
+  measure; Zillow's credit is in the note. ONE query for every metro's
+  rows (`fetchBenchRowsFor` in `lib/live-rates-query.ts`, `.in("metro",
+  names)`; `liveZoriAll` in `lib/zori-read.ts`, cached under the list of
+  names) — forty-four per-metro queries for one picture is the shape the
+  per-series read exists to avoid. `data-bar="rentboard"`.
 - **The deal's own model reads the same table** (#380): `lib/debt-index.ts`
   (pure) picks the index a loan is quoted over off today's rates — the
   Treasury tenor NEAREST the hold for the permanent loan (`treasuryForTerm`,

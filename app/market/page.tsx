@@ -23,7 +23,9 @@ import { MetroLive } from "./metro-live";
 import { ReadOnlyMetroView } from "./read-only-metro";
 import { LessorRentLine } from "./lessor-rent-line";
 import { SectorJobsLine } from "./sector-jobs-line";
-import { liveZori } from "@/lib/zori-read";
+import { liveZori, liveZoriAll } from "@/lib/zori-read";
+import type { ZoriRead } from "@/lib/zori";
+import { RentBoard } from "./rent-board";
 import { ZoriLine } from "./zori-line";
 import { liveRealtor } from "@/lib/realtor-read";
 import { RealtorLine } from "./realtor-line";
@@ -385,6 +387,7 @@ export default async function MarketDataPage({
           sector's payrolls against a year ago, live from FRED. */}
       <SectorJobsBoardLive />
       <SurveyVacancyBoardLive />
+      <RentBoardLive />
       <MidAtlanticTable />
       <SectorExplorer selected={sectorParam} />
       <LiveRatesStrip />
@@ -1094,6 +1097,22 @@ async function SurveyVacancyBoardLive() {
     ...DATA_METROS.map((m) => ({ id: m.id, name: m.name, briefed: false })),
   ];
   return <SurveyVacancyBoard markets={markets} rates={rates} us={us} />;
+}
+
+// ── Rent board (every metro area the site reads, one Zillow read) ──────────
+async function RentBoardLive() {
+  const markets = [
+    ...(metrosSeed.metros ?? []).map((m) => ({ id: m.id, name: m.name })),
+    ...DATA_METROS.map((m) => ({ id: m.id, name: m.name, briefed: false })),
+  ];
+  let reads: Map<string, ZoriRead | null>;
+  try {
+    reads = await liveZoriAll(markets.map((m) => m.name));
+  } catch (err) {
+    console.warn("rent board read failed:", err instanceof Error ? err.message : err);
+    return null;
+  }
+  return <RentBoard markets={markets} reads={reads} />;
 }
 
 // ── Sector leaderboard (cross-metro) ─────────────────────────────────────────
