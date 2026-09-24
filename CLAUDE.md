@@ -2224,9 +2224,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   a metro spanning two states listing both — Kansas City's Kansas side,
   St. Louis's Illinois side, Cincinnati's Kentucky side, Portland's
   Vancouver); `metroForAddress` stays the research question and answers
-  null for these, so the pipeline list, the compare table and the comps
-  page keep saying "not a covered market", and the research panel says
-  "read, not briefed" (`isDataMetro`). The series ride in `metroSeries`
+  null for these; the pipeline list's row and the compare table's
+  "Covered market" line say "Pittsburgh PA · read" / "(read, not
+  briefed)" (`readMarket`, from `dataMetroForAddress`, #406) rather than
+  nothing, the comps page keeps saying "not a covered market", and the
+  research panel says "read, not briefed" (`isDataMetro`). The series ride in `metroSeries`
   under the metro's own id (the boards filter by the research list, so
   they never draw one), each verified from the runner before it went in
   (probes 35937200224, 35937859807, 35938586038 and 35938785892): FRED's

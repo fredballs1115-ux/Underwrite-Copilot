@@ -7,7 +7,7 @@ import type { UnderwritingModel } from "@/lib/model/types";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxCheckSource, evaluateBuyBox, type BuyBox } from "@/lib/criteria";
 import { CompareTable, usd, type Col } from "./compare-table";
-import { metroForAddress } from "@/lib/market-match";
+import { dataMetroForAddress, metroForAddress } from "@/lib/market-match";
 import type { StructuredAddress } from "@/lib/address";
 import type { FirstSignal } from "@/lib/anthropic/types";
 import { capSpreadRead, leverageRead } from "@/lib/leverage";
@@ -72,6 +72,7 @@ function toCol(deal: DealRow, box: BuyBox | null, bench30: number | null, tenYea
     market: ex?.market || "—",
     // Same matcher the pipeline and deal page use — all three surfaces agree.
     coveredMarket: metroForAddress(address ?? {})?.name ?? null,
+    readMarket: dataMetroForAddress(address ?? {})?.name ?? null,
     verdict: verdict?.verdict ?? null,
     reason: verdict?.reason ?? null,
     hasModel: model != null,

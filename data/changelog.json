@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-24",
+      "title": "The pipeline says which deals sit in a metro the site reads",
+      "href": "/deals",
+      "blurb": "A deal in Pittsburgh or Phoenix showed nothing beside its market on the pipeline list, which read as no figures at all. The row and the compare table now name the metro area and say it is read, not briefed — its published figures are under the market check; no brief, comps or tracker on file — so a reader can tell a market the site reads from one it knows nothing about."
+    },
+    {
+      "date": "2026-09-24",
       "title": "Where rental vacancy is lowest, forty metro areas, each with its margin",
       "href": "/market",
       "blurb": "The Census Bureau's Housing Vacancy Survey publishes a rental vacancy rate for the 75 largest metro areas each quarter, and it is the one vacancy figure every metro the site reads has on the same basis. The market page now ranks all forty — the briefed markets and the ones read without a brief alike — tightest first, each bar carrying the survey's own margin of error as a whisker and the national rate as a line, because a quarter's figure for one metro is a sample: two metro areas whose whiskers overlap are not ordered by it, whatever the ranking says."

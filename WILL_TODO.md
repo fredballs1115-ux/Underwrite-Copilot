@@ -318,7 +318,9 @@ not read), reached from a folded chip row on the explorer. Then #405: the survey
 rental vacancy for all forty metro areas is a board under the payroll
 board — tightest first, each bar with the survey's margin as a whisker,
 the national rate as a line, and the note saying that two metros whose
-whiskers overlap are not ordered by it. **Open after
+whiskers overlap are not ordered by it. Then #406: the pipeline
+list's row and the compare table say "read, not briefed" for a deal in
+one of them, rather than nothing. **Open after
 it**: the twenty-six frames are business-district coordinates written
 from knowledge and checked by eye on the deployed page — look at each
 once (`/market?metro=<id>`) and correct any that frames the wrong

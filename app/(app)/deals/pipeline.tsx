@@ -52,6 +52,10 @@ export type DealCard = {
   /** covered-market name when the address maps into the 15-market scope
    *  (computed server-side via metroForAddress) — null outside it */
   coveredMarket: string | null;
+  /** the metro area read without a brief the address sits in (server-side,
+   *  dataMetroForAddress) — its figures are read, nothing is briefed; null
+   *  outside one or where the address is a covered market's */
+  readMarket?: string | null;
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
@@ -1319,6 +1323,16 @@ const DealRow = memo(function DealRow({
     >
       <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
       {d.coveredMarket}
+    </span>
+  ) : d.readMarket ? (
+    // A hollow dot: the ground layer reads this metro's figures and briefs
+    // nothing, and the row says which.
+    <span
+      className="inline-flex items-center gap-1 whitespace-nowrap text-muted"
+      title={`${d.readMarket} is read, not briefed — its published figures are under the market check; no brief, comps or tracker on file`}
+    >
+      <span aria-hidden className="h-1.5 w-1.5 rounded-full border border-muted" />
+      {`${d.readMarket} · read`}
     </span>
   ) : null;
   const asset = assetMeta(d.assetClass ?? "");
