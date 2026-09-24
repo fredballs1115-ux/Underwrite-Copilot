@@ -22,6 +22,8 @@ export type Col = {
   market: string;
   /** covered-market name when the address maps into the 15-market scope */
   coveredMarket: string | null;
+  /** the metro area read without a brief, where the address is in one */
+  readMarket?: string | null;
   verdict: string | null;
   reason: string | null;
   hasModel: boolean;
@@ -139,7 +141,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     signed?: boolean;
   }[] = [
     { label: "Market", get: (c) => c.market },
-    { label: "Covered market", get: (c) => c.coveredMarket ?? "—" },
+    { label: "Covered market", get: (c) => c.coveredMarket ?? (c.readMarket ? `${c.readMarket} (read, not briefed)` : "—") },
     {
       label: "Asset class",
       get: (c) => assetClassLabel(c.assetClass) || "—",

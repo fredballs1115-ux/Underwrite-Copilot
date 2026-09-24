@@ -12,7 +12,7 @@ import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/crite
 import { inferStrategy } from "@/lib/deal-strategy";
 import { pickSlots, shownAssetClass } from "@/lib/pipeline-slots";
 import { scoreMandateFit } from "@/lib/mandate";
-import { metroForAddress } from "@/lib/market-match";
+import { dataMetroForAddress, metroForAddress } from "@/lib/market-match";
 import { listJobStatus, type JobLike } from "@/lib/screen-run";
 
 export const metadata: Metadata = { title: "Pipeline" };
@@ -218,6 +218,11 @@ export default async function DealsPage({
       // on whether an address sits inside the 15-market scope.
       coveredMarket:
         metroForAddress((d.address as StructuredAddress | null) ?? {})?.name ??
+        null,
+      // A metro area the site reads without a brief: named, and said to be
+      // read rather than briefed, so the row never reads as "no figures".
+      readMarket:
+        dataMetroForAddress((d.address as StructuredAddress | null) ?? {})?.name ??
         null,
       offersDue: dueById.get(d.id) ?? null,
       slots: extraction

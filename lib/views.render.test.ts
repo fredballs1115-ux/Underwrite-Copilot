@@ -78,6 +78,8 @@ const CARDS: DealCard[] = [
   card({ id: "a", name: "The Maddox at Brewerytown", verdict: "caution", stage: "underwriting", fit: "near", score: 71, mandateVerdict: "WATCH", slots: { cap: "5.6%", price: "$68,000,000", yoc: null }, offersDue: "2026-09-30" }),
   card({ id: "b", name: "1400 Market — office to residential", verdict: "pass", stage: "loi", fit: "fits", score: 88, mandateVerdict: "PURSUE", slots: { cap: null, price: "$20,000,000", yoc: "11.7%" }, market: "Center City, Philadelphia, PA", coveredMarket: "Philadelphia" }),
   card({ id: "c", name: "Riverbend Site — 240 units", verdict: "pass", stage: "screening", fit: "outside", score: 42, mandateVerdict: "PASS", slots: { cap: null, price: "$4,000,000", yoc: "7.2%" }, market: "Frisco, TX", coveredMarket: null }),
+  // A deal in a metro area the site reads without a brief: named as read, not briefed.
+  card({ id: "p", name: "Strip District Lofts", verdict: "pass", stage: "screening", fit: "near", score: 60, mandateVerdict: "WATCH", slots: { cap: "6.4%", price: "$18,000,000", yoc: null }, market: "Strip District, Pittsburgh, PA", coveredMarket: null, readMarket: "Pittsburgh PA" }),
   card({ id: "d", name: "Tysons Corner Plaza", assetClass: "office", verdict: "pass_on", stage: "dead", fit: "outside", score: 18, mandateVerdict: "PASS", slots: { cap: "8.1%", price: "$60,000,000", yoc: null }, market: "Tysons, VA", coveredMarket: "Northern Virginia" }),
   card({ id: "e", name: "Logan Square Retail", assetClass: "retail", verdict: null, stage: "screening", jobStatus: "running", slots: { cap: null, price: "$12,500,000", yoc: null }, market: "Chicago, IL", coveredMarket: "Chicago", hasAddress: false }),
   card({ id: "f", name: "I-95 Logistics Center", assetClass: "industrial", verdict: null, stage: "screening", jobStatus: "failed", market: "Newark, NJ", coveredMarket: "Northern New Jersey" }),
@@ -120,6 +122,11 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(text).toContain("11.7%");
     expect(text).toContain("5.6%");
     expect(text).toContain("Jordan Lee");
+    // A deal in a metro area the site reads without a brief says so on its
+    // row — read, not briefed — where a covered market's says covered.
+    expect(text).toContain("Pittsburgh PA · read");
+    expect(html).toContain("Pittsburgh PA is read, not briefed");
+    expect(html).toContain("Dallas–Fort Worth is a covered market");
     // The stalled run and the failed re-screen each say so in the status
     // column; the failed one's stored "Go" does not stand in for the call.
     expect(text).toContain("Stalled");
@@ -130,15 +137,17 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // score column, once on the line the narrower widths show — and the
     // words a screen reader gets appear once per deal, not once per meta
     // line as they did when the fit was a word the truncation cut first.
-    expect((html.match(/data-fit-bar/g) ?? []).length).toBe(12);
+    // (seven now: the Pittsburgh deal, read without a brief, is scored too)
+    expect((html.match(/data-fit-bar/g) ?? []).length).toBe(14);
     expect((html.match(/Fit 71 · Watch/g) ?? []).length).toBe(2);
+    expect((html.match(/Fit 60 · Watch/g) ?? []).length).toBe(1);
     expect((html.match(/Fit 88 · Pursue/g) ?? []).length).toBe(1);
     expect((html.match(/Fit 42 · Outside box/g) ?? []).length).toBe(1);
     // Every row keeps a picture slot of the same size, so the names line
     // up: the nine live deals with an address try their photo, the two
     // without one (Logan Square, Arlington Flex Park) show a blank plate;
     // the dead one is folded away.
-    expect((html.match(/data-deal-thumb="photo"/g) ?? []).length).toBe(9);
+    expect((html.match(/data-deal-thumb="photo"/g) ?? []).length).toBe(10);
     expect((html.match(/data-deal-thumb="blank"/g) ?? []).length).toBe(2);
     // The two exports travel together at the filter row's right edge.
     expect(html).toMatch(/class="flex items-center gap-2 md:ml-auto"/);
