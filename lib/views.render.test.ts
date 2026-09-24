@@ -3396,3 +3396,55 @@ describe("SurveyVacancyBoard — where rental vacancy is lowest, by the survey, 
     expect(render(React.createElement(SurveyVacancyBoard, { markets, rates: [], us }))).not.toContain("Where rental vacancy");
   });
 });
+
+// ── The rent board: every metro area the site reads, Zillow's apartment rent (#408) ─
+import { RentBoard } from "@/app/market/rent-board";
+import { zoriFor, type BenchRow } from "@/lib/zori";
+
+describe("RentBoard — where apartment asking rents are moving, every metro area the site reads", () => {
+  const markets = [
+    ...(metrosSeedForBoard.metros ?? []).map((m) => ({ id: m.id, name: m.name })),
+    ...READ_ONLY_METROS.map((m) => ({ id: m.id, name: m.name, briefed: false })),
+  ];
+  // Rows as the Zillow pull writes them (run 35942103564): San Francisco
+  // fastest, Washington falling and shared with its three suburbs, Pittsburgh
+  // read without a brief, Detroit with no apartment row this month.
+  const at = "2026-08-31";
+  const row = (metro: string, metric: string, low: number, note = "the metro area's figure"): BenchRow => ({ metric, metro, low, as_of: at, note, source: null });
+  const rows: BenchRow[] = [
+    row("Washington DC", "zori_rent", 2433), row("Washington DC", "zori_rent_yoy", 0.8), row("Washington DC", "zori_mfr_rent", 2281), row("Washington DC", "zori_mfr_rent_yoy", -0.4), row("Washington DC", "zhvi", 573336),
+    row("Prince George's County MD", "zori_rent", 2433, "the Washington, DC metro area's figure, shared with the MSA"), row("Prince George's County MD", "zori_mfr_rent", 2281), row("Prince George's County MD", "zori_mfr_rent_yoy", -0.4),
+    row("San Francisco", "zori_rent", 3409), row("San Francisco", "zori_rent_yoy", 10.8), row("San Francisco", "zori_mfr_rent", 3137), row("San Francisco", "zori_mfr_rent_yoy", 11.6), row("San Francisco", "zhvi", 1123193),
+    row("Pittsburgh PA", "zori_rent", 1469), row("Pittsburgh PA", "zori_rent_yoy", 3.4), row("Pittsburgh PA", "zori_mfr_rent", 1384), row("Pittsburgh PA", "zori_mfr_rent_yoy", 3.4), row("Pittsburgh PA", "zhvi", 232122),
+    row("Detroit MI", "zori_rent", 1524), row("Detroit MI", "zori_rent_yoy", 3.8),
+  ];
+  const reads = new Map(markets.map((m) => [m.name, zoriFor(rows, m.name)]));
+  const html = render(React.createElement(RentBoard, { markets, reads }));
+  const text = visibleText(html);
+
+  it("ranks the apartment figure fastest first across briefed and read-only metros, lists a suburb's shared row once and an all-homes-only metro unranked, and carries Zillow's credit", () => {
+    expect(text).toContain("Where apartment asking rents are moving");
+    expect(text).toContain("3 metro areas ranked, fastest first · Aug 2026");
+    expect(text.indexOf("San Francisco")).toBeLessThan(text.indexOf("Pittsburgh PA"));
+    expect(text.indexOf("Pittsburgh PA")).toBeLessThan(text.indexOf("Washington DC"));
+    expect(text).not.toContain("Prince George");
+    expect(text).toContain("+11.6%");
+    expect(text).toContain("−0.4%");
+    // Price-to-rent: $1,123,193 over twelve months of $3,409 is 27.5 years; Pittsburgh 13.2.
+    expect(text).toContain("27.5 yrs");
+    expect(text).toContain("13.2 yrs");
+    expect(html).toContain('href="/market?metro=san_francisco"');
+    expect(html).not.toContain('href="/market?metro=pittsburgh"');
+    expect((html.match(/data-bar="rentboard"/g) ?? []).length).toBe(3);
+    expect(text).toContain("No apartment figure this month, all homes shown rather than ranked: Detroit MI +3.8%");
+    expect(text).toContain("a suburb shares its metro area's row and is not listed twice.");
+    expect(text).toContain("Data: Zillow Research.");
+    expect(html).toContain('href="https://www.zillow.com/research/data/"');
+    expect(a11yIssues(html), "rent board").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("renders nothing until a row exists", () => {
+    expect(render(React.createElement(RentBoard, { markets, reads: new Map() }))).not.toContain("Where apartment asking rents");
+  });
+});

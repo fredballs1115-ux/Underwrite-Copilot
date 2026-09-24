@@ -951,6 +951,8 @@ jobs:
           mark "#404 the explorer folds the metro areas read without a brief" grep -q "metro areas with live figures and no research note" p_market.html
           # #405 — the survey vacancy board, forty metro areas with their margins (one JS string):
           mark "#405 the survey vacancy board ranks every metro area the site reads" grep -q "two metro areas whose whiskers overlap are not ordered by it" p_market.html
+          # #408 — the rent board (one JS string in its note):
+          mark "#408 the rent board ranks every metro area the site reads" grep -q "a suburb shares its metro area's row and is not listed twice" p_market.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

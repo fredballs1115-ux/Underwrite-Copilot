@@ -1,7 +1,7 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { fetchBenchRows } from "@/lib/live-rates-query";
+import { fetchBenchRows, fetchBenchRowsFor } from "@/lib/live-rates-query";
 import { ZILLOW_METRICS, zoriFor, type BenchRow, type ZoriRead } from "@/lib/zori";
 
 /**
@@ -31,4 +31,30 @@ const cachedRows = unstable_cache(
 
 export async function liveZori(metroName: string): Promise<ZoriRead | null> {
   return zoriFor(await cachedRows(metroName), metroName);
+}
+
+/**
+ * Every metro area's Zillow read at once — the rent board's one read,
+ * cached an hour under the list of names (a new metro is read the day it
+ * is listed), one query rather than one a metro. A name with no rows
+ * reads null, as `liveZori` would.
+ */
+const cachedRowsFor = unstable_cache(
+  async (metroNames: string[]): Promise<BenchRow[]> => {
+    let supabase: ReturnType<typeof createSupabaseAdminClient>;
+    try {
+      supabase = createSupabaseAdminClient();
+    } catch (err) {
+      console.warn("zori unavailable:", err instanceof Error ? err.message : err);
+      return [];
+    }
+    return fetchBenchRowsFor(supabase, metroNames, ZILLOW_METRICS);
+  },
+  ["zori-rows-for"],
+  { revalidate: 3600, tags: ["benchmarks"] },
+);
+
+export async function liveZoriAll(metroNames: readonly string[]): Promise<Map<string, ZoriRead | null>> {
+  const rows = await cachedRowsFor([...metroNames]);
+  return new Map(metroNames.map((name) => [name, zoriFor(rows, name)]));
 }

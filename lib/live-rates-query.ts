@@ -45,6 +45,30 @@ export async function fetchSeriesRows(
   return perSeries.flat();
 }
 
+/** Many metros' rows in `benchmarks` for the metrics named, in one query —
+ *  the boards read every metro area the site reads at once, and forty-four
+ *  queries for one picture is the shape the per-series read exists to
+ *  avoid. Keyed by the metro's name, as the pulls write them. */
+export async function fetchBenchRowsFor(
+  supabase: SupabaseClient,
+  metroNames: readonly string[],
+  metrics: readonly string[],
+): Promise<BenchRow[]> {
+  if (metrics.length === 0 || metroNames.length === 0) return [];
+  try {
+    const { data, error } = await supabase
+      .from("benchmarks")
+      .select("metric, metro, low, as_of, note, source")
+      .in("metro", [...metroNames])
+      .in("metric", [...metrics]);
+    if (error) throw new Error(error.message);
+    return (data as BenchRow[] | null) ?? [];
+  } catch (err) {
+    console.warn(`benchmarks: ${metroNames.length} metros unavailable:`, err instanceof Error ? err.message : err);
+    return [];
+  }
+}
+
 /** A metro's rows in `benchmarks` for the metrics named — the Zillow and
  *  Realtor.com pulls write them by the metro's name, so that is the key. */
 export async function fetchBenchRows(
