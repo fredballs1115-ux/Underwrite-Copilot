@@ -528,7 +528,12 @@
         "Pittsburgh skyline panorama",
         "Pittsburgh downtown cityscape"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Downtown Pittsburgh seen from Mt. Washington.jpg",
+          "note": "Downtown Pittsburgh at the Point, from Mount Washington — EEJCC, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (contact sheet 7, run 35943054619)."
+        }
+      ]
     },
     {
       "metroId": "phoenix",
@@ -568,7 +573,12 @@
         "Denver skyline panorama",
         "Denver downtown cityscape"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Denver, Colorado skyline (cropped 3x5).jpg",
+          "note": "Downtown Denver against the Front Range — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (contact sheet 7, run 35943054619)."
+        }
+      ]
     },
     {
       "metroId": "nashville",
@@ -588,7 +598,12 @@
         "Nashville skyline panorama",
         "Nashville downtown cityscape"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Nashville, Tennessee (cropped).jpg",
+          "note": "Downtown Nashville over the Cumberland River — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (contact sheet 7, run 35943054619)."
+        }
+      ]
     },
     {
       "metroId": "charlotte",
@@ -628,7 +643,12 @@
         "Austin skyline panorama",
         "Austin downtown cityscape"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Skyline of Austin, Texas (cropped).jpg",
+          "note": "Downtown Austin over Lady Bird Lake — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (contact sheet 7, run 35943054619)."
+        }
+      ]
     },
     {
       "metroId": "houston",
