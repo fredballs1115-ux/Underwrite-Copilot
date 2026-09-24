@@ -767,6 +767,20 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   page), because a row of twenty-six chips is a wall rather than a
   directory. Live-verify fetches Pittsburgh's page (`p_market_pitt.html`)
   and greps the note; the fold's line is grepped on `/market` itself.
+  **The one vacancy figure every metro has on the same basis is a board
+  too** (#405, `app/market/survey-vacancy-board.tsx`,
+  `SurveyVacancyBoard`, pure, under the payroll board): the survey's
+  rental vacancy for all forty metro areas — briefed and read without a
+  brief alike — ranked tightest first, each bar carrying the survey's own
+  margin as a whisker (`LiveRate.moe`, the companion the read fetches
+  beside the figure), the national rate (`RRVRUSQ156N`, off the strip's
+  read) as a thin line, a stale row named after the ranked ones, and the
+  note saying the one thing the picture must not let a reader forget:
+  two metro areas whose whiskers overlap are not ordered by the survey,
+  whatever the ranking says. The tracker figures on the sector pages
+  are a different measure and the note says that too. One cached read
+  (`liveMetricRates("rental_vacancy_msa")`) plus `liveRates()`; a
+  suburb has no series of its own and is not a row; `data-bar="surveyvac"`.
 - **The deal's own model reads the same table** (#380): `lib/debt-index.ts`
   (pure) picks the index a loan is quoted over off today's rates — the
   Treasury tenor NEAREST the hold for the permanent loan (`treasuryForTerm`,

@@ -3331,3 +3331,59 @@ describe("ReadOnlyMetroView — the market page for a metro read without a brief
     }
   });
 });
+
+// ── The survey vacancy board: forty metro areas, each with its margin (#405) ─
+import { SurveyVacancyBoard } from "@/app/market/survey-vacancy-board";
+
+describe("SurveyVacancyBoard — where rental vacancy is lowest, by the survey, with its margin", () => {
+  const markets = [
+    ...(metrosSeedForBoard.metros ?? []).map((m) => ({ id: m.id, name: m.name })),
+    ...READ_ONLY_METROS.map((m) => ({ id: m.id, name: m.name, briefed: false })),
+  ];
+  // The survey's figures as the branch's dry run printed them (hvs run
+  // 35939284206): San Diego the tightest, Austin the loosest, Richmond's
+  // margin wider than its rate; Cleveland's row a year stale.
+  const rows: RateRow[] = [
+    { series_id: "HVS_RVR_47900", obs_date: "2026-04-01", value: 6.2 },
+    { series_id: "HVS_RVR_47900_MOE", obs_date: "2026-04-01", value: 2.2 },
+    { series_id: "HVS_RVR_40060", obs_date: "2026-04-01", value: 6.2 },
+    { series_id: "HVS_RVR_40060_MOE", obs_date: "2026-04-01", value: 5.1 },
+    { series_id: "HVS_RVR_41740", obs_date: "2026-04-01", value: 2.9 },
+    { series_id: "HVS_RVR_41740_MOE", obs_date: "2026-04-01", value: 2.0 },
+    { series_id: "HVS_RVR_12420", obs_date: "2026-04-01", value: 16.9 },
+    { series_id: "HVS_RVR_12420_MOE", obs_date: "2026-04-01", value: 4.9 },
+    { series_id: "HVS_RVR_17410", obs_date: "2025-04-01", value: 8.4 },
+    { series_id: "HVS_RVR_17410_MOE", obs_date: "2025-04-01", value: 4.3 },
+  ];
+  const rates = readMetricRates("rental_vacancy_msa", rows, FIXTURE_NOW);
+  const us = readRates([{ series_id: "RRVRUSQ156N", obs_date: "2026-04-01", value: 7.3 }], FIXTURE_NOW)[0] ?? null;
+  const html = render(React.createElement(SurveyVacancyBoard, { markets, rates, us }));
+  const text = visibleText(html);
+
+  it("ranks the fresh figures tightest first, briefed and read-without-a-brief alike, each with its whisker, the national line drawn and the stale row named", () => {
+    expect(text).toContain("Where rental vacancy is lowest");
+    expect(text).toContain("4 metro areas ranked, tightest first · Q2 2026");
+    // San Diego (read without a brief, unlinked) leads; Austin trails; Washington links.
+    expect(text.indexOf("San Diego CA")).toBeLessThan(text.indexOf("Washington DC"));
+    expect(text.indexOf("Washington DC")).toBeLessThan(text.indexOf("Austin TX"));
+    expect(html).not.toContain('href="/market?metro=san_diego"');
+    expect(html).toContain('href="/market?metro=dc"');
+    expect(text).toContain("2.9%");
+    expect(text).toContain("±2");
+    expect(text).toContain("16.9%");
+    expect((html.match(/data-bar="surveyvac"/g) ?? []).length).toBe(4);
+    // React writes the apostrophe as an entity inside an attribute.
+    expect(html).toContain("the whisker is the survey&#x27;s ±5.1 pt margin of error");
+    expect(text).toContain("The thin vertical line is the national rate, 7.3% in Q2 2026.");
+    expect(text).toContain("Not updating, shown rather than ranked: Cleveland OH 8.4% (Apr 1");
+    expect(text).toContain("two metro areas whose whiskers overlap are not ordered by it, whatever the ranking says.");
+    expect(a11yIssues(html), "survey vacancy board").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("renders nothing until a fresh row exists", () => {
+    const stale = readMetricRates("rental_vacancy_msa", rows, new Date("2027-06-01T00:00:00Z"));
+    expect(render(React.createElement(SurveyVacancyBoard, { markets, rates: stale, us: null }))).not.toContain("Where rental vacancy");
+    expect(render(React.createElement(SurveyVacancyBoard, { markets, rates: [], us }))).not.toContain("Where rental vacancy");
+  });
+});
