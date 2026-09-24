@@ -322,14 +322,19 @@ whiskers overlap are not ordered by it. Then #406: the pipeline
 list's row and the compare table say "read, not briefed" for a deal in
 one of them, rather than nothing. Then #408: Zillow's apartment
 asking rent against a year ago for every metro area the site reads, a
-board under the survey's, one query for all forty-four. **Open after
-it**: the twenty-six frames are business-district coordinates written
-from knowledge and checked by eye on the deployed page — look at each
-once (`/market?metro=<id>`) and correct any that frames the wrong
-blocks; a photograph for each (the skyline probe's Wikipedia door, six
-markets a run) would take the band from an overhead to the picture the
-place is known by; and the vacancy leaderboard's rank picture stays
-paired with the briefed markets for now.
+board under the survey's, one query for all forty-four. Then #407: a
+photograph for each of the twenty-six, chosen by eye through the band's
+own crop (five six-market sheets and six one-market runs, every run id
+in `lib/skyline.ts`), and #409: the market band itself shows them — one
+`MarketBand`, taller, under a scrim anchored in pixels to its words
+instead of veiling half the frame. **Open after it**: the twenty-six
+overhead frames are now only the fallback, but they are still
+business-district coordinates written from knowledge — look at each once
+on the deployed page if a photograph ever 404s; Salt Lake City's city
+sits at the foot of its frame under the Wasatch, and a better file
+(downtown above the words) is a one-market run away if one is ever
+uploaded; and the vacancy leaderboard's rank picture stays paired with
+the briefed markets for now.
 **Mine, next** — a look at one real deal of each kind on the deployed
 site (the signed-in pages are the one surface live-verify cannot
 reach), and the operator items below.
