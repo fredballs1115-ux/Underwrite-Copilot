@@ -89,7 +89,35 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   figure, the totals under the same rule, the allocations against the ask)
   with Excel's own data bars from zero — HyperFormula types the missing
   count into the test's workbook and the shares appear, equal to the
-  reader's on the completed set.
+  reader's on the completed set. **The market check reads each of the
+  portfolio's markets** (#413): `liveMarketFromDb` returns the address's
+  market (`primary` — what the page's since-this-screen compares against,
+  so it stays the address's) and up to `MAX_OTHER_MARKETS` (3) others
+  (`otherPortfolioMarkets`, most properties first, the rest counted and
+  named as not read — a ten-market portfolio read whole would bury the
+  checks), each its own block handed to the model after the first. An
+  other market's block (`role: "other"`) says how many of the properties
+  sit there and that its figures are the metro's (or the state's) — not
+  those properties' own, never the portfolio's — and carries NO national
+  line: the debt market, the lessor rents, the insurance index and CRE
+  prices ride in the first block read (the address's, else the first
+  other's). They are stored as `MarketResult.otherBriefs`, each record
+  with `portfolio: { here, of }`, and every surface that prints the
+  check's evidence prints them under their own heading: the deal page's
+  folds ("Read beside the Cleveland OH market's own figures — where 2 of
+  the 5 properties sit"), the verdict's brief, the report's market page
+  and the shared screen's market read. The report's heading for a state's
+  figures used to say "the Pennsylvania market's … the metro's" and now
+  says the state's. **And every block counts its national lines**
+  (`LiveMarketBrief.national`, stored as the record's `national`: the
+  last lines, after the metro's own — the lessor rents, the insurance
+  index, the debt market, CRE prices): every surface said "each the
+  metro's" over a block that ends with the 10-year, which was not true of
+  it, so the model's header, the deal page's fold ("12 published figures
+  … each dated: 8 the metro's rather than the submarket's and 4 the
+  nation's"), the verdict's brief, the report and the shared screen now
+  say the two apart. A record written before the count has none and
+  reads as before.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`
@@ -336,7 +364,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   429s that read as an empty shelf, and a candidate committed as a bare
   string instead of an object prints `DEAD undefined` — which reads exactly
   like a dead photograph and is nothing of the sort, since the file was
-  never asked for. **A photographer's name is not necessarily Latin-1**:
+  never asked for. A fifth, the same shape: a 429 from Commons printed
+  `DEAD` too, and on the 2026-09-24 run Indianapolis's and Kansas City's
+  served files read DEAD while the visitor's check beneath showed both
+  loading — a rate limit is `BUSY` now (the thumbnail read is paced like
+  the API's, a busy file is asked again once after a pause at the end of
+  the sweep, and the summary counts it apart: "N not checked"), never a
+  verdict on the file. **A photographer's name is not necessarily Latin-1**:
   the route's `x-imagery-source` header carries the credit, a header value
   is a ByteString, and `new Headers()` THROWS above U+00FF rather than
   dropping the character — Philadelphia's photographer is credited as

@@ -358,6 +358,47 @@ function PortfolioBlock({ portfolio, noun }: { portfolio: PortfolioRead; noun: {
   );
 }
 
+/**
+ * Whose figures a printed block of the market check's evidence is: the
+ * address's market first ("the Washington DC market's"), a state as the
+ * state's — an outside-the-metros deal read its state and the page said
+ * "market's … the metro's" before — and a portfolio's other markets
+ * (#413) each with how many of the properties sit there. Never the
+ * portfolio's figure.
+ */
+function briefHeading(b: NonNullable<MarketResult["liveBrief"]>, first: boolean): string {
+  const state = b.grain === "state";
+  const whose = state ? `the state of ${b.metro}'s` : `the ${b.metro} market's`;
+  const pf = b.portfolio;
+  const sit = pf ? `${pf.here} of the portfolio's ${pf.of} properties ${pf.here === 1 ? "sits" : "sit"}` : "";
+  // The last `national` lines are the nation's, and said so here rather
+  // than folded into "each is the metro's".
+  const nat = Math.min(Math.max(b.national ?? 0, 0), b.lines.length);
+  const nationSays = nat > 0 ? (nat === 1 ? " The last is the nation's, and says so." : ` The last ${nat} are the nation's, each said so.`) : "";
+  const localCount = b.lines.length - nat;
+  const first_ = localCount === 1 ? "The first is" : `The first ${localCount} are`;
+  if (!first) {
+    return `And ${whose} own, where ${sit}, read on ${b.readOn}. Each is ${state ? "the state's" : "the metro's"} - not those properties' own, and never the portfolio's.${nationSays}`;
+  }
+  const lead = `Figures the check read beside the rules of thumb: ${whose}, as published, read on ${b.readOn}${
+    state ? " - the address lies outside the metros the site tracks" : ""
+  }.`;
+  const each =
+    (nat > 0
+      ? state
+        ? ` ${first_} the state's, not any metro's, the submarket's or the building's.`
+        : ` ${first_} the metro's, not the submarket's or the building's.`
+      : state
+        ? " Each is the state's, not any metro's, the submarket's or the building's."
+        : " Each is the metro's, not the submarket's or the building's.") + nationSays;
+  const forWhom = pf
+    ? pf.here > 0
+      ? ` They speak for the portfolio's ${pf.here} ${pf.here === 1 ? "property" : "properties"} in ${b.metro} of its ${pf.of}, never for the portfolio.`
+      : ` They are the address on file's, where none of the portfolio's ${pf.of} properties sits.`
+    : "";
+  return lead + each + forWhom;
+}
+
 function TitleRow({
   title,
   count,
@@ -780,7 +821,14 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // under the checks so the report carries the check's evidence as the
   // deal page does. Standard Helvetica: the lines carry only WinAnsi text.
   const liveBrief = market?.liveBrief ?? null;
-  const liveLines = list(liveBrief?.lines).map(str).filter(Boolean);
+  // A portfolio across markets (#413): each other market's own figures,
+  // printed under the address's with a heading saying whose they are.
+  const briefBlocks = [
+    ...(liveBrief ? [{ rec: liveBrief, first: true }] : []),
+    ...list(market?.otherBriefs).map((rec) => ({ rec: rec as NonNullable<MarketResult["liveBrief"]>, first: false })),
+  ]
+    .map((b) => ({ ...b, lines: list(b.rec?.lines).map(str).filter(Boolean) }))
+    .filter((b) => b.lines.length > 0);
   const rows = list(reconciliation?.rows) as NonNullable<
     ReconciliationResult["rows"]
   >;
@@ -1330,18 +1378,16 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               <Text style={s.summaryText}>{str(market?.summary)}</Text>
             </View>
           ) : null}
-          {liveBrief && liveLines.length > 0 ? (
-            <View style={{ marginTop: 8 }}>
-              <Text style={s.sub}>
-                {`Figures the check read beside the rules of thumb: the ${str(liveBrief.metro)} market's, as published, read on ${str(liveBrief.readOn)}. Each is the metro's, not the submarket's or the building's.`}
-              </Text>
-              {liveLines.map((l, i) => (
+          {briefBlocks.map((b, bi) => (
+            <View key={`${str(b.rec.metro)}-${bi}`} style={{ marginTop: 8 }}>
+              <Text style={s.sub}>{str(briefHeading(b.rec, b.first))}</Text>
+              {b.lines.map((l, i) => (
                 <Text key={i} style={{ fontSize: 7.5, color: C.muted, marginTop: 2 }}>
                   {`• ${l}`}
                 </Text>
               ))}
             </View>
-          ) : null}
+          ))}
         </PageChrome>
       )}
 

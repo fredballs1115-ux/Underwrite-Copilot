@@ -277,6 +277,49 @@ describe("ReportDocument (full report)", () => {
     expect((await pdfTextOf(unbarred)).replace(/\s+/g, " ")).toContain("No bars: the properties do not all state a count, nor all an area");
   }, 60000);
 
+  it("prints each market's figures the check read under a heading saying whose they are — a state's as the state's, a portfolio's other markets with their properties", async () => {
+    const market = {
+      checks: [{ assumption: "Rent growth", omSays: "4.0%", typicalRange: "2.5%–3.5%", assessment: "aggressive", note: "Above the index.", page: "" }],
+      summary: "One aggressive assumption.",
+      liveBrief: {
+        metro: "Pennsylvania",
+        grain: "state" as const,
+        readOn: "2026-09-23",
+        lines: ["Unemployment 3.7% (Aug 2026, Pennsylvania; FRED)", "Debt market — 10-year Treasury 4.94% (Sep 17, 2026; FRED)"],
+        national: 1,
+        portfolio: { here: 1, of: 3 },
+      },
+      otherBriefs: [
+        { metro: "Cleveland OH", grain: "metro" as const, readOn: "2026-09-23", lines: ["Unemployment 4.4% (Jul 2026, Cleveland MSA; FRED)"], portfolio: { here: 2, of: 3 } },
+      ],
+    };
+    const deal = {
+      name: "Two-State Portfolio",
+      asset_class: "multifamily",
+      extraction: { dealName: "Two-State Portfolio", assetClass: "multifamily", metrics: [{ label: "Asking price", value: "$40,000,000", flagged: false, page: "p. 3" }] },
+      challenges: null,
+      comps: null,
+      market,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const buf = await renderToBuffer(
+      React.createElement(ReportDocument, { input: buildReportData(deal, "September 24, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain(
+      "Figures the check read beside the rules of thumb: the state of Pennsylvania's, as published, read on 2026-09-23 - the address lies outside the metros the site tracks. The first is the state's, not any metro's, the submarket's or the building's. The last is the nation's, and says so.",
+    );
+    expect(text).not.toContain("the Pennsylvania market's");
+    expect(text).toContain("They speak for the portfolio's 1 property in Pennsylvania of its 3, never for the portfolio.");
+    expect(text).toContain("• Unemployment 3.7% (Aug 2026, Pennsylvania; FRED)");
+    expect(text).toContain(
+      "And the Cleveland OH market's own, where 2 of the portfolio's 3 properties sit, read on 2026-09-23. Each is the metro's - not those properties' own, and never the portfolio's.",
+    );
+    expect(text).toContain("• Unemployment 4.4% (Jul 2026, Cleveland MSA; FRED)");
+  }, 60000);
+
   it("reads the OM's figure onto its typical range", () => {
     // The sample's three checks: at the low end, past the high end, inside.
     expect(rangeRead("5.25%", "5.25–5.75%")).toBe(0);

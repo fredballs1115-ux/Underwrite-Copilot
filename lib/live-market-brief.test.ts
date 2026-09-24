@@ -519,5 +519,57 @@ describe("a portfolio across several markets: the header says whose figures thes
     const single = liveMarketBrief({ ...base })!;
     expect(single.text).not.toContain("portfolio");
     expect(liveMarketBrief({ ...base, portfolio: null })!.text).toBe(single.text);
+    expect(single.portfolio).toBeNull();
+  });
+
+  it("the first block names the markets whose blocks follow, and counts the ones past the cap (#413)", () => {
+    const b = liveMarketBrief({
+      ...base,
+      portfolio: { properties: 9, here: 2, markets: "5 markets — Washington DC (2), Baltimore MD (2), Richmond VA (2), Virginia (2) and Ohio (1)", othersRead: ["Baltimore MD", "Richmond VA", "Virginia"], notRead: 1 },
+    })!;
+    expect(b.text.split("\n")[0]).toContain(
+      "these figures are for the 2 properties in Washington DC — the figures for Baltimore MD, Richmond VA and Virginia follow in blocks of their own, and 1 more market has no figures here, and a figure is never the portfolio's.",
+    );
+    expect(b.portfolio).toEqual({ here: 2, of: 9 });
+    const two = liveMarketBrief({ ...base, portfolio: { properties: 3, here: 2, markets: "2 markets — Washington DC (2) and Baltimore MD (1)", othersRead: ["Baltimore MD"] } })!;
+    expect(two.text).toContain("in Washington DC — the figures for Baltimore MD follow in blocks of their own, and a figure is never the portfolio's.");
+  });
+
+  it("another market's block says how many of the properties sit there, and carries no national line (#413)", () => {
+    const national = readRates(REAL_ROWS, FIXTURE_NOW).filter((r) => BRIEF_NATIONAL_IDS.includes(r.meta.id));
+    const other = liveMarketBrief({
+      ...base,
+      national: undefined,
+      portfolio: { properties: 5, here: 2, markets: "3 markets — Washington DC (2), Baltimore MD (2) and Virginia (1)", role: "other" },
+    })!;
+    expect(other.text.split("\n")[0]).toBe(
+      "Published figures for the Washington DC market, where 2 of the portfolio's 5 properties sit, read on 2026-09-23 from FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com. Each is dated, and each is the metro area's — not the submarket's, not those properties' own and never the portfolio's.",
+    );
+    expect(other.portfolio).toEqual({ here: 2, of: 5 });
+    // The same market read as the address's block, with the national rows,
+    // carries the debt market; the other block does not.
+    const first = liveMarketBrief({ ...base, national })!;
+    expect(first.text).toContain("10-year Treasury");
+    expect(other.text).not.toContain("10-year Treasury");
+    // The national lines are counted, last, and the header says so: "each
+    // is the metro area's" over a block ending in the 10-year was not true.
+    expect(first.national).toBeGreaterThan(0);
+    expect(first.lines.slice(-first.national).every((l) => /national|nation's|10-year|Treasury|banks|Debt market|Capital markets/i.test(l))).toBe(true);
+    expect(first.lines.slice(0, first.lines.length - first.national).some((l) => /10-year/.test(l))).toBe(false);
+    expect(first.text.split("\n")[0]).toContain(`The last ${first.national} lines are the nation's figures, each said as such, and never this market's.`);
+    expect(other.national).toBe(0);
+    expect(other.text.split("\n")[0]).not.toContain("the nation's");
+    // A state's block, for a property outside the metros the site tracks.
+    const state = liveMarketBrief({
+      ...base,
+      metro: { id: "state:VA", name: "Virginia" },
+      rates: readMetroRates("state:VA", [{ series_id: "VAUR", obs_date: "2026-08-01", value: 3.1 }], NOW),
+      national: undefined,
+      portfolio: { properties: 5, here: 1, markets: "3 markets — Washington DC (2), Baltimore MD (2) and Virginia (1)", role: "other" },
+    })!;
+    expect(state.text.split("\n")[0]).toBe(
+      "Published figures for the state of Virginia, where 1 of the portfolio's 5 properties sits outside the metros the site tracks, read on 2026-09-23 from FRED and the Census Bureau. Each is dated, and each is the state's — not a metro's, not those properties' own and never the portfolio's.",
+    );
+    expect(state.grain).toBe("state");
   });
 });

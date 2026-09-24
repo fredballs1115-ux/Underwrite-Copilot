@@ -1511,20 +1511,28 @@ export function MarketCheck({
     (a, b) => order[a.assessment] - order[b.assessment],
   );
   const brief = result.liveBrief ?? null;
+  // A portfolio across markets (#413): each other market's own figures,
+  // folded under the address's the same way.
+  const others = (result.otherBriefs ?? []).filter((b) => b.lines.length > 0);
   return (
     <section className="space-y-4">
       <SectionHeader
         title="Market plausibility check"
         aside={
           <span className="text-xs text-muted">
-            {brief
-              ? `rules of thumb, read beside ${brief.grain === "state" ? "the state's" : "the metro's"} published figures`
-              : "rules-of-thumb, not pulled comps"}
+            {others.length > 0
+              ? `rules of thumb, read beside each market's published figures`
+              : brief
+                ? `rules of thumb, read beside ${brief.grain === "state" ? "the state's" : "the metro's"} published figures`
+                : "rules-of-thumb, not pulled comps"}
           </span>
         }
       />
       {result.summary && <Callout>{result.summary}</Callout>}
       {brief && brief.lines.length > 0 && <LiveBriefRead brief={brief} />}
+      {others.map((b) => (
+        <LiveBriefRead key={b.metro} brief={b} />
+      ))}
       {demand && <MetroDemandCard demand={demand} />}
       {since && <SinceThisScreen since={since} />}
       <div>
@@ -1607,23 +1615,43 @@ function MetroDemandCard({ demand }: { demand: MetroDemand }) {
   );
 }
 
+/**
+ * How many figures a folded block holds and whose they are. The last
+ * `national` lines are the nation's (the debt market, lessor rents, the
+ * insurance index, CRE prices) and are counted as such — "each the
+ * metro's" over a block ending in the 10-year was not true of it.
+ */
+function briefCount(brief: NonNullable<MarketResult["liveBrief"]>): string {
+  const n = brief.lines.length;
+  const nat = Math.min(Math.max(brief.national ?? 0, 0), n);
+  const whose = brief.grain === "state" ? "the state’s rather than any metro’s" : "the metro’s rather than the submarket’s";
+  const split = nat > 0 ? `each dated: ${n - nat} ${whose} and ${nat} the nation’s` : `each dated, each ${whose}`;
+  const tail = brief.portfolio
+    ? ", and never the portfolio’s"
+    : brief.grain === "state"
+      ? " — the address lies outside the metros the site tracks"
+      : "";
+  return ` — ${n} published ${n === 1 ? "figure" : "figures"} as of ${longDate(brief.readOn)}, ${split}${tail}. Open to see them.`;
+}
+
 function LiveBriefRead({ brief }: { brief: NonNullable<MarketResult["liveBrief"]> }) {
-  const readOn = longDate(brief.readOn);
+  // A portfolio's block says whose figures they are: how many of the
+  // properties sit in this market (#413).
+  const pf = brief.portfolio;
+  const where = pf
+    ? pf.here > 0
+      ? ` — where ${pf.here} of the ${pf.of} properties ${pf.here === 1 ? "sits" : "sit"}`
+      : ` — the address on file, where none of the ${pf.of} properties sits`
+    : "";
   return (
     <details className="rounded-xl border border-line bg-paper px-4 py-3 text-sm">
       <summary className="cursor-pointer list-none text-muted [&::-webkit-details-marker]:hidden">
         <span className="font-medium text-ink">
           {brief.grain === "state"
-            ? `Read beside the state of ${brief.metro}’s own figures`
-            : `Read beside the ${brief.metro} market’s own figures`}
+            ? `Read beside the state of ${brief.metro}’s own figures${where}`
+            : `Read beside the ${brief.metro} market’s own figures${where}`}
         </span>
-        <span>
-          {` — ${brief.lines.length} published figures as of ${readOn}, each dated, each ${
-            brief.grain === "state"
-              ? "the state’s rather than any metro’s — the address lies outside the metros the site tracks"
-              : "the metro’s rather than the submarket’s"
-          }. Open to see them.`}
-        </span>
+        <span>{briefCount(brief)}</span>
       </summary>
       <ul className="mt-3 space-y-1.5 text-muted">
         {brief.lines.map((line) => (

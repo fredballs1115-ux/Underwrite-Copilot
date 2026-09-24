@@ -61,6 +61,18 @@ export interface VerdictInputs {
 
 /** Roll the gathered analysis up into one readable brief for the synthesizer.
  *  Exported for its test; the pipeline calls `synthesizeVerdict`. */
+/** The last `national` lines of a stored block are the nation's (the debt
+ *  market, lessor rents, the insurance index, CRE prices): said, so the
+ *  synthesizer never cites the 10-year as the metro's. */
+function nationalNote(b: { lines: string[]; national?: number }): string {
+  const nat = Math.min(Math.max(b.national ?? 0, 0), b.lines.length);
+  return nat > 0
+    ? nat === 1
+      ? " The last line is the nation's figure, not the market's — it says so."
+      : ` The last ${nat} lines are the nation's figures, not the market's — each says so.`
+    : "";
+}
+
 export function buildBrief(input: VerdictInputs): string {
   const sections: string[] = [];
 
@@ -191,9 +203,28 @@ export function buildBrief(input: VerdictInputs): string {
         : `## The ${live.metro} market's published figures the market check read on ${live.readOn}`,
       [
         ...live.lines.map((l) => `- ${l}`),
-        live.grain === "state"
+        (live.grain === "state"
           ? "Each is dated and is the state's, not any metro's, the submarket's or the building's. Where a screen range, a risk or a next step turns on one of these, name the figure and its date as its source, and say it is the state's."
-          : "Each is dated and is the metro's, not the submarket's or the building's. Where a screen range, a risk or a next step turns on one of these, name the figure and its date as its source.",
+          : "Each is dated and is the metro's, not the submarket's or the building's. Where a screen range, a risk or a next step turns on one of these, name the figure and its date as its source.") +
+          nationalNote(live),
+      ].join("\n"),
+    );
+  }
+  // A portfolio across markets (#413): each other market's figures under
+  // its own heading, saying how many of the properties sit there, so a
+  // range or a risk that turns on one names the market it belongs to.
+  for (const o of input.market?.otherBriefs ?? []) {
+    if (o.lines.length === 0) continue;
+    const pf = o.portfolio;
+    const where = pf ? `, where ${pf.here} of the portfolio's ${pf.of} properties ${pf.here === 1 ? "sits" : "sit"}` : "";
+    sections.push(
+      o.grain === "state"
+        ? `## The state of ${o.metro}'s published figures${where}, read on ${o.readOn}`
+        : `## The ${o.metro} market's published figures${where}, read on ${o.readOn}`,
+      [
+        ...o.lines.map((l) => `- ${l}`),
+        `Each is dated and is ${o.grain === "state" ? "the state's" : "the metro's"} — it speaks for the properties in ${o.metro} alone, never for the portfolio or for another market's properties. Where a range, a risk or a next step turns on one, name the figure, its date and its market.` +
+          nationalNote(o),
       ].join("\n"),
     );
   }

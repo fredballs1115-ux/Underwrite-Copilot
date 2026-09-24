@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-24",
+      "title": "A portfolio's markets, each read on its own",
+      "href": "/deals",
+      "blurb": "A portfolio spread across several markets used to be checked against one market's figures, the one its address sat in. The market check now reads each market the properties sit in, up to four: every market's figures arrive in a block of their own saying how many of the properties sit there, and never pass for the portfolio's. The deal page, the verdict, the report and the shared screen show each market's figures under its own name."
+    },
+    {
+      "date": "2026-09-24",
       "title": "The portfolio in the report, the shared screen and the model",
       "href": "/deals",
       "blurb": "A portfolio deal's properties now travel with every document. The full report gives them a page of their own, with each property's share of the units and of the income drawn beside what the memorandum states for it. The shared screen shows a partner the same card as the deal page. The Excel model gets a Portfolio tab whose shares and allocation caps are live formulas: type in a figure the memorandum left out and its share appears. A property's page is cited only where it falls inside the memorandum."

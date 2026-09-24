@@ -410,7 +410,11 @@ describe("runAnalysis — the happy path", () => {
       ],
     } as unknown as ExtractionResult);
     state.deals.d1.address = { city: "Washington", state: "DC" };
-    state.rates = [{ series_id: "WASH911URN", obs_date: "2026-07-01", value: 3.4 }];
+    state.rates = [
+      { series_id: "WASH911URN", obs_date: "2026-07-01", value: 3.4 },
+      { series_id: "BALT524URN", obs_date: "2026-07-01", value: 3.9 },
+      { series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 },
+    ];
     vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
     try {
       await runAnalysis("d1");
@@ -424,11 +428,107 @@ describe("runAnalysis — the happy path", () => {
     expect(note).toContain("No property states an NOI of its own");
     const handed = vi.mocked(checkMarket).mock.calls[0][3] ?? "";
     expect(handed).toContain(
-      "The deal is a portfolio of 2 properties across 2 markets — Washington DC (1) and Baltimore MD (1); these figures are for the 1 property in Washington DC",
+      "The deal is a portfolio of 2 properties across 2 markets — Washington DC (1) and Baltimore MD (1); these figures are for the 1 property in Washington DC — the figures for Baltimore MD follow in blocks of their own, and a figure is never the portfolio's.",
     );
+    // The other market's own block (#413): its header, its figure, and no
+    // second copy of the national lines, which ride in the first block.
+    const [dcBlock, baltBlock] = handed.split("\n\n");
+    expect(dcBlock).toContain("- Unemployment 3.4% (Jul 2026, Washington MSA; FRED)");
+    expect(dcBlock).toContain("10-year Treasury");
+    expect(baltBlock.split("\n")[0]).toBe(
+      "Published figures for the Baltimore MD market, where 1 of the portfolio's 2 properties sits, read on 2026-09-23 from FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com. Each is dated, and each is the metro area's — not the submarket's, not those properties' own and never the portfolio's.",
+    );
+    expect(baltBlock).toContain("- Unemployment 3.9% (Jul 2026, Baltimore MSA; FRED)");
+    expect(baltBlock).not.toContain("10-year Treasury");
+    // Both are stored, each saying how many of the properties sit there.
+    const stored = state.deals.d1.market as {
+      liveBrief?: { metro: string; portfolio?: { here: number; of: number } } | null;
+      otherBriefs?: Array<{ metro: string; grain?: string; lines: string[]; portfolio?: { here: number; of: number } }>;
+    };
+    expect(stored.liveBrief?.metro).toBe("Washington DC");
+    expect(stored.liveBrief?.portfolio).toEqual({ here: 1, of: 2 });
+    // The national lines ride last in the address's block and are counted,
+    // so no surface calls the 10-year the metro's; the other block has none.
+    const primaryRec = stored.liveBrief as unknown as { lines: string[]; national?: number };
+    expect(primaryRec.national).toBeGreaterThan(0);
+    expect(primaryRec.lines.at(-1)).toMatch(/10-year Treasury/);
+    expect((stored.otherBriefs![0] as { national?: number }).national).toBeUndefined();
+    expect(stored.otherBriefs).toHaveLength(1);
+    expect(stored.otherBriefs![0]).toMatchObject({ metro: "Baltimore MD", grain: "metro", portfolio: { here: 1, of: 2 } });
+    expect(stored.otherBriefs![0].lines).toContain("Unemployment 3.9% (Jul 2026, Baltimore MSA; FRED)");
     // The deal context names it too, for the comp scrutiny and the market check.
     expect(vi.mocked(checkMarket).mock.calls[0][2]).toContain("Portfolio: 2 properties across 2 markets");
     expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  it("a portfolio market with nothing fresh is never promised, and with no market on the address the first block read carries the national lines (#413)", async () => {
+    const prop = (name: string, address: string) => ({
+      name, address, count: "100", area: "", noi: "", occupancy: "", yearBuilt: "", allocatedPrice: "", page: "",
+    });
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      properties: [
+        prop("Navy Yard Flats", "1100 First St SE, Washington, DC 20003"),
+        prop("Canton Square", "2800 Boston St, Baltimore, MD 21224"),
+      ],
+    } as unknown as ExtractionResult);
+    // Baltimore's only row is years old: nothing fresh to say.
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    state.rates = [
+      { series_id: "WASH911URN", obs_date: "2026-07-01", value: 3.4 },
+      { series_id: "BALT524URN", obs_date: "2019-07-01", value: 3.9 },
+    ];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    const handed = vi.mocked(checkMarket).mock.calls[0][3] ?? "";
+    expect(handed).not.toContain("follow in blocks of their own");
+    expect(handed).toContain("the other markets' properties are not read here");
+    expect((state.deals.d1.market as { otherBriefs?: unknown }).otherBriefs).toBeUndefined();
+
+    // The address names no state at all: the portfolio's own markets are
+    // read, and the first block that reads anything carries the 10-year.
+    vi.mocked(checkMarket).mockClear();
+    state.deals.d1.address = null;
+    state.deals.d1.market = null;
+    state.rates = [
+      { series_id: "WASH911URN", obs_date: "2026-07-01", value: 3.4 },
+      { series_id: "BALT524URN", obs_date: "2026-07-01", value: 3.9 },
+      { series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 },
+    ];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    const blocks = (vi.mocked(checkMarket).mock.calls[0][3] ?? "").split("\n\n");
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]).toContain("Published figures for the Washington DC market, where 1 of the portfolio's 2 properties sits");
+    expect(blocks[0]).toContain("10-year Treasury");
+    expect(blocks[1]).toContain("Published figures for the Baltimore MD market, where 1 of the portfolio's 2 properties sits");
+    expect(blocks[1]).not.toContain("10-year Treasury");
+    const stored = state.deals.d1.market as { liveBrief?: unknown; otherBriefs?: Array<{ metro: string }> };
+    expect(stored.liveBrief).toBeNull();
+    expect(stored.otherBriefs?.map((b) => b.metro)).toEqual(["Washington DC", "Baltimore MD"]);
+  });
+
+  it("a single-market deal stores no other markets' figures", async () => {
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    state.rates = [{ series_id: "WASH911URN", obs_date: "2026-07-01", value: 3.4 }];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    const stored = state.deals.d1.market as { liveBrief?: { portfolio?: unknown } | null; otherBriefs?: unknown };
+    expect(stored.otherBriefs).toBeUndefined();
+    expect(stored.liveBrief?.portfolio).toBeUndefined();
+    expect(vi.mocked(checkMarket).mock.calls[0][3]).not.toContain("\n\n");
   });
 
   it("a covered-market deal whose tables hold nothing fresh gets a check on typical ranges alone, never a failed screen", async () => {

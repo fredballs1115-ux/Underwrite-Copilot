@@ -179,7 +179,9 @@ async function metadata(file) {
     `&titles=${encodeURIComponent(`File:${file}`)}` +
     `&prop=imageinfo&iiprop=url%7Csize%7Cmime%7Cextmetadata`;
   const res = await api(url);
-  if (!res.ok) return { ok: false, error: `api ${res.error}` };
+  // A 429, a 5xx or no answer at all is Commons asking us to come back —
+  // not a verdict on the file, so it is `busy`, never counted as dead.
+  if (!res.ok) return { ok: false, busy: res.status === 429 || res.status >= 500 || res.status === 0, error: `api ${res.error}` };
   const page = res.body?.query?.pages?.[0];
   if (!page || page.missing) return { ok: false, error: "no such file on Commons" };
   const info = page.imageinfo?.[0];
@@ -200,6 +202,8 @@ async function metadata(file) {
 
 async function thumbnail(file) {
   const url = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=${WIDTH}`;
+  // The same host and the same courtesy as the API: paced.
+  await paced();
   try {
     const res = await fetch(url, {
       headers: { "user-agent": UA, accept: "image/*" },
@@ -208,12 +212,12 @@ async function thumbnail(file) {
     });
     const type = res.headers.get("content-type") ?? "";
     if (!res.ok || !type.startsWith("image/")) {
-      return { ok: false, error: `HTTP ${res.status} · ${type || "no type"}` };
+      return { ok: false, busy: res.status === 429 || res.status >= 500, error: `HTTP ${res.status} · ${type || "no type"}` };
     }
     const bytes = (await res.arrayBuffer()).byteLength;
     return { ok: true, type, bytes };
   } catch (err) {
-    return { ok: false, error: String(err?.message ?? err).slice(0, 80) };
+    return { ok: false, busy: true, error: String(err?.message ?? err).slice(0, 80) };
   }
 }
 
@@ -473,43 +477,91 @@ async function searchMode(markets) {
 // VERIFY MODE — the default
 // ---------------------------------------------------------------------------
 
+/**
+ * A candidate checked from the runner: both reads answered, one of them
+ * said the file is not there, or Commons asked us to come back later.
+ *
+ * A DEAD line used to cover all three, and on the 2026-09-24 run two
+ * served photographs — Indianapolis and Kansas City — printed DEAD on an
+ * HTTP 429 while the visitor's check beneath showed both loading. A rate
+ * limit is not a verdict on the file, so it is BUSY, retried once after a
+ * pause at the end of the sweep, and counted apart from the dead.
+ */
+async function check(file) {
+  const meta = await metadata(file);
+  const thumb = meta.ok || !meta.busy ? await thumbnail(file) : { ok: false, busy: true, error: meta.error };
+  if (meta.ok && thumb.ok) return { state: "live", meta, thumb };
+  const busy = (!meta.ok && meta.busy) || (meta.ok && !thumb.ok && thumb.busy);
+  return { state: busy ? "busy" : "dead", error: meta.ok ? thumb.error : meta.error };
+}
+
 async function verifyMode(markets) {
   console.log(`SKYLINE PROBE: ${markets.length} markets, Commons resolved from this runner`);
   let verified = 0;
   let dead = 0;
+  const later = [];
+
+  const report = (cand, r) => {
+    if (r.state === "dead") {
+      dead++;
+      console.log(`   DEAD  ${cand.file} — ${r.error}`);
+      return;
+    }
+    verified++;
+    const { meta, thumb } = r;
+    const kb = Math.round(thumb.bytes / 1024);
+    const verdict = judge(meta);
+    if (terse) {
+      console.log(
+        `   LIVE  ${kb} KB at ${WIDTH}px · ${meta.width}x${meta.height} · ` +
+          `${verdict.usable ? "shape ok" : verdict.why} | ${cand.file} | ${meta.artist} | ${meta.license}`,
+      );
+    } else {
+      console.log(
+        `   LIVE  ${cand.file}\n` +
+          `         ${meta.width}x${meta.height} ${meta.mime} · ${kb} KB at ${WIDTH}px · ` +
+          `${verdict.usable ? "shape ok" : verdict.why}\n` +
+          `         author: ${meta.artist}\n` +
+          `         licence: ${meta.license}${meta.licenseUrl ? ` (${meta.licenseUrl})` : ""}`,
+      );
+    }
+  };
 
   for (const market of markets) {
     const candidates = market.candidates ?? [];
     if (candidates.length === 0) continue;
     console.log(`\n== ${market.metroId} (${market.city ?? ""})`);
     for (const cand of candidates) {
-      const meta = await metadata(cand.file);
-      const thumb = await thumbnail(cand.file);
-      if (!meta.ok || !thumb.ok) {
-        dead++;
-        console.log(`   DEAD  ${cand.file} — ${meta.ok ? thumb.error : meta.error}`);
+      const r = await check(cand.file);
+      if (r.state === "busy") {
+        console.log(`   BUSY  ${cand.file} — ${r.error}; asked again at the end`);
+        later.push({ market, cand });
         continue;
       }
-      verified++;
-      const kb = Math.round(thumb.bytes / 1024);
-      const verdict = judge(meta);
-      if (terse) {
-        console.log(
-          `   LIVE  ${kb} KB at ${WIDTH}px · ${meta.width}x${meta.height} · ` +
-            `${verdict.usable ? "shape ok" : verdict.why} | ${cand.file} | ${meta.artist} | ${meta.license}`,
-        );
-      } else {
-        console.log(
-          `   LIVE  ${cand.file}\n` +
-            `         ${meta.width}x${meta.height} ${meta.mime} · ${kb} KB at ${WIDTH}px · ` +
-            `${verdict.usable ? "shape ok" : verdict.why}\n` +
-            `         author: ${meta.artist}\n` +
-            `         licence: ${meta.license}${meta.licenseUrl ? ` (${meta.licenseUrl})` : ""}`,
-        );
-      }
+      report(cand, r);
     }
   }
-  console.log(`\nSKYLINE PROBE: ${verified} live, ${dead} dead`);
+
+  // The ones Commons turned away, once more after a pause — the host asked
+  // us to slow down, and a second sweep straight after would be refused too.
+  let busy = 0;
+  if (later.length > 0) {
+    console.log(`\n== asked again after a pause: ${later.length}`);
+    await sleep(15_000);
+    for (const { market, cand } of later) {
+      const r = await check(cand.file);
+      if (r.state === "busy") {
+        busy++;
+        console.log(`   BUSY  ${cand.file} (${market.metroId}) — ${r.error}; not a verdict on the file`);
+        continue;
+      }
+      report(cand, r);
+    }
+  }
+  console.log(
+    `\nSKYLINE PROBE: ${verified} live, ${dead} dead` +
+      (busy > 0 ? `, ${busy} not checked (Commons rate-limited this runner — the PHOTOGRAPHS line below is the visitor's check)` : ""),
+  );
 }
 
 // ---------------------------------------------------------------------------

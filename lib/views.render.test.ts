@@ -3540,6 +3540,42 @@ describe("PortfolioCard — a portfolio OM's properties, one row each", () => {
     expect(visibleText(share({ ...extraction, properties: [extraction.properties[0]] }))).not.toContain("The portfolio");
   });
 
+  it("the shared screen's market read counts each market's figures, the address's first, the nation's apart (#413)", () => {
+    const verdict: VerdictResult = {
+      verdict: "caution",
+      reason: "Two markets.",
+      topRisks: [],
+      nextSteps: [],
+      screen: { ranges: [], dealKillers: [], sensitivity: [] },
+    };
+    const html = renderToStaticMarkup(
+      React.createElement(ShareView, {
+        dealName: extraction.dealName,
+        assetClass: "multifamily",
+        expiresAt: "2026-10-05T12:00:00Z",
+        verdictStale: false,
+        aerial: null,
+        extraction: extraction as unknown as ExtractionResult,
+        comps: null,
+        market: {
+          checks: [],
+          summary: "Rents are ahead of the metro's asking rents.",
+          liveBrief: { metro: "Pittsburgh PA", grain: "metro", readOn: "2026-09-23", lines: ["Unemployment 4.1% (Jul 2026, Pittsburgh MSA; FRED)", "Debt market — 10-year Treasury 4.94% (Sep 17, 2026; FRED)"], national: 1, portfolio: { here: 1, of: 3 } },
+          otherBriefs: [
+            { metro: "Cleveland OH", grain: "metro", readOn: "2026-09-23", lines: ["a", "b"], portfolio: { here: 1, of: 3 } },
+            { metro: "Ohio", grain: "state", readOn: "2026-09-23", lines: ["c"], portfolio: { here: 1, of: 3 } },
+          ],
+        },
+        verdict,
+      }),
+    );
+    const text = visibleText(html);
+    expect(text).toContain("Checked beside 2 published figures for the Pittsburgh PA market, read on 2026-09-23 — 1 the metro's and 1 the nation's, none the building's.");
+    expect(text).toContain("And beside 2 for the Cleveland OH market, where 1 of the 3 properties sits, read on 2026-09-23 — the metro's, never the portfolio's.");
+    expect(text).toContain("And beside 1 for the state of Ohio, where 1 of the 3 properties sits, read on 2026-09-23 — the state's, never the portfolio's.");
+    expect(gluedWords(text)).toEqual([]);
+  });
+
   it("draws no income bar from a partial set, and nothing at all for a single property", () => {
     const partial = { ...extraction, properties: extraction.properties.map((x, i) => (i === 1 ? { ...x, noi: "" } : x)) };
     const html = render(React.createElement(PortfolioCard, { portfolio: readPortfolio(partial), assetClass: "multifamily" }));

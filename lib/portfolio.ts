@@ -387,6 +387,31 @@ export function portfolioNote(p: PortfolioRead): string {
   return `${facts.join(" ")} ${traps}`;
 }
 
+/** How many of a portfolio's OTHER markets the market check reads beyond
+ *  the one the deal's address sits in — four markets in all. Each is a
+ *  block of fifteen to twenty-five dated lines in the prompt and a round of
+ *  reads; a ten-market portfolio read whole would bury the checks it exists
+ *  to inform, so the rest are counted and named as not read. */
+export const MAX_OTHER_MARKETS = 3;
+
+/**
+ * The portfolio's markets the market check reads beyond `readId` (the
+ * market the deal's address sits in, or null where it names none): most
+ * properties first, at most `MAX_OTHER_MARKETS`, with how many were left
+ * past the cap. Null unless the properties span more than one market — a
+ * portfolio in one market is read whole by that market's figures.
+ */
+export function otherPortfolioMarkets(
+  ex: ExtractionResult | null | undefined,
+  readId: string | null,
+  max = MAX_OTHER_MARKETS,
+): { read: Array<{ id: string; name: string; properties: number }>; notRead: number } | null {
+  const p = readPortfolio(ex);
+  if (!p || p.markets.length < 2) return null;
+  const others = p.markets.filter((m) => m.id !== readId);
+  return { read: others.slice(0, max), notRead: Math.max(0, others.length - max) };
+}
+
 /** What the market check's header needs from a portfolio: null unless the
  *  properties span more than one market, since a portfolio in one market is
  *  read whole by that market's figures. */
