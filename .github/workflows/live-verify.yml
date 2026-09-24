@@ -970,6 +970,8 @@ jobs:
           # surfaces again, so its changelog card (no apostrophe in the phrase
           # — React serves one as &#x27;).
           mark "#413 a portfolio's markets are each read on their own" grep -q "markets, each read on its own" p_whats-new.html
+          # #414 — what is being sold (signed-in surfaces): its changelog card.
+          mark "#414 what is being sold is read first" grep -q "What is being sold, read first" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

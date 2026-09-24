@@ -13,6 +13,8 @@
  * to the OM. Gross rent is grossed up from that NOI at an assumed expense ratio
  * and vacancy — the split is a labelled assumption, the NOI is real.
  */
+import { withArticle } from "@/lib/article";
+import { interestOf, interestShortLine, readInterest } from "@/lib/interest";
 import {
   buildingSfRow,
   findGoingInCap,
@@ -26,6 +28,7 @@ import {
   IMPLIED_CAP_CEILING,
   budgetFromText,
   capitalBudgetFromMetrics,
+  askingPriceOf,
   findPriceMetric,
   inferStrategy,
   isPlanDeal,
@@ -78,6 +81,10 @@ export interface WorkbookMeta {
   /** what one of the building is called (lib/asset-words) — the workbook's
    *  per-unit rows read "Price / Key" on a hotel, "Price / Pad" on a park */
   unitNoun?: { one: string; many: string };
+  /** what is being sold (lib/interest, #414) — a note, a share, a
+   *  leasehold: the cover says it in one line and what the model is and is
+   *  not; absent for a plain fee simple */
+  interest?: { line: string; modelCaveat: string | null } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -165,6 +172,13 @@ const normalizeClass = (c: string): keyof typeof CLASS_DEFAULTS => {
   return key && CLASS_DEFAULTS[key] ? key : "auto";
 };
 
+/** The cover's line about what is being sold, and what the model is and
+ *  is not on it — null for a plain fee simple. */
+function interestMeta(extraction: ExtractionResult | null): WorkbookMeta["interest"] {
+  const r = readInterest(extraction, askingPriceOf(extraction));
+  return r ? { line: interestShortLine(r), modelCaveat: r.modelCaveat } : null;
+}
+
 export function deriveUnderwriteInputs(
   extraction: ExtractionResult | null,
   fallbackName: string,
@@ -249,14 +263,34 @@ export function deriveUnderwriteInputs(
       ? capDecimal / 100
       : null;
   let price = priceMetric ? parseMoney(priceMetric.value) : null;
+  // What the price buys (lib/interest, #414). A share's price is grossed up
+  // to the whole asset the building's figures describe — the model runs the
+  // entity's cash flows, of which the share earns its slice before any
+  // promote — and a note's price is the collateral's model at the loan's
+  // price, which the note says outright.
+  const interest = interestOf(extraction);
 
-  if (price != null) {
+  if (price != null && interest.kind === "partial_interest" && interest.sharePct != null) {
+    const share = interest.sharePct;
+    const stated = price;
+    price = stated / (share / 100);
+    mark(
+      "purchasePrice",
+      "derived",
+      `The OM's $${Math.round(stated).toLocaleString("en-US")} for ${withArticle(`${share}%`)} share, grossed up to the whole asset — the model runs the whole building's cash flows; the share earns ${share}% of them before the promote and the sponsor's fees`,
+      pageOf(priceMetric),
+    );
+  } else if (price != null) {
     mark(
       "purchasePrice",
       "extracted",
       priceIsLand
         ? "OM land / site cost — the development's acquisition basis; the build sits in the capital plan"
-        : "OM asking / purchase price",
+        : interest.kind === "note"
+          ? "The OM's price for a NOTE secured by the property — this model runs the collateral as if bought outright at that price, which is not the note's return"
+          : interest.kind === "partial_interest"
+            ? "The OM's price for a SHARE of the owning entity that states no single percentage — the model cannot gross it up, so its returns are not the share's"
+            : "OM asking / purchase price",
       pageOf(priceMetric),
     );
   } else if (goingFig && capPct) {
@@ -295,7 +329,7 @@ export function deriveUnderwriteInputs(
     const amount = `$${Math.round(f.value).toLocaleString("en-US")}`;
     if (!(f.value > 0)) return `The OM's ${f.label} is ${amount} — no income in place to anchor year 1 on`;
     return isPlanDeal(strategy.kind)
-      ? `The OM's ${f.label} of ${amount}${pctOfPrice(f.value)} the finished project's stabilized figure on a ${strategy.label.toLowerCase()} deal, not year-1 income, so it does not anchor year 1 here`
+      ? `The OM's ${f.label} of ${amount}${pctOfPrice(f.value)} the finished project's stabilized figure on ${withArticle(strategy.label.toLowerCase())} deal, not year-1 income, so it does not anchor year 1 here`
       : `The OM's ${f.label} of ${amount}${pctOfPrice(f.value)} above any going-in cap on this price, so it cannot be year-1 income and does not anchor year 1 here`;
   };
   let noi: number;
@@ -530,7 +564,7 @@ export function deriveUnderwriteInputs(
       "assumption",
       strategy.kind === "stabilized" || strategy.kind === "unknown"
         ? "No capital plan in the OM — enter one if the PCA finds work"
-        : `A ${strategy.label.toLowerCase()} deal with no budget in the OM — enter the construction / renovation cost; yield on cost is meaningless without it`,
+        : `${withArticle(strategy.label.toLowerCase(), true)} deal with no budget in the OM — enter the construction / renovation cost; yield on cost is meaningless without it`,
     );
   }
   mark("amFeePctEquity", "assumption", "Default 0.5% of equity/yr");
@@ -563,6 +597,7 @@ export function deriveUnderwriteInputs(
       // The workbook's cover prints this: the label, never a key or "auto".
       assetClass: assetClassLabel(extraction?.assetClass) || "—",
       unitNoun: assetWords(extraction?.assetClass).noun ?? { one: "unit", many: "units" },
+      interest: interestMeta(extraction),
       // Rent-roll actual occupancy outranks the OM's stated figure.
       occupancyPct: rrOcc ?? (occPct != null ? occPct / 100 : null),
       rsf,

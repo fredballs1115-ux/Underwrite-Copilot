@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { withArticle } from "@/lib/article";
 import { parseUsd } from "@/lib/money";
 
 /**
@@ -82,7 +83,7 @@ export function LoiPanel({
       </p>
       {plan && (
         <p className="mt-2 max-w-lg text-xs leading-relaxed text-brand">
-          This deal is a {plan.label.toLowerCase()}: the draft&rsquo;s diligence
+          This deal is {withArticle(plan.label.toLowerCase())}: the draft&rsquo;s diligence
           clause covers structural, environmental, zoning and construction-cost
           work for the plan
           {needsEntitlements

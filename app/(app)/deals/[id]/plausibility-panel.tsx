@@ -1,3 +1,4 @@
+import { withArticle } from "@/lib/article";
 import type { DealStrategy, PlanSummary, PlausibilityFinding } from "@/lib/deal-strategy";
 import { planFacts } from "@/lib/plan-facts";
 
@@ -85,7 +86,7 @@ export function PlausibilityPanel({
       </p>
       <p className="mt-0.5 text-xs text-muted">
         Checked in code against the extracted terms
-        {strategy.kind !== "unknown" ? ` for a ${strategy.label.toLowerCase()} deal` : ""} —
+        {strategy.kind !== "unknown" ? ` for ${withArticle(strategy.label.toLowerCase())} deal` : ""} —
         before any return built on them is believed. Every step below was told the same.
       </p>
       <ul className="mt-2.5 space-y-2">

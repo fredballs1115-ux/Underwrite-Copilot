@@ -24,6 +24,8 @@
  *      the screen says "these can't both be right" instead of "105%".
  */
 
+import { withArticle } from "@/lib/article";
+import { interestOf } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetWords } from "@/lib/asset-words";
 import {
@@ -368,6 +370,16 @@ export function findPriceMetric(metrics: MetricLike[], kind: StrategyKind): Metr
   return findPriceRow(metrics, kind) as MetricLike | null;
 }
 
+/** The asking price as the plausibility check and the model read it — the
+ *  one price reader, handed to lib/interest so the "what is being sold"
+ *  panel, the deal context and the challenger say the same figure. */
+export function askingPriceOf(extraction: ExtractionResult | null | undefined): number | null {
+  if (!extraction) return null;
+  const row = findPriceMetric(extraction.metrics ?? [], inferStrategy(extraction).kind);
+  const n = row ? parseMoney(row.value) : null;
+  return n != null && n > 0 ? n : null;
+}
+
 /** The price row a figure is wanted from — the LOI's prefill: among the
  *  price rows the first whose value IS a figure ("Asking price: call for
  *  pricing" above "Purchase price: $42,000,000" gives the $42M), else the
@@ -592,8 +604,19 @@ export function assessPlausibility(
   if (!extraction) return [];
   const metrics = extraction.metrics ?? [];
   const priceMetric = findPriceMetric(metrics, strategy.kind);
-  const price = priceMetric ? parseMoney(priceMetric.value) : null;
-  if (price == null || !(price > 0)) return [];
+  const stated = priceMetric ? parseMoney(priceMetric.value) : null;
+  if (stated == null || !(stated > 0)) return [];
+  // What the price buys (lib/interest, #414). A note's price is a loan's:
+  // set against the collateral's NOI it is a cap rate nobody earns, so no
+  // price finding is made at all — the interest banner says why. A share's
+  // price is grossed up to the whole the building's figures describe, and
+  // said so; a share the OM states no single percentage for is not
+  // compared at all.
+  const interest = interestOf(extraction);
+  if (interest.kind === "note") return [];
+  if (interest.kind === "partial_interest" && interest.sharePct == null) return [];
+  const price = interest.sharePct != null ? stated / (interest.sharePct / 100) : stated;
+  const priceWord = interest.sharePct != null ? "whole-asset price the share implies" : "price";
 
   const findings: PlausibilityFinding[] = [];
   const planDeal = NON_STABILIZED.has(strategy.kind);
@@ -616,7 +639,7 @@ export function assessPlausibility(
       findings.push({
         code: "label_mismatch",
         severity: "medium",
-        title: `${f.label} of ${money(f.value)} is ${pct(implied, 0)} of the ${money(price)} price on a ${strategy.label.toLowerCase()} deal`,
+        title: `${f.label} of ${money(f.value)} is ${pct(implied, 0)} of the ${money(price)} ${priceWord} on ${withArticle(strategy.label.toLowerCase())} deal`,
         detail: `A building mid-plan does not earn that today. This is almost certainly the finished project's stabilized pro forma carrying an in-place or Year-1 label — read it as the stabilized figure, and confirm what the building actually earns during the works.`,
       });
       continue;
@@ -625,7 +648,7 @@ export function assessPlausibility(
       findings.push({
         code: "strategy_unsettled",
         severity: "medium",
-        title: `${f.label} of ${money(f.value)} is ${pct(implied, 0)} of the ${money(price)} price`,
+        title: `${f.label} of ${money(f.value)} is ${pct(implied, 0)} of the ${money(price)} ${priceWord}`,
         detail: `A stabilized figure that far above the price belongs to a plan — a conversion, a development, a lease-up — that the deck does not name plainly. Settle what the deal is first: measured against total cost it may be a fine yield; against the price alone it means nothing.`,
       });
       continue;
@@ -635,8 +658,8 @@ export function assessPlausibility(
       severity: "high",
       title:
         f.value >= price
-          ? `${f.label} of ${money(f.value)} is above the ${money(price)} price`
-          : `${f.label} of ${money(f.value)} implies a ${pct(implied, 0)} cap rate`,
+          ? `${f.label} of ${money(f.value)} is above the ${money(price)} ${priceWord}`
+          : `${f.label} of ${money(f.value)} implies ${withArticle(pct(implied, 0))} cap rate`,
       detail: `No operating property yields ${pct(implied, 0)}. Either the NOI or the price was misread, or the OM's NOI is a stabilized pro forma for a plan the deck describes elsewhere. Check the source pages before relying on any return built from these two figures.`,
     });
   }
@@ -657,7 +680,7 @@ export function assessPlausibility(
       findings.push({
         code: "cap_mismatch",
         severity: "medium",
-        title: `Stated ${pct(statedCap, 2)} cap vs ${pct(implied, 2)} from ${going.label} ÷ price`,
+        title: `Stated ${pct(statedCap, 2)} cap vs ${pct(implied, 2)} from ${going.label} ÷ ${priceWord}`,
         detail: `The stated cap rate and the stated NOI and price do not describe the same figures — one is on a different basis (a different year, before or after reserves, or a different price). Ask which NOI the cap is quoted on.`,
       });
     }
@@ -680,7 +703,7 @@ export function assessPlausibility(
   const noun = words.noun ?? { one: "unit", many: "units" };
   const clsWord = words.label ? words.label.toLowerCase() : "such";
   const basisTotal = planDeal ? (planSummary(extraction, strategy)?.totalCost ?? null) : price;
-  const basisNoun = planDeal ? "total cost" : "price";
+  const basisNoun = planDeal ? "total cost" : priceWord;
   const misread = (other: string) =>
     planDeal
       ? `No ${clsWord} market delivers there. The total cost or the ${other} was most likely misread — check both against their source pages before the all-in basis is used anywhere.`

@@ -1,4 +1,5 @@
 import "server-only";
+import { withArticle } from "@/lib/article";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { downloadOmPdf } from "@/lib/storage";
 import { readFirstSignal } from "./first-signal";
@@ -24,6 +25,7 @@ import { runDocReconciliation } from "./reconcile-facts";
 import { runActualsIngestion } from "./actuals-ingest";
 import { OM_NOI_BASIS_LABEL, compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import {
+  askingPriceOf,
   assessPlausibility,
   inferStrategy,
   isPlanDeal,
@@ -32,6 +34,7 @@ import {
   plausibilityNote,
 } from "@/lib/deal-strategy";
 import { dealContextFor } from "@/lib/deal-context";
+import { interestNote, readInterest } from "@/lib/interest";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { marketForAddress } from "@/lib/market-match";
@@ -689,7 +692,7 @@ async function runAnalysisSteps(
             const cmp = compareNoi(omNoi, t12Noi, omPick);
             if (cmp.severity !== "in_line") {
               notes.push(
-                `The OM's ${OM_NOI_BASIS_LABEL[omPick.basis]} ($${Math.round(omNoi).toLocaleString("en-US")}) runs ${(Math.abs(cmp.deltaPct) * 100).toFixed(1)}% ${cmp.direction} the T-12 actual ($${Math.round(t12Noi).toLocaleString("en-US")}) — a ${cmp.severity === "red_flag" ? "red-flag" : "material"} gap between the deck's story and what the property produced.`,
+                `The OM's ${OM_NOI_BASIS_LABEL[omPick.basis]} ($${Math.round(omNoi).toLocaleString("en-US")}) runs ${(Math.abs(cmp.deltaPct) * 100).toFixed(1)}% ${cmp.direction} the T-12 actual ($${Math.round(t12Noi).toLocaleString("en-US")}) — ${withArticle(cmp.severity === "red_flag" ? "red-flag" : "material")} gap between the deck's story and what the property produced.`,
               );
             }
           } else if (!omPick && t12Usable && isPlanDeal(strategy.kind)) {
@@ -722,6 +725,12 @@ async function runAnalysisSteps(
         // the ask) and the portfolio traps by name — lib/portfolio.
         const portfolio = readPortfolio(ex);
         if (portfolio) notes.push(portfolioNote(portfolio));
+
+        // What is being sold (#414): a note, a share, a leasehold — the
+        // interest's own traps by name, ahead of everything the challenger
+        // reads the figures through (lib/interest).
+        const interest = readInterest(ex, askingPriceOf(ex));
+        if (interest) notes.unshift(interestNote(interest));
 
         if (flagged.length) {
           notes.push(

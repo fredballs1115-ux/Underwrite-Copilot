@@ -4,6 +4,7 @@
 // geometry and scenario runner as the Sensitivity Playground, so the PDF and
 // the on-screen sliders can never disagree.
 
+import { withArticle } from "@/lib/article";
 import type { UnderwriteInputs } from "./engine";
 import { leverValues, runScenario } from "./playground";
 import { solveMaxBid } from "./solver";
@@ -214,7 +215,7 @@ export function gridTakeaway(grid: CapGrowthGrid, hurdlePct: number): string {
       ? `no tested exit cap clears ${p(hurdlePct)} at base growth`
       : capsClearing.length === grid.capRows.length
         ? `every tested exit cap clears ${p(hurdlePct)} at base growth`
-        : `holds ${p(hurdlePct)}+ up to a ${fmtPctPt(Math.max(...capsClearing), 2)} exit cap at base growth`;
+        : `holds ${p(hurdlePct)}+ up to ${withArticle(fmtPctPt(Math.max(...capsClearing), 2))} exit cap at base growth`;
 
   const growthPart =
     growthsClearing.length === 0

@@ -32,6 +32,7 @@ import type { ExtractionResult, PortfolioProperty } from "@/lib/anthropic/types"
 import { parseCount, parsePct, parseSf } from "@/lib/criteria";
 import { findPricedMetric, inferStrategy } from "@/lib/deal-strategy";
 import { US_STATE_ABBREV } from "@/lib/address";
+import { withArticle } from "@/lib/article";
 import { parsePageNumber } from "@/lib/facts";
 import { marketForAddress } from "@/lib/market-match";
 import { parseUsd } from "@/lib/money";
@@ -336,7 +337,7 @@ export function propertyFigures(p: PortfolioRead, i: number, noun: Noun): string
     a.noi != null ? `NOI ${money(a.noi)}` : null,
     a.allocated != null
       ? `allocated ${money(a.allocated)}${a.allocatedPerCount != null ? ` (${money(a.allocatedPerCount)} per ${noun.one})` : ""}${
-          a.allocationCapPct != null ? `, a ${one(a.allocationCapPct)}% cap on the allocation` : ""
+          a.allocationCapPct != null ? `, ${withArticle(`${one(a.allocationCapPct)}%`)} cap on the allocation` : ""
         }`
       : null,
   ].filter((x): x is string => !!x);

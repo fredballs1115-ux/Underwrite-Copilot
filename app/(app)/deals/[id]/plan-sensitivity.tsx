@@ -1,3 +1,4 @@
+import { withArticle } from "@/lib/article";
 import type { PlanSummary } from "@/lib/deal-strategy";
 import {
   SPREAD_LABEL,
@@ -63,7 +64,7 @@ export function PlanSensitivity({
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="text-sm font-semibold">Yield on cost, stressed</p>
         <p className="text-[11px] text-muted">
-          Spread over a {pct(refCap.pct, 2)} reference cap — {refNote}
+          Spread over {withArticle(pct(refCap.pct, 2))} reference cap — {refNote}
         </p>
       </div>
       <p className="mt-1 max-w-3xl text-xs leading-relaxed text-muted">

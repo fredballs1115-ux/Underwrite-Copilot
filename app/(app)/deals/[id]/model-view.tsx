@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FileField } from "../../file-field";
 import { useMemo, useState, type ReactNode } from "react";
+import { withArticle } from "@/lib/article";
 import { DOC_KINDS, DOC_KIND_LABEL, type DealDocument } from "@/lib/documents";
 import { MODEL_INPUTS, MODEL_PASTES } from "@/lib/model/inputs";
 import type {
@@ -207,8 +208,8 @@ export function ReturnsHeadline({ model }: { model: UnderwritingModel }) {
             This model books the finished project’s NOI as year-1 income
           </p>
           <p className="mt-0.5 text-xs leading-relaxed text-muted">
-            {usd(r.year1Noi)} of NOI against a {usd(r.purchasePrice)} price is a{" "}
-            {pct(r.goingInCapPct)} cap rate, which no operating property yields. The
+            {usd(r.year1Noi)} of NOI against {withArticle(usd(r.purchasePrice))} price is{" "}
+            {withArticle(pct(r.goingInCapPct))} cap rate, which no operating property yields. The
             figure is the stabilized pro forma — what the building earns once
             the plan is complete and leased — but this model carries no
             construction budget, downtime or lease-up, so every return below is

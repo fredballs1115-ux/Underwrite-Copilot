@@ -140,7 +140,31 @@ export interface ExtractionResult {
    *  single-property OM and for extractions saved before portfolios were
    *  read. The whole portfolio's figures stay in `metrics`. */
   properties?: PortfolioProperty[];
+  /** WHAT IS BEING SOLD (#414): the land and the building outright, a
+   *  leasehold on a ground lease, a loan secured by the property, or a
+   *  share of the owning entity — as the OM states it. Absent on an
+   *  extraction saved before it was read, which reads as fee simple. */
+  interest?: ExtractedInterest;
   metrics: ExtractedMetric[];
+}
+
+export type InterestKind = "fee_simple" | "leasehold" | "note" | "partial_interest" | "unknown";
+
+export interface ExtractedInterest {
+  kind: InterestKind;
+  /** one sentence, the interest in the OM's own terms ("" if it states none) */
+  summary: string;
+  /** a partial interest's share as stated ("49% limited partnership
+   *  interest"); "" otherwise */
+  share: string;
+  /** a ground lease as stated — the term left, the ground rent, its resets,
+   *  any purchase option ("" if the OM states none) */
+  groundLease: string;
+  /** a note's terms as stated — the unpaid balance, the coupon, the
+   *  maturity, whether it is performing ("" otherwise) */
+  loan: string;
+  /** the OM's page for the interest ("" if unknown) */
+  page: string;
 }
 
 /** Step 2 — Assumption Challenger */

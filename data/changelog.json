@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-24",
+      "title": "What is being sold, read first",
+      "href": "/deals",
+      "blurb": "Not every memorandum sells a building outright. The screen now reads what is actually being sold (the land and the building, a leasehold on a ground lease, a loan secured by the property, or a share of the owning entity) and says so before any figure. A 49% stake's price is set against the whole it implies instead of producing an impossible cap rate. A note's price is never set against the collateral's income. A leasehold is treated as the wasting asset it is. The deal page, the shared screen, the memo, the report and the workbook all say it."
+    },
+    {
+      "date": "2026-09-24",
       "title": "A portfolio's markets, each read on its own",
       "href": "/deals",
       "blurb": "A portfolio spread across several markets used to be checked against one market's figures, the one its address sat in. The market check now reads each market the properties sit in, up to four: every market's figures arrive in a block of their own saying how many of the properties sit there, and never pass for the portfolio's. The deal page, the verdict, the report and the shared screen show each market's figures under its own name."

@@ -349,8 +349,17 @@ properties sit there, the national lines in the first block alone,
 stored as `otherBriefs` and printed under their own headings on the deal
 page, the verdict's brief, the report and the shared screen — and the
 skyline probe reports a Commons rate limit as BUSY rather than DEAD.
-**Open after it**: since-this-screen still compares the address's
-market alone (a portfolio's other markets have no "what moved" yet); the twenty-six
+Then #414: what is being sold — the extraction reads the interest (fee
+simple, leasehold, a note, a share), `lib/interest` says what the price
+buys, the plausibility check and the model gross a share's price up to
+the whole and make no price finding on a note, and the deal page, the
+shared screen, the memo, the report and the workbook say it first.
+**Open after it**: a note deal still gets the collateral's property
+model with a caveat, not an underwriting of the note itself (its yield
+to maturity on the price, the discount accreting, a foreclosure path) —
+the next step for that deal type; since-this-screen still compares the
+address's market alone (a portfolio's other markets have no "what moved"
+yet); the twenty-six
 overhead frames are now only the fallback, but they are still
 business-district coordinates written from knowledge — look at each once
 on the deployed page if a photograph ever 404s; Salt Lake City's city

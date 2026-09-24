@@ -8,6 +8,7 @@
 // as the report's rangeRead.
 import { buildingSfFromMetrics, parseMoney } from "@/lib/criteria";
 import { findPricedMetric, unitCountFromMetrics, type StrategyKind } from "@/lib/deal-strategy";
+import type { InterestKind } from "@/lib/interest";
 
 /** The shape every metric reader takes — the extraction's rows or a lighter copy. */
 interface MetricLike {
@@ -74,12 +75,22 @@ export interface SubjectBasis {
  *  different price than the deal page. A conversion or a development is
  *  judged on its all-in cost, not the shell's price, so it has no price
  *  basis to set against stabilized trades: both come back null. */
-export function subjectBasis(metrics: MetricLike[], kind: StrategyKind): SubjectBasis {
+export function subjectBasis(
+  metrics: MetricLike[],
+  kind: StrategyKind,
+  /** what the price buys (lib/interest `interestOf`, #414): a note's price
+   *  is nobody's basis, and a share's is grossed up to the whole the
+   *  building's count and area describe — or withheld with no stated share */
+  interest?: { kind: InterestKind; sharePct: number | null },
+): SubjectBasis {
   const none = { perUnit: null, perSf: null };
   if (kind === "conversion" || kind === "development") return none;
+  if (interest?.kind === "note") return none;
+  if (interest?.kind === "partial_interest" && interest.sharePct == null) return none;
   const row = findPricedMetric(metrics, kind);
-  const price = row ? parseMoney(row.value) : null;
-  if (price == null || price < 10_000) return none;
+  const stated = row ? parseMoney(row.value) : null;
+  if (stated == null || stated < 10_000) return none;
+  const price = interest?.sharePct != null ? stated / (interest.sharePct / 100) : stated;
   const units = unitCountFromMetrics(metrics);
   const sf = buildingSfFromMetrics(metrics);
   return {

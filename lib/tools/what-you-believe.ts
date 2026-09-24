@@ -57,6 +57,8 @@
  * Pure, no I/O.
  */
 
+import { withArticle } from "@/lib/article";
+
 // No `irr` import here on purpose: the solve works on the NPV at the
 // target rate, which is cheaper and exact. The agreement WITH the shared
 // `irr` is the test's job — it rebuilds the stream at the solved rate and
@@ -228,7 +230,7 @@ export function readBelief(input: BeliefInputs): BeliefRead {
       ...EMPTY,
       goingInCapPct,
       note:
-        `The deal starts at a ${goingInCapPct}% cap. ` +
+        `The deal starts at ${withArticle(`${goingInCapPct}%`)} cap. ` +
         "Enter the hold, the exit cap and the return you need.",
     };
   }
@@ -286,7 +288,7 @@ export function readBelief(input: BeliefInputs): BeliefRead {
   const notes: string[] = [];
   if (requiredGrowthPct === null) {
     notes.push(
-      `No growth rate up to 50% a year reaches a ${targetIrrPct}% return at this price. ` +
+      `No growth rate up to 50% a year reaches ${withArticle(`${targetIrrPct}%`)} return at this price. ` +
         "The exit cap or the price has to move, not the operations.",
     );
   } else {

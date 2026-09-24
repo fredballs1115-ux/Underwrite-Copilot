@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import { aOrAn, withArticle } from "@/lib/article";
 import { readFigure } from "@/lib/money";
 import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
 import { readDebt, testRefi } from "@/lib/tools/debt-math";
@@ -1364,8 +1365,8 @@ function ResidualLand() {
       {r.byProfit && r.byYield && (
         <p className="mt-4 text-sm text-muted">
           At {num(profit)?.toFixed(0)}% profit on cost the site is worth{" "}
-          <span className="font-semibold tabular-nums text-ink">{usd(r.byProfit.land)}</span>; at a{" "}
-          {num(yoc)?.toFixed(2)}% yield on cost,{" "}
+          <span className="font-semibold tabular-nums text-ink">{usd(r.byProfit.land)}</span>; at{" "}
+          {withArticle(`${num(yoc)?.toFixed(2) ?? ""}%`)} yield on cost,{" "}
           <span className="font-semibold tabular-nums text-ink">{usd(r.byYield.land)}</span>. You
           can only pay the lower of two tests you have agreed to meet.
         </p>
@@ -1667,7 +1668,7 @@ function AfterTax() {
               {/* The sign goes in the words, not in front of the dollar
                   sign: "$-190,455" is not how anyone writes a loss. */}
               <span className="font-semibold tabular-nums text-brand">
-                a {usdExact(Math.abs(r.yearOneTaxable))} paper loss
+                {withArticle(usdExact(Math.abs(r.yearOneTaxable)))} paper loss
               </span>{" "}
               on a building that made money.
             </>
@@ -2294,7 +2295,7 @@ function Recovery() {
                     <>
                       The cap did not bind. When it does it reaches only the
                       controllable {controllable}% — {usd((r.increase ?? 0) - (r.carvedOut ?? 0))}{" "}
-                      of an increase this size — which is why a {capPct}% cap is
+                      of an increase this size — which is why {withArticle(`${capPct}%`)} cap is
                       worth less than it sounds in a year the insurance jumps.
                     </>
                   )}
@@ -2526,7 +2527,7 @@ function PercentageRent() {
           {r.salesToClearCeiling === null ? (
             <>
               {" "}
-              A {ceiling}% ceiling on a {rate}% lease is unreachable: above the
+              {withArticle(`${ceiling}%`, true)} ceiling on {withArticle(`${rate}%`)} lease is unreachable: above the
               breakpoint every further dollar of sales brings {rate}c of rent
               with it, so the ratio falls toward {rate}% and stops.
             </>
@@ -4115,7 +4116,7 @@ function TaxReassessment() {
           <p className="text-sm font-semibold">
             {(r.capLostBps ?? 0) > 0 ? (
               <>
-                You are buying a{" "}
+                You are buying {aOrAn(pct(r.realCapPct, 2))}{" "}
                 <span className="tabular-nums">{pct(r.realCapPct, 2)}</span>, not
                 the{" "}
                 <span className="tabular-nums">{pct(r.omCapPct, 2)}</span>{" "}
@@ -6841,7 +6842,7 @@ function Hotel() {
           {h.ffeReserve !== null && (
             <p className="mt-4 text-sm text-muted">
               The FF&amp;E reserve is {usd(h.ffeReserve)} — struck on revenue, not on NOI, and
-              real cash a franchise agreement requires. Quoted before it the same price is a{" "}
+              real cash a franchise agreement requires. Quoted before it the same price is {aOrAn(pct(h.capBeforeReservePct, 2))}{" "}
               <span className="font-semibold text-ink">{pct(h.capBeforeReservePct, 2)}</span> cap
               rather than {pct(h.capPct, 2)}, which is {usd(h.valueOfReserveOmitted)} of price.
             </p>
@@ -7889,7 +7890,7 @@ function ZoningEnvelope() {
 
               {z.unitsOverstatedByEfficiency !== null && z.grossSfPerUnit !== null && (
                 <p className="mt-4 text-sm text-muted">
-                  A {sf(readFigure(unitSf))} unit at {trimPct(eff)}% efficiency consumes{" "}
+                  {withArticle(sf(readFigure(unitSf)), true)} unit at {trimPct(eff)}% efficiency consumes{" "}
                   <span className="font-semibold text-ink">{sf(z.grossSfPerUnit)}</span> of floor
                   area ratio, so the code allows {z.unitsByFar} rather than the{" "}
                   {z.naiveUnitsByFar} that dividing by the unit size would claim —{" "}

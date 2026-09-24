@@ -45,7 +45,8 @@ import {
 import { planFacts } from "@/lib/plan-facts";
 import type { ModelVsMarket } from "@/lib/model-vs-market";
 import { assetWords } from "@/lib/asset-words";
-import { inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
+import { askingPriceOf, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
+import { interestOf, readInterest } from "@/lib/interest";
 import { basisScale, fmtBasis, subjectBasis } from "@/lib/comp-detail";
 import { gapScale } from "@/lib/gap-detail";
 import { parsePageNumber } from "@/lib/facts";
@@ -786,6 +787,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // One OM, several properties (#411): the portfolio page, read by the same
   // reader as the deal page's card; null for a single property.
   const portfolio = readPortfolio(extraction);
+  // What is being sold (#414): on a note or a share the sensitivity grids
+  // are the collateral's or the whole asset's, and the page says so.
+  const interest = readInterest(extraction, askingPriceOf(extraction));
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
@@ -813,6 +817,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
     subjectBasis(
       metrics.map((m) => ({ label: str(m?.label), value: str(m?.value) })),
       inferStrategy(extraction).kind,
+      interestOf(extraction),
     ),
     planNoun.one,
   );
@@ -1001,6 +1006,11 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                 : `${fmtHurdle(sensitivity.hurdlePct)} screening hurdle`
             } — deeper green clears it by more, deeper red misses by more. The ink-bordered cell is the modeled base case.`}
           </Text>
+          {interest?.modelCaveat ? (
+            <Text style={{ fontSize: 8, color: C.caution, fontFamily: "Helvetica-Bold", marginBottom: 6 }}>
+              {str(`${interest.label}: ${interest.modelCaveat}`)}
+            </Text>
+          ) : null}
 
           <HeatGrid
             axisLabel="EXIT CAP"

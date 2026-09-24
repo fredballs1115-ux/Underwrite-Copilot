@@ -127,7 +127,7 @@ describe("plan deals are judged on their own terms", () => {
 // cost rather than the shell's price.
 describe("what the screen established reaches the steps that read the OM", () => {
   const ctx =
-    "Deal type: Conversion — Convert the vacant office building into 320 apartments. The OM's stabilized NOI of $21.0M is the finished project's figure — over $180.0M of total cost it is a 11.7% yield on cost, not today's income and not a cap rate on the price.";
+    "Deal type: Conversion — Convert the vacant office building into 320 apartments. The OM's stabilized NOI of $21.0M is the finished project's figure — over $180.0M of total cost it is an 11.7% yield on cost, not today's income and not a cap rate on the price.";
 
   it("the broker-comp scrutiny holds a plan's comps against total cost, and carries the context last", () => {
     const bare = brokerCompsInstruction();

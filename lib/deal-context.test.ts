@@ -27,7 +27,7 @@ describe("dealContextFor — what the screen established, for every step that re
   it("names the kind, the stabilized NOI over total cost, the all-in basis per planned unit and the timeline", () => {
     const ctx = dealContextFor(CONVERSION)!;
     expect(ctx).toContain("Deal type: Conversion — Convert the vacant office building into 612 apartments.");
-    expect(ctx).toContain("over $180.0M of total cost it is a 11.7% yield on cost");
+    expect(ctx).toContain("over $180.0M of total cost it is an 11.7% yield on cost");
     expect(ctx).toContain("Total cost is $294k per planned unit (612 units)");
     expect(ctx).toContain("never the shell's price");
     // One period, even though the OM's timeline ended with its own.

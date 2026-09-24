@@ -29,6 +29,17 @@ const ExtractionSchema = z.object({
     capitalBudget: z.string(),
     timeline: z.string(),
   }),
+  // WHAT IS BEING SOLD, read before the figures for the same reason as the
+  // strategy: the price of a 49% stake or of a discounted note set against
+  // the whole building's NOI is a cap rate nobody earns. Read by lib/interest.
+  interest: z.object({
+    kind: z.enum(["fee_simple", "leasehold", "note", "partial_interest", "unknown"]),
+    summary: z.string(),
+    share: z.string(),
+    groundLease: z.string(),
+    loan: z.string(),
+    page: z.string(),
+  }),
   // Each property of a PORTFOLIO OM (two or more separately addressed
   // buildings or sites), with what the OM states for THAT property and ""
   // where it states nothing; an empty list for a single-property OM. The
@@ -105,6 +116,14 @@ export async function extractTerms(
       summary: out.strategy.summary.trim(),
       capitalBudget: out.strategy.capitalBudget.trim(),
       timeline: out.strategy.timeline.trim(),
+    },
+    interest: {
+      kind: out.interest.kind,
+      summary: out.interest.summary.trim(),
+      share: out.interest.share.trim(),
+      groundLease: out.interest.groundLease.trim(),
+      loan: out.interest.loan.trim(),
+      page: out.interest.page.trim(),
     },
     // A one-entry list is a single property restated, not a portfolio.
     properties:

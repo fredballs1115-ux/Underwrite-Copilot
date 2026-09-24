@@ -118,6 +118,44 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   nation's"), the verdict's brief, the report and the shared screen now
   say the two apart. A record written before the count has none and
   reads as before.
+- What is being sold (#414): the extraction reads the INTEREST conveyed
+  (`ExtractionResult.interest`: `fee_simple`, `leasehold`, `note`,
+  `partial_interest` or `unknown`, with the OM's own sentence, a share as
+  stated, the ground lease and the loan as stated, and the page) and
+  `lib/interest.ts` (pure, importing no `lib/deal-strategy`, which reads
+  `interestOf` from it) says what the price buys. Four rules. **A note's
+  price is a loan's**: the collateral's NOI over it is a cap rate nobody
+  earns, so the plausibility check makes no price finding at all, the
+  model's price note says it runs the collateral as if bought outright,
+  and every surface says the property model is not the note's return; the
+  balance comes only from a row the extraction labels "Unpaid principal
+  balance" and the discount to it is said. **A share's price is for the
+  share**: `parseSharePct` reads ONE percentage under 100 off the OM's own
+  words (two different ones is no share), and the plausibility check and
+  the model gross the price up to the whole the building's figures
+  describe — the model's price source is "derived", its note saying the
+  share earns its slice before the promote and fees — while a share with
+  no stated percentage is compared to nothing. **A leasehold is a wasting
+  asset**, said, with the ground lease as stated and a link to the ground
+  lease calculator. **A blank is null.** An extraction saved before the
+  interest was read is fee simple, and a plain fee simple says nothing.
+  One price reader behind all of it (`askingPriceOf` in
+  `lib/deal-strategy.ts`, the plausibility check's and the model's own),
+  and the comps' subject tick takes the same rule (`subjectBasis`'s
+  `interest`: no tick on a note, the whole's basis on a share, none on a
+  share with no stated percentage — a 49% stake's price over the whole
+  building's units read $83k a unit against $170k).
+  Where it shows: the deal context (FIRST, whatever the strategy), the
+  challenger's notes (first, with each interest's traps by name — the
+  note's collateral, discount, foreclosure and documents; the share's
+  control, waterfall, exit rights and capital calls; the leasehold's term,
+  resets, subordination, coverage and reversion), `app/interest-panel.tsx`
+  (`InterestPanel`, pure — the deal page under its header and the shared
+  screen under its title: a note's balance as the track with the price
+  filled, a share's implied whole with the share filled,
+  `data-bar="interest"`), the memo under its title (`interestShortLine`),
+  the report's sensitivity page (the model caveat above the grids) and the
+  workbook's cover (`meta.interest`).
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`
@@ -126,10 +164,22 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   shared with the token-scoped aerial route `app/api/share/[token]/aerial`,
   so never resolve a share anywhere else) — and lint
   the visible text with `lib/render-lint.ts` (a digit glued to a word, a word
-  doubled; `a11yIssues`: an image with no alt, a nameless button or link, an
-  unlabelled control, a duplicate id; `visibleText` decodes `&amp;` last,
-  so a double-escaped entity — the literal `&nbsp;` a reader would see —
-  stays in the text). With `VIEW_SHOTS_DIR` set they also
+  doubled, an article the figure after it does not take; `a11yIssues`: an
+  image with no alt, a nameless button or link, an unlabelled control, a
+  duplicate id; `visibleText` decodes `&amp;` last, so a double-escaped
+  entity — the literal `&nbsp;` a reader would see — stays in the text).
+  **An article before a value goes through `lib/article.ts`** (`aOrAn`,
+  `withArticle`): the figure decides — an 8.0% cap, an 11-story tower, an
+  18% return, an 800 SF unit, an $80M loan, and a 1.8% spread, a 1,800-unit
+  portfolio — and so does a word's sound (an office, an SFR, a unit). The
+  notes' "a 18.0% discount" and the deal context's "a 11.7% yield on
+  cost" shipped because a template typed "a" before whatever arrived, and
+  the fixtures happened to hold figures that took "a";
+  `lib/article.test.ts` scans every source for an article typed before an
+  interpolation (`a ${…}`, `a {…}`, `a{" "}<span>{…}`) and holds the lint's
+  copy of the rule to the helper's, since `render-lint.ts` loads under
+  plain Node from `scripts/lint-pages.mjs` and cannot import it. With
+  `VIEW_SHOTS_DIR` set they also
   write each view as a full document with the built stylesheet linked, so
   headless Chromium can open it at 390px — the visual half, run by hand.
   `lib/jsx-whitespace.test.ts` scans every page's source for the JSX shape

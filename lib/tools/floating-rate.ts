@@ -1,3 +1,4 @@
+import { withArticle } from "@/lib/article";
 import { loanConstant } from "./deal-math";
 
 /**
@@ -330,7 +331,7 @@ function noteFor(s: {
   // Worst first: already through the covenant is not a warning about the
   // future, it is a description of now.
   if (s.dscr !== null && s.covenantDscr !== null && s.dscr < s.covenantDscr) {
-    return `Already through the covenant: ${s.dscr.toFixed(2)}× against a ${s.covenantDscr.toFixed(2)}× test, at today's index.`;
+    return `Already through the covenant: ${s.dscr.toFixed(2)}× against ${withArticle(s.covenantDscr.toFixed(2))}× test, at today's index.`;
   }
   if (s.capProtects === false && s.capStrikePct !== null && s.breachIndexPct !== null) {
     return `The cap is struck at ${s.capStrikePct.toFixed(2)}% and the covenant breaks at ${s.breachIndexPct.toFixed(2)}% — the loan fails before the cap pays anything.`;

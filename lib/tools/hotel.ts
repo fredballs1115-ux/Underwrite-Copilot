@@ -48,6 +48,8 @@
  * Pure, no I/O. Rates are percentages (`72` means 72%), a blank is null.
  */
 
+import { withArticle } from "@/lib/article";
+
 /** The reserve a franchise agreement typically requires, as a % of revenue. */
 export const DEFAULT_FFE_RESERVE_PCT = 4;
 
@@ -407,7 +409,7 @@ function noteFor(x: HotelRead): string {
     return `At ${LEVER_LIFT_PCT}% more occupancy this hotel would be past 100% full, so the two levers no longer reach the same RevPAR and there is no winner to name — rate is the only one with room left.`;
   }
   if (x.leverThatWins !== null && x.leverGap !== null && x.leverThatWins !== "neither") {
-    return `A ${LEVER_LIFT_PCT}% lift in rate and a ${LEVER_LIFT_PCT}% lift in occupancy are the same RevPAR and ${usd(Math.abs(x.leverGap))} apart at the bottom line — ${x.leverThatWins} wins here. Enter the comp set to see whether the market agrees.`;
+    return `${withArticle(`${LEVER_LIFT_PCT}%`, true)} lift in rate and ${withArticle(`${LEVER_LIFT_PCT}%`)} lift in occupancy are the same RevPAR and ${usd(Math.abs(x.leverGap))} apart at the bottom line — ${x.leverThatWins} wins here. Enter the comp set to see whether the market agrees.`;
   }
   return "Enter the competitive set's rate and occupancy to see which half of RevPAR is short.";
 }

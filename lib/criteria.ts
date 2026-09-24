@@ -5,6 +5,7 @@
 // mandate's bound, the deal's figure, and the call in plain English.
 // (Universal module: used by server pages and the background pipeline.)
 
+import { withArticle } from "@/lib/article";
 import { assetWords, countNoun } from "@/lib/asset-words";
 
 export interface GeoTarget {
@@ -1187,7 +1188,7 @@ export function evaluateBuyBox(
         label: "Going-in cap",
         status: "unknown",
         detail: planKind
-          ? `Mandate wants ≥${box.minCapPct}% going-in, but a ${planKind} deal has no going-in cap — its stabilized figure is the finished project's, judged on yield on total cost, not on a cap against the price.`
+          ? `Mandate wants ≥${box.minCapPct}% going-in, but ${withArticle(planKind)} deal has no going-in cap — its stabilized figure is the finished project's, judged on yield on total cost, not on a cap against the price.`
           : `Mandate wants ≥${box.minCapPct}% going-in; no parseable cap rate yet.`,
       });
     } else if (pct >= box.minCapPct) {

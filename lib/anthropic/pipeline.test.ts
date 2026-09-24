@@ -516,6 +516,21 @@ describe("runAnalysis — the happy path", () => {
     expect(stored.otherBriefs?.map((b) => b.metro)).toEqual(["Washington DC", "Baltimore MD"]);
   });
 
+  it("a note sale: the challenger reads the note's traps first, and the deal context says what is being sold (#414)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      interest: { kind: "note", summary: "Sale of the first mortgage note", share: "", groundLease: "", loan: "$24.4M UPB, 5.25% coupon, 90 days delinquent", page: "" },
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note.startsWith("What is being sold: a loan secured by the property.")).toBe(true);
+    expect(note).toContain("The loan as stated: $24.4M UPB, 5.25% coupon, 90 days delinquent.");
+    expect(note).toContain("NOTE TRAPS, checked by name");
+    expect(vi.mocked(checkMarket).mock.calls[0][2]).toContain("What is being sold: a loan secured by the property.");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
   it("a single-market deal stores no other markets' figures", async () => {
     state.deals.d1.address = { city: "Washington", state: "DC" };
     state.rates = [{ series_id: "WASH911URN", obs_date: "2026-07-01", value: 3.4 }];

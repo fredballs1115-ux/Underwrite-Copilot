@@ -15,6 +15,7 @@
  *
  * Pure.
  */
+import { withArticle } from "@/lib/article";
 import type { PipelineProperty, RentBasis, SubmarketPeriod } from "./types";
 import { RENT_BASIS_LABEL } from "./types";
 
@@ -318,7 +319,7 @@ export function reconcilePipeline(
     ? `Grid and property list tie at ${fmt(gridSf)} SF under construction.`
     : `Grid says ${fmt(gridSf)} SF under construction; the property list sums to ${fmt(
         listSf,
-      )} SF — a ${fmt(Math.abs(deltaSf))} SF ${deltaSf > 0 ? "shortfall in" : "excess in"} the list${
+      )} SF — ${withArticle(fmt(Math.abs(deltaSf)))} SF ${deltaSf > 0 ? "shortfall in" : "excess in"} the list${
         excludedSf > 0
           ? `. ${fmt(excludedSf)} SF was removed by your exclusion rules, which explains ${
               Math.abs(deltaSf) > 0 ? `${Math.round((excludedSf / Math.abs(deltaSf)) * 100)}%` : "none"

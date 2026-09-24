@@ -7,7 +7,7 @@ import { describe, it, expect } from "vitest";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { MemoDocument, basePosition, buildMemoData } from "./memo-document";
-import { pdfFillCountOf } from "./pdf-text-of";
+import { pdfFillCountOf, pdfTextOf } from "./pdf-text-of";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
 import type { DealRow } from "@/lib/deals";
@@ -55,6 +55,37 @@ describe("MemoDocument (redesigned)", () => {
     expect(pages.length).toBe(1);
     // No cover was given, so the PDF embeds no image at all.
     expect(buf.toString("latin1")).not.toMatch(/\/Subtype\s*\/Image/);
+  }, 30000);
+
+  it("says what is being sold under the title on a note, and nothing on the sample's fee simple (#414)", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "" },
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Unpaid principal balance", value: "$60,000,000", flagged: false, page: "p. 3", basis: "na" },
+      ],
+    };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "September 24, 2026", []);
+    expect(data.interestLine).toMatch(/^A loan secured by the property, not the property — the \$[\d.]+M price is a [\d.]+% (discount to|premium over) the \$60\.0M balance$/);
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("A loan secured by the property, not the property");
+    // The sample itself is a fee simple: its memo carries no such line.
+    const plain = buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 24, 2026", []);
+    expect(plain.interestLine).toBe("");
   }, 30000);
 
   it("the cover aerial prints on page one, and the memo is still one page", async () => {

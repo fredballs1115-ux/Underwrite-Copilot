@@ -124,6 +124,8 @@ export function extractionInstruction(assetClass: AssetClass): string {
 
 First say what KIND of deal this is — \`strategy.kind\`: "stabilized" (an operating asset bought for its in-place income), "value_add" (in-place income plus a renovation or repositioning program), "lease_up" (largely vacant space still to be leased), "conversion" (a change of use — office to residential and the like — with construction and downtime before any stabilized income), "development" (ground-up or to-be-built), or "unknown" only if the OM truly does not say. Give \`strategy.summary\` (one sentence, the plan in the OM's own terms; "" if it states none), \`strategy.capitalBudget\` (the renovation or construction budget as stated, hard and soft; "" if none) and \`strategy.timeline\` (construction, downtime and lease-up timing to stabilization as stated; "" if none). For a value-add, lease-up, conversion or development, also capture the plan's own figures as metrics — each with its page — labelled exactly so the screen can read them: "Total project cost" (the all-in figure, when the OM states one), "Construction budget" or "Renovation budget" (hard and soft, excluding the price), on a development "Land cost" (the land or site acquisition, when that is what is being bought — never an appraised land value), "Units (proposed)" — or "Keys (proposed)", "Beds (proposed)", "Pads (proposed)" in the OM's own noun — or "SF (proposed)" for the finished product, "Construction period", "Lease-up period", and "Stabilized in" (the year or date the plan stabilizes). Never restate the price as a cost line, and never write 0 for a figure the OM does not state.
 
+Then say WHAT IS BEING SOLD — \`interest.kind\`: "fee_simple" (the land and the building outright — the usual case, and the answer whenever the OM offers the property itself and states no ground lease, loan or share), "leasehold" (the building on land held under a GROUND LEASE — the buyer takes the lease, not the land), "note" (a LOAN secured by the property — a performing or non-performing note or loan sale; the buyer steps into the lender's position, not the owner's), "partial_interest" (a SHARE of the owning entity — a JV, LP, LLC or TIC interest, a recapitalization, a minority or majority stake — not the whole asset), or "unknown" only if the OM truly does not say. Give \`interest.summary\` (one sentence, the interest in the OM's own terms; "" if it states nothing beyond the property), \`interest.share\` (a partial interest's share exactly as stated, like "49% limited partnership interest"; "" otherwise), \`interest.groundLease\` (a ground lease exactly as stated — the term remaining, the ground rent, its escalations or resets, any option to buy the land; "" if none — and fill it for a fee-simple deal whose OM discloses a ground lease under part of the site), \`interest.loan\` (a note's terms exactly as stated — the unpaid principal balance, the coupon, the maturity, whether it is performing, the borrower's position; "" otherwise) and \`interest.page\`. On a note or a partial interest the "Asking price" is what the buyer pays for the note or the share, exactly as stated; the loan's balance goes under "Unpaid principal balance", and a value the OM states for the whole asset under "Whole-asset value" — never multiply or divide a figure to make one.
+
 Capture: asking price (and the per-unit, per-key, per-bed, per-pad, per-SF or per-acre figure if given), NOI, going-in and pro forma cap rates, occupancy (and on a hotel the ADR and RevPAR), in-place and pro forma rents in the OM's own terms (per unit, key, bed or pad per month, or per SF per year), expense ratio, exit cap, IRR, financing (LTV, rate, lender), hold period, the count in the OM's own noun and/or total SF (on land: the acreage, the zoning and the entitlements), year built / renovated, seller, and broker.
 
 Label the headline rows exactly, so the screen reads them the same way every time: "Asking price" for the whole-asset ask (a per-unit or per-SF figure under its own label — "Price per unit", or per key, bed, pad, home or space in the OM's own noun, or "Price per SF"; a prior trade under "Last sale price"); the whole count under the OM's own noun — "Units" for apartments or storage units, "Keys" for a hotel, "Beds" for student or senior housing, "Pads" for a manufactured-housing community, "Homes" for a scattered-site or build-to-rent portfolio, "Spaces" for a garage, "Acres" for land — (a subset — vacant, renovated, affordable, a phase — under its own label); "Total SF" for the building's rentable area (the land under "Land area", a unit's average under "Average unit size"); "Occupancy" for today's physical occupancy as of the OM's date (a stabilized or projected figure under "Stabilized occupancy"); and "Going-in cap rate" for the cap on today's income (a stabilized or pro forma cap under "Stabilized cap rate"). Put the number alone in the value — "42,000,000", "312", "250,000 SF", "94%" — with the unit and nothing else.
@@ -269,17 +271,19 @@ function sectorNormsClause(assetClass: AssetClass): string {
 
 /** Model generator — pass 1: extract underwriting facts from ONE document. */
 export function docExtractionInstruction(kind: string, name: string): string {
+  // Each with its own article: "an offering memorandum", and financials
+  // are plural.
   const kindLabel =
     {
-      om: "offering memorandum",
-      rent_roll: "rent roll",
-      t12: "T-12 / trailing operating statement",
-      financials: "offering financials",
-      loan_terms: "loan term sheet",
-      other: "supporting document",
-    }[kind] ?? "supporting document";
+      om: "an offering memorandum",
+      rent_roll: "a rent roll",
+      t12: "a T-12 / trailing operating statement",
+      financials: "a set of offering financials",
+      loan_terms: "a loan term sheet",
+      other: "a supporting document",
+    }[kind] ?? "a supporting document";
 
-  return `You are reading ONE source document for a CRE deal — a ${kindLabel} ("${name}"). Extract every fact relevant to building an underwriting model. Be faithful to THIS document only; do not infer from anything outside it.
+  return `You are reading ONE source document for a CRE deal — ${kindLabel} ("${name}"). Extract every fact relevant to building an underwriting model. Be faithful to THIS document only; do not infer from anything outside it.
 
 For each fact, give:
 - \`key\`: a canonical snake_case key. Use these where they apply: units, sf, purchase_price, price_per_unit, going_in_cap, exit_cap, in_place_occupancy, economic_occupancy, gross_potential_rent, in_place_rent, market_rent, vacancy_pct, other_income, total_opex, expense_ratio, real_estate_taxes, insurance, noi_actual, noi_proforma, rent_growth, expense_growth, loan_amount, ltv, interest_rate, amortization_years, io_years, loan_term, hold_period. Otherwise pick a sensible key.
