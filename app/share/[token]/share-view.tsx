@@ -12,6 +12,8 @@ import { assetClassLabel } from "@/lib/asset-class";
 import { assetWords } from "@/lib/asset-words";
 import { inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { keyTermRows } from "@/lib/key-terms";
+import { readPortfolio } from "@/lib/portfolio";
+import { PortfolioCard } from "@/app/portfolio-card";
 import { SharePlan } from "./plan-facts";
 import { ShareAerial } from "./share-aerial";
 
@@ -227,6 +229,10 @@ export function ShareView({
   const metrics = keyTermRows(safeExtraction?.metrics ?? [], strategy.kind, 8);
   const ranges = (screen?.ranges ?? []).slice(0, 6);
   const killers = (screen?.dealKillers ?? []).slice(0, 3);
+  // One OM, several properties (#411): the deal page's own card, read by
+  // the same reader, so a partner sees what is being bought property by
+  // property; nothing for a single property.
+  const portfolio = readPortfolio(safeExtraction);
 
   return (
     <main id="main" className="mx-auto max-w-3xl px-6 py-10">
@@ -430,6 +436,12 @@ export function ShareView({
             ))}
           </div>
         </section>
+      )}
+
+      {portfolio && (
+        <div className="mt-6">
+          <PortfolioCard portfolio={portfolio} assetClass={extraction?.assetClass || assetClass} />
+        </div>
       )}
 
       {(comps?.summary || market?.summary) && (

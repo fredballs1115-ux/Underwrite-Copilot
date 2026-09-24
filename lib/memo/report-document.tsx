@@ -49,6 +49,7 @@ import { inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { basisScale, fmtBasis, subjectBasis } from "@/lib/comp-detail";
 import { gapScale } from "@/lib/gap-detail";
 import { parsePageNumber } from "@/lib/facts";
+import { portfolioFacts, propertyFigures, readPortfolio, shareBasisWord, type PortfolioRead } from "@/lib/portfolio";
 
 const C = {
   brand: "#114e54",
@@ -275,6 +276,84 @@ function AssumptionsBlock({ read }: { read: ModelVsMarket | null | undefined }) 
           <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 1 }}>{c.read}</Text>
         </View>
       ))}
+    </View>
+  );
+}
+
+/**
+ * A portfolio memorandum's properties (lib/portfolio), as the deal page's
+ * card draws them: the markets they sit in, the facts a buyer should see
+ * before pricing any of it, then one row a property — its share of the
+ * count (or area) as a bar and, where EVERY property states an NOI, its
+ * share of the income beneath — with the figures the memorandum states for
+ * it and its page (validated in the reader: a citation is never invented).
+ * The sentences are the card's own (`portfolioFacts`, `propertyFigures`),
+ * so the page and the report never disagree. Plain Views.
+ */
+function PortfolioBlock({ portfolio, noun }: { portfolio: PortfolioRead; noun: { one: string; many: string } }) {
+  const p = portfolio;
+  const basisWord = shareBasisWord(p, noun);
+  const widest = Math.max(1, ...(p.shares ?? []), ...(p.noiShares ?? []));
+  const track = 84;
+  const bar = (v: number) => Math.max(1.5, (v / widest) * track);
+  return (
+    <View>
+      <Text style={s.sub}>
+        {str(
+          `Each property as the memorandum states it - a blank is a figure it does not state. ${
+            p.shares && basisWord
+              ? `The bar is each property's share of the ${basisWord}${p.noiShares ? "; the thinner one beneath, its share of the NOI" : ""}.`
+              : "No bars: the properties do not all state a count, nor all an area, so no share of the whole can be drawn."
+          }`,
+        )}
+      </Text>
+      {p.markets.length > 0 ? (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5, marginBottom: 7 }}>
+          {p.markets.map((m) => (
+            <RateChip key={m.id} word={str(`${m.name} · ${m.properties}`)} color={C.brand} />
+          ))}
+        </View>
+      ) : null}
+      {portfolioFacts(p).map((f) => (
+        <Text key={f} style={{ fontSize: 8, color: C.ink, fontFamily: "Helvetica-Oblique", marginBottom: 2 }}>
+          {str(f)}
+        </Text>
+      ))}
+      <View style={[s.tableHead, { marginTop: 8 }]}>
+        <Text style={[s.headText, { width: "30%" }]}>Property</Text>
+        <Text style={[s.headText, { width: "22%" }]}>{p.shares && basisWord ? "Share" : ""}</Text>
+        <Text style={[s.headText, { width: "40%" }]}>What the memorandum states</Text>
+        <Text style={[s.headText, { width: "8%" }]}>Page</Text>
+      </View>
+      {p.assets.map((a, i) => (
+        <View key={`${a.name}-${i}`} style={i % 2 === 1 ? [s.row, s.rowAlt] : s.row} wrap={false}>
+          <View style={{ width: "30%", paddingRight: 6 }}>
+            <Text style={{ fontSize: 8.5, fontFamily: "Helvetica-Bold" }}>{str(a.name)}</Text>
+            {a.place ? <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 1 }}>{str(a.place)}</Text> : null}
+          </View>
+          <View style={{ width: "22%", paddingRight: 6 }}>
+            {p.shares ? (
+              <View style={{ width: track, height: 4, borderRadius: 2, backgroundColor: C.line, position: "relative" }}>
+                <View style={{ position: "absolute", left: 0, top: 0, height: 4, borderRadius: 2, width: bar(p.shares[i]), backgroundColor: "#7fa9a4" }} />
+              </View>
+            ) : null}
+            {p.shares && p.noiShares ? (
+              <View style={{ marginTop: 2, width: track, height: 2.5, borderRadius: 1.25, backgroundColor: C.line, position: "relative" }}>
+                <View
+                  style={{ position: "absolute", left: 0, top: 0, height: 2.5, borderRadius: 1.25, width: bar(p.noiShares[i]), backgroundColor: "#8f9995" }}
+                />
+              </View>
+            ) : null}
+          </View>
+          <Text style={{ width: "40%", fontSize: 8, color: C.ink, paddingRight: 4 }}>{str(propertyFigures(p, i, noun).join(" · "))}</Text>
+          <Text style={{ width: "8%", fontSize: 7.5, color: C.muted }}>{a.page ? str(a.page) : "—"}</Text>
+        </View>
+      ))}
+      <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 8 }}>
+        {str(
+          "An allocation is the seller's split of the price, set for transfer taxes and financing rather than by value; a cap struck on it is the allocation's cap, not the property's. Each property's market is read from its own address; the market check's published figures are the one market's that the deal's address on file sits in, never the portfolio's.",
+        )}
+      </Text>
     </View>
   );
 }
@@ -663,6 +742,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // a hotel development is costed per key, never per unit.
   const planNoun = assetWords(memo.assetClass).noun ?? { one: "unit", many: "units" };
   const extraction = deal.extraction as ExtractionResult | null;
+  // One OM, several properties (#411): the portfolio page, read by the same
+  // reader as the deal page's card; null for a single property.
+  const portfolio = readPortfolio(extraction);
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
@@ -944,6 +1026,19 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           </Text>
 
           <AssumptionsBlock read={modelVsMarket} />
+        </PageChrome>
+      )}
+
+      {/* A portfolio memorandum: what is being bought, property by
+          property, before the terms extracted for the whole. */}
+      {portfolio && (
+        <PageChrome
+          title="The portfolio"
+          count={`${portfolio.assets.length} properties · ${portfolio.markets.length} ${portfolio.markets.length === 1 ? "market" : "markets"}`}
+          dealName={dealName}
+          branding={memo.branding}
+        >
+          <PortfolioBlock portfolio={portfolio} noun={planNoun} />
         </PageChrome>
       )}
 

@@ -336,9 +336,14 @@ property a memorandum offers, `lib/portfolio` reads their shares, the
 income's concentration, the markets and the allocation against the ask,
 the challenger gets the portfolio traps, the deal context and the market
 check's header say what the portfolio spans, and the deal page draws a
-card a property; the report, the shared screen and the workbook do not
-carry it yet, and the market check still reads one market's figures (the
-address on file) and says so. **Open after it**: the twenty-six
+card a property. Then #412: the report gives a portfolio its own page
+(the same bars as plain Views and the same sentences, one list in
+`lib/portfolio`), the shared screen draws the deal page's card, and the
+workbook carries a Portfolio tab whose shares and allocation caps are
+live formulas — fill the blank the memorandum left and the share
+appears; a property's page is cited only inside the memorandum's page
+count. The market check still reads one market's figures (the address
+on file) and says so. **Open after it**: the twenty-six
 overhead frames are now only the fallback, but they are still
 business-district coordinates written from knowledge — look at each once
 on the deployed page if a photograph ever 404s; Salt Lake City's city

@@ -671,3 +671,115 @@ describe("the Market Read tab — the assumptions against the published figures,
     expect(named(hf, "CheckSU")).toBe(true);
   });
 });
+
+// ── The Portfolio tab (#411) ────────────────────────────────────────────────
+import { readPortfolio } from "@/lib/portfolio";
+import { PORTFOLIO_HEAD_ROW } from "./workbook";
+
+describe("the Portfolio tab — each property as the memorandum states it, the shares as live formulas", () => {
+  const prop = (name: string, address: string, count: string, noi: string, occupancy: string, allocatedPrice: string, page: string) => ({
+    name, address, count, area: "", noi, occupancy, yearBuilt: "", allocatedPrice, page,
+  });
+  const portfolioEx: ExtractionResult = {
+    dealName: "Rust Belt Residential Portfolio",
+    assetClass: "multifamily",
+    address: "1200 Liberty Ave, Pittsburgh, PA 15222",
+    metrics: [
+      { label: "Asking price", value: "$75,000,000", flagged: false, page: "p. 3" },
+      { label: "Units", value: "398", flagged: false, page: "p. 3" },
+      { label: "Net operating income", value: "$3,780,000", flagged: false, page: "p. 9" },
+    ],
+    properties: [
+      prop("Liberty Lofts", "1200 Liberty Ave, Pittsburgh, PA 15222", "128", "$1,420,000", "95%", "$28,000,000", "p. 14"),
+      prop("Ohio City Commons", "1850 W 25th St, Cleveland, OH 44113", "210", "$2,050,000", "94%", "$38,000,000", "p. 22"),
+      prop("Marion Gardens", "400 Barks Rd, Marion, OH 43302", "", "$310,000", "82%", "$4,000,000", "p. 26"),
+    ],
+    totalPages: 28,
+  };
+  const pModel = deriveUnderwriteInputs(portfolioEx, "fallback");
+  const read = readPortfolio(portfolioEx)!;
+  const first = PORTFOLIO_HEAD_ROW + 1;
+
+  it("sits after the Deal Summary, with a row a property, its blanks left blank, and the Contents naming it", async () => {
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(pModel, null, null, read));
+    const names = wb.worksheets.map((ws) => ws.name);
+    expect(names.indexOf("Portfolio")).toBe(names.indexOf("Deal Summary") + 1);
+    const ws = wb.getWorksheet("Portfolio")!;
+    expect(ws.getCell(1, 1).value).toBe("The portfolio — 3 properties");
+    expect(String(ws.getCell(3, 1).value)).toContain("The allocated prices sum to $70.0M against the $75.0M ask (-6.7%)");
+    expect(ws.getCell(PORTFOLIO_HEAD_ROW, 4).value).toBe("UNITS");
+    expect(ws.getCell(PORTFOLIO_HEAD_ROW, 12).value).toBe("SHARE OF UNITS");
+    expect(ws.getCell(first, 1).value).toBe("Liberty Lofts");
+    expect(ws.getCell(first, 3).value).toBe("Pittsburgh PA");
+    expect(ws.getCell(first, 4).value).toBe(128);
+    expect(ws.getCell(first, 6).value).toBe(1_420_000);
+    expect(ws.getCell(first, 7).value).toBeCloseTo(0.95, 10);
+    expect(ws.getCell(first, 9).value).toBe(28_000_000);
+    expect(ws.getCell(first, 15).value).toBe("p. 14");
+    // Marion Gardens states no count: the cell is empty, never a zero.
+    expect(ws.getCell(first + 2, 4).value ?? null).toBeNull();
+    // The derived columns are formulas, never values.
+    for (const c of [10, 11, 12, 13, 14]) {
+      const v = ws.getCell(first, c).value as { formula?: string } | null;
+      expect(v && typeof v === "object" && typeof v.formula === "string", `col ${c}`).toBe(true);
+    }
+    const cover = wb.getWorksheet("Cover")!;
+    let listed = false;
+    cover.eachRow((row) => {
+      if (row.getCell(2).value === "Portfolio") listed = true;
+    });
+    expect(listed).toBe(true);
+    // Excel's own data bars on the three shares, from zero.
+    const cfs = (
+      ws as unknown as { conditionalFormattings: { ref: string; rules: { type: string; cfvo?: { type: string; value?: number }[] }[] }[] }
+    ).conditionalFormattings;
+    const bars = cfs.filter((cf) => cf.rules.some((r) => r.type === "dataBar"));
+    expect(bars.map((cf) => cf.ref).sort()).toEqual([`L${first}:L${first + 2}`, `M${first}:M${first + 2}`, `N${first}:N${first + 2}`]);
+    expect(bars[0].rules[0].cfvo?.map((c) => c.type)).toEqual(["num", "max"]);
+  });
+
+  it("computes what lib/portfolio reads, and draws the count's share the moment the missing count is typed in", async () => {
+    const { hf } = await loadIntoHf(await buildUnderwriteWorkbook(pModel, null, null, read));
+    const sheet = hf.getSheetId("Portfolio")!;
+    const at = (row: number, col: number) => hf.getCellValue({ sheet, row: row - 1, col: col - 1 });
+    // Every property states an NOI: the income's shares match the reader's.
+    read.noiShares!.forEach((share, i) => expect(Number(at(first + i, 14))).toBeCloseTo(share / 100, 10));
+    // Not every property states a count: no share of the units, and no total.
+    expect(read.shares).toBeNull();
+    for (let i = 0; i < 3; i++) expect(at(first + i, 12)).toBe("");
+    const total = first + 3;
+    expect(at(total, 4)).toBe("");
+    // The allocation per unit and the cap on it, where both are stated.
+    expect(Number(at(first, 10))).toBeCloseTo(28_000_000 / 128, 6);
+    expect(Number(at(first, 11))).toBeCloseTo(1_420_000 / 28_000_000, 10);
+    expect(at(first + 2, 10)).toBe("");
+    // The allocations against the ask: the reader's gap, as a fraction.
+    expect(Number(at(total, 9))).toBe(70_000_000);
+    expect(Number(at(total + 3, 9))).toBeCloseTo(read.allocationGapPct! / 100, 10);
+    // Type the missing count in: the shares of the units appear, and match
+    // the reader's on the completed set.
+    hf.setCellContents({ sheet, row: first + 2 - 1, col: 4 - 1 }, 60);
+    const completed = readPortfolio({
+      ...portfolioEx,
+      properties: portfolioEx.properties!.map((x, i) => (i === 2 ? { ...x, count: "60" } : x)),
+    })!;
+    completed.shares!.forEach((share, i) => expect(Number(at(first + i, 12))).toBeCloseTo(share / 100, 10));
+    expect(Number(at(total, 4))).toBe(398);
+    // And the book still has no formula error anywhere.
+    const errors: string[] = [];
+    for (const name of hf.getSheetNames()) {
+      const id = hf.getSheetId(name)!;
+      (hf.getSheetValues(id) as unknown[][]).forEach((row, ri) =>
+        row.forEach((v, ci) => {
+          if (isErr(v)) errors.push(`${name}[${ri},${ci}]`);
+        }),
+      );
+    }
+    expect(errors).toEqual([]);
+  });
+
+  it("is absent for a single property", async () => {
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(model, null, null, readPortfolio(extraction)));
+    expect(wb.getWorksheet("Portfolio")).toBeUndefined();
+  });
+});

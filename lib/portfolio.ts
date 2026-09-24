@@ -32,6 +32,7 @@ import type { ExtractionResult, PortfolioProperty } from "@/lib/anthropic/types"
 import { parseCount, parsePct, parseSf } from "@/lib/criteria";
 import { findPricedMetric, inferStrategy } from "@/lib/deal-strategy";
 import { US_STATE_ABBREV } from "@/lib/address";
+import { parsePageNumber } from "@/lib/facts";
 import { marketForAddress } from "@/lib/market-match";
 import { parseUsd } from "@/lib/money";
 
@@ -56,6 +57,9 @@ export interface PortfolioAsset {
   allocatedPerCount: number | null;
   /** NOI over the allocated price, in percent — the ALLOCATION's cap */
   allocationCapPct: number | null;
+  /** the memorandum's page for this property, only where it parses AND falls
+   *  inside the document's real page count (lib/facts' absolute rule — a
+   *  citation is never invented); "" otherwise */
   page: string;
 }
 
@@ -153,6 +157,11 @@ function yearOf(raw: string): number | null {
 export function readPortfolio(ex: ExtractionResult | null | undefined): PortfolioRead | null {
   const props = (ex?.properties ?? []).filter((p) => num(p.name) || num(p.address));
   if (props.length < 2) return null;
+  const pageCount = typeof ex?.totalPages === "number" && Number.isFinite(ex.totalPages) && ex.totalPages > 0 ? ex.totalPages : null;
+  const cited = (raw: string): string => {
+    const n = parsePageNumber(raw);
+    return n != null && pageCount != null && n <= pageCount ? raw : "";
+  };
 
   const assets: PortfolioAsset[] = props.map((p) => {
     const place = placeOf(num(p.address));
@@ -177,7 +186,7 @@ export function readPortfolio(ex: ExtractionResult | null | undefined): Portfoli
       allocated,
       allocatedPerCount: allocated != null && count != null && count > 0 ? allocated / count : null,
       allocationCapPct: allocated != null && noi != null && allocated > 0 ? (noi / allocated) * 100 : null,
-      page: num(p.page),
+      page: cited(num(p.page)),
     };
   });
 
@@ -251,9 +260,12 @@ export function readPortfolio(ex: ExtractionResult | null | undefined): Portfoli
 }
 
 const pct0 = (n: number) => `${Math.round(n)}%`;
-// Rounded on integer tenths, not by toFixed on a float ((2.05).toFixed(1)
-// is "2.0").
-const money = (n: number) =>
+/** One decimal, rounded on the tenths rather than by toFixed on the float. */
+const one = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
+/** A portfolio's money, the one format every surface prints it in. Rounded
+ *  on integer tenths, not by toFixed on a float ((2.05).toFixed(1) is
+ *  "2.0"); a hundred million and up to the million. */
+export const portfolioMoney = (n: number) =>
   n >= 1e8
     ? `$${Math.round(n / 1e6)}M`
     : n >= 1e6
@@ -261,6 +273,74 @@ const money = (n: number) =>
       : n >= 1e3
         ? `$${Math.round(n / 1e3)}k`
         : `$${Math.round(n)}`;
+const money = portfolioMoney;
+
+type Noun = { one: string; many: string };
+
+/** What the shares are measured in, in words — the class's own plural noun
+ *  for a count ("units", "keys", "pads"), "SF" for an area; null with no
+ *  shares. */
+export function shareBasisWord(p: PortfolioRead, noun: Noun): string | null {
+  return p.shareBasis === "area" ? "SF" : p.shareBasis === "count" ? noun.many : null;
+}
+
+/**
+ * The facts a buyer should see before pricing any of it: one property
+ * carrying the income, an income split the memorandum does not state, an
+ * allocation that does or does not add up to the ask, a property whose
+ * address names no state. One list, so the deal page's card, the report's
+ * portfolio page and the shared screen say the same sentences.
+ */
+export function portfolioFacts(p: PortfolioRead): string[] {
+  const facts: string[] = [];
+  if (p.largest?.of === "noi" && p.largest.sharePct >= CONCENTRATION_PCT) {
+    facts.push(`${p.largest.name} carries ${pct0(p.largest.sharePct)} of the stated NOI — the portfolio's income rides on one property.`);
+  }
+  if (!p.noiShares && p.noiStated > 0) {
+    facts.push(`${p.noiStated} of the ${p.assets.length} properties state an NOI of their own, so the income's split is not drawn.`);
+  } else if (p.noiStated === 0) {
+    facts.push("No property states an NOI of its own — the memorandum prices the portfolio on its total alone.");
+  }
+  if (p.allocationGapPct != null) {
+    facts.push(
+      Math.abs(p.allocationGapPct) > ALLOCATION_TOLERANCE_PCT
+        ? `The allocated prices sum to ${money(p.allocationTotal as number)} against the ${money(p.askingPrice as number)} ask (${p.allocationGapPct > 0 ? "+" : ""}${one(p.allocationGapPct)}%) — the memorandum does not add up.`
+        : `The allocated prices sum to the ${money(p.askingPrice as number)} ask. An allocation is the seller's split, not a value.`,
+    );
+  }
+  if (p.unplaced > 0) {
+    facts.push(
+      `${p.unplaced === 1 ? "One property's address names" : `${p.unplaced} properties' addresses name`} no state, so no market is read for ${p.unplaced === 1 ? "it" : "them"}.`,
+    );
+  }
+  return facts;
+}
+
+/**
+ * One property's line: its shares of the whole where the set has them, then
+ * each figure the memorandum states for it — never one it does not. The
+ * card, the report and the shared screen print it; the workbook carries the
+ * same figures as cells.
+ */
+export function propertyFigures(p: PortfolioRead, i: number, noun: Noun): string[] {
+  const a = p.assets[i];
+  if (!a) return [];
+  const basis = shareBasisWord(p, noun);
+  return [
+    p.shares && basis ? `${pct0(p.shares[i])} of the ${basis}` : null,
+    p.noiShares ? `${pct0(p.noiShares[i])} of the NOI` : null,
+    a.count != null ? `${a.count.toLocaleString("en-US")} ${a.count === 1 ? noun.one : noun.many}` : null,
+    a.area != null ? `${a.area.toLocaleString("en-US")} SF` : null,
+    a.occupancy != null ? `${a.occupancy}% occupied` : null,
+    a.yearBuilt != null ? `built ${a.yearBuilt}` : null,
+    a.noi != null ? `NOI ${money(a.noi)}` : null,
+    a.allocated != null
+      ? `allocated ${money(a.allocated)}${a.allocatedPerCount != null ? ` (${money(a.allocatedPerCount)} per ${noun.one})` : ""}${
+          a.allocationCapPct != null ? `, a ${one(a.allocationCapPct)}% cap on the allocation` : ""
+        }`
+      : null,
+  ].filter((x): x is string => !!x);
+}
 
 /** "3 markets — Pittsburgh PA (2), Cleveland OH (2) and Ohio (1)". */
 export function marketsPhrase(p: PortfolioRead): string {
@@ -296,7 +376,7 @@ export function portfolioNote(p: PortfolioRead): string {
   }
   if (p.allocationGapPct != null && Math.abs(p.allocationGapPct) > ALLOCATION_TOLERANCE_PCT) {
     facts.push(
-      `The allocated prices sum to ${money(p.allocationTotal as number)} against the ${money(p.askingPrice as number)} ask (${p.allocationGapPct > 0 ? "+" : ""}${p.allocationGapPct.toFixed(1)}%) — the OM does not add up; put it to the broker.`,
+      `The allocated prices sum to ${money(p.allocationTotal as number)} against the ${money(p.askingPrice as number)} ask (${p.allocationGapPct > 0 ? "+" : ""}${one(p.allocationGapPct)}%) — the OM does not add up; put it to the broker.`,
     );
   }
   if (p.weakestOccupancy && p.weakestOccupancy.pct < 90) {

@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { ExtractionResult, PortfolioProperty } from "@/lib/anthropic/types";
-import { marketsPhrase, placeOf, portfolioContextLine, portfolioFor, portfolioNote, readPortfolio } from "./portfolio";
+import {
+  marketsPhrase,
+  placeOf,
+  portfolioContextLine,
+  portfolioFacts,
+  portfolioFor,
+  portfolioMoney,
+  portfolioNote,
+  propertyFigures,
+  readPortfolio,
+  shareBasisWord,
+} from "./portfolio";
 
 const prop = (over: Partial<PortfolioProperty>): PortfolioProperty => ({
   name: "",
@@ -33,6 +44,7 @@ const ex = (properties: PortfolioProperty[], price = "$102,000,000"): Extraction
     { label: "Asking price", value: price, flagged: false, page: "p. 3" },
     { label: "Units", value: "578", flagged: false, page: "p. 3" },
   ],
+  totalPages: 64,
 });
 
 describe("placeOf — the city and state an OM's address line states", () => {
@@ -158,5 +170,76 @@ describe("portfolioFor — what the market check's header needs", () => {
     const oneCity = FIVE.slice(0, 2);
     expect(portfolioFor(ex(oneCity), "pittsburgh")).toBeNull();
     expect(portfolioFor(ex([]), "pittsburgh")).toBeNull();
+  });
+});
+
+describe("a property's page is cited only where it falls inside the memorandum", () => {
+  it("keeps a page inside the count, and cites none past it or with the count unknown", () => {
+    const p = readPortfolio(ex(FIVE))!;
+    expect(p.assets.map((a) => a.page)).toEqual(["p. 14", "p. 18", "p. 22", "p. 26", "p. 30"]);
+    const short = readPortfolio({ ...ex(FIVE), totalPages: 24 })!;
+    expect(short.assets.map((a) => a.page)).toEqual(["p. 14", "p. 18", "p. 22", "", ""]);
+    const unknown = readPortfolio({ ...ex(FIVE), totalPages: undefined })!;
+    expect(unknown.assets.every((a) => a.page === "")).toBe(true);
+    const garbled = readPortfolio(ex(FIVE.map((x, i) => (i === 0 ? { ...x, page: "see appendix" } : x))))!;
+    expect(garbled.assets[0].page).toBe("");
+  });
+});
+
+describe("the sentences every surface prints — the card, the report and the shared screen", () => {
+  const noun = { one: "unit", many: "units" };
+
+  it("portfolioFacts: the allocation that adds up says so, and one that does not says by how much", () => {
+    expect(portfolioFacts(readPortfolio(ex(FIVE))!)).toEqual([
+      "The allocated prices sum to the $102M ask. An allocation is the seller's split, not a value.",
+    ]);
+    const heavy = FIVE.map((x, i) => (i === 2 ? { ...x, noi: "$6,000,000" } : x));
+    expect(portfolioFacts(readPortfolio(ex(heavy, "$95,000,000"))!)).toEqual([
+      "Ohio City Commons carries 64% of the stated NOI — the portfolio's income rides on one property.",
+      "The allocated prices sum to $102M against the $95.0M ask (+7.4%) — the memorandum does not add up.",
+    ]);
+  });
+
+  it("portfolioFacts: a partial income set, no income at all, and an address with no state", () => {
+    const partial = FIVE.map((x, i) => (i === 1 ? { ...x, noi: "", allocatedPrice: "" } : x));
+    expect(portfolioFacts(readPortfolio(ex(partial))!)).toEqual([
+      "4 of the 5 properties state an NOI of their own, so the income's split is not drawn.",
+    ]);
+    const none = FIVE.map((x) => ({ ...x, noi: "", allocatedPrice: "" }));
+    expect(portfolioFacts(readPortfolio(ex(none))!)).toEqual([
+      "No property states an NOI of its own — the memorandum prices the portfolio on its total alone.",
+    ]);
+    const lost = FIVE.map((x, i) => (i === 4 ? { ...x, address: "400 Barks Rd" } : x));
+    expect(portfolioFacts(readPortfolio(ex(lost))!)).toContain("One property's address names no state, so no market is read for it.");
+  });
+
+  it("propertyFigures: the shares first, then only what the memorandum states, in the class's noun", () => {
+    const p = readPortfolio(ex(FIVE))!;
+    expect(shareBasisWord(p, noun)).toBe("units");
+    expect(propertyFigures(p, 4, noun)).toEqual([
+      "10% of the units",
+      "6% of the NOI",
+      "60 units",
+      "82% occupied",
+      "built 1979",
+      "NOI $310k",
+      "allocated $4.0M ($67k per unit), a 7.8% cap on the allocation",
+    ]);
+    // A hotel's keys, and a blank left out rather than printed as nothing.
+    const keys = { one: "key", many: "keys" };
+    const bare = readPortfolio(ex(FIVE.map((x, i) => (i === 0 ? { ...x, occupancy: "", yearBuilt: "", allocatedPrice: "" } : x))))!;
+    expect(propertyFigures(bare, 0, keys)).toEqual(["22% of the keys", "26% of the NOI", "128 keys", "NOI $1.4M"]);
+    expect(propertyFigures(bare, 9, keys)).toEqual([]);
+    // Areas for every property: the shares are of the SF.
+    const offices = readPortfolio(ex(FIVE.map((x, i) => ({ ...x, count: "", area: `${(i + 1) * 50_000} SF` }))))!;
+    expect(shareBasisWord(offices, noun)).toBe("SF");
+    expect(propertyFigures(offices, 0, noun)[0]).toBe("7% of the SF");
+  });
+
+  it("portfolioMoney rounds on the tenths, never on a float's toFixed", () => {
+    expect(portfolioMoney(2_050_000)).toBe("$2.1M");
+    expect(portfolioMoney(102_000_000)).toBe("$102M");
+    expect(portfolioMoney(218_750)).toBe("$219k");
+    expect(portfolioMoney(950)).toBe("$950");
   });
 });
