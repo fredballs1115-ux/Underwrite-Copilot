@@ -32,10 +32,15 @@ const seenId = new Set();
 // covered metros, and the longest list, so a pull that runs long has
 // written every metro first.
 const SERIES = [...STRIP, ...metroSeries, ...regionSeries, ...stateSeries].filter((s) => !seenId.has(s.id) && seenId.add(s.id));
+// A probe on its own (PROBE_ONLY=1, which the workflow sets for a probe
+// without dry_run ticked) asks its question and walks nothing: the table's
+// walk is two requests a series in a dry run and twenty-odd minutes at
+// 785 series, and a probe is about a handful of ids.
+const probeOnly = process.env.PROBE_ONLY === "1";
 // Nearly all of it is FRED's. The rest is the BLS's own — see the BLS block
 // below for why a series would be.
-const FROM_FRED = SERIES.filter((s) => (s.source ?? "fred") === "fred");
-const FROM_BLS = SERIES.filter((s) => s.source === "bls");
+const FROM_FRED = probeOnly ? [] : SERIES.filter((s) => (s.source ?? "fred") === "fred");
+const FROM_BLS = probeOnly ? [] : SERIES.filter((s) => s.source === "bls");
 
 // The last few dozen observations, not the last one: the strip draws each
 // series' recent path, and one run backfills it. Idempotent — the upsert is
@@ -227,8 +232,10 @@ if (FROM_BLS.length > 0) {
 
 // One line to read the run by, in the shape live-verify's roll-up uses.
 console.log(
-  `RATES ROLL-UP: ${wrote.length} of ${SERIES.length} series answered` +
-    (failed.length ? `; failed: ${failed.join(", ")}` : ""),
+  probeOnly
+    ? "RATES ROLL-UP: probe only — the table was not walked (tick dry_run beside a probe to walk it)"
+    : `RATES ROLL-UP: ${wrote.length} of ${SERIES.length} series answered` +
+        (failed.length ? `; failed: ${failed.join(", ")}` : ""),
 );
 
 // PROBE_BLS — candidate BLS ids, fetched from the BLS and printed with the
@@ -324,4 +331,4 @@ if (searches.length > 0) {
   }
 }
 
-process.exit(wrote.length === 0 ? 1 : 0); // partial success is success
+process.exit(wrote.length === 0 && !probeOnly ? 1 : 0); // partial success is success; a probe writes nothing by design
