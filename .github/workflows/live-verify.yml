@@ -958,6 +958,9 @@ jobs:
           # the photographs themselves are proven by the PHOTOGRAPHS lines
           # (a credit renders whether or not its picture resolves).
           mark "#409 the market band paints the caption scrim" grep -q "var(--color-sidebar) 80%, transparent) 120px" p_market.html
+          # #410 — the commercial property price index on the strip (its tile's
+          # label, one text node). Absent until a pull has written its rows.
+          mark "#410 the commercial property price index is on the strip" grep -q "CRE prices y/y" p_tools2.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

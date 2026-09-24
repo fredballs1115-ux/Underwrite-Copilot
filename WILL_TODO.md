@@ -327,7 +327,11 @@ photograph for each of the twenty-six, chosen by eye through the band's
 own crop (five six-market sheets and six one-market runs, every run id
 in `lib/skyline.ts`), and #409: the market band itself shows them — one
 `MarketBand`, taller, under a scrim anchored in pixels to its words
-instead of veiling half the frame. **Open after it**: the twenty-six
+instead of veiling half the frame. Then #410: the Fed's commercial
+property price index (`BOGZ1FL010000386Q`, quarterly, against a year
+ago) on the rates strip and in the market check's national lines for a
+building that trades on its income — the value side the debt market's
+lines left out. **Open after it**: the twenty-six
 overhead frames are now only the fallback, but they are still
 business-district coordinates written from knowledge — look at each once
 on the deployed page if a photograph ever 404s; Salt Lake City's city

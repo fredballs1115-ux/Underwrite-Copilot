@@ -479,12 +479,17 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   else**: the cron script and the module both import it, so the two cannot
   disagree about what a series is, and `readSeriesTable` REFUSES a
   malformed entry rather than skipping it (a skipped entry is a series the
-  cron keeps writing and the page silently stops showing). Fifty-one
+  cron keeps writing and the page silently stops showing). Fifty-three
   series in seven groups: the whole Treasury curve (eleven tenors, the
   breakeven, the real yield), the money market (SOFR, its 30-day average,
   fed funds, prime), credit spreads, mortgage and bank lending (the two
   PMMS surveys, bank CRE loans y/y, delinquency, the three SLOOS
-  standards series), inflation and cost (CPI, core, rent, OER, the five
+  standards series, and — #410 — commercial property prices against a
+  year ago, `BOGZ1FL010000386Q`, the Fed's Financial Accounts, the one
+  free current CRE price figure: the BIS series FRED also carries stopped
+  at 2025 Q2 and the private indexes are licensed; the probe now prints a
+  candidate's notes and a terms line, and caught Case-Shiller's
+  copyright where this series names none), inflation and cost (CPI, core, rent, OER, the five
   lessor rent indexes — #390: the BLS producer price indexes for the
   rents lessors of nonresidential buildings charge, by the building let —
   office, retail, industrial, self-storage operators and the aggregate,
@@ -2314,9 +2319,15 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   said so), CRE delinquency at commercial banks and bank CRE lending
   against a year ago — the capital side beside the income side, since a
   check that reads one without the other reads half the deal. The
-  pipeline reads the six national series bare; the page's
+  pipeline reads the seven national series bare; the page's
   since-this-screen reads them through `liveRates`; the prompt clause
-  names the exit cap and the debt assumptions as what they answer. **A
+  names the exit cap and the debt assumptions as what they answer. After
+  them, for a building that trades on its income (never land), **what
+  the capital buys** (#410, `CRE_PRICE_ID`): national commercial real
+  estate prices against a year ago, a "Capital markets —" line said as
+  the nation's, a trailing year, not this market's and not a cap rate,
+  and the clause sets an exit value that leans on prices rising against
+  it. **A
   commercial deal's rents ride just ahead of them** (#390): the national
   index of rents its kind of lessor charges (`rentIndexFor`,
   `RENT_INDEX_IDS`), one line said as the nation's lessors and never the
