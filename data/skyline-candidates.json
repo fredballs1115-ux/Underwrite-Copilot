@@ -540,7 +540,11 @@
       "city": "Phoenix, Arizona",
       "wikipedia": [
         "Phoenix, Arizona",
-        "Downtown Phoenix"
+        "Downtown Phoenix",
+        "List of tallest buildings in Phoenix",
+        "Chase Tower (Phoenix)",
+        "Piestewa Peak",
+        "South Mountain Park"
       ],
       "categories": [
         "Skylines of Phoenix, Arizona",
@@ -551,7 +555,11 @@
       ],
       "queries": [
         "Phoenix skyline panorama",
-        "Phoenix downtown cityscape"
+        "Phoenix downtown cityscape",
+        "Phoenix skyline South Mountain",
+        "Downtown Phoenix skyline sunset",
+        "Phoenix skyline from Piestewa Peak",
+        "Phoenix Arizona skyline night"
       ],
       "candidates": []
     },
@@ -610,7 +618,10 @@
       "city": "Charlotte, North Carolina",
       "wikipedia": [
         "Charlotte, North Carolina",
-        "Uptown Charlotte"
+        "Uptown Charlotte",
+        "List of tallest buildings in Charlotte",
+        "Bank of America Corporate Center",
+        "Romare Bearden Park"
       ],
       "categories": [
         "Skylines of Charlotte, North Carolina",
@@ -621,7 +632,11 @@
       ],
       "queries": [
         "Charlotte skyline panorama",
-        "Charlotte downtown cityscape"
+        "Charlotte downtown cityscape",
+        "Uptown Charlotte skyline",
+        "Charlotte skyline from Marshall Park",
+        "Charlotte North Carolina skyline night",
+        "Charlotte skyline sunset"
       ],
       "candidates": []
     },
@@ -705,7 +720,11 @@
       "city": "San Diego",
       "wikipedia": [
         "San Diego",
-        "Downtown San Diego"
+        "Downtown San Diego",
+        "List of tallest buildings in San Diego",
+        "San Diego Bay",
+        "Coronado, California",
+        "Harbor Island (San Diego)"
       ],
       "categories": [
         "Skylines of San Diego",
@@ -716,7 +735,11 @@
       ],
       "queries": [
         "San Diego skyline panorama",
-        "San Diego downtown cityscape"
+        "San Diego downtown cityscape",
+        "San Diego skyline from Coronado",
+        "San Diego skyline Harbor Island",
+        "San Diego bay skyline",
+        "San Diego skyline night Coronado"
       ],
       "candidates": []
     },
@@ -775,7 +798,9 @@
       "city": "Orlando, Florida",
       "wikipedia": [
         "Orlando, Florida",
-        "Downtown Orlando"
+        "Downtown Orlando",
+        "List of tallest buildings in Orlando",
+        "Lake Eola Park"
       ],
       "categories": [
         "Skylines of Orlando, Florida",
@@ -786,7 +811,11 @@
       ],
       "queries": [
         "Orlando skyline panorama",
-        "Orlando downtown cityscape"
+        "Orlando downtown cityscape",
+        "Orlando skyline Lake Eola",
+        "Downtown Orlando skyline Lake Eola fountain",
+        "Orlando Florida skyline night",
+        "Orlando downtown skyline"
       ],
       "candidates": []
     },
@@ -820,7 +849,10 @@
       "city": "Salt Lake City",
       "wikipedia": [
         "Salt Lake City",
-        "Downtown Salt Lake City"
+        "Downtown Salt Lake City",
+        "Ensign Peak",
+        "Utah State Capitol",
+        "List of tallest buildings in Salt Lake City"
       ],
       "categories": [
         "Skylines of Salt Lake City",
@@ -831,7 +863,11 @@
       ],
       "queries": [
         "Salt Lake City skyline panorama",
-        "Salt Lake City downtown cityscape"
+        "Salt Lake City downtown cityscape",
+        "Salt Lake City skyline from Ensign Peak",
+        "Salt Lake City skyline Utah State Capitol",
+        "Salt Lake City downtown skyline night",
+        "Salt Lake City skyline Oquirrh"
       ],
       "candidates": [
         {
@@ -920,7 +956,11 @@
       "city": "Indianapolis",
       "wikipedia": [
         "Indianapolis",
-        "Downtown Indianapolis"
+        "Downtown Indianapolis",
+        "List of tallest buildings in Indianapolis",
+        "Salesforce Tower (Indianapolis)",
+        "White River State Park",
+        "Soldiers' and Sailors' Monument (Indianapolis)"
       ],
       "categories": [
         "Skylines of Indianapolis",
@@ -931,7 +971,11 @@
       ],
       "queries": [
         "Indianapolis skyline panorama",
-        "Indianapolis downtown cityscape"
+        "Indianapolis downtown cityscape",
+        "Indianapolis skyline White River",
+        "Downtown Indianapolis skyline night",
+        "Indianapolis skyline sunset",
+        "Indianapolis Indiana skyline"
       ],
       "candidates": []
     },
@@ -953,7 +997,12 @@
         "Kansas City skyline panorama",
         "Kansas City downtown cityscape"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "View from base of the Liberty Memorial.jpg",
+          "note": "Downtown Kansas City over Union Station, from the Liberty Memorial — Brit By Birth, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (contact sheet 10, run 35943694349)."
+        }
+      ]
     },
     {
       "metroId": "st_louis",
@@ -973,7 +1022,12 @@
         "St. Louis skyline panorama",
         "St. Louis downtown cityscape"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Runner Fountain and Old Courthouse and Arch (5618845531).jpg",
+          "note": "The Gateway Arch over the Old Courthouse, St. Louis — Jefferson National Expansion Memorial, NPS from St. Louis, MO, USA, CC BY 2.0. The chosen file, in lib/skyline.ts (contact sheet 10, run 35943694349)."
+        }
+      ]
     },
     {
       "metroId": "cincinnati",
@@ -993,7 +1047,12 @@
         "Cincinnati skyline panorama",
         "Cincinnati downtown cityscape"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Downtown Cincinnati viewed from Devou Park (cropped).jpg",
+          "note": "Downtown Cincinnati across the Ohio River from Devou Park, Kentucky — EEJCC, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (contact sheet 10, run 35943694349)."
+        }
+      ]
     },
     {
       "metroId": "jacksonville",
@@ -1013,7 +1072,12 @@
         "Jacksonville skyline panorama",
         "Jacksonville downtown cityscape"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Jacksonville skyline.jpg",
+          "note": "Downtown Jacksonville's Northbank from the air — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (contact sheet 10, run 35943694349)."
+        }
+      ]
     },
     {
       "metroId": "riverside",
@@ -1021,7 +1085,9 @@
       "wikipedia": [
         "Riverside, California",
         "Downtown Riverside",
-        "San Bernardino, California"
+        "San Bernardino, California",
+        "Mount Rubidoux",
+        "Mission Inn"
       ],
       "categories": [
         "Skylines of Riverside, California",
@@ -1032,7 +1098,10 @@
       ],
       "queries": [
         "Riverside skyline panorama",
-        "Riverside downtown cityscape"
+        "Riverside downtown cityscape",
+        "Riverside California Mount Rubidoux view",
+        "Riverside California downtown",
+        "Inland Empire skyline"
       ],
       "candidates": []
     },
@@ -1054,7 +1123,12 @@
         "Detroit skyline panorama",
         "Detroit downtown cityscape"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Detroit Skyline from Windsor 2025-09-01.jpg",
+          "note": "Downtown Detroit and the Renaissance Center across the river from Windsor — TheWxResearcher, CC0. The chosen file, in lib/skyline.ts (contact sheet 10, run 35943694349)."
+        }
+      ]
     },
     {
       "metroId": "portland",
@@ -1074,7 +1148,12 @@
         "Portland skyline panorama",
         "Portland downtown cityscape"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Portland from Pittock Mansion October 2019 panorama 2.jpg",
+          "note": "Portland and Mount Hood from Pittock Mansion at dusk — King of Hearts, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (contact sheet 11, run 35943831078)."
+        }
+      ]
     },
     {
       "metroId": "cleveland",
@@ -1094,7 +1173,12 @@
         "Cleveland skyline panorama",
         "Cleveland downtown cityscape"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Cleveland skyline from Lakewood Park, January 2026.jpg",
+          "note": "The Cleveland skyline across Lake Erie from Lakewood Park — Erik Drost, CC BY 4.0. The chosen file, in lib/skyline.ts (contact sheet 11, run 35943831078)."
+        }
+      ]
     }
   ]
 }

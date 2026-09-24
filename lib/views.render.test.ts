@@ -3332,6 +3332,16 @@ describe("ReadOnlyMetroView — the market page for a metro read without a brief
     expect(gluedWords(text)).toEqual([]);
   });
 
+  it("opens on a photograph band, not a texture: the taller band under the caption scrim", () => {
+    // The gradient is anchored in px to the words, so the band above them
+    // is the photograph's (app/place-band's CAPTION_SCRIM).
+    expect(html).toContain("min-h-[15rem]");
+    expect(html).toContain("sm:min-h-[21rem]");
+    expect(html).toContain("background-image:linear-gradient(to top, ");
+    expect(html).toContain("color-mix(in srgb, var(--color-sidebar) 80%, transparent) 120px");
+    expect(html).not.toContain("via-sidebar/85 via-55%");
+  });
+
   it("every metro read without a brief has a frame to open on", () => {
     for (const m of READ_ONLY_METROS) {
       const page = render(React.createElement(ReadOnlyMetroView, { metro: m, rates: [], zori: null, realtor: null }));

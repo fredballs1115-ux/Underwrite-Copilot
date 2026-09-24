@@ -361,6 +361,68 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Paul Wasneski",
     license: "Public domain",
     licenseUrl: "",
+  },  // kansas_city: chosen by eye from contact sheet 10 (skyline-sheet run
+  // 35943694349, 2026-09-24), through the market band's own crop — the downtown article's own view, the towers and the Kauffman Center over Union Station's roof, 3264px — over a tight tower crop that loses its tops in the band, and an Army Corps aerial of Kansas City, Kansas.
+  kansas_city: {
+    file: "View from base of the Liberty Memorial.jpg",
+    place: "Downtown Kansas City over Union Station, from the Liberty Memorial",
+    credit: "Brit By Birth",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+  },
+  // st_louis: chosen by eye from contact sheet 10 (skyline-sheet run
+  // 35943694349, 2026-09-24), through the market band's own crop — the article's lead, the Arch framing the courthouse dome, 3133px — over the Arch Overlook frame (a PNG, never served), a 2007 skyline strip too short for the band at 1139px, and a 1908 postcard.
+  st_louis: {
+    file: "Runner Fountain and Old Courthouse and Arch (5618845531).jpg",
+    place: "The Gateway Arch over the Old Courthouse, St. Louis",
+    credit: "Jefferson National Expansion Memorial, NPS from St. Louis, MO, USA",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+  },
+  // cincinnati: chosen by eye from contact sheet 10 (skyline-sheet run
+  // 35943694349, 2026-09-24), through the market band's own crop — the article's lead at 5568px, the towers, the stadium and the river in one frame — over the Roebling Bridge frame (a tower of the bridge and a sky) and the same photographer's view from Mt. Adams.
+  cincinnati: {
+    file: "Downtown Cincinnati viewed from Devou Park (cropped).jpg",
+    place: "Downtown Cincinnati across the Ohio River from Devou Park, Kentucky",
+    credit: "EEJCC",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+  },
+  // jacksonville: chosen by eye from contact sheet 10 (skyline-sheet run
+  // 35943694349, 2026-09-24), through the market band's own crop — the article's lead at 7823px — over the Fuller Warren Bridge panorama, which in the band is an overpass, and a stadium aerial.
+  jacksonville: {
+    file: "Jacksonville skyline.jpg",
+    place: "Downtown Jacksonville's Northbank from the air",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+  },
+  // detroit: chosen by eye from contact sheet 10 (skyline-sheet run
+  // 35943694349, 2026-09-24), through the market band's own crop — the article's lead at 4773px — over a night frame from 2021 whose Renaissance Center falls out of the phone's crop, a Gordie Howe Bridge aerial and a 1929 panorama (a PNG).
+  detroit: {
+    file: "Detroit Skyline from Windsor 2025-09-01.jpg",
+    place: "Downtown Detroit and the Renaissance Center across the river from Windsor",
+    credit: "TheWxResearcher",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  },
+  // portland: chosen by eye from contact sheet 11 (skyline-sheet run
+  // 35943831078, 2026-09-24), through the market band's own crop — the view the city is known by, downtown under Mount Hood at 22500px and 3.75:1, the band's own shape — over the article's lead aerial, whose crop loses the mountain, and a night skyline on the Willamette that could be any river town.
+  portland: {
+    file: "Portland from Pittock Mansion October 2019 panorama 2.jpg",
+    place: "Portland and Mount Hood from Pittock Mansion at dusk",
+    credit: "King of Hearts",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+  },
+  // cleveland: chosen by eye from contact sheet 11 (skyline-sheet run
+  // 35943831078, 2026-09-24), through the market band's own crop — the article's lead at 8199px, the Key Tower and the Terminal Tower tall in frame — over a sunrise panorama whose towers vanish under the words and the same view in June 2024, which loses the Key Tower's top.
+  cleveland: {
+    file: "Cleveland skyline from Lakewood Park, January 2026.jpg",
+    place: "The Cleveland skyline across Lake Erie from Lakewood Park",
+    credit: "Erik Drost",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
   },
 };
 
