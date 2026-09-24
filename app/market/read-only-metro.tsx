@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PlaceBackdrop } from "@/app/place-band";
+import { MarketBand } from "@/app/place-band";
 import type { DataMetro } from "@/lib/market-match";
 import type { LiveRate } from "@/lib/live-rates";
 import type { ZoriRead } from "@/lib/zori";
@@ -38,13 +38,7 @@ export function ReadOnlyMetroView({
 }) {
   return (
     <div className="mt-4 space-y-4" data-qa="read-only-metro">
-      <div className="band-dark relative flex min-h-[13rem] items-end overflow-hidden rounded-2xl text-white sm:min-h-[16rem]">
-        <PlaceBackdrop metro={metro.id} height={480} />
-        <div className="on-photo band-words relative w-full px-5 pb-6 pt-10 sm:px-6 sm:pb-7 sm:pt-12">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-accent">Read without a brief</p>
-          <h3 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">{metro.name}</h3>
-        </div>
-      </div>
+      <MarketBand metro={metro.id} eyebrow="Read without a brief" name={metro.name} />
       {/* One string, so React puts no separators inside a sentence live-verify greps. */}
       <p className="text-sm leading-relaxed text-muted">
         {`A market the site reads but does not brief: the published figures below — the metro area's own, from FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com, pulled on their own cadences — are all it holds for it. No research note, no sector tracker, no fair market rent, no comps pull and no metro rules on file; a deal here is screened on these figures and its state's rules, and every sentence on it says so.`}

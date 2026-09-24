@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { CAPTION_SCRIM } from "@/app/place-band";
 
 /**
  * The scrim over a market photograph, held to the contrast floor.
@@ -234,8 +235,73 @@ describe("the halo under the words", () => {
     // photograph nobody has looked at yet.
     expect(CSS).toMatch(/\.on-photo\s*\{[\s\S]*?text-shadow:/);
     expect(SOURCE).toContain("on-photo");
-    for (const page of ["app/page.tsx", "app/tools/page.tsx", "app/market/page.tsx", "app/login/page.tsx"]) {
+    for (const page of ["app/page.tsx", "app/tools/page.tsx", "app/login/page.tsx"]) {
       expect(readFileSync(join(process.cwd(), page), "utf8"), page).toContain("on-photo");
     }
+    // The market pages draw their band through MarketBand, whose words sit
+    // inside the halo in this file.
+    expect(/export function MarketBand[\s\S]*?on-photo/.test(SOURCE)).toBe(true);
+    for (const page of ["app/market/page.tsx", "app/market/read-only-metro.tsx"]) {
+      expect(readFileSync(join(process.cwd(), page), "utf8"), page).toContain("<MarketBand");
+    }
+  });
+});
+
+describe("the caption scrim, for a market's own band on /market", () => {
+  // The stops are IMPORTED rather than read as text: the gradient the page
+  // paints is built from this one constant (asserted below), so this is
+  // what renders, not a restatement of it.
+  const stops = [...CAPTION_SCRIM].sort((a, b) => a.px - b.px);
+  const alphaAt = (px: number) => rampAt(px, stops.map((s) => [s.px, s.alpha] as [number, number]));
+  const shownAt = (px: number) => {
+    const a = alphaAt(px);
+    return 1 - (a + (1 - a) * veilAlpha());
+  };
+  const ACCENT = (() => {
+    const hex = /--color-accent:\s*#([0-9a-f]{6})/i.exec(CSS)?.[1] ?? "";
+    expect(hex, "--color-accent").not.toBe("");
+    return [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16)) as RGB;
+  })();
+  const band = /export function MarketBand[\s\S]*?^}$/m.exec(SOURCE)?.[0] ?? "";
+
+  // How far up the band its words can reach, in px, worked from the classes
+  // MarketBand sets: on a phone, pb-6 (24px) under a name wrapped to TWO
+  // lines of text-2xl (2 × 32px), mt-1 (4px) and the 11px eyebrow at the
+  // body's 1.5 line height. From sm up the name is one line of text-3xl
+  // under pb-7, which is lower (84.5px), so the phone is the reach.
+  const REACH_PX = 24 + 2 * 32 + 4 + 11 * 1.5;
+
+  it("is the gradient the band paints, and the market band uses it", () => {
+    expect(SOURCE).toMatch(/CAPTION_SCRIM\.map\(/);
+    expect(band, "MarketBand").not.toBe("");
+    expect(band).toContain('scrim="caption"');
+    for (const cls of ["pb-6", "text-2xl", "mt-1", "text-[11px]", "sm:pb-7", "sm:text-3xl"]) {
+      expect(band, cls).toContain(cls);
+    }
+    expect(REACH_PX).toBeLessThanOrEqual(110);
+  });
+
+  it("holds white to AAA and the accent eyebrow to AA everywhere the words reach", () => {
+    for (let px = 0; px <= Math.ceil(REACH_PX); px += 5) {
+      const bg = scrimOverWhite(alphaAt(px));
+      expect(contrast(WHITE, bg), `white ${px}px up`).toBeGreaterThanOrEqual(7);
+      expect(contrast(ACCENT, bg), `accent ${px}px up`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("leaves the band above the words to the photograph", () => {
+    // The whole point of anchoring in px: the band's height goes to the
+    // picture, not to a proportional veil.
+    const phone = Number(/min-h-\[(\d+)rem\]/.exec(band)?.[1]) * 16;
+    const desk = Number(/sm:min-h-\[(\d+)rem\]/.exec(band)?.[1]) * 16;
+    const clear = stops[stops.length - 1].px;
+    expect(stops[stops.length - 1].alpha).toBe(0);
+    expect(phone, "the phone band clears the scrim with room to spare").toBeGreaterThanOrEqual(clear + 32);
+    expect(desk).toBeGreaterThanOrEqual(300); // a photograph, not a texture
+    expect(shownAt(phone)).toBeGreaterThan(0.7);
+    // From the middle of the desktop band up, at least half the picture.
+    expect(shownAt(desk / 2)).toBeGreaterThanOrEqual(0.5);
+    // …and the words' own zone is still mostly scrim.
+    expect(shownAt(0)).toBeLessThan(0.05);
   });
 });

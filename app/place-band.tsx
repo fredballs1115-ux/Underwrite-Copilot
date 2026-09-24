@@ -30,6 +30,19 @@ import { hasSkyline } from "@/lib/skyline";
 //              `lg` up the scrim is a plateau down the middle with both
 //              margins clear, so the city shows on either side of the card.
 //              Below that the column is the whole width, so an even veil.
+//   "caption" — a market's own band on /market (`MarketBand`), whose words
+//              are an eyebrow and a name and nothing else. The "band" shape
+//              is proportional (85% opaque at 55% of the height) because a
+//              page's opening words can reach 60% up a tall band; stretched
+//              over a short card band it veiled the whole lower half of every
+//              photograph, and at the card's old 256px a skyline was a
+//              texture (see `PlaceBand` on why ~300px is a photograph). So
+//              this one is anchored in PIXELS to the tallest words it holds
+//              — an eyebrow over a name wrapped to two lines on a phone,
+//              110px — and everything above `CAPTION_SCRIM`'s last stop is
+//              photograph under the veil alone. Simulated through the real
+//              crop at 1064×336 and 302×240 before it shipped: the same
+//              Cleveland frame went from a veiled strip to the towers.
 //
 // WHY BOTTOM-TO-TOP AND NOT LEFT-TO-RIGHT, which is the more obvious shape
 // for a headline: every file in lib/skyline is a PANORAMA — 8443×3361 for
@@ -56,7 +69,24 @@ import { hasSkyline } from "@/lib/skyline";
 // failure this whole treatment exists to avoid.
 
 /** How the scrim is shaped, which depends on where the band's words sit. */
-export type Scrim = "band" | "center";
+export type Scrim = "band" | "center" | "caption";
+
+/**
+ * The caption scrim's stops, in px up from the bottom, with the scrim's
+ * alpha at each: opaque under the words, 80% at the top of the tallest
+ * caption, clear by 208px. lib/place-band.contrast.test.ts holds white and
+ * the accent eyebrow to the floor at the words' reach against a pure white
+ * frame, and holds the photograph to showing above it.
+ */
+export const CAPTION_SCRIM: ReadonlyArray<{ px: number; alpha: number }> = [
+  { px: 0, alpha: 1 },
+  { px: 120, alpha: 0.8 },
+  { px: 208, alpha: 0 },
+];
+
+const captionGradient = `linear-gradient(to top, ${CAPTION_SCRIM.map(
+  (s) => `color-mix(in srgb, var(--color-sidebar) ${Math.round(s.alpha * 100)}%, transparent) ${s.px}px`,
+).join(", ")})`;
 
 /**
  * The scrim on its own, for a band drawing its own picture (the hero, when
@@ -69,6 +99,8 @@ export function PhotoScrim({ scrim = "band" }: { scrim?: Scrim }) {
       <div className="absolute inset-0 bg-sidebar/20" />
       {scrim === "band" ? (
         <div className="absolute inset-0 bg-gradient-to-t from-sidebar from-0% via-sidebar/85 via-55% to-sidebar/0 to-100%" />
+      ) : scrim === "caption" ? (
+        <div className="absolute inset-0" style={{ backgroundImage: captionGradient }} />
       ) : (
         <>
           <div className="absolute inset-0 bg-sidebar/85 lg:hidden" />
@@ -150,5 +182,34 @@ export function PlaceBand({
         <div className="on-photo band-words">{children}</div>
       </div>
     </section>
+  );
+}
+
+/**
+ * A market's own band on /market: its photograph, an eyebrow and its name.
+ *
+ * One component for the briefed markets and the ones read without a brief,
+ * so the two cannot drift. 15rem on a phone and 21rem from `sm` — the card
+ * band was 13rem / 16rem, which `PlaceBand`'s own measure calls a texture —
+ * under the "caption" scrim, which is anchored to these words in pixels and
+ * leaves the rest of the band to the photograph.
+ */
+export function MarketBand({
+  metro,
+  eyebrow,
+  name,
+}: {
+  metro: string;
+  eyebrow: string;
+  name: string;
+}) {
+  return (
+    <div className="band-dark relative flex min-h-[15rem] items-end overflow-hidden rounded-2xl text-white sm:min-h-[21rem]">
+      <PlaceBackdrop metro={metro} height={480} scrim="caption" />
+      <div className="on-photo band-words relative w-full px-5 pb-6 pt-10 sm:px-6 sm:pb-7 sm:pt-12">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-accent">{eyebrow}</p>
+        <h3 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">{name}</h3>
+      </div>
+    </div>
   );
 }
