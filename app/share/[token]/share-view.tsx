@@ -203,6 +203,17 @@ function FlipDots({ scenarios }: { scenarios: VerdictScenario[] }) {
   );
 }
 
+/** "14 published figures", "1 published figure". */
+const figureCount = (n: number): string => `${n} published ${n === 1 ? "figure" : "figures"}`;
+
+/** Whose the figures are: the last `national` of them are the nation's
+ *  (the debt market, lessor rents, the insurance index, CRE prices), so a
+ *  block ending in the 10-year is never called "each the metro's". */
+function splitOf(b: { lines: string[]; national?: number }, local: string, each: string, none: string): string {
+  const nat = Math.min(Math.max(b.national ?? 0, 0), b.lines.length);
+  return nat > 0 ? `${b.lines.length - nat} ${local} and ${nat} the nation's, ${none}` : each;
+}
+
 export function ShareView({
   dealName,
   assetClass,
@@ -459,10 +470,27 @@ export function ShareView({
               {market.liveBrief && market.liveBrief.lines.length > 0 && (
                 <p className="mt-2 text-xs text-muted">
                   {market.liveBrief.grain === "state"
-                    ? `Checked beside ${market.liveBrief.lines.length} published figures for the state of ${market.liveBrief.metro}, read on ${market.liveBrief.readOn} — each the state's, not any metro's and not the building's.`
-                    : `Checked beside ${market.liveBrief.lines.length} published figures for the ${market.liveBrief.metro} market, read on ${market.liveBrief.readOn} — each the metro's, not the building's.`}
+                    ? `Checked beside ${figureCount(market.liveBrief.lines.length)} for the state of ${market.liveBrief.metro}, read on ${market.liveBrief.readOn} — ${splitOf(market.liveBrief, "the state's", "each the state's, not any metro's and not the building's", "none any metro's or the building's")}.`
+                    : `Checked beside ${figureCount(market.liveBrief.lines.length)} for the ${market.liveBrief.metro} market, read on ${market.liveBrief.readOn} — ${splitOf(market.liveBrief, "the metro's", "each the metro's, not the building's", "none the building's")}.`}
                 </p>
               )}
+              {/* A portfolio across markets (#413): each other market's own
+                  figures, with how many of the properties sit there. */}
+              {(market.otherBriefs ?? [])
+                .filter((b) => b.lines.length > 0)
+                .map((b, i) => {
+                  const lead = i === 0 && !(market.liveBrief && market.liveBrief.lines.length > 0) ? "Checked beside" : "And beside";
+                  const where = b.portfolio
+                    ? `, where ${b.portfolio.here} of the ${b.portfolio.of} properties ${b.portfolio.here === 1 ? "sits" : "sit"}`
+                    : "";
+                  return (
+                    <p key={b.metro} className="mt-1 text-xs text-muted">
+                      {b.grain === "state"
+                        ? `${lead} ${b.lines.length} for the state of ${b.metro}${where}, read on ${b.readOn} — the state's, never the portfolio's.`
+                        : `${lead} ${b.lines.length} for the ${b.metro} market${where}, read on ${b.readOn} — the metro's, never the portfolio's.`}
+                    </p>
+                  );
+                })}
             </div>
           )}
         </section>

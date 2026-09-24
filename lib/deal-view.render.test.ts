@@ -123,6 +123,66 @@ describe("DealView — the sample deal renders every section without a runtime e
     });
   }
 
+  it("a portfolio across markets folds each market's figures under its own line, saying how many of the properties sit there (#413)", () => {
+    const p = sampleProps("analyses", "market");
+    const props: Props = {
+      ...p,
+      results: {
+        ...p.results,
+        market: {
+          ...p.results.market!,
+          liveBrief: {
+            metro: "Pittsburgh PA",
+            grain: "metro",
+            readOn: "2026-09-23",
+            lines: ["Unemployment 4.1% (Jul 2026, Pittsburgh MSA; FRED), -0.2 pt on the month before"],
+            portfolio: { here: 2, of: 5 },
+          },
+          otherBriefs: [
+            { metro: "Cleveland OH", grain: "metro", readOn: "2026-09-23", lines: ["Unemployment 4.4% (Jul 2026, Cleveland MSA; FRED)"], portfolio: { here: 2, of: 5 } },
+            { metro: "Ohio", grain: "state", readOn: "2026-09-23", lines: ["Unemployment 4.9% (Aug 2026, Ohio; FRED)"], portfolio: { here: 1, of: 5 } },
+          ],
+        },
+      },
+    };
+    const html = render(props);
+    expect(a11yIssues(html)).toEqual([]);
+    const text = textOf(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toMatch(/rules of thumb, read beside each market's published figures/);
+    expect(text).toMatch(/Read beside the Pittsburgh PA market’s own figures — where 2 of the 5 properties sit\s+— 1 published figure as of Sep 23, 2026, each dated, each the metro’s rather than the submarket’s, and never the portfolio’s/);
+    expect(text).toMatch(/Read beside the Cleveland OH market’s own figures — where 2 of the 5 properties sit/);
+    expect(text).toMatch(/Read beside the state of Ohio’s own figures — where 1 of the 5 properties sits\s+— 1 published figure as of Sep 23, 2026, each dated, each the state’s rather than any metro’s, and never the portfolio’s/);
+    expect(text).toMatch(/Unemployment 4\.4% \(Jul 2026, Cleveland MSA; FRED\)/);
+    expect(html.match(/<details/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+  });
+
+  it("counts the nation's figures apart from the metro's — a block ending in the 10-year is never 'each the metro's'", () => {
+    const p = sampleProps("analyses", "market");
+    const props: Props = {
+      ...p,
+      results: {
+        ...p.results,
+        market: {
+          ...p.results.market!,
+          liveBrief: {
+            metro: "Philadelphia, PA",
+            readOn: "2026-09-23",
+            lines: [
+              "Unemployment 4.1% (Jul 2026, Philadelphia MSA; FRED), +0.1 pt on the month before",
+              "Asking rent, all home types: $1,890/mo, +2.4% from a year ago (Aug 2026; Zillow Research — listings, before concessions)",
+              "Debt market — 10-year Treasury 4.94% (Sep 17, 2026; FRED), -3 bps on the day before",
+            ],
+            national: 1,
+          },
+        },
+      },
+    };
+    const text = textOf(render(props));
+    expect(text).toMatch(/3 published figures as of Sep 23, 2026, each dated: 2 the metro’s rather than the submarket’s and 1 the nation’s\./);
+    expect(text).not.toMatch(/each the metro’s rather than the submarket’s/);
+  });
+
   it("a market check that read the metro's published figures folds them open under the summary", () => {
     const p = sampleProps("analyses", "market");
     const withBrief: Props = {

@@ -210,6 +210,12 @@ export interface MarketResult {
    *  so the page can say what the check read, and absent (or null) on a
    *  deal outside the covered markets or a check run before this existed. */
   liveBrief?: LiveBriefRecord | null;
+  /** A portfolio across markets (#413): each OTHER market's own published
+   *  figures the check was handed, most properties first — one record a
+   *  market, each saying how many of the portfolio's properties sit there.
+   *  The national figures ride in `liveBrief` alone. Absent on a single
+   *  property, a portfolio in one market, or a check run before this. */
+  otherBriefs?: LiveBriefRecord[] | null;
 }
 
 export interface LiveBriefRecord {
@@ -224,6 +230,13 @@ export interface LiveBriefRecord {
    *  later screen can say what moved since; absent on a record written
    *  before they were stored */
   figures?: LiveBriefFigure[];
+  /** a portfolio across markets: how many of its properties sit in THIS
+   *  market (`here`) of how many in all (`of`) — absent otherwise */
+  portfolio?: { here: number; of: number } | null;
+  /** how many of `lines` — the last ones — are the nation's figures (the
+   *  debt market, lessor rents, the insurance index, CRE prices), so no
+   *  surface calls them the metro's; absent on a record written before */
+  national?: number;
 }
 
 export interface LiveBriefFigure {

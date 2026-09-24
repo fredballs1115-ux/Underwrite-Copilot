@@ -966,6 +966,10 @@ jobs:
           # is proven by its changelog card (the title, one text node) on the
           # prerendered /whats-new, which exists only since the change.
           mark "#412 the portfolio travels with the documents" grep -q "The portfolio in the report, the shared screen and the model" p_whats-new.html
+          # #413 — each of a portfolio's markets read on its own: signed-in
+          # surfaces again, so its changelog card (no apostrophe in the phrase
+          # — React serves one as &#x27;).
+          mark "#413 a portfolio's markets are each read on their own" grep -q "markets, each read on its own" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

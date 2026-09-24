@@ -342,8 +342,15 @@ card a property. Then #412: the report gives a portfolio its own page
 workbook carries a Portfolio tab whose shares and allocation caps are
 live formulas — fill the blank the memorandum left and the share
 appears; a property's page is cited only inside the memorandum's page
-count. The market check still reads one market's figures (the address
-on file) and says so. **Open after it**: the twenty-six
+count. Then #413: the market check reads each of a portfolio's markets
+(the address's and up to three more, most properties first, the rest
+counted as not read), one block a market saying how many of the
+properties sit there, the national lines in the first block alone,
+stored as `otherBriefs` and printed under their own headings on the deal
+page, the verdict's brief, the report and the shared screen — and the
+skyline probe reports a Commons rate limit as BUSY rather than DEAD.
+**Open after it**: since-this-screen still compares the address's
+market alone (a portfolio's other markets have no "what moved" yet); the twenty-six
 overhead frames are now only the fallback, but they are still
 business-district coordinates written from knowledge — look at each once
 on the deployed page if a photograph ever 404s; Salt Lake City's city

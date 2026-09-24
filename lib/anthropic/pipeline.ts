@@ -32,7 +32,7 @@ import {
   plausibilityNote,
 } from "@/lib/deal-strategy";
 import { dealContextFor } from "@/lib/deal-context";
-import { portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
+import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { marketForAddress } from "@/lib/market-match";
 import { SERIES, metroSeriesFor, readMetroRates, readRates } from "@/lib/live-rates";
@@ -152,12 +152,27 @@ async function dealContextFromDb(
  * the covered markets, or when nothing fresh could be read: the check then
  * reasons from typical ranges alone, as it always did, and says so. A read
  * that fails is a check without figures, never a failed screen.
+ *
+ * A portfolio across markets (#413) reads each OTHER market's own figures
+ * too (lib/portfolio's `otherPortfolioMarkets`: most properties first, at
+ * most `MAX_OTHER_MARKETS`), one block a market whose header names how
+ * many of the properties sit there — never the portfolio's figure, never
+ * those properties' own. The national lines ride in the first block alone:
+ * the address's market where it has one, else the first of the others.
  */
+interface LiveMarketRead {
+  /** the market the deal's address sits in — what the page's since-this-
+   *  screen reads against — or null where it names none or read nothing */
+  primary: LiveMarketBrief | null;
+  /** a portfolio's other markets, in the order read */
+  others: LiveMarketBrief[];
+}
+
 async function liveMarketFromDb(
   admin: ReturnType<typeof createSupabaseAdminClient>,
   dealId: string,
   now: Date = new Date(),
-): Promise<LiveMarketBrief | null> {
+): Promise<LiveMarketRead> {
   try {
     const { data } = await admin
       .from("deals")
@@ -177,34 +192,61 @@ async function liveMarketFromDb(
     // A covered metro's figures where the address sits in one; the state's
     // own otherwise (lib/market-match's stateForAddress — the same series
     // table, filed under `state:PA`), said as the state's. A deal with no
-    // readable state reads nothing, as before.
+    // readable state reads nothing of its own, as before.
     const metro = marketForAddress(address ?? {});
-    if (!metro) return null;
     // The debt-market lines read the class the deck turned out to be, and
     // whether the deal is a plan, so the lending-standards series is the
     // one a bank reports for this kind of loan.
     const ex = (data?.extraction as ExtractionResult | null) ?? null;
     const assetClass = ex?.assetClass || (data?.asset_class as string | null) || null;
     const plan = isPlanDeal(inferStrategy(ex).kind);
-    const [rateRows, bench, nationalRows] = await Promise.all([
-      fetchSeriesRows(admin, metroSeriesFor(metro.id).series),
-      fetchBenchRows(admin, metro.name, [...ZILLOW_METRICS, ...REALTOR_METRICS]),
-      fetchSeriesRows(admin, SERIES.filter((s) => BRIEF_NATIONAL_IDS.includes(s.id))),
-    ]);
-    return liveMarketBrief({
-      metro,
-      rates: readMetroRates(metro.id, rateRows, now),
-      zori: zoriFor(bench, metro.name),
-      realtor: realtorFor(bench, metro.name),
-      now,
-      national: readRates(nationalRows, now),
-      assetClass,
-      portfolio: portfolioFor(ex, metro.id),
-      plan,
-    });
+    const others = otherPortfolioMarkets(ex, metro?.id ?? null);
+    if (!metro && !others) return { primary: null, others: [] };
+    const nationalRows = await fetchSeriesRows(admin, SERIES.filter((s) => BRIEF_NATIONAL_IDS.includes(s.id)));
+    const national = readRates(nationalRows, now);
+    const readMarket = async (
+      market: { id: string; name: string },
+      withNational: boolean,
+      portfolio: Parameters<typeof liveMarketBrief>[0]["portfolio"],
+    ): Promise<LiveMarketBrief | null> => {
+      const [rateRows, bench] = await Promise.all([
+        fetchSeriesRows(admin, metroSeriesFor(market.id).series),
+        fetchBenchRows(admin, market.name, [...ZILLOW_METRICS, ...REALTOR_METRICS]),
+      ]);
+      return liveMarketBrief({
+        metro: market,
+        rates: readMetroRates(market.id, rateRows, now),
+        zori: zoriFor(bench, market.name),
+        realtor: realtorFor(bench, market.name),
+        now,
+        national: withNational ? national : undefined,
+        assetClass,
+        portfolio,
+        plan,
+      });
+    };
+    const whole = portfolioFor(ex, metro?.id ?? "");
+    // The other markets are read FIRST, so the address's header names only
+    // the blocks that actually follow: a market with nothing fresh is
+    // counted with the ones past the cap, never promised.
+    const read: LiveMarketBrief[] = [];
+    for (const m of others?.read ?? []) {
+      if (!whole) break;
+      // One market at a time: each is a round of one-query-a-series reads,
+      // and a portfolio's blocks are a handful at most. The national lines
+      // ride in the address's block; with no address market they ride in
+      // the first other block that reads anything.
+      const b = await readMarket({ id: m.id, name: m.name }, !metro && read.length === 0, { ...whole, here: m.properties, role: "other" });
+      if (b) read.push(b);
+    }
+    const unread = (others?.read.length ?? 0) - read.length + (others?.notRead ?? 0);
+    const primary = metro
+      ? await readMarket(metro, true, whole ? { ...whole, othersRead: read.map((b) => b.metro), notRead: unread } : null)
+      : null;
+    return { primary, others: read };
   } catch (err) {
     console.warn(`[pipeline] live market figures unavailable for deal ${dealId}:`, err instanceof Error ? err.message : err);
-    return null;
+    return { primary: null, others: [] };
   }
 }
 
@@ -731,13 +773,24 @@ async function runAnalysisSteps(
     // page can say what the check read.
     if (!completed.has("market")) {
       await patchJob(dealId, { status: "running", step: "market", progress: 70 });
-      const brief = await liveMarketFromDb(admin, dealId);
-      const checked = await checkMarket(om(), assetClass, dealContext, brief?.text ?? null);
+      const { primary, others } = await liveMarketFromDb(admin, dealId);
+      // One block a market, the address's first: a portfolio's other
+      // markets follow in blocks of their own (#413).
+      const handed = [primary, ...others].filter((b): b is LiveMarketBrief => !!b).map((b) => b.text);
+      const checked = await checkMarket(om(), assetClass, dealContext, handed.length > 0 ? handed.join("\n\n") : null);
+      const record = (b: LiveMarketBrief) => ({
+        metro: b.metro,
+        grain: b.grain,
+        readOn: b.readOn,
+        lines: b.lines,
+        figures: b.figures,
+        ...(b.national > 0 ? { national: b.national } : {}),
+        ...(b.portfolio ? { portfolio: b.portfolio } : {}),
+      });
       const market: MarketResult = {
         ...checked,
-        liveBrief: brief
-          ? { metro: brief.metro, grain: brief.grain, readOn: brief.readOn, lines: brief.lines, figures: brief.figures }
-          : null,
+        liveBrief: primary ? record(primary) : null,
+        ...(others.length > 0 ? { otherBriefs: others.map(record) } : {}),
       };
       await admin
         .from("deals")

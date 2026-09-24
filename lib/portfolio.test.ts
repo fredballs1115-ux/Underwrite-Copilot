@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { ExtractionResult, PortfolioProperty } from "@/lib/anthropic/types";
 import {
+  MAX_OTHER_MARKETS,
   marketsPhrase,
+  otherPortfolioMarkets,
   placeOf,
   portfolioContextLine,
   portfolioFacts,
@@ -241,5 +243,37 @@ describe("the sentences every surface prints — the card, the report and the sh
     expect(portfolioMoney(102_000_000)).toBe("$102M");
     expect(portfolioMoney(218_750)).toBe("$219k");
     expect(portfolioMoney(950)).toBe("$950");
+  });
+});
+
+describe("otherPortfolioMarkets — the markets the check reads beyond the address's (#413)", () => {
+  it("lists the others, most properties first, and none for a portfolio in one market", () => {
+    expect(otherPortfolioMarkets(ex(FIVE), "pittsburgh")).toEqual({
+      read: [
+        { id: "cleveland", name: "Cleveland OH", properties: 2 },
+        { id: "state:OH", name: "Ohio", properties: 1 },
+      ],
+      notRead: 0,
+    });
+    // The address sits in none of the portfolio's markets: all of them.
+    expect(otherPortfolioMarkets(ex(FIVE), "dc")?.read.map((m) => m.id)).toEqual(["pittsburgh", "cleveland", "state:OH"]);
+    expect(otherPortfolioMarkets(ex(FIVE), null)?.read).toHaveLength(3);
+    expect(otherPortfolioMarkets(ex(FIVE.slice(0, 2)), "pittsburgh")).toBeNull();
+    expect(otherPortfolioMarkets(ex([]), "pittsburgh")).toBeNull();
+  });
+
+  it("stops at the cap and counts the markets past it", () => {
+    expect(MAX_OTHER_MARKETS).toBe(3);
+    const spread = [
+      prop({ name: "A", address: "1 Main St, Pittsburgh, PA 15222", count: "10" }),
+      prop({ name: "B", address: "1 Main St, Cleveland, OH 44113", count: "10" }),
+      prop({ name: "C", address: "1 Main St, Phoenix, AZ 85004", count: "10" }),
+      prop({ name: "D", address: "1 Main St, Denver, CO 80202", count: "10" }),
+      prop({ name: "E", address: "1 Main St, Boise, ID 83702", count: "10" }),
+    ];
+    const o = otherPortfolioMarkets(ex(spread), "pittsburgh")!;
+    expect(o.read.map((m) => m.id)).toEqual(["cleveland", "phoenix", "denver"]);
+    expect(o.notRead).toBe(1);
+    expect(otherPortfolioMarkets(ex(spread), "pittsburgh", 1)!.notRead).toBe(3);
   });
 });
