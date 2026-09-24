@@ -3460,7 +3460,7 @@ describe("RentBoard — where apartment asking rents are moving, every metro are
 });
 
 // ── A portfolio OM's properties on the deal page (#411) ────────────────────
-import { PortfolioCard } from "@/app/(app)/deals/[id]/portfolio-card";
+import { PortfolioCard } from "@/app/portfolio-card";
 import { readPortfolio } from "@/lib/portfolio";
 
 describe("PortfolioCard — a portfolio OM's properties, one row each", () => {
@@ -3476,6 +3476,7 @@ describe("PortfolioCard — a portfolio OM's properties, one row each", () => {
       prop("Marion Gardens", "400 Barks Rd, Marion, OH 43302", "60", "$310,000", "82%", "$4,000,000", "p. 30"),
     ],
     metrics: [{ label: "Asking price", value: "$75,000,000", flagged: false, page: "p. 3" }],
+    totalPages: 28,
   };
 
   it("draws each property's share of the units and of the NOI, links the markets the site reads, and says what does not add up", () => {
@@ -3495,8 +3496,48 @@ describe("PortfolioCard — a portfolio OM's properties, one row each", () => {
     // Ohio City Commons carries 54% of the stated NOI.
     expect(text).toContain("Ohio City Commons carries 54% of the stated NOI");
     expect(text).toContain("210 units · 94% occupied · NOI $2.1M · allocated $38.0M ($181k per unit), a 5.4% cap on the allocation");
+    // A page prints only where it falls inside the memorandum: p. 30 is past
+    // its 28 pages, so Marion Gardens cites none (lib/facts' absolute rule).
+    expect(text).toContain("p. 14");
+    expect(text).toContain("p. 22");
+    expect(text).not.toContain("p. 30");
     expect(a11yIssues(html), "portfolio card").toEqual([]);
     expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("is the shared screen's too: a partner opening the link sees the same card under the key terms", () => {
+    const verdict: VerdictResult = {
+      verdict: "caution",
+      reason: "The allocation does not add up to the ask.",
+      topRisks: [],
+      nextSteps: [],
+      screen: { ranges: [], dealKillers: [], sensitivity: [] },
+    };
+    const share = (ex: typeof extraction) =>
+      renderToStaticMarkup(
+        React.createElement(ShareView, {
+          dealName: ex.dealName,
+          assetClass: "multifamily",
+          expiresAt: "2026-10-05T12:00:00Z",
+          verdictStale: false,
+          aerial: null,
+          extraction: ex as unknown as ExtractionResult,
+          comps: null,
+          market: null,
+          verdict,
+        }),
+      );
+    const html = share(extraction);
+    dumpView("share-portfolio", html);
+    const text = visibleText(html);
+    expect(text).toContain("The portfolio — 3 properties");
+    expect(html.match(/data-bar="portfolio"/g)).toHaveLength(3);
+    expect(text).toContain("The allocated prices sum to $70.0M against the $75.0M ask (-6.7%) — the memorandum does not add up.");
+    expect(html).toContain('href="/market?metro=pittsburgh"');
+    expect(a11yIssues(html), "share-portfolio").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+    // A single property has no portfolio block.
+    expect(visibleText(share({ ...extraction, properties: [extraction.properties[0]] }))).not.toContain("The portfolio");
   });
 
   it("draws no income bar from a partial set, and nothing at all for a single property", () => {

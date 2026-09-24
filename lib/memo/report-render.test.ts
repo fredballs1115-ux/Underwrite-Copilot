@@ -205,6 +205,78 @@ describe("ReportDocument (full report)", () => {
     expect(pdfFillCountOf(buf) - pdfFillCountOf(flat)).toBe(drawnGaps * 3);
   }, 120000);
 
+  it("gives a portfolio memorandum a page of its own: each property, its bars and what the memorandum states", async () => {
+    const prop = (name: string, address: string, count: string, noi: string, occupancy: string, allocatedPrice: string, page: string) => ({
+      name, address, count, area: "", noi, occupancy, yearBuilt: "", allocatedPrice, page,
+    });
+    const properties = [
+      prop("Liberty Lofts", "1200 Liberty Ave, Pittsburgh, PA 15222", "128", "$1,420,000", "95%", "$28,000,000", "p. 14"),
+      prop("Ohio City Commons", "1850 W 25th St, Cleveland, OH 44113", "210", "$2,050,000", "94%", "$38,000,000", "p. 22"),
+      prop("Marion Gardens", "400 Barks Rd, Marion, OH 43302", "60", "$310,000", "82%", "$4,000,000", "p. 30"),
+    ];
+    const extraction: ExtractionResult = {
+      dealName: "Rust Belt Residential Portfolio",
+      assetClass: "multifamily",
+      market: "Pittsburgh, PA",
+      address: "1200 Liberty Ave, Pittsburgh, PA 15222",
+      metrics: [
+        { label: "Asking price", value: "$75,000,000", flagged: false, page: "p. 3" },
+        { label: "Units", value: "398", flagged: false, page: "p. 3" },
+        { label: "Net operating income", value: "$3,780,000", flagged: false, page: "p. 9" },
+      ],
+      properties,
+      totalPages: 28,
+    };
+    const dealOf = (ex: ExtractionResult) =>
+      ({
+        name: ex.dealName,
+        asset_class: "multifamily",
+        extraction: ex,
+        challenges: null,
+        comps: null,
+        market: null,
+        reconciliation: null,
+        verdict: SAMPLE_DEAL.verdict,
+        prior_screen: null,
+      }) as unknown as DealRow;
+    const render = (ex: ExtractionResult) =>
+      renderToBuffer(
+        React.createElement(ReportDocument, {
+          input: buildReportData(dealOf(ex), "September 24, 2026", []),
+        }) as unknown as Parameters<typeof renderToBuffer>[0],
+      );
+    const pagesOf = (buf: Buffer) => (buf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length;
+
+    const buf = await render(extraction);
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("The portfolio");
+    expect(text).toContain("3 properties · 3 markets");
+    expect(text).toContain("Pittsburgh PA · 1");
+    expect(text).toContain("Ohio · 1");
+    expect(text).toContain("Ohio City Commons carries 54% of the stated NOI — the portfolio's income rides on one property.");
+    expect(text).toContain("The allocated prices sum to $70.0M against the $75.0M ask (-6.7%) — the memorandum does not add up.");
+    expect(text).toContain("Marion Gardens");
+    expect(text).toContain("Marion, OH");
+    expect(text).toContain("60 units · 82% occupied · NOI $310k · allocated $4.0M ($67k per unit), a 7.8% cap on the allocation");
+    // A page prints only inside the memorandum's 28: Marion Gardens' p. 30
+    // is past it, so it cites none.
+    expect(text).toContain("p. 22");
+    expect(text).not.toContain("p. 30");
+
+    // One page more than the same deal offering one property.
+    const single = await render({ ...extraction, properties: [properties[0]] });
+    expect(await pdfTextOf(single)).not.toContain("The portfolio");
+    expect(pagesOf(buf)).toBe(pagesOf(single) + 1);
+
+    // The bars: a track and its fill for the share of the units, and again
+    // for the share of the NOI — four fills a property — so the same page
+    // with one property's count missing (no share of anything can be drawn)
+    // draws twelve fewer shapes.
+    const unbarred = await render({ ...extraction, properties: properties.map((x, i) => (i === 2 ? { ...x, count: "" } : x)) });
+    expect(pdfFillCountOf(buf) - pdfFillCountOf(unbarred)).toBe(properties.length * 4);
+    expect((await pdfTextOf(unbarred)).replace(/\s+/g, " ")).toContain("No bars: the properties do not all state a count, nor all an area");
+  }, 60000);
+
   it("reads the OM's figure onto its typical range", () => {
     // The sample's three checks: at the low end, past the high end, inside.
     expect(rangeRead("5.25%", "5.25–5.75%")).toBe(0);

@@ -12,6 +12,7 @@ import type { StructuredAddress } from "@/lib/address";
 import { marketForAddress } from "@/lib/market-match";
 import { todayReads } from "@/lib/model-vs-market-read";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
+import { readPortfolio } from "@/lib/portfolio";
 
 export const runtime = "nodejs";
 
@@ -131,7 +132,9 @@ export async function GET(
     } catch (err) {
       console.warn(`workbook market read failed for ${id}:`, err instanceof Error ? err.message : err);
     }
-    const buffer = await buildUnderwriteWorkbook(model, branding, marketRead);
+    // A portfolio memorandum's properties (#411), the same reader as the
+    // deal page's card and the report's portfolio page.
+    const buffer = await buildUnderwriteWorkbook(model, branding, marketRead, readPortfolio(extraction));
     const safe =
       (deal.name || "deal").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() ||
       "deal";

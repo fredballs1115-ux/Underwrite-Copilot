@@ -5,7 +5,7 @@ import { SectorFieldsForm } from "./sector-fields-form";
 import type { SectorFieldValues } from "@/lib/sector-fields";
 import { PublicCompsPanel } from "./public-comps-panel";
 import { PropertyVisual } from "./property-visual";
-import { PortfolioCard } from "./portfolio-card";
+import { PortfolioCard } from "@/app/portfolio-card";
 import { readPortfolio } from "@/lib/portfolio";
 import { PICTURE_CREDIT, ensureDealPicture } from "@/lib/deal-picture";
 import { assetClassLabel } from "@/lib/asset-class";

@@ -65,14 +65,31 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   two-letter state counts only in capitals, so "Oak Ct" is not
   Connecticut), and the allocation's total against the ask — the
   allocation is the seller's split, so a per-property cap on it is "a cap
-  on the allocation". Four readers: the deal context gets a
-  `portfolioContextLine` (whatever the strategy), the challenger's notes
-  get `portfolioNote` (the facts, then five PORTFOLIO TRAPS by name), the
-  market check's header says whose figures they are when the properties
-  span markets (`portfolioFor`), and the deal page draws
-  `PortfolioCard` under the property visual (a bar a property for its
-  share, a second for its NOI share, the markets as chips linking to their
-  market pages, the facts that do not add up).
+  on the allocation". A property's page is kept only where it parses AND
+  falls inside `totalPages` (lib/facts' absolute rule — the first cut
+  printed the model's page raw, one more way to invent a citation). The
+  readers: the deal context gets a `portfolioContextLine` (whatever the
+  strategy), the challenger's notes get `portfolioNote` (the facts, then
+  five PORTFOLIO TRAPS by name), the market check's header says whose
+  figures they are when the properties span markets (`portfolioFor`), and
+  what a person reads draws ONE set of sentences — `portfolioFacts` (the
+  income carried by one property, a partial income set, the allocation
+  against the ask, an address with no state) and `propertyFigures` (a
+  property's shares, then only what the OM states) — in three places:
+  `app/portfolio-card.tsx` (`PortfolioCard`, pure, at the app root because
+  the deal page under the property visual AND the shared screen under its
+  key terms both draw it: a bar a property for its share, a second for its
+  NOI share, the markets as chips linking to their market pages), the full
+  report's own "The portfolio" page before the extracted terms
+  (`PortfolioBlock`, the same bars as plain Views — four fills a property,
+  which the report test counts), and the workbook's Portfolio tab after the
+  Deal Summary: the OM's figures in blue as inputs with a blank left blank,
+  and every derived column a LIVE formula (the allocation per unit and the
+  cap on it, each share only once `COUNT` says every property states the
+  figure, the totals under the same rule, the allocations against the ask)
+  with Excel's own data bars from zero — HyperFormula types the missing
+  count into the test's workbook and the shares appear, equal to the
+  reader's on the completed set.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`

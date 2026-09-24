@@ -7,6 +7,7 @@ import type { DerivedModel, InputSource } from "./inputs";
 import { applyWorkbookBranding, type ExportBranding } from "@/lib/excel-branding";
 import { STRATEGY_LABEL, STRATEGY_READING, isPlanDeal } from "@/lib/deal-strategy";
 import type { ModelVsMarket } from "@/lib/model-vs-market";
+import { portfolioFacts, type PortfolioRead } from "@/lib/portfolio";
 
 /**
  * The institutional acquisition-template workbook (Feature 1). Visible tabs:
@@ -131,6 +132,9 @@ export async function buildUnderwriteWorkbook(
    *  workbook was built (lib/model-vs-market) — a data tab beside the
    *  Assumptions it reads; no tab at all with nothing read */
   marketRead?: ModelVsMarket | null,
+  /** a portfolio memorandum's properties (lib/portfolio) — a tab of their
+   *  own after the Deal Summary; no tab for a single property */
+  portfolio?: PortfolioRead | null,
 ): Promise<Buffer> {
   const { inputs } = model;
   const result = computeUnderwrite(inputs);
@@ -142,6 +146,10 @@ export async function buildUnderwriteWorkbook(
 
   const wsCover = wb.addWorksheet("Cover", { views: [{ showGridLines: false }] });
   const wsSummary = wb.addWorksheet("Deal Summary", { views: [{ showGridLines: false }] });
+  const wsPortfolio =
+    portfolio && portfolio.assets.length >= 2
+      ? wb.addWorksheet("Portfolio", { views: [{ state: "frozen", xSplit: 1, ySplit: PORTFOLIO_HEAD_ROW, showGridLines: false }] })
+      : null;
   const wsAssum = wb.addWorksheet("Assumptions", { views: [{ showGridLines: false }] });
   const wsRead =
     marketRead && marketRead.checks.length > 0
@@ -166,8 +174,9 @@ export async function buildUnderwriteWorkbook(
   wsSummary.properties.tabColor = { argb: HEADFILL };
   wsSens.properties.tabColor = { argb: "FFA05A1C" };
 
-  buildCover(wsCover, model, branding);
+  buildCover(wsCover, model, branding, { portfolio: !!wsPortfolio, marketRead: !!wsRead });
   buildAssumptions(wsAssum, inputs, model.sources, model.meta.strategy);
+  if (wsPortfolio && portfolio) buildPortfolio(wsPortfolio, portfolio, model.meta.unitNoun ?? { one: "unit", many: "units" });
   if (wsRead && marketRead) buildMarketRead(wsRead, marketRead);
   const cf = buildCashFlow(wsCf, inputs, holdYears);
   buildDealSummary(wsSummary, model, cf, holdYears);
@@ -176,7 +185,18 @@ export async function buildUnderwriteWorkbook(
   buildOperatingMetrics(wsOps, cf, model, holdYears);
   buildSensitivity(wsSens, wsEng, inputs);
 
-  const visible = [wsCover, wsSummary, wsAssum, ...(wsRead ? [wsRead] : []), wsCf, wsMonthly, wsDebt, wsOps, wsSens];
+  const visible = [
+    wsCover,
+    wsSummary,
+    ...(wsPortfolio ? [wsPortfolio] : []),
+    wsAssum,
+    ...(wsRead ? [wsRead] : []),
+    wsCf,
+    wsMonthly,
+    wsDebt,
+    wsOps,
+    wsSens,
+  ];
   visible.forEach((ws) => printSetup(ws, ws !== wsCover && ws !== wsAssum));
   // Monthly is 60+ columns — fitting it to one page width prints a smear.
   // Paginate across pages instead, repeating the line labels on each page.
@@ -197,7 +217,13 @@ export async function buildUnderwriteWorkbook(
 }
 
 // ── COVER ─────────────────────────────────────────────────────────────────────
-function buildCover(ws: ExcelJS.Worksheet, model: DerivedModel, branding?: ExportBranding | null) {
+function buildCover(
+  ws: ExcelJS.Worksheet,
+  model: DerivedModel,
+  branding?: ExportBranding | null,
+  /** which of the optional tabs this workbook carries, for the Contents */
+  optional: { portfolio: boolean; marketRead: boolean } = { portfolio: false, marketRead: false },
+) {
   const { meta } = model;
   ws.getColumn(1).width = 3;
   ws.getColumn(2).width = 26;
@@ -259,7 +285,13 @@ function buildCover(ws: ExcelJS.Worksheet, model: DerivedModel, branding?: Expor
   r++;
   const toc: [string, string][] = [
     ["Deal Summary", "KPIs, sources & uses, residual value, and return summary"],
+    ...(optional.portfolio
+      ? ([["Portfolio", "Each property as the OM states it, with live shares, allocation caps and the allocations against the ask"]] as [string, string][])
+      : []),
     ["Assumptions", "Every input with its source (OM page, derived, or assumption)"],
+    ...(optional.marketRead
+      ? ([["Market Read", "The model's assumptions against the published figures, as read the day this was built"]] as [string, string][])
+      : []),
     ["Cash Flow", "Annual property and investment cash flow through exit"],
     ["Monthly Cash Flow", "Monthly operating detail with per-year ties to the annual tab"],
     ["Debt Schedule", "Month-by-month amortization; exit payoff ties to Deal Summary"],
@@ -428,6 +460,152 @@ interface CfMap {
   fwdCol: number;
   y0Col: number;
   rows: Record<string, number>;
+}
+
+/** The Portfolio tab's header row; the properties start on the row under it
+ *  (the frozen pane and the tests address it). */
+export const PORTFOLIO_HEAD_ROW = 5;
+
+/**
+ * The Portfolio tab (#411) — one row a property as the memorandum states it,
+ * in blue because each is an input (the OM's figure: type over it and the
+ * tab recalculates), a blank where the memorandum states nothing, never a
+ * zero. The columns a buyer derives are LIVE formulas off those cells: the
+ * allocation per unit and the cap on it (the ALLOCATION's cap — the seller's
+ * split, not a value), each property's share of the count, the area and the
+ * NOI — each only once EVERY property states that figure, lib/portfolio's
+ * rule, so filling the last blank draws the share rather than a share of a
+ * partial total — the portfolio's totals under the same rule, and the
+ * allocations against the ask. Excel's own data bars on the shares, never a
+ * picture: they stay live as the figures change.
+ */
+function buildPortfolio(ws: ExcelJS.Worksheet, p: PortfolioRead, noun: { one: string; many: string }) {
+  const cap = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
+  const columns: Array<[string, number]> = [
+    ["Property", 30],
+    ["Address", 38],
+    ["Market", 20],
+    [cap(noun.many), 10],
+    ["Area (SF)", 12],
+    ["NOI", 14],
+    ["Occupancy", 11],
+    ["Year built", 10],
+    ["Allocated price", 16],
+    [`Allocated / ${cap(noun.one)}`, 15],
+    ["Cap on the allocation", 13],
+    [`Share of ${noun.many}`, 13],
+    ["Share of SF", 12],
+    ["Share of NOI", 12],
+    ["OM page", 9],
+  ];
+  columns.forEach(([, w], i) => {
+    ws.getColumn(i + 1).width = w;
+  });
+  titleRow(ws, `The portfolio — ${p.assets.length} properties`);
+  label(
+    ws.getCell(2, 1),
+    "Each property as the memorandum states it (blue: type over a figure and the tab recalculates); a blank is a figure it does not state, never a zero. A share is drawn only once every property states that figure. An allocation is the seller's split of the price, not a value.",
+    { color: MUTED, size: 9 },
+  );
+  const facts = portfolioFacts(p);
+  if (facts.length > 0) label(ws.getCell(3, 1), facts.join(" "), { color: INK, size: 9 });
+
+  const head = PORTFOLIO_HEAD_ROW;
+  sectionHeader(ws, head, columns[0][0], 1, columns.length);
+  columns.forEach(([h], i) => {
+    if (i === 0) return;
+    const c = ws.getCell(head, i + 1);
+    c.value = h.toUpperCase();
+    c.font = { name: ARIAL, size: 10, bold: true, color: WHITE };
+    c.alignment = { wrapText: true, vertical: "middle" };
+  });
+  ws.getRow(head).height = 28;
+
+  const first = head + 1;
+  const last = head + p.assets.length;
+  const col = (letter: string) => `${letter}$${first}:${letter}$${last}`;
+  const input = (cell: ExcelJS.Cell, v: number | null, fmt: string) => {
+    if (v != null) cell.value = v;
+    styleInput(cell, fmt);
+  };
+  const formula = (cell: ExcelJS.Cell, f: string, fmt: string, bold = false) => {
+    cell.value = { formula: f } as ExcelJS.CellFormulaValue;
+    styleFormula(cell, fmt, INK, bold);
+  };
+  // A share of the whole, only once every property states the figure.
+  const shareOf = (letter: string, r: number) =>
+    `IF(AND(COUNT(${col(letter)})=ROWS(${col(letter)}),SUM(${col(letter)})>0),${letter}${r}/SUM(${col(letter)}),"")`;
+
+  p.assets.forEach((a, i) => {
+    const r = first + i;
+    label(ws.getCell(r, 1), a.name, { bold: true });
+    label(ws.getCell(r, 2), a.address, { size: 9, color: MUTED });
+    label(ws.getCell(r, 3), a.market?.name ?? "", { size: 9 });
+    input(ws.getCell(r, 4), a.count, FMT.int);
+    input(ws.getCell(r, 5), a.area, FMT.int);
+    input(ws.getCell(r, 6), a.noi, FMT.usd);
+    input(ws.getCell(r, 7), a.occupancy != null ? a.occupancy / 100 : null, FMT.pct1);
+    input(ws.getCell(r, 8), a.yearBuilt, "0");
+    input(ws.getCell(r, 9), a.allocated, FMT.usd);
+    formula(ws.getCell(r, 10), `IF(AND(ISNUMBER(I${r}),ISNUMBER(D${r}),D${r}>0),I${r}/D${r},"")`, FMT.usd);
+    formula(ws.getCell(r, 11), `IF(AND(ISNUMBER(F${r}),ISNUMBER(I${r}),I${r}>0),F${r}/I${r},"")`, FMT.pct2);
+    formula(ws.getCell(r, 12), shareOf("D", r), FMT.pct1);
+    formula(ws.getCell(r, 13), shareOf("E", r), FMT.pct1);
+    formula(ws.getCell(r, 14), shareOf("F", r), FMT.pct1);
+    label(ws.getCell(r, 15), a.page, { size: 9, color: MUTED });
+    if (i % 2 === 1) {
+      for (let c = 1; c <= columns.length; c++) {
+        ws.getCell(r, c).fill = { type: "pattern", pattern: "solid", fgColor: { argb: BANDFILL } };
+      }
+    }
+  });
+
+  // The portfolio's totals — each only when every property states it.
+  const total = last + 1;
+  label(ws.getCell(total, 1), "Portfolio", { bold: true });
+  const sumIfAll = (letter: string) => `IF(COUNT(${col(letter)})=ROWS(${col(letter)}),SUM(${col(letter)}),"")`;
+  formula(ws.getCell(total, 4), sumIfAll("D"), FMT.int, true);
+  formula(ws.getCell(total, 5), sumIfAll("E"), FMT.int, true);
+  formula(ws.getCell(total, 6), sumIfAll("F"), FMT.usd, true);
+  formula(ws.getCell(total, 9), sumIfAll("I"), FMT.usd, true);
+  formula(ws.getCell(total, 10), `IF(AND(ISNUMBER(I${total}),ISNUMBER(D${total}),D${total}>0),I${total}/D${total},"")`, FMT.usd, true);
+  formula(ws.getCell(total, 11), `IF(AND(ISNUMBER(F${total}),ISNUMBER(I${total}),I${total}>0),F${total}/I${total},"")`, FMT.pct2, true);
+  for (let c = 1; c <= columns.length; c++) {
+    ws.getCell(total, c).border = { top: { style: "thin", color: { argb: LINE } } };
+  }
+
+  // The allocations against the ask: the memorandum's own check.
+  const ask = total + 2;
+  label(ws.getCell(ask, 1), "Asking price — the memorandum's, for the whole", { bold: true });
+  input(ws.getCell(ask, 9), p.askingPrice, FMT.usd);
+  const gap = ask + 1;
+  label(ws.getCell(gap, 1), "Allocations against the ask", { bold: true });
+  label(ws.getCell(gap, 2), "Above a percent either way, the allocation does not add up to the price — put it to the broker.", {
+    size: 9,
+    color: MUTED,
+  });
+  formula(ws.getCell(gap, 9), `IF(AND(ISNUMBER(I${total}),ISNUMBER(I${ask}),I${ask}>0),I${total}/I${ask}-1,"")`, FMT.pct1, true);
+
+  // Excel's own data bars on the three shares, from zero so a property's bar
+  // is its share's length against the largest.
+  for (const letter of ["L", "M", "N"]) {
+    ws.addConditionalFormatting({
+      ref: `${letter}${first}:${letter}${last}`,
+      rules: [
+        {
+          type: "dataBar",
+          priority: 1,
+          gradient: false,
+          minLength: 0,
+          maxLength: 100,
+          showValue: true,
+          border: false,
+          cfvo: [{ type: "num", value: 0 }, { type: "max" }],
+          color: { argb: "FFB5CDC9" },
+        } as unknown as ExcelJS.ConditionalFormattingRule,
+      ],
+    });
+  }
 }
 
 /**
