@@ -50,6 +50,8 @@ export const REAL_ROWS: RateRow[] = [
   { series_id: "MORTGAGE15US", obs_date: "2026-09-17", value: 6.26 },
   { series_id: "CREACBW027SBOG_YOY", obs_date: "2026-09-09", value: 3.56389 },
   { series_id: "DRCRELEXFACBS", obs_date: "2026-04-01", value: 1.53 },
+  // Printed by probe run 35945851126 (notes name no copyright), not the dry run.
+  { series_id: "BOGZ1FL010000386Q", obs_date: "2026-04-01", value: 8.8068348464 },
   { series_id: "SUBLPDRCSC", obs_date: "2026-07-01", value: -3.7 },
   { series_id: "SUBLPDRCSM", obs_date: "2026-07-01", value: -5.7 },
   { series_id: "SUBLPDRCSN", obs_date: "2026-07-01", value: -11.3 },

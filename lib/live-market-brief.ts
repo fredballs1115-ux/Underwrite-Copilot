@@ -64,6 +64,21 @@ export interface LiveMarketInput {
  * income side; these are the capital side, and a check that reads one
  * without the other reads half the deal.
  */
+/**
+ * What commercial property is selling for, nationally — the Fed's
+ * Financial Accounts price index for commercial real estate, against a
+ * year ago (Z.1's Financial Soundness Indicators, quarterly, published
+ * about ten weeks after the quarter). The one free, current figure for
+ * the value side: the BIS's national series on FRED stopped at 2025 Q2,
+ * and the private indexes (Green Street, RCA, CoStar's own) are licensed.
+ * Printed by the runner with its notes (rates run 35945851126: no
+ * copyright or permission named, where the same flag caught
+ * Case-Shiller's) before it was trusted. A trailing year of prices, said
+ * as the nation's — never this market's, never a forecast, and never a
+ * cap rate.
+ */
+export const CRE_PRICE_ID = "BOGZ1FL010000386Q";
+
 export const DEBT_MARKET_IDS = [
   "DGS10",
   "SUBLPDRCSC",
@@ -71,6 +86,7 @@ export const DEBT_MARKET_IDS = [
   "SUBLPDRCSN",
   "DRCRELEXFACBS",
   "CREACBW027SBOG_YOY",
+  CRE_PRICE_ID,
 ] as const;
 
 /** The SLOOS series a bank reports for this kind of loan: rental housing
@@ -485,6 +501,15 @@ function debtMarketLines(
     out.push({
       line: `Debt market — bank CRE lending ${signed(loans.value)}% from a year ago (${periodLabel(loans.obsDate, loans.meta.cadence)}; FRED, from the Fed's H.8)`,
       figures: [{ key: "cre_loans_yoy", label: "Bank CRE lending y/y", value: loans.value, unit: "pts", asOf: loans.obsDate }],
+    });
+  }
+  // What the capital buys: commercial property prices, for a building that
+  // trades on its income. Land's value is its entitlement, not this index.
+  const prices = by.get(CRE_PRICE_ID);
+  if (prices && assetWords(assetClass ?? undefined).operating) {
+    out.push({
+      line: `Capital markets — commercial real estate prices, national: ${signed(prices.value)}% from a year ago (${periodLabel(prices.obsDate, prices.meta.cadence)}; the Fed's Financial Accounts via FRED) — the nation's, a trailing year, not this market's and not a cap rate`,
+      figures: [{ key: "cre_prices_yoy", label: "Commercial real estate prices, national", value: prices.value, unit: "pts", asOf: prices.obsDate }],
     });
   }
   return out;

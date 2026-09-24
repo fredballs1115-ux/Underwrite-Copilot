@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readMetroRates, readRates, type RateRow } from "./live-rates";
 import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
-import { BRIEF_NATIONAL_IDS, DEBT_MARKET_IDS, lendingStandardsFor, liveMarketBrief, periodLabel, rentIndexFor, sectorJobsFor, sectorPayrollMetric } from "./live-market-brief";
+import { BRIEF_NATIONAL_IDS, CRE_PRICE_ID, DEBT_MARKET_IDS, lendingStandardsFor, liveMarketBrief, periodLabel, rentIndexFor, sectorJobsFor, sectorPayrollMetric } from "./live-market-brief";
 import type { ZoriRead } from "./zori";
 import type { RealtorRead } from "./realtor";
 
@@ -190,13 +190,27 @@ describe("the debt market — national, for every deal, after the metro's lines"
       "Debt market — banks tightening standards for multifamily loans: a net -5.7% of banks (Q3 2026; Fed SLOOS via FRED; negative is a net share easing)",
       "Debt market — CRE loan delinquency at commercial banks 1.53% (Q2 2026; FRED)",
       "Debt market — bank CRE lending +3.6% from a year ago (Sep 9, 2026; FRED, from the Fed's H.8)",
+      "Capital markets — commercial real estate prices, national: +8.8% from a year ago (Q2 2026; the Fed's Financial Accounts via FRED) — the nation's, a trailing year, not this market's and not a cap rate",
     ]);
     expect(b.figures.map((f) => [f.key, f.value, f.unit])).toEqual([
       ["dgs10", 4.94, "pct"],
       ["sloos_multifamily", -5.7, "pts"],
       ["cre_delinquency", 1.53, "pct"],
       ["cre_loans_yoy", 3.56389, "pts"],
+      ["cre_prices_yoy", 8.8068348464, "pts"],
     ]);
+  });
+
+  it("the commercial property price index is said for every building that trades on its income, never for land, and nothing without the series", () => {
+    const priceLine = (b: { lines: string[] } | null) => b?.lines.find((l) => l.startsWith("Capital markets")) ?? null;
+    for (const cls of ["office", "industrial", "retail", "hospitality_str", "self_storage", "net_lease"]) {
+      expect(priceLine(liveMarketBrief({ ...base, assetClass: cls })), cls).toContain("+8.8% from a year ago (Q2 2026");
+    }
+    expect(priceLine(liveMarketBrief({ ...base, assetClass: "land_infill" }))).toBeNull();
+    const without = national.filter((r) => r.meta.id !== CRE_PRICE_ID);
+    expect(priceLine(liveMarketBrief({ ...base, national: without, assetClass: "office" }))).toBeNull();
+    // It is the one list the pipeline and the page both read.
+    expect(BRIEF_NATIONAL_IDS).toContain(CRE_PRICE_ID);
   });
 
   it("an office deal reads the nonresidential standards; a development adds construction; land reads construction alone", () => {
@@ -218,7 +232,9 @@ describe("the debt market — national, for every deal, after the metro's lines"
     const withMetro = liveMarketBrief({ ...base, rates: readMetroRates("dc", DC_ROWS, NOW), now: NOW, assetClass: "multifamily" })!;
     const firstDebt = withMetro.lines.findIndex((l) => l.startsWith("Debt market"));
     expect(firstDebt).toBeGreaterThan(0);
-    expect(withMetro.lines.slice(firstDebt).every((l) => l.startsWith("Debt market"))).toBe(true);
+    // The capital side runs to the end: the debt market, then what the
+    // capital buys (the national price index).
+    expect(withMetro.lines.slice(firstDebt).every((l) => l.startsWith("Debt market") || l.startsWith("Capital markets"))).toBe(true);
     expect(liveMarketBrief({ ...base, national: [] })).toBeNull();
     expect(liveMarketBrief({ ...base, national: undefined })).toBeNull();
   });
