@@ -295,7 +295,14 @@ if (probe.length > 0) {
       // The notes carry the source and any copyright — a series FRED shows
       // may still be a licensed index (Case-Shiller is S&P's), so a
       // candidate is judged on this line as much as on its title.
-      if (m?.notes) console.log(`      notes: ${String(m.notes).replace(/\s+/g, " ").slice(0, 600)}`);
+      if (m?.notes) {
+        const notes = String(m.notes).replace(/\s+/g, " ").trim();
+        // Said outright when the notes name a copyright or a permission:
+        // that is a licensed index, and it does not go in the table.
+        const terms = /copyright|reprinted with permission|all rights reserved|licen[cs]e/i.exec(notes);
+        console.log(`      terms: ${terms ? `SAYS "${terms[0]}" — read the notes before trusting it` : "no copyright or permission named in the notes"}`);
+        console.log(`      notes: ${notes.slice(0, 2000)}`);
+      }
     } catch (err) {
       console.log(`  ${id}: NOT FOUND — ${err instanceof Error ? err.message : String(err)}`);
     }
