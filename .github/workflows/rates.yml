@@ -64,6 +64,11 @@ jobs:
           PROBE_IDS: ${{ inputs.probe_ids }}
           PROBE_SEARCH: ${{ inputs.probe_search }}
           PROBE_BLS: ${{ inputs.probe_bls }}
+          # A probe on its own skips the table's walk: with 785 series the
+          # walk is two requests a series and twenty-odd minutes, and a
+          # probe is a question about a handful of ids. Tick dry_run beside
+          # a probe to walk the table too.
+          PROBE_ONLY: ${{ (inputs.probe_ids != '' || inputs.probe_search != '' || inputs.probe_bls != '') && inputs.dry_run != true && '1' || '' }}
         run: |
           if [ -z "$FRED_API_KEY" ]; then
             echo "FRED_API_KEY not set. Get a free key at https://fred.stlouisfed.org/docs/api/api_key.html and add it as an Actions secret. Skipping."
