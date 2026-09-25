@@ -1020,6 +1020,8 @@ jobs:
           mark "#430 the IndexNow key is served" grep -qx "a399847bdac5364f2ed07a0d161f42ab" indexnow-key.txt
           # #431 — the pipeline on a map (a signed-in view): its changelog card.
           mark "#431 the pipeline is on a map" grep -q "Your pipeline on a map" p_whats-new.html
+          # #432 — the deal page's views as a filmstrip (signed-in): its card.
+          mark "#432 the deal views are a filmstrip" grep -q "pictures, as a filmstrip" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

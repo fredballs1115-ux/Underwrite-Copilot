@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-25",
+      "title": "The deal's pictures, as a filmstrip",
+      "href": "/deals",
+      "blurb": "The row of word tabs above a deal's picture (Photo, Street, Aerial, Flood, Map) is now a filmstrip under it, the way a listing shows its photos. Each view has its own small picture, and the one on screen is outlined. The thumbnails reuse the images the views already load, so the page makes no extra requests. A view whose picture fails to load drops out of the strip, as before."
+    },
+    {
+      "date": "2026-09-25",
       "title": "Your pipeline on a map",
       "href": "/deals",
       "blurb": "The pipeline has a third view beside Cards and List: every deal on one map, each pin the colour of its call (Go, Caution, No-go, or not screened yet). Hover a pin to see the building's picture, its price and its cap; click to open the deal. The pins sit where each deal's own pictures were taken, and a deal the map can't place yet is counted under the map rather than guessed at."
