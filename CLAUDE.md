@@ -1869,6 +1869,49 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   Schedules from `readDebt`, the rate from `irr` in
   `lib/underwrite/engine`. Bars: `data-bar="assume"` (the two returns) and
   `data-bar="premium"` (the premium against the asking price).
+- The seller's loan on a deal (#417): `lib/assumable-debt.ts` (pure) runs
+  that card's arithmetic on the deal's OWN model. The extraction labels an
+  assumable loan's terms as rows of their own — "Assumable loan balance",
+  "… rate", "… maturity", "… amortization", "… debt service" and
+  "Assumption fee" — only where the OM offers the loan for assumption,
+  never a quote for new financing. `readAssumableTerms` reads only those
+  rows; no balance row means no loan to assume. `modelForAssumption`
+  takes the model's price, year-1 NOI and the NOI's compounded growth over
+  the hold, its exit cap, its closing costs and acquisition fee, and its
+  new loan: amount, the model's own rate (today's tenor plus the class
+  spread where the table seeded it), amortization, interest-only and fee.
+  So the comparison is against the loan the page already assumes the
+  buyer takes. `AssumptionTerms` gained `assumedIoYears` and
+  `newLoanIoYears` for it; absent, the card reads exactly as before.
+  Four rules:
+  - **The schedule comes from what is stated**: a stated debt service
+    solves the years the loan has left (the level payment on today's
+    balance at the coupon, which a stated original amortization cannot
+    say); then the OM's own statement; and an undated interest-only
+    period beside an amortization is run amortizing, the reading that
+    does not flatter the loan.
+  - **The coupon runs for the FULL years to maturity, rounded down** (a
+    part-year is refinanced at today's rate with the rest), and under a
+    year to run is a refinance, not an assumption. The first cut rounded
+    4.5 years up to 5 at the coupon and called it refinanced.
+  - **A term not stated is named, not assumed** (`missing`: its rate, its
+    maturity, its payment schedule). A fee not stated is none, and said.
+  - **Only where the price buys the building** (`assumableApplies`: fee
+    simple, leasehold, unknown). A note's, a share's or the land's buyer
+    does not choose the property's debt.
+
+  The card (`app/(app)/deals/[id]/assumable-card.tsx`, pure, under the
+  debt sizer on the Financials tab) takes plain data (`assumableView`),
+  keeping the engine out of the client bundle. It draws the coupon
+  against the model's rate (`data-bar="assume-rate"`) and the year-1
+  coverage both ways (`data-bar="assume-dscr"`); the premium, the return
+  gap, the extra equity and the debt service saved as tiles; then one
+  sentence, then what the two positions ran on. It draws NO absolute
+  return: those run on the model's NOI before reserves and sale costs,
+  and would sit beside the model's own levered IRR as a second figure
+  for the same loan. The deal context carries the stated terms and what
+  their value turns on (`assumableContextLine`), and the challenger gets
+  the assumable-debt traps by name (`assumableNote`).
 - What a hotel actually earns: `lib/tools/hotel.ts` (pure — the asset class
   forty-two cards did not speak to, although the extraction readers have
   known the word "keys" since #223). A hotel's lease is one night long and

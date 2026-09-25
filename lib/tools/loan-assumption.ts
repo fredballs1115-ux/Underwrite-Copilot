@@ -95,6 +95,10 @@ export interface AssumptionTerms {
   assumedRatePct: number | null;
   /** the amortisation it has left to run, in years */
   assumedAmortYears: number | null;
+  /** years of interest-only it has left at the front — as many as its
+   *  remaining term for a full-term interest-only loan; 0 or absent for
+   *  none (#417: the screen reads an interest-only loan off the memorandum) */
+  assumedIoYears?: number | null;
   /** years until its balloon — rule 2 */
   assumedRemainingYears: number | null;
   /** the lender's fee to consent, as a % of the balance — rule 3 */
@@ -106,6 +110,9 @@ export interface AssumptionTerms {
   newLoanLtvPct: number | null;
   /** its amortisation, in years */
   newLoanAmortYears?: number | null;
+  /** its interest-only years at the front — the deal's own model may carry
+   *  some (#417); 0 or absent for none */
+  newLoanIoYears?: number | null;
   /** its origination fee, as a % of the loan */
   newLoanFeePct?: number | null;
 }
@@ -184,6 +191,7 @@ function runPosition(
   hold: number,
   exitCap: number,
   marketRatePct: number,
+  ioYears = 0,
 ): Position | null {
   // Rule 3. The fee is a USE at closing, so it goes INTO the cheque — it is
   // never netted out of the loan, which would understate both.
@@ -193,6 +201,7 @@ function runPosition(
     loan,
     ratePct,
     amortYears,
+    ioYears,
     termYears: Math.max(1, Math.round(Math.min(termYears, hold))),
   });
   if (first.years.length === 0) return null;
@@ -204,10 +213,13 @@ function runPosition(
     // today's rate, over whatever amortisation is left.
     const balance = first.years.at(-1)!.closing;
     const yearsLeft = Math.round(hold - Math.round(termYears));
+    // An interest-only year used none of the amortisation, so only the
+    // amortising years come off what is left of it.
+    const amortisedYears = Math.max(0, Math.round(termYears) - Math.min(ioYears, Math.round(termYears)));
     const after = readDebt({
       loan: balance,
       ratePct: marketRatePct,
-      amortYears: Math.max(1, amortYears - Math.round(termYears)),
+      amortYears: Math.max(1, amortYears - amortisedYears),
       termYears: Math.max(1, yearsLeft),
     });
     rows.push(...after.years);
@@ -278,6 +290,7 @@ function bothAt(t: AssumptionTerms, price: number, hold: number): {
     hold,
     exitCap,
     t.marketRatePct,
+    positive(t.assumedIoYears) ? t.assumedIoYears : 0,
   );
 
   const newAmount = price * (t.newLoanLtvPct / 100);
@@ -294,6 +307,7 @@ function bothAt(t: AssumptionTerms, price: number, hold: number): {
     hold,
     exitCap,
     t.marketRatePct,
+    positive(t.newLoanIoYears) ? t.newLoanIoYears : 0,
   );
 
   return { assume, newLoan };

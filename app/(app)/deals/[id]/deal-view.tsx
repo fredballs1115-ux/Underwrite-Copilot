@@ -28,10 +28,12 @@ import { type StageChange } from "@/lib/stages";
 import type { InternalComp } from "@/lib/internal-comps";
 import { DebtSizer } from "./debt-sizer";
 import { ModelVsMarketCard } from "./model-vs-market-card";
+import { AssumableLoanCard } from "./assumable-card";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { DealRateSeeds } from "@/lib/debt-index";
 import type { BriefDelta } from "@/lib/brief-delta";
 import type { ModelVsMarket } from "@/lib/model-vs-market";
+import type { AssumableView } from "@/lib/assumable-debt";
 import type { MetroDemand } from "@/lib/metro-demand";
 import { DecisionLog } from "./decision-log";
 import { SampleGuide } from "./sample-guide";
@@ -322,6 +324,7 @@ export function DealView({
   marketSince = null,
   modelVsMarket = null,
   metroDemand = null,
+  assumable = null,
 }: {
   dealId: string;
   dealName: string;
@@ -342,6 +345,10 @@ export function DealView({
   marketSince?: BriefDelta | null;
   /** the model's assumptions against the published figures (lib/model-vs-market) */
   modelVsMarket?: ModelVsMarket | null;
+  /** the seller's loan offered for assumption, priced against the model's
+   *  new loan (lib/assumable-debt, #417) — plain data; null where the
+   *  memorandum offers none */
+  assumable?: AssumableView | null;
   /** the metro area's payrolls by sector today, with this building's
    *  sector marked (lib/metro-demand); null outside the covered markets */
   metroDemand?: MetroDemand | null;
@@ -805,6 +812,7 @@ export function DealView({
             underwrite={playground?.inputs ?? null}
             rateSeeds={rateSeeds}
             modelVsMarket={modelVsMarket}
+            assumable={assumable}
           />
         )}
 
@@ -893,6 +901,7 @@ function FinancialsPanel({
   underwrite = null,
   rateSeeds = null,
   modelVsMarket = null,
+  assumable = null,
 }: {
   results: Results;
   active: boolean;
@@ -908,6 +917,7 @@ function FinancialsPanel({
   underwrite?: UnderwriteInputs | null;
   rateSeeds?: DealRateSeeds | null;
   modelVsMarket?: ModelVsMarket | null;
+  assumable?: AssumableView | null;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -932,6 +942,11 @@ function FinancialsPanel({
         underwrite={underwrite}
         rateSeeds={rateSeeds}
       />
+
+      {/* The seller's loan, where the memorandum offers it for assumption:
+          its rate against the model's new loan, the coverage it buys, and
+          what it is worth (#417). Renders nothing where none is offered. */}
+      <AssumableLoanCard view={assumable} />
 
       {/* The model's four decisive assumptions against the published
           figures — the debt story, then what the growth and the exit are

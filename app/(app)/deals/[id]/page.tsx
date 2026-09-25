@@ -9,6 +9,7 @@ import { PortfolioCard } from "@/app/portfolio-card";
 import { InterestPanel } from "@/app/interest-panel";
 import { withArticle } from "@/lib/article";
 import { interestTag, readInterest } from "@/lib/interest";
+import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { readPortfolio } from "@/lib/portfolio";
 import { PICTURE_CREDIT, ensureDealPicture } from "@/lib/deal-picture";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -512,6 +513,14 @@ export default async function DealPage({
         },
         { debtIndex: debt.permanent },
       )
+    : null;
+  // The seller's loan, where the memorandum offers it for assumption
+  // (#417): priced against the model's own new loan at the model's own
+  // rate — today's index plus the class spread wherever the table seeded
+  // it. Only where the price buys the building (lib/assumable-debt).
+  const assumableRead = extraction ? readAssumable(extraction, derived?.inputs ?? null) : null;
+  const assumable = assumableRead
+    ? assumableView(assumableRead, derived?.sources.allInRatePct?.note ?? null, !!derived?.meta.rateSeed)
     : null;
   const rateSeeds: DealRateSeeds = {
     permanent: derived?.meta.rateSeed ?? null,
@@ -1096,6 +1105,7 @@ export default async function DealPage({
         rateSeeds={rateSeeds}
         marketSince={marketSince}
         modelVsMarket={modelRead}
+        assumable={assumable}
         metroDemand={
           reads && liveMarket
             ? metroDemand(reads.rates, extraction?.assetClass || (deal.asset_class as string | null) || null)

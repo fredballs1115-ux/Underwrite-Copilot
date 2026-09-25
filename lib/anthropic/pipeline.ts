@@ -35,6 +35,7 @@ import {
 } from "@/lib/deal-strategy";
 import { dealContextFor } from "@/lib/deal-context";
 import { interestNote, readInterest } from "@/lib/interest";
+import { assumableNote, readAssumable } from "@/lib/assumable-debt";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { marketForAddress } from "@/lib/market-match";
@@ -731,6 +732,11 @@ async function runAnalysisSteps(
         // reads the figures through (lib/interest).
         const interest = readInterest(ex, askingPriceOf(ex));
         if (interest) notes.unshift(interestNote(interest));
+
+        // The seller's loan offered for assumption (#417): its terms and the
+        // assumable-debt traps by name.
+        const assumable = readAssumable(ex, null);
+        if (assumable) notes.push(assumableNote(assumable));
 
         if (flagged.length) {
           notes.push(

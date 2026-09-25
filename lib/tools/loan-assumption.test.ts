@@ -215,3 +215,20 @@ describe("readAssumption — refusals", () => {
     expect(r.pricePremium).toBeNull();
   });
 });
+
+describe("readAssumption — an interest-only loan in place (#417)", () => {
+  it("a full-term interest-only loan pays only its interest and owes its whole balance at the sale", () => {
+    const io = readAssumption({ ...SEED, assumedIoYears: 5 });
+    // 3.50% on $9.6M is $336,000 a year, with no principal in it.
+    expect(io.assume!.debtService).toBe(336_000);
+    expect(io.assume!.balanceAtExit).toBe(9_600_000);
+    // Less going out each year than the amortising loan, more owed at the end.
+    expect(io.assume!.debtService).toBeLessThan(readAssumption(SEED).assume!.debtService);
+    expect(io.assume!.balanceAtExit).toBeGreaterThan(readAssumption(SEED).assume!.balanceAtExit);
+  });
+
+  it("no interest-only years reads exactly as before", () => {
+    expect(readAssumption({ ...SEED, assumedIoYears: 0 })).toEqual(readAssumption(SEED));
+    expect(readAssumption({ ...SEED, assumedIoYears: null })).toEqual(readAssumption(SEED));
+  });
+});

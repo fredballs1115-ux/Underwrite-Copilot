@@ -372,9 +372,17 @@ dollar and the loan-to-value at the balance and at the price, a
 non-performing or matured note is never shown a yield as earned, and the
 panel draws it as tiles and a collateral bar while the memo, the report,
 the workbook cover and the key terms say it.
-**Open after it**: a non-performing note's foreclosure path (the months
-and cost of taking the property, by the state's process) is still the
-challenger's words, not a figure; a leased fee runs the ground rent
+Then #417: the seller's loan offered for assumption — the extraction labels
+its terms, `lib/assumable-debt` runs the /tools card's two positions on
+the deal's own model and the model's seeded rate, and the Financials tab
+draws the coupon against today's rate, the coverage both ways and what
+the loan is worth, with the challenger checking the overlap, the cheque,
+consent, the balloon and the exit by name.
+**Open after it**: the assumable loan reaches the deal page, the deal
+context and the challenger, not yet the memo, the report or the workbook;
+a non-performing note's foreclosure path (the months and cost of taking
+the property, by the state's process) is still the challenger's words,
+not a figure; a leased fee runs the ground rent
 through a building's model (the caveat sends the reader to the ground
 lease calculator); the document-generated model tab and the
 compare table's cap still read that model's own price; since-this-screen still compares the
@@ -447,7 +455,7 @@ and never was.
 
 Three things they share: every field reads shorthand (`$20M`, `4.75%`,
 `1.25x`); every field travels in the URL, so a sizing is a link; and the
-math is a pure tested module before it reaches a page — **1,111 tests** on
+math is a pure tested module before it reaches a page — **1,113 tests** on
 the forty-two modules, plus **118** that render the page itself and check the
 figures it prints. And since #314 the homepage renders its shelf of those
 calculations from the SAME list the page builds its cards from, so it can
