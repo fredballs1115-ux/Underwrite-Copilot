@@ -294,6 +294,23 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     The input stays the model's; the reader decides.
 
   The shared screen already draws the term, since it draws the panel.
+
+  **The compare table reads each price for what it buys** (#423,
+  `lib/compare-interest.ts`, pure). The table reads each deal's
+  document-generated model, which runs at the documents' price: a loan's
+  on a note, the share's on a share. `compareInterest` applies the deal
+  page's rules:
+  - a note has no cap, so its cell shows the note's yield to maturity at
+    its price (only where the note pays or may), and its returns are
+    withheld as the collateral's;
+  - a share's cap is struck on the whole its price implies
+    (`buildingPriceOf`), and its returns stand only where the model
+    already ran at that whole, within 2%;
+  - a leasehold and a leased fee stand as the model runs them.
+
+  Withheld cells say "n/a — note" or "n/a — share", the way a plan deal's
+  say "n/a — plan", and the price row carries the pipeline's
+  `interestTag`. The leverage rows follow the corrected cap.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`

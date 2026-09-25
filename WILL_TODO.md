@@ -392,15 +392,19 @@ off the memorandum, drawn in the interest panel, and the model's exit
 valued on the years left at its sale on the Financials tab. Then #422:
 the term wherever a leasehold is summarized — the pipeline's tag, the
 memo, the report's block and the workbook's cover, which names the exit
-cap that runs the model on the term.
+cap that runs the model on the term. Then #423: the compare table reads
+each price for what it buys — a note's yield where a cap would sit, a
+share's cap on the whole, returns the price did not buy withheld.
 **Open after it**:
 a ground rent's own schedule (fixed bumps, a reset to a share of
 land value) is not in the model's expense line; a non-performing note's foreclosure path (the months and cost of taking
 the property, by the state's process) is still the challenger's words,
 not a figure; a leased fee runs the ground rent
 through a building's model (the caveat sends the reader to the ground
-lease calculator); the document-generated model tab and the
-compare table's cap still read that model's own price; since-this-screen still compares the
+lease calculator); the document-generated model tab still prints that
+model's own cap and returns (under the page's interest panel, which says
+what the model is not — the compare table reads them for what the price
+buys since #423); since-this-screen still compares the
 address's market alone (a portfolio's other markets have no "what moved"
 yet); the twenty-six
 overhead frames are now only the fallback, but they are still

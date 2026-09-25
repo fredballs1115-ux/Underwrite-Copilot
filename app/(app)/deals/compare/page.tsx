@@ -17,6 +17,7 @@ import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { seedBenchmarks } from "@/lib/research-data";
 import { findPriceMetric, inferStrategy, isPlanDeal, noiFigures } from "@/lib/deal-strategy";
 import { bannerSources } from "@/lib/deal-banner";
+import { compareInterest } from "@/lib/compare-interest";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
 
@@ -53,6 +54,13 @@ function toCol(
   // spread against debt. The yield-on-cost row is its answer.
   const strat = inferStrategy(ex, signal);
   const planDeal = isPlanDeal(strat.kind);
+  // What the price buys (#423): the model runs at the documents' price, and
+  // on a note that is a loan's and on a share the share's — so a note shows
+  // its yield to maturity where a building shows a cap, a share's cap is
+  // struck on the whole its price implies, and returns the price did not
+  // buy are withheld rather than set beside buildings' (lib/compare-interest).
+  const ci = compareInterest(ex, r ?? null);
+  const cap = planDeal ? null : ci.cap;
 
   // Mandate fit — same engine, the same inputs and the same inferred kind
   // as the pipeline and deal page, so a development's land cost is judged
@@ -90,23 +98,20 @@ function toCol(
     fitNote,
     strategy: strat.kind === "unknown" ? null : strat.label,
     planDeal,
-    irr: r?.leveredIrrPct ?? null,
-    em: r?.equityMultiple ?? null,
-    coc: r?.cashOnCashPct ?? null,
-    cap: planDeal ? null : (r?.goingInCapPct ?? null),
+    irr: ci.withheld ? null : (r?.leveredIrrPct ?? null),
+    em: ci.withheld ? null : (r?.equityMultiple ?? null),
+    coc: ci.withheld ? null : (r?.cashOnCashPct ?? null),
+    cap,
     yoc: r?.yieldOnCostPct ?? null,
     // Same arithmetic as the deal page's leverage check, run on the SAME cap
     // this table shows one row above — never a differently-sourced number.
-    leverage:
-      !planDeal && r?.goingInCapPct != null && bench30 != null
-        ? leverageRead(r.goingInCapPct, bench30)
-        : null,
+    leverage: cap != null && bench30 != null ? leverageRead(cap, bench30) : null,
     // The same cap over today's 10-year (lib/debt-index reads it off the
     // rates table the strip draws from) — a fact with a date, no verdict.
-    capOverTenYear:
-      !planDeal && r?.goingInCapPct != null && tenYearPct != null
-        ? capSpreadRead(r.goingInCapPct, tenYearPct)
-        : null,
+    capOverTenYear: cap != null && tenYearPct != null ? capSpreadRead(cap, tenYearPct) : null,
+    interest: ci.tag,
+    noteYtm: ci.noteYtmPct,
+    withheld: ci.withheld,
     // The shared price reader — never a per-unit price or a prior trade; a
     // development's land cost is its price.
     price: usd(r?.purchasePrice) ?? findPriceMetric(ex?.metrics ?? [], strat.kind)?.value ?? null,

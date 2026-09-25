@@ -53,6 +53,18 @@ export type Col = {
   capOverTenYear?: CapSpreadRead | null;
   price: string | null;
   noi: string | null;
+  /** what the price buys where it is not the building outright ("Note",
+   *  "49% share", "Leasehold, 45 yrs left" — lib/interest `interestTag`),
+   *  said beside the price (#423) */
+  interest?: string | null;
+  /** a note's yield to maturity at its price, percent, where it pays or
+   *  may — its answer where a building shows a going-in cap (#423) */
+  noteYtm?: number | null;
+  /** the model's returns withheld: a note's are the collateral's, bought
+   *  outright; a share's, run at the share's price, set the whole
+   *  building's cash flows against a fraction of its cost
+   *  (lib/compare-interest, #423) */
+  withheld?: "note" | "share" | null;
   /** the building's pictures to try, best first, each with its own credit
    *  (lib/deal-banner, #418) — absent where the caller draws none */
   pictures?: BannerSource[];
@@ -154,27 +166,37 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     // A conversion and a stabilized building are not the same kind of thing,
     // and a side-by-side that hides that compares apples to plans.
     { label: "Deal type", get: (c) => c.strategy ?? "—" },
+    // A note's or a share's model returns are not the deal's (#423): said
+    // as withheld, with the reason, rather than left a bare dash.
     {
       label: "Levered IRR",
-      get: (c) => pct(c.irr),
+      get: (c) => (c.withheld ? `n/a — ${c.withheld}` : pct(c.irr)),
       best: (c) => c.verdict !== "pass_on" && c.irr != null && c.irr === bestIrr,
       mono: true,
       num: (c) => c.irr,
     },
     {
       label: "Equity multiple",
-      get: (c) => mult(c.em),
+      get: (c) => (c.withheld ? `n/a — ${c.withheld}` : mult(c.em)),
       best: (c) => c.verdict !== "pass_on" && c.em != null && c.em === bestEm,
       mono: true,
       num: (c) => c.em,
     },
-    { label: "Cash-on-cash (Yr 1)", get: (c) => pct(c.coc), mono: true, num: (c) => c.coc },
+    { label: "Cash-on-cash (Yr 1)", get: (c) => (c.withheld ? `n/a — ${c.withheld}` : pct(c.coc)), mono: true, num: (c) => c.coc },
     // A plan deal's year-1 cap is a dark building's (negative, or a default)
     // — not a figure to compare on. Say so; the yield on cost row below is
-    // its answer. Its cell draws no bar either.
+    // its answer. Its cell draws no bar either. A note has no cap at all:
+    // its answer is its yield to maturity at the price (#423).
     {
       label: "Going-in cap",
-      get: (c) => (c.planDeal ? "n/a — plan" : pct(c.cap)),
+      get: (c) =>
+        c.planDeal
+          ? "n/a — plan"
+          : c.withheld === "note"
+            ? c.noteYtm != null
+              ? `${pct(c.noteYtm)} to maturity`
+              : "n/a — note"
+            : pct(c.cap),
       mono: true,
       num: (c) => (c.planDeal ? null : c.cap),
     },
@@ -187,9 +209,11 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       get: (c) =>
         c.planDeal
           ? "judged on yield on cost"
-          : c.leverage
-            ? `${c.leverage.spreadBps > 0 ? "+" : ""}${c.leverage.spreadBps} bps`
-            : null,
+          : c.withheld === "note"
+            ? "n/a — note"
+            : c.leverage
+              ? `${c.leverage.spreadBps > 0 ? "+" : ""}${c.leverage.spreadBps} bps`
+              : null,
       cls: (c) =>
         c.leverage?.tone === "negative"
           ? "text-kill"
@@ -212,14 +236,18 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       get: (c) =>
         c.planDeal
           ? "judged on yield on cost"
-          : c.capOverTenYear
-            ? `${c.capOverTenYear.spreadBps > 0 ? "+" : ""}${c.capOverTenYear.spreadBps} bps`
-            : null,
+          : c.withheld === "note"
+            ? "n/a — note"
+            : c.capOverTenYear
+              ? `${c.capOverTenYear.spreadBps > 0 ? "+" : ""}${c.capOverTenYear.spreadBps} bps`
+              : null,
       mono: true,
       num: (c) => (c.planDeal || !c.capOverTenYear ? null : c.capOverTenYear.spreadBps),
       signed: true,
     },
-    { label: "Purchase price", get: (c) => c.price, mono: true },
+    // What the price buys, beside it, where it is not the building
+    // outright (#423) — the pipeline row's own tag.
+    { label: "Purchase price", get: (c) => (c.price && c.interest ? `${c.price} · ${c.interest}` : c.price), mono: true },
     { label: "Year-1 NOI", get: (c) => c.noi, mono: true },
   ];
 
