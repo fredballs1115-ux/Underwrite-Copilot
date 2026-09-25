@@ -2422,6 +2422,24 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     `dealContextFor` by the pipeline where the lookup has answered by the
     time the step runs): in an SFHA the expense line needs a flood premium
     the seller's figures may not carry.
+
+  **The full report prints the map** (#427) on a page of its own, "The
+  site", before the portfolio and the terms: `floodMapFor`
+  (`lib/flood-map.ts`) asks the aerial and FEMA's overlay for the Flood
+  tab's frame at `REPORT_FLOOD_SIZE` (1040×468 at z17, `lib/basemaps.ts`,
+  the one size the fetch and the PDF's 524pt frame both read) and
+  composites them with sharp into ONE JPEG (`compositeFloodMap` — react-pdf
+  embeds a single picture, and the overlay is fitted to the aerial's own
+  pixels in case a server rounds a dimension). The composite and every
+  legend swatch pass `intactImage` before they are embedded. The ring is
+  drawn by the PDF at the frame's centre, FEMA's key carries the
+  building's own zone in bold, and the sentence is `floodZoneLine`, so the
+  report and the Flood tab say the same thing. It is bounded (8 s for the
+  picture, 3 s for the legend, fetched beside the cover aerial) and never
+  throws: a slow FEMA leaves the words without the picture, and a deal
+  with no street address, or no zone and no picture, gets no page.
+  `lib/flood-map.test.ts` holds the composite to the aerial's frame pixel
+  by pixel; the report test reads the page back from the PDF.
 - The homepage's photographs: `lib/photos.ts` (pure — the four slots with
   their file names, briefs, sizes and alt text; `presentPhotos` over an
   `exists` callback; `stripPhotos`; `HERO_AERIAL`) and `lib/photos-fs.ts`

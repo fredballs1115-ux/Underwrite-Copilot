@@ -1,9 +1,21 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
-import { NFHL_ROOT, nfhlOverlayUrl } from "@/lib/basemaps";
-export { FLOOD_MIN_ZOOM, FLOOD_ZOOM } from "@/lib/basemaps";
-import type { DealLocation } from "@/lib/deal-location";
-import { parseNfhlLegend, resolveNfhlLayerId, type NfhlLegendEntry } from "@/lib/site-flags/core";
+import { NFHL_ROOT, REPORT_FLOOD_SIZE, nfhlOverlayUrl } from "@/lib/basemaps";
+export { FLOOD_MIN_ZOOM, FLOOD_ZOOM, REPORT_FLOOD_SIZE } from "@/lib/basemaps";
+import {
+  floodKey,
+  floodZoneLine,
+  parseNfhlLegend,
+  resolveNfhlLayerId,
+  type FloodMapView,
+  type NfhlLegendEntry,
+  type SiteFlagsResult,
+} from "@/lib/site-flags/core";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { StructuredAddress } from "@/lib/address";
+import { resolveDealLocation, type DealLocation, type DealVisualCache } from "@/lib/deal-location";
+import { fetchOneImage } from "@/lib/imagery";
+import { intactImage } from "@/lib/memo/cover-aerial";
 
 // FEMA's flood map over the deal's aerial (#425): the National Flood Hazard
 // Layer's zones, in FEMA's own symbology, for the aerial's own frame.
@@ -96,4 +108,86 @@ export async function fetchFloodOverlay(
   } catch {
     return null;
   }
+}
+
+// ── The flood map as a picture in the full report (#427) ────────────────────
+
+/**
+ * The aerial and FEMA's transparent zones as one JPEG — the report embeds a
+ * single image, and react-pdf's own compositing of two is not to be trusted
+ * with alignment. Both inputs are the same frame (lib/basemaps' one
+ * `frameParams`); the overlay is resized to the aerial's pixels in case a
+ * server rounds a dimension.
+ */
+export async function compositeFloodMap(aerial: Buffer, overlay: Buffer): Promise<Buffer> {
+  const sharp = (await import("sharp")).default;
+  const base = sharp(aerial);
+  const { width, height } = await base.metadata();
+  const top = width && height ? await sharp(overlay).resize(width, height, { fit: "fill" }).png().toBuffer() : overlay;
+  return base.composite([{ input: top }]).jpeg({ quality: 82 }).toBuffer();
+}
+
+async function within<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([p, new Promise<T>((resolve) => { timer = setTimeout(() => resolve(fallback), ms); })]);
+  } catch {
+    return fallback;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** A data URI's picture, kept only where its bytes are intact — react-pdf
+ *  hangs the whole render on a PNG whose zlib check fails. */
+function intactDataUri(uri: string | null): string | null {
+  const m = uri ? /^data:(image\/(?:png|jpe?g));base64,([A-Za-z0-9+/=]+)$/.exec(uri) : null;
+  if (!m) return null;
+  return intactImage(Buffer.from(m[2], "base64"), m[1]) ? uri : null;
+}
+
+/**
+ * The full report's flood map (#427), for a deal with a street address: the
+ * aerial and FEMA's zones for the Flood tab's frame composited into one JPEG,
+ * FEMA's key with the building's own zone marked, and the zone sentence.
+ * Bounded — the report is a download a person is waiting on — and never
+ * throws: a slow or failed FEMA leaves the page's words without the picture,
+ * and nothing at all where there is nothing to say.
+ */
+export async function floodMapFor(
+  supabase: SupabaseClient,
+  dealId: string,
+  address: StructuredAddress | null,
+  cache: DealVisualCache | null,
+  flags: SiteFlagsResult | null,
+): Promise<FloodMapView | null> {
+  if (!address?.street?.trim()) return null;
+  const flood = flags && flags.status !== "pending" ? flags.flood : undefined;
+  const picture = within(
+    (async (): Promise<string | null> => {
+      const loc = await resolveDealLocation(supabase, dealId, address, cache);
+      if (!loc) return null;
+      const [aerial, overlay] = await Promise.all([
+        fetchOneImage("aerial", supabase, dealId, address, cache, REPORT_FLOOD_SIZE),
+        fetchFloodOverlay(loc, REPORT_FLOOD_SIZE),
+      ]);
+      if (!aerial || !overlay) return null;
+      const jpeg = await compositeFloodMap(
+        Buffer.from(await aerial.response.arrayBuffer()),
+        Buffer.from(await overlay.arrayBuffer()),
+      );
+      return intactImage(jpeg, "image/jpeg") ? `data:image/jpeg;base64,${jpeg.toString("base64")}` : null;
+    })(),
+    8_000,
+    null,
+  );
+  const legend = await within(floodLegend(), 3_000, [] as NfhlLegendEntry[]);
+  const image = await picture;
+  const line = floodZoneLine(flood, legend);
+  if (!image && !line) return null;
+  return {
+    image,
+    key: floodKey(legend, flood).map((k) => ({ ...k, image: intactDataUri(k.image) })),
+    line,
+  };
 }

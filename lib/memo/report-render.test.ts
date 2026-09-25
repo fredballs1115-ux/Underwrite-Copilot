@@ -11,6 +11,10 @@ import { buildReportData, rangeRead, ReportDocument } from "./report-document";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { pdfFillCountOf, pdfTextOf } from "./pdf-text-of";
+import { TINY_PNG_DATA_URI, tinyPng } from "./test-png";
+import { floodKey, floodZoneLine, type FloodMapView } from "@/lib/site-flags/core";
+
+const tinyDataUri = (rgb: [number, number, number]) => `data:image/png;base64,${tinyPng(rgb).toString("base64")}`;
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
@@ -545,5 +549,61 @@ describe("ReportDocument (full report)", () => {
     // sensitivity passed in never adds a page here.
     expect(withPlan).toBeGreaterThanOrEqual(3);
     expect(withPlan).toBe(without + 1);
+  }, 45000);
+
+  it("gives the site a page of its own: FEMA's flood map as one picture, the ring on the building, FEMA's key with the building's zone marked, and the zone's sentence (#427)", async () => {
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const flag = { zone: "AE", subtype: null, isHighRisk: true };
+    const legend = [
+      { label: "1% Annual Chance Flood Hazard", image: TINY_PNG_DATA_URI, values: ["A,<Null>", "AE,<Null>"] },
+      { label: "Regulatory Floodway", image: tinyDataUri([200, 40, 40]), values: ["AE,FLOODWAY"] },
+      { label: "0.2% Annual Chance Flood Hazard", image: tinyDataUri([240, 150, 40]), values: ["X,0.2 PCT ANNUAL CHANCE FLOOD HAZARD"] },
+    ];
+    const line = floodZoneLine(flag, legend)!;
+    const view: FloodMapView = { image: tinyDataUri([90, 120, 80]), key: floodKey(legend, flag), line };
+    const render = (floodMap: FloodMapView | null) =>
+      renderToBuffer(
+        React.createElement(ReportDocument, {
+          input: buildReportData(deal, "September 25, 2026", [], null, undefined, undefined, undefined, undefined, null, null, null, floodMap),
+        }) as unknown as Parameters<typeof renderToBuffer>[0],
+      );
+    const pagesOf = (buf: Buffer) => (buf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length;
+    const imagesOf = (buf: Buffer) => (buf.toString("latin1").match(/\/Subtype\s*\/Image/g) ?? []).length;
+
+    const buf = await render(view);
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("The site");
+    expect(text).toContain("FEMA flood map");
+    expect(text).toContain("FEMA National Flood Hazard Layer over USGS The National Map; the ring marks the building.");
+    expect(text).toContain("1% Annual Chance Flood Hazard - at the building");
+    expect(text).toContain("Regulatory Floodway");
+    expect(text).toContain("0.2% Annual Chance Flood Hazard");
+    expect(text).toContain(
+      "The building sits in Zone AE (1% annual chance flood hazard), a Special Flood Hazard Area: a federally backed loan requires flood insurance, and the premium belongs in the expense line.",
+    );
+
+    // One page more than the report without it, carrying the map and the
+    // three swatches as images, and the ring as a stroke of its own.
+    const without = await render(null);
+    expect(await pdfTextOf(without)).not.toContain("FEMA flood map");
+    expect(pagesOf(buf)).toBe(pagesOf(without) + 1);
+    expect(imagesOf(buf) - imagesOf(without)).toBeGreaterThanOrEqual(4);
+
+    // FEMA answered the zone and not the picture: the words stand alone,
+    // with no credit for a picture that is not there.
+    const wordsOnly = (await pdfTextOf(await render({ image: null, key: [], line }))).replace(/\s+/g, " ");
+    expect(wordsOnly).toContain("The site");
+    expect(wordsOnly).toContain("a Special Flood Hazard Area");
+    expect(wordsOnly).not.toContain("the ring marks the building");
   }, 45000);
 });

@@ -270,3 +270,17 @@ export function floodContextLine(flood: SiteFlagsResult["flood"] | undefined): s
   }
   return `FEMA's flood map puts the building in Zone ${flood.zone}${flood.subtype ? ` (${subtypeWords(flood.subtype)})` : ""}, outside the Special Flood Hazard Area: flood insurance is not required by a federally backed lender, though the hazard is mapped.`;
 }
+
+/**
+ * The flood map as the full report prints it (#427): the aerial with FEMA's
+ * zones as one JPEG, FEMA's key, and the sentence on the zone at the
+ * building. Built on the server (lib/flood-map `floodMapFor`), every image's
+ * bytes checked before react-pdf sees them.
+ */
+export interface FloodMapView {
+  /** the composite as a data URI; null when either picture did not come */
+  image: string | null;
+  key: { label: string; image: string | null; here: boolean }[];
+  /** `floodZoneLine`; null while the lookup has not answered */
+  line: string | null;
+}

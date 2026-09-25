@@ -1002,6 +1002,9 @@ jobs:
           # #426 — the flood zone wherever a deal is summarized (signed-in
           # surfaces and documents): its changelog card.
           mark "#426 flood zones are on every summary" grep -q "Flood zones, flagged on every summary" p_whats-new.html
+          # #427 — the full report's site page (a signed-in download): its
+          # changelog card.
+          mark "#427 the report carries the flood map" grep -q "The flood map, in the full report" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

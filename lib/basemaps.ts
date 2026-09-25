@@ -204,6 +204,12 @@ export const FLOOD_ZOOM = 17;
  *  a bet on rounding. */
 export const FLOOD_MIN_ZOOM = 15;
 
+/** The full report's flood map (#427): the Flood tab's own zoom, at print
+ *  resolution for a figure the width of a LETTER page (524pt at 2x). The
+ *  fetch and the PDF's frame both read it, so the picture is never
+ *  stretched. */
+export const REPORT_FLOOD_SIZE = { width: 1040, height: 468, zoom: FLOOD_ZOOM } as const;
+
 /**
  * FEMA's flood zones for EXACTLY the frame `usgsAerialUrl` draws — the same
  * bbox from the same centre, zoom and size — as a transparent PNG, so the one
