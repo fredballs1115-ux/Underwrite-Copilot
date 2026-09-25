@@ -8,6 +8,7 @@ import { afterEach, describe, it, expect, vi } from "vitest";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { buildReportData, rangeRead, ReportDocument } from "./report-document";
+import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { pdfFillCountOf, pdfTextOf } from "./pdf-text-of";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
@@ -249,6 +250,53 @@ describe("ReportDocument (full report)", () => {
     expect(text).toMatch(/The note, on its own terms: Held to its Mar 2028 maturity it yields \d+\.\d% on the price \(interest-only as stated\)/);
     // The memo page under the title says it in a clause.
     expect(text).toMatch(/balance, \d+\.\d% to its Mar 2028 maturity/);
+  }, 45000);
+
+  it("prints the seller's loan offered for assumption beside the model it was priced against (#419)", async () => {
+    vi.useFakeTimers({ now: new Date(Date.UTC(2026, 8, 25)), toFake: ["Date"] });
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 12", basis: "na" as const });
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        row("Assumable loan balance", "$30,000,000"),
+        row("Assumable loan rate", "3.45%"),
+        row("Assumable loan maturity", "March 31, 2031"),
+        row("Assumable loan amortization", "Interest-only"),
+      ],
+    } as ExtractionResult;
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    // The route's own chain: the model, then the loan read against it.
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const a = readAssumable(extraction, derived.inputs)!;
+    const view = assumableView(a, derived.sources.allInRatePct?.note ?? null, !!derived.meta.rateSeed);
+    const input = buildReportData(deal, "September 25, 2026", [], sensitivity, undefined, undefined, undefined, undefined, null, view);
+    const buf = await renderToBuffer(
+      React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("The seller's loan, offered for assumption");
+    expect(text).toContain("$30.0M at 3.45% to Mar 2031, interest-only as stated");
+    expect(text).toContain("The loan's 3.45% against 6.00% for a new one — 255 bps under.");
+    // No assumption fee stated, so none charged — and at no fee the loan is
+    // worth a sliver of price where the deal page's 1%-fee case was not.
+    expect(text).toContain("Assuming it is worth $93k of price (0.1% of the ask) on the model's own figures");
+    expect(text).toContain("The memorandum states no assumption fee, so none is charged here");
+    // A placeholder rate is said as one — this model was not seeded.
+    expect(text).toContain("the rates table was not fresh enough to seed it");
+    // The memo on page one carries the line too.
+    expect(text).toContain("The seller's loan is offered for assumption: $30.0M at 3.45% to Mar 2031");
   }, 45000);
 
   it("gives a portfolio memorandum a page of its own: each property, its bars and what the memorandum states", async () => {

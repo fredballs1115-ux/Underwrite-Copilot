@@ -15,6 +15,7 @@
  */
 import { withArticle } from "@/lib/article";
 import { interestOf, interestShortLine, readInterest } from "@/lib/interest";
+import { assumableLine, assumableSentence, readAssumable } from "@/lib/assumable-debt";
 import {
   buildingSfRow,
   findGoingInCap,
@@ -85,6 +86,10 @@ export interface WorkbookMeta {
    *  leasehold: the cover says it in one line and what the model is and is
    *  not; absent for a plain fee simple */
   interest?: { line: string; modelCaveat: string | null } | null;
+  /** the seller's loan offered for assumption (lib/assumable-debt, #419):
+   *  the loan as stated, and what it is worth against this model's new
+   *  loan; absent where none is offered */
+  assumable?: { line: string; read: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -177,6 +182,14 @@ const normalizeClass = (c: string): keyof typeof CLASS_DEFAULTS => {
 function interestMeta(extraction: ExtractionResult | null): WorkbookMeta["interest"] {
   const r = readInterest(extraction, askingPriceOf(extraction));
   return r ? { line: interestShortLine(r), modelCaveat: r.modelCaveat } : null;
+}
+
+/** The cover's lines about the seller's loan offered for assumption
+ *  (#419): the loan as stated, and the deal page's own read of it against
+ *  this model's new loan. Null where none is offered. */
+function assumableMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["assumable"] {
+  const a = readAssumable(extraction, inputs);
+  return a ? { line: assumableLine(a), read: assumableSentence(a) } : null;
 }
 
 export function deriveUnderwriteInputs(
@@ -600,6 +613,7 @@ export function deriveUnderwriteInputs(
       assetClass: assetClassLabel(extraction?.assetClass) || "—",
       unitNoun: assetWords(extraction?.assetClass).noun ?? { one: "unit", many: "units" },
       interest: interestMeta(extraction),
+      assumable: assumableMeta(extraction, inputs),
       // Rent-roll actual occupancy outranks the OM's stated figure.
       occupancyPct: rrOcc ?? (occPct != null ? occPct / 100 : null),
       rsf,

@@ -108,6 +108,14 @@ describe("pipeline workbook — the deal's kind is a column", () => {
     expect(ws.getRow(7).getCell(7).note).toBeUndefined();
   });
 
+  it("the seller's loan offered for assumption rides in the same note, beside what the price buys (#419)", async () => {
+    const ws = (await load([{ ...STABILIZED, interest: "49% share", debt: "Assumable 3.45%" }, { ...CONVERSION, debt: "Assumable loan" }])).getWorksheet("Pipeline")!;
+    const both = JSON.stringify(ws.getRow(6).getCell(7).note);
+    expect(both).toContain("49% share: the price does not buy the building outright");
+    expect(both).toContain("Assumable 3.45%: the seller's loan is offered for assumption");
+    expect(JSON.stringify(ws.getRow(7).getCell(7).note)).toContain("Assumable loan: the seller's loan is offered for assumption");
+  });
+
   it("a row with nothing to read shows dashes — never a guessed kind or a zero", async () => {
     const ws = (await load([LEGACY])).getWorksheet("Pipeline")!;
     const row = ws.getRow(6);

@@ -484,3 +484,28 @@ export function assumableView(a: AssumableRead, rateNote: string | null, seeded:
         : null,
   };
 }
+
+// ── Wherever the deal is summarized (#419) ──────────────────────────────
+
+/**
+ * The pipeline row's tag: "Assumable 3.45%", or "Assumable loan" where the
+ * rate is not stated — beside the price, where a scan of the pipeline sees
+ * which deals carry debt a buyer can take over. Null where no loan is
+ * offered for assumption or the price does not buy the building.
+ */
+export function assumableTag(ex: Extraction): string | null {
+  if (!assumableApplies(ex)) return null;
+  const t = readAssumableTerms(ex as MetricRows);
+  if (!t) return null;
+  return t.ratePct != null ? `Assumable ${pctText(t.ratePct)}` : "Assumable loan";
+}
+
+/**
+ * The documents' one line — the memo under its title, the shared screen,
+ * the workbook's cover: the loan as stated, and that it is offered. The
+ * pricing against today's rate needs the model, which the deal page and the
+ * report carry; a line never claims more than the terms.
+ */
+export function assumableLine(a: AssumableRead): string {
+  return `The seller's loan is offered for assumption: ${assumableTermsLine(a)}`;
+}

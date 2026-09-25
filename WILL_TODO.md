@@ -383,8 +383,10 @@ deal's own photograph, Street View or the USGS aerial, each pinned so its
 credit is the picture on screen, falling back with the credit following —
 and the pipeline thumbnail and the banner both catch a picture that failed
 before the page hydrated.
-**Open after it**: the assumable loan reaches the deal page, the deal
-context and the challenger, not yet the memo, the report or the workbook;
+Then #419: the assumable loan wherever the deal is summarized — the
+pipeline row's tag and CSV column, the meeting workbook's note, the memo,
+the shared screen, the workbook's cover and the report.
+**Open after it**:
 a non-performing note's foreclosure path (the months and cost of taking
 the property, by the state's process) is still the challenger's words,
 not a figure; a leased fee runs the ground rent

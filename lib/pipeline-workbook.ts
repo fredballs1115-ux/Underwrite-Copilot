@@ -40,6 +40,10 @@ export interface PipelineExportRow {
    *  share", "Note", "Leasehold", "Leased fee" (lib/interest `interestTag`,
    *  #415); carried as the price cell's note, since the columns are fixed */
   interest?: string | null;
+  /** the seller's loan where it is offered for assumption — "Assumable
+   *  3.45%" (lib/assumable-debt `assumableTag`, #419); carried in the price
+   *  cell's note beside what the price buys */
+  debt?: string | null;
   /** the going-in cap on today's income — always null on a plan deal */
   cap: string | null;
   /** a plan deal's stabilized NOI over total cost, e.g. "11.7%" */
@@ -194,9 +198,13 @@ export async function buildPipelineWorkbook(
       priceCell.alignment = { horizontal: "right" };
       // A share's price, a note's or the land's under a ground lease is not
       // the building's: the cell says so where Excel shows a note (#415).
-      if (d.interest) {
-        priceCell.note = `${d.interest}: the price does not buy the building outright — the deal page says what it buys.`;
-      }
+      // …and where the seller's loan is offered for assumption (#419), the
+      // same note says so, since the columns are fixed too.
+      const notes = [
+        d.interest ? `${d.interest}: the price does not buy the building outright — the deal page says what it buys.` : null,
+        d.debt ? `${d.debt}: the seller's loan is offered for assumption — the deal page prices it against today's rate.` : null,
+      ].filter((n): n is string => n != null);
+      if (notes.length) priceCell.note = notes.join(" ");
 
       // A plan deal has no going-in cap; its yield on cost sits in the next
       // column, so the cap cell says so rather than showing a dash a reader

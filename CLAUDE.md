@@ -1912,6 +1912,22 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   for the same loan. The deal context carries the stated terms and what
   their value turns on (`assumableContextLine`), and the challenger gets
   the assumable-debt traps by name (`assumableNote`).
+
+  **Wherever the deal is summarized** (#419), the loan goes too:
+  - the pipeline row, at every width, as `assumableTag` ("Assumable
+    3.45%", or "Assumable loan" where no rate is stated), through
+    `PipelineSlots.debt`;
+  - the pipeline CSV's "Assumable debt" column, and the meeting
+    workbook's price-cell note beside what the price buys;
+  - the memo under its title and the shared screen under the interest
+    panel (`assumableLine`, the terms only);
+  - the workbook's cover (`meta.assumable`: the line, plus the deal
+    page's own read against the model's new loan);
+  - the report's block beside the assumptions read (`AssumableBlock`,
+    from the same `assumableView` the report route builds off its
+    derived model).
+
+  A document that carries no model never claims more than the terms.
 - What a hotel actually earns: `lib/tools/hotel.ts` (pure — the asset class
   forty-two cards did not speak to, although the extraction readers have
   known the word "keys" since #223). A hotel's lease is one night long and

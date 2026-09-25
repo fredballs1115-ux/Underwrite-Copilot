@@ -37,7 +37,7 @@ const ex = (metrics: ExtractedMetric[], over: Partial<ExtractionResult> = {}): E
 describe("pickSlots — the pipeline row agrees with the export on which figure a deal carries", () => {
   it("a stabilized asset: its going-in cap, its price, no yield on cost", () => {
     const s = pickSlots(ex([m("Asking price", "$42,000,000"), m("Going-in cap rate", "5.50%"), m("In-place NOI", "$2,310,000")]), null);
-    expect(s).toEqual({ cap: "5.50%", price: "$42,000,000", yoc: null, interest: null });
+    expect(s).toEqual({ cap: "5.50%", price: "$42,000,000", yoc: null, interest: null, debt: null });
   });
 
   it("says what the price buys where it is not the building outright (#415)", () => {
@@ -53,6 +53,17 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
     expect(with_({ ...blank, kind: "fee_simple", groundLease: "a 40-year lease under the deck" })).toBeNull();
     expect(with_({ ...blank, kind: "unknown" })).toBeNull();
     expect(pickSlots(ex(base), null).interest).toBeNull();
+  });
+
+  it("says where the seller's loan is offered for assumption (#419) — never on a note, a share or the land", () => {
+    const base = [m("Asking price", "$42,000,000"), m("Going-in cap rate", "5.50%")];
+    const loan = [m("Assumable loan balance", "$30,000,000"), m("Assumable loan rate", "3.45%")];
+    expect(pickSlots(ex([...base, ...loan]), null).debt).toBe("Assumable 3.45%");
+    expect(pickSlots(ex([...base, loan[0]]), null).debt).toBe("Assumable loan");
+    expect(pickSlots(ex(base), null).debt).toBeNull();
+    const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+    expect(pickSlots(ex([...base, ...loan], { interest: { ...blank, kind: "note" } }), null).debt).toBeNull();
+    expect(pickSlots(ex([...base, ...loan], { interest: { ...blank, kind: "leasehold" } }), null).debt).toBe("Assumable 3.45%");
   });
 
   it("a value-add with a stated going-in cap: the yield on cost, and NO cap — as the .xlsx prints 'n/a — plan'", () => {
@@ -74,7 +85,7 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
       }),
       null,
     );
-    expect(s).toEqual({ cap: null, price: "$8,000,000", yoc: "11.0%", interest: null });
+    expect(s).toEqual({ cap: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null });
   });
 
   it("before the extraction lands, the first signal's ask fills the price — only when it is a figure", () => {
