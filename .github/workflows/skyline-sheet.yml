@@ -20,6 +20,13 @@ name: skyline-sheet
 # read. scripts/probe-flood.mjs prints the service's layers and legend and
 # saves each place's composite; they go to their own branch, `flood-sheet`,
 # force-pushed each run and never merged.
+#
+# AERIAL MODE (`aerial`): how sharp the USGS aerial of a building can be.
+# scripts/probe-aerial.mjs renders each place six ways (today's z19 export,
+# a wider native frame, a server-side resample, and finished variants with
+# and without the card's marker), measures each one's detail and saves a
+# sheet a place to the `aerial-sheet` branch, force-pushed each run and
+# never merged — the choice is made by eye.
 on:
   workflow_dispatch:
     inputs:
@@ -36,6 +43,15 @@ on:
         description: "With flood: places as lat,lng,label separated by ; (blank uses the probe's own list)"
         required: false
         default: ""
+      aerial:
+        description: "Aerial mode: render the building aerial six ways for the probe's places and push the sheets to the aerial-sheet branch"
+        required: false
+        type: boolean
+        default: false
+      aerial_points:
+        description: "With aerial: places as lat,lng,label separated by ; (blank uses the probe's own list)"
+        required: false
+        default: ""
 permissions:
   contents: write
 jobs:
@@ -46,22 +62,27 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - name: Search, with thumbnails
-        if: ${{ !inputs.flood }}
+        if: ${{ !inputs.flood && !inputs.aerial }}
         env:
           SKYLINE_MARKETS: ${{ inputs.markets }}
         run: node scripts/probe-skylines.mjs --search --thumbs=sheet $SKYLINE_MARKETS
-      - name: Install (sharp, for the flood composites)
-        if: ${{ inputs.flood }}
+      - name: Install (sharp, for the flood composites and the aerial sheets)
+        if: ${{ inputs.flood || inputs.aerial }}
         run: npm install --omit=dev --no-audit --no-fund
       - name: Flood map over the aerial, with composites
         if: ${{ inputs.flood }}
         env:
           FLOOD_POINTS: ${{ inputs.flood_points }}
         run: node scripts/probe-flood.mjs --out=sheet
+      - name: The building aerial, six ways
+        if: ${{ inputs.aerial && !inputs.flood }}
+        env:
+          AERIAL_POINTS: ${{ inputs.aerial_points }}
+        run: node scripts/probe-aerial.mjs --out=sheet
       - name: Publish the sheet to its own branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHEET_BRANCH: ${{ inputs.flood && 'flood-sheet' || 'skyline-sheet' }}
+          SHEET_BRANCH: ${{ inputs.flood && 'flood-sheet' || (inputs.aerial && 'aerial-sheet' || 'skyline-sheet') }}
         run: |
           if [ ! -f sheet/index.json ]; then
             echo "No thumbnails were saved — nothing to publish."
