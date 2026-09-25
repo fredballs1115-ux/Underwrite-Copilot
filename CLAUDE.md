@@ -155,7 +155,41 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   filled, a share's implied whole with the share filled,
   `data-bar="interest"`), the memo under its title (`interestShortLine`),
   the report's sensitivity page (the model caveat above the grids) and the
-  workbook's cover (`meta.interest`).
+  workbook's cover (`meta.interest`). **The leased fee is its own kind**
+  (#415, `leased_fee`): the land under a building someone else owns, sold
+  with its ground lease — read as fee simple with a ground lease, the same
+  deal was told its income was an expense. The ground rent IS the
+  buyer's income; the extraction files it under "Ground rent" and the
+  building's operating income under "Income before ground rent", a label
+  with no "NOI" in it so no NOI reader takes the building's income for
+  the deal's (`groundRentOf`, `incomeBeforeGroundRentOf`; a rent per
+  foot, a monthly figure, a coverage, a bump or a reset is not the year's
+  rent). Cover is the one division of two stated rows, said on a
+  leasehold and a leased fee alike and drawn in the panel (the building's
+  income as the track, the rent filled); the plausibility check flags a
+  leased fee whose NOI is over 1.5× the stated rent
+  (`ground_rent_mismatch` — the building's income taken for the deal's)
+  and holds no building basis band to the land's price; the comps draw
+  no subject tick; the traps are the lessor's (the rent is the income,
+  coverage, subordination, resets, the reversion, purchase options).
+  **Every reader that divides a price divides the building's**:
+  `buildingPriceOf` (lib/deal-strategy — the price on a fee simple or a
+  leasehold, a share's grossed up, null for a note, a leased fee or a
+  share of no stated percentage) and `statedBasisIsBuildings` (whether
+  the OM's own per-unit line and cap may be read) feed the plan
+  (`planSummary`: a share's whole price labelled "Whole price, the share
+  grossed up", and `priceWithheld` saying why a note's or the land's
+  price is not the project's rather than "not stated"; a leased fee's
+  plan has no budget, cost or yield — the works are the leaseholder's),
+  the market memory, the internal comps, the analytics, the research
+  panel's per-unit read, the public-record comps' median call and the
+  debt sizer's seed — a memory that pools the account's past screens
+  never averages a note's price or a ground rent's cap into a market's.
+  What the price buys is said beside the figure wherever the figure
+  stands alone: the pipeline row and its CSV (`PipelineSlots.interest`,
+  `interestTag` — "49% share", "Note", "Leasehold", "Leased fee"), the
+  meeting workbook's price-cell note, the deal header ("Price · 49%
+  share") and the internal comps' price column.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`

@@ -1,11 +1,14 @@
 import { METRIC_FIND, findGoingInCap, findMetric, parseMoney, parsePct } from "@/lib/criteria";
 import {
+  buildingPriceOf,
   findPriceMetric,
   inferStrategy,
   planSummary,
+  statedBasisIsBuildings,
   unitCountFromMetrics,
   type StrategyKind,
 } from "@/lib/deal-strategy";
+import { interestOf } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { normalizeStage, type Stage } from "@/lib/stages";
 
@@ -68,7 +71,10 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
 
     // A plan deal has no going-in cap: a stabilized or pro forma cap, or a
     // yield on cost, describes the finished project, not the price paid.
-    const capMetric = plan ? null : findGoingInCap(metrics);
+    // …and a note's cap is the collateral's, a leased fee's a ground rent's
+    // (#415): neither is plotted among buildings' going-in caps.
+    const interestKind = interestOf(extraction).kind;
+    const capMetric = plan || interestKind === "note" || interestKind === "leased_fee" ? null : findGoingInCap(metrics);
     const capPct = capMetric ? parsePct(capMetric.value) : null;
 
     // The asking / purchase price — or, on a development, the land cost.
@@ -93,11 +99,16 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
     } else {
       // The shared per-unit reader: the price over the units, never a rent
       // or an expense per unit.
-      const directPer = findMetric(metrics, METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc);
+      // Only where the price is the building's (#415): a share's grossed up
+      // to the whole, never a note's or a leased fee's over the units.
+      const directPer = statedBasisIsBuildings(extraction)
+        ? findMetric(metrics, METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc)
+        : null;
       if (directPer) perUnit = parseMoney(directPer.value);
-      if (perUnit == null && price != null) {
+      const basisPrice = buildingPriceOf(extraction, price);
+      if (perUnit == null && basisPrice != null) {
         const units = unitCountFromMetrics(metrics);
-        if (units != null) perUnit = price / units;
+        if (units != null) perUnit = basisPrice / units;
       }
     }
 

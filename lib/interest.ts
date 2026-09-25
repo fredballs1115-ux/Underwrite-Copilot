@@ -7,7 +7,7 @@
 // price against the whole). The extraction states the interest
 // (`ExtractionResult.interest`); this reads it into what every surface says.
 //
-// Four rules, each one a way a screen goes wrong when it assumes the usual
+// Five rules, each one a way a screen goes wrong when it assumes the usual
 // case.
 //
 // A NOTE'S PRICE IS A LOAN'S. The buyer steps into the lender's position:
@@ -27,6 +27,14 @@
 // A LEASEHOLD IS A WASTING ASSET. The buyer owns the building and a lease on
 // the land; the ground rent comes ahead of the debt, and at expiry the
 // building reverts. A capitalised NOI values a perpetuity that ends.
+//
+// A LEASED FEE'S INCOME IS THE GROUND RENT (#415). The buyer takes the land
+// under a building someone else owns and becomes the ground lessor: the
+// ground rent is the income — never an expense, and never the building's
+// NOI, which belongs to its owner — the building's own income over that
+// rent is the whole margin of safety, and when the lease ends the building
+// reverts to the buyer. Read as fee simple with a ground lease, the same
+// deal was told its income was an expense.
 //
 // A BLANK IS NULL. A share the OM does not state as a percentage is not
 // guessed at; a balance it does not state is not derived.
@@ -58,10 +66,31 @@ export function interestOf(ex: ExtractionResult | null | undefined): { kind: Int
   return { kind, sharePct: kind === "partial_interest" ? parseSharePct(ex?.interest?.share) : null };
 }
 
+/** What the price buys, as the pipeline row's tag — "49% share", "Note",
+ *  "Leased fee" — and null for a fee simple (or an extraction saved before
+ *  the interest was read), where the price is the building's and the row
+ *  says nothing more. */
+export function interestTag(ex: ExtractionResult | null | undefined): string | null {
+  const { kind, sharePct } = interestOf(ex);
+  switch (kind) {
+    case "note":
+      return "Note";
+    case "partial_interest":
+      return sharePct != null ? `${shareText(sharePct)} share` : "Share";
+    case "leasehold":
+      return "Leasehold";
+    case "leased_fee":
+      return "Leased fee";
+    default:
+      return null;
+  }
+}
+
 /** What the price buys, in words. */
 export const INTEREST_LABEL: Record<InterestKind, string> = {
   fee_simple: "Fee simple",
   leasehold: "Leasehold on a ground lease",
+  leased_fee: "The leased fee — the land under a ground lease",
   note: "A loan secured by the property",
   partial_interest: "A share of the owning entity",
   unknown: "Not stated",
@@ -86,10 +115,19 @@ export interface InterestRead {
    *  premium) */
   discountPct: number | null;
   /** the ground lease as stated ("" if none) — on a leasehold, or a
-   *  fee-simple deal with a ground lease under part of the site */
+   *  fee-simple deal with a ground lease on part of the site */
   groundLease: string;
   /** a note's terms as stated ("" if none) */
   loan: string;
+  /** the annual ground rent the OM states (a leasehold pays it, a leased
+   *  fee collects it); null where none is stated */
+  groundRent: number | null;
+  /** the building's operating income before the ground rent, as stated —
+   *  what pays the rent; null where none is stated */
+  incomeBeforeGroundRent: number | null;
+  /** that income over the ground rent — the lessor's margin of safety and
+   *  the leasehold lender's first test; null unless both are stated */
+  groundRentCoverage: number | null;
   /** the one sentence every surface leads with */
   headline: string;
   /** what the property model on this deal is and is not, for the surfaces
@@ -107,6 +145,8 @@ const money = (n: number) =>
         ? `$${Math.round(n / 1e3)}k`
         : `$${Math.round(n)}`;
 const one = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
+// A coverage ratio: "5.0×".
+const times = (n: number) => `${one(n)}×`;
 // A share as the OM would write it: "49%", "33.3%".
 const shareText = (n: number) => `${one(n).replace(/\.0$/, "")}%`;
 // "an 18.0% discount to", "a 4.0% premium over" — the figure decides the
@@ -120,11 +160,32 @@ function balanceOf(ex: ExtractionResult): number | null {
   return row ? parseUsd(row.value) : null;
 }
 
+// A rent per foot, a monthly figure, a coverage ratio, a bump or a reset is
+// not the year's ground rent.
+const NOT_ANNUAL_RENT = /\bper\b|\/|psf|month|\bmo\b|coverage|ratio|escalat|bump|increase|reset|%|percent|yield|cap|\bterm\b|expir|option/i;
+
+/** The annual ground rent, from the row the extraction is asked to label
+ *  "Ground rent"; null where none is stated. */
+export function groundRentOf(ex: ExtractionResult | null | undefined): number | null {
+  const row = (ex?.metrics ?? []).find((m) => /^\s*(annual\s+|current\s+|in[- ]place\s+)?ground (lease )?rent\b/i.test(m.label) && !NOT_ANNUAL_RENT.test(m.label));
+  const n = row ? parseUsd(row.value) : null;
+  return n != null && n > 0 ? n : null;
+}
+
+/** The building's operating income before the ground rent — the row the
+ *  extraction is asked to label "Income before ground rent", never an NOI
+ *  label, so no NOI reader takes the building's income for the deal's. */
+export function incomeBeforeGroundRentOf(ex: ExtractionResult | null | undefined): number | null {
+  const row = (ex?.metrics ?? []).find((m) => /income before (the )?ground rent|leasehold operating income/i.test(m.label) && !NOT_ANNUAL_RENT.test(m.label));
+  const n = row ? parseUsd(row.value) : null;
+  return n != null && n > 0 ? n : null;
+}
+
 /**
  * Read the interest into what every surface says. Null for a plain fee
  * simple (or an extraction saved before the interest was read) with nothing
  * to say — the usual case needs no banner; a fee simple with a ground lease
- * under part of the site has something to say, and says it.
+ * on part of the site has something to say, and says it.
  *
  * `askingPrice` is the caller's: the shared price reader lives in
  * lib/deal-strategy, which reads this module.
@@ -134,7 +195,9 @@ export function readInterest(ex: ExtractionResult | null | undefined, askingPric
   if (!ex || !it) return null;
   const kind = it.kind;
   const groundLease = (it.groundLease ?? "").trim();
-  if ((kind === "fee_simple" || kind === "unknown") && !groundLease) return null;
+  const groundRent = groundRentOf(ex);
+  const incomeBeforeGroundRent = incomeBeforeGroundRentOf(ex);
+  if ((kind === "fee_simple" || kind === "unknown") && !groundLease && groundRent == null) return null;
   const pageCount = typeof ex.totalPages === "number" && ex.totalPages > 0 ? ex.totalPages : null;
   const n = parsePageNumber(it.page);
   const page = n != null && pageCount != null && n <= pageCount ? it.page.trim() : "";
@@ -144,6 +207,14 @@ export function readInterest(ex: ExtractionResult | null | undefined, askingPric
   const balance = kind === "note" ? balanceOf(ex) : null;
   const discountPct = balance != null && balance > 0 && price != null ? ((balance - price) / balance) * 100 : null;
   const loan = (it.loan ?? "").trim();
+  const groundRentCoverage =
+    groundRent != null && incomeBeforeGroundRent != null ? incomeBeforeGroundRent / groundRent : null;
+  // "the building's $6.0M of income covers the $1.2M ground rent 5.0×" —
+  // two stated figures, one division.
+  const coverageClause =
+    groundRentCoverage != null && groundRent != null && incomeBeforeGroundRent != null
+      ? `the building's ${money(incomeBeforeGroundRent)} of income before the ground rent covers the ${money(groundRent)} rent ${times(groundRentCoverage)}`
+      : null;
 
   let headline: string;
   let modelCaveat: string | null = null;
@@ -170,11 +241,24 @@ export function readInterest(ex: ExtractionResult | null | undefined, askingPric
     case "leasehold":
       headline =
         "This memorandum sells a LEASEHOLD: the building and a lease on the land, not the land. The ground rent comes ahead of the debt, and at the lease's end the building reverts — a capitalised NOI values a perpetuity that ends.";
+      if (coverageClause) headline += ` Here ${coverageClause}.`;
       modelCaveat =
         "The screening model capitalises the exit like a fee-simple building. On a leasehold the value at exit is what the term left will bear — run the ground lease calculator on the stated term.";
       break;
+    case "leased_fee":
+      headline = `This memorandum sells a LEASED FEE: the land under a building someone else owns, with its ground lease. The buyer collects the ground rent — the income here, not an expense and never the building's NOI — and when the lease ends the building reverts to the buyer. The rent is safe while the building's own income covers it${
+        coverageClause ? `, and ${coverageClause}` : ""
+      }.`;
+      modelCaveat =
+        "The screening model runs the ground rent as a building's NOI, with a building's growth, vacancy and expense assumptions. A ground rent grows by its lease's own schedule and resets, has no vacancy while the lease stands, and ends in the reversion of the land and the building — run the ground lease calculator's leased-fee side on the stated terms.";
+      break;
     default:
-      headline = "Part of the site sits on a ground lease: the ground rent is an expense ahead of the debt, and its term and resets decide what that part is worth.";
+      // Either side of the lease: an owner that pays a ground rent under
+      // part of its site, or one that collects it (a pad let on a ground
+      // lease, common on a retail center) — the lease as stated says which,
+      // and the sentence must not guess (#415).
+      headline =
+        "Part of the site is under a ground lease. Whether this owner pays the ground rent (an expense ahead of the debt) or collects it (a pad let on a ground lease), the lease's term and resets decide what that part is worth — the lease as stated says which.";
   }
   return {
     kind,
@@ -188,6 +272,9 @@ export function readInterest(ex: ExtractionResult | null | undefined, askingPric
     discountPct,
     groundLease,
     loan,
+    groundRent,
+    incomeBeforeGroundRent,
+    groundRentCoverage,
     headline,
     modelCaveat,
   };
@@ -214,10 +301,12 @@ export function interestNote(r: InterestRead): string {
       "PARTIAL-INTEREST TRAPS, checked by name where the OM gives the inputs: (a) THE PRICE IS FOR A SHARE — hold the whole asset's income against the price grossed up by the share, never against the share's price; (b) CONTROL — who decides a sale, a refinance and a budget, and what a minority holder can block; (c) THE WATERFALL — the share's economics after the sponsor's promote and fees, not its pro-rata slice; (d) EXIT RIGHTS — buy-sell, right of first refusal, drag and tag, and how a minority share is ever sold; (e) CAPITAL CALLS — what happens to a holder who does not fund one.",
     leasehold:
       "LEASEHOLD TRAPS, checked by name where the OM gives the inputs: (a) THE TERM LEFT — against the loan's term (a lender wants years of margin) and the hold; (b) THE RESETS — a rent struck at a share of then-current land value is an uncapped repricing; (c) SUBORDINATION — an unsubordinated ground rent outranks the mortgage, and a default ends the lease, the building and the loan together; (d) COVERAGE — the NOI over the ground rent, the lender's first test; (e) THE REVERSION — at expiry the building goes to the landowner, so the exit is worth what the remaining term will bear.",
+    leased_fee:
+      "LEASED-FEE TRAPS, checked by name where the OM gives the inputs: (a) THE RENT IS THE INCOME — the ground rent with its bumps and resets, never the building's NOI, which belongs to the building's owner; (b) COVERAGE — the building's income over the ground rent is the whole margin of safety, and a thin one is a tenant that stops paying first; (c) SUBORDINATION — a subordinated ground lease has pledged the land to the leasehold's lender, so a default can cost the buyer the land itself, where an unsubordinated rent sits ahead of that mortgage; (d) THE RESETS — a rent reset to a share of then-current land value is where the growth lives, and a lease on fixed bumps alone has none; (e) THE REVERSION — the years until the building reverts to the buyer, and what it will be worth then; (f) PURCHASE OPTIONS — a tenant's option to buy the land caps the reversion.",
     fee_simple:
-      "GROUND-LEASE TRAP, checked by name: part of the site sits on a ground lease — its rent is an expense ahead of the debt, and its term and resets decide what that part of the property is worth.",
+      "GROUND-LEASE TRAP, checked by name: part of the site is under a ground lease — say which side this owner is on: paying the rent (an expense ahead of the debt, whose term and resets can reprice that part) or collecting it (the ground tenant's credit, and the reversion of its improvements at the lease's end).",
     unknown:
-      "GROUND-LEASE TRAP, checked by name: part of the site sits on a ground lease — its rent is an expense ahead of the debt, and its term and resets decide what that part of the property is worth.",
+      "GROUND-LEASE TRAP, checked by name: part of the site is under a ground lease — say which side this owner is on: paying the rent (an expense ahead of the debt, whose term and resets can reprice that part) or collecting it (the ground tenant's credit, and the reversion of its improvements at the lease's end).",
   };
   return `${interestContextLine(r)} ${traps[r.kind]}`;
 }
@@ -241,7 +330,11 @@ export function interestShortLine(r: InterestRead): string {
         : "A share of the owning entity, its percentage not stated";
     case "leasehold":
       return "A leasehold — the building and a lease on the land, not the land";
+    case "leased_fee":
+      return `The leased fee — the land under a building someone else owns, and its ground rent${
+        r.groundRentCoverage != null ? `, covered ${times(r.groundRentCoverage)} by the building's income` : ""
+      }`;
     default:
-      return "Fee simple, with a ground lease under part of the site";
+      return "Fee simple, with a ground lease on part of the site";
   }
 }

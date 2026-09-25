@@ -22,7 +22,10 @@ export function planFacts(plan: PlanSummary, noun = "unit"): [string, string][] 
       "Stabilized NOI",
       plan.stabilizedNoi ? moneyCompact(plan.stabilizedNoi.value) : "not stated",
     ],
-    [plan.priceLabel, plan.price != null ? moneyCompact(plan.price) : "not stated"],
+    // A price the OM states for something other than the project — a
+    // note, the land under a ground lease, a share of no stated percentage
+    // (#415) — says so rather than "not stated".
+    [plan.priceLabel, plan.price != null ? moneyCompact(plan.price) : (plan.priceWithheld ?? "not stated")],
     [
       plan.budget?.allIn ? "Budget (total cost less price)" : "Budget",
       // An all-in total with no price stated: the works are inside it and

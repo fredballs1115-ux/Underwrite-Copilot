@@ -33,7 +33,7 @@ const ExtractionSchema = z.object({
   // strategy: the price of a 49% stake or of a discounted note set against
   // the whole building's NOI is a cap rate nobody earns. Read by lib/interest.
   interest: z.object({
-    kind: z.enum(["fee_simple", "leasehold", "note", "partial_interest", "unknown"]),
+    kind: z.enum(["fee_simple", "leasehold", "leased_fee", "note", "partial_interest", "unknown"]),
     summary: z.string(),
     share: z.string(),
     groundLease: z.string(),

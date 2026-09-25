@@ -9,7 +9,9 @@ import type { InterestRead } from "@/lib/interest";
  * The picture carries the price's meaning where the memorandum gives the
  * figures: a note's balance as the track with the price filled and the
  * discount the empty remainder, a share's implied whole as the track with
- * the share filled. The sentences are the reader's own (`headline`,
+ * the share filled, and under a ground lease (#415) the building's income
+ * before the ground rent as the track with the rent filled — the empty
+ * remainder is the cover. The sentences are the reader's own (`headline`,
  * `modelCaveat`), so every surface says the same thing.
  */
 // Rounded on the tenths, never a float's toFixed.
@@ -21,6 +23,7 @@ const money = (n: number) =>
       : n >= 1e3
         ? `$${Math.round(n / 1e3)}k`
         : `$${Math.round(n)}`;
+const times = (n: number) => `${(Math.round(n * 10) / 10).toFixed(1)}×`;
 
 export function InterestPanel({ interest }: { interest: InterestRead | null }) {
   if (!interest) return null;
@@ -40,6 +43,20 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
             left: `The share ${money(r.askingPrice)}`,
             right: `The whole, grossed up ${money(r.impliedWhole)}`,
           }
+        : r.groundRent != null && r.incomeBeforeGroundRent != null && r.groundRentCoverage != null
+          ? {
+              fill: Math.min(1, r.groundRent / r.incomeBeforeGroundRent),
+              left: `Ground rent ${money(r.groundRent)}`,
+              right: `The building's income before it ${money(r.incomeBeforeGroundRent)} · covered ${times(r.groundRentCoverage)}`,
+            }
+          : null;
+  // The ground lease calculator values either side of the lease: the
+  // building on its term, or the land and its rent.
+  const groundLeaseLink =
+    r.kind === "leased_fee"
+      ? "Value the leased fee on its term"
+      : r.groundLease || r.kind === "leasehold"
+        ? "Value the leasehold on its term"
         : null;
   return (
     <section
@@ -72,10 +89,10 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
         </ul>
       )}
       {r.modelCaveat && <p className="mt-2 text-xs leading-relaxed text-muted">{r.modelCaveat}</p>}
-      {r.groundLease && (
+      {groundLeaseLink && (
         <p className="mt-2 text-xs">
           <Link href="/tools#ground-lease" prefetch={false} className="font-medium text-brand underline-offset-2 hover:underline">
-            Value the leasehold on its term
+            {groundLeaseLink}
           </Link>
         </p>
       )}

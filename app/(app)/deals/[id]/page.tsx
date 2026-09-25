@@ -8,7 +8,7 @@ import { PropertyVisual } from "./property-visual";
 import { PortfolioCard } from "@/app/portfolio-card";
 import { InterestPanel } from "@/app/interest-panel";
 import { withArticle } from "@/lib/article";
-import { readInterest } from "@/lib/interest";
+import { interestTag, readInterest } from "@/lib/interest";
 import { readPortfolio } from "@/lib/portfolio";
 import { PICTURE_CREDIT, ensureDealPicture } from "@/lib/deal-picture";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -61,6 +61,7 @@ import {
   IMPLIED_CAP_CEILING,
   assessPlausibility,
   askingPriceOf,
+  buildingPriceOf,
   findPriceMetric,
   inferStrategy,
   isPlanDeal,
@@ -701,7 +702,12 @@ export default async function DealPage({
   // claimRecordComps's sentinel makes double-fires harmless.
   const publicComps =
     ((deal as { public_comps?: RecordCompsResult | null }).public_comps) ?? null;
-  const subjectPriceNumber = summaryPrice ? parseMoney(summaryPrice) : null;
+  // The price the building's own figures describe (#415) — a share's
+  // grossed up to the whole, none for a note or a leased fee — which the
+  // public-record comps' median call and the research panel's per-unit
+  // read divide; the header still shows the price as asked.
+  const priceTag = interestTag(extraction);
+  const subjectPriceNumber = buildingPriceOf(extraction, summaryPrice ? parseMoney(summaryPrice) : null);
   // Also re-kick a lingering "pending" sentinel: a deploy can kill the
   // after() worker between claim and result, and claimRecordComps's
   // stale-pending reclaim (10-min threshold) is only reachable if someone
@@ -1006,7 +1012,12 @@ export default async function DealPage({
               // A development's price row is its land cost, and a plan
               // deal's cap slot is its yield on total cost — the same
               // words the pipeline row and the meeting .xlsx use.
-              [plan?.priceLabel ?? "Price", summaryPrice],
+              // The price as asked, labelled with what it buys where that is
+              // not the building outright (#415): "Price · 49% share".
+              [
+                `${plan?.priceLabel === "Land cost" ? "Land cost" : "Price"}${priceTag ? ` · ${priceTag}` : ""}`,
+                summaryPrice,
+              ],
               ["Size", summarySize],
               ...(plan ? [["Yield on cost", summaryYoc] as const] : [["Going-in cap", summaryCap] as const]),
               ["Deal type", summaryStrategy],
@@ -1157,7 +1168,7 @@ export default async function DealPage({
         <ResearchPanel
           address={dealAddress}
           sizeText={summarySize}
-          priceText={summaryPrice}
+          priceText={subjectPriceNumber != null ? String(Math.round(subjectPriceNumber)) : null}
           capText={summaryCap}
           planLabel={isPlanDeal(strategy.kind) ? strategy.label : null}
           yearBuilt={summaryYearBuilt}

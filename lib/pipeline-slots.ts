@@ -2,11 +2,13 @@
 // its going-in cap and, on a plan deal, its yield on total cost — read
 // through the same readers every other surface uses, so the row, the deal
 // page, the meeting .xlsx and the analytics agree on which figure a deal
-// carries. Pure: no I/O, no LLM.
+// carries, and what the price buys where it is not the building (#415).
+// Pure: no I/O, no LLM.
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { ASSET_CLASS_LABEL } from "@/lib/asset-class";
 import { findGoingInCap } from "@/lib/criteria";
 import { findPriceMetric, inferStrategy, planSummary, signalAskPrice } from "@/lib/deal-strategy";
+import { interestTag } from "@/lib/interest";
 
 export interface PipelineSlots {
   /** the going-in cap as the OM states it — null on a plan deal, which has
@@ -16,6 +18,10 @@ export interface PipelineSlots {
   /** a plan deal's yield on total cost — its answer where a stabilized
    *  asset shows a cap — null for a stabilized asset or an unstated plan */
   yoc: string | null;
+  /** what the price buys where it is not the building outright — "49%
+   *  share", "Note", "Leasehold", "Leased fee" (lib/interest
+   *  `interestTag`); absent or null on a fee simple */
+  interest?: string | null;
 }
 
 /**
@@ -61,5 +67,8 @@ export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | nu
     // only when it is a figure, never an "unpriced" or "call for offers".
     price: findPriceMetric(metrics, strategy.kind)?.value ?? signalAskPrice(signal),
     yoc: plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,
+    // A share's price, a note's or the land's under a ground lease is not
+    // the building's, and the row says so beside the figure.
+    interest: interestTag(extraction),
   };
 }

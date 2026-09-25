@@ -25,7 +25,7 @@
  */
 
 import { withArticle } from "@/lib/article";
-import { interestOf } from "@/lib/interest";
+import { groundRentOf, interestOf } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetWords } from "@/lib/asset-words";
 import {
@@ -259,7 +259,8 @@ export type FindingCode =
   | "strategy_unsettled"
   | "cap_mismatch"
   | "basis_out_of_band"
-  | "no_income_in_place";
+  | "no_income_in_place"
+  | "ground_rent_mismatch";
 
 export interface PlausibilityFinding {
   code: FindingCode;
@@ -378,6 +379,37 @@ export function askingPriceOf(extraction: ExtractionResult | null | undefined): 
   const row = findPriceMetric(extraction.metrics ?? [], inferStrategy(extraction).kind);
   const n = row ? parseMoney(row.value) : null;
   return n != null && n > 0 ? n : null;
+}
+
+/**
+ * The price the building's own figures describe (#414, #415) — the one a
+ * basis per unit or per SF, a cap on the price, or a set against other
+ * buildings' sales may divide: the asking price on a fee simple or a
+ * leasehold; a share's grossed up to the whole where the OM states its
+ * percentage; and null for a note (a loan's price), a leased fee (the
+ * land's) and a share with no stated percentage — no building basis is
+ * struck on those, and a memory that pools the account's past screens
+ * never averages one in. The caller passes the price it read (the deal
+ * page's includes the first signal's ask before the extraction lands).
+ */
+export function buildingPriceOf(
+  extraction: ExtractionResult | null | undefined,
+  price: number | null,
+): number | null {
+  if (price == null || !(price > 0)) return null;
+  const { kind, sharePct } = interestOf(extraction);
+  if (kind === "note" || kind === "leased_fee") return null;
+  if (kind === "partial_interest") return sharePct != null ? price / (sharePct / 100) : null;
+  return price;
+}
+
+/** Whether a figure the OM prints per unit or per SF, or its going-in cap,
+ *  describes the building bought outright: false for a note, a leased fee
+ *  and a share, whose OMs quote such figures on a basis the row never says
+ *  (the collateral's, the land's, the whole's or the share's). */
+export function statedBasisIsBuildings(extraction: ExtractionResult | null | undefined): boolean {
+  const { kind } = interestOf(extraction);
+  return kind !== "note" && kind !== "leased_fee" && kind !== "partial_interest";
 }
 
 /** The price row a figure is wanted from — the LOI's prefill: among the
@@ -528,8 +560,14 @@ export interface PlanSummary {
   kind: StrategyKind;
   price: number | null;
   /** what the price figure is: the asking / purchase price, or on a ground-up
-   *  development the land or site cost */
-  priceLabel: "Price" | "Land cost";
+   *  development the land or site cost — or, where a share was bought, the
+   *  whole the share's price implies (#415) */
+  priceLabel: "Price" | "Land cost" | "Whole price, the share grossed up";
+  /** why a price the OM states is not the project's, where it is not — a
+   *  note's, the land's under a ground lease, a share with no stated
+   *  percentage (#415); null otherwise, and the price then reads "not
+   *  stated" only where the OM states none */
+  priceWithheld: string | null;
   /** the stabilized pro forma NOI, when the OM states one */
   stabilizedNoi: NoiFigure | null;
   budget: CapitalBudget | null;
@@ -557,15 +595,33 @@ export function planSummary(
   const metrics = extraction.metrics ?? [];
   const priceMetric = findPriceMetric(metrics, strategy.kind);
   const priceRaw = priceMetric ? parseMoney(priceMetric.value) : null;
-  const price = priceRaw != null && priceRaw > 0 ? priceRaw : null;
+  const stated = priceRaw != null && priceRaw > 0 ? priceRaw : null;
+  // What the price buys (#414, #415): a share's is grossed up to the whole
+  // the plan's figures describe; a note's, a leased fee's and a share's
+  // with no stated percentage is not the project's and never enters its
+  // total cost — the plan says why rather than "not stated".
+  const interest = interestOf(extraction);
+  const price = buildingPriceOf(extraction, stated);
+  const priceWithheld =
+    stated == null || price != null
+      ? null
+      : interest.kind === "note"
+        ? `${money(stated)} for the note — a loan's price, not the project's`
+        : interest.kind === "leased_fee"
+          ? `${money(stated)} for the land under the ground lease — not the project's`
+          : `${money(stated)} for a share of no stated percentage — not the whole project's`;
+  // A leased fee's buyer holds the land: the works and their cost are the
+  // leaseholder's, so the plan has no cost or yield of the buyer's to state.
+  const landOnly = interest.kind === "leased_fee";
   const stabilizedNoi = noiFigures(metrics).find((f) => f.kind === "stabilized") ?? null;
   // A metric row with its page first; the strategy's own wording when the
   // budget appears nowhere else. Against a land price the works are bounded
   // by the absolute ceiling only — a site is a fraction of what is built.
   const wholeAsset = !priceRowIsLand(priceMetric);
-  const budget =
-    capitalBudgetFromMetrics(metrics, price, wholeAsset) ??
-    budgetFromText(extraction.strategy?.capitalBudget, price, wholeAsset);
+  const budget = landOnly
+    ? null
+    : (capitalBudgetFromMetrics(metrics, price, wholeAsset) ??
+      budgetFromText(extraction.strategy?.capitalBudget, price, wholeAsset));
   // Price plus the works; or, when the OM states an all-in total and no
   // price, that total itself — a yield on cost needs no split of the two.
   const totalCost =
@@ -576,7 +632,12 @@ export function planSummary(
   return {
     kind: strategy.kind,
     price,
-    priceLabel: priceRowIsLand(priceMetric) ? "Land cost" : "Price",
+    priceLabel: priceRowIsLand(priceMetric)
+      ? "Land cost"
+      : interest.kind === "partial_interest" && price != null
+        ? "Whole price, the share grossed up"
+        : "Price",
+    priceWithheld,
     stabilizedNoi,
     budget,
     totalCost,
@@ -686,7 +747,23 @@ export function assessPlausibility(
     }
   }
 
-  // 3. A per-unit or per-SF basis outside any US market — a misparse. The
+  // 3. On a leased fee the buyer's income is the ground rent (#415). An NOI
+  //    well above the stated ground rent is the building's income, which
+  //    belongs to the building's owner and only covers that rent — a return
+  //    built on it counts income the buyer never receives.
+  if (interest.kind === "leased_fee") {
+    const groundRent = groundRentOf(extraction);
+    if (groundRent != null && going && going.value > groundRent * 1.5) {
+      findings.push({
+        code: "ground_rent_mismatch",
+        severity: "high",
+        title: `${going.label} of ${money(going.value)} is ${(Math.round((going.value / groundRent) * 10) / 10).toFixed(1)}× the ${money(groundRent)} ground rent on a leased fee`,
+        detail: `The buyer of the land collects the ground rent; the building's operating income belongs to its owner and only has to cover that rent. Every return built on the larger figure counts income the buyer never receives — check which income the NOI row states before relying on it.`,
+      });
+    }
+  }
+
+  // 4. A per-unit or per-SF basis outside any US market — a misparse. The
   //    shared count reader: a "Unit mix" or "Vacant units" row read as the
   //    count would manufacture this finding on a sound deal. On a plan deal
   //    the basis is TOTAL COST over the planned units (rule 4): $12k of
@@ -708,7 +785,10 @@ export function assessPlausibility(
     planDeal
       ? `No ${clsWord} market delivers there. The total cost or the ${other} was most likely misread — check both against their source pages before the all-in basis is used anywhere.`
       : `No ${clsWord} market trades there. The price or the ${other} was most likely misread — check both against their source pages before the basis is used anywhere.`;
-  if (basisTotal != null && cls && words.basis === "unit" && units != null && units >= 1 && units <= 50_000) {
+  // A leased fee's price buys the land alone: over the building's units or
+  // feet it is no basis any building market trades at, and never a misread.
+  const landOnly = interest.kind === "leased_fee";
+  if (!landOnly && basisTotal != null && cls && words.basis === "unit" && units != null && units >= 1 && units <= 50_000) {
     const perUnit = basisTotal / units;
     if (perUnit < 15_000 || perUnit > 2_500_000) {
       findings.push({
@@ -718,7 +798,7 @@ export function assessPlausibility(
         detail: misread(`${noun.one} count`),
       });
     }
-  } else if (basisTotal != null && cls && words.basis === "sf" && sf != null && sf > 100) {
+  } else if (!landOnly && basisTotal != null && cls && words.basis === "sf" && sf != null && sf > 100) {
     const perSf = basisTotal / sf;
     if (perSf < 5 || perSf > 3_000) {
       findings.push({
@@ -730,7 +810,7 @@ export function assessPlausibility(
     }
   }
 
-  // 4. A stabilized deal with no income in place reads as something else.
+  // 5. A stabilized deal with no income in place reads as something else.
   if (strategy.kind === "stabilized" && going && going.value <= 0) {
     findings.push({
       code: "no_income_in_place",
@@ -756,7 +836,13 @@ function planLine(plan: PlanSummary): string {
       ? `stabilized NOI ${money(plan.stabilizedNoi.value)} (${plan.stabilizedNoi.label})`
       : "stabilized NOI not stated",
   );
-  parts.push(plan.price != null ? `price ${money(plan.price)}` : "price not stated");
+  parts.push(
+    plan.price != null
+      ? `${plan.priceLabel === "Whole price, the share grossed up" ? "whole price, the share's grossed up," : "price"} ${money(plan.price)}`
+      : plan.priceWithheld
+        ? `price ${plan.priceWithheld}`
+        : "price not stated",
+  );
   parts.push(
     plan.budget
       ? plan.budget.isTotal
