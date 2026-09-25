@@ -13,11 +13,27 @@ name: skyline-sheet
 #
 # Dispatch with `markets` to keep a run inside the search's time budget
 # (six or so at a time).
+#
+# FLOOD MODE (`flood`): the same idea for the deal page's Flood tab. FEMA's
+# flood map is drawn over the USGS aerial for the same frame, and whether
+# the two line up — and what FEMA's colours mean — has to be seen, not
+# read. scripts/probe-flood.mjs prints the service's layers and legend and
+# saves each place's composite; they go to their own branch, `flood-sheet`,
+# force-pushed each run and never merged.
 on:
   workflow_dispatch:
     inputs:
       markets:
         description: "Space-separated metro ids (blank sweeps every market — mind the search's time budget)"
+        required: false
+        default: ""
+      flood:
+        description: "Flood mode: render FEMA's flood map over the aerial for the probe's places and push them to the flood-sheet branch"
+        required: false
+        type: boolean
+        default: false
+      flood_points:
+        description: "With flood: places as lat,lng,label separated by ; (blank uses the probe's own list)"
         required: false
         default: ""
 permissions:
@@ -30,22 +46,32 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - name: Search, with thumbnails
+        if: ${{ !inputs.flood }}
         env:
           SKYLINE_MARKETS: ${{ inputs.markets }}
         run: node scripts/probe-skylines.mjs --search --thumbs=sheet $SKYLINE_MARKETS
+      - name: Install (sharp, for the flood composites)
+        if: ${{ inputs.flood }}
+        run: npm install --omit=dev --no-audit --no-fund
+      - name: Flood map over the aerial, with composites
+        if: ${{ inputs.flood }}
+        env:
+          FLOOD_POINTS: ${{ inputs.flood_points }}
+        run: node scripts/probe-flood.mjs --out=sheet
       - name: Publish the sheet to its own branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHEET_BRANCH: ${{ inputs.flood && 'flood-sheet' || 'skyline-sheet' }}
         run: |
           if [ ! -f sheet/index.json ]; then
             echo "No thumbnails were saved — nothing to publish."
             exit 0
           fi
           cd sheet
-          git init -q -b skyline-sheet
+          git init -q -b "$SHEET_BRANCH"
           git config user.name "skyline-sheet"
           git config user.email "skyline-sheet@users.noreply.github.com"
           git add -A
-          git commit -q -m "skyline contact sheet $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
-          git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" skyline-sheet
-          echo "Pushed $(git ls-files | wc -l) files to the skyline-sheet branch."
+          git commit -q -m "$SHEET_BRANCH $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
+          git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$SHEET_BRANCH"
+          echo "Pushed $(git ls-files | wc -l) files to the $SHEET_BRANCH branch."
