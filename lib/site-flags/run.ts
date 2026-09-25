@@ -1,6 +1,7 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { geocode } from "@/lib/public-comps/run";
+import { NFHL_ROOT as NFHL_DEFAULT_ROOT } from "@/lib/basemaps";
 import {
   parseCensusTract,
   parseNfhlFlood,
@@ -20,9 +21,8 @@ import {
 // layer id is RESOLVED from the service's own layer list each run — a FEMA
 // re-index becomes a stored "unavailable", never a silently wrong zone.
 
-const NFHL_ROOT =
-  process.env.NFHL_SERVICE_ROOT ??
-  "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer";
+// One root for the lookup and the Flood tab's map (lib/basemaps).
+const NFHL_ROOT = process.env.NFHL_SERVICE_ROOT ?? NFHL_DEFAULT_ROOT;
 const PENDING_STALE_MS = 10 * 60 * 1000;
 
 const fetchJson = async (url: string): Promise<unknown> => {

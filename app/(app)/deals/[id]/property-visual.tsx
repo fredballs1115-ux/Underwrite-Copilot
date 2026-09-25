@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FLOOD_ZOOM } from "@/lib/basemaps";
 import { PropertyMap } from "./property-map";
 import { ReplacePicture } from "./replace-picture";
 
@@ -33,9 +34,16 @@ import { ReplacePicture } from "./replace-picture";
  * Every view degrades to nothing rather than to a placeholder: if nothing
  * loads, the whole card unmounts and the page reads exactly as it did
  * before. No stock photos, no AI imagery, no "photo unavailable" graphic.
+ *
+ * The Flood tab (#425) is the USGS aerial at a wider frame with FEMA's flood
+ * zones drawn over it in FEMA's own colours — the two images asked for the
+ * same location, zoom and size, so they share one Web-Mercator frame — with
+ * a ring at the frame's centre, which is the building, FEMA's key under it
+ * and one sentence on the zone at the building. Only for a street address:
+ * a neighbourhood placement's centre is not the building.
  */
 
-type View = "photo" | "street" | "satellite" | "aerial" | "map";
+type View = "photo" | "street" | "satellite" | "aerial" | "flood" | "map";
 
 const AERIAL = { w: 1280, h: 576 }; // 16:9, the route's max width
 
@@ -47,6 +55,7 @@ export function PropertyVisual({
   hasAddress = true,
   picture = null,
   canReplace = true,
+  flood = null,
 }: {
   dealId: string;
   /** the deal's address line — the caption, and the map pin's tooltip */
@@ -62,6 +71,12 @@ export function PropertyVisual({
   picture?: { credit: string; source: "om" | "upload" } | null;
   /** the reader may put their own picture on the deal (never on the sample) */
   canReplace?: boolean;
+  /** the Flood tab's key and sentence (lib/site-flags `floodKey`,
+   *  `floodZoneLine`); null for no Flood tab */
+  flood?: {
+    key: { label: string; image: string | null; here: boolean }[];
+    line: string | null;
+  } | null;
 }) {
   // Lead with the building's own photograph wherever one exists; the
   // aerial leads only when it is the best picture available.
@@ -71,10 +86,12 @@ export function PropertyVisual({
   const [aerialGone, setAerialGone] = useState(!hasAddress);
   const [streetGone, setStreetGone] = useState(false);
   const [satelliteGone, setSatelliteGone] = useState(false);
+  const [floodGone, setFloodGone] = useState(false);
 
   const photoPossible = !!picture && !photoGone;
   const streetPossible = canStreet && !streetGone;
   const satellitePossible = hasAddress && googleEnabled && !satelliteGone;
+  const floodPossible = hasAddress && hasStreetAddress && !!flood && !floodGone;
   // Nothing photographic resolved — collapse entirely.
   if (aerialGone && !photoPossible && !streetPossible && !satellitePossible) return null;
 
@@ -83,6 +100,7 @@ export function PropertyVisual({
     ...(streetPossible ? [{ id: "street" as const, label: "Street" }] : []),
     ...(satellitePossible ? [{ id: "satellite" as const, label: "Satellite" }] : []),
     ...(aerialGone ? [] : [{ id: "aerial" as const, label: "Aerial" }]),
+    ...(floodPossible ? [{ id: "flood" as const, label: "Flood" }] : []),
     ...(hasAddress ? [{ id: "map" as const, label: "Map" }] : []),
   ];
   // The active view can disappear underneath us when an image 404s.
@@ -178,6 +196,63 @@ export function PropertyVisual({
                 Neighborhood placement — no street address on this deal
               </span>
             )}
+          </div>
+        )}
+
+        {/* FEMA's zones over the aerial, both asked for one frame. Lazy, and
+            hidden until opened, so neither loads for a reader who never looks;
+            either failing takes the tab away rather than leaving a plain
+            aerial under the word "Flood". */}
+        {floodPossible && (
+          <div className={active === "flood" ? "" : "hidden"}>
+            <div className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element -- proxied,
+                  auth-scoped route with its own cache headers */}
+              <img
+                src={`/api/deals/${dealId}/aerial?src=usgs&w=${AERIAL.w}&h=${AERIAL.h}&z=${FLOOD_ZOOM}`}
+                alt={`Aerial photograph of the blocks around ${label}`}
+                width={AERIAL.w}
+                height={AERIAL.h}
+                loading="lazy"
+                className="aspect-[16/9] w-full bg-faint object-cover"
+                onError={() => setFloodGone(true)}
+              />
+              {/* eslint-disable-next-line @next/next/no-img-element -- see above */}
+              <img
+                src={`/api/deals/${dealId}/flood?w=${AERIAL.w}&h=${AERIAL.h}&z=${FLOOD_ZOOM}`}
+                alt={`FEMA flood hazard zones around ${label}`}
+                width={AERIAL.w}
+                height={AERIAL.h}
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover"
+                onError={() => setFloodGone(true)}
+              />
+              {/* Both frames are centred on the building's location. */}
+              <span
+                aria-hidden
+                data-picture="flood-pin"
+                className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_2px_rgba(0,0,0,0.65)]"
+              />
+              <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
+                FEMA flood zones · USGS imagery
+              </span>
+            </div>
+            <div className="border-t border-line px-4 py-3">
+              {flood && flood.key.length > 0 ? (
+                <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-muted" aria-label="FEMA's key">
+                  {flood.key.map((k) => (
+                    <li key={k.label} className={`flex items-center gap-1.5 ${k.here ? "font-semibold text-ink" : ""}`}>
+                      {k.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- FEMA's own 20px swatch, a data URI
+                        <img src={k.image} alt="" width={14} height={14} className="h-3.5 w-3.5 rounded-sm border border-line" />
+                      ) : null}
+                      <span>{k.here ? `${k.label} — at the building` : k.label}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {flood?.line ? <p className="mt-1.5 text-xs leading-relaxed text-ink">{flood.line}</p> : null}
+            </div>
           </div>
         )}
 

@@ -4,7 +4,7 @@
 // "unavailable", never a silent absence. Data: deals.site_flags
 // (lib/site-flags, migration 0030).
 
-import type { SiteFlagsResult } from "@/lib/site-flags/core";
+import { isMinimalHazard, type SiteFlagsResult } from "@/lib/site-flags/core";
 
 function Chip({ label, cls }: { label: string; cls: string }) {
   return (
@@ -41,7 +41,11 @@ export function SiteFlagsCard({
             {result.flood === "unavailable" ? (
               <Chip label="Flood: unavailable" cls="bg-faint text-muted" />
             ) : result.flood === null ? (
-              <Chip label="Flood: no mapped hazard zone at point" cls="bg-line/60 text-muted" />
+              // Every digitally mapped area carries a zone, Zone X included,
+              // so no zone at all means no digital map here — not no hazard.
+              <Chip label="Flood: no FEMA digital map at this point" cls="bg-faint text-muted" />
+            ) : isMinimalHazard(result.flood) ? (
+              <Chip label={`Flood zone ${result.flood.zone} · minimal flood hazard`} cls="bg-line/60 text-muted" />
             ) : result.flood.isHighRisk ? (
               <Chip
                 label={`Flood zone ${result.flood.zone} — SFHA (insurance required on federally-backed debt)`}

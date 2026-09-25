@@ -2366,6 +2366,48 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   `sm` the row's call leads its price line rather than taking an 88px
   column: beside the picture, the column left the name "The Maddox /
   at…".
+- FEMA's flood map over the building (#425): the deal page's picture has
+  a Flood tab for a deal with a street address (a neighbourhood
+  placement's centre is not the building): the USGS aerial at
+  `FLOOD_ZOOM` (17, about 1.2 km across at US latitudes) with FEMA's
+  National Flood Hazard Layer zones drawn over it, a ring at the frame's
+  centre (the building), FEMA's key under it and one sentence on the
+  zone at the building. The two images are asked for the same location,
+  zoom and size, and `usgsAerialUrl` and `nfhlOverlayUrl`
+  (`lib/basemaps.ts`) build their frame through ONE `frameParams`, so the
+  overlay lies over the aerial to the pixel; `/api/deals/[id]/flood`
+  serves the transparent PNG through `fetchFloodOverlay`
+  (`lib/flood-map.ts`, `server-only`), and either image failing takes the
+  tab away rather than leaving a plain aerial under the word "Flood".
+  **Everything FEMA-shaped was printed by the runner first** — the sandbox
+  cannot reach hazards.fema.gov — through `scripts/probe-flood.mjs` in
+  `skyline-sheet.yml`'s flood mode, which renders each place's composite
+  with sharp and pushes it to the `flood-sheet` branch to be looked at:
+  the zones are layer 28 of 32 (resolved at run time by name,
+  `resolveNfhlLayerId`, never written down), drawn only finer than
+  1:36,112 (hence `FLOOD_MIN_ZOOM` 15), in FEMA's own symbology (cyan for
+  the 1% annual chance zone, a red hatch for the regulatory floodway,
+  orange for the 0.2% zone, with FEMA's own "Zone AE (EL 9)" labels), and
+  **Zone X of minimal hazard has no legend entry — FEMA maps it and leaves
+  it undrawn**, so a clear frame means minimal hazard where a zone was
+  found and no digital map where none was. The key is FEMA's own legend
+  (`parseNfhlLegend`, the swatches as data URIs; `floodKey` picks the
+  building's own entry, marked, then the common three by FEMA's own
+  FLD_ZONE,ZONE_SUBTY values rather than labels), cached a day, and
+  raced against 2.5 s on the page so a slow FEMA never holds the deal
+  page. The sentence (`floodZoneLine`) says the zone, FEMA's name for it
+  and what it means for a loan — a Special Flood Hazard Area needs flood
+  insurance on a federally backed loan, and the premium belongs in the
+  expense line — and keeps a point with no zone polygon ("FEMA's digital
+  flood map has no zone at the building's point") apart from minimal
+  hazard; the site flags' chip says the same now, and keeps Zone X of
+  minimal hazard out of the caution colour. The first flood-sheet run
+  died on a connection reset from FEMA's host, so every request is asked
+  twice. **The tract's own Census figures wait on a key**: the ACS data
+  API now answers a keyless request with a redirect to `missing_key.html`
+  (probe run 2026-09-25; the 2020–2024 five-year release and every
+  variable's label were verified), so a free `CENSUS_API_KEY` is the
+  operator's move before the site reads a deal's tract.
 - The homepage's photographs: `lib/photos.ts` (pure — the four slots with
   their file names, briefs, sizes and alt text; `presentPhotos` over an
   `exists` callback; `stripPhotos`; `HERO_AERIAL`) and `lib/photos-fs.ts`

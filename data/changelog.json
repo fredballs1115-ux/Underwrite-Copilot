@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-25",
+      "title": "The flood map, over the building",
+      "href": "/deals",
+      "blurb": "A deal with a street address now has a Flood tab on its picture. It shows FEMA's flood hazard zones over the aerial, in FEMA's own colours, with a ring marking the building and FEMA's key underneath. One line says what the map shows at the building: for example Zone AE, a Special Flood Hazard Area, where a federally backed loan requires flood insurance. The site flags now also tell apart a point FEMA has no digital flood map for and a point of minimal flood hazard."
+    },
+    {
+      "date": "2026-09-25",
       "title": "Your submarkets, pictured",
       "href": "/market#submarkets",
       "blurb": "A submarket you build from your own market exports now opens on a photograph of its metro, and links to that metro's page of published figures. Each card in Your submarkets on Market data shows the same picture. A picture appears only where the metro you typed says which market it is: the site's own name for it (Northern Virginia, Pittsburgh PA) or a city with its state (Arlington, VA). A bare city like Portland is more than one place, so it keeps the plain header. Also fixed: an address written as \"Charleston West Virginia\" was read as Virginia."
