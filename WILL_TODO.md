@@ -385,7 +385,8 @@ and the pipeline thumbnail and the banner both catch a picture that failed
 before the page hydrated.
 Then #419: the assumable loan wherever the deal is summarized — the
 pipeline row's tag and CSV column, the meeting workbook's note, the memo,
-the shared screen, the workbook's cover and the report.
+the shared screen, the workbook's cover and the report. Then #420: the
+pipeline's building pictures on a phone, where they had been hidden.
 **Open after it**:
 a non-performing note's foreclosure path (the months and cost of taking
 the property, by the state's process) is still the challenger's words,

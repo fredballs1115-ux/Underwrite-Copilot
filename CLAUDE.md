@@ -2265,7 +2265,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   with the building mark holds the slot. A picture that failed before
   hydration fired its `error` with no listener, so the banner also checks
   on mount (`complete` with no `naturalWidth` is a failure). The
-  pipeline's `DealThumb` makes the same check.
+  pipeline's `DealThumb` makes the same check, and since #420 it shows
+  on a phone too: it was `hidden` below `sm`, so the width where a list
+  reads most like a set of places showed none. It is 56px there (its
+  `srcSet` asks for 168px, a 3× phone's slot, since the map sources are
+  rendered at the size asked for) and the dense 36px from `sm` up. Below
+  `sm` the row's call leads its price line rather than taking an 88px
+  column: beside the picture, the column left the name "The Maddox /
+  at…".
 - The homepage's photographs: `lib/photos.ts` (pure — the four slots with
   their file names, briefs, sizes and alt text; `presentPhotos` over an
   `exists` callback; `stripPhotos`; `HERO_AERIAL`) and `lib/photos-fs.ts`

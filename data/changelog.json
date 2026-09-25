@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-25",
+      "title": "Your pipeline, pictured on a phone",
+      "href": "/deals",
+      "blurb": "On a phone, the pipeline used to hide every building's picture, so the list read as names and figures only. Each row now opens on the building's picture at every screen width: the photograph from its memorandum, a street-level photograph or an aerial of the site. On a phone the picture is larger, and the call (go, caution, no-go) now leads the price line, so a deal's full name still fits beside the picture. A deal with no address and no photograph keeps a blank plate, so the names still line up."
+    },
+    {
+      "date": "2026-09-25",
       "title": "A loan you can take over, flagged everywhere you look",
       "href": "/deals",
       "blurb": "A deal whose seller offers their loan for assumption now says so wherever the deal is summarized, not only on its own page. The pipeline row carries the loan's rate beside the price at every screen width, the CSV and the meeting workbook add it beside what the price buys, and the one-page memo and the shared screen state the loan's terms under the title. The Excel model's cover and the full report go further: they state what the loan is worth against the model's own new loan. A summary with no model behind it states the loan's terms and nothing more."
