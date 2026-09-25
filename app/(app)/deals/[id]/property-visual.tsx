@@ -220,10 +220,11 @@ export function PropertyVisual({
           </div>
         )}
 
-        {/* FEMA's zones over the aerial, both asked for one frame. Lazy, and
-            hidden until opened, so neither loads for a reader who never looks;
-            either failing takes the tab away rather than leaving a plain
-            aerial under the word "Flood". */}
+        {/* FEMA's zones over the aerial, both asked for one frame. The
+            filmstrip's Flood thumbnail asks for the same two URLs, so they
+            load with the page's other pictures and this view is drawn from
+            the browser's cache when opened; either failing takes the view
+            away rather than leaving a plain aerial under the word "Flood". */}
         {floodPossible && (
           <div className={active === "flood" ? "" : "hidden"}>
             <div className="relative">
