@@ -15,6 +15,7 @@ import { marketForAddress } from "@/lib/market-match";
 import { todayReads } from "@/lib/model-vs-market-read";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { assumableView, readAssumable, type AssumableView } from "@/lib/assumable-debt";
+import { leaseholdExitView, readLeaseholdExit, type LeaseholdExitView } from "@/lib/leasehold-exit";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
 import { staleAfterFailure } from "@/lib/screen-run";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
@@ -151,6 +152,9 @@ export async function GET(
   // The seller's loan offered for assumption, priced against the model's
   // new loan — the deal page's own read (#419).
   let assumable: AssumableView | null = null;
+  // A leasehold's exit on the term its lease has left at the model's sale —
+  // the deal page's own read (#422).
+  let leasehold: LeaseholdExitView | null = null;
   try {
     const extraction = (deal.extraction as ExtractionResult | null) ?? null;
     if (extraction) {
@@ -200,6 +204,8 @@ export async function GET(
       assumable = assumableRead
         ? assumableView(assumableRead, derived.sources.allInRatePct?.note ?? null, !!derived.meta.rateSeed)
         : null;
+      const leaseholdRead = readLeaseholdExit(extraction, derived.inputs);
+      leasehold = leaseholdRead ? leaseholdExitView(leaseholdRead) : null;
 
       // The model's assumptions against the published figures — the same
       // read the deal page's card and the workbook make (lib/model-vs-market,
@@ -266,7 +272,7 @@ export async function GET(
       (deal.address as StructuredAddress | null) ?? null,
       ((deal as unknown as { photo?: DealVisualCache | null }).photo ?? null),
     );
-    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable);
+    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold);
     const element = React.createElement(ReportDocument, {
       input,
     }) as unknown as Parameters<typeof renderToBuffer>[0];

@@ -16,6 +16,7 @@
 import { withArticle } from "@/lib/article";
 import { interestOf, interestShortLine, readInterest } from "@/lib/interest";
 import { assumableLine, assumableSentence, readAssumable } from "@/lib/assumable-debt";
+import { leaseholdBasisLine, leaseholdExitSentence, leaseholdLenderLine, readLeaseholdExit } from "@/lib/leasehold-exit";
 import {
   buildingSfRow,
   findGoingInCap,
@@ -90,6 +91,12 @@ export interface WorkbookMeta {
    *  the loan as stated, and what it is worth against this model's new
    *  loan; absent where none is offered */
   assumable?: { line: string; read: string } | null;
+  /** a leasehold's exit valued on the years its ground lease has left at
+   *  this model's sale (lib/leasehold-exit, #422) — the read, with the
+   *  exit cap that runs this workbook on the term, then the financing and
+   *  the basis; absent unless a leasehold states when its lease ends (the
+   *  lease's end itself rides in `interest.line`) */
+  leasehold?: { line: string; read: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -190,6 +197,23 @@ function interestMeta(extraction: ExtractionResult | null): WorkbookMeta["intere
 function assumableMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["assumable"] {
   const a = readAssumable(extraction, inputs);
   return a ? { line: assumableLine(a), read: assumableSentence(a) } : null;
+}
+
+/** The cover's lines about a leasehold's exit (#422): the deal page's own
+ *  read of this model's sale on the years its lease has left then, with the
+ *  exit cap that runs this workbook on the term — the Exit Cap input stays
+ *  the model's, the reader decides — then the financing and the basis.
+ *  Null unless a leasehold states when its lease ends. */
+function leaseholdMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["leasehold"] {
+  const r = readLeaseholdExit(extraction, inputs);
+  if (!r) return null;
+  const t = r.onTerm;
+  const run =
+    t && t.sharePct < 99.5 ? ` Enter ${(Math.round(t.termCapPct * 100) / 100).toFixed(2)}% as the Exit Cap to run this workbook on the term.` : "";
+  return {
+    line: `${leaseholdExitSentence(r)}${run}`,
+    read: [leaseholdLenderLine(r), leaseholdBasisLine(r)].filter(Boolean).join(" "),
+  };
 }
 
 export function deriveUnderwriteInputs(
@@ -614,6 +638,7 @@ export function deriveUnderwriteInputs(
       unitNoun: assetWords(extraction?.assetClass).noun ?? { one: "unit", many: "units" },
       interest: interestMeta(extraction),
       assumable: assumableMeta(extraction, inputs),
+      leasehold: leaseholdMeta(extraction, inputs),
       // Rent-roll actual occupancy outranks the OM's stated figure.
       occupancyPct: rrOcc ?? (occPct != null ? occPct / 100 : null),
       rsf,

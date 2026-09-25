@@ -277,6 +277,23 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   hold marked (`data-bar="lease-hold"`, `lease-term`, `lease-options`,
   `lease-past` for the hold's years past the lease's end), and the two
   exits on one track (`lh-capitalised`, `lh-term`).
+
+  #422 carries it wherever the deal is summarized:
+  - the pipeline row's tag and its CSV, the deal header and the internal
+    comps (`interestTag(ex, asOf)`): "Leasehold, 45 yrs left", whole years
+    down, and "Leased fee, reverts in 45 yrs";
+  - the memo's header and the workbook cover's "What is being sold"
+    (`interestShortLine`'s clause): "…; the lease ends Dec 2071, 45.3
+    years from today";
+  - the report, as `LeaseholdBlock` beside the assumable block, from the
+    same `leaseholdExitView` the route builds off its own derived model:
+    the term and the two exits in plain Views, then the sentence and the
+    small print;
+  - the workbook cover (`meta.leasehold`): the read with the exit cap
+    that runs the workbook on the term ("Enter 6.23% as the Exit Cap…").
+    The input stays the model's; the reader decides.
+
+  The shared screen already draws the term, since it draws the panel.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`
