@@ -4,7 +4,7 @@
 // the same path as /api/deals/[id]/report — buildReportData with buy-box
 // checks AND the sensitivity grids — so a redesign that breaks any page
 // fails in CI, not at a user's download click.
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { buildReportData, rangeRead, ReportDocument } from "./report-document";
@@ -204,6 +204,52 @@ describe("ReportDocument (full report)", () => {
     );
     expect(pdfFillCountOf(buf) - pdfFillCountOf(flat)).toBe(drawnGaps * 3);
   }, 120000);
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("on a note, prints what the note itself earns under the model's caveat (#416)", async () => {
+    // The day the yield is read on: thirty months before the stated maturity.
+    vi.useFakeTimers({ now: new Date(Date.UTC(2025, 8, 30)), toFake: ["Date"] });
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 3", basis: "na" as const });
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "note" as const, summary: "", share: "", groundLease: "", loan: "", page: "" },
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        // The sample's $68.0M ask for an $80.0M balance: 85 cents.
+        row("Unpaid principal balance", "$80,000,000"),
+        row("Note rate", "5.25%"),
+        row("Maturity date", "March 31, 2028"),
+        row("Amortization", "Interest-only"),
+        row("Payment status", "Performing"),
+      ],
+    } as ExtractionResult;
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    expect(sensitivity).not.toBeNull();
+    const input = buildReportData(deal, "September 30, 2025", [], sensitivity);
+    const buf = await renderToBuffer(
+      React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("not the note's return");
+    expect(text).toMatch(/The note, on its own terms: Held to its Mar 2028 maturity it yields \d+\.\d% on the price \(interest-only as stated\)/);
+    // The memo page under the title says it in a clause.
+    expect(text).toMatch(/balance, \d+\.\d% to its Mar 2028 maturity/);
+  }, 45000);
 
   it("gives a portfolio memorandum a page of its own: each property, its bars and what the memorandum states", async () => {
     const prop = (name: string, address: string, count: string, noi: string, occupancy: string, allocatedPrice: string, page: string) => ({

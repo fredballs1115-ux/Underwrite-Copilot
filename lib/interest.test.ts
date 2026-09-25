@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtractedInterest, ExtractionResult } from "@/lib/anthropic/types";
 import {
   INTEREST_LABEL,
@@ -8,9 +8,11 @@ import {
   interestNote,
   interestOf,
   interestShortLine,
+  noteCaption,
   parseSharePct,
   readInterest,
 } from "./interest";
+import { gluedWords } from "./render-lint";
 import { askingPriceOf, assessPlausibility, noiFigures } from "./deal-strategy";
 import { dealContextFor } from "./deal-context";
 import { deriveUnderwriteInputs } from "./underwrite/inputs";
@@ -214,6 +216,109 @@ describe("readInterest — what the price buys, said", () => {
     for (const trap of ["THE TERM LEFT", "THE RESETS", "SUBORDINATION", "COVERAGE", "THE REVERSION"]) {
       expect(lease, trap).toContain(trap);
     }
+  });
+});
+
+describe("a note, underwritten as a note (#416)", () => {
+  // The worked example (lib/note-yield): $20.0M for a $24.4M balance at
+  // 5.25%, interest-only to the end of March 2028, read on Sep 30, 2025.
+  const AS_OF = new Date(Date.UTC(2025, 8, 30));
+  const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 5", basis: "na" as const });
+  const TERMS = [
+    row("Unpaid principal balance", "$24,400,000"),
+    row("Note rate", "5.25%"),
+    row("Maturity date", "March 31, 2028"),
+    row("Amortization", "Interest-only"),
+    row("Whole-asset value", "$34,000,000"),
+  ];
+  const note = (status: string | null, rows = TERMS) =>
+    ex(interest({ kind: "note", page: "p. 5" }), [...rows, ...(status ? [row("Payment status", status)] : [])]);
+  const LEAD =
+    "This memorandum sells a LOAN secured by the property, not the property: the buyer steps into the lender's position, and the return is the note's coupon and its discount to the balance — or, on a default, what the collateral fetches after foreclosure. The $20.0M price is an 18.0% discount to the $24.4M unpaid balance.";
+  const CUSHION = "The collateral's stated $34.0M puts the balance at 72% of its value and the price at 59%.";
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("a performing note: the yield to maturity with the current yield inside it, then the cushion", () => {
+    const r = readInterest(note("Performing — current through August"), 20_000_000, AS_OF)!;
+    expect(r.note!.ytmPct).toBeCloseTo(13.822, 2);
+    expect(r.lead).toBe(LEAD);
+    expect(r.headline).toBe(
+      `${LEAD} Held to its Mar 2028 maturity it yields 13.8% on the price (interest-only as stated): 6.4% of current yield on the price, the rest the discount accreting. ${CUSHION}`,
+    );
+    expect(interestShortLine(r)).toBe(
+      "A loan secured by the property, not the property — the $20.0M price is an 18.0% discount to the $24.4M balance, 13.8% to its Mar 2028 maturity",
+    );
+    expect(noteCaption(r.note)).toBe("30 months to its Mar 2028 maturity, interest-only as stated.");
+    expect(gluedWords(r.headline)).toEqual([]);
+  });
+
+  it("a note the OM does not call performing is said as paid as agreed", () => {
+    const r = readInterest(note(null), 20_000_000, AS_OF)!;
+    expect(r.headline).toContain(
+      "Paid as agreed to its Mar 2028 maturity it yields 13.8% on the price (interest-only as stated): 6.4% of current yield on the price, the rest the discount accreting — the memorandum does not say whether it is performing.",
+    );
+    expect(interestShortLine(r)).toMatch(/, 13\.8% to its Mar 2028 maturity if paid as agreed$/);
+  });
+
+  it("a non-performing note: the contract yield said as what it would earn if it paid", () => {
+    const r = readInterest(note("90+ days delinquent; foreclosure filed"), 20_000_000, AS_OF)!;
+    expect(r.headline).toContain(
+      "If it paid to its Mar 2028 maturity it would yield 13.8% (interest-only as stated) — it is not paying, so what it earns turns on the time and cost of taking the property.",
+    );
+    expect(r.headline).not.toContain("Held to its");
+    expect(interestShortLine(r)).toMatch(/balance, and not paying$/);
+    expect(gluedWords(r.headline)).toEqual([]);
+  });
+
+  it("a matured note has no contract yield; a note with no maturity has a current yield and says why no more", () => {
+    const matured = readInterest(note("Matured and unpaid", [...TERMS.slice(0, 2), row("Maturity date", "June 30, 2025"), ...TERMS.slice(3)]), 20_000_000, AS_OF)!;
+    expect(matured.headline).toContain(
+      "It is past its Jun 2025 maturity — a matured loan still outstanding is in default or extended, and there is no contract yield to state.",
+    );
+    expect(interestShortLine(matured)).toMatch(/balance, past its maturity$/);
+    const open = readInterest(note("Performing", TERMS.filter((m) => m.label !== "Maturity date")), 20_000_000, AS_OF)!;
+    expect(open.headline).toContain(
+      "A year's interest is 6.4% of the price; the memorandum states no maturity, so there is no yield to maturity to give.",
+    );
+    expect(noteCaption(open.note)).toBe("The memorandum states no maturity, so there is no yield to maturity to give.");
+  });
+
+  it("at a premium the yield is under the current yield, and said so; at par neither is said", () => {
+    const premium = readInterest(note("Performing"), 25_000_000, AS_OF)!;
+    expect(premium.headline).toContain("The $25.0M price is a 2.5% premium over the $24.4M unpaid balance.");
+    expect(premium.headline).toMatch(/it yields 4\.\d% on the price \(interest-only as stated\): under its 5\.1% of current yield, the premium over the balance lost at maturity\./);
+    const par = readInterest(note("Performing"), 24_400_000, AS_OF)!;
+    expect(par.headline).toContain("Held to its Mar 2028 maturity it yields 5.3% on the price (interest-only as stated).");
+    // A premium larger than the interest left to collect is a loss: $28.0M
+    // for $24.4M at 5.25% with thirty months left returns $3.2M of interest
+    // against a $3.6M premium.
+    const loss = readInterest(note("Performing"), 28_000_000, AS_OF)!;
+    expect(loss.note!.ytmPct!).toBeLessThan(0);
+    expect(loss.headline).toMatch(
+      /it yields -0\.\d% on the price \(interest-only as stated\): the \$3\.6M premium over the balance is more than the interest left to collect\./,
+    );
+    expect(gluedWords(loss.headline)).toEqual([]);
+  });
+
+  it("only the rows the OM states: a balance alone says the discount and nothing more", () => {
+    const bare = readInterest(note(null, TERMS.slice(0, 1)), 20_000_000, AS_OF)!;
+    expect(bare.headline).toBe(LEAD);
+    expect(bare.note!.ytmPct).toBeNull();
+    expect(interestShortLine(bare)).toBe(
+      "A loan secured by the property, not the property — the $20.0M price is an 18.0% discount to the $24.4M balance",
+    );
+  });
+
+  it("the deal context and the challenger read the note's yield on the day they run", () => {
+    vi.useFakeTimers({ now: AS_OF, toFake: ["Date"] });
+    const e = note("Performing");
+    const context = dealContextFor(e)!;
+    expect(context).toContain("Held to its Mar 2028 maturity it yields 13.8% on the price");
+    expect(context).toContain(CUSHION);
+    expect(interestNote(readInterest(e, askingPriceOf(e))!)).toContain("it yields 13.8% on the price");
   });
 });
 

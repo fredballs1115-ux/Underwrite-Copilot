@@ -46,7 +46,7 @@ import { planFacts } from "@/lib/plan-facts";
 import type { ModelVsMarket } from "@/lib/model-vs-market";
 import { assetWords } from "@/lib/asset-words";
 import { askingPriceOf, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
-import { interestOf, readInterest } from "@/lib/interest";
+import { interestOf, noteCollateralSentence, noteYieldSentence, readInterest } from "@/lib/interest";
 import { basisScale, fmtBasis, subjectBasis } from "@/lib/comp-detail";
 import { gapScale } from "@/lib/gap-detail";
 import { parsePageNumber } from "@/lib/facts";
@@ -788,8 +788,12 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // reader as the deal page's card; null for a single property.
   const portfolio = readPortfolio(extraction);
   // What is being sold (#414): on a note or a share the sensitivity grids
-  // are the collateral's or the whole asset's, and the page says so.
+  // are the collateral's or the whole asset's, and the page says so — and on
+  // a note, what the note itself earns at its price (#416), beside them.
   const interest = readInterest(extraction, askingPriceOf(extraction));
+  const noteFigures = interest?.note
+    ? [noteYieldSentence(interest.note), noteCollateralSentence(interest.note)].filter(Boolean).join(" ")
+    : "";
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
@@ -1009,6 +1013,11 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           {interest?.modelCaveat ? (
             <Text style={{ fontSize: 8, color: C.caution, fontFamily: "Helvetica-Bold", marginBottom: 6 }}>
               {str(`${interest.label}: ${interest.modelCaveat}`)}
+            </Text>
+          ) : null}
+          {noteFigures ? (
+            <Text style={{ fontSize: 8, color: C.ink, marginBottom: 6 }}>
+              {str(`The note, on its own terms: ${noteFigures}`)}
             </Text>
           ) : null}
 

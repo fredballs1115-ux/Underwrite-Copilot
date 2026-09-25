@@ -364,12 +364,19 @@ share's grossed up, none for a note, a leased fee or an unstated share)
 research panel's per-unit read, the public-record comps' median call and
 the debt sizer's seed — while the pipeline row, its CSV, the meeting
 workbook and the deal header say what the price buys beside the figure.
-**Open after it**: a note deal still gets the collateral's property
-model with a caveat, not an underwriting of the note itself (its yield
-to maturity on the price, the discount accreting, a foreclosure path) —
-the next step for that deal type; a leased fee likewise runs the ground
-rent through a building's model (the caveat sends the reader to the
-ground lease calculator); the document-generated model tab and the
+Then #416: a note is underwritten as a note — the extraction files the
+loan's terms as rows of their own (balance, rate, maturity, amortization,
+payment status), `lib/note-yield` solves the yield to maturity at the
+price with the engine's `irr` beside the current yield, the cents on the
+dollar and the loan-to-value at the balance and at the price, a
+non-performing or matured note is never shown a yield as earned, and the
+panel draws it as tiles and a collateral bar while the memo, the report,
+the workbook cover and the key terms say it.
+**Open after it**: a non-performing note's foreclosure path (the months
+and cost of taking the property, by the state's process) is still the
+challenger's words, not a figure; a leased fee runs the ground rent
+through a building's model (the caveat sends the reader to the ground
+lease calculator); the document-generated model tab and the
 compare table's cap still read that model's own price; since-this-screen still compares the
 address's market alone (a portfolio's other markets have no "what moved"
 yet); the twenty-six

@@ -227,7 +227,8 @@ describe("the eighth review's document cases", () => {
 
   it("12. the shared screen orders its key terms as the memo does and badges each figure's basis", () => {
     const src = readFileSync("app/share/[token]/share-view.tsx", "utf8");
-    expect(src).toMatch(/keyTermRows\(safeExtraction\?\.metrics \?\? \[\], strategy\.kind, 8\)/);
+    // …and, on a note, leads with the loan's own terms as the memo does (#416).
+    expect(src).toMatch(/keyTermRows\(safeExtraction\?\.metrics \?\? \[\], strategy\.kind, 8, interestOf\(safeExtraction\)\.kind\)/);
     expect(src).toMatch(/m\.basis === "pro_forma"/);
     expect(src).toMatch(/m\.basis === "in_place"/);
     // …and keeps each range's confidence and basis line.

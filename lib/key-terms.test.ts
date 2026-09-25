@@ -57,6 +57,32 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
     ]);
   });
 
+  it("on a note: the price, then the loan's own terms — never the collateral's cap first (#416)", () => {
+    const note = [
+      { label: "Going-in cap rate", value: "5.4%", flagged: true },
+      { label: "Asking price", value: "$20,000,000", flagged: false },
+      { label: "Units", value: "240", flagged: false },
+      { label: "Payment status", value: "Performing", flagged: false },
+      { label: "Maturity date", value: "March 31, 2028", flagged: false },
+      { label: "Yield to maturity (at ask)", value: "12.0%", flagged: false },
+      { label: "Note rate", value: "5.25%", flagged: false },
+      { label: "Unpaid principal balance", value: "$24,400,000", flagged: false },
+    ];
+    // The collateral's size still says what secures the loan; its cap
+    // comes after, among the flagged rows.
+    expect(keyTermRows(note, "stabilized", 7, "note").map((m) => m.label)).toEqual([
+      "Asking price",
+      "Unpaid principal balance",
+      "Note rate",
+      "Maturity date",
+      "Payment status",
+      "Units",
+      "Going-in cap rate",
+    ]);
+    // The same rows read as a building lead with its cap and count.
+    expect(keyTermRows(note, "stabilized", 3).map((m) => m.label)).toEqual(["Asking price", "Going-in cap rate", "Units"]);
+  });
+
   it("drops rows that are not objects, never repeats a row, and honours the limit", () => {
     const rows = keyTermRows([null, ...conversion, undefined, conversion[4]], "conversion", 3);
     expect(rows).toHaveLength(3);

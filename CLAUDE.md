@@ -189,7 +189,45 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   stands alone: the pipeline row and its CSV (`PipelineSlots.interest`,
   `interestTag` — "49% share", "Note", "Leasehold", "Leased fee"), the
   meeting workbook's price-cell note, the deal header ("Price · 49%
-  share") and the internal comps' price column.
+  share") and the internal comps' price column. **A note is underwritten
+  as a note** (#416, `lib/note-yield.ts`, pure): the extraction files
+  each of the loan's terms as a row of its own — "Unpaid principal
+  balance", "Note rate", "Maturity date" (as written, with its month; the
+  initial maturity, never an extended one), "Amortization", "Payment
+  status", and the collateral's value under "Whole-asset value" — and
+  `readNoteTerms` reads only those rows, through one finder
+  (`noteRowsOf`) that the key terms share: a bare-year maturity is no
+  maturity; an amortization in months is read in years; an interest-only
+  row's figure is the interest-only period, never an amortization; and an
+  interest-only period beside an amortization is run interest-only and
+  said so, since the OM does not say which applies from today. `readNote`
+  runs the note month by month from today's balance to its maturity and
+  solves its yield to maturity with the engine's `irr` (the monthly rate
+  × 12, the way the coupon is quoted). Beside it are the current yield,
+  the price in cents on the dollar, and the loan-to-value at the balance
+  and at the price, over the value the OM states. Four rules. **The
+  discount is the return**: the yield past the current yield is the
+  discount accreting, and a premium larger than the interest left to
+  collect is a loss, said as one (the report test's $68M ask for a $60M
+  balance read −0.1%, which the first sentence printed without saying
+  why). **A term the OM does not state is not invented.** **A
+  non-performing note's contract yield is not the buyer's**: it is said as
+  what the note would earn if it paid. **A note past its maturity has no
+  contract yield.** `readInterest(ex, price, asOf = today)` carries the
+  read as `note`. The headline adds the yield and the cushion
+  (`noteYieldSentence`, `noteCollateralSentence`) after the `lead`, so the
+  deal context and the challenger read them on the day they run. The
+  panel draws the yield as three tiles (to maturity, current yield, on
+  the dollar), and only where the note pays or may: a large yield nobody
+  earns is not drawn. Beneath the tiles go the months and the payment
+  basis (`noteCaption`), then the collateral's stated value as the track,
+  with the balance filled light (`data-bar="note-balance"`) and the price
+  dark over it; a loan under water gets a tick at the value. The memo's
+  and the workbook cover's short line adds "13.8% to its Mar 2028
+  maturity". The report prints the note's own terms under the model's
+  caveat. A note's key terms lead with the loan's rows after the price
+  (`keyTermRows`' `interest`, `noteTermRows`), and a test holds the
+  prompt's labels to the reader's.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`
