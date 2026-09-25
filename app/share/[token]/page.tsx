@@ -10,6 +10,7 @@ import type {
 import { staleAfterFailure } from "@/lib/screen-run";
 import { SHARE_REFUSAL_COPY, resolveShare } from "@/lib/share-resolve";
 import { Expired, ShareView } from "./share-view";
+import { floodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 
 // Every render checks expiry/revocation against the database.
 export const dynamic = "force-dynamic";
@@ -28,6 +29,14 @@ export const metadata: Metadata = {
  * markup is `ShareView` (share-view.tsx), pure so the render tests draw it
  * on fixtures.
  */
+/** FEMA's flood zone at the building from the stored lookup, one line
+ *  (#426); null while the lookup is pending or has nothing to say. */
+function floodLineOf(raw: unknown): string | null {
+  const flags = (raw as SiteFlagsResult | null) ?? null;
+  if (!flags || flags.status === "pending") return null;
+  return floodShortLine(flags.flood);
+}
+
 export default async function SharePage({
   params,
 }: {
@@ -69,6 +78,7 @@ export default async function SharePage({
       comps={(deal.comps as BrokerCompsResult | null) ?? null}
       market={(deal.market as MarketResult | null) ?? null}
       verdict={deal.verdict as VerdictResult}
+      floodLine={floodLineOf(deal.site_flags)}
     />
   );
 }

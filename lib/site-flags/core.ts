@@ -203,3 +203,70 @@ export function floodKey(
   }
   return out;
 }
+
+// ── The flood zone wherever the deal is summarized (#426) ───────────────────
+
+/** A subtype in words: FEMA writes "0.2 PCT ANNUAL CHANCE FLOOD HAZARD". */
+function subtypeWords(subtype: string): string {
+  return subtype
+    .trim()
+    .toLowerCase()
+    .replace(/\s*\b(?:pct|percent)\b/g, "%");
+}
+
+/**
+ * The pipeline row's tag: a Special Flood Hazard Area only — the zone where
+ * a federally backed loan requires flood insurance, which is the fact a
+ * list of deals needs beside the price. "Flood AE". Null otherwise.
+ */
+export function floodTag(flood: SiteFlagsResult["flood"] | undefined): string | null {
+  if (!flood || flood === "unavailable" || !flood.isHighRisk) return null;
+  return `Flood ${flood.zone}`;
+}
+
+/**
+ * One line for a document's header (the memo, the shared screen): the
+ * Special Flood Hazard Area and every other hazard FEMA draws, in FEMA's own
+ * words. Nothing for minimal hazard — it is not a finding — nor for a point
+ * with no digital map or a lookup that did not answer, which are absences.
+ */
+export function floodShortLine(flood: SiteFlagsResult["flood"] | undefined): string | null {
+  if (!flood || flood === "unavailable" || isMinimalHazard(flood)) return null;
+  if (flood.isHighRisk) {
+    return `Flood zone ${flood.zone}: a Special Flood Hazard Area, where flood insurance is required on federally backed debt (FEMA)`;
+  }
+  return `Flood zone ${flood.zone}${flood.subtype ? ` — ${subtypeWords(flood.subtype)}` : ""} (FEMA)`;
+}
+
+/**
+ * The zone as a cell — the pipeline's CSV and the compare table's row —
+ * every case said, blank only where the lookup has not answered:
+ * "AE (SFHA)", "X (minimal)", "X (0.2% annual chance flood hazard)", "no
+ * FEMA digital map".
+ */
+export function floodCell(flood: SiteFlagsResult["flood"] | undefined): string {
+  if (flood === undefined || flood === "unavailable") return "";
+  if (flood === null) return "no FEMA digital map";
+  if (flood.isHighRisk) return `${flood.zone} (SFHA)`;
+  if (isMinimalHazard(flood)) return `${flood.zone} (minimal)`;
+  return flood.subtype ? `${flood.zone} (${subtypeWords(flood.subtype)})` : flood.zone;
+}
+
+/**
+ * The zone as the Claude steps read it (the deal context, #426): the same
+ * facts as `floodZoneLine`, without the map's shading, which the model never
+ * sees — and the one consequence it can act on, that a Special Flood Hazard
+ * Area puts a flood premium in the expense line the seller's figures may not
+ * carry. Null where the lookup has not answered.
+ */
+export function floodContextLine(flood: SiteFlagsResult["flood"] | undefined): string | null {
+  if (flood === undefined || flood === "unavailable") return null;
+  if (flood === null) {
+    return "FEMA's digital flood map has no zone at the building's point, so whether it floods is not known from the map.";
+  }
+  if (isMinimalHazard(flood)) return `FEMA's flood map puts the building in Zone ${flood.zone}, an area of minimal flood hazard.`;
+  if (flood.isHighRisk) {
+    return `FEMA's flood map puts the building in Zone ${flood.zone}, a Special Flood Hazard Area: a federally backed loan requires flood insurance, so the expense line needs a flood premium the seller's figures may not carry.`;
+  }
+  return `FEMA's flood map puts the building in Zone ${flood.zone}${flood.subtype ? ` (${subtypeWords(flood.subtype)})` : ""}, outside the Special Flood Hazard Area: flood insurance is not required by a federally backed lender, though the hazard is mapped.`;
+}

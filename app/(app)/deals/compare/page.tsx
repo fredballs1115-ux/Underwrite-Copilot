@@ -17,6 +17,7 @@ import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { seedBenchmarks } from "@/lib/research-data";
 import { findPriceMetric, inferStrategy, isPlanDeal, noiFigures } from "@/lib/deal-strategy";
 import { bannerSources } from "@/lib/deal-banner";
+import { floodCell, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { compareInterest } from "@/lib/compare-interest";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
@@ -112,6 +113,14 @@ function toCol(
     interest: ci.tag,
     noteYtm: ci.noteYtmPct,
     withheld: ci.withheld,
+    // FEMA's zone at the building from the stored site-flags lookup (#426);
+    // blank before it has answered, never a guess.
+    flood: floodCell(
+      (() => {
+        const f = (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
+        return f && f.status !== "pending" ? f.flood : undefined;
+      })(),
+    ),
     // The shared price reader — never a per-unit price or a prior trade; a
     // development's land cost is its price.
     price: usd(r?.purchasePrice) ?? findPriceMetric(ex?.metrics ?? [], strat.kind)?.value ?? null,

@@ -65,6 +65,10 @@ export type DealCard = {
   jobStatus?: "running" | "stalled" | "failed" | null;
   /** the deal has an address, so an aerial thumbnail can be attempted */
   hasAddress: boolean;
+  /** FEMA's flood zone at the building (lib/site-flags, #426): `tag` only in
+   *  a Special Flood Hazard Area ("Flood AE"), `cell` for the CSV in every
+   *  case; absent before the lookup has answered */
+  flood?: { tag: string | null; cell: string } | null;
 };
 
 /** One row per deal: name · asset · price · cap · buy box · status · added.
@@ -491,7 +495,7 @@ export function Pipeline({
     };
     // A plan deal's cap cell is empty and its yield on cost sits in its own
     // column — the same two columns the meeting .xlsx carries.
-    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "What the price buys", "Assumable debt", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Added", "Added by"];
+    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "What the price buys", "Assumable debt", "Flood zone", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Added", "Added by"];
     const lines = filtered.map((d) =>
       [
         d.name,
@@ -503,6 +507,8 @@ export function Pipeline({
         d.slots.interest ?? "",
         // Blank where no loan is offered for assumption (#419).
         d.slots.debt ?? "",
+        // Every case said; blank only before FEMA's lookup has answered (#426).
+        d.flood?.cell ?? "",
         d.slots.cap ?? "",
         d.slots.yoc ?? "",
         d.fit ? FIT_META[d.fit].label : "",
@@ -1375,6 +1381,17 @@ const DealRow = memo(function DealRow({
       {d.slots.debt}
     </span>
   ) : null;
+  // A Special Flood Hazard Area (#426): a federally backed loan requires
+  // flood insurance there, which is a cost and a lender's condition — said
+  // beside the price, where a list of deals is read.
+  const floodBit = d.flood?.tag ? (
+    <span
+      className="whitespace-nowrap font-medium text-kill"
+      title={`${d.flood.tag}: FEMA's Special Flood Hazard Area — a federally backed loan requires flood insurance; the deal page draws the map`}
+    >
+      {d.flood.tag}
+    </span>
+  ) : null;
   // A plan deal has no going-in cap; its yield on total cost is the figure
   // that answers the same question, so it takes the slot — labelled.
   const capBit = d.slots.cap ? (
@@ -1532,11 +1549,11 @@ const DealRow = memo(function DealRow({
             the call has its own column and the line is the figures alone. */}
         <div className="mt-1 flex items-center gap-2 md:hidden">
           <span className="flex shrink-0 sm:hidden">{status}</span>
-          <MetaLine flush className="min-w-0" bits={[priceBit, interestBit, debtBit, capBit, fitBit]} />
+          <MetaLine flush className="min-w-0" bits={[priceBit, interestBit, debtBit, floodBit, capBit, fitBit]} />
         </div>
         <MetaLine
           className="hidden md:block lg:hidden"
-          bits={[dueBit, marketBit, coveredBit, assetBit, interestBit, debtBit, fitBit, dateBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, assetBit, interestBit, debtBit, floodBit, fitBit, dateBit, addedByBit]}
         />
         <MetaLine
           className="hidden lg:block xl:hidden"

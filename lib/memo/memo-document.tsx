@@ -30,6 +30,7 @@ import type {
 import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { interestOf, interestShortLine, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
+import { floodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
 import { shownAssetClass } from "@/lib/pipeline-slots";
@@ -121,6 +122,15 @@ function assumableLineFor(extraction: ExtractionResult | null): string {
   return a ? assumableLine(a) : "";
 }
 
+/** FEMA's flood zone at the building, from the stored site-flags lookup,
+ *  in one line for the memo's header (#426): "" where there is nothing to
+ *  say — minimal hazard, no digital map, a lookup still pending. */
+function floodLineFor(deal: DealRow): string {
+  const flags = (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
+  if (!flags || flags.status === "pending") return "";
+  return floodShortLine(flags.flood) ?? "";
+}
+
 export type MemoData = {
   name: string;
   market: string;
@@ -134,6 +144,10 @@ export type MemoData = {
   /** the seller's loan offered for assumption, as stated (#419); "" where
    *  none is */
   assumableLine?: string;
+  /** FEMA's flood zone at the building (lib/site-flags `floodShortLine`,
+   *  #426) — a Special Flood Hazard Area or a drawn hazard; "" for minimal
+   *  hazard, no digital map or a lookup that has not answered */
+  floodLine?: string;
   dateStr: string;
   verdictWord: string | null;
   verdictColor: string;
@@ -373,6 +387,7 @@ export function buildMemoData(
     strategyLine: pdfSafe(strategyLineFor(extraction ?? null)),
     interestLine: pdfSafe(interestLineFor(extraction ?? null)),
     assumableLine: pdfSafe(assumableLineFor(extraction ?? null)),
+    floodLine: pdfSafe(floodLineFor(deal)),
     dateStr,
     verdictWord: vmeta?.word ?? null,
     verdictColor: vmeta?.color ?? C.muted,
@@ -815,6 +830,9 @@ export function MemoPage({ data }: { data: MemoData }) {
             )}
             {/* The seller's loan offered for assumption (#419), as stated. */}
             {data.assumableLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.assumableLine}</Text>}
+            {/* FEMA's flood zone at the building (#426): a Special Flood
+                Hazard Area is a cost and a lender's condition. */}
+            {data.floodLine && <Text style={[s.sub, { color: "#9b1c1c" }]}>{data.floodLine}</Text>}
           </View>
           {data.verdictWord ? (
             <View

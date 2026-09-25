@@ -202,3 +202,71 @@ describe("floodKey — the key under the Flood tab's map", () => {
     expect(floodKey([], flag("AE", null))).toEqual([]);
   });
 });
+
+import { floodCell, floodShortLine, floodTag } from "./core";
+
+describe("the flood zone on every summary (#426)", () => {
+  const flag = (zone: string, subtype: string | null) => ({ zone, subtype, isHighRisk: /^[AV]/.test(zone) });
+
+  it("tags a pipeline row only in a Special Flood Hazard Area", () => {
+    expect(floodTag(flag("AE", null))).toBe("Flood AE");
+    expect(floodTag(flag("VE", null))).toBe("Flood VE");
+    expect(floodTag(flag("X", "0.2 PCT ANNUAL CHANCE FLOOD HAZARD"))).toBeNull();
+    expect(floodTag(flag("X", "AREA OF MINIMAL FLOOD HAZARD"))).toBeNull();
+    expect(floodTag(null)).toBeNull();
+    expect(floodTag("unavailable")).toBeNull();
+    expect(floodTag(undefined)).toBeNull();
+  });
+
+  it("gives a document's header one line in FEMA's words, and nothing for minimal hazard or an absence", () => {
+    expect(floodShortLine(flag("AE", null))).toBe(
+      "Flood zone AE: a Special Flood Hazard Area, where flood insurance is required on federally backed debt (FEMA)",
+    );
+    expect(floodShortLine(flag("X", "0.2 PCT ANNUAL CHANCE FLOOD HAZARD"))).toBe("Flood zone X — 0.2% annual chance flood hazard (FEMA)");
+    expect(floodShortLine(flag("X", "AREA WITH REDUCED FLOOD RISK DUE TO LEVEE"))).toBe(
+      "Flood zone X — area with reduced flood risk due to levee (FEMA)",
+    );
+    expect(floodShortLine(flag("X", "AREA OF MINIMAL FLOOD HAZARD"))).toBeNull();
+    expect(floodShortLine(null)).toBeNull();
+    expect(floodShortLine("unavailable")).toBeNull();
+  });
+
+  it("says every case as a cell, blank only where the lookup has not answered", () => {
+    expect(floodCell(flag("AE", null))).toBe("AE (SFHA)");
+    expect(floodCell(flag("X", "AREA OF MINIMAL FLOOD HAZARD"))).toBe("X (minimal)");
+    expect(floodCell(flag("X", "0.2 PERCENT ANNUAL CHANCE FLOOD HAZARD"))).toBe("X (0.2% annual chance flood hazard)");
+    expect(floodCell(flag("D", null))).toBe("D");
+    expect(floodCell(null)).toBe("no FEMA digital map");
+    expect(floodCell("unavailable")).toBe("");
+    expect(floodCell(undefined)).toBe("");
+  });
+});
+
+import { floodContextLine } from "./core";
+import { dealContextFor } from "@/lib/deal-context";
+import { SAMPLE_DEAL } from "@/lib/sample-deal";
+import type { ExtractionResult } from "@/lib/anthropic/types";
+
+describe("floodContextLine and the deal context — the zone as the Claude steps read it (#426)", () => {
+  const flag = (zone: string, subtype: string | null) => ({ zone, subtype, isHighRisk: /^[AV]/.test(zone) });
+
+  it("names the premium the seller's figures may not carry in a Special Flood Hazard Area, and says the other cases plainly", () => {
+    expect(floodContextLine(flag("AE", null))).toBe(
+      "FEMA's flood map puts the building in Zone AE, a Special Flood Hazard Area: a federally backed loan requires flood insurance, so the expense line needs a flood premium the seller's figures may not carry.",
+    );
+    expect(floodContextLine(flag("X", "AREA OF MINIMAL FLOOD HAZARD"))).toBe("FEMA's flood map puts the building in Zone X, an area of minimal flood hazard.");
+    expect(floodContextLine(flag("X", "0.2 PCT ANNUAL CHANCE FLOOD HAZARD"))).toContain("Zone X (0.2% annual chance flood hazard), outside the Special Flood Hazard Area");
+    expect(floodContextLine(null)).toContain("whether it floods is not known from the map");
+    expect(floodContextLine("unavailable")).toBeNull();
+    expect(floodContextLine(undefined)).toBeNull();
+  });
+
+  it("rides in the deal context after what is being sold, and leaves the context as it was without a lookup", () => {
+    const ex = SAMPLE_DEAL.extraction as unknown as ExtractionResult;
+    const withFlood = dealContextFor(ex, { flood: flag("AE", null) }) ?? "";
+    expect(withFlood).toContain("FEMA's flood map puts the building in Zone AE, a Special Flood Hazard Area");
+    const without = dealContextFor(ex) ?? "";
+    expect(without).not.toContain("FEMA");
+    expect(dealContextFor(ex, null)).toBe(dealContextFor(ex));
+  });
+});
