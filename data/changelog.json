@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-25",
+      "title": "The flood map, in the full report",
+      "href": "/deals",
+      "blurb": "The full report now has a page for the site. It shows FEMA's flood map around the building: the aerial with FEMA's flood zones in FEMA's colours, a ring on the building, and FEMA's key with the building's own zone marked. The line under the map says what the zone means for a loan. If FEMA's map service is slow, the report prints the zone without the picture rather than making you wait."
+    },
+    {
+      "date": "2026-09-25",
       "title": "Flood zones, flagged on every summary",
       "href": "/deals",
       "blurb": "A deal in one of FEMA's Special Flood Hazard Areas, where a federally backed loan requires flood insurance, now says so wherever it is summarized. The pipeline row shows a red \"Flood AE\" tag beside the price, and the pipeline's CSV has a flood zone column. The compare page adds a flood zone row, and the memo and the shared screen state the zone under the title. When the zone is known by the time the analysis runs, the analysis reads it too, so it can check whether the seller's expenses carry a flood premium."

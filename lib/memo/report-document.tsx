@@ -2,6 +2,8 @@ import "server-only";
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import type { DealRow } from "@/lib/deals";
 import type { BuyBoxCheck } from "@/lib/criteria";
+import type { FloodMapView } from "@/lib/site-flags/core";
+import { REPORT_FLOOD_SIZE } from "@/lib/basemaps";
 import type {
   ExtractionResult,
   ChallengerResult,
@@ -309,6 +311,62 @@ function AssumableBlock({ view }: { view: AssumableView | null | undefined }) {
       {view.rateLine ? <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 2 }}>{str(view.rateLine)}</Text> : null}
       {view.basisLine ? <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 1 }}>{str(view.basisLine)}</Text> : null}
       {view.feeLine ? <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 1 }}>{str(view.feeLine)}</Text> : null}
+    </View>
+  );
+}
+
+/**
+ * FEMA's flood map at the building (#427): the aerial with FEMA's zones, in
+ * FEMA's colours, as one picture the width of the page, with a ring at its
+ * centre (the building), FEMA's key under it and the sentence on the zone at
+ * the building. The same frame and the same words as the deal page's Flood
+ * tab, so the report and the page cannot disagree about the map.
+ */
+const SITE_MAP_W = 524; // the page's content width: LETTER less 44pt a side
+const SITE_MAP_H = Math.round((SITE_MAP_W * REPORT_FLOOD_SIZE.height) / REPORT_FLOOD_SIZE.width);
+
+function SiteBlock({ view }: { view: FloodMapView }) {
+  return (
+    <View wrap={false}>
+      {view.image ? (
+        <>
+          <View style={{ position: "relative", width: SITE_MAP_W, height: SITE_MAP_H, marginTop: 2 }}>
+            {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image takes no alt */}
+            <Image src={view.image} style={{ width: SITE_MAP_W, height: SITE_MAP_H, borderRadius: 4, objectFit: "cover" }} />
+            <View
+              style={{
+                position: "absolute",
+                left: SITE_MAP_W / 2 - 6,
+                top: SITE_MAP_H / 2 - 6,
+                width: 12,
+                height: 12,
+                borderRadius: 6,
+                borderWidth: 2,
+                borderColor: "#ffffff",
+              }}
+            />
+          </View>
+          <Text style={{ fontSize: 6.5, color: C.muted, marginTop: 3, textAlign: "right" }}>
+            FEMA National Flood Hazard Layer over USGS The National Map; the ring marks the building.
+          </Text>
+        </>
+      ) : null}
+      {view.key.length > 0 ? (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 6 }}>
+          {view.key.map((k) => (
+            <View key={k.label} style={{ flexDirection: "row", alignItems: "center", marginRight: 12, marginBottom: 3 }}>
+              {k.image ? (
+                // eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image takes no alt
+                <Image src={k.image} style={{ width: 8, height: 8, marginRight: 4, borderWidth: 0.5, borderColor: C.line }} />
+              ) : null}
+              <Text style={{ fontSize: 7.5, color: C.ink, fontFamily: k.here ? "Helvetica-Bold" : "Helvetica" }}>
+                {str(k.here ? `${k.label} - at the building` : k.label)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {view.line ? <Text style={{ fontSize: 9, color: C.ink, marginTop: 6, lineHeight: 1.35 }}>{str(view.line)}</Text> : null}
     </View>
   );
 }
@@ -632,6 +690,9 @@ export interface ReportInput {
    *  model's sale (lib/leasehold-exit, #422) — printed beside the
    *  assumptions read; null unless a leasehold states when its lease ends */
   leasehold?: LeaseholdExitView | null;
+  /** FEMA's flood map at the building (lib/flood-map `floodMapFor`, #427):
+   *  the composite, FEMA's key and the zone sentence; null for no page */
+  floodMap?: FloodMapView | null;
 }
 
 /** Everything the deal screen produced, shaped for the multi-page report. */
@@ -647,6 +708,7 @@ export function buildReportData(
   modelVsMarket?: ModelVsMarket | null,
   assumable?: AssumableView | null,
   leasehold?: LeaseholdExitView | null,
+  floodMap?: FloodMapView | null,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
@@ -654,6 +716,7 @@ export function buildReportData(
     modelVsMarket: modelVsMarket ?? null,
     assumable: assumable ?? null,
     leasehold: leasehold ?? null,
+    floodMap: floodMap ?? null,
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
@@ -1230,6 +1293,16 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           <AssumptionsBlock read={modelVsMarket} />
           <AssumableBlock view={input.assumable} />
           <LeaseholdBlock view={input.leasehold} />
+        </PageChrome>
+      )}
+
+      {/* The site (#427): FEMA's flood map at the building, before the
+          terms — a Special Flood Hazard Area is a lender's condition and a
+          line in the expenses. */}
+      {input.floodMap && (
+        <PageChrome title="The site" count="FEMA flood map" dealName={dealName} branding={memo.branding}>
+          <Text style={s.sub}>{"What FEMA's flood insurance rate map shows around the building, drawn the way FEMA draws it."}</Text>
+          <SiteBlock view={input.floodMap} />
         </PageChrome>
       )}
 
