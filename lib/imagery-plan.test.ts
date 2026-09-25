@@ -153,12 +153,17 @@ describe("frameZoom", () => {
     expect(z("block")).toBeGreaterThan(z("area"));
   });
 
-  it("lets USGS resolve to ~0.3 m/px, where the export service has it", () => {
-    // z19 at DC's latitude is ~0.23 m of ground per pixel — the high-res
-    // ortho scale the National Map carries in covered metros. The old z18 cap
-    // was NAIP scale, and made every downtown look like farmland imagery.
-    expect(MAX_SOURCE_ZOOM.aerial).toBe(19);
-    expect(covers(1, 19, DC)).toBeLessThan(0.3);
+  it("holds USGS to the photograph's own grain — z17, about 0.9 m a pixel — because finer is the export stretching it", () => {
+    // The aerial sheet (#429) drew eight places at z19, z18 and z17: z19 was
+    // mush everywhere, downtowns included, z17 crisp. A cap finer than the
+    // imagery is what put a blurry picture beside every property.
+    expect(MAX_SOURCE_ZOOM.aerial).toBe(17);
+    expect(covers(1, 17, DC)).toBeGreaterThan(0.8);
+    expect(covers(1, 17, DC)).toBeLessThan(1.0);
+    // A card or a hero asks for more pixels, never for finer ground.
+    for (const widthPx of [96, 168, 720, 1280]) {
+      expect(frameZoom({ widthPx, lat: DC, precision: "street", source: "aerial" })).toBeLessThanOrEqual(17);
+    }
   });
 
   it("compensates for Mercator stretch with latitude", () => {

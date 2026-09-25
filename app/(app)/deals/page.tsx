@@ -6,7 +6,11 @@ import { type DealRow } from "@/lib/deals";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { WhatsNewCard } from "./whats-new";
-import { Pipeline, type DealCard } from "./pipeline";
+import { PIPELINE_VIEW_COOKIE, Pipeline, type DealCard } from "./pipeline";
+import { cookies } from "next/headers";
+import { CARD, bannerSources } from "@/lib/deal-banner";
+import { PICTURE_CREDIT, pictureMayBeInMemorandum } from "@/lib/deal-picture";
+import type { DealVisualCache } from "@/lib/deal-location";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
 import { inferStrategy } from "@/lib/deal-strategy";
@@ -80,7 +84,7 @@ export default async function DealsPage({
     supabase
       .from("deals")
       .select(
-        "id, name, asset_class, created_at, verdict, extraction, address, first_signal, user_id, team_id, stage, is_sample, site_flags",
+        "id, name, asset_class, created_at, verdict, extraction, address, first_signal, user_id, team_id, stage, is_sample, site_flags, photo, om_storage_path",
       )
       .order("created_at", { ascending: false }),
     user ? getBuyBoxForDeal(user.id, null).catch(() => null) : Promise.resolve(null),
@@ -127,7 +131,14 @@ export default async function DealsPage({
     team_id: string | null;
     stage: string | null;
     is_sample: boolean | null;
+    photo?: DealVisualCache | null;
+    om_storage_path?: string | null;
   };
+
+  // The card view's pictures (#428): the reader's choice of view from its
+  // cookie, and whether Street View can be tried at all.
+  const initialView = (await cookies()).get(PIPELINE_VIEW_COOKIE)?.value === "list" ? "list" : "cards";
+  const googleEnabled = !!process.env.GOOGLE_MAPS_API_KEY;
 
   // The latest job per deal (Screening… / Failed labels) and the teammate
   // names for shared deals both depend only on the deal list, not on each
@@ -246,6 +257,30 @@ export default async function DealsPage({
       // (#426): the row's tag in a Special Flood Hazard Area, the CSV's cell
       // in every case, nothing before the lookup has answered.
       flood: floodFor((d as { site_flags?: SiteFlagsResult | null }).site_flags ?? null),
+      // The card's pictures, best first and each pinned with its credit
+      // (#428, the compare page's rule): the deal's own photograph — or the
+      // memorandum's cover on its first ask — then Street View, then the
+      // USGS aerial with the building ringed.
+      pictures: (() => {
+        const cache = d.photo ?? null;
+        const address = (d.address as StructuredAddress | null) ?? null;
+        const picture = cache?.picture ?? null;
+        return bannerSources(
+          {
+            dealId: d.id,
+            pictureCredit: picture ? PICTURE_CREDIT[picture.source] : null,
+            memorandumUnread: pictureMayBeInMemorandum({
+              omPath: d.om_storage_path ?? null,
+              isSample: !!d.is_sample,
+              cache,
+            }),
+            googleEnabled,
+            hasStreetAddress: !!address?.street?.trim(),
+            hasAddress: !!address?.label?.trim(),
+          },
+          CARD,
+        );
+      })(),
     };
   });
 
@@ -275,6 +310,7 @@ export default async function DealsPage({
               }
             : null
         }
+        initialView={initialView}
       />
       <TodaysNews />
       <WhatsNewCard />

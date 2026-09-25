@@ -14,6 +14,7 @@
 
 import { NextResponse } from "next/server";
 import { usgsAerialUrl } from "@/lib/basemaps";
+import { finishAerial } from "@/lib/aerial-finish";
 import { frameZoom } from "@/lib/imagery-plan";
 import { METRO_FRAME_METRES, metroView } from "@/lib/metro-imagery";
 
@@ -78,9 +79,18 @@ export async function GET(
     return new NextResponse(null, { status: 404 });
   }
 
-  return new NextResponse(img.body, {
+  // The same finish every building's overhead gets (#429); the plain export
+  // where the finish fails.
+  const raw = Buffer.from(await img.arrayBuffer());
+  let bytes: Buffer = raw;
+  try {
+    bytes = await finishAerial(raw);
+  } catch {
+    // the plain export is still the real picture
+  }
+  return new NextResponse(new Uint8Array(bytes), {
     headers: {
-      "content-type": type,
+      "content-type": bytes === raw ? type : "image/jpeg",
       // A downtown does not move and the id maps to a fixed point, so this
       // response is genuinely immutable. Long public caching is also what
       // keeps a public page from hammering a free federal service.

@@ -16,6 +16,8 @@ import { useRouter } from "next/navigation";
 import { createDeal, createSampleDeal } from "./actions";
 import { BatchUpload } from "./batch-upload";
 import { DealThumb } from "./deal-thumb";
+import { DealBanner } from "./deal-banner";
+import type { BannerSource } from "@/lib/deal-banner";
 import { ManualDealForm } from "./manual-deal-form";
 import { FileDrop } from "../file-drop";
 import { PendingButton } from "../pending-button";
@@ -69,7 +71,16 @@ export type DealCard = {
    *  a Special Flood Hazard Area ("Flood AE"), `cell` for the CSV in every
    *  case; absent before the lookup has answered */
   flood?: { tag: string | null; cell: string } | null;
+  /** the pictures the card view tries, best first, each pinned to one
+   *  source with its own credit (lib/deal-banner, #428) */
+  pictures?: BannerSource[];
 };
+
+/** How the pipeline is drawn (#428): photograph-led cards, or the dense
+ *  list. The choice is a cookie so the server draws the same view the
+ *  reader left — no flash of the other one on the next visit. */
+export type PipelineView = "cards" | "list";
+export const PIPELINE_VIEW_COOKIE = "uc_pipeline_view";
 
 /** One row per deal: name · asset · price · cap · buy box · status · added.
  *  Every column is sortable from its header. */
@@ -219,6 +230,7 @@ export function Pipeline({
   prefillAddress,
   onboarding,
   billing,
+  initialView = "cards",
 }: {
   deals: DealCard[];
   errorMessage: string | null;
@@ -232,8 +244,19 @@ export function Pipeline({
   prefillAddress?: StructuredAddress | null;
   onboarding?: OnboardingState;
   billing: BillingInfo | null;
+  /** the view the reader last chose, read from its cookie by the page */
+  initialView?: PipelineView;
 }) {
   const [query, setQuery] = useState("");
+  const [view, setViewState] = useState<PipelineView>(initialView);
+  const setView = useCallback((v: PipelineView) => {
+    setViewState(v);
+    try {
+      document.cookie = `${PIPELINE_VIEW_COOKIE}=${v}; path=/; max-age=31536000; samesite=lax`;
+    } catch {
+      // cookies unavailable — the choice lasts this visit
+    }
+  }, []);
   const [verdict, setVerdict] = useState("all");
   const [stage, setStage] = useState("all");
   const [asset, setAsset] = useState("all");
@@ -780,7 +803,8 @@ export function Pipeline({
               {showDead ? "Hide dead" : `Show dead (${deadCount})`}
             </button>
           )}
-          {/* Below md the column headers are hidden, so sorting lives here. */}
+          {/* Below md the column headers are hidden, and the cards have none
+              at any width, so sorting lives here. */}
           <FilterSelect
             label="Sort deals"
             value={`${sortKey}:${sortDir}`}
@@ -789,7 +813,7 @@ export function Pipeline({
               setSortKey(k);
               setSortDir(dir);
             }}
-            className="ml-auto md:hidden"
+            className={`ml-auto ${view === "list" ? "md:hidden" : ""}`}
             options={[
               ["added:desc", "Newest"],
               ["added:asc", "Oldest"],
@@ -803,7 +827,8 @@ export function Pipeline({
           {/* The two exports travel together at the right edge: when the
               filters wrap, the last line ends with them, never with one
               stranded select beside them. */}
-          <div className="flex items-center gap-2 md:ml-auto">
+          <div className={`flex items-center gap-2 ${view === "list" ? "md:ml-auto" : ""}`}>
+            <ViewToggle view={view} onChange={setView} />
             <button
               type="button"
               onClick={exportCsv}
@@ -917,6 +942,7 @@ export function Pipeline({
                 is a sort control (sorting applies within each stage group).
                 Widths/gaps mirror DealRow exactly; narrower columns join at
                 lg, the Added column at xl (the Stage select takes its slot). */}
+            {view === "list" && (
             <div className="hidden items-center gap-3 px-5 pb-1.5 md:flex">
               {compareMode && <span className="w-5 shrink-0" />}
               <div className="min-w-0 flex-1">
@@ -935,6 +961,7 @@ export function Pipeline({
               )}
               {!compareMode && <span className="h-4 w-4 shrink-0 lg:hidden" />}
             </div>
+            )}
 
             <div className="space-y-4">
               {STAGES.map((s) => {
@@ -978,8 +1005,24 @@ export function Pipeline({
                         {sectionDeals.length}
                       </span>
                     </button>
-                    {open && (
-                      <ul className="stagger mt-1.5 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+                    {open && view === "cards" && (
+                      // The photograph-led view (#428): a card a deal, the
+                      // building's picture first, the way a listing reads.
+                      <ul className="stagger mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" data-view="cards">
+                        {sectionDeals.map((d, idx) => (
+                          <DealTile
+                            key={d.id}
+                            d={d}
+                            i={idx}
+                            compareMode={compareMode}
+                            checked={selected.has(d.id)}
+                            onToggle={toggleSelected}
+                          />
+                        ))}
+                      </ul>
+                    )}
+                    {open && view === "list" && (
+                      <ul className="stagger mt-1.5 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface shadow-card" data-view="list">
                         {sectionDeals.map((d, idx) => (
                           <DealRow
                             key={d.id}
@@ -1665,6 +1708,265 @@ const DealRow = memo(function DealRow({
             <path d="m9 18 6-6-6-6" />
           </svg>
         </div>
+      )}
+    </li>
+  );
+});
+
+/** The two views as one control: an icon and a word each, the current one
+ *  pressed. */
+function ViewToggle({ view, onChange }: { view: PipelineView; onChange: (v: PipelineView) => void }) {
+  const opt = (v: PipelineView, label: string, icon: ReactNode) => (
+    <button
+      type="button"
+      aria-pressed={view === v}
+      onClick={() => onChange(v)}
+      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium transition-colors ${
+        view === v ? "bg-brand text-white shadow-sm" : "text-muted hover:bg-faint hover:text-ink"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+  return (
+    <div role="group" aria-label="Pipeline view" className="inline-flex items-center gap-0.5 rounded-lg border border-line bg-surface p-0.5 shadow-sm">
+      {opt(
+        "cards",
+        "Cards",
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden>
+          <rect x="3" y="3" width="7.5" height="7.5" rx="1.5" />
+          <rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" />
+          <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" />
+          <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" />
+        </svg>,
+      )}
+      {opt(
+        "list",
+        "List",
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden>
+          <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
+        </svg>,
+      )}
+    </div>
+  );
+}
+
+/** A card's call, drawn solid so it reads over any photograph: the
+ *  verdict in its colour, a failed or stalled run over the verdict it left
+ *  behind, a live screen, or the empty ring of a deal not yet screened. */
+const TILE_CALL: Record<string, string> = {
+  pass: "bg-pass text-white",
+  caution: "bg-caution text-white",
+  pass_on: "bg-kill text-white",
+};
+
+function TileCall({ d }: { d: DealCard }) {
+  const v = d.verdict ? VERDICT_META[d.verdict] : null;
+  const pill = "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold leading-none shadow-sm";
+  if (d.jobStatus === "failed") {
+    return (
+      <span className={`${pill} bg-kill text-white`} title="The latest screen failed — open the deal to see why and try again">
+        Failed
+      </span>
+    );
+  }
+  if (d.jobStatus === "stalled") {
+    return (
+      <span className={`${pill} bg-caution text-white`} title="The run stopped writing progress — open the deal to start it again">
+        Stalled
+      </span>
+    );
+  }
+  if (v && d.verdict) return <span className={`${pill} ${TILE_CALL[d.verdict] ?? "bg-white/95 text-ink"}`}>{v.label}</span>;
+  if (d.jobStatus === "running") {
+    return (
+      <span className={`${pill} bg-white/95 text-ink`}>
+        <span aria-hidden className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
+        Screening…
+      </span>
+    );
+  }
+  return (
+    <span className={`${pill} bg-white/90 py-1.5 text-muted`} title="Not screened yet — open the deal to run the screen">
+      <span aria-hidden className="h-2.5 w-2.5 rounded-full border-[1.5px] border-dashed border-muted/70" />
+      <span className="sr-only">Not screened</span>
+    </span>
+  );
+}
+
+function TileStat({ label, title, children }: { label: string; title?: string; children: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[10px] font-medium uppercase tracking-wide text-muted">{label}</dt>
+      <dd className="mt-0.5 truncate font-mono text-sm tabular-nums text-ink" title={title}>
+        {children}
+      </dd>
+    </div>
+  );
+}
+
+// The card view's deal (#428): the building's picture first — its own
+// photograph, the Street View frame or the USGS aerial with the building
+// ringed, each pinned with its credit — the call over the picture, then the
+// name, the place and the three figures a pipeline is read by. Memoized
+// like the row.
+const DealTile = memo(function DealTile({
+  d,
+  i,
+  compareMode,
+  checked,
+  onToggle,
+}: {
+  d: DealCard;
+  i: number;
+  compareMode: boolean;
+  checked: boolean;
+  onToggle: (id: string) => void;
+}) {
+  const isDead = normalizeStage(d.stage) === "dead";
+  const asset = assetMeta(d.assetClass ?? "");
+  const place = d.coveredMarket ?? d.readMarket ?? d.market;
+  const scored = d.score != null && d.mandateVerdict ? { score: d.score, verdict: d.mandateVerdict } : null;
+  const fitCls = scored ? (d.fit === "outside" ? "text-kill" : MANDATE_META[scored.verdict].cls) : "";
+  // What the picture must not hide: a Special Flood Hazard Area, what the
+  // price buys where it is not the building, the seller's loan.
+  const tags = [
+    d.flood?.tag ? { text: d.flood.tag, cls: "text-kill", title: `${d.flood.tag}: FEMA's Special Flood Hazard Area — a federally backed loan requires flood insurance` } : null,
+    d.slots.interest ? { text: d.slots.interest, cls: "text-brand", title: `${d.slots.interest}: the price does not buy the building outright` } : null,
+    d.slots.debt ? { text: d.slots.debt, cls: "text-brand", title: `${d.slots.debt}: the seller's loan is offered for assumption` } : null,
+  ].filter((t): t is { text: string; cls: string; title: string } => t !== null);
+
+  const inner = (
+    <>
+      <div className="relative">
+        <DealBanner
+          sources={d.pictures ?? []}
+          label={d.name}
+          aspect="16/10"
+          flush
+          shade
+          sizes="(min-width: 1536px) 24vw, (min-width: 1280px) 31vw, (min-width: 640px) 47vw, 100vw"
+        />
+        <span className="absolute left-3 top-3 flex">
+          <TileCall d={d} />
+        </span>
+        {tags.length > 0 && (
+          <span className="absolute right-3 top-3 flex max-w-[60%] flex-col items-end gap-1">
+            {tags.map((t) => (
+              <span
+                key={t.text}
+                title={t.title}
+                className={`truncate rounded-full bg-white/95 px-2 py-0.5 text-[11px] font-semibold shadow-sm ${t.cls}`}
+              >
+                {t.text}
+              </span>
+            ))}
+          </span>
+        )}
+        {compareMode && (
+          <span
+            aria-hidden
+            className={`absolute bottom-3 left-3 flex h-6 w-6 items-center justify-center rounded-md border-2 shadow-sm ${
+              checked ? "border-brand bg-brand text-white" : "border-white bg-white/80"
+            }`}
+          >
+            {checked && (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            )}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col px-4 pb-3.5 pt-3">
+        <p className="line-clamp-2 text-[15px] font-semibold leading-snug tracking-tight" title={d.name}>
+          {d.name}
+        </p>
+        <p className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted">
+          {d.assetClass ? (
+            <>
+              <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-full ${asset.dot}`} />
+              <span className="shrink-0">{assetClassLabel(d.assetClass)}</span>
+            </>
+          ) : null}
+          {d.assetClass && place ? <span aria-hidden>·</span> : null}
+          {place ? (
+            <span className="truncate" title={place}>
+              {place}
+            </span>
+          ) : null}
+        </p>
+        {/* Pushes the figures to the card's foot, so a row of cards lines
+            its figures up whatever the names' lengths. */}
+        <span aria-hidden className="min-h-3 flex-1" />
+        <dl className="grid grid-cols-3 gap-3 border-t border-line pt-3">
+          <TileStat label="Price" title={d.slots.price ?? undefined}>
+            {d.slots.price ? compactPrice(d.slots.price) : <span className="text-line">—</span>}
+          </TileStat>
+          {/* A plan deal has no going-in cap; its yield on total cost takes
+              the slot, labelled. */}
+          <TileStat label={!d.slots.cap && d.slots.yoc ? "Yield on cost" : "Cap"}>
+            {d.slots.cap ?? d.slots.yoc ?? <span className="text-line">—</span>}
+          </TileStat>
+          <div className="min-w-0">
+            <dt className="text-[10px] font-medium uppercase tracking-wide text-muted">Fit</dt>
+            <dd className="mt-0.5 text-sm font-semibold">
+              {scored ? (
+                <span className={`flex items-center gap-1.5 tabular-nums ${fitCls}`} title={`${scored.score} / 100 mandate fit`}>
+                  {scored.score}
+                  <FitBar score={scored.score} />
+                </span>
+              ) : d.fit ? (
+                <span className={FIT_META[d.fit].cls}>{FIT_META[d.fit].label}</span>
+              ) : (
+                <span className="font-normal text-line">—</span>
+              )}
+            </dd>
+          </div>
+        </dl>
+      </div>
+    </>
+  );
+
+  return (
+    <li
+      style={{ "--i": i } as React.CSSProperties}
+      data-deal-tile={d.id}
+      className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-surface shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
+        checked ? "border-brand ring-2 ring-brand/40" : "border-line"
+      } ${isDead ? "opacity-60" : ""}`}
+    >
+      {compareMode ? (
+        <button type="button" onClick={() => onToggle(d.id)} aria-pressed={checked} className="flex flex-1 flex-col text-left">
+          {inner}
+        </button>
+      ) : (
+        <>
+          <Link href={`/deals/${d.id}`} className="flex flex-1 flex-col">
+            {inner}
+          </Link>
+          {/* Outside the link: a select inside an anchor is invalid, and the
+              stage is changed here without leaving the pipeline. */}
+          <div className="flex items-center gap-2 border-t border-line bg-faint/60 px-4 py-2 text-[11px] text-muted">
+            {d.offersDue ? (
+              <OffersDueBit iso={d.offersDue} />
+            ) : (
+              <span className="font-mono tabular-nums">{fmtDate(d.createdAt)}</span>
+            )}
+            {d.addedBy ? (
+              <span className="inline-flex items-center" title={`Added by ${d.addedBy}`}>
+                <span aria-hidden className="flex h-4 w-4 items-center justify-center rounded-full bg-brand/10 text-[9px] font-semibold text-brand">
+                  {initials(d.addedBy)}
+                </span>
+                <span className="sr-only">added by {d.addedBy}</span>
+              </span>
+            ) : null}
+            <span className="ml-auto">
+              <StageSelect dealId={d.id} stage={d.stage} next="pipeline" compact />
+            </span>
+          </div>
+        </>
       )}
     </li>
   );

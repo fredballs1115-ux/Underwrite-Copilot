@@ -26,9 +26,10 @@ import { useEffect, useRef, useState } from "react";
  * On a phone too (#420): the slot was `hidden` below `sm`, so the one
  * width where a list reads most like a set of places showed no place at
  * all. It is larger there (56px, the row's call having moved onto its
- * price line) and the dense 36px from `sm` up; `srcSet` asks for 168px
- * where a phone's slot needs it (56px at 3×) and 96px elsewhere, since
- * the map sources are rendered at the size asked for.
+ * price line) and 48px from `sm` up (#428 — it was 36px, a postage stamp
+ * nobody could read a building in); `srcSet` asks for 168px where a
+ * phone's slot needs it (56px at 3×) and 96px elsewhere (48px at 2×),
+ * since the map sources are rendered at the size asked for.
  *
  * Lazy by design: a long pipeline must not fire a geocode for every row the
  * reader never scrolls to.
@@ -50,7 +51,7 @@ export function DealThumb({ dealId, hasAddress = true }: { dealId: string; hasAd
       <span
         aria-hidden
         data-deal-thumb="blank"
-        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md border border-dashed border-line bg-faint text-muted/60 sm:h-9 sm:w-9"
+        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-dashed border-line bg-faint text-muted/60 sm:h-12 sm:w-12"
       >
         <svg
           viewBox="0 0 24 24"
@@ -74,7 +75,7 @@ export function DealThumb({ dealId, hasAddress = true }: { dealId: string; hasAd
       ref={ref}
       src={`/api/deals/${dealId}/image?w=96&h=96`}
       srcSet={`/api/deals/${dealId}/image?w=96&h=96 96w, /api/deals/${dealId}/image?w=168&h=168 168w`}
-      sizes="(min-width: 640px) 36px, 56px"
+      sizes="(min-width: 640px) 48px, 56px"
       alt=""
       aria-hidden
       data-deal-thumb="photo"
@@ -83,7 +84,7 @@ export function DealThumb({ dealId, hasAddress = true }: { dealId: string; hasAd
       loading="lazy"
       decoding="async"
       onError={() => setGone(true)}
-      className="block h-14 w-14 shrink-0 rounded-md border border-line bg-faint object-cover sm:h-9 sm:w-9"
+      className="block h-14 w-14 shrink-0 rounded-lg border border-line bg-faint object-cover sm:h-12 sm:w-12"
     />
   );
 }

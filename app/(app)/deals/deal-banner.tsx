@@ -21,11 +21,26 @@ export function DealBanner({
   sources,
   label,
   className = "",
+  aspect = "16/9",
+  flush = false,
+  sizes,
+  shade = false,
 }: {
   sources: BannerSource[];
   /** the deal's name, for the picture's alt text */
   label: string;
   className?: string;
+  /** the frame's shape: the compare page's columns are 16:9, the
+   *  pipeline's cards 16:10 (#428) */
+  aspect?: "16/9" | "16/10";
+  /** inside a card that rounds its own corners: no rounding, no border */
+  flush?: boolean;
+  /** the <img>'s sizes hint, where the surface knows its column width */
+  sizes?: string;
+  /** a soft shade across the top of a picture, under the chips a card sets
+   *  there, so a white roof never swallows them — over a picture only,
+   *  never over the blank plate */
+  shade?: boolean;
 }) {
   const [at, setAt] = useState(0);
   const ref = useRef<HTMLImageElement>(null);
@@ -35,12 +50,15 @@ export function DealBanner({
   }, [at]);
 
   const s = sources[at];
+  const shape = aspect === "16/10" ? "aspect-[16/10]" : "aspect-[16/9]";
   if (!s) {
     return (
       <div
         aria-hidden
         data-deal-banner="blank"
-        className={`flex aspect-[16/9] items-center justify-center rounded-lg border border-dashed border-line bg-faint text-muted/60 ${className}`}
+        className={`flex ${shape} items-center justify-center ${
+          flush ? "" : "rounded-lg border border-dashed border-line"
+        } bg-faint text-muted/60 ${className}`}
       >
         <svg
           viewBox="0 0 24 24"
@@ -63,7 +81,7 @@ export function DealBanner({
         ? `Street view of ${label}`
         : `Aerial photograph of ${label}`;
   return (
-    <div className={`relative overflow-hidden rounded-lg bg-faint ${className}`} data-deal-banner={s.kind}>
+    <div className={`relative overflow-hidden ${flush ? "" : "rounded-lg"} bg-faint ${className}`} data-deal-banner={s.kind}>
       {/* eslint-disable-next-line @next/next/no-img-element -- proxied,
           auth-scoped routes with their own cache headers; next/image adds
           nothing over them */}
@@ -73,12 +91,27 @@ export function DealBanner({
         src={s.src}
         alt={alt}
         width={640}
-        height={360}
+        height={aspect === "16/10" ? 400 : 360}
+        sizes={sizes}
         loading="lazy"
         decoding="async"
         onError={() => setAt((i) => i + 1)}
-        className="aspect-[16/9] w-full object-cover"
+        className={`${shape} w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]`}
       />
+      {shade && (
+        <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-14 bg-gradient-to-b from-black/30 to-transparent" />
+      )}
+      {s.marker && (
+        // The building, at the overhead's centre: a white ring with a dark
+        // halo, legible over a roof or a road alike.
+        <span
+          aria-hidden
+          data-picture="banner-pin"
+          className="pointer-events-none absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-[2.5px] border-white shadow-[0_0_0_2px_rgba(0,0,0,0.35),0_1px_6px_rgba(0,0,0,0.45)]"
+        >
+          <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
+        </span>
+      )}
       <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[9px] leading-tight text-white">
         {s.credit}
       </span>

@@ -12,6 +12,7 @@ import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/serve
 import type { StructuredAddress } from "@/lib/address";
 import { resolveDealLocation, type DealVisualCache } from "@/lib/deal-location";
 import { FLOOD_MIN_ZOOM, FLOOD_ZOOM } from "@/lib/basemaps";
+import { MAX_SOURCE_ZOOM } from "@/lib/imagery-plan";
 import { fetchFloodOverlay } from "@/lib/flood-map";
 
 const SIZE = { min: 48, max: 1280, defaultW: 1280, defaultH: 576 };
@@ -40,7 +41,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const size = {
     width: clamp(q.get("w"), SIZE.min, SIZE.max, SIZE.defaultW),
     height: clamp(q.get("h"), SIZE.min, SIZE.max, SIZE.defaultH),
-    zoom: clamp(q.get("z"), FLOOD_MIN_ZOOM, 19, FLOOD_ZOOM),
+    // Held to the aerial's own cap (#429): the aerial route draws no finer
+    // than the photograph's grain, and an overlay asked for a finer frame
+    // would lie over the wrong ground.
+    zoom: clamp(q.get("z"), FLOOD_MIN_ZOOM, MAX_SOURCE_ZOOM.aerial, FLOOD_ZOOM),
   };
 
   const loc = await resolveDealLocation(supabase, id, address, (deal.photo as DealVisualCache | null) ?? null);
