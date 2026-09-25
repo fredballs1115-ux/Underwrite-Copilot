@@ -1005,6 +1005,9 @@ jobs:
           # #427 — the full report's site page (a signed-in download): its
           # changelog card.
           mark "#427 the report carries the flood map" grep -q "The flood map, in the full report" p_whats-new.html
+          # #428/#429 — the pipeline's photograph-led cards and the sharper
+          # aerials (signed-in surfaces): their changelog card.
+          mark "#428 the pipeline leads with sharp pictures" grep -q "Property pictures, sharp and up front" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

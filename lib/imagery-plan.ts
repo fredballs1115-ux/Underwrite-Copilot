@@ -28,8 +28,9 @@ export interface ImagePlanInput {
  *  2. GOOGLE SATELLITE — ~0.15 m/px in cities, which is what makes a building
  *     legible from above. Needs the same key (Maps Static API enabled).
  *  3. USGS AERIAL — public domain, no key, so every US address gets SOMETHING
- *     real. But NAIP is natively 0.6-1.0 m/px, so it can frame a site and not
- *     much tighter (see MAX_SOURCE_ZOOM). It is the floor, not the goal.
+ *     real. But NAIP is natively 0.6-1.0 m/px, so it frames a block and not
+ *     much tighter (see MAX_SOURCE_ZOOM: z17, chosen by eye). It is the
+ *     floor, not the goal.
  *
  * There is deliberately nothing else. A stock photo, an AI-generated
  * building or a scraped listing shot are all pictures of something that is
@@ -88,14 +89,19 @@ export const MAX_SOURCE_ZOOM: Record<ImageSource, number> = {
   // Google's satellite runs ~0.15 m/px in cities.
   satellite: 20,
   // USGS is fetched through the National Map's bbox EXPORT endpoint, which
-  // resamples from the best orthoimagery it holds for that spot. Nationally
-  // that is NAIP at 0.6–1.0 m/px, but across the metros this product covers
-  // the service carries high-resolution orthos at 0.3 m/px and finer. Capping
-  // at z18 (~0.6 m/px) threw that away everywhere it existed, which is why
-  // every aerial looked like a soft NAIP frame even downtown. z19 asks for
-  // ~0.3 m/px: sharp where the data is there, and where it is not the server
-  // returns the same NAIP it would have anyway.
-  aerial: 19,
+  // resamples from the best orthoimagery it holds for that spot — and the
+  // aerial sheet (#429, skyline-sheet run 36193817674: eight places from
+  // Philadelphia's City Hall to a Scottsdale grid, each drawn six ways and
+  // judged by eye) showed what it holds is NAIP's grain nearly everywhere,
+  // downtowns included. At z19 (about 0.23 m a pixel at 40°N) every frame
+  // was the export stretching a metre-scale photograph into mush — the
+  // "blurry picture" beside every property — and z18 was soft. z17 (about
+  // 0.9 m a pixel) is the photograph's own grain: crisp, a block or two
+  // across, the building marked at the centre. The detail measure agreed
+  // (the Laplacian's spread: 2.1–3.1 at z19, 13–22 at z17). An earlier cut
+  // raised the cap to z19 on the belief that high-resolution orthos covered
+  // the metros; the sheet is the evidence that they do not reach the export.
+  aerial: 17,
   // Not an overhead source; present so the record is total.
   streetview: 20,
 };

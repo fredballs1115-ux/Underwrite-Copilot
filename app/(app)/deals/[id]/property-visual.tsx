@@ -186,6 +186,19 @@ export function PropertyVisual({
             <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
               Imagery: USGS The National Map
             </span>
+            {/* The overhead is drawn at the photograph's own grain (#429), a
+                block or two across, so a street address's building is ringed
+                at the frame's centre — never a neighbourhood placement's,
+                whose centre is a district's. */}
+            {hasStreetAddress && (
+              <span
+                aria-hidden
+                data-picture="aerial-pin"
+                className="pointer-events-none absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-[2.5px] border-white shadow-[0_0_0_2px_rgba(0,0,0,0.35),0_1px_6px_rgba(0,0,0,0.45)]"
+              >
+                <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
+              </span>
+            )}
             {/* An area-level address (the sample deal, say) can only truthfully
                 show the district — never let a wide frame read as "this is the
                 building". A street address that the geocoder could only place

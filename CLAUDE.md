@@ -2362,10 +2362,39 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   on a phone too: it was `hidden` below `sm`, so the width where a list
   reads most like a set of places showed none. It is 56px there (its
   `srcSet` asks for 168px, a 3× phone's slot, since the map sources are
-  rendered at the size asked for) and the dense 36px from `sm` up. Below
+  rendered at the size asked for) and 48px from `sm` up (#428; it was a
+  36px postage stamp). Below
   `sm` the row's call leads its price line rather than taking an 88px
   column: beside the picture, the column left the name "The Maddox /
-  at…".
+  at…". **The pipeline opens as cards** (#428, `DealTile` in
+  `app/(app)/deals/pipeline.tsx`, the Dealpath / listing-site pattern): a
+  card a deal in a grid (one column on a phone, up to four wide), led by
+  the building's picture through `DealBanner` at `CARD` (720×450, 16:10)
+  with the call on it as a solid chip, the flood / interest / assumable
+  tags on it, then the name, the class and place, and price, cap (or yield
+  on cost) and fit, with the stage select in a footer outside the link.
+  `bannerSources` gained `memorandumUnread` (lib/deal-picture
+  `pictureMayBeInMemorandum` — a memorandum nobody has looked for a cover
+  in: the picture route lifts it on this first ask, or 404s and the next
+  source follows, credited as the memorandum's since only it can be
+  uncached) and a `marker` on a street address's aerial (a ring at the
+  centre; never on a neighbourhood placement). The List view is one
+  `ViewToggle` away; the choice is a cookie (`PIPELINE_VIEW_COOKIE`) the
+  page reads, so the server draws the view the reader left without a
+  flash of the other. **The aerial is drawn at the photograph's own
+  grain** (#429): `MAX_SOURCE_ZOOM.aerial` is 17. The aerial sheet
+  (`scripts/probe-aerial.mjs`, `skyline-sheet.yml`'s aerial mode, pushed
+  to the `aerial-sheet` branch — run 36193817674, eight places six ways,
+  judged by eye) showed z19 as the export stretching NAIP's metre-scale
+  photograph into mush everywhere, downtowns included, and z18 soft; z17
+  is crisp. `fetchAerialImage` holds an explicit zoom to the cap too (the
+  flood route clamps to the same cap, so its overlay can never be asked
+  for a frame the aerial will not draw) and every USGS frame, the metro
+  overheads included, passes `finishAerial` (`lib/aerial-finish.ts`: a
+  little contrast and colour into the flat midday light, an unsharp mask
+  sized to the grain; tone only, so the flood overlay still lies over it
+  pixel for pixel). The deal page's Aerial tab rings a street address's
+  building (`data-picture="aerial-pin"`).
 - FEMA's flood map over the building (#425): the deal page's picture has
   a Flood tab for a deal with a street address (a neighbourhood
   placement's centre is not the building): the USGS aerial at

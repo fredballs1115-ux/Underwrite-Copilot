@@ -146,6 +146,25 @@ export function picturePaths(cache: DealVisualCache | null | undefined): string[
 const inFlight = new Set<string>();
 
 /**
+ * Whether the deal's memorandum may still hold a photograph nobody has
+ * looked for: it has a memorandum, it is not the sample, no picture is
+ * cached, and none was looked for in the last thirty days. A surface that
+ * pins its sources (the pipeline's cards, #428) tries the picture route
+ * first where this is true — the route lifts the cover on that first ask,
+ * or answers 404 and the next source follows. `ensureDealPicture`'s own
+ * rules, without its in-flight guard.
+ */
+export function pictureMayBeInMemorandum(opts: {
+  omPath: string | null;
+  isSample: boolean;
+  cache: DealVisualCache | null;
+}): boolean {
+  const { cache } = opts;
+  if (cache?.picture || opts.isSample || !opts.omPath) return false;
+  return !(cache?.pictureCheckedAt && Date.now() - Date.parse(cache.pictureCheckedAt) < RECHECK_MS);
+}
+
+/**
  * The deal's picture, extracted from its memorandum on the first ask and
  * read from the cache after. Null means "none right now": no memorandum, a
  * memorandum with no photograph in it, the sample deal, or too many

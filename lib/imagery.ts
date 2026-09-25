@@ -10,6 +10,7 @@ import {
 } from "@/lib/deal-location";
 import {
   IMAGE_CREDIT,
+  MAX_SOURCE_ZOOM,
   aerialPlan,
   bearingDeg,
   frameZoom,
@@ -17,6 +18,8 @@ import {
   type ImageSource,
 } from "@/lib/imagery-plan";
 import { pictureSizeFor, readPictureBytes } from "@/lib/deal-picture";
+import { finishAerial } from "@/lib/aerial-finish";
+export { finishAerial };
 
 // The ordering rule and the credits are pure, so they live in a universal
 // module the client can import too — re-exported here so server callers have
@@ -206,20 +209,25 @@ export async function fetchGoogleSatelliteImage(
 /**
  * USGS aerial orthoimagery of the site. Needs no key, so this is what makes
  * "every deal has a real picture" true rather than aspirational — but at
- * 0.6-1.0 m/px it is the floor, not the good shot.
+ * 0.6-1.0 m/px it is the floor, not the good shot. Drawn no finer than the
+ * photograph's own grain (`MAX_SOURCE_ZOOM.aerial`, z17 — an explicit zoom
+ * is held to it too, so no caller can ask for the stretched frame) and
+ * finished (`finishAerial`); a finish that fails serves the plain export.
  */
 export async function fetchAerialImage(
   loc: DealLocation,
   size: { width: number; height: number; zoom?: number },
 ): Promise<Response | null> {
-  const zoom =
+  const zoom = Math.min(
+    MAX_SOURCE_ZOOM.aerial,
     size.zoom ??
-    frameZoom({
-      widthPx: size.width,
-      lat: loc.lat,
-      precision: loc.precision,
-      source: "aerial",
-    });
+      frameZoom({
+        widthPx: size.width,
+        lat: loc.lat,
+        precision: loc.precision,
+        source: "aerial",
+      }),
+  );
   try {
     const img = await fetch(
       usgsAerialUrl({
@@ -234,7 +242,14 @@ export async function fetchAerialImage(
     // dislikes a request, so content-type is the real success test.
     const type = img.headers.get("content-type") ?? "";
     if (!img.ok || !img.body || !type.startsWith("image/")) return null;
-    return img;
+    const raw = Buffer.from(await img.arrayBuffer());
+    let bytes: Buffer = raw;
+    try {
+      bytes = await finishAerial(raw);
+    } catch {
+      // The plain export is still the real picture.
+    }
+    return new Response(new Uint8Array(bytes), { headers: { "content-type": bytes === raw ? type : "image/jpeg" } });
   } catch {
     return null;
   }

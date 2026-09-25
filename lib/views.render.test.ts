@@ -46,7 +46,7 @@ vi.mock("../app/(app)/deals/actions", () => {
 import { Pipeline, type DealCard } from "@/app/(app)/deals/pipeline";
 import { ModelView } from "@/app/(app)/deals/[id]/model-view";
 import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table";
-import { bannerSources } from "@/lib/deal-banner";
+import { CARD, bannerSources } from "@/lib/deal-banner";
 import { ToastProvider } from "@/app/(app)/toaster";
 import { ScoredFeedView, type AlertRow, type ItemRow } from "@/app/(app)/news/scored-feed";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
@@ -107,6 +107,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
         notice: null,
         onboarding: { hasBuyBox: true, sampleId: "h", hasRealDeal: true },
         billing: BILLING,
+        initialView: "list",
       }),
     );
     expect(html.length).toBeGreaterThan(5_000);
@@ -162,7 +163,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // for each width (one stalled run, two failed ones).
     const rows = (html.match(/data-deal-thumb=/g) ?? []).length;
     expect(html).toContain("image?w=168&amp;h=168 168w");
-    expect(html).toContain('sizes="(min-width: 640px) 36px, 56px"');
+    expect(html).toContain('sizes="(min-width: 640px) 48px, 56px"');
     expect((html.match(/class="flex shrink-0 sm:hidden"/g) ?? []).length).toBe(rows);
     expect((html.match(/class="hidden w-22 shrink-0 justify-end sm:flex"/g) ?? []).length).toBe(rows);
     expect((html.match(/>Stalled</g) ?? []).length).toBe(2);
@@ -183,6 +184,80 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // at every width too (#419); a deal financed fresh says nothing.
     expect((text.match(/Assumable 3\.45%/g) ?? []).length).toBe(4);
     expect(html).toContain("Assumable 3.45%: the seller&#x27;s loan is offered for assumption");
+  });
+
+  it("draws the pipeline as photograph-led cards by default: the building's picture, the call over it, the three figures (#428)", () => {
+    // Each deal's pictures as the page resolves them: the Maddox has a
+    // memorandum nobody has read the cover of yet, 1400 Market its own
+    // photograph, the rest the USGS aerial — and the two with no address
+    // nothing at all.
+    const withPictures = CARDS.map((c) => ({
+      ...c,
+      pictures: bannerSources(
+        {
+          dealId: c.id,
+          pictureCredit: c.id === "b" ? "Photograph added to the deal" : null,
+          memorandumUnread: c.id === "a",
+          googleEnabled: false,
+          hasStreetAddress: c.hasAddress && c.id !== "h",
+          hasAddress: c.hasAddress,
+        },
+        CARD,
+      ),
+    }));
+    const html = render(
+      React.createElement(Pipeline, {
+        deals: withPictures,
+        errorMessage: null,
+        notice: null,
+        onboarding: { hasBuyBox: true, sampleId: "h", hasRealDeal: true },
+        billing: BILLING,
+      }),
+    );
+    dumpView("pipeline-cards", html);
+    expect(a11yIssues(html), "a11y pipeline cards").toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(html).toContain('data-view="cards"');
+    expect(html).not.toContain('data-view="list"');
+    // A card a live deal (the dead one is folded away), each under its name.
+    const live = CARDS.filter((c) => c.stage !== "dead");
+    expect((html.match(/data-deal-tile=/g) ?? []).length).toBe(live.length);
+    for (const c of live) expect(text, c.name).toContain(c.name);
+    // The first picture each card tries: the memorandum's cover on its first
+    // ask, the deal's own photograph, else the aerial at the card's frame —
+    // ringed where the address reaches a street, and never on the sample's
+    // neighbourhood placement. No address, no picture: a blank plate.
+    expect(html).toContain('src="/api/deals/a/picture?size=hero"');
+    expect(html).toContain('src="/api/deals/b/picture?size=hero"');
+    expect(html).toContain(`src="/api/deals/c/aerial?src=usgs&amp;w=${CARD.w}&amp;h=${CARD.h}"`);
+    expect((html.match(/data-deal-banner="blank"/g) ?? []).length).toBe(2);
+    const aerialFirst = live.filter((c) => c.hasAddress && c.id !== "a" && c.id !== "b");
+    const ringed = aerialFirst.filter((c) => c.id !== "h");
+    expect((html.match(/data-deal-banner="aerial"/g) ?? []).length).toBe(aerialFirst.length);
+    expect((html.match(/data-picture="banner-pin"/g) ?? []).length).toBe(ringed.length);
+    // The credit follows the picture on screen.
+    expect(text).toContain("From the offering memorandum");
+    expect(text).toContain("Photograph added to the deal");
+    expect(text).toContain("Imagery: USGS The National Map");
+    // The call rides on the picture, once a card: the failed re-screen and
+    // the failed run each say Failed, the stalled one Stalled.
+    expect((html.match(/>Failed</g) ?? []).length).toBe(2);
+    expect((html.match(/>Stalled</g) ?? []).length).toBe(1);
+    expect(text).toContain("Screening…");
+    // What the picture must not hide is chipped on it, once a card.
+    expect((text.match(/Flood AE/g) ?? []).length).toBe(1);
+    expect((text.match(/49% share/g) ?? []).length).toBe(1);
+    expect((text.match(/Assumable 3\.45%/g) ?? []).length).toBe(1);
+    // The three figures a pipeline is read by; a plan deal's yield on cost
+    // takes the cap's slot under its own label.
+    expect(text).toContain("$68.0M");
+    expect(text).toContain("Yield on cost");
+    expect(text).toContain("11.7%");
+    // The view is one control, the current view pressed; the column heads
+    // belong to the list, so the cards carry the sort select at every width.
+    expect(html).toMatch(/aria-pressed="true"[^>]*>(?:<svg[\s\S]*?<\/svg>)?Cards/);
+    expect(html).not.toContain('class="hidden items-center gap-3 px-5 pb-1.5 md:flex"');
   });
 
   it("renders the empty pipeline with the getting-started state, and the at-limit notice", () => {
@@ -3006,6 +3081,11 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
       React.createElement(PropertyVisual, { ...base, hasStreetAddress: false, picture: null, flood }),
     );
     expect(area).not.toContain("/flood?");
+    // The Aerial tab rings the building too (#429) — a street address's,
+    // never a neighbourhood placement's centre.
+    expect(html).toContain('data-picture="aerial-pin"');
+    expect(area).not.toContain('data-picture="aerial-pin"');
+    expect(area).toContain("Neighborhood placement");
     // No flood prop, no Flood tab.
     expect(renderToStaticMarkup(React.createElement(PropertyVisual, { ...base, picture: null }))).not.toContain("/flood?");
   });
