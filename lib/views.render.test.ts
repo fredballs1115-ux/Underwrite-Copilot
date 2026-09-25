@@ -80,7 +80,8 @@ const CARDS: DealCard[] = [
   card({ id: "b", name: "1400 Market — office to residential", verdict: "pass", stage: "loi", fit: "fits", score: 88, mandateVerdict: "PURSUE", slots: { cap: null, price: "$20,000,000", yoc: "11.7%" }, market: "Center City, Philadelphia, PA", coveredMarket: "Philadelphia" }),
   card({ id: "c", name: "Riverbend Site — 240 units", verdict: "pass", stage: "screening", fit: "outside", score: 42, mandateVerdict: "PASS", slots: { cap: null, price: "$4,000,000", yoc: "7.2%" }, market: "Frisco, TX", coveredMarket: null }),
   // A deal in a metro area the site reads without a brief: named as read, not briefed.
-  card({ id: "p", name: "Strip District Lofts", verdict: "pass", stage: "screening", fit: "near", score: 60, mandateVerdict: "WATCH", slots: { cap: "6.4%", price: "$18,000,000", yoc: null }, market: "Strip District, Pittsburgh, PA", coveredMarket: null, readMarket: "Pittsburgh PA" }),
+  // …and it carries the seller's loan, offered for assumption (#419).
+  card({ id: "p", name: "Strip District Lofts", verdict: "pass", stage: "screening", fit: "near", score: 60, mandateVerdict: "WATCH", slots: { cap: "6.4%", price: "$18,000,000", yoc: null, debt: "Assumable 3.45%" }, market: "Strip District, Pittsburgh, PA", coveredMarket: null, readMarket: "Pittsburgh PA" }),
   card({ id: "d", name: "Tysons Corner Plaza", assetClass: "office", verdict: "pass_on", stage: "dead", fit: "outside", score: 18, mandateVerdict: "PASS", slots: { cap: "8.1%", price: "$60,000,000", yoc: null }, market: "Tysons, VA", coveredMarket: "Northern Virginia" }),
   card({ id: "e", name: "Logan Square Retail", assetClass: "retail", verdict: null, stage: "screening", jobStatus: "running", slots: { cap: null, price: "$12,500,000", yoc: null }, market: "Chicago, IL", coveredMarket: "Chicago", hasAddress: false }),
   card({ id: "f", name: "I-95 Logistics Center", assetClass: "industrial", verdict: null, stage: "screening", jobStatus: "failed", market: "Newark, NJ", coveredMarket: "Northern New Jersey" }),
@@ -163,6 +164,10 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect((text.match(/49% share/g) ?? []).length).toBe(4);
     expect(html).toContain("49% share: the price does not buy the building outright");
     expect(html).toContain('title="$41,250,000 — 49% share"');
+    // The seller's loan offered for assumption is said beside the figure
+    // at every width too (#419); a deal financed fresh says nothing.
+    expect((text.match(/Assumable 3\.45%/g) ?? []).length).toBe(4);
+    expect(html).toContain("Assumable 3.45%: the seller&#x27;s loan is offered for assumption");
   });
 
   it("renders the empty pipeline with the getting-started state, and the at-limit notice", () => {
@@ -742,6 +747,39 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     // The sample's market check read no published figures, so the market
     // read says nothing about any.
     expect(text).not.toContain("Checked beside");
+  });
+
+  it("the seller's loan offered for assumption is said under the title, as stated (#419)", () => {
+    const withLoan = {
+      ...SAMPLE_DEAL.extraction,
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Assumable loan balance", value: "$30,000,000", flagged: false, page: "p. 12", basis: "na" as const },
+        { label: "Assumable loan rate", value: "3.45%", flagged: false, page: "p. 12", basis: "na" as const },
+        { label: "Assumable loan maturity", value: "March 31, 2031", flagged: false, page: "p. 12", basis: "na" as const },
+        { label: "Assumable loan amortization", value: "Interest-only", flagged: false, page: "p. 12", basis: "na" as const },
+      ],
+    };
+    const props = {
+      dealName: SAMPLE_DEAL.name,
+      assetClass: SAMPLE_DEAL.asset_class,
+      expiresAt: "2026-09-30T12:00:00Z",
+      verdictStale: false,
+      aerial: null,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: withLoan }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="share-assumable"');
+    expect(text).toContain("The seller's loan is offered for assumption: $30.0M at 3.45% to Mar 2031, interest-only as stated");
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    // The sample itself offers no loan to assume.
+    expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }))).not.toContain(
+      "share-assumable",
+    );
   });
 
   it("a market read that was checked beside the metro's published figures says so, counted and dated", () => {

@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import {
   assumableContextLine,
+  assumableLine,
+  assumableTag,
   assumableNote,
   assumableSentence,
   assumableTermsLine,
@@ -245,5 +247,30 @@ describe("what the page, the context and the challenger say", () => {
     for (const label of LOAN.map((m) => m.label).concat("Assumable loan debt service")) {
       expect(prompt, label).toContain(`"${label}"`);
     }
+  });
+});
+
+describe("wherever the deal is summarized (#419)", () => {
+  it("the pipeline's tag and the documents' line say the loan as stated, and nothing more", () => {
+    expect(assumableTag(sample())).toBe("Assumable 3.45%");
+    expect(assumableTag(sample(LOAN.filter((m) => m.label !== "Assumable loan rate")))).toBe("Assumable loan");
+    expect(assumableTag(SAMPLE_DEAL.extraction as ExtractionResult)).toBeNull();
+    const a = readAssumable(sample(), null, AS_OF)!;
+    expect(assumableLine(a)).toBe("The seller's loan is offered for assumption: $30.0M at 3.45% to Mar 2031, interest-only as stated");
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("the workbook's cover carries the line and the read against the model's own new loan", () => {
+    // The read is the deal page's, on the day the workbook is built.
+    vi.useFakeTimers({ now: AS_OF, toFake: ["Date"] });
+    const meta = deriveUnderwriteInputs(sample(), SAMPLE_DEAL.name).meta;
+    expect(meta.assumable?.line).toBe("The seller's loan is offered for assumption: $30.0M at 3.45% to Mar 2031, interest-only as stated");
+    expect(meta.assumable?.read).toBe(
+      "Assuming it returns 0.1 points less than the model's new loan: the $1.9M a year it saves in debt service does not pay for the $11.1M larger cheque. It comes due in Mar 2031, inside the 5-year hold, so it runs at its coupon for the 4 full years before that and is refinanced at today's rate after.",
+    );
+    expect(deriveUnderwriteInputs(SAMPLE_DEAL.extraction as ExtractionResult, SAMPLE_DEAL.name).meta.assumable).toBeNull();
   });
 });

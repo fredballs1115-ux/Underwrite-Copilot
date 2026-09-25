@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-25",
+      "title": "A loan you can take over, flagged everywhere you look",
+      "href": "/deals",
+      "blurb": "A deal whose seller offers their loan for assumption now says so wherever the deal is summarized, not only on its own page. The pipeline row carries the loan's rate beside the price at every screen width, the CSV and the meeting workbook add it beside what the price buys, and the one-page memo and the shared screen state the loan's terms under the title. The Excel model's cover and the full report go further: they state what the loan is worth against the model's own new loan. A summary with no model behind it states the loan's terms and nothing more."
+    },
+    {
+      "date": "2026-09-25",
       "title": "Every building you compare, pictured",
       "href": "/deals",
       "blurb": "The compare page now opens each deal on a picture of the building itself: the photograph from its offering memorandum where the deal has one, a street-level photograph where one exists, or an aerial of the site. On a phone, each deal's card opens the same way. Each picture carries its own credit, and if one source fails to load the next is tried and the credit changes with it. A deal with no address and no photograph keeps a blank plate, so the columns stay lined up."

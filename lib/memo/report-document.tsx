@@ -47,6 +47,7 @@ import type { ModelVsMarket } from "@/lib/model-vs-market";
 import { assetWords } from "@/lib/asset-words";
 import { askingPriceOf, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { interestOf, noteCollateralSentence, noteYieldSentence, readInterest } from "@/lib/interest";
+import type { AssumableView } from "@/lib/assumable-debt";
 import { basisScale, fmtBasis, subjectBasis } from "@/lib/comp-detail";
 import { gapScale } from "@/lib/gap-detail";
 import { parsePageNumber } from "@/lib/facts";
@@ -282,6 +283,35 @@ function AssumptionsBlock({ read }: { read: ModelVsMarket | null | undefined }) 
 }
 
 /**
+ * The seller's loan, offered for assumption (#419) — the deal page's card in
+ * words: the loan as stated, the rate against the model's new loan and
+ * where that rate came from, the one sentence that says what the loan is
+ * worth, and what the two positions ran on. The same `assumableView` the
+ * card draws, so the report and the page never disagree. Nothing where no
+ * loan is offered.
+ */
+function AssumableBlock({ view }: { view: AssumableView | null | undefined }) {
+  if (!view) return null;
+  const rate =
+    view.couponPct != null && view.marketPct != null && view.underMarketBps != null
+      ? `The loan's ${view.couponPct.toFixed(2)}% against ${view.marketPct.toFixed(2)}% for a new one — ${Math.abs(view.underMarketBps)} bps ${
+          view.underMarketBps >= 0 ? "under" : "over"
+        }.`
+      : "";
+  return (
+    <View style={{ marginTop: 12 }} wrap={false}>
+      <TitleRow title="The seller's loan, offered for assumption" marginTop={0} />
+      <Text style={s.sub}>{str(view.termsLine)}</Text>
+      {rate ? <Text style={{ fontSize: 8.5, color: C.ink, marginTop: 2 }}>{str(rate)}</Text> : null}
+      <Text style={{ fontSize: 8.5, color: C.ink, marginTop: 2 }}>{str(view.sentence)}</Text>
+      {view.rateLine ? <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 2 }}>{str(view.rateLine)}</Text> : null}
+      {view.basisLine ? <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 1 }}>{str(view.basisLine)}</Text> : null}
+      {view.feeLine ? <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 1 }}>{str(view.feeLine)}</Text> : null}
+    </View>
+  );
+}
+
+/**
  * A portfolio memorandum's properties (lib/portfolio), as the deal page's
  * card draws them: the markets they sit in, the facts a buyer should see
  * before pricing any of it, then one row a property — its share of the
@@ -503,6 +533,10 @@ export interface ReportInput {
    *  the sensitivity grids, or under the plan's grid on a plan deal; null
    *  where there was no model or nothing fresh to read it against */
   modelVsMarket?: ModelVsMarket | null;
+  /** the seller's loan offered for assumption, priced against the model's
+   *  new loan (lib/assumable-debt, #419) — printed beside the assumptions
+   *  read; null where none is offered or there was no model */
+  assumable?: AssumableView | null;
 }
 
 /** Everything the deal screen produced, shaped for the multi-page report. */
@@ -516,11 +550,13 @@ export function buildReportData(
   overrides?: string[] | null,
   cover?: MemoData["cover"],
   modelVsMarket?: ModelVsMarket | null,
+  assumable?: AssumableView | null,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
   return {
     modelVsMarket: modelVsMarket ?? null,
+    assumable: assumable ?? null,
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
@@ -990,6 +1026,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           {/* The plan deal has no sensitivity page, so its assumptions read
               lands here, under the grid it is judged on. */}
           {!sensitivity && <AssumptionsBlock read={modelVsMarket} />}
+          {!sensitivity && <AssumableBlock view={input.assumable} />}
         </PageChrome>
       )}
 
@@ -1093,6 +1130,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           </Text>
 
           <AssumptionsBlock read={modelVsMarket} />
+          <AssumableBlock view={input.assumable} />
         </PageChrome>
       )}
 

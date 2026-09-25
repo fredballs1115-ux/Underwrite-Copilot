@@ -29,6 +29,7 @@ import type {
 } from "@/lib/anthropic/types";
 import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { interestOf, interestShortLine, readInterest } from "@/lib/interest";
+import { assumableLine, readAssumable } from "@/lib/assumable-debt";
 import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
 import { shownAssetClass } from "@/lib/pipeline-slots";
@@ -111,6 +112,15 @@ function interestLineFor(extraction: ExtractionResult | null): string {
   return r ? interestShortLine(r) : "";
 }
 
+/** The seller's loan where it is offered for assumption, in one line for
+ *  the memo's header (lib/assumable-debt, #419): the terms as stated — the
+ *  pricing against today's rate is the deal page's and the report's, which
+ *  carry the model. "" where none is offered. */
+function assumableLineFor(extraction: ExtractionResult | null): string {
+  const a = readAssumable(extraction, null);
+  return a ? assumableLine(a) : "";
+}
+
 export type MemoData = {
   name: string;
   market: string;
@@ -121,6 +131,9 @@ export type MemoData = {
   /** what is being sold (lib/interest, #414) — a note, a share, a
    *  leasehold, in one line; "" for a plain fee simple */
   interestLine?: string;
+  /** the seller's loan offered for assumption, as stated (#419); "" where
+   *  none is */
+  assumableLine?: string;
   dateStr: string;
   verdictWord: string | null;
   verdictColor: string;
@@ -359,6 +372,7 @@ export function buildMemoData(
     assetClass: shownAssetClass(str(deal.asset_class), extraction ?? null),
     strategyLine: pdfSafe(strategyLineFor(extraction ?? null)),
     interestLine: pdfSafe(interestLineFor(extraction ?? null)),
+    assumableLine: pdfSafe(assumableLineFor(extraction ?? null)),
     dateStr,
     verdictWord: vmeta?.word ?? null,
     verdictColor: vmeta?.color ?? C.muted,
@@ -799,6 +813,8 @@ export function MemoPage({ data }: { data: MemoData }) {
             {data.interestLine && (
               <Text style={[s.sub, { color: "#114e54", fontFamily: "Helvetica-Bold" }]}>{data.interestLine}</Text>
             )}
+            {/* The seller's loan offered for assumption (#419), as stated. */}
+            {data.assumableLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.assumableLine}</Text>}
           </View>
           {data.verdictWord ? (
             <View

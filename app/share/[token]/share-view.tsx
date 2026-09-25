@@ -12,6 +12,7 @@ import { assetClassLabel } from "@/lib/asset-class";
 import { assetWords } from "@/lib/asset-words";
 import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { interestOf, readInterest } from "@/lib/interest";
+import { assumableLine, readAssumable } from "@/lib/assumable-debt";
 import { InterestPanel } from "@/app/interest-panel";
 import { keyTermRows } from "@/lib/key-terms";
 import { readPortfolio } from "@/lib/portfolio";
@@ -240,6 +241,10 @@ export function ShareView({
   const plan = planSummary(safeExtraction, strategy);
   // The deal-defining rows first, as the memo orders them (lib/key-terms.ts).
   const metrics = keyTermRows(safeExtraction?.metrics ?? [], strategy.kind, 8, interestOf(safeExtraction).kind);
+  // The seller's loan offered for assumption (#419), as the memorandum
+  // states it — the pricing against today's rate needs the model, which a
+  // shared screen does not carry.
+  const assumable = readAssumable(safeExtraction, null);
   const ranges = (screen?.ranges ?? []).slice(0, 6);
   const killers = (screen?.dealKillers ?? []).slice(0, 3);
   // One OM, several properties (#411): the deal page's own card, read by
@@ -277,6 +282,15 @@ export function ShareView({
       {/* What is being sold (#414) — a note, a share, a leasehold changes
           what every figure below means; nothing for a plain fee simple. */}
       <InterestPanel interest={readInterest(safeExtraction, askingPriceOf(safeExtraction))} />
+
+      {assumable && (
+        <p
+          data-qa="share-assumable"
+          className="mt-3 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm leading-relaxed shadow-sm"
+        >
+          {assumableLine(assumable)}
+        </p>
+      )}
 
       {aerial && <ShareAerial src={aerial.src} place={aerial.place} />}
 

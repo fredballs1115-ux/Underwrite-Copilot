@@ -986,6 +986,9 @@ jobs:
           # #418 — each building pictured on the compare page (signed-in):
           # its changelog card.
           mark "#418 every compared building is pictured" grep -q "Every building you compare, pictured" p_whats-new.html
+          # #419 — the assumable loan wherever the deal is summarized
+          # (signed-in surfaces and documents): its changelog card.
+          mark "#419 an assumable loan is flagged on every summary" grep -q "A loan you can take over, flagged everywhere you look" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

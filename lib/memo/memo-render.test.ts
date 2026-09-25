@@ -88,6 +88,39 @@ describe("MemoDocument (redesigned)", () => {
     expect(plain.interestLine).toBe("");
   }, 30000);
 
+  it("says the seller's loan under the title where it is offered for assumption (#419)", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Assumable loan balance", value: "$30,000,000", flagged: false, page: "p. 3", basis: "na" },
+        { label: "Assumable loan rate", value: "3.45%", flagged: false, page: "p. 3", basis: "na" },
+        { label: "Assumable loan maturity", value: "March 31, 2031", flagged: false, page: "p. 3", basis: "na" },
+      ],
+    };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "September 25, 2026", []);
+    expect(data.assumableLine).toBe("The seller's loan is offered for assumption: $30.0M at 3.45% to Mar 2031");
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("The seller's loan is offered for assumption: $30.0M at 3.45% to Mar 2031");
+    // Still one page.
+    expect((buf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length).toBe(1);
+    // The sample itself offers none.
+    expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 25, 2026", []).assumableLine).toBe("");
+  }, 30000);
+
   it("the cover aerial prints on page one, and the memo is still one page", async () => {
     const deal = {
       name: SAMPLE_DEAL.name,

@@ -14,6 +14,7 @@ import { inferStrategy } from "@/lib/deal-strategy";
 import { marketForAddress } from "@/lib/market-match";
 import { todayReads } from "@/lib/model-vs-market-read";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
+import { assumableView, readAssumable, type AssumableView } from "@/lib/assumable-debt";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
 import { staleAfterFailure } from "@/lib/screen-run";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
@@ -147,6 +148,9 @@ export async function GET(
   // total cost stressed, against the same derived model's exit cap.
   let plan: PlanReport | null = null;
   let assumptions: ModelVsMarket | null = null;
+  // The seller's loan offered for assumption, priced against the model's
+  // new loan — the deal page's own read (#419).
+  let assumable: AssumableView | null = null;
   try {
     const extraction = (deal.extraction as ExtractionResult | null) ?? null;
     if (extraction) {
@@ -192,6 +196,10 @@ export async function GET(
         pct: derived.inputs.exitCapPct,
         provenance: derived.sources.exitCapPct?.provenance ?? "assumption",
       });
+      const assumableRead = readAssumable(extraction, derived.inputs);
+      assumable = assumableRead
+        ? assumableView(assumableRead, derived.sources.allInRatePct?.note ?? null, !!derived.meta.rateSeed)
+        : null;
 
       // The model's assumptions against the published figures — the same
       // read the deal page's card and the workbook make (lib/model-vs-market,
@@ -258,7 +266,7 @@ export async function GET(
       (deal.address as StructuredAddress | null) ?? null,
       ((deal as unknown as { photo?: DealVisualCache | null }).photo ?? null),
     );
-    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions);
+    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable);
     const element = React.createElement(ReportDocument, {
       input,
     }) as unknown as Parameters<typeof renderToBuffer>[0];

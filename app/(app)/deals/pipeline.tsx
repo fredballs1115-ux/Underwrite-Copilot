@@ -59,7 +59,7 @@ export type DealCard = {
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
-  slots: { cap: string | null; price: string | null; yoc: string | null; interest?: string | null };
+  slots: { cap: string | null; price: string | null; yoc: string | null; interest?: string | null; debt?: string | null };
   /** latest analysis-job state: a live run, one that stopped writing
    *  progress (its process died), or a failure that left the verdict behind */
   jobStatus?: "running" | "stalled" | "failed" | null;
@@ -491,7 +491,7 @@ export function Pipeline({
     };
     // A plan deal's cap cell is empty and its yield on cost sits in its own
     // column — the same two columns the meeting .xlsx carries.
-    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "What the price buys", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Added", "Added by"];
+    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "What the price buys", "Assumable debt", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Added", "Added by"];
     const lines = filtered.map((d) =>
       [
         d.name,
@@ -501,6 +501,8 @@ export function Pipeline({
         d.slots.price ?? "",
         // Blank on a fee simple — the price is the building's.
         d.slots.interest ?? "",
+        // Blank where no loan is offered for assumption (#419).
+        d.slots.debt ?? "",
         d.slots.cap ?? "",
         d.slots.yoc ?? "",
         d.fit ? FIT_META[d.fit].label : "",
@@ -1360,6 +1362,16 @@ const DealRow = memo(function DealRow({
       {d.slots.interest}
     </span>
   ) : null;
+  // The seller's loan, where it is offered for assumption (#419) — the deal
+  // page prices it against today's rate.
+  const debtBit = d.slots.debt ? (
+    <span
+      className="whitespace-nowrap font-medium text-brand"
+      title={`${d.slots.debt}: the seller's loan is offered for assumption — the deal page prices it against today's rate`}
+    >
+      {d.slots.debt}
+    </span>
+  ) : null;
   // A plan deal has no going-in cap; its yield on total cost is the figure
   // that answers the same question, so it takes the slot — labelled.
   const capBit = d.slots.cap ? (
@@ -1472,18 +1484,18 @@ const DealRow = memo(function DealRow({
             fits — so the price, the cap and the fit are never the part a
             one-line truncation cuts off. */}
         <MetaLine className="md:hidden" bits={[dueBit, marketBit, coveredBit, assetBit, addedByBit]} />
-        <MetaLine className="md:hidden" bits={[priceBit, interestBit, capBit, fitBit]} />
+        <MetaLine className="md:hidden" bits={[priceBit, interestBit, debtBit, capBit, fitBit]} />
         <MetaLine
           className="hidden md:block lg:hidden"
-          bits={[dueBit, marketBit, coveredBit, assetBit, interestBit, fitBit, dateBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, assetBit, interestBit, debtBit, fitBit, dateBit, addedByBit]}
         />
         <MetaLine
           className="hidden lg:block xl:hidden"
-          bits={[dueBit, marketBit, coveredBit, interestBit, dateBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, interestBit, debtBit, dateBit, addedByBit]}
         />
         <MetaLine
           className="hidden xl:block"
-          bits={[dueBit, marketBit, coveredBit, interestBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, interestBit, debtBit, addedByBit]}
         />
         {fitBar}
       </div>

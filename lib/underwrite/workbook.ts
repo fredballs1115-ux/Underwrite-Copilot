@@ -292,6 +292,17 @@ function buildCover(
       r++;
     }
   }
+  // The seller's loan offered for assumption (#419): as stated, then what
+  // it is worth against this model's own new loan.
+  if (meta.assumable) {
+    fact("The seller's loan", meta.assumable.line);
+    const c = ws.getCell(r, 3);
+    c.value = meta.assumable.read;
+    c.font = { name: ARIAL, size: 9, color: MUTED };
+    c.alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r).height = 40;
+    r++;
+  }
   r++;
 
   sectionHeader(ws, r, "Contents", 2, 3);

@@ -9,6 +9,7 @@ import { ASSET_CLASS_LABEL } from "@/lib/asset-class";
 import { findGoingInCap } from "@/lib/criteria";
 import { findPriceMetric, inferStrategy, planSummary, signalAskPrice } from "@/lib/deal-strategy";
 import { interestTag } from "@/lib/interest";
+import { assumableTag } from "@/lib/assumable-debt";
 
 export interface PipelineSlots {
   /** the going-in cap as the OM states it — null on a plan deal, which has
@@ -22,6 +23,10 @@ export interface PipelineSlots {
    *  share", "Note", "Leasehold", "Leased fee" (lib/interest
    *  `interestTag`); absent or null on a fee simple */
   interest?: string | null;
+  /** the seller's loan where it is offered for assumption — "Assumable
+   *  3.45%" (lib/assumable-debt `assumableTag`, #419); absent or null
+   *  where none is */
+  debt?: string | null;
 }
 
 /**
@@ -70,5 +75,8 @@ export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | nu
     // A share's price, a note's or the land's under a ground lease is not
     // the building's, and the row says so beside the figure.
     interest: interestTag(extraction),
+    // Debt a buyer can take over is a screening fact of its own in 2026:
+    // the row says so beside the price, and the deal page prices it.
+    debt: assumableTag(extraction),
   };
 }
