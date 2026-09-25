@@ -83,12 +83,31 @@ const DEFAULT_POINTS = [
 
 const UA = { "user-agent": "UnderwriteCopilot/1.0 (+https://underwrite-copilot.onrender.com)" };
 
+// FEMA's host resets connections now and then (the first run of this probe
+// died on an ECONNRESET before printing anything), so a request is asked
+// three times with a pause, and a failure is printed rather than thrown:
+// a probe that crashes on the first refusal says nothing about the rest.
 async function get(url, timeoutMs = 30_000) {
-  const res = await fetch(url, { headers: UA, signal: AbortSignal.timeout(timeoutMs) });
-  const type = res.headers.get("content-type") ?? "";
-  const buf = Buffer.from(await res.arrayBuffer());
-  return { status: res.status, type, buf };
+  let last = "";
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(url, { headers: UA, signal: AbortSignal.timeout(timeoutMs) });
+      const type = res.headers.get("content-type") ?? "";
+      const buf = Buffer.from(await res.arrayBuffer());
+      return { status: res.status, type, buf, error: null };
+    } catch (err) {
+      const cause = err instanceof Error && err.cause instanceof Error ? ` (${err.cause.message})` : "";
+      last = `${err instanceof Error ? err.message : String(err)}${cause}`;
+      console.log(`    attempt ${attempt} failed: ${last}`);
+      await new Promise((r) => setTimeout(r, 1500 * attempt));
+    }
+  }
+  return { status: 0, type: "", buf: Buffer.alloc(0), error: last };
 }
+
+// The documented service root first, then the older path the same host
+// has served the layer under — each a claim this probe exists to test.
+const ROOTS = [NFHL_ROOT, "https://hazards.fema.gov/gis/nfhl/rest/services/public/NFHL/MapServer"];
 
 async function main() {
   const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -107,14 +126,27 @@ async function main() {
   const H = 576;
   await mkdir(out, { recursive: true });
 
-  // 1. Which layer is the zones — the service's own list, as lib/site-flags reads it.
-  const svc = await get(`${NFHL_ROOT}?f=json`);
-  console.log(`SERVICE ${NFHL_ROOT}?f=json · HTTP ${svc.status} · ${svc.type} · ${svc.buf.length} bytes`);
+  // 1. Which layer is the zones — the service's own list, as lib/site-flags
+  //    reads it — from the first root that answers one.
+  let root = null;
   let json = {};
-  try {
-    json = JSON.parse(svc.buf.toString("utf8"));
-  } catch {
-    console.log("  not JSON — stopping");
+  for (const r of ROOTS) {
+    const svc = await get(`${r}?f=json`);
+    console.log(`SERVICE ${r}?f=json · HTTP ${svc.status} · ${svc.type} · ${svc.buf.length} bytes${svc.error ? ` · ${svc.error}` : ""}`);
+    try {
+      const parsed = JSON.parse(svc.buf.toString("utf8"));
+      if (Array.isArray(parsed.layers)) {
+        root = r;
+        json = parsed;
+        break;
+      }
+      console.log(`  JSON without a layer list: ${svc.buf.toString("utf8").slice(0, 300)}`);
+    } catch {
+      if (svc.buf.length) console.log(`  not JSON: ${svc.buf.toString("utf8").slice(0, 300)}`);
+    }
+  }
+  if (!root) {
+    console.log("No root answered a layer list — stopping.");
     return;
   }
   const layers = Array.isArray(json.layers) ? json.layers : [];
@@ -126,9 +158,9 @@ async function main() {
   if (!zones) return;
 
   // 2. FEMA's own legend for that layer: each label and its swatch, saved.
-  const leg = await get(`${NFHL_ROOT}/legend?f=json`);
+  const leg = await get(`${root}/legend?f=json`);
   console.log(`LEGEND · HTTP ${leg.status} · ${leg.type} · ${leg.buf.length} bytes`);
-  const index = { service: NFHL_ROOT, layerId: zones.id, layerName: zones.name, legend: [], frames: [] };
+  const index = { service: root, layerId: zones.id, layerName: zones.name, legend: [], frames: [] };
   try {
     const lj = JSON.parse(leg.buf.toString("utf8"));
     const entry = (lj.layers ?? []).find((l) => l.layerId === zones.id);
@@ -161,7 +193,7 @@ async function main() {
       returnGeometry: "false",
     });
     try {
-      const z = await get(`${NFHL_ROOT}/${zones.id}/query?${q}`);
+      const z = await get(`${root}/${zones.id}/query?${q}`);
       const feats = JSON.parse(z.buf.toString("utf8")).features ?? [];
       console.log(`PLACE ${label} (${lat}, ${lng}): ${feats.length} zone(s) at the point — ${feats.map((f) => `${f.attributes?.FLD_ZONE}${f.attributes?.ZONE_SUBTY ? ` / ${f.attributes.ZONE_SUBTY}` : ""}`).join("; ") || "none"}`);
     } catch (err) {
@@ -169,7 +201,7 @@ async function main() {
     }
     for (const zoom of zooms) {
       const b = bboxFor(lat, lng, zoom, W, H);
-      const [a, o] = await Promise.all([get(aerialUrl(b, W, H)), get(overlayUrl(b, W, H, zones.id))]);
+      const [a, o] = await Promise.all([get(aerialUrl(b, W, H)), get(overlayUrl(b, W, H, zones.id, root))]);
       console.log(`  z${zoom}: aerial HTTP ${a.status} ${a.type} ${Math.round(a.buf.length / 1024)} KB · overlay HTTP ${o.status} ${o.type} ${Math.round(o.buf.length / 1024)} KB`);
       const base = `${label}-z${zoom}`;
       if (o.type.startsWith("image/")) await writeFile(join(out, `${base}-overlay.png`), o.buf);
@@ -189,7 +221,7 @@ async function main() {
     [
       "# Flood sheet",
       "",
-      `FEMA National Flood Hazard Layer (${NFHL_ROOT}), layer ${zones.id} "${zones.name}", drawn over USGS The National Map orthoimagery for the same Web-Mercator frame.`,
+      `FEMA National Flood Hazard Layer (${root}), layer ${zones.id} "${zones.name}", drawn over USGS The National Map orthoimagery for the same Web-Mercator frame.`,
       `The service's copyright text: ${JSON.stringify(json.copyrightText ?? null)}.`,
       "",
       "Legend (FEMA's own labels and swatches):",
