@@ -10,7 +10,7 @@ import { PIPELINE_VIEW_COOKIE, Pipeline, type DealCard } from "./pipeline";
 import { cookies } from "next/headers";
 import { CARD, bannerSources } from "@/lib/deal-banner";
 import { PICTURE_CREDIT, pictureMayBeInMemorandum } from "@/lib/deal-picture";
-import type { DealVisualCache } from "@/lib/deal-location";
+import { cacheFresh, type DealVisualCache } from "@/lib/deal-location";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
 import { inferStrategy } from "@/lib/deal-strategy";
@@ -137,7 +137,8 @@ export default async function DealsPage({
 
   // The card view's pictures (#428): the reader's choice of view from its
   // cookie, and whether Street View can be tried at all.
-  const initialView = (await cookies()).get(PIPELINE_VIEW_COOKIE)?.value === "list" ? "list" : "cards";
+  const viewCookie = (await cookies()).get(PIPELINE_VIEW_COOKIE)?.value;
+  const initialView = viewCookie === "list" || viewCookie === "map" ? viewCookie : "cards";
   const googleEnabled = !!process.env.GOOGLE_MAPS_API_KEY;
 
   // The latest job per deal (Screening… / Failed labels) and the teammate
@@ -257,6 +258,17 @@ export default async function DealsPage({
       // (#426): the row's tag in a Special Flood Hazard Area, the CSV's cell
       // in every case, nothing before the lookup has answered.
       flood: floodFor((d as { site_flags?: SiteFlagsResult | null }).site_flags ?? null),
+      // Where the deal is, from the location its pictures were drawn at
+      // (#431): read from the cache only — the list never geocodes; the map
+      // places the rest on its own first view.
+      ...(() => {
+        const cache = d.photo ?? null;
+        if (!cacheFresh(cache)) return { place: null };
+        if (cache?.geoMiss) return { place: null, placeMiss: true };
+        return typeof cache?.lat === "number" && typeof cache?.lng === "number"
+          ? { place: { lat: cache.lat, lng: cache.lng, precision: cache.geoPrecision ?? ((d.address as StructuredAddress | null)?.street?.trim() ? "street" : "area") } }
+          : { place: null };
+      })(),
       // The card's pictures, best first and each pinned with its credit
       // (#428, the compare page's rule): the deal's own photograph — or the
       // memorandum's cover on its first ask — then Street View, then the

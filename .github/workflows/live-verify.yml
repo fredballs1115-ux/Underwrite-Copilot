@@ -1018,6 +1018,8 @@ jobs:
           mark "#430 each market page names itself" grep -q "Pittsburgh PA market data: rents, vacancy, jobs and supply" p_market_pitt.html
           mark "#430 the sitemap lists every market page" grep -q "market?metro=pittsburgh" sitemap.xml
           mark "#430 the IndexNow key is served" grep -qx "a399847bdac5364f2ed07a0d161f42ab" indexnow-key.txt
+          # #431 — the pipeline on a map (a signed-in view): its changelog card.
+          mark "#431 the pipeline is on a map" grep -q "Your pipeline on a map" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

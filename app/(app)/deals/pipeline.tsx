@@ -18,6 +18,8 @@ import { BatchUpload } from "./batch-upload";
 import { DealThumb } from "./deal-thumb";
 import { DealBanner } from "./deal-banner";
 import type { BannerSource } from "@/lib/deal-banner";
+import { PipelineMap } from "./pipeline-map";
+import type { MapDeal, MapPlace } from "@/lib/pipeline-map";
 import { ManualDealForm } from "./manual-deal-form";
 import { FileDrop } from "../file-drop";
 import { PendingButton } from "../pending-button";
@@ -74,12 +76,32 @@ export type DealCard = {
   /** the pictures the card view tries, best first, each pinned to one
    *  source with its own credit (lib/deal-banner, #428) */
   pictures?: BannerSource[];
+  /** where the deal is, from the location its pictures were drawn at
+   *  (lib/deal-location's cache, #431); null until one is resolved */
+  place?: MapPlace | null;
+  /** a geocoder definitively found nothing for the address */
+  placeMiss?: boolean;
 };
 
-/** How the pipeline is drawn (#428): photograph-led cards, or the dense
- *  list. The choice is a cookie so the server draws the same view the
- *  reader left — no flash of the other one on the next visit. */
-export type PipelineView = "cards" | "list";
+/** How the pipeline is drawn: photograph-led cards (#428), the dense list,
+ *  or every deal on one map (#431). The choice is a cookie so the server
+ *  draws the same view the reader left — no flash of another on the next
+ *  visit. */
+export type PipelineView = "cards" | "list" | "map";
+
+/** A card as the map reads it. */
+function mapDealOf(d: DealCard): MapDeal {
+  return {
+    id: d.id,
+    name: d.name,
+    verdict: d.verdict,
+    price: d.slots.price ? compactPrice(d.slots.price) : null,
+    figure: d.slots.cap ? `${d.slots.cap} cap` : d.slots.yoc ? `${d.slots.yoc} yield on cost` : null,
+    place: d.place ?? null,
+    placeMiss: d.placeMiss,
+    hasAddress: d.hasAddress,
+  };
+}
 export const PIPELINE_VIEW_COOKIE = "uc_pipeline_view";
 
 /** One row per deal: name · asset · price · cap · buy box · status · added.
@@ -937,6 +959,15 @@ export function Pipeline({
               </button>
             </p>
           )}
+          {view === "map" && (
+            <PipelineMap
+              deals={filtered.map(mapDealOf)}
+              compareMode={compareMode}
+              selected={selected}
+              onToggle={toggleSelected}
+            />
+          )}
+          {view !== "map" && (
           <div>
             {/* One header row labels the columns for every group — each label
                 is a sort control (sorting applies within each stage group).
@@ -1040,6 +1071,7 @@ export function Pipeline({
               })}
             </div>
           </div>
+          )}
         </>
       )}
     </div>
@@ -1746,6 +1778,14 @@ function ViewToggle({ view, onChange }: { view: PipelineView; onChange: (v: Pipe
         "List",
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden>
           <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
+        </svg>,
+      )}
+      {opt(
+        "map",
+        "Map",
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden>
+          <path d="M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4Z" />
+          <path d="M9 4v13M15 6.5v13" />
         </svg>,
       )}
     </div>

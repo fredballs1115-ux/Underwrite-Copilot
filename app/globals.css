@@ -308,6 +308,40 @@ body {
   font-size: 9px;
   background: rgba(255, 255, 255, 0.75);
 }
+/* The pipeline map's hover card (#431): the building's picture beside its
+   name, its call and its figures. */
+.uc-map .leaflet-tooltip.uc-maptip-wrap {
+  padding: 6px;
+  white-space: normal;
+}
+.uc-maptip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 232px;
+}
+.uc-maptip-img {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--color-faint);
+}
+.uc-maptip-body {
+  min-width: 0;
+}
+.uc-maptip-name {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--color-ink);
+}
+.uc-maptip-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--color-muted);
+}
 
 /* Landing research ticker (site-polish 2): seamless marquee — content is
    rendered twice, track slides one copy's width. Motion-sensitive users get

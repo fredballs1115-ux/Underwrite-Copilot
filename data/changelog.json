@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-25",
+      "title": "Your pipeline on a map",
+      "href": "/deals",
+      "blurb": "The pipeline has a third view beside Cards and List: every deal on one map, each pin the colour of its call (Go, Caution, No-go, or not screened yet). Hover a pin to see the building's picture, its price and its cap; click to open the deal. The pins sit where each deal's own pictures were taken, and a deal the map can't place yet is counted under the map rather than guessed at."
+    },
+    {
+      "date": "2026-09-25",
       "title": "Market pages that name their market",
       "href": "/market",
       "blurb": "Each market page now has its own title and description, so a shared link or a search result says which market it is. Before, every market page was titled \"Market data\". The site map also lists every market and sector page, so search engines can find all of them."
