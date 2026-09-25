@@ -35,6 +35,11 @@ import { ReplacePicture } from "./replace-picture";
  * loads, the whole card unmounts and the page reads exactly as it did
  * before. No stock photos, no AI imagery, no "photo unavailable" graphic.
  *
+ * The views are a filmstrip under the picture (#432) — each one's own
+ * picture under its name, the one on screen ringed — where they were a row
+ * of words: a thumbnail draws the very URL its view draws, so it costs no
+ * request of its own, and one that fails takes its view away.
+ *
  * The Flood tab (#425) is the USGS aerial at a wider frame with FEMA's flood
  * zones drawn over it in FEMA's own colours — the two images asked for the
  * same location, zoom and size, so they share one Web-Mercator frame — with
@@ -106,28 +111,31 @@ export function PropertyVisual({
   // The active view can disappear underneath us when an image 404s.
   const active = views.some((v) => v.id === view) ? view : views[0].id;
 
+  // Each view's own picture, for its place in the filmstrip: the very URL
+  // the view draws, so a thumbnail costs no request the view does not
+  // already make, and a thumbnail that fails takes its view away just as
+  // the view failing would.
+  const aerialSrc = `/api/deals/${dealId}/aerial?src=usgs&w=${AERIAL.w}&h=${AERIAL.h}`;
+  const floodAerialSrc = `${aerialSrc}&z=${FLOOD_ZOOM}`;
+  const floodSrc = `/api/deals/${dealId}/flood?w=${AERIAL.w}&h=${AERIAL.h}&z=${FLOOD_ZOOM}`;
+  const thumbs: Record<View, { src: string | null; over?: string; fail: () => void }> = {
+    photo: { src: `/api/deals/${dealId}/picture?size=hero`, fail: () => setPhotoGone(true) },
+    street: { src: `/api/deals/${dealId}/photo`, fail: () => setStreetGone(true) },
+    satellite: { src: `/api/deals/${dealId}/aerial?src=satellite&w=${AERIAL.w}&h=${AERIAL.h}`, fail: () => setSatelliteGone(true) },
+    aerial: { src: aerialSrc, fail: () => setAerialGone(true) },
+    flood: { src: floodAerialSrc, over: floodSrc, fail: () => setFloodGone(true) },
+    map: { src: null, fail: () => {} },
+  };
+
   return (
     <figure className="shadow-card overflow-hidden rounded-2xl border border-line bg-surface">
       <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2">
         <figcaption className="truncate text-xs font-medium text-muted">{label}</figcaption>
-        <div className="flex shrink-0 items-center gap-2">
-          {canReplace && <ReplacePicture dealId={dealId} hasPicture={!!picture} />}
-          <div className="flex overflow-hidden rounded-lg border border-line">
-            {views.map((v) => (
-              <button
-                key={v.id}
-                type="button"
-                onClick={() => setView(v.id)}
-                aria-pressed={active === v.id}
-                className={`px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                  active === v.id ? "bg-brand text-white" : "hover:bg-faint"
-                }`}
-              >
-                {v.label}
-              </button>
-            ))}
+        {canReplace && (
+          <div className="flex shrink-0 items-center gap-2">
+            <ReplacePicture dealId={dealId} hasPicture={!!picture} />
           </div>
-        </div>
+        )}
       </div>
 
       <div className="relative">
@@ -291,6 +299,55 @@ export function PropertyVisual({
           <PropertyMap dealId={dealId} label={label} heightClass="aspect-[16/9] w-full" />
         )}
       </div>
+
+      {/* The views as a filmstrip (#432), the way a listing shows its
+          photographs: each one's own picture under its name, the one on
+          screen ringed. */}
+      {views.length > 1 && (
+        <div role="group" aria-label="Views of the property" className="flex gap-2 overflow-x-auto border-t border-line bg-faint/60 px-3 py-2.5">
+          {views.map((v) => {
+            const t = thumbs[v.id];
+            const on = active === v.id;
+            return (
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => setView(v.id)}
+                aria-pressed={on}
+                data-view-thumb={v.id}
+                className={`group relative h-14 w-24 shrink-0 overflow-hidden rounded-lg border bg-surface text-left transition ${
+                  on ? "border-brand ring-2 ring-brand" : "border-line opacity-80 hover:opacity-100"
+                }`}
+              >
+                {t.src ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- the view's own URL, cached by the browser once for both */}
+                    <img src={t.src} alt="" aria-hidden width={96} height={56} className="absolute inset-0 h-full w-full object-cover" onError={t.fail} />
+                    {t.over ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- FEMA's zones over the same frame, as the view draws them
+                      <img src={t.over} alt="" aria-hidden width={96} height={56} className="absolute inset-0 h-full w-full object-cover" onError={t.fail} />
+                    ) : null}
+                  </>
+                ) : (
+                  <span aria-hidden className="absolute inset-0 flex items-center justify-center bg-brand/5 text-brand">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+                      <path d="M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4Z" />
+                      <path d="M9 4v13M15 6.5v13" />
+                    </svg>
+                  </span>
+                )}
+                <span
+                  className={`absolute inset-x-0 bottom-0 px-1.5 pb-0.5 pt-3 text-[10px] font-semibold ${
+                    t.src ? "bg-gradient-to-t from-black/70 to-transparent text-white" : "text-brand"
+                  }`}
+                >
+                  {v.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </figure>
   );
 }

@@ -2394,7 +2394,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   little contrast and colour into the flat midday light, an unsharp mask
   sized to the grain; tone only, so the flood overlay still lies over it
   pixel for pixel). The deal page's Aerial tab rings a street address's
-  building (`data-picture="aerial-pin"`). **And on one map** (#431, `app/(app)/deals/pipeline-map.tsx`,
+  building (`data-picture="aerial-pin"`), and its views are a FILMSTRIP
+  under the picture (#432, `PropertyVisual`), where they were a row of
+  words: each view's own picture under its name (`data-view-thumb`), the
+  one on screen ringed, the Flood thumbnail FEMA's zones over the same
+  frame and the Map a glyph. A thumbnail draws the very URL its view
+  draws, so it costs no request the view does not already make, and one
+  that fails takes its view away as the view failing would. **And on one map** (#431, `app/(app)/deals/pipeline-map.tsx`,
   `PipelineMap`; the rules pure in `lib/pipeline-map.ts`): the third view
   beside Cards and List (`PipelineView` `"map"`, the same cookie) draws
   every deal the filters leave as a pin in its call's colour — the split

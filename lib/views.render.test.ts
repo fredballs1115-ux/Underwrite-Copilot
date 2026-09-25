@@ -3061,7 +3061,7 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
     expect(text).toContain("From the offering memorandum");
     expect(text).toContain("Replace photo");
     // The Photo tab is the pressed one; the aerial and the map are still offered.
-    expect(html).toMatch(/aria-pressed="true"[^>]*>Photo</);
+    expect(html).toMatch(/aria-pressed="true" data-view-thumb="photo"/);
     expect(text).toContain("Aerial");
     expect(text).toContain("Map");
   });
@@ -3073,7 +3073,7 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
     expect(html).not.toContain("/picture?size=hero");
     expect(text).toContain("Add photo");
     expect(text).not.toContain("Replace photo");
-    expect(html).toMatch(/aria-pressed="true"[^>]*>Aerial</);
+    expect(html).toMatch(/aria-pressed="true" data-view-thumb="aerial"/);
   });
 
   it("never offers to replace the sample deal's picture", () => {
@@ -3110,13 +3110,21 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
     expect(text).toContain("FEMA flood zones · USGS imagery");
     expect(text).toContain("a federally backed loan requires flood insurance");
     // The aerial still leads; the Flood tab waits to be opened.
-    expect(html).toMatch(/aria-pressed="true"[^>]*>Aerial</);
+    expect(html).toMatch(/aria-pressed="true" data-view-thumb="aerial"/);
 
     // No street address, no Flood tab: a neighbourhood's centre is not the building.
     const area = renderToStaticMarkup(
       React.createElement(PropertyVisual, { ...base, hasStreetAddress: false, picture: null, flood }),
     );
     expect(area).not.toContain("/flood?");
+    // The views are a filmstrip (#432): each one's own picture — the very
+    // URL its view draws, so a thumbnail costs no request of its own — the
+    // Flood thumbnail FEMA's zones over the same frame, the Map a glyph.
+    expect(html).toContain('data-view-thumb="aerial"');
+    expect(html).toContain('data-view-thumb="flood"');
+    expect(html).toContain('data-view-thumb="map"');
+    expect((html.match(/src="\/api\/deals\/d1\/flood\?w=1280&amp;h=576&amp;z=17"/g) ?? []).length).toBe(2);
+    expect(html).toContain('aria-label="Views of the property"');
     // The Aerial tab rings the building too (#429) — a street address's,
     // never a neighbourhood placement's centre.
     expect(html).toContain('data-picture="aerial-pin"');
