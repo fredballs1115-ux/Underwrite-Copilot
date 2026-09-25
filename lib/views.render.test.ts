@@ -260,6 +260,42 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(html).not.toContain('class="hidden items-center gap-3 px-5 pb-1.5 md:flex"');
   });
 
+  it("draws the pipeline on one map when the reader chose the map: the legend, the basemaps and where every deal is (#431)", () => {
+    const placed = CARDS.map((c, i) =>
+      c.id === "a" || c.id === "b" ? { ...c, place: { lat: 39.95 + i / 100, lng: -75.16, precision: "street" as const } } : c.id === "c" ? { ...c, placeMiss: true } : c,
+    );
+    const html = render(
+      React.createElement(Pipeline, {
+        deals: placed,
+        errorMessage: null,
+        notice: null,
+        onboarding: { hasBuyBox: true, sampleId: "h", hasRealDeal: true },
+        billing: BILLING,
+        initialView: "map",
+      }),
+    );
+    dumpView("pipeline-map", html);
+    expect(a11yIssues(html), "a11y pipeline map").toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(html).toContain('data-view="map"');
+    expect(html).not.toContain('data-view="cards"');
+    expect(html).not.toContain('data-view="list"');
+    // The legend is the split bar's four calls; the basemaps are the deal
+    // page's three.
+    for (const w of ["Go", "Caution", "No-go", "Not screened", "Satellite", "Hybrid", "Map"]) expect(text).toContain(w);
+    // Every live deal is counted in exactly one place: two resolved, one
+    // no geocoder could place, the two with no address unplaceable too, the
+    // rest waiting on the location route (the dead one is filtered away).
+    const live = CARDS.filter((c) => c.stage !== "dead");
+    const noAddress = live.filter((c) => !c.hasAddress).length;
+    const waiting = live.length - 2 - 1 - noAddress;
+    expect(text).toContain(
+      `2 of ${live.length} deals on the map · ${waiting} being placed · ${1 + noAddress} with no address a geocoder could place`,
+    );
+    expect(html).toMatch(/aria-pressed="true"[^>]*>(?:<svg[\s\S]*?<\/svg>)?Map/);
+  });
+
   it("renders the empty pipeline with the getting-started state, and the at-limit notice", () => {
     const emptyHtml = render(
         React.createElement(Pipeline, {

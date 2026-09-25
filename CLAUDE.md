@@ -2394,7 +2394,23 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   little contrast and colour into the flat midday light, an unsharp mask
   sized to the grain; tone only, so the flood overlay still lies over it
   pixel for pixel). The deal page's Aerial tab rings a street address's
-  building (`data-picture="aerial-pin"`).
+  building (`data-picture="aerial-pin"`). **And on one map** (#431, `app/(app)/deals/pipeline-map.tsx`,
+  `PipelineMap`; the rules pure in `lib/pipeline-map.ts`): the third view
+  beside Cards and List (`PipelineView` `"map"`, the same cookie) draws
+  every deal the filters leave as a pin in its call's colour — the split
+  bar's four — hollow where the placement is vaguer than a street, with a
+  hover card of the building's picture, name, call and figures (every
+  string escaped: a name is whatever its owner typed) and a click that
+  opens the deal (or selects it in compare mode, where the pin wears a
+  brand ring). A pin sits on the location `lib/deal-location` cached for
+  the deal's own pictures — the page reads the cache and never geocodes
+  (`cacheFresh`), and the map places the rest on its first view through
+  the cached location route, three at a time and `MAX_TO_PLACE` at most;
+  `partitionForMap` keeps placed, to-place and unplaceable apart and
+  `placementLine` counts every deal in exactly one of them, so a deal no
+  geocoder could place is counted, never guessed. It frames the pins until
+  the reader moves the map, then adds a late pin without pulling the view
+  away.
 - FEMA's flood map over the building (#425): the deal page's picture has
   a Flood tab for a deal with a street address (a neighbourhood
   placement's centre is not the building): the USGS aerial at
