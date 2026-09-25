@@ -48,6 +48,8 @@ import { assetWords } from "@/lib/asset-words";
 import { askingPriceOf, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { interestOf, noteCollateralSentence, noteYieldSentence, readInterest } from "@/lib/interest";
 import type { AssumableView } from "@/lib/assumable-debt";
+import { yearsText as leaseYears } from "@/lib/ground-lease-term";
+import { exitMoney, type LeaseholdExitView } from "@/lib/leasehold-exit";
 import { basisScale, fmtBasis, subjectBasis } from "@/lib/comp-detail";
 import { gapScale } from "@/lib/gap-detail";
 import { parsePageNumber } from "@/lib/facts";
@@ -312,6 +314,95 @@ function AssumableBlock({ view }: { view: AssumableView | null | undefined }) {
 }
 
 /**
+ * A leasehold's exit, on the term its ground lease has left at the model's
+ * sale (#422) — the deal page's card on paper, from the same
+ * `leaseholdExitView`, so the report and the page never disagree. Two
+ * pictures in plain Views: the term from today, the model's hold filled
+ * dark, the rest of the lease light, the extension options outlined and
+ * dashed, the hold's years past the lease's end in the warning tone; and
+ * the two exits on one track. Then the sentence and the small print.
+ * Nothing where the deal is not a leasehold that states when its lease
+ * ends.
+ */
+function LeaseholdBlock({ view }: { view: LeaseholdExitView | null | undefined }) {
+  if (!view) return null;
+  const v = view;
+  const opts = v.optionYears ?? 0;
+  const whole = Math.max(v.yearsLeft + opts, v.holdYears, 1);
+  const at = (years: number) => `${Math.max(0, Math.min(100, (years / whole) * 100))}%`;
+  const held = Math.min(v.holdYears, Math.max(0, v.yearsLeft));
+  const after = Math.max(0, v.yearsLeft - v.holdYears);
+  const past = Math.max(0, v.holdYears - Math.max(0, v.yearsLeft));
+  const top = Math.max(v.capitalised, v.onTerm ?? 0) || 1;
+  const exitBar = (label: string, value: number, color: string) => (
+    <View style={{ marginTop: 4 }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <Text style={{ fontSize: 7.5, color: C.ink }}>{str(label)}</Text>
+        <Text style={{ fontSize: 7.5, color: C.ink, fontFamily: "Helvetica-Bold" }}>{str(exitMoney(value))}</Text>
+      </View>
+      <View style={{ height: 5, backgroundColor: C.faint, borderRadius: 2, marginTop: 1.5 }}>
+        <View style={{ height: 5, width: `${Math.max(1.5, (value / top) * 100)}%`, backgroundColor: color, borderRadius: 2 }} />
+      </View>
+    </View>
+  );
+  return (
+    <View style={{ marginTop: 12 }} wrap={false}>
+      <TitleRow title="The exit, on the ground lease's term" marginTop={0} />
+      <Text style={s.sub}>{str(`${v.termLine}.`)}</Text>
+      {v.yearsLeft > 0 ? (
+        <View style={{ marginTop: 3 }}>
+          <View style={{ height: 6, backgroundColor: C.faint, borderRadius: 3, position: "relative" }}>
+            <View style={{ position: "absolute", left: 0, top: 0, height: 6, width: at(held), backgroundColor: C.brand }} />
+            {after > 0 ? (
+              <View style={{ position: "absolute", left: at(held), top: 0, height: 6, width: at(after), backgroundColor: "#9fb8ba" }} />
+            ) : null}
+            {past > 0 ? (
+              <View style={{ position: "absolute", left: at(Math.max(0, v.yearsLeft)), top: 0, height: 6, width: at(past), backgroundColor: C.kill }} />
+            ) : null}
+            {opts > 0 ? (
+              <View
+                style={{
+                  position: "absolute",
+                  left: at(v.yearsLeft),
+                  top: 0,
+                  height: 6,
+                  width: at(opts),
+                  borderWidth: 0.75,
+                  borderStyle: "dashed",
+                  borderColor: C.brand,
+                }}
+              />
+            ) : null}
+          </View>
+          <Text style={{ fontSize: 7, color: C.muted, marginTop: 2 }}>
+            {str(
+              [
+                `Dark: the model's ${v.holdYears}-year hold`,
+                after > 0 ? `light: the ${leaseYears(after)} left at the sale, to ${v.endLabel}` : "",
+                past > 0 ? `red: the hold's ${leaseYears(past)} after the lease ends` : "",
+                opts > 0 ? `dashed: ${leaseYears(opts)} of extension options, if exercised` : "",
+              ]
+                .filter(Boolean)
+                .join("; ") + ".",
+            )}
+          </Text>
+        </View>
+      ) : null}
+      {v.onTerm != null ? (
+        <View style={{ marginTop: 3 }}>
+          {exitBar("Capitalised, as the model runs it", v.capitalised, "#9aa3a1")}
+          {exitBar(`On the ${leaseYears(v.yearsAtSale ?? 0)} left at the sale`, v.onTerm, C.brand)}
+        </View>
+      ) : null}
+      <Text style={{ fontSize: 8.5, color: C.ink, marginTop: 4 }}>{str(v.sentence)}</Text>
+      {v.optionsLine ? <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 2 }}>{str(v.optionsLine)}</Text> : null}
+      {v.lenderLine ? <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 1 }}>{str(v.lenderLine)}</Text> : null}
+      {v.basisLine ? <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 1 }}>{str(v.basisLine)}</Text> : null}
+    </View>
+  );
+}
+
+/**
  * A portfolio memorandum's properties (lib/portfolio), as the deal page's
  * card draws them: the markets they sit in, the facts a buyer should see
  * before pricing any of it, then one row a property — its share of the
@@ -537,6 +628,10 @@ export interface ReportInput {
    *  new loan (lib/assumable-debt, #419) — printed beside the assumptions
    *  read; null where none is offered or there was no model */
   assumable?: AssumableView | null;
+  /** a leasehold's exit on the term its ground lease has left at the
+   *  model's sale (lib/leasehold-exit, #422) — printed beside the
+   *  assumptions read; null unless a leasehold states when its lease ends */
+  leasehold?: LeaseholdExitView | null;
 }
 
 /** Everything the deal screen produced, shaped for the multi-page report. */
@@ -551,12 +646,14 @@ export function buildReportData(
   cover?: MemoData["cover"],
   modelVsMarket?: ModelVsMarket | null,
   assumable?: AssumableView | null,
+  leasehold?: LeaseholdExitView | null,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
   return {
     modelVsMarket: modelVsMarket ?? null,
     assumable: assumable ?? null,
+    leasehold: leasehold ?? null,
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
@@ -1027,6 +1124,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               lands here, under the grid it is judged on. */}
           {!sensitivity && <AssumptionsBlock read={modelVsMarket} />}
           {!sensitivity && <AssumableBlock view={input.assumable} />}
+          {!sensitivity && <LeaseholdBlock view={input.leasehold} />}
         </PageChrome>
       )}
 
@@ -1131,6 +1229,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
 
           <AssumptionsBlock read={modelVsMarket} />
           <AssumableBlock view={input.assumable} />
+          <LeaseholdBlock view={input.leasehold} />
         </PageChrome>
       )}
 

@@ -389,12 +389,12 @@ the shared screen, the workbook's cover and the report. Then #420: the
 pipeline's building pictures on a phone, where they had been hidden. Then
 #421: a leasehold valued on its term — when the ground lease ends, read
 off the memorandum, drawn in the interest panel, and the model's exit
-valued on the years left at its sale on the Financials tab.
+valued on the years left at its sale on the Financials tab. Then #422:
+the term wherever a leasehold is summarized — the pipeline's tag, the
+memo, the report's block and the workbook's cover, which names the exit
+cap that runs the model on the term.
 **Open after it**:
-the leasehold's exit on its term reaches the deal page alone — the
-report, the workbook's cover, the memo and the shared screen still carry
-only the caveat and the term line (the documents round, as #419 was for
-#417); a ground rent's own schedule (fixed bumps, a reset to a share of
+a ground rent's own schedule (fixed bumps, a reset to a share of
 land value) is not in the model's expense line; a non-performing note's foreclosure path (the months and cost of taking
 the property, by the state's process) is still the challenger's words,
 not a figure; a leased fee runs the ground rent

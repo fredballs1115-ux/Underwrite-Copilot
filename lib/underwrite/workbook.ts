@@ -303,6 +303,24 @@ function buildCover(
     ws.getRow(r).height = 40;
     r++;
   }
+  // A leasehold's exit (#422): this model's sale valued on the years its
+  // lease has left then, and the Exit Cap that runs the workbook on the
+  // term — the input stays the model's; the reader decides. The lease's
+  // end rides in "What is being sold" above.
+  if (meta.leasehold) {
+    fact("The exit, on the lease's term", meta.leasehold.line);
+    // A sentence, not a figure: wrapped, with the room it needs.
+    ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r - 1).height = 52;
+    if (meta.leasehold.read) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.leasehold.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 64;
+      r++;
+    }
+  }
   r++;
 
   sectionHeader(ws, r, "Contents", 2, 3);

@@ -43,7 +43,7 @@ import type { ExtractionResult, InterestKind } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
 import { parsePageNumber } from "@/lib/facts";
 import { parseUsd } from "@/lib/money";
-import { groundLeaseTermLine, readGroundLeaseTerm, type GroundLeaseTerm } from "@/lib/ground-lease-term";
+import { groundLeaseTermLine, readGroundLeaseTerm, termEndLabel, yearsText, type GroundLeaseTerm } from "@/lib/ground-lease-term";
 import { readNote, readNoteTerms, type NoteRead } from "@/lib/note-yield";
 
 export type { InterestKind };
@@ -71,18 +71,23 @@ export function interestOf(ex: ExtractionResult | null | undefined): { kind: Int
 /** What the price buys, as the pipeline row's tag — "49% share", "Note",
  *  "Leased fee" — and null for a fee simple (or an extraction saved before
  *  the interest was read), where the price is the building's and the row
- *  says nothing more. */
-export function interestTag(ex: ExtractionResult | null | undefined): string | null {
+ *  says nothing more. Either side of a ground lease carries the years to
+ *  its end where the memorandum states it (#422): "Leasehold, 45 yrs left"
+ *  (whole years, down — a leasehold is never credited with a year it does
+ *  not have), "Leased fee, reverts in 45 yrs". */
+export function interestTag(ex: ExtractionResult | null | undefined, asOf: Date = new Date()): string | null {
   const { kind, sharePct } = interestOf(ex);
+  const left = kind === "leasehold" || kind === "leased_fee" ? readGroundLeaseTerm(ex, asOf)?.yearsLeft ?? null : null;
+  const yrs = left != null && left > 0 ? (left < 1 ? "under 1 yr" : `${Math.floor(left)} ${Math.floor(left) === 1 ? "yr" : "yrs"}`) : null;
   switch (kind) {
     case "note":
       return "Note";
     case "partial_interest":
       return sharePct != null ? `${shareText(sharePct)} share` : "Share";
     case "leasehold":
-      return "Leasehold";
+      return yrs ? `Leasehold, ${yrs} left` : "Leasehold";
     case "leased_fee":
-      return "Leased fee";
+      return yrs ? `Leased fee, reverts in ${yrs}` : "Leased fee";
     default:
       return null;
   }
@@ -418,6 +423,14 @@ export function interestNote(r: InterestRead): string {
   return `${interestContextLine(r)} ${traps[r.kind]}`;
 }
 
+/** "; the lease ends Dec 2071, 45.3 years from today" — the term's end in a
+ *  clause for the short line (#422), where the memorandum states it and it
+ *  has not passed. */
+function termClause(t: GroundLeaseTerm | null, what: string): string {
+  if (!t || t.yearsLeft <= 0) return "";
+  return `; ${what} ${t.from === "year" ? "in " : t.from === "remaining" ? "about " : ""}${termEndLabel(t)}, ${yearsText(t.yearsLeft)} from today`;
+}
+
 /**
  * The interest in one line, for the documents with no room for the panel —
  * the memo's header, the workbook's cover: what the price buys, and the one
@@ -450,11 +463,11 @@ export function interestShortLine(r: InterestRead): string {
         ? `${withArticle(shareText(r.sharePct), true)} share of the owning entity — ${money(r.askingPrice)} for the share is ${money(r.impliedWhole)} for the whole`
         : "A share of the owning entity, its percentage not stated";
     case "leasehold":
-      return "A leasehold — the building and a lease on the land, not the land";
+      return `A leasehold — the building and a lease on the land, not the land${termClause(r.term, "the lease ends")}`;
     case "leased_fee":
       return `The leased fee — the land under a building someone else owns, and its ground rent${
         r.groundRentCoverage != null ? `, covered ${times(r.groundRentCoverage)} by the building's income` : ""
-      }`;
+      }${termClause(r.term, "the building reverts")}`;
     default:
       return "Fee simple, with a ground lease on part of the site";
   }

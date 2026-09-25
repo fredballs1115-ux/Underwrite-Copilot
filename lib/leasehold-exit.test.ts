@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import ExcelJS from "exceljs";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { dealContextFor } from "@/lib/deal-context";
+import { interestShortLine, interestTag, readInterest } from "@/lib/interest";
+import { buildUnderwriteWorkbook } from "@/lib/underwrite/workbook";
 import {
   leaseholdExitSentence,
   leaseholdExitView,
@@ -179,5 +182,60 @@ describe("the term, wherever the deal is read after the extraction", () => {
     const ex = leasehold([row("Ground lease expiration", "December 31, 2071"), row("Ground lease extension options", "Four 10-year options")]);
     const ctx = dealContextFor(ex)!;
     expect(ctx).toMatch(/The ground lease ends Dec 2071, \d+\.\d years from today, with extension options after it as stated: four of 10 years, 40 years in all\./);
+  });
+});
+
+describe("the term, wherever a leasehold is summarized (#422)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("the pipeline's tag carries the years left, in whole years down; either side of the lease", () => {
+    const ex = leasehold([row("Ground lease expiration", "December 31, 2071")]);
+    expect(interestTag(ex, AS_OF)).toBe("Leasehold, 45 yrs left");
+    expect(interestTag({ ...ex, interest: { ...ex.interest!, kind: "leased_fee" } }, AS_OF)).toBe("Leased fee, reverts in 45 yrs");
+    expect(interestTag(leasehold([row("Ground lease expiration", "March 2027")]), AS_OF)).toBe("Leasehold, under 1 yr left");
+    // A term that has passed, or none stated: the kind alone.
+    expect(interestTag(leasehold([row("Ground lease expiration", "March 2020")]), AS_OF)).toBe("Leasehold");
+    expect(interestTag(leasehold([]), AS_OF)).toBe("Leasehold");
+  });
+
+  it("the documents' short line says when the lease ends — the memo's header and the workbook's cover", () => {
+    const r = readInterest(leasehold([row("Ground lease expiration", "December 31, 2071")]), 68_000_000, AS_OF)!;
+    expect(interestShortLine(r)).toBe(
+      "A leasehold — the building and a lease on the land, not the land; the lease ends Dec 2071, 45.3 years from today",
+    );
+    const year = readInterest(leasehold([row("Ground lease expiration", "2071")]), 68_000_000, AS_OF)!;
+    expect(interestShortLine(year)).toBe("A leasehold — the building and a lease on the land, not the land; the lease ends in 2071, 44.3 years from today");
+    expect(interestShortLine(readInterest(leasehold([]), 68_000_000, AS_OF)!)).toBe("A leasehold — the building and a lease on the land, not the land");
+  });
+
+  it("the workbook's cover carries the read and the exit cap that runs it on the term", async () => {
+    vi.useFakeTimers({ now: AS_OF, toFake: ["Date"] });
+    const ex = leasehold([row("Ground lease expiration", "December 31, 2071")]);
+    const derived = deriveUnderwriteInputs(ex, SAMPLE_DEAL.name);
+    expect(derived.meta.leasehold?.line).toBe(
+      "With 40.3 years left at the model's sale in year 5, the term bears 87% of the capitalised exit — $72.2M against $82.5M — which is the model's 5.45% exit cap read as 6.23% on a building that reverts. At that exit the model's levered IRR is 6.2%, against 11.7% as it runs. Enter 6.23% as the Exit Cap to run this workbook on the term.",
+    );
+    expect(derived.meta.leasehold?.read).toContain("It will have 40.3 years.");
+    expect(derived.meta.leasehold?.read).toContain("The years left are valued at the model's own exit return");
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await buildUnderwriteWorkbook(derived)) as unknown as ArrayBuffer);
+    const cover = wb.getWorksheet("Cover")!;
+    let at = 0;
+    cover.eachRow((r, n) => {
+      if (String(r.getCell(2).value ?? "") === "The exit, on the lease's term") at = n;
+    });
+    expect(at).toBeGreaterThan(0);
+    expect(String(cover.getCell(at, 3).value)).toContain("Enter 6.23% as the Exit Cap to run this workbook on the term.");
+    expect(String(cover.getCell(at + 1, 3).value)).toContain("It will have 40.3 years.");
+    // "What is being sold" carries the lease's end above it.
+    let sold = 0;
+    cover.eachRow((r, n) => {
+      if (String(r.getCell(2).value ?? "") === "What is being sold") sold = n;
+    });
+    expect(String(cover.getCell(sold, 3).value)).toContain("the lease ends Dec 2071, 45.3 years from today");
+    // A fee simple's cover says none of it.
+    expect(deriveUnderwriteInputs(SAMPLE_DEAL.extraction as ExtractionResult, SAMPLE_DEAL.name).meta.leasehold).toBeNull();
   });
 });

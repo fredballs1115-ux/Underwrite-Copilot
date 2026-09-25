@@ -9,6 +9,7 @@ import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { buildReportData, rangeRead, ReportDocument } from "./report-document";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
+import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { pdfFillCountOf, pdfTextOf } from "./pdf-text-of";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
@@ -297,6 +298,58 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("the rates table was not fresh enough to seed it");
     // The memo on page one carries the line too.
     expect(text).toContain("The seller's loan is offered for assumption: $30.0M at 3.45% to Mar 2031");
+  }, 45000);
+
+  it("prints a leasehold's exit on the term its lease has left at the sale, with the term and the two exits drawn (#422)", async () => {
+    vi.useFakeTimers({ now: new Date(Date.UTC(2026, 8, 25)), toFake: ["Date"] });
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 12", basis: "na" as const });
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      totalPages: 40,
+      interest: { kind: "leasehold", summary: "The leasehold interest in the building", share: "", groundLease: "Ground lease through December 31, 2071; unsubordinated.", loan: "", page: "p. 12" },
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        row("Ground lease expiration", "December 31, 2071"),
+        row("Ground lease extension options", "Four 10-year options"),
+      ],
+    } as ExtractionResult;
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    // The route's own chain: the model, then the lease read against it.
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const view = leaseholdExitView(readLeaseholdExit(extraction, derived.inputs)!);
+    const render = async (leasehold: typeof view | null) =>
+      renderToBuffer(
+        React.createElement(ReportDocument, {
+          input: buildReportData(deal, "September 25, 2026", [], sensitivity, undefined, undefined, undefined, undefined, null, null, leasehold),
+        }) as unknown as Parameters<typeof renderToBuffer>[0],
+      );
+    const buf = await render(view);
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("The exit, on the ground lease's term");
+    expect(text).toContain("The ground lease ends Dec 2071, 45.3 years from today, with extension options after it as stated: four of 10 years, 40 years in all.");
+    expect(text).toContain("Dark: the model's 5-year hold; light: the 40.3 years left at the sale, to Dec 2071; dashed: 40 years of extension options, if exercised.");
+    expect(text).toContain("Capitalised, as the model runs it $82.5M");
+    expect(text).toContain("On the 40.3 years left at the sale $72.2M");
+    expect(text).toContain(
+      "With 40.3 years left at the model's sale in year 5, the term bears 87% of the capitalised exit — $72.2M against $82.5M — which is the model's 5.45% exit cap read as 6.23% on a building that reverts.",
+    );
+    expect(text).toContain("It will have 40.3 years.");
+    // The two pictures are filled shapes the report without the block does
+    // not draw: the term's segments and the two exits.
+    const without = await render(null);
+    expect((await pdfFillCountOf(buf)) - (await pdfFillCountOf(without))).toBeGreaterThanOrEqual(6);
+    expect(await pdfTextOf(without)).not.toContain("The exit, on the ground lease's term");
   }, 45000);
 
   it("gives a portfolio memorandum a page of its own: each property, its bars and what the memorandum states", async () => {

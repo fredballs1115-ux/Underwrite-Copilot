@@ -995,6 +995,9 @@ jobs:
           # #421 — a leasehold valued on its term (signed-in): its changelog
           # card.
           mark "#421 a leasehold is valued on its term" grep -q "A leasehold, valued on the years its lease has left" p_whats-new.html
+          # #422 — the lease's term wherever a leasehold is summarized
+          # (signed-in surfaces and documents): its changelog card.
+          mark "#422 a leasehold's term is on every summary" grep -q "on every summary of a leasehold" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then
