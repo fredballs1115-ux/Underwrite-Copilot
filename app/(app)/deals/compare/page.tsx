@@ -16,6 +16,9 @@ import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { seedBenchmarks } from "@/lib/research-data";
 import { findPriceMetric, inferStrategy, isPlanDeal, noiFigures } from "@/lib/deal-strategy";
+import { bannerSources } from "@/lib/deal-banner";
+import type { DealVisualCache } from "@/lib/deal-location";
+import { PICTURE_CREDIT } from "@/lib/deal-picture";
 
 export const metadata: Metadata = { title: "Compare deals" };
 
@@ -29,7 +32,13 @@ function goingInNoiText(ex: ExtractionResult | null): string | null {
   return going ? ex.metrics.find((m) => m.label === going.label)?.value ?? null : null;
 }
 
-function toCol(deal: DealRow, box: BuyBox | null, bench30: number | null, tenYearPct: number | null): Col {
+function toCol(
+  deal: DealRow,
+  box: BuyBox | null,
+  bench30: number | null,
+  tenYearPct: number | null,
+  googleEnabled: boolean,
+): Col {
   const ex = (deal.extraction as ExtractionResult | null) ?? null;
   const verdict = (deal.verdict as VerdictResult | null) ?? null;
   const model = (deal.model as UnderwritingModel | null) ?? null;
@@ -37,6 +46,7 @@ function toCol(deal: DealRow, box: BuyBox | null, bench30: number | null, tenYea
   const signal = ((deal as { first_signal?: unknown }).first_signal as FirstSignal | null) ?? null;
   const address =
     ((deal as { address?: unknown }).address as StructuredAddress | null) ?? null;
+  const picture = ((deal as { photo?: unknown }).photo as DealVisualCache | null)?.picture ?? null;
 
   // A plan deal's generated model books dark years first, so its year-1 cap
   // is negative or a default — not a figure to compare on, and not one to
@@ -101,6 +111,16 @@ function toCol(deal: DealRow, box: BuyBox | null, bench30: number | null, tenYea
     // development's land cost is its price.
     price: usd(r?.purchasePrice) ?? findPriceMetric(ex?.metrics ?? [], strat.kind)?.value ?? null,
     noi: usd(r?.year1Noi) ?? goingInNoiText(ex),
+    // Each building pictured at the head of its column (#418): its own
+    // photograph where the deal has one cached, then Street View, then the
+    // USGS aerial — each pinned, so its credit is the picture on screen.
+    pictures: bannerSources({
+      dealId: deal.id,
+      pictureCredit: picture ? PICTURE_CREDIT[picture.source] : null,
+      googleEnabled,
+      hasStreetAddress: !!address?.street,
+      hasAddress: !!address?.label,
+    }),
   };
 }
 
@@ -153,7 +173,7 @@ export default async function ComparePage({
   const tenYearPct = debt.tenYear?.pct ?? null;
 
   const cols = (rows as Scoped[]).map((d) =>
-    toCol(d, boxByScope.get(scopeKey(d)) ?? null, bench30?.value ?? null, tenYearPct),
+    toCol(d, boxByScope.get(scopeKey(d)) ?? null, bench30?.value ?? null, tenYearPct, !!process.env.GOOGLE_MAPS_API_KEY),
   );
 
   const backLink = (

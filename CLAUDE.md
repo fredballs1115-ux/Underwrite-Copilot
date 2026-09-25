@@ -2236,7 +2236,20 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   from a listing portal or an image search**: the memorandum's cover was
   sent to the reader to evaluate this deal, which is exactly this use, and
   a portal's photograph is under that portal's terms. The Street View
-  photograph remains the operator's `GOOGLE_MAPS_API_KEY` path.
+  photograph remains the operator's `GOOGLE_MAPS_API_KEY` path. **The
+  compare page pictures every building it compares** (#418): each column
+  on desktop, and each card on a phone, opens on the deal's picture. The
+  list of sources is `bannerSources` in `lib/deal-banner.ts` (pure, in
+  `imagePlan`'s order): the deal's own cached photograph, then Street
+  View where the key and a street address allow, then the USGS aerial —
+  no Google satellite at card size. Each source is PINNED to one route, so
+  the corner credit is exactly the picture on screen. `DealBanner` (client)
+  advances to the next source when one fails, and the credit follows it.
+  Nothing loads, or there is no address and no photograph: a blank plate
+  with the building mark holds the slot. A picture that failed before
+  hydration fired its `error` with no listener, so the banner also checks
+  on mount (`complete` with no `naturalWidth` is a failure). The
+  pipeline's `DealThumb` makes the same check.
 - The homepage's photographs: `lib/photos.ts` (pure — the four slots with
   their file names, briefs, sizes and alt text; `presentPhotos` over an
   `exists` callback; `stripPhotos`; `HERO_AERIAL`) and `lib/photos-fs.ts`

@@ -983,6 +983,9 @@ jobs:
           # surfaces): its changelog card. The title's apostrophe serves as
           # &#x27;, so the phrase starts after it.
           mark "#417 an assumable loan is priced against today's rate" grep -q "loan, priced against today" p_whats-new.html
+          # #418 — each building pictured on the compare page (signed-in):
+          # its changelog card.
+          mark "#418 every compared building is pictured" grep -q "Every building you compare, pictured" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

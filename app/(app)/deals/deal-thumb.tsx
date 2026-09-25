@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * The building's own picture, at list-row size — its "logo", in the sense
@@ -25,9 +25,19 @@ import { useState } from "react";
  *
  * Lazy by design: a long pipeline must not fire a geocode for every row the
  * reader never scrolls to.
+ *
+ * A picture that failed before the page hydrated fired its `error` event
+ * with no listener attached, so the effect checks on mount: a finished
+ * load with no pixels is a failure too, and the plate takes the slot
+ * (DealBanner's rule, #418).
  */
 export function DealThumb({ dealId, hasAddress = true }: { dealId: string; hasAddress?: boolean }) {
   const [gone, setGone] = useState(false);
+  const ref = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    const img = ref.current;
+    if (img && img.complete && img.naturalWidth === 0) setGone(true);
+  }, []);
   if (!hasAddress || gone) {
     return (
       <span
@@ -54,6 +64,7 @@ export function DealThumb({ dealId, hasAddress = true }: { dealId: string; hasAd
        auth-scoped route; next/image can't add anything over a route that
        already sets its own cache headers */
     <img
+      ref={ref}
       src={`/api/deals/${dealId}/image?w=96&h=96`}
       alt=""
       aria-hidden

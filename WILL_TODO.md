@@ -378,6 +378,11 @@ the deal's own model and the model's seeded rate, and the Financials tab
 draws the coupon against today's rate, the coverage both ways and what
 the loan is worth, with the challenger checking the overlap, the cheque,
 consent, the balloon and the exit by name.
+Then #418: the compare page pictures every building it compares — the
+deal's own photograph, Street View or the USGS aerial, each pinned so its
+credit is the picture on screen, falling back with the credit following —
+and the pipeline thumbnail and the banner both catch a picture that failed
+before the page hydrated.
 **Open after it**: the assumable loan reaches the deal page, the deal
 context and the challenger, not yet the memo, the report or the workbook;
 a non-performing note's foreclosure path (the months and cost of taking
