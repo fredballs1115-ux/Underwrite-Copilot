@@ -1,0 +1,259 @@
+{
+  "service": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer",
+  "layerId": 28,
+  "layerName": "Flood Hazard Zones",
+  "legend": [
+    {
+      "label": "1% Annual Chance Flood Hazard",
+      "file": "legend-00.png",
+      "values": [
+        "A99,<Null>",
+        "A,1 PCT ANNUAL CHANCE FLOOD HAZARD CONTAINED IN CHANNEL",
+        "A,1 PCT ANNUAL CHANCE FLOOD HAZARD CONTAINED IN STRUCTURE",
+        "A,<Null>",
+        "A,COASTAL FLOODPLAIN",
+        "AE,1 PCT ANNUAL CHANCE FLOOD HAZARD CONTAINED IN CHANNEL",
+        "AE,1 PCT ANNUAL CHANCE FLOOD HAZARD CONTAINED IN STRUCTURE",
+        "AE,<Null>",
+        "AE,COASTAL FLOODPLAIN",
+        "AR,<Null>",
+        "AE,RIVERINE FLOODPLAIN IN COASTAL AREA",
+        "AH,<Null>",
+        "AH,COASTAL FLOODPLAIN",
+        "AH,RIVERINE FLOODPLAIN IN COASTAL AREA",
+        "AO,<Null>",
+        "AO,RIVERINE FLOODPLAIN IN COASTAL AREA",
+        "AO,COASTAL FLOODPLAIN",
+        "V,COASTAL FLOODPLAIN",
+        "VE,COASTAL FLOODPLAIN",
+        "AH,AREA WITH FLOOD HAZARD DUE TO LEVEE SYSTEM",
+        "AH,AREA WITH UNDETERMINED FLOOD HAZARD DUE TO NON-ACCREDITED LEVEE SYSTEM",
+        "AO,AREA WITH FLOOD HAZARD DUE TO LEVEE SYSTEM",
+        "AO,AREA WITH UNDETERMINED FLOOD HAZARD DUE TO NON-ACCREDITED LEVEE SYSTEM",
+        "AE,AREA WITH UNDETERMINED FLOOD HAZARD DUE TO NON-ACCREDITED LEVEE SYSTEM",
+        "A99,AREA WITH REDUCED FLOOD HAZARD DUE TO LEVEE SYSTEM",
+        "A,AREA WITH UNDETERMINED FLOOD HAZARD DUE TO NON-ACCREDITED LEVEE SYSTEM",
+        "AR,AREA WITH REDUCED FLOOD HAZARD DUE TO LEVEE SYSTEM",
+        "A,AREA WITH FLOOD HAZARD DUE TO LEVEE SYSTEM",
+        "AE,COMBINED RIVERINE AND COASTAL FLOODPLAIN",
+        "VE,<Null>",
+        "V,<Null>",
+        "A,COMBINED RIVERINE AND COASTAL FLOODPLAIN",
+        "A,RIVERINE FLOODPLAIN IN COASTAL AREA",
+        "VE,COMBINED RIVERINE AND COASTAL FLOODPLAIN",
+        "VE,RIVERINE FLOODPLAIN IN COASTAL AREA",
+        "V,COMBINED RIVERINE AND COASTAL FLOODPLAIN",
+        "V,RIVERINE FLOODPLAIN IN COASTAL AREA",
+        "A,",
+        "AE,",
+        "AO,",
+        "A99,",
+        "AH,",
+        "VE,",
+        "V,",
+        "A,1 PERCENT ANNUAL CHANCE FLOOD HAZARD CONTAINED IN STRUCTURE",
+        "A,1 PERCENT ANNUAL CHANCE FLOOD HAZARD CONTAINED IN CHANNEL",
+        "AE,1 PERCENT ANNUAL CHANCE FLOOD HAZARD CONTAINED IN STRUCTURE",
+        "AE,1 PERCENT ANNUAL CHANCE FLOOD HAZARD CONTAINED IN CHANNEL",
+        "AE,RIVERINE FLOODPLAIN IN COASTAL ZONE",
+        "V,RIVERINE FLOODPLAIN IN COASTAL ZONE",
+        "AR,AREA WITH REDUCED FLOOD RISK DUE TO LEVEE",
+        "AO,COMBINED RIVERINE AND COASTAL FLOODPLAIN",
+        "AH,COMBINED RIVERINE AND COASTAL FLOODPLAIN",
+        "AE,AREA WITH FLOOD HAZARD DUE TO LEVEE SYSTEM",
+        "VE,RIVERINE FLOODPLAIN IN COASTAL ZONE2"
+      ]
+    },
+    {
+      "label": "Regulatory Floodway ",
+      "file": "legend-01.png",
+      "values": [
+        "AE,COMMUNITY ENCROACHMENT AREA",
+        "AE,FLOODWAY",
+        "AE,FLOODWAY CONTAINED IN CHANNEL",
+        "AE,ADMINISTRATIVE FLOODWAY",
+        "AE,FLOODWAY CONTAINED IN STRUCTURE",
+        "AE,FLOWAGE EASEMENT AREA",
+        "AE,NARROW FLOODWAY",
+        "AE,STATE ENCROACHMENT AREA",
+        "AE,RIVERINE FLOODWAY SHOWN IN COASTAL ZONE",
+        "AE,RIVERINE FLOODWAY IN COMBINED RIVERINE AND COASTAL ZONE",
+        "V,RIVERINE FLOODWAY IN COMBINED RIVERINE AND COASTAL ZONE",
+        "VE,RIVERINE FLOODWAY IN COMBINED RIVERINE AND COASTAL ZONE",
+        "AO,FLOODWAY",
+        "A,FLOODWAY",
+        "V,RIVERINE FLOODWAY SHOWN IN COASTAL ZONE",
+        "VE,RIVERINE FLOODWAY SHOWN IN COASTAL ZONE",
+        "AH,FLOODWAY",
+        "A,FLOWAGE EASEMENT AREA",
+        "A,ADMINISTRATIVE FLOODWAY"
+      ]
+    },
+    {
+      "label": "Special Floodway",
+      "file": "legend-02.png",
+      "values": [
+        "AE,AREA OF SPECIAL CONSIDERATION",
+        "AE,COLORADO RIVER",
+        "AE,DENSITY FRINGE AREA",
+        "AE,COLORADO RIVER FLOODWAY"
+      ]
+    },
+    {
+      "label": "Area of Undetermined Flood Hazard",
+      "file": "legend-03.png",
+      "values": [
+        "D,<Null>"
+      ]
+    },
+    {
+      "label": "0.2% Annual Chance Flood Hazard",
+      "file": "legend-04.png",
+      "values": [
+        "X,1 PCT DRAINAGE AREA LESS THAN 1 SQUARE MILE",
+        "X,0.2 PCT ANNUAL CHANCE FLOOD HAZARD IN COASTAL ZONE",
+        "X,0.2 PCT ANNUAL CHANCE FLOOD HAZARD IN COMBINED RIVERINE AND COASTAL ZONE",
+        "X,0.2 PCT ANNUAL CHANCE FLOOD HAZARD",
+        "X,0.2 PCT ANNUAL CHANCE FLOOD HAZARD CONTAINED IN CHANNEL",
+        "X,1 PCT DEPTH LESS THAN 1 FOOT",
+        "X,0.2 PCT ANNUAL CHANCE FLOOD HAZARD CONTAINED IN STRUCTURE",
+        "X,0.2 PERCENT ANNUAL CHANCE FLOOD HAZARD",
+        "X,0.2 PERCENT ANNUAL CHANCE FLOOD HAZARD CONTAINED IN STRUCTURE",
+        "X,0.2 PERCENT ANNUAL CHANCE FLOOD HAZARD CONTAINED IN CHANNEL",
+        "X,0.2 PERCENT ANNUAL CHANCE FLOOD HAZARD IN COASTAL ZONE",
+        "X,0.2 PERCENT ANNUAL CHANCE FLOOD HAZARD IN COMBINED RIVERINE AND COASTAL ZONE",
+        "X,1 PERCENT DEPTH LESS THAN 1 FOOT",
+        "X,1 PERCENT DRAINAGE AREA LESS THAN 1 SQUARE MILE",
+        "X,AREA WITH FLOOD HAZARD DUE TO NON-ACCREDITED LEVEE SYSTEM"
+      ]
+    },
+    {
+      "label": "Future Conditions 1% Annual Chance Flood Hazard",
+      "file": "legend-05.png",
+      "values": [
+        "X,1 PCT FUTURE CONDITIONS",
+        "X,1 PCT FUTURE CONDITIONS CONTAINED IN STRUCTURE",
+        "X,1 PCT FUTURE CONDITIONS, FLOODWAY",
+        "X,1 PCT FUTURE CONDITONS, COMMUNITY ENCROACHMENT",
+        "X,1 PERCENT FUTURE CONDITIONS",
+        "X,1 PERCENT FUTURE CONDITIONS CONTAINED IN STRUCTURE"
+      ]
+    },
+    {
+      "label": "Area with Reduced Risk Due to Levee",
+      "file": "legend-06.png",
+      "values": [
+        "X,AREA WITH REDUCED FLOOD RISK DUE TO LEVEE",
+        "X,AREA WITH REDUCED FLOOD HAZARD DUE TO ACCREDITED LEVEE SYSTEM",
+        "X,AREA WITH REDUCED FLOOD HAZARD DUE TO PROVISIONALLY ACCREDITED LEVEE SYSTEM"
+      ]
+    },
+    {
+      "label": "Area with Risk Due to Levee",
+      "file": "legend-07.png",
+      "values": [
+        "D,AREA WITH FLOOD RISK DUE TO LEVEE",
+        "D,AREA WITH UNDETERMINED FLOOD HAZARD DUE TO NONACCREDITED LEVEE SYSTEM",
+        "D,AREA WITH UNDETERMINED FLOOD HAZARD DUE TO NON-ACCREDITED LEVEE SYSTEM"
+      ]
+    }
+  ],
+  "frames": [
+    {
+      "place": "hoboken",
+      "lat": 40.744,
+      "lng": -74.0324,
+      "zoom": 17,
+      "file": "hoboken-z17.jpg",
+      "overlay": "hoboken-z17-overlay.png"
+    },
+    {
+      "place": "hoboken",
+      "lat": 40.744,
+      "lng": -74.0324,
+      "zoom": 19,
+      "file": "hoboken-z19.jpg",
+      "overlay": "hoboken-z19-overlay.png"
+    },
+    {
+      "place": "new-orleans",
+      "lat": 29.966,
+      "lng": -90.09,
+      "zoom": 17,
+      "file": "new-orleans-z17.jpg",
+      "overlay": "new-orleans-z17-overlay.png"
+    },
+    {
+      "place": "new-orleans",
+      "lat": 29.966,
+      "lng": -90.09,
+      "zoom": 19,
+      "file": "new-orleans-z19.jpg",
+      "overlay": "new-orleans-z19-overlay.png"
+    },
+    {
+      "place": "houston-meyerland",
+      "lat": 29.686,
+      "lng": -95.46,
+      "zoom": 17,
+      "file": "houston-meyerland-z17.jpg",
+      "overlay": "houston-meyerland-z17-overlay.png"
+    },
+    {
+      "place": "houston-meyerland",
+      "lat": 29.686,
+      "lng": -95.46,
+      "zoom": 19,
+      "file": "houston-meyerland-z19.jpg",
+      "overlay": "houston-meyerland-z19-overlay.png"
+    },
+    {
+      "place": "miami-beach",
+      "lat": 25.7907,
+      "lng": -80.13,
+      "zoom": 17,
+      "file": "miami-beach-z17.jpg",
+      "overlay": "miami-beach-z17-overlay.png"
+    },
+    {
+      "place": "miami-beach",
+      "lat": 25.7907,
+      "lng": -80.13,
+      "zoom": 19,
+      "file": "miami-beach-z19.jpg",
+      "overlay": "miami-beach-z19-overlay.png"
+    },
+    {
+      "place": "philadelphia-manayunk",
+      "lat": 40.026,
+      "lng": -75.223,
+      "zoom": 17,
+      "file": "philadelphia-manayunk-z17.jpg",
+      "overlay": "philadelphia-manayunk-z17-overlay.png"
+    },
+    {
+      "place": "philadelphia-manayunk",
+      "lat": 40.026,
+      "lng": -75.223,
+      "zoom": 19,
+      "file": "philadelphia-manayunk-z19.jpg",
+      "overlay": "philadelphia-manayunk-z19-overlay.png"
+    },
+    {
+      "place": "denver-downtown",
+      "lat": 39.742,
+      "lng": -104.991,
+      "zoom": 17,
+      "file": "denver-downtown-z17.jpg",
+      "overlay": "denver-downtown-z17-overlay.png"
+    },
+    {
+      "place": "denver-downtown",
+      "lat": 39.742,
+      "lng": -104.991,
+      "zoom": 19,
+      "file": "denver-downtown-z19.jpg",
+      "overlay": "denver-downtown-z19-overlay.png"
+    }
+  ]
+}
