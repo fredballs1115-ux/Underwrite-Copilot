@@ -999,6 +999,9 @@ jobs:
           # #425 — FEMA's flood map over the building's aerial (signed-in):
           # its changelog card.
           mark "#425 the flood map is over the building" grep -q "The flood map, over the building" p_whats-new.html
+          # #426 — the flood zone wherever a deal is summarized (signed-in
+          # surfaces and documents): its changelog card.
+          mark "#426 flood zones are on every summary" grep -q "Flood zones, flagged on every summary" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

@@ -35,7 +35,7 @@ export const SHARE_REFUSAL_COPY: Record<ShareRefusal, string> = {
  *  and the visual cache (for the aerial), and the ownership the sender check
  *  needs. Never the OM's storage path, the notes, the model or the buy box. */
 export const SHARED_DEAL_COLUMNS =
-  "name, asset_class, address, photo, extraction, comps, market, verdict, updated_at, user_id, team_id";
+  "name, asset_class, address, photo, extraction, comps, market, verdict, updated_at, user_id, team_id, site_flags";
 
 export interface SharedDealRow {
   name: string;
@@ -49,6 +49,9 @@ export interface SharedDealRow {
   updated_at: string | null;
   user_id: string | null;
   team_id: string | null;
+  /** the stored FEMA / Opportunity Zone lookup (lib/site-flags) — the flood
+   *  zone line reads it (#426) */
+  site_flags?: unknown;
 }
 
 export interface ResolvedShare {

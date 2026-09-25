@@ -88,6 +88,43 @@ describe("MemoDocument (redesigned)", () => {
     expect(plain.interestLine).toBe("");
   }, 30000);
 
+  it("prints FEMA's flood zone under the title in a Special Flood Hazard Area, and nothing for minimal hazard or a pending lookup (#426)", async () => {
+    const base = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    };
+    const flags = (flood: unknown, status = "ok") => ({ status, tractGeoid: null, opportunityZone: null, flood, retrievedAt: "2026-09-25T00:00:00Z", note: "" });
+    const data = buildMemoData(
+      { ...base, site_flags: flags({ zone: "AE", subtype: null, isHighRisk: true }) } as unknown as DealRow,
+      "September 25, 2026",
+      [],
+    );
+    expect(data.floodLine).toBe("Flood zone AE: a Special Flood Hazard Area, where flood insurance is required on federally backed debt (FEMA)");
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    expect((await pdfTextOf(buf)).replace(/\s+/g, " ")).toContain("Flood zone AE: a Special Flood Hazard Area");
+    const minimal = buildMemoData(
+      { ...base, site_flags: flags({ zone: "X", subtype: "AREA OF MINIMAL FLOOD HAZARD", isHighRisk: false }) } as unknown as DealRow,
+      "September 25, 2026",
+      [],
+    );
+    expect(minimal.floodLine).toBe("");
+    const pending = buildMemoData(
+      { ...base, site_flags: flags({ zone: "AE", subtype: null, isHighRisk: true }, "pending") } as unknown as DealRow,
+      "September 25, 2026",
+      [],
+    );
+    expect(pending.floodLine).toBe("");
+    expect(buildMemoData(base as unknown as DealRow, "September 25, 2026", []).floodLine).toBe("");
+  }, 30000);
+
   it("says the seller's loan under the title where it is offered for assumption (#419)", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

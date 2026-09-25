@@ -1,3 +1,4 @@
+import { floodContextLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
 import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
@@ -22,7 +23,10 @@ const compact = (n: number): string =>
  * asserted. Pure — no I/O — so it is testable and the worker can
  * use it.
  */
-export function dealContextFor(extraction: ExtractionResult | null): string | null {
+export function dealContextFor(
+  extraction: ExtractionResult | null,
+  site?: { flood?: SiteFlagsResult["flood"] } | null,
+): string | null {
   const strategy = inferStrategy(extraction);
   // A portfolio is said whatever the strategy: several properties in one
   // OM change what every whole-deal figure means (lib/portfolio).
@@ -33,7 +37,15 @@ export function dealContextFor(extraction: ExtractionResult | null): string | nu
   // The seller's loan, where it is offered for assumption (#417): its terms
   // as stated and what its value turns on, right after what is being sold.
   const assumable = readAssumable(extraction, null);
-  const head = [...(interest ? [interestContextLine(interest)] : []), ...(assumable ? [assumableContextLine(assumable)] : [])];
+  // FEMA's flood zone at the building, where the site lookup has answered
+  // by the time the step runs (#426): a Special Flood Hazard Area is a
+  // premium in the expense line and a lender's condition.
+  const flood = floodContextLine(site?.flood);
+  const head = [
+    ...(interest ? [interestContextLine(interest)] : []),
+    ...(assumable ? [assumableContextLine(assumable)] : []),
+    ...(flood ? [flood] : []),
+  ];
   const tail = [...(portfolio ? [portfolioContextLine(portfolio)] : [])];
   if (strategy.kind === "unknown") return head.length || tail.length ? [...head, ...tail].join(" ") : null;
   const plan = planSummary(extraction, strategy);

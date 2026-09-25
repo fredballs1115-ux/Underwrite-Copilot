@@ -45,6 +45,10 @@ export interface ShareViewProps {
   comps: BrokerCompsResult | null;
   market: MarketResult | null;
   verdict: VerdictResult;
+  /** FEMA's flood zone at the building, one line (lib/site-flags
+   *  `floodShortLine`, #426); null for minimal hazard, no digital map or a
+   *  lookup that has not answered */
+  floodLine?: string | null;
 }
 
 // A range's confidence, in the deal page's colours (RANGE_CONF there).
@@ -227,6 +231,7 @@ export function ShareView({
   comps,
   market,
   verdict,
+  floodLine = null,
 }: ShareViewProps) {
   const vmeta = VERDICT_META[verdict.verdict] ?? UNKNOWN_VERDICT;
   const call: VerdictCall | null = VERDICT_META[verdict.verdict] ? verdict.verdict : null;
@@ -289,6 +294,15 @@ export function ShareView({
           className="mt-3 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm leading-relaxed shadow-sm"
         >
           {assumableLine(assumable)}
+        </p>
+      )}
+
+      {floodLine && (
+        <p
+          data-qa="share-flood"
+          className="mt-3 rounded-xl border border-kill/25 bg-kill/5 px-4 py-2.5 text-sm leading-relaxed text-ink shadow-sm"
+        >
+          {floodLine}
         </p>
       )}
 

@@ -407,7 +407,9 @@ FEMA's flood map over the building — a Flood tab on the deal page's
 picture, the aerial with FEMA's zones in FEMA's colours, a ring at the
 building, FEMA's key and the zone at the building in one sentence, every
 FEMA claim printed and every composite looked at from the runner's flood
-sheet first.
+sheet first. Then #426: the zone wherever the deal is summarized — the
+pipeline row's red tag and CSV column, the compare table's row, the memo's
+and the shared screen's line, and the deal context the screen's steps read.
 **Your move, five minutes**: request a free Census API key
 (api.census.gov/data/key_signup.html) and set it as `CENSUS_API_KEY` on
 the Render web service and as an Actions secret. The ACS data API now

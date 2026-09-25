@@ -2408,6 +2408,20 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   (probe run 2026-09-25; the 2020–2024 five-year release and every
   variable's label were verified), so a free `CENSUS_API_KEY` is the
   operator's move before the site reads a deal's tract.
+  **The zone goes wherever the deal is summarized** (#426), one reader per
+  shape in `lib/site-flags/core.ts`, each from the stored lookup and silent
+  while it is pending:
+  - the pipeline row's red tag in a Special Flood Hazard Area only
+    (`floodTag`: "Flood AE"), and the CSV's "Flood zone" column in every
+    case (`floodCell`: "AE (SFHA)", "X (minimal)", "no FEMA digital map");
+  - the compare table's "Flood zone" row (`floodCell`, the SFHA in red);
+  - the memo under its title and the shared screen under its assumable
+    line (`floodShortLine` — the SFHA and every drawn hazard in FEMA's
+    words, nothing for minimal hazard or an absence);
+  - the deal context the Claude steps read (`floodContextLine`, passed to
+    `dealContextFor` by the pipeline where the lookup has answered by the
+    time the step runs): in an SFHA the expense line needs a flood premium
+    the seller's figures may not carry.
 - The homepage's photographs: `lib/photos.ts` (pure — the four slots with
   their file names, briefs, sizes and alt text; `presentPhotos` over an
   `exists` callback; `stripPhotos`; `HERO_AERIAL`) and `lib/photos-fs.ts`

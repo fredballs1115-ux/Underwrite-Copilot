@@ -1,4 +1,5 @@
 import "server-only";
+import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import { withArticle } from "@/lib/article";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { downloadOmPdf } from "@/lib/storage";
@@ -140,8 +141,15 @@ async function dealContextFromDb(
   dealId: string,
 ): Promise<string | null> {
   try {
-    const { data } = await admin.from("deals").select("extraction").eq("id", dealId).single();
-    return dealContextFor((data?.extraction as ExtractionResult | null) ?? null);
+    const { data } = await admin.from("deals").select("extraction, site_flags").eq("id", dealId).single();
+    // The FEMA / Opportunity Zone lookup runs on the deal page's first view
+    // (lib/site-flags); where it has answered by now, the step reads the
+    // flood zone too (#426). A pending lookup is no zone.
+    const flags = (data as { site_flags?: SiteFlagsResult | null } | null)?.site_flags ?? null;
+    return dealContextFor(
+      (data?.extraction as ExtractionResult | null) ?? null,
+      flags && flags.status !== "pending" ? { flood: flags.flood } : null,
+    );
   } catch {
     return null;
   }

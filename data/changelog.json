@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-25",
+      "title": "Flood zones, flagged on every summary",
+      "href": "/deals",
+      "blurb": "A deal in one of FEMA's Special Flood Hazard Areas, where a federally backed loan requires flood insurance, now says so wherever it is summarized. The pipeline row shows a red \"Flood AE\" tag beside the price, and the pipeline's CSV has a flood zone column. The compare page adds a flood zone row, and the memo and the shared screen state the zone under the title. When the zone is known by the time the analysis runs, the analysis reads it too, so it can check whether the seller's expenses carry a flood premium."
+    },
+    {
+      "date": "2026-09-25",
       "title": "The flood map, over the building",
       "href": "/deals",
       "blurb": "A deal with a street address now has a Flood tab on its picture. It shows FEMA's flood hazard zones over the aerial, in FEMA's own colours, with a ring marking the building and FEMA's key underneath. One line says what the map shows at the building: for example Zone AE, a Special Flood Hazard Area, where a federally backed loan requires flood insurance. The site flags now also tell apart a point FEMA has no digital flood map for and a point of minimal flood hazard."

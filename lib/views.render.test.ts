@@ -93,7 +93,7 @@ const CARDS: DealCard[] = [
   // A run whose process died mid-screen, and a re-screen that failed before
   // its verdict — the stored verdict must not read as the current call.
   card({ id: "k", name: "Arlington Flex Park", assetClass: "industrial", stage: "screening", jobStatus: "stalled", slots: { cap: null, price: "$9,100,000", yoc: null }, market: "Arlington, TX", coveredMarket: "Dallas–Fort Worth", hasAddress: false }),
-  card({ id: "l", name: "Elm Street Lofts", verdict: "pass", stage: "underwriting", jobStatus: "failed", fit: "fits", score: 84, mandateVerdict: "PURSUE", slots: { cap: "6.0%", price: "$14,000,000", yoc: null }, market: "Dallas, TX", coveredMarket: "Dallas–Fort Worth" }),
+  card({ id: "l", name: "Elm Street Lofts", verdict: "pass", stage: "underwriting", jobStatus: "failed", fit: "fits", score: 84, mandateVerdict: "PURSUE", slots: { cap: "6.0%", price: "$14,000,000", yoc: null }, market: "Dallas, TX", coveredMarket: "Dallas–Fort Worth", flood: { tag: "Flood AE", cell: "AE (SFHA)" } }),
 ];
 
 const BILLING = { isPro: false, canCreateDeal: true, dealCount: 9, dealLimit: 25 };
@@ -128,6 +128,9 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // A deal in a metro area the site reads without a brief says so on its
     // row — read, not briefed — where a covered market's says covered.
     expect(text).toContain("Pittsburgh PA · read");
+    // A deal in FEMA's Special Flood Hazard Area says so on its row (#426).
+    expect(text).toContain("Flood AE");
+    expect(html).toContain("FEMA&#x27;s Special Flood Hazard Area");
     expect(html).toContain("Pittsburgh PA is read, not briefed");
     expect(html).toContain("Dallas–Fort Worth is a covered market");
     // The stalled run and the failed re-screen each say so in the status
@@ -345,6 +348,21 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     expect(a11yIssues(html), "a11y compare pictured").toEqual([]);
     expect(gluedWords(text)).toEqual([]);
     expect((html.match(/<li /g) ?? []).length).toBe(pictured.length);
+  });
+
+  it("sets FEMA's flood zone side by side, the Special Flood Hazard Area in red and a pending lookup as a dash (#426)", () => {
+    const cols: Col[] = [
+      col({ ...COLS[0], id: "f1", name: "Riverside Flats", flood: "AE (SFHA)" }),
+      col({ ...COLS[0], id: "f2", name: "Hilltop Commons", flood: "X (minimal)" }),
+      col({ ...COLS[0], id: "f3", name: "Unchecked Plaza", flood: "" }),
+    ];
+    const html = renderToStaticMarkup(React.createElement(CompareTable, { cols }));
+    const text = visibleText(html);
+    expect(text).toContain("Flood zone");
+    expect(text).toContain("AE (SFHA)");
+    expect(text).toContain("X (minimal)");
+    expect(html).toMatch(/text-kill[^>]*>AE \(SFHA\)/);
+    expect(a11yIssues(html)).toEqual([]);
   });
 
   it("reads a note's and a share's price for what it buys (#423): the note's yield, the share's cap on the whole, returns withheld", () => {
@@ -896,6 +914,30 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }))).not.toContain(
       "share-assumable",
     );
+  });
+
+  it("says FEMA's flood zone under the title where the building sits in one, and nothing without a line (#426)", () => {
+    const props = {
+      dealName: SAMPLE_DEAL.name,
+      assetClass: SAMPLE_DEAL.asset_class,
+      expiresAt: "2026-09-30T12:00:00Z",
+      verdictStale: false,
+      aerial: null,
+      extraction: SAMPLE_DEAL.extraction,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const html = renderToStaticMarkup(
+      React.createElement(ShareView, {
+        ...props,
+        floodLine: "Flood zone AE: a Special Flood Hazard Area, where flood insurance is required on federally backed debt (FEMA)",
+      }),
+    );
+    expect(html).toContain('data-qa="share-flood"');
+    expect(visibleText(html)).toContain("Flood zone AE: a Special Flood Hazard Area");
+    expect(a11yIssues(html)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(ShareView, props))).not.toContain("share-flood");
   });
 
   it("a market read that was checked beside the metro's published figures says so, counted and dated", () => {

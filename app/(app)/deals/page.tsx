@@ -11,6 +11,7 @@ import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
 import { inferStrategy } from "@/lib/deal-strategy";
 import { pickSlots, shownAssetClass } from "@/lib/pipeline-slots";
+import { floodCell, floodTag, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { scoreMandateFit } from "@/lib/mandate";
 import { dataMetroForAddress, metroForAddress } from "@/lib/market-match";
 import { listJobStatus, type JobLike } from "@/lib/screen-run";
@@ -39,6 +40,12 @@ const ERRORS: Record<string, string> = {
 // scannable columns instead of repeating micro-labels in every row. The
 // slots themselves are read in lib/pipeline-slots (pure, tested) by the
 // same rule the meeting .xlsx applies.
+
+/** A stored site-flags result as the pipeline row reads it (#426). */
+function floodFor(flags: SiteFlagsResult | null): { tag: string | null; cell: string } | null {
+  if (!flags || flags.status === "pending") return null;
+  return { tag: floodTag(flags.flood), cell: floodCell(flags.flood) };
+}
 
 export default async function DealsPage({
   searchParams,
@@ -73,7 +80,7 @@ export default async function DealsPage({
     supabase
       .from("deals")
       .select(
-        "id, name, asset_class, created_at, verdict, extraction, address, first_signal, user_id, team_id, stage, is_sample",
+        "id, name, asset_class, created_at, verdict, extraction, address, first_signal, user_id, team_id, stage, is_sample, site_flags",
       )
       .order("created_at", { ascending: false }),
     user ? getBuyBoxForDeal(user.id, null).catch(() => null) : Promise.resolve(null),
@@ -235,6 +242,10 @@ export default async function DealsPage({
       // Gate the aerial thumbnail here rather than letting every row fire a
       // request that can only 404: no address, no possible photograph.
       hasAddress: !!(d.address as StructuredAddress | null)?.label?.trim(),
+      // FEMA's flood zone at the building, from the stored site-flags lookup
+      // (#426): the row's tag in a Special Flood Hazard Area, the CSV's cell
+      // in every case, nothing before the lookup has answered.
+      flood: floodFor((d as { site_flags?: SiteFlagsResult | null }).site_flags ?? null),
     };
   });
 

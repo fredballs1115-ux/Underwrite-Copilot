@@ -65,6 +65,10 @@ export type Col = {
    *  building's cash flows against a fraction of its cost
    *  (lib/compare-interest, #423) */
   withheld?: "note" | "share" | null;
+  /** FEMA's flood zone at the building as a cell ("AE (SFHA)", "X
+   *  (minimal)", "no FEMA digital map" — lib/site-flags `floodCell`, #426);
+   *  blank before the lookup has answered */
+  flood?: string;
   /** the building's pictures to try, best first, each with its own credit
    *  (lib/deal-banner, #418) — absent where the caller draws none */
   pictures?: BannerSource[];
@@ -159,6 +163,14 @@ export function CompareTable({ cols }: { cols: Col[] }) {
   }[] = [
     { label: "Market", get: (c) => c.market },
     { label: "Covered market", get: (c) => c.coveredMarket ?? (c.readMarket ? `${c.readMarket} (read, not briefed)` : "—") },
+    // FEMA's zone at the building (#426): a Special Flood Hazard Area means
+    // flood insurance on federally backed debt, a cost and a lender's
+    // condition, set side by side with the others.
+    {
+      label: "Flood zone",
+      get: (c) => c.flood || "—",
+      cls: (c) => (c.flood?.includes("(SFHA)") ? "font-medium text-kill" : ""),
+    },
     {
       label: "Asset class",
       get: (c) => assetClassLabel(c.assetClass) || "—",
