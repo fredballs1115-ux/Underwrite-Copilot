@@ -3642,6 +3642,58 @@ describe("InterestPanel — what the price buys, said before any figure is belie
     expect(render(React.createElement(InterestPanel, { interest: readInterestFor(base({ ...blank, kind: "fee_simple" }), 20_000_000) }))).not.toContain("What is being sold");
   });
 
+  it("a note underwritten as a note (#416): its yield as tiles, the balance and the price against the collateral's value", () => {
+    const AS_OF = new Date(Date.UTC(2025, 8, 30));
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 5" });
+    const terms = [
+      row("Unpaid principal balance", "$24,400,000"),
+      row("Note rate", "5.25%"),
+      row("Maturity date", "March 31, 2028"),
+      row("Amortization", "Interest-only"),
+      row("Whole-asset value", "$34,000,000"),
+    ];
+    const noteEx = (status: string, rows = terms) => base({ ...blank, kind: "note", page: "p. 5" }, [...rows, row("Payment status", status)]);
+
+    const html = render(React.createElement(InterestPanel, { interest: readInterestFor(noteEx("Performing"), 20_000_000, AS_OF) }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="note-figures"');
+    for (const tile of ["To maturity", "13.8%", "yield on the price", "Current yield", "6.4%", "On the dollar", "82.0¢", "the price over the balance"]) {
+      expect(text, tile).toContain(tile);
+    }
+    expect(text).toContain("30 months to its Mar 2028 maturity, interest-only as stated.");
+    // The tiles and the bar say the figures; the lead says the rest.
+    expect(text).toContain("The $20.0M price is an 18.0% discount to the $24.4M unpaid balance.");
+    expect(text).not.toContain("Held to its");
+    expect(text).not.toContain("The collateral's stated");
+    expect(text).toContain("Price $20.0M · 59% of the collateral's value");
+    expect(text).toContain("Unpaid balance $24.4M · 72%");
+    expect(text).toContain("The collateral, as stated $34.0M");
+    expect(html.match(/data-bar="interest"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="note-balance"/g)).toHaveLength(1);
+    expect(html).toContain('data-bar="interest" style="width:58.8');
+    expect(html).toContain('data-bar="note-balance" style="width:71.7');
+    expect(a11yIssues(html), "note panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+
+    // Not paying: no tiles — the sentence says what the contract yield is.
+    const npl = render(
+      React.createElement(InterestPanel, { interest: readInterestFor(noteEx("Non-performing; foreclosure filed"), 20_000_000, AS_OF) }),
+    );
+    expect(npl).not.toContain('data-qa="note-figures"');
+    expect(visibleText(npl)).toContain("If it paid to its Mar 2028 maturity it would yield 13.8% (interest-only as stated) — it is not paying");
+    expect(gluedWords(visibleText(npl))).toEqual([]);
+
+    // A loan under water: the track runs to the balance, a tick marks the
+    // collateral's value.
+    const under = render(
+      React.createElement(InterestPanel, {
+        interest: readInterestFor(noteEx("Performing", [...terms.slice(0, 4), row("Whole-asset value", "$20,000,000")]), 14_000_000, AS_OF),
+      }),
+    );
+    expect(visibleText(under)).toContain("Unpaid balance $24.4M · 122%");
+    expect(under).toMatch(/left:81\.9\d*%/);
+  });
+
   it("a leased fee: the building's income as the track, the ground rent filled, and the calculator's leased-fee side", () => {
     const ex = base({ ...blank, kind: "leased_fee", groundLease: "71 years remaining; unsubordinated" }, [
       { label: "Ground rent", value: "$1,200,000", flagged: false, page: "p. 4" },

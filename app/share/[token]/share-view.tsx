@@ -11,7 +11,7 @@ import type {
 import { assetClassLabel } from "@/lib/asset-class";
 import { assetWords } from "@/lib/asset-words";
 import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
-import { readInterest } from "@/lib/interest";
+import { interestOf, readInterest } from "@/lib/interest";
 import { InterestPanel } from "@/app/interest-panel";
 import { keyTermRows } from "@/lib/key-terms";
 import { readPortfolio } from "@/lib/portfolio";
@@ -239,7 +239,7 @@ export function ShareView({
   const strategy = inferStrategy(safeExtraction);
   const plan = planSummary(safeExtraction, strategy);
   // The deal-defining rows first, as the memo orders them (lib/key-terms.ts).
-  const metrics = keyTermRows(safeExtraction?.metrics ?? [], strategy.kind, 8);
+  const metrics = keyTermRows(safeExtraction?.metrics ?? [], strategy.kind, 8, interestOf(safeExtraction).kind);
   const ranges = (screen?.ranges ?? []).slice(0, 6);
   const killers = (screen?.dealKillers ?? []).slice(0, 3);
   // One OM, several properties (#411): the deal page's own card, read by

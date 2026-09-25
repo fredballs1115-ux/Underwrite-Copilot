@@ -43,6 +43,7 @@ import type { ExtractionResult, InterestKind } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
 import { parsePageNumber } from "@/lib/facts";
 import { parseUsd } from "@/lib/money";
+import { readNote, readNoteTerms, type NoteRead } from "@/lib/note-yield";
 
 export type { InterestKind };
 
@@ -114,6 +115,11 @@ export interface InterestRead {
   /** a note: the price's discount to the balance, percent (negative: a
    *  premium) */
   discountPct: number | null;
+  /** a note, underwritten as a note (#416): its yield to maturity at the
+   *  price, current yield, cents on the dollar and loan-to-value, from the
+   *  terms the OM states (lib/note-yield) — null on every other interest,
+   *  or where the OM states no balance */
+  note: NoteRead | null;
   /** the ground lease as stated ("" if none) — on a leasehold, or a
    *  fee-simple deal with a ground lease on part of the site */
   groundLease: string;
@@ -130,6 +136,10 @@ export interface InterestRead {
   groundRentCoverage: number | null;
   /** the one sentence every surface leads with */
   headline: string;
+  /** the headline without a note's figures (#416) — what the panel says
+   *  above the figures it draws; the headline itself on every other
+   *  interest */
+  lead: string;
   /** what the property model on this deal is and is not, for the surfaces
    *  that draw one — null where it is simply the buyer's model */
   modelCaveat: string | null;
@@ -154,10 +164,79 @@ const shareText = (n: number) => `${one(n).replace(/\.0$/, "")}%`;
 const discountPhrase = (pct: number) =>
   pct >= 0 ? `${withArticle(`${one(pct)}%`)} discount to` : `${withArticle(`${one(-pct)}%`)} premium over`;
 
-/** A note's balance, from the row the extraction is asked to label it. */
-function balanceOf(ex: ExtractionResult): number | null {
-  const row = (ex.metrics ?? []).find((m) => /unpaid principal|\bupb\b|outstanding (loan |note )?balance|(loan|note) balance/i.test(m.label));
-  return row ? parseUsd(row.value) : null;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** "Mar 2028" from an ISO date. */
+const monthYear = (isoDate: string) => {
+  const [y, m] = isoDate.split("-").map(Number);
+  return `${MONTHS[m - 1]} ${y}`;
+};
+const pctText = (n: number) => `${one(n)}%`;
+
+/**
+ * What the note earns, in a sentence (#416) — only where its terms are
+ * stated: the yield to maturity on the price with how the payments were
+ * run and the current yield beside it; a note the OM does not call
+ * performing said as paid as agreed; a non-performing note's contract yield
+ * said as what it would earn if it paid; a matured one's none. "" when
+ * there is nothing to add.
+ */
+export function noteYieldSentence(n: NoteRead | null): string {
+  if (!n) return "";
+  const due = n.terms.maturity ? monthYear(n.terms.maturity) : null;
+  if (n.matured && due) {
+    return `It is past its ${due} maturity — a matured loan still outstanding is in default or extended, and there is no contract yield to state.`;
+  }
+  if (n.ytmPct != null && due) {
+    if (n.terms.status === "non_performing") {
+      return `If it paid to its ${due} maturity it would yield ${pctText(n.ytmPct)} (${n.paymentBasis}) — it is not paying, so what it earns turns on the time and cost of taking the property.`;
+    }
+    // Under the balance the yield runs past the coupon's cash on the price,
+    // the difference the discount accreting; over it, the premium is lost
+    // at maturity — and a premium larger than the interest left to collect
+    // is a loss, said as one. Compared on the tenths the page prints, so a
+    // note at par says neither.
+    const [ytm10, cy10] = [Math.round(n.ytmPct * 10), n.currentYieldPct != null ? Math.round(n.currentYieldPct * 10) : null];
+    const premium = n.price - (n.terms.balance ?? n.price);
+    const current =
+      n.currentYieldPct == null || cy10 == null || ytm10 === cy10
+        ? ""
+        : ytm10 > cy10
+          ? `: ${pctText(n.currentYieldPct)} of current yield on the price, the rest the discount accreting`
+          : ytm10 < 0 && premium > 0
+            ? `: the ${money(premium)} premium over the balance is more than the interest left to collect`
+            : `: under its ${pctText(n.currentYieldPct)} of current yield, the premium over the balance lost at maturity`;
+    return n.terms.status === "performing"
+      ? `Held to its ${due} maturity it yields ${pctText(n.ytmPct)} on the price (${n.paymentBasis})${current}.`
+      : `Paid as agreed to its ${due} maturity it yields ${pctText(n.ytmPct)} on the price (${n.paymentBasis})${current} — the memorandum does not say whether it is performing.`;
+  }
+  if (n.currentYieldPct != null) {
+    return `A year's interest is ${pctText(n.currentYieldPct)} of the price; the memorandum states no maturity, so there is no yield to maturity to give.`;
+  }
+  return "";
+}
+
+/** The note's cushion (#416): the loan-to-value at the balance and at the
+ *  price, over the value the OM states for the collateral — "" where it
+ *  states none. */
+export function noteCollateralSentence(n: NoteRead | null): string {
+  if (!n || n.ltvAtBalancePct == null || n.ltvAtPricePct == null || n.terms.collateralValue == null) return "";
+  return `The collateral's stated ${money(n.terms.collateralValue)} puts the balance at ${Math.round(n.ltvAtBalancePct)}% of its value and the price at ${Math.round(n.ltvAtPricePct)}%.`;
+}
+
+/**
+ * The small print under the note's figures (#416): how long the note runs
+ * and how its payments were run, or why there is no yield to maturity —
+ * "" where neither applies.
+ */
+export function noteCaption(n: NoteRead | null): string {
+  if (!n) return "";
+  if (n.monthsLeft != null && n.terms.maturity && n.paymentBasis) {
+    return `${n.monthsLeft} ${n.monthsLeft === 1 ? "month" : "months"} to its ${monthYear(n.terms.maturity)} maturity, ${n.paymentBasis}.`;
+  }
+  if (!n.terms.maturity && n.currentYieldPct != null) {
+    return "The memorandum states no maturity, so there is no yield to maturity to give.";
+  }
+  return "";
 }
 
 // A rent per foot, a monthly figure, a coverage ratio, a bump or a reset is
@@ -190,7 +269,12 @@ export function incomeBeforeGroundRentOf(ex: ExtractionResult | null | undefined
  * `askingPrice` is the caller's: the shared price reader lives in
  * lib/deal-strategy, which reads this module.
  */
-export function readInterest(ex: ExtractionResult | null | undefined, askingPrice: number | null): InterestRead | null {
+export function readInterest(
+  ex: ExtractionResult | null | undefined,
+  askingPrice: number | null,
+  /** the day the note's yield is read on (#416) — today unless a test says */
+  asOf: Date = new Date(),
+): InterestRead | null {
   const it = ex?.interest;
   if (!ex || !it) return null;
   const kind = it.kind;
@@ -204,7 +288,9 @@ export function readInterest(ex: ExtractionResult | null | undefined, askingPric
   const sharePct = kind === "partial_interest" ? parseSharePct(it.share) : null;
   const price = askingPrice != null && askingPrice > 0 ? askingPrice : null;
   const impliedWhole = sharePct != null && price != null ? price / (sharePct / 100) : null;
-  const balance = kind === "note" ? balanceOf(ex) : null;
+  const noteTerms = kind === "note" ? readNoteTerms(ex) : null;
+  const balance = noteTerms?.balance ?? null;
+  const note = noteTerms ? readNote(noteTerms, askingPrice != null && askingPrice > 0 ? askingPrice : null, asOf) : null;
   const discountPct = balance != null && balance > 0 && price != null ? ((balance - price) / balance) * 100 : null;
   const loan = (it.loan ?? "").trim();
   const groundRentCoverage =
@@ -270,12 +356,16 @@ export function readInterest(ex: ExtractionResult | null | undefined, askingPric
     impliedWhole,
     balance,
     discountPct,
+    note,
     groundLease,
     loan,
     groundRent,
     incomeBeforeGroundRent,
     groundRentCoverage,
-    headline,
+    // A note's figures follow the lead (#416): what it earns, then its
+    // cushion — the panel draws both and says the lead alone.
+    headline: [headline, noteYieldSentence(note), noteCollateralSentence(note)].filter(Boolean).join(" "),
+    lead: headline,
     modelCaveat,
   };
 }
@@ -318,12 +408,26 @@ export function interestNote(r: InterestRead): string {
  */
 export function interestShortLine(r: InterestRead): string {
   switch (r.kind) {
-    case "note":
+    case "note": {
+      // What it earns, in a clause (#416): to maturity where it pays, "not
+      // paying" or "past its maturity" where the contract yield is not the
+      // buyer's.
+      const n = r.note;
+      const earns = !n
+        ? ""
+        : n.matured
+          ? ", past its maturity"
+          : n.terms.status === "non_performing"
+            ? ", and not paying"
+            : n.ytmPct != null && n.terms.maturity
+              ? `, ${pctText(n.ytmPct)} to its ${monthYear(n.terms.maturity)} maturity${n.terms.status === "performing" ? "" : " if paid as agreed"}`
+              : "";
       return `A loan secured by the property, not the property${
         r.discountPct != null && r.askingPrice != null && r.balance != null
-          ? ` — the ${money(r.askingPrice)} price is ${discountPhrase(r.discountPct)} the ${money(r.balance)} balance`
-          : ""
+          ? ` — the ${money(r.askingPrice)} price is ${discountPhrase(r.discountPct)} the ${money(r.balance)} balance${earns}`
+          : earns
       }`;
+    }
     case "partial_interest":
       return r.sharePct != null && r.askingPrice != null && r.impliedWhole != null
         ? `${withArticle(shareText(r.sharePct), true)} share of the owning entity — ${money(r.askingPrice)} for the share is ${money(r.impliedWhole)} for the whole`

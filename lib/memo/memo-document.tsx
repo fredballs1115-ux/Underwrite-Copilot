@@ -28,7 +28,7 @@ import type {
   VerdictResult,
 } from "@/lib/anthropic/types";
 import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
-import { interestShortLine, readInterest } from "@/lib/interest";
+import { interestOf, interestShortLine, readInterest } from "@/lib/interest";
 import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
 import { shownAssetClass } from "@/lib/pipeline-slots";
@@ -246,7 +246,7 @@ export function buildMemoData(
   // The deal-defining rows first (price, cap or the plan's figures, units),
   // then the flagged ones — so the block never opens on four speculative
   // pro-forma figures and omits the asking price (lib/key-terms.ts).
-  const keyTerms = keyTermRows(metrics, inferStrategy(extraction ?? null).kind, 8).map((m) => ({
+  const keyTerms = keyTermRows(metrics, inferStrategy(extraction ?? null).kind, 8, interestOf(extraction ?? null).kind).map((m) => ({
     label: str(m.label),
     value: str(m.value),
     flagged: !!m.flagged,

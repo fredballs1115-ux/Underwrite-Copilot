@@ -976,6 +976,9 @@ jobs:
           # surfaces): its changelog card. No apostrophe in the phrase (the
           # served HTML escapes one as &#x27;).
           mark "#415 the land under a building is read as a leased fee" grep -q "The land under a building, and a price that is not the building" p_whats-new.html
+          # #416 — a note underwritten as a note (signed-in surfaces): its
+          # changelog card.
+          mark "#416 a note is underwritten as a note" grep -q "A note, underwritten as a note" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

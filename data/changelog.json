@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-25",
+      "title": "A note, underwritten as a note",
+      "href": "/deals",
+      "blurb": "A memorandum selling a loan now gets the loan's own arithmetic, not only a caveat on the collateral's. From the balance, the coupon, the maturity and the payment schedule it states, the screen works out what the note yields to maturity at the asking price, its current yield and its price in cents on the dollar. It also shows how much of the collateral's stated value the balance and the price each take. A note that is not paying, or is past its maturity, is never shown a yield as if it were earned. The deal page draws the figures, and the memo, the report, the workbook and the shared screen say them."
+    },
+    {
+      "date": "2026-09-25",
       "title": "The land under a building, and a price that is not the building's",
       "href": "/deals",
       "blurb": "A memorandum selling the land beneath someone else's building, with its ground lease, is now read as what it is. The ground rent is the buyer's income, never an expense and never the building's NOI. The screen says how many times the building's own income covers that rent, and flags an NOI that is really the building's. Wherever a price is not the building's (a share, a note, the land), the pipeline row, the deal header and the exports say what it buys. That price is also kept out of every figure that divides by it: your past screens' basis by market, the internal comps, the analytics and the plan's yield on cost."
