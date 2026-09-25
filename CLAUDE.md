@@ -2536,6 +2536,35 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   every photographer shown (`galleryCredit`, and
   `OVERHEAD_GRID_CREDIT` where a market shows its overhead — the same
   line the homepage's gallery prints).
+- Being found (#430): `lib/public-pages.ts` (pure) is the one catalogue
+  of the public market and sector pages — every briefed market and every
+  metro area read without a brief (`marketPages`, each once), every
+  sector (`sectorPages`) — and `marketMeta` names each: its own title,
+  description and canonical (`/market?metro=dc`), a brief claimed only
+  where there is one, a metro winning over a sector when a link carries
+  both. `app/market/page.tsx`'s `generateMetadata` reads it (the page had
+  gone out as one bare "Market data" under forty-odd addresses), and
+  `app/sitemap.ts` lists every page from the same catalogue. The
+  homepage's JSON-LD names the Organization and the WebSite beside the
+  SoftwareApplication and the FAQ, `<` escaped as Next's own guide does.
+  Search Console's and Bing's HTML-tag tokens render from
+  `GOOGLE_SITE_VERIFICATION` / `BING_SITE_VERIFICATION` (root layout's
+  `verification`, nothing until set). The site serves an IndexNow key at
+  its root (`public/<key>.txt`) and `scripts/indexnow.mjs` (via
+  `indexnow.yml`, weekly and on dispatch) checks the live key and hands
+  the live sitemap to IndexNow — Bing, and through it DuckDuckGo and
+  Yahoo; `lib/indexnow.test.ts` holds the served file to the script's
+  key. `lib/canonical-host.ts` (pure) is the move to the operator's own
+  domain, inert until `CANONICAL_HOST` is set: a GET or HEAD at another
+  public host goes to the canonical one with a 308, path and query kept,
+  while `/api` (a webhook does not follow a redirect), `/auth` (an email
+  link's code is exchanged against a verifier cookie on the host it was
+  requested from), a posted form and a local server never move;
+  `proxy.ts` asks it first. The domain itself is a purchase and the
+  operator's (WILL_TODO's first section has the order of the move:
+  Render's custom domain, `NEXT_PUBLIC_APP_URL` on web and worker,
+  Supabase's URLs, then `CANONICAL_HOST` last). Live-verify fetches the
+  sitemap and the key and greps Pittsburgh's page title.
 - The News page's live layer: `lib/news/feeds.ts` (pure: the sources with
   their fallbacks, parsing, ranking) and `lib/news/live.ts` (the network:
   a fresh copy per process, a wall-clock deadline per source, the

@@ -127,6 +127,11 @@ jobs:
           curl -sS -o p_market_nova.html --max-time 60 "https://underwrite-copilot.onrender.com/market?metro=nova" || true
           # A metro area read without a brief (#404): its own page body.
           curl -sS -o p_market_pitt.html --max-time 60 "https://underwrite-copilot.onrender.com/market?metro=pittsburgh" || true
+          # What a search engine is handed (#430): the sitemap and the
+          # IndexNow key the site serves at its root.
+          curl -sS -o sitemap.xml --max-time 60 "https://underwrite-copilot.onrender.com/sitemap.xml" || true
+          curl -sS -o indexnow-key.txt --max-time 60 "https://underwrite-copilot.onrender.com/a399847bdac5364f2ed07a0d161f42ab.txt" || true
+          echo "SITEMAP: $(grep -o '<loc>' sitemap.xml | wc -l) URLs, $(grep -o 'market?metro=' sitemap.xml | wc -l) of them market pages"
           grep -q "tightening while the District" p_market_nova.html && echo "NOVA OFFICE SPREAD (Aug 25): present" || echo "NOVA OFFICE SPREAD (Aug 25): not yet deployed"
           # Each brief's sector rows carry a rank chip into the cross-metro
           # ranking (the chip's title text is count-independent).
@@ -1008,6 +1013,11 @@ jobs:
           # #428/#429 — the pipeline's photograph-led cards and the sharper
           # aerials (signed-in surfaces): their changelog card.
           mark "#428 the pipeline leads with sharp pictures" grep -q "Property pictures, sharp and up front" p_whats-new.html
+          # #430 — findable: each market page names itself, the sitemap lists
+          # every market page, and the IndexNow key is served at the root.
+          mark "#430 each market page names itself" grep -q "Pittsburgh PA market data: rents, vacancy, jobs and supply" p_market_pitt.html
+          mark "#430 the sitemap lists every market page" grep -q "market?metro=pittsburgh" sitemap.xml
+          mark "#430 the IndexNow key is served" grep -qx "a399847bdac5364f2ed07a0d161f42ab" indexnow-key.txt
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

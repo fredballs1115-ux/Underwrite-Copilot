@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-25",
+      "title": "Market pages that name their market",
+      "href": "/market",
+      "blurb": "Each market page now has its own title and description, so a shared link or a search result says which market it is. Before, every market page was titled \"Market data\". The site map also lists every market and sector page, so search engines can find all of them."
+    },
+    {
+      "date": "2026-09-25",
       "title": "Property pictures, sharp and up front",
       "href": "/deals",
       "blurb": "The pipeline now opens as cards, each led by a large picture of the building: its memorandum's cover photo where it has one, otherwise the aerial with the building ringed. The call sits on the picture, and the price, cap and mandate fit sit underneath. The list view is one click away, and the site remembers which you chose. The aerials are sharper everywhere too. They had been drawn at finer detail than the imagery actually holds, which is what made them blurry; they now come at the photo's own detail with a light finish. The deal page's aerial rings the building as well."

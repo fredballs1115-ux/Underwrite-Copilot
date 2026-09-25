@@ -18,6 +18,7 @@ import { SectorJobsRank } from "./sector-jobs-rank";
 import { BOARD_METRICS, SectorJobsBoard } from "./sector-jobs-board";
 import { SurveyVacancyBoard } from "./survey-vacancy-board";
 import { DATA_METROS } from "@/lib/market-match";
+import { marketMeta, marketPageFor, sectorPageFor } from "@/lib/public-pages";
 import { heatShade } from "./heat-shade";
 import { MetroLive } from "./metro-live";
 import { ReadOnlyMetroView } from "./read-only-metro";
@@ -270,7 +271,17 @@ const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) => {
   };
 });
 
-export const metadata: Metadata = { title: "Market data" };
+// Each metro and sector page names itself (#430): its own title, what it
+// holds, and itself as canonical — forty-odd pages had gone out as one.
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams?: Promise<{ metro?: string; sector?: string }>;
+}): Promise<Metadata> {
+  const { metro, sector } = (await searchParams) ?? {};
+  const meta = marketMeta(marketPageFor(metro), sectorPageFor(sector));
+  return { title: meta.title, description: meta.description, alternates: { canonical: meta.canonical } };
+}
 
 const CALL_META: Record<string, { label: string; cls: string }> = {
   pass: { label: "Go", cls: "text-pass" },

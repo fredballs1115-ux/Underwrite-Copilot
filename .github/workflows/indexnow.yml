@@ -1,0 +1,25 @@
+name: indexnow
+# Tells the search engines that take IndexNow (Bing — which DuckDuckGo and
+# Yahoo read — Yandex, Seznam, Naver) about every page in the live sitemap
+# (#430). No account and no secret: the site serves its key at its root
+# (public/<key>.txt) and scripts/indexnow.mjs checks that before it sends
+# anything. Weekly, and on dispatch after a deploy that adds pages — never
+# on push, since the key has to be live before the engines read the list.
+# Google does not take IndexNow; it reads the sitemap once the operator has
+# verified the site in Search Console (GOOGLE_SITE_VERIFICATION).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 13 * * 1"
+permissions:
+  contents: read
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Submit the live sitemap
+        run: node scripts/indexnow.mjs
