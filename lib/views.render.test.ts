@@ -3712,3 +3712,64 @@ describe("InterestPanel — what the price buys, said before any figure is belie
     expect(gluedWords(text)).toEqual([]);
   });
 });
+
+// ── The loan in place, offered for assumption (#417) ────────────────────────
+import { AssumableLoanCard } from "@/app/(app)/deals/[id]/assumable-card";
+import { assumableView, readAssumable } from "@/lib/assumable-debt";
+import { deriveUnderwriteInputs as deriveForAssumable } from "@/lib/underwrite/inputs";
+
+describe("AssumableLoanCard — the rate, the coverage and what the loan is worth", () => {
+  const AS_OF = new Date(Date.UTC(2026, 8, 25));
+  const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 12", basis: "na" as const });
+  const inputs = deriveForAssumable(SAMPLE_DEAL.extraction as ExtractionResult, SAMPLE_DEAL.name).inputs;
+  const withLoan = (rows: ReturnType<typeof row>[]) =>
+    ({ ...SAMPLE_DEAL.extraction, totalPages: 40, metrics: [...SAMPLE_DEAL.extraction.metrics, ...rows] }) as ExtractionResult;
+  const RATE_NOTE = "5-yr Treasury 3.75% (FRED, Sep 24, 2026) + 225 bps multifamily spread, a screening default — enter your quote";
+
+  it("draws the rate and the coverage as pairs, the figures, the sentence and the tools link", () => {
+    const a = readAssumable(
+      withLoan([
+        row("Assumable loan balance", "$40,000,000"),
+        row("Assumable loan rate", "3.45%"),
+        row("Assumable loan maturity", "June 30, 2033"),
+        row("Assumable loan amortization", "Interest-only"),
+        row("Assumption fee", "1%"),
+      ]),
+      inputs,
+      AS_OF,
+    )!;
+    const html = render(React.createElement(AssumableLoanCard, { view: assumableView(a, RATE_NOTE, true) }));
+    dumpView("assumable-loan", html);
+    const text = visibleText(html);
+    expect(text).toContain("The loan in place, offered for assumption");
+    expect(text).toContain("$40.0M at 3.45% to Jun 2033, interest-only as stated");
+    expect(text).toContain("p. 12");
+    expect(text).toMatch(/The loan in place\s+3\.45%/);
+    expect(text).toMatch(/A new loan today\s+6\.00%/);
+    expect(text).toContain("255 bps under a new loan's rate");
+    expect(text).toContain(`A new loan today, as the model runs it: ${RATE_NOTE}.`);
+    expect(text).toContain("Worth in price");
+    expect(text).toContain("Against a new loan");
+    expect(text).toMatch(/Assuming it is worth \$[\d.]+[Mk] of price/);
+    expect(text).toContain("Only the 5 years of it the 5-year hold uses count");
+    expect(text).toContain("The 1% assumption fee ($400k) is funded at closing, in the cheque.");
+    expect(html).toContain('href="/tools#loan-assumption"');
+    expect(html.match(/data-bar="assume-rate"/g)).toHaveLength(2);
+    expect(html.match(/data-bar="assume-dscr"/g)).toHaveLength(2);
+    expect(a11yIssues(html), "assumable card").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("renders nothing without a loan to assume; a loan with a missing term says which and draws no coverage", () => {
+    expect(render(React.createElement(AssumableLoanCard, { view: null }))).not.toContain("The loan in place");
+    const bare = readAssumable(withLoan([row("Assumable loan balance", "$30,000,000"), row("Assumable loan rate", "3.45%")]), inputs, AS_OF)!;
+    const html = render(React.createElement(AssumableLoanCard, { view: assumableView(bare, null, false) }));
+    const text = visibleText(html);
+    expect(text).toContain("It cannot be priced against a new loan: the memorandum does not state its maturity or its payment schedule.");
+    expect(text).toContain("A new loan at the model's 6.00% placeholder");
+    expect(html).not.toContain('data-bar="assume-dscr"');
+    expect(html).not.toContain('data-qa="assumable-figures"');
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+});

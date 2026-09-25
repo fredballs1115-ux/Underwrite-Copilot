@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-25",
+      "title": "The seller's loan, priced against today's rate",
+      "href": "/deals",
+      "blurb": "When a memorandum offers the seller's loan for assumption, the deal page now prices it instead of repeating its rate. The loan's coupon is set against the rate the model gives a new loan today, which comes from the day's Treasury plus a spread for the property type. Both ways of financing the deal are run on the model's own figures, and the page draws the coverage each gives and says whether the loan is worth paying for. A cheap rate on a small balance often is not, because the smaller loan means a larger equity cheque. Only the years of the loan the hold actually uses count, and a term the memorandum leaves out is named rather than assumed."
+    },
+    {
+      "date": "2026-09-25",
       "title": "A note, underwritten as a note",
       "href": "/deals",
       "blurb": "A memorandum selling a loan now gets the loan's own arithmetic, not only a caveat on the collateral's. From the balance, the coupon, the maturity and the payment schedule it states, the screen works out what the note yields to maturity at the asking price, its current yield and its price in cents on the dollar. It also shows how much of the collateral's stated value the balance and the price each take. A note that is not paying, or is past its maturity, is never shown a yield as if it were earned. The deal page draws the figures, and the memo, the report, the workbook and the shared screen say them."

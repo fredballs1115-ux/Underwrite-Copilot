@@ -3,6 +3,7 @@ import { withArticle } from "@/lib/article";
 import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { assetWords } from "@/lib/asset-words";
 import { interestContextLine, readInterest } from "@/lib/interest";
+import { assumableContextLine, readAssumable } from "@/lib/assumable-debt";
 import { portfolioContextLine, readPortfolio } from "@/lib/portfolio";
 
 const compact = (n: number): string =>
@@ -29,7 +30,10 @@ export function dealContextFor(extraction: ExtractionResult | null): string | nu
   // What is being sold is said FIRST whatever the strategy (#414): a note's
   // price or a share's changes what every figure after it means.
   const interest = readInterest(extraction, askingPriceOf(extraction));
-  const head = interest ? [interestContextLine(interest)] : [];
+  // The seller's loan, where it is offered for assumption (#417): its terms
+  // as stated and what its value turns on, right after what is being sold.
+  const assumable = readAssumable(extraction, null);
+  const head = [...(interest ? [interestContextLine(interest)] : []), ...(assumable ? [assumableContextLine(assumable)] : [])];
   const tail = [...(portfolio ? [portfolioContextLine(portfolio)] : [])];
   if (strategy.kind === "unknown") return head.length || tail.length ? [...head, ...tail].join(" ") : null;
   const plan = planSummary(extraction, strategy);
