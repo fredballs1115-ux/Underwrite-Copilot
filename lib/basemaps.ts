@@ -162,18 +162,64 @@ export interface AerialRequest {
  * interactive map is the wrong tool: list thumbnails, the shared report,
  * the exported memo — all of which need an <img>, not a Leaflet canvas.
  */
-export function usgsAerialUrl({ center, zoom, width, height }: AerialRequest): string {
-  const b = mercatorBbox(center, zoom, width, height);
+export function usgsAerialUrl(req: AerialRequest): string {
   const params = new URLSearchParams({
-    bbox: [b.minX, b.minY, b.maxX, b.maxY].map((n) => n.toFixed(3)).join(","),
-    bboxSR: "3857",
-    imageSR: "3857",
-    size: `${Math.round(width)},${Math.round(height)}`,
+    ...frameParams(req),
     format: "jpg",
     transparent: "false",
     f: "image",
   });
   return `${USGS_IMAGERY}/export?${params.toString()}`;
+}
+
+/** The frame an ArcGIS `export` draws: one definition, so two layers asked
+ *  for the same request cover the same ground to the pixel. */
+function frameParams({ center, zoom, width, height }: AerialRequest): Record<string, string> {
+  const b = mercatorBbox(center, zoom, width, height);
+  return {
+    bbox: [b.minX, b.minY, b.maxX, b.maxY].map((n) => n.toFixed(3)).join(","),
+    bboxSR: "3857",
+    imageSR: "3857",
+    size: `${Math.round(width)},${Math.round(height)}`,
+  };
+}
+
+/**
+ * FEMA's National Flood Hazard Layer: the flood insurance rate maps as a map
+ * service. A US federal work, public domain, no key.
+ */
+export const NFHL_ROOT = "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer";
+
+/**
+ * The Flood tab's frame. At the aerial's own zoom (z19 for a street address)
+ * one zone fills the frame and the photograph is soft; at z17 the frame is
+ * about 1.2 km across at US latitudes and shows the zone's edges and the
+ * river or coast that makes it — judged on the runner's composites
+ * (flood-sheet, 2026-09-25).
+ */
+export const FLOOD_ZOOM = 17;
+
+/** Below this FEMA draws nothing: the zones layer's minScale, 1:36,112 as
+ *  the runner printed it, is z14 at the equator, and a frame at the limit is
+ *  a bet on rounding. */
+export const FLOOD_MIN_ZOOM = 15;
+
+/**
+ * FEMA's flood zones for EXACTLY the frame `usgsAerialUrl` draws — the same
+ * bbox from the same centre, zoom and size — as a transparent PNG, so the one
+ * lies over the other pixel for pixel on the deal page's Flood tab. The layer
+ * is the service's own zones layer, its id resolved from the service's layer
+ * list (`resolveNfhlLayerId` in lib/site-flags), never a number written here.
+ */
+export function nfhlOverlayUrl(req: AerialRequest & { layerId: number; root?: string }): string {
+  const params = new URLSearchParams({
+    ...frameParams(req),
+    format: "png32",
+    transparent: "true",
+    layers: `show:${req.layerId}`,
+    f: "image",
+  });
+  return `${req.root ?? NFHL_ROOT}/export?${params.toString()}`;
 }
 
 /** Hosts the CSP must allow as image sources for any of the above to render. */

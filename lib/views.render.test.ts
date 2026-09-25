@@ -2882,6 +2882,7 @@ describe("a metro's for-sale market, from Realtor.com", () => {
 
 // ── The deal page's picture ─────────────────────────────────────────────────
 import { PropertyVisual } from "@/app/(app)/deals/[id]/property-visual";
+import type { SiteFlagsResult as SiteFlagsResultForTest } from "@/lib/site-flags/core";
 
 describe("PropertyVisual — the building's own photograph leads, then the overhead", () => {
   const base = {
@@ -2929,6 +2930,70 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
     const text = visibleText(html);
     expect(text).not.toContain("Add photo");
     expect(text).not.toContain("Replace photo");
+  });
+
+  it("draws FEMA's flood zones over the aerial for the same frame, with a ring at the building, FEMA's key and the zone at the building (#425)", () => {
+    const flood = {
+      key: [
+        { label: "1% Annual Chance Flood Hazard", image: "data:image/png;base64,iVBORw0KGgo=", here: true },
+        { label: "Regulatory Floodway", image: "data:image/png;base64,iVBORw0KGgo=", here: false },
+        { label: "0.2% Annual Chance Flood Hazard", image: null, here: false },
+      ],
+      line: "The building sits in Zone AE (1% annual chance flood hazard), a Special Flood Hazard Area: a federally backed loan requires flood insurance, and the premium belongs in the expense line.",
+    };
+    const html = renderToStaticMarkup(React.createElement(PropertyVisual, { ...base, picture: null, flood }));
+    dumpView("property-visual-flood", html);
+    expect(a11yIssues(html), "a11y property-visual-flood").toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toContain("Flood");
+    // The aerial and FEMA's zones asked for one frame: the same size and zoom.
+    expect(html).toContain('src="/api/deals/d1/aerial?src=usgs&amp;w=1280&amp;h=576&amp;z=17"');
+    expect(html).toContain('src="/api/deals/d1/flood?w=1280&amp;h=576&amp;z=17"');
+    expect(html).toContain('data-picture="flood-pin"');
+    expect(text).toContain("1% Annual Chance Flood Hazard — at the building");
+    expect(text).toContain("Regulatory Floodway");
+    // Short enough to sit on a phone's picture without covering it.
+    expect(text).toContain("FEMA flood zones · USGS imagery");
+    expect(text).toContain("a federally backed loan requires flood insurance");
+    // The aerial still leads; the Flood tab waits to be opened.
+    expect(html).toMatch(/aria-pressed="true"[^>]*>Aerial</);
+
+    // No street address, no Flood tab: a neighbourhood's centre is not the building.
+    const area = renderToStaticMarkup(
+      React.createElement(PropertyVisual, { ...base, hasStreetAddress: false, picture: null, flood }),
+    );
+    expect(area).not.toContain("/flood?");
+    // No flood prop, no Flood tab.
+    expect(renderToStaticMarkup(React.createElement(PropertyVisual, { ...base, picture: null }))).not.toContain("/flood?");
+  });
+});
+
+// ── The site flags' flood chip (#425) ──────────────────────────────────────
+import { SiteFlagsCard } from "@/app/(app)/deals/[id]/site-flags-card";
+
+describe("SiteFlagsCard — the flood chip says what FEMA's map says, and no more", () => {
+  const result = (flood: SiteFlagsResultForTest["flood"]): SiteFlagsResultForTest => ({
+    status: "ok",
+    tractGeoid: "42101014200",
+    opportunityZone: null,
+    flood,
+    retrievedAt: "2026-09-25T00:00:00Z",
+    note: "Screening flags from federal datasets at the geocoded point.",
+  });
+  const chip = (flood: SiteFlagsResultForTest["flood"]) =>
+    visibleText(renderToStaticMarkup(React.createElement(SiteFlagsCard, { result: result(flood), hasAddress: true })));
+
+  it("keeps a point off FEMA's digital map apart from minimal hazard, and minimal hazard out of the caution colour", () => {
+    expect(chip(null)).toContain("Flood: no FEMA digital map at this point");
+    expect(chip(null)).not.toMatch(/no mapped hazard/);
+    const minimal = renderToStaticMarkup(
+      React.createElement(SiteFlagsCard, { result: result({ zone: "X", subtype: "AREA OF MINIMAL FLOOD HAZARD", isHighRisk: false }), hasAddress: true }),
+    );
+    expect(visibleText(minimal)).toContain("Flood zone X · minimal flood hazard");
+    expect(minimal).not.toContain("bg-caution/10");
+    expect(chip({ zone: "X", subtype: "0.2 PCT ANNUAL CHANCE FLOOD HAZARD", isHighRisk: false })).toContain("Flood zone X · 0.2 pct annual chance flood hazard");
+    expect(chip({ zone: "AE", subtype: null, isHighRisk: true })).toContain("Flood zone AE — SFHA");
   });
 });
 

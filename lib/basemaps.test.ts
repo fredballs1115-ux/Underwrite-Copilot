@@ -7,8 +7,10 @@ import {
   DEFAULT_BASEMAP,
   MAX_MERCATOR_LAT,
   basemapById,
+  NFHL_ROOT,
   groundResolution,
   mercatorBbox,
+  nfhlOverlayUrl,
   resolution,
   toMercator,
   usgsAerialUrl,
@@ -132,6 +134,49 @@ describe("usgsAerialUrl", () => {
       height: 450,
     });
     expect(other).not.toBe(url);
+  });
+});
+
+describe("nfhlOverlayUrl — FEMA's flood zones for the aerial's own frame", () => {
+  const req = { center: WHITE_HOUSE, zoom: 18, width: 800, height: 450 };
+  const aerial = new URL(usgsAerialUrl(req));
+  const flood = new URL(nfhlOverlayUrl({ ...req, layerId: 28 }));
+
+  it("draws exactly the ground the aerial draws, so one lies over the other", () => {
+    for (const k of ["bbox", "bboxSR", "imageSR", "size"]) {
+      expect(flood.searchParams.get(k), k).toBe(aerial.searchParams.get(k));
+    }
+  });
+
+  it("asks FEMA's export for a transparent PNG of one layer, the id it is given", () => {
+    expect(`${flood.origin}${flood.pathname}`).toBe(`${NFHL_ROOT}/export`);
+    expect(flood.searchParams.get("format")).toBe("png32");
+    expect(flood.searchParams.get("transparent")).toBe("true");
+    expect(flood.searchParams.get("layers")).toBe("show:28");
+    expect(flood.searchParams.get("f")).toBe("image");
+    expect(nfhlOverlayUrl({ ...req, layerId: 29 })).toContain("show%3A29");
+  });
+
+  it("takes another root where the service is overridden, and carries no key", () => {
+    const other = nfhlOverlayUrl({ ...req, layerId: 28, root: "https://example.test/NFHL/MapServer" });
+    expect(other.startsWith("https://example.test/NFHL/MapServer/export?")).toBe(true);
+    expect(nfhlOverlayUrl({ ...req, layerId: 28 })).not.toMatch(/key|token|secret/i);
+  });
+
+  it("is the frame the runner's flood sheet renders (scripts/probe-flood.mjs restates it for plain Node)", async () => {
+    const probe = (await import("../scripts/probe-flood.mjs")) as {
+      bboxFor: (lat: number, lng: number, z: number, w: number, h: number) => { minX: number; minY: number; maxX: number; maxY: number };
+      overlayUrl: (b: unknown, w: number, h: number, id: number, root?: string) => string;
+    };
+    for (const [lat, lng, z] of [[38.8977, -77.0365, 18], [40.744, -74.0324, 17], [29.966, -90.09, 19]] as const) {
+      const b = probe.bboxFor(lat, lng, z, 1280, 576);
+      const m = mercatorBbox({ lat, lng }, z, 1280, 576);
+      expect(b.minX).toBeCloseTo(m.minX, 6);
+      expect(b.maxY).toBeCloseTo(m.maxY, 6);
+      expect(new URL(probe.overlayUrl(b, 1280, 576, 28)).searchParams.get("bbox")).toBe(
+        new URL(nfhlOverlayUrl({ center: { lat, lng }, zoom: z, width: 1280, height: 576, layerId: 28 })).searchParams.get("bbox"),
+      );
+    }
   });
 });
 

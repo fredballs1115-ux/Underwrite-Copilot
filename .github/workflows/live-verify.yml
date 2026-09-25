@@ -996,6 +996,9 @@ jobs:
           # #424 — each submarket opens on its metro's photograph (signed-in):
           # its changelog card.
           mark "#424 each submarket is pictured" grep -q "Your submarkets, pictured" p_whats-new.html
+          # #425 — FEMA's flood map over the building's aerial (signed-in):
+          # its changelog card.
+          mark "#425 the flood map is over the building" grep -q "The flood map, over the building" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

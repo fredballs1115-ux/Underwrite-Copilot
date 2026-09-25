@@ -402,7 +402,18 @@ band linking to the metro's page, and each card in Your submarkets
 pictured under one credit line; a full state name is now tried longest
 first, so "Charleston West Virginia" is not Virginia; and the marker
 test renders /whats-new, which retired four diagnostics that had been
-printing "not yet deployed" since their entries were trimmed.
+printing "not yet deployed" since their entries were trimmed. Then #425:
+FEMA's flood map over the building — a Flood tab on the deal page's
+picture, the aerial with FEMA's zones in FEMA's colours, a ring at the
+building, FEMA's key and the zone at the building in one sentence, every
+FEMA claim printed and every composite looked at from the runner's flood
+sheet first.
+**Your move, five minutes**: request a free Census API key
+(api.census.gov/data/key_signup.html) and set it as `CENSUS_API_KEY` on
+the Render web service and as an Actions secret. The ACS data API now
+refuses a keyless request, and the next round reads each deal's census
+tract (renters' median income, median gross rent, renter share and rental
+vacancy, each with its margin) against the OM's rents.
 **Open after it**:
 a ground rent's own schedule (fixed bumps, a reset to a share of
 land value) is not in the model's expense line; a non-performing note's foreclosure path (the months and cost of taking

@@ -20,7 +20,8 @@ import type { DealVisualCache } from "@/lib/deal-location";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
-import type { SiteFlagsResult } from "@/lib/site-flags/core";
+import { floodKey, floodZoneLine, type NfhlLegendEntry, type SiteFlagsResult } from "@/lib/site-flags/core";
+import { floodLegend } from "@/lib/flood-map";
 import { SiteFlagsCard } from "./site-flags-card";
 import { PublicRecordCard } from "./public-record-card";
 import { buildingSfRow, findGoingInCap, parseMoney } from "@/lib/criteria";
@@ -749,6 +750,19 @@ export default async function DealPage({
     });
   }
 
+  // The Flood tab's key is FEMA's own legend (lib/flood-map, cached a day).
+  // Asked for here and read at the picture, so a slow FEMA overlaps the
+  // page's other reads; a legend that has not answered in 2.5 s leaves the
+  // key out rather than holding the page. A street address only: a
+  // neighbourhood placement's centre is not the building.
+  const floodStreet = !!dealAddress?.street?.trim();
+  const floodLegendRead: Promise<NfhlLegendEntry[]> = floodStreet
+    ? Promise.race([
+        floodLegend(),
+        new Promise<NfhlLegendEntry[]>((resolve) => setTimeout(() => resolve([]), 2500)),
+      ])
+    : Promise.resolve([]);
+
   // The buy-box call as one chip. When there's a numeric mandate-fit score,
   // it leads — "Buy box 82 · Pursue", coloured by the PURSUE/WATCH/PASS call.
   // Otherwise the older fold (Outside / Near / Fits) stands in.
@@ -789,6 +803,8 @@ export default async function DealPage({
     extraction?.market ||
     firstSignal?.market ||
     null;
+
+  const floodLegendEntries = await floodLegendRead;
 
   return (
     <div className="flex flex-col gap-6">
@@ -1084,6 +1100,14 @@ export default async function DealPage({
           hasAddress={!!dealAddress?.label}
           picture={picture ? { credit: PICTURE_CREDIT[picture.source], source: picture.source } : null}
           canReplace={!(deal as { is_sample?: boolean }).is_sample}
+          flood={
+            floodStreet
+              ? {
+                  key: floodKey(floodLegendEntries, siteFlags?.flood),
+                  line: floodZoneLine(siteFlags?.flood, floodLegendEntries),
+                }
+              : null
+          }
         />
       )}
 
