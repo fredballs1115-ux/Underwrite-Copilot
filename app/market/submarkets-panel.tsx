@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { listSubmarkets } from "@/lib/market/store";
 import type { Submarket } from "@/lib/market/types";
-import { assetClassLabel } from "@/lib/asset-class";
 import { createSubmarket } from "@/app/(app)/submarkets/actions";
+import { SubmarketCards } from "./submarket-cards";
 
 /**
  * "Your submarkets" — the user's own supply / rent-trend / vacancy series,
@@ -22,17 +21,6 @@ const ERRORS: Record<string, string> = {
   save: "Couldn't create that submarket.",
   notfound: "That submarket no longer exists.",
 };
-
-/** One line naming what a submarket's persistent exclusion rules drop. */
-export function exclusionLine(rules: Submarket["exclusionRules"]): string | null {
-  const bits = [
-    ...rules.subtypes,
-    ...rules.namePatterns,
-    rules.minSf != null ? `under ${rules.minSf.toLocaleString("en-US")} SF` : null,
-    rules.maxSf != null ? `over ${rules.maxSf.toLocaleString("en-US")} SF` : null,
-  ].filter((b): b is string => !!b);
-  return bits.length ? bits.join(", ") : null;
-}
 
 export async function SubmarketsPanel({
   userId,
@@ -80,29 +68,7 @@ export async function SubmarketsPanel({
       ) : null}
 
       {submarkets.length ? (
-        <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {submarkets.map((s) => {
-            const excl = exclusionLine(s.exclusionRules);
-            return (
-              <li key={s.id}>
-                <Link
-                  href={`/submarkets/${s.id}`}
-                  className="hover-lift flex h-full flex-col gap-1 rounded-lg border border-line bg-canvas/60 p-3.5 transition hover:border-brand/40"
-                >
-                  <span className="text-sm font-medium text-ink">{s.name}</span>
-                  <span className="text-xs text-muted">
-                    {s.metro ? `${s.metro} · ` : ""}
-                    <span>{assetClassLabel(s.assetClass)}</span>
-                    {" · "}warns past {s.supplyWarningMonths} mo of supply
-                  </span>
-                  {excl ? (
-                    <span className="text-xs text-muted">Excludes: {excl}</span>
-                  ) : null}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+        <SubmarketCards submarkets={submarkets} />
       ) : (
         <p className="mt-4 rounded-lg border border-dashed border-line px-4 py-5 text-center text-sm text-muted">
           No submarkets yet. Create one below, then import a market export or

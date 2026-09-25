@@ -31,7 +31,7 @@
 import type { ExtractionResult, PortfolioProperty } from "@/lib/anthropic/types";
 import { parseCount, parsePct, parseSf } from "@/lib/criteria";
 import { findPricedMetric, inferStrategy } from "@/lib/deal-strategy";
-import { US_STATE_ABBREV } from "@/lib/address";
+import { placeOf } from "@/lib/address";
 import { withArticle } from "@/lib/article";
 import { parsePageNumber } from "@/lib/facts";
 import { marketForAddress } from "@/lib/market-match";
@@ -100,51 +100,6 @@ export const CONCENTRATION_PCT = 40;
 /** An allocation total this far off the ask (either way) is a discrepancy
  *  to put to the broker, not rounding. */
 export const ALLOCATION_TOLERANCE_PCT = 1;
-
-const STATE_CODES = new Set(Object.values(US_STATE_ABBREV));
-
-/**
- * The city and state out of a free-text address the way an OM prints it —
- * "1200 Liberty Ave, Pittsburgh, PA 15222", "Pittsburgh, Pennsylvania",
- * "88 Main Street Cleveland OH 44114". Only what the text states: a string
- * with no recognisable state gives nothing, never a guess.
- */
-export function placeOf(address: string): { city: string | null; state: string } | null {
-  const text = address.replace(/\s+/g, " ").trim();
-  if (!text) return null;
-  const parts = text.split(",").map((p) => p.trim()).filter(Boolean);
-  // The state is in the last part (with or without a zip), or the last part
-  // IS the zip and the state sits in the one before it.
-  const stateIn = (part: string): { state: string; rest: string } | null => {
-    const s = part.replace(/\b\d{5}(?:-\d{4})?\b/, "").trim();
-    if (!s) return null;
-    // A two-letter code counts only in capitals: "Oak Ct" is a street, not
-    // Connecticut, and "Main St" is not a state at all.
-    if (/^[A-Z]{2}$/.test(s) && STATE_CODES.has(s)) return { state: s, rest: "" };
-    const full = US_STATE_ABBREV[s.toLowerCase()];
-    if (full) return { state: full, rest: "" };
-    // "Cleveland OH" or "Street Cleveland OH" — a trailing capital code.
-    const m = /^(.*?)\s+([A-Z]{2})$/.exec(s);
-    if (m && STATE_CODES.has(m[2])) return { state: m[2], rest: m[1].trim() };
-    // A trailing full state name after a city in the same part.
-    for (const [name, c] of Object.entries(US_STATE_ABBREV)) {
-      if (s.toLowerCase().endsWith(` ${name}`)) return { state: c, rest: s.slice(0, s.length - name.length).trim() };
-    }
-    return null;
-  };
-  for (let i = parts.length - 1; i >= Math.max(0, parts.length - 2); i--) {
-    const hit = stateIn(parts[i]);
-    if (!hit) continue;
-    // The city: the rest of the state's own part, else the part before it.
-    // A rest that is a whole street line ("88 Main Street Cleveland") keeps
-    // only its last word, which is all the text states about the city there.
-    let city = hit.rest || (i > 0 ? parts[i - 1] : "");
-    if (hit.rest && /\d/.test(hit.rest)) city = hit.rest.split(" ").at(-1) ?? "";
-    if (!hit.rest && i > 0 && /^\d/.test(city) && parts.length === 2) city = "";
-    return { city: city.trim() || null, state: hit.state };
-  }
-  return null;
-}
 
 const num = (raw: string | undefined): string => (raw ?? "").trim();
 

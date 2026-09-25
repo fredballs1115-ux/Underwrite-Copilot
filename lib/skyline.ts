@@ -560,6 +560,14 @@ export function galleryCredit(ids: readonly string[]): string {
   return `Skyline photographs by ${names.join(", ")} — via Wikimedia Commons, ${licenses.join(" / ")}.`;
 }
 
+/**
+ * The overhead frames' line under a grid of market pictures: public domain
+ * and owed nobody, and said anyway, so a reader knows an overhead from a
+ * photograph. One string for every grid that shows them.
+ */
+export const OVERHEAD_GRID_CREDIT =
+  "Overhead frames: USGS The National Map (public domain), each centred on that market's business district.";
+
 /** The page that documents the file, for the credit link. */
 export function commonsPage(file: string): string {
   return `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(file)}`;

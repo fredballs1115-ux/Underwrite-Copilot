@@ -142,3 +142,49 @@ describe("the /tools round markers", () => {
     expect(hydration.replace(/<!-- -->/g, "").includes(broken)).toBe(true);
   });
 });
+
+// ── The markers that grep /whats-new ────────────────────────────────────────
+import WhatsNewPage from "@/app/whats-new/page";
+
+/** Every `grep -q|-o <pattern> p_whats-new.html` the workflow runs — the
+ *  roll-up's `mark` lines and the plain diagnostics alike. */
+function whatsNewPatterns(): string[] {
+  const out: string[] = [];
+  for (const m of YML.matchAll(/grep -[qo] "((?:[^"\\]|\\.)*)" p_whats-new\.html/g)) {
+    out.push(m[1].replace(/\\\$/g, "$").replace(/\\"/g, '"'));
+  }
+  for (const m of YML.matchAll(/grep -[qo] '([^']*)' p_whats-new\.html/g)) {
+    out.push(m[1].replace(/\\\$/g, "$"));
+  }
+  return out;
+}
+
+/**
+ * A round's marker greps its changelog title on /whats-new, and the page
+ * draws only the newest entries (`changelogEntries(100)`). A title that has
+ * fallen off the end — or been trimmed from the log — reads NOT DEPLOYED on
+ * a site that is fine, the same broken as a marker that cannot fail. Four
+ * diagnostics that grepped September 7's and 8's titles had been printing
+ * "not yet deployed" on every run since those entries were trimmed; this
+ * renders the page as a curl receives it and holds every pattern to it.
+ */
+describe("the /whats-new markers", () => {
+  const served = renderToString(React.createElement(WhatsNewPage));
+
+  it("reads them out of the workflow", () => {
+    const patterns = whatsNewPatterns();
+    expect(patterns.length, "no /whats-new markers found — has the grep shape changed?").toBeGreaterThan(10);
+    expect(patterns).toContain("Compare reads each price for what it buys");
+  });
+
+  it("greps text the page really serves", () => {
+    for (const p of whatsNewPatterns()) {
+      expect(
+        served.includes(p),
+        `the marker grepping ${JSON.stringify(p)} would read NOT DEPLOYED — the phrase is not on /whats-new ` +
+          `as served. A changelog title past the page's last entry has fallen off it: retire the marker, ` +
+          `or grep prose with no {expression} or apostrophe in it.`,
+      ).toBe(true);
+    }
+  });
+});

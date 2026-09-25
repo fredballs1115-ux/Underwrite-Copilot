@@ -241,7 +241,7 @@ describe("the halo under the words", () => {
     // The market pages draw their band through MarketBand, whose words sit
     // inside the halo in this file.
     expect(/export function MarketBand[\s\S]*?on-photo/.test(SOURCE)).toBe(true);
-    for (const page of ["app/market/page.tsx", "app/market/read-only-metro.tsx"]) {
+    for (const page of ["app/market/page.tsx", "app/market/read-only-metro.tsx", "app/(app)/submarkets/[id]/page.tsx"]) {
       expect(readFileSync(join(process.cwd(), page), "utf8"), page).toContain("<MarketBand");
     }
   });
@@ -275,7 +275,9 @@ describe("the caption scrim, for a market's own band on /market", () => {
     expect(SOURCE).toMatch(/CAPTION_SCRIM\.map\(/);
     expect(band, "MarketBand").not.toBe("");
     expect(band).toContain('scrim="caption"');
-    for (const cls of ["pb-6", "text-2xl", "mt-1", "text-[11px]", "sm:pb-7", "sm:text-3xl"]) {
+    // line-clamp-2 is what makes "two lines" the reach whatever name is
+    // passed — a submarket's is whatever its owner typed.
+    for (const cls of ["pb-6", "text-2xl", "mt-1", "text-[11px]", "sm:pb-7", "sm:text-3xl", "line-clamp-2"]) {
       expect(band, cls).toContain(cls);
     }
     expect(REACH_PX).toBeLessThanOrEqual(110);

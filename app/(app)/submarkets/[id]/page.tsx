@@ -6,6 +6,8 @@ import { loadSubmarketView } from "@/lib/market/store";
 import { exclusionSummary } from "@/lib/market/exclusions";
 import { RENT_BASIS_LABEL, RENT_BASES } from "@/lib/market/types";
 import { assetClassLabel } from "@/lib/asset-class";
+import { metroForName } from "@/lib/market-match";
+import { MarketBand } from "@/app/place-band";
 import { DualAxisTrend } from "./trend-chart";
 import {
   deleteSubmarket,
@@ -50,6 +52,10 @@ export default async function SubmarketPage({
   if (!view) notFound();
   const { submarket, periods, properties, applied, metrics } = view;
   const rules = submarket.exclusionRules;
+  // The metro its owner typed, read only where the text says which market
+  // it is — the page opens on that market's photograph and links to its
+  // published figures; a metro the text cannot place keeps the plain title.
+  const market = metroForName(submarket.metro);
 
   const supplyLine =
     metrics.supply.status === "ok"
@@ -60,18 +66,33 @@ export default async function SubmarketPage({
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6">
-      <header className="flex flex-col gap-1">
+      <header className={`flex flex-col ${market ? "gap-3" : "gap-1"}`}>
         <Link
           href="/market#submarkets"
           className="text-sm text-muted underline-offset-2 hover:text-brand hover:underline"
         >
           ← Market data · your submarkets
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">{submarket.name}</h1>
+        {market ? (
+          <MarketBand metro={market.id} eyebrow={market.name} name={submarket.name} as="h1" />
+        ) : (
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">{submarket.name}</h1>
+        )}
         <p className="text-sm text-muted">
           {submarket.metro ? `${submarket.metro} · ` : ""}
           <span>{assetClassLabel(submarket.assetClass)}</span> ·{" "}
           {metrics.periodsCovered} period{metrics.periodsCovered === 1 ? "" : "s"} loaded
+          {market ? (
+            <>
+              {" · "}
+              <Link
+                href={`/market?metro=${market.id}`}
+                className="text-brand underline-offset-2 hover:underline"
+              >
+                {`The ${market.name} market →`}
+              </Link>
+            </>
+          ) : null}
         </p>
       </header>
 

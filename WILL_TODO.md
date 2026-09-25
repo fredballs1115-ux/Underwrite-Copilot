@@ -394,7 +394,15 @@ the term wherever a leasehold is summarized — the pipeline's tag, the
 memo, the report's block and the workbook's cover, which names the exit
 cap that runs the model on the term. Then #423: the compare table reads
 each price for what it buys — a note's yield where a cap would sit, a
-share's cap on the whole, returns the price did not buy withheld.
+share's cap on the whole, returns the price did not buy withheld. Then
+#424: a submarket opens on its metro's photograph — the metro its owner
+typed, read only where the text says which market (the site's own name
+for one, or a city with its state; a bare "Portland" is no market), its
+band linking to the metro's page, and each card in Your submarkets
+pictured under one credit line; a full state name is now tried longest
+first, so "Charleston West Virginia" is not Virginia; and the marker
+test renders /whats-new, which retired four diagnostics that had been
+printing "not yet deployed" since their entries were trimmed.
 **Open after it**:
 a ground rent's own schedule (fixed bumps, a reset to a share of
 land value) is not in the model's expense line; a non-performing note's foreclosure path (the months and cost of taking

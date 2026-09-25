@@ -61,9 +61,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   the area, never a mix), its share of the NOI only when EVERY property
   states one (four of five stated is no concentration — the fifth could be
   the largest), the markets from each property's own address through the
-  market check's matcher (`placeOf` reads the OM's address line; a
-  two-letter state counts only in capitals, so "Oak Ct" is not
-  Connecticut), and the allocation's total against the ask — the
+  market check's matcher (`placeOf`, in `lib/address.ts`, reads the OM's
+  address line; a two-letter state counts only in capitals, so "Oak Ct"
+  is not Connecticut, and a full state name is tried longest first, so
+  "Charleston West Virginia" is not Virginia), and the allocation's
+  total against the ask — the
   allocation is the seller's split, so a per-property cap on it is "a cap
   on the allocation". A property's page is kept only where it parses AND
   falls inside `totalPages` (lib/facts' absolute rule — the first cut
@@ -354,7 +356,15 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   to fail: where the phrase is already on the page before the change (a
   second "Copy as table"), the marker counts the matches through a
   `grep -o … | wc -l` helper instead, and the guard reads `-o` patterns
-  alongside `-q` ones so both kinds stay honest.
+  alongside `-q` ones so both kinds stay honest. **The same file renders
+  `/whats-new`** (its page is synchronous, so `renderToString` gives the
+  bytes a curl gets) and holds every grep of `p_whats-new.html` to it: a
+  round's marker greps its changelog title, the page draws only the
+  newest hundred entries, and a title that falls off the end — or is
+  trimmed from the log — reads NOT DEPLOYED on a site that is fine. It
+  caught four diagnostics that had been printing "not yet deployed" on
+  every run since September 7's and 8's entries were trimmed; they are
+  gone. When it fails on an old round's title, retire that marker.
   `lib/a11y-source.test.ts` scans every page's source for a form control
   with no accessible name (the pages the render tests cannot reach). The
   root layout renders the one skip link (`app/skip-link.tsx`); every page's
@@ -2397,7 +2407,32 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   lines on a phone, 110px), clear by 208px, and the band is 15rem / 21rem
   so everything above that is picture; the contrast test imports the
   stops and holds white to AAA and the accent eyebrow to AA at every
-  point the words reach, against the same pure-white frame.
+  point the words reach, against the same pure-white frame. **A
+  submarket opens on its metro's photograph** (#424): the submarket's
+  metro is whatever its owner typed, so `metroForName`
+  (`lib/market-match.ts`, pure) reads it only where the text says which
+  market it is — the site's own name for one, whole ("Northern
+  Virginia", "Pittsburgh PA", "Dallas-Fort Worth"), or a city with its
+  state through `placeOf` and the address matchers ("Arlington, VA",
+  "Brooklyn NY", "DC" — the District is its city), with "metro", "MSA"
+  or "market" dropped off the end. A bare city is never read
+  ("Portland", "Columbus" and "Richmond" are each more than one place),
+  a state alone is no metro, and nothing falls back to the state's
+  market, since a state has no photograph or page. The page
+  (`app/(app)/submarkets/[id]/page.tsx`) then opens on `MarketBand`
+  with the market's name as the eyebrow and the submarket's as the
+  page's `h1` (`as="h1"`; the market pages keep `h3`), and links to the
+  metro's market page; the band's name is clamped to two lines
+  (`line-clamp-2`, held by the contrast test) because the scrim is
+  measured to a two-line name and a submarket's is user text. The
+  "Your submarkets" cards on `/market` are `SubmarketCards`
+  (`app/market/submarket-cards.tsx`, pure, rendered in
+  `lib/views.render.test.ts`): each card whose metro names a market
+  opens on a strip of its photograph wearing the market's name
+  (`data-picture="submarket"`), and ONE credit line under the grid names
+  every photographer shown (`galleryCredit`, and
+  `OVERHEAD_GRID_CREDIT` where a market shows its overhead — the same
+  line the homepage's gallery prints).
 - The News page's live layer: `lib/news/feeds.ts` (pure: the sources with
   their fallbacks, parsing, ranking) and `lib/news/live.ts` (the network:
   a fresh copy per process, a wall-clock deadline per source, the
