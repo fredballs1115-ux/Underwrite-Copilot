@@ -152,6 +152,18 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // the dead one is folded away.
     expect((html.match(/data-deal-thumb="photo"/g) ?? []).length).toBe(10);
     expect((html.match(/data-deal-thumb="blank"/g) ?? []).length).toBe(2);
+    // …at every width (#420): the picture was hidden on a phone. There it
+    // asks for a picture sized to its larger slot, and the row's call
+    // leads the price line instead of taking a column from the name — the
+    // column is hidden below `sm`, so each live row carries its call once
+    // for each width (one stalled run, two failed ones).
+    const rows = (html.match(/data-deal-thumb=/g) ?? []).length;
+    expect(html).toContain("image?w=168&amp;h=168 168w");
+    expect(html).toContain('sizes="(min-width: 640px) 36px, 56px"');
+    expect((html.match(/class="flex shrink-0 sm:hidden"/g) ?? []).length).toBe(rows);
+    expect((html.match(/class="hidden w-22 shrink-0 justify-end sm:flex"/g) ?? []).length).toBe(rows);
+    expect((html.match(/>Stalled</g) ?? []).length).toBe(2);
+    expect((html.match(/>Failed</g) ?? []).length).toBe(4);
     // The two exports travel together at the filter row's right edge.
     expect(html).toMatch(/class="flex items-center gap-2 md:ml-auto"/);
     // A stored class prints its words: the storage deal's row and the

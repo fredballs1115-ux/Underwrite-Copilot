@@ -1263,14 +1263,17 @@ function EmptyArt() {
 function MetaLine({
   className,
   bits,
+  flush = false,
 }: {
   className?: string;
   bits: ReactNode[];
+  /** no top margin: the line sits in a row that sets its own spacing */
+  flush?: boolean;
 }) {
   const shown = bits.filter(Boolean);
   if (shown.length === 0) return null;
   return (
-    <p className={`mt-0.5 truncate text-xs text-muted ${className ?? ""}`}>
+    <p className={`${flush ? "" : "mt-0.5 "}truncate text-xs text-muted ${className ?? ""}`}>
       {shown.map((b, idx) => (
         <Fragment key={idx}>
           {idx > 0 && " · "}
@@ -1445,6 +1448,47 @@ const DealRow = memo(function DealRow({
     </span>
   ) : null;
 
+  // The call. It sits in its own column from `sm` up; on a phone it leads
+  // the price line instead (#420), because the column's 88px beside a name
+  // that also has the building's picture beside it left the name
+  // "The Maddox at…".
+  // A failed or stalled run outranks the stored verdict: that verdict was
+  // written about the terms as they were before the run the analyst just
+  // asked for, and the deal page says so.
+  const status =
+    d.jobStatus === "failed" ? (
+      <span
+        className="rounded-full bg-kill/10 px-2.5 py-1 text-center text-[11px] font-medium leading-tight text-kill"
+        title={
+          v
+            ? "The latest screen failed before it reached the verdict — the previous verdict still shows on the deal page, marked as such"
+            : "The screen failed — open the deal to see why and try again"
+        }
+      >
+        Failed
+      </span>
+    ) : d.jobStatus === "stalled" ? (
+      <span
+        className="rounded-full bg-caution/10 px-2.5 py-1 text-center text-[11px] font-medium leading-tight text-caution"
+        title="The run stopped writing progress — its process was likely interrupted. Open the deal to start it again."
+      >
+        Stalled
+      </span>
+    ) : v ? (
+      <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${v.cls}`}>{v.label}</span>
+    ) : d.jobStatus === "running" ? (
+      <span className="flex items-center gap-1.5 text-[11px] text-muted">
+        <span className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
+        Screening…
+      </span>
+    ) : (
+      // Nothing has run yet: an empty ring where the verdict pill will sit.
+      <span className="inline-flex h-6 items-center" title="Not screened yet — open the deal to run the screen">
+        <span aria-hidden className="h-2.5 w-2.5 rounded-full border-[1.5px] border-dashed border-muted/70" />
+        <span className="sr-only">Not screened</span>
+      </span>
+    );
+
   const inner = (
     <>
       {compareMode && (
@@ -1484,7 +1528,12 @@ const DealRow = memo(function DealRow({
             fits — so the price, the cap and the fit are never the part a
             one-line truncation cuts off. */}
         <MetaLine className="md:hidden" bits={[dueBit, marketBit, coveredBit, assetBit, addedByBit]} />
-        <MetaLine className="md:hidden" bits={[priceBit, interestBit, debtBit, capBit, fitBit]} />
+        {/* On a phone the price line leads with the call; from `sm` to `md`
+            the call has its own column and the line is the figures alone. */}
+        <div className="mt-1 flex items-center gap-2 md:hidden">
+          <span className="flex shrink-0 sm:hidden">{status}</span>
+          <MetaLine flush className="min-w-0" bits={[priceBit, interestBit, debtBit, capBit, fitBit]} />
+        </div>
         <MetaLine
           className="hidden md:block lg:hidden"
           bits={[dueBit, marketBit, coveredBit, assetBit, interestBit, debtBit, fitBit, dateBit, addedByBit]}
@@ -1545,53 +1594,7 @@ const DealRow = memo(function DealRow({
           <span className="font-normal text-line">—</span>
         )}
       </span>
-      <span className="flex w-22 shrink-0 justify-end">
-        {/* A failed or stalled run outranks the stored verdict: that verdict
-            was written about the terms as they were before the run the
-            analyst just asked for, and the deal page says so. */}
-        {d.jobStatus === "failed" ? (
-          <span
-            className="rounded-full bg-kill/10 px-2.5 py-1 text-center text-[11px] font-medium leading-tight text-kill"
-            title={
-              v
-                ? "The latest screen failed before it reached the verdict — the previous verdict still shows on the deal page, marked as such"
-                : "The screen failed — open the deal to see why and try again"
-            }
-          >
-            Failed
-          </span>
-        ) : d.jobStatus === "stalled" ? (
-          <span
-            className="rounded-full bg-caution/10 px-2.5 py-1 text-center text-[11px] font-medium leading-tight text-caution"
-            title="The run stopped writing progress — its process was likely interrupted. Open the deal to start it again."
-          >
-            Stalled
-          </span>
-        ) : v ? (
-          <span
-            className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${v.cls}`}
-          >
-            {v.label}
-          </span>
-        ) : d.jobStatus === "running" ? (
-          <span className="flex items-center gap-1.5 text-[11px] text-muted">
-            <span className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
-            Screening…
-          </span>
-        ) : (
-          // Nothing has run yet: an empty ring where the verdict pill will sit.
-          <span
-            className="inline-flex h-6 items-center"
-            title="Not screened yet — open the deal to run the screen"
-          >
-            <span
-              aria-hidden
-              className="h-2.5 w-2.5 rounded-full border-[1.5px] border-dashed border-muted/70"
-            />
-            <span className="sr-only">Not screened</span>
-          </span>
-        )}
-      </span>
+      <span className="hidden w-22 shrink-0 justify-end sm:flex">{status}</span>
       <span className="hidden w-24 shrink-0 whitespace-nowrap text-right font-mono text-xs tabular-nums text-muted xl:block">
         {fmtDate(d.createdAt)}
       </span>
