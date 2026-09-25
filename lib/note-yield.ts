@@ -99,7 +99,6 @@ const MONTH: Record<string, number> = {
 const iso = (y: number, m: number, d: number) =>
   `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 const lastDay = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
-const validYear = (y: number) => y >= 1990 && y <= 2100;
 
 /**
  * A maturity as the OM writes it — "March 1, 2028", "Mar 2028", "3/1/2028",
@@ -108,6 +107,16 @@ const validYear = (y: number) => y >= 1990 && y <= 2100;
  * read a year wide moves the yield too far to guess.
  */
 export function parseMaturity(text: string | null | undefined): string | null {
+  return parseStatedDate(text, 1990, 2100);
+}
+
+/**
+ * A date as the OM writes it, in the formats `parseMaturity` reads, inside
+ * the years the caller accepts — a loan's maturity falls this century, a
+ * ninety-nine-year ground lease's end can fall in the next (#421).
+ */
+export function parseStatedDate(text: string | null | undefined, minYear: number, maxYear: number): string | null {
+  const validYear = (y: number) => y >= minYear && y <= maxYear;
   const s = (text ?? "").trim().replace(/\s+/g, " ");
   if (!s) return null;
   let m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);

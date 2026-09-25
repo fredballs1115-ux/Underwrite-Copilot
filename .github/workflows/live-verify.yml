@@ -992,6 +992,9 @@ jobs:
           # #420 — the pipeline's pictures on a phone (signed-in): its
           # changelog card.
           mark "#420 the pipeline is pictured on a phone" grep -q "Your pipeline, pictured on a phone" p_whats-new.html
+          # #421 — a leasehold valued on its term (signed-in): its changelog
+          # card.
+          mark "#421 a leasehold is valued on its term" grep -q "A leasehold, valued on the years its lease has left" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

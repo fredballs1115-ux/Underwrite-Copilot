@@ -43,6 +43,7 @@ import type { ExtractionResult, InterestKind } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
 import { parsePageNumber } from "@/lib/facts";
 import { parseUsd } from "@/lib/money";
+import { groundLeaseTermLine, readGroundLeaseTerm, type GroundLeaseTerm } from "@/lib/ground-lease-term";
 import { readNote, readNoteTerms, type NoteRead } from "@/lib/note-yield";
 
 export type { InterestKind };
@@ -143,6 +144,12 @@ export interface InterestRead {
   /** what the property model on this deal is and is not, for the surfaces
    *  that draw one — null where it is simply the buyer's model */
   modelCaveat: string | null;
+  /** when the ground lease ends, as the memorandum states it (#421,
+   *  lib/ground-lease-term) — null where no ground lease is involved or its
+   *  end is not stated */
+  term: GroundLeaseTerm | null;
+  /** that term in one sentence ("" where there is none) */
+  termLine: string;
 }
 
 // Rounded on the tenths, never a float's toFixed.
@@ -295,6 +302,10 @@ export function readInterest(
   const loan = (it.loan ?? "").trim();
   const groundRentCoverage =
     groundRent != null && incomeBeforeGroundRent != null ? incomeBeforeGroundRent / groundRent : null;
+  // When the ground lease ends (#421): on either side of it, and on a fee
+  // simple with one under part of the site — only as the memorandum states.
+  const term =
+    kind === "leasehold" || kind === "leased_fee" || groundLease ? readGroundLeaseTerm(ex, asOf) : null;
   // "the building's $6.0M of income covers the $1.2M ground rent 5.0×" —
   // two stated figures, one division.
   const coverageClause =
@@ -367,13 +378,19 @@ export function readInterest(
     headline: [headline, noteYieldSentence(note), noteCollateralSentence(note)].filter(Boolean).join(" "),
     lead: headline,
     modelCaveat,
+    term,
+    termLine: term ? groundLeaseTermLine(term) : "",
   };
 }
 
 /** The deal context's line: what is being sold, for every step that reads
  *  the OM after the extraction. */
 export function interestContextLine(r: InterestRead): string {
-  const facts = [r.groundLease ? `The ground lease as stated: ${r.groundLease}.` : "", r.loan ? `The loan as stated: ${r.loan}.` : ""]
+  const facts = [
+    r.groundLease ? `The ground lease as stated: ${r.groundLease}.` : "",
+    r.termLine ? `${r.termLine}.` : "",
+    r.loan ? `The loan as stated: ${r.loan}.` : "",
+  ]
     .filter(Boolean)
     .join(" ");
   return `What is being sold: ${r.label.toLowerCase()}. ${r.headline}${facts ? ` ${facts}` : ""}`;

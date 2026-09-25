@@ -10,6 +10,7 @@ import { InterestPanel } from "@/app/interest-panel";
 import { withArticle } from "@/lib/article";
 import { interestTag, readInterest } from "@/lib/interest";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
+import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { readPortfolio } from "@/lib/portfolio";
 import { PICTURE_CREDIT, ensureDealPicture } from "@/lib/deal-picture";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -522,6 +523,10 @@ export default async function DealPage({
   const assumable = assumableRead
     ? assumableView(assumableRead, derived?.sources.allInRatePct?.note ?? null, !!derived?.meta.rateSeed)
     : null;
+  // A leasehold's exit, valued on the term its ground lease has left at the
+  // model's sale (#421) — only where the memorandum states when it ends.
+  const leaseholdRead = extraction ? readLeaseholdExit(extraction, derived?.inputs ?? null) : null;
+  const leaseholdExit = leaseholdRead ? leaseholdExitView(leaseholdRead) : null;
   const rateSeeds: DealRateSeeds = {
     permanent: derived?.meta.rateSeed ?? null,
     construction: constructionSeed(debt),
@@ -1106,6 +1111,7 @@ export default async function DealPage({
         marketSince={marketSince}
         modelVsMarket={modelRead}
         assumable={assumable}
+        leaseholdExit={leaseholdExit}
         metroDemand={
           reads && liveMarket
             ? metroDemand(reads.rates, extraction?.assetClass || (deal.asset_class as string | null) || null)

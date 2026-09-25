@@ -29,11 +29,13 @@ import type { InternalComp } from "@/lib/internal-comps";
 import { DebtSizer } from "./debt-sizer";
 import { ModelVsMarketCard } from "./model-vs-market-card";
 import { AssumableLoanCard } from "./assumable-card";
+import { LeaseholdExitCard } from "./leasehold-exit-card";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { DealRateSeeds } from "@/lib/debt-index";
 import type { BriefDelta } from "@/lib/brief-delta";
 import type { ModelVsMarket } from "@/lib/model-vs-market";
 import type { AssumableView } from "@/lib/assumable-debt";
+import type { LeaseholdExitView } from "@/lib/leasehold-exit";
 import type { MetroDemand } from "@/lib/metro-demand";
 import { DecisionLog } from "./decision-log";
 import { SampleGuide } from "./sample-guide";
@@ -325,6 +327,7 @@ export function DealView({
   modelVsMarket = null,
   metroDemand = null,
   assumable = null,
+  leaseholdExit = null,
 }: {
   dealId: string;
   dealName: string;
@@ -349,6 +352,10 @@ export function DealView({
    *  new loan (lib/assumable-debt, #417) — plain data; null where the
    *  memorandum offers none */
   assumable?: AssumableView | null;
+  /** a leasehold's exit valued on the term its ground lease has left at
+   *  the model's sale (lib/leasehold-exit, #421) — plain data; null unless
+   *  a leasehold states when its lease ends */
+  leaseholdExit?: LeaseholdExitView | null;
   /** the metro area's payrolls by sector today, with this building's
    *  sector marked (lib/metro-demand); null outside the covered markets */
   metroDemand?: MetroDemand | null;
@@ -813,6 +820,7 @@ export function DealView({
             rateSeeds={rateSeeds}
             modelVsMarket={modelVsMarket}
             assumable={assumable}
+            leaseholdExit={leaseholdExit}
           />
         )}
 
@@ -902,6 +910,7 @@ function FinancialsPanel({
   rateSeeds = null,
   modelVsMarket = null,
   assumable = null,
+  leaseholdExit = null,
 }: {
   results: Results;
   active: boolean;
@@ -918,6 +927,7 @@ function FinancialsPanel({
   rateSeeds?: DealRateSeeds | null;
   modelVsMarket?: ModelVsMarket | null;
   assumable?: AssumableView | null;
+  leaseholdExit?: LeaseholdExitView | null;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -947,6 +957,11 @@ function FinancialsPanel({
           its rate against the model's new loan, the coverage it buys, and
           what it is worth (#417). Renders nothing where none is offered. */}
       <AssumableLoanCard view={assumable} />
+
+      {/* A leasehold's exit, valued on the years its ground lease has left
+          at the model's sale (#421). Renders nothing for any other interest,
+          or where the memorandum does not state when the lease ends. */}
+      <LeaseholdExitCard view={leaseholdExit} />
 
       {/* The model's four decisive assumptions against the published
           figures — the debt story, then what the growth and the exit are

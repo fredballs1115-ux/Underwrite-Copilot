@@ -227,7 +227,56 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   maturity". The report prints the note's own terms under the model's
   caveat. A note's key terms lead with the loan's rows after the price
   (`keyTermRows`' `interest`, `noteTermRows`), and a test holds the
-  prompt's labels to the reader's.
+  prompt's labels to the reader's. **A leasehold is valued on its term**
+  (#421). The extraction files when the ground lease ends as rows of its
+  own:
+  - "Ground lease expiration": the current term's end as written, never a
+    date that assumes the options are exercised;
+  - "Ground lease term remaining": only where the OM states a count
+    instead of a date;
+  - "Ground lease extension options".
+
+  `lib/ground-lease-term.ts` (pure) reads them three ways, best first:
+  - a stated date, as written (`parseStatedDate` in lib/note-yield,
+    `parseMaturity`'s reader with a year range, since a 99-year lease can
+    end after 2100);
+  - a year alone, read as its FIRST day, the earliest end the year allows;
+  - a count of years, counted from today and said to be possibly short,
+    since the memorandum's own date is earlier.
+
+  The options are read apart from the term: "four 10-year options", "4 x
+  10 years", "three successive 10-year", "to 2111". A separator is
+  required between the count and the length, so "25-year" is never two
+  of five. A term "including options" is a ceiling. A purchase option is
+  never an extension. `readInterest` carries the result as `term` and
+  `termLine`; the deal context and the challenger read it, and the panel
+  draws it (`app/lease-term-bar.tsx`, `LeaseTermBar`, pure: the years
+  left filled, the options dashed).
+
+  `lib/leasehold-exit.ts` (pure) values the model's exit on the years
+  left at its sale. The rate is the model's own exit return, its exit cap
+  plus the rate its NOI grows in the year after the sale: what a buyer
+  paying that cap for a building that never reverts earns. At it, the
+  term is worth `1 − ((1+g)/(1+c+g))^n` of the capitalised figure
+  (`termShare`; tests pin it to a year-by-year sum and to /tools'
+  `leaseholdPv`). The engine is run again at the cap that value implies,
+  so the returns on the term are the model's own. A lease that ends
+  inside the hold prices no sale. The options are the ceiling, beside
+  the term, never instead of it. The lender line asks whether a buyer's
+  10-year loan at the sale gets its `TERM_MARGIN_YEARS` margin, unless
+  the lease says it is subordinated. It is the term's arithmetic alone,
+  the generous side of the truth, and the card says so.
+
+  On the sample model as a leasehold ending Dec 2071, 40.3 years are left
+  at the sale. The term bears 87% of the $82.5M capitalised exit. That is
+  the 5.45% exit cap read as 6.23%, and the levered IRR is 6.2% against
+  11.7%.
+
+  The card is `app/(app)/deals/[id]/leasehold-exit-card.tsx` on the
+  Financials tab under the assumable card. It draws the term with the
+  hold marked (`data-bar="lease-hold"`, `lease-term`, `lease-options`,
+  `lease-past` for the hold's years past the lease's end), and the two
+  exits on one track (`lh-capitalised`, `lh-term`).
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`

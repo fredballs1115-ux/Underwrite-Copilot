@@ -3850,3 +3850,96 @@ describe("AssumableLoanCard — the rate, the coverage and what the loan is wort
     expect(gluedWords(text)).toEqual([]);
   });
 });
+
+// ── A leasehold's exit, on its term (#421) ──────────────────────────────────
+import { LeaseholdExitCard } from "@/app/(app)/deals/[id]/leasehold-exit-card";
+import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
+
+describe("LeaseholdExitCard — the term, the two exits, and the model's returns on the term", () => {
+  const AS_OF = new Date(Date.UTC(2026, 8, 25));
+  const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 12", basis: "na" as const });
+  const leasehold = (rows: ReturnType<typeof row>[], groundLease = "Ground lease through December 31, 2071; unsubordinated.") =>
+    ({
+      ...SAMPLE_DEAL.extraction,
+      totalPages: 40,
+      interest: { kind: "leasehold", summary: "The leasehold interest in the building", share: "", groundLease, loan: "", page: "p. 12" },
+      metrics: [...SAMPLE_DEAL.extraction.metrics, ...rows],
+    }) as ExtractionResult;
+  const viewOf = (rows: ReturnType<typeof row>[]) => {
+    const ex = leasehold(rows);
+    const r = readLeaseholdExit(ex, deriveForAssumable(ex, SAMPLE_DEAL.name).inputs, AS_OF);
+    return r ? leaseholdExitView(r) : null;
+  };
+
+  it("draws the term with the hold marked and the options dashed, the two exits on one track, the figures and the sentence", () => {
+    const html = render(
+      React.createElement(LeaseholdExitCard, {
+        view: viewOf([row("Ground lease expiration", "December 31, 2071"), row("Ground lease extension options", "Four 10-year options")]),
+      }),
+    );
+    dumpView("leasehold-exit", html);
+    const text = visibleText(html);
+    expect(text).toContain("The exit, on the ground lease’s term");
+    expect(text).toContain("p. 12");
+    expect(text).toContain(
+      "The ground lease ends Dec 2071, 45.3 years from today, with extension options after it as stated: four of 10 years, 40 years in all.",
+    );
+    expect(text).toContain("The model's hold, 5 years");
+    expect(text).toContain("Left at the sale, 40.3 years (to Dec 2071)");
+    expect(text).toContain("Extension options, 40 years if exercised");
+    expect(text).toMatch(/Capitalised, as the model runs it\s+\$82\.5M/);
+    expect(text).toMatch(/On the 40\.3 years left at the sale\s+\$72\.2M/);
+    expect(text).toMatch(/Left at the sale\s+40\.3 yrs\s+of 45\.3 today/);
+    expect(text).toMatch(/The term's share\s+87%/);
+    expect(text).toMatch(/Exit cap, on the term\s+6\.23%\s+the model runs 5\.45%/);
+    expect(text).toMatch(/Levered IRR, on the term\s+6\.2%\s+11\.7% as it runs/);
+    expect(text).toContain("the term bears 87% of the capitalised exit — $72.2M against $82.5M");
+    expect(text).toContain("Were every extension option exercised (four of 10 years, as stated)");
+    expect(text).toContain("It will have 40.3 years.");
+    expect(html).toContain('href="/tools#ground-lease"');
+    for (const [bar, n] of [["lease-hold", 1], ["lease-term", 1], ["lease-options", 1], ["lease-past", 0], ["lh-capitalised", 1], ["lh-term", 1]] as const) {
+      expect((html.match(new RegExp(`data-bar="${bar}"`, "g")) ?? []).length, bar).toBe(n);
+    }
+    expect(a11yIssues(html), "leasehold card").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("a lease that ends inside the hold draws the hold's years past its end in the warning tone and prices no sale", () => {
+    const html = render(React.createElement(LeaseholdExitCard, { view: viewOf([row("Ground lease expiration", "March 2029")]) }));
+    const text = visibleText(html);
+    expect(text).toContain("The model's hold, 5 years, 2.5 years of it after the lease ends");
+    expect(text).toContain("Past the lease's end");
+    expect(text).toContain("in year 3 of the model's 5-year hold: the building reverts to the landowner before the model sells it");
+    expect(html).toContain('data-bar="lease-past"');
+    expect(html).not.toContain('data-bar="lh-term"');
+    expect(html).not.toContain('data-qa="leasehold-figures"');
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("renders nothing for a leasehold whose memorandum does not say when its lease ends", () => {
+    expect(viewOf([])).toBeNull();
+    expect(render(React.createElement(LeaseholdExitCard, { view: null }))).not.toContain("The exit, on the ground lease");
+  });
+
+  it("the interest panel draws the term under its lead, with the options dashed, and says in words only what the bar cannot", () => {
+    const ex = leasehold([row("Ground lease expiration", "December 31, 2071"), row("Ground lease extension options", "Four 10-year options")]);
+    const html = render(React.createElement(InterestPanel, { interest: readInterestFor(ex, 68_000_000, AS_OF) }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="lease-term"');
+    expect((html.match(/data-bar="lease-term"/g) ?? []).length).toBe(1);
+    expect((html.match(/data-bar="lease-options"/g) ?? []).length).toBe(1);
+    expect(text).toContain("Left today, 45.3 years (to Dec 2071)");
+    expect(text).toContain("Extension options, 40 years if exercised");
+    // A stated date and options that parse: the legend says it all.
+    expect(text).not.toContain("The ground lease ends Dec 2071");
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+    // A year alone is read as its first day, which the legend cannot say.
+    const year = visibleText(
+      render(React.createElement(InterestPanel, { interest: readInterestFor(leasehold([row("Ground lease expiration", "2071")]), 68_000_000, AS_OF) })),
+    );
+    expect(year).toContain("Left today, 44.3 years (to 2071)");
+    expect(year).toContain("The ground lease ends in 2071, 44.3 years from today — the memorandum states the year alone, read as its first day.");
+  });
+});

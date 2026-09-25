@@ -386,9 +386,16 @@ before the page hydrated.
 Then #419: the assumable loan wherever the deal is summarized — the
 pipeline row's tag and CSV column, the meeting workbook's note, the memo,
 the shared screen, the workbook's cover and the report. Then #420: the
-pipeline's building pictures on a phone, where they had been hidden.
+pipeline's building pictures on a phone, where they had been hidden. Then
+#421: a leasehold valued on its term — when the ground lease ends, read
+off the memorandum, drawn in the interest panel, and the model's exit
+valued on the years left at its sale on the Financials tab.
 **Open after it**:
-a non-performing note's foreclosure path (the months and cost of taking
+the leasehold's exit on its term reaches the deal page alone — the
+report, the workbook's cover, the memo and the shared screen still carry
+only the caveat and the term line (the documents round, as #419 was for
+#417); a ground rent's own schedule (fixed bumps, a reset to a share of
+land value) is not in the model's expense line; a non-performing note's foreclosure path (the months and cost of taking
 the property, by the state's process) is still the challenger's words,
 not a figure; a leased fee runs the ground rent
 through a building's model (the caveat sends the reader to the ground
