@@ -1,0 +1,405 @@
+{
+  "size": "720x450",
+  "places": [
+    {
+      "label": "philadelphia-city-hall",
+      "lat": 39.9526,
+      "lng": -75.1652,
+      "variants": [
+        {
+          "key": "A",
+          "what": "z19 export (today)",
+          "file": "philadelphia-city-hall-A.jpg",
+          "detail": 2.25,
+          "kb": 30
+        },
+        {
+          "key": "B",
+          "what": "z18 export, a wider frame",
+          "file": "philadelphia-city-hall-B.jpg",
+          "detail": 4.3,
+          "kb": 44
+        },
+        {
+          "key": "C",
+          "what": "z19 frame from z18 grain, lanczos + sharpen",
+          "file": "philadelphia-city-hall-C.jpg",
+          "detail": 2.48,
+          "kb": 19
+        },
+        {
+          "key": "D",
+          "what": "z18, finished",
+          "file": "philadelphia-city-hall-D.jpg",
+          "detail": 5.37,
+          "kb": 33
+        },
+        {
+          "key": "E",
+          "what": "z17, finished",
+          "file": "philadelphia-city-hall-E.jpg",
+          "detail": 14.05,
+          "kb": 56
+        },
+        {
+          "key": "F",
+          "what": "z18, finished, with the marker",
+          "file": "philadelphia-city-hall-F.jpg",
+          "detail": 7.05,
+          "kb": 34
+        }
+      ],
+      "sheet": "philadelphia-city-hall-sheet.jpg"
+    },
+    {
+      "label": "nyc-empire-state",
+      "lat": 40.7484,
+      "lng": -73.9857,
+      "variants": [
+        {
+          "key": "A",
+          "what": "z19 export (today)",
+          "file": "nyc-empire-state-A.jpg",
+          "detail": 2.25,
+          "kb": 29
+        },
+        {
+          "key": "B",
+          "what": "z18 export, a wider frame",
+          "file": "nyc-empire-state-B.jpg",
+          "detail": 4.31,
+          "kb": 45
+        },
+        {
+          "key": "C",
+          "what": "z19 frame from z18 grain, lanczos + sharpen",
+          "file": "nyc-empire-state-C.jpg",
+          "detail": 2.38,
+          "kb": 17
+        },
+        {
+          "key": "D",
+          "what": "z18, finished",
+          "file": "nyc-empire-state-D.jpg",
+          "detail": 5.37,
+          "kb": 34
+        },
+        {
+          "key": "E",
+          "what": "z17, finished",
+          "file": "nyc-empire-state-E.jpg",
+          "detail": 13.25,
+          "kb": 57
+        },
+        {
+          "key": "F",
+          "what": "z18, finished, with the marker",
+          "file": "nyc-empire-state-F.jpg",
+          "detail": 6.98,
+          "kb": 34
+        }
+      ],
+      "sheet": "nyc-empire-state-sheet.jpg"
+    },
+    {
+      "label": "chicago-willis-tower",
+      "lat": 41.8789,
+      "lng": -87.6359,
+      "variants": [
+        {
+          "key": "A",
+          "what": "z19 export (today)",
+          "file": "chicago-willis-tower-A.jpg",
+          "detail": 2.05,
+          "kb": 27
+        },
+        {
+          "key": "B",
+          "what": "z18 export, a wider frame",
+          "file": "chicago-willis-tower-B.jpg",
+          "detail": 4.36,
+          "kb": 45
+        },
+        {
+          "key": "C",
+          "what": "z19 frame from z18 grain, lanczos + sharpen",
+          "file": "chicago-willis-tower-C.jpg",
+          "detail": 2.22,
+          "kb": 16
+        },
+        {
+          "key": "D",
+          "what": "z18, finished",
+          "file": "chicago-willis-tower-D.jpg",
+          "detail": 5.3,
+          "kb": 34
+        },
+        {
+          "key": "E",
+          "what": "z17, finished",
+          "file": "chicago-willis-tower-E.jpg",
+          "detail": 13.2,
+          "kb": 52
+        },
+        {
+          "key": "F",
+          "what": "z18, finished, with the marker",
+          "file": "chicago-willis-tower-F.jpg",
+          "detail": 6.99,
+          "kb": 35
+        }
+      ],
+      "sheet": "chicago-willis-tower-sheet.jpg"
+    },
+    {
+      "label": "dc-k-street",
+      "lat": 38.902,
+      "lng": -77.039,
+      "variants": [
+        {
+          "key": "A",
+          "what": "z19 export (today)",
+          "file": "dc-k-street-A.jpg",
+          "detail": 3.04,
+          "kb": 38
+        },
+        {
+          "key": "B",
+          "what": "z18 export, a wider frame",
+          "file": "dc-k-street-B.jpg",
+          "detail": 6.14,
+          "kb": 57
+        },
+        {
+          "key": "C",
+          "what": "z19 frame from z18 grain, lanczos + sharpen",
+          "file": "dc-k-street-C.jpg",
+          "detail": 3.27,
+          "kb": 25
+        },
+        {
+          "key": "D",
+          "what": "z18, finished",
+          "file": "dc-k-street-D.jpg",
+          "detail": 7.54,
+          "kb": 43
+        },
+        {
+          "key": "E",
+          "what": "z17, finished",
+          "file": "dc-k-street-E.jpg",
+          "detail": 22.45,
+          "kb": 67
+        },
+        {
+          "key": "F",
+          "what": "z18, finished, with the marker",
+          "file": "dc-k-street-F.jpg",
+          "detail": 8.73,
+          "kb": 43
+        }
+      ],
+      "sheet": "dc-k-street-sheet.jpg"
+    },
+    {
+      "label": "atlanta-perimeter",
+      "lat": 33.928,
+      "lng": -84.34,
+      "variants": [
+        {
+          "key": "A",
+          "what": "z19 export (today)",
+          "file": "atlanta-perimeter-A.jpg",
+          "detail": 2.56,
+          "kb": 34
+        },
+        {
+          "key": "B",
+          "what": "z18 export, a wider frame",
+          "file": "atlanta-perimeter-B.jpg",
+          "detail": 4.93,
+          "kb": 55
+        },
+        {
+          "key": "C",
+          "what": "z19 frame from z18 grain, lanczos + sharpen",
+          "file": "atlanta-perimeter-C.jpg",
+          "detail": 2.72,
+          "kb": 21
+        },
+        {
+          "key": "D",
+          "what": "z18, finished",
+          "file": "atlanta-perimeter-D.jpg",
+          "detail": 5.9,
+          "kb": 41
+        },
+        {
+          "key": "E",
+          "what": "z17, finished",
+          "file": "atlanta-perimeter-E.jpg",
+          "detail": 16.64,
+          "kb": 65
+        },
+        {
+          "key": "F",
+          "what": "z18, finished, with the marker",
+          "file": "atlanta-perimeter-F.jpg",
+          "detail": 7.42,
+          "kb": 42
+        }
+      ],
+      "sheet": "atlanta-perimeter-sheet.jpg"
+    },
+    {
+      "label": "dallas-uptown",
+      "lat": 32.799,
+      "lng": -96.803,
+      "variants": [
+        {
+          "key": "A",
+          "what": "z19 export (today)",
+          "file": "dallas-uptown-A.jpg",
+          "detail": 3.1,
+          "kb": 41
+        },
+        {
+          "key": "B",
+          "what": "z18 export, a wider frame",
+          "file": "dallas-uptown-B.jpg",
+          "detail": 5.74,
+          "kb": 59
+        },
+        {
+          "key": "C",
+          "what": "z19 frame from z18 grain, lanczos + sharpen",
+          "file": "dallas-uptown-C.jpg",
+          "detail": 3.45,
+          "kb": 26
+        },
+        {
+          "key": "D",
+          "what": "z18, finished",
+          "file": "dallas-uptown-D.jpg",
+          "detail": 7.07,
+          "kb": 45
+        },
+        {
+          "key": "E",
+          "what": "z17, finished",
+          "file": "dallas-uptown-E.jpg",
+          "detail": 20.11,
+          "kb": 71
+        },
+        {
+          "key": "F",
+          "what": "z18, finished, with the marker",
+          "file": "dallas-uptown-F.jpg",
+          "detail": 8.33,
+          "kb": 45
+        }
+      ],
+      "sheet": "dallas-uptown-sheet.jpg"
+    },
+    {
+      "label": "scottsdale",
+      "lat": 33.495,
+      "lng": -111.926,
+      "variants": [
+        {
+          "key": "A",
+          "what": "z19 export (today)",
+          "file": "scottsdale-A.jpg",
+          "detail": 2.68,
+          "kb": 35
+        },
+        {
+          "key": "B",
+          "what": "z18 export, a wider frame",
+          "file": "scottsdale-B.jpg",
+          "detail": 4.77,
+          "kb": 52
+        },
+        {
+          "key": "C",
+          "what": "z19 frame from z18 grain, lanczos + sharpen",
+          "file": "scottsdale-C.jpg",
+          "detail": 2.91,
+          "kb": 22
+        },
+        {
+          "key": "D",
+          "what": "z18, finished",
+          "file": "scottsdale-D.jpg",
+          "detail": 5.91,
+          "kb": 39
+        },
+        {
+          "key": "E",
+          "what": "z17, finished",
+          "file": "scottsdale-E.jpg",
+          "detail": 15.29,
+          "kb": 62
+        },
+        {
+          "key": "F",
+          "what": "z18, finished, with the marker",
+          "file": "scottsdale-F.jpg",
+          "detail": 7.39,
+          "kb": 39
+        }
+      ],
+      "sheet": "scottsdale-sheet.jpg"
+    },
+    {
+      "label": "denver-downtown",
+      "lat": 39.742,
+      "lng": -104.991,
+      "variants": [
+        {
+          "key": "A",
+          "what": "z19 export (today)",
+          "file": "denver-downtown-A.jpg",
+          "detail": 2.69,
+          "kb": 34
+        },
+        {
+          "key": "B",
+          "what": "z18 export, a wider frame",
+          "file": "denver-downtown-B.jpg",
+          "detail": 5.08,
+          "kb": 51
+        },
+        {
+          "key": "C",
+          "what": "z19 frame from z18 grain, lanczos + sharpen",
+          "file": "denver-downtown-C.jpg",
+          "detail": 2.88,
+          "kb": 21
+        },
+        {
+          "key": "D",
+          "what": "z18, finished",
+          "file": "denver-downtown-D.jpg",
+          "detail": 6.32,
+          "kb": 39
+        },
+        {
+          "key": "E",
+          "what": "z17, finished",
+          "file": "denver-downtown-E.jpg",
+          "detail": 15.16,
+          "kb": 62
+        },
+        {
+          "key": "F",
+          "what": "z18, finished, with the marker",
+          "file": "denver-downtown-F.jpg",
+          "detail": 7.75,
+          "kb": 40
+        }
+      ],
+      "sheet": "denver-downtown-sheet.jpg"
+    }
+  ]
+}
