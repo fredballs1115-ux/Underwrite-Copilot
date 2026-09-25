@@ -346,6 +346,47 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     expect(gluedWords(text)).toEqual([]);
     expect((html.match(/<li /g) ?? []).length).toBe(pictured.length);
   });
+
+  it("reads a note's and a share's price for what it buys (#423): the note's yield, the share's cap on the whole, returns withheld", () => {
+    const cols: Col[] = [
+      COLS[0],
+      col({
+        id: "n",
+        name: "Harbor Point note",
+        price: "$20,000,000",
+        interest: "Note",
+        noteYtm: 13.8,
+        withheld: "note",
+        noi: "$1,900,000",
+      }),
+      col({
+        id: "s",
+        name: "Harbor View Apartments",
+        price: "$20,000,000",
+        interest: "49% share",
+        withheld: "share",
+        cap: 4.66,
+        leverage: leverageRead(4.66, 6.2),
+        capOverTenYear: capSpreadRead(4.66, 4.94),
+        noi: "$1,900,000",
+      }),
+    ];
+    const html = renderToStaticMarkup(React.createElement(CompareTable, { cols }));
+    const text = visibleText(html);
+    // The note: no cap — its yield to maturity where the cap would sit —
+    // and its model's returns withheld with the reason, in every return row.
+    expect(text).toContain("13.8% to maturity");
+    expect((text.match(/n\/a — note/g) ?? []).length).toBeGreaterThanOrEqual(5);
+    // The share: its cap on the whole its price implies, and the returns
+    // the share's price did not buy withheld.
+    expect(text).toContain("4.7%");
+    expect((text.match(/n\/a — share/g) ?? []).length).toBeGreaterThanOrEqual(3);
+    // What each price buys, beside it.
+    expect(text).toContain("$20,000,000 · Note");
+    expect(text).toContain("$20,000,000 · 49% share");
+    expect(a11yIssues(html), "a11y compare interests").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
 });
 
 // ── The bridge and the BOV reconciler ──────────────────────────────────────

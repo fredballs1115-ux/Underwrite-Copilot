@@ -998,6 +998,9 @@ jobs:
           # #422 — the lease's term wherever a leasehold is summarized
           # (signed-in surfaces and documents): its changelog card.
           mark "#422 a leasehold's term is on every summary" grep -q "on every summary of a leasehold" p_whats-new.html
+          # #423 — the compare table reads each price for what it buys
+          # (signed-in): its changelog card.
+          mark "#423 compare reads each price for what it buys" grep -q "Compare reads each price for what it buys" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then
