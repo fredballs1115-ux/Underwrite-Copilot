@@ -3,6 +3,66 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
+## 🟢 2026-09-25 — being found, and the site's own address (#430)
+
+The site is already public: anyone can open
+**https://underwrite-copilot.onrender.com** today. What was missing was
+being FOUND.
+
+Each page now tells a search engine what it is:
+- Every market and sector page has its own title, description and
+  canonical address. Forty-odd pages used to go out under one bare
+  "Market data".
+- The sitemap lists all of them.
+- The homepage's structured data names the organisation and the site.
+- The site serves an IndexNow key, and `indexnow.yml` hands the whole
+  sitemap to Bing, and through it DuckDuckGo and Yahoo, every Monday.
+  That needs no account.
+
+Google needs you, once:
+
+1. **Google Search Console** (free, about five minutes):
+   - Go to search.google.com/search-console and add a **URL-prefix**
+     property for `https://underwrite-copilot.onrender.com`.
+   - Choose **HTML tag** verification and copy only the `content="…"`
+     value.
+   - On Render, open `underwrite-copilot-web` → Environment, add
+     `GOOGLE_SITE_VERIFICATION` with that value, and save. That redeploys.
+   - Back in Search Console, click **Verify**.
+   - Under **Sitemaps**, submit `sitemap.xml`.
+   - Use **URL Inspection → Request indexing** on `/` and `/market`.
+2. **Bing Webmaster Tools** (bing.com/webmasters): **Import from Google
+   Search Console** is one click once step 1 is done. Or use its meta tag
+   through `BING_SITE_VERIFICATION`, the same way.
+
+**Your own domain is a purchase, so it is your move; I bought nothing.**
+Registry lookups from the GitHub runner on 2026-09-25 (RDAP, Verisign for
+.com) found **underwritecopilot.com** unregistered, and
+underwrite-copilot.com, underwritecopilot.ai and underwritecopilot.app with
+it. A .com is about $10–15 a year at Cloudflare Registrar, Porkbun or
+Namecheap. Once you own one, do these steps in this order:
+
+1. **Render**: `underwrite-copilot-web` → Settings → **Custom Domains**.
+   Add `underwritecopilot.com` and `www.underwritecopilot.com`, then create
+   the DNS records Render shows at your registrar. Render issues the
+   certificate itself; wait until it says so.
+2. Set **`NEXT_PUBLIC_APP_URL=https://underwritecopilot.com`** on the web
+   service AND the worker (render.yaml says to keep them identical), then
+   redeploy both. The canonical links, the sitemap, the email links and
+   Stripe's return URLs all follow it.
+3. **Supabase** → Authentication → URL Configuration:
+   - set the Site URL to the new domain;
+   - add `https://underwritecopilot.com/**` to the redirect URLs, and keep
+     the onrender one while the move settles.
+4. **Stripe** can keep its webhook on the onrender address, since `/api`
+   is never redirected. Move it later if you like.
+5. **Last**: set **`CANONICAL_HOST=underwritecopilot.com`** on the web
+   service. From then on a page asked for at the onrender address is sent
+   to the domain with a permanent redirect. `/api` and `/auth` never move,
+   so a webhook and an email sign-in link keep working.
+6. **Search Console**: add the new domain as a property, then use
+   **Change of Address** from the old one.
+
 ## 🟢 2026-09-21 — every market figure on the site is today's (#362)
 
 The rates strip on `/tools` and `/market` carried four FRED figures. It now

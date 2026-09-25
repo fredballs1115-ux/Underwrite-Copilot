@@ -53,6 +53,13 @@ export const metadata: Metadata = {
       "Every CRE deal through the same disciplined screen — sourced ranges, deal-killers first, a Go / No-go that shows its work. One method, every deal.",
   },
   robots: { index: true, follow: true },
+  // Search Console and Bing Webmaster Tools prove ownership with a meta tag
+  // (#430): the operator pastes each tool's token into the service's
+  // environment and redeploys. Nothing renders until a token is set.
+  verification: {
+    ...(process.env.GOOGLE_SITE_VERIFICATION ? { google: process.env.GOOGLE_SITE_VERIFICATION } : {}),
+    ...(process.env.BING_SITE_VERIFICATION ? { other: { "msvalidate.01": process.env.BING_SITE_VERIFICATION } } : {}),
+  },
 };
 
 // Baked into every rendered page: the sha of the build that produced THIS

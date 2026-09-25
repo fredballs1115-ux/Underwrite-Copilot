@@ -35,6 +35,18 @@ services:
         sync: false
       - key: NEXT_PUBLIC_APP_URL
         sync: false
+      # Being found (#430), each optional and inert until set:
+      # Search Console's and Bing Webmaster Tools' HTML-tag tokens (the
+      # meta tags render only once a token is here), and the site's own
+      # domain — set LAST, once the domain resolves to this service, and
+      # every page request at another host is sent there with a 308
+      # (lib/canonical-host; /api and /auth never move).
+      - key: GOOGLE_SITE_VERIFICATION
+        sync: false
+      - key: BING_SITE_VERIFICATION
+        sync: false
+      - key: CANONICAL_HOST
+        sync: false
       # Stripe billing — set in the dashboard (see .env.example for how to get each).
       # All FIVE price/secret vars belong here: the webhook checks every
       # incoming subscription's price ids against them and ALERTS instead of

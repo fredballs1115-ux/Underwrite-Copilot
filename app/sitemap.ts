@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { marketPages, marketPath, sectorPages, sectorPath } from "@/lib/public-pages";
 
 // Generated at /sitemap.xml. Only the public, indexable pages belong here —
 // the app itself sits behind auth and is disallowed in robots.txt.
@@ -73,5 +74,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "yearly",
       priority: 0.3,
     },
+    // Each market's own page and each sector's (#430): the figures move
+    // weekly, and each is a page someone searching for that market's
+    // rents or vacancy should land on.
+    ...marketPages().map((m) => ({
+      url: `${APP_URL}${marketPath(m.id)}`,
+      lastModified: now,
+      changeFrequency: "weekly" as const,
+      priority: m.briefed ? 0.6 : 0.5,
+    })),
+    ...sectorPages().map((s) => ({
+      url: `${APP_URL}${sectorPath(s.id)}`,
+      lastModified: now,
+      changeFrequency: "weekly" as const,
+      priority: 0.5,
+    })),
   ];
 }

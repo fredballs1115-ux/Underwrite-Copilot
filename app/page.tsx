@@ -321,12 +321,33 @@ const FAQ: { q: string; a: string }[] = [
 ];
 
 // Structured data so search engines understand the product and pricing.
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://underwrite-copilot.onrender.com";
+
 const JSON_LD = {
   "@context": "https://schema.org",
   "@graph": [
+    // Who publishes the site and what the site is (#430), so a search
+    // engine can name it in results and tie the app to its maker.
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: "Underwrite Copilot",
+      url: SITE_URL,
+      logo: `${SITE_URL}/icon`,
+      email: "underwritecopilot.support@gmail.com",
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      name: "Underwrite Copilot",
+      url: SITE_URL,
+      publisher: { "@id": `${SITE_URL}/#organization` },
+    },
     {
       "@type": "SoftwareApplication",
       name: "Underwrite Copilot",
+      url: SITE_URL,
+      publisher: { "@id": `${SITE_URL}/#organization` },
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web",
       description:
@@ -485,7 +506,9 @@ export default function Home() {
     <div className="flex flex-1 flex-col">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
+        // `<` escaped, as Next's own guide does, so no string inside can
+        // close the script tag.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD).replace(/</g, "\\u003c") }}
       />
       {/* Hairline reading-progress bar over everything (accent, so it reads
           on the dark hero and the light body alike). */}
