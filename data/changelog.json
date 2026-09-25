@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-25",
+      "title": "A leasehold, valued on the years its lease has left",
+      "href": "/deals",
+      "blurb": "When the building sits on leased land, the land comes back to its owner when the lease ends, so the building is worth only the years left. The screen now reads when the ground lease ends and any extension options, and draws the term. The Financials tab marks the model's hold on it and values the sale on the years left at that point, not as if the building were owned outright forever. It then runs the model at that sale price and shows the return. A lease that ends before the model's sale is flagged, and so is one too short for the next buyer to finance."
+    },
+    {
+      "date": "2026-09-25",
       "title": "Your pipeline, pictured on a phone",
       "href": "/deals",
       "blurb": "On a phone, the pipeline used to hide every building's picture, so the list read as names and figures only. Each row now opens on the building's picture at every screen width: the photograph from its memorandum, a street-level photograph or an aerial of the site. On a phone the picture is larger, and the call (go, caution, no-go) now leads the price line, so a deal's full name still fits beside the picture. A deal with no address and no photograph keeps a blank plate, so the names still line up."

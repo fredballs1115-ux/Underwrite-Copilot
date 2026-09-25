@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { LeaseTermBar } from "@/app/lease-term-bar";
+import { termEndLabel } from "@/lib/ground-lease-term";
 import { noteCaption, noteYieldSentence, type InterestRead } from "@/lib/interest";
 
 /**
@@ -22,6 +24,11 @@ import { noteCaption, noteYieldSentence, type InterestRead } from "@/lib/interes
  * at each, and the empty remainder the cushion. A note that is not paying,
  * or is past its maturity, keeps its sentence: a large yield there is one
  * nobody earns.
+ *
+ * A ground lease's term is drawn under the lead where the memorandum states
+ * when it ends (#421): the years left today, and the extension options
+ * after them dashed — the one fact that decides what a leasehold is worth,
+ * and what a leased fee's reversion waits on.
  */
 // Rounded on the tenths, never a float's toFixed.
 const money = (n: number) =>
@@ -98,6 +105,13 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
               right: `The building's income before it ${money(r.incomeBeforeGroundRent)} · covered ${times(r.groundRentCoverage)}`,
             }
           : null;
+  // The bar's legend says a stated date's term and parsed options whole;
+  // the sentence is kept for what it cannot say — a year read as its first
+  // day, a count from today, a term that already counts its options,
+  // options that did not parse, an end that has passed.
+  const t = r.term;
+  const termNeedsWords =
+    !!t && (t.from !== "date" || t.includesOptions || (!!t.optionsStated && !t.options) || t.yearsLeft <= 0);
   // The ground lease calculator values either side of the lease: the
   // building on its term, or the land and its rent.
   const groundLeaseLink =
@@ -118,6 +132,12 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
       </p>
       <p className="mt-1 text-sm leading-relaxed">{text}</p>
+      {r.term && r.termLine && (
+        <div className="mt-2.5">
+          <LeaseTermBar yearsLeft={r.term.yearsLeft} endLabel={termEndLabel(r.term)} optionYears={r.term.options?.years ?? null} />
+          {termNeedsWords && <p className="mt-1 text-[11px] leading-snug text-muted">{`${r.termLine}.`}</p>}
+        </div>
+      )}
       {tiles.length > 0 && (
         <div className="mt-2.5" data-qa="note-figures">
           <dl className="grid grid-cols-3 gap-1.5">
