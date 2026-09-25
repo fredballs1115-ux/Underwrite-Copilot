@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { assetClassLabel } from "@/lib/asset-class";
+import type { BannerSource } from "@/lib/deal-banner";
+import { DealBanner } from "../deal-banner";
 import type { CapSpreadRead, LeverageRead } from "@/lib/leverage";
 
 export const VERDICT_PILL: Record<string, { label: string; cls: string }> = {
@@ -51,6 +53,9 @@ export type Col = {
   capOverTenYear?: CapSpreadRead | null;
   price: string | null;
   noi: string | null;
+  /** the building's pictures to try, best first, each with its own credit
+   *  (lib/deal-banner, #418) — absent where the caller draws none */
+  pictures?: BannerSource[];
 };
 
 const FIT_LABEL: Record<NonNullable<Col["fit"]>, { text: string; cls: string }> = {
@@ -256,6 +261,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
           const p = c.verdict ? VERDICT_PILL[c.verdict] : null;
           return (
             <li key={c.id} className="rounded-2xl border border-line bg-surface p-4 shadow-card">
+              {c.pictures && <DealBanner sources={c.pictures} label={c.name} className="mb-3" />}
               <div className="flex items-start justify-between gap-3">
                 <Link href={`/deals/${c.id}`} className="font-medium text-ink hover:text-brand">
                   {c.name}
@@ -320,6 +326,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                     key={c.id}
                     className="border-b border-l border-line p-4 text-left align-top"
                   >
+                    {c.pictures && (
+                      <DealBanner sources={c.pictures} label={c.name} className="mb-3 w-full max-w-[16rem]" />
+                    )}
                     <Link
                       href={`/deals/${c.id}`}
                       className="font-medium text-ink hover:text-brand"

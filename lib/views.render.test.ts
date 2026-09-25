@@ -46,6 +46,7 @@ vi.mock("../app/(app)/deals/actions", () => {
 import { Pipeline, type DealCard } from "@/app/(app)/deals/pipeline";
 import { ModelView } from "@/app/(app)/deals/[id]/model-view";
 import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table";
+import { bannerSources } from "@/lib/deal-banner";
 import { ToastProvider } from "@/app/(app)/toaster";
 import { ScoredFeedView, type AlertRow, type ItemRow } from "@/app/(app)/news/scored-feed";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
@@ -301,6 +302,32 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     const single = renderToStaticMarkup(React.createElement(CompareTable, { cols: [COLS[0]] }));
     expect(single).not.toContain("data-spread-bar");
     expect(single).not.toContain("data-signed-bar");
+  });
+
+  it("pictures each building at the head of its column and its phone card, the credit on the picture (#418)", () => {
+    const pictured = [
+      { ...COLS[0], pictures: bannerSources({ dealId: "a", pictureCredit: "From the offering memorandum", googleEnabled: false, hasStreetAddress: true, hasAddress: true }) },
+      { ...COLS[1], pictures: bannerSources({ dealId: "b", pictureCredit: null, googleEnabled: false, hasStreetAddress: true, hasAddress: true }) },
+      // No address and no photograph: a blank plate holds the slot.
+      { ...COLS[2], pictures: bannerSources({ dealId: "c", pictureCredit: null, googleEnabled: false, hasStreetAddress: false, hasAddress: false }) },
+      COLS[3],
+    ];
+    const html = renderToStaticMarkup(React.createElement(CompareTable, { cols: pictured }));
+    dumpView("compare-pictured", html);
+    // Once in the table and once in the phone cards: two photographs, two
+    // aerials, two blank plates; the fourth column draws none.
+    expect((html.match(/data-deal-banner="photo"/g) ?? []).length).toBe(2);
+    expect((html.match(/data-deal-banner="aerial"/g) ?? []).length).toBe(2);
+    expect((html.match(/data-deal-banner="blank"/g) ?? []).length).toBe(2);
+    expect(html).toContain('src="/api/deals/a/picture?size=hero"');
+    expect(html).toContain('alt="Photograph of The Maddox at Brewerytown"');
+    expect(html).toContain('alt="Aerial photograph of 1400 Market — office to residential"');
+    const text = visibleText(html);
+    expect(text).toContain("From the offering memorandum");
+    expect(text).toContain("Imagery: USGS The National Map");
+    expect(a11yIssues(html), "a11y compare pictured").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+    expect((html.match(/<li /g) ?? []).length).toBe(pictured.length);
   });
 });
 
