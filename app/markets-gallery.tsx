@@ -3,7 +3,7 @@ import metrosSeed from "@/data/research/metros.json";
 import { METRO_VIEWS } from "@/lib/metro-imagery";
 import { MARKET_COUNT, metroFact } from "./markets-marquee";
 import { CityPhoto } from "./city-photo";
-import { galleryCredit, hasSkyline } from "@/lib/skyline";
+import { OVERHEAD_GRID_CREDIT, galleryCredit, hasSkyline } from "@/lib/skyline";
 
 // Server-component module only: it pulls a research seed JSON, which must
 // never ride into a client bundle.
@@ -96,12 +96,7 @@ export function MarketsGallery() {
           only while some market still shows its overhead frame. */}
       <p className="mt-4 text-[11px] leading-relaxed text-muted">
         {credit ? <>{credit} </> : null}
-        {anyOverhead ? (
-          <>
-            Overhead frames: USGS The National Map (public domain), each centred
-            on that market&apos;s business district.
-          </>
-        ) : null}
+        {anyOverhead ? OVERHEAD_GRID_CREDIT : null}
       </p>
     </section>
   );

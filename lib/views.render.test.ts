@@ -743,6 +743,69 @@ describe("DualAxisTrend — a submarket's vacancy bars and rent line render", ()
   });
 });
 
+// ── A submarket, opened on its metro's photograph (#424) ────────────────────
+import { SubmarketCards } from "@/app/market/submarket-cards";
+import { MarketBand } from "@/app/place-band";
+import { EMPTY_RULES, type Submarket } from "@/lib/market/types";
+import { galleryCredit } from "@/lib/skyline";
+
+describe("SubmarketCards and the submarket's band — the metro its owner typed, pictured only where the text says which (#424)", () => {
+  const sub = (over: Partial<Submarket> & Pick<Submarket, "id" | "name">): Submarket => ({
+    userId: "u",
+    metro: null,
+    assetClass: "industrial",
+    exclusionRules: EMPTY_RULES,
+    supplyWarningMonths: 24,
+    notes: null,
+    createdAt: "2026-09-01T12:00:00Z",
+    ...over,
+  });
+  const SUBS: Submarket[] = [
+    sub({ id: "s1", name: "I-95 Corridor", metro: "Richmond, VA", exclusionRules: { ...EMPTY_RULES, subtypes: ["Data Center"] } }),
+    sub({ id: "s2", name: "Rosslyn-Ballston", metro: "Arlington, VA", assetClass: "office" }),
+    // A bare city is more than one place: no picture, the card as before.
+    sub({ id: "s3", name: "Harbor East", metro: "Portland" }),
+    sub({ id: "s4", name: "Airport flex", metro: null }),
+  ];
+
+  it("pictures each card whose metro names a market, wears the market's name on the strip, and owes one credit line under the grid", () => {
+    const html = render(React.createElement(SubmarketCards, { submarkets: SUBS }));
+    dumpView("submarket-cards", html);
+    expect(a11yIssues(html), "a11y submarket-cards").toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    // Two of the four name a market; the other two keep the plain card.
+    expect(html.match(/data-picture="submarket"/g)?.length).toBe(2);
+    expect(text).toContain("Richmond VA");
+    expect(text).toContain("Northern Virginia");
+    for (const s of SUBS) expect(html).toContain(`href="/submarkets/${s.id}"`);
+    expect(text).toContain("Excludes: Data Center");
+    // The one credit line names the photographers of the pictures shown.
+    const credit = galleryCredit(["richmond", "nova"]);
+    expect(credit).not.toBe("");
+    expect(text).toContain(credit);
+
+    // No market named, no picture and no credit owed.
+    const plain = render(React.createElement(SubmarketCards, { submarkets: SUBS.slice(2) }));
+    expect(plain).not.toContain('data-picture="submarket"');
+    expect(visibleText(plain)).not.toContain("Skyline photographs");
+  });
+
+  it("opens the submarket's page on the band with the submarket's name as the page's heading", () => {
+    const html = render(
+      React.createElement(MarketBand, { metro: "richmond", eyebrow: "Richmond VA", name: "I-95 Corridor", as: "h1" }),
+    );
+    dumpView("submarket-band", html);
+    expect(a11yIssues(html), "a11y submarket band").toEqual([]);
+    expect(html).toMatch(/<h1[^>]*>I-95 Corridor<\/h1>/);
+    expect(html).not.toContain("<h3");
+    expect(visibleText(html)).toContain("Richmond VA");
+    // The market pages keep their section heading.
+    const section = render(React.createElement(MarketBand, { metro: "richmond", eyebrow: "Mid-Atlantic", name: "Richmond VA" }));
+    expect(section).toMatch(/<h3[^>]*>Richmond VA<\/h3>/);
+  });
+});
+
 // ── The shared screen (the one signed-out surface) ─────────────────────────
 import { Expired, ShareView } from "@/app/share/[token]/share-view";
 import type { ExtractionResult, VerdictResult } from "@/lib/anthropic/types";

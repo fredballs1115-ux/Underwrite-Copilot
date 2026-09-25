@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-25",
+      "title": "Your submarkets, pictured",
+      "href": "/market#submarkets",
+      "blurb": "A submarket you build from your own market exports now opens on a photograph of its metro, and links to that metro's page of published figures. Each card in Your submarkets on Market data shows the same picture. A picture appears only where the metro you typed says which market it is: the site's own name for it (Northern Virginia, Pittsburgh PA) or a city with its state (Arlington, VA). A bare city like Portland is more than one place, so it keeps the plain header. Also fixed: an address written as \"Charleston West Virginia\" was read as Virginia."
+    },
+    {
+      "date": "2026-09-25",
       "title": "Compare reads each price for what it buys",
       "href": "/deals/compare",
       "blurb": "The compare page set a note's price or a share's price against the whole building's income, as if it had bought the building. Now a note shows its yield to maturity where a building shows its cap, and a share's cap is taken on the whole building's price. Returns the price did not buy are marked \"n/a\" with the reason. The price row says what each price buys: a note, a 49% share, or a leasehold and its years left."

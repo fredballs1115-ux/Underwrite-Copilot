@@ -186,29 +186,37 @@ export function PlaceBand({
 }
 
 /**
- * A market's own band on /market: its photograph, an eyebrow and its name.
+ * A market's own band: its photograph, an eyebrow and a name.
  *
- * One component for the briefed markets and the ones read without a brief,
- * so the two cannot drift. 15rem on a phone and 21rem from `sm` — the card
- * band was 13rem / 16rem, which `PlaceBand`'s own measure calls a texture —
- * under the "caption" scrim, which is anchored to these words in pixels and
- * leaves the rest of the band to the photograph.
+ * One component for the briefed markets and the ones read without a brief
+ * on /market, and for a submarket's own page, which opens on its metro's
+ * photograph with the submarket's name as the page's heading — so none of
+ * them can drift. 15rem on a phone and 21rem from `sm` — the card band was
+ * 13rem / 16rem, which `PlaceBand`'s own measure calls a texture — under the
+ * "caption" scrim, which is anchored to these words in pixels and leaves the
+ * rest of the band to the photograph.
  */
 export function MarketBand({
   metro,
   eyebrow,
   name,
+  as: Heading = "h3",
 }: {
   metro: string;
   eyebrow: string;
   name: string;
+  /** the name's heading level: a section of /market, or a page's own title */
+  as?: "h1" | "h3";
 }) {
   return (
     <div className="band-dark relative flex min-h-[15rem] items-end overflow-hidden rounded-2xl text-white sm:min-h-[21rem]">
       <PlaceBackdrop metro={metro} height={480} scrim="caption" />
       <div className="on-photo band-words relative w-full px-5 pb-6 pt-10 sm:px-6 sm:pb-7 sm:pt-12">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-accent">{eyebrow}</p>
-        <h3 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">{name}</h3>
+        {/* Two lines at most: the scrim is measured to the top of a name
+            wrapped to two lines on a phone, and a submarket's name is
+            whatever its owner typed. The whole name stays in the text. */}
+        <Heading className="mt-1 line-clamp-2 text-2xl font-semibold tracking-tight sm:text-3xl">{name}</Heading>
       </div>
     </div>
   );

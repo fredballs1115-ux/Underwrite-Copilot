@@ -141,3 +141,58 @@ describe("dataMetroForAddress — the metro areas the site reads but does not br
     expect(isDataMetro(null)).toBe(false);
   });
 });
+
+// ── A place typed as a name: a submarket's metro ────────────────────────────
+import { metroForName } from "./market-match";
+
+describe("metroForName — the market a typed metro names, only where the text says which", () => {
+  it("reads the site's own name for a market, whole, however it is cased or punctuated", () => {
+    expect(metroForName("Northern Virginia")?.id).toBe("nova");
+    expect(metroForName("Boston")?.id).toBe("boston");
+    expect(metroForName("dallas-fort worth")?.id).toBe("dallas");
+    expect(metroForName("Dallas Fort Worth")?.id).toBe("dallas");
+    expect(metroForName("Prince George's County MD")?.id).toBe("pg_county");
+    expect(metroForName("Minneapolis-St. Paul")?.id).toBe("minneapolis");
+    expect(metroForName("Richmond VA")?.id).toBe("richmond");
+    expect(metroForName("Pittsburgh PA")?.id).toBe("pittsburgh");
+    expect(metroForName("Kansas City")?.id).toBe("kansas_city");
+    expect(metroForName("St. Louis")?.id).toBe("st_louis");
+  });
+
+  it("reads a city with its state through the address matchers, the briefed markets first", () => {
+    expect(metroForName("Richmond, VA")?.id).toBe("richmond");
+    expect(metroForName("Arlington, VA")?.id).toBe("nova");
+    expect(metroForName("Arlington, TX")?.id).toBe("dallas");
+    expect(metroForName("Brooklyn NY")?.id).toBe("nyc");
+    expect(metroForName("Tampa, Florida")?.id).toBe("tampa");
+    expect(metroForName("Scottsdale, AZ")?.id).toBe("phoenix");
+    expect(metroForName("Vancouver, WA")?.id).toBe("portland");
+    expect(metroForName("Washington, D.C.")?.id).toBe("dc");
+    // The District is its city.
+    expect(metroForName("DC")?.id).toBe("dc");
+  });
+
+  it("drops what a person appends to a metro's name", () => {
+    expect(metroForName("DC Metro")?.id).toBe("dc");
+    expect(metroForName("Richmond, VA MSA")?.id).toBe("richmond");
+    expect(metroForName("the Boston market")?.id).toBe("boston");
+    expect(metroForName("Phoenix AZ metro area")?.id).toBe("phoenix");
+  });
+
+  it("reads nothing a bare city, a state or another place would have to be guessed from", () => {
+    // Each of these is more than one place without its state.
+    expect(metroForName("Portland")).toBeNull();
+    expect(metroForName("Columbus")).toBeNull();
+    expect(metroForName("Richmond")).toBeNull();
+    // The state guard: Portland, Maine and Richmond, California are no market here.
+    expect(metroForName("Portland, ME")).toBeNull();
+    expect(metroForName("Richmond, CA")).toBeNull();
+    // A state is no metro, and nothing falls back to the state's market.
+    expect(metroForName("Pennsylvania")).toBeNull();
+    expect(metroForName("Harrisburg, PA")).toBeNull();
+    expect(metroForName("I-95 Corridor")).toBeNull();
+    expect(metroForName("")).toBeNull();
+    expect(metroForName(null)).toBeNull();
+    expect(metroForName(undefined)).toBeNull();
+  });
+});

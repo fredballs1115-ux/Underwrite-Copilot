@@ -4,7 +4,6 @@ import {
   MAX_OTHER_MARKETS,
   marketsPhrase,
   otherPortfolioMarkets,
-  placeOf,
   portfolioContextLine,
   portfolioFacts,
   portfolioFor,
@@ -47,21 +46,6 @@ const ex = (properties: PortfolioProperty[], price = "$102,000,000"): Extraction
     { label: "Units", value: "578", flagged: false, page: "p. 3" },
   ],
   totalPages: 64,
-});
-
-describe("placeOf — the city and state an OM's address line states", () => {
-  it("reads the usual shapes, and nothing where no state is written", () => {
-    expect(placeOf("1200 Liberty Ave, Pittsburgh, PA 15222")).toEqual({ city: "Pittsburgh", state: "PA" });
-    expect(placeOf("Pittsburgh, Pennsylvania")).toEqual({ city: "Pittsburgh", state: "PA" });
-    expect(placeOf("123 Main St, Cleveland OH 44114")).toEqual({ city: "Cleveland", state: "OH" });
-    expect(placeOf("88 Main Street Cleveland OH 44114")).toEqual({ city: "Cleveland", state: "OH" });
-    expect(placeOf("1200 Liberty Ave, Pittsburgh, PA, 15222")).toEqual({ city: "Pittsburgh", state: "PA" });
-    expect(placeOf("Dallas, TX")).toEqual({ city: "Dallas", state: "TX" });
-    // A street suffix is not a state: "Ct" is Court, not Connecticut.
-    expect(placeOf("123 Oak Ct, Springfield")).toBeNull();
-    expect(placeOf("")).toBeNull();
-    expect(placeOf("Downtown")).toBeNull();
-  });
 });
 
 describe("readPortfolio — a portfolio OM's properties, read into shares, concentration, markets and the allocation", () => {

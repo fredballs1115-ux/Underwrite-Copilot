@@ -5,7 +5,7 @@
 
 import metrosSeed from "@/data/research/metros.json";
 import dataMetrosSeed from "@/data/data-metros.json";
-import { US_STATE_ABBREV, abbrevState } from "@/lib/address";
+import { US_STATE_ABBREV, abbrevState, placeOf } from "@/lib/address";
 import type { GeoTarget } from "@/lib/criteria";
 
 export interface CoveredMetro {
@@ -223,6 +223,61 @@ export function marketForAddress(addr: {
   submarket?: string | null;
 }): CoveredMetro | null {
   return metroForAddress(addr) ?? dataMetroForAddress(addr) ?? stateForAddress(addr);
+}
+
+/** A market's name the way names compare: no case, no apostrophes, every
+ *  other mark a space — "Prince George's County MD" is
+ *  "prince georges county md", "Dallas-Fort Worth" "dallas fort worth". */
+const nameKey = (s: string): string =>
+  s
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+/** Every market with a page and a photograph, by its name's key. */
+const MARKET_BY_NAME = new Map<string, CoveredMetro>(
+  [
+    ...(metrosSeed.metros ?? []).map((m) => ({ id: m.id, name: m.name as string })),
+    ...DATA_METROS.map((m) => ({ id: m.id, name: m.name })),
+  ].map((m) => [nameKey(m.name), m]),
+);
+
+// What a person appends to a metro's name — "DC Metro", "Richmond, VA MSA",
+// "the Boston market" — says nothing about which metro it is.
+const TRAILING_QUALIFIER = /\s*\b(?:metro(?:politan)?(?:\s+area)?|msa|cbsa|market|region|area)\s*$/i;
+
+/**
+ * The market a place NAME falls in — the metro a person typed on a
+ * submarket ("Richmond, VA", "Northern Virginia", "Pittsburgh PA") rather
+ * than a deal's structured address. Two ways and only two, because the
+ * answer puts a city's photograph on the page, and a photograph of the
+ * wrong city is the site being wrong:
+ *
+ *   - the site's own name for a market, whole: "Boston", "Dallas-Fort
+ *     Worth", "Minneapolis-St. Paul", "Richmond VA";
+ *   - a city with its state ("Arlington, VA", "Brooklyn NY", "Tampa,
+ *     Florida"), read by `placeOf` and matched by the address matchers,
+ *     the briefed markets first. The state guard is what keeps Arlington
+ *     VA from Arlington TX and Portland OR from Portland ME.
+ *
+ * A bare city with no state is not read — "Portland", "Columbus" and
+ * "Richmond" are each more than one place — a state alone is no metro,
+ * and nothing falls back to the state's market: this answers which
+ * metro's photograph and page, and a state has neither.
+ */
+export function metroForName(text: string | null | undefined): CoveredMetro | null {
+  const raw = (text ?? "").replace(/\s+/g, " ").trim().replace(/^the\s+/i, "").replace(TRAILING_QUALIFIER, "").trim();
+  if (!raw) return null;
+  const whole = MARKET_BY_NAME.get(nameKey(raw));
+  if (whole) return whole;
+  const place = placeOf(raw);
+  if (!place) return null;
+  // The District is its city: "DC" names Washington.
+  const city = place.city ?? (place.state === "DC" ? "Washington" : null);
+  if (!city) return null;
+  const addr = { city, state: place.state };
+  return metroForAddress(addr) ?? dataMetroForAddress(addr);
 }
 
 export interface MarketNavEntry {
