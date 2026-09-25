@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxCheckSource, evaluateBuyBox, findGoingInCap } from "@/lib/criteria";
 import { findPriceMetric, inferStrategy, planSummary } from "@/lib/deal-strategy";
+import { interestTag } from "@/lib/interest";
 import { getTeam } from "@/lib/teams";
 import { getActiveBranding } from "@/lib/branding-server";
 import {
@@ -129,6 +130,7 @@ export async function GET(req: Request) {
       dealType: strategy.kind === "unknown" ? null : strategy.label,
       planDeal: plan != null,
       price: findPriceMetric(metrics, strategy.kind)?.value ?? null,
+      interest: interestTag(extraction),
       cap: plan ? null : (findGoingInCap(metrics)?.value ?? null),
       yieldOnCost:
         plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,

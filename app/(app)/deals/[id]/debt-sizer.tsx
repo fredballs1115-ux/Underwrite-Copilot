@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { findMetric, parseMoney } from "@/lib/criteria";
 import {
   IMPLIED_CAP_CEILING,
+  buildingPriceOf,
   findPriceMetric,
   inferStrategy,
   isPlanDeal,
@@ -178,9 +179,12 @@ function deriveSeed(
     };
   }
   const metrics = extraction?.metrics ?? [];
-  // The shared price reader; a development's land cost is its price.
+  // The shared price reader; a development's land cost is its price — and
+  // the price the building's own figures describe (#415): a lender sizes
+  // the whole asset, so a share's price is grossed up, and a note's or a
+  // leased fee's seeds no price the property's loan could be tested on.
   const priceMetric = findPriceMetric(metrics, inferStrategy(extraction).kind);
-  const price = priceMetric ? parseMoney(priceMetric.value) : null;
+  const price = buildingPriceOf(extraction, priceMetric ? parseMoney(priceMetric.value) : null);
   // The in-place or Year-1 NOI, never the stabilized pro forma.
   const figs = noiFigures(metrics);
   const going = figs.find((f) => f.kind === "in_place") ?? figs.find((f) => f.kind === "year1") ?? null;

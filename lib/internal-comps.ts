@@ -7,12 +7,15 @@ import {
   parsePct,
 } from "@/lib/criteria";
 import {
+  buildingPriceOf,
   findPriceMetric,
   inferStrategy,
   planSummary,
+  statedBasisIsBuildings,
   type StrategyKind,
   unitCountFromMetrics,
 } from "@/lib/deal-strategy";
+import { interestOf, interestTag } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetWords, perSuffix } from "@/lib/asset-words";
 
@@ -86,6 +89,9 @@ function deriveBasis(
   /** the price is a plan deal's total cost: skip the OM's own per-unit line
    *  (whose basis is unknowable there) and say so in the label */
   allIn = false,
+  /** the OM's own per-unit line may be read — false where the price is not
+   *  for the building bought outright (#415) */
+  statedLine = true,
 ): string | null {
   const suffix = allIn ? " all-in" : "";
 
@@ -97,7 +103,7 @@ function deriveBasis(
   const words = assetWords(assetClass);
   if (words.basis === "acre") return null;
   if (words.basis === "unit") {
-    if (!allIn) {
+    if (!allIn && statedLine) {
       // The shared per-unit reader: the price over the units, never a rent
       // or an expense per unit.
       const direct = findMetric(metrics, METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc);
@@ -157,7 +163,10 @@ export function deriveInternalComps(
     const strategy = inferStrategy(ext);
     const plan = planSummary(ext, strategy);
     const price = findPriceMetric(metrics, strategy.kind);
-    const cap = plan ? null : findGoingInCap(metrics);
+    // A note's stated cap is the collateral's and a leased fee's a ground
+    // rent's (#415): neither sits in a column of buildings' caps.
+    const interestKind = interestOf(ext).kind;
+    const cap = plan || interestKind === "note" || interestKind === "leased_fee" ? null : findGoingInCap(metrics);
     const yoc = plan?.yieldOnCost ?? null;
     if (!price && !cap && yoc == null) continue;
     // Only rows whose values actually parse — a garbled extraction ("TBD",
@@ -172,13 +181,16 @@ export function deriveInternalComps(
       market: extraction?.market ?? "",
       screenedAt: row.created_at,
       call: (row.verdict as { verdict?: string } | null)?.verdict ?? null,
-      priceLabel: priceNum != null ? fmtCompact(priceNum) : null,
+      // The price as asked, with what it buys where that is not the
+      // building outright — "$20.0M · 49% share" — and the basis struck
+      // only on the price the building's figures describe (#415).
+      priceLabel: priceNum != null ? `${fmtCompact(priceNum)}${interestTag(ext) ? ` · ${interestTag(ext)!.toLowerCase()}` : ""}` : null,
       capLabel: capNum != null ? cap!.value : null,
       basisLabel: plan
         ? plan.totalCost != null
           ? deriveBasis(metrics, wanted, plan.totalCost, true)
           : null
-        : deriveBasis(metrics, wanted, priceNum),
+        : deriveBasis(metrics, wanted, buildingPriceOf(ext, priceNum), false, statedBasisIsBuildings(ext)),
       kind: strategy.kind,
       kindLabel: plan ? strategy.label : null,
       yieldOnCostLabel: yoc != null ? `${(yoc * 100).toFixed(1)}%` : null,

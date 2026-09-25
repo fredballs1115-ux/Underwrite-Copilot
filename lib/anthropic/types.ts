@@ -141,14 +141,15 @@ export interface ExtractionResult {
    *  read. The whole portfolio's figures stay in `metrics`. */
   properties?: PortfolioProperty[];
   /** WHAT IS BEING SOLD (#414): the land and the building outright, a
-   *  leasehold on a ground lease, a loan secured by the property, or a
-   *  share of the owning entity — as the OM states it. Absent on an
-   *  extraction saved before it was read, which reads as fee simple. */
+   *  leasehold on a ground lease, the leased fee under one (#415), a loan
+   *  secured by the property, or a share of the owning entity — as the OM
+   *  states it. Absent on an extraction saved before it was read, which
+   *  reads as fee simple. */
   interest?: ExtractedInterest;
   metrics: ExtractedMetric[];
 }
 
-export type InterestKind = "fee_simple" | "leasehold" | "note" | "partial_interest" | "unknown";
+export type InterestKind = "fee_simple" | "leasehold" | "leased_fee" | "note" | "partial_interest" | "unknown";
 
 export interface ExtractedInterest {
   kind: InterestKind;

@@ -100,6 +100,14 @@ describe("pipeline workbook — the deal's kind is a column", () => {
     expect(conv.getCell(13).value).toBe("2026-09-08");
   });
 
+  it("a share's price keeps its figure and carries what it buys as the cell's note; a building's has none (#415)", async () => {
+    const ws = (await load([{ ...STABILIZED, interest: "49% share" }, CONVERSION])).getWorksheet("Pipeline")!;
+    const share = ws.getRow(6).getCell(7);
+    expect(share.value).toBe(50_000_000);
+    expect(JSON.stringify(share.note)).toContain("49% share: the price does not buy the building outright");
+    expect(ws.getRow(7).getCell(7).note).toBeUndefined();
+  });
+
   it("a row with nothing to read shows dashes — never a guessed kind or a zero", async () => {
     const ws = (await load([LEGACY])).getWorksheet("Pipeline")!;
     const row = ws.getRow(6);

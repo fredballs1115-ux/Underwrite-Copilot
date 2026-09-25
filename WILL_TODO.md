@@ -354,10 +354,23 @@ simple, leasehold, a note, a share), `lib/interest` says what the price
 buys, the plausibility check and the model gross a share's price up to
 the whole and make no price finding on a note, and the deal page, the
 shared screen, the memo, the report and the workbook say it first.
+Then #415: the leased fee — the land under someone else's building, sold
+with its ground lease — is its own interest (the ground rent is the
+buyer's income, its cover is the building's income before it, an NOI
+several times the rent is flagged as the building's), and every reader
+that divides a price divides the building's (`buildingPriceOf`: a
+share's grossed up, none for a note, a leased fee or an unstated share)
+— the plan, the market memory, the internal comps, the analytics, the
+research panel's per-unit read, the public-record comps' median call and
+the debt sizer's seed — while the pipeline row, its CSV, the meeting
+workbook and the deal header say what the price buys beside the figure.
 **Open after it**: a note deal still gets the collateral's property
 model with a caveat, not an underwriting of the note itself (its yield
 to maturity on the price, the discount accreting, a foreclosure path) —
-the next step for that deal type; since-this-screen still compares the
+the next step for that deal type; a leased fee likewise runs the ground
+rent through a building's model (the caveat sends the reader to the
+ground lease calculator); the document-generated model tab and the
+compare table's cap still read that model's own price; since-this-screen still compares the
 address's market alone (a portfolio's other markets have no "what moved"
 yet); the twenty-six
 overhead frames are now only the fallback, but they are still

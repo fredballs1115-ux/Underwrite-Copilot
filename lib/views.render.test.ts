@@ -83,7 +83,8 @@ const CARDS: DealCard[] = [
   card({ id: "d", name: "Tysons Corner Plaza", assetClass: "office", verdict: "pass_on", stage: "dead", fit: "outside", score: 18, mandateVerdict: "PASS", slots: { cap: "8.1%", price: "$60,000,000", yoc: null }, market: "Tysons, VA", coveredMarket: "Northern Virginia" }),
   card({ id: "e", name: "Logan Square Retail", assetClass: "retail", verdict: null, stage: "screening", jobStatus: "running", slots: { cap: null, price: "$12,500,000", yoc: null }, market: "Chicago, IL", coveredMarket: "Chicago", hasAddress: false }),
   card({ id: "f", name: "I-95 Logistics Center", assetClass: "industrial", verdict: null, stage: "screening", jobStatus: "failed", market: "Newark, NJ", coveredMarket: "Northern New Jersey" }),
-  card({ id: "g", name: "Harbor View Apartments", verdict: "caution", stage: "underwriting", addedBy: "Jordan Lee", fit: "fits", score: 79, mandateVerdict: "PURSUE", slots: { cap: "5.9%", price: "$41,250,000", yoc: null }, market: "Baltimore, MD", coveredMarket: "Baltimore" }),
+  // A 49% LP interest: the row says what the price buys beside the figure.
+  card({ id: "g", name: "Harbor View Apartments", verdict: "caution", stage: "underwriting", addedBy: "Jordan Lee", fit: "fits", score: 79, mandateVerdict: "PURSUE", slots: { cap: "5.9%", price: "$41,250,000", yoc: null, interest: "49% share" }, market: "Baltimore, MD", coveredMarket: "Baltimore" }),
   card({ id: "h", name: "Sample — The Maddox at Brewerytown", verdict: "caution", stage: "screening", fit: "near", score: 71, mandateVerdict: "WATCH", slots: { cap: "5.6%", price: "$68,000,000", yoc: null }, market: "Brewerytown, Philadelphia, PA", coveredMarket: "Philadelphia" }),
   card({ id: "i", name: "Lakewood Self Storage", assetClass: "self_storage", verdict: "pass", stage: "closed", fit: null, slots: { cap: "6.4%", price: "$9,800,000", yoc: null }, market: "Lakewood, CO", coveredMarket: null }),
   card({ id: "j", name: "Unpriced land — Route 1 parcel", verdict: "caution", stage: "screening", fit: null, slots: { cap: null, price: null, yoc: null }, market: "Laurel, MD", coveredMarket: "Baltimore" }),
@@ -155,6 +156,12 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // asset filter both say "Self-storage", and the key never shows.
     expect(text).toContain("Self-storage");
     expect(text).not.toMatch(/self_storage|Self_storage/);
+    // A share's price is said as a share's beside the figure, at every
+    // width, and the wide price column's tooltip carries it too; a deal
+    // bought outright says nothing more.
+    expect((text.match(/49% share/g) ?? []).length).toBe(4);
+    expect(html).toContain("49% share: the price does not buy the building outright");
+    expect(html).toContain('title="$41,250,000 — 49% share"');
   });
 
   it("renders the empty pipeline with the getting-started state, and the at-limit notice", () => {
@@ -3633,5 +3640,23 @@ describe("InterestPanel — what the price buys, said before any figure is belie
     expect(leaseHtml).not.toContain('data-bar="interest"');
     expect(visibleText(leaseHtml)).toContain("The ground lease as stated: 62 years remaining; $310,000 a year");
     expect(render(React.createElement(InterestPanel, { interest: readInterestFor(base({ ...blank, kind: "fee_simple" }), 20_000_000) }))).not.toContain("What is being sold");
+  });
+
+  it("a leased fee: the building's income as the track, the ground rent filled, and the calculator's leased-fee side", () => {
+    const ex = base({ ...blank, kind: "leased_fee", groundLease: "71 years remaining; unsubordinated" }, [
+      { label: "Ground rent", value: "$1,200,000", flagged: false, page: "p. 4" },
+      { label: "Income before ground rent", value: "$6,000,000", flagged: false, page: "p. 6" },
+    ]);
+    const html = render(React.createElement(InterestPanel, { interest: readInterestFor(ex, 20_000_000) }));
+    const text = visibleText(html);
+    expect(text).toContain("The leased fee — the land under a ground lease");
+    expect(text).toContain("the income here, not an expense and never the building's NOI");
+    expect(text).toContain("Ground rent $1.2M");
+    expect(text).toContain("The building's income before it $6.0M · covered 5.0×");
+    expect(text).toContain("Value the leased fee on its term");
+    expect(html).toContain('href="/tools#ground-lease"');
+    expect(html.match(/data-bar="interest"/g)).toHaveLength(1);
+    expect(a11yIssues(html), "leased fee panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
   });
 });

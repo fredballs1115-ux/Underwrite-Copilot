@@ -2,6 +2,12 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-09-25",
+      "title": "The land under a building, and a price that is not the building's",
+      "href": "/deals",
+      "blurb": "A memorandum selling the land beneath someone else's building, with its ground lease, is now read as what it is. The ground rent is the buyer's income, never an expense and never the building's NOI. The screen says how many times the building's own income covers that rent, and flags an NOI that is really the building's. Wherever a price is not the building's (a share, a note, the land), the pipeline row, the deal header and the exports say what it buys. That price is also kept out of every figure that divides by it: your past screens' basis by market, the internal comps, the analytics and the plan's yield on cost."
+    },
+    {
       "date": "2026-09-24",
       "title": "What is being sold, read first",
       "href": "/deals",

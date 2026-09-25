@@ -37,7 +37,22 @@ const ex = (metrics: ExtractedMetric[], over: Partial<ExtractionResult> = {}): E
 describe("pickSlots — the pipeline row agrees with the export on which figure a deal carries", () => {
   it("a stabilized asset: its going-in cap, its price, no yield on cost", () => {
     const s = pickSlots(ex([m("Asking price", "$42,000,000"), m("Going-in cap rate", "5.50%"), m("In-place NOI", "$2,310,000")]), null);
-    expect(s).toEqual({ cap: "5.50%", price: "$42,000,000", yoc: null });
+    expect(s).toEqual({ cap: "5.50%", price: "$42,000,000", yoc: null, interest: null });
+  });
+
+  it("says what the price buys where it is not the building outright (#415)", () => {
+    const base = [m("Asking price", "$20,000,000"), m("Going-in cap rate", "5.50%")];
+    const with_ = (interest: NonNullable<ExtractionResult["interest"]>) =>
+      pickSlots(ex(base, { interest }), null).interest;
+    const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+    expect(with_({ ...blank, kind: "partial_interest", share: "49% limited partnership interest" })).toBe("49% share");
+    expect(with_({ ...blank, kind: "partial_interest", share: "a majority stake" })).toBe("Share");
+    expect(with_({ ...blank, kind: "note" })).toBe("Note");
+    expect(with_({ ...blank, kind: "leasehold" })).toBe("Leasehold");
+    expect(with_({ ...blank, kind: "leased_fee" })).toBe("Leased fee");
+    expect(with_({ ...blank, kind: "fee_simple", groundLease: "a 40-year lease under the deck" })).toBeNull();
+    expect(with_({ ...blank, kind: "unknown" })).toBeNull();
+    expect(pickSlots(ex(base), null).interest).toBeNull();
   });
 
   it("a value-add with a stated going-in cap: the yield on cost, and NO cap — as the .xlsx prints 'n/a — plan'", () => {
@@ -59,7 +74,7 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
       }),
       null,
     );
-    expect(s).toEqual({ cap: null, price: "$8,000,000", yoc: "11.0%" });
+    expect(s).toEqual({ cap: null, price: "$8,000,000", yoc: "11.0%", interest: null });
   });
 
   it("before the extraction lands, the first signal's ask fills the price — only when it is a figure", () => {

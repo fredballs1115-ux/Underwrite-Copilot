@@ -290,7 +290,9 @@ export function deriveUnderwriteInputs(
           ? "The OM's price for a NOTE secured by the property — this model runs the collateral as if bought outright at that price, which is not the note's return"
           : interest.kind === "partial_interest"
             ? "The OM's price for a SHARE of the owning entity that states no single percentage — the model cannot gross it up, so its returns are not the share's"
-            : "OM asking / purchase price",
+            : interest.kind === "leased_fee"
+              ? "The OM's price for the LEASED FEE — the land under a building someone else owns, with its ground lease; the model runs the ground rent as the income, with a building's assumptions"
+              : "OM asking / purchase price",
       pageOf(priceMetric),
     );
   } else if (goingFig && capPct) {

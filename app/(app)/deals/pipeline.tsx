@@ -59,7 +59,7 @@ export type DealCard = {
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
-  slots: { cap: string | null; price: string | null; yoc: string | null };
+  slots: { cap: string | null; price: string | null; yoc: string | null; interest?: string | null };
   /** latest analysis-job state: a live run, one that stopped writing
    *  progress (its process died), or a failure that left the verdict behind */
   jobStatus?: "running" | "stalled" | "failed" | null;
@@ -491,7 +491,7 @@ export function Pipeline({
     };
     // A plan deal's cap cell is empty and its yield on cost sits in its own
     // column — the same two columns the meeting .xlsx carries.
-    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Added", "Added by"];
+    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "What the price buys", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Added", "Added by"];
     const lines = filtered.map((d) =>
       [
         d.name,
@@ -499,6 +499,8 @@ export function Pipeline({
         d.market,
         d.coveredMarket ?? "",
         d.slots.price ?? "",
+        // Blank on a fee simple — the price is the building's.
+        d.slots.interest ?? "",
         d.slots.cap ?? "",
         d.slots.yoc ?? "",
         d.fit ? FIT_META[d.fit].label : "",
@@ -1347,6 +1349,17 @@ const DealRow = memo(function DealRow({
       {compactPrice(d.slots.price)}
     </span>
   ) : null;
+  // What the price buys where it is not the building (#415): a share's
+  // price, a note's, the land's under a ground lease — said beside the
+  // figure so a $20M share never reads as a $20M building.
+  const interestBit = d.slots.interest ? (
+    <span
+      className="whitespace-nowrap font-medium text-brand"
+      title={`${d.slots.interest}: the price does not buy the building outright — the deal page says what it buys`}
+    >
+      {d.slots.interest}
+    </span>
+  ) : null;
   // A plan deal has no going-in cap; its yield on total cost is the figure
   // that answers the same question, so it takes the slot — labelled.
   const capBit = d.slots.cap ? (
@@ -1459,18 +1472,18 @@ const DealRow = memo(function DealRow({
             fits — so the price, the cap and the fit are never the part a
             one-line truncation cuts off. */}
         <MetaLine className="md:hidden" bits={[dueBit, marketBit, coveredBit, assetBit, addedByBit]} />
-        <MetaLine className="md:hidden" bits={[priceBit, capBit, fitBit]} />
+        <MetaLine className="md:hidden" bits={[priceBit, interestBit, capBit, fitBit]} />
         <MetaLine
           className="hidden md:block lg:hidden"
-          bits={[dueBit, marketBit, coveredBit, assetBit, fitBit, dateBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, assetBit, interestBit, fitBit, dateBit, addedByBit]}
         />
         <MetaLine
           className="hidden lg:block xl:hidden"
-          bits={[dueBit, marketBit, coveredBit, dateBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, interestBit, dateBit, addedByBit]}
         />
         <MetaLine
           className="hidden xl:block"
-          bits={[dueBit, marketBit, coveredBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, interestBit, addedByBit]}
         />
         {fitBar}
       </div>
@@ -1489,7 +1502,7 @@ const DealRow = memo(function DealRow({
       </span>
       <span
         className="hidden w-20 shrink-0 truncate text-right font-mono text-sm tabular-nums md:block"
-        title={d.slots.price ?? undefined}
+        title={d.slots.price ? (d.slots.interest ? `${d.slots.price} — ${d.slots.interest.toLowerCase()}` : d.slots.price) : undefined}
       >
         {d.slots.price ? compactPrice(d.slots.price) : <span className="text-line">—</span>}
       </span>

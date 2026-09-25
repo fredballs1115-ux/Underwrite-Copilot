@@ -36,6 +36,10 @@ export interface PipelineExportRow {
   planDeal: boolean;
   /** raw extracted strings — parsed for number cells, kept verbatim otherwise */
   price: string | null;
+  /** what the price buys where it is not the building outright — "49%
+   *  share", "Note", "Leasehold", "Leased fee" (lib/interest `interestTag`,
+   *  #415); carried as the price cell's note, since the columns are fixed */
+  interest?: string | null;
   /** the going-in cap on today's income — always null on a plan deal */
   cap: string | null;
   /** a plan deal's stabilized NOI over total cost, e.g. "11.7%" */
@@ -188,6 +192,11 @@ export async function buildPipelineWorkbook(
       }
       priceCell.font = baseFont;
       priceCell.alignment = { horizontal: "right" };
+      // A share's price, a note's or the land's under a ground lease is not
+      // the building's: the cell says so where Excel shows a note (#415).
+      if (d.interest) {
+        priceCell.note = `${d.interest}: the price does not buy the building outright — the deal page says what it buys.`;
+      }
 
       // A plan deal has no going-in cap; its yield on cost sits in the next
       // column, so the cap cell says so rather than showing a dash a reader

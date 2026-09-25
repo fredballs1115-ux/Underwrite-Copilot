@@ -16,7 +16,15 @@ import {
   parsePct,
   METRIC_FIND,
 } from "@/lib/criteria";
-import { findPriceMetric, inferStrategy, planSummary, unitCountFromMetrics } from "@/lib/deal-strategy";
+import {
+  buildingPriceOf,
+  findPriceMetric,
+  inferStrategy,
+  planSummary,
+  statedBasisIsBuildings,
+  unitCountFromMetrics,
+} from "@/lib/deal-strategy";
+import { interestOf } from "@/lib/interest";
 import { assetWords } from "@/lib/asset-words";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
@@ -107,6 +115,10 @@ function deriveBasis(
   /** the price is a plan deal's total cost: skip the OM's own per-unit
    *  line, which is the shell's price over the units, not the basis */
   allIn = false,
+  /** the OM's own per-unit line may be read — false where the price is not
+   *  for the building bought outright (a share, a note, a leased fee), whose
+   *  per-unit line is on a basis the row never says */
+  statedLine = true,
 ): { value: number; basis: "unit" | "sf" } | null {
   // The class says the basis (lib/asset-words): apartments, hotels, parks,
   // student beds and garages trade per unit, key, pad, bed or space — one
@@ -115,7 +127,7 @@ function deriveBasis(
   const basis = assetWords(assetClass).basis;
   if (basis === "acre") return null;
   if (basis === "unit") {
-    const direct = allIn ? null : findMetric(metrics, METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc);
+    const direct = allIn || !statedLine ? null : findMetric(metrics, METRIC_FIND.perUnit.inc, METRIC_FIND.perUnit.exc);
     if (direct) {
       const n = parseMoney(direct.value);
       if (n != null && n > 0) return { value: n, basis: "unit" };
@@ -163,21 +175,26 @@ export function buildComps(rows: DealRowLike[]): MarketComp[] {
 
     // The shared going-in reader on an operating asset only: a plan deal's
     // stabilized / pro forma cap never averages into what the account
-    // "usually sees" in a market.
-    const cap = plan ? null : findGoingInCap(metrics);
+    // "usually sees" in a market — and neither does a note's (the
+    // collateral's, on a price that is a loan's) or a leased fee's (a
+    // ground rent's cap, a different market entirely), #415.
+    const interestKind = interestOf(ext).kind;
+    const cap = plan || interestKind === "note" || interestKind === "leased_fee" ? null : findGoingInCap(metrics);
     const rawCap = cap ? parsePct(cap.value) : null;
     // Drop physically implausible caps (a mis-extraction like -5% or 300%) —
     // not fabrication, just refusing to average garbage into the market read.
     const capPct = rawCap != null && rawCap > 0 && rawCap <= 25 ? rawCap : null;
 
-    // The shared price reader: on a development with no ask, the land cost.
+    // The shared price reader: on a development with no ask, the land cost —
+    // and the price the building's figures describe (#415): a share's
+    // grossed up to the whole, none for a note or a leased fee.
     const priceMetric = findPriceMetric(metrics, strategy.kind);
-    const price = priceMetric ? parseMoney(priceMetric.value) : null;
+    const price = buildingPriceOf(ext, priceMetric ? parseMoney(priceMetric.value) : null);
     const basis = plan
       ? plan.totalCost != null
         ? deriveBasis(metrics, assetClass, plan.totalCost, true)
         : null
-      : deriveBasis(metrics, assetClass, price);
+      : deriveBasis(metrics, assetClass, price, false, statedBasisIsBuildings(ext));
 
     // Nothing usable → not a comp (never pad the memory with empty rows).
     if (capPct == null && !basis) continue;

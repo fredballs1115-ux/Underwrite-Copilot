@@ -79,13 +79,14 @@ export function subjectBasis(
   metrics: MetricLike[],
   kind: StrategyKind,
   /** what the price buys (lib/interest `interestOf`, #414): a note's price
-   *  is nobody's basis, and a share's is grossed up to the whole the
-   *  building's count and area describe — or withheld with no stated share */
+   *  is nobody's basis, a leased fee's buys the land alone (#415), and a
+   *  share's is grossed up to the whole the building's count and area
+   *  describe — or withheld with no stated share */
   interest?: { kind: InterestKind; sharePct: number | null },
 ): SubjectBasis {
   const none = { perUnit: null, perSf: null };
   if (kind === "conversion" || kind === "development") return none;
-  if (interest?.kind === "note") return none;
+  if (interest?.kind === "note" || interest?.kind === "leased_fee") return none;
   if (interest?.kind === "partial_interest" && interest.sharePct == null) return none;
   const row = findPricedMetric(metrics, kind);
   const stated = row ? parseMoney(row.value) : null;
