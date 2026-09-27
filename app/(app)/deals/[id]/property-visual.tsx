@@ -40,6 +40,10 @@ import { ReplacePicture } from "./replace-picture";
  * of words: a thumbnail draws the very URL its view draws, so it costs no
  * request of its own, and one that fails takes its view away.
  *
+ * It is the deal header's picture (#433, `DealHero`): no card of its own,
+ * beside the name and the figures where the header is wide and above them
+ * where it is not, with the reader's Replace photo on the picture itself.
+ *
  * The Flood tab (#425) is the USGS aerial at a wider frame with FEMA's flood
  * zones drawn over it in FEMA's own colours — the two images asked for the
  * same location, zoom and size, so they share one Web-Mercator frame — with
@@ -50,7 +54,13 @@ import { ReplacePicture } from "./replace-picture";
 
 type View = "photo" | "street" | "satellite" | "aerial" | "flood" | "map";
 
-const AERIAL = { w: 1280, h: 576 }; // 16:9, the route's max width
+const AERIAL = { w: 1280, h: 576 }; // the route's max width
+
+/** Every view's frame, read against the deal header it sits in (#433): 16:9
+ *  on a phone, a wider band where the header stacks at a tablet's width (so
+ *  the name and the figures stay on the first screen), and 16:9 again in the
+ *  split, where the picture takes the left of the header. */
+const FRAME = "aspect-[16/9] @2xl:aspect-[21/9] @3xl:aspect-[16/9]";
 
 export function PropertyVisual({
   dealId,
@@ -128,15 +138,13 @@ export function PropertyVisual({
   };
 
   return (
-    <figure className="shadow-card overflow-hidden rounded-2xl border border-line bg-surface">
-      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2">
-        <figcaption className="truncate text-xs font-medium text-muted">{label}</figcaption>
-        {canReplace && (
-          <div className="flex shrink-0 items-center gap-2">
-            <ReplacePicture dealId={dealId} hasPicture={!!picture} />
-          </div>
-        )}
-      </div>
+    // The deal header's own picture (#433): no card of its own — the header
+    // is the card — and marked, so the header lays itself out as a split
+    // only while a picture is actually there. It rounds the card's top
+    // corners itself (the card cannot clip, or its popovers would be cut):
+    // both on a narrow header, the left one beside the facts.
+    <figure data-hero-picture className="min-w-0 overflow-hidden rounded-t-[15px] bg-surface @3xl:rounded-tr-none">
+      <figcaption className="sr-only">{label}</figcaption>
 
       <div className="relative">
         {photoPossible && (
@@ -149,7 +157,7 @@ export function PropertyVisual({
               alt={`Photograph of ${label}`}
               width={AERIAL.w}
               height={AERIAL.h}
-              className="aspect-[16/9] w-full bg-faint object-cover"
+              className={`${FRAME} w-full bg-faint object-cover`}
               onError={() => setPhotoGone(true)}
             />
             <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
@@ -169,7 +177,7 @@ export function PropertyVisual({
               alt={`Satellite view of ${label}`}
               width={AERIAL.w}
               height={AERIAL.h}
-              className="aspect-[16/9] w-full bg-faint object-cover"
+              className={`${FRAME} w-full bg-faint object-cover`}
               onError={() => setSatelliteGone(true)}
             />
             <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
@@ -188,7 +196,7 @@ export function PropertyVisual({
               alt={`Aerial photograph of ${label}`}
               width={AERIAL.w}
               height={AERIAL.h}
-              className="aspect-[16/9] w-full bg-faint object-cover"
+              className={`${FRAME} w-full bg-faint object-cover`}
               onError={() => setAerialGone(true)}
             />
             <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
@@ -236,7 +244,7 @@ export function PropertyVisual({
                 width={AERIAL.w}
                 height={AERIAL.h}
                 loading="lazy"
-                className="aspect-[16/9] w-full bg-faint object-cover"
+                className={`${FRAME} w-full bg-faint object-cover`}
                 onError={() => setFloodGone(true)}
               />
               {/* eslint-disable-next-line @next/next/no-img-element -- see above */}
@@ -284,7 +292,7 @@ export function PropertyVisual({
             <img
               src={`/api/deals/${dealId}/photo`}
               alt={`Street view of ${label}`}
-              className="aspect-[16/9] w-full bg-faint object-cover"
+              className={`${FRAME} w-full bg-faint object-cover`}
               loading="lazy"
               onError={() => setStreetGone(true)}
             />
@@ -297,7 +305,16 @@ export function PropertyVisual({
         {/* Leaflet only mounts once the map tab is actually opened — no tile
             traffic for the readers who never look at it. */}
         {active === "map" && hasAddress && (
-          <PropertyMap dealId={dealId} label={label} heightClass="aspect-[16/9] w-full" />
+          <PropertyMap dealId={dealId} label={label} heightClass={`${FRAME} w-full`} />
+        )}
+
+        {/* "That's not the building": on the picture itself, where a cover
+            photograph's own control sits — never over the map, whose corner
+            belongs to its controls. */}
+        {canReplace && active !== "map" && (
+          <div className="absolute right-2 top-2 z-[5]">
+            <ReplacePicture dealId={dealId} hasPicture={!!picture} tone="overlay" />
+          </div>
         )}
       </div>
 

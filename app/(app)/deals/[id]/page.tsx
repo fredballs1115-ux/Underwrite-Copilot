@@ -5,6 +5,7 @@ import { SectorFieldsForm } from "./sector-fields-form";
 import type { SectorFieldValues } from "@/lib/sector-fields";
 import { PublicCompsPanel } from "./public-comps-panel";
 import { PropertyVisual } from "./property-visual";
+import { DealHero } from "./deal-hero";
 import { PortfolioCard } from "@/app/portfolio-card";
 import { InterestPanel } from "@/app/interest-panel";
 import { withArticle } from "@/lib/article";
@@ -815,43 +816,80 @@ export default async function DealPage({
         ← All deals
       </Link>
 
-      {/* THE summary bar — the deal in five seconds, no scrolling:
-          name, verdict, buy-box call, address, asset type, and exactly
-          three figures. Everything else is one click below. */}
-      <header className="shadow-card rounded-2xl border border-line bg-surface px-6 py-5">
-        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-semibold tracking-tight">
-                {deal.name}
-              </h1>
-              {pill && (
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${pill.cls}`}
-                >
-                  {pill.label}
-                </span>
-              )}
-              {buyBoxChip && (
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${buyBoxChip.cls}`}
-                >
-                  {buyBoxChip.label}
-                </span>
-              )}
-            </div>
-            <p className="mt-0.5 truncate text-sm text-muted">
-              {addressLine ? <>{addressLine} · </> : null}
-              {/* The class as the label map says it — never a stored
-                  "self_storage" or a form's "auto" — and, on a deal filed
-                  "Auto-detect", what the deck turned out to be. */}
-              {assetClassLabel(shownClass) || "Asset class not read yet"}
-            </p>
-          </div>
-          {/* min-w-0 (not shrink-0): the cluster must be allowed to shrink
-              below its one-row width or its internal flex-wrap never engages
-              and the tail controls overflow the card on phones. */}
-          <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+      {/* THE summary bar — the deal in five seconds, no scrolling: the
+          building's picture, its name, the call, the buy-box fit, the
+          address and class, and exactly three figures, laid out the way a
+          listing opens (#433). Everything else is one click below. */}
+      <DealHero
+        title={deal.name as string}
+        chips={
+          <>
+            {pill && (
+              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${pill.cls}`}>
+                {pill.label}
+              </span>
+            )}
+            {buyBoxChip && (
+              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${buyBoxChip.cls}`}>
+                {buyBoxChip.label}
+              </span>
+            )}
+          </>
+        }
+        subtitle={
+          <>
+            {addressLine ? <>{addressLine} · </> : null}
+            {/* The class as the label map says it — never a stored
+                "self_storage" or a form's "auto" — and, on a deal filed
+                "Auto-detect", what the deck turned out to be. */}
+            {assetClassLabel(shownClass) || "Asset class not read yet"}
+          </>
+        }
+        figures={[
+          // A development's price row is its land cost, and a plan deal's
+          // cap slot is its yield on total cost — the same words the
+          // pipeline row and the meeting .xlsx use. The price as asked,
+          // labelled with what it buys where that is not the building
+          // outright (#415): "Price · 49% share".
+          {
+            label: `${plan?.priceLabel === "Land cost" ? "Land cost" : "Price"}${priceTag ? ` · ${priceTag}` : ""}`,
+            value: summaryPrice ?? null,
+            figure: true,
+          },
+          { label: "Size", value: summarySize ?? null, figure: true },
+          plan
+            ? { label: "Yield on cost", value: summaryYoc ?? null, figure: true }
+            : { label: "Going-in cap", value: summaryCap ?? null, figure: true },
+          { label: "Deal type", value: summaryStrategy ?? null, title: strategy.summary || undefined },
+        ]}
+        picture={
+          /* What the place actually looks like. The USGS aerial needs no
+             API key, so something real renders for every deal with an
+             address; the Street and Satellite views need GOOGLE_MAPS_API_KEY
+             (two separate Google APIs on the one key) and are where the
+             sharp imagery comes from. */
+          dealAddress?.label || picture ? (
+            <PropertyVisual
+              dealId={id}
+              label={dealAddress?.label ?? (deal.name as string)}
+              hasStreetAddress={!!dealAddress?.street}
+              googleEnabled={!!process.env.GOOGLE_MAPS_API_KEY}
+              hasAddress={!!dealAddress?.label}
+              picture={picture ? { credit: PICTURE_CREDIT[picture.source], source: picture.source } : null}
+              canReplace={!(deal as { is_sample?: boolean }).is_sample}
+              flood={
+                floodStreet
+                  ? {
+                      key: floodKey(floodLegendEntries, siteFlags?.flood),
+                      line: floodZoneLine(siteFlags?.flood, floodLegendEntries),
+                    }
+                  : null
+              }
+            />
+          ) : null
+        }
+        actions={
+          <>
             {verdict && !(deal as { is_sample?: boolean }).is_sample && (
               <ShareControl
                 dealId={id}
@@ -1022,6 +1060,10 @@ export default async function DealPage({
                 </span>
               </Link>
             )}
+          </>
+        }
+        controls={
+          <>
             <OffersDueControl
               key={`due-${offersDue ?? "unset"}`}
               dealId={id}
@@ -1033,44 +1075,11 @@ export default async function DealPage({
               stage={((deal as { stage?: string }).stage as string) ?? "screening"}
             />
             <DealActions dealId={id} dealName={deal.name} canDelete={canDelete} />
-          </div>
-        </div>
-
-        <dl className="mt-4 flex flex-wrap gap-x-10 gap-y-2">
-          {(
-            [
-              // A development's price row is its land cost, and a plan
-              // deal's cap slot is its yield on total cost — the same
-              // words the pipeline row and the meeting .xlsx use.
-              // The price as asked, labelled with what it buys where that is
-              // not the building outright (#415): "Price · 49% share".
-              [
-                `${plan?.priceLabel === "Land cost" ? "Land cost" : "Price"}${priceTag ? ` · ${priceTag}` : ""}`,
-                summaryPrice,
-              ],
-              ["Size", summarySize],
-              ...(plan ? [["Yield on cost", summaryYoc] as const] : [["Going-in cap", summaryCap] as const]),
-              ["Deal type", summaryStrategy],
-            ] as const
-          ).map(([label, value]) => (
-            <div key={label}>
-              <dt className="text-[11px] uppercase tracking-wide text-muted">
-                {label}
-              </dt>
-              <dd
-                className={`mt-0.5 text-base font-semibold ${
-                  label === "Deal type" ? "" : "font-mono tabular-nums"
-                }`}
-                title={label === "Deal type" && strategy.summary ? strategy.summary : undefined}
-              >
-                {value ?? "—"}
-              </dd>
-            </div>
-          ))}
-        </dl>
-
+          </>
+        }
+      >
         {/* The plan, as the OM states it, when the deal is not a stabilized
-            asset — it changes what every figure below means. Then anything
+            asset — it changes what every figure above means. Then anything
             that genuinely does not tie. */}
         <PlanStrip strategy={strategy} plan={plan} noun={assetWords(shownClass).noun?.one} />
         {/* What is being sold (#414): a note, a share, a leasehold — said
@@ -1081,35 +1090,9 @@ export default async function DealPage({
         <PlanSensitivity plan={plan} refCap={refCap} />
 
         {!extraction && firstSignal?.take && (
-          <p className="mt-3 border-t border-line pt-3 text-sm leading-relaxed text-muted">
-            {firstSignal.take}
-          </p>
+          <p className="mt-4 text-sm leading-relaxed text-muted">{firstSignal.take}</p>
         )}
-      </header>
-
-      {/* What the place actually looks like. The USGS aerial needs no API key,
-          so something real renders for every deal with an address; the Street
-          and Satellite tabs need GOOGLE_MAPS_API_KEY (two separate Google
-          APIs on the one key) and are where the sharp imagery comes from. */}
-      {(dealAddress?.label || picture) && (
-        <PropertyVisual
-          dealId={id}
-          label={dealAddress?.label ?? (deal.name as string)}
-          hasStreetAddress={!!dealAddress?.street}
-          googleEnabled={!!process.env.GOOGLE_MAPS_API_KEY}
-          hasAddress={!!dealAddress?.label}
-          picture={picture ? { credit: PICTURE_CREDIT[picture.source], source: picture.source } : null}
-          canReplace={!(deal as { is_sample?: boolean }).is_sample}
-          flood={
-            floodStreet
-              ? {
-                  key: floodKey(floodLegendEntries, siteFlags?.flood),
-                  line: floodZoneLine(siteFlags?.flood, floodLegendEntries),
-                }
-              : null
-          }
-        />
-      )}
+      </DealHero>
 
       {/* A portfolio OM's properties, one row each (lib/portfolio): absent
           for a single-property memorandum. */}
