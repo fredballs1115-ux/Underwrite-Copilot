@@ -22,6 +22,18 @@ export function changelogEntries(limit = 6): ChangelogEntry[] {
     .slice(0, Math.max(0, limit));
 }
 
+/** /whats-new draws the newest this-many entries in full, and every older one
+ *  as a line in its archive (#433) — so a title never falls off the page as
+ *  the log grows: a tool card's note stays where its guard reads it, and a
+ *  round's live-verify marker keeps finding its title. */
+export const FULL_NOTES = 100;
+
+/** The entries older than the newest `FULL_NOTES`, newest first: the page's
+ *  archive, one line each. */
+export function changelogArchive(): ChangelogEntry[] {
+  return changelogEntries(Number.MAX_SAFE_INTEGER).slice(FULL_NOTES);
+}
+
 /** The single newest entry, for compact stamps. */
 export function latestChange(): ChangelogEntry | null {
   return changelogEntries(1)[0] ?? null;

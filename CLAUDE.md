@@ -359,12 +359,16 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   alongside `-q` ones so both kinds stay honest. **The same file renders
   `/whats-new`** (its page is synchronous, so `renderToString` gives the
   bytes a curl gets) and holds every grep of `p_whats-new.html` to it: a
-  round's marker greps its changelog title, the page draws only the
-  newest hundred entries, and a title that falls off the end — or is
-  trimmed from the log — reads NOT DEPLOYED on a site that is fine. It
-  caught four diagnostics that had been printing "not yet deployed" on
-  every run since September 7's and 8's entries were trimmed; they are
-  gone. When it fails on an old round's title, retire that marker.
+  round's marker greps its changelog title, and a title trimmed from the
+  log reads NOT DEPLOYED on a site that is fine. It caught four
+  diagnostics that had been printing "not yet deployed" on every run
+  since September 7's and 8's entries were trimmed; they are gone. When it
+  fails on an old round's title, retire that marker. The page draws the
+  newest `FULL_NOTES` (100) in full and every older entry as one line of
+  its "Earlier improvements" archive (`changelogArchive`, #433): it had
+  drawn only the newest hundred, so each new note pushed an old one off
+  the page — the card-note guard in `lib/changelog.test.ts` caught a
+  tool card's note falling off, and every round would have pushed another.
   `lib/a11y-source.test.ts` scans every page's source for a form control
   with no accessible name (the pages the render tests cannot reach). The
   root layout renders the one skip link (`app/skip-link.tsx`); every page's
@@ -2400,7 +2404,20 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   one on screen ringed, the Flood thumbnail FEMA's zones over the same
   frame and the Map a glyph. A thumbnail draws the very URL its view
   draws, so it costs no request the view does not already make, and one
-  that fails takes its view away as the view failing would. **And on one map** (#431, `app/(app)/deals/pipeline-map.tsx`,
+  that fails takes its view away as the view failing would. **The deal
+  page opens the way a listing does** (#433, `app/(app)/deals/[id]/deal-hero.tsx`,
+  `DealHero`, pure): the picture is the header's own — no card of its
+  own, marked `data-hero-picture` — beside the name, the call and the
+  three figures where the header is 48rem wide, and first where it is
+  not (at 21:9 on a laptop's width, so the figures stay on the first
+  screen); the tools sit in a bar beneath, Replace photo on the picture
+  itself. The split reads the header's OWN width (a container query —
+  the sidebar takes 240px of every desktop) and a `:has()` on the
+  picture, so a header whose picture unmounted is never half an empty
+  column. The card never clips: `overflow-hidden` would cut the share
+  panel and the deal's menu, which open out of the toolbar, so the
+  picture rounds its own top corners and the toolbar its own bottom when
+  it is the last row. **And on one map** (#431, `app/(app)/deals/pipeline-map.tsx`,
   `PipelineMap`; the rules pure in `lib/pipeline-map.ts`): the third view
   beside Cards and List (`PipelineView` `"map"`, the same cookie) draws
   every deal the filters leave as a pin in its call's colour — the split

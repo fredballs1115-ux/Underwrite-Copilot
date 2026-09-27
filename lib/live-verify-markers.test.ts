@@ -145,6 +145,7 @@ describe("the /tools round markers", () => {
 
 // ── The markers that grep /whats-new ────────────────────────────────────────
 import WhatsNewPage from "@/app/whats-new/page";
+import { FULL_NOTES, changelogEntries } from "@/lib/changelog";
 
 /** Every `grep -q|-o <pattern> p_whats-new.html` the workflow runs — the
  *  roll-up's `mark` lines and the plain diagnostics alike. */
@@ -160,9 +161,10 @@ function whatsNewPatterns(): string[] {
 }
 
 /**
- * A round's marker greps its changelog title on /whats-new, and the page
- * draws only the newest entries (`changelogEntries(100)`). A title that has
- * fallen off the end — or been trimmed from the log — reads NOT DEPLOYED on
+ * A round's marker greps its changelog title on /whats-new. The page draws
+ * the newest `FULL_NOTES` in full and every older title in its archive
+ * (#433), so a title leaves the page only when it is trimmed from the log —
+ * and a title trimmed from the log reads NOT DEPLOYED on
  * a site that is fine, the same broken as a marker that cannot fail. Four
  * diagnostics that grepped September 7's and 8's titles had been printing
  * "not yet deployed" on every run since those entries were trimmed; this
@@ -182,9 +184,20 @@ describe("the /whats-new markers", () => {
       expect(
         served.includes(p),
         `the marker grepping ${JSON.stringify(p)} would read NOT DEPLOYED — the phrase is not on /whats-new ` +
-          `as served. A changelog title past the page's last entry has fallen off it: retire the marker, ` +
+          `as served. A changelog title trimmed from the log has left the page: retire the marker, ` +
           `or grep prose with no {expression} or apostrophe in it.`,
       ).toBe(true);
     }
+  });
+
+  it("draws every title in the log, the older ones in its archive (#433)", () => {
+    const esc = (t: string) =>
+      t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
+    const all = changelogEntries(Number.MAX_SAFE_INTEGER);
+    expect(all.length).toBeGreaterThan(FULL_NOTES);
+    for (const e of all) expect(served.includes(esc(e.title)), e.title).toBe(true);
+    expect(served).toContain("Earlier improvements");
+    // (React puts `<!-- -->` between the count and the words.)
+    expect(served.replace(/<!-- -->/g, "")).toContain(`${all.length} improvements logged since`);
   });
 });

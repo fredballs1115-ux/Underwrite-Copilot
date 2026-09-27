@@ -2,7 +2,7 @@
 // must be whole sentences, never a mid-word cut, and a short note must come
 // back untouched.
 import { describe, expect, it } from "vitest";
-import { LONG_NOTE, blurbExcerpt, changelogEntries } from "./changelog";
+import { FULL_NOTES, LONG_NOTE, blurbExcerpt, changelogArchive, changelogEntries } from "./changelog";
 import { TOOL_INDEX } from "./tools/catalog";
 
 describe("blurbExcerpt — a note's opening, in whole sentences", () => {
@@ -118,8 +118,10 @@ describe("a card's note", () => {
     "build-or-buy",
   ]);
 
+  // Every note /whats-new draws: the newest in full and the rest as its
+  // archive's lines (#433) — a card's note is on the page either way.
   const noted = new Set(
-    changelogEntries(100)
+    [...changelogEntries(FULL_NOTES), ...changelogArchive()]
       .filter((e) => e.href?.startsWith("/tools#"))
       .map((e) => e.href!.slice("/tools#".length)),
   );
@@ -151,5 +153,14 @@ describe("a card's note", () => {
       BEFORE_THE_CONVENTION.size,
       "the frozen list grew — a new card needs a changelog note, not an exemption",
     ).toBe(14);
+  });
+});
+
+describe("the archive (#433)", () => {
+  it("holds every entry past the full notes, so /whats-new draws every title", () => {
+    const all = changelogEntries(Number.MAX_SAFE_INTEGER);
+    const drawn = [...changelogEntries(FULL_NOTES), ...changelogArchive()];
+    expect(drawn.map((e) => `${e.date}|${e.title}`)).toEqual(all.map((e) => `${e.date}|${e.title}`));
+    expect(changelogEntries(FULL_NOTES)).toHaveLength(Math.min(FULL_NOTES, all.length));
   });
 });

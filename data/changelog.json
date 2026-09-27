@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-25",
+      "title": "Each deal opens on its building",
+      "href": "/deals",
+      "blurb": "A deal's page now opens the way a listing does. On a wide screen, the building's picture sits beside the deal's name, its call and its three figures. On a phone or tablet the picture comes first, and the name and figures still fit on the first screen. The deal's tools sit in a bar underneath, and Replace photo is on the picture itself."
+    },
+    {
+      "date": "2026-09-25",
       "title": "The deal's pictures, as a filmstrip",
       "href": "/deals",
       "blurb": "The row of word tabs above a deal's picture (Photo, Street, Aerial, Flood, Map) is now a filmstrip under it, the way a listing shows its photos. Each view has its own small picture, and the one on screen is outlined. The thumbnails reuse the images the views already load, so the page makes no extra requests. A view whose picture fails to load drops out of the strip, as before."

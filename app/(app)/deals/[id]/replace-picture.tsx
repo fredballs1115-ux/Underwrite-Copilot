@@ -7,7 +7,16 @@ import { replacePicture } from "../actions";
 /** The size the action refuses past — said here before the upload starts. */
 const MAX_MB = 12;
 
-function PickButton({ hasPicture }: { hasPicture: boolean }) {
+/** How the control sits: on a plain bar, or on the picture itself (#433),
+ *  where it wears the same dark glass as the picture's credit lines. */
+export type PickTone = "plain" | "overlay";
+
+const TONE: Record<PickTone, string> = {
+  plain: "border border-line hover:bg-faint",
+  overlay: "bg-black/55 text-white shadow-sm backdrop-blur-sm hover:bg-black/70",
+};
+
+function PickButton({ hasPicture, tone }: { hasPicture: boolean; tone: PickTone }) {
   const { pending } = useFormStatus();
   const inputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -44,7 +53,7 @@ function PickButton({ hasPicture }: { hasPicture: boolean }) {
             ? "Swap the photograph for one of your own — a JPEG, PNG or WebP of the building."
             : "Add a photograph of the building — a JPEG, PNG or WebP. It leads the deal's picture from then on."
         }
-        className="inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1 text-[11px] font-medium transition-colors hover:bg-faint disabled:cursor-not-allowed disabled:opacity-50"
+        className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${TONE[tone]}`}
       >
         {pending ? (
           <span aria-hidden className="h-3 w-3 animate-spin rounded-full border-2 border-line border-t-brand" />
@@ -70,11 +79,19 @@ function PickButton({ hasPicture }: { hasPicture: boolean }) {
 }
 
 /** "That's not the building" or "I have a better shot": the reader's own picture, in one step. */
-export function ReplacePicture({ dealId, hasPicture }: { dealId: string; hasPicture: boolean }) {
+export function ReplacePicture({
+  dealId,
+  hasPicture,
+  tone = "plain",
+}: {
+  dealId: string;
+  hasPicture: boolean;
+  tone?: PickTone;
+}) {
   return (
     <form action={replacePicture}>
       <input type="hidden" name="dealId" value={dealId} />
-      <PickButton hasPicture={hasPicture} />
+      <PickButton hasPicture={hasPicture} tone={tone} />
     </form>
   );
 }

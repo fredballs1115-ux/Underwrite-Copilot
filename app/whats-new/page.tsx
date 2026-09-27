@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
 import { MarketsMarquee } from "@/app/markets-marquee";
-import { LONG_NOTE, blurbExcerpt, changelogEntries } from "@/lib/changelog";
+import { FULL_NOTES, LONG_NOTE, blurbExcerpt, changelogArchive, changelogEntries } from "@/lib/changelog";
 
 // ISR, five-minute window — same freshness cap as the homepage, so a new
 // changelog entry shows here within minutes of deploying.
@@ -20,7 +20,10 @@ export const metadata: Metadata = {
  *  all three, so no surface can outrun another. Every entry names where in
  *  the app to see it, so the log doubles as a tour. */
 export default function WhatsNewPage() {
-  const entries = changelogEntries(100);
+  // The newest in full; every older note as one line of the archive below,
+  // so no title ever falls off the page (#433).
+  const entries = changelogEntries(FULL_NOTES);
+  const archive = changelogArchive();
   const fmt = (iso: string) =>
     new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", {
       weekday: "short",
@@ -36,7 +39,8 @@ export default function WhatsNewPage() {
     if (list) list.push(e);
     else byDay.set(e.date, [e]);
   }
-  const oldest = entries[entries.length - 1];
+  const oldest = archive[archive.length - 1] ?? entries[entries.length - 1];
+  const logged = entries.length + archive.length;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -66,7 +70,7 @@ export default function WhatsNewPage() {
         </p>
         {entries.length > 0 && oldest && (
           <p className="mt-2 text-xs font-medium text-brand">
-            {entries.length} improvements logged since {fmt(oldest.date)} —
+            {logged} improvements logged since {fmt(oldest.date)} —
             every one live on this build, every one linking to where it landed.
           </p>
         )}
@@ -135,6 +139,31 @@ export default function WhatsNewPage() {
               </section>
             ))}
           </div>
+        )}
+        {/* The older notes, one line each: the title, the day and where it
+            landed — the notes themselves stay in the log. */}
+        {archive.length > 0 && (
+          <section aria-labelledby="earlier" className="mt-10">
+            <h2 id="earlier" className="text-xs font-semibold uppercase tracking-wider text-muted">
+              Earlier improvements
+            </h2>
+            <ul className="mt-3 divide-y divide-line rounded-xl border border-line bg-surface">
+              {archive.map((e) => (
+                <li key={`${e.date}|${e.title}`} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-4 py-2.5">
+                  <p className="min-w-0 text-sm">
+                    <span className="mr-2 text-[11px] text-muted">{fmt(e.date)}</span>
+                    {e.title}
+                  </p>
+                  <Link
+                    href={e.href}
+                    className="shrink-0 text-[11px] font-medium text-brand underline-offset-2 hover:underline"
+                  >
+                    See it live →
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
         <p className="mt-10 text-sm text-muted">
           Want these features on your own deals?{" "}

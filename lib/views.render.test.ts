@@ -3135,6 +3135,106 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
   });
 });
 
+// ── The deal header, laid out the way a listing opens (#433) ───────────────
+import { DealHero } from "@/app/(app)/deals/[id]/deal-hero";
+
+describe("DealHero — the building's picture beside its name and its figures (#433)", () => {
+  const figures = [
+    { label: "Price", value: "$48,500,000", figure: true },
+    { label: "Size", value: "248 units", figure: true },
+    { label: "Going-in cap", value: "5.45%", figure: true },
+    { label: "Deal type", value: "Stabilized", title: "A stabilized asset bought on its in-place income." },
+  ];
+  const hero = (picture: React.ReactNode, panels?: React.ReactNode) =>
+    renderToStaticMarkup(
+      React.createElement(
+        DealHero,
+        {
+          title: "The Maddox",
+          chips: React.createElement("span", { className: "rounded-full bg-pass/10 px-2.5 py-0.5 text-xs font-semibold text-pass" }, "Go"),
+          subtitle: "1200 N 31st St, Philadelphia, PA · Multifamily",
+          figures,
+          picture,
+          actions: React.createElement(
+            React.Fragment,
+            null,
+            React.createElement("a", { href: "/api/deals/d1/memo", className: "rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium" }, "IC memo"),
+            React.createElement("a", { href: "/api/deals/d1/report", className: "rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium" }, "Full report"),
+          ),
+          controls: React.createElement(
+            "label",
+            { className: "flex items-center gap-1.5 text-xs" },
+            "Stage",
+            React.createElement("select", { defaultValue: "screening", className: "rounded-lg border border-line bg-surface px-2 py-1 text-xs" },
+              React.createElement("option", { value: "screening" }, "Screening"),
+            ),
+          ),
+        },
+        panels,
+      ),
+    );
+  const visual = React.createElement(PropertyVisual, {
+    dealId: "d1",
+    label: "1200 N 31st St, Philadelphia, PA",
+    hasStreetAddress: true,
+    googleEnabled: false,
+    picture: { credit: "From the offering memorandum", source: "om" as const },
+    flood: {
+      key: [{ label: "0.2% Annual Chance Flood Hazard", image: null, here: true }],
+      line: "The building sits in Zone X (0.2% annual chance flood hazard), outside the Special Flood Hazard Area.",
+    },
+  });
+  const panel = React.createElement(
+    "section",
+    { "aria-label": "What is being sold", className: "mt-4 rounded-xl border border-l-4 border-brand/30 border-l-brand bg-brand/5 px-4 py-3 text-sm" },
+    "A leasehold: the ground lease ends Dec 2071, 45.3 years from today.",
+  );
+  const html = hero(visual, panel);
+  const bare = hero(null);
+
+  it("lays the picture beside the name and the figures, and reads clean", () => {
+    dumpView("deal-hero", html);
+    dumpView("deal-hero-bare", bare);
+    expect(a11yIssues(html), "a11y deal hero").toEqual([]);
+    expect(a11yIssues(bare), "a11y bare deal hero").toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(html).toContain("data-deal-hero");
+    expect(html).toMatch(/<h1[^>]*>The Maddox<\/h1>/);
+    for (const f of figures) {
+      expect(text).toContain(f.label);
+      expect(text).toContain(f.value);
+    }
+    expect(html).toContain('title="A stabilized asset bought on its in-place income."');
+    // The picture is the header's own, marked so the header splits only
+    // while it is there; its Replace photo sits on the picture itself.
+    expect(html).toContain('data-hero-picture="true"');
+    expect(html).toContain("[grid-area:pic]");
+    expect(text).toContain("Replace photo");
+    expect(html).toContain("bg-black/55 text-white");
+    // The name comes first to a screen reader; the grid puts the picture
+    // first on the page.
+    expect(html.indexOf("<h1")).toBeLessThan(html.indexOf('data-hero-picture="true"'));
+    // The toolbar and the panels follow.
+    expect(text).toContain("IC memo");
+    expect(text).toContain("the ground lease ends Dec 2071");
+    // The card never clips: the share panel and the deal's menu open out of
+    // the toolbar as popovers. The picture rounds its own top corners.
+    const card = html.match(/<header data-deal-hero="true" class="([^"]*)"/)?.[1] ?? "";
+    expect(card).toContain("rounded-2xl");
+    expect(card).not.toContain("overflow-hidden");
+    expect(html).toMatch(/<figure data-hero-picture="true" class="[^"]*rounded-t-\[15px\][^"]*@3xl:rounded-tr-none/);
+  });
+
+  it("with no picture, the header is one column and marks nothing to split around", () => {
+    expect(bare).not.toContain('data-hero-picture="true"');
+    expect(bare).not.toContain("[grid-area:pic]");
+    expect(visibleText(bare)).toContain("$48,500,000");
+    // The panels' slot is empty and hides itself rather than leaving a gap.
+    expect(bare).toMatch(/<div class="[^"]*empty:hidden[^"]*"><\/div>/);
+  });
+});
+
 // ── The site flags' flood chip (#425) ──────────────────────────────────────
 import { SiteFlagsCard } from "@/app/(app)/deals/[id]/site-flags-card";
 
