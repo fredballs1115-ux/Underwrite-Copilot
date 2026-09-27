@@ -358,6 +358,32 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(text).toMatch(/\$252k\/unit against the subject's \$274k\/unit/);
   });
 
+  it("the comps tab pictures each comparable from the reader's own pipeline beside its name (#435)", () => {
+    const html = render({
+      ...sampleProps("analyses", "comps"),
+      internalComps: [
+        {
+          dealId: "deal-2",
+          name: "Girard Flats",
+          market: "Philadelphia, PA",
+          screenedAt: "2026-08-12T15:00:00Z",
+          call: "caution",
+          priceLabel: "$41,000,000",
+          capLabel: "5.6%",
+          basisLabel: "$215k/unit",
+          kind: "stabilized",
+          kindLabel: null,
+          yieldOnCostLabel: null,
+        },
+      ],
+    } as unknown as Props);
+    expect(html).toContain("From your pipeline");
+    expect(html).toContain('src="/api/deals/deal-2/image?w=64&amp;h=64"');
+    // Before the name, in the same cell.
+    expect(html.indexOf("/api/deals/deal-2/image")).toBeLessThan(html.indexOf("Girard Flats"));
+    expect(a11yIssues(html)).toEqual([]);
+  });
+
   it("the reconciler tab draws each stated gap as a bar from a centre line", () => {
     const html = render(sampleProps("analyses", "reconciler"));
     // Two of the sample's three rows state a figure — "$174k below the OM"

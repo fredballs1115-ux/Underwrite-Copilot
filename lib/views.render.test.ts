@@ -3285,6 +3285,25 @@ describe("DealHero — the building's picture beside its name and its figures (#
   });
 });
 
+// ── A deal's building at avatar size: the ⌘K list, the comps (#435) ────────
+import { DealAvatar } from "@/app/(app)/deal-avatar";
+
+describe("DealAvatar — each deal in a list pictured, the call on the corner where the list has no call column", () => {
+  it("draws the pipeline row's own picture route at twice the slot, lazily, with the call's dot", () => {
+    const html = renderToStaticMarkup(React.createElement(DealAvatar, { dealId: "d1", dot: "bg-pass" }));
+    expect(a11yIssues(html), "a11y deal avatar").toEqual([]);
+    expect(html).toContain('src="/api/deals/d1/image?w=64&amp;h=64"');
+    expect(html).toContain('data-deal-avatar="picture"');
+    expect(html).toContain('loading="lazy"');
+    // Decorative beside the deal's name, which the row already reads out.
+    expect(html).toMatch(/^<span aria-hidden="true"/);
+    expect(html).toContain('alt=""');
+    expect(html).toMatch(/rounded-full ring-2 ring-surface bg-pass/);
+    // No call, no dot.
+    expect(renderToStaticMarkup(React.createElement(DealAvatar, { dealId: "d1" }))).not.toContain("ring-surface");
+  });
+});
+
 // ── The site flags' flood chip (#425) ──────────────────────────────────────
 import { SiteFlagsCard } from "@/app/(app)/deals/[id]/site-flags-card";
 

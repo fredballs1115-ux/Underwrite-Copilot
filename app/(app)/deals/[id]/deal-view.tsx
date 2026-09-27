@@ -26,6 +26,7 @@ import { ActualsPrompt, type ActualsSlotState } from "./actuals-prompt";
 import { SensitivityPlayground, type PlaygroundData } from "./sensitivity-playground";
 import { type StageChange } from "@/lib/stages";
 import type { InternalComp } from "@/lib/internal-comps";
+import { DealAvatar } from "@/app/(app)/deal-avatar";
 import { DebtSizer } from "./debt-sizer";
 import { ModelVsMarketCard } from "./model-vs-market-card";
 import { AssumableLoanCard } from "./assumable-card";
@@ -1656,26 +1657,33 @@ function InternalCompsBlock({ comps }: { comps: InternalComp[] }) {
               const call = c.call ? COMP_CALL[c.call] : null;
               return (
                 <tr key={c.dealId}>
-                  <td className="max-w-50 py-2 pr-3">
-                    <Link
-                      href={`/deals/${c.dealId}`}
-                      className="block truncate font-medium text-brand hover:underline"
-                    >
-                      {c.name}
-                    </Link>
-                    {c.market && (
-                      <span className="block truncate text-xs text-muted">
-                        {c.market}
-                      </span>
-                    )}
-                    {c.kindLabel && (
-                      <span
-                        className="mt-0.5 inline-block rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand"
-                        title="A plan deal — its figures describe the finished project and are judged on yield on total cost; the basis shown is all-in"
-                      >
-                        {c.kindLabel}
-                      </span>
-                    )}
+                  <td className="max-w-60 py-2 pr-3">
+                    {/* Each comparable pictured beside its name (#435), the
+                        way a comp table shows the buildings it compares. */}
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <DealAvatar dealId={c.dealId} />
+                      <div className="min-w-0">
+                        <Link
+                          href={`/deals/${c.dealId}`}
+                          className="block truncate font-medium text-brand hover:underline"
+                        >
+                          {c.name}
+                        </Link>
+                        {c.market && (
+                          <span className="block truncate text-xs text-muted">
+                            {c.market}
+                          </span>
+                        )}
+                        {c.kindLabel && (
+                          <span
+                            className="mt-0.5 inline-block rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand"
+                            title="A plan deal — its figures describe the finished project and are judged on yield on total cost; the basis shown is all-in"
+                          >
+                            {c.kindLabel}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </td>
                   <td className="whitespace-nowrap py-2 pr-3 font-mono text-xs tabular-nums text-muted">
                     {new Date(c.screenedAt).toLocaleDateString("en-US", {
