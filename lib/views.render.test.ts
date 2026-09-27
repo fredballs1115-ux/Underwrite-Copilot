@@ -947,8 +947,19 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
         assetClass: SAMPLE_DEAL.asset_class,
         expiresAt: "2026-09-30T12:00:00Z",
         verdictStale: false,
-        aerial: {
-          src: "/api/share/0f6f2d4e-1b2c-4d5e-8f90-a1b2c3d4e5f6/aerial?w=960&h=400",
+        picture: {
+          sources: [
+            {
+              kind: "photo",
+              src: "/api/share/0f6f2d4e-1b2c-4d5e-8f90-a1b2c3d4e5f6/picture?size=hero",
+              credit: "From the offering memorandum",
+            },
+            {
+              kind: "aerial",
+              src: "/api/share/0f6f2d4e-1b2c-4d5e-8f90-a1b2c3d4e5f6/aerial?w=960&h=400",
+              credit: "aerial imagery: USGS The National Map (public domain)",
+            },
+          ],
           place: "Brewerytown, Philadelphia, PA",
         },
         extraction: SAMPLE_DEAL.extraction,
@@ -964,10 +975,14 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     expect(gluedWords(text)).toEqual([]);
     expect(text).toContain(SAMPLE_DEAL.name);
     expect(text).toContain("expires Sep 30");
-    // The building from above, through the token-scoped route, credited.
-    expect(html).toContain('alt="Aerial view of Brewerytown, Philadelphia, PA"');
-    expect(html).toContain("/api/share/0f6f2d4e-1b2c-4d5e-8f90-a1b2c3d4e5f6/aerial");
-    expect(text).toContain("USGS The National Map");
+    // The building's own photograph leads (#434), through the token-scoped
+    // route and credited as its own; the aerial waits behind it, drawn only
+    // if the photograph fails, so its credit is not on the page.
+    expect(html).toContain('data-share-picture="photo"');
+    expect(html).toContain('alt="Photograph of Brewerytown, Philadelphia, PA"');
+    expect(html).toContain("/api/share/0f6f2d4e-1b2c-4d5e-8f90-a1b2c3d4e5f6/picture?size=hero");
+    expect(text).toContain("From the offering memorandum");
+    expect(text).not.toContain("USGS The National Map");
     expect(text).toContain("Caution");
     // The call across the range, as three dots — No-go / Caution / Go.
     expect(text).toMatch(/Conservative\s*No-go/);
@@ -1010,7 +1025,7 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
       assetClass: SAMPLE_DEAL.asset_class,
       expiresAt: "2026-09-30T12:00:00Z",
       verdictStale: false,
-      aerial: null,
+      picture: null,
       comps: SAMPLE_DEAL.comps,
       market: SAMPLE_DEAL.market,
       verdict: SAMPLE_DEAL.verdict,
@@ -1027,13 +1042,48 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     );
   });
 
+  it("falls back to the aerial where the deal has no photograph of its own, credited to USGS, and draws no frame with neither (#434)", () => {
+    const base = {
+      dealName: SAMPLE_DEAL.name,
+      assetClass: SAMPLE_DEAL.asset_class,
+      expiresAt: "2026-09-30T12:00:00Z",
+      verdictStale: false,
+      extraction: SAMPLE_DEAL.extraction,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const aerialOnly = renderToStaticMarkup(
+      React.createElement(ShareView, {
+        ...base,
+        picture: {
+          sources: [
+            {
+              kind: "aerial" as const,
+              src: "/api/share/0f6f2d4e-1b2c-4d5e-8f90-a1b2c3d4e5f6/aerial?w=960&h=400",
+              credit: "aerial imagery: USGS The National Map (public domain)",
+            },
+          ],
+          place: "Brewerytown, Philadelphia, PA",
+        },
+      }),
+    );
+    expect(a11yIssues(aerialOnly), "a11y share aerial").toEqual([]);
+    expect(aerialOnly).toContain('data-share-picture="aerial"');
+    expect(aerialOnly).toContain('alt="Aerial view of Brewerytown, Philadelphia, PA"');
+    expect(visibleText(aerialOnly)).toContain("USGS The National Map");
+    expect(aerialOnly).not.toContain("/picture?size=hero");
+    const none = renderToStaticMarkup(React.createElement(ShareView, { ...base, picture: null }));
+    expect(none).not.toContain("data-share-picture");
+  });
+
   it("says FEMA's flood zone under the title where the building sits in one, and nothing without a line (#426)", () => {
     const props = {
       dealName: SAMPLE_DEAL.name,
       assetClass: SAMPLE_DEAL.asset_class,
       expiresAt: "2026-09-30T12:00:00Z",
       verdictStale: false,
-      aerial: null,
+      picture: null,
       extraction: SAMPLE_DEAL.extraction,
       comps: SAMPLE_DEAL.comps,
       market: SAMPLE_DEAL.market,
@@ -1058,7 +1108,7 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
         assetClass: SAMPLE_DEAL.asset_class,
         expiresAt: "2026-09-30T12:00:00Z",
         verdictStale: false,
-        aerial: null,
+        picture: null,
         extraction: SAMPLE_DEAL.extraction,
         comps: SAMPLE_DEAL.comps,
         market: {
@@ -1116,7 +1166,7 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
         assetClass: "multifamily",
         expiresAt: "2026-10-05T12:00:00Z",
         verdictStale: true,
-        aerial: null,
+        picture: null,
         extraction: conversion,
         comps: null,
         market: null,
@@ -3297,7 +3347,7 @@ describe("ShareView — a hotel development is spoken in keys", () => {
         assetClass: "hospitality_str",
         expiresAt: "2026-10-05T12:00:00Z",
         verdictStale: false,
-        aerial: null,
+        picture: null,
         extraction: hotel,
         comps: null,
         market: null,
@@ -4039,7 +4089,7 @@ describe("PortfolioCard — a portfolio OM's properties, one row each", () => {
           assetClass: "multifamily",
           expiresAt: "2026-10-05T12:00:00Z",
           verdictStale: false,
-          aerial: null,
+          picture: null,
           extraction: ex as unknown as ExtractionResult,
           comps: null,
           market: null,
@@ -4073,7 +4123,7 @@ describe("PortfolioCard — a portfolio OM's properties, one row each", () => {
         assetClass: "multifamily",
         expiresAt: "2026-10-05T12:00:00Z",
         verdictStale: false,
-        aerial: null,
+        picture: null,
         extraction: extraction as unknown as ExtractionResult,
         comps: null,
         market: {

@@ -188,9 +188,10 @@ export type MemoData = {
     logoDataUri: string | null;
     footerText: string | null;
   } | null;
-  /** The building from above, on the cover: a JPEG or PNG data URI and its
-   *  credit line (lib/memo/cover-aerial.ts). Null or absent prints the
-   *  cover as it always was. */
+  /** The building on the cover: its own photograph where the deal has one,
+   *  else from above (#434) — a JPEG or PNG data URI and its credit line
+   *  (lib/memo/cover-aerial.ts). Null or absent prints the cover as it
+   *  always was. */
   cover?: MemoCover | null;
 };
 

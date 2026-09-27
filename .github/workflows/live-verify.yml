@@ -1024,6 +1024,9 @@ jobs:
           mark "#432 the deal views are a filmstrip" grep -q "pictures, as a filmstrip" p_whats-new.html
           # #433 — the deal page opens on its building (signed-in): its card.
           mark "#433 each deal opens on its building" grep -q "Each deal opens on its building" p_whats-new.html
+          # #434 — the building's own photograph on the shared screen and the
+          # memo's cover (a token-scoped page and a signed-in download): its card.
+          mark "#434 the shared link and the memo lead with the building" grep -q "on the shared link and the IC memo" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

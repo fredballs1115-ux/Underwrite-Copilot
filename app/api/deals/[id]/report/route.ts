@@ -23,7 +23,7 @@ import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { buildSensitivityData, type SensitivityData } from "@/lib/underwrite/report-grid";
 import { buildPlanReport, type PlanReport } from "@/lib/plan-sensitivity";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
-import { coverAerialFor } from "@/lib/memo/cover-aerial";
+import { coverPictureFor } from "@/lib/memo/cover-aerial";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { floodMapFor } from "@/lib/flood-map";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
@@ -266,13 +266,13 @@ export async function GET(
       deal.name,
       (deal.extraction as ExtractionResult | null) ?? null,
     );
-    // The cover aerial, as the standalone memo carries it, and the site's
-    // flood map (#427) — fetched side by side, each bounded, so neither
-    // holds the report up.
+    // The cover picture, as the standalone memo carries it (#434), and the
+    // site's flood map (#427) — fetched side by side, each bounded, so
+    // neither holds the report up.
     const address = (deal.address as StructuredAddress | null) ?? null;
     const visualCache = (deal as unknown as { photo?: DealVisualCache | null }).photo ?? null;
     const [cover, floodMap] = await Promise.all([
-      coverAerialFor(supabase, id, address, visualCache),
+      coverPictureFor(supabase, id, address, visualCache),
       floodMapFor(
         supabase,
         id,

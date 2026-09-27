@@ -18,7 +18,7 @@ import { keyTermRows } from "@/lib/key-terms";
 import { readPortfolio } from "@/lib/portfolio";
 import { PortfolioCard } from "@/app/portfolio-card";
 import { SharePlan } from "./plan-facts";
-import { ShareAerial } from "./share-aerial";
+import { SharePicture, type SharePictureSource } from "./share-picture";
 
 /**
  * The read-only shared screen, as pure markup. `page.tsx` is the loader: it
@@ -38,9 +38,10 @@ export interface ShareViewProps {
   expiresAt: string;
   /** the sender's latest screen failed before it reached the verdict */
   verdictStale: boolean;
-  /** the building from above — the token-scoped aerial route and the place
-   *  it frames; null when the deal has no address */
-  aerial: { src: string; place: string } | null;
+  /** the building (#434): its own photograph where the deal has one, then
+   *  the aerial — each a token-scoped route with its credit — and the
+   *  place they picture; null when there is neither */
+  picture: { sources: SharePictureSource[]; place: string } | null;
   extraction: ExtractionResult | null;
   comps: BrokerCompsResult | null;
   market: MarketResult | null;
@@ -226,7 +227,7 @@ export function ShareView({
   assetClass,
   expiresAt,
   verdictStale,
-  aerial,
+  picture,
   extraction,
   comps,
   market,
@@ -306,7 +307,7 @@ export function ShareView({
         </p>
       )}
 
-      {aerial && <ShareAerial src={aerial.src} place={aerial.place} />}
+      {picture && picture.sources.length > 0 && <SharePicture sources={picture.sources} place={picture.place} />}
 
       <section
         className={`mt-6 rounded-2xl border border-line bg-surface p-5 shadow-sm border-l-4 ${vmeta.border}`}

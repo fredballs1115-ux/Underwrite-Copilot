@@ -5,9 +5,43 @@
  * because react-pdf hangs its whole render on a corrupt PNG, the memo
  * download must never be handed one.
  */
-import { describe, expect, it } from "vitest";
-import { coverFrom, intactImage } from "./cover-aerial";
+import sharp from "sharp";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CORRUPT_PNG, TINY_PNG } from "./test-png";
+
+const state = vi.hoisted(() => ({
+  pictureBytes: null as Buffer | null,
+  pictureReads: [] as string[],
+  aerialAsks: 0,
+}));
+
+// The stored photograph (#434), and the aerial behind it.
+vi.mock("@/lib/deal-picture", () => ({
+  PICTURE_CREDIT: { om: "From the offering memorandum", upload: "Photograph added to the deal" },
+  readPictureBytes: async (dealId: string, _picture: unknown, size: string) => {
+    state.pictureReads.push(`${dealId}:${size}`);
+    if (!state.pictureBytes) throw new Error("the stored file is gone");
+    return state.pictureBytes;
+  },
+}));
+vi.mock("@/lib/imagery", () => ({
+  IMAGE_CREDIT: {
+    photo: "From the offering memorandum",
+    streetview: "Street View imagery © Google",
+    satellite: "Satellite imagery © Google",
+    aerial: "Imagery: USGS The National Map",
+  },
+  fetchOneImage: async (source: string) => {
+    state.aerialAsks += 1;
+    return {
+      source,
+      response: new Response(new Uint8Array(TINY_PNG), { headers: { "content-type": "image/png" } }),
+    };
+  },
+}));
+
+import { COVER_SIZE, coverFrom, coverPictureFor, fitCover, intactImage } from "./cover-aerial";
 
 const image = (type: string, body: Buffer | null = TINY_PNG) =>
   new Response(body ? new Uint8Array(body) : null, { headers: { "content-type": type } });
@@ -68,5 +102,67 @@ describe("coverFrom", () => {
     const cover = await coverFrom(() => new Promise(() => {}), 40);
     expect(cover).toBeNull();
     expect(Date.now() - started).toBeLessThan(2_000);
+  });
+});
+
+describe("coverPictureFor — the building's own photograph on the cover, the aerial behind it (#434)", () => {
+  const supabase = {} as SupabaseClient;
+  const address = { label: "1200 N 31st St, Philadelphia, PA", street: "1200 N 31st St" } as never;
+  const picture = {
+    hero: "photos/d1/1700000000000-hero.jpg",
+    thumb: "photos/d1/1700000000000-thumb.jpg",
+    width: 1600,
+    height: 1067,
+    source: "om" as const,
+    at: "2026-09-20T12:00:00Z",
+  };
+  beforeEach(() => {
+    state.pictureReads = [];
+    state.aerialAsks = 0;
+    state.pictureBytes = null;
+  });
+  // A 1600 × 1067 photograph, as the stored hero derivative is.
+  const hero = () =>
+    sharp({ create: { width: 1600, height: 1067, channels: 3, background: { r: 120, g: 150, b: 180 } } })
+      .jpeg()
+      .toBuffer();
+
+  it("cuts a stored photograph to the cover's own pixels, a whole JPEG", async () => {
+    const framed = await fitCover(await hero());
+    const meta = await sharp(framed).metadata();
+    expect([meta.width, meta.height]).toEqual([COVER_SIZE.width, COVER_SIZE.height]);
+    expect(meta.format).toBe("jpeg");
+    expect(intactImage(framed, "image/jpeg")).toBe(true);
+  });
+
+  it("leads with the deal's own photograph, credited as the memorandum's, and asks for no aerial", async () => {
+    state.pictureBytes = await hero();
+    const cover = await coverPictureFor(supabase, "d1", address, { picture } as never);
+    expect(cover?.dataUri.startsWith("data:image/jpeg;base64,")).toBe(true);
+    expect(cover?.credit).toBe("From the offering memorandum");
+    expect(state.pictureReads).toEqual(["d1:hero"]);
+    expect(state.aerialAsks).toBe(0);
+    // A picture the reader added is credited as theirs.
+    const theirs = await coverPictureFor(supabase, "d1", address, { picture: { ...picture, source: "upload" } } as never);
+    expect(theirs?.credit).toBe("Photograph added to the deal");
+  });
+
+  it("falls back to the aerial where the deal has no photograph, or its file is gone", async () => {
+    const aerial = await coverPictureFor(supabase, "d1", address, null);
+    expect(aerial?.credit).toBe("Imagery: USGS The National Map");
+    expect(state.pictureReads).toEqual([]);
+    expect(state.aerialAsks).toBe(1);
+
+    const gone = await coverPictureFor(supabase, "d1", address, { picture } as never);
+    expect(gone?.credit).toBe("Imagery: USGS The National Map");
+    expect(state.pictureReads).toEqual(["d1:hero"]);
+    expect(state.aerialAsks).toBe(2);
+  });
+
+  it("a deal with a photograph and no address still gets its photograph; with neither, no cover", async () => {
+    state.pictureBytes = await hero();
+    expect((await coverPictureFor(supabase, "d1", null, { picture } as never))?.credit).toBe("From the offering memorandum");
+    state.pictureBytes = null;
+    expect(await coverPictureFor(supabase, "d1", null, null)).toBeNull();
   });
 });

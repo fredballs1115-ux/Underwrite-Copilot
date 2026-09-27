@@ -16,7 +16,7 @@ import type { StructuredAddress } from "@/lib/address";
 import { inferStrategy } from "@/lib/deal-strategy";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
 import { staleAfterFailure } from "@/lib/screen-run";
-import { coverAerialFor } from "@/lib/memo/cover-aerial";
+import { coverPictureFor } from "@/lib/memo/cover-aerial";
 import type { DealVisualCache } from "@/lib/deal-location";
 
 // PDF generation needs the Node runtime (not edge).
@@ -165,10 +165,11 @@ export async function GET(
       deal.name,
       (deal.extraction as ExtractionResult | null) ?? null,
     );
-    // The building from above, on the cover — the same USGS frame the deal
-    // page's Aerial tab shows, through the same resolver. Bounded to a few
-    // seconds: the memo never waits on imagery, it just prints without it.
-    const cover = await coverAerialFor(
+    // The building on the cover (#434): its own photograph where the deal
+    // has one, else the same USGS frame the deal page's Aerial tab shows,
+    // through the same resolver. Bounded to a few seconds: the memo never
+    // waits on imagery, it just prints without it.
+    const cover = await coverPictureFor(
       supabase,
       id,
       (deal.address as StructuredAddress | null) ?? null,
