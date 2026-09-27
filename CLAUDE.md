@@ -318,8 +318,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`
   is only the loader, so keep the markup in the view; the token's
   resolution — the six refusals, then the deal — is `lib/share-resolve.ts`,
-  shared with the token-scoped aerial route `app/api/share/[token]/aerial`,
-  so never resolve a share anywhere else) — and lint
+  shared with the token-scoped picture and aerial routes
+  (`app/api/share/[token]/picture`, `…/aerial`), so never resolve a share
+  anywhere else) — and lint
   the visible text with `lib/render-lint.ts` (a digit glued to a word, a word
   doubled, an article the figure after it does not take; `a11yIssues`: an
   image with no alt, a nameless button or link, an unlabelled control, a
@@ -401,8 +402,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   says, not on its page count. `lib/key-terms.ts` orders a "Key terms" block
   (memo and shared screen): the deal-defining rows first, then the flagged
   ones. Standard Helvetica is WinAnsi-only (`lib/memo/pdf-text.ts`): no "✓",
-  no arrows. The memo's cover aerial is fetched at render time, bounded, and
-  its bytes validated before embedding (`lib/memo/cover-aerial.ts`):
+  no arrows. The memo's cover picture — the deal's own photograph cut to
+  the cover's pixels (`fitCover`), else the aerial (`coverPictureFor`,
+  #434) — is fetched at render time, bounded, and its bytes validated
+  before embedding (`lib/memo/cover-aerial.ts`):
   react-pdf hangs the whole render on a PNG whose zlib check fails rather
   than throwing, so never hand it unverified image bytes; test images come
   from `lib/memo/test-png.ts`, built with the real deflate and CRC. A
@@ -2345,7 +2348,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   credited to Google or to USGS. A replaced memorandum drops the picture
   taken from the old one; a picture the reader added ("Replace photo" /
   "Add photo" on the deal page, `replacePicture`, 12 MB, never on the
-  sample) survives a reissue. **A building's photograph is never fetched
+  sample) survives a reissue. **The shared screen and the IC memo lead
+  with it too** (#434): they had printed the USGS aerial alone, so a
+  partner opening the link, or a committee reading the memo, met the
+  roofs of the block while the sender was looking at the building.
+  `SharePicture` (`app/share/[token]/share-picture.tsx`) walks the stored
+  photograph through the token-scoped `/api/share/[token]/picture` (only
+  what is stored — a share never reads the memorandum — revalidated
+  against the stored path, so a revoked link's picture stops with the
+  link), then the aerial, the credit following whichever loaded; the
+  memo's cover and so the report's first page take the photograph cut to
+  the cover's pixels (`coverPictureFor`, `fitCover`), credited as the
+  memorandum's or the reader's, the aerial behind it. Google's frames
+  stay off the public page and off paper. **A building's photograph is never fetched
   from a listing portal or an image search**: the memorandum's cover was
   sent to the reader to evaluate this deal, which is exactly this use, and
   a portal's photograph is under that portal's terms. The Street View

@@ -11,6 +11,13 @@ import { staleAfterFailure } from "@/lib/screen-run";
 import { SHARE_REFUSAL_COPY, resolveShare } from "@/lib/share-resolve";
 import { Expired, ShareView } from "./share-view";
 import { floodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
+import type { DealVisualCache } from "@/lib/deal-location";
+import { PICTURE_CREDIT } from "@/lib/deal-picture";
+import type { SharePictureSource } from "./share-picture";
+
+/** The aerial's credit on the public screen: The National Map is a US
+ *  federal work in the public domain, and the line says so. */
+const SHARE_AERIAL_CREDIT = "aerial imagery: USGS The National Map (public domain)";
 
 // Every render checks expiry/revocation against the database.
 export const dynamic = "force-dynamic";
@@ -25,9 +32,9 @@ export const metadata: Metadata = {
  * The loader for the read-only shared screen. The token's resolution — its
  * shape, the link's expiry and revocation, the deal, the sender's standing
  * access — is `resolveShare` (lib/share-resolve), shared with the
- * token-scoped aerial route so the picture can never outlive the page. The
- * markup is `ShareView` (share-view.tsx), pure so the render tests draw it
- * on fixtures.
+ * token-scoped picture and aerial routes so the picture can never outlive
+ * the page. The markup is `ShareView` (share-view.tsx), pure so the render
+ * tests draw it on fixtures.
  */
 /** FEMA's flood zone at the building from the stored lookup, one line
  *  (#426); null while the lookup is pending or has nothing to say. */
@@ -59,13 +66,22 @@ export default async function SharePage({
     .limit(1)
     .maybeSingle();
 
-  // The building from above, when the deal has a place to frame. The route
-  // is scoped by the same token, so the picture lives exactly as long as the
-  // link does.
+  // The building (#434): its own photograph where the deal has one — the
+  // order the sender's deal page leads with — then the aerial where the deal
+  // has a place to frame. Each route is scoped by the same token, so the
+  // picture lives exactly as long as the link does, and each carries its own
+  // credit, so the line under the frame is the picture in it.
   const address = (deal.address as StructuredAddress | null) ?? null;
-  const aerial = address?.label
-    ? { src: `/api/share/${token}/aerial?w=960&h=400`, place: address.label }
-    : null;
+  const stored = ((deal.photo as DealVisualCache | null) ?? null)?.picture ?? null;
+  const sources: SharePictureSource[] = [
+    ...(stored
+      ? [{ kind: "photo" as const, src: `/api/share/${token}/picture?size=hero`, credit: PICTURE_CREDIT[stored.source] }]
+      : []),
+    ...(address?.label
+      ? [{ kind: "aerial" as const, src: `/api/share/${token}/aerial?w=960&h=400`, credit: SHARE_AERIAL_CREDIT }]
+      : []),
+  ];
+  const picture = sources.length > 0 ? { sources, place: address?.label || deal.name } : null;
 
   return (
     <ShareView
@@ -73,7 +89,7 @@ export default async function SharePage({
       assetClass={deal.asset_class ?? null}
       expiresAt={expiresAt}
       verdictStale={staleAfterFailure(latestJob).has("verdict")}
-      aerial={aerial}
+      picture={picture}
       extraction={(deal.extraction as ExtractionResult | null) ?? null}
       comps={(deal.comps as BrokerCompsResult | null) ?? null}
       market={(deal.market as MarketResult | null) ?? null}

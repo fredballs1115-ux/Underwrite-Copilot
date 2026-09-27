@@ -65,6 +65,9 @@ export function intactImage(bytes: Buffer, type: string): boolean {
 export async function coverFrom(
   get: () => Promise<BestImage | null>,
   timeoutMs = 4_000,
+  /** the credit to print where the source's own line is not the whole
+   *  story — a deal's photograph is the memorandum's or the reader's */
+  credit?: string,
 ): Promise<MemoCover | null> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -81,7 +84,7 @@ export async function coverFrom(
     if (bytes.length === 0 || !intactImage(bytes, type)) return null;
     return {
       dataUri: `data:${type.toLowerCase()};base64,${bytes.toString("base64")}`,
-      credit: IMAGE_CREDIT[best.source],
+      credit: credit ?? IMAGE_CREDIT[best.source],
     };
   } catch {
     return null;
@@ -104,4 +107,55 @@ export function coverAerialFor(
 ): Promise<MemoCover | null> {
   if (!address?.label?.trim()) return Promise.resolve(null);
   return coverFrom(() => fetchOneImage("aerial", supabase, dealId, address, cache, COVER_SIZE));
+}
+
+/** A stored photograph cut to the cover's frame (#434): the hero derivative
+ *  runs to 1600px, and a PDF needs only the frame's own pixels — twice the
+ *  printed box, as the aerial is asked for — so the memo does not carry a
+ *  megabyte for a picture an inch and a half wide. Cropped by attention, the
+ *  way the pipeline's thumbnail is, so the building stays in the frame. */
+export async function fitCover(bytes: Buffer): Promise<Buffer> {
+  const sharp = (await import("sharp")).default;
+  return sharp(bytes)
+    .rotate()
+    .resize(COVER_SIZE.width, COVER_SIZE.height, { fit: "cover", position: sharp.strategy.attention })
+    .jpeg({ quality: 84, mozjpeg: true })
+    .toBuffer();
+}
+
+/**
+ * The picture on the memo's cover — and so on the full report's first page
+ * (#434): the building's OWN photograph where the deal has one stored (the
+ * cover of its memorandum, or the one the reader put on the deal — the
+ * picture its deal page leads with), cut to the cover's frame and credited
+ * as the memorandum's or the reader's; the USGS aerial otherwise. The cover
+ * had printed the aerial alone, so a memo for a building the reader was
+ * looking at printed its roof. Google's frames stay off paper, as they
+ * always have. Bounded and never throwing, as every cover is.
+ */
+export async function coverPictureFor(
+  supabase: SupabaseClient,
+  dealId: string,
+  address: StructuredAddress | null,
+  cache: DealVisualCache | null,
+): Promise<MemoCover | null> {
+  const picture = cache?.picture ?? null;
+  if (picture) {
+    // Loaded here, not at the top: the storage reader and sharp are for the
+    // routes, never for the pure helpers' tests.
+    const { PICTURE_CREDIT, readPictureBytes } = await import("@/lib/deal-picture");
+    const own = await coverFrom(
+      async () => {
+        const framed = await fitCover(await readPictureBytes(dealId, picture, "hero"));
+        return {
+          source: "photo",
+          response: new Response(new Uint8Array(framed), { headers: { "content-type": "image/jpeg" } }),
+        };
+      },
+      4_000,
+      PICTURE_CREDIT[picture.source],
+    );
+    if (own) return own;
+  }
+  return coverAerialFor(supabase, dealId, address, cache);
 }

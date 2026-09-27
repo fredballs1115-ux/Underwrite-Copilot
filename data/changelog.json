@@ -2,6 +2,12 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-09-27",
+      "title": "Your building, on the shared link and the IC memo",
+      "href": "/deals",
+      "blurb": "A shared link now opens on the building's own photograph (the cover of its memorandum, or the one you added) instead of an aerial of the block. So do the IC memo's cover and the full report's first page. Where a deal has no photograph, the aerial stands in, and the credit under the picture always names the picture actually shown."
+    },
+    {
       "date": "2026-09-25",
       "title": "Each deal opens on its building",
       "href": "/deals",

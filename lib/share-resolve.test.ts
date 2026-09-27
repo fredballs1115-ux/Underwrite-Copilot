@@ -1,8 +1,8 @@
 /**
  * The share token's one resolution, driven against a fake admin client: the
  * six refusals in order, the deal handed back whole when the link is good —
- * and the token-scoped aerial route, which must answer a dead link with a
- * bare 404 before it asks any imagery source for a picture.
+ * and the token-scoped aerial and picture routes, which must answer a dead
+ * link with a bare 404 before they ask any source for a picture.
  */
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -71,6 +71,8 @@ const state = vi.hoisted(() => ({
   client: null as unknown as SupabaseClient,
   imageryCalls: 0,
   imageryAnswers: true,
+  pictureReads: [] as string[],
+  pictureAnswers: true,
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({
@@ -90,8 +92,18 @@ vi.mock("@/lib/imagery", () => ({
   },
 }));
 
+vi.mock("@/lib/deal-picture", () => ({
+  PICTURE_CREDIT: { om: "From the offering memorandum", upload: "Photograph added to the deal" },
+  readPictureBytes: async (dealId: string, _picture: unknown, size: string) => {
+    state.pictureReads.push(`${dealId}:${size}`);
+    if (!state.pictureAnswers) throw new Error("the stored file is gone");
+    return Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
+  },
+}));
+
 import { SHARE_REFUSAL_COPY, resolveShare } from "./share-resolve";
 import { GET } from "@/app/api/share/[token]/aerial/route";
+import { GET as GET_PICTURE } from "@/app/api/share/[token]/picture/route";
 
 describe("resolveShare — the six refusals, then the deal", () => {
   it("refuses a malformed token before touching the database", async () => {
@@ -194,5 +206,61 @@ describe("GET /api/share/[token]/aerial — the picture lives exactly as long as
     state.client = fakeDb({ deal_shares: [share()], deals: [deal({ team_id: null })] }).client;
     expect((await get(TOKEN)).status).toBe(404);
     expect(state.imageryCalls).toBe(1);
+  });
+});
+
+describe("GET /api/share/[token]/picture — the deal's own photograph, as long as the link lives (#434)", () => {
+  const PICTURE = {
+    hero: "photos/deal-1/1700000000000-hero.jpg",
+    thumb: "photos/deal-1/1700000000000-thumb.jpg",
+    width: 1600,
+    height: 1067,
+    source: "upload",
+    at: "2026-09-20T12:00:00Z",
+  };
+  beforeEach(() => {
+    state.pictureReads = [];
+    state.pictureAnswers = true;
+  });
+  const get = (token: string, query = "?size=hero", headers?: Record<string, string>) =>
+    GET_PICTURE(new NextRequest(`https://app.test/api/share/${token}/picture${query}`, { headers }), {
+      params: Promise.resolve({ token }),
+    });
+
+  it("serves the stored photograph for a good link, credited by its own source and revalidated every view", async () => {
+    state.client = fakeDb({ deal_shares: [share()], deals: [deal({ team_id: null, photo: { picture: PICTURE } })] }).client;
+    const res = await get(TOKEN);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
+    expect(res.headers.get("x-image-credit")).toBe("Photograph added to the deal");
+    // Revalidated rather than cached for a day, so a revoked link's
+    // picture stops with the link and a replaced one shows at once.
+    expect(res.headers.get("cache-control")).toBe("private, no-cache");
+    expect(res.headers.get("etag")).toBe(`W/"${PICTURE.hero}"`);
+    expect(state.pictureReads).toEqual(["deal-1:hero"]);
+    // An unchanged picture costs a 304 and no read.
+    const again = await get(TOKEN, "?size=hero", { "if-none-match": `W/"${PICTURE.hero}"` });
+    expect(again.status).toBe(304);
+    expect(state.pictureReads).toEqual(["deal-1:hero"]);
+    // The thumbnail is its own derivative.
+    expect((await get(TOKEN, "?size=thumb")).status).toBe(200);
+    expect(state.pictureReads).toEqual(["deal-1:hero", "deal-1:thumb"]);
+  });
+
+  it("a dead link is a bare 404 and reads nothing", async () => {
+    state.client = fakeDb({ deal_shares: [share({ revoked: true })], deals: [deal({ team_id: null, photo: { picture: PICTURE } })] }).client;
+    expect((await get(TOKEN)).status).toBe(404);
+    expect((await get("not-a-uuid")).status).toBe(404);
+    expect(state.pictureReads).toEqual([]);
+  });
+
+  it("no stored photograph is a 404 without a read — a share never lifts one out of the memorandum — and a missing file is a 404 too", async () => {
+    state.client = fakeDb({ deal_shares: [share()], deals: [deal({ team_id: null, photo: null })] }).client;
+    expect((await get(TOKEN)).status).toBe(404);
+    expect(state.pictureReads).toEqual([]);
+
+    state.pictureAnswers = false;
+    state.client = fakeDb({ deal_shares: [share()], deals: [deal({ team_id: null, photo: { picture: PICTURE } })] }).client;
+    expect((await get(TOKEN)).status).toBe(404);
   });
 });
