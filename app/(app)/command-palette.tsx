@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { MarketNavEntry } from "@/lib/market-match";
+import { DealAvatar } from "./deal-avatar";
 
 type PaletteDeal = {
   id: string;
@@ -293,7 +294,8 @@ export function CommandPalette({
       label: d.name,
       hint: d.market || d.address || d.stage,
       href: `/deals/${d.id}`,
-      dot: d.call ? (CALL_DOT[d.call] ?? "bg-line") : "bg-line",
+      // The building's picture with the call's dot on its corner (#435).
+      icon: <DealAvatar dealId={d.id} dot={d.call ? (CALL_DOT[d.call] ?? "bg-line") : "bg-line"} />,
       group: "deals" as const,
       search: `${d.name} ${d.market} ${d.address} ${d.docs}`,
     }));

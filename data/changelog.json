@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-27",
+      "title": "Every deal list shows the building",
+      "href": "/deals",
+      "blurb": "The ⌘K search now shows each deal's building beside its name, with the call as a dot on the picture's corner, the way a listing site's search shows its results. The comps from your own pipeline on a deal's Comps tab show each comparable building too. Each uses the same best picture as the pipeline: the building's own photograph first, then the street view, then the aerial."
+    },
+    {
+      "date": "2026-09-27",
       "title": "Your building, on the shared link and the IC memo",
       "href": "/deals",
       "blurb": "A shared link now opens on the building's own photograph (the cover of its memorandum, or the one you added) instead of an aerial of the block. So do the IC memo's cover and the full report's first page. Where a deal has no photograph, the aerial stands in, and the credit under the picture always names the picture actually shown."

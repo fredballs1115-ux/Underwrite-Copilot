@@ -2360,7 +2360,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   memo's cover and so the report's first page take the photograph cut to
   the cover's pixels (`coverPictureFor`, `fitCover`), credited as the
   memorandum's or the reader's, the aerial behind it. Google's frames
-  stay off the public page and off paper. **A building's photograph is never fetched
+  stay off the public page and off paper. **And every list of deals
+  pictures each one** (#435, `app/(app)/deal-avatar.tsx`, `DealAvatar`):
+  the building at avatar size through the pipeline row's own
+  `/api/deals/[id]/image`, asked at twice the slot, lazy, a plate where
+  nothing loads so the names start at one x — in the ⌘K list with the
+  call's dot on its corner, and beside each comparable in the deal page's
+  "From your pipeline" comps. **A building's photograph is never fetched
   from a listing portal or an image search**: the memorandum's cover was
   sent to the reader to evaluate this deal, which is exactly this use, and
   a portal's photograph is under that portal's terms. The Street View
