@@ -2624,7 +2624,22 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   operator's (WILL_TODO's first section has the order of the move:
   Render's custom domain, `NEXT_PUBLIC_APP_URL` on web and worker,
   Supabase's URLs, then `CANONICAL_HOST` last). Live-verify fetches the
-  sitemap and the key and greps Pittsburgh's page title.
+  sitemap and the key and greps Pittsburgh's page title. **Each market
+  page previews its own city** (#436): a shared `/market?metro=` link had
+  gone out under the homepage's title and the site's one card, because a
+  child's `openGraph` replaces the root's wholesale, so the page's
+  `generateMetadata` states the preview's title, description and picture
+  (`marketMeta`'s `image`). A metro's picture is
+  `/api/og/market/[id]` (`lib/og-card.tsx`): the market's own skyline
+  (`lib/skyline-fetch`, the one Commons fetch and cache the skyline route
+  shares) cut to 1200 × 630, the words drawn by next/og in its bundled
+  Geist as a transparent layer and laid over by sharp as a JPEG, with the
+  photographer's credit, the licence and "cropped" on the card — and a
+  photograph whose credit the card's font cannot draw (`cardCanDraw`:
+  Philadelphia's 颐园居) stays off the card, the business district's USGS
+  overhead (`lib/metro-overhead`, shared with the overhead route) standing
+  in; where neither answers, a 307 to the site's own card, never a blank.
+  Live-verify prints each card's type and size (`OG CARD`).
 - The News page's live layer: `lib/news/feeds.ts` (pure: the sources with
   their fallbacks, parsing, ranking) and `lib/news/live.ts` (the network:
   a fresh copy per process, a wall-clock deadline per source, the

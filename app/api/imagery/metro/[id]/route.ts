@@ -13,10 +13,8 @@
 // the homepage costs nothing to serve and needs no key.
 
 import { NextResponse } from "next/server";
-import { usgsAerialUrl } from "@/lib/basemaps";
-import { finishAerial } from "@/lib/aerial-finish";
-import { frameZoom } from "@/lib/imagery-plan";
-import { METRO_FRAME_METRES, metroView } from "@/lib/metro-imagery";
+import { metroView } from "@/lib/metro-imagery";
+import { fetchMetroOverhead } from "@/lib/metro-overhead";
 
 // 1600 is the hero's backdrop (lib/photos HERO_AERIAL): a 1.2km frame across
 // 1600px is ~0.75 m/px, still inside NAIP's native 0.6–1.0 m/px, so even
@@ -53,44 +51,13 @@ export async function GET(
   const width = clamp(q.get("w"), SIZE.min, SIZE.max, SIZE.defaultW);
   const height = clamp(q.get("h"), SIZE.min, SIZE.max, SIZE.defaultH);
 
-  const url = usgsAerialUrl({
-    center: { lat: view.lat, lng: view.lng },
-    zoom: frameZoom({
-      widthPx: width,
-      lat: view.lat,
-      precision: "area",
-      source: "aerial",
-      frameMetres: METRO_FRAME_METRES,
-    }),
-    width,
-    height,
-  });
-
-  let img: Response;
-  try {
-    img = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-  } catch {
-    return new NextResponse(null, { status: 404 });
-  }
-  const type = img.headers.get("content-type") ?? "";
-  // The ArcGIS export endpoint answers 200 with a JSON error body when it
-  // dislikes a request, so content-type is the real success test.
-  if (!img.ok || !img.body || !type.startsWith("image/")) {
-    return new NextResponse(null, { status: 404 });
-  }
-
-  // The same finish every building's overhead gets (#429); the plain export
-  // where the finish fails.
-  const raw = Buffer.from(await img.arrayBuffer());
-  let bytes: Buffer = raw;
-  try {
-    bytes = await finishAerial(raw);
-  } catch {
-    // the plain export is still the real picture
-  }
-  return new NextResponse(new Uint8Array(bytes), {
+  // The fetch, its success test and the finish live in lib/metro-overhead
+  // (#436), shared with the link preview's card.
+  const got = await fetchMetroOverhead(id, width, height);
+  if (!got) return new NextResponse(null, { status: 404 });
+  return new NextResponse(new Uint8Array(got.bytes), {
     headers: {
-      "content-type": bytes === raw ? type : "image/jpeg",
+      "content-type": got.type,
       // A downtown does not move and the id maps to a fixed point, so this
       // response is genuinely immutable. Long public caching is also what
       // keeps a public page from hammering a free federal service.

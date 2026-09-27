@@ -39,4 +39,19 @@ describe("public pages — every market and sector page, named for itself (#430)
     expect(base.description).toContain(`${marketPages().length} US metro areas`);
     expect(marketPath("a b")).toBe("/market?metro=a%20b");
   });
+
+  it("gives a metro page its own link preview, and every other page the site's card (#436)", () => {
+    const pitt = marketMeta(marketPageFor("pittsburgh"), null);
+    expect(pitt.image).toEqual({
+      url: "/api/og/market/pittsburgh",
+      width: 1200,
+      height: 630,
+      alt: "Pittsburgh PA market data, over the market's own photograph",
+    });
+    expect(marketMeta(null, sectorPageFor("office")).image.url).toBe("/opengraph-image");
+    expect(marketMeta(null, null).image.url).toBe("/opengraph-image");
+    // Every metro page's card is its own address.
+    const urls = marketPages().map((p) => marketMeta(p, null).image.url);
+    expect(new Set(urls).size).toBe(urls.length);
+  });
 });
