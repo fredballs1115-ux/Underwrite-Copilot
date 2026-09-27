@@ -29,6 +29,22 @@ export interface PageMeta {
   title: string;
   description: string;
   canonical: string;
+  /** the link preview's picture (#436): a metro's page carries its own
+   *  card; the others the site's branded one */
+  image: { url: string; width: number; height: number; alt: string };
+}
+
+/** The site's own branded card (app/opengraph-image.tsx). */
+const SITE_CARD = {
+  url: "/opengraph-image",
+  width: 1200,
+  height: 630,
+  alt: "Underwrite Copilot: every CRE deal through the same disciplined screen",
+};
+
+/** A metro page's own card (app/api/og/market/[id]). */
+export function marketCardPath(id: string): string {
+  return `/api/og/market/${encodeURIComponent(id)}`;
 }
 
 /** Every metro page, the briefed markets first, each once. */
@@ -84,6 +100,7 @@ export function marketMeta(metro: MarketPage | null, sector: SectorPage | null):
         ? `${metro.name}: the research brief, and the published figures the site reads for the market — asking rents, rental vacancy, jobs by sector, building permits and the for-sale market — each dated and linked to its source.`
         : `${metro.name}: the published figures the site reads for the metro area — asking rents, rental vacancy, jobs by sector, building permits and the for-sale market — each dated and linked to its source.`,
       canonical: marketPath(metro.id),
+      image: { url: marketCardPath(metro.id), width: 1200, height: 630, alt: `${metro.name} market data, over the market's own photograph` },
     };
   }
   if (sector) {
@@ -91,6 +108,7 @@ export function marketMeta(metro: MarketPage | null, sector: SectorPage | null):
       title: `${sector.label} market data: vacancy, cap rates and demand by market`,
       description: `${sector.label} across the markets the site covers: the research tracker's vacancy and cap rate ranges, dated and sourced, and where demand for the space is growing.`,
       canonical: sectorPath(sector.id),
+      image: SITE_CARD,
     };
   }
   const count = marketPages().length;
@@ -98,5 +116,6 @@ export function marketMeta(metro: MarketPage | null, sector: SectorPage | null):
     title: "CRE market data: rates, rents, vacancy and jobs",
     description: `Live commercial real estate market data for ${count} US metro areas: today's Treasury curve and lending rates, asking rents, rental vacancy, jobs by sector and building permits — each figure dated and linked to its source.`,
     canonical: "/market",
+    image: SITE_CARD,
   };
 }

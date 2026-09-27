@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-27",
+      "title": "Market pages that preview their city",
+      "href": "/market?metro=pittsburgh",
+      "blurb": "Share a market page in Slack, LinkedIn or a text message and the preview now names the market and shows its own photograph: the skyline the page opens on, with the photographer's credit printed on the card. It used to show the site's general card under the homepage's title."
+    },
+    {
+      "date": "2026-09-27",
       "title": "Every deal list shows the building",
       "href": "/deals",
       "blurb": "The ⌘K search now shows each deal's building beside its name, with the call as a dot on the picture's corner, the way a listing site's search shows its results. The comps from your own pipeline on a deal's Comps tab show each comparable building too. Each uses the same best picture as the pipeline: the building's own photograph first, then the street view, then the aerial."

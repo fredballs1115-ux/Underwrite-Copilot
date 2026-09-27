@@ -132,6 +132,12 @@ jobs:
           curl -sS -o sitemap.xml --max-time 60 "https://underwrite-copilot.onrender.com/sitemap.xml" || true
           curl -sS -o indexnow-key.txt --max-time 60 "https://underwrite-copilot.onrender.com/a399847bdac5364f2ed07a0d161f42ab.txt" || true
           echo "SITEMAP: $(grep -o '<loc>' sitemap.xml | wc -l) URLs, $(grep -o 'market?metro=' sitemap.xml | wc -l) of them market pages"
+          # A market page's link preview (#436): the card itself, as a crawler
+          # gets it — its type and size (a JPEG of the skyline with the words
+          # on it; a redirect to the site's card means neither picture came).
+          for m in pittsburgh chicago philadelphia montgomery_county; do
+            echo "OG CARD $m: $(curl -sS -o /dev/null --max-time 60 -w '%{http_code} %{content_type} %{size_download} bytes' "https://underwrite-copilot.onrender.com/api/og/market/$m" || echo 'no answer')"
+          done
           grep -q "tightening while the District" p_market_nova.html && echo "NOVA OFFICE SPREAD (Aug 25): present" || echo "NOVA OFFICE SPREAD (Aug 25): not yet deployed"
           # Each brief's sector rows carry a rank chip into the cross-metro
           # ranking (the chip's title text is count-independent).
@@ -1029,6 +1035,9 @@ jobs:
           mark "#434 the shared link and the memo lead with the building" grep -q "on the shared link and the IC memo" p_whats-new.html
           # #435 — the building at avatar size in the ⌘K list and the comps (signed-in): its card.
           mark "#435 every deal list shows the building" grep -q "Every deal list shows the building" p_whats-new.html
+          # #436 — a market page names itself in its link preview and carries
+          # its own card (the og:image and twitter:image tags).
+          mark "#436 a market page carries its own link preview" grep -q "/api/og/market/pittsburgh" p_market_pitt.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then
