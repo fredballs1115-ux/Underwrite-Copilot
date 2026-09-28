@@ -3182,6 +3182,39 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
     expect(html).toMatch(/aria-pressed="true" data-view-thumb="aerial"/);
   });
 
+  it("with no picture of the building's own, leads with its market's photograph, named as the market's, the aerial one step along (#439)", () => {
+    const market = marketPictureFor({ city: "Philadelphia", state: "PA" })!;
+    const html = renderToStaticMarkup(React.createElement(PropertyVisual, { ...base, picture: null, market }));
+    dumpView("property-visual-market", html);
+    expect(a11yIssues(html), "a11y property-visual-market").toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    // The market's photograph is the view on screen, its thumbnail pressed.
+    expect(html).toContain(`src="${market.src.replace(/&/g, "&amp;")}"`);
+    expect(html).toMatch(/aria-pressed="true" data-view-thumb="market"/);
+    // Said on its face as the market's, credited, never passed for the building.
+    expect(text.replace(/\s+/g, " ")).toContain(`Market photo ${market.name}`);
+    expect(text).toContain(market.credit);
+    expect(html).toContain("No photograph of the building yet.");
+    // The site itself is one step along the filmstrip, and a photograph can be added.
+    expect(html).toContain('data-view-thumb="aerial"');
+    expect(text).toContain("Add photo");
+  });
+
+  it("never shows the market's photograph where the building has its own picture", () => {
+    const market = marketPictureFor({ city: "Philadelphia", state: "PA" })!;
+    const html = renderToStaticMarkup(
+      React.createElement(PropertyVisual, {
+        ...base,
+        picture: { credit: "From the offering memorandum", source: "om" as const },
+        market,
+      }),
+    );
+    expect(html).not.toContain(market.src.replace(/&/g, "&amp;"));
+    expect(html).not.toContain('data-view-thumb="market"');
+    expect(html).toMatch(/aria-pressed="true" data-view-thumb="photo"/);
+  });
+
   it("never offers to replace the sample deal's picture", () => {
     const html = renderToStaticMarkup(
       React.createElement(PropertyVisual, { ...base, picture: null, canReplace: false }),

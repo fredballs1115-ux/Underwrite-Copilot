@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { BannerSource } from "@/lib/deal-banner";
+import { MarketCaption } from "./market-caption";
 
 /**
  * The building's picture at card size (#418) — the compare page's columns.
@@ -121,16 +122,7 @@ export function DealBanner({
         // The market's photograph (#438) says so on its face: the market
         // named over a shade at the foot, so a skyline never passes for the
         // building, and its photographer and licence beside it.
-        <span
-          data-picture="market"
-          className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-black/80 via-black/45 to-transparent px-3 pb-2 pt-9"
-        >
-          <span className="min-w-0">
-            <span className="block text-[9px] font-semibold uppercase tracking-[0.14em] text-white/90">Market photo</span>{" "}
-            <span className="block truncate text-[13px] font-semibold leading-tight text-white">{s.market}</span>
-          </span>{" "}
-          <span className="max-w-[55%] text-right text-[9px] leading-tight text-white/85">{s.credit}</span>
-        </span>
+        <MarketCaption market={s.market} credit={s.credit} />
       ) : (
         <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[9px] leading-tight text-white">
           {s.credit}
