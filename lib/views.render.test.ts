@@ -226,20 +226,29 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     const live = CARDS.filter((c) => c.stage !== "dead");
     expect((html.match(/data-deal-tile=/g) ?? []).length).toBe(live.length);
     for (const c of live) expect(text, c.name).toContain(c.name);
-    // The first picture each card tries: the memorandum's cover on its first
-    // ask, the deal's own photograph, else the aerial at the card's frame —
-    // ringed where the address reaches a street, and never on the sample's
-    // neighbourhood placement. No address, no picture: a blank plate.
-    expect(html).toContain('src="/api/deals/a/picture?size=hero"');
+    // The first picture each card shows: the deal's own photograph, else the
+    // aerial at the card's frame — ringed where the address reaches a
+    // street, and never on the sample's neighbourhood placement. No address,
+    // no picture: a blank plate.
     expect(html).toContain('src="/api/deals/b/picture?size=hero"');
     expect(html).toContain(`src="/api/deals/c/aerial?src=usgs&amp;w=${CARD.w}&amp;h=${CARD.h}"`);
     expect((html.match(/data-deal-banner="blank"/g) ?? []).length).toBe(2);
-    const aerialFirst = live.filter((c) => c.hasAddress && c.id !== "a" && c.id !== "b");
+    const aerialFirst = live.filter((c) => c.hasAddress && c.id !== "b");
     const ringed = aerialFirst.filter((c) => c.id !== "h");
     expect((html.match(/data-deal-banner="aerial"/g) ?? []).length).toBe(aerialFirst.length);
     expect((html.match(/data-picture="banner-pin"/g) ?? []).length).toBe(ringed.length);
+    // A memorandum nobody has read the cover of yet is searched OVER the
+    // next picture (#440): the Maddox shows its aerial at once, and its
+    // cover is asked for on top of it, unseen and unannounced until it
+    // loads, then fades in under its own credit.
+    const lifted = html.match(/<img[^>]*data-lift="photo"[^>]*>/g) ?? [];
+    expect(lifted).toHaveLength(1);
+    expect(lifted[0]).toContain('src="/api/deals/a/picture?size=hero"');
+    expect(lifted[0]).toContain('alt=""');
+    expect(lifted[0]).toContain('aria-hidden="true"');
+    expect(lifted[0]).toContain("opacity-0");
     // The credit follows the picture on screen.
-    expect(text).toContain("From the offering memorandum");
+    expect(text).not.toContain("From the offering memorandum");
     expect(text).toContain("Photograph added to the deal");
     expect(text).toContain("Imagery: USGS The National Map");
     // The call rides on the picture, once a card: the failed re-screen and

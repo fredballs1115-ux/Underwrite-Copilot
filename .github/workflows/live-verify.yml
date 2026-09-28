@@ -1044,6 +1044,8 @@ jobs:
           mark "#438 the pipeline shows pictures, not maps" grep -q "Pictures, not maps, on your pipeline" p_whats-new.html
           # #439 — the deal page opens on the same market photograph (signed-in): its card.
           mark "#439 a deal opens on its market photo" grep -q "Deals open on their market photo, not a map" p_whats-new.html
+          # #440 — a secured memorandum's cover found, and faded in over the card (signed-in): its card.
+          mark "#440 a locked memorandum's cover is found" grep -q "even from a locked memorandum" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

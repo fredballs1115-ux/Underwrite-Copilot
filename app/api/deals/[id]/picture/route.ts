@@ -11,7 +11,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import type { DealVisualCache } from "@/lib/deal-location";
-import { PICTURE_CREDIT, ensureDealPicture, readPictureBytes } from "@/lib/deal-picture";
+import { PICTURE_CREDIT, SEARCH_WAIT_MS, ensureDealPicture, readPictureBytes } from "@/lib/deal-picture";
 
 export async function GET(
   req: Request,
@@ -34,6 +34,8 @@ export async function GET(
     omPath: (deal.om_storage_path as string | null) ?? null,
     isSample: !!(deal as { is_sample?: boolean }).is_sample,
     cache: (deal.photo as DealVisualCache | null) ?? null,
+    // The page shows the next picture meanwhile; this one may wait its turn.
+    waitMs: SEARCH_WAIT_MS,
   });
   if (!picture) return new NextResponse(null, { status: 404 });
 

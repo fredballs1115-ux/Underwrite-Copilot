@@ -73,6 +73,37 @@ describe("RunGate — at most N runs hold a slot; the rest wait their turn", () 
   });
 });
 
+describe("RunGate.acquireWithin — a turn for a caller that cannot wait forever", () => {
+  it("takes a free slot at once, and a freed one while it still waits", async () => {
+    const gate = new RunGate(() => 1);
+    const a = await gate.acquireWithin(50);
+    expect(a).not.toBeNull();
+    const pending = gate.acquireWithin(1_000);
+    await tick();
+    expect(gate.queued).toBe(1);
+    a!();
+    const b = await pending;
+    expect(b).not.toBeNull();
+    expect(gate.inFlight).toBe(1);
+    b!();
+    expect(gate.inFlight).toBe(0);
+  });
+
+  it("gives up after its time, leaves the queue, and the next release wakes the caller behind it", async () => {
+    const gate = new RunGate(() => 1);
+    const held = await gate.acquire();
+    const impatient = gate.acquireWithin(20);
+    const patient = gate.acquire();
+    expect(await impatient).toBeNull();
+    expect(gate.queued).toBe(1);
+    held();
+    const next = await patient;
+    expect(gate.inFlight).toBe(1);
+    next();
+    expect(gate.inFlight).toBe(0);
+  });
+});
+
 describe("concurrencyFromEnv", () => {
   it("reads a whole number of at least one, else two", () => {
     expect(concurrencyFromEnv({ ANALYSIS_CONCURRENCY: "3" })).toBe(3);

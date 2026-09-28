@@ -16,7 +16,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import type { StructuredAddress } from "@/lib/address";
 import type { DealVisualCache } from "@/lib/deal-location";
-import { PICTURE_CREDIT, ensureDealPicture, pictureSizeFor } from "@/lib/deal-picture";
+import { PICTURE_CREDIT, SEARCH_WAIT_MS, ensureDealPicture, pictureSizeFor } from "@/lib/deal-picture";
 import { IMAGE_CREDIT, fetchBestBuildingImage } from "@/lib/imagery";
 
 const SIZE = { min: 48, max: 1280, defaultW: 800, defaultH: 450 };
@@ -55,6 +55,8 @@ export async function GET(
     omPath: (deal.om_storage_path as string | null) ?? null,
     isSample: !!(deal as { is_sample?: boolean }).is_sample,
     cache,
+    // A thumbnail's slot holds its plate meanwhile; this may wait its turn.
+    waitMs: SEARCH_WAIT_MS,
   });
   const withPicture: DealVisualCache | null = picture ? { ...(cache ?? {}), picture } : cache;
 
