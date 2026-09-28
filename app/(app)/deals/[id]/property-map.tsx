@@ -152,7 +152,10 @@ export function PropertyMap({
   }
 
   return (
-    <div className="relative">
+    // Its own stacking context: Leaflet sets z-index 400–1000 on its panes
+    // and the basemap switch, which would otherwise draw over the app's
+    // sticky bars as the map scrolls under them (#437).
+    <div className="relative isolate">
       <div
         ref={divRef}
         className={`uc-map ${heightClass} overflow-hidden rounded-lg border border-line bg-faint`}

@@ -5,7 +5,8 @@ import { SectorFieldsForm } from "./sector-fields-form";
 import type { SectorFieldValues } from "@/lib/sector-fields";
 import { PublicCompsPanel } from "./public-comps-panel";
 import { PropertyVisual } from "./property-visual";
-import { DealHero } from "./deal-hero";
+import { DealHero, type HeroFigure } from "./deal-hero";
+import { DealStickyBar } from "./deal-sticky-bar";
 import { PortfolioCard } from "@/app/portfolio-card";
 import { InterestPanel } from "@/app/interest-panel";
 import { withArticle } from "@/lib/article";
@@ -807,6 +808,21 @@ export default async function DealPage({
 
   const floodLegendEntries = await floodLegendRead;
 
+  // A development's price row is its land cost, and a plan deal's cap slot is
+  // its yield on total cost — the same words the pipeline row and the meeting
+  // .xlsx use. The price as asked, labelled with what it buys where that is
+  // not the building outright (#415): "Price · 49% share". The header draws
+  // both, and the bar that keeps the deal in view repeats them word for word
+  // (#437), so a price never stands alone without what it buys.
+  const priceFigure: HeroFigure = {
+    label: `${plan?.priceLabel === "Land cost" ? "Land cost" : "Price"}${priceTag ? ` · ${priceTag}` : ""}`,
+    value: summaryPrice ?? null,
+    figure: true,
+  };
+  const returnFigure: HeroFigure = plan
+    ? { label: "Yield on cost", value: summaryYoc ?? null, figure: true }
+    : { label: "Going-in cap", value: summaryCap ?? null, figure: true };
+
   return (
     <div className="flex flex-col gap-6">
       <Link
@@ -846,20 +862,9 @@ export default async function DealPage({
           </>
         }
         figures={[
-          // A development's price row is its land cost, and a plan deal's
-          // cap slot is its yield on total cost — the same words the
-          // pipeline row and the meeting .xlsx use. The price as asked,
-          // labelled with what it buys where that is not the building
-          // outright (#415): "Price · 49% share".
-          {
-            label: `${plan?.priceLabel === "Land cost" ? "Land cost" : "Price"}${priceTag ? ` · ${priceTag}` : ""}`,
-            value: summaryPrice ?? null,
-            figure: true,
-          },
+          priceFigure,
           { label: "Size", value: summarySize ?? null, figure: true },
-          plan
-            ? { label: "Yield on cost", value: summaryYoc ?? null, figure: true }
-            : { label: "Going-in cap", value: summaryCap ?? null, figure: true },
+          returnFigure,
           { label: "Deal type", value: summaryStrategy ?? null, title: strategy.summary || undefined },
         ]}
         picture={
@@ -1094,6 +1099,15 @@ export default async function DealPage({
         )}
       </DealHero>
 
+      {/* The deal, kept in view once the header scrolls away (#437): the
+          header's own price and return figures, a blank left out. */}
+      <DealStickyBar
+        dealId={id}
+        name={deal.name as string}
+        chip={pill ?? null}
+        figures={[priceFigure, returnFigure].flatMap((f) => (f.value ? [{ label: f.label, value: f.value }] : []))}
+      />
+
       {/* A portfolio OM's properties, one row each (lib/portfolio): absent
           for a single-property memorandum. */}
       <PortfolioCard
@@ -1204,6 +1218,9 @@ export default async function DealPage({
           survey30={debt.survey30}
         />
       </div>
+      {/* Room at the foot for the deal's bar on a phone (#437), so the
+          page's last lines never sit under it. */}
+      <div aria-hidden className="h-12 md:hidden" />
     </div>
   );
 }

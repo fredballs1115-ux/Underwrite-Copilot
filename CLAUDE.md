@@ -2438,7 +2438,22 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   column. The card never clips: `overflow-hidden` would cut the share
   panel and the deal's menu, which open out of the toolbar, so the
   picture rounds its own top corners and the toolbar its own bottom when
-  it is the last row. **And on one map** (#431, `app/(app)/deals/pipeline-map.tsx`,
+  it is the last row. **The deal stays in view past it** (#437,
+  `app/(app)/deals/[id]/deal-sticky-bar.tsx`, `DealStickyBar`): once an
+  IntersectionObserver sees `[data-deal-hero]` leave, a slim bar holds
+  the building (`DealAvatar`), the name (a button back to the top), the
+  call and the header's own price and return figures, word for word (one
+  `priceFigure` / `returnFigure` feeds both, so "Price · 49% share" never
+  loses its tag). It is fixed at the top from `md` (clear of the 240px
+  sidebar) and at the foot on a phone (under the thumb, clear of the
+  app's sticky top bar), and hidden it is `inert` and `aria-hidden`, so
+  no reader meets the header twice. **Every Leaflet map is `isolate`**:
+  Leaflet's panes sit at z-index 400 to 1000 and each map's basemap
+  switch at z-[1000], which with no stacking context of their own drew
+  over the phone's z-10 top bar as the map scrolled under it (checked in
+  Chromium: the map's overlay path was the element on top at the bar's
+  point); `lib/map-isolation.test.ts` holds every file that loads Leaflet
+  to a `relative isolate` wrapper. **And on one map** (#431, `app/(app)/deals/pipeline-map.tsx`,
   `PipelineMap`; the rules pure in `lib/pipeline-map.ts`): the third view
   beside Cards and List (`PipelineView` `"map"`, the same cookie) draws
   every deal the filters leave as a pin in its call's colour — the split

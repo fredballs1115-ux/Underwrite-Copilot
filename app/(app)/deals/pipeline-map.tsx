@@ -205,7 +205,10 @@ export function PipelineMap({
 
   return (
     <section aria-label="The pipeline on a map" data-view="map" className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
-      <div className="relative">
+      {/* Its own stacking context: Leaflet sets z-index 400–1000 on its panes
+          and these controls, which would otherwise draw over the app's sticky
+          bars as the map scrolls under them (#437). */}
+      <div className="relative isolate">
         <div ref={divRef} className="uc-map h-[26rem] bg-faint md:h-[34rem]" />
         <div className="absolute right-2 top-2 z-[1000] flex overflow-hidden rounded-lg border border-line bg-surface shadow-sm">
           {BASEMAP_ORDER.map((id) => (

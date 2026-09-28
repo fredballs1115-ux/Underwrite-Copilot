@@ -3285,6 +3285,50 @@ describe("DealHero — the building's picture beside its name and its figures (#
   });
 });
 
+// ── The deal, kept in view once its header scrolls away (#437) ─────────────
+import { DealStickyBar } from "@/app/(app)/deals/[id]/deal-sticky-bar";
+
+describe("DealStickyBar — the deal kept in view past its header", () => {
+  const html = renderToStaticMarkup(
+    React.createElement(DealStickyBar, {
+      dealId: "d1",
+      name: "The Maddox",
+      chip: { label: "Go", cls: "bg-pass/15 text-pass" },
+      // The header's own labels, word for word: the price with what it buys.
+      figures: [
+        { label: "Price · 49% share", value: "$23,765,000" },
+        { label: "Going-in cap", value: "5.45%" },
+      ],
+    }),
+  );
+
+  it("starts hidden, inert and out of the accessibility tree, below the fold on a phone and above it on a wide screen", () => {
+    dumpView("deal-sticky-bar", html);
+    expect(html).toContain("data-deal-sticky");
+    expect(html).toContain('aria-hidden="true"');
+    expect(html).toMatch(/ inert=""/);
+    expect(html).toContain("translate-y-full md:-translate-y-full");
+    expect(html).toContain("fixed inset-x-0 bottom-0");
+    expect(html).toContain("md:top-0");
+    // Never on paper.
+    expect(html).toContain("print:hidden");
+  });
+
+  it("carries the building, the name as the way back up, the call and the two figures", () => {
+    expect(a11yIssues(html), "a11y sticky bar").toEqual([]);
+    expect(html).toContain('src="/api/deals/d1/image?w=64&amp;h=64"');
+    const text = visibleText(html);
+    expect(text.replace(/\s+/g, " ")).toContain("Back to the top: The Maddox");
+    expect(text).toContain("Go");
+    // The price never stands without what it buys (#415's rule).
+    expect(text).toContain("Price · 49% share");
+    expect(text).toContain("$23,765,000");
+    expect(text).toContain("Going-in cap");
+    expect(text).toContain("5.45%");
+    expect(gluedWords(text)).toEqual([]);
+  });
+});
+
 // ── A deal's building at avatar size: the ⌘K list, the comps (#435) ────────
 import { DealAvatar } from "@/app/(app)/deal-avatar";
 

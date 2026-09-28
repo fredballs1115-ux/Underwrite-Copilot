@@ -389,8 +389,10 @@ export function CompsMap({
           Placing comps on the map…
         </div>
       )}
+      {/* Its own stacking context, so Leaflet's z-indexes never draw over
+          the app's sticky bars (#437). */}
       {phase === "ready" && (
-        <div className="relative mt-3">
+        <div className="relative isolate mt-3">
           <div ref={mapDivRef} className="uc-map h-80 overflow-hidden rounded-lg border border-line md:h-96" />
           <div className="absolute right-2 top-2 z-[1000] flex overflow-hidden rounded-lg border border-line bg-surface shadow-sm">
             {BASEMAP_ORDER.map((id) => (
