@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-28",
+      "title": "The building's own photograph, even from a locked memorandum",
+      "href": "/deals",
+      "blurb": "Brokers often send an offering memorandum secured, with printing or copying locked. That hid the cover photograph from the search that puts a building's own picture on its card, so those deals showed their market or an overhead instead. The search now opens a secured memorandum the way any PDF reader does, and reads a photograph stored as a PNG too. Deals searched before are searched again on their next view. While a memorandum is searched, its card shows the market's photograph, and the building's own fades in the moment it is found."
+    },
+    {
+      "date": "2026-09-28",
       "title": "Deals open on their market photo, not a map",
       "href": "/deals",
       "blurb": "A deal whose building has no photograph of its own now opens on the same market photograph its pipeline card shows. It is named as the market's and credited to its photographer, with Add photo on it for the building's own picture. The aerial, the flood map and the map are one step along the filmstrip underneath."

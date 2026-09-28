@@ -42,6 +42,10 @@ export interface BannerSource {
   market?: string;
   /** a market photograph's alt text: what it shows, and whose it is */
   alt?: string;
+  /** the deal's own photograph, not yet looked for in its memorandum
+   *  (#440): the next source shows at once and this one takes over the
+   *  moment it loads, or is dropped if the route has none */
+  pending?: boolean;
 }
 
 export interface BannerFacts {
@@ -87,7 +91,9 @@ export function bannerSources(f: BannerFacts, frame: BannerFrame = BANNER): Bann
   const id = encodeURIComponent(f.dealId);
   const out: BannerSource[] = [];
   if (f.pictureCredit) out.push({ kind: "photo", src: `/api/deals/${id}/picture?size=hero`, credit: f.pictureCredit });
-  else if (f.memorandumUnread) out.push({ kind: "photo", src: `/api/deals/${id}/picture?size=hero`, credit: IMAGE_CREDIT.photo });
+  else if (f.memorandumUnread) {
+    out.push({ kind: "photo", src: `/api/deals/${id}/picture?size=hero`, credit: IMAGE_CREDIT.photo, pending: true });
+  }
   if (f.googleEnabled && f.hasStreetAddress) {
     out.push({ kind: "streetview", src: `/api/deals/${id}/photo`, credit: IMAGE_CREDIT.streetview });
   }

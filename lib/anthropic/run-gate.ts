@@ -30,6 +30,38 @@ export class RunGate {
     while (this.active >= Math.max(1, this.limit())) {
       await new Promise<void>((resolve) => this.waiting.push(resolve));
     }
+    return this.take();
+  }
+
+  /**
+   * `acquire`, for a caller that cannot wait forever (#440 — a picture a
+   * page is waiting on): the release function once a slot is free, or null
+   * when none came free within `ms`. A caller that gives up leaves the
+   * queue, so a release never wakes a caller that is gone.
+   */
+  async acquireWithin(ms: number): Promise<(() => void) | null> {
+    const deadline = Date.now() + ms;
+    while (this.active >= Math.max(1, this.limit())) {
+      const left = deadline - Date.now();
+      if (left <= 0) return null;
+      const woken = await new Promise<boolean>((resolve) => {
+        const wake = () => {
+          clearTimeout(timer);
+          resolve(true);
+        };
+        const timer = setTimeout(() => {
+          const at = this.waiting.indexOf(wake);
+          if (at >= 0) this.waiting.splice(at, 1);
+          resolve(false);
+        }, left);
+        this.waiting.push(wake);
+      });
+      if (!woken) return null;
+    }
+    return this.take();
+  }
+
+  private take(): () => void {
     this.active++;
     let released = false;
     return () => {

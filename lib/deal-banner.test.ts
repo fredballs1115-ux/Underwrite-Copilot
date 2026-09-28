@@ -37,10 +37,15 @@ describe("bannerSources — the pictures a card tries, best first, each with its
     const first = bannerSources({ ...base, memorandumUnread: true });
     expect(first.map((x) => x.kind)).toEqual(["photo", "aerial"]);
     expect(first[0]).toMatchObject({ src: "/api/deals/d1/picture?size=hero", credit: IMAGE_CREDIT.photo });
-    // A cached picture wins, under its own credit; nothing is tried twice.
+    // Asked for over the next picture, which shows meanwhile (#440).
+    expect(first[0].pending).toBe(true);
+    expect(first[1].pending).toBeUndefined();
+    // A cached picture wins, under its own credit; nothing is tried twice,
+    // and a picture already found is simply shown.
     const cached = bannerSources({ ...base, memorandumUnread: true, pictureCredit: "Photograph added to the deal" });
     expect(cached.filter((x) => x.kind === "photo")).toHaveLength(1);
     expect(cached[0].credit).toBe("Photograph added to the deal");
+    expect(cached[0].pending).toBeUndefined();
   });
 
   it("frames the card's overhead at the card's size and rings the building only for a street address (#428)", () => {

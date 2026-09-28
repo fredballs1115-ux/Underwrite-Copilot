@@ -2348,7 +2348,37 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   credited to Google or to USGS. A replaced memorandum drops the picture
   taken from the old one; a picture the reader added ("Replace photo" /
   "Add photo" on the deal page, `replacePicture`, 12 MB, never on the
-  sample) survives a reissue. **The shared screen and the IC memo lead
+  sample) survives a reissue. **A secured memorandum's cover is found
+  too** (#440). A broker's "secured" file (printing or copying locked:
+  an owner password over an EMPTY user password) encrypts every stream,
+  the photographs included, so the byte scan found no JPEG and the deal
+  showed its market or an overhead; so did a photograph stored as pixels
+  (`/FlateDecode`, a PNG). Where the scan finds nothing, `coverOf` hands
+  the file to `lib/om-photo-decode.ts` (`decodeOmCover`), which opens it
+  with pdfjs as a viewer does (RC4 40 and 128, AES 128 and 256 — a file
+  that asks for a password to OPEN is never read), reads the images the
+  first `COVER_PAGES` (4) pages paint, and takes the largest of the scan's
+  own size and shape with page one weighted 1.5×, skipping a greyscale
+  picture (sampled pixels, since pdfjs hands grey over as RGB) and a mask.
+  It decodes inside `MAX_DECODE_PIXELS` and `DECODE_BUDGET_MS` and never
+  throws. The pixels go to sharp raw (`PictureInput`, an alpha channel laid
+  on white). The tests build real files with the report's own PDF writer
+  (`lib/test-memorandum.ts`, `@react-pdf/pdfkit`), every cipher, a PNG, and
+  a user password refused. A "no photograph" verdict carries the rules it
+  was reached under (`pictureSearchV`, `PICTURE_SEARCH_VERSION` 2;
+  `searchedRecently`), so every deal judged under the byte scan alone is
+  searched again on its next view, not a month later. Searches take turns
+  (`RunGate.acquireWithin`): the two picture routes wait up to
+  `SEARCH_WAIT_MS` (20 s) for one and share a search already running for
+  the deal, where they used to answer "not yet" at once, so the first view
+  of a pipeline shows every picture it can. A page render never waits
+  (`waitMs` 0), so a busy process costs a deal page its photograph this once
+  and never its speed. On a card, the unread memorandum's photograph is
+  `pending` (`bannerSources`): `DealBanner` shows the next picture at once
+  and asks for the photograph over it, invisible and out of the
+  accessibility tree, then fades it in under its own credit the moment it
+  loads, or drops it on a 404. Checked in Chromium over a harness, with a
+  slow, a missing and a fast photograph. **The shared screen and the IC memo lead
   with it too** (#434): they had printed the USGS aerial alone, so a
   partner opening the link, or a committee reading the memo, met the
   roofs of the block while the sender was looking at the building.

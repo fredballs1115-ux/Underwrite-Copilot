@@ -36,6 +36,8 @@ export interface DealVisualCache {
   picture?: DealPicture;
   /** when the memorandum was last searched for one and none was found */
   pictureCheckedAt?: string;
+  /** the search rules that verdict was reached under; see PICTURE_SEARCH_VERSION */
+  pictureSearchV?: number;
 }
 
 /** The building's own photograph — where it came from and where its two sizes live. */
