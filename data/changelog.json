@@ -2,6 +2,12 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-09-28",
+      "title": "The deal stays in view as you scroll",
+      "href": "/deals",
+      "blurb": "Scroll down a deal page and a slim bar keeps the building's picture, its name, the call and its price and cap in view, the way a listing keeps its price and address in reach once the photographs are behind you. Tap the name to go back to the top. On a phone it sits at the foot of the screen, under your thumb, and the maps on the page no longer draw over it or over the app's own top bar as they scroll past."
+    },
+    {
       "date": "2026-09-27",
       "title": "Market pages that preview their city",
       "href": "/market?metro=pittsburgh",

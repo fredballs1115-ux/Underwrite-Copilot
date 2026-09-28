@@ -1038,6 +1038,8 @@ jobs:
           # #436 — a market page names itself in its link preview and carries
           # its own card (the og:image and twitter:image tags).
           mark "#436 a market page carries its own link preview" grep -q "/api/og/market/pittsburgh" p_market_pitt.html
+          # #437 — the deal kept in view past its header (signed-in): its card.
+          mark "#437 the deal stays in view as you scroll" grep -q "The deal stays in view as you scroll" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then
