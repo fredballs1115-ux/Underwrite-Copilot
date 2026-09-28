@@ -20,6 +20,7 @@ import { DealBanner } from "./deal-banner";
 import type { BannerSource } from "@/lib/deal-banner";
 import { PipelineMap } from "./pipeline-map";
 import type { MapDeal, MapPlace } from "@/lib/pipeline-map";
+import { PIPELINE_VIEW_COOKIE, remembersView, type PipelineView } from "@/lib/pipeline-view";
 import { ManualDealForm } from "./manual-deal-form";
 import { FileDrop } from "../file-drop";
 import { PendingButton } from "../pending-button";
@@ -83,11 +84,10 @@ export type DealCard = {
   placeMiss?: boolean;
 };
 
-/** How the pipeline is drawn: photograph-led cards (#428), the dense list,
- *  or every deal on one map (#431). The choice is a cookie so the server
- *  draws the same view the reader left — no flash of another on the next
- *  visit. */
-export type PipelineView = "cards" | "list" | "map";
+// How the pipeline is drawn, and which view is remembered, live in
+// lib/pipeline-view (#438): the page is a server component and reads them,
+// and an export of this "use client" module is only a client reference there.
+export type { PipelineView } from "@/lib/pipeline-view";
 
 /** A card as the map reads it. */
 function mapDealOf(d: DealCard): MapDeal {
@@ -102,7 +102,6 @@ function mapDealOf(d: DealCard): MapDeal {
     hasAddress: d.hasAddress,
   };
 }
-export const PIPELINE_VIEW_COOKIE = "uc_pipeline_view";
 
 /** One row per deal: name · asset · price · cap · buy box · status · added.
  *  Every column is sortable from its header. */
@@ -273,6 +272,8 @@ export function Pipeline({
   const [view, setViewState] = useState<PipelineView>(initialView);
   const setView = useCallback((v: PipelineView) => {
     setViewState(v);
+    // Only the cards or the list is remembered: the map is for this visit.
+    if (!remembersView(v)) return;
     try {
       document.cookie = `${PIPELINE_VIEW_COOKIE}=${v}; path=/; max-age=31536000; samesite=lax`;
     } catch {
@@ -1847,10 +1848,11 @@ function TileStat({ label, title, children }: { label: string; title?: string; c
 }
 
 // The card view's deal (#428): the building's picture first — its own
-// photograph, the Street View frame or the USGS aerial with the building
-// ringed, each pinned with its credit — the call over the picture, then the
-// name, the place and the three figures a pipeline is read by. Memoized
-// like the row.
+// photograph or the Street View frame, else the photograph its market is
+// known by, named as the market's (#438), and the USGS aerial with the
+// building ringed only outside every photographed market; each pinned with
+// its credit — the call over the picture, then the name, the place and the
+// three figures a pipeline is read by. Memoized like the row.
 const DealTile = memo(function DealTile({
   d,
   i,
@@ -1888,8 +1890,24 @@ const DealTile = memo(function DealTile({
           shade
           sizes="(min-width: 1536px) 24vw, (min-width: 1280px) 31vw, (min-width: 640px) 47vw, 100vw"
         />
-        <span className="absolute left-3 top-3 flex">
+        {/* The call, and in compare mode the pick beside it: the foot of the
+            picture is the market photograph's caption (#438). */}
+        <span className="absolute left-3 top-3 flex items-center gap-1.5">
           <TileCall d={d} />
+          {compareMode && (
+            <span
+              aria-hidden
+              className={`flex h-6 w-6 items-center justify-center rounded-md border-2 shadow-sm ${
+                checked ? "border-brand bg-brand text-white" : "border-white bg-white/80"
+              }`}
+            >
+              {checked && (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              )}
+            </span>
+          )}
         </span>
         {tags.length > 0 && (
           <span className="absolute right-3 top-3 flex max-w-[60%] flex-col items-end gap-1">
@@ -1902,20 +1920,6 @@ const DealTile = memo(function DealTile({
                 {t.text}
               </span>
             ))}
-          </span>
-        )}
-        {compareMode && (
-          <span
-            aria-hidden
-            className={`absolute bottom-3 left-3 flex h-6 w-6 items-center justify-center rounded-md border-2 shadow-sm ${
-              checked ? "border-brand bg-brand text-white" : "border-white bg-white/80"
-            }`}
-          >
-            {checked && (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                <path d="M20 6 9 17l-5-5" />
-              </svg>
-            )}
           </span>
         )}
       </div>

@@ -2403,10 +2403,36 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   in: the picture route lifts it on this first ask, or 404s and the next
   source follows, credited as the memorandum's since only it can be
   uncached) and a `marker` on a street address's aerial (a ring at the
-  centre; never on a neighbourhood placement). The List view is one
-  `ViewToggle` away; the choice is a cookie (`PIPELINE_VIEW_COOKIE`) the
-  page reads, so the server draws the view the reader left without a
-  flash of the other. **The aerial is drawn at the photograph's own
+  centre; never on a neighbourhood placement). **Pictures, not maps**
+  (#438, the operator's words for the pipeline): an overhead at card size
+  reads as a map, so a card with no photograph of the building's own and
+  no Street View shows the photograph its market is known by before the
+  aerial — `marketPictureFor` (`lib/market-picture.ts`, pure: the
+  address's briefed market or metro area read without a brief, else the
+  market the memorandum names through `metroForName`, a suburb with no
+  photograph of its own borrowing its metro's through `metroAliasOf`),
+  handed to `bannerSources` as `market` by the pipeline page only (two
+  compare columns in one market would show one skyline twice). The card
+  names it on its face — "Market photo" over the market's name on a shade
+  at the foot (`data-picture="market"`), the photographer and licence
+  beside it (`photographerLine`), the place in its alt text with "No
+  photograph of the building yet" — and the aerial stays behind it, for a
+  photograph that fails and a deal outside every photographed market;
+  `lib/market-picture.test.ts` holds every market the site covers to
+  having a photograph for its cards, its own or its metro's. The compare
+  pick sits beside the call, clear of the caption. The List view is one
+  `ViewToggle` away; the choice of cards or list is a cookie the page
+  reads, so the server draws the view the reader left without a flash of
+  the other, and the map is opened for a visit and never landed on
+  (`landingView`, `remembersView`). **Both live in
+  `lib/pipeline-view.ts`, never in the pipeline's client module**: every
+  export of a `"use client"` module is a client reference on the server,
+  so the page read `cookies().get(PIPELINE_VIEW_COOKIE)` with a function
+  as the name, found nothing, and opened every visit on the cards — the
+  list the reader chose was silently never read (and a helper called that
+  way throws, a 500). `lib/client-reference.test.ts` reads every source
+  and fails on a server file importing a value (an ALL_CAPS or camelCase
+  export) from a client module. **The aerial is drawn at the photograph's own
   grain** (#429): `MAX_SOURCE_ZOOM.aerial` is 17. The aerial sheet
   (`scripts/probe-aerial.mjs`, `skyline-sheet.yml`'s aerial mode, pushed
   to the `aerial-sheet` branch — run 36193817674, eight places six ways,

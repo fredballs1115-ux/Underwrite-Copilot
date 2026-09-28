@@ -579,8 +579,18 @@ export function commonsPage(file: string): string {
  * page, in the memo, and in any export that ever embeds one of these.
  */
 export function creditLine(shot: SkylineShot): string {
+  return `${shot.place} · ${photographerLine(shot)}`;
+}
+
+/**
+ * The same credit without the place, for a surface that says the place in
+ * words of its own — a pipeline card names the market beside the picture
+ * and carries the place in its alt text (#438) — so its corner holds the
+ * photographer and the licence, which are what the licence obliges.
+ */
+export function photographerLine(shot: SkylineShot): string {
   const author = shot.credit && shot.credit !== "unknown" ? shot.credit : "Wikimedia Commons";
-  return `${shot.place} · ${author} · ${shot.license}`;
+  return `${author} · ${shot.license}`;
 }
 
 /**

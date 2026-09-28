@@ -527,6 +527,14 @@ export const STATE_SERIES: readonly MetroSeriesMeta[] = TABLE.stateSeries;
  * one number, so the page reads back exactly the path the cron backfilled.
  */
 export const HISTORY_ROWS: number = TABLE.historyRows;
+/**
+ * The metro a suburb borrows from (`metroAliases`: Montgomery County's is
+ * Washington's), or null for a market that borrows nothing. The pipeline's
+ * cards read it for a photograph as the series read it for a figure (#438).
+ */
+export function metroAliasOf(metroId: string): string | null {
+  return TABLE.metroAliases[metroId] ?? null;
+}
 
 export function seriesMeta(id: string): SeriesMeta | null {
   return (
