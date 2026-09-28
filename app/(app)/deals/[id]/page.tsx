@@ -6,6 +6,7 @@ import type { SectorFieldValues } from "@/lib/sector-fields";
 import { PublicCompsPanel } from "./public-comps-panel";
 import { PropertyVisual } from "./property-visual";
 import { DealHero, type HeroFigure } from "./deal-hero";
+import { marketPictureFor } from "@/lib/market-picture";
 import { DealStickyBar } from "./deal-sticky-bar";
 import { PortfolioCard } from "@/app/portfolio-card";
 import { InterestPanel } from "@/app/interest-panel";
@@ -808,6 +809,11 @@ export default async function DealPage({
 
   const floodLegendEntries = await floodLegendRead;
 
+  // The photograph the deal's market is known by, leading the picture where
+  // the building has none of its own and no Street View (#439) — the one its
+  // pipeline card shows (#438), from the same reader.
+  const marketPicture = marketPictureFor(dealAddress, extraction?.market ?? null);
+
   // A development's price row is its land cost, and a plan deal's cap slot is
   // its yield on total cost — the same words the pipeline row and the meeting
   // .xlsx use. The price as asked, labelled with what it buys where that is
@@ -873,7 +879,7 @@ export default async function DealPage({
              address; the Street and Satellite views need GOOGLE_MAPS_API_KEY
              (two separate Google APIs on the one key) and are where the
              sharp imagery comes from. */
-          dealAddress?.label || picture ? (
+          dealAddress?.label || picture || marketPicture ? (
             <PropertyVisual
               dealId={id}
               label={dealAddress?.label ?? (deal.name as string)}
@@ -882,6 +888,7 @@ export default async function DealPage({
               hasAddress={!!dealAddress?.label}
               picture={picture ? { credit: PICTURE_CREDIT[picture.source], source: picture.source } : null}
               canReplace={!(deal as { is_sample?: boolean }).is_sample}
+              market={marketPicture}
               flood={
                 floodStreet
                   ? {

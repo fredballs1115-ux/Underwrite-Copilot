@@ -2420,7 +2420,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   photograph that fails and a deal outside every photographed market;
   `lib/market-picture.test.ts` holds every market the site covers to
   having a photograph for its cards, its own or its metro's. The compare
-  pick sits beside the call, clear of the caption. The List view is one
+  pick sits beside the call, clear of the caption. **The deal page opens
+  on the same photograph** (#439): `PropertyVisual` takes the page's
+  `marketPictureFor` as `market` and adds a Market view, leading only
+  where there is no photograph of the building's own and no Street View
+  (a picture that fails to load hands the lead to it), the aerial, the
+  flood map and the map one step along the filmstrip, "Add photo" on it.
+  Both surfaces draw ONE caption, `MarketCaption`
+  (`app/(app)/deals/market-caption.tsx`, pure). The List view is one
   `ViewToggle` away; the choice of cards or list is a cookie the page
   reads, so the server draws the view the reader left without a flash of
   the other, and the map is opened for a visit and never landed on

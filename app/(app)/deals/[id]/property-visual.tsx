@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { FLOOD_ZOOM } from "@/lib/basemaps";
+import type { MarketPicture } from "@/lib/market-picture";
+import { MarketCaption } from "../market-caption";
 import { PropertyMap } from "./property-map";
 import { ReplacePicture } from "./replace-picture";
 
@@ -50,9 +52,15 @@ import { ReplacePicture } from "./replace-picture";
  * a ring at the frame's centre, which is the building, FEMA's key under it
  * and one sentence on the zone at the building. Only for a street address:
  * a neighbourhood placement's centre is not the building.
+ *
+ * Where the deal has no photograph of the building's own and no Street View,
+ * the picture leads with the photograph its market is known by (#439), the
+ * one its pipeline card shows (#438): named on its face as the market's,
+ * never passed for the building, with the aerial, the flood map and the map
+ * one step along the filmstrip. The reader's "Add photo" sits on it.
  */
 
-type View = "photo" | "street" | "satellite" | "aerial" | "flood" | "map";
+type View = "photo" | "street" | "market" | "satellite" | "aerial" | "flood" | "map";
 
 const AERIAL = { w: 1280, h: 576 }; // the route's max width
 
@@ -71,6 +79,7 @@ export function PropertyVisual({
   picture = null,
   canReplace = true,
   flood = null,
+  market = null,
 }: {
   dealId: string;
   /** the deal's address line — the caption, and the map pin's tooltip */
@@ -92,27 +101,36 @@ export function PropertyVisual({
     key: { label: string; image: string | null; here: boolean }[];
     line: string | null;
   } | null;
+  /** the photograph the deal's market is known by (lib/market-picture),
+   *  leading only where the deal has no photograph of its own and no
+   *  Street View (#439); null for none */
+  market?: MarketPicture | null;
 }) {
   // Lead with the building's own photograph wherever one exists; the
   // aerial leads only when it is the best picture available.
   const canStreet = hasAddress && hasStreetAddress && googleEnabled;
-  const [view, setView] = useState<View>(picture ? "photo" : canStreet ? "street" : "aerial");
+  const [view, setView] = useState<View>(picture ? "photo" : canStreet ? "street" : market ? "market" : "aerial");
   const [photoGone, setPhotoGone] = useState(false);
   const [aerialGone, setAerialGone] = useState(!hasAddress);
   const [streetGone, setStreetGone] = useState(false);
   const [satelliteGone, setSatelliteGone] = useState(false);
   const [floodGone, setFloodGone] = useState(false);
+  const [marketGone, setMarketGone] = useState(false);
 
   const photoPossible = !!picture && !photoGone;
   const streetPossible = canStreet && !streetGone;
   const satellitePossible = hasAddress && googleEnabled && !satelliteGone;
   const floodPossible = hasAddress && hasStreetAddress && !!flood && !floodGone;
+  // The market's photograph stands in only for the building's own pictures:
+  // a deal with a photograph or a street view never shows a skyline.
+  const marketPossible = !!market && !marketGone && !photoPossible && !streetPossible;
   // Nothing photographic resolved — collapse entirely.
-  if (aerialGone && !photoPossible && !streetPossible && !satellitePossible) return null;
+  if (aerialGone && !photoPossible && !streetPossible && !satellitePossible && !marketPossible) return null;
 
   const views: { id: View; label: string }[] = [
     ...(photoPossible ? [{ id: "photo" as const, label: "Photo" }] : []),
     ...(streetPossible ? [{ id: "street" as const, label: "Street" }] : []),
+    ...(marketPossible ? [{ id: "market" as const, label: "Market" }] : []),
     ...(satellitePossible ? [{ id: "satellite" as const, label: "Satellite" }] : []),
     ...(aerialGone ? [] : [{ id: "aerial" as const, label: "Aerial" }]),
     ...(floodPossible ? [{ id: "flood" as const, label: "Flood" }] : []),
@@ -131,6 +149,7 @@ export function PropertyVisual({
   const thumbs: Record<View, { src: string | null; over?: string; fail: () => void }> = {
     photo: { src: `/api/deals/${dealId}/picture?size=hero`, fail: () => setPhotoGone(true) },
     street: { src: `/api/deals/${dealId}/photo`, fail: () => setStreetGone(true) },
+    market: { src: market?.src ?? null, fail: () => setMarketGone(true) },
     satellite: { src: `/api/deals/${dealId}/aerial?src=satellite&w=${AERIAL.w}&h=${AERIAL.h}`, fail: () => setSatelliteGone(true) },
     aerial: { src: aerialSrc, fail: () => setAerialGone(true) },
     flood: { src: floodAerialSrc, over: floodSrc, fail: () => setFloodGone(true) },
@@ -163,6 +182,22 @@ export function PropertyVisual({
             <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
               {picture?.credit}
             </span>
+          </div>
+        )}
+
+        {marketPossible && market && (
+          <div className={active === "market" ? "" : "hidden"}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- the skyline
+                route, proxied from Commons with its own immutable cache headers */}
+            <img
+              src={market.src}
+              alt={`${market.place}: the market this deal is in, ${market.name}. No photograph of the building yet.`}
+              width={AERIAL.w}
+              height={AERIAL.h}
+              className={`${FRAME} w-full bg-faint object-cover`}
+              onError={() => setMarketGone(true)}
+            />
+            <MarketCaption market={market.name} credit={market.credit} size="hero" />
           </div>
         )}
 
