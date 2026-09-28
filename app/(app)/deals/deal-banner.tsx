@@ -16,6 +16,10 @@ import type { BannerSource } from "@/lib/deal-banner";
  * A picture that failed before the page hydrated fired its `error` event
  * with no listener attached, so the effect checks on mount (and after each
  * switch): a finished load with no pixels is a failure too.
+ *
+ * A market photograph (#438, the pipeline's cards only) names its market on
+ * the picture, over a shade at the foot, with its photographer and licence:
+ * it is the place the deal is in, never passed off as the building.
  */
 export function DealBanner({
   sources,
@@ -75,11 +79,12 @@ export function DealBanner({
     );
   }
   const alt =
-    s.kind === "photo"
+    s.alt ??
+    (s.kind === "photo"
       ? `Photograph of ${label}`
       : s.kind === "streetview"
         ? `Street view of ${label}`
-        : `Aerial photograph of ${label}`;
+        : `Aerial photograph of ${label}`);
   return (
     <div className={`relative overflow-hidden ${flush ? "" : "rounded-lg"} bg-faint ${className}`} data-deal-banner={s.kind}>
       {/* eslint-disable-next-line @next/next/no-img-element -- proxied,
@@ -112,9 +117,25 @@ export function DealBanner({
           <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
         </span>
       )}
-      <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[9px] leading-tight text-white">
-        {s.credit}
-      </span>
+      {s.kind === "market" && s.market ? (
+        // The market's photograph (#438) says so on its face: the market
+        // named over a shade at the foot, so a skyline never passes for the
+        // building, and its photographer and licence beside it.
+        <span
+          data-picture="market"
+          className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-black/80 via-black/45 to-transparent px-3 pb-2 pt-9"
+        >
+          <span className="min-w-0">
+            <span className="block text-[9px] font-semibold uppercase tracking-[0.14em] text-white/90">Market photo</span>{" "}
+            <span className="block truncate text-[13px] font-semibold leading-tight text-white">{s.market}</span>
+          </span>{" "}
+          <span className="max-w-[55%] text-right text-[9px] leading-tight text-white/85">{s.credit}</span>
+        </span>
+      ) : (
+        <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[9px] leading-tight text-white">
+          {s.credit}
+        </span>
+      )}
     </div>
   );
 }

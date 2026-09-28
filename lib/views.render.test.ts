@@ -47,6 +47,8 @@ import { Pipeline, type DealCard } from "@/app/(app)/deals/pipeline";
 import { ModelView } from "@/app/(app)/deals/[id]/model-view";
 import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table";
 import { CARD, bannerSources } from "@/lib/deal-banner";
+import { marketPictureFor } from "@/lib/market-picture";
+import { landingView, remembersView } from "@/lib/pipeline-view";
 import { ToastProvider } from "@/app/(app)/toaster";
 import { ScoredFeedView, type AlertRow, type ItemRow } from "@/app/(app)/news/scored-feed";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
@@ -258,6 +260,60 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // belong to the list, so the cards carry the sort select at every width.
     expect(html).toMatch(/aria-pressed="true"[^>]*>(?:<svg[\s\S]*?<\/svg>)?Cards/);
     expect(html).not.toContain('class="hidden items-center gap-3 px-5 pb-1.5 md:flex"');
+  });
+
+  it("shows a card whose building has no photograph its market's photograph, named as the market's — pictures, not maps (#438)", () => {
+    const market = marketPictureFor({ city: "Pittsburgh", state: "PA" })!;
+    const withMarket = CARDS.map((c) => ({
+      ...c,
+      pictures: bannerSources(
+        {
+          dealId: c.id,
+          pictureCredit: c.id === "b" ? "Photograph added to the deal" : null,
+          googleEnabled: false,
+          hasStreetAddress: c.hasAddress && c.id !== "h",
+          hasAddress: c.hasAddress,
+          market: c.id === "c" ? market : null,
+        },
+        CARD,
+      ),
+    }));
+    const html = render(
+      React.createElement(Pipeline, {
+        deals: withMarket,
+        errorMessage: null,
+        notice: null,
+        onboarding: { hasBuyBox: true, sampleId: "h", hasRealDeal: true },
+        billing: BILLING,
+      }),
+    );
+    dumpView("pipeline-cards-market", html);
+    expect(a11yIssues(html), "a11y pipeline market card").toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    // The market's photograph where the aerial was, the aerial left behind it.
+    expect((html.match(/data-deal-banner="market"/g) ?? []).length).toBe(1);
+    expect(html).toContain(`src="${market.src.replace(/&/g, "&amp;")}"`);
+    expect(html).not.toContain(`src="/api/deals/c/aerial?src=usgs&amp;w=${CARD.w}&amp;h=${CARD.h}"`);
+    // Named on its face as the market's, never passed for the building, and
+    // credited to its photographer.
+    expect((html.match(/data-picture="market"/g) ?? []).length).toBe(1);
+    const flat = text.replace(/\s+/g, " ");
+    expect(flat).toContain(`Market photo ${market.name}`);
+    expect(flat).toContain(market.credit);
+    expect(html).toContain("No photograph of the building yet.");
+    // A building's own photograph is untouched.
+    expect(html).toContain('src="/api/deals/b/picture?size=hero"');
+  });
+
+  it("opens on the cards unless the reader chose the list, and never lands on the map (#438)", () => {
+    expect(landingView(undefined)).toBe("cards");
+    expect(landingView("cards")).toBe("cards");
+    expect(landingView("list")).toBe("list");
+    // A map chosen once no longer greets the reader on every visit.
+    expect(landingView("map")).toBe("cards");
+    expect(remembersView("map")).toBe(false);
+    expect(remembersView("list")).toBe(true);
   });
 
   it("draws the pipeline on one map when the reader chose the map: the legend, the basemaps and where every deal is (#431)", () => {

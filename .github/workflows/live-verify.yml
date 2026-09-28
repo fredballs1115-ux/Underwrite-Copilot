@@ -1040,6 +1040,8 @@ jobs:
           mark "#436 a market page carries its own link preview" grep -q "/api/og/market/pittsburgh" p_market_pitt.html
           # #437 — the deal kept in view past its header (signed-in): its card.
           mark "#437 the deal stays in view as you scroll" grep -q "The deal stays in view as you scroll" p_whats-new.html
+          # #438 — a card with no photograph of its building shows its market's (signed-in): its card.
+          mark "#438 the pipeline shows pictures, not maps" grep -q "Pictures, not maps, on your pipeline" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BANNER, CARD, bannerSources } from "./deal-banner";
 import { IMAGE_CREDIT, imagePlan } from "./imagery-plan";
+import { marketPictureFor } from "./market-picture";
 
 const base = { dealId: "d1", pictureCredit: null, googleEnabled: false, hasStreetAddress: true, hasAddress: true };
 
@@ -54,5 +55,25 @@ describe("bannerSources — the pictures a card tries, best first, each with its
     expect(bannerSources({ ...base, hasStreetAddress: false }, CARD)[0].marker).toBeUndefined();
     // A frame may pin its zoom.
     expect(bannerSources(base, { ...CARD, z: 16 })[0].src).toBe(`/api/deals/d1/aerial?src=usgs&w=${CARD.w}&h=${CARD.h}&z=16`);
+  });
+
+  it("tries the market's photograph before the aerial on a pipeline card, named as the market's (#438)", () => {
+    const market = marketPictureFor({ city: "Pittsburgh", state: "PA" });
+    expect(market).not.toBeNull();
+    // No photograph of the building and no Google key: the market's
+    // photograph, then the aerial behind it should the photograph fail.
+    const card = bannerSources({ ...base, market }, CARD);
+    expect(card.map((x) => x.kind)).toEqual(["market", "aerial"]);
+    expect(card[0]).toMatchObject({ src: market!.src, credit: market!.credit, market: market!.name });
+    // Its alt says what it shows and that it is not the building.
+    expect(card[0].alt).toContain(market!.place);
+    expect(card[0].alt).toContain("No photograph of the building yet");
+    // The building's own pictures still come first.
+    const all = bannerSources({ ...base, market, pictureCredit: "From the offering memorandum", googleEnabled: true }, CARD);
+    expect(all.map((x) => x.kind)).toEqual(["photo", "streetview", "market", "aerial"]);
+    // With no address a card may still show its market, named in the memorandum.
+    expect(bannerSources({ ...base, hasAddress: false, hasStreetAddress: false, market }, CARD).map((x) => x.kind)).toEqual(["market"]);
+    // No market handed in (the compare page): exactly as before.
+    expect(bannerSources(base, CARD).map((x) => x.kind)).toEqual(["aerial"]);
   });
 });
