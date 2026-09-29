@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FLOOD_ZOOM } from "@/lib/basemaps";
 import type { MarketPicture } from "@/lib/market-picture";
 import { MarketCaption } from "../market-caption";
+import { PhotoViewer, type ViewerFrame } from "./photo-viewer";
 import { PropertyMap } from "./property-map";
 import { ReplacePicture } from "./replace-picture";
 
@@ -58,11 +59,18 @@ import { ReplacePicture } from "./replace-picture";
  * one its pipeline card shows (#438): named on its face as the market's,
  * never passed for the building, with the aerial, the flood map and the map
  * one step along the filmstrip. The reader's "Add photo" sits on it.
+ *
+ * Every picture opens full screen (#445, `PhotoViewer`): a click on it, or
+ * the expand control at its top left, shows the views one at a time at the
+ * largest size the site holds them, each with its own credit, the overheads
+ * at a taller frame than the header's band.
  */
 
 type View = "photo" | "street" | "market" | "satellite" | "aerial" | "flood" | "map";
 
 const AERIAL = { w: 1280, h: 576 }; // the route's max width
+/** The overheads' frame in the full-screen viewer: the route's width, 4:3. */
+const VIEWER = { w: 1280, h: 960 };
 
 /** Every view's frame, read against the deal header it sits in (#433): 16:9
  *  on a phone, a wider band where the header stacks at a tablet's width (so
@@ -116,6 +124,7 @@ export function PropertyVisual({
   const [satelliteGone, setSatelliteGone] = useState(false);
   const [floodGone, setFloodGone] = useState(false);
   const [marketGone, setMarketGone] = useState(false);
+  const [viewing, setViewing] = useState<View | null>(null);
 
   const photoPossible = !!picture && !photoGone;
   const streetPossible = canStreet && !streetGone;
@@ -156,6 +165,74 @@ export function PropertyVisual({
     map: { src: null, fail: () => {} },
   };
 
+  // The full-screen viewer's pictures (#445): the views the page has, the
+  // map apart, each credited exactly as its own view is.
+  const viewerAerial = `/api/deals/${dealId}/aerial?src=usgs&w=${VIEWER.w}&h=${VIEWER.h}`;
+  const frames: ViewerFrame[] = views.flatMap((v): ViewerFrame[] => {
+    const thumb = thumbs[v.id].src ?? "";
+    switch (v.id) {
+      case "photo":
+        return [{ id: v.id, label: v.label, src: `/api/deals/${dealId}/picture?size=hero`, alt: `Photograph of ${label}`, credit: picture?.credit ?? "", thumb }];
+      case "street":
+        return [{ id: v.id, label: v.label, src: `/api/deals/${dealId}/photo`, alt: `Street view of ${label}`, credit: "Street View imagery © Google", thumb }];
+      case "market":
+        return market
+          ? [
+              {
+                id: v.id,
+                label: v.label,
+                src: market.src,
+                alt: `${market.place}: the market this deal is in, ${market.name}. No photograph of the building yet.`,
+                credit: `Market photo: ${market.name} · ${market.credit}`,
+                thumb,
+              },
+            ]
+          : [];
+      case "satellite":
+        return [
+          {
+            id: v.id,
+            label: v.label,
+            src: `/api/deals/${dealId}/aerial?src=satellite&w=${VIEWER.w}&h=${VIEWER.h}`,
+            alt: `Satellite view of ${label}`,
+            credit: "Satellite imagery © Google",
+            thumb,
+          },
+        ];
+      case "aerial":
+        return [
+          {
+            id: v.id,
+            label: v.label,
+            src: viewerAerial,
+            alt: `Aerial photograph of ${label}`,
+            credit: hasStreetAddress
+              ? "Imagery: USGS The National Map"
+              : "Imagery: USGS The National Map · neighborhood placement, no street address on this deal",
+            thumb,
+            ring: hasStreetAddress,
+          },
+        ];
+      case "flood":
+        return [
+          {
+            id: v.id,
+            label: v.label,
+            src: `${viewerAerial}&z=${FLOOD_ZOOM}`,
+            over: `/api/deals/${dealId}/flood?w=${VIEWER.w}&h=${VIEWER.h}&z=${FLOOD_ZOOM}`,
+            alt: `Aerial photograph of the blocks around ${label}, with FEMA's flood hazard zones`,
+            credit: "FEMA flood zones · USGS imagery",
+            thumb,
+            thumbOver: thumbs.flood.over,
+            ring: true,
+          },
+        ];
+      default:
+        return [];
+    }
+  });
+  const open = () => setViewing(active);
+
   return (
     // The deal header's own picture (#433): no card of its own — the header
     // is the card — and marked, so the header lays itself out as a split
@@ -176,7 +253,8 @@ export function PropertyVisual({
               alt={`Photograph of ${label}`}
               width={AERIAL.w}
               height={AERIAL.h}
-              className={`${FRAME} w-full bg-faint object-cover`}
+              onClick={open}
+              className={`${FRAME} w-full cursor-zoom-in bg-faint object-cover`}
               onError={() => setPhotoGone(true)}
             />
             <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
@@ -194,7 +272,8 @@ export function PropertyVisual({
               alt={`${market.place}: the market this deal is in, ${market.name}. No photograph of the building yet.`}
               width={AERIAL.w}
               height={AERIAL.h}
-              className={`${FRAME} w-full bg-faint object-cover`}
+              onClick={open}
+              className={`${FRAME} w-full cursor-zoom-in bg-faint object-cover`}
               onError={() => setMarketGone(true)}
             />
             <MarketCaption market={market.name} credit={market.credit} size="hero" />
@@ -212,7 +291,8 @@ export function PropertyVisual({
               alt={`Satellite view of ${label}`}
               width={AERIAL.w}
               height={AERIAL.h}
-              className={`${FRAME} w-full bg-faint object-cover`}
+              onClick={open}
+              className={`${FRAME} w-full cursor-zoom-in bg-faint object-cover`}
               onError={() => setSatelliteGone(true)}
             />
             <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
@@ -231,7 +311,8 @@ export function PropertyVisual({
               alt={`Aerial photograph of ${label}`}
               width={AERIAL.w}
               height={AERIAL.h}
-              className={`${FRAME} w-full bg-faint object-cover`}
+              onClick={open}
+              className={`${FRAME} w-full cursor-zoom-in bg-faint object-cover`}
               onError={() => setAerialGone(true)}
             />
             <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
@@ -289,7 +370,8 @@ export function PropertyVisual({
                 width={AERIAL.w}
                 height={AERIAL.h}
                 loading="lazy"
-                className="absolute inset-0 h-full w-full object-cover"
+                onClick={open}
+                className="absolute inset-0 h-full w-full cursor-zoom-in object-cover"
                 onError={() => setFloodGone(true)}
               />
               {/* Both frames are centred on the building's location. */}
@@ -327,7 +409,8 @@ export function PropertyVisual({
             <img
               src={`/api/deals/${dealId}/photo`}
               alt={`Street view of ${label}`}
-              className={`${FRAME} w-full bg-faint object-cover`}
+              onClick={open}
+              className={`${FRAME} w-full cursor-zoom-in bg-faint object-cover`}
               loading="lazy"
               onError={() => setStreetGone(true)}
             />
@@ -341,6 +424,23 @@ export function PropertyVisual({
             traffic for the readers who never look at it. */}
         {active === "map" && hasAddress && (
           <PropertyMap dealId={dealId} label={label} heightClass={`${FRAME} w-full`} />
+        )}
+
+        {/* The picture full screen (#445), from its top left corner: the
+            top right is the reader's Replace photo. Never over the map. */}
+        {active !== "map" && frames.length > 0 && (
+          <button
+            type="button"
+            onClick={open}
+            aria-label={`See the pictures of ${label} full screen`}
+            title="Full screen"
+            data-picture="expand"
+            className="absolute left-2 top-2 z-[5] flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white shadow-sm backdrop-blur-sm transition hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-4 w-4">
+              <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+            </svg>
+          </button>
         )}
 
         {/* "That's not the building": on the picture itself, where a cover
@@ -400,6 +500,15 @@ export function PropertyVisual({
             );
           })}
         </div>
+      )}
+
+      {viewing && frames.length > 0 && (
+        <PhotoViewer
+          frames={frames}
+          start={Math.max(0, frames.findIndex((f) => f.id === viewing))}
+          title={label}
+          onClose={() => setViewing(null)}
+        />
       )}
     </figure>
   );
