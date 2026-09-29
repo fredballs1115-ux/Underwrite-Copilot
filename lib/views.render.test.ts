@@ -3180,6 +3180,7 @@ describe("a metro's for-sale market, from Realtor.com", () => {
 
 // ── The deal page's picture ─────────────────────────────────────────────────
 import { PropertyVisual } from "@/app/(app)/deals/[id]/property-visual";
+import { PhotoViewerBody } from "@/app/(app)/deals/[id]/photo-viewer";
 import type { SiteFlagsResult as SiteFlagsResultForTest } from "@/lib/site-flags/core";
 
 describe("PropertyVisual — the building's own photograph leads, then the overhead", () => {
@@ -3209,6 +3210,48 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
     expect(html).toMatch(/aria-pressed="true" data-view-thumb="photo"/);
     expect(text).toContain("Aerial");
     expect(text).toContain("Map");
+    // The picture opens full screen (#445): from its top left corner, the
+    // Replace photo keeping the top right, and from a click on any picture.
+    expect(html).toContain('aria-label="See the pictures of 1200 N 31st St, Philadelphia, PA full screen"');
+    expect((html.match(/data-picture="expand"/g) ?? []).length).toBe(1);
+    expect((html.match(/cursor-zoom-in/g) ?? []).length).toBe(2);
+    // Nothing is open until it is asked for.
+    expect(html).not.toContain("data-photo-viewer");
+  });
+
+  it("shows the building full screen, one view at a time with its own credit (#445)", () => {
+    const frames = [
+      { id: "photo", label: "Photo", src: "/api/deals/d1/picture?size=hero", alt: "Photograph of 1200 N 31st St", credit: "From the offering memorandum", thumb: "/api/deals/d1/picture?size=hero" },
+      { id: "aerial", label: "Aerial", src: "/api/deals/d1/aerial?src=usgs&w=1280&h=960", alt: "Aerial photograph of 1200 N 31st St", credit: "Imagery: USGS The National Map", thumb: "/api/deals/d1/aerial?src=usgs&w=1280&h=576", ring: true },
+      { id: "flood", label: "Flood", src: "/api/deals/d1/aerial?src=usgs&w=1280&h=960&z=17", over: "/api/deals/d1/flood?w=1280&h=960&z=17", alt: "Aerial photograph of the blocks around 1200 N 31st St, with FEMA's flood hazard zones", credit: "FEMA flood zones · USGS imagery", thumb: "/api/deals/d1/aerial?src=usgs&w=1280&h=576&z=17", thumbOver: "/api/deals/d1/flood?w=1280&h=576&z=17", ring: true },
+    ];
+    const html = renderToStaticMarkup(
+      React.createElement(PhotoViewerBody, { frames, start: 1, title: "1200 N 31st St, Philadelphia, PA", onClose: () => {} }),
+    );
+    dumpView("photo-viewer", html);
+    expect(a11yIssues(html), "a11y photo viewer").toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(html).toContain('role="dialog"');
+    expect(html).toContain('aria-modal="true"');
+    // It opens on the view asked for, credited as that view is, the
+    // building ringed on the overhead.
+    expect(html).toContain('data-viewer-frame="aerial"');
+    expect(text).toContain("Aerial · 2 of 3");
+    expect(text).toContain("Imagery: USGS The National Map");
+    expect(html).toContain('data-picture="viewer-ring"');
+    expect(html).toContain('src="/api/deals/d1/aerial?src=usgs&amp;w=1280&amp;h=960"');
+    // The arrows, the close and every view along the foot, the one on screen pressed.
+    for (const name of ["Previous picture", "Next picture", "Close"]) expect(html).toContain(`aria-label="${name}"`);
+    expect(html).toMatch(/aria-pressed="true" aria-label="Aerial"/);
+    expect(html).toContain('src="/api/deals/d1/flood?w=1280&amp;h=576&amp;z=17"');
+    // One picture: no arrows, no strip.
+    const one = renderToStaticMarkup(
+      React.createElement(PhotoViewerBody, { frames: frames.slice(0, 1), title: "1200 N 31st St", onClose: () => {} }),
+    );
+    expect(one).not.toContain("Next picture");
+    expect(one).not.toContain('aria-label="Pictures"');
+    expect(visibleText(one)).toContain("Photo · 1 of 1");
   });
 
   it("without a picture, the aerial leads and the button offers to add one", () => {

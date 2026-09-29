@@ -1052,6 +1052,8 @@ jobs:
           mark "#442 no maps in the pipeline" grep -q "No more maps in your pipeline" p_whats-new.html
           # #444 — the memorandum's photograph from its cover page, never a map (signed-in): its card.
           mark "#444 the building's photo, never the memorandum's map" grep -q "never the memorandum" p_whats-new.html
+          # #445 — the deal page's pictures full screen (signed-in): its card.
+          mark "#445 the building full screen" grep -q "See the building full screen" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

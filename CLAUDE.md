@@ -2587,7 +2587,22 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   one on screen ringed, the Flood thumbnail FEMA's zones over the same
   frame and the Map a glyph. A thumbnail draws the very URL its view
   draws, so it costs no request the view does not already make, and one
-  that fails takes its view away as the view failing would. **The deal
+  that fails takes its view away as the view failing would. **Every view
+  opens full screen** (#445, `app/(app)/deals/[id]/photo-viewer.tsx`): a
+  click on the picture, or the expand control at its top left (the top
+  right is Replace photo; never over the map), opens `PhotoViewer`, a
+  dialog over the page with the views one at a time at the largest size
+  the site holds them (the overheads at 1280 × 960 rather than the
+  header's band), each with its own view's credit, the building ringed on
+  an overhead of a street address, the arrows, the arrow keys and a swipe
+  stepping between them, and the views' own pictures along the foot. Esc,
+  Close or a click on the dark closes it and gives the focus back; while
+  it is open the focus stays inside and the page behind does not scroll.
+  It renders through a portal into `document.body`, since a transformed
+  ancestor would hold a fixed layer to its own box; `PhotoViewerBody` is
+  the markup, which the render test draws with no page to portal into.
+  Checked in Chromium over CDP: keys, wrap, the focus trap, the return of
+  focus and scroll, the backdrop, at 1280 and 390. **The deal
   page opens the way a listing does** (#433, `app/(app)/deals/[id]/deal-hero.tsx`,
   `DealHero`, pure): the picture is the header's own — no card of its
   own, marked `data-hero-picture` — beside the name, the call and the
