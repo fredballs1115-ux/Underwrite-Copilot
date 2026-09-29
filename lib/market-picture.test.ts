@@ -32,6 +32,13 @@ describe("marketPictureFor — the photograph a card shows where the building ha
     expect(marketPictureFor({}, "Portland")).toBeNull();
   });
 
+  it("reads a typed line the way it reads a picked suggestion (#441)", () => {
+    // An address saved without picking a suggestion is a line and nothing
+    // else; its card fell to the overhead although the line names Dallas.
+    expect(marketPictureFor({ label: "4200 Maple Ave, Dallas, TX 75219" })?.id).toBe("dallas");
+    expect(marketPictureFor({ label: "1200 Liberty Ave, Pittsburgh, PA 15222", street: "", city: "", state: "" })?.id).toBe("pittsburgh");
+  });
+
   it("outside every photographed market there is nothing to borrow", () => {
     expect(marketPictureFor({ city: "Boise", state: "ID" })).toBeNull();
     expect(marketPictureFor({ state: "PA" })).toBeNull();

@@ -9,7 +9,7 @@ import { getBrandingForDeal, brandingLogoDataUri } from "@/lib/branding-server";
 import { buyBoxCheckSource, evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
-import type { StructuredAddress } from "@/lib/address";
+import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { inferStrategy } from "@/lib/deal-strategy";
 import { marketForAddress } from "@/lib/market-match";
 import { todayReads } from "@/lib/model-vs-market-read";
@@ -216,7 +216,7 @@ export async function GET(
       try {
         // The covered metro, or the state's own series outside one — the
         // same market the page reads, so the report cannot disagree with it.
-        const metro = marketForAddress((deal.address as StructuredAddress | null) ?? {});
+        const metro = marketForAddress(addressUpgrade(deal.address, extraction) ?? (deal.address as StructuredAddress | null) ?? {});
         assumptions = modelVsMarketFor({
           derived,
           extraction,

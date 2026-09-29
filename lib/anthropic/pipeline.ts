@@ -38,7 +38,7 @@ import { dealContextFor } from "@/lib/deal-context";
 import { interestNote, readInterest } from "@/lib/interest";
 import { assumableNote, readAssumable } from "@/lib/assumable-debt";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
-import { parseStructuredAddress, type StructuredAddress } from "@/lib/address";
+import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { marketForAddress } from "@/lib/market-match";
 import { SERIES, metroSeriesFor, readMetroRates, readRates } from "@/lib/live-rates";
 import { fetchBenchRows, fetchSeriesRows } from "@/lib/live-rates-query";
@@ -195,12 +195,18 @@ async function liveMarketFromDb(
     // list and the compare page read it the same way); a row that still
     // carries the form's JSON string is parsed the form's way.
     const raw = data?.address;
+    const ex = (data?.extraction as ExtractionResult | null) ?? null;
+    // A typed line read for its city and state, and a deal nobody typed an
+    // address for placed by the one its memorandum states (#441) — the
+    // extraction step writes the same upgrade, so this only matters for a
+    // run resumed from before it.
     const address: Partial<StructuredAddress> | null =
-      raw && typeof raw === "object"
+      addressUpgrade(raw, ex) ??
+      (raw && typeof raw === "object"
         ? (raw as Partial<StructuredAddress>)
         : typeof raw === "string"
           ? parseStructuredAddress(raw)
-          : null;
+          : null);
     // A covered metro's figures where the address sits in one; the state's
     // own otherwise (lib/market-match's stateForAddress — the same series
     // table, filed under `state:PA`), said as the state's. A deal with no
@@ -209,7 +215,6 @@ async function liveMarketFromDb(
     // The debt-market lines read the class the deck turned out to be, and
     // whether the deal is a plan, so the lending-standards series is the
     // one a bank reports for this kind of loan.
-    const ex = (data?.extraction as ExtractionResult | null) ?? null;
     const assetClass = ex?.assetClass || (data?.asset_class as string | null) || null;
     const plan = isPlanDeal(inferStrategy(ex).kind);
     const others = otherPortfolioMarkets(ex, metro?.id ?? null);
@@ -589,6 +594,22 @@ async function runAnalysisSteps(
         .from("deals")
         .update({ extraction, updated_at: new Date().toISOString() })
         .eq("id", dealId);
+      // Place the deal by its address (#441): a deal uploaded with the
+      // address box empty takes the one the memorandum states, and a typed
+      // line gets the street, city and state it names — so the market check
+      // below, the pictures, the flood map and the comps all have one.
+      // Best-effort: a failed write leaves the deal as it was.
+      try {
+        const { data: placed } = await admin
+          .from("deals")
+          .select("address, is_sample")
+          .eq("id", dealId)
+          .maybeSingle();
+        const upgrade = placed && !placed.is_sample ? addressUpgrade(placed.address, extraction) : null;
+        if (upgrade) await admin.from("deals").update({ address: upgrade }).eq("id", dealId);
+      } catch {
+        // the deal keeps the address it had
+      }
 
       // Citation-level provenance (migration 0018): store one deal_facts row
       // per extracted figure, with its page VALIDATED against the OM's real

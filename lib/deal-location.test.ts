@@ -4,6 +4,7 @@ import type { StructuredAddress } from "./address";
 import {
   GEO_VERSION,
   cacheFresh,
+  geoKey,
   resolveDealLocation,
   type DealVisualCache,
 } from "./deal-location";
@@ -107,6 +108,7 @@ describe("resolveDealLocation", () => {
       geoPrecision: "street",
       geoSource: "census",
       geoV: GEO_VERSION,
+      geoFor: geoKey(ADDR),
     };
     const { client, writes } = fakeSupabase(current);
     let asked = 0;
@@ -114,6 +116,35 @@ describe("resolveDealLocation", () => {
     expect(asked).toBe(0);
     expect(writes).toHaveLength(0);
     expect(loc).toMatchObject({ precision: "street" });
+  });
+
+  it("re-resolves a location cached for another address, and keeps the new one with its address (#441)", async () => {
+    // An edited address kept the old one's point for up to a month: the
+    // aerial, the pin and the flood zone all showed the old place.
+    const current: DealVisualCache = {
+      lat: CENSUS.lat,
+      lng: CENSUS.lng,
+      geoAt: new Date(NOW - 1000).toISOString(),
+      geoPrecision: "street",
+      geoSource: "census",
+      geoV: GEO_VERSION,
+      geoFor: geoKey(ADDR),
+    };
+    const moved: StructuredAddress = { ...ADDR, label: "1400 Market St, Philadelphia, PA 19102", street: "1400 Market St", city: "Philadelphia", state: "PA" };
+    const { client, writes } = fakeSupabase(current);
+    let asked = 0;
+    await resolveDealLocation(client, "d1", moved, current, deps(async () => { asked++; return CENSUS; }));
+    expect(asked).toBe(1);
+    expect(writes.at(-1)).toMatchObject({ geoFor: geoKey(moved), geoV: GEO_VERSION });
+    // The same line with its street read out is asked again too: without a
+    // street the geocoder framed the district, and never asked for the door.
+    const typed: StructuredAddress = { ...ADDR, street: "", city: "", state: "", zip: "" };
+    expect(geoKey(typed)).not.toBe(geoKey(ADDR));
+    expect(cacheFresh({ ...current, geoFor: geoKey(typed) }, NOW, ADDR)).toBe(false);
+    // Case and spacing are not a different address.
+    expect(geoKey({ ...ADDR, label: `  ${ADDR.label.toUpperCase()}  ` })).toBe(geoKey(ADDR));
+    // A caller that names no address reads the age and the rules alone.
+    expect(cacheFresh({ ...current, geoFor: undefined }, NOW)).toBe(true);
   });
 
   it("caches a definitive miss, so an unknown address costs one lookup", async () => {

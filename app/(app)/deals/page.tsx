@@ -4,7 +4,7 @@ import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/serve
 import { getBilling } from "@/lib/billing";
 import { type DealRow } from "@/lib/deals";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
-import { parseStructuredAddress, type StructuredAddress } from "@/lib/address";
+import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { WhatsNewCard } from "./whats-new";
 import { Pipeline, type DealCard } from "./pipeline";
 import { PIPELINE_VIEW_COOKIE, landingView } from "@/lib/pipeline-view";
@@ -193,6 +193,38 @@ export default async function DealsPage({
     ),
   );
 
+  // Every deal placed by its address (#441): a deal uploaded with the
+  // address box empty takes the one its memorandum states, and a typed line
+  // gets the street, city and state it names. Written once, so the pictures,
+  // the flood map and the market check read it too, and read here for this
+  // view; the card showed an overhead, or nothing, for a place it could have
+  // named. A write the row's policy refuses (a teammate's deal) still reads
+  // right on this page.
+  const upgrades = new Map<string, StructuredAddress>();
+  for (const d of rows) {
+    if (d.is_sample) continue;
+    const next = addressUpgrade(d.address, d.extraction as ExtractionResult | null);
+    if (next) upgrades.set(d.id, next);
+  }
+  if (upgrades.size) {
+    await Promise.all(
+      [...upgrades].map(([id, address]) =>
+        supabase
+          .from("deals")
+          .update({ address })
+          .eq("id", id)
+          .then(
+            () => undefined,
+            () => undefined,
+          ),
+      ),
+    );
+    for (const d of rows) {
+      const next = upgrades.get(d.id);
+      if (next) d.address = next;
+    }
+  }
+
   const deals: DealCard[] = rows.map((d) => {
     const extraction = d.extraction as ExtractionResult | null;
     const verdict = d.verdict as { verdict?: string } | null;
@@ -265,7 +297,7 @@ export default async function DealsPage({
       // places the rest on its own first view.
       ...(() => {
         const cache = d.photo ?? null;
-        if (!cacheFresh(cache)) return { place: null };
+        if (!cacheFresh(cache, Date.now(), (d.address as StructuredAddress | null) ?? null)) return { place: null };
         if (cache?.geoMiss) return { place: null, placeMiss: true };
         return typeof cache?.lat === "number" && typeof cache?.lng === "number"
           ? { place: { lat: cache.lat, lng: cache.lng, precision: cache.geoPrecision ?? ((d.address as StructuredAddress | null)?.street?.trim() ? "street" : "area") } }

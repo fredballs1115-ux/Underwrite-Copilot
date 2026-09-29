@@ -8,7 +8,7 @@ import type { ExportBranding } from "@/lib/excel-branding";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
-import type { StructuredAddress } from "@/lib/address";
+import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { marketForAddress } from "@/lib/market-match";
 import { todayReads } from "@/lib/model-vs-market-read";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
@@ -121,7 +121,7 @@ export async function GET(
     try {
       // The covered metro, or the state's own series outside one — the same
       // market the page and the report read.
-      const metro = marketForAddress((deal.address as StructuredAddress | null) ?? {});
+      const metro = marketForAddress(addressUpgrade(deal.address, extraction) ?? (deal.address as StructuredAddress | null) ?? {});
       marketRead = modelVsMarketFor({
         derived: model,
         extraction,

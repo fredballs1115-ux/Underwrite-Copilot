@@ -2,6 +2,12 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-09-29",
+      "title": "Every deal placed by its address",
+      "href": "/deals",
+      "blurb": "A deal uploaded without an address now takes the one its memorandum states. An address typed without picking a suggestion is read for its street, city and state. Both used to leave a deal placed nowhere: no market figures, no market photograph on its card, and a district-wide overhead where its own building belonged. Editing an address now moves the pictures and the flood map with it; they used to keep the old place for up to a month."
+    },
+    {
       "date": "2026-09-28",
       "title": "The building's own photograph, even from a locked memorandum",
       "href": "/deals",
