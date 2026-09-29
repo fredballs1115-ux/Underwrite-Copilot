@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { BannerSource } from "@/lib/deal-banner";
+import type { DealCoverFacts } from "@/lib/deal-cover";
+import { DealCover } from "./deal-cover";
 import { MarketCaption } from "./market-caption";
 
 /**
@@ -24,6 +26,9 @@ import { MarketCaption } from "./market-caption";
  *
  * A photograph not yet looked for in the deal's memorandum (`pending`,
  * #440) is asked for over the next picture and fades in when it loads.
+ *
+ * Where the surface passes a `cover` (the pipeline, #442), the deal's cover
+ * takes the blank plate's place: its gradient, its building type, its place.
  */
 export function DealBanner({
   sources,
@@ -33,6 +38,7 @@ export function DealBanner({
   flush = false,
   sizes,
   shade = false,
+  cover = null,
 }: {
   sources: BannerSource[];
   /** the deal's name, for the picture's alt text */
@@ -49,6 +55,9 @@ export function DealBanner({
    *  there, so a white roof never swallows them — over a picture only,
    *  never over the blank plate */
   shade?: boolean;
+  /** what the frame shows when no picture is left: the deal's cover
+   *  (lib/deal-cover) where the surface has one, the blank plate otherwise */
+  cover?: DealCoverFacts | null;
 }) {
   // A photograph nobody has looked for yet (`pending`, #440) is asked for
   // OVER the next picture, which shows at once; it fades in the moment it
@@ -102,6 +111,16 @@ export function DealBanner({
     />
   );
 
+  if (!base && !shown && cover) {
+    // The deal's cover (#442): never a map, never another building. A
+    // memorandum's photograph still being looked for is asked for over it.
+    return (
+      <div className={`relative ${flush ? "" : "overflow-hidden rounded-lg"} ${className}`} data-deal-banner="cover">
+        <DealCover cover={cover} label={label} className={`${shape} w-full`} />
+        {overlay}
+      </div>
+    );
+  }
   if (!base && !shown) {
     return (
       <div

@@ -9,7 +9,8 @@ import { WhatsNewCard } from "./whats-new";
 import { Pipeline, type DealCard } from "./pipeline";
 import { PIPELINE_VIEW_COOKIE, landingView } from "@/lib/pipeline-view";
 import { cookies } from "next/headers";
-import { CARD, bannerSources } from "@/lib/deal-banner";
+import { CARD, THUMB, bannerSources } from "@/lib/deal-banner";
+import { coverFor, coverPlace } from "@/lib/deal-cover";
 import { marketPictureFor } from "@/lib/market-picture";
 import { PICTURE_CREDIT, pictureMayBeInMemorandum } from "@/lib/deal-picture";
 import { cacheFresh, type DealVisualCache } from "@/lib/deal-location";
@@ -307,28 +308,40 @@ export default async function DealsPage({
       // (#428, the compare page's rule): the deal's own photograph — or the
       // memorandum's cover on its first ask — then Street View, then the
       // photograph the deal's market is known by, named as the market's
-      // (#438: pictures, not maps), and the USGS aerial with the building
-      // ringed only behind it.
-      pictures: (() => {
+      // (#438). No overhead (#442): the pipeline's rule is pictures, not
+      // maps, so where no photograph answers the card wears the deal's
+      // cover, and the list row's thumbnail the same, at its own frame.
+      ...(() => {
         const cache = d.photo ?? null;
         const address = (d.address as StructuredAddress | null) ?? null;
         const picture = cache?.picture ?? null;
-        return bannerSources(
-          {
-            dealId: d.id,
-            pictureCredit: picture ? PICTURE_CREDIT[picture.source] : null,
-            memorandumUnread: pictureMayBeInMemorandum({
-              omPath: d.om_storage_path ?? null,
-              isSample: !!d.is_sample,
-              cache,
-            }),
-            googleEnabled,
-            hasStreetAddress: !!address?.street?.trim(),
-            hasAddress: !!address?.label?.trim(),
-            market: marketPictureFor(address, extraction?.market ?? null),
-          },
-          CARD,
-        );
+        const market = marketPictureFor(address, extraction?.market ?? null);
+        const facts = {
+          dealId: d.id,
+          pictureCredit: picture ? PICTURE_CREDIT[picture.source] : null,
+          memorandumUnread: pictureMayBeInMemorandum({
+            omPath: d.om_storage_path ?? null,
+            isSample: !!d.is_sample,
+            cache,
+          }),
+          googleEnabled,
+          hasStreetAddress: !!address?.street?.trim(),
+          hasAddress: !!address?.label?.trim(),
+          aerial: false,
+        };
+        return {
+          pictures: bannerSources({ ...facts, market }, CARD),
+          // No market photograph on a row: a skyline is a panorama, a sliver
+          // at 48px, and its licence wants the photographer named beside it,
+          // which a row's slot has no room for. The building's own
+          // photograph, then its cover.
+          thumbs: bannerSources(facts, THUMB),
+          cover: coverFor({
+            seed: d.id,
+            assetClass: shownAssetClass(d.asset_class, extraction),
+            place: coverPlace(address, market?.name, extraction?.market),
+          }),
+        };
       })(),
     };
   });

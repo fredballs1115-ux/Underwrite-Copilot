@@ -1,57 +1,93 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { BannerSource } from "@/lib/deal-banner";
+import type { DealCoverFacts } from "@/lib/deal-cover";
+import { DealCover } from "./deal-cover";
 
 /**
- * The building's own picture, at list-row size — its "logo", in the sense
- * that every deal is recognisable by the place it actually is.
+ * The building's picture at list-row size — its "logo", in the sense that
+ * every deal is recognisable by the place it actually is.
  *
- * Served by /api/deals/[id]/image, which returns the BEST real picture
- * available: the building's own photograph first — the cover of its
- * memorandum, lifted out of the file on the deal's first view, or the
- * picture the reader put on the deal — then the Street View photograph of
- * the building front where there's a key and Google has coverage, the USGS
- * aerial of the site otherwise. So a row shows the building the moment its
- * memorandum is read, and an overhead upgrades to a street photograph the
- * moment GOOGLE_MAPS_API_KEY is configured — no code change, no re-import.
- * The route answers a revalidation with a 304, so a replaced picture shows
- * on the next view rather than after a day of the old one.
+ * It tries the card's own pictures, best first, each pinned to one source
+ * (`bannerSources` at the THUMB frame, lib/deal-banner): the building's own
+ * photograph (the cover of its memorandum, or the picture the reader put on
+ * the deal), then Street View where there's a key and Google has coverage.
+ * It used to ask one route for "the best picture", which fell to the USGS
+ * overhead for every deal without a photograph, so a reader on the list saw
+ * a column of little maps (#442). Where no photograph answers, the deal's
+ * cover (lib/deal-cover) holds the slot: its gradient and its building type,
+ * never a map and never another building. A memorandum nobody has looked in
+ * yet is searched over the cover, and its photograph fades in when found.
  *
- * The slot is always the same size: a deal with no address, or one whose
- * picture 404s (nothing geocodes, every source failed), shows a blank plate
- * in its place rather than nothing — a row with a picture and a row without
- * used to start their names at different x, and a column of names that
- * does not line up reads as a mistake.
- *
- * On a phone too (#420): the slot was `hidden` below `sm`, so the one
- * width where a list reads most like a set of places showed no place at
- * all. It is larger there (56px, the row's call having moved onto its
- * price line) and 48px from `sm` up (#428 — it was 36px, a postage stamp
- * nobody could read a building in); `srcSet` asks for 168px where a
- * phone's slot needs it (56px at 3×) and 96px elsewhere (48px at 2×),
- * since the map sources are rendered at the size asked for.
- *
- * Lazy by design: a long pipeline must not fire a geocode for every row the
- * reader never scrolls to.
- *
- * A picture that failed before the page hydrated fired its `error` event
- * with no listener attached, so the effect checks on mount: a finished
- * load with no pixels is a failure too, and the plate takes the slot
- * (DealBanner's rule, #418).
+ * The slot is always the same size — 56px on a phone, 48px from `sm` —
+ * so the names down the list start at one x. Lazy, so a long pipeline asks
+ * for no picture the reader never scrolls to. A picture that failed before
+ * the page hydrated fired its `error` with no listener attached, so the
+ * effect checks on mount: a finished load with no pixels is a failure too.
  */
-export function DealThumb({ dealId, hasAddress = true }: { dealId: string; hasAddress?: boolean }) {
-  const [gone, setGone] = useState(false);
+export function DealThumb({
+  sources,
+  cover = null,
+  label,
+}: {
+  sources: BannerSource[];
+  /** the deal's cover, where no photograph answers */
+  cover?: DealCoverFacts | null;
+  /** the deal's name, for the picture's title */
+  label: string;
+}) {
+  const lift = sources[0]?.pending ? sources[0] : null;
+  const rest = lift ? sources.slice(1) : sources;
+  const [at, setAt] = useState(0);
+  const [lifted, setLifted] = useState<"trying" | "shown" | "gone">("trying");
   const ref = useRef<HTMLImageElement>(null);
+  const liftRef = useRef<HTMLImageElement>(null);
   useEffect(() => {
     const img = ref.current;
-    if (img && img.complete && img.naturalWidth === 0) setGone(true);
+    if (img && img.complete && img.naturalWidth === 0) setAt((i) => i + 1);
+  }, [at]);
+  useEffect(() => {
+    const img = liftRef.current;
+    if (img?.complete) setLifted(img.naturalWidth > 0 ? "shown" : "gone");
   }, []);
-  if (!hasAddress || gone) {
+
+  const box = "relative block h-14 w-14 shrink-0 overflow-hidden rounded-lg sm:h-12 sm:w-12";
+  const base = rest[at];
+  const shown = !!lift && lifted === "shown";
+  const overlay = lift && lifted !== "gone" && (
+    // eslint-disable-next-line @next/next/no-img-element -- the deal's own picture route, auth-scoped, with its own cache headers
+    <img
+      ref={liftRef}
+      src={lift.src}
+      alt=""
+      aria-hidden
+      title={shown ? `${label}: ${lift.credit}` : undefined}
+      data-lift={lift.kind}
+      width={96}
+      height={96}
+      loading="lazy"
+      decoding="async"
+      onLoad={() => setLifted("shown")}
+      onError={() => setLifted("gone")}
+      className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${shown ? "opacity-100" : "opacity-0"}`}
+    />
+  );
+
+  if (!base && !shown) {
+    if (cover) {
+      return (
+        <span aria-hidden data-deal-thumb="cover" className={box}>
+          <DealCover cover={cover} label={label} size="thumb" className="h-full w-full" />
+          {overlay}
+        </span>
+      );
+    }
     return (
       <span
         aria-hidden
         data-deal-thumb="blank"
-        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-dashed border-line bg-faint text-muted/60 sm:h-12 sm:w-12"
+        className={`${box} flex items-center justify-center border border-dashed border-line bg-faint text-muted/60`}
       >
         <svg
           viewBox="0 0 24 24"
@@ -64,27 +100,30 @@ export function DealThumb({ dealId, hasAddress = true }: { dealId: string; hasAd
         >
           <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5M9 10h.01M15 10h.01M9 14h.01M15 14h.01" />
         </svg>
+        {overlay}
       </span>
     );
   }
   return (
-    /* eslint-disable-next-line @next/next/no-img-element -- proxied,
-       auth-scoped route; next/image can't add anything over a route that
-       already sets its own cache headers */
-    <img
-      ref={ref}
-      src={`/api/deals/${dealId}/image?w=96&h=96`}
-      srcSet={`/api/deals/${dealId}/image?w=96&h=96 96w, /api/deals/${dealId}/image?w=168&h=168 168w`}
-      sizes="(min-width: 640px) 48px, 56px"
-      alt=""
-      aria-hidden
-      data-deal-thumb="photo"
-      width={96}
-      height={96}
-      loading="lazy"
-      decoding="async"
-      onError={() => setGone(true)}
-      className="block h-14 w-14 shrink-0 rounded-lg border border-line bg-faint object-cover sm:h-12 sm:w-12"
-    />
+    <span aria-hidden data-deal-thumb="photo" className={`${box} border border-line bg-faint`}>
+      {base ? (
+        /* eslint-disable-next-line @next/next/no-img-element -- proxied,
+           auth-scoped routes with their own cache headers */
+        <img
+          key={base.src}
+          ref={ref}
+          src={base.src}
+          alt=""
+          title={shown ? undefined : `${label}: ${base.credit}`}
+          width={96}
+          height={96}
+          loading="lazy"
+          decoding="async"
+          onError={() => setAt((i) => i + 1)}
+          className="h-full w-full object-cover"
+        />
+      ) : null}
+      {overlay}
+    </span>
   );
 }

@@ -46,7 +46,8 @@ vi.mock("../app/(app)/deals/actions", () => {
 import { Pipeline, type DealCard } from "@/app/(app)/deals/pipeline";
 import { ModelView } from "@/app/(app)/deals/[id]/model-view";
 import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table";
-import { CARD, bannerSources } from "@/lib/deal-banner";
+import { CARD, THUMB, bannerSources } from "@/lib/deal-banner";
+import { coverFor } from "@/lib/deal-cover";
 import { marketPictureFor } from "@/lib/market-picture";
 import { landingView, remembersView } from "@/lib/pipeline-view";
 import { ToastProvider } from "@/app/(app)/toaster";
@@ -100,11 +101,35 @@ const CARDS: DealCard[] = [
 
 const BILLING = { isPro: false, canCreateDeal: true, dealCount: 9, dealLimit: 25 };
 
+/**
+ * The cards as the pipeline page hands them over (#442): each row's
+ * thumbnail sources at its own frame, no overhead among them, and each
+ * deal's cover. The Maddox has a memorandum nobody has read the cover of
+ * yet; 1400 Market has its own photograph.
+ */
+const withThumbs = (cards: DealCard[]): DealCard[] =>
+  cards.map((c) => ({
+    ...c,
+    thumbs: bannerSources(
+      {
+        dealId: c.id,
+        pictureCredit: c.id === "b" ? "Photograph added to the deal" : null,
+        memorandumUnread: c.id === "a",
+        googleEnabled: false,
+        hasStreetAddress: c.hasAddress,
+        hasAddress: c.hasAddress,
+        aerial: false,
+      },
+      THUMB,
+    ),
+    cover: coverFor({ seed: c.id, assetClass: c.assetClass, place: c.market || null }),
+  }));
+
 describe("Pipeline — every card shape renders and reads clean", () => {
   it("renders the pipeline with twelve deals in every state", () => {
     const html = render(
       React.createElement(Pipeline, {
-        deals: CARDS,
+        deals: withThumbs(CARDS),
         errorMessage: null,
         notice: null,
         onboarding: { hasBuyBox: true, sampleId: "h", hasRealDeal: true },
@@ -153,19 +178,22 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect((html.match(/Fit 88 · Pursue/g) ?? []).length).toBe(1);
     expect((html.match(/Fit 42 · Outside box/g) ?? []).length).toBe(1);
     // Every row keeps a picture slot of the same size, so the names line
-    // up: the nine live deals with an address try their photo, the two
-    // without one (Logan Square, Arlington Flex Park) show a blank plate;
-    // the dead one is folded away.
-    expect((html.match(/data-deal-thumb="photo"/g) ?? []).length).toBe(10);
-    expect((html.match(/data-deal-thumb="blank"/g) ?? []).length).toBe(2);
-    // …at every width (#420): the picture was hidden on a phone. There it
-    // asks for a picture sized to its larger slot, and the row's call
-    // leads the price line instead of taking a column from the name — the
-    // column is hidden below `sm`, so each live row carries its call once
-    // for each width (one stalled run, two failed ones).
+    // up, and none of them is a map (#442): the deal with its own
+    // photograph shows it, the memorandum nobody has looked in yet is
+    // searched over its cover, and every other row wears its cover — the
+    // two with no address (Logan Square, Arlington Flex Park) included.
+    // The dead one is folded away.
+    expect((html.match(/data-deal-thumb="photo"/g) ?? []).length).toBe(1);
+    expect((html.match(/data-deal-thumb="cover"/g) ?? []).length).toBe(11);
+    expect((html.match(/data-deal-thumb="blank"/g) ?? []).length).toBe(0);
+    expect(html).not.toContain("/aerial?");
+    expect(html).toContain('src="/api/deals/b/picture?size=thumb"');
+    expect(html).toMatch(/<img[^>]*data-lift="photo"[^>]*>/);
+    // …at every width (#420): the picture was hidden on a phone. The row's
+    // call leads the price line there instead of taking a column from the
+    // name — the column is hidden below `sm`, so each live row carries its
+    // call once for each width (one stalled run, two failed ones).
     const rows = (html.match(/data-deal-thumb=/g) ?? []).length;
-    expect(html).toContain("image?w=168&amp;h=168 168w");
-    expect(html).toContain('sizes="(min-width: 640px) 48px, 56px"');
     expect((html.match(/class="flex shrink-0 sm:hidden"/g) ?? []).length).toBe(rows);
     expect((html.match(/class="hidden w-22 shrink-0 justify-end sm:flex"/g) ?? []).length).toBe(rows);
     expect((html.match(/>Stalled</g) ?? []).length).toBe(2);
@@ -191,8 +219,8 @@ describe("Pipeline — every card shape renders and reads clean", () => {
   it("draws the pipeline as photograph-led cards by default: the building's picture, the call over it, the three figures (#428)", () => {
     // Each deal's pictures as the page resolves them: the Maddox has a
     // memorandum nobody has read the cover of yet, 1400 Market its own
-    // photograph, the rest the USGS aerial — and the two with no address
-    // nothing at all.
+    // photograph, and no overhead for anyone (#442) — the rest wear their
+    // covers, the two with no address included.
     const withPictures = CARDS.map((c) => ({
       ...c,
       pictures: bannerSources(
@@ -203,9 +231,11 @@ describe("Pipeline — every card shape renders and reads clean", () => {
           googleEnabled: false,
           hasStreetAddress: c.hasAddress && c.id !== "h",
           hasAddress: c.hasAddress,
+          aerial: false,
         },
         CARD,
       ),
+      cover: coverFor({ seed: c.id, assetClass: c.assetClass, place: c.market || null }),
     }));
     const html = render(
       React.createElement(Pipeline, {
@@ -226,21 +256,21 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     const live = CARDS.filter((c) => c.stage !== "dead");
     expect((html.match(/data-deal-tile=/g) ?? []).length).toBe(live.length);
     for (const c of live) expect(text, c.name).toContain(c.name);
-    // The first picture each card shows: the deal's own photograph, else the
-    // aerial at the card's frame — ringed where the address reaches a
-    // street, and never on the sample's neighbourhood placement. No address,
-    // no picture: a blank plate.
+    // The first picture each card shows: the deal's own photograph, else its
+    // cover (#442) — its gradient, its building type and its place, named
+    // as having no photograph yet. Never a map, and never the blank plate.
     expect(html).toContain('src="/api/deals/b/picture?size=hero"');
-    expect(html).toContain(`src="/api/deals/c/aerial?src=usgs&amp;w=${CARD.w}&amp;h=${CARD.h}"`);
-    expect((html.match(/data-deal-banner="blank"/g) ?? []).length).toBe(2);
-    const aerialFirst = live.filter((c) => c.hasAddress && c.id !== "b");
-    const ringed = aerialFirst.filter((c) => c.id !== "h");
-    expect((html.match(/data-deal-banner="aerial"/g) ?? []).length).toBe(aerialFirst.length);
-    expect((html.match(/data-picture="banner-pin"/g) ?? []).length).toBe(ringed.length);
+    expect(html).not.toContain("/aerial?");
+    expect(html).not.toContain('data-picture="banner-pin"');
+    expect((html.match(/data-deal-banner="blank"/g) ?? []).length).toBe(0);
+    expect((html.match(/data-deal-banner="cover"/g) ?? []).length).toBe(live.length - 1);
+    expect(html).toContain('data-deal-cover="housing"');
+    expect(html).toContain('data-deal-cover="storage"');
+    expect((text.match(/No photo yet/g) ?? []).length).toBe(live.length - 1);
     // A memorandum nobody has read the cover of yet is searched OVER the
-    // next picture (#440): the Maddox shows its aerial at once, and its
-    // cover is asked for on top of it, unseen and unannounced until it
-    // loads, then fades in under its own credit.
+    // next picture (#440): the Maddox shows its cover at once, and the
+    // memorandum's is asked for on top of it, unseen and unannounced until
+    // it loads, then fades in under its own credit.
     const lifted = html.match(/<img[^>]*data-lift="photo"[^>]*>/g) ?? [];
     expect(lifted).toHaveLength(1);
     expect(lifted[0]).toContain('src="/api/deals/a/picture?size=hero"');
@@ -250,7 +280,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // The credit follows the picture on screen.
     expect(text).not.toContain("From the offering memorandum");
     expect(text).toContain("Photograph added to the deal");
-    expect(text).toContain("Imagery: USGS The National Map");
+    expect(text).not.toContain("Imagery: USGS The National Map");
     // The call rides on the picture, once a card: the failed re-screen and
     // the failed run each say Failed, the stalled one Stalled.
     expect((html.match(/>Failed</g) ?? []).length).toBe(2);

@@ -2479,11 +2479,35 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   names it on its face — "Market photo" over the market's name on a shade
   at the foot (`data-picture="market"`), the photographer and licence
   beside it (`photographerLine`), the place in its alt text with "No
-  photograph of the building yet" — and the aerial stays behind it, for a
-  photograph that fails and a deal outside every photographed market;
-  `lib/market-picture.test.ts` holds every market the site covers to
-  having a photograph for its cards, its own or its metro's. The compare
-  pick sits beside the call, clear of the caption. **The deal page opens
+  photograph of the building yet" — and `lib/market-picture.test.ts`
+  holds every market the site covers to having a photograph for its
+  cards, its own or its metro's. The compare pick sits beside the call,
+  clear of the caption. **No overhead on the pipeline at all** (#442):
+  the page passes `aerial: false` to `bannerSources`, so a photograph
+  that fails, or a deal outside every photographed market, falls to the
+  deal's COVER (`lib/deal-cover.ts`, pure, drawn by
+  `app/(app)/deals/deal-cover.tsx`): one of eight deep gradients picked
+  by hashing the deal's id (`coverToneFor`, so a deal always wears the
+  same one), a white line drawing of its kind of building
+  (`coverKindFor` through `assetClassKey`: an apartment block, an office
+  tower, a warehouse, a storefront, a hotel, storage doors, a staked
+  parcel, a plain building), and at a card's foot "No photo yet" over
+  its place (`coverPlace`: the address's city and state, else the
+  market's name, else the memorandum's words) — the market caption's
+  type, the drawing above it so a long name never runs through it, and
+  its accessible name saying there is no photograph of the deal yet.
+  `lib/deal-cover.test.ts` holds white to AAA on every gradient where
+  the words sit. The list row's thumbnail had asked the image route for
+  "the best picture", which fell to the USGS aerial for every deal
+  without a photograph — a column of little maps; `DealThumb` now takes
+  the card's own sources at the `THUMB` frame (168px, which asks for
+  the stored 240px crop, `size=thumb`), the memorandum's photograph
+  faded in over the cover while it is searched, and never the market's
+  photograph: a skyline is a sliver at 48px, and its licence wants the
+  photographer named beside it, which a row has no room for. The
+  compare page keeps its aerial, where two columns' overheads tell two
+  buildings apart, and the deal page keeps it one step along its
+  filmstrip. **The deal page opens
   on the same photograph** (#439): `PropertyVisual` takes the page's
   `marketPictureFor` as `market` and adds a Market view, leading only
   where there is no photograph of the building's own and no Street View
