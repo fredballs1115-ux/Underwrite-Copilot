@@ -1048,6 +1048,8 @@ jobs:
           mark "#440 a locked memorandum's cover is found" grep -q "even from a locked memorandum" p_whats-new.html
           # #441 — a deal placed by its memorandum's or its typed address (signed-in): its card.
           mark "#441 every deal is placed by its address" grep -q "Every deal placed by its address" p_whats-new.html
+          # #442 — no overhead on the pipeline's cards or rows; a deal's cover instead (signed-in): its card.
+          mark "#442 no maps in the pipeline" grep -q "No more maps in your pipeline" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

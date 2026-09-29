@@ -18,6 +18,7 @@ import { BatchUpload } from "./batch-upload";
 import { DealThumb } from "./deal-thumb";
 import { DealBanner } from "./deal-banner";
 import type { BannerSource } from "@/lib/deal-banner";
+import type { DealCoverFacts } from "@/lib/deal-cover";
 import { PipelineMap } from "./pipeline-map";
 import type { MapDeal, MapPlace } from "@/lib/pipeline-map";
 import { PIPELINE_VIEW_COOKIE, remembersView, type PipelineView } from "@/lib/pipeline-view";
@@ -77,6 +78,11 @@ export type DealCard = {
   /** the pictures the card view tries, best first, each pinned to one
    *  source with its own credit (lib/deal-banner, #428) */
   pictures?: BannerSource[];
+  /** the pictures a list row's thumbnail tries, at its own frame (#442) */
+  thumbs?: BannerSource[];
+  /** what the card and the row show where no photograph answers: the deal's
+   *  cover (lib/deal-cover, #442), never an overhead */
+  cover?: DealCoverFacts | null;
   /** where the deal is, from the location its pictures were drawn at
    *  (lib/deal-location's cache, #431); null until one is resolved */
   place?: MapPlace | null;
@@ -1608,7 +1614,7 @@ const DealRow = memo(function DealRow({
           )}
         </span>
       )}
-      <DealThumb dealId={d.id} hasAddress={d.hasAddress} />
+      <DealThumb sources={d.thumbs ?? []} cover={d.cover ?? null} label={d.name} />
       <div className="min-w-0 flex-1">
         {/* The name is the row: two lines before an ellipsis at every
             width, so "The Maddox at Brewerytown" is never "The Maddox at
@@ -1849,9 +1855,9 @@ function TileStat({ label, title, children }: { label: string; title?: string; c
 
 // The card view's deal (#428): the building's picture first — its own
 // photograph or the Street View frame, else the photograph its market is
-// known by, named as the market's (#438), and the USGS aerial with the
-// building ringed only outside every photographed market; each pinned with
-// its credit — the call over the picture, then the name, the place and the
+// known by, named as the market's (#438), and outside every photographed
+// market the deal's cover, never an overhead (#442); each pinned with its
+// credit — the call over the picture, then the name, the place and the
 // three figures a pipeline is read by. Memoized like the row.
 const DealTile = memo(function DealTile({
   d,
@@ -1884,6 +1890,7 @@ const DealTile = memo(function DealTile({
       <div className="relative">
         <DealBanner
           sources={d.pictures ?? []}
+          cover={d.cover ?? null}
           label={d.name}
           aspect="16/10"
           flush

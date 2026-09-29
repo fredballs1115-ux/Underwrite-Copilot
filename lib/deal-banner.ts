@@ -20,11 +20,13 @@
 // The pipeline's cards put ONE more source before the aerial (#438): the
 // photograph the deal's market is known by (lib/market-picture), named on
 // the picture as the market's. The operator's rule for the pipeline is
-// pictures, not maps, and an overhead at card size reads as a map; the
-// aerial stays behind it, for a market whose photograph fails to load and
-// for a deal outside every photographed market. The compare page passes no
-// market: two columns in one market would show one skyline twice, where
-// their overheads tell the buildings apart.
+// pictures, not maps, and an overhead at card size reads as a map — so the
+// pipeline now leaves the aerial out altogether (`aerial: false`, #442) and
+// draws the deal's cover (lib/deal-cover) where no photograph answers, on
+// the card and on the list row's thumbnail (the THUMB frame, which takes
+// the stored 240px crop of the deal's own photograph). The compare page
+// passes no market and keeps the aerial: two columns in one market would
+// show one skyline twice, where their overheads tell the buildings apart.
 
 import { IMAGE_CREDIT } from "@/lib/imagery-plan";
 import type { MarketPicture } from "@/lib/market-picture";
@@ -70,6 +72,11 @@ export interface BannerFacts {
   /** the photograph of the deal's market, tried before the aerial — the
    *  pipeline's cards only (#438); absent, the aerial follows Street View */
   market?: MarketPicture | null;
+  /** whether the overhead is tried at all. The pipeline says no (#442): its
+   *  rule is pictures, not maps, and where no photograph answers it draws
+   *  the deal's cover instead. The compare page keeps it, where two
+   *  columns' overheads tell two buildings apart. */
+  aerial?: boolean;
 }
 
 /** An overhead's frame: its size in pixels and, where the surface sets one,
@@ -87,12 +94,17 @@ export const BANNER: BannerFrame = { w: 640, h: 360 };
 /** The pipeline's cards (#428): 16:10, twice a 360px card. */
 export const CARD: BannerFrame = { w: 720, h: 450 };
 
+/** A list row's thumbnail (#442): square, three times a phone's 56px slot. */
+export const THUMB: BannerFrame = { w: 168, h: 168 };
+
 export function bannerSources(f: BannerFacts, frame: BannerFrame = BANNER): BannerSource[] {
   const id = encodeURIComponent(f.dealId);
   const out: BannerSource[] = [];
-  if (f.pictureCredit) out.push({ kind: "photo", src: `/api/deals/${id}/picture?size=hero`, credit: f.pictureCredit });
+  // A thumbnail's frame takes the stored 240px crop; anything larger the hero.
+  const size = frame.w <= 240 && frame.h <= 240 ? "thumb" : "hero";
+  if (f.pictureCredit) out.push({ kind: "photo", src: `/api/deals/${id}/picture?size=${size}`, credit: f.pictureCredit });
   else if (f.memorandumUnread) {
-    out.push({ kind: "photo", src: `/api/deals/${id}/picture?size=hero`, credit: IMAGE_CREDIT.photo, pending: true });
+    out.push({ kind: "photo", src: `/api/deals/${id}/picture?size=${size}`, credit: IMAGE_CREDIT.photo, pending: true });
   }
   if (f.googleEnabled && f.hasStreetAddress) {
     out.push({ kind: "streetview", src: `/api/deals/${id}/photo`, credit: IMAGE_CREDIT.streetview });
@@ -106,7 +118,7 @@ export function bannerSources(f: BannerFacts, frame: BannerFrame = BANNER): Bann
       alt: `${f.market.place}: the market this deal is in, ${f.market.name}. No photograph of the building yet.`,
     });
   }
-  if (f.hasAddress) {
+  if (f.hasAddress && f.aerial !== false) {
     const z = frame.z != null ? `&z=${frame.z}` : "";
     out.push({
       kind: "aerial",
