@@ -17,13 +17,15 @@
  * dictionary can lie, a SOF cannot. A stream that is not a JPEG (double
  * encoded, truncated, a mask) is skipped rather than served.
  *
- * WHICH ONE. A memorandum carries dozens of images — interiors, amenities,
- * maps, the broker's logo, the comps' photographs. The cover is the largest
- * photograph in the file more often than not, and it sits early: a
- * linearised PDF puts page one's objects first, and the exporters brokers
- * use write objects in page order. So the pick is the largest image of a
- * photograph's shape, with the first third of the file preferred. It is a
- * heuristic and it says so; the deal page lets the reader replace it.
+ * WHICH ONE is not this module's to say any more (#444). A memorandum
+ * carries dozens of images — interiors, amenities, the broker's logo, the
+ * comps' photographs, and its aerial and location maps, which are the
+ * largest pictures it has. The scan used to take the largest image of a
+ * photograph's shape in the file, the first third preferred, and so could
+ * take a map for the building. The pages decide now (`lib/om-photo-decode`
+ * reads the cover page first and refuses a map), and this scan supplies
+ * the camera's own bytes for the picture they chose (`coverOf` in
+ * `lib/deal-picture`), and its guess only where the file cannot be read.
  *
  * Pure: bytes in, bytes out. The storing, the derivatives and the cache
  * are `lib/deal-picture.ts`.
@@ -139,32 +141,17 @@ export const COVER_MIN = { width: 480, height: 320, maxBytes: 12 * 1024 * 1024 }
 export const COVER_ASPECT = { min: 0.5, max: 2.6 };
 /** The share of the file counted as "early", where the cover tends to sit. */
 export const EARLY_SHARE = 0.3;
-const EARLY_BONUS = 1.5;
 
-/**
- * The image most likely to be the cover photograph: the largest of a
- * photograph's shape, with an image in the first third of the file
- * preferred over a larger one deeper in. Null when the memorandum carries
- * no usable photograph — a scanned deck, a text-only teaser — and the deal
- * keeps its overhead.
- */
-export function pickCover(images: readonly OmImage[], fileLength: number): OmImage | null {
-  let best: OmImage | null = null;
-  let bestScore = 0;
-  for (const im of images) {
-    if (im.width < COVER_MIN.width || im.height < COVER_MIN.height) continue;
-    if (im.bytes.length > COVER_MIN.maxBytes) continue;
-    if (im.components !== 3 && im.components !== 4) continue;
-    const aspect = im.width / im.height;
-    if (aspect < COVER_ASPECT.min || aspect > COVER_ASPECT.max) continue;
-    const early = fileLength > 0 && im.offset / fileLength < EARLY_SHARE;
-    const score = im.width * im.height * (early ? EARLY_BONUS : 1);
-    if (score > bestScore) {
-      best = im;
-      bestScore = score;
-    }
-  }
-  return best;
+/** Whether a stored JPEG could be the cover by size and shape: large
+ *  enough, of a photograph's proportions, colour (one component is a mask),
+ *  and not so heavy it is refused before it is read. Which one IS the cover
+ *  is the pages' to say (`lib/om-photo-decode`, #444). */
+export function scanShaped(im: OmImage): boolean {
+  if (im.width < COVER_MIN.width || im.height < COVER_MIN.height) return false;
+  if (im.bytes.length > COVER_MIN.maxBytes) return false;
+  if (im.components !== 3 && im.components !== 4) return false;
+  const aspect = im.width / im.height;
+  return aspect >= COVER_ASPECT.min && aspect <= COVER_ASPECT.max;
 }
 
 /** The file as one byte-per-character string, so the scan can use `indexOf`. */
