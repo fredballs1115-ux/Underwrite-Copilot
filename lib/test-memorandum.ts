@@ -101,3 +101,29 @@ export async function testPicture(
   if (as === "png") return img.png().toBuffer();
   return img.ensureAlpha(0.5).png().toBuffer();
 }
+
+/**
+ * A location map as a memorandum prints one: the flat fills of land, a park
+ * and a river, a street grid, a pin and its labels. What the cover search
+ * must never take for the building (#444).
+ */
+export async function testMap(width: number, height: number, as: "jpeg" | "png"): Promise<Buffer> {
+  const streets = Array.from({ length: 12 }, (_, i) => {
+    const x = Math.round(((i + 0.5) * width) / 12);
+    const y = Math.round(((i + 0.5) * height) / 12);
+    const w = i % 4 === 0 ? 18 : 8;
+    return `<path d="M${x} 0 L${x + 40} ${height}" stroke="#ffffff" stroke-width="${w}"/><path d="M0 ${y} L${width} ${y + 25}" stroke="${i % 3 === 0 ? "#fcd6a4" : "#ffffff"}" stroke-width="${w}"/>`;
+  }).join("");
+  const labels = Array.from({ length: 8 }, (_, i) => `<text x="${40 + i * (width / 9)}" y="${60 + i * (height / 10)}" font-size="${Math.round(height / 40)}" fill="#555555">Main St</text>`).join("");
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">` +
+    `<rect width="100%" height="100%" fill="#f2efe9"/>` +
+    `<rect x="${width * 0.08}" y="${height * 0.1}" width="${width * 0.25}" height="${height * 0.25}" fill="#c8facc"/>` +
+    `<path d="M0 ${height * 0.65} C${width * 0.3} ${height * 0.6} ${width * 0.6} ${height * 0.75} ${width} ${height * 0.7}" stroke="#aad3df" stroke-width="${height / 12}" fill="none"/>` +
+    streets +
+    `<circle cx="${width / 2}" cy="${height / 2}" r="${height / 40}" fill="#d93025"/>` +
+    labels +
+    `</svg>`;
+  const img = sharp(Buffer.from(svg));
+  return as === "jpeg" ? img.jpeg({ quality: 80 }).toBuffer() : img.png().toBuffer();
+}

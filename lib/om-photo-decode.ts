@@ -1,28 +1,42 @@
 /**
- * The memorandum's cover photograph, where the byte scan (`lib/om-photo`)
- * finds none (#440).
+ * The memorandum's cover photograph, read the way a viewer draws the pages
+ * (#440, #444).
  *
- * The scan lifts a JPEG out of the file as the bytes it is stored as, and
- * two common kinds of memorandum give it nothing to lift:
+ * Every memorandum is read this way now (#444). The byte scan
+ * (`lib/om-photo`) alone weighed every JPEG in the whole file by its area,
+ * with a bonus for the first 30% of the bytes, and knew nothing of pages: a
+ * memorandum's "property aerial" and its location maps are the largest
+ * pictures it carries (a 4800 × 3600 export beside a 1600 × 1200 cover), so
+ * a card could show a map, credited as the building's own photograph. Here
+ * the pages decide:
+ *
+ * - THE COVER PAGE FIRST. Page one's photograph wins outright, whatever is
+ *   larger further in; only a memorandum whose first page holds none is
+ *   searched on the next three, and the largest photograph there is taken.
+ *   Nothing past page four is ever a candidate.
+ * - A PHOTOGRAPH, NOT A MAP. A location map, a site plan, a chart or a page
+ *   of text is a handful of flat colours, and a photograph is not
+ *   (`flatShare`, `FLAT_SHARE`): an image whose eight commonest colours
+ *   cover most of it is never the cover.
+ *
+ * Two kinds of memorandum gave the scan nothing to lift at all, and are why
+ * this reader exists (#440):
  *
  * - A LOCKED file. A broker's memorandum is often "secured": anyone can
  *   open it, with printing or copying restricted. Those permissions are an
  *   owner password set over an EMPTY user password, and every stream in
  *   the file, the photographs included, is encrypted under the key that
- *   empty password yields. No JPEG starts where the scan looks, so the deal
- *   showed a map. Every PDF reader opens such a file without asking, and
- *   pdfjs does too. A file that asks for a password to OPEN is not read.
+ *   empty password yields. Every PDF reader opens such a file without
+ *   asking, and pdfjs does too. A file that asks for a password to OPEN is
+ *   not read.
  * - A photograph stored as PIXELS (`/FlateDecode`, usually with PNG
  *   predictors): a PNG, or an image a layout tool flattened or edited,
  *   rather than the camera's JPEG.
  *
- * pdfjs decodes both, the way a viewer draws the page. It reads the images
- * each of the first pages paints, since the cover sits there. It takes the
- * largest one of a photograph's size and shape, by `lib/om-photo`'s own
- * rules, with page one preferred as the scan prefers the start of the file.
  * It never throws: a file it cannot read, or one that runs past its time,
- * reads as no photograph. It runs only after the scan comes back empty,
- * because it decodes pixels where the scan copies bytes.
+ * reads as no photograph, and says whether the file was read at all
+ * (`opened`) and whether the cover page was (`pageOneRead`) so the caller
+ * knows when the byte scan's guess is all there is.
  */
 
 import { COVER_ASPECT, COVER_MIN } from "@/lib/om-photo";
@@ -33,8 +47,16 @@ export const COVER_PAGES = 4;
 export const MAX_DECODE_PIXELS = 40_000_000;
 /** The most the search may take before it settles for what it has. */
 export const DECODE_BUDGET_MS = 8_000;
-/** Page one's weight against a larger picture further in. */
-const PAGE_ONE_BONUS = 1.5;
+/**
+ * The share of a picture its eight commonest colours may cover and still be
+ * a photograph (`flatShare`). Measured on real pictures: 23 photographs of
+ * cities reached 0.39 and 18 USGS aerials and 12 flood-map composites 0.46,
+ * where a road map read 0.87 as a JPEG and 0.98 as a PNG, a site plan 1.00
+ * and a page of text 0.96.
+ */
+export const FLAT_SHARE = 0.6;
+/** The side of the even sample `flatShare` reads. */
+const FLAT_SAMPLE = 64;
 
 /** pdfjs's pixel layouts: 1 is a bilevel mask, 2 is RGB, 3 is RGBA. */
 export const IMAGE_KIND = { mask: 1, rgb: 2, rgba: 3 } as const;
@@ -49,6 +71,9 @@ export interface ImageCandidate {
   page: number;
   /** every sampled pixel has equal channels: a greyscale picture */
   grey: boolean;
+  /** `flatShare` of its pixels: near 1 for a map, a plan or a page of
+   *  text. Absent reads as a photograph's. */
+  flat?: number;
 }
 
 /** The cover the search settled on, as pixels sharp can take raw. */
@@ -58,6 +83,15 @@ export interface DecodedCover {
   channels: 3 | 4;
   pixels: Uint8Array;
   page: number;
+}
+
+/** What reading a memorandum's first pages found. */
+export interface OmCoverRead {
+  cover: DecodedCover | null;
+  /** pdfjs opened the file */
+  opened: boolean;
+  /** every image the cover page paints was weighed, inside the time */
+  pageOneRead: boolean;
 }
 
 /**
@@ -76,30 +110,53 @@ export function isGrey(pixels: ArrayLike<number>, channels: 3 | 4, samples = 204
   return true;
 }
 
-/** Whether an image could be the cover, by the scan's own size and shape rules. */
+/**
+ * How flat a picture is: the share of an even 64 × 64 sample of its pixels,
+ * each colour cut to five bits a channel, that its eight commonest colours
+ * take. A photograph's light and texture spread it over hundreds of colours;
+ * a map, a plan, a chart or a page of text is a few flat fills.
+ */
+export function flatShare(pixels: ArrayLike<number>, width: number, height: number, channels: number): number {
+  if (width <= 0 || height <= 0) return 1;
+  const counts = new Map<number, number>();
+  for (let sy = 0; sy < FLAT_SAMPLE; sy++) {
+    const y = Math.min(height - 1, Math.floor(((sy + 0.5) * height) / FLAT_SAMPLE));
+    for (let sx = 0; sx < FLAT_SAMPLE; sx++) {
+      const x = Math.min(width - 1, Math.floor(((sx + 0.5) * width) / FLAT_SAMPLE));
+      const o = (y * width + x) * channels;
+      const key = ((pixels[o] >> 3) << 10) | ((pixels[o + 1] >> 3) << 5) | (pixels[o + 2] >> 3);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+  }
+  const top = [...counts.values()].sort((a, b) => b - a).slice(0, 8);
+  return top.reduce((a, b) => a + b, 0) / (FLAT_SAMPLE * FLAT_SAMPLE);
+}
+
+/**
+ * Whether an image could be the cover: a colour picture of a photograph's
+ * size and shape, by the scan's own rules, that is not a handful of flat
+ * colours.
+ */
 export function coverShaped(im: ImageCandidate): boolean {
   if (im.kind !== IMAGE_KIND.rgb && im.kind !== IMAGE_KIND.rgba) return false;
   if (im.grey) return false;
+  if ((im.flat ?? 0) >= FLAT_SHARE) return false;
   if (im.width < COVER_MIN.width || im.height < COVER_MIN.height) return false;
   const aspect = im.width / im.height;
   return aspect >= COVER_ASPECT.min && aspect <= COVER_ASPECT.max;
 }
 
-/** An image's claim to be the cover: its area, weighted up on page one. */
-export function coverScore(im: ImageCandidate): number {
-  return coverShaped(im) ? im.width * im.height * (im.page === 1 ? PAGE_ONE_BONUS : 1) : 0;
-}
-
-/** The likeliest cover among the painted images, or null when none is a photograph. */
+/**
+ * The likeliest cover among the painted images, or null when none is a
+ * photograph: the largest on the cover page wherever it holds one, else the
+ * largest on the pages after it.
+ */
 export function pickDecodedCover<T extends ImageCandidate>(images: readonly T[]): T | null {
+  const shaped = images.filter(coverShaped);
+  const onCover = shaped.filter((im) => im.page === 1);
   let best: T | null = null;
-  let bestScore = 0;
-  for (const im of images) {
-    const score = coverScore(im);
-    if (score > bestScore) {
-      best = im;
-      bestScore = score;
-    }
+  for (const im of onCover.length > 0 ? onCover : shaped) {
+    if (!best || im.width * im.height > best.width * best.height) best = im;
   }
   return best;
 }
@@ -140,21 +197,23 @@ function paintedImage(page: PdfPage, id: string): Promise<PaintedImage | null> {
 }
 
 /**
- * The cover photograph of a memorandum the byte scan could not read, as raw
- * pixels, or null: no photograph on the first pages, a file that needs a
- * password to open, a file pdfjs cannot parse, or a search out of time.
+ * The cover photograph of a memorandum as raw pixels (`pickDecodedCover`'s
+ * rule), with what the read managed: a file that needs a password to open,
+ * one pdfjs cannot parse, or a search out of time finds no cover and says
+ * so. Page one is read first, and when it holds a photograph the pages
+ * after it are never decoded.
  */
-export async function decodeOmCover(pdf: Uint8Array): Promise<DecodedCover | null> {
+export async function decodeOmCover(pdf: Uint8Array): Promise<OmCoverRead> {
+  const read: OmCoverRead = { cover: null, opened: false, pageOneRead: false };
   let pdfjs: Pdfjs;
   try {
     pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   } catch {
-    return null;
+    return read;
   }
   const deadline = Date.now() + DECODE_BUDGET_MS;
   let task: ReturnType<Pdfjs["getDocument"]> | null = null;
-  let best: DecodedCover | null = null;
-  let bestScore = 0;
+  let best: ImageCandidate | null = null;
   try {
     task = pdfjs.getDocument({
       // A copy: pdfjs may take ownership of the buffer it is handed.
@@ -167,6 +226,7 @@ export async function decodeOmCover(pdf: Uint8Array): Promise<DecodedCover | nul
       maxImageSize: MAX_DECODE_PIXELS,
     });
     const doc = await before(task.promise, deadline);
+    read.opened = true;
     const last = Math.min(doc.numPages, COVER_PAGES);
     for (let p = 1; p <= last; p++) {
       if (Date.now() >= deadline) break;
@@ -181,16 +241,19 @@ export async function decodeOmCover(pdf: Uint8Array): Promise<DecodedCover | nul
           const img = await before(paintedImage(page, id), deadline);
           if (!img?.data) continue;
           const channels = img.kind === IMAGE_KIND.rgba ? 4 : 3;
+          if (img.data.length < img.width * img.height * channels) continue;
+          const photo = img.kind === IMAGE_KIND.rgb || img.kind === IMAGE_KIND.rgba;
           const candidate: ImageCandidate = {
             width: img.width,
             height: img.height,
             kind: img.kind,
             page: p,
-            grey: img.kind === IMAGE_KIND.mask ? true : isGrey(img.data, channels),
+            grey: photo ? isGrey(img.data, channels) : true,
+            flat: photo ? flatShare(img.data, img.width, img.height, channels) : 1,
           };
-          const score = coverScore(candidate);
-          if (score > bestScore && img.data.length >= img.width * img.height * channels) {
-            best = {
+          if (pickDecodedCover(best ? [best, candidate] : [candidate]) === candidate && candidate !== best) {
+            best = candidate;
+            read.cover = {
               width: img.width,
               height: img.height,
               channels,
@@ -199,20 +262,22 @@ export async function decodeOmCover(pdf: Uint8Array): Promise<DecodedCover | nul
               pixels: new Uint8Array(img.data.buffer, img.data.byteOffset, img.width * img.height * channels),
               page: p,
             };
-            bestScore = score;
           }
         }
+        if (p === 1) read.pageOneRead = true;
       } catch {
         // A page that fails or runs out of time: keep what earlier pages gave.
         if (Date.now() >= deadline) break;
       } finally {
         page?.cleanup();
       }
+      // The cover page's photograph is the cover: the rest is never decoded.
+      if (p === 1 && read.cover) break;
     }
-    return best;
+    return read;
   } catch {
     // A password to open, a file pdfjs cannot parse, or no time left to open it.
-    return best;
+    return read;
   } finally {
     try {
       await task?.destroy();

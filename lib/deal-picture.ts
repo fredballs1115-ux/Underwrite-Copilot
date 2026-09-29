@@ -3,8 +3,8 @@ import sharp from "sharp";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeCache, type DealPicture, type DealVisualCache } from "@/lib/deal-location";
 import { RunGate } from "@/lib/anthropic/run-gate";
-import { findOmImages, pickCover } from "@/lib/om-photo";
-import { decodeOmCover } from "@/lib/om-photo-decode";
+import { EARLY_SHARE, findOmImages, scanShaped, type OmImage } from "@/lib/om-photo";
+import { FLAT_SHARE, decodeOmCover, flatShare, type DecodedCover } from "@/lib/om-photo-decode";
 import {
   dealPhotoPath,
   downloadDealFile,
@@ -42,6 +42,16 @@ import {
  * (`PICTURE_SEARCH_VERSION`), so a memorandum searched before a rule
  * changed is searched again on its next view rather than a month later.
  *
+ * THE COVER PAGE'S PHOTOGRAPH, NEVER A MAP (#444). The pages decide now
+ * (`coverOf`): the old scan took the largest JPEG anywhere in the file, and
+ * a memorandum's largest pictures are its aerial and its location maps. A
+ * photograph lifted under the older rules is judged again on its next ask
+ * (`staleOmPicture`): replaced where the cover page gives another, dropped
+ * where the first pages hold none, and kept while the search cannot run.
+ * A page render never waits on it (the old one shows this once); the
+ * pipeline asks for it as a memorandum not yet looked in, over the next
+ * picture. The reader's own picture is theirs and never judged again.
+ *
  * A LIMIT ON WHAT RUNS AT ONCE. The first view of a long pipeline asks for
  * every row's picture together; each answer for a deal with no picture yet
  * means downloading its memorandum. Two run at a time in a process, and the
@@ -59,10 +69,12 @@ export const THUMB_PX = 240;
 const RECHECK_MS = 30 * 86_400_000;
 /**
  * The memorandum search's rules. A "no photograph" verdict reached under
- * older rules is stale: 2 is the search that opens a locked file and
- * decodes a photograph stored as pixels (#440).
+ * older rules is stale, and so is a photograph lifted under them: 2 is the
+ * search that opens a locked file and decodes a photograph stored as pixels
+ * (#440), 3 the one that reads the cover page first and refuses a map, a
+ * plan or a page of text (#444).
  */
-export const PICTURE_SEARCH_VERSION = 2;
+export const PICTURE_SEARCH_VERSION = 3;
 /** Extractions in flight per process. */
 const MAX_IN_FLIGHT = 2;
 /** How long an ask waits for its turn before it answers "not yet". */
@@ -220,22 +232,101 @@ export function pictureMayBeInMemorandum(opts: {
   cache: DealVisualCache | null;
 }): boolean {
   const { cache } = opts;
-  if (cache?.picture || opts.isSample || !opts.omPath) return false;
+  if (opts.isSample || !opts.omPath || currentPicture(cache)) return false;
+  // A photograph lifted under older rules is looked for again (#444).
+  if (staleOmPicture(cache)) return true;
   return !searchedRecently(cache);
 }
 
 /**
- * The cover out of a memorandum's bytes: the byte scan's JPEG where it
- * finds one, else the decoded search's pixels (a locked file, a photograph
- * stored as pixels), else null.
+ * A photograph lifted from the memorandum under an older search's rules
+ * (#444): those could take a map for the cover, so it is judged again on
+ * its next ask. A picture the reader put there is theirs and never is.
+ */
+export function staleOmPicture(cache: DealVisualCache | null | undefined): boolean {
+  return cache?.picture?.source === "om" && cache.pictureSearchV !== PICTURE_SEARCH_VERSION;
+}
+
+/** The deal's picture as today's rules stand behind it: the reader's own,
+ *  or the memorandum's lifted under today's search. */
+export function currentPicture(cache: DealVisualCache | null | undefined): DealPicture | null {
+  return cache?.picture && !staleOmPicture(cache) ? cache.picture : null;
+}
+
+/** An even 16 × 16 sample's mean colour, from raw pixels. */
+function meanOf(pixels: ArrayLike<number>, width: number, height: number, channels: number): number[] {
+  const sum = [0, 0, 0];
+  for (let sy = 0; sy < 16; sy++) {
+    const y = Math.min(height - 1, Math.floor(((sy + 0.5) * height) / 16));
+    for (let sx = 0; sx < 16; sx++) {
+      const x = Math.min(width - 1, Math.floor(((sx + 0.5) * width) / 16));
+      const o = (y * width + x) * channels;
+      for (let c = 0; c < 3; c++) sum[c] += pixels[o + c];
+    }
+  }
+  return sum.map((v) => v / 256);
+}
+
+/** A stored JPEG's small sample, raw RGB: for the flat test and the match. */
+async function jpegSample(bytes: Uint8Array, side: number): Promise<Buffer | null> {
+  try {
+    return await sharp(bytes, { failOn: "none" })
+      .removeAlpha()
+      .resize(side, side, { fit: "fill", kernel: "nearest" })
+      .raw()
+      .toBuffer();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The file's own JPEG of the picture the pages were read for, where the file
+ * stores it as one: the same size, and the same colour on a small sample, so
+ * a different picture of the same size is never taken for it. The camera's
+ * bytes rather than a re-encoding of pdfjs's pixels.
+ */
+async function storedJpegOf(images: readonly OmImage[], cover: DecodedCover): Promise<OmImage | null> {
+  const want = meanOf(cover.pixels, cover.width, cover.height, cover.channels);
+  for (const im of images) {
+    if (im.width !== cover.width || im.height !== cover.height || !scanShaped(im)) continue;
+    const sample = await jpegSample(im.bytes, 16);
+    if (!sample) continue;
+    const got = meanOf(sample, 16, 16, 3);
+    if (got.every((v, i) => Math.abs(v - want[i]) <= 16)) return im;
+  }
+  return null;
+}
+
+/**
+ * The cover out of a memorandum's bytes (#444): the photograph the pages
+ * say it is (`lib/om-photo-decode`: the cover page's first, never a map, a
+ * plan or a page of text, nothing past page four), as the file's own JPEG
+ * where it stores one and as pixels otherwise. Only where pdfjs could not
+ * read the file, or ran out of time before the cover page was weighed, does
+ * the byte scan guess: the first photograph-shaped JPEG in the file's first
+ * 30% that is not a flat map. It no longer takes the largest in the file,
+ * which was how a memorandum's high-resolution aerial or location map beat
+ * its cover.
  */
 export async function coverOf(pdf: Uint8Array): Promise<PictureInput | null> {
-  const lifted = pickCover(findOmImages(pdf), pdf.length);
-  if (lifted) return Buffer.from(lifted.bytes);
-  const decoded = await decodeOmCover(pdf);
-  return decoded
-    ? { width: decoded.width, height: decoded.height, channels: decoded.channels, pixels: decoded.pixels }
-    : null;
+  const read = await decodeOmCover(pdf);
+  const stored = findOmImages(pdf);
+  if (read.cover) {
+    const jpeg = await storedJpegOf(stored, read.cover);
+    if (jpeg) return Buffer.from(jpeg.bytes);
+    const { width, height, channels, pixels } = read.cover;
+    return { width, height, channels, pixels };
+  }
+  if (read.opened && read.pageOneRead) return null;
+  const early = stored
+    .filter((im) => pdf.length > 0 && im.offset / pdf.length < EARLY_SHARE && scanShaped(im))
+    .sort((a, b) => a.offset - b.offset);
+  for (const im of early) {
+    const sample = await jpegSample(im.bytes, 64);
+    if (sample && flatShare(sample, 64, 64, 3) < FLAT_SHARE) return Buffer.from(im.bytes);
+  }
+  return null;
 }
 
 /**
@@ -249,6 +340,11 @@ export async function coverOf(pdf: Uint8Array): Promise<PictureInput | null> {
  * whose image a page is already showing a placeholder for, waits
  * (`SEARCH_WAIT_MS`); a page render never does, so a busy process costs a
  * page its photograph this once and never its speed.
+ *
+ * A memorandum photograph lifted under older rules (#444) is judged again:
+ * a route waits for the verdict; a page render gets the old photograph at
+ * once and the search runs behind it. Where the search cannot run (no turn,
+ * no memorandum, a storage failure), the old photograph stands.
  */
 export async function ensureDealPicture(
   supabase: SupabaseClient,
@@ -257,18 +353,30 @@ export async function ensureDealPicture(
 ): Promise<DealPicture | null> {
   const { cache } = opts;
   const waitMs = opts.waitMs ?? 0;
-  if (cache?.picture) return cache.picture;
-  if (opts.isSample || !opts.omPath) return null;
-  if (searchedRecently(cache)) return null;
+  const current = currentPicture(cache);
+  if (current) return current;
+  const stale = cache?.picture ?? null;
+  if (opts.isSample || !opts.omPath) return stale;
+  if (!stale && searchedRecently(cache)) return null;
   const running = inFlight.get(dealId);
-  if (running) return waitMs > 0 ? running : null;
-  const search = searchMemorandum(supabase, dealId, opts.omPath, cache, waitMs);
+  if (running) return waitMs > 0 ? running : stale;
+  const search = searchMemorandum(supabase, dealId, opts.omPath, cache, waitMs)
+    .then((outcome) => (outcome.settled ? outcome.picture : stale))
+    .finally(() => inFlight.delete(dealId));
   inFlight.set(dealId, search);
-  try {
-    return await search;
-  } finally {
-    inFlight.delete(dealId);
+  if (stale && waitMs === 0) {
+    // Judged behind the render: the old photograph shows this once.
+    search.catch(() => {});
+    return stale;
   }
+  return search;
+}
+
+/** A search's answer: `settled` when the memorandum was read and the cache
+ *  written, and not when no turn was free or the read failed. */
+interface SearchOutcome {
+  picture: DealPicture | null;
+  settled: boolean;
 }
 
 async function searchMemorandum(
@@ -277,25 +385,32 @@ async function searchMemorandum(
   omPath: string,
   cache: DealVisualCache | null,
   waitMs: number,
-): Promise<DealPicture | null> {
+): Promise<SearchOutcome> {
   const release = await searches.acquireWithin(waitMs);
-  if (!release) return null;
+  if (!release) return { picture: null, settled: false };
   try {
     const pdf = await downloadOmPdf(omPath, { kind: "deal", dealId, only: ["om"] });
     const cover = await coverOf(pdf);
     if (!cover) {
+      // A photograph lifted under older rules that today's search does not
+      // find on the cover pages was not the cover (#444): it goes.
+      const dropped = cache?.picture?.source === "om" ? cache.picture : null;
       await writeCache(supabase, dealId, cache, {
+        ...(dropped ? { picture: undefined } : {}),
         pictureCheckedAt: new Date().toISOString(),
         pictureSearchV: PICTURE_SEARCH_VERSION,
       });
-      return null;
+      if (dropped) {
+        await removeStorageFiles([dropped.hero, dropped.thumb], photoScope(dealId)).catch(() => {});
+      }
+      return { picture: null, settled: true };
     }
-    return await storePicture(supabase, dealId, cache, cover, "om");
+    return { picture: await storePicture(supabase, dealId, cache, cover, "om"), settled: true };
   } catch (err) {
     // A storage or decode failure is this request's problem, not the deal's:
     // nothing is written, so the next ask tries again.
     console.warn(`deal picture: ${dealId}:`, err instanceof Error ? err.message : err);
-    return null;
+    return { picture: null, settled: false };
   } finally {
     release();
   }

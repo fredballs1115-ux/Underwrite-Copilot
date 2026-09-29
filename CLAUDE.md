@@ -2357,11 +2357,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
 - Each building's own photograph: `lib/om-photo.ts` (pure) reads the JPEG
   image objects out of the deal's memorandum — a `/DCTDecode` stream IS the
   JPEG's bytes, verbatim, and `jpegInfo` reads its width, height and
-  component count off the SOF marker — and `pickCover` takes the largest
-  one of a photograph's shape (`COVER_MIN` 480×320, an aspect between 0.5
-  and 2.6, three or four components because a one-component image is a
-  mask), with a 1.5× bonus on AREA for an image in the first 30% of the
-  file, where a cover sits. Only what the file states: a Flate-then-DCT
+  component count off the SOF marker — and `scanShaped` admits one of a
+  photograph's shape (`COVER_MIN` 480×320, an aspect between 0.5 and 2.6,
+  three or four components because a one-component image is a mask).
+  Which one is the cover is the PAGES' to say (#444, below): the scan
+  supplies the camera's bytes for the picture they choose, and guesses
+  only where pdfjs cannot read the file. Only what the file states: a Flate-then-DCT
   stream, a form object, a stream that is not a JPEG are all skipped, never
   decoded. `lib/deal-picture.ts` (`server-only`) makes the two derivatives
   with sharp — a hero inside 1600px and a 240px cover-crop by attention for
@@ -2386,21 +2387,48 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   an owner password over an EMPTY user password) encrypts every stream,
   the photographs included, so the byte scan found no JPEG and the deal
   showed its market or an overhead; so did a photograph stored as pixels
-  (`/FlateDecode`, a PNG). Where the scan finds nothing, `coverOf` hands
-  the file to `lib/om-photo-decode.ts` (`decodeOmCover`), which opens it
-  with pdfjs as a viewer does (RC4 40 and 128, AES 128 and 256 — a file
-  that asks for a password to OPEN is never read), reads the images the
-  first `COVER_PAGES` (4) pages paint, and takes the largest of the scan's
-  own size and shape with page one weighted 1.5×, skipping a greyscale
-  picture (sampled pixels, since pdfjs hands grey over as RGB) and a mask.
-  It decodes inside `MAX_DECODE_PIXELS` and `DECODE_BUDGET_MS` and never
-  throws. The pixels go to sharp raw (`PictureInput`, an alpha channel laid
-  on white). The tests build real files with the report's own PDF writer
-  (`lib/test-memorandum.ts`, `@react-pdf/pdfkit`), every cipher, a PNG, and
-  a user password refused. A "no photograph" verdict carries the rules it
-  was reached under (`pictureSearchV`, `PICTURE_SEARCH_VERSION` 2;
-  `searchedRecently`), so every deal judged under the byte scan alone is
-  searched again on its next view, not a month later. Searches take turns
+  (`/FlateDecode`, a PNG). `lib/om-photo-decode.ts` (`decodeOmCover`)
+  opens the file with pdfjs as a viewer does (RC4 40 and 128, AES 128 and
+  256 — a file that asks for a password to OPEN is never read), reads the
+  images the first `COVER_PAGES` (4) pages paint, skips a greyscale
+  picture (sampled pixels, since pdfjs hands grey over as RGB) and a mask,
+  decodes inside `MAX_DECODE_PIXELS` and `DECODE_BUDGET_MS`, never throws,
+  and says what it managed (`opened`, `pageOneRead`). The pixels go to
+  sharp raw (`PictureInput`, an alpha channel laid on white). **The cover
+  page's photograph, never a map** (#444): the scan had taken the largest
+  JPEG in the WHOLE file, and a memorandum's largest pictures are its
+  "property aerial" and its location maps (a 4800 × 3600 export beside a
+  1600 × 1200 cover), so a card could show a map credited as the
+  building's own photograph. Every memorandum is read through the pages
+  now (`coverOf`): page one's largest photograph wins outright, whatever is
+  larger further in (`pickDecodedCover`), the next three pages are decoded
+  only where page one holds none, and nothing past page four is a
+  candidate. A photograph is told from a map, a site plan, a chart or a
+  page of text by `flatShare` — the share of an even 64 × 64 sample, cut
+  to five bits a channel, its eight commonest colours cover — under
+  `FLAT_SHARE` (0.6), measured before it was set: 23 Commons photographs
+  reached 0.39, 18 USGS aerials and 12 flood composites 0.46, a road map
+  0.87 as a JPEG and 0.98 as a PNG, a site plan 1.00, a page of text
+  0.96. The picture chosen is served as the file's own JPEG where one of
+  the same size and the same colour on a 16 × 16 sample exists
+  (`storedJpegOf`, so a different picture of the same size is never taken
+  for it), as pixels otherwise; only where pdfjs cannot read the file, or
+  ran out of time before page one, does the scan guess: the FIRST
+  photograph-shaped, non-flat JPEG in the file's first 30%. The tests
+  build real files with the report's own PDF writer
+  (`lib/test-memorandum.ts`, `@react-pdf/pdfkit`, and `testMap`, a
+  location map's flat fills), every cipher, a PNG, a map on the cover, a
+  larger picture on page three, one past page four, a file pdfjs cannot
+  open, and a user password refused. A verdict carries the rules it was
+  reached under (`pictureSearchV`, `PICTURE_SEARCH_VERSION` 3;
+  `searchedRecently`), and so does a picture: a memorandum photograph
+  lifted under older rules (`staleOmPicture`) is judged again on its next
+  ask (`lib/deal-picture.test.ts` drives it with storage faked) —
+  replaced by the cover page's, dropped where the first pages hold none,
+  kept where the memorandum cannot be read; a page render shows the old
+  one at once and judges behind it, and the pipeline asks for it like one
+  never looked for (`pictureMayBeInMemorandum`, the picture faded in over
+  the next source). The reader's own upload is never judged again. Searches take turns
   (`RunGate.acquireWithin`): the two picture routes wait up to
   `SEARCH_WAIT_MS` (20 s) for one and share a search already running for
   the deal, where they used to answer "not yet" at once, so the first view

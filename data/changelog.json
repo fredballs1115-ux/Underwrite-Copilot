@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-29",
+      "title": "The building's photo, never the memorandum's map",
+      "href": "/deals",
+      "blurb": "A deal's own photograph now comes from its memorandum's cover page. The search used to take the largest picture anywhere in the file, and a memorandum's largest pictures are usually its aerial and its location maps, so a card could show a map as the building's photograph. It now takes the cover page's photograph first, looks no further than page four, and never takes a map, a site plan or a page of text. Photographs picked the old way are checked again the next time you open your pipeline. A photo you added yourself is never touched."
+    },
+    {
+      "date": "2026-09-29",
       "title": "No more maps in your pipeline",
       "href": "/deals",
       "blurb": "Every card and every list row in your pipeline now shows a picture: the building's own photograph, from its memorandum or one you add, or the photograph its market is known by. A deal with neither wears a cover of its own, in its own colour, with a drawing of its kind of building and the place it is in. Those deals used to show a satellite overhead that read like a map, and the list showed one for every deal without a photograph. The ⌘K search, the comps from your own pipeline, the bar that follows you down a deal and the map's hover cards now show the same photograph or cover. The overhead is still on the deal page, one step along its filmstrip, and the Map view still puts every deal on one map."

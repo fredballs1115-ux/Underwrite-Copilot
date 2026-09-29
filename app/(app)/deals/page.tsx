@@ -314,16 +314,20 @@ export default async function DealsPage({
       ...(() => {
         const cache = d.photo ?? null;
         const address = (d.address as StructuredAddress | null) ?? null;
-        const picture = cache?.picture ?? null;
+        const unread = pictureMayBeInMemorandum({
+          omPath: d.om_storage_path ?? null,
+          isSample: !!d.is_sample,
+          cache,
+        });
+        // A memorandum photograph lifted under older rules is asked for
+        // again like one not yet looked for (#444): over the next picture,
+        // taking over only if today's search keeps it.
+        const picture = unread ? null : (cache?.picture ?? null);
         const market = marketPictureFor(address, extraction?.market ?? null);
         const facts = {
           dealId: d.id,
           pictureCredit: picture ? PICTURE_CREDIT[picture.source] : null,
-          memorandumUnread: pictureMayBeInMemorandum({
-            omPath: d.om_storage_path ?? null,
-            isSample: !!d.is_sample,
-            cache,
-          }),
+          memorandumUnread: unread,
           googleEnabled,
           hasStreetAddress: !!address?.street?.trim(),
           hasAddress: !!address?.label?.trim(),

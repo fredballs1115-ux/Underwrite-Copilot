@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COVER_MIN, EARLY_SHARE, findOmImages, jpegInfo, pickCover } from "./om-photo";
+import { COVER_MIN, EARLY_SHARE, findOmImages, jpegInfo, scanShaped } from "./om-photo";
 
 /**
  * A JPEG that is a JPEG to the marker walk and to nothing else: SOI, an
@@ -115,54 +115,37 @@ describe("the photographs in a memorandum", () => {
   });
 });
 
-describe("which photograph is the cover", () => {
+describe("which stored JPEG could be the cover", () => {
   const images = (pdf: Uint8Array) => findOmImages(pdf);
 
-  it("takes the largest photograph of a photograph's shape", () => {
-    const pdf = fakePdf([
-      { w: 300, h: 120 }, // a logo strip: too small
-      { w: 1200, h: 800 },
-      { w: 2400, h: 1600 },
-      { w: 6000, h: 400 }, // a panorama strip: not a cover's shape
-    ]);
-    const cover = pickCover(images(pdf), pdf.length)!;
-    expect(cover.width).toBe(2400);
-    expect(cover.height).toBe(1600);
-  });
-
-  it("prefers an early image over a larger one deep in the file", () => {
-    // The cover sits early; a comp's photograph deep in the deck can be
-    // bigger and is not the building. The bonus is 1.5× on AREA: the late
-    // one here is 1.29× the early one's area (2,070,000 against 1,600,000),
-    // inside the bonus, so the early one wins at 2,400,000 to 2,070,000.
-    const early = { w: 1600, h: 1000 };
-    const late = { w: 1800, h: 1150, filler: 40000 };
-    const pdf = fakePdf([early, { w: 100, h: 100, filler: 60000 }, { w: 100, h: 100, filler: 60000 }, late]);
-    const found = images(pdf);
-    expect(found[0].offset / pdf.length).toBeLessThan(EARLY_SHARE);
-    expect(found[3].offset / pdf.length).toBeGreaterThan(EARLY_SHARE);
-    const cover = pickCover(found, pdf.length)!;
-    expect(cover.width).toBe(1600);
-    // Unless the late one is bigger by more than the early bonus.
-    const bigLate = { w: 4000, h: 2600, filler: 40000 };
-    const pdf2 = fakePdf([early, { w: 100, h: 100, filler: 60000 }, { w: 100, h: 100, filler: 60000 }, bigLate]);
-    expect(pickCover(images(pdf2), pdf2.length)!.width).toBe(4000);
+  // Which one IS the cover is the pages' to say (#444, lib/om-photo-decode):
+  // the scan used to take the largest in the whole file, and a memorandum's
+  // largest pictures are its aerial and its maps.
+  it("admits a photograph's size and shape, and nothing else", () => {
+    const shaped = images(
+      fakePdf([
+        { w: 300, h: 120 }, // a logo strip: too small
+        { w: 1200, h: 800 },
+        { w: 2400, h: 1600 },
+        { w: 6000, h: 400 }, // a panorama strip: not a cover's shape
+      ]),
+    ).filter(scanShaped);
+    expect(shaped.map((im) => im.width)).toEqual([1200, 2400]);
   });
 
   it("accepts a CMYK print export and refuses a greyscale mask", () => {
-    const pdf = fakePdf([
-      { w: 2400, h: 1600, c: 1 },
-      { w: 1800, h: 1200, c: 4 },
-    ]);
-    const cover = pickCover(images(pdf), pdf.length)!;
-    expect(cover.components).toBe(4);
-    expect(cover.width).toBe(1800);
+    const shaped = images(
+      fakePdf([
+        { w: 2400, h: 1600, c: 1 },
+        { w: 1800, h: 1200, c: 4 },
+      ]),
+    ).filter(scanShaped);
+    expect(shaped.map((im) => [im.width, im.components])).toEqual([[1800, 4]]);
   });
 
-  it("answers null for a memorandum with no usable photograph", () => {
-    expect(pickCover([], 100)).toBeNull();
-    const tiny = fakePdf([{ w: 400, h: 300 }]);
-    expect(pickCover(images(tiny), tiny.length)).toBeNull();
+  it("admits nothing too small to show", () => {
+    expect(images(fakePdf([{ w: 400, h: 300 }])).filter(scanShaped)).toEqual([]);
     expect(COVER_MIN.width).toBe(480);
+    expect(EARLY_SHARE).toBe(0.3);
   });
 });
