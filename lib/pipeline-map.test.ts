@@ -51,7 +51,7 @@ describe("the pipeline map's rules (#431)", () => {
     const html = tooltipHtml(deal({ id: "x/1", name: `<img src=x onerror="alert(1)"> & Co's`, verdict: "caution", price: "$68.0M", figure: "5.6% cap" }));
     expect(html).not.toContain("<img src=x");
     expect(html).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt; &amp; Co&#39;s");
-    expect(html).toContain("/api/deals/x%2F1/image?w=96&amp;h=96");
+    expect(html).toContain("/api/deals/x%2F1/image?w=96&amp;h=96&amp;fallback=cover");
     expect(html).toContain("Caution");
     expect(html).toContain("$68.0M · 5.6% cap");
     expect(tooltipHtml(deal({ id: "y" }))).toContain("Not screened");

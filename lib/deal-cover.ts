@@ -12,14 +12,15 @@
 // overhead stays on the deal page, one step along its filmstrip.
 //
 // Pure: the page resolves the facts server-side (the class through
-// lib/asset-words, so its table stays out of the browser bundle) and hands
-// the component plain data.
+// lib/asset-words) and hands the component plain data; the drawings are
+// lib/deal-cover-art, which the image route also draws its SVG cover from
+// (#443), so every surface shows one cover for one deal.
 
 import type { StructuredAddress } from "@/lib/address";
 import { assetClassKey } from "@/lib/asset-words";
+import type { CoverKind } from "@/lib/deal-cover-art";
 
-/** What the line art draws: the building types a pipeline holds. */
-export type CoverKind = "housing" | "office" | "industrial" | "retail" | "hotel" | "storage" | "land" | "building";
+export type { CoverKind };
 
 export interface DealCoverFacts {
   kind: CoverKind;

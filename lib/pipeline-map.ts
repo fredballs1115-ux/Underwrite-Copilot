@@ -98,11 +98,13 @@ export function pinHtml(verdict: string | null, precision: LocationPrecision, se
 }
 
 /** The hover card: the building's picture, its name, its call and figures —
- *  every string escaped, since a deal's name is whatever its owner typed. */
+ *  every string escaped, since a deal's name is whatever its owner typed.
+ *  The picture is the building's photograph or the deal's cover, never an
+ *  overhead (#443): the map is already the view from above. */
 export function tooltipHtml(d: MapDeal): string {
   const call = d.verdict && PIN_LABEL[d.verdict] ? PIN_LABEL[d.verdict] : "Not screened";
   const figures = [d.price, d.figure].filter((x): x is string => !!x).map(escapeHtml).join(" · ");
-  const img = `/api/deals/${encodeURIComponent(d.id)}/image?w=96&amp;h=96`;
+  const img = `/api/deals/${encodeURIComponent(d.id)}/image?w=96&amp;h=96&amp;fallback=cover`;
   return (
     `<div class="uc-maptip">` +
     `<img src="${img}" alt="" width="48" height="48" class="uc-maptip-img"/>` +

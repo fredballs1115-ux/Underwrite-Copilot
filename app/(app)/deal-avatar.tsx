@@ -9,10 +9,12 @@ import { useState } from "react";
  * before), and the deal page's comps from the reader's own pipeline, the
  * way a comp table pictures each comparable.
  *
- * The same best-picture route the pipeline row draws (/api/deals/[id]/image:
- * the building's own photograph, then the street, then the aerial), asked
- * at twice the slot for a sharp avatar on a dense screen. A deal with
- * nothing to show keeps the slot with a plate, so the names down the list
+ * The best-picture route (/api/deals/[id]/image: the building's own
+ * photograph, then the street), asked at twice the slot for a sharp avatar
+ * on a dense screen, and asked for the deal's cover where no photograph
+ * answers (`fallback=cover`, #443) — the pipeline's rule, pictures, not
+ * maps: it had fallen to the aerial, a smudge of roofs at 32px. A deal the
+ * route cannot find keeps the slot with a plate, so the names down the list
  * start at one x. Lazy, so a long list fires no request for the rows the
  * reader never scrolls to.
  */
@@ -41,7 +43,7 @@ export function DealAvatar({ dealId, dot }: { dealId: string; dot?: string }) {
         // eslint-disable-next-line @next/next/no-img-element -- the pipeline row's own proxied route, with its own cache headers
         <img
           data-deal-avatar="picture"
-          src={`/api/deals/${dealId}/image?w=64&h=64`}
+          src={`/api/deals/${dealId}/image?w=64&h=64&fallback=cover`}
           alt=""
           width={32}
           height={32}
