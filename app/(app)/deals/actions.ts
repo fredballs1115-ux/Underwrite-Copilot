@@ -24,7 +24,7 @@ import {
   workerSchemaReady,
   newJobRow,
 } from "@/lib/jobs";
-import { parseStructuredAddress } from "@/lib/address";
+import { parseStructuredAddress, typedAddress } from "@/lib/address";
 import {
   STAGES,
   normalizeStage,
@@ -155,15 +155,12 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
   const path = omStoragePath(user.id, dealId);
 
   // Optional property address from the autocomplete: the structured pick
-  // when the user selected a suggestion, else the raw text as a bare label.
+  // when the user selected a suggestion, else the typed line with the
+  // street, city and state it names read out (#441).
   // Best-effort separate update so a pre-0011 schema can't sink the create.
   const structured = parseStructuredAddress(formData.get("address"));
   const rawText = String(formData.get("addressText") ?? "").trim().slice(0, 160);
-  const address =
-    structured ??
-    (rawText
-      ? { label: rawText, street: "", city: "", state: "", zip: "", county: "", submarket: "" }
-      : null);
+  const address = structured ?? (rawText ? typedAddress(rawText) : null);
   if (address) {
     try {
       await supabase.from("deals").update({ address }).eq("id", dealId);
@@ -294,16 +291,13 @@ export async function createManualDeal(
   if (recent?.id) redirect(`/deals/${recent.id}`);
 
   // A structured autocomplete pick fills the market for the pipeline table
-  // and geography checks; a bare typed address stays a label.
+  // and geography checks, and so does a typed line, from the city and state
+  // it names (#441).
   const structured = parseStructuredAddress(formData.get("address"));
-  if (!facts.market && structured) {
-    facts.market = [structured.city, structured.state].filter(Boolean).join(", ");
+  const address = structured ?? (facts.address ? typedAddress(facts.address) : null);
+  if (!facts.market && address?.state) {
+    facts.market = [address.city, address.state].filter(Boolean).join(", ");
   }
-  const address =
-    structured ??
-    (facts.address
-      ? { label: facts.address, street: "", city: "", state: "", zip: "", county: "", submarket: "" }
-      : null);
 
   const extraction = buildManualExtraction(facts);
   const firstSignal = firstSignalFromExtraction(extraction);
@@ -473,7 +467,7 @@ export async function updateManualFacts(
   const structuredUpdate = structured
     ? { address: structured }
     : facts.address
-      ? { address: { label: facts.address, street: "", city: "", state: "", zip: "", county: "", submarket: "" } }
+      ? { address: typedAddress(facts.address) }
       : null;
   if (structuredUpdate) {
     // Only a CHANGED address invalidates the stored comps — a facts save

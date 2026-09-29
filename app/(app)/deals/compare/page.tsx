@@ -8,7 +8,7 @@ import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxCheckSource, evaluateBuyBox, type BuyBox } from "@/lib/criteria";
 import { CompareTable, usd, type Col } from "./compare-table";
 import { dataMetroForAddress, metroForAddress } from "@/lib/market-match";
-import type { StructuredAddress } from "@/lib/address";
+import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import type { FirstSignal } from "@/lib/anthropic/types";
 import { capSpreadRead, leverageRead } from "@/lib/leverage";
 import { benchmark30 } from "@/lib/debt-index";
@@ -46,8 +46,14 @@ function toCol(
   const model = (deal.model as UnderwritingModel | null) ?? null;
   const r = model?.returns;
   const signal = ((deal as { first_signal?: unknown }).first_signal as FirstSignal | null) ?? null;
+  // Read the way the pipeline and the deal page read it (#441): a typed line
+  // with its street, city and state, a deal with no address placed by its
+  // memorandum's. The pipeline's view stores the same upgrade.
+  const stored = (deal as { address?: unknown }).address;
   const address =
-    ((deal as { address?: unknown }).address as StructuredAddress | null) ?? null;
+    ((deal as { is_sample?: boolean }).is_sample ? null : addressUpgrade(stored, ex)) ??
+    (stored as StructuredAddress | null) ??
+    null;
   const picture = ((deal as { photo?: unknown }).photo as DealVisualCache | null)?.picture ?? null;
 
   // A plan deal's generated model books dark years first, so its year-1 cap

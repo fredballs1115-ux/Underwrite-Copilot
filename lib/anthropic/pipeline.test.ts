@@ -620,6 +620,47 @@ describe("runAnalysis — the happy path", () => {
   });
 });
 
+describe("runAnalysis — a deal placed by its address (#441)", () => {
+  it("takes the address its memorandum states where none was typed, and the market check reads that market", async () => {
+    // Uploaded with the address box empty: nothing placed the deal, although
+    // the memorandum names its street ("100 Main St, Dallas, TX").
+    state.deals.d1.address = null;
+    state.rates = [{ series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 }];
+    state.benchmarks = [];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    expect(state.deals.d1.address).toMatchObject({
+      label: "100 Main St, Dallas, TX",
+      street: "100 Main St",
+      city: "Dallas",
+      state: "TX",
+      from: "memorandum",
+    });
+    const handed = vi.mocked(checkMarket).mock.calls[0][3] ?? "";
+    expect(handed).toContain("Published figures for the Dallas-Fort Worth market the deal sits in");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  it("fills a typed line from itself, and never replaces an address someone gave", async () => {
+    state.deals.d1.address = { label: "1200 Liberty Ave, Pittsburgh, PA 15222", street: "", city: "", state: "", zip: "", county: "", submarket: "" };
+    state.rates = [{ series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 }];
+    state.benchmarks = [];
+    await runAnalysis("d1");
+    expect(state.deals.d1.address).toMatchObject({ street: "1200 Liberty Ave", city: "Pittsburgh", state: "PA", zip: "15222" });
+    expect((state.deals.d1.address as { from?: string }).from).toBeUndefined();
+    // A picked suggestion stays exactly as it was picked.
+    const picked = { label: "1400 Market St, Philadelphia, PA 19102", street: "1400 Market St", city: "Philadelphia", state: "PA", zip: "19102", county: "Philadelphia County", submarket: "" };
+    state.deals.d1.address = { ...picked };
+    await runAnalysis("d1");
+    expect(state.deals.d1.address).toEqual(picked);
+  });
+});
+
 describe("runAnalysis — what a failure leaves behind, and what it tells the analyst", () => {
   it("a provider overload becomes one sentence; the raw text goes to the log; the results it never reached stay the previous screen's", async () => {
     vi.mocked(scrutinizeComps).mockRejectedValue(apiError(529, "overloaded_error", "Overloaded"));

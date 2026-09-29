@@ -196,3 +196,24 @@ describe("metroForName — the market a typed metro names, only where the text s
     expect(metroForName(undefined)).toBeNull();
   });
 });
+
+import { readableAddress } from "./market-match";
+
+describe("a typed line is placed like a picked suggestion (#441)", () => {
+  it("reads the market from an address that is only a line", () => {
+    expect(marketForAddress({ label: "4200 Maple Ave, Dallas, TX 75219" })).toEqual({ id: "dallas", name: expect.any(String) });
+    expect(metroForAddress({ label: "1200 Liberty Ave, Pittsburgh, PA 15222" })).toBeNull();
+    expect(dataMetroForAddress({ label: "1200 Liberty Ave, Pittsburgh, PA 15222" })?.id).toBe("pittsburgh");
+    expect(stateForAddress({ label: "10 Main St, Boise, ID 83702" })?.id).toBe("state:ID");
+    expect(marketForAddress({ label: "1 Main St, Washington, DC 20001" })?.id).toBe("dc");
+    // A line that names no state places nothing, as before.
+    expect(marketForAddress({ label: "the old mill on Route 9" })).toBeNull();
+  });
+
+  it("never lets the line override a field the address states", () => {
+    // A picked suggestion's own city and state win over whatever its line says.
+    expect(readableAddress({ label: "Dallas, TX", city: "Fort Worth", state: "TX" })).toEqual({ label: "Dallas, TX", city: "Fort Worth", state: "TX" });
+    // A state with no city takes the line's city.
+    expect(readableAddress({ label: "4200 Maple Ave, Dallas, TX 75219", state: "TX" })).toMatchObject({ city: "Dallas", state: "TX" });
+  });
+});

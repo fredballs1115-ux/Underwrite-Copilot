@@ -1046,6 +1046,8 @@ jobs:
           mark "#439 a deal opens on its market photo" grep -q "Deals open on their market photo, not a map" p_whats-new.html
           # #440 — a secured memorandum's cover found, and faded in over the card (signed-in): its card.
           mark "#440 a locked memorandum's cover is found" grep -q "even from a locked memorandum" p_whats-new.html
+          # #441 — a deal placed by its memorandum's or its typed address (signed-in): its card.
+          mark "#441 every deal is placed by its address" grep -q "Every deal placed by its address" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

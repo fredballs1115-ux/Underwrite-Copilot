@@ -87,9 +87,12 @@ export async function fetchStreetViewImage(
   if (!building || building.precision !== "street") return null;
   const target = `${building.lat},${building.lng}`;
 
+  // A verdict counts only for the point it was reached for: after the
+  // address changes, the old pano would stand the camera somewhere else.
   let verdict = cache;
   const fresh =
     !!verdict?.checkedAt &&
+    verdict.checkedFor === target &&
     Date.now() - Date.parse(verdict.checkedAt) < STREET_VIEW_TTL_MS;
 
   if (!fresh) {
@@ -111,12 +114,13 @@ export async function fetchStreetViewImage(
           ...cache,
           status: "ok",
           checkedAt: new Date().toISOString(),
+          checkedFor: target,
           panoLat: meta.location?.lat,
           panoLng: meta.location?.lng,
         };
       } else if (meta.status === "ZERO_RESULTS" || meta.status === "NOT_FOUND") {
         // Definitive "Google has never driven here" — safe to remember.
-        verdict = { ...cache, status: "none", checkedAt: new Date().toISOString() };
+        verdict = { ...cache, status: "none", checkedAt: new Date().toISOString(), checkedFor: target };
       } else {
         // OVER_QUERY_LIMIT / REQUEST_DENIED / UNKNOWN_ERROR: configuration or
         // transient states. Fail this request, never cache the verdict.

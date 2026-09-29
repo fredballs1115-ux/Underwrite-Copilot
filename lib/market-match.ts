@@ -108,14 +108,41 @@ const NAME_BY_ID = new Map(
 /** States that contain at least one covered market. */
 export const COVERED_STATES = new Set(MATCHERS.map((m) => m.state));
 
-/** The covered metro a deal address falls in, or null. Null does NOT mean
- *  uncovered state — pair with coveredState() for the honest sentence. */
-export function metroForAddress(addr: {
+/** An address as the matchers take it: the structured fields, and the
+ *  line itself for an address that has nothing else. */
+export interface AddressLike {
   city?: string | null;
   county?: string | null;
   state?: string | null;
   submarket?: string | null;
-}): CoveredMetro | null {
+  label?: string | null;
+}
+
+/**
+ * The fields the matchers read (#441). An address typed without picking a
+ * suggestion, or read off a memorandum's line, is a label and nothing else,
+ * and every matcher found no state in it: a deal at "4200 Maple Ave,
+ * Dallas, TX 75219" read no Dallas figures, no Texas figures and no market
+ * photograph. The line's city and state (`placeOf`) fill the fields it
+ * leaves blank; a field it does state is never replaced.
+ */
+export function readableAddress(addr: AddressLike): AddressLike {
+  const state = abbrevState((addr.state ?? "").trim()).trim();
+  if (state && (addr.city?.trim() || addr.county?.trim() || addr.submarket?.trim())) return addr;
+  const line = (addr.label ?? "").trim();
+  const place = line ? placeOf(line) : null;
+  if (!place) return addr;
+  return {
+    ...addr,
+    state: state || place.state,
+    city: addr.city?.trim() || place.city || (place.state === "DC" ? "Washington" : ""),
+  };
+}
+
+/** The covered metro a deal address falls in, or null. Null does NOT mean
+ *  uncovered state — pair with coveredState() for the honest sentence. */
+export function metroForAddress(address: AddressLike): CoveredMetro | null {
+  const addr = readableAddress(address);
   const state = abbrevState(addr.state ?? "").toUpperCase();
   if (!state) return null;
   const hay = [addr.city, addr.county, addr.submarket]
@@ -161,7 +188,8 @@ export const STATE_MARKET_PREFIX = "state:";
  * under it and every sentence can say the figure is the state's, never the
  * metro's. Null for an address whose state the table does not know.
  */
-export function stateForAddress(addr: { state?: string | null }): CoveredMetro | null {
+export function stateForAddress(address: AddressLike): CoveredMetro | null {
+  const addr = readableAddress(address);
   const code = abbrevState((addr.state ?? "").trim()).trim().toUpperCase();
   const name = STATE_NAME_BY_CODE[code];
   return name ? { id: `${STATE_MARKET_PREFIX}${code}`, name } : null;
@@ -182,12 +210,8 @@ export function stateOfMarket(id: string | null | undefined): string | null {
  * null — the same rule as the briefed markets (keywords against the city,
  * county and submarket, guarded by state), consulted after them.
  */
-export function dataMetroForAddress(addr: {
-  city?: string | null;
-  county?: string | null;
-  state?: string | null;
-  submarket?: string | null;
-}): CoveredMetro | null {
+export function dataMetroForAddress(address: AddressLike): CoveredMetro | null {
+  const addr = readableAddress(address);
   const state = abbrevState((addr.state ?? "").trim()).trim().toUpperCase();
   if (!state) return null;
   const hay = [addr.city, addr.county, addr.submarket]
@@ -216,12 +240,8 @@ export function isDataMetro(id: string | null | undefined): boolean {
  * research question ("is this a briefed market, with comps and a tracker"),
  * which a data metro and a state never answer.
  */
-export function marketForAddress(addr: {
-  city?: string | null;
-  county?: string | null;
-  state?: string | null;
-  submarket?: string | null;
-}): CoveredMetro | null {
+export function marketForAddress(address: AddressLike): CoveredMetro | null {
+  const addr = readableAddress(address);
   return metroForAddress(addr) ?? dataMetroForAddress(addr) ?? stateForAddress(addr);
 }
 

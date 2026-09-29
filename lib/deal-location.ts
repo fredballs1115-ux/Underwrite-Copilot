@@ -17,6 +17,9 @@ export interface DealVisualCache {
   /** Street View metadata verdict (set by the photo route) */
   status?: "ok" | "none" | "unconfigured";
   checkedAt?: string;
+  /** the point that verdict was reached for, "lat,lng" — a verdict for
+   *  another point is no verdict on this one (#441) */
+  checkedFor?: string;
   /** pano location echo from Street View metadata */
   panoLat?: number;
   panoLng?: number;
@@ -30,6 +33,8 @@ export interface DealVisualCache {
   geoSource?: GeocodeSource;
   /** the geocoding rules this entry was produced under; see GEO_VERSION */
   geoV?: number;
+  /** the address this entry was resolved for, as `geoKey` writes it (#441) */
+  geoFor?: string;
   /** a geocode that definitively found nothing, so we stop re-asking */
   geoMiss?: boolean;
   /** the building's own photograph, stored as two derivatives (lib/deal-picture) */
@@ -76,19 +81,43 @@ const GEO_TTL_MS = 30 * 86_400_000;
  *   2 — Census first for street addresses, Photon fallback, precision read
  *       off the geocoder's answer (lib/geocode). The fix for "the pictures
  *       are terrible for most buildings".
+ *   3 — the entry is kept with the address it was resolved for (`geoFor`,
+ *       #441). Nothing tied the two before: an edited address kept the old
+ *       one's point, so the aerial, the pin and the flood zone showed the
+ *       old place for up to a month, and a typed line whose street was read
+ *       out later kept the district-wide frame it got without one.
  */
-export const GEO_VERSION = 2;
+export const GEO_VERSION = 3;
+
+/**
+ * What a cached location was resolved FOR: whether the address named a
+ * street (the geocoder asks the street-level service only then) and its line,
+ * whitespace and case aside. A location resolved for another key is stale.
+ */
+export function geoKey(address: StructuredAddress | null): string {
+  const line = (address?.label ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+  return `${address?.street?.trim() ? "street" : "area"}:${line}`;
+}
 
 /** The most an address's WORDING can support — the geocoder may deliver less. */
 export function addressPrecision(a: StructuredAddress | null): LocationPrecision {
   return a?.street?.trim() ? "street" : "area";
 }
 
-export function cacheFresh(cache: DealVisualCache | null, now = Date.now()): boolean {
+/**
+ * Whether the cached location still stands: resolved under today's rules,
+ * inside the month, and — given the deal's address — for THAT address.
+ */
+export function cacheFresh(
+  cache: DealVisualCache | null,
+  now = Date.now(),
+  address?: StructuredAddress | null,
+): boolean {
   return (
     !!cache?.geoAt &&
     cache.geoV === GEO_VERSION &&
-    now - Date.parse(cache.geoAt) < GEO_TTL_MS
+    now - Date.parse(cache.geoAt) < GEO_TTL_MS &&
+    (address === undefined || cache.geoFor === geoKey(address))
   );
 }
 
@@ -117,7 +146,7 @@ export async function resolveDealLocation(
   const now = deps.now ?? Date.now;
   const geocode = deps.geocode ?? geocodeAddress;
 
-  if (cacheFresh(cache, now())) {
+  if (cacheFresh(cache, now(), address)) {
     if (cache?.geoMiss) return null;
     if (typeof cache?.lat === "number" && typeof cache?.lng === "number") {
       return {
@@ -139,7 +168,7 @@ export async function resolveDealLocation(
     return null;
   }
 
-  const stamp = { geoAt: new Date(now()).toISOString(), geoV: GEO_VERSION };
+  const stamp = { geoAt: new Date(now()).toISOString(), geoV: GEO_VERSION, geoFor: geoKey(address) };
   const patch: Partial<DealVisualCache> = hit
     ? {
         ...stamp,

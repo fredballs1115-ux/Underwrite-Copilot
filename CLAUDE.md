@@ -2321,6 +2321,39 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   inverts the **binding** test only — a target to work toward, not a
   promise, since pushing NOI past it hands the job to whichever test binds
   next.
+- A deal's address, and where it comes from (#441). The row's `address`
+  holds a picked suggestion (the autocomplete's structured pick, with a
+  state), a typed line, or nothing. A typed line used to be stored as a
+  label and nothing else, and a deal uploaded with the address box empty
+  had no address at all, although its memorandum names its street. Every
+  reader found blank fields: no market figures, no market photograph, no
+  street-level geocode (so a district-wide aerial with no ring), no Street
+  View and no flood tab. Now:
+  - `addressFromLine` (`lib/address.ts`, pure) reads a line's street (the
+    part before the city that opens on a number, a spelled one included),
+    city, state and ZIP (after the street, so a five-digit street number
+    is never it). A line naming no state is not read.
+  - `typedAddress` stores a typed line read that way (the deal actions),
+    and the matchers read a label-only address the same way
+    (`readableAddress` in `lib/market-match.ts`), never over a field the
+    address states.
+  - `memorandumAddress` is the extraction's stated street address, marked
+    `from: "memorandum"`; never a portfolio's, and never a line with no
+    street, which places a market, not a building.
+  - `addressUpgrade(current, extraction)` is the one rule for what a row
+    should become: a blank address takes the memorandum's, a typed line is
+    filled from itself, and a picked suggestion, a line with no state, an
+    address with fields and no line, and the sample are never touched. The
+    screen writes it right after the extraction; the pipeline page and the
+    deal page write it for deals screened before, and read it for that
+    view whatever the row's policy allows; the compare page, the report
+    and the workbook read it too.
+  - The location cache is kept with the address it was resolved for
+    (`geoFor`, `geoKey`: the line and whether it named a street;
+    `GEO_VERSION` 3), and a Street View verdict with the point it was
+    reached for (`checkedFor`). Before, an edited address kept the old
+    one's point, so the aerial, the pin and the flood zone showed the old
+    place for up to a month.
 - Each building's own photograph: `lib/om-photo.ts` (pure) reads the JPEG
   image objects out of the deal's memorandum — a `/DCTDecode` stream IS the
   JPEG's bytes, verbatim, and `jpegInfo` reads its width, height and

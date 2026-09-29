@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { addressUpgrade } from "@/lib/address";
 import { notFound } from "next/navigation";
 import { ResearchPanel } from "./research-panel";
 import { SectorFieldsForm } from "./sector-fields-form";
@@ -338,7 +339,22 @@ export default async function DealPage({
   // the first signal stands in — so "outside your box" can surface ~30s into
   // a screen instead of minutes later. The user-entered property address
   // widens the location haystack in every case (city, county, state).
+  // Placed by its address (#441): a deal uploaded with the address box empty
+  // takes the one its memorandum states, and a typed line gets the street,
+  // city and state it names — written once, so the pictures, the flood map
+  // and the market check read it too.
+  const addressUpgraded = (deal as { is_sample?: boolean }).is_sample
+    ? null
+    : addressUpgrade(deal.address, extraction);
+  if (addressUpgraded) {
+    try {
+      await supabase.from("deals").update({ address: addressUpgraded }).eq("id", id);
+    } catch {
+      // read right on this page all the same
+    }
+  }
   const dealAddress =
+    addressUpgraded ??
     (deal.address as import("@/lib/address").StructuredAddress | undefined) ??
     null;
   // The kind rides along as the page infers it (extraction + first signal),
