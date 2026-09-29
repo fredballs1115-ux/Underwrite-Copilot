@@ -11,6 +11,14 @@
 // 404 still means what it always meant: no address, nothing geocodes, or
 // every source failed. Callers render their address-only state. Never a
 // stock photo, never AI imagery, never a different building.
+//
+// `?fallback=cover` (#443) is the pipeline's rule, pictures, not maps, for
+// the surfaces that draw whatever this URL answers — the ⌘K list, the comps
+// from the reader's own pipeline, the deal page's sticky bar and the
+// pipeline map's hover card: the overheads are never tried, and where no
+// photograph of the building answers, the deal's cover is drawn instead
+// (lib/deal-cover-art `coverSvg`: its gradient and its kind of building,
+// the one the pipeline's card wears). A cover, plainly not a photograph.
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
@@ -18,6 +26,9 @@ import type { StructuredAddress } from "@/lib/address";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT, SEARCH_WAIT_MS, ensureDealPicture, pictureSizeFor } from "@/lib/deal-picture";
 import { IMAGE_CREDIT, fetchBestBuildingImage } from "@/lib/imagery";
+import { coverFor } from "@/lib/deal-cover";
+import { coverSvg } from "@/lib/deal-cover-art";
+import { shownAssetClass } from "@/lib/pipeline-slots";
 
 const SIZE = { min: 48, max: 1280, defaultW: 800, defaultH: 450 };
 
@@ -39,7 +50,7 @@ export async function GET(
   // RLS scopes this: a deal the caller can't read simply isn't returned.
   const { data: deal } = await supabase
     .from("deals")
-    .select("id, address, photo, om_storage_path, is_sample")
+    .select("id, address, photo, om_storage_path, is_sample, asset_class, extracted_class:extraction->>assetClass")
     .eq("id", id)
     .maybeSingle();
   if (!deal) return NextResponse.json({ error: "not found" }, { status: 404 });
@@ -47,6 +58,7 @@ export async function GET(
   const q = new URL(req.url).searchParams;
   const width = clamp(q.get("w"), SIZE.min, SIZE.max, SIZE.defaultW);
   const height = clamp(q.get("h"), SIZE.min, SIZE.max, SIZE.defaultH);
+  const coverFallback = q.get("fallback") === "cover";
 
   // The deal's own photograph first — found in its memorandum on the first
   // ask and stored, so the plan below can serve it.
@@ -69,7 +81,7 @@ export async function GET(
   // deals' pictures the next day rather than after a week of aerials.
   const etag = picture
     ? `W/"${picture[pictureSizeFor({ width, height })]}"`
-    : `W/"map:${cache?.geoAt ?? ""}:${new Date().toISOString().slice(0, 10)}:${width}x${height}"`;
+    : `W/"map:${cache?.geoAt ?? ""}:${new Date().toISOString().slice(0, 10)}:${width}x${height}${coverFallback ? ":cover" : ""}"`;
   const revalidate = { etag, "cache-control": "private, no-cache" };
   if (req.headers.get("if-none-match") === etag) {
     return new NextResponse(null, { status: 304, headers: revalidate });
@@ -81,7 +93,27 @@ export async function GET(
     (deal.address as StructuredAddress | null) ?? null,
     withPicture,
     { width, height },
+    { overhead: !coverFallback },
   );
+  if (!best && coverFallback) {
+    const row = deal as { asset_class?: string | null; extracted_class?: string | null };
+    const cover = coverFor({
+      seed: id,
+      assetClass: shownAssetClass(row.asset_class ?? null, { assetClass: row.extracted_class ?? null }),
+    });
+    return new NextResponse(coverSvg(cover.kind, cover.tone, width, height), {
+      headers: {
+        "content-type": "image/svg+xml; charset=utf-8",
+        // An SVG opened on its own is a document: this one carries no script
+        // and no style, and is told so.
+        "content-security-policy": "default-src 'none'",
+        "x-content-type-options": "nosniff",
+        ...revalidate,
+        "x-image-source": "cover",
+        "x-image-credit": "No photograph of the building yet",
+      },
+    });
+  }
   if (!best) return new NextResponse(null, { status: 404 });
 
   const credit =

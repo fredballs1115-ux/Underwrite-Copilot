@@ -344,7 +344,8 @@ async function runPlan(
  * photograph where one is stored, else the Street View photograph, else
  * the sharp Google satellite frame, else the USGS aerial. Null when the
  * deal has no address, nothing geocodes, or every source failed — callers
- * then render nothing.
+ * then render nothing. With `overhead: false` the two overheads are never
+ * tried (#443): null then means no photograph of the building answered.
  */
 export async function fetchBestBuildingImage(
   supabase: SupabaseClient,
@@ -352,12 +353,14 @@ export async function fetchBestBuildingImage(
   address: StructuredAddress | null,
   cache: DealVisualCache | null,
   size: { width: number; height: number },
+  opts: { overhead?: boolean } = {},
 ): Promise<BestImage | null> {
   return runPlan(
     imagePlan({
       hasStreetAddress: !!address?.street?.trim(),
       googleConfigured: googleConfigured(),
       hasPicture: !!cache?.picture,
+      overhead: opts.overhead,
     }),
     supabase,
     dealId,

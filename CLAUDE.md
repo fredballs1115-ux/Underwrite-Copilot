@@ -2507,7 +2507,21 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   photographer named beside it, which a row has no room for. The
   compare page keeps its aerial, where two columns' overheads tell two
   buildings apart, and the deal page keeps it one step along its
-  filmstrip. **The deal page opens
+  filmstrip. **And every other small picture of a deal** (#443):
+  `/api/deals/[id]/image?fallback=cover` never tries an overhead
+  (`imagePlan`'s `overhead: false`, through `fetchBestBuildingImage`)
+  and, where no photograph of the building answers, draws the deal's
+  cover as an SVG (`coverSvg` in `lib/deal-cover-art.ts`, pure and
+  dependency-free: the ONE set of drawings `DealCover` draws too, so the
+  card, the row and the avatar show one cover for one deal; the class
+  the deck turned out to be through `shownAssetClass`). `DealAvatar`
+  (⌘K, the comps from the reader's own pipeline, the sticky bar) and
+  the pipeline map's hover card ask for it; a caller that does not keeps
+  the overheads and the 404. The SVG carries no words, script or style,
+  refuses a tone that is not a hex colour, and is served under
+  `default-src 'none'`; `lib/deal-cover-art.test.ts` draws every kind
+  through sharp (librsvg), so a document a browser could not read fails
+  there, and drives the route with its reads faked. **The deal page opens
   on the same photograph** (#439): `PropertyVisual` takes the page's
   `marketPictureFor` as `market` and adds a Market view, leading only
   where there is no photograph of the building's own and no Street View

@@ -13,6 +13,10 @@ export interface ImagePlanInput {
   googleConfigured: boolean;
   /** the deal has its own photograph — the cover of its memorandum, or one the reader uploaded */
   hasPicture?: boolean;
+  /** whether an overhead may answer at all (default yes). A surface whose
+   *  rule is pictures, not maps, says no, and draws the deal's cover
+   *  where no photograph answers (#443). */
+  overhead?: boolean;
 }
 
 /**
@@ -41,6 +45,7 @@ export function imagePlan(opts: ImagePlanInput): ImageSource[] {
   const plan: ImageSource[] = [];
   if (opts.hasPicture) plan.push("photo");
   if (opts.hasStreetAddress && opts.googleConfigured) plan.push("streetview");
+  if (opts.overhead === false) return plan;
   if (opts.googleConfigured) plan.push("satellite");
   plan.push("aerial");
   return plan;
