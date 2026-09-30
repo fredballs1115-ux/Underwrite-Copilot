@@ -175,15 +175,18 @@ export function isDebtSeedSeries(s: { id: string; tenorMonths: number | null }):
 }
 
 /**
- * Today's debt indices as one line a Claude step reads (the audit of
- * 2026-09-30): the challenger was told to judge the OM's financing "at
- * current rates" and the first-draft model to pick a "market-reasonable"
+ * The latest published debt indices as one line a Claude step reads (the
+ * audit of 2026-09-30): the challenger was told to judge the OM's financing
+ * "at current rates" and the first-draft model to pick a "market-reasonable"
  * loan rate, and neither was handed a rate, so each stated one from what
  * it remembered as current. Now each is handed the same figures the site's
  * own model is seeded from — the Treasury tenor nearest the hold (a
  * fixed-rate permanent loan's index), the 10-year, and 30-day average SOFR
  * (a floating, bridge or construction loan's index) — each with its date.
- * Only a fresh contract rate is read (`debtSeeds`' own rule), and null
+ * The header says what they are: the latest figures FRED has published,
+ * each dated the day it is for, which is a business day or more behind the
+ * day the step runs — not "today's", and not "read today" as if the market
+ * were. Only a fresh contract rate is read (`debtSeeds`' own rule), and null
  * where the table seeds none: then the step reasons as before, with
  * nothing claimed.
  */
@@ -203,7 +206,7 @@ export function ratesPromptLine(seeds: DebtSeeds, holdMonths: number): string | 
     parts.push(`${indexName(seeds.floating)} ${said(seeds.floating)}, a floating, bridge or construction loan's index`);
   }
   if (parts.length === 0) return null;
-  return `TODAY'S RATES (FRED, read today): ${parts.join("; ")}. A loan's rate is its index plus the lender's spread. Judge the financing — and whether the going-in cap sits below the cost of the debt — against these figures, and never state a rate as current that is not one of them or built from one of them.`;
+  return `LATEST PUBLISHED RATES (FRED, each dated the day it is for): ${parts.join("; ")}. A loan's rate is its index plus the lender's spread. Judge the financing — and whether the going-in cap sits below the cost of the debt — against these figures, and never state a rate as current that is not one of them or built from one of them.`;
 }
 
 /** Index plus spread, as a percent to two places — the figure a term sheet prints. */

@@ -388,7 +388,8 @@ describe("runAnalysis — the happy path", () => {
     }
     expect(job().status).toBe("done");
     const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
-    expect(note).toContain("TODAY'S RATES (FRED, read today): the 5-yr Treasury 3.90% (Sep 22, 2026)");
+    // The day before the screen's: said as the latest published, dated, never as today's.
+    expect(note).toContain("LATEST PUBLISHED RATES (FRED, each dated the day it is for): the 5-yr Treasury 3.90% (Sep 22, 2026)");
     expect(note).toContain("the 10-yr Treasury 4.20% (Sep 22, 2026)");
     expect(note).toContain("30-day avg SOFR 4.05% (Sep 22, 2026)");
   });
@@ -402,7 +403,7 @@ describe("runAnalysis — the happy path", () => {
       vi.useRealTimers();
     }
     expect(job().status).toBe("done");
-    expect(vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "").not.toContain("TODAY'S RATES");
+    expect(vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "").not.toContain("PUBLISHED RATES");
   });
 
   it("a deal in a covered market hands the market check the metro's published figures, dated, and stores what it read", async () => {

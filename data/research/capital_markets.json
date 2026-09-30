@@ -1,7 +1,7 @@
 {
-  "$schema_note": "Rates snapshot + the FRED series contract the live rates service (scripts/fetch-rates.mjs) pulls daily. Snapshot values here are seed/fallback only — the app prefers the rates table. status labels per project convention.",
+  "$schema_note": "Rates snapshot + the FRED series contract the live rates service (scripts/fetch-rates.mjs) pulls every weekday. Snapshot values here are seed/fallback only — the app prefers the rates table. status labels per project convention.",
   "as_of": "2026-08-21",
-  "fred_series_note": "The live list is data/fred-series.json — the one table both scripts/fetch-rates.mjs and lib/live-rates.ts read. Forty-six series as of 2026-09-21, every id verified from the runner against FRED's own title.",
+  "fred_series_note": "The live list is data/fred-series.json — the one table both scripts/fetch-rates.mjs and lib/live-rates.ts read: 53 national series on the rates strip, and 1,026 in the weekday pull with each metro's, Census region's and state's own (1,023 from FRED, 3 from the BLS; the file's 40 Census survey series are scripts/fetch-hvs.mjs's), every id verified from the runner before it went in. lib/fred-series-count.test.ts holds these counts to the file.",
   "snapshot": {
     "mortgage_30y_pmms": {
       "value": 6.65,
