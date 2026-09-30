@@ -3350,7 +3350,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     asked at `MARKET_PHOTO_WIDTH` 1600 (it was 1280, the link previews'
     width): a panorama cropped into a 16:10 card is covered by its HEIGHT,
     and a phone's full-width card is ~224px tall, 672 device pixels at 3×,
-    which a 2.5:1 panorama reaches only near 1,680px wide. `CityPhoto`
+    which a 2.5:1 panorama reaches only near 1,680px wide — so a
+    photograph whose size the table records (`SkylineShot.size`, every
+    served file's, as the verify probe prints it) is asked at the route's
+    2400 step where 1600 would fall short of 672 tall
+    (`marketPhotoWidth`: Louisville's 4.2:1 panorama was 383px tall).
+    `CityPhoto`
     takes a `sizes` and offers the skyline at `SKYLINE_SRCSET` (480 / 960
     / 1600, `skylineSrcSet` in lib/skyline) and an overhead at twice its
     size; a tile's `sizes` says the width the picture must be drawn at to
