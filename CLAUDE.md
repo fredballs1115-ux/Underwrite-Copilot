@@ -55,7 +55,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   each property in `ExtractionResult.properties` (name, address, count,
   area, NOI, occupancy, year built, the allocated price and the page, each
   as the OM states it for THAT property and "" where it states none; a
-  one-entry list is dropped as a single property restated), and
+  one-entry list is dropped as a single property restated; up to 150 are
+  listed, and a larger tape leaves the list empty rather than list part of
+  it, since a share of an unknown whole is no share — the extraction's
+  output cap is 16,000 tokens so a long list is never cut off), and
   `lib/portfolio.ts` (pure) reads them: each property's share of the whole
   in ONE unit for the set (the count when every property states one, else
   the area, never a mix), its share of the NOI only when EVERY property
@@ -1037,7 +1040,16 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   commercial are not), whether it is `operating` (land is not: no NOI, no
   cap, no occupancy), the rent-roll `profile` family it leases like and
   the research tables' `researchSector`. `assetClassKey` files a phrase
-  the model wrote ("boutique hotel", "NNN retail") by its words;
+  the model wrote ("boutique hotel", "NNN retail") by its words —
+  self-storage by name first, then refrigerated buildings and outdoor-
+  storage yards as industrial, then the bare word "storage"; housing named
+  by its program or tenants ("Affordable Housing (LIHTC)") as multifamily
+  after every other rule (#479: the bare word had filed a cold-storage
+  warehouse as self-storage). **A deal has one class**: every reader goes
+  through `shownAssetClass` (the analyst's class where they filed one, the
+  deck's where they left Auto) — the market check, the deal page's
+  since-this-screen, demand and portfolio cards and the shared screen had
+  read the deck's word first while the header read the analyst's;
   `countNoun` reads a count row's OWN noun ahead of the class's, because
   the OM's word wins wherever the screen read one. The survey that
   bought the table (2026-09-22) found the deal header printing
@@ -1051,7 +1063,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   (`CLASS_DEFAULTS` in `lib/underwrite/inputs.ts`, every class), the
   comp and market memories' basis (`/key`, `/pad`, per SF for storage,
   none for land), the plausibility band (per-unit for a unit-basis
-  class, per-SF otherwise), the rules panel (`buildSubject`'s
+  class, per-SF otherwise; a data center held to its floor only, since
+  its price is its power, and an outdoor-storage yard to no per-SF band,
+  since it trades by the acre), the rules panel (`buildSubject`'s
   `residential` — an office is commercial property to the regimes, and a
   class nothing has read yet keeps their questions open), the rent-roll
   profile default, the manual deal form's labels and metrics ("Keys",
@@ -1724,7 +1738,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   tests. The hold is `HOLD_MONTHS` (60), one constant, because the caller
   that reads the tenor must ask for the hold the model runs on. Before
   this the model's rate was 6.00% on every deal on every day, the sizer's
-  6.50% and the construction panel's 8.00%. **The leverage check reads
+  6.50% and the construction panel's 8.00%. **The page says what its
+  returns carry for buying and selling** (#479, `costAssumptionsLine` in
+  `lib/underwrite/cost-note`, under the sensitivity playground's
+  figures): the transfer and recordation tax — none is said as the
+  model's default, never as the jurisdiction's rate — the closing hold
+  and the cost of sale, from the inputs themselves; only the workbook had
+  named them. **The leverage check reads
   the same curve** (#386): `DebtSeeds.tenYear` carries the 10-year beside
   the tenor, `capSpreadRead` in `lib/leverage.ts` says the cap's spread
   over it — a fact with a direction and a date, no verdict, because what
