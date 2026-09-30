@@ -57,6 +57,9 @@ describe("a market photograph's credit, with its links", () => {
     expect(a11yIssues(markup)).toEqual([]);
     expect(gluedWords(visibleText(markup))).toEqual([]);
     expect(html(React.createElement(GalleryCreditText, { ids: ["atlantis"] }))).toBe("");
+    // Not every market's photograph is a skyline (a memorial, a wheel on the
+    // river), so the line does not call them that.
+    expect(galleryCredit(ids)).toMatch(/^Photographs by /);
   });
 
   it("names a photographer with several photographs shown once, and links each photograph by what it shows", () => {

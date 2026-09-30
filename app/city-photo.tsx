@@ -61,6 +61,7 @@ export function CityPhoto({
   // lets clicks through to the band's own words
   creditClassName = "pointer-events-auto absolute bottom-3 right-4 z-10 text-[10px] text-white/75",
   alt,
+  describe = false,
   eager = false,
   showCredit = true,
   sizes,
@@ -77,6 +78,10 @@ export function CityPhoto({
   creditClassName?: string;
   /** empty for a decorative backdrop, descriptive when the picture is content */
   alt?: string;
+  /** the alt text says what the picture on screen shows — the photograph's
+   *  own description, or the overhead's place "from above" — and follows the
+   *  fallback as the credit does: a fixed "skyline" is false of an overhead */
+  describe?: boolean;
   /** the page's opening picture paints with the page; every other one waits */
   eager?: boolean;
   showCredit?: boolean;
@@ -154,7 +159,7 @@ export function CityPhoto({
       src={src}
       srcSet={srcSet}
       sizes={srcSet ? sizes : undefined}
-      alt={alt ?? ""}
+      alt={describe ? (skyline ? shot.place : view ? `${view.place} from above` : "") : (alt ?? "")}
       width={width}
       height={height}
       loading={eager ? "eager" : "lazy"}

@@ -1394,7 +1394,7 @@ describe("SubmarketCards and the submarket's band — the metro its owner typed,
     // No market named, no picture and no credit owed.
     const plain = render(React.createElement(SubmarketCards, { submarkets: SUBS.slice(2) }));
     expect(plain).not.toContain('data-picture="submarket"');
-    expect(visibleText(plain)).not.toContain("Skyline photographs");
+    expect(visibleText(plain)).not.toContain("Photographs by");
   });
 
   it("opens the submarket's page on the band with the submarket's name as the page's heading", () => {

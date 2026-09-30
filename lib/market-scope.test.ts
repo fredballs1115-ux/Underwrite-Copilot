@@ -44,6 +44,9 @@ describe("coverage scope", () => {
   it("says why the gallery shows more tiles than the markets its heading counts", () => {
     const text = visibleText(renderToStaticMarkup(React.createElement(MarketsGallery)));
     expect(text).toContain(`The ${MARKET_COUNT} covered markets.`);
-    expect(text).toContain(`${BRIEF_COUNT} briefs: the Washington area's 4 jurisdictions have one each.`);
+    // Four briefs, not "four jurisdictions": Northern Virginia is several.
+    expect(text).toContain(`${BRIEF_COUNT} briefs, 4 of them for the Washington area.`);
+    const line = text.split("\n").find((l) => l.includes(" briefs")) ?? "";
+    expect(line).not.toMatch(/jurisdiction|skyline/i);
   });
 });

@@ -10,6 +10,7 @@ import { a11yIssues } from "./render-lint";
 import { buyBoxRead, dealCheckSource } from "./buy-box-chip";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
 import { SKYLINES, commonsPage } from "./skyline";
+import { METRO_VIEWS } from "./metro-imagery";
 
 vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => {
@@ -71,6 +72,28 @@ describe("the homepage, as a screen reader hears it", () => {
     const pictured = tiles.filter((id) => SKYLINES[id]);
     expect(pictured.length).toBeGreaterThan(1);
     for (const id of pictured) expect(gallery, id).toContain(`href="${commonsPage(SKYLINES[id].file)}"`);
+  }, 60_000);
+
+  it("says what each coverage tile shows, and never calls an overhead a skyline", async () => {
+    const html = await renderHome();
+    const start = html.indexOf(">Coverage<");
+    const gallery = html.slice(start, html.indexOf("</section>", start));
+    const decode = (s: string) => s.replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&");
+    let overheads = 0;
+    for (const li of gallery.split("<li").slice(1)) {
+      const id = /href="\/market\?metro=([^"]+)"/.exec(li)?.[1] ?? "";
+      const alt = decode(/<img\b[^>]*\balt="([^"]*)"/.exec(li)?.[1] ?? "");
+      const shot = SKYLINES[id];
+      if (!shot) overheads++;
+      expect(alt, id).toBe(shot ? shot.place : `${METRO_VIEWS[id].place} from above`);
+    }
+    // Montgomery County is drawn from above: the table chose it no photograph.
+    expect(overheads).toBeGreaterThan(0);
+    // The line under the heading: why there are more tiles than markets,
+    // and no "skyline" or "jurisdictions" (Northern Virginia is several).
+    const line = decode(/<\/h2><p\b[^>]*>([^<]*)<\/p>/.exec(gallery)?.[1] ?? "");
+    expect(line).toMatch(/\d+ briefs/);
+    expect(line).not.toMatch(/skyline|jurisdiction/i);
   }, 60_000);
 
   it("reads each stat once, its label as the term and its figure as the value", async () => {

@@ -1361,12 +1361,14 @@ export function galleryCreditParts(ids: readonly string[]): { authors: GalleryAu
  * Emmerling (Downtown Richmond; Downtown Norfolk from the Elizabeth River)",
  * semicolons because a place can hold a comma. Then each licence, linked to
  * its text, and that the photographs are cropped. Null where no market shown
- * has a photograph.
+ * has a photograph. "Photographs", not "Skyline photographs": a market is
+ * shown by the photograph it is known by, which may be a memorial, a wheel
+ * on the river or a row of houses.
  */
 export function galleryCreditLine(ids: readonly string[]): CreditPart[] | null {
   const parts = galleryCreditParts(ids);
   if (!parts) return null;
-  const out: CreditPart[] = ["Skyline photographs by "];
+  const out: CreditPart[] = ["Photographs by "];
   parts.authors.forEach((a, i) => {
     if (i) out.push(", ");
     if (a.photos.length === 1) {
