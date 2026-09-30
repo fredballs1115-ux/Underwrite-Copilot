@@ -1,5 +1,5 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import { publicMetadata } from "@/lib/page-meta";
 import { LogoMark } from "@/app/logo";
 import { MarketsMarquee } from "@/app/markets-marquee";
 import { ScreenRunStrip } from "@/app/screen-run-strip";
@@ -22,12 +22,14 @@ const MAJOR_MARKET_COUNT = (metrosSeed.metros ?? []).filter(
 // the same trap the homepage had. next.config expireTime caps the rest.
 export const revalidate = 300;
 
-export const metadata: Metadata = {
+// The title names the site already, so it stands without the layout's
+// " · Underwrite Copilot" (lib/page-meta).
+export const metadata = publicMetadata({
   title: "Why Underwrite Copilot",
   description:
     "Why Underwrite Copilot exists: screen more offering memoranda without cutting corners. Deterministic math, page-level citations, and a fast read on whether a deal fits your mandate.",
-  alternates: { canonical: "/why" },
-};
+  canonical: "/why",
+});
 
 // Copy rules for this page: short sentences, plain words, no hype, no
 // exclamation marks, no rhetorical questions. Every claim maps to something the

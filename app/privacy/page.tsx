@@ -1,14 +1,14 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
 import { ProcessorList } from "@/app/processor-list";
+import { publicMetadata } from "@/lib/page-meta";
 
-export const metadata: Metadata = {
+export const metadata = publicMetadata({
   title: "Privacy policy",
   description:
     "What Underwrite Copilot collects, how deal documents are handled, and what we never do with your data.",
-  alternates: { canonical: "/privacy" },
-};
+  canonical: "/privacy",
+});
 
 // The outside services are lib/data-processors, the security page's list
 // too, held to the hosts the code sends a user's data to.

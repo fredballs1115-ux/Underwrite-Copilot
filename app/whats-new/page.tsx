@@ -1,19 +1,19 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
 import { MarketsMarquee } from "@/app/markets-marquee";
 import { FULL_NOTES, LONG_NOTE, blurbExcerpt, changelogArchive, changelogEntries } from "@/lib/changelog";
+import { publicMetadata } from "@/lib/page-meta";
 
 // ISR, five-minute window — same freshness cap as the homepage, so a new
 // changelog entry shows here within minutes of deploying.
 export const revalidate = 300;
 
-export const metadata: Metadata = {
+export const metadata = publicMetadata({
   title: "What's new",
   description:
     "Every product improvement to Underwrite Copilot, newest first — the same log the homepage and the app draw from.",
-  alternates: { canonical: "/whats-new" },
-};
+  canonical: "/whats-new",
+});
 
 /** PUBLIC changelog — no login needed. The homepage's shipped block and the
  *  pipeline's What's-new card both link here; one checked-in source feeds

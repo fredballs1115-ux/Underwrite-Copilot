@@ -1,18 +1,18 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
 import { FREE_DEALS } from "@/lib/marketing-constants";
 import { MARKET_COUNT } from "@/app/markets-marquee";
 import { authLinkBanner, initialLoginMode } from "@/lib/auth-flow";
+import { publicMetadata } from "@/lib/page-meta";
 import { LoginForm } from "./login-form";
 import { PlaceBackdrop } from "@/app/place-band";
 
-export const metadata: Metadata = {
+export const metadata = publicMetadata({
   title: "Sign in",
   description:
     "Sign in to Underwrite Copilot — upload an offering memorandum and get a sourced, adversarial screen of the deal in minutes.",
-  alternates: { canonical: "/login" },
-};
+  canonical: "/login",
+});
 
 export default async function LoginPage({
   searchParams,

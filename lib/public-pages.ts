@@ -36,7 +36,7 @@ export interface PageMeta {
 }
 
 /** The site's own branded card (app/opengraph-image.tsx). */
-const SITE_CARD = {
+export const SITE_CARD = {
   url: "/opengraph-image",
   width: 1200,
   height: 630,

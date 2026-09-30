@@ -1,14 +1,14 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
 import { ProcessorList } from "@/app/processor-list";
+import { publicMetadata } from "@/lib/page-meta";
 
-export const metadata: Metadata = {
+export const metadata = publicMetadata({
   title: "Security",
   description:
     "How Underwrite Copilot protects uploaded offering memoranda: private storage, database-level isolation, server-side keys, and no model training on your documents.",
-  alternates: { canonical: "/security" },
-};
+  canonical: "/security",
+});
 
 // Every claim on this page is verifiable in the codebase or in a vendor's
 // published terms. No aspirational statements, no certifications we don't

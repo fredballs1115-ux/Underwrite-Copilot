@@ -19,6 +19,7 @@ import { BOARD_METRICS, SectorJobsBoard } from "./sector-jobs-board";
 import { SurveyVacancyBoard } from "./survey-vacancy-board";
 import { DATA_METROS } from "@/lib/market-match";
 import { marketMeta, marketPageFor, sectorPageFor } from "@/lib/public-pages";
+import { publicMetadata } from "@/lib/page-meta";
 import { heatShade } from "./heat-shade";
 import { MetroLive } from "./metro-live";
 import { ReadOnlyMetroView } from "./read-only-metro";
@@ -203,30 +204,11 @@ export async function generateMetadata({
   searchParams?: Promise<{ metro?: string; sector?: string }>;
 }): Promise<Metadata> {
   const { metro, sector } = (await searchParams) ?? {};
-  const meta = marketMeta(marketPageFor(metro), sectorPageFor(sector));
-  // A child's openGraph and twitter REPLACE the root's wholesale (the demo
-  // page's note), so the preview's title, description and picture are all
-  // stated here — a shared market page had gone out under the homepage's
-  // title and card (#436).
-  return {
-    title: meta.title,
-    description: meta.description,
-    alternates: { canonical: meta.canonical },
-    openGraph: {
-      type: "website",
-      url: meta.canonical,
-      siteName: "Underwrite Copilot",
-      title: meta.title,
-      description: meta.description,
-      images: [meta.image],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: meta.title,
-      description: meta.description,
-      images: [meta.image],
-    },
-  };
+  // A child's openGraph and twitter REPLACE the root's wholesale, so the
+  // preview's title, description and picture are all stated — a shared
+  // market page had gone out under the homepage's title and card (#436).
+  // The one helper every public page states its own through.
+  return publicMetadata(marketMeta(marketPageFor(metro), sectorPageFor(sector)));
 }
 
 const CALL_META: Record<string, { label: string; cls: string }> = {
