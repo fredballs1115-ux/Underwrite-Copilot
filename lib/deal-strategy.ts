@@ -313,10 +313,51 @@ export function buildsSomething(extraction: ExtractionResult | null | undefined,
 
 // ── The plan's cost ──────────────────────────────────────────────────────
 
-const BUDGET_INCLUDE =
-  /renovation (budget|cost|plan)|capex budget|capital (budget|plan|improvements?|expenditures?)|construction (cost|budget)|hard costs?|redevelopment (cost|budget)|conversion (cost|budget)|improvement budget|total (project|development) cost|all[- ]?in (cost|basis)/i;
-const BUDGET_EXCLUDE = /\bper\b|\/|psf|unit|reserve|annual|\byr\b|year/i;
-const ALL_IN = /total (project|development) cost|all[- ]?in/i;
+// The plan's cost is read from ONE row, and never from a line of the
+// budget. The first matching row had won, so an extraction that listed
+// "Hard costs" before "Total project cost" dropped the soft costs and the
+// land, and flattered the yield on cost.
+//
+// A TOTAL — the whole project's cost, the price inside it — wins wherever
+// it sits.
+const TOTAL_ROW = /total (project|development) (cost|budget)s?|total capitali[sz]ation|all[- ]?in (cost|basis|budget)/i;
+// Else a budget for the WORKS as a whole: hard and soft, the price outside it.
+const WORKS_ROW =
+  /renovation (budget|cost|plan)|capex budget|capital (budget|plan|improvements?|expenditures?)|construction (cost|budget)|redevelopment (cost|budget)|conversion (cost|budget)|improvement budget|hard (and|&|\+) soft/i;
+// A rate, an annual figure or a reserve is no budget. An interest reserve a
+// total says it includes is a note on the total, not a reserve row.
+const BUDGET_EXCLUDE = /\bper\b|\/|psf|unit|(?<!interest[\s-])reserve|annual|\byr\b|year/i;
+const ALL_IN = /total (project|development) (cost|budget)|total capitali[sz]ation|all[- ]?in/i;
+// A LINE of the budget, never the whole of it: hard costs without the soft
+// (or soft without the hard), the land or the site, a contingency, a
+// developer's fee, FF&E, the interest reserve or the financing — unless the
+// label names it only to say what the figure includes or leaves out
+// ("incl. contingency", "excl. land").
+const LINE_ITEM =
+  /\bhard\b|\bsoft\b|\bland\b|\bsite\b|\bcontingenc(?:y|ies)\b|\bdevelop(?:er|ment)(?:'s|s)?\s+fees?\b|\bff\s*&\s*e\b|\bffe\b|\bfurniture\b|\binterest\s+reserves?\b|\bcapitali[sz]ed\s+interest\b|\bcarry(?:ing\s+costs?)?\b|\bfinancing\s+(?:costs?|fees?)\b/gi;
+const NOTE_BEFORE =
+  /\b(?:incl(?:\.|uding|udes|usive\s+of)?|with|plus|excl(?:\.|uding|udes|usive\s+of)?|ex\.|net\s+of|before|without|less|except|not\s+including)(?=\W|$)/i;
+const NOTE_AFTER = /^\s*(?:(?:is|are)\s+)?(?:excluded|included|not\s+included)\b/i;
+const CLAUSE_BREAK = /[;:(),–—|]/g;
+
+/** Whether a works row's label names one line of the budget rather than
+ *  the whole (a hard-costs line, a contingency) — hard and soft together
+ *  are the works' whole. */
+function isLineItemRow(label: string): boolean {
+  const items: string[] = [];
+  for (const m of label.matchAll(LINE_ITEM)) {
+    const at = m.index ?? 0;
+    const lead = label.slice(0, at);
+    const clause = lead.slice(Math.max(0, ...[...lead.matchAll(CLAUSE_BREAK)].map((b) => (b.index ?? 0) + 1)));
+    const tail = label.slice(at + m[0].length).split(CLAUSE_BREAK)[0];
+    if (NOTE_BEFORE.test(clause) || NOTE_AFTER.test(tail)) continue;
+    items.push(m[0].toLowerCase());
+  }
+  const others = items.filter((i) => i !== "hard" && i !== "soft");
+  const hard = items.includes("hard");
+  const soft = items.includes("soft");
+  return others.length > 0 || hard !== soft;
+}
 
 export interface CapitalBudget {
   /** the plan's spend, $ — excludes the price even when the OM stated an all-in figure */
@@ -347,20 +388,30 @@ function budgetPlausible(budget: number, price: number | null, priceIsWholeAsset
 }
 
 /**
- * The plan's cost from the metrics. A "total project cost" includes the
- * price; a budget line does not. Bounded so a mis-parsed figure never lands
- * here (nothing, or ten times a whole-asset price, is not a budget) — and
- * never invented: absent is absent. On a development the price is the
- * LAND cost, routinely a tenth of the works or less, so the ten-times
- * bound applies only when the price is the whole asset's
- * (`priceIsWholeAsset`, which callers read off the price row's label).
+ * The plan's cost from the metrics. A total — "total project cost", "total
+ * development cost", "total capitalization", an all-in cost — includes the
+ * price and wins wherever it sits among the rows; else a budget for the
+ * works as a whole ("construction budget", "renovation budget", hard and
+ * soft together), which does not. A line of the budget — hard costs alone,
+ * soft costs alone, the land, a contingency, a developer fee, FF&E — is
+ * never taken for the total, and several lines are never summed into one:
+ * with only lines stated there is no stated total, and the reader says
+ * none. Bounded so a mis-parsed figure never lands here (nothing, or ten
+ * times a whole-asset price, is not a budget) — and never invented: absent
+ * is absent. On a development the price is the LAND cost, routinely a
+ * tenth of the works or less, so the ten-times bound applies only when the
+ * price is the whole asset's (`priceIsWholeAsset`, which callers read off
+ * the price row's label).
  */
 export function capitalBudgetFromMetrics(
   metrics: MetricLike[],
   price: number | null,
   priceIsWholeAsset = true,
 ): CapitalBudget | null {
-  const m = findMetric(metrics, BUDGET_INCLUDE, BUDGET_EXCLUDE) as MetricLike | null;
+  const m =
+    metrics.find((r) => TOTAL_ROW.test(r.label) && !BUDGET_EXCLUDE.test(r.label)) ??
+    metrics.find((r) => WORKS_ROW.test(r.label) && !BUDGET_EXCLUDE.test(r.label) && !isLineItemRow(r.label)) ??
+    null;
   if (!m) return null;
   // A cost is read as a price is (#466): a range's top, the end that does
   // not flatter the yield on it.

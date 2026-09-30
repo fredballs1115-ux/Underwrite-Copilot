@@ -1522,7 +1522,8 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
   it("reads the deal's kind as the sender's page does, from the extraction and the first signal", () => {
     // Nothing in the extraction names a plan; the first signal names the
     // conversion (the audit of 2026-09-30), so the page, and now the shared
-    // screen, call it one.
+    // screen, call it one. The budget is a whole one — a "Hard costs" line
+    // alone is no stated total.
     const wexley = {
       dealName: "The Wexley",
       assetClass: "multifamily",
@@ -1531,7 +1532,7 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
       metrics: [
         { label: "Asking price", value: "$20,000,000", flagged: false, page: "" },
         { label: "In-place NOI", value: "$900,000", flagged: false, page: "" },
-        { label: "Hard costs", value: "$18,000,000", flagged: false, page: "" },
+        { label: "Construction budget", value: "$18,000,000", flagged: false, page: "" },
         { label: "Stabilized NOI", value: "$2,660,000", flagged: false, page: "" },
         { label: "Units", value: "180", flagged: false, page: "" },
       ],

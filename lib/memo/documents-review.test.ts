@@ -242,9 +242,10 @@ describe("the eighth review's document cases", () => {
 // the report read it from the extraction alone, so a deal the page calls a
 // conversion printed as a stabilized asset.
 describe("the documents read the deal's kind as its page does — the extraction and the first signal", () => {
-  // Nothing in the extraction names a plan (an in-place income, a "Hard
-  // costs" row and a stabilized figure), so on its own it reads stabilized;
-  // the first signal names the conversion.
+  // Nothing in the extraction names a plan (an in-place income, a
+  // "Construction budget" row and a stabilized figure), so on its own it
+  // reads stabilized; the first signal names the conversion. (The budget is
+  // a whole one: a "Hard costs" line alone is no stated total.)
   const signalConversion: ExtractionResult = {
     dealName: "The Wexley",
     assetClass: "multifamily",
@@ -254,7 +255,7 @@ describe("the documents read the deal's kind as its page does — the extraction
     metrics: [
       { label: "Asking price", value: "$20,000,000", flagged: false, page: "" },
       { label: "In-place NOI", value: "$900,000", flagged: false, page: "" },
-      { label: "Hard costs", value: "$18,000,000", flagged: false, page: "" },
+      { label: "Construction budget", value: "$18,000,000", flagged: false, page: "" },
       { label: "Stabilized NOI", value: "$2,660,000", flagged: false, page: "" },
       { label: "Units", value: "180", flagged: false, page: "" },
     ],
@@ -282,7 +283,7 @@ describe("the documents read the deal's kind as its page does — the extraction
     expect(withSignal.strategyLine).toMatch(/^Conversion · stabilized NOI \$2\.7M on \$38\.0M total cost \(7\.0% yield on cost/);
     // A plan deal's key terms lead with the price, then the stabilized NOI
     // and the budget it is judged on.
-    expect(withSignal.keyTerms.slice(0, 3).map((t) => t.label)).toEqual(["Asking price", "Stabilized NOI", "Hard costs"]);
+    expect(withSignal.keyTerms.slice(0, 3).map((t) => t.label)).toEqual(["Asking price", "Stabilized NOI", "Construction budget"]);
     // A row screened before the first signal existed reads as before.
     const without = buildMemoData(row(null), "September 30, 2026");
     expect(without.strategyLine).toBe("");

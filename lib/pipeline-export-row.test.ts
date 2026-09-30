@@ -50,7 +50,8 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
   });
 
   // Nothing in the extraction names a plan; the first signal names the
-  // conversion (the audit of 2026-09-30).
+  // conversion (the audit of 2026-09-30). The budget is a whole one — a
+  // "Hard costs" line alone is no stated total.
   const wexley = {
     dealName: "The Wexley",
     assetClass: "multifamily",
@@ -59,7 +60,7 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     metrics: [
       m("Asking price", "$20,000,000"),
       m("In-place NOI", "$900,000"),
-      m("Hard costs", "$18,000,000"),
+      m("Construction budget", "$18,000,000"),
       m("Stabilized NOI", "$2,660,000"),
       m("Units", "180"),
     ],

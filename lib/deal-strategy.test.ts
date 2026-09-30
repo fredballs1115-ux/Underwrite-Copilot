@@ -268,6 +268,81 @@ describe("planSummary / capitalBudgetFromMetrics", () => {
     expect(capitalBudgetFromMetrics([metric("Total project cost", "$15M")], 20_000_000)).toBeNull(); // below the price
     expect(capitalBudgetFromMetrics([metric("Construction budget", "—")], 20_000_000)).toBeNull();
   });
+
+  it("takes the total wherever it sits, and never a line of the budget for it", () => {
+    // Hard costs listed ahead of the total: the first matching row had won,
+    // so the soft costs and the land dropped out of the plan's cost.
+    const lines = [
+      metric("Hard costs", "$18,000,000"),
+      metric("Soft costs", "$4,000,000"),
+      metric("Total project cost", "$40,000,000", { page: "p. 14" }),
+    ];
+    expect(capitalBudgetFromMetrics(lines, 10_000_000)).toMatchObject({
+      budget: 30_000_000,
+      allIn: true,
+      label: "Total project cost",
+      page: "p. 14",
+    });
+    // A works budget as a whole wins over a line listed ahead of it too.
+    expect(capitalBudgetFromMetrics([metric("Hard costs", "$18,000,000"), metric("Construction budget", "$22,000,000")], 10_000_000)).toMatchObject({
+      budget: 22_000_000,
+      label: "Construction budget",
+    });
+    // A total wins over a works budget, wherever the two sit.
+    expect(capitalBudgetFromMetrics([metric("Construction budget", "$22,000,000"), metric("Total development cost", "$34,000,000")], 10_000_000)).toMatchObject({
+      budget: 24_000_000,
+      label: "Total development cost",
+    });
+    expect(capitalBudgetFromMetrics([metric("Total capitalization", "$40,000,000")], 10_000_000)).toMatchObject({ budget: 30_000_000, allIn: true });
+  });
+
+  it("with only lines of the budget stated there is no stated total: null, never a sum", () => {
+    expect(capitalBudgetFromMetrics([metric("Hard costs", "$18,000,000")], 10_000_000)).toBeNull();
+    expect(capitalBudgetFromMetrics([metric("Hard costs", "$18,000,000"), metric("Soft costs", "$4,000,000"), metric("Land cost", "$10,000,000")], 10_000_000)).toBeNull();
+    for (const label of [
+      "Construction hard costs",
+      "Construction budget (hard costs)",
+      "Renovation budget – soft costs",
+      "Construction cost – contingency",
+      "Construction budget: developer fee",
+      "Renovation budget (FF&E)",
+      "Construction budget – interest reserve",
+      "Construction cost (land)",
+    ]) {
+      expect(capitalBudgetFromMetrics([metric(label, "$4,000,000")], 10_000_000), label).toBeNull();
+    }
+    // Hard and soft together are the works' whole; a line named only to say
+    // what the figure includes or leaves out is a note, not the row.
+    for (const label of ["Hard and soft costs", "Construction budget (hard & soft)", "Renovation budget (incl. contingency)", "Construction budget, excl. land", "Construction cost (land excluded)"]) {
+      expect(capitalBudgetFromMetrics([metric(label, "$4,000,000")], 10_000_000)?.budget, label).toBe(4_000_000);
+    }
+  });
+
+  it("the plan and the model's capital line read the one reader: hard costs ahead of the total never flatter the yield", async () => {
+    const e = ex(
+      [
+        metric("Purchase price", "$20,000,000"),
+        metric("Hard costs", "$120,000,000"),
+        metric("NOI (stabilized, pro forma)", "$21,000,000"),
+        metric("Total project cost", "$180,000,000"),
+      ],
+      { strategy: { kind: "conversion", summary: "", capitalBudget: "", timeline: "" } },
+    );
+    const p = planSummary(e)!;
+    expect(p.budget?.label).toBe("Total project cost");
+    expect(p.totalCost).toBe(180_000_000);
+    // $21M over the hard costs and the price alone would have read 15.0%.
+    expect(p.yieldOnCost).toBeCloseTo(21 / 180, 9);
+    const { deriveUnderwriteInputs } = await import("./underwrite/inputs");
+    expect(deriveUnderwriteInputs(e, "x").inputs.capitalImprovementsYr1).toBe(160_000_000);
+    // Hard costs alone: no budget, no total cost, no yield on cost — and
+    // the model carries no capital it was never told.
+    const bare = ex([metric("Purchase price", "$20,000,000"), metric("Hard costs", "$120,000,000"), metric("NOI (stabilized, pro forma)", "$21,000,000")], {
+      strategy: { kind: "conversion", summary: "", capitalBudget: "", timeline: "" },
+    });
+    expect(planSummary(bare)).toMatchObject({ budget: null, totalCost: null, yieldOnCost: null });
+    expect(deriveUnderwriteInputs(bare, "x").inputs.capitalImprovementsYr1).toBe(0);
+  });
 });
 
 describe("renovationProgramBudget — a value-add program stated a door at a time (#460)", () => {
