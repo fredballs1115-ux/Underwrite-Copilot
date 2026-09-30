@@ -39,6 +39,7 @@ import { readValueAdd, valueAddShortLine } from "@/lib/value-add";
 import { readTaxAbatement, taxAbatementShortLine } from "@/lib/tax-abatement";
 import { readSellerFinancing, sellerFinancingLine } from "@/lib/seller-financing";
 import { readSiteReports, siteReportsShortLine } from "@/lib/site-reports";
+import { readStudentHousing, studentShortLine } from "@/lib/student-housing";
 import { floodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -182,6 +183,13 @@ function siteReportsLineFor(extraction: ExtractionResult | null): string {
   return r ? siteReportsShortLine(r) : "";
 }
 
+/** A student building (lib/student-housing, #468) in one line for the
+ *  memo's header: the pre-leasing, the beds and the walk. "" otherwise. */
+function studentLineFor(extraction: ExtractionResult | null): string {
+  const r = readStudentHousing(extraction);
+  return r ? studentShortLine(r) : "";
+}
+
 function taxAbatementLineFor(extraction: ExtractionResult | null): string {
   const r = readTaxAbatement(extraction);
   return r ? taxAbatementShortLine(r) : "";
@@ -252,6 +260,9 @@ export type MemoData = {
   /** what the third-party reports found (lib/site-reports, #465), in one
    *  line; "" where the memorandum cites none */
   siteReportsLine?: string;
+  /** a student building's pre-leasing, beds and walk (lib/student-housing,
+   *  #468), in one line; "" on anything else */
+  studentLine?: string;
   /** FEMA's flood zone at the building (lib/site-flags `floodShortLine`,
    *  #426) — a Special Flood Hazard Area or a drawn hazard; "" for minimal
    *  hazard, no digital map or a lookup that has not answered */
@@ -505,6 +516,7 @@ export function buildMemoData(
     taxAbatementLine: pdfSafe(taxAbatementLineFor(extraction ?? null)),
     sellerNoteLine: pdfSafe(sellerNoteLineFor(extraction ?? null)),
     siteReportsLine: pdfSafe(siteReportsLineFor(extraction ?? null)),
+    studentLine: pdfSafe(studentLineFor(extraction ?? null)),
     floodLine: pdfSafe(floodLineFor(deal)),
     dateStr,
     verdictWord: vmeta?.word ?? null,
@@ -971,6 +983,9 @@ export function MemoPage({ data }: { data: MemoData }) {
             {/* What the third-party reports found (#465): the Phase I, the
                 immediate repairs, the seismic PML and the zoning. */}
             {data.siteReportsLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.siteReportsLine}</Text>}
+            {/* A student building (#468): the pre-leasing against last
+                year's, the beds and the walk to campus. */}
+            {data.studentLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.studentLine}</Text>}
             {/* What a hotel is sold with (#455): the flag, the encumbrance,
                 the PIP and the franchise's end. */}
             {data.hotelLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.hotelLine}</Text>}

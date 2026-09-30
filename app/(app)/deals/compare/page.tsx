@@ -28,6 +28,7 @@ import { taxAbatementTag } from "@/lib/tax-abatement";
 import { sellerFinancingTag } from "@/lib/seller-financing";
 import { siteReportsTag } from "@/lib/site-reports";
 import { brokerageOf } from "@/lib/offering";
+import { studentHousingTag } from "@/lib/student-housing";
 import { compareInterest } from "@/lib/compare-interest";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
@@ -145,6 +146,7 @@ function toCol(
     sellerNote: sellerFinancingTag(ex),
     reports: siteReportsTag(ex),
     broker: brokerageOf(ex),
+    student: studentHousingTag(ex),
     hotel: hotelTag(ex),
     sale: saleTag(ex),
     noteYtm: ci.noteYtmPct,

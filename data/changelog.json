@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "Student housing, read by the bed",
+      "href": "/deals",
+      "blurb": "A student deal's year is decided by how much of it is leased for the fall, and the screen now reads that. The deal page draws the share pre-leased for the coming term on a track, with last year's share at the same point as a tick and, where the deal has a model, the occupancy the model runs at as a dashed line; the gap between them is the leasing still to sign. It also shows the beds and a unit's worth of them, the price and the rent by the bed, the parents' guarantees, and the walk to campus: pedestrian within half a mile, and a distance is read only where the memorandum states one. The pipeline flags the pace against last year (\"Pre-leased 87%, +5 pts y/y\"), and the memo, the report, the workbook and the compare table carry it."
+    },
+    {
+      "date": "2026-09-30",
       "title": "Who is selling it, and when offers are due",
       "href": "/deals",
       "blurb": "The screen now reads the memorandum's call for offers and its listing team. Where the memorandum states the day offers are due, that day becomes the deal's deadline, so the pipeline counts down to it and the Monday digest names it without anyone typing it in. A date you set yourself is never replaced, and a date with no year is shown as written, never guessed. The deadline in the deal's header says when it is the memorandum's, and one click puts it in your calendar with a reminder two days before. Under the deal's reports, a card lists each broker as the memorandum prints them, with their title and firm and a tap to call or email. The pipeline's CSV and the compare table name the brokerage."

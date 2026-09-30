@@ -101,6 +101,9 @@ export type Col = {
   /** the brokerage offering the deal, as printed ("CBRE" — lib/offering
    *  `brokerageOf`, #467); absent where the memorandum names no firm */
   broker?: string | null;
+  /** a student building's pre-leasing ("Pre-leased 87%, +5 pts y/y" —
+   *  lib/student-housing `studentHousingTag`, #468); absent otherwise */
+  student?: string | null;
   /** what a hotel is sold with ("Mgmt encumbered, PIP $35k/key" —
    *  lib/hotel-deal `hotelTag`, #455); absent on anything but a hotel */
   hotel?: string | null;
@@ -241,6 +244,8 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     { label: "Reports", get: (c) => c.reports || "—" },
     // Who is selling it (#467): two deals from one brokerage are one call.
     { label: "Broker", get: (c) => c.broker || "—" },
+    // A student building's leasing for the coming year (#468).
+    { label: "Pre-leasing", get: (c) => c.student || "—" },
     // A conversion and a stabilized building are not the same kind of thing,
     // and a side-by-side that hides that compares apples to plans.
     { label: "Deal type", get: (c) => c.strategy ?? "—" },

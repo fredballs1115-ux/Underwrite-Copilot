@@ -786,6 +786,26 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("a student building: the challenger reads its pre-leasing and what to check by name (#468)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      assetClass: "student_housing",
+      metrics: [
+        ...EXTRACTION.metrics,
+        { label: "Beds", value: "612", flagged: false, page: "", basis: "na" },
+        { label: "Pre-leased", value: "74% for Fall 2026 vs. 81% a year ago", flagged: false, page: "", basis: "na" },
+        { label: "Distance to campus", value: "1.6 miles", flagged: false, page: "", basis: "na" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("STUDENT HOUSING AS STATED: The building is 74% pre-leased for Fall 2026, 7 points behind last year's 81% at the same point");
+    expect(note).toContain("past the half mile a student walks");
+    expect(note).toContain("the pre-lease pace against last year's at the same date");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
   it("the third-party reports: the challenger reads what they found and the site-report traps (#465)", async () => {
     vi.mocked(extractTerms).mockResolvedValue({
       ...EXTRACTION,

@@ -194,6 +194,16 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
     ]);
   });
 
+  it("a student building's pre-leasing and walk lead after the price (#468)", () => {
+    const student = [
+      { label: "Occupancy", value: "96%", flagged: false },
+      { label: "Distance to campus", value: "0.3 miles", flagged: false },
+      { label: "Pre-leased", value: "87% for Fall 2026", flagged: false },
+      { label: "Asking price", value: "$61,200,000", flagged: false },
+    ];
+    expect(keyTermRows(student, "stabilized", 3).map((m) => m.label)).toEqual(["Asking price", "Pre-leased", "Distance to campus"]);
+  });
+
   it("what the third-party reports found leads after the price (#465)", () => {
     const reported = [
       { label: "Occupancy", value: "94%", flagged: false },

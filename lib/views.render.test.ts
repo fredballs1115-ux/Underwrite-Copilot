@@ -5952,3 +5952,83 @@ describe("The offering (#467) — the brokers to call and when offers are due", 
     expect(none).not.toContain("offers-due.ics");
   });
 });
+
+import { StudentHousingPanel } from "@/app/student-housing-panel";
+import { readStudentHousing, studentModelLine } from "@/lib/student-housing";
+
+describe("StudentHousingPanel (#468) — the pre-leasing against last year's and the model, the beds, the walk", () => {
+  const row = (label: string, value: string, page = "p. 6") => ({ label, value, flagged: false, page, basis: "na" as const });
+  const student = (metrics: ReturnType<typeof row>[]) =>
+    ({ dealName: "The Standard", assetClass: "student_housing", totalPages: 60, metrics: [row("Asking price", "$61,200,000", "p. 2"), ...metrics] }) as unknown as ExtractionResult;
+
+  it("draws the pre-leasing on a track with last year's tick and the model's line, then a tile a figure", () => {
+    const r = readStudentHousing(
+      student([
+        row("Beds", "612"),
+        row("Units", "204"),
+        row("Pre-leased", "87% for Fall 2026"),
+        row("Pre-leased last year", "82%"),
+        row("Distance to campus", "0.3 miles"),
+        row("Rent per bed", "$1,085"),
+        row("Parental guarantees", "78%"),
+      ]),
+    )!;
+    const html = render(React.createElement(StudentHousingPanel, { student: r, modelLine: studentModelLine(r, { vacancyPct: 5 }), modelOccupancyPct: 95 }));
+    dumpView("student-housing-panel", html);
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="student-housing-panel"');
+    expect(text).toContain("Pre-leased 87% for Fall 2026");
+    expect(html.match(/data-bar="prelease"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="prelease-prior"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="prelease-model"/g)).toHaveLength(1);
+    expect(text).toContain("Last year at this point: 82% (+5 pts)");
+    expect(text).toContain("The model runs at 95%");
+    for (const key of ["beds", "price-bed", "rent-bed", "walk", "guarantees"]) expect(html).toContain(`data-student="${key}"`);
+    expect(text).toContain("Pedestrian");
+    expect(text).toContain("$100,000");
+    expect(text).toContain("8 points of the fall's leasing is still to sign");
+    expect(a11yIssues(html), "student housing panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("draws no line it has no figure for, and nothing on anything else", () => {
+    const r = readStudentHousing(student([row("Beds", "300"), row("Distance to campus", "2.1 miles")]))!;
+    const html = render(React.createElement(StudentHousingPanel, { student: r }));
+    const text = visibleText(html);
+    expect(text).toContain("Leased by the bed");
+    expect(text).toContain("Drive-to");
+    expect(html).not.toContain('data-bar="prelease"');
+    expect(renderToStaticMarkup(React.createElement(StudentHousingPanel, { student: null }))).toBe("");
+  });
+});
+
+describe("ShareView — a student building (#468)", () => {
+  it("draws the pre-leasing and leads the key terms with it, and nothing on the sample", () => {
+    const withStudent = {
+      ...SAMPLE_DEAL.extraction,
+      assetClass: "student_housing",
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Beds", value: "612", flagged: false, page: "", basis: "na" as const },
+        { label: "Pre-leased", value: "87% for Fall 2026", flagged: false, page: "", basis: "na" as const },
+      ],
+    };
+    const props = {
+      dealName: SAMPLE_DEAL.name,
+      assetClass: "student_housing",
+      expiresAt: "2026-09-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: withStudent }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="student-housing-panel"');
+    expect(text).toContain("Pre-leased 87% for Fall 2026");
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, assetClass: SAMPLE_DEAL.asset_class, extraction: SAMPLE_DEAL.extraction }))).not.toContain("student-housing-panel");
+  });
+});

@@ -20,6 +20,7 @@ import { taxAbatementTag } from "@/lib/tax-abatement";
 import { sellerFinancingTag } from "@/lib/seller-financing";
 import { siteReportsTag } from "@/lib/site-reports";
 import { brokerageOf } from "@/lib/offering";
+import { studentHousingTag } from "@/lib/student-housing";
 
 export interface PipelineSlots {
   /** the going-in cap as the OM states it — null on a plan deal, which has
@@ -78,6 +79,10 @@ export interface PipelineSlots {
    *  "CBRE", "Newmark · JLL" (lib/offering `brokerageOf`, #467); absent or
    *  null where it names no firm */
   broker?: string | null;
+  /** a student building's pre-leasing — "Pre-leased 87%, +5 pts y/y",
+   *  "Drive-to campus" (lib/student-housing `studentHousingTag`, #468);
+   *  absent or null on anything else */
+  student?: string | null;
 }
 
 /**
@@ -153,5 +158,7 @@ export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | nu
     reports: siteReportsTag(extraction),
     // Who is selling it (#467): the brokerage the memorandum names.
     broker: brokerageOf(extraction),
+    // A student building's pre-leasing against last year's (#468).
+    student: studentHousingTag(extraction),
   };
 }

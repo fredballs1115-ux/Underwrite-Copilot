@@ -548,6 +548,39 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("so the next buyer takes the step-up and prices it");
   }, 60000);
 
+  it("prints a student building's pre-leasing over the grids, and the beds still to sign (#468)", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      assetClass: "student_housing",
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Beds", value: "612", flagged: false, page: "", basis: "na" as const },
+        { label: "Pre-leased", value: "80% for Fall 2026", flagged: false, page: "", basis: "na" as const },
+      ],
+    } as ExtractionResult;
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: "student_housing",
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const input = buildReportData(deal, "September 30, 2026", [], sensitivity, undefined, null, null, undefined, null, null, null, null, null, null, null, null, null, null, null, null, null, derived.meta.student ?? null);
+    expect(input.sensitivity).not.toBeNull();
+    const buf = await renderToBuffer(
+      React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Student housing: 80% pre-leased for Fall 2026; 612 beds");
+    expect(text).toContain("of the fall's leasing is still to sign");
+  }, 60000);
+
   it("prints what the third-party reports found over the grids, and the repairs the model carries (#465)", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

@@ -58,6 +58,7 @@ import { readRoster, rosterShortLine } from "@/lib/tenant-roster";
 import { readValueAdd, valueAddShortLine } from "@/lib/value-add";
 import { readTaxAbatement, taxAbatementShortLine } from "@/lib/tax-abatement";
 import { readSiteReports, siteReportsShortLine } from "@/lib/site-reports";
+import { readStudentHousing, studentShortLine } from "@/lib/student-housing";
 import type { AssumableView } from "@/lib/assumable-debt";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
 import { exitMoney, type LeaseholdExitView } from "@/lib/leasehold-exit";
@@ -791,6 +792,12 @@ export interface ReportInput {
    *  `meta.siteReports`, #465) — printed over the grids; absent where the
    *  caller built no model, and then the line prints alone */
   siteReports?: { line: string; read: string } | null;
+  /** a student building's pre-leasing, beds and walk, and the model's
+   *  vacancy against the beds still to sign (lib/student-housing via the
+   *  derived model's `meta.student`, #468) — printed over the grids;
+   *  absent where the caller built no model, and then the line prints
+   *  alone */
+  student?: { line: string; read: string } | null;
   /** FEMA's flood map at the building (lib/flood-map `floodMapFor`, #427):
    *  the composite, FEMA's key and the zone sentence; null for no page */
   floodMap?: FloodMapView | null;
@@ -823,6 +830,7 @@ export function buildReportData(
   taxAbatement?: { line: string; read: string } | null,
   sellerNote?: AssumableView | null,
   siteReports?: { line: string; read: string } | null,
+  student?: { line: string; read: string } | null,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
@@ -840,6 +848,7 @@ export function buildReportData(
     taxAbatement: taxAbatement ?? null,
     sellerNote: sellerNote ?? null,
     siteReports: siteReports ?? null,
+    student: student ?? null,
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
@@ -1139,6 +1148,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // What the third-party reports found (#465), the same way.
   const reportsRead = readSiteReports(extraction);
   const siteReports = input.siteReports ?? (reportsRead ? { line: siteReportsShortLine(reportsRead), read: "" } : null);
+  // A student building (#468), the same way.
+  const studentRead = readStudentHousing(extraction);
+  const student = input.student ?? (studentRead ? { line: studentShortLine(studentRead), read: "" } : null);
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
@@ -1342,6 +1354,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           {!sensitivity && <SingleTenantCaveat lease={valueAdd} />}
           {!sensitivity && <SingleTenantCaveat lease={taxAbatement} />}
           {!sensitivity && <SingleTenantCaveat lease={siteReports} />}
+          {!sensitivity && <SingleTenantCaveat lease={student} />}
           {!sensitivity && <AssumptionsBlock read={modelVsMarket} />}
           {!sensitivity && <AssumableBlock view={input.assumable} />}
           {!sensitivity && <AssumableBlock view={input.sellerNote} />}
@@ -1384,6 +1397,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           <SingleTenantCaveat lease={valueAdd} />
           <SingleTenantCaveat lease={taxAbatement} />
           <SingleTenantCaveat lease={siteReports} />
+          <SingleTenantCaveat lease={student} />
 
           <HeatGrid
             axisLabel="EXIT CAP"

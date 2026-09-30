@@ -241,6 +241,26 @@ describe("dealContextFor — a note the seller offers to carry (#462)", () => {
   });
 });
 
+describe("dealContextFor — a student building (#468)", () => {
+  it("says the pre-leasing against last year's, the beds and the walk, each as stated", () => {
+    const student: ExtractionResult = {
+      dealName: "The Standard",
+      assetClass: "student_housing",
+      metrics: [
+        m("Asking price", "$61,200,000"),
+        m("Beds", "612"),
+        m("Pre-leased", "87% for Fall 2026"),
+        m("Pre-leased last year", "82%"),
+        m("Distance to campus", "0.3 miles"),
+      ],
+    };
+    const ctx = dealContextFor(student)!;
+    expect(ctx).toContain("Student housing: The building is 87% pre-leased for Fall 2026, 5 points ahead of last year's 82% at the same point");
+    expect(ctx).toContain("612 beds, $100,000 a bed at the price");
+    expect(ctx).toContain("It is 0.3 miles from campus: pedestrian");
+  });
+});
+
 describe("dealContextFor — the third-party reports (#465)", () => {
   it("says what the reports found, report by report, each as stated", () => {
     const reported: ExtractionResult = {

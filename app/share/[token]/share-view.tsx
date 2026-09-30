@@ -21,6 +21,8 @@ import { readAffordable } from "@/lib/affordable";
 import { SingleTenantPanel } from "@/app/single-tenant-panel";
 import { readSingleTenant } from "@/lib/single-tenant";
 import { HotelPanel } from "@/app/hotel-panel";
+import { StudentHousingPanel } from "@/app/student-housing-panel";
+import { readStudentHousing } from "@/lib/student-housing";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { readRoster } from "@/lib/tenant-roster";
@@ -335,6 +337,10 @@ export function ShareView({
       {/* What a hotel is sold with (#455): the flag, the manager, the
           encumbrance, the PIP and the rooms. */}
       <HotelPanel hotel={readHotelDeal(safeExtraction)} />
+
+      {/* A student building (#468): the pre-leasing against last year's,
+          the beds and the walk to campus. */}
+      <StudentHousingPanel student={readStudentHousing(safeExtraction)} />
 
       {/* What the third-party reports found (#465): a tile a report, the
           Phase I's age and the seismic PML against the lenders' lines. */}
