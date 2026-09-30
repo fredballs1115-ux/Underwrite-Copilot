@@ -27,6 +27,7 @@ import { valueAddTermRows } from "./value-add";
 import { taxAbatementTermRows } from "./tax-abatement";
 import { sellerFinancingTermRows } from "./seller-financing";
 import { siteReportTermRows } from "./site-reports";
+import { studentTermRows } from "./student-housing";
 
 export interface KeyTermMetric {
   label: string;
@@ -101,6 +102,9 @@ export function keyTermRows<M extends KeyTermMetric>(
   // What the third-party reports found (#465): the Phase I's finding and
   // date, the immediate repairs, the seismic PML and the zoning.
   for (const row of siteReportTermRows(rows)) lead(row);
+  // A student building (#468): the pre-leasing and last year's, the walk to
+  // campus and the rent per bed.
+  for (const row of studentTermRows(rows)) lead(row);
   const rest = rows.filter((m) => !head.includes(m));
   return [...head, ...rest.filter((m) => m.flagged), ...rest.filter((m) => !m.flagged)].slice(0, limit);
 }

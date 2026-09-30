@@ -167,6 +167,7 @@ export async function GET(
   let valueAdd: { line: string; read: string } | null = null;
   let taxAbatement: { line: string; read: string } | null = null;
   let siteReports: { line: string; read: string } | null = null;
+  let student: { line: string; read: string } | null = null;
   try {
     const extraction = (deal.extraction as ExtractionResult | null) ?? null;
     if (extraction) {
@@ -236,6 +237,7 @@ export async function GET(
       taxAbatement = derived.meta.taxAbatement ?? null;
       // What the third-party reports found (#465), read against this model.
       siteReports = derived.meta.siteReports ?? null;
+      student = derived.meta.student ?? null;
       // How it is sold (#456): the ceiling bid at this report's own hurdle,
       // the buy box's where set — the same one its grids are coloured by.
       sale = derived.meta.sale
@@ -322,7 +324,7 @@ export async function GET(
       // a failed read is no page, never a failed report.
       galleryPhotosFor(id, visualCache).catch(() => []),
     ]);
-    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports);
+    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student);
     const element = React.createElement(ReportDocument, {
       input,
     }) as unknown as Parameters<typeof renderToBuffer>[0];

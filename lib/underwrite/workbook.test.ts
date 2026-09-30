@@ -876,6 +876,29 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The value-add program")).toThrow();
   });
 
+  it("a student building (#468): its pre-leasing, beds and walk, then the model's vacancy against the beds to sign", async () => {
+    const student = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        assetClass: "student_housing",
+        metrics: [
+          ...extraction.metrics,
+          { label: "Beds", value: "612", flagged: false, page: "p. 6" },
+          { label: "Pre-leased", value: "87% for Fall 2026", flagged: false, page: "p. 6" },
+          { label: "Distance to campus", value: "0.3 miles", flagged: false, page: "p. 6" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(student));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "Student housing");
+    expect(String(cover.getCell(r, 3).value)).toMatch(/^Student housing: 87% pre-leased for Fall 2026; 612 beds at \$\d+k a bed; 0\.3 miles to campus \(pedestrian\)$/);
+    expect(String(cover.getCell(r + 1, 3).value)).toMatch(/^The model's /);
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "Student housing")).toThrow();
+  });
+
   it("the third-party reports (#465): what they found, then what the model does with the immediate repairs", async () => {
     const reported = deriveUnderwriteInputs(
       {

@@ -53,6 +53,7 @@ import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { assetClassLabel } from "@/lib/asset-class";
 import { readSiteReports, siteReportsModelLine, siteReportsShortLine } from "@/lib/site-reports";
+import { readStudentHousing, studentModelLine, studentShortLine } from "@/lib/student-housing";
 import { allInPct, debtRateNote, type DebtIndex, type RateSeed } from "@/lib/debt-index";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { UnderwriteInputs } from "./engine";
@@ -150,6 +151,10 @@ export interface WorkbookMeta {
    *  reports in one line, then what this model does with the immediate
    *  repairs; absent where the memorandum cites none */
   siteReports?: { line: string; read: string } | null;
+  /** a student building (lib/student-housing, #468): its pre-leasing, beds
+   *  and walk to campus in a line, then the model's vacancy against the
+   *  beds still to sign. Absent on anything else. */
+  student?: { line: string; read: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -280,6 +285,14 @@ function singleTenantMeta(extraction: ExtractionResult | null, inputs: Underwrit
       exitCapPct: inputs.exitCapPct,
     }),
   };
+}
+
+/** The cover's lines about a student building (#468): the read, then the
+ *  model's vacancy against the beds still to sign for the fall. */
+function studentMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["student"] {
+  const r = readStudentHousing(extraction);
+  if (!r) return null;
+  return { line: studentShortLine(r), read: studentModelLine(r, { vacancyPct: inputs.vacancyPct * 100 }) };
 }
 
 /** The cover's lines about a multi-tenant property's listed tenants
@@ -844,6 +857,7 @@ export function deriveUnderwriteInputs(
             read: siteReportsModelLine(reportsRead, { capitalYr1: capitalBudget, capitalIsRepairs: repairsCapital != null }),
           }
         : null,
+      student: studentMeta(extraction, inputs),
       sale: saleFloor ? { line: saleShortLine(saleFloor), read: saleCeilingRead(extraction, inputs) } : null,
       hotel: hotelRead
         ? {

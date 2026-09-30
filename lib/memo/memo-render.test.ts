@@ -323,6 +323,37 @@ describe("MemoDocument (redesigned)", () => {
     expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).valueAddLine).toBe("");
   }, 30000);
 
+  it("says a student building's pre-leasing under the title (#468), and nothing on the sample", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      assetClass: "student_housing",
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Beds", value: "612", flagged: false, page: "", basis: "na" },
+        { label: "Pre-leased", value: "87% for Fall 2026", flagged: false, page: "", basis: "na" },
+        { label: "Distance to campus", value: "0.3 miles", flagged: false, page: "", basis: "na" },
+      ],
+    };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: "student_housing",
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "September 30, 2026", []);
+    expect(data.studentLine).toMatch(/^Student housing: 87% pre-leased for Fall 2026; 612 beds at \$\d+k a bed; 0\.3 miles to campus \(pedestrian\)$/);
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Student housing: 87% pre-leased for Fall 2026");
+    expect(buildMemoData({ ...deal, asset_class: SAMPLE_DEAL.asset_class, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).studentLine).toBe("");
+  }, 30000);
+
   it("says what the third-party reports found under the title (#465), and nothing on the sample", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

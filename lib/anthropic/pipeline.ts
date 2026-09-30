@@ -46,6 +46,7 @@ import { readValueAdd, valueAddNote } from "@/lib/value-add";
 import { readTaxAbatement, taxAbatementNote } from "@/lib/tax-abatement";
 import { readSellerFinancing, sellerFinancingNote } from "@/lib/seller-financing";
 import { readSiteReports, siteReportsNote } from "@/lib/site-reports";
+import { readStudentHousing, studentNote } from "@/lib/student-housing";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { offersDueOf, offersDueUpgrade } from "@/lib/offering";
@@ -921,6 +922,11 @@ async function runAnalysisSteps(
         // seismic PML and the zoning — the site-report traps by name.
         const reports = readSiteReports(ex);
         if (reports) notes.push(siteReportsNote(reports));
+
+        // A student building (#468): the pre-lease pace, the beds still to
+        // sign against the model's vacancy, the rent per bed, the walk.
+        const student = readStudentHousing(ex);
+        if (student) notes.push(studentNote(student));
 
         if (flagged.length) {
           notes.push(

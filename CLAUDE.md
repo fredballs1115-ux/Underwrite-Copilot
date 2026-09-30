@@ -741,6 +741,39 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   reports, the pipeline's CSV "Broker" column (`PipelineSlots.broker`,
   `brokerageOf`) and the compare table's Broker row. Never on the shared
   screen or in an email: the listing team is the reader's contact list.
+- Student housing (#468): the extraction labels a student deal's leasing as
+  rows of its own, each only as stated — "Pre-leased" (the share leased for
+  the coming academic year, with its term and date as written), "Pre-leased
+  last year" (the same point a year earlier), "Beds", "Rent per bed",
+  "Distance to campus", "University", "University enrollment", "Parental
+  guarantees" and "Lease term" — and `lib/student-housing.ts` (pure) reads
+  them (`readStudentHousing`; null unless the class is student housing or a
+  pre-leasing row sits beside a count of beds). Five rules: **pre-leasing is
+  next year's rent roll** (the model's read, `studentModelLine`: its
+  vacancy against the beds still to sign, or "covered" where the building
+  has already signed more); **the pace is the comparison** (points against
+  last year's same point, from its own row or from the same row only where
+  the words say "last year" or "a year ago"; two bare figures are no pace);
+  **beds, not units** (the building's price over the beds through
+  `buildingPriceOf`, the rent a bed a month as stated, never an annual
+  figure); **the walk is the moat** (`campusWalk`: within
+  `PEDESTRIAN_MILES`, half a mile, or `PEDESTRIAN_MINUTES`, a ten-minute
+  walk, or words placing it on the campus's edge, is pedestrian; read only
+  from miles, feet or minutes stated, "close to campus" is no distance);
+  **a blank is null**. Where it shows: the deal context and the challenger
+  (`studentNote`, beside the class's own STUDENT_TRAPS),
+  `app/student-housing-panel.tsx` (`StudentHousingPanel`, pure:
+  `data-bar="prelease"` on a track to 100% with `prelease-prior` last
+  year's tick and `prelease-model` the model's occupancy dashed, where the
+  page has a model; a tile each for the beds, the price and rent a bed, the
+  walk and the guarantees, `data-student`) on the deal page and the shared
+  screen, the key terms (`studentTermRows`), the pipeline row, card and
+  CSV's "Student housing" column and the meeting workbook's price note
+  (`studentHousingTag`: "Pre-leased 87%, +5 pts y/y", "Drive-to campus"; a
+  pace behind in the warning tone), the memo under its title
+  (`studentShortLine`), the workbook's cover ("Student housing",
+  `meta.student`), the report's caveat (`buildReportData`'s twenty-second
+  argument) and the compare table's Pre-leasing row.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`

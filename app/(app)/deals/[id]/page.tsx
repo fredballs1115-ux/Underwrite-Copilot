@@ -14,6 +14,8 @@ import { InterestPanel } from "@/app/interest-panel";
 import { AffordablePanel } from "@/app/affordable-panel";
 import { SingleTenantPanel } from "@/app/single-tenant-panel";
 import { HotelPanel } from "@/app/hotel-panel";
+import { StudentHousingPanel } from "@/app/student-housing-panel";
+import { readStudentHousing } from "@/lib/student-housing";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { ValueAddPanel } from "@/app/value-add-panel";
@@ -1247,6 +1249,14 @@ export default async function DealPage({
           hotel={readHotelDeal(extraction)}
           holdYears={derived ? derived.inputs.holdMonths / 12 : null}
           modelLine={derived?.meta.hotel?.read ?? ""}
+        />
+        {/* A student building (#468): the pre-leasing against last year's
+            and the occupancy the model runs at, the beds, the walk to
+            campus (lib/student-housing). */}
+        <StudentHousingPanel
+          student={readStudentHousing(extraction)}
+          modelLine={derived?.meta.student?.read ?? ""}
+          modelOccupancyPct={derived ? Math.round((1 - derived.inputs.vacancyPct) * 1000) / 10 : null}
         />
         {/* What the third-party reports found (#465): a tile a report, the
             Phase I's age against the 180-day and one-year marks, the PML

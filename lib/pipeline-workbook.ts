@@ -77,6 +77,10 @@ export interface PipelineExportRow {
    *  (lib/site-reports `siteReportsTag`, #465); carried in the price
    *  cell's note */
   reports?: string | null;
+  /** a student building's pre-leasing — "Pre-leased 87%, +5 pts y/y"
+   *  (lib/student-housing `studentHousingTag`, #468); carried in the price
+   *  cell's note */
+  student?: string | null;
   /** the going-in cap on today's income — always null on a plan deal */
   cap: string | null;
   /** a plan deal's stabilized NOI over total cost, e.g. "11.7%" */
@@ -249,6 +253,7 @@ export async function buildPipelineWorkbook(
         d.abatement ? `${d.abatement}: the NOI is on an abated tax bill — the deal page reads when it ends and what it is worth.` : null,
         d.sellerNote ? `${d.sellerNote}: the seller offers to carry financing — the deal page prices the note against today's rate.` : null,
         d.reports ? `${d.reports}: from the third-party reports the memorandum cites — the deal page reads them.` : null,
+        d.student ? `${d.student}: a student building's leasing for the coming year — the deal page reads the pace, the beds and the walk to campus.` : null,
       ].filter((n): n is string => n != null);
       if (notes.length) priceCell.note = notes.join(" ");
 

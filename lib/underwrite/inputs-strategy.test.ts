@@ -410,6 +410,22 @@ describe("deriveUnderwriteInputs — a hotel's PIP is the buyer's capital (#455)
   });
 });
 
+describe("deriveUnderwriteInputs — a student building's pre-leasing against the model's vacancy (#468)", () => {
+  it("says the read in a line and the beds still to sign against the model's occupancy", () => {
+    const m = deriveUnderwriteInputs(
+      ex([metric("Asking price", "$61,200,000"), metric("NOI (in-place)", "$3,300,000"), metric("Beds", "612"), metric("Pre-leased", "87% for Fall 2026")], {
+        assetClass: "student_housing",
+      }),
+      "fallback",
+    );
+    expect(m.meta.student?.line).toBe("Student housing: 87% pre-leased for Fall 2026; 612 beds at $100k a bed");
+    expect(m.meta.student?.read).toMatch(/^The model's \d+(\.\d)?% vacancy /);
+    expect(m.meta.student?.read).toContain("87% pre-leased for Fall 2026");
+    // Anything else carries none.
+    expect(deriveUnderwriteInputs(ex([metric("Asking price", "$20,000,000"), metric("Units", "240")]), "fallback").meta.student).toBeNull();
+  });
+});
+
 describe("deriveUnderwriteInputs — the PCA's immediate repairs are capital at closing (#465)", () => {
   const base = [metric("Asking price", "$42,000,000"), metric("NOI (in-place)", "$2,520,000"), metric("Units", "240")];
 
