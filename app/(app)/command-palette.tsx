@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { MarketNavEntry } from "@/lib/market-match";
+import { asksServer, uniqueById } from "@/lib/palette-search";
 import { DealAvatar } from "./deal-avatar";
+
+/** How long typing rests before the server is asked for every deal whose
+ *  name holds the query. */
+const SEARCH_DEBOUNCE_MS = 180;
 
 type PaletteDeal = {
   id: string;
@@ -225,6 +230,9 @@ const CALL_DOT: Record<string, string> = {
 /**
  * ⌘K / Ctrl+K jump-anywhere. Deals are fetched lazily on first open (and
  * refreshed on each open) from /api/palette — RLS keeps it to the caller's own.
+ * That list is the most recently updated fifty; a typed query also asks the
+ * route for every deal whose name holds it (`?q=`), so an older deal is
+ * found by its name, and the answer joins the list the query filters.
  */
 export function CommandPalette({
   open,
@@ -240,6 +248,10 @@ export function CommandPalette({
   const [query, setQuery] = useState("");
   const [deals, setDeals] = useState<PaletteDeal[] | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  // What typed queries found beyond the recent list this time the palette
+  // is open, and the last query the server answered (or failed to).
+  const [found, setFound] = useState<PaletteDeal[]>([]);
+  const [answered, setAnswered] = useState<{ q: string; ok: boolean } | null>(null);
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -268,6 +280,8 @@ export function CommandPalette({
     const raf = requestAnimationFrame(() => {
       setQuery("");
       setActive(0);
+      setFound([]);
+      setAnswered(null);
       inputRef.current?.focus();
     });
     fetch("/api/palette", { cache: "no-store" })
@@ -287,9 +301,43 @@ export function CommandPalette({
     return () => cancelAnimationFrame(raf);
   }, [open]);
 
+  // A typed query searches every deal by its name on the server, once the
+  // typing rests; each keystroke drops the question before it. Not where
+  // the recent list came back short: it already holds every deal.
+  const typed = query.trim();
+  const ask = open && asksServer(typed, deals?.length ?? null);
+  useEffect(() => {
+    if (!ask) return;
+    const ctrl = new AbortController();
+    const t = setTimeout(() => {
+      fetch(`/api/palette?q=${encodeURIComponent(typed)}`, { cache: "no-store", signal: ctrl.signal })
+        .then((r) => {
+          if (!r.ok) throw new Error(String(r.status));
+          return r.json();
+        })
+        .then((d: { deals: PaletteDeal[] }) => {
+          setFound((prev) => uniqueById(prev, d.deals));
+          setAnswered({ q: typed, ok: true });
+        })
+        .catch(() => {
+          // Dropped for the next keystroke: nothing to say. Unreachable: the
+          // recent list still filters, and the empty list says what broke.
+          if (!ctrl.signal.aborted) setAnswered({ q: typed, ok: false });
+        });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [ask, typed]);
+  const searching = ask && answered?.q !== typed;
+
   const items = useMemo<Item[]>(() => {
     const q = query.trim().toLowerCase();
-    const dealItems: Item[] = (deals ?? []).map((d) => ({
+    // An empty query lists the recent deals alone; a typed one filters them
+    // with what the server found beyond them.
+    const pool = q ? uniqueById(deals ?? [], found) : (deals ?? []);
+    const dealItems: Item[] = pool.map((d) => ({
       key: d.id,
       label: d.name,
       hint: d.market || d.address || d.stage,
@@ -321,7 +369,7 @@ export function CommandPalette({
     return all.filter((i) =>
       (i.search ?? `${i.label} ${i.hint}`).toLowerCase().includes(q),
     );
-  }, [deals, markets, query]);
+  }, [deals, found, markets, query]);
 
   // Clamp instead of a state-syncing effect: as the filter narrows, the
   // highlighted row is derived from the raw index, never reset via setState.
@@ -435,7 +483,11 @@ export function CommandPalette({
                 ? "Loading…"
                 : loadFailed
                   ? "Search is unreachable right now — close and try again."
-                  : "No matches."}
+                  : searching
+                    ? "Searching every deal…"
+                    : answered && !answered.ok
+                      ? "Couldn’t search every deal just now — close and try again."
+                      : "No matches."}
             </li>
           )}
           {groups.map((g) => (
