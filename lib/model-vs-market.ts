@@ -7,7 +7,14 @@ import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { INSURANCE_INDEX_ID, periodLabel, rentIndexFor } from "@/lib/live-market-brief";
 import { isStateMarket } from "@/lib/market-match";
 import { datedLong } from "@/lib/debt-index";
-import { inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
+import {
+  IMPLIED_CAP_CEILING,
+  askingPriceOf,
+  buildingPriceOf,
+  inferStrategy,
+  isPlanDeal,
+  noiFigures,
+} from "@/lib/deal-strategy";
 import { findGoingInCap, parsePct } from "@/lib/criteria";
 import { shownAssetClass } from "@/lib/pipeline-slots";
 import { bandText, trackerFor, type TrackerRead } from "@/lib/tracker-read";
@@ -122,6 +129,11 @@ export interface ModelVsMarketInput {
   plan?: boolean;
   /** the going-in cap, percent, as the page shows it — null on a plan deal */
   goingInCapPct?: number | null;
+  /** where that cap came from: stated by the documents (the default), or
+   *  implied by their NOI over their price where they state none
+   *  (`impliedGoingInCap`) — over the whole price a share implies, for a
+   *  share — and said as such */
+  goingInCapSource?: "stated" | "implied" | "implied_whole";
   metro?: { id: string; name: string } | null;
   /** the metro's own series (`readMetroRates`) */
   rates?: readonly LiveRate[];
@@ -567,6 +579,14 @@ function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
   const inSpread = Math.round((g - ten.value) * 100);
   const delta = exitSpread - inSpread;
   const tone: CheckTone = delta > 0 ? "widens" : delta < 0 ? "compresses" : "level";
+  // A cap the documents imply rather than state is said as the arithmetic
+  // it is, so the reader can see what the exit is being set against.
+  const entry =
+    input.goingInCapSource === "implied"
+      ? `The going-in cap implied by the OM's NOI over its price, ${g.toFixed(2)}%,`
+      : input.goingInCapSource === "implied_whole"
+        ? `The going-in cap implied by the OM's NOI over the whole price its share implies, ${g.toFixed(2)}%,`
+        : `The going-in cap ${g.toFixed(2)}%`;
   const clause =
     tone === "widens"
       ? `so the exit assumes the spread widens ${delta} bps with the 10-year where it is today — the conservative direction.`
@@ -582,7 +602,7 @@ function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
     tone,
     toneLabel: TONE_LABEL[tone],
     scope,
-    read: `${head} The going-in cap ${g.toFixed(2)}% is ${Math.abs(inSpread)} bps ${inSpread >= 0 ? "over" : "under"} it, ${clause}${band.sentence}`,
+    read: `${head} ${entry} is ${Math.abs(inSpread)} bps ${inSpread >= 0 ? "over" : "under"} it, ${clause}${band.sentence}`,
   };
 }
 
@@ -611,13 +631,40 @@ export interface MarketReads {
 }
 
 /**
+ * The going-in cap the documents imply where they state none: the OM's
+ * in-place NOI, else its Year-1, over the price the building's own figures
+ * describe — the pairing the plausibility check holds a stated cap to
+ * (`assessPlausibility`), through the same shared readers: `noiFigures`,
+ * `askingPriceOf` (a range at its top) and `buildingPriceOf` (a share's
+ * price grossed up to the whole, `whole`; none for a note, whose price is a
+ * loan's, or a leased fee, whose price is the land's). Null where either
+ * figure is missing, and outside the band a cap can be — at or under 0.5%,
+ * or at IMPLIED_CAP_CEILING and past it, where the NOI is no going-in
+ * figure on this price. A plan deal has no going-in cap; the caller says
+ * which deal it is.
+ */
+export function impliedGoingInCap(extraction: ExtractionResult | null): { pct: number; whole: boolean } | null {
+  if (!extraction) return null;
+  const figs = noiFigures(extraction.metrics ?? []);
+  const going = figs.find((f) => f.kind === "in_place") ?? figs.find((f) => f.kind === "year1");
+  if (!going || !(going.value > 0)) return null;
+  const asked = askingPriceOf(extraction);
+  const price = buildingPriceOf(extraction, asked);
+  if (asked == null || price == null || !(price > 0)) return null;
+  const cap = going.value / price;
+  if (!(cap > 0.005) || !(cap < IMPLIED_CAP_CEILING)) return null;
+  return { pct: cap * 100, whole: price !== asked };
+}
+
+/**
  * The read for a deal, from what every surface already holds — the derived
  * model, the extraction, the stored class, the covered metro and today's
  * figures — so the deal page, the report route and the workbook route call
  * ONE function and cannot disagree about the class the deck turned out to
  * be (`shownAssetClass`), whether the deal is a plan (`inferStrategy`), or
  * which cap is the going-in cap (the page's own summary figure where it
- * passes one, else the extraction's, and none on a plan deal).
+ * passes one, else the extraction's; where neither states one, the cap the
+ * documents' NOI implies on their price; and none on a plan deal).
  */
 export function modelVsMarketFor(args: {
   derived: Pick<DerivedModel, "inputs" | "sources">;
@@ -632,7 +679,9 @@ export function modelVsMarketFor(args: {
   metro: { id: string; name: string; placedBy?: unknown } | null;
   reads: MarketReads;
   /** the going-in cap as the page shows it; leave undefined to read the
-   *  extraction's, pass null for none */
+   *  extraction's, pass null where the page shows none — either way, where
+   *  no cap is stated the one the documents' NOI implies on their price is
+   *  read in its place (none on a plan deal) */
   goingInCapText?: string | null;
 }): ModelVsMarket | null {
   const { derived, extraction, storedAssetClass, metro, reads } = args;
@@ -643,13 +692,21 @@ export function modelVsMarketFor(args: {
       : planDeal
         ? null
         : (findGoingInCap(extraction?.metrics ?? [])?.value ?? null);
+  const parsed = capText ? parsePct(capText) : null;
+  const stated = parsed != null && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  // Where the documents state no going-in cap, the one their own NOI and
+  // price imply: without it a deal whose NOI is 7.50% of its price read "no
+  // going-in cap to set it against" while the model's 6.00% default exit
+  // priced 150 bps of compression unsaid. Never on a plan deal.
+  const implied = stated == null && !planDeal ? impliedGoingInCap(extraction) : null;
   const assetClass = shownAssetClass(storedAssetClass ?? null, extraction) || null;
   return modelVsMarket({
     inputs: derived.inputs,
     sources: derived.sources,
     assetClass,
     plan: planDeal,
-    goingInCapPct: capText ? parsePct(capText) : null,
+    goingInCapPct: stated ?? implied?.pct ?? null,
+    goingInCapSource: stated != null ? "stated" : implied ? (implied.whole ? "implied_whole" : "implied") : undefined,
     metro,
     rates: reads.rates,
     zori: reads.zori,

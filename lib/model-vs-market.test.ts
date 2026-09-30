@@ -320,7 +320,7 @@ describe("ModelVsMarketCard — the card on the deal page", () => {
 });
 
 // ── One read for every surface ──────────────────────────────────────────────
-import { modelVsMarketFor } from "./model-vs-market";
+import { impliedGoingInCap, modelVsMarketFor } from "./model-vs-market";
 import { deriveUnderwriteInputs } from "./underwrite/inputs";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 
@@ -372,11 +372,19 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
     expect(r.checks.every((c) => c.scope === "national")).toBe(true);
   });
 
-  it("takes the page's own cap where it passes one, and none where it passes null", () => {
+  it("takes the page's own cap where it passes one; where the page shows none, the cap the documents' NOI implies on their price", () => {
     const own = modelVsMarketFor({ derived, extraction, storedAssetClass: "industrial", metro: null, reads, goingInCapText: "5.5%" })!;
     expect(own.checks[2].read).toContain("The going-in cap 5.50% is 56 bps over it, so the exit assumes the spread widens 50 bps");
+    // No cap in the page's slot: the OM's $3,000,000 NOI over its
+    // $50,000,000 price is 6.00% going in, said as the arithmetic it is.
     const none = modelVsMarketFor({ derived, extraction, storedAssetClass: "industrial", metro: null, reads, goingInCapText: null })!;
-    expect(none.checks[2].tone).toBe("stated");
+    expect(none.checks[2].tone).toBe("level");
+    expect(none.checks[2].read).toContain("The going-in cap implied by the OM's NOI over its price, 6.00%, is 106 bps over it, so the exit holds the spread");
+    // Nothing to imply it from: no cap, and the check states the spread alone.
+    const bare: ExtractionResult = { ...extraction, metrics: extraction.metrics.filter((m) => !/net operating income/i.test(m.label)) };
+    const noNoi = modelVsMarketFor({ derived, extraction: bare, storedAssetClass: "industrial", metro: null, reads, goingInCapText: null })!;
+    expect(noNoi.checks[2].tone).toBe("stated");
+    expect(noNoi.checks[2].read).toContain("No going-in cap to set it against; the spread is the claim.");
   });
 
   it("a plan deal reads no going-in cap, whatever the extraction states", () => {
@@ -394,6 +402,10 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
     const exit = r?.checks.find((c) => c.key === "exit_cap");
     expect(exit?.tone).toBe("stated");
     expect(exit?.read).toContain("A plan deal has no going-in cap to set it against");
+    // Not even the one its figures would imply: a plan's NOI belongs over
+    // total cost, and the page shows none either.
+    const shown = modelVsMarketFor({ derived: deriveUnderwriteInputs(plan, "plan"), extraction: plan, storedAssetClass: "auto", metro: null, reads, goingInCapText: null });
+    expect(shown?.checks.find((c) => c.key === "exit_cap")?.read).toContain("A plan deal has no going-in cap to set it against");
   });
 
   it("reads the plan the first signal names, as the page does (the audit of 2026-09-30)", () => {
@@ -415,6 +427,97 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
     expect(exitOf(withSignal)?.read).toContain("A plan deal has no going-in cap to set it against");
     const without = modelVsMarketFor({ derived, extraction, storedAssetClass: "industrial", metro: null, reads });
     expect(exitOf(without)?.read).toContain("The going-in cap 6.00%");
+  });
+});
+
+describe("the going-in cap the documents imply where they state none", () => {
+  // A $20,000,000 price and a $1,500,000 NOI, no cap row: 7.50% going in.
+  // The model exits at its 6.00% default, 150 bps of compression the check
+  // had left unsaid ("No going-in cap to set it against").
+  const priced: ExtractionResult = {
+    dealName: "Elm Court",
+    assetClass: "multifamily",
+    market: "Washington, DC",
+    address: "100 Elm St NW, Washington, DC",
+    metrics: [
+      { label: "Asking price", value: "$20,000,000", flagged: false, page: "p. 3" },
+      { label: "Net operating income (T-12)", value: "$1,500,000", flagged: false, page: "p. 9" },
+      { label: "Units", value: "80", flagged: false, page: "p. 2" },
+    ],
+  };
+  const derived = deriveUnderwriteInputs(priced, priced.dealName!);
+  const reads = { rates, zori, national, now: FIXTURE_NOW };
+  const exitOf = (r: ReturnType<typeof modelVsMarketFor>) => r?.checks.find((c) => c.key === "exit_cap");
+
+  it("reads the OM's NOI over its price, on the page, the report and the workbook alike, and names the compression the default exit runs", () => {
+    expect(derived.inputs.exitCapPct).toBe(0.06);
+    expect(derived.sources.exitCapPct?.provenance).toBe("assumption");
+    expect(impliedGoingInCap(priced)).toEqual({ pct: 7.5, whole: false });
+    const metro = { id: "dc", name: "Washington DC" };
+    for (const exit of [
+      // the report's and the workbook's call: no cap text, the extraction's own
+      exitOf(modelVsMarketFor({ derived, extraction: priced, storedAssetClass: "auto", metro, reads })),
+      // the deal page's call: its summary bar shows no cap
+      exitOf(modelVsMarketFor({ derived, extraction: priced, storedAssetClass: "auto", metro, reads, goingInCapText: null })),
+    ]) {
+      expect(exit?.modelSource).toBe("a screening default");
+      expect(exit?.tone).toBe("compresses");
+      expect(exit?.read).toContain(
+        "The exit cap 6.00% is 106 bps over today's 10-year (4.94%, Sep 17, 2026; FRED). The going-in cap implied by the OM's NOI over its price, 7.50%, is 256 bps over it, so the exit assumes the spread narrows 150 bps with the 10-year where it is today. Cap compression is not a plan",
+      );
+      expect(exit?.read).not.toContain("No going-in cap");
+    }
+  });
+
+  it("a stated cap wins, and is said as the stated one", () => {
+    const stated: ExtractionResult = { ...priced, metrics: [...priced.metrics, { label: "Going-in cap rate", value: "7.0%", flagged: false, page: "p. 3" }] };
+    const exit = exitOf(modelVsMarketFor({ derived: deriveUnderwriteInputs(stated, "x"), extraction: stated, storedAssetClass: "auto", metro: null, reads }));
+    expect(exit?.read).toContain("The going-in cap 7.00% is 206 bps over it");
+    expect(exit?.read).not.toContain("implied");
+  });
+
+  it("grosses a share's price up to the whole and says so; a note and a leased fee imply none", () => {
+    const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+    const share: ExtractionResult = { ...priced, interest: { ...blank, kind: "partial_interest", share: "50% limited partnership interest" } };
+    // $1.5M over the $40M whole the $20M half implies.
+    expect(impliedGoingInCap(share)).toEqual({ pct: 3.75, whole: true });
+    const shareExit = exitOf(modelVsMarketFor({ derived: deriveUnderwriteInputs(share, "x"), extraction: share, storedAssetClass: "auto", metro: null, reads }));
+    expect(shareExit?.read).toContain("The going-in cap implied by the OM's NOI over the whole price its share implies, 3.75%,");
+    // A share with no stated percentage, a note (a loan's price) and a
+    // leased fee (the land's): no building price, so no cap on it.
+    for (const interest of [
+      { ...blank, kind: "partial_interest" as const, share: "a majority interest" },
+      { ...blank, kind: "note" as const },
+      { ...blank, kind: "leased_fee" as const },
+    ]) {
+      const ex: ExtractionResult = { ...priced, interest };
+      expect(impliedGoingInCap(ex), interest.kind).toBeNull();
+      expect(exitOf(modelVsMarketFor({ derived: deriveUnderwriteInputs(ex, "x"), extraction: ex, storedAssetClass: "auto", metro: null, reads }))?.tone, interest.kind).toBe("stated");
+    }
+  });
+
+  it("reads none where the NOI is no going-in figure on the price, or a figure is missing", () => {
+    const withNoi = (value: string): ExtractionResult => ({
+      ...priced,
+      metrics: priced.metrics.map((m) => (/net operating income/i.test(m.label) ? { ...m, value } : m)),
+    });
+    // 30% of the price is past the ceiling a cap can be: a misread or a pro forma.
+    expect(impliedGoingInCap(withNoi("$6,000,000"))).toBeNull();
+    expect(impliedGoingInCap(withNoi("$0"))).toBeNull();
+    expect(impliedGoingInCap({ ...priced, metrics: priced.metrics.filter((m) => !/price/i.test(m.label)) })).toBeNull();
+    expect(impliedGoingInCap(null)).toBeNull();
+    // A stabilized pro forma is not today's income: it implies no going-in cap.
+    const proForma: ExtractionResult = {
+      ...priced,
+      metrics: priced.metrics.map((m) => (/net operating income/i.test(m.label) ? { ...m, label: "NOI (stabilized, pro forma)" } : m)),
+    };
+    expect(impliedGoingInCap(proForma)).toBeNull();
+    // A price stated as a range is read at its top, as every price reader reads it.
+    const ranged: ExtractionResult = {
+      ...priced,
+      metrics: priced.metrics.map((m) => (/price/i.test(m.label) ? { ...m, value: "$18,000,000 – $20,000,000" } : m)),
+    };
+    expect(impliedGoingInCap(ranged)).toEqual({ pct: 7.5, whole: false });
   });
 });
 

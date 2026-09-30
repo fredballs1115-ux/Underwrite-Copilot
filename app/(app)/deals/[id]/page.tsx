@@ -848,8 +848,9 @@ export default async function DealPage({
   // today's 10-year beside the going-in cap's — the same reads as above,
   // the memorandum's stated cap (the summary bar's, save on a note, whose
   // bar withholds it while the model runs the collateral as if bought
-  // outright), no model call. Null where there is no model or nothing fresh
-  // to read it against.
+  // outright); where it states none, the cap its NOI implies on its price,
+  // said as such (none on a note, whose price is a loan's); no model call.
+  // Null where there is no model or nothing fresh to read it against.
   const modelRead: ModelVsMarket | null =
     derived && reads
       ? modelVsMarketFor({
