@@ -1125,7 +1125,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   card, itself a link, keeps its corner text, and the page carries one
   linked line under the cards. Served by `app/api/imagery/skyline/[id]`
   (proxied, validated by content-type, cached immutable, 404 on any
-  failure). `app/city-photo.tsx` (`CityPhoto`) is the one component every
+  failure) at `SKYLINE_WIDTHS` alone, the overhead route at `METRO_FRAMES`
+  alone — any other size snaps to the nearest, so a public URL cannot make
+  a process fetch and hold a frame per width — each fetch shared by the
+  requests that ask at once and gated (`COMMONS_IN_FLIGHT`,
+  `OVERHEAD_IN_FLIGHT`), the link-preview cards bounded too. `app/city-photo.tsx` (`CityPhoto`) is the one component every
   market surface draws through: skyline first, the USGS overhead as the
   floor, and **the credit follows whichever picture actually rendered** —
   that is why the fallback is in the component and not the route, because
@@ -1766,8 +1770,16 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   beats a benchmark — and only a rate a document states is a quote: the
   first-draft model carries a rate whatever the documents say, so the
   sizer takes it only where `statedModelRate` (lib/model/stated-rate)
-  finds its rate metric won by a document, never a market norm, 2026-09-30;
-  a note's or a leased fee's price seeds no property loan), and the
+  finds the metric that IS the loan's rate — a rate or a coupon, never a
+  tax rate, a fee, a cap, growth or vacancy — carrying the rate the model
+  runs on and won by a loan's own paper: a term sheet, a lender's quote, a
+  commitment, the loan's documents, an assumable loan as stated. Never a
+  feed, a norm or an assumption, however the reconciliation filed it. The
+  rule is positive (2026-09-30): a list of words for "assumed" missed an
+  authority of "FRED" over "5-yr Treasury 4.78% + 200 bps" and refused a
+  real quote over "Treasury + 185 bps"; the sizer's base row says
+  "(entered)", never "(today)". A note's or a leased fee's price seeds no
+  property loan), and the
   construction panel starts from SOFR + 350
   instead of a flat 8%. **A benchmark is not a quote** holds here as on
   `/tools`: only a `contractRate` series that is fresh and plausible seeds
@@ -4284,8 +4296,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   estate prices against a year ago, a "Capital markets —" line said as
   the nation's, a trailing year, not this market's and not a cap rate,
   and the clause sets an exit value that leans on prices rising against
-  it. **A deal with a plan reads what building costs** (2026-09-30,
-  `CONSTRUCTION_COST_IDS`): the BLS producer price index for the goods
+  it. **A deal that builds something reads what building costs**
+  (2026-09-30, `CONSTRUCTION_COST_IDS`, gated by `buildsSomething` in
+  lib/deal-strategy: a development, a conversion, or a value-add that
+  states its budget — a lease-up is a plan with nothing to build and reads
+  neither line, though it keeps the construction lending standards, which
+  `plan` gates): the BLS producer price index for the goods
   that go into residential or nonresidential construction, by the class
   being built, and construction's average hourly earnings, each against a
   year ago — series the strip already carried, verified when they joined
@@ -4371,7 +4387,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   is the boundary; never call the client directly, and mint paths with the
   helpers there. Migration 0034 asserts the same shapes at the row.
   `lib/rls-policies.test.ts` lints the migrations: no write policy may be a
-  bare `true` without a column grant behind it. **A page never signs a
+  bare `true` without a column grant behind it; every table turns
+  row-level security on in the file that creates it; every SECURITY
+  DEFINER function pins its `search_path`, and no signed-out caller may
+  run one unless it is listed as deliberate — Postgres grants EXECUTE to
+  PUBLIC and Supabase's defaults grant it to anon by name, so a revoke
+  names both; and 0036's write guards stay in place (the free-deal cap on
+  insert and on the updates that could dodge it, a share link's token the
+  database's and its expiry clamped, a job's `created_at` the database's
+  clock, `deals.qa` append-only). **A regulatory alert's dismissal is the
+  reader's own** (`lib/dismissed-alerts.ts`, a cookie of up to 50 ids for
+  a year, alerts inside `ALERT_WINDOW_DAYS`): the banner's Dismiss had
+  written the shared row's `dismissed_at`, so one customer dismissing an
+  alert hid it from every other. **A page never signs a
   link at render** (#479): a signed URL lasts an hour, so a page left open
   handed the reader the storage host's expiry error. The OM opens through
   `/api/deals/[id]/om` (`lib/om-link`), and a file added with a note, a
@@ -4434,6 +4462,11 @@ whose move each item is. **As of 2026-09-16 every migration through 0035 is
 run and verified** (`supabase/CHECK_MIGRATIONS.sql` reported them all ✅), so
 the four LPC pages, the cost ledger and the site-flag card are live rather
 than inert — the long-standing "blocked on migrations" caveat is retired.
+**0036 (security hardening, 2026-09-30) is drafted and is the owner's to
+run**: until it runs, the public anon key can call the two public-record
+RPCs, a share link minted through PostgREST keeps the expiry and token its
+minter chose, and the free-deal cap can be dodged by an update; the app's
+own writes pass it unchanged, and `CHECK_MIGRATIONS.sql` checks it.
 What remains is seeding and the operator's own accounts, not schema.
 
 ## Agents
