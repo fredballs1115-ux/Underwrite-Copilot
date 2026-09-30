@@ -23,6 +23,7 @@ import { buildSensitivityData, pageBaseLevers } from "@/lib/underwrite/report-gr
 import { bidFloors, fmtBid, solveMaxBid } from "@/lib/underwrite/solver";
 import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { buildPlanReport } from "@/lib/plan-sensitivity";
+import { challengerInstruction } from "@/lib/anthropic/prompts";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
@@ -218,6 +219,29 @@ describe("ReportDocument (full report)", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+
+  it("says the challenges run most severe first, the order the challenger is asked for, never the order deals die", async () => {
+    // The prompt's own order, so the subtitle cannot drift from it again.
+    expect(challengerInstruction("multifamily")).toContain("Give 3–6 challenges, most severe first.");
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const text = pdfTextOf(
+      await renderToBuffer(
+        React.createElement(ReportDocument, { input: buildReportData(deal, "September 30, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0],
+      ),
+    ).replace(/\s+/g, " ");
+    expect(text).toContain("The pro forma's assumptions, challenged most severe first, each with the exact question to put to the broker.");
+    expect(text).not.toContain("in the order deals die");
+  }, 45000);
 
   it("prints the call in full after the memo: the whole rationale, every risk and step, each range's source, basis and confidence", async () => {
     const reason =

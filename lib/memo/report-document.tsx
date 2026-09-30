@@ -1836,8 +1836,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           dealName={dealName}
           branding={memo.branding}
         >
+          {/* The challenger is asked for its challenges most severe first
+              (lib/anthropic/prompts), so that is the order the page says. */}
           <Text style={s.sub}>
-            The pro forma grilled in the order deals die — basis, exit, debt —
+            The pro forma&apos;s assumptions, challenged most severe first,
             each with the exact question to put to the broker.
           </Text>
           {chList.map((c, i) => (
