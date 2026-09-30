@@ -352,6 +352,22 @@ function buildCover(
       r++;
     }
   }
+  // A value-add renovation program (#460): the program, then what a door
+  // is worth at this model's exit cap and the premium the model does not
+  // carry.
+  if (meta.valueAdd) {
+    fact("The value-add program", meta.valueAdd.line);
+    ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r - 1).height = 40;
+    if (meta.valueAdd.read) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.valueAdd.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 64;
+      r++;
+    }
+  }
   // How the property is sold (#456): an auction's bid, premium, reserve
   // and deadline, then the most this model pays all-in at the screening
   // hurdle, backed out of the premium.

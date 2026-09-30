@@ -9,6 +9,7 @@ import { singleTenantTag } from "@/lib/single-tenant";
 import { hotelTag } from "@/lib/hotel-deal";
 import { saleTag } from "@/lib/sale-terms";
 import { rosterTag } from "@/lib/tenant-roster";
+import { valueAddTag } from "@/lib/value-add";
 import { getTeam } from "@/lib/teams";
 import { getActiveBranding } from "@/lib/branding-server";
 import {
@@ -143,6 +144,7 @@ export async function GET(req: Request) {
       hotel: hotelTag(extraction),
       sale: saleTag(extraction),
       roster: rosterTag(extraction),
+      valueAdd: valueAddTag(extraction),
       cap: plan ? null : (findGoingInCap(metrics)?.value ?? null),
       yieldOnCost:
         plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,

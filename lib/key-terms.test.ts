@@ -143,6 +143,24 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
     expect(keyTermRows(center, "stabilized", 2).map((m) => m.label)).toEqual(["Asking price", "WALT"]);
   });
 
+  it("a value-add program's doors, cost, premium and achieved premium lead after the price (#460)", () => {
+    const program = [
+      { label: "Occupancy", value: "94%", flagged: false },
+      { label: "Achieved renovation premium", value: "$235", flagged: false },
+      { label: "Renovation premium", value: "$250", flagged: false },
+      { label: "Renovation cost per unit", value: "$15,000", flagged: false },
+      { label: "Units to renovate", value: "192", flagged: false },
+      { label: "Asking price", value: "$48,000,000", flagged: false },
+    ];
+    expect(keyTermRows(program, "stabilized", 5).map((m) => m.label)).toEqual([
+      "Asking price",
+      "Units to renovate",
+      "Renovation cost per unit",
+      "Renovation premium",
+      "Achieved renovation premium",
+    ]);
+  });
+
   it("drops rows that are not objects, never repeats a row, and honours the limit", () => {
     const rows = keyTermRows([null, ...conversion, undefined, conversion[4]], "conversion", 3);
     expect(rows).toHaveLength(3);

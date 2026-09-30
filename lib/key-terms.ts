@@ -23,6 +23,7 @@ import { singleTenantTermRows } from "./single-tenant";
 import { hotelTermRows } from "./hotel-deal";
 import { saleTermRows } from "./sale-terms";
 import { rosterTermRows } from "./tenant-roster";
+import { valueAddTermRows } from "./value-add";
 
 export interface KeyTermMetric {
   label: string;
@@ -85,6 +86,9 @@ export function keyTermRows<M extends KeyTermMetric>(
   // A multi-tenant property's quoted WALT (#457), which the deal page reads
   // against the listed tenants' own term.
   for (const row of rosterTermRows(rows)) lead(row);
+  // A renovation program's unit economics (#460): the doors, the cost of a
+  // door, the premium and the premium already achieved.
+  for (const row of valueAddTermRows(rows)) lead(row);
   // What a hotel is sold with (#455): the PIP, the flag's end, RevPAR.
   for (const row of hotelTermRows(rows)) lead(row);
   const rest = rows.filter((m) => !head.includes(m));

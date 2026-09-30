@@ -16,11 +16,13 @@ import { SingleTenantPanel } from "@/app/single-tenant-panel";
 import { HotelPanel } from "@/app/hotel-panel";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
+import { ValueAddPanel } from "@/app/value-add-panel";
 import { readAffordable } from "@/lib/affordable";
 import { readSingleTenant } from "@/lib/single-tenant";
 import { readHotelDeal } from "@/lib/hotel-deal";
 import { readSale } from "@/lib/sale-terms";
 import { readRoster } from "@/lib/tenant-roster";
+import { readValueAdd } from "@/lib/value-add";
 import { SALE_HURDLE_PCT, saleCeiling } from "@/lib/sale-ceiling";
 import { withArticle } from "@/lib/article";
 import { interestTag, readInterest } from "@/lib/interest";
@@ -1185,6 +1187,15 @@ export default async function DealPage({
             leases with an anchor outside the sale drawn apart, and each
             tenant's end and rights. */}
         <RosterPanel roster={readRoster(extraction)} modelLine={derived?.meta.roster?.read ?? ""} />
+        {/* A value-add renovation program (#460): the doors done and to
+            go, the premium priced on against the one achieved with the
+            break-even at the model's exit cap, and the pace the period
+            asks of turnover. */}
+        <ValueAddPanel
+          program={readValueAdd(extraction)}
+          exitCapPct={derived ? derived.inputs.exitCapPct : null}
+          modelLine={derived?.meta.valueAdd?.read ?? ""}
+        />
         {/* What a hotel is sold with (#455): the flag, the manager, the
             encumbrance and the PIP — the basis a key with the PIP on top,
             the agreements' clocks against the model's sale, the rooms. */}

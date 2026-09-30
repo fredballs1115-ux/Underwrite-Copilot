@@ -292,6 +292,37 @@ describe("MemoDocument (redesigned)", () => {
     expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).rosterLine).toBe("");
   }, 30000);
 
+  it("says a value-add program under the title (#460), and nothing on the sample", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Units to renovate", value: "192", flagged: false, page: "", basis: "na" },
+        { label: "Renovation cost per unit", value: "$15,000", flagged: false, page: "", basis: "na" },
+        { label: "Renovation premium", value: "$250", flagged: false, page: "", basis: "na" },
+        { label: "Achieved renovation premium", value: "$235", flagged: false, page: "", basis: "na" },
+      ],
+    };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "September 30, 2026", []);
+    expect(data.valueAddLine).toBe("Value-add program: 192 doors to renovate; $15,000 a door; $250 a month premium (20% on cost); $235 achieved on renovated units");
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Value-add program: 192 doors to renovate");
+    expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).valueAddLine).toBe("");
+  }, 30000);
+
   it("says how the property is sold under the title (#456), and nothing on the sample", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

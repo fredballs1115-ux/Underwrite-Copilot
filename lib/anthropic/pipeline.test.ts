@@ -740,6 +740,26 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("a value-add program: the challenger reads the program and the value-add traps (#460)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      strategy: { kind: "value_add", summary: "", capitalBudget: "", timeline: "" },
+      metrics: [
+        ...EXTRACTION.metrics,
+        { label: "Units to renovate", value: "192", flagged: false, page: "", basis: "na" },
+        { label: "Renovation cost per unit", value: "$15,000", flagged: false, page: "", basis: "na" },
+        { label: "Renovation premium", value: "$250", flagged: false, page: "", basis: "na" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("The renovation program: The program renovates 192 doors");
+    expect(note).toContain("VALUE-ADD TRAPS, checked by name");
+    expect(note).toContain("(b) THE PREMIUM IS TWO NUMBERS");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
   it("a single-market deal stores no other markets' figures", async () => {
     state.deals.d1.address = { city: "Washington", state: "DC" };
     state.rates = [{ series_id: "WASH911URN", obs_date: "2026-07-01", value: 3.4 }];

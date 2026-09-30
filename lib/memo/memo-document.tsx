@@ -35,6 +35,7 @@ import { readSingleTenant, singleTenantShortLine } from "@/lib/single-tenant";
 import { hotelShortLine, readHotelDeal } from "@/lib/hotel-deal";
 import { readSale, saleShortLine } from "@/lib/sale-terms";
 import { readRoster, rosterShortLine } from "@/lib/tenant-roster";
+import { readValueAdd, valueAddShortLine } from "@/lib/value-add";
 import { floodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -152,6 +153,14 @@ function rosterLineFor(extraction: ExtractionResult | null): string {
   return r ? rosterShortLine(r) : "";
 }
 
+/** A value-add renovation program (lib/value-add, #460), in one line for
+ *  the memo's header: the doors, the cost of a door, the premium and
+ *  whether it is proven. "" where the memorandum states none. */
+function valueAddLineFor(extraction: ExtractionResult | null): string {
+  const r = readValueAdd(extraction);
+  return r ? valueAddShortLine(r) : "";
+}
+
 /** How the property is sold (lib/sale-terms, #456), in one line for the
  *  memo's header: the auction's bid, premium, reserve and deadline, or who
  *  is selling. "" on a negotiated sale. */
@@ -205,6 +214,9 @@ export type MemoData = {
   /** a multi-tenant property's listed tenants (lib/tenant-roster, #457),
    *  in one line; "" where fewer than two are listed */
   rosterLine?: string;
+  /** a value-add renovation program (lib/value-add, #460), in one line; ""
+   *  where none is stated */
+  valueAddLine?: string;
   /** FEMA's flood zone at the building (lib/site-flags `floodShortLine`,
    *  #426) — a Special Flood Hazard Area or a drawn hazard; "" for minimal
    *  hazard, no digital map or a lookup that has not answered */
@@ -454,6 +466,7 @@ export function buildMemoData(
     hotelLine: pdfSafe(hotelLineFor(extraction ?? null)),
     saleLine: pdfSafe(saleLineFor(extraction ?? null)),
     rosterLine: pdfSafe(rosterLineFor(extraction ?? null)),
+    valueAddLine: pdfSafe(valueAddLineFor(extraction ?? null)),
     floodLine: pdfSafe(floodLineFor(deal)),
     dateStr,
     verdictWord: vmeta?.word ?? null,
@@ -909,6 +922,9 @@ export function MemoPage({ data }: { data: MemoData }) {
             {/* A multi-tenant property's listed tenants (#457): the roll
                 before the sale, the anchors in and out of it. */}
             {data.rosterLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.rosterLine}</Text>}
+            {/* A value-add renovation program (#460): the doors, the cost
+                of a door, the premium and its proof. */}
+            {data.valueAddLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.valueAddLine}</Text>}
             {/* What a hotel is sold with (#455): the flag, the encumbrance,
                 the PIP and the franchise's end. */}
             {data.hotelLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.hotelLine}</Text>}

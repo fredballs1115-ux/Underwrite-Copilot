@@ -13,6 +13,8 @@ import {
   planSummary,
   plausibilityNote,
   priceRowIsLand,
+  renovationCostPerDoor,
+  renovationProgramBudget,
   timelineFromMetrics,
 } from "./deal-strategy";
 import { parseMoney } from "./criteria";
@@ -249,6 +251,63 @@ describe("planSummary / capitalBudgetFromMetrics", () => {
     expect(capitalBudgetFromMetrics([metric("Construction budget", "$900,000,000")], 30_000_000)).toBeNull();
     expect(capitalBudgetFromMetrics([metric("Total project cost", "$15M")], 20_000_000)).toBeNull(); // below the price
     expect(capitalBudgetFromMetrics([metric("Construction budget", "—")], 20_000_000)).toBeNull();
+  });
+});
+
+describe("renovationProgramBudget — a value-add program stated a door at a time (#460)", () => {
+  const VALUE_ADD = (extra: ExtractedMetric[] = [], kind: "value_add" | "stabilized" = "value_add") =>
+    ex(
+      [
+        metric("Asking price", "$48,000,000", { basis: "na", page: "p. 3" }),
+        metric("NOI (in-place)", "$2,500,000", { basis: "in_place" }),
+        metric("NOI (stabilized, pro forma)", "$3,100,000", { basis: "pro_forma", page: "p. 20" }),
+        metric("Units", "248", { basis: "na" }),
+        metric("Units to renovate", "192", { page: "p. 14" }),
+        metric("Renovation cost per unit", "$15,000", { page: "p. 14" }),
+        ...extra,
+      ],
+      { strategy: { kind, summary: "", capitalBudget: "", timeline: "" } },
+    );
+
+  it("the plan's budget is the doors times a door's cost, derived and labelled with the arithmetic", () => {
+    const p = planSummary(VALUE_ADD())!;
+    expect(p.budget).toEqual({
+      budget: 2_880_000,
+      allIn: false,
+      program: true,
+      label: "192 doors × $15,000 a door, the renovation program as stated",
+      page: "p. 14",
+    });
+    expect(p.totalCost).toBe(50_880_000);
+    expect(p.yieldOnCost).toBeCloseTo(3_100_000 / 50_880_000, 6);
+    // The challenger's plan line prints the arithmetic, never a stated figure.
+    expect(plausibilityNote([], inferStrategy(VALUE_ADD()), p)).toContain(
+      "$2.9M (192 doors × $15,000 a door, the renovation program as stated)",
+    );
+  });
+
+  it("a total the memorandum states wins, and is never added to the program", () => {
+    const p = planSummary(VALUE_ADD([metric("Renovation budget", "$4,000,000", { page: "p. 15" })]))!;
+    expect(p.budget).toMatchObject({ budget: 4_000_000, label: "Renovation budget" });
+    expect(p.budget?.program).toBeUndefined();
+    expect(p.totalCost).toBe(52_000_000);
+  });
+
+  it("no budget from a range, a total typed into the per-door row, one row alone, or a deal that is not a value-add", () => {
+    const without = (label: string) => VALUE_ADD().metrics.filter((m) => m.label !== label);
+    expect(renovationCostPerDoor("$12,000 - $15,000")).toBeNull();
+    expect(renovationCostPerDoor("$12,000–$15,000")).toBeNull();
+    expect(renovationCostPerDoor("$2,880,000")).toBeNull();
+    expect(renovationCostPerDoor("$15k per unit")).toBe(15_000);
+    expect(renovationProgramBudget(without("Units to renovate"), 48_000_000)).toBeNull();
+    expect(renovationProgramBudget(without("Renovation cost per unit"), 48_000_000)).toBeNull();
+    // An interior line that states no "per unit" is not a door's cost.
+    expect(
+      renovationProgramBudget([metric("Units to renovate", "192"), metric("Interior upgrade cost", "$2,000,000")], 48_000_000),
+    ).toBeNull();
+    // A deal the memorandum calls stabilized keeps its program as an
+    // option: the plan and its budget are a value-add's alone.
+    expect(planSummary(VALUE_ADD([], "stabilized"))).toBeNull();
   });
 });
 

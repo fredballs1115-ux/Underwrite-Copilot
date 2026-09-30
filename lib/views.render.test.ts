@@ -79,7 +79,8 @@ const card = (over: Partial<DealCard> & Pick<DealCard, "id" | "name">): DealCard
 });
 
 const CARDS: DealCard[] = [
-  card({ id: "a", name: "The Maddox at Brewerytown", verdict: "caution", stage: "underwriting", fit: "near", score: 71, mandateVerdict: "WATCH", slots: { cap: "5.6%", price: "$68,000,000", yoc: null }, offersDue: "2026-09-30" }),
+  // A renovation program stated a door at a time (#460).
+  card({ id: "a", name: "The Maddox at Brewerytown", verdict: "caution", stage: "underwriting", fit: "near", score: 71, mandateVerdict: "WATCH", slots: { cap: "5.6%", price: "$68,000,000", yoc: null, valueAdd: "Reno $250/mo, 20% on cost" }, offersDue: "2026-09-30" }),
   card({ id: "b", name: "1400 Market — office to residential", verdict: "pass", stage: "loi", fit: "fits", score: 88, mandateVerdict: "PURSUE", slots: { cap: null, price: "$20,000,000", yoc: "11.7%" }, market: "Center City, Philadelphia, PA", coveredMarket: "Philadelphia" }),
   // Frisco names no place the Dallas market's list knows: its county placed it (#447).
   card({ id: "c", name: "Riverbend Site — 240 units", verdict: "pass", stage: "screening", fit: "outside", score: 42, mandateVerdict: "PASS", slots: { cap: null, price: "$4,000,000", yoc: "7.2%" }, market: "Frisco, TX", coveredMarket: null, readMarket: "Dallas–Fort Worth", readCounty: "Collin County, TX" }),
@@ -246,6 +247,10 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // sale, and the rent rolling before the model's.
     expect((text.match(/Shadow-anchored, 56% rolls in 5 yrs/g) ?? []).length).toBe(4);
     expect(html).toContain("Shadow-anchored, 56% rolls in 5 yrs: the listed tenants against the model&#x27;s sale");
+    // A renovation program, at every width too (#460): the premium and
+    // the memorandum's own return on cost.
+    expect((text.match(/Reno \$250\/mo, 20% on cost/g) ?? []).length).toBe(4);
+    expect(html).toContain("Reno $250/mo, 20% on cost: the renovation program as stated");
   });
 
   it("draws the pipeline as photograph-led cards by default: the building's picture, the call over it, the three figures (#428)", () => {
@@ -365,6 +370,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect((text.match(/Mgmt encumbered, PIP \$35k\/key/g) ?? []).length).toBe(1);
     expect((text.match(/Auction, 5% premium/g) ?? []).length).toBe(1);
     expect((text.match(/Shadow-anchored, 56% rolls in 5 yrs/g) ?? []).length).toBe(1);
+    expect((text.match(/Reno \$250\/mo, 20% on cost/g) ?? []).length).toBe(1);
     // The three figures a pipeline is read by; a plan deal's yield on cost
     // takes the cap's slot under its own label.
     expect(text).toContain("$68.0M");
@@ -5455,5 +5461,114 @@ describe("ShareView — a multi-tenant property's listed tenants, under the titl
     expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, assetClass: SAMPLE_DEAL.asset_class, extraction: SAMPLE_DEAL.extraction }))).not.toContain(
       "roster-panel",
     );
+  });
+});
+
+// ── A value-add renovation program (#460) ─────────────────────────────────
+import { ValueAddPanel } from "@/app/value-add-panel";
+import { readValueAdd, valueAddModelLine } from "@/lib/value-add";
+
+describe("ValueAddPanel — the doors, the premium against its break-even, and the pace, drawn", () => {
+  const row = (label: string, value: string, page = "p. 14") => ({ label, value, flagged: false, page, basis: "na" as const });
+  const program = (metrics?: ReturnType<typeof row>[]) =>
+    ({
+      dealName: "The Parkline",
+      assetClass: "multifamily",
+      totalPages: 40,
+      strategy: { kind: "value_add", summary: "", capitalBudget: "", timeline: "" },
+      metrics: metrics ?? [
+        row("Units", "248", "p. 2"),
+        row("Units to renovate", "192"),
+        row("Units renovated", "56"),
+        row("Renovation cost per unit", "$15,000"),
+        row("Renovation premium", "$250/month"),
+        row("Achieved renovation premium", "$235"),
+        row("Annual turnover", "45%"),
+        row("Renovation period", "24 months"),
+      ],
+    }) as unknown as ExtractionResult;
+
+  it("draws the doors done and to go, the premium priced on and achieved with the break-even at the exit cap, and the pace against the building's turnover", () => {
+    const r = readValueAdd(program())!;
+    const modelLine = valueAddModelLine(r, { holdMonths: 60, exitCapPct: 0.055, capitalYr1: 2_880_000, rentGrowthPct: 0.03 });
+    const html = render(React.createElement(ValueAddPanel, { program: r, exitCapPct: 0.055, modelLine }));
+    dumpView("value-add-panel", html);
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="value-add-panel"');
+    expect(text).toContain("Value-add program");
+    expect(text).toContain("20% on cost");
+    expect(text).toContain("Premium proven on renovated units");
+    // The doors: one bar, the done filled and the rest light.
+    expect(text).toContain("248 in the program");
+    expect(text).toContain("56 renovated");
+    expect(text).toContain("192 to renovate");
+    expect(html.match(/data-bar="va-done"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="va-left"/g)).toHaveLength(1);
+    // The premium: priced on and achieved on one scale, the break-even a
+    // tick on each.
+    expect(html.match(/data-bar="va-premium"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="va-achieved"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="va-breakeven"/g)).toHaveLength(2);
+    expect(text).toContain("$250");
+    expect(text).toContain("$235");
+    expect(text).toContain("The line is the premium that breaks even at the model's 5.50% exit cap, $68.75");
+    // The pace: the share the period needs against the building's own.
+    expect(html.match(/data-bar="va-needed"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="va-turnover"/g)).toHaveLength(1);
+    expect(text).toContain("For 24 months");
+    expect(text).toContain("50%");
+    expect(text).toContain("45%");
+    expect(text).toContain("at that pace the program takes 2.2 years");
+    expect(text).toContain("the premium is in none of its returns");
+    expect(a11yIssues(html), "value-add panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("an unproven premium is named, no model means no tick, and nothing without a program", () => {
+    const r = readValueAdd(program([row("Units to renovate", "120"), row("Renovation cost per unit", "$12,000"), row("Renovation premium", "$200")]))!;
+    const html = render(React.createElement(ValueAddPanel, { program: r }));
+    const text = visibleText(html);
+    expect(text).toContain("Premium not yet proven");
+    expect(text).toContain("No premium achieved on renovated units is stated");
+    expect(html).not.toContain('data-bar="va-breakeven"');
+    expect(html).not.toContain('data-bar="va-done"');
+    expect(html).not.toContain('data-bar="va-needed"');
+    expect(render(React.createElement(ValueAddPanel, { program: readValueAdd(program([row("Units", "248")])) }))).toBe(
+      render(React.createElement(React.Fragment)),
+    );
+  });
+});
+
+describe("ShareView — a value-add renovation program, under the title (#460)", () => {
+  it("draws the program and leads the key terms with the doors and the premium, and nothing on the sample", () => {
+    const withProgram = {
+      ...SAMPLE_DEAL.extraction,
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Units to renovate", value: "192", flagged: false, page: "", basis: "na" as const },
+        { label: "Renovation cost per unit", value: "$15,000", flagged: false, page: "", basis: "na" as const },
+        { label: "Renovation premium", value: "$250", flagged: false, page: "", basis: "na" as const },
+      ],
+    };
+    const props = {
+      dealName: SAMPLE_DEAL.name,
+      assetClass: SAMPLE_DEAL.asset_class,
+      expiresAt: "2026-09-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: withProgram }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="value-add-panel"');
+    expect(text).toContain("The program renovates 192 doors at $15,000 each for $250 a month more rent");
+    expect(text).toContain("Units to renovate");
+    // A plan deal now: its budget is the doors times a door's cost.
+    expect(text).toContain("Budget (doors × cost a door)");
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }))).not.toContain("value-add-panel");
   });
 });

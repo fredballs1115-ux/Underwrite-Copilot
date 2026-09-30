@@ -23,6 +23,7 @@ import { hotelModelLine, hotelShortLine, readHotelDeal } from "@/lib/hotel-deal"
 import { readSale, saleShortLine } from "@/lib/sale-terms";
 import { saleCeilingRead } from "@/lib/sale-ceiling";
 import { readRoster, rosterModelLine, rosterShortLine } from "@/lib/tenant-roster";
+import { readValueAdd, valueAddModelLine, valueAddShortLine } from "@/lib/value-add";
 import {
   buildingSfRow,
   findGoingInCap,
@@ -41,6 +42,7 @@ import {
   inferStrategy,
   isPlanDeal,
   noiFigures,
+  renovationProgramBudget,
   type StrategyKind,
   unitCountFromMetrics,
 } from "@/lib/deal-strategy";
@@ -128,6 +130,10 @@ export interface WorkbookMeta {
    *  roll — its leasing capital, its flat vacancy; absent where the
    *  memorandum lists fewer than two tenants */
   roster?: { line: string; read: string } | null;
+  /** a value-add renovation program (lib/value-add, #460): the program in
+   *  one line, then what a door is worth at this model's exit cap and the
+   *  premium the model does not carry; absent where none is stated */
+  valueAdd?: { line: string; read: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -268,6 +274,23 @@ function rosterMeta(extraction: ExtractionResult | null, inputs: UnderwriteInput
       tiPsf: inputs.tiPsf,
       lcPct: inputs.lcPct,
       vacancyPct: inputs.vacancyPct,
+    }),
+  };
+}
+
+/** The cover's lines about a value-add renovation program (#460): the
+ *  program, then its worth at this model's exit cap and what the model does
+ *  not carry of it. Null where the memorandum states no program. */
+function valueAddMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["valueAdd"] {
+  const r = readValueAdd(extraction);
+  if (!r) return null;
+  return {
+    line: valueAddShortLine(r),
+    read: valueAddModelLine(r, {
+      holdMonths: inputs.holdMonths,
+      exitCapPct: inputs.exitCapPct,
+      capitalYr1: inputs.capitalImprovementsYr1,
+      rentGrowthPct: inputs.rentGrowthPct,
     }),
   };
 }
@@ -518,9 +541,13 @@ export function deriveUnderwriteInputs(
   // Read against the STATED price only: a "total project cost" beside no
   // ask must not be thrown out as ten times a $10M placeholder. Against a
   // land price the ten-times bound does not apply at all.
+  // A value-add that states its program a door at a time and no total
+  // (#460) carries the doors times a door's cost — the plan's own budget,
+  // from lib/deal-strategy, so the model and the plan spend one figure.
   const budgetRead =
     capitalBudgetFromMetrics(metrics, statedPrice, !priceIsLand) ??
-    budgetFromText(extraction?.strategy?.capitalBudget, statedPrice, !priceIsLand);
+    budgetFromText(extraction?.strategy?.capitalBudget, statedPrice, !priceIsLand) ??
+    (strategy.kind === "value_add" ? renovationProgramBudget(metrics, statedPrice, !priceIsLand) : null);
   // A hotel's PIP (#455): the brand's required renovation is the buyer's
   // capital. Where the memorandum states a PIP and no other capital budget
   // the model carries it; where it states both, the budget is read as
@@ -681,7 +708,9 @@ export function deriveUnderwriteInputs(
   if (budgetRead) {
     mark(
       "capitalImprovementsYr1",
-      "extracted",
+      // The program's doors times a door's cost is two stated figures
+      // multiplied, not a figure the memorandum states.
+      budgetRead.program ? "derived" : "extracted",
       // sourceText() already prefixes "OM p. N —", so the note names the line.
       `${budgetRead.label}${
         budgetRead.allIn
@@ -744,6 +773,7 @@ export function deriveUnderwriteInputs(
       affordable: affordableMeta(extraction),
       singleTenant: singleTenantMeta(extraction, inputs),
       roster: rosterMeta(extraction, inputs),
+      valueAdd: valueAddMeta(extraction, inputs),
       sale: saleFloor ? { line: saleShortLine(saleFloor), read: saleCeilingRead(extraction, inputs) } : null,
       hotel: hotelRead
         ? {

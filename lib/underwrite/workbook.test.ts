@@ -853,6 +853,29 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The tenants")).toThrow();
   });
 
+  it("a value-add program (#460): the program, then what a door is worth and the premium the model does not carry", async () => {
+    const withProgram = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        strategy: { kind: "value_add", summary: "", capitalBudget: "", timeline: "" },
+        metrics: [
+          ...extraction.metrics,
+          { label: "Units to renovate", value: "192", flagged: false, page: "p. 14" },
+          { label: "Renovation cost per unit", value: "$15,000", flagged: false, page: "p. 14" },
+          { label: "Renovation premium", value: "$250", flagged: false, page: "p. 14" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(withProgram));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The value-add program");
+    expect(String(cover.getCell(r, 3).value)).toMatch(/^Value-add program: 192 doors to renovate; \$15,000 a door; \$250 a month premium \(20% on cost\)/);
+    expect(String(cover.getCell(r + 1, 3).value)).toContain("the premium breaks even at");
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The value-add program")).toThrow();
+  });
+
   it("an auction (#456): how it is sold, then the ceiling bid at the screening hurdle", async () => {
     const auction = deriveUnderwriteInputs(
       {

@@ -523,6 +523,49 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   tenant's `tenancy`), the memo under its title (`rosterShortLine`), the
   workbook's cover ("The tenants", `meta.roster`), the report's caveat and
   the compare table's Tenants row.
+- A value-add renovation program (#460): the extraction labels the
+  program's figures as rows of their own, each only as stated — "Units to
+  renovate", "Units renovated", "Renovation cost per unit", "Renovation
+  premium", "Achieved renovation premium", "Classic rent", "Renovated
+  rent", "Annual turnover", "Renovation period" — and `lib/value-add.ts`
+  (pure) reads them (`readValueAdd`; null unless the deal is a value-add or
+  states the doors beside a cost or a premium). Five rules: **the premium
+  is a claim until a door proves it** (an achieved premium is evidence, a
+  projected one a pro forma, and the panel's chip says which); **the return
+  on cost has no clock** (the premium a year over a door's cost — how many
+  doors are done by the sale is the pace's question); **the pace is set by
+  turnover** (a program of N months needs 12/N of the classic units to turn
+  each year, set against the building's own turnover where stated);
+  **the premium is worth its cap, less its cost** (`valueAddModelLine`: a
+  door's premium at the model's exit cap against its cost, and the
+  break-even premium, cost × cap / 12); **a blank is null**. The model is
+  not the plan: it grows today's rent at one rate, so its read (in
+  `meta.valueAdd`) says the premium is in none of its returns. **A program
+  stated a door at a time is the plan's budget** where the memorandum
+  states no total: `renovationProgramBudget` in `lib/deal-strategy.ts`
+  multiplies the doors by a door's cost (`renovationCostPerDoor`: a range
+  or a figure past `DOOR_COST_CEILING`, $250,000, is none) and marks it
+  `program` with the arithmetic as its label ("192 doors × $15,000 a door,
+  the renovation program as stated"), on a value-add only and never added
+  to a stated total. `planSummary` and the model's capital line read it
+  (provenance "derived"), so such a deal has a total cost — and, where the
+  memorandum states a stabilized NOI, a yield on cost and the report's
+  plan page — and the plan facts say "Budget (doors × cost a door)";
+  before, a value-add with a per-door program and no total had neither the
+  IRR page (omitted on a plan deal) nor the plan's. The two rows' patterns live in `lib/deal-strategy`
+  (`RENOVATION_DOORS_ROW`, `RENOVATION_COST_PER_DOOR_ROW`), since
+  `lib/value-add` imports from there. Where it shows: the deal context and
+  the challenger (`valueAddNote`: VALUE-ADD TRAPS (a)–(e)),
+  `app/value-add-panel.tsx` (`ValueAddPanel`, pure: `data-bar="va-done"` /
+  `va-left` the doors, `va-premium` / `va-achieved` the premium on one
+  scale with `va-breakeven` a tick at the model's exit cap, `va-needed` /
+  `va-turnover` the pace; the read's first sentence, the rest folded) on
+  the deal page and the shared screen, the key terms, the pipeline row,
+  card and CSV and the meeting workbook's price note (`valueAddTag`: "Reno
+  $250/mo, 20% on cost", its own `valueAdd` slot), the memo under its
+  title (`valueAddShortLine`), the workbook's cover ("The value-add
+  program", `meta.valueAdd`), the report's caveat and the compare table's
+  Value-add row.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`

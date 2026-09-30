@@ -27,7 +27,9 @@ export function planFacts(plan: PlanSummary, noun = "unit"): [string, string][] 
     // (#415) — says so rather than "not stated".
     [plan.priceLabel, plan.price != null ? moneyCompact(plan.price) : (plan.priceWithheld ?? "not stated")],
     [
-      plan.budget?.allIn ? "Budget (total cost less price)" : "Budget",
+      // A value-add's program stated a door at a time (#460): the budget is
+      // the doors times a door's cost, and the label says it was multiplied.
+      plan.budget?.allIn ? "Budget (total cost less price)" : plan.budget?.program ? "Budget (doors × cost a door)" : "Budget",
       // An all-in total with no price stated: the works are inside it and
       // cannot be split out — the total cost row carries the figure.
       plan.budget

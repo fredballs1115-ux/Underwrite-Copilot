@@ -158,6 +158,31 @@ describe("SharePlan — the plan on the shared screen", () => {
     expect(renderToStaticMarkup(React.createElement(SharePlan, { strategy, plan: null }))).toBe("");
   });
 
+  it("labels a value-add's budget as the doors times a door's cost, where that is what it is (#460)", () => {
+    const va: ExtractionResult = {
+      dealName: "The Parkline",
+      assetClass: "multifamily",
+      strategy: { kind: "value_add", summary: "", capitalBudget: "", timeline: "" },
+      metrics: [
+        { label: "Asking price", value: "$48,000,000", flagged: false, page: "p. 3" },
+        { label: "NOI (stabilized, pro forma)", value: "$3,100,000", flagged: false, page: "p. 20" },
+        { label: "Units to renovate", value: "192", flagged: false, page: "p. 14" },
+        { label: "Renovation cost per unit", value: "$15,000", flagged: false, page: "p. 14" },
+      ],
+    };
+    const vaStrategy = inferStrategy(va);
+    const vaPlan = planSummary(va, vaStrategy)!;
+    for (const html of [
+      renderToStaticMarkup(React.createElement(SharePlan, { strategy: vaStrategy, plan: vaPlan })),
+      renderToStaticMarkup(React.createElement(PlanStrip, { strategy: vaStrategy, plan: vaPlan })),
+    ]) {
+      expect(html).toContain("Budget (doors × cost a door)");
+      expect(html).toContain("$2.9M");
+      expect(html).toContain("$50.9M"); // total cost
+      expect(html).toContain("6.1%"); // yield on cost
+    }
+  });
+
   it("prints the same five facts as the deal page's plan strip", () => {
     const share = renderToStaticMarkup(React.createElement(SharePlan, { strategy, plan }));
     const strip = renderToStaticMarkup(React.createElement(PlanStrip, { strategy, plan }));
