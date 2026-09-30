@@ -1736,7 +1736,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   multifamily spread, a screening default — enter your quote". The seed
   rides in `meta.rateSeed` so the deal page's debt sizer starts where the
   workbook does (a loan the documents state still outranks it: a quote
-  beats a benchmark), and the construction panel starts from SOFR + 350
+  beats a benchmark — and only a rate a document states is a quote: the
+  first-draft model carries a rate whatever the documents say, so the
+  sizer takes it only where `statedModelRate` (lib/model/stated-rate)
+  finds its rate metric won by a document, never a market norm, 2026-09-30;
+  a note's or a leased fee's price seeds no property loan), and the
+  construction panel starts from SOFR + 350
   instead of a flat 8%. **A benchmark is not a quote** holds here as on
   `/tools`: only a `contractRate` series that is fresh and plausible seeds
   (`seedRate`), a stale table seeds nothing and every surface keeps its old
@@ -3832,6 +3837,17 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   page. `lib/flood-map.test.ts` drives the draw, the correction, the keep,
   the crop and the key against a faked network and bucket with real
   pixels; the report test reads the page back from the PDF.
+- The homepage's hero (2026-09-30): its words sit at the TOP of its band,
+  where the shared "band" scrim is clear, so it has a scrim of its own
+  (`scrim="hero"` in `app/place-band.tsx`). Below lg the photograph is a
+  strip across the top (`HERO_STRIP`, 18rem / 22rem) fading into the band,
+  and the words start at its foot (`HERO_WORDS_TOP`); from lg the words'
+  column is dark from the left (`HERO_SIDE_SCRIM`) and the photograph
+  shows across the sample card's side. Measured in Chromium over a pure
+  white frame, the headline had read 1.9:1 on a phone and 3.0:1 on a
+  laptop; every text box now reads 6:1 or better, and
+  `lib/place-band.contrast.test.ts` holds the strip to the words' start
+  and the column's tiers to the floor.
 - The homepage's photographs: `lib/photos.ts` (pure — the four slots with
   their file names, briefs, sizes and alt text; `presentPhotos` over an
   `exists` callback; `stripPhotos`; `HERO_AERIAL`) and `lib/photos-fs.ts`
