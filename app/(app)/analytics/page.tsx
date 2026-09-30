@@ -4,9 +4,12 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import {
   deriveAnalytics,
-  median,
   fmtUsdCompact,
+  middleRead,
+  middleText,
+  parsedPhrase,
   type AnalyticsRow,
+  type MiddleRead,
 } from "@/lib/analytics";
 import { STAGES, STAGE_LABEL, normalizeStage } from "@/lib/stages";
 import { isPlanDeal } from "@/lib/deal-strategy";
@@ -47,9 +50,12 @@ export default async function AnalyticsPage() {
   // project's, judged on yield on total cost — so they sit outside the cap
   // series and are counted, and read, on their own.
   const planDeals = deals.filter((d) => isPlanDeal(d.kind));
-  const medYoc = median(
+  // A median needs three figures (lib/public-comps' floor, through
+  // lib/analytics `middleRead`); one or two are said as what they are.
+  const yocRead = middleRead(
     planDeals.map((d) => d.yieldOnCostPct).filter((v): v is number => v != null),
   );
+  const yocText = middleText(yocRead, pct);
 
   const live = deals.filter((d) => d.stage !== "dead");
   const decided = deals.filter((d) => d.verdict !== null);
@@ -57,8 +63,8 @@ export default async function AnalyticsPage() {
     decided.length > 0
       ? (decided.filter((d) => d.verdict === "pass").length / decided.length) * 100
       : null;
-  const medCap = median(capPoints.map((p) => p.value));
-  const medUnit = median(unitPoints.map((p) => p.value));
+  const capRead = middleRead(capPoints.map((p) => p.value));
+  const unitRead = middleRead(unitPoints.map((p) => p.value));
 
   const funnel = STAGES.filter((s) => s !== "dead")
     .map((s) => ({
@@ -80,8 +86,8 @@ export default async function AnalyticsPage() {
     .map(([market, list]) => ({
       market,
       n: list.length,
-      medCap: median(list.map((d) => d.capPct).filter((v): v is number => v != null)),
-      medUnit: median(list.map((d) => d.perUnit).filter((v): v is number => v != null)),
+      cap: middleRead(list.map((d) => d.capPct).filter((v): v is number => v != null)),
+      unit: middleRead(list.map((d) => d.perUnit).filter((v): v is number => v != null)),
       go: list.filter((d) => d.verdict === "pass").length,
     }));
 
@@ -120,22 +126,22 @@ export default async function AnalyticsPage() {
             {[
               { label: "Deals screened", value: String(deals.length), sub: `${live.length} live · ${deadCount} dead` },
               {
-                label: "Median going-in cap",
-                value: medCap != null ? pct(medCap) : "—",
+                label: capRead.kind === "median" ? "Median going-in cap" : "Going-in cap",
+                value: middleText(capRead, pct) ?? "—",
                 sub:
                   planDeals.length > 0
-                    ? `${capPoints.length} parsed · ${planDeals.length} plan deal${planDeals.length === 1 ? "" : "s"} judged on yield on cost${medYoc != null ? ` (median ${pct(medYoc)})` : ""}`
-                    : `${capPoints.length} deals parsed`,
+                    ? `${capPoints.length} parsed · ${planDeals.length} plan deal${planDeals.length === 1 ? "" : "s"} judged on yield on cost${yocText != null ? ` (${yocRead.kind === "median" ? `median ${yocText}` : yocText})` : ""}`
+                    : parsedPhrase(capPoints.length),
               },
               {
-                label: "Median $/unit",
-                value: medUnit != null ? fmtUsdCompact(medUnit) : "—",
-                sub: `${unitPoints.length} deals parsed`,
+                label: unitRead.kind === "median" ? "Median $/unit" : "$/unit",
+                value: middleText(unitRead, fmtUsdCompact) ?? "—",
+                sub: parsedPhrase(unitPoints.length),
               },
               {
                 label: "Go rate",
                 value: goRate != null ? `${Math.round(goRate)}%` : "—",
-                sub: `${decided.length} verdicts`,
+                sub: `${decided.length} verdict${decided.length === 1 ? "" : "s"}`,
               },
             ].map((t) => (
               <div
@@ -216,8 +222,8 @@ export default async function AnalyticsPage() {
                     <tr className="border-b border-line text-left text-xs uppercase tracking-wider text-muted">
                       <th className="py-2 pr-3 font-medium">Market</th>
                       <th className="py-2 pr-3 text-right font-medium">Screens</th>
-                      <th className="py-2 pr-3 text-right font-medium">Median cap</th>
-                      <th className="py-2 pr-3 text-right font-medium">Median $/unit</th>
+                      <th className="py-2 pr-3 text-right font-medium">Cap</th>
+                      <th className="py-2 pr-3 text-right font-medium">$/unit</th>
                       <th className="py-2 text-right font-medium">Go calls</th>
                     </tr>
                   </thead>
@@ -229,10 +235,10 @@ export default async function AnalyticsPage() {
                         </td>
                         <td className="py-2 pr-3 text-right tabular-nums">{m.n}</td>
                         <td className="py-2 pr-3 text-right tabular-nums">
-                          {m.medCap != null ? pct(m.medCap) : "—"}
+                          <MiddleCell read={m.cap} fmt={pct} />
                         </td>
                         <td className="py-2 pr-3 text-right tabular-nums">
-                          {m.medUnit != null ? fmtUsdCompact(m.medUnit) : "—"}
+                          <MiddleCell read={m.unit} fmt={fmtUsdCompact} />
                         </td>
                         <td className="py-2 text-right tabular-nums">{m.go}</td>
                       </tr>
@@ -241,15 +247,31 @@ export default async function AnalyticsPage() {
                 </table>
               </div>
               <p className="mt-2 text-xs text-muted">
+                Each figure is the market&rsquo;s median from three deals up; a
+                market with one or two shows those deals&rsquo; own, marked.
                 Deals whose figures didn&rsquo;t parse are counted in Screens
-                but excluded from the medians.
+                but not in the figures.
                 {planDeals.length > 0 &&
-                  " Plan deals carry no going-in cap and sit outside the cap medians."}
+                  " Plan deals carry no going-in cap and sit outside the cap figures."}
               </p>
             </section>
           )}
         </>
       )}
     </div>
+  );
+}
+
+/** A market's cap or $/unit cell: its median from three deals, and under
+ *  that the deals' own figures, marked with how many there are. */
+function MiddleCell({ read, fmt }: { read: MiddleRead; fmt: (n: number) => string }) {
+  const text = middleText(read, fmt);
+  if (text == null) return <>—</>;
+  if (read.kind === "median") return <>{text}</>;
+  return (
+    <>
+      {text}{" "}
+      <span className="text-[11px] text-muted">{read.kind === "one" ? "1 deal" : "2 deals"}</span>
+    </>
   );
 }
