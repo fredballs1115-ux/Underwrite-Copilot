@@ -26,7 +26,7 @@ export const SECTOR_FIELDS: Record<string, SectorFieldDef[]> = {
       key: "year_built",
       label: "Year built",
       type: "number",
-      help: "Settles age-based coverage: NYC pre-1974, Jersey City pre-1987, LA pre-1979, Montgomery County's under-23-years exemption. Only needed if the screen below still asks.",
+      help: "Settles age-based coverage: NYC pre-1974, Jersey City pre-1987, LA pre-1979, and the rolling new-building exemptions (Montgomery County under 23 years, California under 15, Washington under 12). Only needed if the screen below still asks.",
     },
     {
       key: "will_owner_occupy",

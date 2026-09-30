@@ -315,14 +315,14 @@
    "exempt_if": {
     "any_of": [
      {
-      "building_permit_issued_after": "2011-01-01"
+      "building_age_years_lt": 15
      },
      {
       "owner_occupied_with_units_lte": 2
      }
     ]
    },
-   "effect": "California AB 1482 (Tenant Protection Act) caps annual rent increases statewide at 5% + regional CPI, max 10%, and requires just cause after 12 months. EXEMPT: housing issued a certificate of occupancy within the last 15 YEARS (rolling - the 2011 date encoded here is the 2026 snapshot and moves forward each year), and an owner-occupied DUPLEX where the owner lives in the other unit for the whole tenancy. Separately-owned SFR/condos have their own exemption unless held by a corporation/REIT. City ordinances (LA RSO, SF) override where stricter.",
+   "effect": "California AB 1482 (Tenant Protection Act) caps annual rent increases statewide at 5% + regional CPI, max 10%, and requires just cause after 12 months. EXEMPT: housing issued a certificate of occupancy within the last 15 YEARS (a rolling window, read here as the building's age in whole years from its year built), and an owner-occupied DUPLEX where the owner lives in the other unit for the whole tenancy. Separately-owned SFR/condos have their own exemption unless held by a corporation/REIT. City ordinances (LA RSO, SF) override where stricter.",
    "quote": "A duplex in which the owner occupies one of the units as the owner's principal place of residence for the duration of the tenancy is exempt",
    "source": "https://caanet.org/topics/ab-1482/",
    "as_of": "2026-08-22",
@@ -360,14 +360,14 @@
    "exempt_if": {
     "any_of": [
      {
-      "building_permit_issued_after": "2014-01-01"
+      "building_age_years_lt": 12
      },
      {
       "owner_occupied_with_units_lte": 2
      }
     ]
    },
-   "effect": "Washington HB 1217 (signed May 2025, effective immediately) caps annual rent increases statewide at the lesser of 7% + CPI or 10% - 10% for 2025, 9.683% for increases taking effect in 2026 - with NO increase allowed in a tenancy's first 12 months. EXEMPT from the cap: buildings within 12 YEARS of first certificate of occupancy (rolling - 2014 here is the 2026 snapshot) and owner-occupied single-family homes renting out no more than 2 units/bedrooms (incl. ADU). Exempt properties still owe the notice/parity requirements (RCW 59.18.710).",
+   "effect": "Washington HB 1217 (signed May 2025, effective immediately) caps annual rent increases statewide at the lesser of 7% + CPI or 10% - 10% for 2025, 9.683% for increases taking effect in 2026 - with NO increase allowed in a tenancy's first 12 months. EXEMPT from the cap: buildings within 12 YEARS of first certificate of occupancy (a rolling window, read here as the building's age in whole years from its year built) and owner-occupied single-family homes renting out no more than 2 units/bedrooms (incl. ADU). Exempt properties still owe the notice/parity requirements (RCW 59.18.710).",
    "quote": "up to 7% plus the Consumer Price Index, or 10 percent, whichever is less",
    "source": "https://www.commerce.wa.gov/housing-policy/hb1217-landlord-resource-center/",
    "as_of": "2026-08-22",
@@ -561,7 +561,7 @@
   "DC TOPA single-family and 2-4 unit tier timelines verbatim (§§ 42-3404.09-.11)",
   "FY2026 2BR FMRs for Chicago/LA/SF/Seattle/Boston/Dallas metro areas - aggregator figures conflicted, did not meet the 2-source bar (huduser pull queued); NYC $2,910 confirmed by two independent republishers",
   "FL 166.043 statute text direct pull (currently one practitioner source)",
-  "Rolling exemption windows (CA 15yr / WA 12yr / OR 15yr) encoded as 2026-snapshot dates - steward re-verification advances them annually",
+  "Rolling exemption windows (CA 15yr / WA 12yr) encoded as building ages (building_age_years_lt) read against the current year, so they advance on their own; the read is to the year built, not the certificate-of-occupancy date the statutes count from",
   "SCOPE NOTE (2026-08-22, per direction): rules for jurisdictions outside the 15 covered markets were REMOVED from the product (recoverable in git history). The screener says 'no rules on file - unscreened, not unregulated' outside the covered set."
  ]
 }

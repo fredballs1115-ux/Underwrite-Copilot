@@ -82,10 +82,75 @@ describe("California", () => {
       locality: ["Los Angeles"],
       units: 4,
       built_year: 1990,
+      current_year: 2026,
       occupancy: "tenant_occupied",
     });
     expect(o["ca-la-rso-coverage"]).toBe("not_applicable"); // panels filter this out
     expect(o["ca-ab1482-rent-cap"]).toBe("applies");
+  });
+});
+
+describe("the statewide caps' new-building exemptions roll forward every January 1", () => {
+  // California's AB 1482 exempts housing whose certificate of occupancy is
+  // under 15 years old, Washington's HB 1217 buildings under 12 (the rules'
+  // own text) — windows that move each year. Encoded as fixed "permit after"
+  // dates (2011, 2014) they were right for 2026 alone; as ages they read the
+  // year the subject is evaluated in, to the year built.
+  const tenant = { ...BASE, units: 4, occupancy: "tenant_occupied" };
+  const ca = (built_year: number, current_year: number) =>
+    outcomes({ ...tenant, state: "CA", locality: ["Fresno"], built_year, current_year })["ca-ab1482-rent-cap"];
+  const wa = (built_year: number, current_year: number) =>
+    outcomes({ ...tenant, state: "WA", locality: ["Spokane"], built_year, current_year })["wa-rent-cap-hb1217"];
+
+  it("California in 2026: built 2012 is exempt, built 2011 is capped (the same answers the 2026 snapshot gave)", () => {
+    expect(ca(2012, 2026)).toBe("exempt");
+    expect(ca(2011, 2026)).toBe("applies");
+  });
+
+  it("California in 2027: the window has moved a year — built 2012 is capped now, built 2013 exempt", () => {
+    expect(ca(2012, 2027)).toBe("applies");
+    expect(ca(2013, 2027)).toBe("exempt");
+  });
+
+  it("Washington in 2026 and 2027: built 2015 is exempt, then capped; built 2016 exempt in 2027", () => {
+    expect(wa(2015, 2026)).toBe("exempt");
+    expect(wa(2014, 2026)).toBe("applies");
+    expect(wa(2015, 2027)).toBe("applies");
+    expect(wa(2016, 2027)).toBe("exempt");
+  });
+
+  it("buildSubject's injected year is the year the windows are read in", () => {
+    const at = (currentYear: number) =>
+      outcomes(
+        buildSubject({
+          address: { state: "CA", city: "Fresno" },
+          sizeText: "4 units",
+          yearBuilt: 2012,
+          sectorFields: { will_owner_occupy: false },
+          currentYear,
+        }),
+      )["ca-ab1482-rent-cap"];
+    expect(at(2026)).toBe("exempt");
+    expect(at(2027)).toBe("applies");
+  });
+
+  it("a permit year alone proves a young building young, and an old permit proves nothing", () => {
+    const permitOnly = (building_permit_year: number, current_year: number) =>
+      outcomes({ ...tenant, state: "CA", locality: ["Fresno"], building_permit_year, current_year })["ca-ab1482-rent-cap"];
+    // Permitted 2016: finished no earlier, so under 15 years old in 2027.
+    expect(permitOnly(2016, 2027)).toBe("exempt");
+    // Permitted 2010: it may have been finished any year since.
+    expect(permitOnly(2010, 2027)).toBe("possibly_applies");
+  });
+
+  it("the seed file carries no fixed 'built after' date for either window", () => {
+    const rule = (id: string) => seedRules().find((r) => r.id === id)!;
+    for (const id of ["ca-ab1482-rent-cap", "wa-rent-cap-hb1217"]) {
+      const exempt = JSON.stringify(rule(id).exempt_if);
+      expect(exempt, id).not.toContain("building_permit_issued_after");
+      expect(exempt, id).toContain("building_age_years_lt");
+      expect(rule(id).effect, id).not.toMatch(/snapshot/i);
+    }
   });
 });
 
@@ -111,7 +176,7 @@ describe("San Francisco", () => {
 describe("statewide caps and preemptions", () => {
   it("WA HB 1217 catches a tenant-occupied 1980 triplex (no exemption path holds)", () => {
     const o = outcomes({
-      ...BASE, state: "WA", locality: ["Seattle"], units: 3, built_year: 1980, occupancy: "tenant_occupied",
+      ...BASE, state: "WA", locality: ["Seattle"], units: 3, built_year: 1980, current_year: 2026, occupancy: "tenant_occupied",
     });
     expect(o["wa-rent-cap-hb1217"]).toBe("applies");
   });

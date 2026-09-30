@@ -52,8 +52,9 @@ export interface RuleSubject {
   units?: number;
   building_permit_year?: number;
   built_year?: number;
-  /** "now" for rolling-age tests (MoCo's under-23-years exemption) — injected
-   *  so evaluation stays deterministic and testable */
+  /** "now" for rolling-age tests (MoCo's under-23-years exemption, the CA and
+   *  WA caps' new-building exemptions) — injected so evaluation stays
+   *  deterministic and testable */
   current_year?: number;
   municipality_population?: number;
   /** CURRENT status ("vacant_registered", "non_owner_occupied_rental", …) —
@@ -251,15 +252,22 @@ function evalCondition(key: string, want: unknown, s: RuleSubject): Tri {
     if (occ === undefined || s.units === undefined) return "unknown";
     return occ && s.units <= w ? "yes" : "no";
   }
-  // Rolling-age tests (MoCo's under-23-years exemption). The base
-  // "building_age_years" is derived, not a subject field — without this the
-  // generic sweep below would read undefined and stay unknown forever.
+  // Rolling-age tests: MoCo's under-23-years exemption, and the new-building
+  // exemptions from California's statewide cap (under 15 years) and
+  // Washington's (under 12). The base "building_age_years" is derived, not a
+  // subject field — without this the generic sweep below would read
+  // undefined and stay unknown forever. Read against `current_year`, so a
+  // window advances every January 1 on its own; a fixed "built after" date
+  // would be right for one year only.
   if (key === "building_age_years_lt") {
     const w = typeof want === "number" ? want : Number(want);
-    if (s.built_year === undefined || s.current_year === undefined || !Number.isFinite(w)) {
-      return "unknown";
-    }
-    return s.current_year - s.built_year < w ? "yes" : "no";
+    if (s.current_year === undefined || !Number.isFinite(w)) return "unknown";
+    if (s.built_year !== undefined) return s.current_year - s.built_year < w ? "yes" : "no";
+    // A permit comes before the building it permits, so a permit younger
+    // than the window proves the building is too; an older one proves
+    // nothing about when it was finished.
+    if (s.building_permit_year !== undefined && s.current_year - s.building_permit_year < w) return "yes";
+    return "unknown";
   }
 
   // comparator suffixes over numeric subject fields
