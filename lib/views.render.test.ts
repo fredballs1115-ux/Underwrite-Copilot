@@ -5904,6 +5904,97 @@ describe("the blur-up preview under a deal's photograph while it loads (#463)", 
   });
 });
 
+// ── Photographs held at their subject where a frame crops them ───────────────
+import { SharePicture } from "@/app/share/[token]/share-picture";
+
+describe("a deal's photograph held at its subject wherever a frame crops it (lib/photo-focus)", () => {
+  const PREVIEW = "data:image/webp;base64,UklGRlIAAABXRUJQVlA4IEYAAAAwAgCdASoYABAAPm0wkkWkIqGYBABABsSgCdMoRwBAbAhvCgAA/vy3qgA=";
+  const focus = { x: 0.203, y: 0.719 };
+  const held = "object-position:20.3% 71.9%";
+  const photo = { kind: "photo" as const, src: "/api/deals/d1/picture?size=hero", credit: "From the offering memorandum", preview: PREVIEW, focus };
+  const cover = coverFor({ seed: "d1", assetClass: "multifamily", place: "Philadelphia, PA" });
+
+  it("holds the card's photograph, its preview, and the photograph it flips to, each at its own point", () => {
+    const slides = [{ kind: "photo" as const, src: "/api/deals/d1/picture?size=hero&g=1", credit: "From the offering memorandum, page 3", focus: { x: 0.9, y: 0.5 } }];
+    const html = render(React.createElement(DealBanner, { sources: [photo], label: "The Fairmount", aspect: "16/10", cover, photos: 2, slides, slide: 1 }));
+    expect(html).toMatch(new RegExp(`<img[^>]*src="/api/deals/d1/picture\\?size=hero"[^>]*style="${held}"`));
+    expect(html).toMatch(/data-preview="banner"[^>]*style="[^"]*background-position:20.3% 71.9%"/);
+    expect(html).toMatch(/data-slide="1"[^>]*style="object-position:90% 50%"/);
+    expect(a11yIssues(html)).toEqual([]);
+    // A photograph with no point keeps the centre, as before.
+    const plain = render(React.createElement(DealBanner, { sources: [{ ...photo, focus: undefined }], label: "The Fairmount", aspect: "16/10", cover }));
+    expect(plain).not.toContain("object-position");
+    expect(plain).toMatch(/data-preview="banner"[^>]*style="[^"]*background-position:center"/);
+  });
+
+  it("holds the list row's preview where sharp cut the thumbnail that fades in over it", () => {
+    const html = render(React.createElement(DealThumb, { sources: [{ ...photo, src: "/api/deals/d1/picture?size=thumb" }], label: "The Fairmount", cover }));
+    expect(html).toMatch(/data-preview="thumb"[^>]*style="[^"]*background-position:20.3% 71.9%"/);
+  });
+
+  it("holds the deal page's cover, its mosaic tiles and its filmstrip at their points, and the viewer's strip with them", () => {
+    const gallery = [
+      { page: 3, credit: "From the offering memorandum, page 3", width: 1600, height: 1000, focus: { x: 0.9, y: 0.3 } },
+      { page: 7, credit: "From the offering memorandum, page 7", width: 1600, height: 1000 },
+    ];
+    const html = render(
+      React.createElement(PropertyVisualForPreview, {
+        dealId: "d1",
+        label: "1 Fairmount Ave, Philadelphia, PA",
+        hasStreetAddress: true,
+        googleEnabled: false,
+        hasAddress: true,
+        picture: { credit: "From the offering memorandum", source: "om", preview: PREVIEW, focus, width: 1600, height: 1067 },
+        gallery,
+      }),
+    );
+    // The cover: its preview and the photograph over it, held at one point.
+    expect(html).toMatch(/data-preview="hero"/);
+    expect(html).toMatch(/style="background-image:[^"]*background-position:20.3% 71.9%;object-position:20.3% 71.9%"[^>]*data-preview="hero"/);
+    // The mosaic's first tile at its own point; the second, with none, at the centre.
+    expect(html).toMatch(/<img src="\/api\/deals\/d1\/picture\?size=hero&amp;g=1"[^>]*style="object-position:90% 30%"/);
+    expect(html).not.toMatch(/<img src="\/api\/deals\/d1\/picture\?size=hero&amp;g=2"[^>]*object-position/);
+    // The filmstrip: the cover's hero at its point, and a gallery photograph's
+    // square crop at the point's place in the square (the right 62.5% of a
+    // 16:10 frame, the subject 84% across it).
+    expect(html).toMatch(new RegExp(`data-view-thumb="photo"[^>]*><img src="/api/deals/d1/picture\\?size=hero"[^>]*style="${held}"`));
+    expect(html).toMatch(/data-view-thumb="g1"[^>]*><img src="\/api\/deals\/d1\/picture\?size=thumb&amp;g=1"[^>]*style="object-position:84% 30%"/);
+    expect(a11yIssues(html)).toEqual([]);
+    // The viewer shows each whole, uncropped; its strip crops them as the page's does.
+    const viewer = render(
+      React.createElement(PhotoViewerBody, {
+        frames: [
+          { id: "photo", label: "Photo 1", src: "/api/deals/d1/picture?size=hero", alt: "Photograph of 1 Fairmount Ave", credit: "From the offering memorandum", thumb: "/api/deals/d1/picture?size=hero", thumbFocus: focus },
+          { id: "aerial", label: "Aerial", src: "/api/deals/d1/aerial?src=usgs&w=1280&h=960", alt: "Aerial photograph of 1 Fairmount Ave", credit: "Imagery: USGS The National Map", thumb: "/api/deals/d1/aerial?src=usgs&w=1280&h=576" },
+        ],
+        start: 0,
+        title: "1 Fairmount Ave",
+        onClose: () => {},
+      }),
+    );
+    expect(viewer).not.toMatch(/data-viewer-frame="photo"[^>]*object-position/);
+    expect(viewer.match(/object-position/g)).toHaveLength(1);
+    expect(viewer).toMatch(new RegExp(`<img src="/api/deals/d1/picture\\?size=hero" alt="" aria-hidden="true" style="${held}"`));
+  });
+
+  it("holds the shared screen's 12:5 strip at the photograph's subject, and an aerial at its centre", () => {
+    const html = render(
+      React.createElement(SharePicture, {
+        sources: [{ kind: "photo", src: "/api/share/t/picture?size=hero", credit: "From the offering memorandum", preview: PREVIEW, focus }],
+        place: "1 Fairmount Ave, Philadelphia, PA",
+      }),
+    );
+    expect(html).toMatch(/style="background-image:[^"]*background-position:20.3% 71.9%;object-position:20.3% 71.9%"/);
+    const aerial = render(
+      React.createElement(SharePicture, {
+        sources: [{ kind: "aerial", src: "/api/share/t/aerial?w=960&h=400", credit: "USGS The National Map (public domain)" }],
+        place: "1 Fairmount Ave, Philadelphia, PA",
+      }),
+    );
+    expect(aerial).not.toContain("object-position");
+  });
+});
+
 // ── The building on the deal's own pages (#464) ──────────────────────────────
 import { DealCrumb } from "@/app/(app)/deals/[id]/deal-crumb";
 

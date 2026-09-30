@@ -6,6 +6,7 @@ import type { DealCoverFacts } from "@/lib/deal-cover";
 import { DealCover } from "./deal-cover";
 import { MarketCaption } from "./market-caption";
 import { previewStyle } from "@/lib/photo-preview";
+import { focusStyle } from "@/lib/photo-focus";
 
 /**
  * The building's picture at card size (#418) — the compare page's columns.
@@ -47,6 +48,10 @@ import { previewStyle } from "@/lib/photo-preview";
  * leaves the lead photograph on screen. The card is told whether the
  * deal's own photograph is the picture on screen (`onPhoto`), so it offers
  * the others only over it.
+ *
+ * The card crops every photograph to its shape, so a stored one with a
+ * point of interest (lib/photo-focus) is held there, its preview with it,
+ * rather than at its centre.
  */
 export function DealBanner({
   sources,
@@ -216,7 +221,7 @@ export function DealBanner({
           once, the way a listing's card arrives — else the deal's cover,
           without its words, or the plain plate. */}
       {base?.preview ? (
-        <span aria-hidden data-preview="banner" className="absolute inset-0" style={previewStyle(base.preview)} />
+        <span aria-hidden data-preview="banner" className="absolute inset-0" style={previewStyle(base.preview, base.focus)} />
       ) : cover ? (
         <DealCover cover={cover} label={label} words={false} className="absolute inset-0 h-full w-full" />
       ) : null}
@@ -238,6 +243,8 @@ export function DealBanner({
           decoding="async"
           onLoad={(e) => setLoaded(e.currentTarget.currentSrc || e.currentTarget.src)}
           onError={() => setAt((i) => i + 1)}
+          // The card crops the photograph: held at its subject, not its centre.
+          style={focusStyle(base.focus)}
           className={`relative ${shape} w-full object-cover transition-[opacity,transform] duration-500 ease-out motion-safe:group-hover:scale-[1.03] ${
             baseLoaded ? "opacity-100" : "opacity-0"
           }`}
@@ -262,6 +269,7 @@ export function DealBanner({
             setSlideGone((g) => new Set(g).add(other.src));
             onSlideGone?.(other.src);
           }}
+          style={focusStyle(other.focus)}
           className={`absolute inset-0 h-full w-full object-cover transition-[opacity,transform] duration-300 ease-out motion-safe:group-hover:scale-[1.03] ${
             otherLoaded ? "opacity-100" : "opacity-0"
           }`}

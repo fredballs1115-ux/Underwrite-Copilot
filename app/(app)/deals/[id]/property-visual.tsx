@@ -13,7 +13,8 @@ import { MarketCaption } from "../market-caption";
 import { PhotoViewer, type ViewerFrame } from "./photo-viewer";
 import { PropertyMap } from "./property-map";
 import { ReplacePicture } from "./replace-picture";
-import { previewStyle } from "@/lib/photo-preview";
+import { photoStyle } from "@/lib/photo-preview";
+import { focusStyle, thumbFocus, type PhotoFocus } from "@/lib/photo-focus";
 import {
   headerPhotoSizes,
   mosaicTileSizes,
@@ -103,6 +104,12 @@ import {
  * width it is drawn at (lib/photo-srcset), so a dense screen, a panorama
  * covering the frame by its height and the viewer take the full copy where
  * the hero would be stretched, and every other screen the hero it had.
+ *
+ * Every frame here but the viewer's crops the photograph — the 21:9 band, a
+ * mosaic tile, a filmstrip thumbnail — so a stored photograph with a point
+ * of interest (lib/photo-focus) is held there, its preview with it, rather
+ * than at its centre; a gallery photograph's filmstrip thumbnail, which
+ * sharp already cut around the point, is held at the point's place in it.
  */
 
 /** A view's id: the fixed views, and the memorandum's other photographs
@@ -154,9 +161,9 @@ export function PropertyVisual({
   /** the deal has an address at all — without one there is no overhead and no map */
   hasAddress?: boolean;
   /** the deal's own photograph, with what it is credited as, its blur-up
-   *  preview (#463) and its stored sizes (the hero's, and the full-size
-   *  copy's width where one is stored); null for none */
-  picture?: ({ credit: string; source: "om" | "upload"; preview?: string | null } & StoredPhotoSizes) | null;
+   *  preview (#463), its stored sizes (the hero's, and the full-size copy's
+   *  width where one is stored) and where its subject is; null for none */
+  picture?: ({ credit: string; source: "om" | "upload"; preview?: string | null; focus?: PhotoFocus | null } & StoredPhotoSizes) | null;
   /** the reader may put their own picture on the deal (never on the sample) */
   canReplace?: boolean;
   /** the Flood tab (#472): the frame's URL stem (the route, with the point
@@ -177,8 +184,9 @@ export function PropertyVisual({
    *  Street View (#439); null for none */
   market?: MarketPicture | null;
   /** the memorandum's other photographs, in page order, each with its
-   *  credit (#448) and its stored sizes; served as `?g=1`, `?g=2`… */
-  gallery?: ({ page: number | null; credit: string; preview?: string | null } & StoredPhotoSizes)[];
+   *  credit (#448), its stored sizes and where its subject is; served as
+   *  `?g=1`, `?g=2`… */
+  gallery?: ({ page: number | null; credit: string; preview?: string | null; focus?: PhotoFocus | null } & StoredPhotoSizes)[];
 }) {
   // Lead with the building's own photograph wherever one exists; the
   // aerial leads only when it is the best picture available.
@@ -314,8 +322,10 @@ export function PropertyVisual({
   const floodR = floodTry ? `&r=${floodTry}` : "";
   const floodView = flood ? `${flood.src}&w=${FLOOD_VIEW.w}&h=${FLOOD_VIEW.h}${floodR}` : "";
   const floodView2x = flood ? `${flood.src}&w=${FLOOD_VIEW.w * 2}&h=${FLOOD_VIEW.h * 2}${floodR}` : "";
-  const thumbs: Record<string, { src: string | null; fail: () => void }> = {
-    photo: { src: `/api/deals/${dealId}/picture?size=hero`, fail: () => setPhotoGone(true) },
+  const thumbs: Record<string, { src: string | null; focus?: PhotoFocus; fail: () => void }> = {
+    // The cover's place is its hero, cropped to the strip's shape: held at
+    // its subject (lib/photo-focus).
+    photo: { src: `/api/deals/${dealId}/picture?size=hero`, focus: picture?.focus ?? undefined, fail: () => setPhotoGone(true) },
     street: { src: `/api/deals/${dealId}/photo`, fail: () => setStreetGone(true) },
     market: { src: market?.src ?? null, fail: () => setMarketGone(true) },
     satellite: { src: `/api/deals/${dealId}/aerial?src=satellite&w=${AERIAL.w}&h=${AERIAL.h}`, fail: () => setSatelliteGone(true) },
@@ -323,9 +333,14 @@ export function PropertyVisual({
     flood: { src: flood && floodState !== "failed" ? `${flood.src}&w=192&h=108${floodR}` : null, fail: onFloodError },
     map: { src: null, fail: () => {} },
     // A gallery photograph's place in the filmstrip is its stored 240px
-    // crop: its full-size picture waits for its view to be opened.
+    // crop: its full-size picture waits for its view to be opened. The crop
+    // is square and the strip is not, so it is held at the point's place in
+    // the square sharp cut around it.
     ...Object.fromEntries(
-      galleryLive.map((g) => [g.id, { src: `/api/deals/${dealId}/picture?size=thumb&g=${g.i}`, fail: () => loseGallery(g.i) }]),
+      galleryLive.map((g) => [
+        g.id,
+        { src: `/api/deals/${dealId}/picture?size=thumb&g=${g.i}`, focus: thumbFocus(g.focus, g), fail: () => loseGallery(g.i) },
+      ]),
     ),
   };
   const galleryHero = (i: number) => `/api/deals/${dealId}/picture?size=hero&g=${i}`;
@@ -343,6 +358,9 @@ export function PropertyVisual({
   const viewerAerial = `/api/deals/${dealId}/aerial?src=usgs&w=${VIEWER.w}&h=${VIEWER.h}`;
   const frames: ViewerFrame[] = views.flatMap((v): ViewerFrame[] => {
     const thumb = thumbs[v.id].src ?? "";
+    // The strip along the viewer's foot crops its thumbnails as the page's
+    // own filmstrip does, and holds them at the same points.
+    const held = thumbs[v.id].focus ? { thumbFocus: thumbs[v.id].focus } : {};
     const photo = galleryLive.find((g) => g.id === v.id);
     if (photo) {
       const srcSet = gallerySrcSet(photo);
@@ -355,6 +373,7 @@ export function PropertyVisual({
           alt: galleryAlt(photo),
           credit: photo.credit,
           thumb,
+          ...held,
         },
       ];
     }
@@ -369,6 +388,7 @@ export function PropertyVisual({
             alt: `Photograph of ${label}`,
             credit: picture?.credit ?? "",
             thumb,
+            ...held,
           },
         ];
       case "street":
@@ -475,7 +495,8 @@ export function PropertyVisual({
                   onClick={open}
                   // Its blur-up preview paints the frame until the
                   // photograph covers it (#463): its colours, never grey.
-                  style={previewStyle(picture?.preview)}
+                  // The band crops both: held at the photograph's subject.
+                  style={photoStyle(picture?.preview, picture?.focus)}
                   data-preview={picture?.preview ? "hero" : undefined}
                   className={`${mosaic ? MOSAIC_COVER : FRAME} w-full cursor-zoom-in bg-faint object-cover`}
                   onError={() => setPhotoGone(true)}
@@ -525,7 +546,7 @@ export function PropertyVisual({
                           width={AERIAL.w}
                           height={AERIAL.h}
                           loading="lazy"
-                          style={previewStyle(g.preview)}
+                          style={photoStyle(g.preview, g.focus)}
                           className="h-full w-full object-cover transition-transform duration-300 motion-safe:group-hover/tile:scale-[1.04]"
                           onError={() => loseGallery(g.i)}
                         />
@@ -561,7 +582,7 @@ export function PropertyVisual({
                 width={AERIAL.w}
                 height={AERIAL.h}
                 onClick={open}
-                style={previewStyle(g.preview)}
+                style={photoStyle(g.preview, g.focus)}
                 className={`${FRAME} w-full cursor-zoom-in bg-faint object-cover`}
                 onError={() => loseGallery(g.i)}
               />
@@ -845,7 +866,7 @@ export function PropertyVisual({
               >
                 {t.src ? (
                   // eslint-disable-next-line @next/next/no-img-element -- the view's own URL, cached by the browser once for both
-                  <img key={t.src} src={t.src} alt="" aria-hidden width={96} height={56} className="absolute inset-0 h-full w-full object-cover" onError={t.fail} />
+                  <img key={t.src} src={t.src} alt="" aria-hidden width={96} height={56} style={focusStyle(t.focus)} className="absolute inset-0 h-full w-full object-cover" onError={t.fail} />
                 ) : v.id === "flood" ? (
                   <span aria-hidden className="absolute inset-0 flex items-center justify-center bg-brand/5 text-brand">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">

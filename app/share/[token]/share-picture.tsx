@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { previewStyle } from "@/lib/photo-preview";
+import { photoStyle } from "@/lib/photo-preview";
+import type { PhotoFocus } from "@/lib/photo-focus";
 
 /** One way to picture the building on the shared screen, pinned to one
  *  token-scoped route, with the credit that route's picture carries. */
@@ -11,6 +12,9 @@ export interface SharePictureSource {
   credit: string;
   /** the photograph's blur-up preview (#463): painted until it loads */
   preview?: string | null;
+  /** where the photograph's subject is (lib/photo-focus): the strip crops
+   *  it to 12:5, held there rather than at its centre */
+  focus?: PhotoFocus | null;
 }
 
 /**
@@ -54,7 +58,7 @@ export function SharePicture({ sources, place }: { sources: SharePictureSource[]
         height={400}
         decoding="async"
         onError={() => setAt((i) => i + 1)}
-        style={previewStyle(s.preview)}
+        style={photoStyle(s.preview, s.focus)}
         className="aspect-[12/5] w-full object-cover"
       />
       <figcaption className="px-3 py-1.5 text-[11px] text-muted">

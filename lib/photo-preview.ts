@@ -10,6 +10,8 @@
 // Pure: the preview is made by lib/deal-picture (sharp, server-only); this
 // only checks one and turns it into the CSS that draws it.
 
+import { focusPosition, focusStyle } from "@/lib/photo-focus";
+
 /** The preview's long side, pixels: small enough to ride in the page, large
  *  enough that the blur has the photograph's shapes to work with. */
 export const PREVIEW_PX = 24;
@@ -45,8 +47,24 @@ export function blurredBackground(preview: string | null | undefined): string | 
 }
 
 /** The style that paints a preview under a frame: the blurred background,
- *  covering. Empty where there is no preview. */
-export function previewStyle(preview: string | null | undefined): { backgroundImage: string; backgroundSize: string; backgroundPosition: string } | undefined {
+ *  covering, held at the photograph's point of interest where it has one
+ *  (lib/photo-focus) — where the photograph that fades in over it is held —
+ *  and at the centre otherwise. Empty where there is no preview. */
+export function previewStyle(
+  preview: string | null | undefined,
+  focus?: unknown,
+): { backgroundImage: string; backgroundSize: string; backgroundPosition: string } | undefined {
   const bg = blurredBackground(preview);
-  return bg ? { backgroundImage: bg, backgroundSize: "cover", backgroundPosition: "center" } : undefined;
+  return bg ? { backgroundImage: bg, backgroundSize: "cover", backgroundPosition: focusPosition(focus) ?? "center" } : undefined;
+}
+
+/** The style of a stored photograph's own <img> in a frame that crops it:
+ *  its preview painted under it, and both held at its point of interest.
+ *  Undefined where it has neither. */
+export function photoStyle(
+  preview: string | null | undefined,
+  focus?: unknown,
+): { backgroundImage?: string; backgroundSize?: string; backgroundPosition?: string; objectPosition?: string } | undefined {
+  const style = { ...previewStyle(preview, focus), ...focusStyle(focus) };
+  return Object.keys(style).length > 0 ? style : undefined;
 }

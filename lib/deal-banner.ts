@@ -30,6 +30,7 @@
 
 import { IMAGE_CREDIT } from "@/lib/imagery-plan";
 import { isPreview } from "@/lib/photo-preview";
+import { isFocus, type PhotoFocus } from "@/lib/photo-focus";
 import type { MarketPicture } from "@/lib/market-picture";
 
 export interface BannerSource {
@@ -52,6 +53,12 @@ export interface BannerSource {
   /** the photograph's blur-up preview (#463, lib/photo-preview): drawn
    *  blurred in the frame until the photograph has loaded whole */
   preview?: string;
+  /** where the photograph's subject is, as shares of its whole frame
+   *  (lib/photo-focus): the frame holds the photograph there, and its
+   *  preview with it, where it would otherwise hold the centre. A square
+   *  slot drawing the 240px thumbnail, which sharp cut around the same
+   *  point, has nothing to hold but the preview. */
+  focus?: PhotoFocus;
 }
 
 export interface BannerFacts {
@@ -61,6 +68,9 @@ export interface BannerFacts {
   pictureCredit: string | null;
   /** its blur-up preview, where the photo cache holds one (#463) */
   picturePreview?: string | null;
+  /** where its subject is, where the photo cache holds the point
+   *  (lib/photo-focus) */
+  pictureFocus?: PhotoFocus | null;
   /** no picture is cached but the deal's memorandum may hold one nobody has
    *  looked for (lib/deal-picture `pictureMayBeInMemorandum`): the picture
    *  route lifts the cover on this first ask, or answers 404 and the next
@@ -114,6 +124,7 @@ export function bannerSources(f: BannerFacts, frame: BannerFrame = BANNER): Bann
       src: `/api/deals/${id}/picture?size=${size}`,
       credit: f.pictureCredit,
       ...(isPreview(f.picturePreview) ? { preview: f.picturePreview } : {}),
+      ...(isFocus(f.pictureFocus) ? { focus: { x: f.pictureFocus.x, y: f.pictureFocus.y } } : {}),
     });
   }
   else if (f.memorandumUnread) {

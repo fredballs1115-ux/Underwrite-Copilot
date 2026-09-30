@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeCache, type DealPicture, type DealVisualCache } from "@/lib/deal-location";
 import { RunGate } from "@/lib/anthropic/run-gate";
 import { PREVIEW_PX, isPreview } from "@/lib/photo-preview";
+import { isFocus, type PhotoFocus } from "@/lib/photo-focus";
 import { EARLY_SHARE, findOmImages, scanShaped, type OmImage } from "@/lib/om-photo";
 import {
   FLAT_SHARE,
@@ -48,6 +49,14 @@ import {
  * through a srcset, where the hero alone was drawn stretched. The reader's
  * own upload goes through the same sizes, so a picture is never served as
  * the bytes somebody uploaded.
+ *
+ * HELD AT ITS SUBJECT. Beside the derivatives, the point sharp's attention
+ * analysis finds the subject at — the analysis that cuts the thumbnail — is
+ * kept with the record (`focusOf`, lib/photo-focus), and every page that
+ * crops the photograph holds it there rather than at its centre. One
+ * stored before the point was kept gets it from its own hero the next time
+ * the picture route serves it (`backfillPicture`, with a missing preview),
+ * never by being derived again.
  *
  * MADE AGAIN, QUIETLY. A memorandum's photograph derived under older rules
  * (`DERIVED_VERSION`: before the full-size copy) is made again from the
@@ -221,6 +230,8 @@ export interface DerivedPicture {
   full: { bytes: Buffer; width: number; height: number } | null;
   /** the blur-up preview (#463), null where it could not be made */
   preview: string | null;
+  /** where its subject is (lib/photo-focus), null where none was found */
+  focus: PhotoFocus | null;
 }
 
 /** The derivatives sharp writes from any picture it can read. */
@@ -272,7 +283,77 @@ export async function derivePicture(input: PictureInput): Promise<DerivedPicture
     height: hero.info.height,
     full: full ? { bytes: full.data, width: full.info.width, height: full.info.height } : null,
     preview: await previewOf(hero.data),
+    focus: await focusOf(hero.data),
   };
+}
+
+/**
+ * The long side, in pixels, a photograph is read at for its point of
+ * interest: the analysis is made on a 32-cell grid whatever the size, so
+ * more pixels only cost time.
+ */
+export const FOCUS_WORK_PX = 256;
+
+/**
+ * Where a photograph's subject is (lib/photo-focus): sharp's attention
+ * point, the analysis that cuts the thumbnail — luminance frequency,
+ * saturation and skin, on a 32 × 32 grid, the busiest cell after a blur —
+ * read as shares of the photograph's frame. Made from the hero, the frame
+ * the pages crop.
+ *
+ * Two of sharp's habits shape the read. It reports the point only where it
+ * crops, so the picture is asked for a square of its short side (the
+ * thumbnail's own cut; a square picture one row short), which crops the
+ * long side and leaves the grid to say both. And it reports a JPEG's point
+ * scaled by the decoder's shrink-on-load rather than in the frame it read,
+ * so the picture goes in as plain pixels at `FOCUS_WORK_PX`, whose frame is
+ * the frame the point is in. The grid gives a cell's left and top edges;
+ * the point is the cell's middle. A picture with nothing on it to attend
+ * to — the grid's every cell alike, whose peak would be its first, the top
+ * left corner — has no point, and neither has one too small to read. Null
+ * then, and on any failure: a picture with no point keeps the centre, never
+ * a reason it is not stored.
+ */
+export async function focusOf(bytes: Buffer): Promise<PhotoFocus | null> {
+  try {
+    const { data, info } = await sharp(bytes, { failOn: "none" })
+      .rotate()
+      .resize({ width: FOCUS_WORK_PX, height: FOCUS_WORK_PX, fit: "inside", withoutEnlargement: true })
+      .removeAlpha()
+      .toColourspace("srgb")
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const { width: w, height: h, channels } = info;
+    if (w < 32 || h < 32 || featureless(data, channels)) return null;
+    const side = Math.min(w, h);
+    const [cw, ch] = w === h ? [w, h - 1] : [side, side];
+    const { info: cut } = await sharp(data, { raw: { width: w, height: h, channels } })
+      .resize({ width: cw, height: ch, fit: "cover", position: sharp.strategy.attention })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    if (typeof cut.attentionX !== "number" || typeof cut.attentionY !== "number") return null;
+    const share = (at: number, of: number) => Math.round(Math.min(1, Math.max(0, at / of + 1 / 64)) * 1000) / 1000;
+    const focus = { x: share(cut.attentionX, w), y: share(cut.attentionY, h) };
+    return isFocus(focus) ? focus : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether pixels are one flat field: each channel within a couple of
+ *  levels of its mean — a photograph's vary by tens. */
+function featureless(pixels: Buffer, channels: number): boolean {
+  const n = Math.floor(pixels.length / channels);
+  if (n === 0) return true;
+  for (let c = 0; c < channels; c++) {
+    let sum = 0;
+    for (let i = c; i < pixels.length; i += channels) sum += pixels[i];
+    const mean = sum / n;
+    let sq = 0;
+    for (let i = c; i < pixels.length; i += channels) sq += (pixels[i] - mean) ** 2;
+    if (Math.sqrt(sq / n) >= 2) return false;
+  }
+  return true;
 }
 
 /**
@@ -296,33 +377,74 @@ export async function previewOf(bytes: Buffer): Promise<string | null> {
   }
 }
 
+/** Whether a stored photograph lacks what is made beside its derivatives
+ *  now: its blur-up preview (#463), or a look for its point of interest. */
+export function lacksExtras(picture: DealPicture): boolean {
+  return !picture.preview || picture.focus === undefined;
+}
+
 /**
- * Give a photograph stored before previews existed its preview, from the
- * hero bytes a request already holds (#463) — the picture route's, so no
- * photograph is ever fetched for its preview alone. The row is read again
- * just before the write and the preview goes onto the picture stored THEN,
- * only where it is still the one the bytes are of: a photograph replaced
- * while the request ran is never put back. Never throws.
+ * Backfills run at once in a process, and how long one waits for its turn:
+ * the first view of a pipeline after photographs gain a field asks for every
+ * card's at once, and one that waits longer is left to a later request.
  */
-export async function backfillPreview(
+export const BACKFILL_AT_ONCE = 2;
+export const BACKFILL_WAIT_MS = 10_000;
+const backfills = new RunGate(() => BACKFILL_AT_ONCE);
+
+/**
+ * Give a photograph stored before them its preview (#463) and its point of
+ * interest (lib/photo-focus), from its own frame, after a request — so a
+ * photograph stored before either is never derived again for them, and the
+ * reader's own upload, whose original is not kept, gets them too. The frame
+ * is the bytes the picture route already holds (its hero or its full-size
+ * copy, one frame at two sizes), or, where the browser had the photograph
+ * and was answered 304, its hero read once from storage; `BACKFILL_AT_ONCE`
+ * at a time, each waiting up to `waitMs` for its turn. The row is read again
+ * just before the write, and the fields go onto the photograph stored THEN —
+ * the cover, or the gallery's `gallery`th — only where it is still the one
+ * the bytes are of and still lacks them: a photograph replaced while the
+ * request ran is never put back, and nothing stored is overwritten. A point
+ * looked for and not found is kept as null, so it is looked for once.
+ * Never throws.
+ */
+export async function backfillPicture(
   supabase: SupabaseClient,
   dealId: string,
   picture: DealPicture,
-  heroBytes: Buffer,
+  opts: { bytes?: Buffer | null; gallery?: number | null; waitMs?: number } = {},
 ): Promise<void> {
-  if (picture.preview) return;
-  const preview = await previewOf(heroBytes);
-  if (!preview) return;
+  if (!lacksExtras(picture)) return;
+  const release = await backfills.acquireWithin(opts.waitMs ?? BACKFILL_WAIT_MS);
+  if (!release) return;
   try {
+    const bytes = opts.bytes ?? (await readPictureBytes(dealId, picture, "hero"));
+    const made: Pick<DealPicture, "preview" | "focus"> = {};
+    if (!picture.preview) {
+      const preview = await previewOf(bytes);
+      if (preview) made.preview = preview;
+    }
+    if (picture.focus === undefined) made.focus = await focusOf(bytes);
+    if (Object.keys(made).length === 0) return;
     const { data } = await supabase.from("deals").select("photo").eq("id", dealId).maybeSingle();
     const current = (data as { photo?: DealVisualCache | null } | null)?.photo ?? null;
-    if (!current?.picture || current.picture.hero !== picture.hero || current.picture.preview) return;
-    await supabase
-      .from("deals")
-      .update({ photo: { ...current, picture: { ...current.picture, preview } } })
-      .eq("id", dealId);
+    const at = opts.gallery ?? null;
+    const stored = at ? current?.gallery?.[at - 1] : current?.picture;
+    if (!current || !stored || stored.hero !== picture.hero) return;
+    const fill: Pick<DealPicture, "preview" | "focus"> = {
+      ...(made.preview && !stored.preview ? { preview: made.preview } : {}),
+      ...("focus" in made && stored.focus === undefined ? { focus: made.focus } : {}),
+    };
+    if (Object.keys(fill).length === 0) return;
+    const next: DealPicture = { ...stored, ...fill };
+    const photo: DealVisualCache = at
+      ? { ...current, gallery: (current.gallery ?? []).map((g, k) => (k === at - 1 ? next : g)) }
+      : { ...current, picture: next };
+    await supabase.from("deals").update({ photo }).eq("id", dealId);
   } catch {
-    // A preview is a nicety: never fail a request over one.
+    // Both are niceties: never fail a request over one.
+  } finally {
+    release();
   }
 }
 
@@ -367,6 +489,8 @@ async function putDerived(
     at,
     derivedV: DERIVED_VERSION,
     ...(derived.preview ? { preview: derived.preview } : {}),
+    // Kept even where none was found (null), so it is never looked for again.
+    focus: derived.focus,
   };
 }
 

@@ -11,6 +11,7 @@ import { Pipeline, type DealCard } from "./pipeline";
 import { PIPELINE_VIEW_COOKIE, landingView } from "@/lib/pipeline-view";
 import { cookies } from "next/headers";
 import { CARD, THUMB, bannerSources } from "@/lib/deal-banner";
+import { isFocus } from "@/lib/photo-focus";
 import { coverFor, coverPlace } from "@/lib/deal-cover";
 import { marketPictureFor } from "@/lib/market-picture";
 import { PICTURE_CREDIT, memorandumPhotoCredit, pictureMayBeInMemorandum } from "@/lib/deal-picture";
@@ -365,6 +366,8 @@ export default async function DealsPage({
           // Its colours before its pixels (#463): the blur-up the frame
           // shows until the photograph has loaded whole.
           picturePreview: picture?.preview ?? null,
+          // Where its subject is, so the card holds the crop there.
+          pictureFocus: picture?.focus ?? null,
           memorandumUnread: unread,
           googleEnabled,
           hasStreetAddress: !!address?.street?.trim(),
@@ -397,6 +400,7 @@ export default async function DealsPage({
                   alt: g.page
                     ? `Photograph from page ${g.page} of the memorandum for ${d.name}`
                     : `Photograph from the memorandum for ${d.name}`,
+                  ...(isFocus(g.focus) ? { focus: { x: g.focus.x, y: g.focus.y } } : {}),
                 }))
               : [],
         };

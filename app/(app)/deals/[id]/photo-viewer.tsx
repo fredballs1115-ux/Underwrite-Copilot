@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { focusStyle, type PhotoFocus } from "@/lib/photo-focus";
 
 /** One picture the viewer can show: a view of the property at its size. */
 export interface ViewerFrame {
@@ -22,6 +23,9 @@ export interface ViewerFrame {
   credit: string;
   /** the filmstrip's picture of the view, for the strip along the foot */
   thumb: string;
+  /** where the strip holds that picture as it crops it: a stored
+   *  photograph's subject (lib/photo-focus); the centre where absent */
+  thumbFocus?: PhotoFocus;
   /** the strip's layer over it, as the filmstrip draws it (FEMA's zones) */
   thumbOver?: string;
   /** a ring at the frame's centre: the building, on an overhead of a
@@ -240,7 +244,7 @@ export function PhotoViewerBody({ frames, start = 0, title, onClose }: ViewerPro
               }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- the filmstrip's own URL, already cached by the page */}
-              <img src={f.thumb} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover" />
+              <img src={f.thumb} alt="" aria-hidden style={focusStyle(f.thumbFocus)} className="absolute inset-0 h-full w-full object-cover" />
               {f.thumbOver ? (
                 // eslint-disable-next-line @next/next/no-img-element -- the filmstrip's own layer, already cached
                 <img src={f.thumbOver} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover" />

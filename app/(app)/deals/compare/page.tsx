@@ -174,6 +174,8 @@ function toCol(
     pictures: bannerSources({
       dealId: deal.id,
       pictureCredit: picture ? PICTURE_CREDIT[picture.source] : null,
+      // The column crops the photograph: held at its subject (lib/photo-focus).
+      pictureFocus: picture?.focus ?? null,
       googleEnabled,
       hasStreetAddress: !!address?.street,
       hasAddress: !!address?.label,

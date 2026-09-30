@@ -118,9 +118,11 @@ export function DealThumb({
       {/* What holds the slot until the photograph has loaded whole (#446):
           its own blur-up preview where the cache has one (#463) — its
           colours at once — else the deal's cover, so a row never shows a
-          half-drawn picture. */}
+          half-drawn picture. The preview is the whole frame cropped to the
+          square, so it is held at the photograph's subject, where sharp cut
+          the thumbnail that fades in over it (lib/photo-focus). */}
       {base?.preview ? (
-        <span aria-hidden data-preview="thumb" className="absolute inset-0" style={previewStyle(base.preview)} />
+        <span aria-hidden data-preview="thumb" className="absolute inset-0" style={previewStyle(base.preview, base.focus)} />
       ) : cover ? (
         <DealCover cover={cover} label={label} size="thumb" className="absolute inset-0 h-full w-full" />
       ) : null}

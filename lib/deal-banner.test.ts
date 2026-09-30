@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BANNER, CARD, bannerSources } from "./deal-banner";
+import { BANNER, CARD, THUMB, bannerSources } from "./deal-banner";
 import { IMAGE_CREDIT, imagePlan } from "./imagery-plan";
 import { marketPictureFor } from "./market-picture";
 
@@ -93,5 +93,23 @@ describe("bannerSources — the deal's own photograph carries its blur-up previe
     expect(bannerSources({ ...base, memorandumUnread: true, picturePreview: PREVIEW })[0].preview).toBeUndefined();
     // Anything that is not a small image data URI is dropped, never styled.
     expect(bannerSources({ ...base, pictureCredit: "x", picturePreview: 'data:image/webp;base64,a");}' })[0].preview).toBeUndefined();
+  });
+});
+
+describe("bannerSources — the deal's own photograph carries where its subject is (lib/photo-focus)", () => {
+  it("on the stored photograph only, and only a point this site kept", () => {
+    const focus = { x: 0.203, y: 0.719 };
+    const got = bannerSources({ ...base, pictureCredit: "From the offering memorandum", pictureFocus: focus }, CARD);
+    expect(got[0]).toMatchObject({ kind: "photo", focus });
+    expect(got.slice(1).every((x) => x.focus === undefined)).toBe(true);
+    // The thumbnail's frame too: its preview is the whole frame, held there.
+    expect(bannerSources({ ...base, pictureCredit: "x", pictureFocus: focus }, THUMB)[0].focus).toEqual(focus);
+    // A photograph not yet looked for has no point yet: the centre.
+    expect(bannerSources({ ...base, memorandumUnread: true, pictureFocus: focus })[0].focus).toBeUndefined();
+    // Looked for and none found, or not a point at all: the centre.
+    expect(bannerSources({ ...base, pictureCredit: "x", pictureFocus: null })[0].focus).toBeUndefined();
+    expect(
+      bannerSources({ ...base, pictureCredit: "x", pictureFocus: { x: 3, y: 0 } as unknown as { x: number; y: number } })[0].focus,
+    ).toBeUndefined();
   });
 });
