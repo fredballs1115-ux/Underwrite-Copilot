@@ -44,6 +44,7 @@ import { readSale, saleNote } from "@/lib/sale-terms";
 import { readRoster, rosterNote } from "@/lib/tenant-roster";
 import { readValueAdd, valueAddNote } from "@/lib/value-add";
 import { readTaxAbatement, taxAbatementNote } from "@/lib/tax-abatement";
+import { readSellerFinancing, sellerFinancingNote } from "@/lib/seller-financing";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { countyOf, placeDeal } from "@/lib/market-county";
@@ -851,6 +852,11 @@ async function runAnalysisSteps(
         // assumable-debt traps by name.
         const assumable = readAssumable(ex, null);
         if (assumable) notes.push(assumableNote(assumable));
+
+        // A note the seller offers to carry (#462): the price that pays for
+        // its rate, the balloon, the underlying loan, a second and the paper.
+        const sellerNote = readSellerFinancing(ex, null);
+        if (sellerNote) notes.push(sellerFinancingNote(sellerNote));
 
         // A covenant or a contract that sets the rents (#453): the
         // restriction's facts, then each program's traps by name — a

@@ -899,6 +899,29 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The tax abatement")).toThrow();
   });
 
+  it("a seller's note (#462): the note as stated, then what it is worth against the model's new loan", async () => {
+    const withNote = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        metrics: [
+          ...extraction.metrics,
+          { label: "Seller financing amount", value: "$14,000,000", flagged: false, page: "p. 9" },
+          { label: "Seller financing rate", value: "5.00%", flagged: false, page: "p. 9" },
+          { label: "Seller financing term", value: "5 years", flagged: false, page: "p. 9" },
+          { label: "Seller financing amortization", value: "25 years", flagged: false, page: "p. 9" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(withNote));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The seller's note");
+    expect(String(cover.getCell(r, 3).value)).toBe("The seller offers to carry financing: $14.0M at 5.00% for 5 years, amortizing over 25 years");
+    expect(String(cover.getCell(r + 1, 3).value)).toMatch(/^The seller's note (is worth|returns)/);
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The seller's note")).toThrow();
+  });
+
   it("an auction (#456): how it is sold, then the ceiling bid at the screening hurdle", async () => {
     const auction = deriveUnderwriteInputs(
       {

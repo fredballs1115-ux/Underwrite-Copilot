@@ -328,6 +328,7 @@ export function DealView({
   modelVsMarket = null,
   metroDemand = null,
   assumable = null,
+  sellerNote = null,
   leaseholdExit = null,
 }: {
   dealId: string;
@@ -353,6 +354,9 @@ export function DealView({
    *  new loan (lib/assumable-debt, #417) — plain data; null where the
    *  memorandum offers none */
   assumable?: AssumableView | null;
+  /** a note the seller offers to carry, priced the same way (lib/seller-
+   *  financing, #462) — plain data; null where the memorandum offers none */
+  sellerNote?: AssumableView | null;
   /** a leasehold's exit valued on the term its ground lease has left at
    *  the model's sale (lib/leasehold-exit, #421) — plain data; null unless
    *  a leasehold states when its lease ends */
@@ -821,6 +825,7 @@ export function DealView({
             rateSeeds={rateSeeds}
             modelVsMarket={modelVsMarket}
             assumable={assumable}
+            sellerNote={sellerNote}
             leaseholdExit={leaseholdExit}
           />
         )}
@@ -911,6 +916,7 @@ function FinancialsPanel({
   rateSeeds = null,
   modelVsMarket = null,
   assumable = null,
+  sellerNote = null,
   leaseholdExit = null,
 }: {
   results: Results;
@@ -928,6 +934,7 @@ function FinancialsPanel({
   rateSeeds?: DealRateSeeds | null;
   modelVsMarket?: ModelVsMarket | null;
   assumable?: AssumableView | null;
+  sellerNote?: AssumableView | null;
   leaseholdExit?: LeaseholdExitView | null;
 }) {
   return (
@@ -958,6 +965,11 @@ function FinancialsPanel({
           its rate against the model's new loan, the coverage it buys, and
           what it is worth (#417). Renders nothing where none is offered. */}
       <AssumableLoanCard view={assumable} />
+
+      {/* A note the seller offers to carry (#462): the same comparison, the
+          note in the seller's loan's place. Renders nothing where none is
+          offered. */}
+      <AssumableLoanCard view={sellerNote} />
 
       {/* A leasehold's exit, valued on the years its ground lease has left
           at the model's sale (#421). Renders nothing for any other interest,

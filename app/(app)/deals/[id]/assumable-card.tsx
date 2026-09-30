@@ -62,6 +62,13 @@ function Pair({
 export function AssumableLoanCard({ view }: { view: AssumableView | null }) {
   if (!view) return null;
   const v = view;
+  // A note the seller offers to carry (#462) runs the same arithmetic in
+  // the seller's loan's place; only the words change.
+  const seller = v.kind === "seller";
+  const heading = seller ? "The seller's note, offered to carry the price" : "The loan in place, offered for assumption";
+  const theirs = seller ? "The seller's note" : "The loan in place";
+  const taking = seller ? "Taking the seller's note" : "Assuming the loan";
+  const id = seller ? "seller-note-heading" : "assumable-heading";
   const tiles = [
     v.pricePremium != null
       ? { label: "Worth in price", value: money(v.pricePremium), sub: `${v.pricePremiumPct ?? 0}% of the ask` }
@@ -77,7 +84,7 @@ export function AssumableLoanCard({ view }: { view: AssumableView | null }) {
       ? {
           label: v.extraEquity >= 0 ? "More equity" : "Less equity",
           value: money(Math.abs(v.extraEquity)),
-          sub: "the smaller balance, a larger cheque",
+          sub: v.extraEquity >= 0 ? "a smaller loan, a larger cheque" : "a larger loan, a smaller cheque",
         }
       : null,
     v.debtServiceSaved != null
@@ -92,13 +99,13 @@ export function AssumableLoanCard({ view }: { view: AssumableView | null }) {
   return (
     <section
       className="rounded-2xl border border-line bg-surface shadow-card print:break-inside-avoid"
-      data-qa="assumable-loan"
-      aria-labelledby="assumable-heading"
+      data-qa={seller ? "seller-note" : "assumable-loan"}
+      aria-labelledby={id}
     >
       <div className="border-b border-line px-5 py-4">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <h2 id="assumable-heading" className="text-sm font-semibold tracking-tight">
-            The loan in place, offered for assumption
+          <h2 id={id} className="text-sm font-semibold tracking-tight">
+            {heading}
           </h2>
           {v.page && <span className="font-mono text-[10px] text-muted">{v.page}</span>}
         </div>
@@ -112,7 +119,7 @@ export function AssumableLoanCard({ view }: { view: AssumableView | null }) {
               marker="assume-rate"
               format={pct2}
               rows={[
-                { label: "The loan in place", value: v.couponPct, tone: "bg-brand/70" },
+                { label: theirs, value: v.couponPct, tone: "bg-brand/70" },
                 { label: "A new loan today", value: v.marketPct, tone: "bg-ink/40" },
               ]}
             />
@@ -130,7 +137,7 @@ export function AssumableLoanCard({ view }: { view: AssumableView | null }) {
             marker="assume-dscr"
             format={times}
             rows={[
-              { label: "Assuming the loan", value: v.dscrAssume, tone: "bg-brand/70" },
+              { label: taking, value: v.dscrAssume, tone: "bg-brand/70" },
               { label: "The model's new loan", value: v.dscrNew, tone: "bg-ink/40" },
             ]}
           />
@@ -159,7 +166,7 @@ export function AssumableLoanCard({ view }: { view: AssumableView | null }) {
             prefetch={false}
             className="font-medium text-brand underline-offset-2 hover:underline"
           >
-            Run the assumption with other terms
+            {seller ? "Run the seller's note with other terms" : "Run the assumption with other terms"}
           </Link>
         </p>
       </div>

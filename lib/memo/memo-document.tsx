@@ -37,6 +37,7 @@ import { readSale, saleShortLine } from "@/lib/sale-terms";
 import { readRoster, rosterShortLine } from "@/lib/tenant-roster";
 import { readValueAdd, valueAddShortLine } from "@/lib/value-add";
 import { readTaxAbatement, taxAbatementShortLine } from "@/lib/tax-abatement";
+import { readSellerFinancing, sellerFinancingLine } from "@/lib/seller-financing";
 import { floodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -162,6 +163,14 @@ function valueAddLineFor(extraction: ExtractionResult | null): string {
   return r ? valueAddShortLine(r) : "";
 }
 
+/** A note the seller offers to carry (lib/seller-financing, #462), in one
+ *  line for the memo's header: the note as stated — the pricing needs the
+ *  model, which the report carries. "" where none is offered. */
+function sellerNoteLineFor(extraction: ExtractionResult | null): string {
+  const s = extraction ? readSellerFinancing(extraction, null) : null;
+  return s ? sellerFinancingLine(s.terms) : "";
+}
+
 /** A property-tax abatement (lib/tax-abatement, #461), in one line for the
  *  memo's header: the program, when it ends and the step-up. "" where the
  *  memorandum states none. */
@@ -229,6 +238,9 @@ export type MemoData = {
   /** a property-tax abatement (lib/tax-abatement, #461), in one line; ""
    *  where none is stated */
   taxAbatementLine?: string;
+  /** a note the seller offers to carry (lib/seller-financing, #462), in
+   *  one line; "" where none is offered */
+  sellerNoteLine?: string;
   /** FEMA's flood zone at the building (lib/site-flags `floodShortLine`,
    *  #426) — a Special Flood Hazard Area or a drawn hazard; "" for minimal
    *  hazard, no digital map or a lookup that has not answered */
@@ -480,6 +492,7 @@ export function buildMemoData(
     rosterLine: pdfSafe(rosterLineFor(extraction ?? null)),
     valueAddLine: pdfSafe(valueAddLineFor(extraction ?? null)),
     taxAbatementLine: pdfSafe(taxAbatementLineFor(extraction ?? null)),
+    sellerNoteLine: pdfSafe(sellerNoteLineFor(extraction ?? null)),
     floodLine: pdfSafe(floodLineFor(deal)),
     dateStr,
     verdictWord: vmeta?.word ?? null,
@@ -926,6 +939,8 @@ export function MemoPage({ data }: { data: MemoData }) {
             {data.saleLine && <Text style={[s.sub, { color: "#8a5a00", fontFamily: "Helvetica-Bold" }]}>{data.saleLine}</Text>}
             {/* The seller's loan offered for assumption (#419), as stated. */}
             {data.assumableLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.assumableLine}</Text>}
+            {/* A note the seller offers to carry (#462), as stated. */}
+            {data.sellerNoteLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.sellerNoteLine}</Text>}
             {/* A covenant or a contract that sets the rents (#453): the
                 restricted units' rents move with the limits, not the market. */}
             {data.affordableLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.affordableLine}</Text>}

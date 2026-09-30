@@ -4,6 +4,7 @@
 // the same path as /api/deals/[id]/report — buildReportData with buy-box
 // checks AND the sensitivity grids — so a redesign that breaks any page
 // fails in CI, not at a user's download click.
+import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
 import { afterEach, describe, it, expect, vi } from "vitest";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
@@ -545,6 +546,42 @@ describe("ReportDocument (full report)", () => {
     const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
     expect(text).toContain("Tax abatement: 10-year Philadelphia tax abatement; ends 2099");
     expect(text).toContain("so the next buyer takes the step-up and prices it");
+  }, 60000);
+
+  it("prints a seller's note beside the grids, priced against the model's new loan (#462)", async () => {
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "", basis: "na" as const });
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        row("Seller financing amount", "70% of the purchase price"),
+        row("Seller financing rate", "5.00%"),
+        row("Seller financing term", "5 years"),
+        row("Seller financing amortization", "25 years"),
+      ],
+    } as ExtractionResult;
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const s = readSellerFinancing(extraction, derived.inputs)!;
+    const input = buildReportData(deal, "September 30, 2026", [], sensitivity, undefined, null, null, undefined, null, null, null, null, null, null, null, null, null, null, null, sellerFinancingView(s, null, false));
+    const buf = await renderToBuffer(
+      React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("The seller's note, offered to carry the price");
+    expect(text).toContain("The note's 5.00% against 6.00% for a new one — 100 bps under.");
+    expect(text).toMatch(/The seller's note (is worth|returns)/);
   }, 60000);
 
   it("prints a leasehold's exit on the term its lease has left at the sale, with the term and the two exits drawn (#422)", async () => {

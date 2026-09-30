@@ -69,6 +69,10 @@ export interface PipelineExportRow {
    *  (lib/tax-abatement `taxAbatementTag`, #461); carried in the price
    *  cell's note */
   abatement?: string | null;
+  /** a note the seller offers to carry — "Seller financing 5.00%"
+   *  (lib/seller-financing `sellerFinancingTag`, #462); carried in the
+   *  price cell's note */
+  sellerNote?: string | null;
   /** the going-in cap on today's income — always null on a plan deal */
   cap: string | null;
   /** a plan deal's stabilized NOI over total cost, e.g. "11.7%" */
@@ -235,6 +239,7 @@ export async function buildPipelineWorkbook(
         d.roster ? `${d.roster}: the listed tenants against the model's sale — the deal page reads the roll, the anchors and their rights.` : null,
         d.valueAdd ? `${d.valueAdd}: the renovation program as stated — the deal page reads its proof, its pace and what the model does not carry.` : null,
         d.abatement ? `${d.abatement}: the NOI is on an abated tax bill — the deal page reads when it ends and what it is worth.` : null,
+        d.sellerNote ? `${d.sellerNote}: the seller offers to carry financing — the deal page prices the note against today's rate.` : null,
       ].filter((n): n is string => n != null);
       if (notes.length) priceCell.note = notes.join(" ");
 

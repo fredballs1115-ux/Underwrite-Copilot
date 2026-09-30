@@ -780,6 +780,24 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("a seller's note: the challenger reads the note and the seller-financing traps (#462)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      metrics: [
+        ...EXTRACTION.metrics,
+        { label: "Seller financing amount", value: "$10,000,000", flagged: false, page: "", basis: "na" },
+        { label: "Seller financing rate", value: "5.00%", flagged: false, page: "", basis: "na" },
+        { label: "Seller financing term", value: "5 years", flagged: false, page: "", basis: "na" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("The memorandum says the seller will carry financing: $10.0M at 5.00% for 5 years.");
+    expect(note).toContain("SELLER-FINANCING TRAPS, checked by name");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
   it("a single-market deal stores no other markets' figures", async () => {
     state.deals.d1.address = { city: "Washington", state: "DC" };
     state.rates = [{ series_id: "WASH911URN", obs_date: "2026-07-01", value: 3.4 }];

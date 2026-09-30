@@ -96,7 +96,8 @@ const CARDS: DealCard[] = [
   // A 49% LP interest: the row says what the price buys beside the figure.
   card({ id: "g", name: "Harbor View Apartments", verdict: "caution", stage: "underwriting", addedBy: "Jordan Lee", fit: "fits", score: 79, mandateVerdict: "PURSUE", slots: { cap: "5.9%", price: "$41,250,000", yoc: null, interest: "49% share" }, market: "Baltimore, MD", coveredMarket: "Baltimore" }),
   card({ id: "h", name: "Sample — The Maddox at Brewerytown", verdict: "caution", stage: "screening", fit: "near", score: 71, mandateVerdict: "WATCH", slots: { cap: "5.6%", price: "$68,000,000", yoc: null }, market: "Brewerytown, Philadelphia, PA", coveredMarket: "Philadelphia" }),
-  card({ id: "i", name: "Lakewood Self Storage", assetClass: "self_storage", verdict: "pass", stage: "closed", fit: null, slots: { cap: "6.4%", price: "$9,800,000", yoc: null }, market: "Lakewood, CO", coveredMarket: null }),
+  // A note the seller will carry (#462).
+  card({ id: "i", name: "Lakewood Self Storage", assetClass: "self_storage", verdict: "pass", stage: "closed", fit: null, slots: { cap: "6.4%", price: "$9,800,000", yoc: null, sellerNote: "Seller financing 5.00%" }, market: "Lakewood, CO", coveredMarket: null }),
   card({ id: "j", name: "Unpriced land — Route 1 parcel", verdict: "caution", stage: "screening", fit: null, slots: { cap: null, price: null, yoc: null }, market: "Laurel, MD", coveredMarket: "Baltimore" }),
   // A run whose process died mid-screen, and a re-screen that failed before
   // its verdict — the stored verdict must not read as the current call.
@@ -255,6 +256,9 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // step-up when it ends.
     expect((text.match(/Tax abated, 4 yrs left, \+\$450k\/yr/g) ?? []).length).toBe(4);
     expect(html).toContain("Tax abated, 4 yrs left, +$450k/yr: the NOI is on an abated tax bill");
+    // A note the seller will carry, at every width too (#462).
+    expect((text.match(/Seller financing 5\.00%/g) ?? []).length).toBe(4);
+    expect(html).toContain("Seller financing 5.00%: the seller offers to carry financing");
   });
 
   it("draws the pipeline as photograph-led cards by default: the building's picture, the call over it, the three figures (#428)", () => {
@@ -376,6 +380,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect((text.match(/Shadow-anchored, 56% rolls in 5 yrs/g) ?? []).length).toBe(1);
     expect((text.match(/Reno \$250\/mo, 20% on cost/g) ?? []).length).toBe(1);
     expect((text.match(/Tax abated, 4 yrs left, \+\$450k\/yr/g) ?? []).length).toBe(1);
+    expect((text.match(/Seller financing 5\.00%/g) ?? []).length).toBe(1);
     // The three figures a pipeline is read by; a plan deal's yield on cost
     // takes the cap's slot under its own label.
     expect(text).toContain("$68.0M");
@@ -4862,6 +4867,69 @@ describe("AssumableLoanCard — the rate, the coverage and what the loan is wort
     expect(html).not.toContain('data-qa="assumable-figures"');
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(text)).toEqual([]);
+  });
+});
+
+// ── A note the seller offers to carry (#462) ─────────────────────────────────
+import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
+
+describe("AssumableLoanCard — a note the seller offers to carry, in the seller's loan's place", () => {
+  const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 12", basis: "na" as const });
+  const inputs = deriveForAssumable(SAMPLE_DEAL.extraction as ExtractionResult, SAMPLE_DEAL.name).inputs;
+  const withNote = (rows: ReturnType<typeof row>[]) =>
+    ({ ...SAMPLE_DEAL.extraction, totalPages: 40, metrics: [...SAMPLE_DEAL.extraction.metrics, ...rows] }) as ExtractionResult;
+
+  it("says it is the seller's note, draws the note against a new loan and the coverage, and links to the tools card", () => {
+    const s = readSellerFinancing(
+      withNote([
+        row("Seller financing amount", "70% of the purchase price"),
+        row("Seller financing rate", "5.00%"),
+        row("Seller financing term", "5 years"),
+        row("Seller financing amortization", "25 years"),
+      ]),
+      inputs,
+    )!;
+    const html = render(React.createElement(AssumableLoanCard, { view: sellerFinancingView(s, null, false) }));
+    dumpView("seller-note", html);
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="seller-note"');
+    expect(text).toContain("The seller's note, offered to carry the price");
+    expect(text).toContain("$47.6M (70% of the price) at 5.00% for 5 years, amortizing over 25 years");
+    expect(text).toMatch(/The seller's note\s+5\.00%/);
+    expect(text).toMatch(/A new loan today\s+6\.00%/);
+    expect(text).toMatch(/Taking the seller's note\s+[\d.]+×/);
+    expect(text).toContain("Less equity");
+    expect(text).toContain("a larger loan, a smaller cheque");
+    expect(text).toContain("The note's 70% of the price is struck on the model's $68.0M price.");
+    expect(text).toContain("Run the seller's note with other terms");
+    expect(text).not.toContain("offered for assumption");
+    expect(a11yIssues(html), "seller note card").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+});
+
+describe("ShareView — a note the seller offers to carry, as stated (#462)", () => {
+  it("says the note under the title, and nothing on the sample", () => {
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "", basis: "na" as const });
+    const props = {
+      dealName: SAMPLE_DEAL.name,
+      assetClass: SAMPLE_DEAL.asset_class,
+      expiresAt: "2026-09-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      metrics: [...SAMPLE_DEAL.extraction.metrics, row("Seller financing amount", "$40,000,000"), row("Seller financing rate", "5.00%"), row("Seller financing term", "5 years")],
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction }));
+    expect(html).toContain('data-qa="share-seller-note"');
+    expect(visibleText(html)).toContain("The seller offers to carry financing: $40.0M at 5.00% for 5 years");
+    expect(a11yIssues(html)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }))).not.toContain("share-seller-note");
   });
 });
 

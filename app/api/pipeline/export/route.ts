@@ -11,6 +11,7 @@ import { saleTag } from "@/lib/sale-terms";
 import { rosterTag } from "@/lib/tenant-roster";
 import { valueAddTag } from "@/lib/value-add";
 import { taxAbatementTag } from "@/lib/tax-abatement";
+import { sellerFinancingTag } from "@/lib/seller-financing";
 import { getTeam } from "@/lib/teams";
 import { getActiveBranding } from "@/lib/branding-server";
 import {
@@ -147,6 +148,7 @@ export async function GET(req: Request) {
       roster: rosterTag(extraction),
       valueAdd: valueAddTag(extraction),
       abatement: taxAbatementTag(extraction),
+      sellerNote: sellerFinancingTag(extraction),
       cap: plan ? null : (findGoingInCap(metrics)?.value ?? null),
       yieldOnCost:
         plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,
