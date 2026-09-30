@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { METRO_VIEWS } from "@/lib/metro-imagery";
+import { metroView } from "@/lib/metro-imagery";
 import { skylineFor, skylineSrcSet, skylineTag } from "@/lib/skyline";
 import { SkylineCreditText } from "./photo-credit";
 
@@ -73,7 +73,7 @@ export function CityPhoto({
   sizes?: string;
 }) {
   const shot = skylineFor(metro);
-  const view = METRO_VIEWS[metro];
+  const view = metroView(metro);
   const [mode, setMode] = useState<"skyline" | "aerial" | "none">(
     shot ? "skyline" : view ? "aerial" : "none",
   );

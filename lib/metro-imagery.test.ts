@@ -86,4 +86,9 @@ describe("metroView", () => {
     expect(metroView("atlantis")).toBeNull();
     expect(metroView("")).toBeNull();
   });
+  it("reads an id off a URL that names what every object inherits as unknown", () => {
+    for (const id of ["constructor", "__proto__", "toString", "hasOwnProperty", "valueOf"]) {
+      expect(metroView(id), id).toBeNull();
+    }
+  });
 });

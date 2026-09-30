@@ -80,8 +80,11 @@ export const METRO_VIEWS: Record<string, MetroView> = {
  */
 export const METRO_FRAME_METRES = 1200;
 
+/** A market's frame, or null. The id may come straight off a URL (the
+ *  overhead route), so only the table's OWN keys answer — an indexed read
+ *  also finds what every object inherits ("constructor", "__proto__"). */
 export function metroView(id: string): MetroView | null {
-  return METRO_VIEWS[id] ?? null;
+  return Object.hasOwn(METRO_VIEWS, id) ? METRO_VIEWS[id] : null;
 }
 
 /** Rough continental-US bounds, incl. Alaska/Hawaii headroom — a coordinate

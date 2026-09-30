@@ -1,6 +1,6 @@
 import Link from "next/link";
 import metrosSeed from "@/data/research/metros.json";
-import { METRO_VIEWS } from "@/lib/metro-imagery";
+import { metroView } from "@/lib/metro-imagery";
 import { MARKET_COUNT, metroFact, researchAsOf } from "./markets-marquee";
 import { CityPhoto } from "./city-photo";
 import { OVERHEAD_GRID_CREDIT, galleryCredit, hasSkyline } from "@/lib/skyline";
@@ -36,7 +36,7 @@ export function MarketsGallery() {
         name: entry.name,
         fact: fact?.text ?? entry.region ?? "covered market",
         asOf: fact?.asOf ?? null,
-        place: METRO_VIEWS[entry.id]?.place ?? null,
+        place: metroView(entry.id)?.place ?? null,
         dmv: entry.region === "DMV core",
       };
     })

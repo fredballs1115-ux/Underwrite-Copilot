@@ -1154,13 +1154,20 @@ export const SKYLINES: Record<string, SkylineShot> = {
   },
 };
 
+/**
+ * A market's photograph, or null. The id may come straight off a URL (the
+ * skyline route, the link preview's card), so only the table's OWN keys
+ * answer: an indexed read or `in` also finds what every object inherits,
+ * and "constructor", "__proto__" or "toString" read as a photograph with
+ * no file — a request to Commons for nothing, or a 500.
+ */
 export function skylineFor(id: string): SkylineShot | null {
-  return SKYLINES[id] ?? null;
+  return Object.hasOwn(SKYLINES, id) ? SKYLINES[id] : null;
 }
 
 /** Does this market have a verified photograph yet? */
 export function hasSkyline(id: string): boolean {
-  return id in SKYLINES;
+  return Object.hasOwn(SKYLINES, id);
 }
 
 /**
@@ -1200,7 +1207,7 @@ export function commonsUrl(file: string, width: number): string {
  * is a cache key, never a checksum — nothing here is trusting it.
  */
 export function skylineTag(id: string): string {
-  const shot = SKYLINES[id];
+  const shot = skylineFor(id);
   if (!shot) return "0";
   let h = 2166136261;
   for (let i = 0; i < shot.file.length; i++) {
@@ -1286,7 +1293,7 @@ export function skylineCredit(shot: SkylineShot): { place: string; author: Credi
  *  their files shown, and each licence once, linked to its text. Null where
  *  no market shown has a photograph. */
 export function galleryCreditParts(ids: readonly string[]): { authors: CreditLink[]; licenses: CreditLink[] } | null {
-  const shots = ids.map((id) => SKYLINES[id]).filter((s): s is SkylineShot => Boolean(s));
+  const shots = ids.map((id) => skylineFor(id)).filter((s): s is SkylineShot => Boolean(s));
   if (shots.length === 0) return null;
   const authors = new Map<string, CreditLink>();
   for (const s of shots) {

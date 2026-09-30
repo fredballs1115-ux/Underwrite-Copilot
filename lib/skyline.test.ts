@@ -6,6 +6,7 @@ import {
   commonsPage,
   commonsUrl,
   creditLine,
+  galleryCreditParts,
   hasSkyline,
   headerSafe,
   skylineFor,
@@ -73,6 +74,15 @@ describe("the market photograph table", () => {
     for (const id of Object.keys(SKYLINES)) {
       expect(hasSkyline(id)).toBe(true);
       expect(skylineFor(id)?.file).toBe(SKYLINES[id].file);
+    }
+  });
+
+  it("reads an id off a URL that names what every object inherits as no market at all", () => {
+    for (const id of ["constructor", "__proto__", "toString", "hasOwnProperty", "valueOf"]) {
+      expect(skylineFor(id), id).toBeNull();
+      expect(hasSkyline(id), id).toBe(false);
+      expect(skylineTag(id), id).toBe("0");
+      expect(galleryCreditParts([id]), id).toBeNull();
     }
   });
 });

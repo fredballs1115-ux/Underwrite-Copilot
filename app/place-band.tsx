@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { CityPhoto } from "./city-photo";
-import { METRO_VIEWS } from "@/lib/metro-imagery";
+import { metroView } from "@/lib/metro-imagery";
 import { hasSkyline } from "@/lib/skyline";
 
 // A real place behind a page's opening words.
@@ -182,7 +182,7 @@ export function PlaceBackdrop({
   // aerial too — and would have blanked the band for the first market that
   // got a photograph without one. CityPhoto decides between them; this only
   // decides whether there is anything to decide between.
-  if (!METRO_VIEWS[metro] && !hasSkyline(metro)) return null;
+  if (!metroView(metro) && !hasSkyline(metro)) return null;
   return (
     <div className={`pointer-events-none ${scrim === "hero" ? HERO_STRIP : "absolute inset-0"}`}>
       {/* Offered at the skyline's widths (#451), each encoded again at a
