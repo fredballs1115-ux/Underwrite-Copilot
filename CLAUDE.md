@@ -1917,10 +1917,22 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   medical office, a net lease, storage, a hotel and the rest read none,
   since a neighbour's figure is not theirs — as a vacancy BAND (a spread
   is never averaged into a printed number: a band is two published
-  figures, a point one), the cap range where the tracker has one, the
-  snapshot's day and the first source's host. It is dated research, not a
-  feed, and every sentence says so ("on the research tracker (as of Aug
-  25, 2026; colliers.com) — a quarterly print, not a feed"). Three reads:
+  figures, a point one), the cap range where the tracker has one, and the
+  snapshot's day. **Each figure carries its own provenance** (2026-09-30):
+  a block's `vacancy_read` and `cap_read` name the house, the area and the
+  period the figure is for, its links and what the figure is (`construct`,
+  `slice`), each taken only from that block's own note and source list —
+  `figureRead` counts a link only where it is one of the block's sources,
+  and a figure the file dates nowhere says "undated" (`figureCitation`)
+  rather than borrowing the block's first source, which had credited
+  Chicago's Essex Realty cap average to JPMorgan. It is research, not a
+  feed, and every sentence says so ("Office vacancy reads 19.2% on the
+  research tracker: Colliers, Suburban Maryland (Montgomery and Prince
+  George's together, not a county split), Q1 2026 (read Aug 25, 2026) — a
+  research print, not a feed"); the benchmark rows the research panel
+  prints carry the same citation (`Benchmark.cite`). A lab, an
+  outdoor-storage yard or a cold-storage warehouse, named so in the class
+  or the deck's own class words, reads no tracker. Three reads:
   a commercial deal's stabilized vacancy — which had no row, the Census
   survey counting rental housing only — is set against the band (under
   its low end tighter, over its high end looser and conservative, inside
@@ -1929,9 +1941,20 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   the tracker has a cap range the exit-cap check adds it to the 10-year
   read (over its high end the conservative direction for an exit, under
   its low end "cap compression on top of the spread read") and its scope
-  becomes the metro's. `modelVsMarketFor` reads it, so the page, the
+  becomes the metro's — unless the file says the range is for a narrower
+  stock than the class (`slice`: Chicago's Class B/C small buildings,
+  Miami's and Boston's core), which is named and shown but never held
+  against the exit. `modelVsMarketFor` reads it, so the page, the
   report and the workbook agree; `modelVsMarket` takes it as `tracker`,
-  and a read without one is exactly as before.
+  and a read without one is exactly as before. **Where the documents
+  state no cap**, the exit is set against the going-in cap their NOI over
+  their price implies (through `buildingPriceOf`'s rules: a share grossed
+  up, none for a note or a leased fee, none on a plan deal), said as
+  implied; the model's own default exit is unchanged (an owner item). The
+  three surfaces' scope sentence is `readScope` in
+  `lib/model-vs-market-scope.ts` ("set against the published figures for
+  the Washington DC market and the nation, read on …" — the nation named
+  only where a national figure was read, a state called a state).
 - HUD's fair market rents (#476): `lib/fmr.ts` (pure, no runtime
   imports, so the two scripts load it under plain Node) is the one reader.
   `fmrOf` reads a metros.json entry's `fmr` block — `fy`, `effective`,
