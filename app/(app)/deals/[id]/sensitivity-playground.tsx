@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
+import { costAssumptionsLine } from "@/lib/underwrite/cost-note";
 import {
   sliderValues,
   runScenario,
@@ -240,6 +241,11 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         <Metric label="Year-1 CoC" value={fmtPct(current.cocYr1Pct)} cur={current.cocYr1Pct} was={base.cocYr1Pct} baseText={fmtPct(base.cocYr1Pct)} dirty={dirty} />
         <Metric label="Year-1 DSCR" value={fmtX(current.dscrYr1)} cur={current.dscrYr1} was={base.dscrYr1} baseText={fmtX(base.dscrYr1)} dirty={dirty} />
       </div>
+      {/* The costs these returns carry and the card cannot show: the
+          model's defaults, said as defaults (lib/underwrite/cost-note). */}
+      <p className="mt-2 text-[11px] leading-relaxed text-muted" data-qa="playground-costs">
+        {costAssumptionsLine(inputs)}
+      </p>
 
       {bid && (
         <MaxBidCard
