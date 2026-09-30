@@ -60,6 +60,20 @@ describe("each public page states its own canonical and link preview", () => {
     expect(title.split(SITE_NAME).length - 1, title).toBe(1);
   });
 
+  it.each(PAGES)("%s has a description a search result can show", (_path, m) => {
+    // A meta description is a line under a search result: /tools' ran to
+    // 3,317 characters, every card on the page listed in prose.
+    expect(typeof m.description).toBe("string");
+    expect((m.description as string).length).toBeGreaterThan(40);
+    expect((m.description as string).length).toBeLessThanOrEqual(200);
+  });
+
+  it("keeps /tools' figures out of the Referer header", () => {
+    // Its links carry the figures typed into it in the query string.
+    expect(tools.referrer).toBe("no-referrer");
+    expect((tools.description as string).length).toBeLessThanOrEqual(160);
+  });
+
   it("titles /tools and /why the way a reader sees them", () => {
     expect(renderedTitle(tools)).toBe(`Deal math · ${SITE_NAME}`);
     expect(renderedTitle(why)).toBe("Why Underwrite Copilot");
