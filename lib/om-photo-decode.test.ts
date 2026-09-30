@@ -3,10 +3,15 @@ import { describe, expect, it } from "vitest";
 import {
   COVER_PAGES,
   FLAT_SHARE,
+  GALLERY_PAGES,
   IMAGE_KIND,
+  NEAR_BITS,
   coverShaped,
   decodeOmCover,
+  decodeOmPhotos,
+  differenceHash,
   flatShare,
+  hashDistance,
   isGrey,
   pickDecodedCover,
   type ImageCandidate,
@@ -19,6 +24,8 @@ import {
   coverOf,
   currentPicture,
   derivePicture,
+  galleryOf,
+  hashOf,
   pictureMayBeInMemorandum,
   searchedRecently,
   staleOmPicture,
@@ -310,3 +317,95 @@ describe("the cover page's photograph, never a map (#444)", () => {
   });
 });
 
+describe("the memorandum's other photographs (#448)", () => {
+  const raw = (variant: number, w = W, h = H) => testPixels(w, h, variant);
+
+  it("hashes a picture and its resized copy as one, and two photographs as two", async () => {
+    const a = raw(1);
+    const small = await sharp(a, { raw: { width: W, height: H, channels: 3 } }).resize(480, 300).raw().toBuffer();
+    const ha = differenceHash(a, W, H, 3);
+    expect(hashDistance(ha, ha)).toBe(0);
+    expect(hashDistance(ha, differenceHash(small, 480, 300, 3))).toBeLessThanOrEqual(NEAR_BITS);
+    for (const other of [0, 2, 3]) {
+      expect(hashDistance(ha, differenceHash(raw(other), W, H, 3)), `variant ${other}`).toBeGreaterThan(NEAR_BITS * 2);
+    }
+    // The cover arrives as a file where the memorandum stores its JPEG: the
+    // same photograph by the same rule.
+    const file = await testPicture(W, H, "jpeg", 1);
+    expect(hashDistance(ha, (await hashOf(file))!)).toBeLessThanOrEqual(NEAR_BITS);
+  });
+
+  const memorandum = async () => {
+    const cover = await testPicture(W, H, "jpeg", 1);
+    const copy = await sharp(cover).resize(560, 350).jpeg({ quality: 80 }).toBuffer();
+    return testMemorandum([
+      { images: [cover] },
+      { text: "Confidentiality" },
+      { images: [copy, await testPicture(W, H, "jpeg", 2)] },
+      { images: [await testMap(1600, 1100, "jpeg")] },
+      { images: [await testPicture(640, 480, "png", 3)] },
+    ]);
+  };
+
+  it("reads each photograph of the first pages in page order, passing over a copy and a map", async () => {
+    const pdf = await memorandum();
+    const pages: number[] = [];
+    const read = await decodeOmPhotos(pdf, (p) => {
+      pages.push(p.page);
+    });
+    expect(read).toEqual({ opened: true, found: 3, aborted: false });
+    expect(pages).toEqual([1, 3, 5]);
+  });
+
+  it("passes over the cover by its hash, so the cover is never shown twice", async () => {
+    const pdf = await memorandum();
+    const pages: number[] = [];
+    await decodeOmPhotos(pdf, (p) => void pages.push(p.page), { skip: [differenceHash(raw(1), W, H, 3)] });
+    expect(pages).toEqual([3, 5]);
+  });
+
+  it("stops at the most it keeps, and reads no further than its pages", async () => {
+    const pdf = await memorandum();
+    const first: number[] = [];
+    expect(await decodeOmPhotos(pdf, (p) => void first.push(p.page), { max: 1 })).toEqual({ opened: true, found: 1, aborted: false });
+    expect(first).toEqual([1]);
+    const late = await testMemorandum([
+      ...Array.from({ length: GALLERY_PAGES }, (_, i) => ({ text: `Page ${i + 1}` })),
+      { images: [await testPicture(W, H, "jpeg", 2)] },
+    ]);
+    expect(await decodeOmPhotos(late, () => {})).toEqual({ opened: true, found: 0, aborted: false });
+  });
+
+  it("gives way the moment a cover is waiting, and an incomplete gallery is never a gallery", async () => {
+    const pdf = await memorandum();
+    let waiting = false;
+    const pages: number[] = [];
+    const read = await decodeOmPhotos(pdf, (p) => {
+      pages.push(p.page);
+      waiting = true;
+    }, { yieldTo: () => waiting });
+    expect(read).toEqual({ opened: true, found: 1, aborted: true });
+    expect(pages).toEqual([1]);
+    expect(await galleryOf(pdf, [], () => true)).toBeNull();
+  });
+
+  it("reads nothing from a file that asks for a password to open", async () => {
+    const locked = await testMemorandum([{ images: [await testPicture(W, H, "jpeg", 2)] }], "user-password");
+    expect(await decodeOmPhotos(locked, () => {})).toEqual({ opened: false, found: 0, aborted: false });
+  });
+
+  it("derives each photograph beside the cover as the cover is, with its page", async () => {
+    const pdf = await memorandum();
+    const cover = await coverOf(pdf);
+    expect(cover).not.toBeNull();
+    const hash = await hashOf(cover!);
+    const gallery = await galleryOf(pdf, [hash!]);
+    expect(gallery?.map((g) => g.page)).toEqual([3, 5]);
+    for (const g of gallery ?? []) {
+      // Enlarged cleanly like a small cover (#446), and a thumbnail beside it.
+      expect(Math.max(g.width, g.height)).toBeGreaterThanOrEqual(HERO_MIN_PX);
+      const thumb = await sharp(g.thumb).metadata();
+      expect({ w: thumb.width, h: thumb.height }).toEqual({ w: 240, h: 240 });
+    }
+  });
+});

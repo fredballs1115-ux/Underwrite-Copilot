@@ -147,6 +147,24 @@ export function a11yIssues(html: string): string[] {
 }
 
 /**
+ * Elements carrying two position utilities at one breakpoint — `relative`
+ * beside `absolute` — where the stylesheet's order silently decides which
+ * applies. `relative` won (#448): a deal's cover laid under a loading
+ * photograph took the frame's place in the flow, so the card's frame
+ * showed no cover and a list row's photograph was pushed out of its slot,
+ * and no test saw it, because the markup was all there.
+ */
+export function positionConflicts(html: string): string[] {
+  const position = new Set(["static", "fixed", "absolute", "relative", "sticky"]);
+  const out: string[] = [];
+  for (const m of html.matchAll(/\sclass="([^"]*)"/g)) {
+    const found = m[1].split(/\s+/).filter((t) => position.has(t));
+    if (found.length > 1) out.push(`${found.join(" + ")} in "${m[1].slice(0, 80)}"`);
+  }
+  return out;
+}
+
+/**
  * The visual half of a render smoke test, run by hand: with VIEW_SHOTS_DIR
  * set, each rendered view is also written as a complete document — the
  * signed-in app's shell around it, the built stylesheets (VIEW_SHOTS_CSS, a

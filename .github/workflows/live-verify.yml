@@ -1065,6 +1065,8 @@ jobs:
           mark "#445 the building full screen" grep -q "See the building full screen" p_whats-new.html
           # #446 — sharp pictures, loaded whole: its card (the widths are the PHOTOGRAPHS step's).
           mark "#446 sharper pictures on your cards" grep -q "Sharper pictures on your cards" p_whats-new.html
+          # #448 — the memorandum's other photographs on the deal (signed-in): its card.
+          mark "#448 the memorandum's other photos" grep -q "other photos, on the deal" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

@@ -54,7 +54,7 @@ import { ToastProvider } from "@/app/(app)/toaster";
 import { ScoredFeedView, type AlertRow, type ItemRow } from "@/app/(app)/news/scored-feed";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { capSpreadRead, leverageRead } from "@/lib/leverage";
-import { a11yIssues, dumpView, gluedWords, visibleText } from "./render-lint";
+import { a11yIssues, dumpView, gluedWords, positionConflicts, visibleText } from "./render-lint";
 
 function render(node: React.ReactElement): string {
   return renderToStaticMarkup(React.createElement(ToastProvider, null, node));
@@ -189,6 +189,10 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(html).not.toContain("/aerial?");
     expect(html).toContain('src="/api/deals/b/picture?size=thumb"');
     expect(html).toMatch(/<img[^>]*data-lift="photo"[^>]*>/);
+    // The cover under a loading photograph is laid over the slot, never in
+    // it (#448): positioned twice, it took the slot and pushed the row's
+    // photograph out of sight.
+    expect(positionConflicts(html)).toEqual([]);
     // …at every width (#420): the picture was hidden on a phone. The row's
     // call leads the price line there instead of taking a column from the
     // name — the column is hidden below `sm`, so each live row carries its
@@ -236,6 +240,8 @@ describe("Pipeline — every card shape renders and reads clean", () => {
         CARD,
       ),
       cover: coverFor({ seed: c.id, assetClass: c.assetClass, place: c.market || null }),
+      // The deal with its own photograph holds five on its page (#448).
+      photos: c.id === "b" ? 5 : 0,
     }));
     const html = render(
       React.createElement(Pipeline, {
@@ -276,6 +282,11 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(photo).toContain('fetchPriority="high"');
     expect(photo).toContain("motion-safe:group-hover:scale-[1.03]");
     expect((html.match(/data-deal-cover=/g) ?? []).length).toBe(live.length);
+    expect(positionConflicts(html)).toEqual([]);
+    // Over the deal's own photograph, the card counts the photographs its
+    // deal page holds (#448), and a reader hears the word; nowhere else.
+    expect((html.match(/data-picture="photo-count"/g) ?? []).length).toBe(1);
+    expect(html).toMatch(/data-picture="photo-count"[^>]*>[\s\S]*?<span>5<\/span><span class="sr-only"> photographs<\/span>/);
     // A memorandum nobody has read the cover of yet is searched OVER the
     // next picture (#440): the Maddox shows its cover at once, and the
     // memorandum's is asked for on top of it, unseen and unannounced until
@@ -3366,6 +3377,69 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
     expect(area).toContain("Neighborhood placement");
     // No flood prop, no Flood tab.
     expect(renderToStaticMarkup(React.createElement(PropertyVisual, { ...base, picture: null }))).not.toContain("/flood?");
+  });
+
+  const gallery = [
+    { page: 3, credit: "From the offering memorandum, page 3" },
+    { page: 7, credit: "From the offering memorandum, page 7" },
+  ];
+
+  it("follows the cover with the memorandum's other photographs, each a view of its own (#448)", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(PropertyVisual, {
+        ...base,
+        picture: { credit: "From the offering memorandum", source: "om" as const },
+        gallery,
+      }),
+    );
+    dumpView("property-visual-gallery", html);
+    expect(a11yIssues(html), "a11y property-visual gallery").toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    // The cover leads; the others follow it in the filmstrip, numbered.
+    expect(html).toMatch(/aria-pressed="true" data-view-thumb="photo"/);
+    expect(html).toContain('data-view-thumb="g1"');
+    expect(html).toContain('data-view-thumb="g2"');
+    expect(html.indexOf('data-view-thumb="g2"')).toBeLessThan(html.indexOf('data-view-thumb="aerial"'));
+    for (const label of ["Photo 1", "Photo 2", "Photo 3"]) expect(text).toContain(label);
+    // The filmstrip draws each one's stored crop; its full-size picture
+    // waits for its view to be opened.
+    expect(html).toContain('src="/api/deals/d1/picture?size=thumb&amp;g=1"');
+    expect(html).toContain('src="/api/deals/d1/picture?size=thumb&amp;g=2"');
+    expect(html).not.toContain("size=hero&amp;g=");
+    expect(html).not.toContain("data-gallery-photo");
+    // The count on the picture: which photograph this is, of how many.
+    expect(html).toContain('data-picture="photo-count"');
+    expect(text).toContain("1 / 3");
+    expect(html).toContain('aria-label="Photograph 1 of 3: see them full screen"');
+  });
+
+  it("offers the photographs from a view that is not one, and never leads with them", () => {
+    const html = renderToStaticMarkup(React.createElement(PropertyVisual, { ...base, picture: null, gallery }));
+    // Past the cover a memorandum's photograph may be the neighbourhood: the
+    // aerial leads, and the count offers the way to the photographs.
+    expect(html).toMatch(/aria-pressed="true" data-view-thumb="aerial"/);
+    expect(visibleText(html)).toContain("2 photos");
+    expect(html).toContain('aria-label="See the 2 photographs of 1200 N 31st St, Philadelphia, PA"');
+    // One photograph alone is "Photo", with no count.
+    const one = renderToStaticMarkup(
+      React.createElement(PropertyVisual, { ...base, picture: { credit: "From the offering memorandum", source: "om" as const } }),
+    );
+    expect(one).not.toContain('data-picture="photo-count"');
+    expect(visibleText(one)).not.toContain("Photo 1");
+  });
+
+  it("shows a gallery photograph full screen with its page's credit", () => {
+    const frames = [
+      { id: "g1", label: "Photo 2", src: "/api/deals/d1/picture?size=hero&g=1", alt: "Photograph from page 3 of the memorandum for 1200 N 31st St", credit: "From the offering memorandum, page 3", thumb: "/api/deals/d1/picture?size=thumb&g=1" },
+      { id: "photo", label: "Photo 1", src: "/api/deals/d1/picture?size=hero", alt: "Photograph of 1200 N 31st St", credit: "From the offering memorandum", thumb: "/api/deals/d1/picture?size=hero" },
+    ];
+    const html = renderToStaticMarkup(
+      React.createElement(PhotoViewerBody, { frames, start: 0, title: "1200 N 31st St", onClose: () => {} }),
+    );
+    expect(a11yIssues(html)).toEqual([]);
+    expect(visibleText(html)).toContain("From the offering memorandum, page 3");
+    expect(html).toContain('src="/api/deals/d1/picture?size=hero&amp;g=1"');
   });
 });
 

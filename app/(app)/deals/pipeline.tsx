@@ -83,6 +83,9 @@ export type DealCard = {
   /** what the card and the row show where no photograph answers: the deal's
    *  cover (lib/deal-cover, #442), never an overhead */
   cover?: DealCoverFacts | null;
+  /** the photographs the deal page holds — its cover and the memorandum's
+   *  others (#448); 0 where the card shows none of them */
+  photos?: number;
   /** where the deal is, from the location its pictures were drawn at
    *  (lib/deal-location's cache, #431); null until one is resolved */
   place?: MapPlace | null;
@@ -1896,6 +1899,7 @@ const DealTile = memo(function DealTile({
           flush
           shade
           priority={i < 4}
+          photos={d.photos ?? 0}
           sizes="(min-width: 1536px) 24vw, (min-width: 1280px) 31vw, (min-width: 640px) 47vw, 100vw"
         />
         {/* The call, and in compare mode the pick beside it: the foot of the

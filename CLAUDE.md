@@ -2639,6 +2639,48 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     `fetchPriority="high"` (React also emits a preload link for them), the
     rest lazy, and a card's picture zooms a little on hover
     (`motion-safe:`).
+  **The memorandum's other photographs are the deal's gallery** (#448): a
+  listing shows the building from every side, and a memorandum carries
+  those pictures while the site showed one. `decodeOmPhotos`
+  (`lib/om-photo-decode`) walks the first `GALLERY_PAGES` (16) pages
+  through the same page walker as the cover (`walkPaintedImages`; an image
+  painted on several pages is visited once) and hands each photograph —
+  by the cover's own rules (`coverShaped`: colour, a photograph's size and
+  shape, never flat) — to a callback while its pixels are alive, so one
+  decoded picture is held at a time, never the set. A picture within
+  `NEAR_BITS` (10) of one already taken, or of the cover, is the same
+  photograph placed again (`differenceHash`: 64 bits, neighbouring cells'
+  brightness on a 9 × 8 grid of 4 × 4 means; a resized copy lands within a
+  few bits, two photographs twenty or more apart), up to `GALLERY_MAX` (8)
+  inside `GALLERY_BUDGET_MS`. `galleryOf` (`lib/deal-picture`) derives
+  each as the cover is (the file's own JPEG where it stores one), and the
+  cache keeps them as `DealVisualCache.gallery` (`DealPicture` with its
+  `page`) with `galleryV` (`GALLERY_VERSION`). **It is read behind the
+  cover in the same turn** (the search answers with the cover and holds
+  its turn until the gallery is stored), and for a deal whose cover needs
+  no search — the reader's own, one already current — in a turn of its
+  own only if one is free now (`refreshGalleryBehind`); the cover's hash
+  comes from its stored hero (`hashOf`, the same hash through sharp).
+  **A gallery gives way to a cover**: it is not started while a cover
+  search waits for a turn, and one under way stops at its next picture
+  the moment one does (`coverWaiting`, `decodeOmPhotos`'s `yieldTo`) —
+  a cover is what a card is holding a placeholder for, and an incomplete
+  gallery is never stored, so a later view reads it whole.
+  **A gallery photograph never becomes the cover**: past the first pages
+  it may be the neighbourhood, so it is credited with its page
+  (`memorandumPhotoCredit`: "From the offering memorandum, page 7") and
+  never leads a view. The picture route serves it as `?g=N` from what is
+  stored, never searching; a replaced memorandum drops it
+  (`clearOmPicture`), the deletion sweep counts it (`picturePaths`), and
+  the sample deal and the shared screen never have one. On the deal page
+  each is a view of its own after the cover (`g1`, `g2`… labelled "Photo
+  2", "Photo 3"), the filmstrip drawing its stored 240px crop and its hero
+  asked for only once its view is opened; `data-picture="photo-count"`
+  beside the expand control says "2 / 5" on a photograph and "5 photos"
+  elsewhere (a way to the first), and the viewer steps through them all.
+  The pipeline card counts them over the deal's own photograph
+  (`DealBanner`'s `photos`, a camera and the number, "photographs" for a
+  screen reader).
   **The deal
   page opens the way a listing does** (#433, `app/(app)/deals/[id]/deal-hero.tsx`,
   `DealHero`, pure): the picture is the header's own — no card of its
