@@ -226,9 +226,9 @@ const MODEL_ERRORS: Record<string, string> = {
   reportstale:
     "The latest screen failed before it reached the verdict — run it again so the report pairs today’s terms with today’s call.",
   memorunning:
-    "A screen of this deal is still running — the memo waits for its verdict, so it never pairs the new terms with the last call.",
+    "The latest screen of this deal hasn’t reached its verdict yet — the memo waits for it, so it never pairs the new terms with the last call.",
   reportrunning:
-    "A screen of this deal is still running — the report waits for its verdict, so it never pairs the new terms with the last call.",
+    "The latest screen of this deal hasn’t reached its verdict yet — the report waits for it, so it never pairs the new terms with the last call.",
 };
 
 // Errors from the Reconciler tab's own upload are shown inline there; every
