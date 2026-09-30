@@ -35,6 +35,11 @@ export type Col = {
   readCounty?: string | null;
   verdict: string | null;
   reason: string | null;
+  /** why the call on file is the previous screen's, if it is: a re-screen
+   *  still running toward its verdict, or one that failed before reaching
+   *  it (lib/screen-run `verdictBehind`). Such a call is shown as the run,
+   *  the way the pipeline card shows it, and never crowned "best". */
+  behind?: "running" | "failed" | null;
   hasModel: boolean;
   /** deterministic mandate fit + a one-line why (misses / near-misses) */
   fit: "fits" | "near" | "outside" | null;
@@ -183,6 +188,57 @@ function SignedBar({
   );
 }
 
+/** A deal whose figures may be crowned "best": not one the screen rejected,
+ *  and not one whose call a re-screen is replacing — that call was written
+ *  about the terms before the run the analyst asked for. */
+const crownable = (c: Col) => c.verdict !== "pass_on" && !c.behind;
+
+/** The deal's call, the way the pipeline card draws it (lib/screen-run): a
+ *  running or failed re-screen outranks the call on file, which is the
+ *  previous screen's; else the call; else nothing has run. */
+function CallPill({ c, className = "" }: { c: Col; className?: string }) {
+  const p = c.verdict ? VERDICT_PILL[c.verdict] : null;
+  if (c.behind === "running") {
+    return (
+      <span
+        data-qa="call-behind"
+        className={`inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] text-muted ${className}`}
+        title={p ? `Re-screening — the previous call was ${p.label}` : undefined}
+      >
+        <span aria-hidden className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
+        {p ? "Re-screening…" : "Screening…"}
+      </span>
+    );
+  }
+  if (c.behind === "failed") {
+    return (
+      <span
+        data-qa="call-behind"
+        className={`rounded-full bg-kill/10 px-2.5 py-1 text-[11px] font-medium text-kill ${className}`}
+        title={
+          p
+            ? `The latest screen failed before it reached the verdict — the previous call was ${p.label}`
+            : "The screen failed — open the deal to see why and try again"
+        }
+      >
+        Failed
+      </span>
+    );
+  }
+  if (p) {
+    return <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${p.cls} ${className}`}>{p.label}</span>;
+  }
+  return <span className={`text-[11px] text-muted ${className}`}>Not screened</span>;
+}
+
+/** The verdict's reason under the call — said as the previous screen's
+ *  where a re-screen is replacing it, so it never reads as this run's. */
+function reasonLine(c: Col): string | null {
+  const p = c.verdict ? VERDICT_PILL[c.verdict] : null;
+  if (!c.behind || !p) return c.reason;
+  return c.reason ? `Previous screen's call: ${p.label} — ${c.reason}` : `Previous screen's call: ${p.label}`;
+}
+
 const BEST_PILL = (
   <>
     {/* The space keeps "2.10x best" two words when the table is read aloud
@@ -196,8 +252,9 @@ const BEST_PILL = (
 
 export function CompareTable({ cols }: { cols: Col[] }) {
   // Never crown a hero number on a deal the screen rejected — that's the
-  // exact pro-forma trap the product exists to counter.
-  const eligible = cols.filter((c) => c.verdict !== "pass_on");
+  // exact pro-forma trap the product exists to counter — nor on one whose
+  // call a running or failed re-screen is replacing.
+  const eligible = cols.filter(crownable);
   const bestIrr = Math.max(...eligible.map((c) => c.irr ?? -Infinity));
   const bestEm = Math.max(...eligible.map((c) => c.em ?? -Infinity));
 
@@ -273,14 +330,14 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     {
       label: "Levered IRR",
       get: (c) => (c.withheld ? `n/a — ${c.withheld}` : pct(c.irr)),
-      best: (c) => c.verdict !== "pass_on" && c.irr != null && c.irr === bestIrr,
+      best: (c) => crownable(c) && c.irr != null && c.irr === bestIrr,
       mono: true,
       num: (c) => c.irr,
     },
     {
       label: "Equity multiple",
       get: (c) => (c.withheld ? `n/a — ${c.withheld}` : mult(c.em)),
-      best: (c) => c.verdict !== "pass_on" && c.em != null && c.em === bestEm,
+      best: (c) => crownable(c) && c.em != null && c.em === bestEm,
       mono: true,
       num: (c) => c.em,
     },
@@ -404,7 +461,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
           From `sm` up the table takes over. */}
       <ul className="grid gap-3 sm:hidden" aria-label="Deals compared">
         {cols.map((c, ci) => {
-          const p = c.verdict ? VERDICT_PILL[c.verdict] : null;
+          const reason = reasonLine(c);
           return (
             <li key={c.id} className="rounded-2xl border border-line bg-surface p-4 shadow-card">
               {c.pictures && <DealBanner sources={c.pictures} label={c.name} className="mb-3" />}
@@ -412,15 +469,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                 <Link href={`/deals/${c.id}`} className="font-medium text-ink hover:text-brand">
                   {c.name}
                 </Link>
-                {p ? (
-                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${p.cls}`}>
-                    {p.label}
-                  </span>
-                ) : (
-                  <span className="shrink-0 text-[11px] text-muted">Screening</span>
-                )}
+                <CallPill c={c} className="shrink-0" />
               </div>
-              {c.reason && <p className="mt-1 text-xs leading-relaxed text-muted">{c.reason}</p>}
+              {reason && <p className="mt-1 text-xs leading-relaxed text-muted">{reason}</p>}
               {c.fit && (
                 <p className="mt-2 text-xs">
                   <span className={`font-semibold ${FIT_LABEL[c.fit].cls}`}>{FIT_LABEL[c.fit].text}</span>
@@ -466,7 +517,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
             <tr>
               <th className="sticky left-0 z-10 bg-surface" />
               {cols.map((c) => {
-                const p = c.verdict ? VERDICT_PILL[c.verdict] : null;
+                const reason = reasonLine(c);
                 return (
                   <th
                     key={c.id}
@@ -482,19 +533,11 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                       {c.name}
                     </Link>
                     <div className="mt-2">
-                      {p ? (
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${p.cls}`}
-                        >
-                          {p.label}
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-muted">Screening</span>
-                      )}
+                      <CallPill c={c} />
                     </div>
-                    {c.reason && (
+                    {reason && (
                       <p className="mt-2 max-w-[16rem] text-xs font-normal leading-relaxed text-muted">
-                        {c.reason}
+                        {reason}
                       </p>
                     )}
                     {!c.hasModel && (

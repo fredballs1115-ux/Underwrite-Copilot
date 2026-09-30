@@ -733,6 +733,49 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     expect(single).not.toContain("data-signed-bar");
   });
 
+  it("marks a call a running or failed re-screen is replacing, the pipeline card's way, and never crowns it", () => {
+    // The Maddox leads both return rows but a re-screen is running toward
+    // its verdict; the Tysons deal's re-screen failed before its verdict.
+    // Both calls on file are the previous screen's (lib/screen-run).
+    const cols: Col[] = [
+      { ...COLS[0], irr: 24.0, em: 2.9, behind: "running" },
+      COLS[1],
+      { ...COLS[2], verdict: "caution", behind: "failed" },
+      COLS[3],
+    ];
+    const html = renderToStaticMarkup(React.createElement(CompareTable, { cols }));
+    dumpView("compare-rescreen", html);
+    expect(a11yIssues(html), "a11y compare re-screen").toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    // The run, as the pipeline card says it, the previous call in the title
+    // and said as the previous screen's under it — in both layouts.
+    expect((text.match(/Re-screening…/g) ?? []).length).toBe(2);
+    expect(html).toContain('title="Re-screening — the previous call was Caution"');
+    expect(text).toContain("Previous screen's call: Caution — Rents assume a premium the submarket has not printed.");
+    expect(html).toContain('title="The latest screen failed before it reached the verdict — the previous call was Caution"');
+    expect((html.match(/data-qa="call-behind"/g) ?? []).length).toBe(4);
+    // A deal nothing has screened says so, never "Screening".
+    expect(text).toContain("Not screened");
+    // "Best" goes to the conversion alone, the one call no run is replacing:
+    // its IRR and its multiple, in its phone card and in the table's row.
+    const cards = html.split("<li ").slice(1);
+    expect((cards[0].match(/>best</g) ?? []).length).toBe(0);
+    expect((cards[1].match(/>best</g) ?? []).length).toBe(2);
+    expect((cards[2].match(/>best</g) ?? []).length).toBe(0);
+    const tableRow = (label: string) =>
+      (html.match(new RegExp(`<td class="sticky left-0[^"]*">${label}</td>([\\s\\S]*?)</tr>`))?.[1] ?? "").split("<td ").slice(1);
+    for (const label of ["Levered IRR", "Equity multiple"]) {
+      const cells = tableRow(label);
+      expect(cells, label).toHaveLength(4);
+      expect(cells.map((c) => c.includes(">best<")), label).toEqual([false, true, false, false]);
+    }
+    // No run in flight: the call is drawn as the call, and crowned as before.
+    const settled = renderToStaticMarkup(React.createElement(CompareTable, { cols: cols.map((c) => ({ ...c, behind: null })) }));
+    expect(visibleText(settled)).not.toContain("Re-screening");
+    expect(settled.split("<li ").slice(1)[0].match(/>best</g) ?? []).toHaveLength(2);
+  });
+
   it("pictures each building at the head of its column and its phone card, the credit on the picture (#418)", () => {
     const pictured = [
       { ...COLS[0], pictures: bannerSources({ dealId: "a", pictureCredit: "From the offering memorandum", googleEnabled: false, hasStreetAddress: true, hasAddress: true }) },

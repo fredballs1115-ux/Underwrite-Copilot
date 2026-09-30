@@ -35,6 +35,7 @@ import { selfStorageTag } from "@/lib/self-storage";
 import { compareInterest } from "@/lib/compare-interest";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
+import { verdictBehind, type JobLike } from "@/lib/screen-run";
 
 export const metadata: Metadata = { title: "Compare deals" };
 
@@ -54,6 +55,7 @@ function toCol(
   bench30: number | null,
   tenYearPct: number | null,
   googleEnabled: boolean,
+  job: JobLike | null,
 ): Col {
   const ex = (deal.extraction as ExtractionResult | null) ?? null;
   const verdict = (deal.verdict as VerdictResult | null) ?? null;
@@ -124,6 +126,11 @@ function toCol(
     })(),
     verdict: verdict?.verdict ?? null,
     reason: verdict?.reason ?? null,
+    // A re-screen still running, or one that failed before its verdict,
+    // leaves the call on file the previous screen's (lib/screen-run, the
+    // reader the memo, the report, the shared screen and the meeting
+    // workbook ask): marked as the run, never crowned "best".
+    behind: verdictBehind(job),
     hasModel: model != null,
     fit,
     fitNote,
@@ -201,6 +208,26 @@ export default async function ComparePage({
     (a, b) => ids.indexOf(a.id) - ids.indexOf(b.id),
   );
 
+  // Each deal's latest job, read the way the pipeline page reads it: a
+  // re-screen running, or one that failed before its verdict, leaves the
+  // call on file the previous screen's beside this run's terms.
+  const { data: jobRows } = rows.length
+    ? await supabase
+        .from("analysis_jobs")
+        .select("deal_id, status, step, updated_at, created_at")
+        .in(
+          "deal_id",
+          rows.map((d) => d.id),
+        )
+        .order("created_at", { ascending: false })
+        .limit(Math.max(100, rows.length * 3))
+    : { data: [] as ({ deal_id: string } & JobLike)[] };
+  // The newest job per deal (rows arrive newest first).
+  const jobByDeal = new Map<string, JobLike>();
+  for (const j of (jobRows ?? []) as ({ deal_id: string } & JobLike)[]) {
+    if (!jobByDeal.has(j.deal_id)) jobByDeal.set(j.deal_id, j);
+  }
+
   // One buy box per owning scope (team or personal) — fetch each scope once.
   type Scoped = DealRow & { user_id: string; team_id: string | null };
   const scopeKey = (d: Scoped) => (d.team_id ? `t:${d.team_id}` : `u:${d.user_id}`);
@@ -230,7 +257,14 @@ export default async function ComparePage({
   const tenYearPct = debt.tenYear?.pct ?? null;
 
   const cols = (rows as Scoped[]).map((d) =>
-    toCol(d, boxByScope.get(scopeKey(d)) ?? null, bench30?.value ?? null, tenYearPct, !!process.env.GOOGLE_MAPS_API_KEY),
+    toCol(
+      d,
+      boxByScope.get(scopeKey(d)) ?? null,
+      bench30?.value ?? null,
+      tenYearPct,
+      !!process.env.GOOGLE_MAPS_API_KEY,
+      jobByDeal.get(d.id) ?? null,
+    ),
   );
 
   const backLink = (
@@ -279,7 +313,8 @@ export default async function ComparePage({
 
       <p className="text-xs leading-relaxed text-muted">
         First-pass screen, not investment advice. &ldquo;Best&rdquo; is only
-        awarded among deals the screen didn&apos;t reject.
+        awarded among deals the screen didn&apos;t reject
+        {cols.some((c) => c.behind) ? ", and never to a call a re-screen is replacing" : ""}.
         {cols.every((c) => !c.fit) && (
           <>
             {" "}
