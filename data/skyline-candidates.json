@@ -2285,6 +2285,537 @@
           "note": "Reno, NV — Downtowngal, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780959488)."
         }
       ]
+    },
+    {
+      "metroId": "cbsa:10900",
+      "city": "Allentown, Pennsylvania",
+      "area": "Allentown-Bethlehem-Easton, PA-NJ",
+      "wikipedia": [
+        "Allentown, Pennsylvania",
+        "Bethlehem, Pennsylvania",
+        "Easton, Pennsylvania",
+        "Lehigh Valley"
+      ],
+      "categories": [
+        "Skylines of Allentown, Pennsylvania",
+        "Views of Allentown, Pennsylvania",
+        "Panoramics of Allentown, Pennsylvania",
+        "Aerial photographs of Allentown, Pennsylvania",
+        "Downtown Allentown, Pennsylvania",
+        "Views of Bethlehem, Pennsylvania",
+        "SteelStacks"
+      ],
+      "queries": [
+        "Allentown Pennsylvania skyline",
+        "Bethlehem Pennsylvania SteelStacks",
+        "Lehigh Valley aerial"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:35300",
+      "city": "New Haven, Connecticut",
+      "area": "New Haven, CT",
+      "wikipedia": [
+        "New Haven, Connecticut",
+        "New Haven Green",
+        "East Rock Park"
+      ],
+      "categories": [
+        "Skylines of New Haven, Connecticut",
+        "Views of New Haven, Connecticut",
+        "Panoramics of New Haven, Connecticut",
+        "Aerial photographs of New Haven, Connecticut",
+        "New Haven Green",
+        "East Rock Park"
+      ],
+      "queries": [
+        "New Haven Connecticut skyline",
+        "New Haven from East Rock",
+        "New Haven Green aerial"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:12540",
+      "city": "Bakersfield, California",
+      "area": "Bakersfield-Delano, CA",
+      "wikipedia": [
+        "Bakersfield, California"
+      ],
+      "categories": [
+        "Skylines of Bakersfield, California",
+        "Views of Bakersfield, California",
+        "Panoramics of Bakersfield, California",
+        "Aerial photographs of Bakersfield, California",
+        "Downtown Bakersfield, California"
+      ],
+      "queries": [
+        "Bakersfield California skyline",
+        "Bakersfield California downtown",
+        "Bakersfield California aerial"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:32580",
+      "city": "McAllen, Texas",
+      "area": "McAllen-Edinburg-Mission, TX",
+      "wikipedia": [
+        "McAllen, Texas",
+        "Edinburg, Texas",
+        "Mission, Texas",
+        "Rio Grande Valley"
+      ],
+      "categories": [
+        "Skylines of McAllen, Texas",
+        "Views of McAllen, Texas",
+        "Panoramics of McAllen, Texas",
+        "Aerial photographs of McAllen, Texas",
+        "McAllen, Texas"
+      ],
+      "queries": [
+        "McAllen Texas skyline",
+        "McAllen Texas aerial",
+        "McAllen Texas downtown"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:37100",
+      "city": "Ventura, California",
+      "area": "Oxnard-Thousand Oaks-Ventura, CA",
+      "wikipedia": [
+        "Ventura, California",
+        "Oxnard, California",
+        "Thousand Oaks, California",
+        "Ventura County, California"
+      ],
+      "categories": [
+        "Skylines of Ventura, California",
+        "Views of Ventura, California",
+        "Panoramics of Ventura, California",
+        "Aerial photographs of Ventura, California",
+        "Ventura Pier",
+        "Views of Oxnard, California",
+        "Channel Islands Harbor",
+        "Views of Thousand Oaks, California"
+      ],
+      "queries": [
+        "Ventura California pier coast",
+        "Oxnard California harbor",
+        "Thousand Oaks California hills",
+        "Ventura County coast aerial"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:24660",
+      "city": "Greensboro, North Carolina",
+      "area": "Greensboro-High Point, NC",
+      "wikipedia": [
+        "Greensboro, North Carolina",
+        "Downtown Greensboro",
+        "High Point, North Carolina"
+      ],
+      "categories": [
+        "Skylines of Greensboro, North Carolina",
+        "Views of Greensboro, North Carolina",
+        "Panoramics of Greensboro, North Carolina",
+        "Aerial photographs of Greensboro, North Carolina",
+        "Downtown Greensboro, North Carolina"
+      ],
+      "queries": [
+        "Greensboro North Carolina skyline",
+        "Greensboro North Carolina downtown"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:49180",
+      "city": "Winston-Salem, North Carolina",
+      "area": "Winston-Salem, NC",
+      "wikipedia": [
+        "Winston-Salem, North Carolina",
+        "Downtown Winston-Salem"
+      ],
+      "categories": [
+        "Skylines of Winston-Salem, North Carolina",
+        "Views of Winston-Salem, North Carolina",
+        "Panoramics of Winston-Salem, North Carolina",
+        "Aerial photographs of Winston-Salem, North Carolina",
+        "Downtown Winston-Salem, North Carolina"
+      ],
+      "queries": [
+        "Winston-Salem North Carolina skyline",
+        "Winston-Salem downtown"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:10420",
+      "city": "Akron, Ohio",
+      "area": "Akron, OH",
+      "wikipedia": [
+        "Akron, Ohio",
+        "Downtown Akron"
+      ],
+      "categories": [
+        "Skylines of Akron, Ohio",
+        "Views of Akron, Ohio",
+        "Panoramics of Akron, Ohio",
+        "Aerial photographs of Akron, Ohio",
+        "Downtown Akron, Ohio"
+      ],
+      "queries": [
+        "Akron Ohio skyline",
+        "Akron Ohio downtown"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:25420",
+      "city": "Harrisburg, Pennsylvania",
+      "area": "Harrisburg-Carlisle, PA",
+      "wikipedia": [
+        "Harrisburg, Pennsylvania",
+        "Pennsylvania State Capitol",
+        "Susquehanna River"
+      ],
+      "categories": [
+        "Skylines of Harrisburg, Pennsylvania",
+        "Views of Harrisburg, Pennsylvania",
+        "Panoramics of Harrisburg, Pennsylvania",
+        "Aerial photographs of Harrisburg, Pennsylvania",
+        "Downtown Harrisburg, Pennsylvania"
+      ],
+      "queries": [
+        "Harrisburg Pennsylvania skyline Susquehanna",
+        "Harrisburg skyline from City Island",
+        "Pennsylvania State Capitol Harrisburg"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:29540",
+      "city": "Lancaster, Pennsylvania",
+      "area": "Lancaster, PA",
+      "wikipedia": [
+        "Lancaster, Pennsylvania",
+        "Lancaster County, Pennsylvania"
+      ],
+      "categories": [
+        "Skylines of Lancaster, Pennsylvania",
+        "Views of Lancaster, Pennsylvania",
+        "Panoramics of Lancaster, Pennsylvania",
+        "Aerial photographs of Lancaster, Pennsylvania",
+        "Downtown Lancaster, Pennsylvania",
+        "Farms in Lancaster County, Pennsylvania"
+      ],
+      "queries": [
+        "Lancaster Pennsylvania skyline",
+        "Lancaster Pennsylvania downtown",
+        "Lancaster County Pennsylvania farmland"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:38860",
+      "city": "Portland, Maine",
+      "area": "Portland-South Portland, ME",
+      "wikipedia": [
+        "Portland, Maine",
+        "Old Port",
+        "Portland Head Light"
+      ],
+      "categories": [
+        "Skylines of Portland, Maine",
+        "Views of Portland, Maine",
+        "Panoramics of Portland, Maine",
+        "Aerial photographs of Portland, Maine",
+        "Old Port (Portland, Maine)",
+        "Portland Head Light"
+      ],
+      "queries": [
+        "Portland Maine skyline",
+        "Portland Maine waterfront Old Port",
+        "Portland Maine harbor aerial"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:42340",
+      "city": "Savannah, Georgia",
+      "area": "Savannah, GA",
+      "wikipedia": [
+        "Savannah, Georgia",
+        "Savannah Historic District",
+        "Forsyth Park",
+        "Savannah River"
+      ],
+      "categories": [
+        "Skylines of Savannah, Georgia",
+        "Views of Savannah, Georgia",
+        "Panoramics of Savannah, Georgia",
+        "Aerial photographs of Savannah, Georgia",
+        "Savannah Historic District",
+        "Forsyth Park",
+        "River Street (Savannah, Georgia)"
+      ],
+      "queries": [
+        "Savannah Georgia skyline river",
+        "Savannah Georgia Forsyth Park fountain",
+        "Savannah Georgia River Street waterfront"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:11700",
+      "city": "Asheville, North Carolina",
+      "area": "Asheville, NC",
+      "wikipedia": [
+        "Asheville, North Carolina",
+        "Downtown Asheville"
+      ],
+      "categories": [
+        "Skylines of Asheville, North Carolina",
+        "Views of Asheville, North Carolina",
+        "Panoramics of Asheville, North Carolina",
+        "Aerial photographs of Asheville, North Carolina",
+        "Downtown Asheville, North Carolina"
+      ],
+      "queries": [
+        "Asheville skyline Blue Ridge",
+        "Asheville North Carolina downtown mountains"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:26620",
+      "city": "Huntsville, Alabama",
+      "area": "Huntsville, AL",
+      "wikipedia": [
+        "Huntsville, Alabama",
+        "Downtown Huntsville"
+      ],
+      "categories": [
+        "Skylines of Huntsville, Alabama",
+        "Views of Huntsville, Alabama",
+        "Panoramics of Huntsville, Alabama",
+        "Aerial photographs of Huntsville, Alabama",
+        "Downtown Huntsville, Alabama",
+        "Big Spring International Park"
+      ],
+      "queries": [
+        "Huntsville Alabama skyline",
+        "Huntsville Alabama downtown Big Spring Park"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:11260",
+      "city": "Anchorage, Alaska",
+      "area": "Anchorage, AK",
+      "wikipedia": [
+        "Anchorage, Alaska",
+        "Downtown Anchorage"
+      ],
+      "categories": [
+        "Skylines of Anchorage, Alaska",
+        "Views of Anchorage, Alaska",
+        "Panoramics of Anchorage, Alaska",
+        "Aerial photographs of Anchorage, Alaska",
+        "Downtown Anchorage, Alaska"
+      ],
+      "queries": [
+        "Anchorage Alaska skyline Chugach",
+        "Anchorage Alaska skyline from Earthquake Park"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:20500",
+      "city": "Durham, North Carolina",
+      "area": "Durham-Chapel Hill, NC",
+      "wikipedia": [
+        "Durham, North Carolina",
+        "Downtown Durham",
+        "Chapel Hill, North Carolina"
+      ],
+      "categories": [
+        "Skylines of Durham, North Carolina",
+        "Views of Durham, North Carolina",
+        "Panoramics of Durham, North Carolina",
+        "Aerial photographs of Durham, North Carolina",
+        "Downtown Durham, North Carolina",
+        "American Tobacco Campus"
+      ],
+      "queries": [
+        "Durham North Carolina skyline",
+        "Durham North Carolina downtown"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:12260",
+      "city": "Augusta, Georgia",
+      "area": "Augusta-Richmond County, GA-SC",
+      "wikipedia": [
+        "Augusta, Georgia",
+        "Augusta Riverwalk",
+        "Downtown Augusta"
+      ],
+      "categories": [
+        "Skylines of Augusta, Georgia",
+        "Views of Augusta, Georgia",
+        "Panoramics of Augusta, Georgia",
+        "Aerial photographs of Augusta, Georgia",
+        "Downtown Augusta, Georgia",
+        "Augusta Riverwalk"
+      ],
+      "queries": [
+        "Augusta Georgia skyline Savannah River",
+        "Augusta Georgia downtown Broad Street"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:27140",
+      "city": "Jackson, Mississippi",
+      "area": "Jackson, MS",
+      "wikipedia": [
+        "Jackson, Mississippi",
+        "Downtown Jackson, Mississippi"
+      ],
+      "categories": [
+        "Skylines of Jackson, Mississippi",
+        "Views of Jackson, Mississippi",
+        "Panoramics of Jackson, Mississippi",
+        "Aerial photographs of Jackson, Mississippi",
+        "Downtown Jackson, Mississippi"
+      ],
+      "queries": [
+        "Jackson Mississippi skyline",
+        "Jackson Mississippi downtown"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:37860",
+      "city": "Pensacola, Florida",
+      "area": "Pensacola-Ferry Pass-Brent, FL",
+      "wikipedia": [
+        "Pensacola, Florida",
+        "Pensacola Beach, Florida",
+        "Downtown Pensacola"
+      ],
+      "categories": [
+        "Skylines of Pensacola, Florida",
+        "Views of Pensacola, Florida",
+        "Panoramics of Pensacola, Florida",
+        "Aerial photographs of Pensacola, Florida",
+        "Pensacola Beach, Florida",
+        "Palafox Street"
+      ],
+      "queries": [
+        "Pensacola Florida skyline bay",
+        "Pensacola Beach Florida aerial",
+        "Pensacola Florida downtown Palafox"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:42540",
+      "city": "Scranton, Pennsylvania",
+      "area": "Scranton--Wilkes-Barre, PA",
+      "wikipedia": [
+        "Scranton, Pennsylvania",
+        "Wilkes-Barre, Pennsylvania",
+        "Wyoming Valley"
+      ],
+      "categories": [
+        "Skylines of Scranton, Pennsylvania",
+        "Views of Scranton, Pennsylvania",
+        "Panoramics of Scranton, Pennsylvania",
+        "Aerial photographs of Scranton, Pennsylvania",
+        "Views of Wilkes-Barre, Pennsylvania",
+        "Skylines of Wilkes-Barre, Pennsylvania"
+      ],
+      "queries": [
+        "Scranton Pennsylvania skyline",
+        "Wilkes-Barre Pennsylvania skyline Susquehanna"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:44700",
+      "city": "Stockton, California",
+      "area": "Stockton-Lodi, CA",
+      "wikipedia": [
+        "Stockton, California",
+        "Downtown Stockton",
+        "Port of Stockton"
+      ],
+      "categories": [
+        "Skylines of Stockton, California",
+        "Views of Stockton, California",
+        "Panoramics of Stockton, California",
+        "Aerial photographs of Stockton, California",
+        "Downtown Stockton, California",
+        "Stockton Channel"
+      ],
+      "queries": [
+        "Stockton California skyline waterfront",
+        "Stockton California downtown"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:33700",
+      "city": "Modesto, California",
+      "area": "Modesto, CA",
+      "wikipedia": [
+        "Modesto, California",
+        "Modesto Arch"
+      ],
+      "categories": [
+        "Skylines of Modesto, California",
+        "Views of Modesto, California",
+        "Panoramics of Modesto, California",
+        "Aerial photographs of Modesto, California",
+        "Downtown Modesto, California",
+        "Modesto Arch"
+      ],
+      "queries": [
+        "Modesto California downtown arch",
+        "Modesto California skyline"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:19660",
+      "city": "Daytona Beach, Florida",
+      "area": "Deltona-Daytona Beach-Ormond Beach, FL",
+      "wikipedia": [
+        "Daytona Beach, Florida",
+        "Ormond Beach, Florida",
+        "Deltona, Florida",
+        "Daytona Beach Main Street Pier"
+      ],
+      "categories": [
+        "Skylines of Daytona Beach, Florida",
+        "Views of Daytona Beach, Florida",
+        "Panoramics of Daytona Beach, Florida",
+        "Aerial photographs of Daytona Beach, Florida",
+        "Daytona Beach Main Street Pier",
+        "Views of Ormond Beach, Florida"
+      ],
+      "queries": [
+        "Daytona Beach Florida skyline beach",
+        "Daytona Beach Florida aerial ocean",
+        "Ormond Beach Florida"
+      ],
+      "candidates": []
     }
   ]
 }
