@@ -1,6 +1,7 @@
 import metrosSeed from "@/data/research/metros.json";
 import { FMR_BEDS, fmrOf } from "@/lib/fmr";
 import { compsFeedLive } from "@/lib/public-comps/core";
+import { datedLong } from "@/lib/debt-index";
 import type { CompareMetro, CompareSector } from "./market-compare";
 
 // The compare tool's compact per-metro facts, derived once from the research
@@ -22,6 +23,9 @@ export const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) 
   // the "By asset type" panel renders — nulls simply produce no entry.
   const snap = (m as { sector_snapshot?: Record<string, unknown> | null })
     .sector_snapshot;
+  // The snapshot's own date, said beside its figures (a quarterly print is
+  // research as of a day, not a feed).
+  const snapAsOf = typeof snap?.as_of === "string" && /^\d{4}-\d{2}-\d{2}$/.test(snap.as_of) ? snap.as_of : null;
   let sectors: CompareMetro["sectors"];
   if (snap) {
     sectors = {};
@@ -62,6 +66,7 @@ export const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) 
     fmr: beds,
     sectors,
     ruleCount: ((m as { rule_ids?: string[] }).rule_ids ?? []).length,
+    researchAsOf: snapAsOf ? datedLong(snapAsOf) : null,
     // Live only where the provider registry runs the feed, never merely
     // because the research file names one (Washington's is documented, not
     // wired).

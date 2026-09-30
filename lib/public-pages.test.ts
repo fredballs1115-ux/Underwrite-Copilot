@@ -36,7 +36,7 @@ describe("public pages — every market and sector page, named for itself (#430)
     expect(sectorPageFor("moon_base")).toBeNull();
     const base = marketMeta(null, null);
     expect(base.canonical).toBe("/market");
-    expect(base.description).toContain(`${marketPages().length} US metro areas`);
+    expect(base.description).toContain(`${marketPages().length} US markets`);
     expect(marketPath("a b")).toBe("/market?metro=a%20b");
   });
 

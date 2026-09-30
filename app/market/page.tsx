@@ -836,6 +836,21 @@ function SectorHeatGrid() {
   }
   const filled = ranks.size;
   const total = metros.length * HEAT_SECTORS.length;
+  // The snapshots' own dates: the board is dated research, a quarter's
+  // prints, and says as of when — one date, or the span where they differ.
+  const snapDates = [
+    ...new Set(
+      (metrosSeed.metros ?? [])
+        .map((m) => (m as { sector_snapshot?: { as_of?: unknown } | null }).sector_snapshot?.as_of)
+        .filter((d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)),
+    ),
+  ].sort();
+  const boardAsOf =
+    snapDates.length === 0
+      ? "undated"
+      : snapDates.length === 1
+        ? `as of ${datedLong(snapDates[0])}`
+        : `as of ${datedLong(snapDates[0])} to ${datedLong(snapDates[snapDates.length - 1])}`;
   // Emerald (tight) → amber (loose), low alpha so the figure stays readable
   // — the one shade every board on this page uses (app/market/heat-shade).
   const shade = heatShade;
@@ -847,8 +862,7 @@ function SectorHeatGrid() {
           The whole board — vacancy by market and asset class
         </h2>
         <span className="text-[11px] text-muted">
-          {filled} of {total} cells carry a numeric read · shaded within each
-          column, so office compares to office
+          {`Research ${boardAsOf} · ${filled} of ${total} cells carry a numeric read · shaded within each column, so office compares to office`}
         </span>
       </div>
       <div className="mt-3 overflow-x-auto">
@@ -1370,7 +1384,7 @@ async function IntelDigestCard() {
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold tracking-tight">Daily intel</h2>
+        <h2 className="text-sm font-semibold tracking-tight">Weekday intel</h2>
         {digest && (
           <span className="text-[11px] text-muted">
             latest digest {digest.digest_date} · {digest.item_count} notable

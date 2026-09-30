@@ -210,7 +210,7 @@
             "https://www.colliers.com/en/research/washington-dc/maryland-industrial-report-q4-2024",
             "https://klnb.com/wp-content/uploads/2025/04/NAIKLNB_MD_Industrial_Q1_2025-1.pdf"
           ],
-          "note": "County-specific print from the Colliers/KLNB Maryland industrial series, Q4 2024 VINTAGE (declared — the newest MoCo-specific level to clear the bar): asking .94/SF, up /bin/bash.09 QoQ; +15,360 SF Q4 absorption (2024 total −12,839 SF); NO projects under construction, so new supply pressure is nil and absorption works straight against vacancy. A vacancy RATE for the county has not cleared the bar: Colliers’ Q1 2026 “Maryland 10.1%” runs on a Baltimore/I-95-corridor-shaped base (its own narrative ties the print to that corridor) and is rejected as a MoCo read; Transwestern’s 6.9% suburban-MD figure is Q2 2025 vintage on the two-county base. Both stay recorded, neither is a county vacancy."
+          "note": "County-specific print from the Colliers/KLNB Maryland industrial series, Q4 2024 VINTAGE (declared — the newest MoCo-specific level to clear the bar): asking $6.94/SF, up $0.09 QoQ; +15,360 SF Q4 absorption (2024 total −12,839 SF); NO projects under construction, so new supply pressure is nil and absorption works straight against vacancy. A vacancy RATE for the county has not cleared the bar: Colliers’ Q1 2026 “Maryland 10.1%” runs on a Baltimore/I-95-corridor-shaped base (its own narrative ties the print to that corridor) and is rejected as a MoCo read; Transwestern’s 6.9% suburban-MD figure is Q2 2025 vintage on the two-county base. Both stay recorded, neither is a county vacancy."
         },
         "multifamily": {
           "vacancy_pct": 5.2,
@@ -483,7 +483,7 @@
         "note": "One HUD area across Hampton Roads. Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
       },
       "market_notes": {
-        "value": "No rent control (VA). Military-demand rental base; screened for stock/pricing in a future pass — currently the thinnest data of the eight metros.",
+        "value": "No rent control (VA). Military-demand rental base.",
         "status": "sourced"
       },
       "rule_ids": [
@@ -617,7 +617,7 @@
             "https://centercityphila.org/research-reports/retail",
             "https://www.marcusmillichap.com/research/market-report/philadelphia/philadelphia-2026-investment-forecast-retail-market-report"
           ],
-          "note": "NUMERIC FIELD HELD OPEN — two reads exist and neither is an SF-based metro vacancy print. Center City District’s on-foot storefront survey (April 2026, PRIMARY): occupancy 84.2%, a two-year high, up from 82.6% in six months (+32 storefronts); Walnut St 87.5% (west side 88.6%), Sansom 85.1%, Market St 68.2→71.6%. CONSTRUCT DECLARED: a storefront COUNT, not square-footage vacancy — never compare it to the SF-based figures on other tiles. Marcus & Millichap’s 2026 forecast notes East Center City retail vacancy under 2% in 2025 on CBD apartment growth (+30% occupied units since 2019), but a digest of that report interleaved multifamily-shaped numbers (.56/SF rent, 4.7% inventory growth) into the retail answer, so its “7.3%” print is REJECTED as probable report conflation until the primary confirms."
+          "note": "NUMERIC FIELD HELD OPEN — two reads exist and neither is an SF-based metro vacancy print. Center City District’s on-foot storefront survey (April 2026, PRIMARY): occupancy 84.2%, a two-year high, up from 82.6% in six months (+32 storefronts); Walnut St 87.5% (west side 88.6%), Sansom 85.1%, Market St 68.2→71.6%. CONSTRUCT DECLARED: a storefront COUNT, not square-footage vacancy — never compare it to the SF-based figures on other tiles. Marcus & Millichap’s 2026 forecast notes East Center City retail vacancy under 2% in 2025 on CBD apartment growth (+30% occupied units since 2019), but a digest of that report interleaved multifamily-shaped numbers ($1.56/SF rent, 4.7% inventory growth) into the retail answer, so its “7.3%” print is REJECTED as probable report conflation until the primary confirms."
         }
       }
     },

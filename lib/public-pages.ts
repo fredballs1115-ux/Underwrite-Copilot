@@ -114,7 +114,7 @@ export function marketMeta(metro: MarketPage | null, sector: SectorPage | null):
   const count = marketPages().length;
   return {
     title: "CRE market data: rates, rents, vacancy and jobs",
-    description: `Live commercial real estate market data for ${count} US metro areas: today's Treasury curve and lending rates, asking rents, rental vacancy, jobs by sector and building permits — each figure dated and linked to its source.`,
+    description: `Live commercial real estate market data for ${count} US markets: today's Treasury curve and lending rates, asking rents, rental vacancy, jobs by sector and building permits — each figure dated and linked to its source.`,
     canonical: "/market",
     image: SITE_CARD,
   };

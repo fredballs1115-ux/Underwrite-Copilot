@@ -146,6 +146,13 @@ export interface OpportunityZoneRead {
   caveat: string | null;
 }
 
+/** The next round (data/research/tax_law.json, sourced): the program's new
+ *  zones take effect January 1, 2027 and the 2018 zones run to December 31,
+ *  2028, so an answer from the 2018 list is not the whole answer for a deal
+ *  closing from 2027 — said beside every answer the list gives. */
+export const OZ_NEXT_ROUND_NOTE =
+  "This checks the 2018 round's zones. The next round's zones take effect January 1, 2027 and the 2018 zones run to December 31, 2028, so a deal closing from 2027 should be checked against the new round's maps too.";
+
 export const OZ_CURRENT_NUMBER_CAVEAT =
   "Opportunity Zones were checked by the tract's current number. The zones were designated on 2010 tract numbers, so a tract split or renumbered since can sit in a zone and still miss the list.";
 

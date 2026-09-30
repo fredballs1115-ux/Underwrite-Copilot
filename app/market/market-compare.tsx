@@ -30,6 +30,9 @@ export type CompareMetro = {
   >;
   ruleCount: number;
   compsLive: boolean;
+  /** the research snapshot's date, said ("Aug 25, 2026"); null where the
+   *  file states none */
+  researchAsOf?: string | null;
 };
 
 const SECTOR_ROWS = ["office", "industrial", "multifamily", "retail"] as const;
@@ -48,6 +51,16 @@ function sectorCell(s: CompareSector | undefined): string {
   if (typeof s.capLow === "number" && typeof s.capHigh === "number")
     extras.push(`cap ${s.capLow}–${s.capHigh}%`);
   return extras.length > 0 ? `${v} · ${extras.join(" · ")}` : v;
+}
+
+/** The two metros' research snapshot dates, said once where they agree:
+ *  the figures are a quarter's print, dated, never a feed. */
+function researchDates(a: CompareMetro, b: CompareMetro): string {
+  const da = a.researchAsOf ?? null;
+  const db = b.researchAsOf ?? null;
+  if (da && db && da !== db) return `research as of ${da} (${a.name}) and ${db} (${b.name})`;
+  const d = da ?? db;
+  return d ? `research as of ${d}` : "research undated";
 }
 
 /** "FY… fair market rent" with the year the block states; no year typed. */
@@ -196,7 +209,7 @@ export function MarketCompare({ metros }: { metros: CompareMetro[] }) {
       {(a.sectors || b.sectors) && (
         <div className="mt-4 overflow-x-auto">
           <p className="text-[10px] uppercase tracking-wide text-muted">
-            Asset-type read · vacancy, asking rent, cap where sourced
+            {`Asset-type read · vacancy, asking rent, cap where sourced · ${researchDates(a, b)}`}
           </p>
           <table className="mt-1.5 w-full min-w-[28rem] text-left text-[11px]">
             <thead>

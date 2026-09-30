@@ -4,7 +4,7 @@
 // "unavailable", never a silent absence. Data: deals.site_flags
 // (lib/site-flags, migration 0030).
 
-import { isMinimalHazard, opportunityZoneRead, type SiteFlagsResult } from "@/lib/site-flags/core";
+import { OZ_NEXT_ROUND_NOTE, isMinimalHazard, opportunityZoneRead, type SiteFlagsResult } from "@/lib/site-flags/core";
 
 function Chip({ label, cls }: { label: string; cls: string }) {
   return (
@@ -83,6 +83,7 @@ export function SiteFlagsCard({
             )}
           </div>
           {oz?.caveat && <p className="mt-2 text-xs text-muted">{oz.caveat}</p>}
+          {oz && oz.kind !== "unchecked" && <p className="mt-2 text-xs text-muted">{OZ_NEXT_ROUND_NOTE}</p>}
           <p className="mt-2 text-xs text-muted">{result.note}</p>
           {result.error && <p className="mt-1 text-xs text-caution">{result.error}</p>}
         </>

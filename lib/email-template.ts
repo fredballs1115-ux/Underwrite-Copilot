@@ -43,7 +43,7 @@ export function analysisReadyEmail(input: AnalysisReadyEmailInput): {
     `Buy box: ${input.buyBoxLabel}`,
     input.reason ? `Why: ${input.reason}` : null,
     ``,
-    `Open the full report: ${input.dealUrl}`,
+    `Open the deal: ${input.dealUrl}`,
     ``,
     `You're getting this because analysis emails are on. Turn them off on your Account page: ${input.settingsUrl}`,
   ]
@@ -92,7 +92,7 @@ export function analysisReadyEmail(input: AnalysisReadyEmailInput): {
             <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:22px;">
               <tr>
                 <td style="background-color:#114e54;border-radius:8px;">
-                  <a href="${esc(input.dealUrl)}" style="display:inline-block;padding:10px 20px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">Open the full report</a>
+                  <a href="${esc(input.dealUrl)}" style="display:inline-block;padding:10px 20px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">Open the deal</a>
                 </td>
               </tr>
             </table>

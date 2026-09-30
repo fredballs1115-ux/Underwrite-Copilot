@@ -185,7 +185,9 @@ export function MetroLive({
       {sectors.length > 0 && <SectorJobsPicture sectors={sectors} allJobs={allJobs} metroId={metroId} />}
       {supply && <SupplyPicture supply={supply} metroId={metroId} />}
       <p className="mt-2 text-[11px] text-muted">
-        Pulled every weekday; each figure links to its series.
+        {hasMsaVacancy
+          ? "Pulled every weekday, the survey's metro vacancy each quarter; each figure links to its series."
+          : "Pulled every weekday; each figure links to its series."}
         {sectors.length > 0 &&
           " Jobs by sector are the BLS's payroll counts for the metro area by supersector, each against a year ago beside all payrolls: the sector that fills a building's kind is the demand an underwrite of it is assuming, and a screen of a deal here is handed that sector's line."}
         {supply &&
