@@ -23,7 +23,8 @@ export function SiteFlagsCard({
 }) {
   if (!hasAddress) return null;
   // The Opportunity Zone as the stored lookup can say it (lib/site-flags):
-  // on the list, off it by the tract's current number, or not checked and why.
+  // on the list, off it (by the 2010 tract, or the current number with its
+  // caveat), or not checked and why.
   const oz = result ? opportunityZoneRead(result) : null;
   return (
     <section className="rounded-xl border border-line bg-surface p-4">
@@ -75,6 +76,10 @@ export function SiteFlagsCard({
             )}
             {result.tractGeoid && (
               <span className="text-xs text-muted">tract {result.tractGeoid}</span>
+            )}
+            {/* The number the zone was checked by, where 2010's differs. */}
+            {result.ozTract?.vintage === "2010" && result.ozTract.geoid !== result.tractGeoid && (
+              <span className="text-xs text-muted">2010 tract {result.ozTract.geoid}</span>
             )}
           </div>
           {oz?.caveat && <p className="mt-2 text-xs text-muted">{oz.caveat}</p>}

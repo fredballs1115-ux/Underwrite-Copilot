@@ -67,14 +67,19 @@ const REGISTRY: ZoneRow[] = [
   { zone_type: "opportunity_zone", tract_geoid: "24033805903", source_dataset: MD_DATASET },
 ];
 
-/** The Census geocoder's geographies answer for a tract, and FEMA's for no zone. */
-function stubFetch(tract: string) {
+/** The Census geocoder's geographies answer for a tract — `tract2010` for
+ *  its 2010 vintage (the same tract unless given; "fail" answers a 503) —
+ *  and FEMA's for no zone. */
+function stubFetch(tract: string, tract2010: string | "fail" = tract) {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
       const u = String(url);
+      const is2010 = u.includes("vintage=Census2010_Current");
+      if (is2010 && tract2010 === "fail") return new Response("down", { status: 503 });
+      const t = is2010 ? tract2010 : tract;
       const body = u.includes("geocoding.geo.census.gov")
-        ? { result: { geographies: { "Census Tracts": [{ GEOID: tract }], Counties: [{ NAME: "Somewhere County", GEOID: tract.slice(0, 5) }] } } }
+        ? { result: { geographies: { "Census Tracts": [{ GEOID: t }], Counties: [{ NAME: "Somewhere County", GEOID: t.slice(0, 5) }] } } }
         : u.includes("?f=json")
           ? { layers: [{ id: 28, name: "Flood Hazard Zones" }] }
           : { features: [] };
@@ -118,6 +123,26 @@ describe("computeSiteFlags — the Opportunity Zone answer is the tract's own st
     const r = await computeSiteFlags({ label: "100 Light St, Baltimore, MD 21202", subject: { lat: 39.28, lng: -76.61 } });
     expect(r.opportunityZone).toEqual({ sourceDataset: MD_DATASET });
     expect(admin.likes).toEqual([]);
+  });
+
+  it("checks the zone by the 2010 tract it was designated on, not the current number (#473)", async () => {
+    // Frisco, TX as the runner printed it: the 2010 tract 48085030408 was
+    // renumbered 48085030410. A registry holding the 2010 number finds it.
+    admin = fakeAdmin([{ zone_type: "opportunity_zone", tract_geoid: "48085030408", source_dataset: "Designated QOZs" }]);
+    vi.mocked(createSupabaseAdminClient).mockImplementation(() => admin as never);
+    stubFetch("48085030410", "48085030408");
+    const r = await computeSiteFlags({ label: "5000 Main St, Frisco, TX 75034", subject: { lat: 33.1507, lng: -96.8236 } });
+    expect(r.tractGeoid).toBe("48085030410");
+    expect(r.ozTract).toEqual({ geoid: "48085030408", vintage: "2010" });
+    expect(r.opportunityZone).toEqual({ sourceDataset: "Designated QOZs" });
+  });
+
+  it("falls back to the current number where the 2010 call fails, and says which it read", async () => {
+    stubFetch("24005400100", "fail");
+    const r = await computeSiteFlags({ label: "1 W Pennsylvania Ave, Towson, MD 21204", subject: { lat: 39.4, lng: -76.6 } });
+    expect(r.ozTract).toEqual({ geoid: "24005400100", vintage: "current" });
+    expect(r.opportunityZone).toBeNull();
+    expect(r.error).toBeUndefined();
   });
 
   it("a count that cannot be read is no answer, and a point with no tract says so", async () => {

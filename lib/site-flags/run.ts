@@ -109,6 +109,24 @@ async function geographiesFor(
   return { tract: parseCensusTract(json), place: parseCensusPlace(json), county: parseCensusCounty(json) };
 }
 
+/** The point's 2010 census tract (#473): the Opportunity Zones were
+ *  designated on 2010 tract numbers, and the Census geocoder answers them
+ *  under its Census2010_Current vintage — a call of its own, since the
+ *  current vintage's answer carries the current tract under the same layer
+ *  name and nothing in the body but the vintage says which it is (the
+ *  runner printed both: at a point in Frisco, TX the 2010 tract is
+ *  48085030408 and the current one 48085030410). */
+async function tract2010For(lat: number, lng: number): Promise<string | null> {
+  const u = new URL("https://geocoding.geo.census.gov/geocoder/geographies/coordinates");
+  u.searchParams.set("x", String(lng));
+  u.searchParams.set("y", String(lat));
+  u.searchParams.set("benchmark", "Public_AR_Current");
+  u.searchParams.set("vintage", "Census2010_Current");
+  u.searchParams.set("layers", "Census Tracts");
+  u.searchParams.set("format", "json");
+  return parseCensusTract(await fetchJson(u.toString()));
+}
+
 async function floodFor(lat: number, lng: number): Promise<SiteFlagsResult["flood"]> {
   try {
     const layerId = resolveNfhlLayerId(await fetchJson(`${NFHL_ROOT}?f=json`));
@@ -163,28 +181,39 @@ export async function computeSiteFlags(input: {
   let place: CensusPlace | null | undefined;
   let county: CensusPlace | null = null;
   let tractError: string | null = null;
-  try {
-    const g = await geographiesFor(point.lat, point.lng);
-    tractGeoid = g.tract;
-    place = g.place;
-    county = g.county;
-  } catch (err) {
-    tractError = String(err).slice(0, 200);
+  // The current geographies and the 2010 tract, asked together.
+  const [current, old] = await Promise.allSettled([
+    geographiesFor(point.lat, point.lng),
+    tract2010For(point.lat, point.lng),
+  ]);
+  if (current.status === "fulfilled") {
+    tractGeoid = current.value.tract;
+    place = current.value.place;
+    county = current.value.county;
+  } else {
+    tractError = String(current.reason).slice(0, 200);
   }
+  const tract2010 = old.status === "fulfilled" ? old.value : null;
 
-  // No tract, no check: said apart from a tract lookup that failed.
+  // The zone is checked by the 2010 number it was designated on, else the
+  // current one (said so on the card). No tract, no check: said apart from
+  // a tract lookup that failed.
+  const ozGeoid = tract2010 ?? tractGeoid;
+  const ozTract: SiteFlagsResult["ozTract"] = ozGeoid
+    ? { geoid: ozGeoid, vintage: tract2010 ? "2010" : "current" }
+    : undefined;
   let oz: Pick<SiteFlagsResult, "opportunityZone" | "opportunityZoneUnchecked"> = {
     opportunityZone: "unchecked",
-    opportunityZoneUnchecked: tractError ? "tract_failed" : "no_tract",
+    opportunityZoneUnchecked: tractError && old.status === "rejected" ? "tract_failed" : "no_tract",
   };
-  const stateFips = tractStateFips(tractGeoid);
-  if (tractGeoid && stateFips) {
+  const stateFips = tractStateFips(ozGeoid);
+  if (ozGeoid && stateFips) {
     try {
       const { data, error } = await admin
         .from("incentive_zones")
         .select("source_dataset")
         .eq("zone_type", "opportunity_zone")
-        .eq("tract_geoid", tractGeoid)
+        .eq("tract_geoid", ozGeoid)
         .limit(1);
       if (error) throw new Error(error.message);
       const hit = data && data.length > 0 ? { sourceDataset: String(data[0].source_dataset) } : null;
@@ -221,6 +250,7 @@ export async function computeSiteFlags(input: {
     ...(county ? { county } : {}),
     opportunityZone: oz.opportunityZone,
     ...(oz.opportunityZoneUnchecked ? { opportunityZoneUnchecked: oz.opportunityZoneUnchecked } : {}),
+    ...(ozTract ? { ozTract } : {}),
     flood,
     v: SITE_FLAGS_V,
     ...(tractError ? { error: `census tract: ${tractError}` } : {}),

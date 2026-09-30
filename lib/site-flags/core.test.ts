@@ -400,6 +400,14 @@ describe("the Opportunity Zone check — not on the list only where the list hol
     });
   });
 
+  it("a miss read by the 2010 tract the zones were designated on owes no caveat (#473)", () => {
+    const off = opportunityZoneRead({ opportunityZone: null, v: SITE_FLAGS_V, ozTract: { geoid: "24005400100", vintage: "2010" } });
+    expect(off).toEqual({ kind: "not_listed", label: "Tract not on the Opportunity Zone list", caveat: null });
+    // Read by the current number, it keeps the caveat.
+    const current = opportunityZoneRead({ opportunityZone: null, v: SITE_FLAGS_V, ozTract: { geoid: "24005400100", vintage: "current" } });
+    expect(current.caveat).toBe(OZ_CURRENT_NUMBER_CAVEAT);
+  });
+
   it("a 'not on the list' stored before the state rule is no answer, and a check that did not run says why", () => {
     // v2 and earlier read the miss against whatever state the registry held.
     expect(OZ_STATE_RULE_V).toBeLessThanOrEqual(SITE_FLAGS_V);

@@ -39,6 +39,11 @@ export interface SiteFlagsResult {
    *  any state's zones answered null); "unchecked" = no answer, the reason in
    *  `opportunityZoneUnchecked` */
   opportunityZone: { sourceDataset: string } | null | "unchecked";
+  /** the tract number the Opportunity Zone check read (#473): its 2010
+   *  number, the one the zones were designated on, where the Census geocoder
+   *  answered its 2010 vintage; the current number otherwise. Absent on a
+   *  lookup made before the 2010 number was read. */
+  ozTract?: { geoid: string; vintage: "2010" | "current" };
   /** why the Opportunity Zone check did not answer: no census tract at the
    *  point, a tract lookup that failed, a registry holding no zones for the
    *  tract's state (the ingest loads Maryland's unless a national layer is
@@ -58,9 +63,10 @@ export interface SiteFlagsResult {
  *  county beside the tract (#452); 3 looks up at the deal's own geocoded
  *  point — the one its aerial and flood map are drawn around, so the zone
  *  said and the ring drawn are one place — reads FEMA's base flood
- *  elevation (#472), and says a tract is not in an Opportunity Zone only
- *  where the registry holds zones for the tract's own state. An answered
- *  lookup under older rules is made again on the deal's next view. */
+ *  elevation (#472), says a tract is not in an Opportunity Zone only
+ *  where the registry holds zones for the tract's own state, and checks
+ *  the zone by the point's 2010 tract (#473). An answered lookup under
+ *  older rules is made again on the deal's next view. */
 export const SITE_FLAGS_V = 3;
 
 /** How long a lookup whose flood zone FEMA did not answer stands before it
@@ -85,11 +91,12 @@ export function siteFlagsOutdated(
 // The registry (incentive_zones) is loaded by scripts/ingest/opportunity_zones.ts,
 // which loads Maryland's designated tracts unless a national layer is set. A
 // tract missing from it is "not in a zone" only where the registry holds the
-// tract's own state; anywhere else the check did not run. And a miss is read
-// by the tract's CURRENT number, the one the Census geocoder returns: the
-// zones were designated on older tract numbers, so a tract split or
-// renumbered since can sit in a zone and still miss the list — every surface
-// that says "not on the list" says it was checked by the current number.
+// tract's own state; anywhere else the check did not run. The zones were
+// designated on 2010 tract numbers, so the check reads the point's 2010
+// number — the Census geocoder answers it under its Census2010_Current
+// vintage, a call of its own (#473) — and where that call fails, the
+// current number, which a tract split or renumbered since 2010 can miss the
+// list by: a miss read that way says so.
 
 export type OpportunityZoneUnchecked = "no_tract" | "tract_failed" | "state_not_loaded" | "lookup_failed";
 
@@ -137,16 +144,21 @@ export interface OpportunityZoneRead {
 }
 
 export const OZ_CURRENT_NUMBER_CAVEAT =
-  "Opportunity Zones were checked by the tract's current number. The zones were designated on older tract numbers, so a tract split or renumbered since can sit in a zone and still miss the list.";
+  "Opportunity Zones were checked by the tract's current number. The zones were designated on 2010 tract numbers, so a tract split or renumbered since can sit in a zone and still miss the list.";
 
 export function opportunityZoneRead(
-  flags: Pick<SiteFlagsResult, "opportunityZone" | "opportunityZoneUnchecked" | "v">,
+  flags: Pick<SiteFlagsResult, "opportunityZone" | "opportunityZoneUnchecked" | "v" | "ozTract">,
 ): OpportunityZoneRead {
   const oz = flags.opportunityZone;
   if (oz && typeof oz === "object") return { kind: "listed", label: "Opportunity Zone tract", caveat: null };
   // A "not on the list" stored before the state rule may have been read
   // against another state's zones: not an answer.
   if (oz === null && (flags.v ?? 1) >= OZ_STATE_RULE_V) {
+    // Read by the 2010 number the zones were designated on, a miss is the
+    // answer; read by the current number, it owes the caveat.
+    if (flags.ozTract?.vintage === "2010") {
+      return { kind: "not_listed", label: "Tract not on the Opportunity Zone list", caveat: null };
+    }
     return { kind: "not_listed", label: "Tract's current number not on the Opportunity Zone list", caveat: OZ_CURRENT_NUMBER_CAVEAT };
   }
   const why = oz === "unchecked" && flags.opportunityZoneUnchecked ? OZ_UNCHECKED_WHY[flags.opportunityZoneUnchecked] : null;
