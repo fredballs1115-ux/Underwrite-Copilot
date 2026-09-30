@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "Single-tenant deals, read as one lease",
+      "href": "/deals",
+      "blurb": "When one tenant leases the whole property — a net lease, a build-to-suit, a sale-leaseback — the screen now reads the lease itself: the tenant and who guarantees the rent, any credit rating the memorandum states, when the lease ends, the renewal options after it, any early termination right, and the rent's stated increases. The deal page draws the years left today and at the model's five-year sale, with the tenant's options dashed after the term, and sets the lease's own increases against the model's rent growth, saying what to enter to run the model on the lease. A lease that ends inside the hold is said to, and an early termination date is read as the lease's end. The pipeline, the memo, the report, the workbook and the compare table carry it too, and the assumption review checks the single-tenant traps by name."
+    },
+    {
+      "date": "2026-09-30",
       "title": "Affordable housing, read as affordable housing",
       "href": "/deals",
       "blurb": "A deal whose rents a tax-credit regulatory agreement, a Section 8 HAP contract, a bond set-aside or a similar covenant sets is now read that way. The screen reads how many units are restricted, at which income limits, and when the restriction and any HAP contract end, and the deal page draws the units by tier, each tier's rent against its limit, and the years left on each clock. It says that restricted rents move with the published income limits rather than the market, that a gap to market on those units is not upside until the restriction ends, and that the model's single rent-growth rate should be read as the market-rate units' alone. The pipeline, the memo, the report, the workbook and the compare table carry it too, and the assumption review checks each program's own traps."

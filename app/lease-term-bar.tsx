@@ -1,7 +1,8 @@
 /**
- * A ground lease's term, drawn (#421) — the one picture of it, pure, at the
- * app root because the interest panel (the deal page and the shared screen)
- * and the deal page's leasehold card both draw it.
+ * A lease's term, drawn (#421) — the one picture of it, pure, at the app
+ * root because the interest panel (the deal page and the shared screen),
+ * the deal page's leasehold card and the single-tenant panel (#454) all
+ * draw it.
  *
  * One track from today: the term left, filled; the extension options after
  * it, dashed, because they are the leaseholder's to exercise and not yet
@@ -23,6 +24,7 @@ export function LeaseTermBar({
   endLabel,
   optionYears = null,
   holdYears = null,
+  optionsWord = "Extension options",
 }: {
   /** years left on the lease today */
   yearsLeft: number;
@@ -32,6 +34,9 @@ export function LeaseTermBar({
   optionYears?: number | null;
   /** the model's hold, where the picture is the model's */
   holdYears?: number | null;
+  /** what the options are called: a ground lease's extension options, a
+   *  tenant's renewal options (#454) */
+  optionsWord?: string;
 }) {
   if (!(yearsLeft > 0)) return null;
   const opts = optionYears != null && optionYears > 0 ? optionYears : 0;
@@ -50,7 +55,7 @@ export function LeaseTermBar({
         : null
       : { tone: "bg-brand/60", text: `Left today, ${years(yearsLeft)} (to ${endLabel})` },
     pastEnd > 0 ? { tone: "bg-kill/60", text: "Past the lease's end" } : null,
-    opts > 0 ? { tone: "border border-dashed border-brand/60 bg-brand/5", text: `Extension options, ${years(opts)} if exercised` } : null,
+    opts > 0 ? { tone: "border border-dashed border-brand/60 bg-brand/5", text: `${optionsWord}, ${years(opts)} if exercised` } : null,
   ].filter((l): l is { tone: string; text: string } => l != null);
 
   return (

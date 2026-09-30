@@ -96,7 +96,8 @@ const CARDS: DealCard[] = [
   card({ id: "j", name: "Unpriced land — Route 1 parcel", verdict: "caution", stage: "screening", fit: null, slots: { cap: null, price: null, yoc: null }, market: "Laurel, MD", coveredMarket: "Baltimore" }),
   // A run whose process died mid-screen, and a re-screen that failed before
   // its verdict — the stored verdict must not read as the current call.
-  card({ id: "k", name: "Arlington Flex Park", assetClass: "industrial", stage: "screening", jobStatus: "stalled", slots: { cap: null, price: "$9,100,000", yoc: null }, market: "Arlington, TX", coveredMarket: "Dallas–Fort Worth", hasAddress: false }),
+  // …and one tenant leasing the whole building (#454).
+  card({ id: "k", name: "Arlington Flex Park", assetClass: "industrial", stage: "screening", jobStatus: "stalled", slots: { cap: null, price: "$9,100,000", yoc: null, tenancy: "Single tenant, 6 yrs left" }, market: "Arlington, TX", coveredMarket: "Dallas–Fort Worth", hasAddress: false }),
   // …and a LIHTC regulatory agreement on three units in four (#453).
   card({ id: "l", name: "Elm Street Lofts", verdict: "pass", stage: "underwriting", jobStatus: "failed", fit: "fits", score: 84, mandateVerdict: "PURSUE", slots: { cap: "6.0%", price: "$14,000,000", yoc: null, affordable: "LIHTC, 75% restricted" }, market: "Dallas, TX", coveredMarket: "Dallas–Fort Worth", flood: { tag: "Flood AE", cell: "AE (SFHA)" } }),
 ];
@@ -227,6 +228,10 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // (#453); a market-rate deal says nothing.
     expect((text.match(/LIHTC, 75% restricted/g) ?? []).length).toBe(4);
     expect(html).toContain("LIHTC, 75% restricted: a covenant or a contract sets these rents");
+    // One tenant's lease is said beside the figure at every width too
+    // (#454); a multi-tenant deal says nothing.
+    expect((text.match(/Single tenant, 6 yrs left/g) ?? []).length).toBe(4);
+    expect(html).toContain("Single tenant, 6 yrs left: one lease is the whole income");
   });
 
   it("draws the pipeline as photograph-led cards by default: the building's picture, the call over it, the three figures (#428)", () => {
@@ -342,6 +347,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect((text.match(/49% share/g) ?? []).length).toBe(1);
     expect((text.match(/Assumable 3\.45%/g) ?? []).length).toBe(1);
     expect((text.match(/LIHTC, 75% restricted/g) ?? []).length).toBe(1);
+    expect((text.match(/Single tenant, 6 yrs left/g) ?? []).length).toBe(1);
     // The three figures a pipeline is read by; a plan deal's yield on cost
     // takes the cap's slot under its own label.
     expect(text).toContain("$68.0M");
@@ -4951,6 +4957,130 @@ describe("AffordablePanel — a covenant or a contract that sets the rents, draw
     const marketRate = { dealName: "Maple Court", assetClass: "multifamily", metrics: [row("Units", "240")] } as ExtractionResult;
     expect(render(React.createElement(AffordablePanel, { affordable: readAffordable(marketRate, AS_OF) }))).toBe(
       render(React.createElement(React.Fragment)),
+    );
+  });
+});
+
+// ── One tenant leases the whole property (#454) ───────────────────────────
+import { SingleTenantPanel } from "@/app/single-tenant-panel";
+import { readSingleTenant } from "@/lib/single-tenant";
+
+describe("SingleTenantPanel — the one lease a single-tenant property is, drawn", () => {
+  const AS_OF = new Date(Date.UTC(2026, 8, 30));
+  const row = (label: string, value: string, page = "p. 4") => ({ label, value, flagged: false, page, basis: "na" as const });
+  const walgreens = (over: Partial<NonNullable<ExtractionResult["singleTenant"]>> = {}, metrics: ExtractionResult["metrics"] = []) =>
+    ({
+      dealName: "Walgreens | Tulsa, OK",
+      assetClass: "net_lease",
+      totalPages: 30,
+      singleTenant: {
+        tenant: "Walgreens Co.",
+        guarantor: "Walgreens Boots Alliance, Inc.",
+        leaseType: "Absolute NNN",
+        landlordObligations: "",
+        tenantRights: "Tenant holds a right of first refusal on any sale",
+        page: "p. 4",
+        ...over,
+      },
+      metrics: [
+        row("Asking price", "$6,500,000", "p. 2"),
+        row("Going-in cap rate", "6.00%", "p. 2"),
+        row("Lease expiration", "March 31, 2036"),
+        row("Renewal options", "Eight 5-year options"),
+        row("Rent increases", "10% every 5 years"),
+        row("Annual base rent", "$390,000"),
+        row("Tenant credit rating", "BBB- (S&P)", "p. 5"),
+        ...metrics,
+      ],
+    }) as ExtractionResult;
+  const MODEL = { holdMonths: 60, rentGrowthPct: 0.03, vacancyPct: 0.02, exitCapPct: 0.06 };
+
+  it("draws the term with the model's hold and the tenant's options, the increases against the model's growth, and the facts", () => {
+    const html = render(React.createElement(SingleTenantPanel, { lease: readSingleTenant(walgreens(), AS_OF), model: MODEL }));
+    const text = visibleText(html);
+    expect(text).toContain("Single tenant");
+    expect(text).toContain("Walgreens Co.");
+    expect(text).toContain("p. 4");
+    expect(text).toContain("The lease ends Mar 2036, 9.5 years from today, then renewal options as stated, eight of 5 years");
+    // The term: the hold, the years left after the sale, the options dashed.
+    expect(html.match(/data-bar="lease-hold"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="lease-term"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="lease-options"/g)).toHaveLength(1);
+    expect(text).toContain("The model's hold, 5 years");
+    expect(text).toContain("Left at the sale, 4.5 years (to Mar 2036)");
+    expect(text).toContain("Renewal options, 40 years if exercised");
+    // The increases against the model's growth, on one scale.
+    expect(html.match(/data-bar="lease-increase"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="model-growth"/g)).toHaveLength(1);
+    expect(text).toContain("1.92% a year — 10% every 5 years");
+    expect(text).toContain("3.0% a year");
+    // The facts as stated, the rating graded by its own letters.
+    expect(text).toContain("Walgreens Boots Alliance, Inc.");
+    expect(text).toContain("BBB- (S&P) — investment grade");
+    expect(text).toContain("Tenant holds a right of first refusal on any sale");
+    expect(text).toContain("$390,000");
+    expect(text).toContain("enter 1.92% as the rent growth to run the model on the lease");
+    expect(a11yIssues(html), "single-tenant panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("marks the hold's years past a lease that ends inside it, and draws no growth there", () => {
+    const short = walgreens({}, []);
+    short.metrics = short.metrics.map((m) => (m.label === "Lease expiration" ? { ...m, value: "2029" } : m));
+    const html = render(React.createElement(SingleTenantPanel, { lease: readSingleTenant(short, AS_OF), model: MODEL }));
+    const text = visibleText(html);
+    expect(html.match(/data-bar="lease-past"/g)).toHaveLength(1);
+    expect(text).toContain("Past the lease's end");
+    expect(html).not.toContain('data-bar="lease-increase"');
+    expect(text).toContain("The lease ends in 2029, inside the model's 5-year hold");
+  });
+
+  it("without a model: the term alone, no hold and no growth; nothing at all on a multi-tenant deal", () => {
+    const html = render(React.createElement(SingleTenantPanel, { lease: readSingleTenant(walgreens({ guarantor: "" }), AS_OF) }));
+    const text = visibleText(html);
+    expect(html).not.toContain('data-bar="lease-hold"');
+    expect(html.match(/data-bar="lease-term"/g)).toHaveLength(1);
+    expect(html).not.toContain('data-bar="model-growth"');
+    expect(text).toContain("Left today, 9.5 years (to Mar 2036)");
+    expect(text).toContain("None named in the memorandum");
+    expect(text).not.toContain("the model");
+    const multi = walgreens({ tenant: "" });
+    expect(render(React.createElement(SingleTenantPanel, { lease: readSingleTenant(multi, AS_OF) }))).toBe(render(React.createElement(React.Fragment)));
+  });
+});
+
+describe("ShareView — a single tenant's lease under the title (#454)", () => {
+  it("draws the lease, and nothing on a multi-tenant deal", () => {
+    const leased = {
+      ...SAMPLE_DEAL.extraction,
+      singleTenant: { tenant: "Walgreens Co.", guarantor: "Walgreens Boots Alliance, Inc.", leaseType: "Absolute NNN", landlordObligations: "", tenantRights: "", page: "" },
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Lease expiration", value: "March 31, 2036", flagged: false, page: "", basis: "na" as const },
+        { label: "Rent increases", value: "Flat", flagged: false, page: "", basis: "na" as const },
+      ],
+    };
+    const props = {
+      dealName: SAMPLE_DEAL.name,
+      assetClass: SAMPLE_DEAL.asset_class,
+      expiresAt: "2026-09-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: leased }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="single-tenant-panel"');
+    expect(text).toContain("Walgreens Co. leases the whole property, the rent guaranteed by Walgreens Boots Alliance, Inc. as stated.");
+    expect(text).toContain("The rent is flat until Mar 2036, as stated");
+    // The key terms lead with the lease's own rows.
+    expect(text).toContain("Lease expiration");
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }))).not.toContain(
+      "single-tenant-panel",
     );
   });
 });

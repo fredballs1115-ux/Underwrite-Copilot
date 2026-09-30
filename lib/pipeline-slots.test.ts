@@ -37,7 +37,7 @@ const ex = (metrics: ExtractedMetric[], over: Partial<ExtractionResult> = {}): E
 describe("pickSlots — the pipeline row agrees with the export on which figure a deal carries", () => {
   it("a stabilized asset: its going-in cap, its price, no yield on cost", () => {
     const s = pickSlots(ex([m("Asking price", "$42,000,000"), m("Going-in cap rate", "5.50%"), m("In-place NOI", "$2,310,000")]), null);
-    expect(s).toEqual({ cap: "5.50%", price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null });
+    expect(s).toEqual({ cap: "5.50%", price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null });
   });
 
   it("says a covenant on the rents beside the price (#453), and nothing on a market-rate deal", () => {
@@ -53,6 +53,17 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
     expect(lihtc.price).toBe("$38,000,000");
     expect(lihtc.cap).toBe("5.10%");
     expect(pickSlots(ex(base), null).affordable).toBeNull();
+  });
+
+  it("says how long a single tenant's lease has left (#454), and nothing on a multi-tenant deal", () => {
+    const base = [m("Asking price", "$6,500,000"), m("Going-in cap rate", "6.00%")];
+    const tenant = { tenant: "Walgreens Co.", guarantor: "", leaseType: "NNN", landlordObligations: "", tenantRights: "", page: "" };
+    // A lease a century out, so the whole years left never move with the day the test runs.
+    const s = pickSlots(ex([...base, m("Lease expiration", "December 31, 2126")], { singleTenant: tenant }), null);
+    expect(s.tenancy).toMatch(/^Single tenant, \d+ yrs left$/);
+    expect(pickSlots(ex(base, { singleTenant: tenant }), null).tenancy).toBe("Single tenant");
+    expect(pickSlots(ex(base, { singleTenant: { ...tenant, tenant: "" } }), null).tenancy).toBeNull();
+    expect(pickSlots(ex(base), null).tenancy).toBeNull();
   });
 
   it("says what the price buys where it is not the building outright (#415)", () => {
@@ -100,7 +111,7 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
       }),
       null,
     );
-    expect(s).toEqual({ cap: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null });
+    expect(s).toEqual({ cap: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null });
   });
 
   it("before the extraction lands, the first signal's ask fills the price — only when it is a figure", () => {

@@ -38,6 +38,7 @@ import { dealContextFor } from "@/lib/deal-context";
 import { interestNote, readInterest } from "@/lib/interest";
 import { assumableNote, readAssumable } from "@/lib/assumable-debt";
 import { affordableNote, readAffordable } from "@/lib/affordable";
+import { readSingleTenant, singleTenantNote } from "@/lib/single-tenant";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { countyOf, placeDeal } from "@/lib/market-county";
@@ -851,6 +852,12 @@ async function runAnalysisSteps(
         // pro forma that marks restricted units to market is a misread.
         const affordable = readAffordable(ex);
         if (affordable) notes.push(affordableNote(affordable));
+
+        // One tenant leases the whole property (#454): the lease's facts,
+        // then the single-tenant traps keyed to them by name — the
+        // guarantor, the term at the exit, dark value, the increases.
+        const singleTenant = readSingleTenant(ex);
+        if (singleTenant) notes.push(singleTenantNote(singleTenant));
 
         if (flagged.length) {
           notes.push(

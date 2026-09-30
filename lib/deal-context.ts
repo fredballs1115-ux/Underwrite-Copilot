@@ -6,6 +6,7 @@ import { assetWords } from "@/lib/asset-words";
 import { interestContextLine, readInterest } from "@/lib/interest";
 import { assumableContextLine, readAssumable } from "@/lib/assumable-debt";
 import { affordableContextLine, readAffordable } from "@/lib/affordable";
+import { readSingleTenant, singleTenantContextLine } from "@/lib/single-tenant";
 import { portfolioContextLine, readPortfolio } from "@/lib/portfolio";
 
 const compact = (n: number): string =>
@@ -42,6 +43,10 @@ export function dealContextFor(
   // units' rents move with the limits, not the market, and a gap to market
   // on them is not loss to lease — said before any rent is read.
   const affordable = readAffordable(extraction);
+  // One tenant leases the whole property (#454): the lease is the income —
+  // its guarantor, its term and its increases — said before any figure is
+  // read as a market's.
+  const singleTenant = readSingleTenant(extraction);
   // FEMA's flood zone at the building, where the site lookup has answered
   // by the time the step runs (#426): a Special Flood Hazard Area is a
   // premium in the expense line and a lender's condition.
@@ -50,6 +55,7 @@ export function dealContextFor(
     ...(interest ? [interestContextLine(interest)] : []),
     ...(assumable ? [assumableContextLine(assumable)] : []),
     ...(affordable ? [affordableContextLine(affordable)] : []),
+    ...(singleTenant ? [singleTenantContextLine(singleTenant)] : []),
     ...(flood ? [flood] : []),
   ];
   const tail = [...(portfolio ? [portfolioContextLine(portfolio)] : [])];

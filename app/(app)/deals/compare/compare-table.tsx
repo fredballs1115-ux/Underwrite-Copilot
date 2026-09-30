@@ -76,6 +76,9 @@ export type Col = {
    *  restricted" — lib/affordable `affordableTag`, #453); absent on a
    *  market-rate deal */
   affordable?: string | null;
+  /** one tenant leases the whole property ("Single tenant, 9 yrs left" —
+   *  lib/single-tenant `singleTenantTag`, #454); absent otherwise */
+  tenancy?: string | null;
   /** the building's pictures to try, best first, each with its own credit
    *  (lib/deal-banner, #418) — absent where the caller draws none */
   pictures?: BannerSource[];
@@ -193,6 +196,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     // A dash, never "market-rate": a screen saved before the restriction
     // was read did not look.
     { label: "Affordability", get: (c) => c.affordable || "—" },
+    { label: "Tenancy", get: (c) => c.tenancy || "—" },
     // A conversion and a stabilized building are not the same kind of thing,
     // and a side-by-side that hides that compares apples to plans.
     { label: "Deal type", get: (c) => c.strategy ?? "—" },

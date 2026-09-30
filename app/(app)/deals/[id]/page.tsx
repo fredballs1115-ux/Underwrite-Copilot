@@ -12,7 +12,9 @@ import { DealStickyBar } from "./deal-sticky-bar";
 import { PortfolioCard } from "@/app/portfolio-card";
 import { InterestPanel } from "@/app/interest-panel";
 import { AffordablePanel } from "@/app/affordable-panel";
+import { SingleTenantPanel } from "@/app/single-tenant-panel";
 import { readAffordable } from "@/lib/affordable";
+import { readSingleTenant } from "@/lib/single-tenant";
 import { withArticle } from "@/lib/article";
 import { interestTag, readInterest } from "@/lib/interest";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
@@ -1147,6 +1149,22 @@ export default async function DealPage({
             binds, until when, each tier against its limit — said before any
             rent growth is believed (lib/affordable). */}
         <AffordablePanel affordable={readAffordable(extraction)} />
+        {/* One tenant leases the whole property (#454): its guarantor, the
+            term left today and at the model's sale, the options, and the
+            lease's increases against the model's growth (lib/single-tenant). */}
+        <SingleTenantPanel
+          lease={readSingleTenant(extraction)}
+          model={
+            derived
+              ? {
+                  holdMonths: derived.inputs.holdMonths,
+                  rentGrowthPct: derived.inputs.rentGrowthPct,
+                  vacancyPct: derived.inputs.vacancyPct,
+                  exitCapPct: derived.inputs.exitCapPct,
+                }
+              : null
+          }
+        />
         <PlausibilityPanel findings={plausibility} strategy={strategy} />
         <PlanSensitivity plan={plan} refCap={refCap} />
 

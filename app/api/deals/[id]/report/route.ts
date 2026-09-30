@@ -157,6 +157,7 @@ export async function GET(
   // A leasehold's exit on the term its lease has left at the model's sale —
   // the deal page's own read (#422).
   let leasehold: LeaseholdExitView | null = null;
+  let singleTenant: { line: string; read: string } | null = null;
   try {
     const extraction = (deal.extraction as ExtractionResult | null) ?? null;
     if (extraction) {
@@ -208,6 +209,9 @@ export async function GET(
         : null;
       const leaseholdRead = readLeaseholdExit(extraction, derived.inputs);
       leasehold = leaseholdRead ? leaseholdExitView(leaseholdRead) : null;
+      // The one lease a single-tenant property is (#454), read against this
+      // model — the workbook cover's own two lines.
+      singleTenant = derived.meta.singleTenant ?? null;
 
       // The model's assumptions against the published figures — the same
       // read the deal page's card and the workbook make (lib/model-vs-market,
@@ -286,7 +290,7 @@ export async function GET(
         ((deal as unknown as { site_flags?: SiteFlagsResult | null }).site_flags ?? null),
       ).catch(() => null),
     ]);
-    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap);
+    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant);
     const element = React.createElement(ReportDocument, {
       input,
     }) as unknown as Parameters<typeof renderToBuffer>[0];

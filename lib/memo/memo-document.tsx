@@ -31,6 +31,7 @@ import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { interestOf, interestShortLine, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
+import { readSingleTenant, singleTenantShortLine } from "@/lib/single-tenant";
 import { floodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -131,6 +132,14 @@ function affordableLineFor(extraction: ExtractionResult | null): string {
   return r ? affordableShortLine(r) : "";
 }
 
+/** The one lease a single-tenant property is (lib/single-tenant, #454), in
+ *  one line for the memo's header: the tenant, its guarantor, when the
+ *  lease ends and how its rent grows. "" on anything else. */
+function singleTenantLineFor(extraction: ExtractionResult | null): string {
+  const r = readSingleTenant(extraction);
+  return r ? singleTenantShortLine(r) : "";
+}
+
 /** FEMA's flood zone at the building, from the stored site-flags lookup,
  *  in one line for the memo's header (#426): "" where there is nothing to
  *  say — minimal hazard, no digital map, a lookup still pending. */
@@ -156,6 +165,9 @@ export type MemoData = {
   /** a covenant or a contract that sets the rents (lib/affordable, #453),
    *  in one line; "" on a market-rate deal */
   affordableLine?: string;
+  /** the one lease a single-tenant property is (lib/single-tenant, #454),
+   *  in one line; "" on anything else */
+  singleTenantLine?: string;
   /** FEMA's flood zone at the building (lib/site-flags `floodShortLine`,
    *  #426) — a Special Flood Hazard Area or a drawn hazard; "" for minimal
    *  hazard, no digital map or a lookup that has not answered */
@@ -401,6 +413,7 @@ export function buildMemoData(
     interestLine: pdfSafe(interestLineFor(extraction ?? null)),
     assumableLine: pdfSafe(assumableLineFor(extraction ?? null)),
     affordableLine: pdfSafe(affordableLineFor(extraction ?? null)),
+    singleTenantLine: pdfSafe(singleTenantLineFor(extraction ?? null)),
     floodLine: pdfSafe(floodLineFor(deal)),
     dateStr,
     verdictWord: vmeta?.word ?? null,
@@ -847,6 +860,9 @@ export function MemoPage({ data }: { data: MemoData }) {
             {/* A covenant or a contract that sets the rents (#453): the
                 restricted units' rents move with the limits, not the market. */}
             {data.affordableLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.affordableLine}</Text>}
+            {/* The one lease a single-tenant property is (#454): the
+                tenant, its guarantor, the term and the increases. */}
+            {data.singleTenantLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.singleTenantLine}</Text>}
             {/* FEMA's flood zone at the building (#426): a Special Flood
                 Hazard Area is a cost and a lender's condition. */}
             {data.floodLine && <Text style={[s.sub, { color: "#9b1c1c" }]}>{data.floodLine}</Text>}

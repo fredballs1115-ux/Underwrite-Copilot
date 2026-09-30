@@ -11,6 +11,7 @@ import { findPriceMetric, inferStrategy, planSummary, signalAskPrice } from "@/l
 import { interestTag } from "@/lib/interest";
 import { assumableTag } from "@/lib/assumable-debt";
 import { affordableTag } from "@/lib/affordable";
+import { singleTenantTag } from "@/lib/single-tenant";
 
 export interface PipelineSlots {
   /** the going-in cap as the OM states it — null on a plan deal, which has
@@ -32,6 +33,10 @@ export interface PipelineSlots {
    *  restricted", "Section 8, 34% of units" (lib/affordable
    *  `affordableTag`, #453); absent or null on a market-rate deal */
   affordable?: string | null;
+  /** one tenant leases the whole property — "Single tenant, 9 yrs left",
+   *  "Single tenant, may leave in 4 yrs" (lib/single-tenant
+   *  `singleTenantTag`, #454); absent or null otherwise */
+  tenancy?: string | null;
 }
 
 /**
@@ -86,5 +91,7 @@ export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | nu
     // A restricted building's rents move with the limits, not the market:
     // the row says so beside the price, where a scan of the pipeline reads.
     affordable: affordableTag(extraction),
+    // One lease is the whole income: the row says how long it has left.
+    tenancy: singleTenantTag(extraction),
   };
 }

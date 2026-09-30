@@ -153,7 +153,38 @@ export interface ExtractionResult {
    *  extraction saved before it was read, and empty (no programs) on a
    *  market-rate deal. Read by lib/affordable. */
   affordable?: ExtractedAffordability;
+  /** ONE TENANT LEASES THE WHOLE PROPERTY (#454): a single-tenant net
+   *  lease, a build-to-suit, a sale-leaseback, a single-tenant warehouse,
+   *  office or clinic — the tenant, its guarantor and the lease's terms as
+   *  the OM states them. Absent on an extraction saved before it was read,
+   *  and a blank tenant on a multi-tenant or vacant property. Read by
+   *  lib/single-tenant. */
+  singleTenant?: ExtractedSingleTenant;
   metrics: ExtractedMetric[];
+}
+
+/** The one lease a single-tenant property is (#454), as the OM states it —
+ *  every field a string, "" where it states none. The lease's figures (its
+ *  end, the years left, the options, the increases, the rent, the rating)
+ *  are rows of their own in `metrics`. */
+export interface ExtractedSingleTenant {
+  /** the tenant as the OM names it; "" on a multi-tenant or vacant
+   *  property */
+  tenant: string;
+  /** who guarantees the rent, exactly as stated — the parent, a
+   *  subsidiary, a franchisee, a person */
+  guarantor: string;
+  /** the lease type as stated: "Absolute NNN", "NNN", "NN" */
+  leaseType: string;
+  /** what the landlord pays or repairs, exactly as stated — the roof, the
+   *  structure, the parking, HVAC replacement */
+  landlordObligations: string;
+  /** rights the tenant holds that reach the owner, exactly as stated — an
+   *  early termination, a right of first refusal or offer on a sale, a
+   *  purchase option, a right to go dark */
+  tenantRights: string;
+  /** the OM's page for the lease */
+  page: string;
 }
 
 /** A restriction or contract that sets rents (#453): Section 42 housing tax

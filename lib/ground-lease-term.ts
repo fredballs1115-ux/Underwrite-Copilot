@@ -29,7 +29,7 @@
 import { parsePageNumber } from "@/lib/facts";
 import { monthsBetween, parseStatedDate } from "@/lib/note-yield";
 
-type MetricRow = { label: string; value: string; page?: string };
+export type MetricRow = { label: string; value: string; page?: string };
 type Rows = { metrics?: MetricRow[]; totalPages?: number } | null | undefined;
 
 export interface GroundLeaseTerm {
@@ -152,10 +152,30 @@ export function readOptions(text: string): { years: number; how: string } | null
  * end, no year and no years remaining for it — nothing is assumed.
  */
 export function readGroundLeaseTerm(rows: Rows, asOf: Date = new Date()): GroundLeaseTerm | null {
+  return readLeaseTerm(
+    { endRow: rowOf(rows, END_ROW, OPTION_ROW), leftRow: rowOf(rows, LEFT_ROW), optionRow: rowOf(rows, OPTION_ROW, LEFT_ROW) },
+    rows?.totalPages,
+    asOf,
+  );
+}
+
+/** A lease's term as its rows state it — the ground lease's above, a
+ *  tenant's in lib/single-tenant (#454): the same three readings of the
+ *  end, the options apart from it, one copy of the rules. */
+export type LeaseTerm = GroundLeaseTerm;
+
+/**
+ * The term the given rows state, on a day: `endRow` the current term's end,
+ * `leftRow` the years left where stated as a count, `optionRow` the
+ * options. The caller finds the rows; null where they state no end.
+ */
+export function readLeaseTerm(
+  found: { endRow: MetricRow | null; leftRow: MetricRow | null; optionRow: MetricRow | null },
+  totalPages: number | undefined,
+  asOf: Date = new Date(),
+): LeaseTerm | null {
   const today = isoOf(asOf);
-  const endRow = rowOf(rows, END_ROW, OPTION_ROW);
-  const leftRow = rowOf(rows, LEFT_ROW);
-  const optionRow = rowOf(rows, OPTION_ROW, LEFT_ROW);
+  const { endRow, leftRow, optionRow } = found;
 
   let read: { ends: string; from: GroundLeaseTerm["from"]; row: MetricRow } | null = null;
   const stated = endRow ? endOf(endRow.value) : null;
@@ -192,7 +212,7 @@ export function readGroundLeaseTerm(rows: Rows, asOf: Date = new Date()): Ground
     }
   }
 
-  const pageCount = typeof rows?.totalPages === "number" && rows.totalPages > 0 ? rows.totalPages : null;
+  const pageCount = typeof totalPages === "number" && totalPages > 0 ? totalPages : null;
   const n = parsePageNumber(read.row.page);
   const page = n != null && pageCount != null && n <= pageCount ? (read.row.page ?? "").trim() : "";
 

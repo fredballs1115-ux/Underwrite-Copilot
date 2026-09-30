@@ -48,6 +48,10 @@ export interface PipelineExportRow {
    *  restricted" (lib/affordable `affordableTag`, #453); carried in the
    *  price cell's note beside what the price buys */
   affordable?: string | null;
+  /** one tenant leases the whole property — "Single tenant, 9 yrs left"
+   *  (lib/single-tenant `singleTenantTag`, #454); carried in the price
+   *  cell's note beside what the price buys */
+  tenancy?: string | null;
   /** the going-in cap on today's income — always null on a plan deal */
   cap: string | null;
   /** a plan deal's stabilized NOI over total cost, e.g. "11.7%" */
@@ -208,6 +212,7 @@ export async function buildPipelineWorkbook(
         d.interest ? `${d.interest}: the price does not buy the building outright — the deal page says what it buys.` : null,
         d.debt ? `${d.debt}: the seller's loan is offered for assumption — the deal page prices it against today's rate.` : null,
         d.affordable ? `${d.affordable}: a covenant or a contract sets these rents — they move with the limits, not the market; the deal page says until when.` : null,
+        d.tenancy ? `${d.tenancy}: one lease is the whole income — the deal page reads its guarantor, its term and its increases.` : null,
       ].filter((n): n is string => n != null);
       if (notes.length) priceCell.note = notes.join(" ");
 
