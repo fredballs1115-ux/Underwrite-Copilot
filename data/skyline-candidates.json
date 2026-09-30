@@ -3155,6 +3155,12 @@
         "York Pennsylvania downtown",
         "York Pennsylvania skyline",
         "York County Pennsylvania farmland"
+      ],
+      "candidates": [
+        {
+          "file": "Hanover, PA 17331, USA - panoramio (2).jpg",
+          "note": "York-Hanover, PA — Idawriter, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36791223837)."
+        }
       ]
     },
     {
@@ -3264,6 +3270,12 @@
         "Visalia California downtown",
         "Visalia California Sierra Nevada",
         "Tulare County California"
+      ],
+      "candidates": [
+        {
+          "file": "Visalia CA downtown 2.jpg",
+          "note": "Visalia, CA — Original uploader was VisalianNsf at en.wikipedia, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36791296577)."
+        }
       ]
     },
     {
@@ -3317,6 +3329,12 @@
         "Santa Rosa California downtown",
         "Petaluma California river downtown",
         "Sonoma County California vineyards"
+      ],
+      "candidates": [
+        {
+          "file": "Sonomamtnvineyard.jpg",
+          "note": "Santa Rosa-Petaluma, CA — w:en:User:Anlace, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36791355974)."
+        }
       ]
     },
     {
@@ -3395,6 +3413,12 @@
         "Port St. Lucie Florida",
         "Stuart Florida waterfront",
         "Fort Pierce Florida waterfront"
+      ],
+      "candidates": [
+        {
+          "file": "Fort Pierce Inlet State Park.jpg",
+          "note": "Port St. Lucie, FL — JonathanPuello, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36791449560)."
+        }
       ]
     },
     {
@@ -3416,6 +3440,12 @@
         "Tallahassee Florida skyline",
         "Tallahassee Florida Capitol",
         "Tallahassee Florida downtown"
+      ],
+      "candidates": [
+        {
+          "file": "TallahasseeSkyline2.JPG",
+          "note": "Tallahassee, FL — UrbanTallahassee, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36791060658)."
+        }
       ]
     }
   ]

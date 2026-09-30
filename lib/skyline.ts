@@ -1094,6 +1094,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Portland, ME",
     size: [4323, 1431],
   },
+  // Port St. Lucie, FL: skyline-sheet run 36791449560 — the Fort Pierce article's lead, the inlet, its beaches and the town whole in both crops with a horizon, so it reads as a photograph, not a map; Stuart's downtown would print STUART on a card named Port St. Lucie, and the river view is mostly sky.
+  "cbsa:38940": {
+    file: "Fort Pierce Inlet State Park.jpg",
+    place: "The Fort Pierce Inlet and its beaches from above",
+    credit: "JonathanPuello",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Port St. Lucie, FL",
+    size: [5318, 3542],
+  },
   // Providence, RI: skyline-sheet run 36750289515 — the article's lead image; the river, bridge and skyline stay whole in every crop.
   "cbsa:39300": {
     file: "Providence RI skyline.jpg",
@@ -1143,6 +1153,18 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "Salem, OR",
     size: [3796, 2473],
+  },
+  // Santa Rosa-Petaluma, CA: skyline-sheet run 36791355974 — the Sonoma County article's lead, whole in both crops under a blue sky; the county's coast (Arched Rock, Bodega Head) is as fine but farther from the market, and the rest were a train platform, San Francisco and a downtown sign.
+  // The runner printed the author as "w:en:User:Anlace" (a link to the
+  // English Wikipedia user); the credit is the name in it.
+  "cbsa:42220": {
+    file: "Sonomamtnvineyard.jpg",
+    place: "A Sonoma County vineyard below the mountains",
+    credit: "Anlace",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "http://creativecommons.org/licenses/by-sa/3.0/",
+    name: "Santa Rosa-Petaluma, CA",
+    size: [2816, 1508],
   },
   // Savannah, GA: skyline-sheet run 36782855933 — the picture the city is known by, over its houses and a park path.
   "cbsa:42340": {
@@ -1194,6 +1216,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Syracuse, NY",
     size: [10019, 5567],
   },
+  // Tallahassee, FL: skyline-sheet run 36791060658 — the downtown towers whole in both crops under a clear sky, over the Capitol tower cut at its top, a street corner and a hazy view from high above.
+  "cbsa:45220": {
+    file: "TallahasseeSkyline2.JPG",
+    place: "Downtown Tallahassee's towers over the trees under a blue sky",
+    credit: "UrbanTallahassee",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Tallahassee, FL",
+    size: [3093, 1779],
+  },
   // Toledo, OH: skyline-sheet run 36780959488 — sharp and vivid; the evening skyline is 354px tall and would be soft on every card.
   "cbsa:45780": {
     file: "Anthony Wayne Bridge, Toledo, OH from Middlegrounds Metropark Full Span.jpg",
@@ -1244,6 +1276,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Vallejo, CA",
     size: [4573, 3053],
   },
+  // Visalia, CA: skyline-sheet run 36791296577 — the one view of the city, whole in both crops under a clear sky, over the county article's Sierra landscapes (Columbine Lake, Mount Whitney), which are the county's mountains, not the market.
+  "cbsa:47300": {
+    file: "Visalia CA downtown 2.jpg",
+    place: "Downtown Visalia from a rooftop",
+    credit: "Original uploader was VisalianNsf at en.wikipedia",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "http://creativecommons.org/licenses/by-sa/3.0/",
+    name: "Visalia, CA",
+    size: [1818, 1228],
+  },
   // Wichita, KS: skyline-sheet run 36780959488 — the article's lead.
   "cbsa:48620": {
     file: "Wichita, Kansas skyline.jpg",
@@ -1273,6 +1315,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Worcester, MA",
     size: [7154, 3974],
+  },
+  // York-Hanover, PA: skyline-sheet run 36791223837 — the Hanover article's lead, whole in both crops in warm light; the search's only other result was New York City's skyline.
+  "cbsa:49620": {
+    file: "Hanover, PA 17331, USA - panoramio (2).jpg",
+    place: "Shops on a tree-lined street in Hanover",
+    credit: "Idawriter",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "York-Hanover, PA",
+    size: [3968, 2976],
   },
 };
 

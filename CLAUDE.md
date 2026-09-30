@@ -1234,7 +1234,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   row to a real metro area in the delineation, to a name, and to not being
   one the site reads. Its candidates are in the same file under the same
   id, and the sheet's folder takes the id with the colon replaced.
-  Seventy-three are served (2026-09-30: Albuquerque, Birmingham, Boise,
+  Seventy-eight are served (2026-09-30: Albuquerque, Birmingham, Boise,
   Bridgeport, Buffalo, Charleston, Des Moines, Grand Rapids, Greenville,
   Hartford, Honolulu, Knoxville, Louisville, Memphis, Milwaukee, New
   Orleans, Oklahoma City, Omaha, Providence, Tucson, Tulsa; then Albany,
@@ -1247,7 +1247,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   Winston-Salem; then Brownsville-Harlingen, Corpus Christi, Fayetteville
   (Arkansas), Fort Wayne, Killeen-Temple, Lakeland, Myrtle Beach, Ogden,
   Palm Bay-Melbourne-Titusville, Provo, Salem and Vallejo — runs
-  36786974652, 36787138337 and 36787230817), each judged through the card's 16:10 and the deal page's
+  36786974652, 36787138337 and 36787230817; then, a one-market run each,
+  Port St. Lucie, Santa Rosa-Petaluma, Tallahassee, Visalia and
+  York-Hanover — runs 36791449560, 36791355974, 36791060658, 36791296577
+  and 36791223837), each judged through the card's 16:10 and the deal page's
   21:9 crops — never the 4:1 band, which a `cbsa:` row never draws; San
   Jose, Fresno and Madison had nothing usable, and Baton Rouge's best frames
   are PNGs (never served) with its one JPEG a steep aerial that reads as a
@@ -1272,12 +1275,18 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   inside Commons' "No machine-readable author provided. … assumed"
   sentence, which the row's comment quotes whole, and Provo's the name
   inside the "Creator: Javin Weaver" the runner printed from Commons'
-  Creator template. Springfield (Missouri), York, Visalia, Santa
-  Rosa-Petaluma, Port St. Lucie and Tallahassee keep the drawn cover until
-  a one-market run each: York's sheet held New York's skyline and
-  Hanover's, Santa Rosa's a view of San Francisco, and
-  Tallahassee's one JPEG whole in both crops was a court building through
-  a filter.
+  Creator template, and Santa Rosa-Petaluma's the name inside the
+  "w:en:User:Anlace" it printed. Springfield (Missouri) keeps the drawn
+  cover: its one-market run (36791144586) found a ballpark's outfield, a
+  night aerial and a black-and-white alley. The one-market runs found the
+  rest where six-market sheets had not: Tallahassee's towers (its sheet's
+  one whole JPEG had been a court building through a filter), a street in
+  Hanover for York-Hanover (the sheet's only other result was New York's
+  skyline), Visalia's downtown over the county's Sierra landscapes, which
+  are its mountains and not its market, the Sonoma County article's
+  vineyard for Santa Rosa-Petaluma, and the Fort Pierce Inlet for Port St.
+  Lucie — an oblique with a horizon, which reads as a photograph where a
+  steep aerial reads as a map.
   Milwaukee's and Greenville's credits are the author Commons names, where
   each filename names another (the owner was told). The route
   decodes the key itself (the cards ask for it percent-encoded, and no key
