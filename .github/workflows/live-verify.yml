@@ -1125,6 +1125,11 @@ jobs:
           mark "#473 corrections: dates, rules and who sees your data" grep -q "Corrections: dates, rules and who sees your data" p_whats-new.html
           mark "#474 a picture for every deal" grep -q "A picture for every deal, even before its photograph" p_whats-new.html
           mark "#475 twenty-one more cities, pictured" grep -q "Twenty-one more cities, pictured" p_whats-new.html
+          mark "#476 the FY2027 fair market rents" grep -q "The FY2027 fair market rents, the year read from the data" p_whats-new.html
+          mark "#476 /market prints HUD's FY2027 rents, the year from the data" grep -q "FY2027 fair market rent" p_market.html
+          mark "#477 building photographs, found sooner and drawn sharper" grep -q "Building photographs, found sooner and drawn sharper" p_whats-new.html
+          mark "#478 corrections: what the site says about itself" grep -q "Corrections: what the site says about itself" p_whats-new.html
+          mark "#478 current rates, handed to the analysis" grep -q "Current rates, handed to the analysis" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

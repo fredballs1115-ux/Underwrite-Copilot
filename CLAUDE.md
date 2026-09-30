@@ -1815,6 +1815,32 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   becomes the metro's. `modelVsMarketFor` reads it, so the page, the
   report and the workbook agree; `modelVsMarket` takes it as `tracker`,
   and a read without one is exactly as before.
+- HUD's fair market rents (#476): `lib/fmr.ts` (pure, no runtime
+  imports, so the two scripts load it under plain Node) is the one reader.
+  `fmrOf` reads a metros.json entry's `fmr` block — `fy`, `effective`,
+  `area` (HUD's name for it), the bedrooms `0br`…`4br`, `status`,
+  `sources`, `as_of` (the day the figures were read, never the day they
+  take effect) and `note` — and a block that names no fiscal year, no day
+  inside it or no area is null, never printed. **The year is data**: every
+  surface prints `FY${fy}` from the block (`fmrLabel`) — the markets band,
+  the brief's `FmrRow` (`app/market/fmr-row.tsx`: HUD's area and
+  "effective Oct 1, 2026", or "ended Sep 30, 2027" in the warning tone once
+  `fmrPhase` says the year is over), the compare card
+  (`app/market/compare-metros.ts`, which will not set two different years'
+  2BR figures against each other), the Mid-Atlantic DC line, the ZORI bar,
+  the demo and the deal page's research panel (one line a metro, one
+  source link). Rows are `hud_fmr_fy<fy>_<bed>` (`fmrMetric`), built by
+  `fmrRows` / `fmrBenchmarkRows`, which the app's seeds,
+  `scripts/seed-research.mjs` and `scripts/fetch-fmr.mjs` all call, so the
+  table and the file are one shape; `newestFmrOnly` drops every row of an
+  older year than the newest present (HUD publishes every area at once),
+  so a database row still keyed to last year is never shown as current.
+  `lib/fiscal-year-literal.test.ts` fails on a typed "FY20xx" anywhere in
+  app/, lib/ or the two scripts. The FY2027 figures were read from HUD's
+  FY27_FMRs.xlsx (the Internet Archive's capture of 2026-09-22), effective
+  2026-10-01 per FR 2026-17891. The database may still hold FY2026 rows;
+  they are hidden on read, and `node scripts/seed-research.mjs` writes the
+  FY2027 ones.
 - What landlords are asking this month: `lib/zori.ts` (pure — a metro's
   Zillow Observed Rent Index and its change from a year ago, read out of
   the two `benchmarks` rows the MONTHLY pull writes, `scripts/fetch-zori.mjs`
@@ -3088,6 +3114,31 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   - **The challenger computes a tax reset only from the memorandum's own
     bill and assessed value**, and otherwise says the tax line resets and
     the rate is the assessor's to give — never an assumed ratio or millage.
+  - **The second audit** (2026-09-30, #478), each claim read against the
+    code. A recorded-sales feed is "live" only where the provider registry
+    runs it (`compsFeedLive` in lib/public-comps/core; Washington's
+    `dc_its` is documented, `configured: false`). The homepage's Excel
+    copy describes `lib/underwrite/workbook.ts`'s tabs (the first-draft
+    workbook and its conflicts sheet were retired in July). Outside the
+    covered markets the screen does not stop: statewide rules evaluate and
+    the market check reads the metro area's or state's figures. The rules
+    are "source-linked" (one has no source, five cite secondary sites),
+    the nine major markets are "nine of the largest", and "the AI never
+    does the arithmetic" became what is true: the cash flows, returns,
+    loan sizing and scores are computed in code. The homepage's buy-box
+    chips are the sample's own checks against `SAMPLE_DEMO_BOX`.
+  - **A Claude step that judges financing is handed today's rates**:
+    `ratesPromptLine` (lib/debt-index) writes the seeded indices — the
+    tenor the model prices off, the 10-year, 30-day average SOFR — dated,
+    from `debtSeeds`' own freshness rule, and null where nothing is fresh.
+    The screen reads the series bare (`isDebtSeedSeries`,
+    `todaysRatesLine` in the pipeline) and appends the line to the
+    challenger's notes, after the document so the cache never moves; the
+    first-draft model's reconciliation gets it through `liveDebtSeeds`.
+  - **The Opportunity Zone answer names its round**: beside every answer
+    from the 2018 list, `OZ_NEXT_ROUND_NOTE` says the next round's zones
+    take effect January 1, 2027 and the 2018 zones run to December 31,
+    2028 (data/research/tax_law.json).
 - Each building's own photograph: `lib/om-photo.ts` (pure) reads the JPEG
   image objects out of the deal's memorandum — a `/DCTDecode` stream IS the
   JPEG's bytes, verbatim, and `jpegInfo` reads its width, height and
@@ -3436,6 +3487,36 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   deal's bridge, rent roll and valuations pages head with `DealCrumb`
   (`app/(app)/deals/[id]/deal-crumb.tsx`: `DealAvatar` at its `md` 40px
   beside the way back).
+  **Found sooner, drawn sharper** (#477). The screen lifts the cover
+  itself, right after the extraction and beside the steps that follow
+  (`liftPictureBeside` in the pipeline: the bytes it already holds, the
+  cover alone, never the sample, only where `pictureMayBeInMemorandum`,
+  waiting at most `SCREEN_PICTURE_WAIT_MS` 30 s for a turn and settling
+  within `SCREEN_PICTURE_MS` 60 s; a failure is a log line). **A read cut
+  short says nothing**: `readCover`'s `complete` is true only for a read
+  that reached its end (or a file that cannot be opened at all), and a
+  read the time budget cut short writes no verdict — it is counted
+  (`pictureRetry`), the next waits `RETRY_AFTER_MS` (10 minutes, then 2
+  hours), and the third in a row (`MAX_CUT_READS`) stands for the month;
+  `PICTURE_SEARCH_VERSION` 5 looked again at the old "none" verdicts,
+  while `PHOTO_RULES_SINCE` 4 keeps every photograph already lifted.
+  **JPEG 2000** covers decode: `lib/pdfjs-wasm.ts` hands pdfjs its wasm
+  decoder on every `getDocument` (the same value each time — it is
+  process-wide), tested on a real JP2 (`lib/test-jpx.ts`). **A full-size
+  copy** up to `FULL_MAX_PX` (2560) is kept where the source is larger
+  than the hero (`<stamp>-full.jpg`, `?size=full`, swept with the rest by
+  `picturePaths`), and `lib/photo-srcset.ts` writes the `srcset` and
+  `sizes` for the deal header, the mosaic's tiles and the viewer from the
+  page's own layout, so only a screen that needs it fetches it; older
+  memorandum photographs are derived again quietly behind a view
+  (`DERIVED_VERSION`), replacing the stored one only where the pages give
+  the same photograph by its hash, never a reader's upload. **Crops stay
+  centred.** A focal point from sharp's attention analysis, applied as
+  `object-position`, was built and reverted: judged by eye on 31 real
+  photographs cropped to the header's 21:9 and a mosaic tile, the point
+  sat on an edge or a corner in 8, and on the one-tower shot most like a
+  memorandum's cover it pulled the band down to the cars and cut the
+  crown. The 240px thumbnail keeps its attention cut; nothing else does.
   **The memorandum's other photographs are the deal's gallery** (#448): a
   listing shows the building from every side, and a memorandum carries
   those pictures while the site showed one. `decodeOmPhotos`
@@ -4170,7 +4251,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   same rule (#241): the pipeline's stage ladder is a funnel with counts, its
   verdict split a bar, a teammate an initials badge, "not screened" an empty
   ring; a helper sentence under a card says only what the card cannot. A
-  research note on `/market` folds (`Fold` in `app/market/page.tsx`): the
+  research note on `/market` folds (`Fold` in `app/market/fold.tsx`): the
   first sentence shows, the rest is one click away, and the whole text stays
   in the HTML for the lints, live-verify and screen readers.
   Before adding a section or a sentence, measure the page (`scratchpad`'s

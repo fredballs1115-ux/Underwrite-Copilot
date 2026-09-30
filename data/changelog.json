@@ -3,6 +3,30 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "Current rates, handed to the analysis",
+      "href": "/deals",
+      "blurb": "The screen's challenger asks whether an OM's financing holds at current rates, and the first-draft model picks a loan rate, but neither was ever given a rate, so each worked from memory. Both are now handed the day's Treasury and SOFR rates from the same feed the site's own model runs on, each with its date, and told to build any rate from them. Where the feed has nothing fresh, they are handed nothing and claim nothing as current."
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Building photographs, found sooner and drawn sharper",
+      "href": "/deals",
+      "blurb": "A new deal's photograph is now lifted from its offering memorandum while the deal is being screened, so its card can show the building the first time the pipeline opens rather than waiting for someone to open the deal. A memorandum whose pages ran out of reading time is read again later that day instead of being written off for a month, and a cover stored as JPEG 2000, a format some brokers' software exports, is now read. A large photograph keeps a full-size copy beside its standard one, so a dense laptop screen and the full-screen viewer draw it sharp rather than stretched."
+    },
+    {
+      "date": "2026-09-30",
+      "title": "The FY2027 fair market rents, the year read from the data",
+      "href": "/market",
+      "blurb": "HUD's new fair market rents take effect October 1, and the market pages, the market comparison, the demo and a deal's research panel now carry them for every covered metro, four bedrooms included. The fiscal year, the day it takes effect and HUD's name for each area are read from the data rather than typed on the page, so when the next year takes effect no page goes on calling last year's rents current, and a year that has ended says so. Three rent caps carry the new year's figures too: Los Angeles's rent-stabilized units at 3% to June 2027, the Los Angeles area's statewide cap at 8.7% to July 2027, and Washington's at 10% for increases in 2027."
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Corrections: what the site says about itself",
+      "href": "/",
+      "blurb": "Every claim on the public pages was read against the code, and a few were wrong. The homepage now describes the Excel workbook that ships: live formulas, sources and uses, every assumption with its source, annual and monthly cash flows, the debt schedule and the sensitivity grids. Outside the covered markets the screen still checks statewide rules and reads the metro area's or the state's published figures, and the FAQ says so. The rules are called source-linked, since a few cite a secondary source rather than a statute. Washington DC's recorded-sales feed is labelled documented, not yet wired, where it said live. Two research notes that had lost their dollar signs have them back, and the market tables say the date their figures are as of."
+    },
+    {
+      "date": "2026-09-30",
       "title": "Opportunity Zones, checked in every state",
       "href": "/deals",
       "blurb": "The site-check card could say a tract was not in an Opportunity Zone anywhere outside Maryland, because the list it checked held only Maryland's zones. It now checks the Treasury CDFI Fund's list of all 8,764 tracts designated in 2018, in every state and territory, and it checks each deal by the tract number the zones were designated on — the 2010 census tract, which is not always today's, since a tract split or renumbered since could sit in a zone and still miss the list. Where the check cannot run, the card says why."
