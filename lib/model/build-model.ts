@@ -6,7 +6,7 @@ import { describeRunFailure } from "@/lib/anthropic/failure";
 import { extractDocFacts } from "@/lib/anthropic/model-extract";
 import { reconcileDocs } from "@/lib/anthropic/model-reconcile";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
-import { ratesPromptLine } from "@/lib/debt-index";
+import { modelRatesLine } from "@/lib/model-market";
 import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { DOC_KIND_LABEL } from "@/lib/documents";
 import { computeModel, planCaveats } from "./compute";
@@ -43,12 +43,16 @@ type DocRow = {
 export async function runModelGeneration(dealId: string): Promise<void> {
   try {
     const admin = createSupabaseAdminClient();
-    const { data: docsData } = await admin
-      .from("deal_documents")
-      .select("id, kind, filename, storage_path")
-      .eq("deal_id", dealId)
-      .order("created_at", { ascending: true });
+    const [{ data: docsData }, { data: dealData }] = await Promise.all([
+      admin
+        .from("deal_documents")
+        .select("id, kind, filename, storage_path")
+        .eq("deal_id", dealId)
+        .order("created_at", { ascending: true }),
+      admin.from("deals").select("is_sample").eq("id", dealId).maybeSingle(),
+    ]);
     const docs = (docsData as DocRow[] | null) ?? [];
+    const isSample = !!(dealData as { is_sample?: boolean | null } | null)?.is_sample;
     if (docs.length === 0) {
       throw new Error(
         "Add at least one document (start with the OM and a rent roll) before generating a model.",
@@ -89,8 +93,9 @@ export async function runModelGeneration(dealId: string): Promise<void> {
     await patchJob(dealId, { status: "running", step: "model", progress: 62 });
     // Today's debt indices, dated — the model's loan rate is built from
     // them where no document states one (liveDebtSeeds never throws; a
-    // table with nothing fresh hands the step no rates).
-    const ratesLine = ratesPromptLine(await liveDebtSeeds(HOLD_MONTHS), HOLD_MONTHS);
+    // table with nothing fresh hands the step no rates). None on the
+    // sample, whose figures are pinned (lib/model-market).
+    const ratesLine = modelRatesLine(isSample, await liveDebtSeeds(HOLD_MONTHS), HOLD_MONTHS);
     const recon = await reconcileDocs(allFacts, ratesLine);
 
     // Pass 3 — compute the cash flow and returns deterministically.

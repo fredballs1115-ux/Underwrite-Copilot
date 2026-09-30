@@ -22,6 +22,7 @@ import { verdictBehind } from "@/lib/screen-run";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { SALE_HURDLE_PCT, saleCeilingRead } from "@/lib/sale-ceiling";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
+import { modelMarketFor } from "@/lib/model-market";
 import { buildSensitivityData, type SensitivityData } from "@/lib/underwrite/report-grid";
 import { buildPlanReport, type PlanReport } from "@/lib/plan-sensitivity";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
@@ -191,7 +192,8 @@ export async function GET(
           .limit(1)
           .maybeSingle(),
       ]);
-      // The same rate read as the deal page and the workbook route.
+      // The same rate read as the deal page and the workbook route — and,
+      // as there, none for the sample (lib/model-market).
       const debt = await liveDebtSeeds(HOLD_MONTHS);
       const derived = deriveUnderwriteInputs(
         extraction,
@@ -210,7 +212,7 @@ export async function GET(
               }
             : null,
         },
-        { debtIndex: debt.permanent },
+        modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt),
       );
       sensitivity = buildSensitivityData(derived.inputs, hurdlePct);
       // The plan page for the kind the deal page reads — the extraction and

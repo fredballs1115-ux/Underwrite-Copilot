@@ -128,7 +128,8 @@ import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { ActualsData } from "./property-actuals";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
-import { constructionSeed, type DealRateSeeds } from "@/lib/debt-index";
+import { type DealRateSeeds } from "@/lib/debt-index";
+import { constructionSeedFor, modelMarketFor } from "@/lib/model-market";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { countyOf, placeDeal } from "@/lib/market-county";
 import { BRIEF_NATIONAL_IDS, liveMarketBrief } from "@/lib/live-market-brief";
@@ -710,7 +711,8 @@ export default async function DealPage({
   // model's rate starts from the Treasury tenor nearest its hold plus the
   // class spread, the construction panel's from 30-day SOFR plus its own —
   // the same read the workbook and report routes make, so no two surfaces
-  // print a different rate for one deal on one day.
+  // print a different rate for one deal on one day. Never on the sample,
+  // whose figures are pinned (lib/model-market).
   const debt = await liveDebtSeeds(HOLD_MONTHS);
   const derived = extraction
     ? deriveUnderwriteInputs(
@@ -724,7 +726,7 @@ export default async function DealPage({
             ? { summary: actuals.t12.summary, periodEnd: actuals.t12.periodEnd }
             : null,
         },
-        { debtIndex: debt.permanent },
+        modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt),
       )
     : null;
   // The seller's loan, where the memorandum offers it for assumption
@@ -747,7 +749,7 @@ export default async function DealPage({
   const leaseholdExit = leaseholdRead ? leaseholdExitView(leaseholdRead) : null;
   const rateSeeds: DealRateSeeds = {
     permanent: derived?.meta.rateSeed ?? null,
-    construction: constructionSeed(debt),
+    construction: constructionSeedFor((deal as { is_sample?: boolean }).is_sample, debt),
   };
   const playground: PlaygroundData | null = derived
     ? {

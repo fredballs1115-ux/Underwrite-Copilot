@@ -4,6 +4,7 @@ import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
+import { modelMarketFor } from "@/lib/model-market";
 import type { Assumptions } from "./model";
 
 /**
@@ -26,8 +27,10 @@ export async function currentDealAssumptions(
   // The same rate read as the deal page: the current set's all-in rate is
   // today's index plus the class spread, so a version saved last month and
   // the set on the page today differ by the rate the market moved — which
-  // the bridge then names as a driver, as it should.
-  const [rrRes, t12Res, debt] = await Promise.all([
+  // the bridge then names as a driver, as it should. Never on the sample,
+  // whose figures are pinned (lib/model-market): its row says which it is,
+  // read beside the rest, so no caller has to remember to ask.
+  const [rrRes, t12Res, debt, dealRes] = await Promise.all([
     supabase
       .from("deal_rent_rolls")
       .select("as_of_date, summary")
@@ -43,7 +46,9 @@ export async function currentDealAssumptions(
       .limit(1)
       .maybeSingle(),
     liveDebtSeeds(HOLD_MONTHS),
+    supabase.from("deals").select("is_sample").eq("id", dealId).maybeSingle(),
   ]);
+  const isSample = !!(dealRes.data as { is_sample?: boolean | null } | null)?.is_sample;
 
   const rrSummary = (rrRes.data?.summary as RentRollSummary | null) ?? null;
   const t12Summary = (t12Res.data?.summary as T12Summary | null) ?? null;
@@ -59,6 +64,6 @@ export async function currentDealAssumptions(
         ? { summary: t12Summary, periodEnd: (t12Res.data?.period_end_date as string | null) ?? null }
         : null,
     },
-    { debtIndex: debt.permanent },
+    modelMarketFor(isSample, debt),
   ).inputs;
 }

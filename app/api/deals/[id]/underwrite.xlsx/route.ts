@@ -2,6 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
 import { HOLD_MONTHS, deriveUnderwriteInputs, type ActualsForModel } from "@/lib/underwrite/inputs";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
+import { modelMarketFor } from "@/lib/model-market";
 import { buildUnderwriteWorkbook } from "@/lib/underwrite/workbook";
 import { getBrandingForDeal } from "@/lib/branding-server";
 import type { ExportBranding } from "@/lib/excel-branding";
@@ -113,9 +114,10 @@ export async function GET(
 
   try {
     // The same rate read as the deal page, so the workbook's All-in Rate
-    // cell and its Sources note match the page the download came from.
+    // cell and its Sources note match the page the download came from —
+    // and, as there, none for the sample (lib/model-market).
     const debt = await liveDebtSeeds(HOLD_MONTHS);
-    const model = deriveUnderwriteInputs(extraction, deal.name, actuals, { debtIndex: debt.permanent });
+    const model = deriveUnderwriteInputs(extraction, deal.name, actuals, modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt));
     // An auction's ceiling bid (#456) is said at the buyer's own hurdle, the
     // buy box's IRR floor, as the deal page and the report say it; the
     // model's own read is at the screening default. Asked only of a deal
