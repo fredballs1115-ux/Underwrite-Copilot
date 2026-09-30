@@ -148,6 +148,43 @@ describe("MemoDocument (redesigned)", () => {
     expect(buildMemoData(base as unknown as DealRow, "September 25, 2026", []).floodLine).toBe("");
   }, 30000);
 
+  it("prints no flood zone looked up for an address the deal has since changed from — the deal page's rule (the audit of 2026-09-30)", () => {
+    const base = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    };
+    const ELM = "100 Elm St, Dallas, TX 75201";
+    const lookedUpFor = (label: string) => ({
+      status: "ok",
+      subject: { lat: 32.8, lng: -96.8, label },
+      tractGeoid: null,
+      opportunityZone: null,
+      flood: { zone: "AE", subtype: null, isHighRisk: true },
+      retrievedAt: "2026-09-25T00:00:00Z",
+      note: "",
+    });
+    const address = (label: string) => ({ label, street: label.split(",")[0], city: "Dallas", state: "TX", zip: "75201", county: "", submarket: "" });
+    const current = buildMemoData(
+      { ...base, address: address(ELM), site_flags: lookedUpFor(ELM) } as unknown as DealRow,
+      "September 30, 2026",
+      [],
+    );
+    expect(current.floodLine).toMatch(/^Flood zone AE: a Special Flood Hazard Area/);
+    // The address was edited since: the lookup is the old building's.
+    const moved = buildMemoData(
+      { ...base, address: address("200 Main St, Dallas, TX 75201"), site_flags: lookedUpFor(ELM) } as unknown as DealRow,
+      "September 30, 2026",
+      [],
+    );
+    expect(moved.floodLine).toBe("");
+  });
+
   it("says the seller's loan under the title where it is offered for assumption (#419)", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

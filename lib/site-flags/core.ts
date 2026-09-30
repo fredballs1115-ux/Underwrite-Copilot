@@ -477,6 +477,23 @@ export function floodShortLine(flood: SiteFlagsResult["flood"] | undefined): str
 }
 
 /**
+ * The zone in one line (`floodShortLine`) from a STORED lookup, as the memo
+ * and the shared screen print it under their titles: nothing while the
+ * lookup is pending, and nothing where it was made for an address the deal
+ * has since changed from (`siteFlagsStale`, the deal page's rule, read
+ * against the address the page reads the deal at) — a stale lookup says
+ * nothing, as a pending one does, and never the old building's zone under
+ * the new address.
+ */
+export function storedFloodShortLine(
+  flags: SiteFlagsResult | null | undefined,
+  addressLabel: string | null | undefined,
+): string | null {
+  if (!flags || flags.status === "pending" || siteFlagsStale(flags, addressLabel)) return null;
+  return floodShortLine(flags.flood);
+}
+
+/**
  * The zone as a cell — the pipeline's CSV and the compare table's row —
  * every case said, blank only where the lookup has not answered:
  * "AE (SFHA)", "X (minimal)", "X (0.2% annual chance flood hazard)", "no

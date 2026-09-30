@@ -30,7 +30,8 @@ vi.mock("@/lib/storage", () => ({
 }));
 
 import sharp from "sharp";
-import { composeFloodFrame, drawFloodFrame, ensureFloodFrame, floodCrop, floodKeyFor, VENDORED_LEGEND, type FloodFetchers } from "./flood-map";
+import { composeFloodFrame, drawFloodFrame, ensureFloodFrame, floodCrop, floodKeyFor, floodMapFor, VENDORED_LEGEND, type FloodFetchers } from "./flood-map";
+import type { SiteFlagsResult } from "./site-flags/core";
 import { FLOOD_FRAME, FLOOD_FRAME_VERSION, floodFramePaths, pointKey } from "./flood-frame-core";
 import { StoragePathError } from "./storage-paths";
 import { FEMA_LAYER_OPACITY, floodStyleOf, type Rgba } from "./flood-style";
@@ -275,6 +276,34 @@ describe("floodKeyFor — the key under a crop", () => {
       { key: "moderate", label: "0.2% annual chance flood hazard", here: false },
     ]);
     expect(floodKeyFor([], "unavailable", VENDORED_LEGEND)).toEqual([]);
+  });
+});
+
+describe("floodMapFor — the report's flood page reads the zone looked up for the address its map is drawn at", { timeout: 60_000 }, () => {
+  // Offline here, so no picture is drawn: the page is the zone's sentence,
+  // or nothing. The audit of 2026-09-30: after an edited address the report
+  // drew the new address's map under the old building's zone.
+  const ELM = "100 Elm St, Dallas, TX 75201";
+  const address = { label: ELM, street: "100 Elm St", city: "Dallas", state: "TX", zip: "75201", county: "", submarket: "" };
+  const lookedUpFor = (label: string): SiteFlagsResult => ({
+    status: "ok",
+    subject: { lat: 32.78, lng: -96.8, label },
+    tractGeoid: null,
+    opportunityZone: null,
+    flood: { zone: "AE", subtype: null, isHighRisk: true },
+    retrievedAt: "2026-09-25T00:00:00Z",
+    note: "",
+  });
+
+  it("says the zone where the lookup was made for this address", async () => {
+    const view = await floodMapFor(fakeDb(null).client, "deal-elm", address, null, lookedUpFor(ELM));
+    expect(view?.image).toBeNull();
+    expect(view?.line).toMatch(/Zone AE/);
+  });
+
+  it("says nothing where the lookup was made for an address the deal has since changed from, as for a pending one", async () => {
+    expect(await floodMapFor(fakeDb(null).client, "deal-elm", address, null, lookedUpFor("200 Main St, Dallas, TX 75201"))).toBeNull();
+    expect(await floodMapFor(fakeDb(null).client, "deal-elm", address, null, { ...lookedUpFor(ELM), status: "pending" })).toBeNull();
   });
 });
 

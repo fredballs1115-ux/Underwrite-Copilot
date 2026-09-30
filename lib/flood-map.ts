@@ -33,6 +33,7 @@ import {
   floodZoneLine,
   parseNfhlLegend,
   resolveNfhlLayerId,
+  siteFlagsStale,
   type FloodMapView,
   type NfhlLegendEntry,
   type SiteFlagsResult,
@@ -399,7 +400,13 @@ export async function floodMapFor(
   flags: SiteFlagsResult | null,
 ): Promise<FloodMapView | null> {
   if (!address?.street?.trim()) return null;
-  const flood = flags && flags.status !== "pending" ? flags.flood : undefined;
+  // The zone the lookup found, only where it was looked up for the address
+  // this map is drawn at (the deal page's rule, `siteFlagsStale`): after an
+  // edit the frame is the new address's, and the old building's zone under
+  // it would be a claim about the wrong place. A stale lookup says nothing,
+  // as a pending one does.
+  const current = flags && flags.status !== "pending" && !siteFlagsStale(flags, address.label) ? flags : null;
+  const flood = current ? current.flood : undefined;
   const legend = await within(floodLegend(), 3_000, VENDORED_LEGEND);
   const picture = await within(
     (async (): Promise<{ image: string; classes: FloodClassKey[] } | null> => {

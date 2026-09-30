@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import type { StructuredAddress } from "@/lib/address";
+import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import type {
   ExtractionResult,
   BrokerCompsResult,
@@ -12,7 +12,7 @@ import { previousScreenResults, verdictBehind } from "@/lib/screen-run";
 import { shownAssetClass } from "@/lib/pipeline-slots";
 import { SHARE_REFUSAL_COPY, resolveShare } from "@/lib/share-resolve";
 import { Expired, ShareView } from "./share-view";
-import { floodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
+import { storedFloodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
 import type { SharePictureSource } from "./share-picture";
@@ -38,14 +38,6 @@ export const metadata: Metadata = {
  * the page. The markup is `ShareView` (share-view.tsx), pure so the render
  * tests draw it on fixtures.
  */
-/** FEMA's flood zone at the building from the stored lookup, one line
- *  (#426); null while the lookup is pending or has nothing to say. */
-function floodLineOf(raw: unknown): string | null {
-  const flags = (raw as SiteFlagsResult | null) ?? null;
-  if (!flags || flags.status === "pending") return null;
-  return floodShortLine(flags.flood);
-}
-
 export default async function SharePage({
   params,
 }: {
@@ -114,7 +106,14 @@ export default async function SharePage({
       comps={(deal.comps as BrokerCompsResult | null) ?? null}
       market={(deal.market as MarketResult | null) ?? null}
       verdict={deal.verdict as VerdictResult}
-      floodLine={floodLineOf(deal.site_flags)}
+      // FEMA's zone at the building from the stored lookup (#426): nothing
+      // while it is pending or has nothing to say, and nothing where it was
+      // made for an address the deal has since changed from — read against
+      // the address the sender's page reads the deal at, as that page does.
+      floodLine={storedFloodShortLine(
+        (deal.site_flags as SiteFlagsResult | null) ?? null,
+        (addressUpgrade(deal.address, (deal.extraction as ExtractionResult | null) ?? null) ?? address)?.label,
+      )}
     />
   );
 }

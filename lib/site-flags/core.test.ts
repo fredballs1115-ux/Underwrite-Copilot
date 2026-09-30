@@ -13,7 +13,9 @@ import {
   SITE_FLAGS_V,
   siteFlagsOutdated,
   siteFlagsStale,
+  storedFloodShortLine,
   tractStateFips,
+  type SiteFlagsResult,
 } from "./core";
 
 describe("isHighRiskZone", () => {
@@ -298,6 +300,33 @@ describe("siteFlagsStale — flags looked up for an address the deal no longer h
     expect(siteFlagsStale(flags, " 100 Elm St, Dallas, TX 75201 ")).toBe(false);
     expect(siteFlagsStale({}, "5000 Main St, Frisco, TX 75034")).toBe(false);
     expect(siteFlagsStale(null, "5000 Main St, Frisco, TX 75034")).toBe(false);
+  });
+});
+
+describe("storedFloodShortLine — a document's flood line holds to the deal page's rule (the audit of 2026-09-30)", () => {
+  const lookup = (label: string | null, status: SiteFlagsResult["status"] = "ok"): SiteFlagsResult => ({
+    status,
+    ...(label ? { subject: { lat: 32.8, lng: -96.8, label } } : {}),
+    tractGeoid: null,
+    opportunityZone: null,
+    flood: { zone: "AE", subtype: null, isHighRisk: true },
+    retrievedAt: "2026-09-25T00:00:00Z",
+    note: "",
+  });
+  const ELM = "100 Elm St, Dallas, TX 75201";
+
+  it("says the zone where the lookup was made for the address the deal is read at", () => {
+    expect(storedFloodShortLine(lookup(ELM), ELM)).toBe(
+      "Flood zone AE: a Special Flood Hazard Area, where flood insurance is required on federally backed debt (FEMA)",
+    );
+    // A lookup that names no address cannot be judged, and stands.
+    expect(storedFloodShortLine(lookup(null), ELM)).toMatch(/^Flood zone AE/);
+  });
+
+  it("says nothing for a lookup made for an address the deal has since changed from, as for a pending one", () => {
+    expect(storedFloodShortLine(lookup(ELM), "5000 Main St, Frisco, TX 75034")).toBeNull();
+    expect(storedFloodShortLine(lookup(ELM, "pending"), ELM)).toBeNull();
+    expect(storedFloodShortLine(null, ELM)).toBeNull();
   });
 });
 

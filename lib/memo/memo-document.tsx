@@ -44,7 +44,8 @@ import { readSiteReports, siteReportsShortLine } from "@/lib/site-reports";
 import { readStudentHousing, studentShortLine } from "@/lib/student-housing";
 import { mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageShortLine } from "@/lib/self-storage";
-import { floodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
+import { storedFloodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
+import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
 import { shownAssetClass } from "@/lib/pipeline-slots";
@@ -234,11 +235,16 @@ function hotelLineFor(extraction: ExtractionResult | null): string {
 
 /** FEMA's flood zone at the building, from the stored site-flags lookup,
  *  in one line for the memo's header (#426): "" where there is nothing to
- *  say — minimal hazard, no digital map, a lookup still pending. */
-function floodLineFor(deal: DealRow): string {
+ *  say — minimal hazard, no digital map, a lookup still pending, or one made
+ *  for an address the deal has since changed from. The address is the one
+ *  the deal page reads the deal at: a blank one the memorandum's, a typed
+ *  line its own fields (`addressUpgrade`), the sample's as stored. */
+function floodLineFor(deal: DealRow, extraction: ExtractionResult | null): string {
   const flags = (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
-  if (!flags || flags.status === "pending") return "";
-  return floodShortLine(flags.flood) ?? "";
+  const address =
+    ((deal as { is_sample?: boolean }).is_sample ? null : addressUpgrade(deal.address, extraction)) ??
+    ((deal.address as StructuredAddress | null | undefined) ?? null);
+  return storedFloodShortLine(flags, address?.label) ?? "";
 }
 
 export type MemoData = {
@@ -558,7 +564,7 @@ export function buildMemoData(
     studentLine: pdfSafe(studentLineFor(extraction ?? null)),
     mhLine: pdfSafe(mhLineFor(extraction ?? null)),
     storageLine: pdfSafe(storageLineFor(extraction ?? null)),
-    floodLine: pdfSafe(floodLineFor(deal)),
+    floodLine: pdfSafe(floodLineFor(deal, extraction ?? null)),
     dateStr,
     screened: screenedOn(verdict?.generatedAt) ? `Screened ${screenedOn(verdict?.generatedAt)}` : "",
     verdictWord: vmeta?.word ?? null,
