@@ -1,5 +1,5 @@
 import "server-only";
-import type { SiteFlagsResult } from "@/lib/site-flags/core";
+import { siteFlagsStale, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { withArticle } from "@/lib/article";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { downloadOmPdf } from "@/lib/storage";
@@ -39,7 +39,8 @@ import { interestNote, readInterest } from "@/lib/interest";
 import { assumableNote, readAssumable } from "@/lib/assumable-debt";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
-import { marketForAddress } from "@/lib/market-match";
+import { countyOf, placeDeal } from "@/lib/market-county";
+import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
 import { SERIES, metroSeriesFor, readMetroRates, readRates } from "@/lib/live-rates";
 import { fetchBenchRows, fetchSeriesRows } from "@/lib/live-rates-query";
 import { ZILLOW_METRICS, zoriFor } from "@/lib/zori";
@@ -131,6 +132,81 @@ function startHeartbeat(dealId: string): () => void {
   return () => clearInterval(timer);
 }
 
+/** How long the screen waits on the site flags' lookup before reading the
+ *  market by the address alone: the lookup carries on and stores its answer
+ *  for the page either way. */
+export const SITE_FLAGS_WAIT_MS = 15_000;
+
+/** A timer that never holds the process open, cancelled once the race ends. */
+function pause(ms: number): { done: Promise<void>; cancel: () => void } {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const done = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, ms);
+    timer.unref?.();
+  });
+  return { done, cancel: () => clearTimeout(timer) };
+}
+
+/**
+ * The deal's site flags for the steps after the extraction (#447): the
+ * FEMA, Opportunity Zone and census-tract lookup the deal page makes on its
+ * first view (lib/site-flags). The tract's county places a deal in its metro
+ * area where its address names no place a market's keywords know, and the
+ * flood zone rides in the deal context (#426). Where the page has not looked
+ * yet — a deal whose address arrived with its memorandum, a screen started
+ * with no page open — the screen looks itself; where a lookup is running, it
+ * waits for it. Either way no longer than `SITE_FLAGS_WAIT_MS`: a slow
+ * geocoder or FEMA leaves the screen to read the market by the address, as
+ * it always did. Null where nothing has answered.
+ */
+async function siteFlagsForScreen(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  dealId: string,
+): Promise<SiteFlagsResult | null> {
+  const read = async (): Promise<{ label: string; flags: SiteFlagsResult | null }> => {
+    try {
+      const { data } = await admin.from("deals").select("address, site_flags").eq("id", dealId).maybeSingle();
+      const row = data as { address?: { label?: string } | null; site_flags?: SiteFlagsResult | null } | null;
+      return { label: row?.address?.label?.trim() ?? "", flags: row?.site_flags ?? null };
+    } catch {
+      return { label: "", flags: null };
+    }
+  };
+  // Answered, and for the address the deal has now: flags looked up before
+  // an edit are the old address's.
+  const answered = ({ label, flags }: { label: string; flags: SiteFlagsResult | null }) =>
+    !!flags && flags.status !== "pending" && !siteFlagsStale(flags, label);
+  const first = await read();
+  // No address, no lookup: the address matchers read nothing either.
+  if (!first.label) return null;
+  if (answered(first)) return first.flags;
+  const stale = !!first.flags && first.flags.status !== "pending";
+  let stopped = false;
+  const wait = pause(SITE_FLAGS_WAIT_MS);
+  try {
+    // Claimed here where no one has looked (or looked for another address);
+    // a lookup already running — the page's — is waited on, a second at a
+    // time. A lookup outlasting the wait carries on and stores its answer.
+    const lookup = (async () => {
+      if (await claimSiteFlags(dealId, stale)) {
+        await runSiteFlags(dealId);
+        return;
+      }
+      while (!stopped) {
+        const tick = pause(1000);
+        await tick.done;
+        if (stopped || answered(await read())) return;
+      }
+    })().catch(() => {});
+    await Promise.race([lookup, wait.done]);
+  } finally {
+    stopped = true;
+    wait.cancel();
+  }
+  const last = await read();
+  return answered(last) ? last.flags : null;
+}
+
 /**
  * What the screen established about the deal — its kind and, on a plan deal,
  * the plan's figures — for the steps that read the OM after the extraction.
@@ -139,13 +215,12 @@ function startHeartbeat(dealId: string): () => void {
 async function dealContextFromDb(
   admin: ReturnType<typeof createSupabaseAdminClient>,
   dealId: string,
+  flags: SiteFlagsResult | null,
 ): Promise<string | null> {
   try {
-    const { data } = await admin.from("deals").select("extraction, site_flags").eq("id", dealId).single();
-    // The FEMA / Opportunity Zone lookup runs on the deal page's first view
-    // (lib/site-flags); where it has answered by now, the step reads the
-    // flood zone too (#426). A pending lookup is no zone.
-    const flags = (data as { site_flags?: SiteFlagsResult | null } | null)?.site_flags ?? null;
+    const { data } = await admin.from("deals").select("extraction").eq("id", dealId).single();
+    // Where the FEMA lookup has answered (`siteFlagsForScreen`), the step
+    // reads the flood zone too (#426).
     return dealContextFor(
       (data?.extraction as ExtractionResult | null) ?? null,
       flags && flags.status !== "pending" ? { flood: flags.flood } : null,
@@ -183,6 +258,7 @@ interface LiveMarketRead {
 async function liveMarketFromDb(
   admin: ReturnType<typeof createSupabaseAdminClient>,
   dealId: string,
+  flags: SiteFlagsResult | null = null,
   now: Date = new Date(),
 ): Promise<LiveMarketRead> {
   try {
@@ -207,11 +283,13 @@ async function liveMarketFromDb(
         : typeof raw === "string"
           ? parseStructuredAddress(raw)
           : null);
-    // A covered metro's figures where the address sits in one; the state's
-    // own otherwise (lib/market-match's stateForAddress — the same series
-    // table, filed under `state:PA`), said as the state's. A deal with no
-    // readable state reads nothing of its own, as before.
-    const metro = marketForAddress(address ?? {});
+    // A covered metro's figures where the address sits in one; the metro
+    // area its county sits in where the address names no place a market's
+    // keywords know (#447, lib/market-county — said as placed by its
+    // county); the state's own otherwise (the same series table, filed
+    // under `state:PA`), said as the state's. A deal with no readable state
+    // or county reads nothing of its own, as before.
+    const metro = placeDeal(address, countyOf(address, flags)).live;
     // The debt-market lines read the class the deck turned out to be, and
     // whether the deal is a plan, so the lending-standards series is the
     // one a bank reports for this kind of loan.
@@ -222,7 +300,7 @@ async function liveMarketFromDb(
     const nationalRows = await fetchSeriesRows(admin, SERIES.filter((s) => BRIEF_NATIONAL_IDS.includes(s.id)));
     const national = readRates(nationalRows, now);
     const readMarket = async (
-      market: { id: string; name: string },
+      market: { id: string; name: string; placedBy?: { county: string; area: string } },
       withNational: boolean,
       portfolio: Parameters<typeof liveMarketBrief>[0]["portfolio"],
     ): Promise<LiveMarketBrief | null> => {
@@ -797,9 +875,13 @@ async function runAnalysisSteps(
     // The comp scrutiny and the market check are told what the screen
     // established — the deal's kind and, on a plan deal, the plan's figures —
     // so a conversion's comps are held against total cost, not the shell.
+    // The site flags once, for both steps: the flood zone for the deal
+    // context (#426), the census tract's county for the market (#447).
+    const siteFlags =
+      !completed.has("comps") || !completed.has("market") ? await siteFlagsForScreen(admin, dealId) : null;
     const dealContext =
       !completed.has("comps") || !completed.has("market")
-        ? await dealContextFromDb(admin, dealId)
+        ? await dealContextFromDb(admin, dealId, siteFlags)
         : null;
     if (!completed.has("comps")) {
       await patchJob(dealId, { status: "running", step: "comps", progress: 50 });
@@ -817,7 +899,7 @@ async function runAnalysisSteps(
     // page can say what the check read.
     if (!completed.has("market")) {
       await patchJob(dealId, { status: "running", step: "market", progress: 70 });
-      const { primary, others } = await liveMarketFromDb(admin, dealId);
+      const { primary, others } = await liveMarketFromDb(admin, dealId, siteFlags);
       // One block a market, the address's first: a portfolio's other
       // markets follow in blocks of their own (#413).
       const handed = [primary, ...others].filter((b): b is LiveMarketBrief => !!b).map((b) => b.text);
@@ -830,6 +912,7 @@ async function runAnalysisSteps(
         figures: b.figures,
         ...(b.national > 0 ? { national: b.national } : {}),
         ...(b.portfolio ? { portfolio: b.portfolio } : {}),
+        ...(b.placedBy ? { placedBy: b.placedBy } : {}),
       });
       const market: MarketResult = {
         ...checked,

@@ -9,7 +9,8 @@ import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
-import { marketForAddress } from "@/lib/market-match";
+import { countyOf, placeDeal } from "@/lib/market-county";
+import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import { todayReads } from "@/lib/model-vs-market-read";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { readPortfolio } from "@/lib/portfolio";
@@ -119,9 +120,13 @@ export async function GET(
     // read leaves the tab out, never the workbook.
     let marketRead: ModelVsMarket | null = null;
     try {
-      // The covered metro, or the state's own series outside one — the same
-      // market the page and the report read.
-      const metro = marketForAddress(addressUpgrade(deal.address, extraction) ?? (deal.address as StructuredAddress | null) ?? {});
+      // The covered metro, the metro area its county sits in (#447), or the
+      // state's own series — the same market the page and the report read.
+      const address = addressUpgrade(deal.address, extraction) ?? (deal.address as StructuredAddress | null) ?? null;
+      const metro = placeDeal(
+        address,
+        countyOf(address, (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null),
+      ).live;
       marketRead = modelVsMarketFor({
         derived: model,
         extraction,

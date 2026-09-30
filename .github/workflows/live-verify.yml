@@ -1073,6 +1073,8 @@ jobs:
           mark "#450 flip through a deal's photos" grep -q "photos on its card" p_whats-new.html
           # #451 — the city photographs encoded again, and a 2400px band: its card (the bytes are the PHOTOGRAPHS step's).
           mark "#451 city photos, lighter and sharper" grep -q "City photos, lighter and sharper" p_whats-new.html
+          # #447 — a suburb placed in its metro area by its county (signed-in): its card.
+          mark "#447 suburbs read their metro area" grep -q "Suburbs read their metro area" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

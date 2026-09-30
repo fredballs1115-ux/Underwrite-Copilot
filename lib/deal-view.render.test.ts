@@ -157,6 +157,33 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(html.match(/<details/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
   });
 
+  it("a deal its county placed says so on the fold (#447)", () => {
+    const p = sampleProps("analyses", "market");
+    const props: Props = {
+      ...p,
+      results: {
+        ...p.results,
+        market: {
+          ...p.results.market!,
+          liveBrief: {
+            metro: "Dallas-Fort Worth",
+            grain: "metro",
+            readOn: "2026-09-23",
+            lines: ["Unemployment 4.1% (Jul 2026, Dallas–Fort Worth MSA; FRED)"],
+            placedBy: { county: "Collin County, TX", area: "Dallas-Fort Worth-Arlington, TX" },
+          },
+        },
+      },
+    };
+    const html = render(props);
+    expect(a11yIssues(html)).toEqual([]);
+    const text = textOf(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toMatch(
+      /Read beside the Dallas-Fort Worth market’s own figures — placed there by its county: Collin County, TX, which the Census Bureau files in the Dallas-Fort Worth-Arlington, TX metro area\s+— 1 published figure/,
+    );
+  });
+
   it("counts the nation's figures apart from the metro's — a block ending in the 10-year is never 'each the metro's'", () => {
     const p = sampleProps("analyses", "market");
     const props: Props = {

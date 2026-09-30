@@ -326,6 +326,23 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
     expect(r.checks[3].read).not.toContain("cap range");
   });
 
+  it("reads no research tracker for a deal its county alone placed in the market (#447)", () => {
+    // The tracker is the market's research, and may be its core county's; a
+    // deal placed by its county reads the metro area's published figures only.
+    const r = modelVsMarketFor({
+      derived,
+      extraction,
+      storedAssetClass: "auto",
+      metro: { id: "dc", name: "Washington DC", placedBy: { county: "Stafford County, VA", area: "Washington-Arlington-Alexandria, DC-VA-MD-WV" } },
+      reads,
+    })!;
+    expect(r.checks.map((c) => c.read).join(" ")).not.toContain("research tracker");
+    // A warehouse's one metro figure was the tracker's, so with it out the
+    // read names no metro rather than one it read nothing of.
+    expect(r.metro).toBeNull();
+    expect(r.checks.every((c) => c.scope === "national")).toBe(true);
+  });
+
   it("takes the page's own cap where it passes one, and none where it passes null", () => {
     const own = modelVsMarketFor({ derived, extraction, storedAssetClass: "industrial", metro: null, reads, goingInCapText: "5.5%" })!;
     expect(own.checks[2].read).toContain("The going-in cap 5.50% is 56 bps over it, so the exit assumes the spread widens 50 bps");

@@ -18,9 +18,9 @@ import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
 import { inferStrategy } from "@/lib/deal-strategy";
 import { pickSlots, shownAssetClass } from "@/lib/pipeline-slots";
-import { floodCell, floodTag, type SiteFlagsResult } from "@/lib/site-flags/core";
+import { floodCell, floodTag, siteFlagsStale, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { scoreMandateFit } from "@/lib/mandate";
-import { dataMetroForAddress, metroForAddress } from "@/lib/market-match";
+import { countyOf, placeDeal } from "@/lib/market-county";
 import { listJobStatus, type JobLike } from "@/lib/screen-run";
 
 export const metadata: Metadata = { title: "Pipeline" };
@@ -246,6 +246,14 @@ export default async function DealsPage({
       : null;
     const mandate =
       box && checkSource ? scoreMandateFit(d.asset_class, checkSource, box) : null;
+    // Where the deal is, the deal page's answer (lib/market-county, #447):
+    // its briefed market, else the metro area whose figures it reads — by
+    // its county where its address names no place a market's keywords know.
+    // Site flags looked up for an address since edited are the old one's.
+    const rowAddress = (d.address as StructuredAddress | null) ?? null;
+    const storedFlags = (d as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
+    const flags = siteFlagsStale(storedFlags, rowAddress?.label) ? null : storedFlags;
+    const placement = placeDeal(rowAddress, countyOf(rowAddress, flags));
     return {
       id: d.id,
       name: d.name,
@@ -268,16 +276,14 @@ export default async function DealsPage({
           ? (nameById.get(d.user_id) ?? "Teammate")
           : null,
       market: extraction?.market ?? "",
-      // The same matcher the deal page uses — the list and the detail agree
-      // on whether an address sits inside the 15-market scope.
-      coveredMarket:
-        metroForAddress((d.address as StructuredAddress | null) ?? {})?.name ??
-        null,
-      // A metro area the site reads without a brief: named, and said to be
-      // read rather than briefed, so the row never reads as "no figures".
-      readMarket:
-        dataMetroForAddress((d.address as StructuredAddress | null) ?? {})?.name ??
-        null,
+      // The same placement the deal page makes — the list and the detail
+      // agree on whether an address sits inside the briefed markets.
+      coveredMarket: placement.briefed?.name ?? null,
+      // A metro area the site reads without a brief, or one the deal's
+      // county placed it in: named, and said how, so the row never reads
+      // as "no figures".
+      readMarket: placement.read?.name ?? null,
+      readCounty: placement.placedBy?.county ?? null,
       offersDue: dueById.get(d.id) ?? null,
       slots: extraction
         ? pickSlots(extraction, (d.first_signal as FirstSignal | null) ?? null)
@@ -292,7 +298,7 @@ export default async function DealsPage({
       // FEMA's flood zone at the building, from the stored site-flags lookup
       // (#426): the row's tag in a Special Flood Hazard Area, the CSV's cell
       // in every case, nothing before the lookup has answered.
-      flood: floodFor((d as { site_flags?: SiteFlagsResult | null }).site_flags ?? null),
+      flood: floodFor(flags),
       // Where the deal is, from the location its pictures were drawn at
       // (#431): read from the cache only — the list never geocodes; the map
       // places the rest on its own first view.
@@ -323,7 +329,7 @@ export default async function DealsPage({
         // again like one not yet looked for (#444): over the next picture,
         // taking over only if today's search keeps it.
         const picture = unread ? null : (cache?.picture ?? null);
-        const market = marketPictureFor(address, extraction?.market ?? null);
+        const market = marketPictureFor(address, extraction?.market ?? null, placement.briefed ?? placement.read);
         const facts = {
           dealId: d.id,
           pictureCredit: picture ? PICTURE_CREDIT[picture.source] : null,

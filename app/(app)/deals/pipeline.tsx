@@ -56,12 +56,16 @@ export type DealCard = {
   mandateVerdict: "PURSUE" | "WATCH" | "PASS" | null;
   market: string;
   /** covered-market name when the address maps into the 15-market scope
-   *  (computed server-side via metroForAddress) — null outside it */
+   *  (computed server-side, lib/market-county's placeDeal) — null outside it */
   coveredMarket: string | null;
-  /** the metro area read without a brief the address sits in (server-side,
-   *  dataMetroForAddress) — its figures are read, nothing is briefed; null
-   *  outside one or where the address is a covered market's */
+  /** the metro area whose figures are read and nothing briefed: one read
+   *  without a brief, or one the deal's county placed it in (server-side,
+   *  placeDeal) — null outside one or where the address is a covered
+   *  market's */
   readMarket?: string | null;
+  /** where the deal's county alone placed it in `readMarket` (#447):
+   *  "Collin County, TX" — the row names the county rather than "read" */
+  readCounty?: string | null;
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
@@ -1427,13 +1431,18 @@ const DealRow = memo(function DealRow({
     </span>
   ) : d.readMarket ? (
     // A hollow dot: the ground layer reads this metro's figures and briefs
-    // nothing, and the row says which.
+    // nothing, and the row says which — or, where the deal's county placed
+    // it there (#447), which county.
     <span
       className="inline-flex items-center gap-1 whitespace-nowrap text-muted"
-      title={`${d.readMarket} is read, not briefed — its published figures are under the market check; no brief, comps or tracker on file`}
+      title={
+        d.readCounty
+          ? `${d.readCounty} lies in the ${d.readMarket} metro area — its published figures are read for this deal, placed by its county; the market check says which`
+          : `${d.readMarket} is read, not briefed — its published figures are under the market check; no brief, comps or tracker on file`
+      }
     >
       <span aria-hidden className="h-1.5 w-1.5 rounded-full border border-muted" />
-      {`${d.readMarket} · read`}
+      {d.readCounty ? `${d.readMarket} · ${d.readCounty.split(",")[0]}` : `${d.readMarket} · read`}
     </span>
   ) : null;
   const asset = assetMeta(d.assetClass ?? "");

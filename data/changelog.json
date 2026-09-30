@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "Suburbs read their metro area's figures",
+      "href": "/deals",
+      "blurb": "A deal whose address names a suburb the site's market lists do not know, such as Frisco, Irvine, Fort Lauderdale or Cranberry Township, used to read its state's figures. The site now finds the county the building sits in, from its census tract or the county its address names, and places it in that county's metro area using the Census Bureau's list of every county in every metro area. The market check, the deal page, the report and the workbook then read the metro area's published figures, and each says the deal was placed there by its county. A county in no metro area the site reads keeps the state's figures, and an address word naming a place in another metro area is no longer taken for it."
+    },
+    {
+      "date": "2026-09-30",
       "title": "City photos, lighter and sharper",
       "href": "/market",
       "blurb": "The city photographs across the site are now re-encoded before they reach you, so they load lighter with nothing lost to the eye, and the wide photo that opens each market page is sharp on high-resolution laptop screens, where it had been stretched to twice its size."

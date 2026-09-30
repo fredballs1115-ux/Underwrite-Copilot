@@ -226,6 +226,40 @@ export function dataMetroForAddress(address: AddressLike): CoveredMetro | null {
   return null;
 }
 
+/**
+ * Every market an address's words match, in the order the matchers try
+ * them — the briefed markets first, then the metro areas read without a
+ * brief — each once. `metroForAddress` and `dataMetroForAddress` answer with
+ * the first of each; a caller that knows more about where the deal is (its
+ * county, lib/market-county) chooses among them: "Dade City, Pasco County"
+ * matches Miami's "dade" before Tampa's "pasco", and the county says Tampa.
+ */
+export function marketsForAddress(address: AddressLike): { market: CoveredMetro; briefed: boolean }[] {
+  const addr = readableAddress(address);
+  const state = abbrevState((addr.state ?? "").trim()).trim().toUpperCase();
+  if (!state) return [];
+  const hay = [addr.city, addr.county, addr.submarket]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (!hay) return [];
+  const out: { market: CoveredMetro; briefed: boolean }[] = [];
+  const seen = new Set<string>();
+  for (const m of MATCHERS) {
+    if (m.state !== state || seen.has(m.id) || !m.keywords.some((k) => hay.includes(k))) continue;
+    const name = NAME_BY_ID.get(m.id);
+    if (!name) continue;
+    seen.add(m.id);
+    out.push({ market: { id: m.id, name }, briefed: true });
+  }
+  for (const m of DATA_METROS) {
+    if (!m.states.includes(state) || seen.has(m.id) || !m.keywords.some((k) => hay.includes(k))) continue;
+    seen.add(m.id);
+    out.push({ market: { id: m.id, name: m.name }, briefed: false });
+  }
+  return out;
+}
+
 /** Whether a market id is a metro area's read without a brief. */
 export function isDataMetro(id: string | null | undefined): boolean {
   return typeof id === "string" && DATA_METROS.some((m) => m.id === id);

@@ -81,7 +81,8 @@ const card = (over: Partial<DealCard> & Pick<DealCard, "id" | "name">): DealCard
 const CARDS: DealCard[] = [
   card({ id: "a", name: "The Maddox at Brewerytown", verdict: "caution", stage: "underwriting", fit: "near", score: 71, mandateVerdict: "WATCH", slots: { cap: "5.6%", price: "$68,000,000", yoc: null }, offersDue: "2026-09-30" }),
   card({ id: "b", name: "1400 Market — office to residential", verdict: "pass", stage: "loi", fit: "fits", score: 88, mandateVerdict: "PURSUE", slots: { cap: null, price: "$20,000,000", yoc: "11.7%" }, market: "Center City, Philadelphia, PA", coveredMarket: "Philadelphia" }),
-  card({ id: "c", name: "Riverbend Site — 240 units", verdict: "pass", stage: "screening", fit: "outside", score: 42, mandateVerdict: "PASS", slots: { cap: null, price: "$4,000,000", yoc: "7.2%" }, market: "Frisco, TX", coveredMarket: null }),
+  // Frisco names no place the Dallas market's list knows: its county placed it (#447).
+  card({ id: "c", name: "Riverbend Site — 240 units", verdict: "pass", stage: "screening", fit: "outside", score: 42, mandateVerdict: "PASS", slots: { cap: null, price: "$4,000,000", yoc: "7.2%" }, market: "Frisco, TX", coveredMarket: null, readMarket: "Dallas–Fort Worth", readCounty: "Collin County, TX" }),
   // A deal in a metro area the site reads without a brief: named as read, not briefed.
   // …and it carries the seller's loan, offered for assumption (#419).
   card({ id: "p", name: "Strip District Lofts", verdict: "pass", stage: "screening", fit: "near", score: 60, mandateVerdict: "WATCH", slots: { cap: "6.4%", price: "$18,000,000", yoc: null, debt: "Assumable 3.45%" }, market: "Strip District, Pittsburgh, PA", coveredMarket: null, readMarket: "Pittsburgh PA" }),
@@ -160,6 +161,9 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(text).toContain("Flood AE");
     expect(html).toContain("FEMA&#x27;s Special Flood Hazard Area");
     expect(html).toContain("Pittsburgh PA is read, not briefed");
+    // A deal its county placed names the county rather than "read" (#447).
+    expect(text).toContain("Dallas–Fort Worth · Collin County");
+    expect(html).toContain("Collin County, TX lies in the Dallas–Fort Worth metro area");
     expect(html).toContain("Dallas–Fort Worth is a covered market");
     // The stalled run and the failed re-screen each say so in the status
     // column; the failed one's stored "Go" does not stand in for the call.
@@ -526,7 +530,7 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     col({ id: "a", name: "The Maddox at Brewerytown", reason: "Rents assume a premium the submarket has not printed.", fit: "near", fitNote: "Near on basis / unit", irr: 14.2, em: 1.82, coc: 6.1, cap: 5.6, leverage: leverageRead(5.6, 6.2), capOverTenYear: capSpreadRead(5.6, 4.94), price: "$68,000,000", noi: "$3,808,000" }),
     col({ id: "b", name: "1400 Market — office to residential", verdict: "pass", reason: "The plan holds a 567 bps spread in the worst corner.", fit: "fits", strategy: "Conversion", planDeal: true, irr: 18.9, em: 2.1, coc: null, cap: null, yoc: 11.7, price: "$20,000,000", noi: "$21,000,000", market: "Center City, Philadelphia, PA", coveredMarket: "Philadelphia" }),
     col({ id: "c", name: "Tysons Corner Plaza", assetClass: "office", verdict: "pass_on", reason: "Vacancy above 20% with no leasing story.", fit: "outside", fitNote: "Misses: size, price", irr: 22.0, em: 2.4, coc: 8.0, cap: 8.1, leverage: leverageRead(8.1, 6.2), capOverTenYear: capSpreadRead(8.1, 4.94), price: "$60,000,000", noi: "$4,860,000", market: "Tysons, VA", coveredMarket: "Northern Virginia" }),
-    col({ id: "d", name: "Riverbend Site — 240 units", hasModel: false, verdict: null, strategy: "Development", planDeal: true, price: "$4,000,000", market: "Frisco, TX", coveredMarket: null }),
+    col({ id: "d", name: "Riverbend Site — 240 units", hasModel: false, verdict: null, strategy: "Development", planDeal: true, price: "$4,000,000", market: "Frisco, TX", coveredMarket: null, readMarket: "Dallas–Fort Worth", readCounty: "Collin County, TX" }),
   ];
 
   it("renders four columns and reads clean", () => {
@@ -536,6 +540,8 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     const text = visibleText(html);
     expect(gluedWords(text)).toEqual([]);
     for (const c of COLS) expect(text, c.name).toContain(c.name);
+    // The market row names how a county-placed deal reached its metro area (#447).
+    expect(text).toContain("Dallas–Fort Worth (by its county, Collin County, TX)");
     // The conversion's cap cell says it is judged on the plan, never a
     // dark building's cap; the rejected deal's 22% IRR is never crowned.
     expect(text).toMatch(/n\/a|plan/);
@@ -4485,6 +4491,44 @@ describe("PortfolioCard — a portfolio OM's properties, one row each", () => {
     expect(text).toContain("Checked beside 2 published figures for the Pittsburgh PA market, read on 2026-09-23 — 1 the metro's and 1 the nation's, none the building's.");
     expect(text).toContain("And beside 2 for the Cleveland OH market, where 1 of the 3 properties sits, read on 2026-09-23 — the metro's, never the portfolio's.");
     expect(text).toContain("And beside 1 for the state of Ohio, where 1 of the 3 properties sits, read on 2026-09-23 — the state's, never the portfolio's.");
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("the shared screen's market read says how a county-placed deal reached its market (#447)", () => {
+    const verdict: VerdictResult = {
+      verdict: "caution",
+      reason: "One market.",
+      topRisks: [],
+      nextSteps: [],
+      screen: { ranges: [], dealKillers: [], sensitivity: [] },
+    };
+    const html = renderToStaticMarkup(
+      React.createElement(ShareView, {
+        dealName: extraction.dealName,
+        assetClass: "multifamily",
+        expiresAt: "2026-10-05T12:00:00Z",
+        verdictStale: false,
+        picture: null,
+        extraction: { ...extraction, properties: [] } as unknown as ExtractionResult,
+        comps: null,
+        market: {
+          checks: [],
+          summary: "Rents are ahead of the metro's asking rents.",
+          liveBrief: {
+            metro: "Dallas-Fort Worth",
+            grain: "metro",
+            readOn: "2026-09-23",
+            lines: ["Unemployment 4.1% (Jul 2026, Dallas–Fort Worth MSA; FRED)"],
+            placedBy: { county: "Collin County, TX", area: "Dallas-Fort Worth-Arlington, TX" },
+          },
+        },
+        verdict,
+      }),
+    );
+    const text = visibleText(html);
+    expect(text).toContain(
+      "Checked beside 1 published figure for the Dallas-Fort Worth market — placed there by its county: Collin County, TX, which the Census Bureau files in the Dallas-Fort Worth-Arlington, TX metro area, read on 2026-09-23",
+    );
     expect(gluedWords(text)).toEqual([]);
   });
 

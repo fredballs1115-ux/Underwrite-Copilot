@@ -154,6 +154,14 @@ vi.mock("./verdict", () => ({ synthesizeVerdict: vi.fn() }));
 vi.mock("./reconcile", () => ({ reconcileModel: vi.fn() }));
 vi.mock("./reconcile-facts", () => ({ runDocReconciliation: vi.fn(async () => {}) }));
 vi.mock("./actuals-ingest", () => ({ runActualsIngestion: vi.fn(async () => {}) }));
+// The FEMA / census-tract lookup (lib/site-flags): the screen looks itself
+// where the page has not (#447). Faked here, so no test reaches a geocoder;
+// a claim that is won returns at once, and a test that needs the lookup to
+// store something says what.
+vi.mock("@/lib/site-flags/run", () => ({
+  claimSiteFlags: vi.fn(async () => true),
+  runSiteFlags: vi.fn(async () => {}),
+}));
 vi.mock("./om-source", async (importOriginal) => {
   const orig = await importOriginal<typeof import("./om-source")>();
   return {
@@ -174,6 +182,7 @@ import { scrutinizeComps } from "./comps";
 import { checkMarket } from "./market";
 import { synthesizeVerdict } from "./verdict";
 import { omSourceFor, releaseOmSource } from "./om-source";
+import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
 
 const EXTRACTION = {
   dealName: "Oakwood Flats",
@@ -395,6 +404,86 @@ describe("runAnalysis — the happy path", () => {
       ["dgs10", 4.9],
       ["sloos_multifamily", -5.7],
     ]);
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  it("a suburb its address's words miss reads its metro area's figures, placed by its tract's county and said so (#447)", async () => {
+    const label = "5000 Main St, Frisco, TX 75034";
+    state.deals.d1.address = { label, street: "5000 Main St", city: "Frisco", state: "TX", zip: "75034", county: "", submarket: "" };
+    // The deal page's lookup has answered: the building's tract is in Collin County.
+    state.deals.d1.site_flags = {
+      status: "ok",
+      subject: { lat: 33.15, lng: -96.82, label },
+      tractGeoid: "48085030100",
+      opportunityZone: null,
+      flood: null,
+      retrievedAt: "2026-09-23T11:00:00Z",
+      note: "",
+    };
+    state.rates = [
+      { series_id: "DALL148URN", obs_date: "2026-07-01", value: 4.1 },
+      { series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 },
+    ];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    const handed = vi.mocked(checkMarket).mock.calls[0][3] ?? "";
+    expect(handed).toContain(
+      "Published figures for the Dallas-Fort Worth market the deal sits in — placed there by its county: Collin County, TX, which the Census Bureau files in the Dallas-Fort Worth-Arlington, TX metro area, and the address names no place the site's list for this market does — read on 2026-09-23",
+    );
+    expect(handed).toContain("each is the metro area's — not the county's, not the submarket's and not the building's.");
+    expect(handed).toContain("- Unemployment 4.1% (Jul 2026, Dallas–Fort Worth MSA; FRED)");
+    const stored = state.deals.d1.market as { liveBrief?: { metro: string; placedBy?: unknown } | null };
+    expect(stored.liveBrief?.metro).toBe("Dallas-Fort Worth");
+    expect(stored.liveBrief?.placedBy).toEqual({ county: "Collin County, TX", area: "Dallas-Fort Worth-Arlington, TX" });
+    // The page had looked: the screen did not look again.
+    expect(vi.mocked(claimSiteFlags)).not.toHaveBeenCalled();
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  it("looks the site flags up itself where the page has not, and again where they were looked up for an edited address (#447)", async () => {
+    const label = "5000 Main St, Frisco, TX 75034";
+    state.deals.d1.address = { label, street: "5000 Main St", city: "Frisco", state: "TX", zip: "75034", county: "", submarket: "" };
+    // Flags from the address the deal had before an edit: the old building's.
+    state.deals.d1.site_flags = {
+      status: "ok",
+      subject: { lat: 29.76, lng: -95.37, label: "900 Travis St, Houston, TX 77002" },
+      tractGeoid: "48201100000",
+      opportunityZone: null,
+      flood: null,
+      retrievedAt: "2026-09-01T00:00:00Z",
+      note: "",
+    };
+    vi.mocked(runSiteFlags).mockImplementationOnce(async () => {
+      state.deals.d1.site_flags = {
+        status: "ok",
+        subject: { lat: 33.15, lng: -96.82, label },
+        tractGeoid: "48085030100",
+        opportunityZone: null,
+        flood: { zone: "AE", subtype: null, isHighRisk: true },
+        retrievedAt: "2026-09-23T11:59:00Z",
+        note: "",
+      };
+    });
+    state.rates = [{ series_id: "DALL148URN", obs_date: "2026-07-01", value: 4.1 }];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    // Claimed over the stale answer (forced), run, and read.
+    expect(vi.mocked(claimSiteFlags)).toHaveBeenCalledWith("d1", true);
+    expect(vi.mocked(runSiteFlags)).toHaveBeenCalledWith("d1");
+    const handed = vi.mocked(checkMarket).mock.calls[0][3] ?? "";
+    expect(handed).toContain("Published figures for the Dallas-Fort Worth market the deal sits in — placed there by its county: Collin County, TX");
+    // The flood zone the fresh lookup found reaches the deal context too.
+    expect(vi.mocked(checkMarket).mock.calls[0][2]).toMatch(/Zone AE/);
     expect(errSpy).not.toHaveBeenCalled();
   });
 

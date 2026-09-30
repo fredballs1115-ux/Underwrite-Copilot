@@ -29,7 +29,7 @@ import {
 import { withArticle } from "@/lib/article";
 import { sectorLeaderboard } from "@/lib/sector-leaderboard";
 import { linkOk } from "@/lib/link-audit";
-import { coveredState, dataMetroForAddress, metroForAddress } from "@/lib/market-match";
+import { coveredState, dataMetroForAddress, isDataMetro, metroForAddress } from "@/lib/market-match";
 import { parsePct } from "@/lib/criteria";
 import { capSpreadRead, leverageRead } from "@/lib/leverage";
 import {
@@ -42,6 +42,7 @@ import {
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import Link from "next/link";
 import type { StructuredAddress } from "@/lib/address";
+import type { DealPlacement } from "@/lib/market-county";
 
 const OUTCOME_META: Record<
   RuleEvaluation["outcome"],
@@ -189,8 +190,13 @@ export async function ResearchPanel({
   rateSeed = null,
   tenYear = null,
   survey30 = null,
+  placement,
 }: {
   address: StructuredAddress | null;
+  /** where the page placed the deal (lib/market-county's `placeDeal`): its
+   *  briefed market, a metro area whose figures are read, and how — the
+   *  address matchers answer where it is not given */
+  placement?: Pick<DealPlacement, "briefed" | "read" | "placedBy"> | null;
   sizeText?: string | null;
   priceText?: string | null;
   /** the deal's going-in cap as displayed (e.g. "5.8%") — for the leverage check */
@@ -249,10 +255,14 @@ export async function ResearchPanel({
   });
   const evals = address?.state ? evaluateRules(rules, subject) : [];
   const shown = evals.filter((e) => e.outcome !== "not_applicable");
-  const metro = address ? metroForAddress(address) : null;
+  const metro = placement ? placement.briefed : address ? metroForAddress(address) : null;
   // A metro area the site reads without a brief: its published figures are
   // under the market check, and the honest sentence here says that is all.
-  const dataMetro = address && !metro ? dataMetroForAddress(address) : null;
+  // So is a metro area the deal's county alone placed it in (#447): the
+  // metro area's figures are read, and its market's brief covers the places
+  // its keywords name.
+  const dataMetro = placement ? placement.read : address && !metro ? dataMetroForAddress(address) : null;
+  const placedBy = placement?.placedBy ?? null;
 
   // vs-market: covered-market name first (a Brooklyn deal must find the
   // "New York City" FMR row), raw city as the fallback. Same-sector rows
@@ -335,7 +345,11 @@ export async function ResearchPanel({
         // Houston: the market check reads its published figures (jobs,
         // permits, prices, rents, vacancy) and nothing else is on file for it.
         <p className="mt-2 text-[11px] text-muted">
-          {`${dataMetro.name} is read, not briefed — its published figures sit under the market check; no brief, comps pull or tracker here`}
+          {placedBy
+            ? isDataMetro(dataMetro.id)
+              ? `${placedBy.county} lies in the ${placedBy.area} metro area, which the site reads but does not brief — its published figures sit under the market check; no brief, comps pull or tracker here`
+              : `${placedBy.county} lies in the ${placedBy.area} metro area, so the market check reads the ${dataMetro.name} market's published figures — its brief, comps pull and tracker cover the places the market names, and this address names none of them`
+            : `${dataMetro.name} is read, not briefed — its published figures sit under the market check; no brief, comps pull or tracker here`}
           {coveredState(address.state)
             ? "; statewide rules still evaluate below."
             : "."}{" "}

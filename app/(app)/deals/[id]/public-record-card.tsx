@@ -33,9 +33,14 @@ const money = (v: number | null) =>
 export async function PublicRecordCard({
   address,
   subject,
+  market,
 }: {
   address: StructuredAddress | null;
   subject: { lat: number; lng: number } | null;
+  /** the briefed market the page placed the deal in (lib/market-county's
+   *  `placeDeal(...).briefed`, which drops an address word naming a place
+   *  in another county's metro area); the address matchers otherwise */
+  market?: { id: string } | null;
 }) {
   if (!address?.label) return null;
   const supabase = await createSupabaseServerClient();
@@ -53,7 +58,7 @@ export async function PublicRecordCard({
     }
     if (!row && address.street) {
       // Coordinate-less markets (Boston's roll): prefix-match the situs.
-      const metro = metroForAddress(address);
+      const metro = market !== undefined ? market : metroForAddress(address);
       const ingestMarket = metro
         ? ((metrosSeed.metros.find((m) => m.id === metro.id) as { ingest_market?: string } | undefined)
             ?.ingest_market ?? null)

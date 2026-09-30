@@ -4,6 +4,7 @@ import {
   parseCensusTract,
   parseNfhlFlood,
   resolveNfhlLayerId,
+  siteFlagsStale,
 } from "./core";
 
 describe("isHighRiskZone", () => {
@@ -268,5 +269,19 @@ describe("floodContextLine and the deal context — the zone as the Claude steps
     const without = dealContextFor(ex) ?? "";
     expect(without).not.toContain("FEMA");
     expect(dealContextFor(ex, null)).toBe(dealContextFor(ex));
+  });
+});
+
+describe("siteFlagsStale — flags looked up for an address the deal no longer has (#447)", () => {
+  const flags = { subject: { lat: 32.8, lng: -96.8, label: "100 Elm St, Dallas, TX 75201" } };
+  it("is stale where the lookup's address is not the deal's", () => {
+    expect(siteFlagsStale(flags, "5000 Main St, Frisco, TX 75034")).toBe(true);
+    expect(siteFlagsStale(flags, "")).toBe(true);
+    expect(siteFlagsStale(flags, null)).toBe(true);
+  });
+  it("is current for the same address, and flags that name no address cannot be judged", () => {
+    expect(siteFlagsStale(flags, " 100 Elm St, Dallas, TX 75201 ")).toBe(false);
+    expect(siteFlagsStale({}, "5000 Main St, Frisco, TX 75034")).toBe(false);
+    expect(siteFlagsStale(null, "5000 Main St, Frisco, TX 75034")).toBe(false);
   });
 });

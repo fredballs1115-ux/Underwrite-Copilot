@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { rerunAnalysis, reconcileWithModel } from "../actions";
+import { placedByClause } from "@/lib/placed-by";
 import { PendingButton } from "../../pending-button";
 import {
   addSupplementNote,
@@ -1649,7 +1650,7 @@ function LiveBriefRead({ brief }: { brief: NonNullable<MarketResult["liveBrief"]
         <span className="font-medium text-ink">
           {brief.grain === "state"
             ? `Read beside the state of ${brief.metro}’s own figures${where}`
-            : `Read beside the ${brief.metro} market’s own figures${where}`}
+            : `Read beside the ${brief.metro} market’s own figures${where}${placedByClause(brief.placedBy)}`}
         </span>
         <span>{briefCount(brief)}</span>
       </summary>

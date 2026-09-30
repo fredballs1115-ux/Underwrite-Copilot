@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { placedByClause } from "@/lib/placed-by";
 import type {
   BrokerCompsResult,
   ExtractionResult,
@@ -506,7 +507,7 @@ export function ShareView({
                 <p className="mt-2 text-xs text-muted">
                   {market.liveBrief.grain === "state"
                     ? `Checked beside ${figureCount(market.liveBrief.lines.length)} for the state of ${market.liveBrief.metro}, read on ${market.liveBrief.readOn} — ${splitOf(market.liveBrief, "the state's", "each the state's, not any metro's and not the building's", "none any metro's or the building's")}.`
-                    : `Checked beside ${figureCount(market.liveBrief.lines.length)} for the ${market.liveBrief.metro} market, read on ${market.liveBrief.readOn} — ${splitOf(market.liveBrief, "the metro's", "each the metro's, not the building's", "none the building's")}.`}
+                    : `Checked beside ${figureCount(market.liveBrief.lines.length)} for the ${market.liveBrief.metro} market${placedByClause(market.liveBrief.placedBy)}, read on ${market.liveBrief.readOn} — ${splitOf(market.liveBrief, "the metro's", "each the metro's, not the building's", "none the building's")}.`}
                 </p>
               )}
               {/* A portfolio across markets (#413): each other market's own

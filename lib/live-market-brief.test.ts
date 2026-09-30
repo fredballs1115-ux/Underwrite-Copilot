@@ -500,6 +500,40 @@ describe("a deal in a metro area the site reads without a brief gets the metro's
   });
 });
 
+// ── A deal its county placed (#447) ─────────────────────────────────────────
+describe("a deal its county alone placed in a market says so, and whose figures they are", () => {
+  const placedBy = { county: "Butler County, PA", area: "Pittsburgh, PA" };
+  const rows: RateRow[] = [{ series_id: "PITT342URN", obs_date: "2026-07-01", value: 4.1 }];
+  const input = { assetClass: "multifamily", rates: readMetroRates("pittsburgh", rows, NOW), zori: null, realtor: null, national: [], now: NOW };
+
+  it("a metro area read without a brief: the county and its metro area in the header, and the figures never the county's", () => {
+    const b = liveMarketBrief({ ...input, metro: { id: "pittsburgh", name: "Pittsburgh PA", placedBy } })!;
+    expect(b.text).toContain(
+      "Published figures for the Pittsburgh PA metro area the deal sits in — a market the site reads but does not brief, so these figures are all it holds for it — placed there by its county: Butler County, PA, which the Census Bureau files in the Pittsburgh, PA metro area, and the address names no place the site's list for this market does — read on 2026-09-23",
+    );
+    expect(b.text).toContain("each is the metro area's — not the county's, not the submarket's and not the building's.");
+    expect(b.placedBy).toEqual(placedBy);
+  });
+
+  it("a briefed market's metro area: the same clause, and the record carries it", () => {
+    const dc = liveMarketBrief({
+      ...input,
+      rates: readMetroRates("dc", DC_ROWS, NOW),
+      metro: { id: "dc", name: "Washington DC", placedBy: { county: "Stafford County, VA", area: "Washington-Arlington-Alexandria, DC-VA-MD-WV" } },
+    })!;
+    expect(dc.text).toContain(
+      "Published figures for the Washington DC market the deal sits in — placed there by its county: Stafford County, VA, which the Census Bureau files in the Washington-Arlington-Alexandria, DC-VA-MD-WV metro area, and the address names no place the site's list for this market does — read on 2026-09-23",
+    );
+    expect(dc.placedBy?.county).toBe("Stafford County, VA");
+  });
+
+  it("a market its address named carries no county, and a state never does", () => {
+    const named = liveMarketBrief({ ...input, metro: { id: "pittsburgh", name: "Pittsburgh PA" } })!;
+    expect(named.placedBy).toBeUndefined();
+    expect(named.text).not.toContain("county");
+  });
+});
+
 // ── A portfolio across several markets ──────────────────────────────────────
 describe("a portfolio across several markets: the header says whose figures these are", () => {
   const base = { metro: { id: "dc", name: "Washington DC" }, assetClass: "multifamily", rates: readMetroRates("dc", DC_ROWS, NOW), zori: null, realtor: null, national: [], now: NOW };

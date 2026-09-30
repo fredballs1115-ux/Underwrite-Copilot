@@ -24,7 +24,7 @@ import type { DealVisualCache } from "@/lib/deal-location";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
-import { floodKey, floodZoneLine, type NfhlLegendEntry, type SiteFlagsResult } from "@/lib/site-flags/core";
+import { floodKey, floodZoneLine, siteFlagsStale, type NfhlLegendEntry, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { floodLegend } from "@/lib/flood-map";
 import { SiteFlagsCard } from "./site-flags-card";
 import { PublicRecordCard } from "./public-record-card";
@@ -84,7 +84,7 @@ import type { ActualsData } from "./property-actuals";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { constructionSeed, type DealRateSeeds } from "@/lib/debt-index";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
-import { marketForAddress } from "@/lib/market-match";
+import { countyOf, placeDeal } from "@/lib/market-county";
 import { BRIEF_NATIONAL_IDS, liveMarketBrief } from "@/lib/live-market-brief";
 import { metroDemand } from "@/lib/metro-demand";
 import { briefDelta, type BriefDelta } from "@/lib/brief-delta";
@@ -385,6 +385,33 @@ export default async function DealPage({
       ? scoreMandateFit(deal.asset_class, checkSource, buyBox)
       : null;
 
+  // Site flags (flood zone / Opportunity Zone / census tract): same stored-
+  // result + backfill-on-render protocol as public comps below. The column
+  // may predate migration 0030 on a live DB — a missing column simply reads
+  // as null here and the claim's update no-ops server-side, so the card
+  // shows "checking…" instead of erroring. Flags looked up for the address
+  // the deal had before an edit are the old building's (#447): not shown,
+  // not read for the county, and looked up again.
+  const storedFlags =
+    ((deal as { site_flags?: SiteFlagsResult | null }).site_flags) ?? null;
+  const flagsStale = siteFlagsStale(storedFlags, dealAddress?.label);
+  const siteFlags = flagsStale ? null : storedFlags;
+  if (dealAddress?.label && (!siteFlags || siteFlags.status === "pending")) {
+    after(async () => {
+      try {
+        if (await claimSiteFlags(id, flagsStale)) await runSiteFlags(id);
+      } catch {
+        // pre-0030 DB — nothing to store onto yet
+      }
+    });
+  }
+  // Where the deal is, answered once for every surface on the page
+  // (lib/market-county, #447): the briefed market its address names, a
+  // metro area whose figures are read, the market the live figures are
+  // read for — the metro area its county sits in where the address names
+  // no place a market's keywords know — and the county itself.
+  const placement = placeDeal(dealAddress, countyOf(dealAddress, siteFlags));
+
   // Since this screen (lib/brief-delta): the figures the market check read
   // on the day it ran, against the same figures read today through the
   // page's cached readers — so a check opened weeks later says whether the
@@ -400,7 +427,7 @@ export default async function DealPage({
   // The market the live figures are read for: the covered metro where the
   // address sits in one, the state's own series otherwise (the same table,
   // filed under `state:PA`), every surface saying which grain it read.
-  const liveMarket = marketForAddress(dealAddress ?? {});
+  const liveMarket = placement.live;
   let reads: TodayReads | null = null;
   if (extraction || (storedBrief?.figures && storedBrief.figures.length > 0)) {
     try {
@@ -409,7 +436,11 @@ export default async function DealPage({
       console.warn("live figures read failed:", err instanceof Error ? err.message : err);
     }
   }
-  if (storedBrief?.figures && storedBrief.figures.length > 0 && liveMarket && reads) {
+  // Only against the same market: a check stored for the state before the
+  // county placed the deal in its metro area, or for an address since
+  // edited, is a different market's figures, and no move between the two
+  // is a move.
+  if (storedBrief?.figures && storedBrief.figures.length > 0 && liveMarket && reads && storedBrief.metro === liveMarket.name) {
     const today = liveMarketBrief({
       metro: liveMarket,
       rates: reads.rates,
@@ -760,23 +791,6 @@ export default async function DealPage({
     });
   }
 
-  // Site flags (flood zone / Opportunity Zone / census tract): same stored-
-  // result + backfill-on-render protocol as public comps above. The column
-  // may predate migration 0030 on a live DB — a missing column simply reads
-  // as null here and the claim's update no-ops server-side, so the card
-  // shows "checking…" instead of erroring.
-  const siteFlags =
-    ((deal as { site_flags?: SiteFlagsResult | null }).site_flags) ?? null;
-  if (dealAddress?.label && (!siteFlags || siteFlags.status === "pending")) {
-    after(async () => {
-      try {
-        if (await claimSiteFlags(id)) await runSiteFlags(id);
-      } catch {
-        // pre-0030 DB — nothing to store onto yet
-      }
-    });
-  }
-
   // The Flood tab's key is FEMA's own legend (lib/flood-map, cached a day).
   // Asked for here and read at the picture, so a slow FEMA overlaps the
   // page's other reads; a legend that has not answered in 2.5 s leaves the
@@ -836,7 +850,7 @@ export default async function DealPage({
   // The photograph the deal's market is known by, leading the picture where
   // the building has none of its own and no Street View (#439) — the one its
   // pipeline card shows (#438), from the same reader.
-  const marketPicture = marketPictureFor(dealAddress, extraction?.market ?? null);
+  const marketPicture = marketPictureFor(dealAddress, extraction?.market ?? null, placement.briefed ?? placement.read);
 
   // A development's price row is its land cost, and a plan deal's cap slot is
   // its yield on total cost — the same words the pipeline row and the meeting
@@ -1221,6 +1235,7 @@ export default async function DealPage({
         <SiteFlagsCard result={siteFlags} hasAddress={!!dealAddress?.label} />
         <PublicRecordCard
           address={dealAddress}
+          market={placement.briefed}
           subject={publicComps?.subject ?? siteFlags?.subject ?? null}
         />
         {/* Anchor target for the Regulation panel's "answer in Deal facts"
@@ -1236,6 +1251,7 @@ export default async function DealPage({
         </div>
         <ResearchPanel
           address={dealAddress}
+          placement={placement}
           sizeText={summarySize}
           priceText={subjectPriceNumber != null ? String(Math.round(subjectPriceNumber)) : null}
           capText={summaryCap}

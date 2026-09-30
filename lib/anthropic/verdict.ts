@@ -6,6 +6,7 @@ import { structured } from "./failure";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, verdictInstruction } from "./prompts";
 import { assessPlausibility, inferStrategy, planSummary, plausibilityNote } from "@/lib/deal-strategy";
+import { placedBySentence } from "@/lib/placed-by";
 import type {
   ExtractionResult,
   ChallengerResult,
@@ -205,7 +206,7 @@ export function buildBrief(input: VerdictInputs): string {
         ...live.lines.map((l) => `- ${l}`),
         (live.grain === "state"
           ? "Each is dated and is the state's, not any metro's, the submarket's or the building's. Where a screen range, a risk or a next step turns on one of these, name the figure and its date as its source, and say it is the state's."
-          : "Each is dated and is the metro's, not the submarket's or the building's. Where a screen range, a risk or a next step turns on one of these, name the figure and its date as its source.") +
+          : `Each is dated and is the metro's, not the submarket's or the building's. Where a screen range, a risk or a next step turns on one of these, name the figure and its date as its source.${placedBySentence(live.placedBy)}`) +
           nationalNote(live),
       ].join("\n"),
     );
