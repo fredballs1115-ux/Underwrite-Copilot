@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { elapsedLabel, runStartMs } from "./run-clock";
+import { MAX_RUN_MS, elapsedLabel, runStartMs } from "./run-clock";
 
 const LOADED = Date.parse("2026-09-30T14:03:00Z");
 
@@ -18,6 +18,16 @@ describe("the deal page's screen clock", () => {
     }
     expect(elapsedLabel(runStartMs(null, LOADED), LOADED)).toBe("0:00");
     expect(elapsedLabel(runStartMs(null, LOADED), LOADED + 65_000)).toBe("1:05");
+  });
+
+  it("does not count from a row stamped before claims restamped it", () => {
+    // A run claimed before the deploy keeps the deal's first screen's day as
+    // its created_at: counted from, the rail would read thousands of minutes.
+    const firstScreen = "2026-09-12T09:00:00Z";
+    expect(runStartMs(firstScreen, LOADED)).toBe(LOADED);
+    // Inside the bound a start is the run's own.
+    const earlier = new Date(LOADED - MAX_RUN_MS + 60_000).toISOString();
+    expect(runStartMs(earlier, LOADED)).toBe(LOADED - MAX_RUN_MS + 60_000);
   });
 
   it("never reads below 0:00 when the browser's clock runs behind the database's", () => {
