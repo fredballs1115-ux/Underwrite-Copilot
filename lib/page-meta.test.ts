@@ -89,6 +89,16 @@ describe("each public page states its own canonical and link preview", () => {
     expect(renderedTitle(why)).toBe("Why Underwrite Copilot");
   });
 
+  it("names the homepage's organization by a logo Google will take", () => {
+    // Google asks for a logo of at least 112px; the favicon is 32.
+    const route = /logo:\s*`\$\{SITE_URL\}\/([a-z-]+)`/.exec(read("app/page.tsx"))?.[1];
+    expect(route).toBe("apple-icon");
+    const size = /size = \{ width: (\d+), height: (\d+) \}/.exec(read(`app/${route}.tsx`));
+    expect(size, `app/${route}.tsx declares its size`).not.toBeNull();
+    expect(Number(size![1])).toBeGreaterThanOrEqual(112);
+    expect(Number(size![2])).toBeGreaterThanOrEqual(112);
+  });
+
   it("is the market pages' own shape too, which go through the same helper", () => {
     const pitt = publicMetadata(marketMeta(marketPageFor("pittsburgh"), null));
     expect(pitt.alternates?.canonical).toBe("/market?metro=pittsburgh");

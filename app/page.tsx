@@ -337,7 +337,9 @@ const JSON_LD = {
       "@id": `${SITE_URL}/#organization`,
       name: "Underwrite Copilot",
       url: SITE_URL,
-      logo: `${SITE_URL}/icon`,
+      // The 180px touch icon (app/apple-icon.tsx): Google wants a logo of
+      // 112px at least, and the favicon is 32.
+      logo: `${SITE_URL}/apple-icon`,
       email: "underwritecopilot.support@gmail.com",
     },
     {
