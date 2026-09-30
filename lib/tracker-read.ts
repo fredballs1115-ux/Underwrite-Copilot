@@ -40,15 +40,40 @@ const SECTOR_LABEL: Record<TrackerSector, string> = {
 };
 
 /**
+ * Buildings a sector's tracker does not describe, though lib/asset-words
+ * files them under its class: a lab or life-science building (filed as
+ * office) is a market of its own, with its own vacancy and caps; an
+ * outdoor-storage yard (filed as industrial) trades by the usable acre, not
+ * as a warehouse — the plausibility check's yard test reads the same words
+ * (lib/deal-strategy); and a cold-storage or refrigerated warehouse (filed
+ * as industrial) is a specialty building the warehouse market's figures do
+ * not speak to. Each reads no tracker rather than its neighbour's.
+ */
+const OWN_MARKET: readonly RegExp[] = [
+  /\b(life[- ]?sciences?|labs?|laborator(?:y|ies))\b/i,
+  /\b(industrial outdoor storage|outdoor storage|ios|truck (?:terminal|yard)|storage yard)\b/i,
+  /\b(cold[- ]storage|refrigerated|freezer)\b/i,
+];
+
+/** Whether any of the deal's own words name a building no tracker here describes. */
+function ownMarket(words: readonly (string | null | undefined)[]): boolean {
+  return words.some((w) => typeof w === "string" && OWN_MARKET.some((re) => re.test(w)));
+}
+
+/**
  * Which tracker sector a class reads: an office building the office
  * tracker, a warehouse the industrial one, a store the retail one, an
  * apartment building the multifamily one. A medical office is its own
  * market and not the office tracker's; a net lease's tenant may be a store
  * or a depot; single-family rentals, student and senior housing, storage,
- * hotels, data centres, parking and land have no tracker here — null, so
- * nothing is read against a neighbour's figure.
+ * hotels, data centres, parking and land have no tracker here; and a lab,
+ * an outdoor-storage yard or a cold-storage warehouse, named so in the
+ * class or in the deck's own class words (`deckWords`, the extraction's
+ * phrase, read where the analyst filed a plain class), reads none either —
+ * null, so nothing is read against a neighbour's figure.
  */
-export function trackerSectorFor(assetClass: string | null | undefined): TrackerSector | null {
+export function trackerSectorFor(assetClass: string | null | undefined, deckWords?: string | null): TrackerSector | null {
+  if (ownMarket([assetClass, deckWords])) return null;
   switch (assetClassKey(assetClass)) {
     case "office":
       return "office";
@@ -83,9 +108,15 @@ function hostOf(url: string | undefined): string | null {
   }
 }
 
-/** The tracker's read for a metro and a class — null where either has none. */
-export function trackerFor(metroId: string | null | undefined, assetClass: string | null | undefined): TrackerRead | null {
-  const sector = trackerSectorFor(assetClass);
+/** The tracker's read for a metro and a class — null where either has none,
+ *  or where the class or the deck's own class words (`deckWords`) name a
+ *  building the tracker does not describe. */
+export function trackerFor(
+  metroId: string | null | undefined,
+  assetClass: string | null | undefined,
+  deckWords?: string | null,
+): TrackerRead | null {
+  const sector = trackerSectorFor(assetClass, deckWords);
   if (!sector || !metroId) return null;
   const metro = (metrosSeed.metros ?? []).find((m) => m.id === metroId) as
     | { sector_snapshot?: Record<string, unknown> | null }

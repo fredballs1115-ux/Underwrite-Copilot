@@ -536,6 +536,58 @@ describe("trackerFor — the sector snapshot's vacancy band and cap range for a 
     }
   });
 
+  it("reads no tracker for a lab, an outdoor-storage yard or a cold-storage warehouse: a neighbour's figure is not theirs", () => {
+    // lib/asset-words files each under office or industrial; the trackers
+    // describe offices and warehouses, not these.
+    for (const cls of [
+      "Life Science / Lab",
+      "Laboratory building",
+      "Life sciences campus",
+      "Industrial Outdoor Storage",
+      "IOS yard",
+      "Truck terminal",
+      "Cold Storage Warehouse",
+      "Refrigerated distribution",
+      "Freezer facility",
+    ]) {
+      expect(trackerSectorFor(cls), cls).toBeNull();
+      expect(trackerFor("dc", cls), cls).toBeNull();
+    }
+    // A plain class filed by the analyst, with the deck's own words naming the building.
+    expect(trackerSectorFor("office", "Life Science / Lab")).toBeNull();
+    expect(trackerSectorFor("industrial", "Cold Storage Warehouse")).toBeNull();
+    expect(trackerFor("dc", "industrial", "Industrial Outdoor Storage")).toBeNull();
+    // A plain office, warehouse or distribution building reads its tracker as before.
+    expect(trackerSectorFor("Warehouse / Distribution")).toBe("industrial");
+    expect(trackerSectorFor("industrial", "Bulk distribution warehouse")).toBe("industrial");
+    expect(trackerSectorFor("office", "Class A office tower")).toBe("office");
+    expect(trackerSectorFor("Collaborative office studios")).toBe("office");
+    expect(trackerFor("dc", "industrial", "Industrial")).toMatchObject({ sector: "industrial", vacancyLow: 7.4 });
+  });
+
+  it("the model's checks read no tracker for a cold-storage warehouse the analyst filed as industrial", () => {
+    const cold: ExtractionResult = {
+      dealName: "Anacostia Cold Storage",
+      assetClass: "Cold Storage Warehouse",
+      market: "Washington, DC",
+      address: "1 Cold Storage Way NE, Washington, DC",
+      metrics: [
+        { label: "Asking price", value: "$50,000,000", flagged: false, page: "p. 5" },
+        { label: "Going-in cap rate", value: "6.0%", flagged: false, page: "p. 6" },
+        { label: "Net operating income", value: "$3,000,000", flagged: false, page: "p. 7" },
+      ],
+    };
+    const r = modelVsMarketFor({
+      derived: deriveUnderwriteInputs(cold, "cold"),
+      extraction: cold,
+      storedAssetClass: "industrial",
+      metro: { id: "dc", name: "Washington DC" },
+      reads: { rates, zori, national, now: FIXTURE_NOW },
+    })!;
+    expect(r.checks.map((c) => c.key)).toEqual(["rent_growth", "expense_growth", "exit_cap"]);
+    expect(r.checks.map((c) => c.read).join(" ")).not.toContain("research tracker");
+  });
+
   it("reads a band as a band, a point as a point, the snapshot's day and the first source's host", () => {
     expect(trackerFor("dc", "office")).toEqual({
       sector: "office",

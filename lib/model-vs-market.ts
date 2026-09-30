@@ -715,8 +715,10 @@ export function modelVsMarketFor(args: {
     // research layer, dated, beside the feeds. Research, so only for a
     // market the address names: a deal its county alone placed (#447) reads
     // the metro area's published figures, and the tracker's may be the core
-    // county's — Los Angeles's office vacancy is not Orange County's.
-    tracker: metro && !metro.placedBy ? trackerFor(metro.id, assetClass) : null,
+    // county's — Los Angeles's office vacancy is not Orange County's. The
+    // deck's own class words ride along, so a lab, a yard or a cold-storage
+    // warehouse the analyst filed as plain office or industrial reads none.
+    tracker: metro && !metro.placedBy ? trackerFor(metro.id, assetClass, extraction?.assetClass ?? null) : null,
     now: reads.now,
   });
 }
