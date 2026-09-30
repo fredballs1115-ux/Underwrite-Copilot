@@ -444,6 +444,22 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(html).toContain('src="/api/deals/b/picture?size=hero"');
   });
 
+  it("sorts by when offers are due — from the sort control, and from the list's own header beside the deal's name, where the deadline is drawn", () => {
+    const props = {
+      deals: withThumbs(CARDS),
+      errorMessage: null,
+      notice: null,
+      onboarding: { hasBuyBox: true, sampleId: "h", hasRealDeal: true },
+      billing: BILLING,
+    };
+    const cards = render(React.createElement(Pipeline, props));
+    expect(cards).toContain('<option value="due:asc">Offers due, soonest</option>');
+    const list = render(React.createElement(Pipeline, { ...props, initialView: "list" as const }));
+    expect(list).toContain('aria-label="Sort by offers due"');
+    expect(list).toMatch(/aria-label="Sort by deal"[^>]*>Deal<\/button><button[^>]*aria-label="Sort by offers due"[^>]*>Offers due<\/button>/);
+    expect(a11yIssues(list)).toEqual([]);
+  });
+
   it("opens on the cards unless the reader chose the list, and never lands on the map (#438)", () => {
     expect(landingView(undefined)).toBe("cards");
     expect(landingView("cards")).toBe("cards");

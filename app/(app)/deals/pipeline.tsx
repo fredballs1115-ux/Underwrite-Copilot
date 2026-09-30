@@ -31,6 +31,7 @@ import { ASSET_CLASS_OPTIONS, assetClassLabel } from "@/lib/asset-class";
 import { StageSelect } from "./[id]/stage-select";
 import { OffersDueBit } from "./offers-due";
 import { parseMoney, parsePct, parsePrice, priceRange, priceRangeShort } from "@/lib/criteria";
+import { compareSortValues, type SortDir } from "@/lib/pipeline-sort";
 import {
   STAGES,
   STAGE_LABEL,
@@ -120,8 +121,9 @@ function mapDealOf(d: DealCard): MapDeal {
 }
 
 /** One row per deal: name · asset · price · cap · buy box · status · added.
- *  Every column is sortable from its header. */
-type SortKey = "name" | "asset" | "price" | "cap" | "fit" | "status" | "added";
+ *  Every column is sortable from its header, and so is the call-for-offers
+ *  date the deal's own cell carries. */
+type SortKey = "name" | "asset" | "price" | "cap" | "fit" | "status" | "added" | "due";
 
 /** The price as a table wants it — "$68.0M", "$950k" — with the OM's own
  *  figure kept for the tooltip and the CSV. A column eighty pixels wide
@@ -160,7 +162,7 @@ function statusRank(d: DealCard): number {
   return 0;
 }
 
-function sortValue(d: DealCard, key: SortKey): string | number {
+function sortValue(d: DealCard, key: SortKey): string | number | null {
   switch (key) {
     case "name":
       return d.name.toLowerCase();
@@ -178,12 +180,17 @@ function sortValue(d: DealCard, key: SortKey): string | number {
       return statusRank(d);
     case "added":
       return d.createdAt;
+    case "due":
+      // An ISO day, so the text sorts as the date; a deal with no deadline
+      // has nothing to sort on and goes after every deal that has one.
+      return d.offersDue;
   }
 }
 
 /** First click on a header sorts the way people expect that column to lead:
- *  text A→Z, figures biggest-first, dates newest-first, best fits first. */
-const DEFAULT_DIR: Record<SortKey, "asc" | "desc"> = {
+ *  text A→Z, figures biggest-first, dates newest-first, best fits first, and
+ *  the offers due soonest first. */
+const DEFAULT_DIR: Record<SortKey, SortDir> = {
   name: "asc",
   asset: "asc",
   price: "desc",
@@ -191,6 +198,7 @@ const DEFAULT_DIR: Record<SortKey, "asc" | "desc"> = {
   fit: "desc",
   status: "desc",
   added: "desc",
+  due: "asc",
 };
 
 const VERDICT_META: Record<
@@ -307,7 +315,7 @@ export function Pipeline({
   // Mandate-fit filter (Feature 4): all / PURSUE / WATCH / PASS.
   const [mfit, setMfit] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("added");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   // Dead deals stay out of the pipeline until asked for (or filtered to).
   const [showDead, setShowDead] = useState(false);
   // Which stage sections the user has explicitly collapsed/expanded — until
@@ -475,15 +483,10 @@ export function Pipeline({
       return true;
     });
     return list.sort((a, b) => {
-      const va = sortValue(a, sortKey);
-      const vb = sortValue(b, sortKey);
-      const cmp =
-        typeof va === "string" && typeof vb === "string"
-          ? va.localeCompare(vb)
-          : (va as number) - (vb as number);
+      const cmp = compareSortValues(sortValue(a, sortKey), sortValue(b, sortKey), sortDir);
       // Ties fall back to newest-first so the order stays stable and sane.
       const tie = sortKey === "added" ? 0 : b.createdAt.localeCompare(a.createdAt);
-      return (sortDir === "asc" ? cmp : -cmp) || tie;
+      return cmp || tie;
     });
   }, [deals, deferredQuery, verdict, stage, asset, market, mfit, sortKey, sortDir, showDead]);
 
@@ -884,7 +887,7 @@ export function Pipeline({
             label="Sort deals"
             value={`${sortKey}:${sortDir}`}
             onChange={(v) => {
-              const [k, dir] = v.split(":") as [SortKey, "asc" | "desc"];
+              const [k, dir] = v.split(":") as [SortKey, SortDir];
               setSortKey(k);
               setSortDir(dir);
             }}
@@ -892,6 +895,7 @@ export function Pipeline({
             options={[
               ["added:desc", "Newest"],
               ["added:asc", "Oldest"],
+              ["due:asc", "Offers due, soonest"],
               ["price:desc", "Price: high to low"],
               ["cap:desc", "Cap: high to low"],
               ["fit:desc", "Mandate fit: high to low"],
@@ -1032,8 +1036,11 @@ export function Pipeline({
             {view === "list" && (
             <div className="hidden items-center gap-3 px-5 pb-1.5 md:flex">
               {compareMode && <span className="w-5 shrink-0" />}
-              <div className="min-w-0 flex-1">
+              {/* The call for offers is drawn in the deal's own cell, under
+                  its name, so its sort sits beside the name's. */}
+              <div className="flex min-w-0 flex-1 items-center gap-3">
                 <SortHead label="Deal" k="name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                <SortHead label="Offers due" k="due" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
               </div>
               <SortHead label="Asset" k="asset" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="hidden w-24 lg:flex" />
               <SortHead label="Price" k="price" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="w-20" right />
