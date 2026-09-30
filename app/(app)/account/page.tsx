@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { getBilling } from "@/lib/billing";
+import { dealAllowance } from "@/lib/deal-allowance";
 import { signOut } from "@/app/login/actions";
 import { ChangePasswordForm } from "./change-password-form";
 import { DeleteAccountForm } from "./delete-account-form";
@@ -66,6 +67,9 @@ export default async function AccountPage({
     ? await Promise.all([getBilling(supabase, user.id), emailPrefsOf(user.id)])
     : [null, { onAnalysis: true, weeklyDigest: true }];
   const isPro = billing?.isPro ?? false;
+  // The pipeline's meter and this line count by the create action's own
+  // rule (lib/deal-allowance): a team's trial first, then the reader's own.
+  const allowance = billing ? dealAllowance(billing) : null;
   const emailOnAnalysis = prefs.onAnalysis;
   const emailWeeklyDigest = prefs.weeklyDigest;
 
@@ -100,11 +104,7 @@ export default async function AccountPage({
               Signed in as
             </p>
             <p className="mt-1 font-medium">{user?.email ?? "—"}</p>
-            {billing && !isPro && (
-              <p className="mt-1 text-xs text-muted">
-                {billing.dealCount} of {billing.dealLimit} free deals used
-              </p>
-            )}
+            {allowance?.line && <p className="mt-1 text-xs text-muted">{allowance.line}</p>}
           </div>
           <div className="flex items-center gap-3">
             <span

@@ -1094,7 +1094,7 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     }
     // Every row a figure fills stays — the development's blank yield on cost
     // and its missing returns included, since another deal has them.
-    for (const label of ["Market", "Covered market", "Asset class", "Deal type", "Levered IRR", "Equity multiple", "Cash-on-cash (Yr 1)", "Going-in cap", "Yield on cost (stabilized)", "Leverage vs 30-yr", "Cap over 10-yr Treasury", "Purchase price", "Year-1 NOI"]) {
+    for (const label of ["Market", "Market read", "Asset class", "Deal type", "Levered IRR", "Equity multiple", "Cash-on-cash (Yr 1)", "Going-in cap", "Yield on cost (stabilized)", "Leverage vs 30-yr", "Cap over 10-yr Treasury", "Purchase price", "Year-1 NOI"]) {
       expect(shown, label).toContain(label);
     }
     expect(cardRows(html).filter((l) => l === "Market")).toHaveLength(COLS.length);

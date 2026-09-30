@@ -306,7 +306,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
   }[] = [
     { label: "Market", get: (c) => c.market },
     {
-      label: "Covered market",
+      label: "Market read",
       get: (c) =>
         c.coveredMarket ??
         (c.readMarket ? (c.readCounty ? `${c.readMarket} (by its county, ${c.readCounty})` : `${c.readMarket} (read, not briefed)`) : "—"),

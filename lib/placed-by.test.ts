@@ -1,7 +1,8 @@
 // The market a pipeline row names, said once for the row and its CSV (the
-// audit of 2026-09-30: the CSV's "Covered market" column was blank for a
-// metro area the row itself named, read without a brief or placed there by
-// the deal's county).
+// audit of 2026-09-30: the CSV's market column was blank for a metro area
+// the row itself named, read without a brief or placed there by the deal's
+// county; the column is "Market read" since it holds more than the covered
+// markets).
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { rowMarketLabel } from "./placed-by";
@@ -16,7 +17,7 @@ describe("rowMarketLabel — the market a pipeline row names", () => {
     expect(rowMarketLabel({ coveredMarket: null, readMarket: null, readCounty: null })).toBeNull();
   });
 
-  it("is what the pipeline's CSV writes in its Covered market column, as the row prints it", () => {
+  it("is what the pipeline's CSV writes in its Market read column, as the row prints it", () => {
     // The CSV is built in the list's click handler, which no render reaches,
     // so its cell is held at its source.
     const src = readFileSync("app/(app)/deals/pipeline.tsx", "utf8");
