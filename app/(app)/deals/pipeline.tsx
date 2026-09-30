@@ -2138,12 +2138,14 @@ const DealTile = memo(function DealTile({
           )}
         </span>
         {tags.length > 0 && (
-          <span className="absolute right-3 top-3 flex max-w-[60%] flex-col items-end gap-1">
+          // Each tag truncates inside the column's 58%, never past it: a
+          // flex item sized to its content ran leftward over the call.
+          <span className="absolute right-3 top-3 flex max-w-[58%] flex-col items-end gap-1">
             {tags.map((t) => (
               <span
                 key={t.text}
                 title={t.title}
-                className={`truncate rounded-full bg-white/95 px-2 py-0.5 text-[11px] font-semibold shadow-sm ${t.cls}`}
+                className={`max-w-full truncate rounded-full bg-white/95 px-2 py-0.5 text-[11px] font-semibold shadow-sm ${t.cls}`}
               >
                 {t.text}
               </span>
@@ -2172,7 +2174,9 @@ const DealTile = memo(function DealTile({
         {/* Pushes the figures to the card's foot, so a row of cards lines
             its figures up whatever the names' lengths. */}
         <span aria-hidden className="min-h-3 flex-1" />
-        <dl className="grid grid-cols-3 gap-3 border-t border-line pt-3">
+        {/* The price is the longest figure ("$9–9.5M", "$124.5M"), so its
+            column is the widest. */}
+        <dl className="grid grid-cols-[minmax(0,4fr)_minmax(0,3fr)_minmax(0,3fr)] gap-3 border-t border-line pt-3">
           <TileStat label="Price" title={d.slots.price ?? undefined} sub={d.slots.basis}>
             {d.slots.price ? compactPrice(d.slots.price) : <span className="text-line">—</span>}
           </TileStat>
