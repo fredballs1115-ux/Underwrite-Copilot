@@ -379,6 +379,7 @@ describe("DealView — the sample deal renders every section without a runtime e
       staleResults: ["market", "verdict"],
     });
     const html = render(running("overview"));
+    dumpView("deal-rescreen-overview", html);
     expect(a11yIssues(html)).toEqual([]);
     const text = textOf(html);
     expect(gluedWords(text)).toEqual([]);

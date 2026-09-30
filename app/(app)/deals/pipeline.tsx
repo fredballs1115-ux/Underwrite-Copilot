@@ -1039,7 +1039,7 @@ export function Pipeline({
               <SortHead label="Price" k="price" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="w-20" right />
               <SortHead label="Cap" k="cap" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="w-12" right />
               <SortHead label="Fit" k="fit" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="hidden w-16 lg:flex" right />
-              <SortHead label="Status" k="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="w-22" right />
+              <SortHead label="Status" k="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="w-24" right />
               <SortHead label="Added" k="added" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} cls="hidden w-24 xl:flex" right />
               {!compareMode && (
                 <span className="hidden w-36 shrink-0 text-right text-[10px] font-medium uppercase tracking-wide text-muted lg:block">
@@ -1747,7 +1747,7 @@ const DealRow = memo(function DealRow({
       </span>
     ) : d.jobStatus === "running" ? (
       <span
-        className="flex items-center gap-1.5 text-[11px] text-muted"
+        className="flex items-center gap-1.5 whitespace-nowrap text-[11px] text-muted"
         title={v ? `Re-screening — the previous call was ${v.label}` : undefined}
       >
         <span className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
@@ -1872,7 +1872,7 @@ const DealRow = memo(function DealRow({
           <span className="font-normal text-line">—</span>
         )}
       </span>
-      <span className="hidden w-22 shrink-0 justify-end sm:flex">{status}</span>
+      <span className="hidden w-24 shrink-0 justify-end sm:flex">{status}</span>
       <span className="hidden w-24 shrink-0 whitespace-nowrap text-right font-mono text-xs tabular-nums text-muted xl:block">
         {fmtDate(d.createdAt)}
       </span>

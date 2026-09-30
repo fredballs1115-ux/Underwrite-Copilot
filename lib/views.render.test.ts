@@ -526,6 +526,48 @@ describe("Pipeline — every card shape renders and reads clean", () => {
   });
 });
 
+describe("Pipeline — a deal screened again shows the run, never the call it is replacing", () => {
+  // #479: a re-screen rewrites the terms first and the verdict last, so the
+  // stored call is the previous screen's until the run reaches it.
+  const rescreen = card({
+    id: "r",
+    name: "Harbor View Apartments",
+    verdict: "pass",
+    stage: "underwriting",
+    jobStatus: "running",
+    slots: { cap: "5.9%", price: "$41,250,000", yoc: null },
+    market: "Baltimore, MD",
+    coveredMarket: "Baltimore",
+  });
+  const props = {
+    errorMessage: null,
+    notice: null,
+    onboarding: { hasBuyBox: true, sampleId: null, hasRealDeal: true },
+    billing: BILLING,
+  };
+
+  it("says Re-screening on the card and the row, with the previous call in the title", () => {
+    for (const initialView of ["cards", "list"] as const) {
+      const html = render(React.createElement(Pipeline, { ...props, deals: withThumbs([rescreen]), initialView }));
+      dumpView(`pipeline-rescreen-${initialView}`, html);
+      expect(a11yIssues(html), initialView).toEqual([]);
+      const text = visibleText(html);
+      expect(gluedWords(text)).toEqual([]);
+      expect(text, initialView).toContain("Re-screening…");
+      expect(html, initialView).toContain('title="Re-screening — the previous call was Go"');
+      // The old call is not drawn as the deal's call.
+      expect(text, initialView).not.toMatch(/(^|\n)Go(\n|$)/);
+    }
+    // A first screen still says Screening, and a finished one its call.
+    const first = visibleText(render(React.createElement(Pipeline, { ...props, deals: withThumbs([{ ...rescreen, verdict: null }]) })));
+    expect(first).toContain("Screening…");
+    expect(first).not.toContain("Re-screening");
+    const done = visibleText(render(React.createElement(Pipeline, { ...props, deals: withThumbs([{ ...rescreen, jobStatus: null }]) })));
+    expect(done).not.toContain("screening…");
+    expect(done).toMatch(/(^|\n)Go(\n|$)/);
+  });
+});
+
 describe("ModelView — the sample model renders every panel", () => {
   it("renders the returns, stress, sensitivity, assumptions, capex and cash-flow panels", () => {
     const html = render(
@@ -1477,6 +1519,7 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
         verdict: { ...verdict, generatedAt: "2026-09-12T14:03:00.000Z" },
       }),
     );
+    dumpView("share-rescreening", rescreening);
     expect(a11yIssues(rescreening), "a11y share-rescreening").toEqual([]);
     const rs = visibleText(rescreening);
     expect(gluedWords(rs)).toEqual([]);
