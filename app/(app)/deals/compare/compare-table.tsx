@@ -17,6 +17,10 @@ export const pct = (n: number | null | undefined) =>
 export const mult = (n: number | null | undefined) =>
   n == null || !isFinite(n) ? null : n.toFixed(2) + "x";
 
+/** A cell that says nothing: no figure, or the dash that stands for none.
+ *  A reason ("n/a — plan", "judged on yield on cost") is not blank. */
+const blankCell = (v: string | null | undefined) => v == null || v.trim() === "" || v.trim() === "—";
+
 export type Col = {
   id: string;
   name: string;
@@ -349,11 +353,19 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     { label: "Year-1 NOI", get: (c) => c.noi, mono: true },
   ];
 
+  // A row blank for every deal compared says nothing a meeting can read:
+  // most deal-type rows (a hotel's, a park's, an auction's) hold a figure
+  // for one kind of deal and a dash for every other, so a side-by-side of
+  // apartments ran a column of dashes a dozen rows long. Such a row is left
+  // out, in the table and the phone cards alike; a row with a figure for
+  // any one deal stays, its dashes with it.
+  const rows = metricRows.filter((mr) => cols.some((c) => !blankCell(mr.get(c))));
+
   // Each row's spread, once, for both layouts: every figure against the
   // row's largest (the widest either way on a signed row), rejected deals
   // included (the proportions must be honest) but drawn muted — the "best"
   // pill still never lands on one. One column is no spread, so no bars.
-  const rowStats = metricRows.map((mr) => {
+  const rowStats = rows.map((mr) => {
     const nums = cols.map((c) => mr.num?.(c) ?? null);
     const rowMax = Math.max(0, ...nums.map((n) => (n == null ? 0 : mr.signed ? Math.abs(n) : n)));
     const drawBars = cols.length > 1 && rowMax > 0;
@@ -364,9 +376,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     const n = nums[col];
     if (!drawBars || n == null) return null;
     const share = n / rowMax;
-    return metricRows[row].signed ? Math.max(-1, Math.min(1, share)) : Math.min(1, Math.max(0, share));
+    return rows[row].signed ? Math.max(-1, Math.min(1, share)) : Math.min(1, Math.max(0, share));
   };
-  const barFor = (mr: (typeof metricRows)[number], c: Col, ri: number, ci: number, isBest: boolean) => {
+  const barFor = (mr: (typeof rows)[number], c: Col, ri: number, ci: number, isBest: boolean) => {
     const share = shareOf(ri, ci);
     if (share == null) return null;
     const rejected = c.verdict === "pass_on";
@@ -408,7 +420,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                 </p>
               )}
               <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5">
-                {metricRows.map((mr, ri) => {
+                {rows.map((mr, ri) => {
                   const val = mr.get(c);
                   const isBest = (mr.best?.(c) ?? false) && cols.length > 1;
                   return (
@@ -518,7 +530,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                 ))}
               </tr>
             )}
-            {metricRows.map((mr, ri) => (
+            {rows.map((mr, ri) => (
               <tr key={mr.label} className="border-b border-line last:border-0">
                 <td className="sticky left-0 z-10 whitespace-nowrap bg-surface px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted">
                   {mr.label}

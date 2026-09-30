@@ -774,6 +774,37 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     expect(a11yIssues(html)).toEqual([]);
   });
 
+  it("leaves out a row blank for every deal compared, in the table and the phone cards, and keeps one with a figure for any deal", () => {
+    // The row labels each layout draws: the table's sticky first cells, and
+    // the phone cards' terms (a card each, so a row's label once a card).
+    const tableRows = (html: string) => [...html.matchAll(/<td class="sticky left-0[^"]*">([^<]+)<\/td>/g)].map((m) => m[1]);
+    const cardRows = (html: string) => [...html.matchAll(/<dt class="text-\[10px\][^"]*">([^<]+)<\/dt>/g)].map((m) => m[1]);
+    const DEAL_TYPE_ROWS = ["Flood zone", "Affordability", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Seller financing", "Hotel", "Sale", "Reports", "Broker", "Pre-leasing", "Manufactured housing", "Self-storage"];
+    // Four deals none of which states a hotel, a sale, a restriction or any
+    // of the other deal-type facts: no column of dashes for any of them.
+    const html = renderToStaticMarkup(React.createElement(CompareTable, { cols: COLS }));
+    const shown = tableRows(html);
+    for (const label of DEAL_TYPE_ROWS) {
+      expect(shown, label).not.toContain(label);
+      expect(cardRows(html), label).not.toContain(label);
+    }
+    // Every row a figure fills stays — the development's blank yield on cost
+    // and its missing returns included, since another deal has them.
+    for (const label of ["Market", "Covered market", "Asset class", "Deal type", "Levered IRR", "Equity multiple", "Cash-on-cash (Yr 1)", "Going-in cap", "Yield on cost (stabilized)", "Leverage vs 30-yr", "Cap over 10-yr Treasury", "Purchase price", "Year-1 NOI"]) {
+      expect(shown, label).toContain(label);
+    }
+    expect(cardRows(html).filter((l) => l === "Market")).toHaveLength(COLS.length);
+    // One hotel among them brings its row back, a dash beside each other deal.
+    const withHotel = renderToStaticMarkup(
+      React.createElement(CompareTable, { cols: [COLS[0], { ...COLS[1], hotel: "Mgmt encumbered, PIP $35k/key" }] }),
+    );
+    expect(tableRows(withHotel)).toContain("Hotel");
+    expect(cardRows(withHotel).filter((l) => l === "Hotel")).toHaveLength(2);
+    expect(visibleText(withHotel)).toContain("Mgmt encumbered, PIP $35k/key");
+    expect(tableRows(withHotel)).not.toContain("Sale");
+    expect(a11yIssues(withHotel)).toEqual([]);
+  });
+
   it("reads a note's and a share's price for what it buys (#423): the note's yield, the share's cap on the whole, returns withheld", () => {
     const cols: Col[] = [
       COLS[0],
