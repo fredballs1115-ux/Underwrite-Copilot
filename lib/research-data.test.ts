@@ -10,6 +10,7 @@ import {
   mergeBenchmarks,
   mergeRules,
   metroFmr,
+  ruleCounts,
   seedBenchmarks,
   seedRules,
   twoToFourMedian,
@@ -346,5 +347,17 @@ describe("mergeRules — a rule's words are the file's; the database adds only a
     expect(merged.find((r) => r.id === "db-only-rule")?.effect).toBe("A rule added in the database.");
     expect(merged.length).toBe(seed.length + 1);
     expect(mergeRules(null)).toEqual(seed);
+  });
+});
+
+describe("ruleCounts — the homepage's claim about the rules on file", () => {
+  it("counts a rule filed without a source, and never calls it source-linked", () => {
+    const { all, sourced } = ruleCounts();
+    expect(all).toBe(seedRules().length);
+    expect(sourced).toBe(seedRules().filter((r) => !!r.source && r.source.trim() !== "").length);
+    // A rule the file carries with no source (New Jersey's municipal rent
+    // control, as of this writing) keeps the two counts apart.
+    const unsourced = seedRules().filter((r) => !r.source || r.source.trim() === "").length;
+    expect(all - sourced).toBe(unsourced);
   });
 });

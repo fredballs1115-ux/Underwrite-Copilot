@@ -14,6 +14,7 @@ import {
   fmrTwoBed,
   fyEnd,
   fyStart,
+  fmrWhen,
   newestFmrOnly,
   readFmrMetric,
 } from "./fmr";
@@ -122,8 +123,8 @@ describe("fmrBlock / fmrOf — the one reader", () => {
     expect(fmr.note).toBeNull();
   });
 
-  it("hands the two-bedroom figure over with its year", () => {
-    expect(fmrTwoBed(fmrBlock(BLOCK))).toEqual({ rent: 1860, fy: 2027 });
+  it("hands the two-bedroom figure over with its year and the day it takes effect", () => {
+    expect(fmrTwoBed(fmrBlock(BLOCK))).toEqual({ rent: 1860, fy: 2027, effective: "2026-10-01" });
     expect(fmrTwoBed(null)).toBeNull();
   });
 });
@@ -181,7 +182,7 @@ describe("the benchmarks table's FMR rows", () => {
 describe("newestFmrOnly — an older fiscal year is never shown as current", () => {
   const row = (metro: string, metric: string, low: number) => ({ sector: "multifamily", metro, metric, low });
 
-  it("drops every fair market rent of a year older than the newest present, whatever its label", () => {
+  it("drops a metro's older year where it has a newer one, an older pull's label read as today's", () => {
     const rows = [
       row(DC_AREA_METRO, "hud_fmr_fy2027_2br", 2438),
       row(DC_AREA_METRO, "hud_fmr_fy2026_2br", 2246),
@@ -192,7 +193,7 @@ describe("newestFmrOnly — an older fiscal year is never shown as current", () 
       row("Philadelphia PA", "hud_fmr_fy2027_2br", 1860),
       row("Washington DC", "multifamily_vacancy_pct", 5),
     ];
-    const kept = newestFmrOnly(rows);
+    const kept = newestFmrOnly(rows, "2026-09-30");
     expect(kept.map((r) => `${r.metro}|${r.metric}`)).toEqual([
       `${DC_AREA_METRO}|hud_fmr_fy2027_2br`,
       "Philadelphia PA|hud_fmr_fy2027_2br",
@@ -200,9 +201,29 @@ describe("newestFmrOnly — an older fiscal year is never shown as current", () 
     ]);
   });
 
+  it("a metro the newest pull missed keeps its year while it is in force, and loses it once it ends", () => {
+    // FY2028 is on file for Boston; Richmond's HUD area was not matched and
+    // it holds FY2027 alone (the pre-ship audit of 2026-09-30).
+    const rows = [row("Boston", "hud_fmr_fy2028_2br", 3100), row("Richmond VA", "hud_fmr_fy2027_2br", 1520)];
+    expect(newestFmrOnly(rows, "2027-09-15").map((r) => r.metro)).toEqual(["Boston", "Richmond VA"]);
+    expect(newestFmrOnly(rows, "2027-09-30").map((r) => r.metro)).toEqual(["Boston", "Richmond VA"]);
+    expect(newestFmrOnly(rows, "2027-10-01").map((r) => r.metro)).toEqual(["Boston"]);
+    // With no newer year anywhere, an ended year is the latest there is:
+    // kept, and every surface says it ended (fmrWhen).
+    expect(newestFmrOnly([row("Richmond VA", "hud_fmr_fy2027_2br", 1520)], "2027-10-01")).toHaveLength(1);
+  });
+
+  it("says when a year applies, and that it ended once it has", () => {
+    const f = { fy: 2027, effective: "2026-10-01" };
+    expect(fmrWhen(f, "2026-09-30")).toEqual({ ended: false, text: "effective Oct 1, 2026" });
+    expect(fmrWhen(f, "2027-09-30")).toEqual({ ended: false, text: "effective Oct 1, 2026" });
+    expect(fmrWhen(f, "2027-10-01")).toEqual({ ended: true, text: "ended Sep 30, 2027" });
+    expect(fmrWhen({ fy: 2027, effective: null }, "2027-01-01")).toEqual({ ended: false, text: null });
+  });
+
   it("a newer year replaces this one the same way, and a set with one year passes whole", () => {
     const rows = [row("Boston", "hud_fmr_fy2027_2br", 3008), row("Boston", "hud_fmr_fy2028_2br", 3100)];
-    expect(newestFmrOnly(rows).map((r) => r.metric)).toEqual(["hud_fmr_fy2028_2br"]);
+    expect(newestFmrOnly(rows, "2027-09-01").map((r) => r.metric)).toEqual(["hud_fmr_fy2028_2br"]);
     const one = [row("Boston", "hud_fmr_fy2027_2br", 3008), row("Boston", "zori_rent", 3200)];
     expect(newestFmrOnly(one)).toEqual(one);
     expect(newestFmrOnly([])).toEqual([]);

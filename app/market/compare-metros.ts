@@ -1,6 +1,6 @@
 import metrosSeed from "@/data/research/metros.json";
 import { FMR_BEDS, fmrOf } from "@/lib/fmr";
-import { compsFeedLive } from "@/lib/public-comps/core";
+import { compsFeedState } from "@/lib/public-comps/core";
 import { datedLong } from "@/lib/debt-index";
 import type { CompareMetro, CompareSector } from "./market-compare";
 
@@ -69,7 +69,7 @@ export const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) 
     researchAsOf: snapAsOf ? datedLong(snapAsOf) : null,
     // Live only where the provider registry runs the feed, never merely
     // because the research file names one (Washington's is documented, not
-    // wired).
-    compsLive: compsFeedLive(m.comps_provider as string | null),
+    // wired); none where the file names no source at all.
+    compsFeed: compsFeedState(m.comps_provider as string | null),
   };
 });

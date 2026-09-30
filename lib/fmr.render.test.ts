@@ -146,8 +146,15 @@ describe("the deal page's research panel reads a metro's fair market rents as on
 
   it("one line for the Washington area, the newest year only, its day from the row's note", () => {
     expect(fmrItems).toHaveLength(1);
-    const line = fmrLine(fmrItems[0]);
+    const line = fmrLine(fmrItems[0], "2026-10-01");
     expect(line.heading).toBe("FY2027 fair market rent, effective Oct 1, 2026");
+    expect(line.ended).toBe(false);
+    // Past the year's last day it says the year ended (the pre-ship audit of
+    // 2026-09-30: the panel used to call a year in force "stale" after 180
+    // days, and never said it had ended).
+    const after = fmrLine(fmrItems[0], "2027-10-01");
+    expect(after.heading).toBe("FY2027 fair market rent, ended Sep 30, 2027");
+    expect(after.ended).toBe(true);
     expect(line.figures).toBe("studio $2,111 · 1BR $2,204 · 2BR $2,438 · 3BR $3,107 · 4BR $3,658");
     expect(line.head).toMatchObject({ metric: "hud_fmr_fy2027_2br", status: "verified", as_of: "2026-09-30" });
     expect(gluedWords(`${line.heading}: ${line.figures}`)).toEqual([]);
@@ -162,6 +169,6 @@ describe("the deal page's research panel reads a metro's fair market rents as on
 
   it("a line with no effective day in its note says the year alone", () => {
     const bare = { ...fmrItems[0], rows: fmrItems[0].rows.map((r) => ({ ...r, b: { ...r.b, note: null } })) };
-    expect(fmrLine(bare).heading).toBe(`${fmrLabel(bare.fy)} fair market rent`);
+    expect(fmrLine(bare, "2026-10-01").heading).toBe(`${fmrLabel(bare.fy)} fair market rent`);
   });
 });

@@ -11,11 +11,15 @@
  * takes effect and HUD's name for the area are data in the block itself,
  * and a page prints `FY${fy}` from what it reads here.
  *
- * Two rules. **A blank is null**: a bedroom the file on hand does not state
- * is null, never zero. **Only the newest fiscal year present is current**
- * (`newestFmrOnly`): HUD publishes every area's figures at once, so a row of
- * an older year — a database copy still keyed to it, merged in beside the
- * checked-in file's — is superseded wherever a newer year is on file.
+ * Three rules. **A blank is null**: a bedroom the file on hand does not
+ * state is null, never zero. **A metro's newest fiscal year is its current
+ * one** (`newestFmrOnly`): a row of an older year — a database copy still
+ * keyed to it, merged in beside the checked-in file's — is superseded where
+ * the same metro has a newer one, and anywhere once its own year has ended
+ * and HUD's next is on file; a metro the newest pull missed keeps its year
+ * while that year is in force. **A year ends**: every surface that prints
+ * one says so past its last day (`fmrWhen`), rather than printing last
+ * year's rents as current.
  *
  * Pure, and imports nothing at run time, because the two scripts that write
  * FMR rows to the `benchmarks` table (scripts/seed-research.mjs and
@@ -129,9 +133,40 @@ export function fmrOf(entry: unknown): Fmr | null {
 
 /** The two-bedroom figure with the year it is for — what a surface drawing
  *  HUD's rent beside another measure needs; null without one. */
-export function fmrTwoBed(fmr: Fmr | null): { rent: number; fy: number } | null {
+export function fmrTwoBed(fmr: Fmr | null): { rent: number; fy: number; effective: string } | null {
   const rent = fmr?.rents["2br"] ?? null;
-  return fmr && rent !== null ? { rent, fy: fmr.fy } : null;
+  return fmr && rent !== null ? { rent, fy: fmr.fy, effective: fmr.effective } : null;
+}
+
+/** Today as an ISO day, UTC — read by a page outside its render and handed
+ *  to what it draws, since it reads the clock. */
+export function fmrToday(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** An ISO day as a page says it ("Sep 30, 2027"), read in UTC. */
+function longDay(iso: string): string {
+  const t = Date.parse(`${iso}T00:00:00Z`);
+  return Number.isFinite(t)
+    ? new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
+    : iso;
+}
+
+/**
+ * When a year's figures apply, said as it stands on `today`: "effective Oct
+ * 1, 2026" before and through the year, "ended Sep 30, 2027" once its last
+ * day has passed. Every surface that prints a fair market rent says it this
+ * way — the research panel, the compare card, the asking-rent line, the
+ * homepage's band, the demo and the Mid-Atlantic line — where only the
+ * market brief's row once knew that a year ends (the pre-ship audit of
+ * 2026-09-30). `effective` may be null for a row whose note states no day.
+ */
+export function fmrWhen(
+  fmr: { fy: number; effective: string | null },
+  today: string,
+): { ended: boolean; text: string | null } {
+  if (today > fyEnd(fmr.fy)) return { ended: true, text: `ended ${longDay(fyEnd(fmr.fy))}` };
+  return { ended: false, text: fmr.effective ? `effective ${longDay(fmr.effective)}` : null };
 }
 
 /** Where a year's figures stand on an ISO day: not yet in effect, in force,
@@ -211,22 +246,43 @@ export function fmrBenchmarkRows(
   return out;
 }
 
+/** A label an older pull filed a metro's rows under, and the one they are
+ *  filed under now: the pull before #476 labelled the Washington entry's
+ *  rows by its research name. Both are one HUD area. */
+const RENAMED_LABEL: Readonly<Record<string, string>> = { "Washington DC": DC_AREA_METRO };
+
 /**
- * The rows with every fair market rent of an older fiscal year than the
- * newest present taken out; every other row passes as it came. HUD
- * publishes all its areas' figures at once, so a newer year on file
- * anywhere supersedes an older one everywhere — a database row still keyed
- * to last year, merged in beside this year's file, is never shown as
- * current, whatever label it carries.
+ * The rows with every fair market rent a newer one supersedes taken out;
+ * every other row passes as it came. A row is superseded where its own
+ * metro (an older pull's label read as today's) has a newer fiscal year,
+ * and anywhere once its own year has ended and a newer year is on file.
+ * HUD publishes every area at once, so a newer year anywhere means the
+ * older one is done — but only at its end: a metro the newest pull missed
+ * (its HUD area not matched, say) keeps the year still in force rather than
+ * showing no rent at all (the pre-ship audit of 2026-09-30: the rule used
+ * to be global and immediate).
  */
-export function newestFmrOnly<T extends { metric: string }>(rows: readonly T[]): T[] {
+export function newestFmrOnly<T extends { metric: string; metro?: string | null }>(
+  rows: readonly T[],
+  today: string = fmrToday(),
+): T[] {
+  const groupOf = (r: T) => {
+    const label = r.metro ?? "";
+    return RENAMED_LABEL[label] ?? label;
+  };
   let newest = -Infinity;
+  const newestFor = new Map<string, number>();
   for (const r of rows) {
     const m = readFmrMetric(r.metric);
-    if (m && m.fy > newest) newest = m.fy;
+    if (!m) continue;
+    if (m.fy > newest) newest = m.fy;
+    const g = groupOf(r);
+    if (m.fy > (newestFor.get(g) ?? -Infinity)) newestFor.set(g, m.fy);
   }
   return rows.filter((r) => {
     const m = readFmrMetric(r.metric);
-    return !m || m.fy === newest;
+    if (!m) return true;
+    if (m.fy < (newestFor.get(groupOf(r)) ?? m.fy)) return false;
+    return !(m.fy < newest && today > fyEnd(m.fy));
   });
 }

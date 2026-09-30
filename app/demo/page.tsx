@@ -10,7 +10,7 @@ import { benchmark30 } from "@/lib/debt-index";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { metroFmr, seedBenchmarks, twoToFourMedian } from "@/lib/research-data";
-import { fmrLabel } from "@/lib/fmr";
+import { fmrLabel, fmrToday, fmrWhen } from "@/lib/fmr";
 import { monthOf } from "@/lib/zori";
 import { sectorLeaderboard } from "@/lib/sector-leaderboard";
 import { sampleLegal } from "@/lib/sample-legal";
@@ -251,6 +251,8 @@ export default async function DemoPage() {
   // block names (lib/fmr), never a figure or a year typed on the page.
   const phillyFmr = metroFmr("philadelphia");
   const phillyFmr2br = phillyFmr?.rents["2br"] ?? null;
+  // Past the fiscal year's last day the figure says its year ended.
+  const phillyFmrWhen = phillyFmr ? fmrWhen(phillyFmr, fmrToday()) : null;
   const band = (metric: string): string | null => {
     const r = phillyRows.find((b) => b.metric === metric);
     if (!r || typeof r.low !== "number") return null;
@@ -512,7 +514,7 @@ export default async function DemoPage() {
               <dl className="mt-2 grid grid-cols-2 gap-3">
                 {phillyFmr && phillyFmr2br !== null && (
                   <div>
-                    <dt className="text-[11px] text-muted">{`${fmrLabel(phillyFmr.fy)} 2BR fair market rent`}</dt>
+                    <dt className="text-[11px] text-muted">{`${fmrLabel(phillyFmr.fy)} 2BR fair market rent${phillyFmrWhen?.ended ? `, ${phillyFmrWhen.text}` : ""}`}</dt>
                     <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums">
                       {`$${phillyFmr2br.toLocaleString("en-US")}/mo`}
                     </dd>

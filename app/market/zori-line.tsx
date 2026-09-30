@@ -1,5 +1,5 @@
 import { ZORI_CREDIT, ZORI_SOURCE_URL, monthOf, type ZoriRead } from "@/lib/zori";
-import { fmrLabel } from "@/lib/fmr";
+import { fmrLabel, fmrWhen } from "@/lib/fmr";
 
 /**
  * What landlords are asking this month, beside HUD's fair market rent — the
@@ -31,9 +31,21 @@ import { fmrLabel } from "@/lib/fmr";
  * (lib/fmr `fmrTwoBed`), and the bar and the sentence name that year: a
  * figure for one year is not the next year's.
  */
-export function ZoriLine({ z, fmr2br }: { z: ZoriRead | null; fmr2br: { rent: number; fy: number } | null }) {
+export function ZoriLine({
+  z,
+  fmr2br,
+  today,
+}: {
+  z: ZoriRead | null;
+  fmr2br: { rent: number; fy: number; effective?: string | null } | null;
+  /** today's ISO day, read by the page: past the fair market rent's fiscal
+   *  year the line says the year ended (lib/fmr `fmrWhen`) */
+  today?: string;
+}) {
   if (!z) return null;
   const hud = fmr2br?.rent ?? null;
+  const ended = fmr2br && today ? fmrWhen({ fy: fmr2br.fy, effective: fmr2br.effective ?? null }, today) : null;
+  const endedClause = ended?.ended ? `, a year that ${ended.text},` : "";
   const top = Math.max(z.rent, z.mfrRent ?? 0, hud ?? 0);
   const width = (v: number) => `${Math.max(6, Math.round((v / top) * 100))}%`;
   const gapPct = hud ? Math.round(((z.rent - hud) / hud) * 1000) / 10 : null;
@@ -44,7 +56,7 @@ export function ZoriLine({ z, fmr2br }: { z: ZoriRead | null; fmr2br: { rent: nu
   const sentence =
     (gapPct !== null && fmr2br
       ? "Two different measures on one scale, and neither is the other: the asking rent is this month's listings of every type and size of home, before concessions; " +
-        `HUD's ${fmrLabel(fmr2br.fy)} fair market rent is a yearly figure for a two-bedroom, utilities included. ` +
+        `HUD's ${fmrLabel(fmr2br.fy)} fair market rent${endedClause} is a yearly figure for a two-bedroom, utilities included. ` +
         `The asking rent reads ${Math.abs(gapPct).toFixed(1)}% ${gapPct >= 0 ? "above" : "below"} it, a gap between the two measures and not a premium over what HUD pays.`
       : "The asking rent is this month's listings of every type and size of home, before concessions.") +
     (z.shared ? " The asking rent is the metro area's, shared across the MSA." : "") +
@@ -100,7 +112,12 @@ export function ZoriLine({ z, fmr2br }: { z: ZoriRead | null; fmr2br: { rent: nu
             <Bar label="Apartments" value={z.mfrRent} width={width(z.mfrRent)} tone="bg-brand" />
           )}
           <Bar label="All homes" value={z.rent} width={width(z.rent)} tone={z.mfrRent !== null ? "bg-brand/70" : "bg-brand"} />
-          <Bar label={`HUD ${fmrLabel(fmr2br.fy)} 2BR`} value={fmr2br.rent} width={width(fmr2br.rent)} tone="bg-brand/40" />
+          <Bar
+            label={`HUD ${fmrLabel(fmr2br.fy)} 2BR${ended?.ended ? " (ended)" : ""}`}
+            value={fmr2br.rent}
+            width={width(fmr2br.rent)}
+            tone="bg-brand/40"
+          />
         </div>
       )}
       <p className="mt-1 text-[11px] leading-relaxed text-muted">{sentence}</p>

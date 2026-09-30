@@ -25,7 +25,7 @@ import {
 import { computeModel } from "@/lib/model/compute";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { sampleLegal } from "@/lib/sample-legal";
-import { seedRules } from "@/lib/research-data";
+import { ruleCounts } from "@/lib/research-data";
 import { hoursSince } from "@/lib/research";
 import { latestChange } from "@/lib/changelog";
 import { StressBench } from "./landing-stress";
@@ -43,7 +43,11 @@ import { photosOnDisk } from "@/lib/photos-fs";
 // — the homepage can never claim coverage the rules engine doesn't have.
 // (Server component only: these pull the research JSONs, which must not ride
 // into client bundles via marketing-constants.)
-const RULE_COUNT = seedRules().length;
+const RULES = ruleCounts();
+// "29 rules, 28 source-linked" — a rule filed without a source is never
+// counted as linked (the pre-ship audit of 2026-09-30).
+const RULES_PHRASE =
+  RULES.sourced === RULES.all ? `${RULES.all} source-linked` : `${RULES.all}, ${RULES.sourced} of them source-linked`;
 // The sample deal's legal read through the REAL rules engine — feeds the
 // walkthrough widget's Regulation block.
 const LEGAL = sampleLegal();
@@ -294,7 +298,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Which markets does it cover?",
-    a: `${MARKET_COUNT} markets, deliberately: the DMV core (DC, Prince George's, Montgomery County, Northern Virginia), Baltimore, Richmond, Hampton Roads, Philadelphia (incl. Wilmington), Newark/Jersey City — and ${MAJOR_MARKET_COUNT} of the largest US metros: ${MAJOR_MARKETS.map((m) => m.name).join(", ")}. Each carries its rent rules (${RULE_COUNT} source-linked, machine-evaluated at every address), market notes, and data coverage with sources. Outside them the screen still runs: statewide rules are checked, the market check reads the metro area's or the state's published figures, and where no local rule is on file it says "unscreened — not unregulated" rather than guessing. Recorded-sales comps run via county APIs in ${COMPS_JURISDICTIONS}, extended by the bulk property database (${WIRED_MARKETS.join(", ")} wired).`,
+    a: `${MARKET_COUNT} markets, deliberately: the DMV core (DC, Prince George's, Montgomery County, Northern Virginia), Baltimore, Richmond, Hampton Roads, Philadelphia (incl. Wilmington), Newark/Jersey City — and ${MAJOR_MARKET_COUNT} of the largest US metros: ${MAJOR_MARKETS.map((m) => m.name).join(", ")}. Each carries its rent rules (${RULES_PHRASE}, machine-evaluated at every address), market notes, and data coverage with sources. Outside them the screen still runs: statewide rules are checked, the market check reads the metro area's or the state's published figures, and where no local rule is on file it says "unscreened — not unregulated" rather than guessing. Recorded-sales comps run via county APIs in ${COMPS_JURISDICTIONS}, extended by the bulk property database (${WIRED_MARKETS.join(", ")} wired).`,
   },
   {
     q: "Why not just ask ChatGPT?",

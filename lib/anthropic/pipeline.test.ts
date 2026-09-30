@@ -388,7 +388,7 @@ describe("runAnalysis — the happy path", () => {
     }
     expect(job().status).toBe("done");
     const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
-    expect(note).toContain("TODAY'S RATES (FRED, read for this screen): the 5-yr Treasury 3.90% (Sep 22, 2026)");
+    expect(note).toContain("TODAY'S RATES (FRED, read today): the 5-yr Treasury 3.90% (Sep 22, 2026)");
     expect(note).toContain("the 10-yr Treasury 4.20% (Sep 22, 2026)");
     expect(note).toContain("30-day avg SOFR 4.05% (Sep 22, 2026)");
   });

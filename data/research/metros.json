@@ -117,7 +117,7 @@
       ],
       "comps_provider": "md_sdat",
       "gaps": [
-        "FY2026 SAFMRs by PG ZIP",
+        "Small Area FMRs by PG ZIP (ZIP-level rents not on file)",
         "county tax-rate + municipal add-on benchmark rows"
       ],
       "region": "DMV core",
@@ -1155,8 +1155,7 @@
       ],
       "comps_provider": null,
       "gaps": [
-        "KC_PARCEL_LAYER_URL for sale coordinates",
-        "FY2026 FMR (fetch-fmr.mjs closes this once HUD_API_TOKEN is set)"
+        "KC_PARCEL_LAYER_URL for sale coordinates"
       ],
       "ingest_market": "king_county",
       "region": "Major US markets",
@@ -1191,7 +1190,7 @@
           "sources": [
             "https://kidder.com/market-reports/seattle-multifamily-market-report/"
           ],
-          "note": "Kidder Q2 2026: vacancy 6.7%, improving from 7.0% in Q1. Asking rents by type: studio $1,544 / 1BR $1,908 / 2BR $2,285 / 3BR $2,631. The market-rate 2BR asking sits below the FY2026 FMR — see this metro's FMR note for the conflation history. Cap filled Aug 25: Kidder Q2 2026 sales average 5.7% (+10bps YoY from 5.6%) — a transaction average, not a quoted band; average sale $276,610/unit (-14.75% YoY)."
+          "note": "Kidder Q2 2026: vacancy 6.7%, improving from 7.0% in Q1. Asking rents by type: studio $1,544 / 1BR $1,908 / 2BR $2,285 / 3BR $2,631. The market-rate 2BR asking sits below HUD's FY2027 2BR fair market rent ($2,549). Cap filled Aug 25: Kidder Q2 2026 sales average 5.7% (+10bps YoY from 5.6%) — a transaction average, not a quoted band; average sale $276,610/unit (-14.75% YoY)."
         },
         "retail": {
           "vacancy_pct_low": 3.9,
@@ -1402,8 +1401,7 @@
       ],
       "comps_provider": null,
       "gaps": [
-        "DCAD roll ingest wiring",
-        "Fort Worth-Arlington-Grapevine HMFA FMR (separate area, not yet sourced)"
+        "DCAD roll ingest wiring"
       ],
       "region": "Major US markets",
       "sector_snapshot": {

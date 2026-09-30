@@ -203,7 +203,7 @@ export function ratesPromptLine(seeds: DebtSeeds, holdMonths: number): string | 
     parts.push(`${indexName(seeds.floating)} ${said(seeds.floating)}, a floating, bridge or construction loan's index`);
   }
   if (parts.length === 0) return null;
-  return `TODAY'S RATES (FRED, read for this screen): ${parts.join("; ")}. A loan's rate is its index plus the lender's spread. Judge the financing — and whether the going-in cap sits below the cost of the debt — against these figures, and never state a rate as current that is not one of them or built from one of them.`;
+  return `TODAY'S RATES (FRED, read today): ${parts.join("; ")}. A loan's rate is its index plus the lender's spread. Judge the financing — and whether the going-in cap sits below the cost of the debt — against these figures, and never state a rate as current that is not one of them or built from one of them.`;
 }
 
 /** Index plus spread, as a percent to two places — the figure a term sheet prints. */

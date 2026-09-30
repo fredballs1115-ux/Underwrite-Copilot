@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { FMR_BEDS, fmrLabel, type FmrBed } from "@/lib/fmr";
+import { FMR_BEDS, fmrLabel, fmrWhen, type FmrBed } from "@/lib/fmr";
 
 // Compact, serializable per-metro facts the server derives from the research
 // layer (metros.json) — this component only arranges them. Bars share ONE
@@ -29,7 +29,8 @@ export type CompareMetro = {
     Record<"office" | "industrial" | "multifamily" | "retail", CompareSector>
   >;
   ruleCount: number;
-  compsLive: boolean;
+  /** the recorded-sales feed: running, a source named but not wired, or none */
+  compsFeed: "live" | "documented" | "none";
   /** the research snapshot's date, said ("Aug 25, 2026"); null where the
    *  file states none */
   researchAsOf?: string | null;
@@ -63,19 +64,22 @@ function researchDates(a: CompareMetro, b: CompareMetro): string {
   return d ? `research as of ${d}` : "research undated";
 }
 
-/** "FY… fair market rent" with the year the block states; no year typed. */
-function fmrHeading(m: CompareMetro): string {
-  return typeof m.fmr.fy === "number" ? `${fmrLabel(m.fmr.fy)} fair market rent` : "Fair market rent";
+/** "FY… fair market rent" with the year the block states; no year typed —
+ *  and, past the year's last day, that it ended (lib/fmr `fmrWhen`). */
+function fmrHeading(m: CompareMetro, today?: string): string {
+  if (typeof m.fmr.fy !== "number") return "Fair market rent";
+  const when = today ? fmrWhen({ fy: m.fmr.fy, effective: null }, today) : null;
+  return `${fmrLabel(m.fmr.fy)} fair market rent${when?.ended ? `, ${when.text}` : ""}`;
 }
 
-function Ladder({ m, max }: { m: CompareMetro; max: number }) {
+function Ladder({ m, max, today }: { m: CompareMetro; max: number; today?: string }) {
   const rows = FMR_BEDS.map((b) => ({ label: b.toUpperCase(), value: m.fmr[b] })).filter(
     (r): r is { label: string; value: number } => typeof r.value === "number",
   );
   if (rows.length === 0) {
     return (
       <p className="mt-2 text-[11px] leading-relaxed text-muted">
-        {`${fmrHeading(m)} not yet confirmed for this metro — an honest gap, never an estimate.`}
+        {`${fmrHeading(m, today)} not yet confirmed for this metro — an honest gap, never an estimate.`}
       </p>
     );
   }
@@ -132,7 +136,7 @@ function Picker({
   );
 }
 
-export function MarketCompare({ metros }: { metros: CompareMetro[] }) {
+export function MarketCompare({ metros, today }: { metros: CompareMetro[]; today?: string }) {
   const [aId, setAId] = useState(metros.find((m) => m.id === "philadelphia")?.id ?? metros[0]?.id ?? "");
   const [bId, setBId] = useState(metros.find((m) => m.id === "dc")?.id ?? metros[1]?.id ?? "");
   const a = metros.find((m) => m.id === aId);
@@ -171,7 +175,7 @@ export function MarketCompare({ metros }: { metros: CompareMetro[] }) {
           <div key={label} className="rounded-xl border border-line bg-paper p-4">
             <Picker metros={metros} value={m.id} onChange={set} label={label} />
             <p className="mt-2 text-[10px] uppercase tracking-wide text-muted">
-              {fmrHeading(m)}
+              {fmrHeading(m, today)}
               {m.fmr.status && (
                 <span
                   className={`ml-1.5 rounded px-1.5 py-px text-[9px] font-medium normal-case tracking-normal ${
@@ -184,7 +188,7 @@ export function MarketCompare({ metros }: { metros: CompareMetro[] }) {
                 </span>
               )}
             </p>
-            <Ladder m={m} max={max} />
+            <Ladder m={m} max={max} today={today} />
             <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted">
               <span>
                 <span className="font-semibold text-ink">{m.ruleCount}</span>{" "}
@@ -192,8 +196,8 @@ export function MarketCompare({ metros }: { metros: CompareMetro[] }) {
               </span>
               <span>
                 comps feed:{" "}
-                <span className={m.compsLive ? "font-medium text-emerald-600" : ""}>
-                  {m.compsLive ? "live" : "documented, not wired"}
+                <span className={m.compsFeed === "live" ? "font-medium text-emerald-600" : ""}>
+                  {m.compsFeed === "live" ? "live" : m.compsFeed === "documented" ? "documented, not wired" : "none yet"}
                 </span>
               </span>
             </div>

@@ -100,7 +100,7 @@ export function FmrRow({ name, fmr, today }: { name: string; fmr: Fmr | null; to
         </div>
       )}
       <CopyCite
-        text={`${name} — ${fmrLabel(fmr.fy)} 2BR fair market rent $${twoBed.toLocaleString("en-US")}/mo (${fmr.area}, effective ${datedLong(fmr.effective)}; ${fmr.status}${source ? `; source: ${source}` : ""}) · via Underwrite Copilot market brief`}
+        text={`${name} — ${fmrLabel(fmr.fy)} 2BR fair market rent $${twoBed.toLocaleString("en-US")}/mo (${fmr.area}, ${when}; ${fmr.status}${source ? `; source: ${source}` : ""}) · via Underwrite Copilot market brief`}
       />
       {fmr.note && <Fold text={fmr.note} className="mt-1 text-[11px] leading-relaxed text-muted" />}
     </div>

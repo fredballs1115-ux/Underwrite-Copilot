@@ -17,12 +17,20 @@ const store = vi.hoisted(() => ({
 // The cover's read, given no time at all where a test asks for a read the
 // time budget cuts short; the real reader otherwise.
 const decodeBudget = vi.hoisted(() => ({ ms: undefined as number | undefined }));
+// The gallery's read, the same way, apart from the cover's.
+const galleryBudget = vi.hoisted(() => ({ ms: undefined as number | undefined }));
 vi.mock("@/lib/om-photo-decode", async (importOriginal) => {
   const orig = await importOriginal<typeof import("./om-photo-decode")>();
   return {
     ...orig,
     decodeOmCover: (pdf: Uint8Array, opts?: { budgetMs?: number }) =>
       orig.decodeOmCover(pdf, decodeBudget.ms === undefined ? opts : { budgetMs: decodeBudget.ms }),
+    decodeOmPhotos: (...args: Parameters<typeof orig.decodeOmPhotos>) =>
+      orig.decodeOmPhotos(
+        args[0],
+        args[1],
+        galleryBudget.ms === undefined ? args[2] : { ...(args[2] ?? {}), budgetMs: galleryBudget.ms },
+      ),
   };
 });
 
@@ -66,6 +74,7 @@ import {
   previewOf,
   readPictureBytes,
   retryWaiting,
+  galleryRetryWaiting,
   searchedRecently,
 } from "./deal-picture";
 import { PREVIEW_PX, isPreview } from "./photo-preview";
@@ -226,7 +235,7 @@ describe("a read the time budget cut short writes no verdict", () => {
     expect(db.photo?.pictureRetry).toBeUndefined();
   });
 
-  it("neither drops nor replaces a photograph lifted under older rules, and keeps it after the third", async () => {
+  it("neither drops nor replaces a photograph lifted under older rules while reads are cut short, and drops it at the third", async () => {
     store.oms.set("u/d1.pdf", await locked());
     decodeBudget.ms = 0;
     const { client, db } = fakeDb(staleCache());
@@ -235,15 +244,49 @@ describe("a read the time budget cut short writes no verdict", () => {
     expect(db.photo?.pictureRetry?.n).toBe(1);
     // The card shows it as it is while the next read waits.
     expect(pictureMayBeInMemorandum({ omPath: "u/d1.pdf", isSample: false, cache: db.photo })).toBe(false);
-    for (let n = 2; n <= MAX_CUT_READS; n++) {
+    for (let n = 2; n < MAX_CUT_READS; n++) {
       expect(await ask(client, waited(db.photo!))).toEqual(OLD);
     }
-    // No read could judge it, so it stands as the deal's photograph.
-    expect(db.photo?.picture).toEqual(OLD);
+    // The third in a row is the verdict: a photograph lifted under rules
+    // that could take a map for the building, never judged under today's,
+    // goes — rather than stand as the building's under today's stamp for
+    // good (the pre-ship audit of 2026-09-30).
+    expect(await ask(client, waited(db.photo!))).toBeNull();
+    expect(db.photo?.picture).toBeUndefined();
     expect(db.photo?.pictureSearchV).toBe(PICTURE_SEARCH_VERSION);
-    expect(currentPicture(db.photo)).toEqual(OLD);
-    expect(store.removed).toEqual([]);
+    expect(currentPicture(db.photo)).toBeNull();
+    expect(store.removed).toEqual([OLD.hero, OLD.thumb]);
     expect(store.uploads).toEqual([]);
+  });
+
+  it("a cover lifted while the reader added a picture never replaces it: its own new files go instead", async () => {
+    decodeBudget.ms = undefined;
+    store.oms.set("u/d1.pdf", await testMemorandum([{ images: [await testPicture(800, 500, "jpeg")] }]));
+    const UPLOAD: DealPicture = { ...OLD, hero: "photos/d1/up-hero.jpg", thumb: "photos/d1/up-thumb.jpg", source: "upload" };
+    // The search began from a row with no picture; the row holds the upload now.
+    const { client, db } = fakeDb({ picture: UPLOAD, pictureSearchV: PICTURE_SEARCH_VERSION });
+    const got = await ensureDealPicture(client, "d1", { omPath: "u/d1.pdf", isSample: false, cache: null, waitMs: 5_000, gallery: false });
+    expect(got).toEqual(UPLOAD);
+    expect(db.photo?.picture).toEqual(UPLOAD);
+    // The cover's files were put and taken away again; the upload's never touched.
+    expect(store.uploads.length).toBeGreaterThanOrEqual(2);
+    expect([...store.removed].sort()).toEqual([...store.uploads].sort());
+    expect(store.removed).not.toContain(UPLOAD.hero);
+  });
+
+  it("never drops a picture the reader added while the third read ran", async () => {
+    store.oms.set("u/d1.pdf", await locked());
+    decodeBudget.ms = 0;
+    const UPLOAD: DealPicture = { ...OLD, hero: "photos/d1/up-hero.jpg", thumb: "photos/d1/up-thumb.jpg", source: "upload" };
+    const snapshot: DealVisualCache = {
+      ...staleCache(),
+      pictureRetry: { n: MAX_CUT_READS - 1, at: "2026-01-01T00:00:00Z", v: PICTURE_SEARCH_VERSION },
+    };
+    // The row holds the reader's upload; the search began from the old copy.
+    const { client, db } = fakeDb({ ...snapshot, picture: UPLOAD });
+    expect(await ask(client, snapshot)).toEqual(UPLOAD);
+    expect(db.photo?.picture).toEqual(UPLOAD);
+    expect(store.removed).toEqual([]);
   });
 
   it("is forgotten with the memorandum it was read from", async () => {
@@ -477,6 +520,38 @@ describe("the memorandum's other photographs, read behind the cover (#448)", () 
     await vi.waitFor(() => expect(db.photo?.galleryV).toBe(GALLERY_VERSION), { timeout: 15_000 });
     expect(db.photo?.gallery?.map((g) => g.page)).toEqual([2, 4]);
     expect(store.removed).toEqual(before.flatMap((h) => [h, h.replace("-hero", "-thumb")]));
+  });
+
+  it("a gallery read the time cut short is counted and waits its turn, never stamped as the gallery until the third", async () => {
+    store.oms.set("u/d1.pdf", await memorandum());
+    const { client, db } = fakeDb(null);
+    galleryBudget.ms = 0;
+    try {
+      await ensureDealPicture(client, "d1", { omPath: "u/d1.pdf", isSample: false, cache: null, waitMs: 5_000 });
+      await vi.waitFor(() => expect(db.photo?.galleryRetry?.n).toBe(1), { timeout: 15_000 });
+      // Read to no photograph at all in no time: nothing stored as the gallery.
+      expect(db.photo?.galleryV).toBeUndefined();
+      expect(db.photo?.gallery).toBeUndefined();
+      expect(galleryRetryWaiting(db.photo)).toBe(true);
+      // Held back while it waits: a view reads nothing again.
+      const held = { ...db.photo! };
+      await ensureDealPicture(client, "d1", { omPath: "u/d1.pdf", isSample: false, cache: held });
+      expect(db.photo?.galleryRetry?.n).toBe(1);
+      // Past its wait, the second and the third; the third stands.
+      for (let n = 2; n <= MAX_CUT_READS; n++) {
+        const past = { ...db.photo!, galleryRetry: { ...db.photo!.galleryRetry!, at: new Date(Date.now() - RETRY_AFTER_MS[RETRY_AFTER_MS.length - 1] - 1_000).toISOString() } };
+        db.photo = past;
+        await ensureDealPicture(client, "d1", { omPath: "u/d1.pdf", isSample: false, cache: past });
+        if (n < MAX_CUT_READS) {
+          await vi.waitFor(() => expect(db.photo?.galleryRetry?.n).toBe(n), { timeout: 15_000 });
+        } else {
+          await vi.waitFor(() => expect(db.photo?.galleryV).toBe(GALLERY_VERSION), { timeout: 15_000 });
+        }
+      }
+      expect(db.photo?.galleryRetry).toBeUndefined();
+    } finally {
+      galleryBudget.ms = undefined;
+    }
   });
 
   it("goes with the memorandum it came from, whoever's the cover is", async () => {

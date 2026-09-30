@@ -1,7 +1,7 @@
 import Link from "next/link";
 import metrosSeed from "@/data/research/metros.json";
 import { datedLong } from "@/lib/debt-index";
-import { fmrLabel, fmrOf } from "@/lib/fmr";
+import { fmrLabel, fmrOf, fmrToday, fmrWhen } from "@/lib/fmr";
 
 // Server-component module only: it pulls a research seed JSON, which must
 // never ride into a client bundle. Shared by the homepage, /why, and /demo
@@ -89,11 +89,13 @@ export function metroFact(m: unknown, rotate = 0): MetroFact | null {
   }
 
   // The FMR through the one reader, so the text names the year its block
-  // states — never a year typed here.
+  // states — never a year typed here — and never a year that has ended: a
+  // band this short has no room to say so, so it leaves the figure out.
   const fmr = fmrOf(m);
   const twoBed = fmr?.rents["2br"] ?? null;
+  const inForce = !!fmr && !fmrWhen(fmr, fmrToday()).ended;
   const parts = [
-    fmr && twoBed !== null ? `${fmrLabel(fmr.fy)} 2BR FMR $${twoBed.toLocaleString("en-US")}/mo` : null,
+    fmr && twoBed !== null && inForce ? `${fmrLabel(fmr.fy)} 2BR FMR $${twoBed.toLocaleString("en-US")}/mo` : null,
     rulesPart,
   ].filter((x): x is string => x !== null);
   return parts.length ? { text: parts.join(" · "), asOf: null } : null;

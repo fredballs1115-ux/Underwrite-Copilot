@@ -25,6 +25,18 @@ export function seedRules(): RegulatoryRule[] {
   );
 }
 
+/** The rules on file, said as they are: how many, and how many link their
+ *  source — a rule filed without one (New Jersey's municipal rent control,
+ *  a patchwork of local ordinances the file points at rather than cites) is
+ *  counted, never called source-linked. */
+export function ruleCounts(): { all: number; sourced: number } {
+  const rules = seedRules();
+  return {
+    all: rules.length,
+    sourced: rules.filter((r) => typeof r.source === "string" && r.source.trim() !== "").length,
+  };
+}
+
 /** A value's JSON with every object's keys sorted, so a rule's conditions
  *  compare equal whatever order they come back in — Postgres's jsonb stores
  *  keys by length before byte order, never as the file wrote them. */

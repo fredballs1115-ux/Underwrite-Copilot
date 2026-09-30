@@ -582,6 +582,17 @@ export function compsFeedLive(providerId: string | null | undefined): boolean {
   return PROVIDERS.some((p) => p.id === providerId && p.configured);
 }
 
+/** A metro's recorded-sales feed, as the research file and the registry
+ *  say it together: live where the registry runs it, documented where the
+ *  file names a source nobody has wired yet (Washington's extract, Northern
+ *  Virginia's counties in discovery), none where the file names nothing —
+ *  "documented, not wired" said of a metro with no source at all was the
+ *  pre-ship audit's finding of 2026-09-30. */
+export function compsFeedState(providerId: string | null | undefined): "live" | "documented" | "none" {
+  if (compsFeedLive(providerId)) return "live";
+  return providerId ? "documented" : "none";
+}
+
 /** Human-readable coverage, derived from the configs so copy can't drift. */
 export const COVERAGE_LIVE = PROVIDERS.filter((p) => p.configured);
 export const COVERAGE_DISCOVERY = PROVIDERS.filter((p) => !p.configured);

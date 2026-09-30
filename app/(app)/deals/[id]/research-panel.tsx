@@ -29,7 +29,7 @@ import {
   seedRules,
 } from "@/lib/research-data";
 import { withArticle } from "@/lib/article";
-import { FMR_BEDS, fmrEffectiveOf, fmrLabel, readFmrMetric, type FmrBed } from "@/lib/fmr";
+import { FMR_BEDS, fmrEffectiveOf, fmrLabel, fmrToday, fmrWhen, readFmrMetric, type FmrBed } from "@/lib/fmr";
 import { sectorLeaderboard } from "@/lib/sector-leaderboard";
 import { linkOk } from "@/lib/link-audit";
 import { coveredState, dataMetroForAddress, isDataMetro, metroForAddress } from "@/lib/market-match";
@@ -95,16 +95,21 @@ export function benchItems(rows: readonly Benchmark[]): BenchItem[] {
 }
 
 /** One metro's fair market rent line: the year and the day it takes effect
- *  (read back out of the headline row's note), the bedroom row, and the
- *  headline two-bedroom row whose provenance the line shows — the rows of
- *  one year and one metro come from one source. */
-export function fmrLine(item: Extract<BenchItem, { kind: "fmr" }>): { heading: string; figures: string; head: Benchmark } {
+ *  (read back out of the headline row's note) — or the day it ended, once
+ *  it has (lib/fmr `fmrWhen`) — the bedroom row, and the headline
+ *  two-bedroom row whose provenance the line shows — the rows of one year
+ *  and one metro come from one source. */
+export function fmrLine(
+  item: Extract<BenchItem, { kind: "fmr" }>,
+  today: string,
+): { heading: string; figures: string; head: Benchmark; ended: boolean } {
   const head = (item.rows.find((r) => r.bed === "2br") ?? item.rows[0]).b;
-  const effective = fmrEffectiveOf(head.note);
+  const when = fmrWhen({ fy: item.fy, effective: fmrEffectiveOf(head.note) }, today);
   return {
-    heading: `${fmrLabel(item.fy)} fair market rent${effective ? `, effective ${datedLong(effective)}` : ""}`,
+    heading: `${fmrLabel(item.fy)} fair market rent${when.text ? `, ${when.text}` : ""}`,
     figures: item.rows.map((r) => `${bedLabel(r.bed)} ${fmtBenchValue(r.b.metric, r.b.low, r.b.high)}`).join(" · "),
     head,
+    ended: when.ended,
   };
 }
 
@@ -184,16 +189,21 @@ function SourceLink({
   source,
   asOf,
   status,
+  yearEnded,
 }: {
   source: string | null;
   asOf: string;
   status: string;
+  /** a figure that holds for a fiscal year (a fair market rent): its
+   *  freshness is the year's — true once the year has ended — never the
+   *  180 days since it was read, which would call a year in force stale */
+  yearEnded?: boolean;
 }) {
   const meta = STATUS_META[status] ?? STATUS_META.sourced;
   // A figure whose file states no date is undated — flagged in the stale
   // tone, but never given a date it does not have.
   const undated = !(typeof asOf === "string" && asOf.trim());
-  const stale = undated || isStale(asOf);
+  const stale = yearEnded === undefined ? undated || isStale(asOf) : yearEnded;
   // Audit gate: a link the audit script has verified DEAD renders as plain
   // text — the user never gets handed a clickable 404. Unaudited links render
   // normally (never audited ≠ dead).
@@ -203,7 +213,7 @@ function SourceLink({
       <span className={`rounded px-1.5 py-px font-medium ${meta.cls}`}>{meta.label}</span>
       {stale && (
         <span className="rounded bg-amber-500/10 px-1.5 py-px font-medium text-amber-600">
-          {undated ? "undated" : `stale · ${asOf}`}
+          {yearEnded ? "year ended" : undated ? "undated" : `stale · ${asOf}`}
         </span>
       )}
       {!stale && <span>{asOfLabel(asOf)}</span>}
@@ -271,6 +281,8 @@ export async function ResearchPanel({
   /** the deal's asset class — same-sector benchmark rows sort first */
   assetClass?: string | null;
 }) {
+  // Today, for a fair market rent's year (ended or not) — read once here.
+  const today = fmrToday();
   // The checked-in research layer, with the database's rows merged in — a
   // missing table (migration not yet run) degrades silently to the files.
   // A rule's words are always the file's (mergeRules: nothing else writes
@@ -572,7 +584,7 @@ export async function ResearchPanel({
           <ul className="mt-2 space-y-2">
             {benchItems(metroBench).map((item) => {
               if (item.kind === "fmr") {
-                const line = fmrLine(item);
+                const line = fmrLine(item, today);
                 return (
                   <li
                     key={`${item.metro}|fmr`}
@@ -582,7 +594,7 @@ export async function ResearchPanel({
                       {`${line.heading}: `}
                       <span className="font-mono tabular-nums">{line.figures}</span>
                     </span>
-                    <SourceLink source={line.head.source} asOf={line.head.as_of} status={line.head.status} />
+                    <SourceLink source={line.head.source} asOf={line.head.as_of} status={line.head.status} yearEnded={line.ended} />
                   </li>
                 );
               }

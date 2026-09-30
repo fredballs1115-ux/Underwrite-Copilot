@@ -382,9 +382,13 @@ describe("which metros' recorded-sales feeds are live", () => {
 
   it("is what the market compare card says, metro by metro", async () => {
     const { COMPARE_METROS } = await import("@/app/market/compare-metros");
-    const live = Object.fromEntries(COMPARE_METROS.map((m) => [m.id, m.compsLive]));
-    expect(live.dc).toBe(false);
-    expect(live.philadelphia).toBe(true);
-    expect(live.baltimore).toBe(true);
+    const feed = Object.fromEntries(COMPARE_METROS.map((m) => [m.id, m.compsFeed]));
+    expect(feed.dc).toBe("documented");
+    expect(feed.philadelphia).toBe("live");
+    expect(feed.baltimore).toBe("live");
+    // A metro the research file names no source for is "none yet", never
+    // "documented, not wired" (the pre-ship audit of 2026-09-30).
+    expect(feed.nyc).toBe("none");
+    expect(feed.richmond).toBe("none");
   });
 });

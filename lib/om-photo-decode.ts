@@ -455,7 +455,7 @@ export async function decodeOmPhotos(
     budgetMs?: number;
     yieldTo?: () => boolean;
   } = {},
-): Promise<{ opened: boolean; found: number; aborted: boolean }> {
+): Promise<{ opened: boolean; found: number; aborted: boolean; cut: boolean }> {
   const max = opts.max ?? GALLERY_MAX;
   const taken: bigint[] = [...(opts.skip ?? [])];
   let found = 0;
@@ -464,7 +464,7 @@ export async function decodeOmPhotos(
     if (opts.yieldTo?.()) aborted = true;
     return aborted;
   };
-  if (max <= 0) return { opened: false, found, aborted };
+  if (max <= 0) return { opened: false, found, aborted, cut: false };
   const walk = await walkPaintedImages(
     pdf,
     { pages: opts.pages ?? GALLERY_PAGES, budgetMs: opts.budgetMs ?? GALLERY_BUDGET_MS },
@@ -480,5 +480,7 @@ export async function decodeOmPhotos(
     },
     () => !give(),
   );
-  return { opened: walk.opened, found, aborted };
+  // `cut`: the time budget ended the walk before its pages did, so the
+  // photographs found are the ones read so far, not the file's.
+  return { opened: walk.opened, found, aborted, cut: walk.cut && !aborted };
 }

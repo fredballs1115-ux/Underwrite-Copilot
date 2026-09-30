@@ -55,6 +55,11 @@ export interface DealVisualCache {
   /** the rules the gallery was read under; see GALLERY_VERSION. Set, with
    *  no gallery, where the memorandum held no other photograph */
   galleryV?: number;
+  /** gallery reads in a row that the time budget cut short (lib/deal-
+   *  picture, as `pictureRetry` counts the cover's): such a read stores what
+   *  it found without `galleryV`, the next waits its turn, and the third in
+   *  a row is taken as the gallery */
+  galleryRetry?: { n: number; at: string; v: number };
   /** the Flood view's drawn frame (#472, lib/flood-map) — the picture and
    *  the classes each crop shows, for the point it was drawn around */
   floodFrame?: FloodFrameRecord;

@@ -161,7 +161,7 @@ describe("today's rates, as a line a Claude step reads (the audit of 2026-09-30)
   it("names the index the model prices off, the 10-year and SOFR, each dated, from the same seeds the model takes", () => {
     const seeds = debtSeeds(rates, 60);
     const line = ratesPromptLine(seeds, 60)!;
-    expect(line).toMatch(/^TODAY'S RATES \(FRED, read for this screen\): /);
+    expect(line).toMatch(/^TODAY'S RATES \(FRED, read today\): /);
     expect(line).toContain(`the 5-yr Treasury ${seeds.permanent!.pct.toFixed(2)}% (${datedLong(seeds.permanent!.asOf)}), which the site's model prices a fixed-rate permanent loan off for its hold of 5 years`);
     expect(line).toContain(`the 10-yr Treasury ${seeds.tenYear!.pct.toFixed(2)}% (${datedLong(seeds.tenYear!.asOf)})`);
     expect(line).toContain(`30-day avg SOFR ${seeds.floating!.pct.toFixed(2)}% (${datedLong(seeds.floating!.asOf)}), a floating, bridge or construction loan's index`);

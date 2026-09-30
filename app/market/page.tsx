@@ -31,7 +31,7 @@ import { ZoriLine } from "./zori-line";
 import { liveRealtor } from "@/lib/realtor-read";
 import { RealtorLine } from "./realtor-line";
 import { mergeBenchmarks, seedBenchmarks, seedRules } from "@/lib/research-data";
-import { DC_AREA_METRO, FMR_BEDS, fmrEffectiveOf, fmrLabel, fmrOf, fmrTwoBed, readFmrMetric } from "@/lib/fmr";
+import { DC_AREA_METRO, FMR_BEDS, fmrEffectiveOf, fmrLabel, fmrOf, fmrTwoBed, fmrWhen, readFmrMetric } from "@/lib/fmr";
 import { datedLong } from "@/lib/debt-index";
 import { asOfLabel } from "@/lib/research";
 import { linkOk } from "@/lib/link-audit";
@@ -337,7 +337,7 @@ export default async function MarketDataPage({
       <MetroExplorer selected={metroParam} />
       {/* Side-by-side: any two covered markets on one shared dollar scale,
           straight off the research layer. */}
-      <MarketCompare metros={COMPARE_METROS} />
+      <MarketCompare metros={COMPARE_METROS} today={todayIso()} />
       {/* The research layer at a glance — every market × every asset class. */}
       <SectorHeatGrid />
       {/* The same board over the demand side: every metro area × every
@@ -394,6 +394,8 @@ async function MidAtlanticTable() {
     })
     .sort((x, y) => FMR_BEDS.indexOf(x.bed) - FMR_BEDS.indexOf(y.bed));
   const dcEffective = fmrEffectiveOf(dcFmr[0]?.b.note);
+  // The year's day it took effect — or, past its last day, that it ended.
+  const dcWhen = dcFmr.length > 0 ? fmrWhen({ fy: dcFmr[0].fy, effective: dcEffective }, todayIso()) : null;
   const priceRows = metros
     .map((m) => ({ metro: m, price: get(m, "median_sale_price_2_4_unit"), sales: get(m, "monthly_sales_2_4_unit"), listings: get(m, "active_listings_2_4_unit") }))
     .filter((r) => r.price)
@@ -446,7 +448,7 @@ async function MidAtlanticTable() {
       </div>
       {dcFmr.length > 0 && (
         <p className="mt-3 border-t border-line pt-2 text-xs text-muted">
-          {`DC-area ${fmrLabel(dcFmr[0].fy)} HUD fair market rents${dcEffective ? `, effective ${datedLong(dcEffective)}` : ""}: `}
+          {`DC-area ${fmrLabel(dcFmr[0].fy)} HUD fair market rents${dcWhen?.text ? `, ${dcWhen.text}` : ""}: `}
           {dcFmr.map((r) => `${r.bed.toUpperCase()} $${r.low.toLocaleString("en-US")}`).join(" · ")}{" "}
           <span className="text-[11px]">
             {`(${dcFmr[0].b.status})`}
@@ -694,7 +696,7 @@ async function MetroExplorer({ selected }: { selected?: string }) {
 
         <FmrRow name={active.name} fmr={fmr} today={todayIso()} />
 
-        <ZoriLine z={zori} fmr2br={fmrTwoBed(fmr)} />
+        <ZoriLine z={zori} fmr2br={fmrTwoBed(fmr)} today={todayIso()} />
 
         <RealtorLine r={realtor} />
 

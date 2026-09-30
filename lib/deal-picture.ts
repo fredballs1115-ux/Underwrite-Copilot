@@ -372,7 +372,15 @@ async function putDerived(
 
 /**
  * Store a picture as the deal's own — from the memorandum or from the
- * reader — replacing whatever was there, and say so in the cache.
+ * reader — and say so in the cache. The row is read at the write, never at
+ * the search's start: a memorandum's cover goes only onto the picture the
+ * search began from, so a reader's upload (or another search's cover)
+ * stored while this one read the file wins and this cover's files go — the
+ * screen's lift held its copy of the row through a thirty-second wait for a
+ * turn, replaced an upload, and left the upload's files where no deletion
+ * sweep knew of them (the pre-ship audit of 2026-09-30). A reader's upload
+ * goes over whatever is there. The files removed are the picture actually
+ * replaced. Answers the picture the deal holds afterwards.
  */
 export async function storePicture(
   supabase: SupabaseClient,
@@ -380,20 +388,57 @@ export async function storePicture(
   cache: DealVisualCache | null,
   input: PictureInput,
   source: DealPicture["source"],
-): Promise<DealPicture> {
+): Promise<DealPicture | null> {
   const derived = await derivePicture(input);
   const picture = await putDerived(dealId, derived, Date.now().toString(36), source, new Date().toISOString());
-  await writeCache(supabase, dealId, cache, {
-    picture,
-    pictureCheckedAt: picture.at,
-    pictureSearchV: PICTURE_SEARCH_VERSION,
-    pictureRetry: undefined,
-  });
-  // The previous picture's files are orphaned now — best effort, never fatal.
-  if (cache?.picture) {
-    await removeStorageFiles(pathsOf(cache.picture), photoScope(dealId)).catch(() => {});
+  const swap = await swapPicture(
+    supabase,
+    dealId,
+    cache,
+    { picture, pictureCheckedAt: picture.at, pictureSearchV: PICTURE_SEARCH_VERSION, pictureRetry: undefined },
+    source === "om" ? (cache?.picture?.hero ?? null) : undefined,
+  );
+  if (!swap.stored) {
+    await removeStorageFiles(pathsOf(picture), photoScope(dealId)).catch(() => {});
+    return swap.current;
+  }
+  // The picture replaced is orphaned now — best effort, never fatal.
+  if (swap.replaced && swap.replaced.hero !== picture.hero) {
+    await removeStorageFiles(pathsOf(swap.replaced), photoScope(dealId)).catch(() => {});
   }
   return picture;
+}
+
+/**
+ * Merge a patch touching the picture into the cache, read at the write:
+ * where `expectHero` is given (null for "no picture"), only while the
+ * picture stored is still that one. Answers whether it wrote, the picture
+ * it replaced and the one stored after.
+ */
+async function swapPicture(
+  supabase: SupabaseClient,
+  dealId: string,
+  fallback: DealVisualCache | null,
+  patch: Partial<DealVisualCache>,
+  expectHero?: string | null,
+): Promise<{ stored: boolean; replaced: DealPicture | null; current: DealPicture | null }> {
+  let row: DealVisualCache = fallback ?? {};
+  try {
+    const { data } = await supabase.from("deals").select("photo").eq("id", dealId).maybeSingle();
+    row = ((data as { photo?: DealVisualCache | null } | null)?.photo ?? fallback ?? {}) as DealVisualCache;
+  } catch {
+    // Read failed: the caller's copy stands in, as writeCache's does.
+  }
+  const was = row.picture ?? null;
+  if (expectHero !== undefined && (was?.hero ?? null) !== expectHero) {
+    return { stored: false, replaced: null, current: was };
+  }
+  try {
+    await supabase.from("deals").update({ photo: { ...row, ...patch } }).eq("id", dealId);
+  } catch {
+    // Pre-0027 schema has no `photo` column — never fail over a cache write.
+  }
+  return { stored: true, replaced: was, current: "picture" in patch ? (patch.picture ?? null) : was };
 }
 
 /**
@@ -410,7 +455,9 @@ export async function clearOmPicture(
   // The memorandum's other photographs were the old file's too (#448).
   const galleryFiles = galleryPaths(cache);
   const galleryPatch =
-    cache?.galleryV !== undefined || galleryFiles.length > 0 ? { gallery: undefined, galleryV: undefined } : {};
+    cache?.galleryV !== undefined || cache?.galleryRetry !== undefined || galleryFiles.length > 0
+      ? { gallery: undefined, galleryV: undefined, galleryRetry: undefined }
+      : {};
   if (!pic || pic.source !== "om") {
     // No memorandum picture to drop, but a "nothing in there" verdict — and
     // a count of reads the time cut short — is stale the moment the file
@@ -636,13 +683,16 @@ interface DerivedPhoto extends DerivedPicture {
  * each derived as it is read — as the file's own JPEG where it stores one,
  * as pixels otherwise — so one decoded picture is held at a time. `skip`
  * holds the cover's hash. Null where it gave way to `yieldTo` before the
- * end: an incomplete gallery is never stored as the gallery.
+ * end: an incomplete gallery is never stored as the gallery. `cut` where
+ * the time budget ended the read first: the photographs are the ones read
+ * so far, which `readGallery` never stamps as the file's all.
  */
 export async function galleryOf(
   pdf: Uint8Array,
   skip: readonly bigint[],
   yieldTo?: () => boolean,
-): Promise<DerivedPhoto[] | null> {
+  opts: { budgetMs?: number } = {},
+): Promise<{ photos: DerivedPhoto[]; cut: boolean } | null> {
   const stored = findOmImages(pdf);
   const out: DerivedPhoto[] = [];
   const read = await decodeOmPhotos(
@@ -654,9 +704,9 @@ export async function galleryOf(
         : { width: photo.width, height: photo.height, channels: photo.channels, pixels: photo.pixels };
       out.push({ ...(await derivePicture(input)), page: photo.page });
     },
-    { skip, yieldTo },
+    { skip, yieldTo, budgetMs: opts.budgetMs },
   );
-  return read.aborted ? null : out;
+  return read.aborted ? null : { photos: out, cut: read.cut };
 }
 
 /**
@@ -675,6 +725,21 @@ export function galleryCurrent(cache: DealVisualCache | null | undefined): boole
   return cache?.galleryV === GALLERY_VERSION;
 }
 
+/** Whether a gallery read the time cut short still holds the next back —
+ *  the cover's rule (`retryWaiting`), counted apart. */
+export function galleryRetryWaiting(cache: DealVisualCache | null | undefined, now = Date.now()): boolean {
+  const r = cache?.galleryRetry;
+  if (!r || r.v !== GALLERY_VERSION || !(r.n >= 1)) return false;
+  const wait = RETRY_AFTER_MS[Math.min(r.n, RETRY_AFTER_MS.length) - 1];
+  return now - Date.parse(r.at) < wait;
+}
+
+/** Whether the gallery should be read now: not read under today's rules,
+ *  and no read the time cut short still waiting its turn. */
+function galleryDue(cache: DealVisualCache | null | undefined): boolean {
+  return !galleryCurrent(cache) && !galleryRetryWaiting(cache);
+}
+
 /**
  * Read the memorandum's gallery and store it, replacing the one before
  * (#448). Never throws: a failure writes nothing, so a later view reads it
@@ -688,18 +753,34 @@ async function readGallery(
   skip: readonly bigint[],
 ): Promise<void> {
   try {
-    const derived = await galleryOf(pdf, skip, coverWaiting);
+    const read = await galleryOf(pdf, skip, coverWaiting);
     // Gave way to a cover: nothing is written, so a later view reads it.
-    if (!derived) return;
-    const base = Date.now().toString(36);
+    if (!read) return;
     const at = new Date().toISOString();
+    // A read the time cut short found the photographs read so far, not the
+    // file's (the pre-ship audit of 2026-09-30: it was stamped as the
+    // gallery for good). Counted as the cover's are: stored without
+    // `galleryV`, the next read waiting its turn, the third in a row taken
+    // as the gallery — and never over a stored gallery it found fewer of.
+    const prior = cache?.galleryRetry?.v === GALLERY_VERSION ? cache.galleryRetry.n : 0;
+    const n = read.cut ? prior + 1 : 0;
+    const final = !read.cut || n >= MAX_CUT_READS;
+    const stamp: Partial<DealVisualCache> = final
+      ? { galleryV: GALLERY_VERSION, galleryRetry: undefined }
+      : { galleryV: undefined, galleryRetry: { n, at, v: GALLERY_VERSION } };
+    const had = cache?.gallery ?? [];
+    if (read.cut && read.photos.length <= had.length) {
+      await writeCache(supabase, dealId, cache, stamp);
+      return;
+    }
+    const base = Date.now().toString(36);
     const gallery: DealPicture[] = [];
-    for (const [i, d] of derived.entries()) {
+    for (const [i, d] of read.photos.entries()) {
       gallery.push({ ...(await putDerived(dealId, d, `${base}g${i + 1}`, "om", at)), page: d.page });
     }
     await writeCache(supabase, dealId, cache, {
       gallery: gallery.length > 0 ? gallery : undefined,
-      galleryV: GALLERY_VERSION,
+      ...stamp,
     });
     // The gallery before is orphaned now — best effort, never fatal.
     const old = galleryPaths(cache);
@@ -791,7 +872,7 @@ function refreshBehind(
   const { cache, omPath } = opts;
   const cover = currentPicture(cache);
   const redoCover = derivedOutdated(cover);
-  const redoGallery = !galleryCurrent(cache);
+  const redoGallery = galleryDue(cache);
   if (opts.isSample || !omPath || (!redoCover && !redoGallery)) return;
   if (behindInFlight.has(dealId) || inFlight.has(dealId) || coverWaiting()) return;
   behindInFlight.add(dealId);
@@ -933,30 +1014,48 @@ async function searchMemorandum(
         await writeCache(supabase, dealId, cache, { pictureRetry: { n, at, v: PICTURE_SEARCH_VERSION } });
         outcome = { picture: null, settled: false };
       } else {
-        // An older photograph stands as the deal's for good, since no read
-        // can judge it ("kept while the search cannot run"); none stays none
-        // for the month.
-        await writeCache(supabase, dealId, cache, {
-          pictureCheckedAt: at,
-          pictureSearchV: PICTURE_SEARCH_VERSION,
-          pictureRetry: undefined,
-        });
-        outcome = { picture: older, settled: true };
+        // The third in a row is the verdict for the month. An older
+        // photograph was lifted under rules that could take a map for the
+        // building (#444), and no read has judged it: it goes, rather than
+        // stand as the building's under today's stamp for good (the pre-ship
+        // audit of 2026-09-30) — and only if it is still the one stored.
+        const verdict = { pictureCheckedAt: at, pictureSearchV: PICTURE_SEARCH_VERSION, pictureRetry: undefined };
+        if (older) {
+          const swap = await swapPicture(supabase, dealId, cache, { picture: undefined, ...verdict }, older.hero);
+          if (swap.stored) {
+            await removeStorageFiles(pathsOf(older), photoScope(dealId)).catch(() => {});
+            outcome = { picture: null, settled: true };
+          } else {
+            outcome = { picture: swap.current, settled: true };
+          }
+        } else {
+          await writeCache(supabase, dealId, cache, verdict);
+          outcome = { picture: null, settled: true };
+        }
       }
     } else if (!cover) {
       // Read to its end, and none on the cover pages. A photograph lifted
       // under older rules that today's search does not find there was not
       // the cover (#444): it goes.
-      await writeCache(supabase, dealId, cache, {
-        ...(older ? { picture: undefined } : {}),
+      const verdict = {
         pictureCheckedAt: new Date().toISOString(),
         pictureSearchV: PICTURE_SEARCH_VERSION,
         pictureRetry: undefined,
-      });
+      };
       if (older) {
-        await removeStorageFiles([older.hero, older.thumb], photoScope(dealId)).catch(() => {});
+        // Only if it is still the one stored: an upload meanwhile stands.
+        const swap = await swapPicture(supabase, dealId, cache, { picture: undefined, ...verdict }, older.hero);
+        if (swap.stored) {
+          // Every size, the full copy included.
+          await removeStorageFiles(pathsOf(older), photoScope(dealId)).catch(() => {});
+          outcome = { picture: null, settled: true };
+        } else {
+          outcome = { picture: swap.current, settled: true };
+        }
+      } else {
+        await writeCache(supabase, dealId, cache, verdict);
+        outcome = { picture: null, settled: true };
       }
-      outcome = { picture: null, settled: true };
     } else {
       // The reader's own picture is theirs and is never replaced here: only
       // a memorandum picture, or none, reaches this search.
@@ -969,7 +1068,7 @@ async function searchMemorandum(
     if (
       withGallery &&
       (cover || complete) &&
-      !galleryCurrent(cache) &&
+      galleryDue(cache) &&
       !behindInFlight.has(dealId) &&
       !coverWaiting()
     ) {

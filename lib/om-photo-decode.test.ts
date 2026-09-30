@@ -439,7 +439,7 @@ describe("the memorandum's other photographs (#448)", () => {
     const read = await decodeOmPhotos(pdf, (p) => {
       pages.push(p.page);
     });
-    expect(read).toEqual({ opened: true, found: 3, aborted: false });
+    expect(read).toEqual({ opened: true, found: 3, aborted: false, cut: false });
     expect(pages).toEqual([1, 3, 5]);
   });
 
@@ -453,13 +453,13 @@ describe("the memorandum's other photographs (#448)", () => {
   it("stops at the most it keeps, and reads no further than its pages", async () => {
     const pdf = await memorandum();
     const first: number[] = [];
-    expect(await decodeOmPhotos(pdf, (p) => void first.push(p.page), { max: 1 })).toEqual({ opened: true, found: 1, aborted: false });
+    expect(await decodeOmPhotos(pdf, (p) => void first.push(p.page), { max: 1 })).toEqual({ opened: true, found: 1, aborted: false, cut: false });
     expect(first).toEqual([1]);
     const late = await testMemorandum([
       ...Array.from({ length: GALLERY_PAGES }, (_, i) => ({ text: `Page ${i + 1}` })),
       { images: [await testPicture(W, H, "jpeg", 2)] },
     ]);
-    expect(await decodeOmPhotos(late, () => {})).toEqual({ opened: true, found: 0, aborted: false });
+    expect(await decodeOmPhotos(late, () => {})).toEqual({ opened: true, found: 0, aborted: false, cut: false });
   });
 
   it("gives way the moment a cover is waiting, and an incomplete gallery is never a gallery", async () => {
@@ -470,14 +470,23 @@ describe("the memorandum's other photographs (#448)", () => {
       pages.push(p.page);
       waiting = true;
     }, { yieldTo: () => waiting });
-    expect(read).toEqual({ opened: true, found: 1, aborted: true });
+    expect(read).toEqual({ opened: true, found: 1, aborted: true, cut: false });
     expect(pages).toEqual([1]);
     expect(await galleryOf(pdf, [], () => true)).toBeNull();
   });
 
+  it("says when the time budget cut the read short, so what it found is never taken for the file's all (the pre-ship audit of 2026-09-30)", async () => {
+    const pdf = await memorandum();
+    const read = await decodeOmPhotos(pdf, () => {}, { budgetMs: 0 });
+    expect(read.cut).toBe(true);
+    expect(read.aborted).toBe(false);
+    const gallery = await galleryOf(pdf, [], undefined, { budgetMs: 0 });
+    expect(gallery?.cut).toBe(true);
+  });
+
   it("reads nothing from a file that asks for a password to open", async () => {
     const locked = await testMemorandum([{ images: [await testPicture(W, H, "jpeg", 2)] }], "user-password");
-    expect(await decodeOmPhotos(locked, () => {})).toEqual({ opened: false, found: 0, aborted: false });
+    expect(await decodeOmPhotos(locked, () => {})).toEqual({ opened: false, found: 0, aborted: false, cut: false });
   });
 
   it("derives each photograph beside the cover as the cover is, with its page", async () => {
@@ -485,7 +494,9 @@ describe("the memorandum's other photographs (#448)", () => {
     const cover = await coverOf(pdf);
     expect(cover).not.toBeNull();
     const hash = await hashOf(cover!);
-    const gallery = await galleryOf(pdf, [hash!]);
+    const read = await galleryOf(pdf, [hash!]);
+    expect(read?.cut).toBe(false);
+    const gallery = read?.photos;
     expect(gallery?.map((g) => g.page)).toEqual([3, 5]);
     for (const g of gallery ?? []) {
       // Enlarged cleanly like a small cover (#446), and a thumbnail beside it.
