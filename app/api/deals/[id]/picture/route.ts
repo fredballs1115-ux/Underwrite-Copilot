@@ -22,9 +22,8 @@ import type { DealVisualCache } from "@/lib/deal-location";
 import {
   PICTURE_CREDIT,
   SEARCH_WAIT_MS,
-  backfillPicture,
+  backfillPreview,
   ensureDealPicture,
-  lacksExtras,
   memorandumPhotoCredit,
   picturePathFor,
   readPictureBytes,
@@ -85,21 +84,7 @@ export async function GET(
     "x-image-source": "photo",
     "x-image-credit": credit,
   };
-  // A photograph stored before its blur-up (#463) or its point of interest
-  // (lib/photo-focus) were kept gets them from its own frame after the
-  // response — the cover or the gallery photograph this is — so the next
-  // page that draws it has its colours before its pixels and holds it at its
-  // subject. The thumbnail is a crop, not the frame, so it never serves.
-  const stored = picture;
-  const gallery = g === null ? null : Number(g);
-  const frame = size !== "thumb";
   if (req.headers.get("if-none-match") === etag) {
-    // The browser has the photograph. A point never looked for is looked for
-    // once, from the hero read from storage in its turn (a missing preview
-    // made with it); a preview alone waits for a response that holds the
-    // bytes, as it always has, so a photograph whose preview cannot be made
-    // is never read from storage on every view.
-    if (frame && stored.focus === undefined) after(() => backfillPicture(supabase, id, stored, { gallery }));
     return new NextResponse(null, { status: 304, headers });
   }
   let bytes: Buffer;
@@ -108,7 +93,13 @@ export async function GET(
   } catch {
     return new NextResponse(null, { status: 404 });
   }
-  if (frame && lacksExtras(stored)) after(() => backfillPicture(supabase, id, stored, { bytes, gallery }));
+  // A cover stored before previews existed (#463) gets its blur-up from the
+  // hero bytes this request already holds, after the response: the next
+  // page that draws it has its colours before its pixels.
+  if (g === null && size === "hero" && !picture.preview) {
+    const cover = picture;
+    after(() => backfillPreview(supabase, id, cover, bytes));
+  }
   return new NextResponse(new Uint8Array(bytes), {
     headers: { "content-type": "image/jpeg", ...headers },
   });

@@ -12,9 +12,6 @@ const store = vi.hoisted(() => ({
   removed: [] as string[],
   /** a memorandum download held until the test lets it go */
   gate: null as Promise<void> | null,
-  /** every stored photograph read back, and a hold on those reads */
-  reads: [] as string[],
-  fileGate: null as Promise<void> | null,
 }));
 
 // The cover's read, given no time at all where a test asks for a read the
@@ -31,11 +28,7 @@ vi.mock("@/lib/om-photo-decode", async (importOriginal) => {
 
 vi.mock("@/lib/storage", () => ({
   dealPhotoPath: (dealId: string, stamp: string, size: string) => `photos/${dealId}/${stamp}-${size}.jpg`,
-  downloadDealFile: async (path: string) => {
-    store.reads.push(path);
-    if (store.fileGate) await store.fileGate;
-    return store.files.get(path) ?? Buffer.alloc(0);
-  },
+  downloadDealFile: async (path: string) => store.files.get(path) ?? Buffer.alloc(0),
   downloadOmPdf: async (path: string) => {
     if (store.gate) await store.gate;
     const om = store.oms.get(path);
@@ -53,7 +46,6 @@ vi.mock("@/lib/storage", () => ({
 }));
 
 import {
-  BACKFILL_AT_ONCE,
   DERIVED_VERSION,
   FULL_MAX_PX,
   GALLERY_VERSION,
@@ -62,14 +54,12 @@ import {
   PHOTO_RULES_SINCE,
   PICTURE_SEARCH_VERSION,
   RETRY_AFTER_MS,
-  backfillPicture,
+  backfillPreview,
   clearOmPicture,
   currentPicture,
   derivePicture,
   derivedOutdated,
   ensureDealPicture,
-  focusOf,
-  lacksExtras,
   pictureMayBeInMemorandum,
   picturePathFor,
   picturePaths,
@@ -79,7 +69,6 @@ import {
   searchedRecently,
 } from "./deal-picture";
 import { PREVIEW_PX, isPreview } from "./photo-preview";
-import { isFocus, type PhotoFocus } from "./photo-focus";
 import sharp from "sharp";
 
 /** A deals table of one row's photo cache, read and written as the code does. */
@@ -574,7 +563,7 @@ describe("the blur-up preview each stored photograph carries (#463)", () => {
     const hero = await testPicture(1600, 1000, "jpeg", 4);
     const cache: DealVisualCache = { picture: OLD, pictureSearchV: PICTURE_SEARCH_VERSION, gallery: [] };
     const { client, db } = fakeDb(cache);
-    await backfillPicture(client, "d1", OLD, { bytes: Buffer.from(hero) });
+    await backfillPreview(client, "d1", OLD, Buffer.from(hero));
     expect(isPreview(db.photo?.picture?.preview)).toBe(true);
     expect(db.photo?.picture?.hero).toBe(OLD.hero);
     expect(db.photo?.pictureSearchV).toBe(PICTURE_SEARCH_VERSION);
@@ -582,182 +571,12 @@ describe("the blur-up preview each stored photograph carries (#463)", () => {
     // backfill ran: the replacement stays, with no preview of the old one.
     const replaced: DealPicture = { ...OLD, hero: "photos/d1/new-hero.jpg", source: "upload" };
     const second = fakeDb({ picture: replaced });
-    await backfillPicture(second.client, "d1", OLD, { bytes: Buffer.from(hero) });
+    await backfillPreview(second.client, "d1", OLD, Buffer.from(hero));
     expect(second.db.photo?.picture).toEqual(replaced);
     // A preview already stored is never overwritten.
     const kept = "data:image/webp;base64,AAAA";
     const third = fakeDb({ picture: { ...OLD, preview: kept } });
-    await backfillPicture(third.client, "d1", OLD, { bytes: Buffer.from(hero) });
+    await backfillPreview(third.client, "d1", OLD, Buffer.from(hero));
     expect(third.db.photo?.picture?.preview).toBe(kept);
-  });
-});
-
-/**
- * A photograph with its subject off the middle — a busy, saturated facade on
- * a muted grey-blue ground, graded across the frame and grained, with
- * nothing on it to attend to — at `at`, as shares of the frame.
- */
-async function subjectPicture(width: number, height: number, at: PhotoFocus): Promise<Buffer> {
-  const raw = Buffer.alloc(width * height * 3);
-  const half = { x: width * 0.08, y: height * 0.08 };
-  const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const i = (y * width + x) * 3;
-      const ground = 90 + (x / width) * 60 + (y / height) * 50 + ((((x * 73856093) ^ (y * 19349663) ^ 83492791) >>> 0) % 17) - 8;
-      const inside = Math.abs(x - at.x * width) < half.x && Math.abs(y - at.y * height) < half.y;
-      const on = ((x >> 3) + (y >> 3)) % 2 === 0;
-      raw[i] = inside ? (on ? 230 : 120) : clamp(ground);
-      raw[i + 1] = inside ? (on ? 60 : 20) : clamp(ground + 6);
-      raw[i + 2] = inside ? (on ? 30 : 10) : clamp(ground + 16);
-    }
-  }
-  return sharp(raw, { raw: { width, height, channels: 3 } }).jpeg({ quality: 88 }).toBuffer();
-}
-
-const near = (got: PhotoFocus | null | undefined, want: PhotoFocus) => {
-  expect(isFocus(got)).toBe(true);
-  expect(Math.abs(got!.x - want.x)).toBeLessThan(0.04);
-  expect(Math.abs(got!.y - want.y)).toBeLessThan(0.04);
-};
-
-describe("where a photograph's subject is, kept with its record (lib/photo-focus)", () => {
-  beforeEach(() => {
-    store.oms.clear();
-    store.files.clear();
-    store.uploads = [];
-    store.removed = [];
-    store.reads = [];
-    store.fileGate = null;
-  });
-
-  it("is found at the subject, whatever the frame's shape, and read as shares of it", async () => {
-    // A landscape cover with the building right of the middle and high.
-    near((await derivePicture(await subjectPicture(1600, 1067, { x: 0.8, y: 0.3 }))).focus, { x: 0.8, y: 0.3 });
-    // A portrait photograph, the entrance low and left.
-    near((await derivePicture(await subjectPicture(1067, 1600, { x: 0.25, y: 0.8 }))).focus, { x: 0.25, y: 0.8 });
-    // A square one, and a panorama wider than any frame it is drawn in.
-    near((await derivePicture(await subjectPicture(1200, 1200, { x: 0.2, y: 0.7 }))).focus, { x: 0.2, y: 0.7 });
-    near((await derivePicture(await subjectPicture(2400, 900, { x: 0.15, y: 0.5 }))).focus, { x: 0.15, y: 0.5 });
-  });
-
-  it("is the same from a locked memorandum's pixels as from a file, and from the hero as from the source", async () => {
-    const jpeg = await subjectPicture(1400, 900, { x: 0.7, y: 0.35 });
-    const { data, info } = await sharp(jpeg).raw().toBuffer({ resolveWithObject: true });
-    const fromPixels = await derivePicture({ width: info.width, height: info.height, channels: 3, pixels: new Uint8Array(data) });
-    near(fromPixels.focus, { x: 0.7, y: 0.35 });
-    // The backfill reads the stored hero; the point it finds is the one the
-    // derivation kept.
-    const fromFile = await derivePicture(jpeg);
-    expect(await focusOf(fromFile.hero)).toEqual(fromFile.focus);
-  });
-
-  it("is read from a greyscale photograph too, and is nothing for bytes that are not a picture", async () => {
-    near(await focusOf(await sharp(await subjectPicture(1200, 800, { x: 0.3, y: 0.6 })).greyscale().jpeg().toBuffer()), { x: 0.3, y: 0.6 });
-    expect(await focusOf(Buffer.from("not a picture"))).toBeNull();
-    // Too small to say anything about, and never enlarged to pretend.
-    const plate = (width: number, height: number, background: string) =>
-      sharp({ create: { width, height, channels: 3, background } }).png().toBuffer();
-    expect(await focusOf(await plate(24, 16, "#3a6ea5"))).toBeNull();
-    // Nothing on it to attend to: its grid's peak would be the top left
-    // corner, which is no subject — the centre stands.
-    expect(await focusOf(await plate(1600, 1000, "#3a6ea5"))).toBeNull();
-  });
-
-  it("is stored with the cover and with every gallery photograph", async () => {
-    // Photographs to the cover search (never flat); where each point lies
-    // is the derivation's to say, above.
-    store.oms.set(
-      "u/d1.pdf",
-      await testMemorandum([
-        { images: [await testPicture(800, 500, "jpeg", 1)] },
-        { images: [await testPicture(800, 500, "jpeg", 2)] },
-      ]),
-    );
-    const { client, db } = fakeDb(null);
-    const got = await ensureDealPicture(client, "d1", { omPath: "u/d1.pdf", isSample: false, cache: null, waitMs: 5_000 });
-    expect(isFocus(got?.focus)).toBe(true);
-    await vi.waitFor(() => expect(db.photo?.galleryV).toBe(GALLERY_VERSION), { timeout: 15_000 });
-    expect(db.photo?.picture?.focus).toEqual(got?.focus);
-    expect(db.photo?.gallery).toHaveLength(1);
-    expect(isFocus(db.photo?.gallery?.[0].focus)).toBe(true);
-    // Neither needs a backfill.
-    expect(lacksExtras(db.photo!.picture!)).toBe(false);
-    expect(lacksExtras(db.photo!.gallery![0])).toBe(false);
-  });
-
-  it("is backfilled onto a photograph stored before it, from its own frame: the cover, or the gallery photograph asked for", async () => {
-    const hero = await subjectPicture(1600, 1000, { x: 0.8, y: 0.3 });
-    const other: DealPicture = { ...OLD, hero: "photos/d1/old-g1-hero.jpg", thumb: "photos/d1/old-g1-thumb.jpg", page: 3 };
-    const cache: DealVisualCache = { picture: OLD, gallery: [other, { ...other, hero: "photos/d1/old-g2-hero.jpg" }] };
-    const { client, db } = fakeDb(cache);
-    expect(lacksExtras(OLD)).toBe(true);
-    await backfillPicture(client, "d1", OLD, { bytes: hero });
-    near(db.photo?.picture?.focus, { x: 0.8, y: 0.3 });
-    expect(isPreview(db.photo?.picture?.preview)).toBe(true);
-    // The gallery is untouched by the cover's backfill …
-    expect(db.photo?.gallery?.every((g) => g.focus === undefined)).toBe(true);
-    // … and the gallery photograph asked for gets its own, the others none.
-    await backfillPicture(client, "d1", other, { bytes: await subjectPicture(1600, 1000, { x: 0.2, y: 0.7 }), gallery: 1 });
-    near(db.photo?.gallery?.[0].focus, { x: 0.2, y: 0.7 });
-    expect(db.photo?.gallery?.[1].focus).toBeUndefined();
-    near(db.photo?.picture?.focus, { x: 0.8, y: 0.3 });
-    // Complete now: nothing more to make.
-    expect(lacksExtras(db.photo!.picture!)).toBe(false);
-  });
-
-  it("where the browser had the photograph, reads its hero from storage instead", async () => {
-    store.files.set(OLD.hero, await subjectPicture(1600, 1000, { x: 0.3, y: 0.25 }));
-    const { client, db } = fakeDb({ picture: OLD });
-    await backfillPicture(client, "d1", OLD);
-    expect(store.reads).toEqual([OLD.hero]);
-    near(db.photo?.picture?.focus, { x: 0.3, y: 0.25 });
-    // A photograph with both never reads anything again.
-    await backfillPicture(client, "d1", db.photo!.picture!);
-    expect(store.reads).toEqual([OLD.hero]);
-  });
-
-  it("never lands on a photograph replaced meanwhile, never overwrites a point, and keeps a point looked for and not found", async () => {
-    const hero = await subjectPicture(1600, 1000, { x: 0.8, y: 0.3 });
-    const replaced: DealPicture = { ...OLD, hero: "photos/d1/new-hero.jpg", source: "upload" };
-    const second = fakeDb({ picture: replaced });
-    await backfillPicture(second.client, "d1", OLD, { bytes: hero });
-    expect(second.db.photo?.picture).toEqual(replaced);
-    // A point already stored stands, even where it says there is none.
-    const kept = fakeDb({ picture: { ...OLD, focus: { x: 0.5, y: 0.1 } } });
-    await backfillPicture(kept.client, "d1", OLD, { bytes: hero });
-    expect(kept.db.photo?.picture?.focus).toEqual({ x: 0.5, y: 0.1 });
-    const none = fakeDb({ picture: { ...OLD, focus: null } });
-    await backfillPicture(none.client, "d1", OLD, { bytes: hero });
-    expect(none.db.photo?.picture?.focus).toBeNull();
-    // Bytes that are no picture: looked for once, none found, kept as none.
-    const junk = fakeDb({ picture: OLD });
-    await backfillPicture(junk.client, "d1", OLD, { bytes: Buffer.from("not a picture") });
-    expect(junk.db.photo?.picture?.focus).toBeNull();
-    expect(lacksExtras({ ...OLD, preview: "data:image/webp;base64,AAAA", focus: null })).toBe(false);
-  });
-
-  it(`runs ${BACKFILL_AT_ONCE} at once: the next waits its turn, and one that cannot wait is left to a later request`, async () => {
-    store.files.set(OLD.hero, await subjectPicture(1600, 1000, { x: 0.6, y: 0.4 }));
-    let release!: () => void;
-    store.fileGate = new Promise<void>((r) => (release = r));
-    const dbs = Array.from({ length: BACKFILL_AT_ONCE + 2 }, () => fakeDb({ picture: OLD }));
-    const [late, impatient] = dbs.slice(BACKFILL_AT_ONCE);
-    const running = dbs.slice(0, BACKFILL_AT_ONCE).map((d) => backfillPicture(d.client, "d1", OLD));
-    await vi.waitFor(() => expect(store.reads).toHaveLength(BACKFILL_AT_ONCE));
-    // Both turns taken: the next waits for one …
-    const waiting = backfillPicture(late.client, "d1", OLD);
-    // … and one that cannot wait answers at once, having read nothing.
-    await backfillPicture(impatient.client, "d1", OLD, { waitMs: 0 });
-    expect(store.reads).toHaveLength(BACKFILL_AT_ONCE);
-    expect(impatient.db.photo?.picture?.focus).toBeUndefined();
-    release();
-    await Promise.all([...running, waiting]);
-    store.fileGate = null;
-    expect(store.reads).toHaveLength(BACKFILL_AT_ONCE + 1);
-    for (const d of dbs.slice(0, BACKFILL_AT_ONCE + 1)) near(d.db.photo?.picture?.focus, { x: 0.6, y: 0.4 });
-    // Its turn free again, the photograph left behind is filled in by the next request.
-    await backfillPicture(impatient.client, "d1", OLD, { waitMs: 0 });
-    near(impatient.db.photo?.picture?.focus, { x: 0.6, y: 0.4 });
   });
 });

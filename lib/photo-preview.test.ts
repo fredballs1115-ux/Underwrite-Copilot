@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PREVIEW_MAX_CHARS, blurredBackground, isPreview, photoStyle, previewStyle } from "./photo-preview";
+import { PREVIEW_MAX_CHARS, blurredBackground, isPreview, previewStyle } from "./photo-preview";
 
 const PREVIEW = "data:image/webp;base64,UklGRlIAAABXRUJQVlA4IEYAAAAwAgCdASoYABAAPm0wkkWkIqGYBABABsSgCdMoRwBAbAhvCgAA/vy3qgA=";
 
@@ -34,28 +34,5 @@ describe("blurredBackground — the preview blurred by the browser, as one CSS v
     expect(blurredBackground("not a preview")).toBeNull();
     expect(previewStyle(undefined)).toBeUndefined();
     expect(previewStyle(PREVIEW)).toMatchObject({ backgroundSize: "cover", backgroundPosition: "center" });
-  });
-});
-
-describe("a cropped photograph and its preview, held at its subject (lib/photo-focus)", () => {
-  const focus = { x: 0.203, y: 0.719 };
-
-  it("holds the preview where the photograph fading in over it is held", () => {
-    expect(previewStyle(PREVIEW, focus)).toMatchObject({ backgroundPosition: "20.3% 71.9%" });
-    // A point that is not one keeps the centre.
-    expect(previewStyle(PREVIEW, { x: 5, y: 0 })).toMatchObject({ backgroundPosition: "center" });
-  });
-
-  it("gives a photograph's own <img> its preview and the point together, or whichever it has", () => {
-    expect(photoStyle(PREVIEW, focus)).toMatchObject({
-      backgroundSize: "cover",
-      backgroundPosition: "20.3% 71.9%",
-      objectPosition: "20.3% 71.9%",
-    });
-    expect(photoStyle(null, focus)).toEqual({ objectPosition: "20.3% 71.9%" });
-    const plain = photoStyle(PREVIEW);
-    expect(plain).toMatchObject({ backgroundPosition: "center" });
-    expect(plain).not.toHaveProperty("objectPosition");
-    expect(photoStyle(null, null)).toBeUndefined();
   });
 });

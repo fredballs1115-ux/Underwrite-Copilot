@@ -82,8 +82,6 @@ export default async function SharePage({
             credit: PICTURE_CREDIT[stored.source],
             // Its colours before its pixels (#463).
             preview: stored.preview ?? null,
-            // Where its subject is: the strip crops it there, not at its centre.
-            focus: stored.focus ?? null,
           },
         ]
       : []),

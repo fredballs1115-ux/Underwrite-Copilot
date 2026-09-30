@@ -4,7 +4,6 @@ import type { StructuredAddress } from "@/lib/address";
 import type { Point } from "@/lib/basemaps";
 import { geocodeAddress, type Geocoded, type GeocodeSource } from "@/lib/geocode";
 import type { FloodFrameRecord } from "@/lib/flood-frame-core";
-import type { PhotoFocus } from "@/lib/photo-focus";
 
 /**
  * Where a deal IS, resolved once and cached — the shared dependency of every
@@ -89,13 +88,6 @@ export interface DealPicture {
    *  data URI kept inline so a page has the photograph's colours before it
    *  fetches the photograph (lib/photo-preview) */
   preview?: string;
-  /** where its subject is, as shares of the hero's frame — sharp's attention
-   *  point, which a page that crops the photograph holds it at
-   *  (lib/photo-focus). Null where it was looked for and none was found;
-   *  absent on one stored before it was kept, which the picture route fills
-   *  in from the hero (lib/deal-picture `backfillPicture`) and which keeps
-   *  the centre until then. */
-  focus?: PhotoFocus | null;
 }
 
 // Precision now lives with the framing rules it drives (lib/imagery-plan),

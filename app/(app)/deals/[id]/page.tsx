@@ -366,8 +366,6 @@ export default async function DealPage({
         width: g.width,
         height: g.height,
         fullWidth: g.fullWidth ?? null,
-        // Where its subject is: every frame that crops it holds it there.
-        focus: g.focus ?? null,
       })));
   const omUrlPromise = deal.om_storage_path
     ? signedSupplementUrl(deal.om_storage_path, { kind: "deal", dealId: id })
@@ -1029,7 +1027,6 @@ export default async function DealPage({
                       width: picture.width,
                       height: picture.height,
                       fullWidth: picture.fullWidth ?? null,
-                      focus: picture.focus ?? null,
                     }
                   : null
               }
