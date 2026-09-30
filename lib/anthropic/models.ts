@@ -85,7 +85,11 @@ export const MODELS = {
 
 /** Output-token caps. Our outputs are compact JSON, so these stay small. */
 export const MAX_TOKENS = {
-  extraction: 8000,
+  // A portfolio lists every property (up to 150, lib/anthropic/prompts). At
+  // an estimated ~65 tokens a property, a tape of 75-odd homes would run
+  // past 8,000, and a cut-off fails the whole screen. The cap bounds the
+  // answer; only the tokens written are billed.
+  extraction: 16000,
   analysis: 8000,
   verdict: 4000,
   // The model reconciliation emits a large audit (every metric + sources +
