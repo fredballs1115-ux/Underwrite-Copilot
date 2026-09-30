@@ -37,7 +37,7 @@ const ex = (metrics: ExtractedMetric[], over: Partial<ExtractionResult> = {}): E
 describe("pickSlots — the pipeline row agrees with the export on which figure a deal carries", () => {
   it("a stabilized asset: its going-in cap, its price, no yield on cost", () => {
     const s = pickSlots(ex([m("Asking price", "$42,000,000"), m("Going-in cap rate", "5.50%"), m("In-place NOI", "$2,310,000")]), null);
-    expect(s).toEqual({ cap: "5.50%", price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null });
+    expect(s).toEqual({ cap: "5.50%", price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, basis: null });
   });
 
   it("says a covenant on the rents beside the price (#453), and nothing on a market-rate deal", () => {
@@ -186,12 +186,35 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
       }),
       null,
     );
-    expect(s).toEqual({ cap: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null });
+    expect(s).toEqual({ cap: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, basis: null });
   });
 
   it("before the extraction lands, the first signal's ask fills the price — only when it is a figure", () => {
     const bare = ex([]);
     expect(pickSlots(bare, { askPrice: "$20,000,000", goingInCap: "", perUnit: "", assetClass: "", market: "", take: "", dealName: "" } as never).price).toBe("$20,000,000");
     expect(pickSlots(bare, { askPrice: "Call for offers", goingInCap: "", perUnit: "", assetClass: "", market: "", take: "", dealName: "" } as never).price).toBeNull();
+  });
+});
+
+describe("the basis at a glance (#469)", () => {
+  const m = (label: string, value: string) => ({ label, value, flagged: false, page: "" });
+  const ex = (metrics: ReturnType<typeof m>[], assetClass: string, extra: Record<string, unknown> = {}) =>
+    ({ dealName: "x", assetClass, metrics, ...extra }) as unknown as import("@/lib/anthropic/types").ExtractionResult;
+
+  it("prints the price by the class's own basis and the memorandum's own noun", () => {
+    expect(pickSlots(ex([m("Asking price", "$68,000,000"), m("Units", "248")], "multifamily"), null).basis).toBe("$274k/unit");
+    expect(pickSlots(ex([m("Asking price", "$24,000,000"), m("Keys", "120")], "hospitality_str"), null).basis).toBe("$200k/key");
+    expect(pickSlots(ex([m("Asking price", "$61,200,000"), m("Beds", "612")], "student_housing"), null).basis).toBe("$100k/bed");
+    expect(pickSlots(ex([m("Asking price", "$42,000,000"), m("Rentable SF", "198,000")], "office"), null).basis).toBe("$212/SF");
+    // A range reads at its top (#466), as every price does.
+    expect(pickSlots(ex([m("Pricing guidance", "$60,000,000 – $62,000,000"), m("Units", "248")], "multifamily"), null).basis).toBe("$250k/unit");
+  });
+
+  it("prints none where the price is not the building's or the count is not stated", () => {
+    expect(pickSlots(ex([m("Asking price", "$68,000,000")], "multifamily"), null).basis).toBeNull();
+    const note = { kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "" };
+    expect(pickSlots(ex([m("Asking price", "$18,000,000"), m("Units", "248")], "multifamily", { interest: note }), null).basis).toBeNull();
+    const plan = { kind: "development", summary: "", capitalBudget: "", timeline: "" };
+    expect(pickSlots(ex([m("Land price", "$4,000,000"), m("Units (proposed)", "240")], "multifamily", { strategy: plan }), null).basis).toBeNull();
   });
 });

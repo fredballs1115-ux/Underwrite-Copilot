@@ -1093,6 +1093,7 @@ jobs:
           mark "#466 a price range is read at its top" grep -q "A price range is read at its top" p_whats-new.html
           mark "#467 who is selling it, and when offers are due" grep -q "Who is selling it, and when offers are due" p_whats-new.html
           mark "#468 student housing, read by the bed" grep -q "Student housing, read by the bed" p_whats-new.html
+          mark "#469 the price per unit on every card" grep -q "The price per unit on every card" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

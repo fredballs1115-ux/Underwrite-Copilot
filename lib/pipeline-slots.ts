@@ -6,9 +6,11 @@
 // Pure: no I/O, no LLM.
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { ASSET_CLASS_LABEL } from "@/lib/asset-class";
-import { findGoingInCap } from "@/lib/criteria";
-import { findPriceMetric, inferStrategy, planSummary, signalAskPrice } from "@/lib/deal-strategy";
-import { interestTag } from "@/lib/interest";
+import { findGoingInCap, unitCountRow } from "@/lib/criteria";
+import { findPriceMetric, inferStrategy, planSummary, signalAskPrice, type StrategyKind } from "@/lib/deal-strategy";
+import { interestOf, interestTag } from "@/lib/interest";
+import { assetWords, countNoun } from "@/lib/asset-words";
+import { subjectBasis } from "@/lib/comp-detail";
 import { assumableTag } from "@/lib/assumable-debt";
 import { affordableTag } from "@/lib/affordable";
 import { singleTenantTag } from "@/lib/single-tenant";
@@ -83,6 +85,35 @@ export interface PipelineSlots {
    *  "Drive-to campus" (lib/student-housing `studentHousingTag`, #468);
    *  absent or null on anything else */
   student?: string | null;
+  /** the price by the class's own basis, as a listing card shows it —
+   *  "$274k/unit", "$200k/key", "$212/SF" (`basisTag`, #469); absent or
+   *  null on a plan deal, a note, the land, a share with no stated
+   *  percentage, or where the count or the area is not stated */
+  basis?: string | null;
+}
+
+const compactUsd = (n: number) =>
+  n >= 1e6 ? `$${(Math.round(n / 1e5) / 10).toFixed(1).replace(/\.0$/, "")}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
+
+/**
+ * The price by the class's own basis — "$274k/unit", "$200k/key", "$212/SF"
+ * — read through the comps page's subject reader (lib/comp-detail
+ * `subjectBasis`), so the card and the comps' tick agree on the figure: the
+ * building's price (a share's grossed up, none for a note or the land)
+ * over the count in the memorandum's own noun, or over the building's
+ * area where the class is priced by the foot. None on a conversion or a
+ * development, whose basis is the all-in cost, not the shell's price.
+ */
+export function basisTag(extraction: ExtractionResult, kind: StrategyKind): string | null {
+  const metrics = extraction.metrics ?? [];
+  const words = assetWords(extraction.assetClass);
+  const b = subjectBasis(metrics, kind, interestOf(extraction));
+  if (words.basis === "sf") return b.perSf != null ? `$${Math.round(b.perSf).toLocaleString("en-US")}/SF` : null;
+  if (words.basis === "unit" && b.perUnit != null) {
+    const noun = countNoun(unitCountRow(metrics)?.label, words.key).replace(/s$/, "");
+    return `${compactUsd(b.perUnit)}/${noun}`;
+  }
+  return null;
 }
 
 /**
@@ -160,5 +191,7 @@ export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | nu
     broker: brokerageOf(extraction),
     // A student building's pre-leasing against last year's (#468).
     student: studentHousingTag(extraction),
+    // The price by the unit or the foot, as a listing card shows it (#469).
+    basis: basisTag(extraction, strategy.kind),
   };
 }

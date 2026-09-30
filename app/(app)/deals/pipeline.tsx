@@ -69,7 +69,7 @@ export type DealCard = {
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
-  slots: { cap: string | null; price: string | null; yoc: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null; broker?: string | null; student?: string | null };
+  slots: { cap: string | null; price: string | null; yoc: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null; broker?: string | null; student?: string | null; basis?: string | null };
   /** latest analysis-job state: a live run, one that stopped writing
    *  progress (its process died), or a failure that left the verdict behind */
   jobStatus?: "running" | "stalled" | "failed" | null;
@@ -561,7 +561,7 @@ export function Pipeline({
     };
     // A plan deal's cap cell is empty and its yield on cost sits in its own
     // column — the same two columns the meeting .xlsx carries.
-    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "What the price buys", "Assumable debt", "Seller financing", "Affordability", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Hotel", "Sale", "Reports", "Student housing", "Flood zone", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Broker", "Added", "Added by"];
+    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "Basis", "What the price buys", "Assumable debt", "Seller financing", "Affordability", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Hotel", "Sale", "Reports", "Student housing", "Flood zone", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Broker", "Added", "Added by"];
     const lines = filtered.map((d) =>
       [
         d.name,
@@ -569,6 +569,9 @@ export function Pipeline({
         d.market,
         d.coveredMarket ?? "",
         d.slots.price ?? "",
+        // The price by the unit, the key or the foot (#469); blank where
+        // the count or the area is not stated, and on a plan deal.
+        d.slots.basis ?? "",
         // Blank on a fee simple — the price is the building's.
         d.slots.interest ?? "",
         // Blank where no loan is offered for assumption (#419).
@@ -1480,7 +1483,7 @@ const DealRow = memo(function DealRow({
     </span>
   ) : null;
   const priceBit = d.slots.price ? (
-    <span className="font-mono tabular-nums" title={d.slots.price}>
+    <span className="font-mono tabular-nums" title={d.slots.basis ? `${d.slots.price} — ${d.slots.basis}` : d.slots.price}>
       {compactPrice(d.slots.price)}
     </span>
   ) : null;
@@ -1803,7 +1806,11 @@ const DealRow = memo(function DealRow({
       </span>
       <span
         className="hidden w-20 shrink-0 truncate text-right font-mono text-sm tabular-nums md:block"
-        title={d.slots.price ? (d.slots.interest ? `${d.slots.price} — ${d.slots.interest.toLowerCase()}` : d.slots.price) : undefined}
+        title={
+          d.slots.price
+            ? [d.slots.price, d.slots.basis, d.slots.interest?.toLowerCase()].filter(Boolean).join(" — ")
+            : undefined
+        }
       >
         {d.slots.price ? compactPrice(d.slots.price) : <span className="text-line">—</span>}
       </span>
@@ -1983,13 +1990,16 @@ function TileCall({ d }: { d: DealCard }) {
   );
 }
 
-function TileStat({ label, title, children }: { label: string; title?: string; children: ReactNode }) {
+function TileStat({ label, title, sub, children }: { label: string; title?: string; sub?: string | null; children: ReactNode }) {
   return (
     <div className="min-w-0">
       <dt className="text-[10px] font-medium uppercase tracking-wide text-muted">{label}</dt>
       <dd className="mt-0.5 truncate font-mono text-sm tabular-nums text-ink" title={title}>
         {children}
       </dd>
+      {/* A second figure under the first, as a listing card prints the
+          price per unit under the price (#469). */}
+      {sub && <dd className="truncate font-mono text-[10px] tabular-nums text-muted" data-qa="tile-sub">{sub}</dd>}
     </div>
   );
 }
@@ -2136,7 +2146,7 @@ const DealTile = memo(function DealTile({
             its figures up whatever the names' lengths. */}
         <span aria-hidden className="min-h-3 flex-1" />
         <dl className="grid grid-cols-3 gap-3 border-t border-line pt-3">
-          <TileStat label="Price" title={d.slots.price ?? undefined}>
+          <TileStat label="Price" title={d.slots.price ?? undefined} sub={d.slots.basis}>
             {d.slots.price ? compactPrice(d.slots.price) : <span className="text-line">—</span>}
           </TileStat>
           {/* A plan deal has no going-in cap; its yield on total cost takes
