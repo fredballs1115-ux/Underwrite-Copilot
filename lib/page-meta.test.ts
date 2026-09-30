@@ -9,6 +9,7 @@ import { metadata as privacy } from "@/app/privacy/page";
 import { metadata as terms } from "@/app/terms/page";
 import { metadata as tools } from "@/app/tools/page";
 import { metadata as login } from "@/app/login/page";
+import { metadata as notFound } from "@/app/not-found";
 import { changelogSince } from "./changelog";
 import { SITE_CARD, marketMeta, marketPageFor, sectorPageFor } from "./public-pages";
 import { SITE_NAME, publicMetadata } from "./page-meta";
@@ -87,6 +88,14 @@ describe("each public page states its own canonical and link preview", () => {
   it("titles /tools and /why the way a reader sees them", () => {
     expect(renderedTitle(tools)).toBe(`Deal math · ${SITE_NAME}`);
     expect(renderedTitle(why)).toBe("Why Underwrite Copilot");
+  });
+
+  it("keeps the 404 out of the index, and says nothing else about it", () => {
+    // The root layout indexes every page; the 404 carried its
+    // "index, follow" beside Next's own "noindex". Its own robots
+    // replaces the layout's, and says noindex alone.
+    expect(read("app/layout.tsx")).toMatch(/robots:\s*\{\s*index:\s*true,\s*follow:\s*true\s*\}/);
+    expect(notFound.robots).toEqual({ index: false });
   });
 
   it("names the homepage's organization by a logo Google will take", () => {

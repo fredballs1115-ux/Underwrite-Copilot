@@ -1,5 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
+
+// A 404 is never to be indexed. Next adds its own `noindex` to one, and the
+// root layout's `index, follow` rode in beside it, so the page said both;
+// this replaces the layout's robots for the 404 alone (Next reads a
+// not-found file's metadata last, over the layouts').
+export const metadata: Metadata = { robots: { index: false } };
 
 // Global 404 — branded to match the marketing pages.
 export default function NotFound() {
