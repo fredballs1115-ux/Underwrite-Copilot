@@ -2363,6 +2363,10 @@ function RemoveButton({
   );
 }
 
+/** A note or a file kept with the deal (deals.supplements), shown back under
+ *  the section and on the Documents tab. Nothing in the analysis reads it —
+ *  not the screen, the model or Ask — so the words promise a note kept with
+ *  the deal, never a correction to a figure. */
 export function AddData({ dealId, tab }: { dealId: string; tab: string }) {
   const [open, setOpen] = useState(false);
   return (
@@ -2376,7 +2380,7 @@ export function AddData({ dealId, tab }: { dealId: string; tab: string }) {
         <IconPlus
           className={`h-4 w-4 transition-transform ${open ? "rotate-45" : ""}`}
         />
-        Add info or upload to this section
+        Add a note or a file to this section
       </button>
       {open && (
         <div className="mt-4 space-y-4">
@@ -2385,10 +2389,10 @@ export function AddData({ dealId, tab }: { dealId: string; tab: string }) {
             <input type="hidden" name="tab" value={tab} />
             <textarea
               name="text"
-              aria-label="Note for this section"
+              aria-label="Note to keep with this deal"
               required
               rows={2}
-              placeholder="Add a note, a correction, or a figure the analysis missed…"
+              placeholder="A note to keep with this deal…"
               className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
             />
             <button
@@ -2414,8 +2418,8 @@ export function AddData({ dealId, tab }: { dealId: string; tab: string }) {
               </button>
             </form>
             <p className="mt-1.5 text-[11px] text-muted">
-              Rent roll, T-12, comp sheet, anything — PDF, Excel, CSV, or image
-              (up to 32 MB).
+              Kept with the deal for reference — the analysis does not read
+              notes or files added here. PDF, Excel, CSV or image, up to 32 MB.
             </p>
           </div>
         </div>

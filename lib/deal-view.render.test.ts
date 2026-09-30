@@ -25,6 +25,8 @@ import { inferStrategy } from "@/lib/deal-strategy";
 import { ToastProvider } from "@/app/(app)/toaster";
 import { DealView } from "@/app/(app)/deals/[id]/deal-view";
 import { a11yIssues, dumpView, gluedWords, visibleText as textOf } from "./render-lint";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 type Props = Parameters<typeof DealView>[0];
 
@@ -537,5 +539,29 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(text).toMatch(/Cap compression is not a plan/);
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(text)).toEqual([]);
+  });
+});
+
+describe("the add-a-note box says what it does", () => {
+  // Its note and file are kept with the deal (deals.supplements) and read by
+  // nothing in the analysis, so the box never promises a correction.
+  it("offers a note or a file kept with the deal, on the Documents tab and under each analysis", () => {
+    for (const [tab, analysis] of [["documents", null], ["analyses", "verdict"]] as const) {
+      const text = textOf(render(sampleProps(tab, analysis)));
+      expect(text, `${tab}/${analysis}`).toMatch(/Add a note or a file to this section/);
+      expect(text, `${tab}/${analysis}`).not.toMatch(/Add info or upload/);
+    }
+  });
+
+  it("its open form keeps a note with the deal and says the analysis does not read it", () => {
+    // The form renders only once the box is opened, which a static render
+    // cannot do: its words are read off the component's source.
+    const src = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/deal-sections.tsx"), "utf8");
+    const start = src.indexOf("export function AddData(");
+    const body = src.slice(start, src.indexOf("\nexport function ", start + 1));
+    expect(start).toBeGreaterThan(-1);
+    expect(body).toMatch(/placeholder="A note to keep with this deal…"/);
+    expect(body).toMatch(/the analysis does not read\s+notes or files added here/);
+    expect(body).not.toMatch(/correction|the analysis missed/i);
   });
 });
