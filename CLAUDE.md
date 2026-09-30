@@ -1173,6 +1173,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   `headerSafe` in `lib/skyline.ts` percent-encodes what a header cannot
   carry, and `lib/skyline.test.ts` puts every market's credit through a
   real `Headers`.
+  **A metro area the site reads no figures for** (#472) is a row too,
+  keyed by its Census code (`areaSkylineId`: `cbsa:41940`) with the name
+  its card shows (`SkylineShot.name`, "San Jose, CA"), reached through the
+  county the deal is placed in (`marketPictureFor`'s `county`, after the
+  market the site reads, never instead of it); the table's test holds such a
+  row to a real metro area in the delineation, to a name, and to not being
+  one the site reads. Its candidates are in the same file under the same
+  id, and the sheet's folder takes the id with the colon replaced.
   Montgomery County
   is deliberately absent: a suburban submarket has no skyline, and the
   overhead is the more honest picture of a place shaped by its land — the
@@ -3474,48 +3482,115 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   geocoder could place is counted, never guessed. It frames the pins until
   the reader moves the map, then adds a late pin without pulling the view
   away.
-- FEMA's flood map over the building (#425): the deal page's picture has
-  a Flood tab for a deal with a street address (a neighbourhood
-  placement's centre is not the building): the USGS aerial at
-  `FLOOD_ZOOM` (17, about 1.2 km across at US latitudes) with FEMA's
-  National Flood Hazard Layer zones drawn over it, a ring at the frame's
-  centre (the building), FEMA's key under it and one sentence on the
-  zone at the building. The two images are asked for the same location,
-  zoom and size, and `usgsAerialUrl` and `nfhlOverlayUrl`
-  (`lib/basemaps.ts`) build their frame through ONE `frameParams`, so the
-  overlay lies over the aerial to the pixel; `/api/deals/[id]/flood`
-  serves the transparent PNG through `fetchFloodOverlay`
-  (`lib/flood-map.ts`, `server-only`), and either image failing takes the
-  tab away rather than leaving a plain aerial under the word "Flood".
-  **Everything FEMA-shaped was printed by the runner first** — the sandbox
-  cannot reach hazards.fema.gov — through `scripts/probe-flood.mjs` in
-  `skyline-sheet.yml`'s flood mode, which renders each place's composite
-  with sharp and pushes it to the `flood-sheet` branch to be looked at:
-  the zones are layer 28 of 32 (resolved at run time by name,
-  `resolveNfhlLayerId`, never written down), drawn only finer than
-  1:36,112 (hence `FLOOD_MIN_ZOOM` 15), in FEMA's own symbology (cyan for
-  the 1% annual chance zone, a red hatch for the regulatory floodway,
-  orange for the 0.2% zone, with FEMA's own "Zone AE (EL 9)" labels), and
-  **Zone X of minimal hazard has no legend entry — FEMA maps it and leaves
-  it undrawn**, so a clear frame means minimal hazard where a zone was
-  found and no digital map where none was. The key is FEMA's own legend
-  (`parseNfhlLegend`, the swatches as data URIs; `floodKey` picks the
-  building's own entry, marked, then the common three by FEMA's own
-  FLD_ZONE,ZONE_SUBTY values rather than labels), cached a day, and
-  raced against 2.5 s on the page so a slow FEMA never holds the deal
-  page. The sentence (`floodZoneLine`) says the zone, FEMA's name for it
-  and what it means for a loan — a Special Flood Hazard Area needs flood
+- FEMA's flood map over the building (#425, rebuilt #472): the deal
+  page's picture has a Flood view for a deal with a street address
+  geocoded finer than a neighbourhood (neither centre is the building): the
+  USGS aerial at `FLOOD_ZOOM` (17, about 1.5 × 1.1 km) with FEMA's National
+  Flood Hazard Layer zones drawn over it, a ring at the frame's centre (the
+  building), a key of the zones the picture shows and one sentence on the
+  zone at the building.
+  **It is drawn once a deal and kept** (`lib/flood-map.ts`, `server-only`;
+  the pure half is `lib/flood-frame-core.ts`). The first cut asked two
+  pictures of two federal hosts on every view (the aerial 10 s with no
+  retry, FEMA 15 s), kept nothing, and removed the view whenever either
+  missed; the runner measured both hosts answering a cold first request in
+  20–30 s, so it failed "sometimes": the cold views. Now
+  `ensureFloodFrame` draws the deal's frame — 4:3, `FLOOD_FRAME`, the
+  aerial finished (#429), brought to the zones' pixels and calmed
+  (`FLOOD_AERIAL_MUTE`), FEMA's zones at `scale` 2 for the same ground
+  (dpi 192; the service allows 4096 px a side) — stores it at
+  `flood/<dealId>/<stamp>.jpg` (storage kind `flood`) and records it on the
+  deal's photo cache (`DealVisualCache.floodFrame`: the path, the point it
+  was drawn around as `pointKey`, the version, the classes each crop shows).
+  A frame stands while `floodFrameCurrent` says so (same point, same rules,
+  under 30 days); one draw a deal at a time, two a process (`RunGate`), a
+  failure never recorded. The deal page draws it behind its first render
+  (`after()`), so it is usually there before the view is opened. Every
+  request is asked twice (`askTwice`: a throw, a 5xx or a non-image is asked
+  again) with a 35 s timeout sized to the cold answer.
+  `/api/deals/[id]/flood?w=&h=` cuts the frame from its centre to the
+  shape asked for (`floodCrop`, never past the frame's pixels): the view's
+  own 16:9 at 1x and 2x (`FLOOD_VIEW`), the filmstrip's 192×108, the
+  viewer's whole 4:3, the report's band. A frame not drawn yet is drawn and
+  waited for up to 50 s; a longer draw goes on behind the request, which
+  answers 503 so the page asks again; `?meta=1` answers the classes instead
+  and says by status which failure a picture was — 404 nothing to draw,
+  503 not drawn yet. The URL carries `v=<FLOOD_FRAME_VERSION>.<pointKey>`,
+  so a moved deal asks for a new picture. `PropertyVisual` shows a plate
+  ("Drawing FEMA's flood map…") until the picture is whole, fades it in,
+  retries three times a little later each time, reads a failure that
+  settled before hydration on mount, and says the map did not come through
+  if it never does — the key and the sentence stay. The viewer takes the
+  whole frame at its drawn pixels; there is no second overlay image any
+  more.
+  **The zones in the site's palette** (`lib/flood-style.ts`, pure). The
+  service reports `supportsDynamicLayers: true`, so `floodDynamicLayers`
+  POSTs (the class list is some 80 KB, `nfhlRestyledForm` in
+  `lib/basemaps.ts`, the one frame definition shared with `usgsAerialUrl`)
+  FEMA's own zones layer three times, top first: hatches, tints and
+  outlines, white casings. The classes are FEMA's legend entries by their
+  FLD_ZONE,ZONE_SUBTY values, "<Null>" and the empty subtype included — a
+  first cut keyed on SFHA_TF drew nothing over Hoboken's Zone AE, and
+  FEMA's renderer has no default symbol, so a value no entry lists is
+  undrawn in both. The 1% zone blue, its floodway red-hatched OVER the
+  blue (it is part of the 1% zone; hatch alone read as the river), the
+  0.2% zone amber, future conditions purple, levee areas teal and brown,
+  Zone D grey; FEMA's labels off. The legend is FEMA's own, cached a day,
+  else the runner's copy (`data/nfhl-legend.json`, `VENDORED_LEGEND`,
+  generated from flood-sheet run 36745937081's index — never edited by
+  hand). **FEMA's layer transparency is not to be trusted either way**: the
+  zones layer carries 70% of its own, and one run returned the restyle's
+  tint at alpha 32 (105 × 0.3) while a run thirteen minutes later, with
+  the identical request, returned 105 — so every overlay is measured
+  (`overlayAlphaScale`, the interior tint's alpha against the asked one)
+  and a scaled one corrected (`unscaleAlpha`); an alpha that fits neither
+  is not kept. **The key is read off the drawn pixels** (`classesIn`, by a
+  tint's interior at its own alpha — colour alone keyed a levee class in
+  New Orleans where amber met a dark-blue outline — and the floodway by its
+  red hatch), per crop (`cropRegion`), and matched FEMA's own frame query
+  on all eight places the runner drew (Hoboken, Houston, Manayunk, New
+  Orleans, Galveston, Sacramento, St. Louis, Miami Beach); the building's
+  own class leads, marked (`floodClassOfZone`). The swatches are CSS on the
+  page (`floodSwatchBackground`) and PNGs from `floodSwatchSvg` in the
+  report. **Everything FEMA-shaped was printed by the runner first** — the
+  sandbox cannot reach hazards.fema.gov — through `scripts/probe-flood.mjs`
+  in `skyline-sheet.yml`'s flood mode (it restates the restyle for plain
+  Node and a test holds the two equal), which pushes each place's
+  composite, overlay, aerial and the zones' polygons (`frameQuery`) to the
+  `flood-sheet` branch: the zones are layer 28 of 32 (resolved at run
+  time by name, `resolveNfhlLayerId`), drawn only finer than 1:36,112
+  (hence `FLOOD_MIN_ZOOM` 15), and **Zone X of minimal hazard has no
+  legend entry — FEMA maps it and leaves it undrawn**. A vector drawing is
+  possible (`frameQuery` answers in 0.1–3 s) but New Orleans' polygons are
+  228,000 vertices, 5 MB a frame, so the export stays the source.
+  **The sentence** (`floodZoneLine`) says the zone, FEMA's name for it and
+  what it means for a loan — a Special Flood Hazard Area needs flood
   insurance on a federally backed loan, and the premium belongs in the
-  expense line — and keeps a point with no zone polygon ("FEMA's digital
-  flood map has no zone at the building's point") apart from minimal
-  hazard; the site flags' chip says the same now, and keeps Zone X of
-  minimal hazard out of the caution colour. The first flood-sheet run
-  died on a connection reset from FEMA's host, so every request is asked
-  twice. **The tract's own Census figures wait on a key**: the ACS data
-  API now answers a keyless request with a redirect to `missing_key.html`
-  (probe run 2026-09-25; the 2020–2024 five-year release and every
-  variable's label were verified), so a free `CENSUS_API_KEY` is the
-  operator's move before the site reads a deal's tract.
+  expense line — with FEMA's base flood elevation where it states one
+  (STATIC_BFE with its unit and datum; FEMA writes -9999 for none) or an
+  AO zone's depth; the regulatory floodway (new building and fill
+  restricted) and a V zone (storm waves add to the flood) say so; open
+  water says the point is likely off the building, an area the map does not
+  include says another map covers it, Zone D says FEMA has not determined
+  the hazard, and a bare Zone X says only that it is outside the Special
+  Flood Hazard Area. A point with no zone polygon ("FEMA's digital flood
+  map has no zone at the building's point") is kept apart from minimal
+  hazard. **The zone said is the zone under the ring**: the site-flags
+  lookup (`runSiteFlags`) looks up at the deal's own point
+  (`resolveDealLocation`, the one its pictures are drawn around) where it
+  used to geocode the line itself (Photon's first result), asks FEMA and
+  the Census twice at 25 s, and a lookup whose flood zone FEMA did not
+  answer is asked again after `FLOOD_RETRY_MS` (6 h) — one timeout used to
+  be kept for good. `SITE_FLAGS_V` 3 remakes every answered lookup on its
+  deal's next view. **`/api/flood/health`** (public, `floodHealth`) draws a
+  small restyled frame of a public place from Render's own network and
+  names each step — the layer list, the legend against the runner's copy
+  (values FEMA added or dropped listed), the overlay and whether FEMA sent
+  it at its own 30%, the aerial — kept ten minutes a process; live-verify
+  prints it after every deploy. **The tract's own Census figures wait on a
+  key**: the ACS data API now answers a keyless request with a redirect to
+  `missing_key.html` (probe run 2026-09-25), so a free `CENSUS_API_KEY` is
+  the operator's move before the site reads a deal's tract.
   **The zone goes wherever the deal is summarized** (#426), one reader per
   shape in `lib/site-flags/core.ts`, each from the stored lookup and silent
   while it is pending:
@@ -3532,22 +3607,18 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     the seller's figures may not carry.
 
   **The full report prints the map** (#427) on a page of its own, "The
-  site", before the portfolio and the terms: `floodMapFor`
-  (`lib/flood-map.ts`) asks the aerial and FEMA's overlay for the Flood
-  tab's frame at `REPORT_FLOOD_SIZE` (1040×468 at z17, `lib/basemaps.ts`,
-  the one size the fetch and the PDF's 524pt frame both read) and
-  composites them with sharp into ONE JPEG (`compositeFloodMap` — react-pdf
-  embeds a single picture, and the overlay is fitted to the aerial's own
-  pixels in case a server rounds a dimension). The composite and every
-  legend swatch pass `intactImage` before they are embedded. The ring is
-  drawn by the PDF at the frame's centre, FEMA's key carries the
-  building's own zone in bold, and the sentence is `floodZoneLine`, so the
-  report and the Flood tab say the same thing. It is bounded (8 s for the
-  picture, 3 s for the legend, fetched beside the cover aerial) and never
-  throws: a slow FEMA leaves the words without the picture, and a deal
-  with no street address, or no zone and no picture, gets no page.
-  `lib/flood-map.test.ts` holds the composite to the aerial's frame pixel
-  by pixel; the report test reads the page back from the PDF.
+  site", before the portfolio and the terms: `floodMapFor` takes the deal's
+  frame (drawing it where it must, bounded at 20 s, the draw going on for
+  the next report and the page) cut to `REPORT_FLOOD_SIZE`'s band at twice
+  its points, the key of the classes that band shows with the building's
+  own in bold, and `floodZoneLine`, so the report and the Flood view say the
+  same thing. The picture and every swatch pass `intactImage` before they
+  are embedded; the ring is drawn by the PDF over a dark halo. It never
+  throws: a frame not drawn in time leaves the words without the picture,
+  and a deal with no street address, or no zone and no picture, gets no
+  page. `lib/flood-map.test.ts` drives the draw, the correction, the keep,
+  the crop and the key against a faked network and bucket with real
+  pixels; the report test reads the page back from the PDF.
 - The homepage's photographs: `lib/photos.ts` (pure — the four slots with
   their file names, briefs, sizes and alt text; `presentPhotos` over an
   `exists` callback; `stripPhotos`; `HERO_AERIAL`) and `lib/photos-fs.ts`
@@ -4055,6 +4126,35 @@ run and verified** (`supabase/CHECK_MIGRATIONS.sql` reported them all ✅), so
 the four LPC pages, the cost ledger and the site-flag card are live rather
 than inert — the long-standing "blocked on migrations" caveat is retired.
 What remains is seeding and the operator's own accounts, not schema.
+
+## Agents
+
+`.claude/agents/` holds the roles the build hands work to (2026-09-30, the
+owner's ask: agents that take the work that does not need the lead, and one
+always looking for ways to make the site better). Each file's frontmatter
+names its tools; each body binds it to this file's rules.
+
+- `site-researcher` — the outside view (what other CRE tools do) and the
+  inside view (what on the site is wrong or stale), ranked, with files named.
+- `correctness-auditor` — reads a change or an area for statements the site
+  makes that are not true, or will stop being true on a date.
+- `surface-wirer` — carries a new reader to every surface a deal-type round
+  touches (the context line, the panel, the key terms, the pipeline slot and
+  CSV, the workbook, the memo, the report, the compare row).
+- `ship-checker` — the local ship loop: types, lint, the full suite, a build,
+  the page lint, the changelog marker.
+- `picture-curator` — the skyline, aerial and flood sheets from the runner,
+  judged by eye through the site's own crops; credits only as printed.
+- `data-verifier` — a candidate series, file or column printed by the runner
+  before it is trusted.
+
+Rules for the lead: an agent that edits works in its own worktree
+(`isolation: "worktree"`, `.claude/worktrees/` is ignored) and commits
+locally; the lead reviews each diff and cherry-picks. An agent never pushes,
+never edits this file, the changelog or a workflow, and never writes a
+figure, id, filename or credit from memory. Nothing an agent finds that
+changes the model's math, needs a key or a purchase, or widens the covered
+markets ships without the owner's permission.
 
 ## Build roadmap
 

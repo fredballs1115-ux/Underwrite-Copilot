@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "The flood map, drawn once and kept",
+      "href": "/deals",
+      "blurb": "The Flood view on a deal page could vanish when FEMA's map service or the USGS aerial answered slowly, which they often do on a first request. Each deal's flood map is now drawn once on the server, as soon as the deal page is first opened, and kept: the aerial, calmed, with FEMA's flood zones drawn over it in clear colours at twice the pixels, so edges stay sharp on a high-resolution screen. The 1% annual chance zone is blue, its floodway a red hatch over the blue, the 0.2% zone amber and levee areas teal. While the map is being drawn the view says so; a slow answer is asked for again; and if it never comes, the key and the sentence stay. The key lists only the zones the picture actually shows. The sentence names the zone at the building correctly for every zone FEMA returns, with FEMA's base flood elevation where it states one. It is now looked up at the same point the map is drawn around. The full report prints the same picture."
+    },
+    {
+      "date": "2026-09-30",
       "title": "Self-storage, read by the unit and the street rate",
       "href": "/deals",
       "blurb": "A self-storage deal is now read the way an operator reads one. The deal page draws the share of units let, the share of the area let and the share of the rent collected as three bars against the 85% line a facility is read as stabilized past, so the gap between units let and rent collected is the distance between two bars. It puts what sitting tenants pay on one scale with today's street rate. The premium years of rate increases built is the part past the street tick, and the page says what the rent would be with every tenant at street, the case a new facility down the road makes real. Rates are compared only on one basis: a per-unit figure is never set against a per-foot one, and a yearly figure is converted to a month's. It also reads the climate-controlled share, the tenant insurance program and a third-party manager as stated, and says a buyer on another platform keeps neither the program nor the pricing system. A facility under 85% by units is flagged as a lease-up on the pipeline card. Where the deal has a model, the page says what the premium is worth at its exit cap and that its single vacancy never leases up."

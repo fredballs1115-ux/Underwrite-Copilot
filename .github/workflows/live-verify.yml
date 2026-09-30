@@ -1118,6 +1118,7 @@ jobs:
           mark "#469 the price per unit on every card" grep -q "The price per unit on every card" p_whats-new.html
           mark "#470 mobile-home parks, read by the lot" grep -q "Mobile-home parks, read by the lot" p_whats-new.html
           mark "#471 self-storage, read by the unit and the street rate" grep -q "Self-storage, read by the unit and the street rate" p_whats-new.html
+          mark "#472 the flood map, drawn once and kept" grep -q "The flood map, drawn once and kept" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then
