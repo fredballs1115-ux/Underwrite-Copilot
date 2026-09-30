@@ -43,7 +43,9 @@ function render(now: Date, zori: ZoriRead | null, realtor: RealtorRead | null): 
 
 describe("FeedsCard — every feed's row, current or named stale", () => {
   it("on the fixture's day every feed is current, and the sample metro is named", () => {
-    const html = render(FIXTURE_NOW, { asOf: "2026-08-31" } as ZoriRead, { asOf: "2026-09-01" } as RealtorRead);
+    // What the two monthly pulls hold on Sep 21: August from each, Zillow's
+    // dated the month's last day and Realtor.com's its first.
+    const html = render(FIXTURE_NOW, { asOf: "2026-08-31" } as ZoriRead, { asOf: "2026-08-01" } as RealtorRead);
     dumpView("feeds-current", html);
     expect(a11yIssues(html)).toEqual([]);
     const text = visibleText(html);

@@ -53,14 +53,23 @@ export const FEEDS: readonly FeedSpec[] = [
   { id: "realtor", name: "For-sale market and hotness", publisher: "Realtor.com", schedule: "the 8th of each month", workflow: "realtor.yml" },
 ];
 
-/** Zillow dates a month's figure its last day and publishes it around the
- *  17th of the next month; the pull runs the 20th, so on the eve of the
- *  next pull the figure is about fifty days old and current. */
+/** Zillow dates a month's figure its LAST day and publishes it in the middle
+ *  of the next month; the pull runs on the 20th (zori.yml) and writes the
+ *  month before, so the August figure (Aug 31) is written on Sep 20 and
+ *  replaced on Oct 20, when it is 50 days old. The oldest a current figure
+ *  gets is the month between at its longest (31 days) and the 20 days to
+ *  the pull: 51, the July figure on Sep 20. Four more days are the grace a
+ *  late release or a re-run is given before the figure is called stale. */
 export const ZILLOW_FRESH_DAYS = 55;
-/** Realtor.com dates a month's figure its first day and publishes early
- *  the next month; the pull runs the 8th, so the figure is at most about
- *  forty days old while current. */
-export const REALTOR_FRESH_DAYS = 45;
+/** Realtor.com dates a month's figure its FIRST day and publishes it early
+ *  the next month; the pull runs on the 8th (realtor.yml), so the August
+ *  figure (Aug 1) is written on Sep 8 and replaced on Oct 8, when it is 68
+ *  days old. The oldest a current figure gets is its own month and the next
+ *  at their longest (two 31-day months, July and August or December and
+ *  January) and the 7 days to the pull: 69. The same four days' grace make
+ *  73. The limit had been 45 — as if the figure were dated its month's last
+ *  day — so a healthy August figure read "stale" from Sep 15 to Oct 8. */
+export const REALTOR_FRESH_DAYS = 73;
 
 export interface FeedStatus {
   spec: FeedSpec;

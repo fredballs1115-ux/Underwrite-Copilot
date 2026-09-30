@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import metros from "@/data/research/metros.json";
-import { readMetroRates, readRates, type RateRow } from "./live-rates";
+import { ageDays, readMetroRates, readRates, type RateRow } from "./live-rates";
 import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
 import { FEEDS, REALTOR_FRESH_DAYS, SAMPLE_METRO, ZILLOW_FRESH_DAYS, feedHealth, feedStatusWord } from "./feed-health";
 import type { ZoriRead } from "./zori";
@@ -16,8 +16,12 @@ const DC_ROWS: RateRow[] = [
   { series_id: "RRVRSOQ156N", obs_date: "2026-04-01", value: 9.5 },
 ];
 
+// What the two monthly pulls hold on the fixture's day (Sep 21): Zillow's
+// pull ran on the 20th and wrote August, dated its last day; Realtor.com's
+// ran on the 8th and wrote August too, dated its first day. September's
+// figure from Realtor.com does not exist until Oct 8.
 const zori = { asOf: "2026-08-31" } as ZoriRead;
-const realtor = { asOf: "2026-09-01" } as RealtorRead;
+const realtor = { asOf: "2026-08-01" } as RealtorRead;
 
 const health = (now = FIXTURE_NOW) =>
   feedHealth({
@@ -56,8 +60,41 @@ describe("feedHealth — each feed judged on its own cadence, the stale series n
 
   it("Zillow and Realtor.com are judged on their own month's cadence", () => {
     expect(byId.zillow).toMatchObject({ fresh: true, newest: "2026-08-31", ageDays: 21, seriesTotal: 1 });
-    expect(byId.realtor).toMatchObject({ fresh: true, newest: "2026-09-01", ageDays: 20 });
-    expect(ZILLOW_FRESH_DAYS).toBeGreaterThan(REALTOR_FRESH_DAYS);
+    expect(byId.realtor).toMatchObject({ fresh: true, newest: "2026-08-01", ageDays: 51 });
+    // Realtor.com dates a month its first day and Zillow its last, so the
+    // same month's figure is thirty-odd days older on Realtor.com's clock.
+    expect(REALTOR_FRESH_DAYS).toBeGreaterThan(ZILLOW_FRESH_DAYS);
+  });
+
+  it("each limit is the publisher's own calendar: never stale while its successor is still to come, stale within a week of a missed pull", () => {
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    let zillowOldest = 0;
+    let realtorOldest = 0;
+    for (let y = 2025; y <= 2028; y++) {
+      for (let m = 0; m < 12; m++) {
+        // Zillow: the month's last day, replaced by the pull on the 20th of the month after next.
+        zillowOldest = Math.max(zillowOldest, ageDays(iso(new Date(Date.UTC(y, m + 1, 0))), new Date(Date.UTC(y, m + 2, 20))));
+        // Realtor.com: the month's first day, replaced by the pull on the 8th of the month after next.
+        realtorOldest = Math.max(realtorOldest, ageDays(iso(new Date(Date.UTC(y, m, 1))), new Date(Date.UTC(y, m + 2, 8))));
+      }
+    }
+    expect(zillowOldest).toBe(51);
+    expect(realtorOldest).toBe(69);
+    for (const [limit, oldest] of [
+      [ZILLOW_FRESH_DAYS, zillowOldest],
+      [REALTOR_FRESH_DAYS, realtorOldest],
+    ]) {
+      expect(limit).toBeGreaterThanOrEqual(oldest);
+      expect(limit).toBeLessThan(oldest + 7);
+    }
+    // The case that read "stale" on a healthy feed: Realtor.com's August
+    // figure on Sep 30 (60 days old) is current until its successor lands on
+    // Oct 8, and stale within the week after a missed pull.
+    const onDay = (day: string) =>
+      feedHealth({ rates: [], metro: [], zori: null, realtor, now: new Date(`${day}T12:00:00Z`) }).find((s) => s.spec.id === "realtor")!;
+    expect(onDay("2026-09-30")).toMatchObject({ fresh: true, ageDays: 60 });
+    expect(onDay("2026-10-08")).toMatchObject({ fresh: true, ageDays: 68 });
+    expect(onDay("2026-10-15")).toMatchObject({ fresh: false, stale: ["median list price"] });
   });
 
   it("a dead daily pull shows as stale on the daily row while the monthly rows stay current — the steward's whole-table check cannot see this", () => {
