@@ -48,21 +48,79 @@ import { readNote, readNoteTerms, type NoteRead } from "@/lib/note-yield";
 
 export type { InterestKind };
 
+// A percentage is a share only where its own words say what it is a share
+// OF. Any lone percentage had been read as the share, so "Preferred equity,
+// 12% preferred return" read as a 12% stake and grossed a $15M price up to
+// $125M. A return, a pref, a rate, a coupon, a yield, a cap, an IRR, a fee,
+// a promote or an occupancy is never an ownership share, and the words
+// naming one win over any share word beside them ("a 12% preferred equity
+// interest" is withheld, not read). The fee simple and the leased fee are
+// estates, not a fee or an occupancy.
+const NOT_A_SHARE =
+  /\breturns?\b|\bpref(?:s|erred|erence)?\b|\brates?\b|\bcoupons?\b|\byield|\bcaps?\b|\bcapped\b|\bcapitali[sz]ation\b|\birrs?\b|(?<!leased[\s-])\bfees?\b(?![\s-]+simple)|\bpromote[sd]?\b|\bcarr(?:y|ied)\b|\bprofits?\b|\boccup(?:ancy|ied)\b|\bleased\b(?![\s-]+fee)|\bvacan(?:t|cy)\b|\bhurdles?\b|\bearn|\bpa(?:y|ys|ying|id|yable)\b|\bdistribut|\baccru|\bdividends?\b|\bannual(?:ly)?\b|\bannum\b|\bcompound|\bcash[\s-]+on[\s-]+cash\b|\bltv\b|\bltc\b|\bloan[\s-]+to[\s-]+(?:value|cost)\b|\bdiscount|\bpremium|\bcommission|\bspread|\bmargin|\bcoverage\b|\bescalat|\bincrease|\bbumps?\b|\binterest[\s-]+(?:only|income|expense|reserve|payments?)\b|\bdefault\b/i;
+// What an ownership share is called: an interest, a stake, ownership, a
+// share, a tenancy in common, a membership or a partnership interest — or
+// the entity it is a share of ("49% of the LLC").
+const SHARE_WORDS =
+  /\binterests?\b|\bstakes?\b|\bown(?:ed|er|ers|ership)\b|\bshares?\b|\bten(?:ant|ants|ancy)[\s-]+in[\s-]+common\b|\btic\b|\bmember(?:s|ships?)?\b|\bpartner(?:s|ships?)?\b|\bllcs?\b|\bentity\b|\b(?:joint[\s-]+)?ventures?\b|\bjv\b/i;
+const PCT_MENTION = /(?<![\d.])(\d{1,2}(?:\.\d+)?)\s*(?:%|percent\b|per cent\b)/gi;
+// Where a percentage's own words end: its clause's end, a sentence's, or a
+// word that starts the next clause.
+const CLAUSE_WORD = String.raw`\s(?:and|with|plus|while|which|whereas|but|at|or|versus|vs\.?|including|excluding|where|when)\s`;
+const WORDS_AFTER_END = new RegExp(String.raw`[,;:)\]\n]|\.(?=\s|$)|${CLAUSE_WORD}`, "i");
+// The words before it run back to its clause's start — never past a colon or
+// an opening parenthesis, which put a label in front ("Ownership: 49%",
+// "TIC interest (49%)").
+const WORDS_BEFORE_START = new RegExp(String.raw`[,;\n]|\.(?=\s|$)|${CLAUSE_WORD}`, "gi");
+
+/** What one percentage's own words say it is: "share", "not" (a return, a
+ *  rate, an occupancy…), or null where they name neither. */
+function readShareWords(words: string): "share" | "not" | null {
+  if (NOT_A_SHARE.test(words)) return "not";
+  return SHARE_WORDS.test(words) ? "share" : null;
+}
+
 /** A partial interest's share, in percent, read off the OM's own words
- *  ("49% limited partnership interest", "a 90 percent stake"); null where
- *  no single percentage under 100 is stated. */
+ *  ("49% limited partnership interest", "a 90 percent stake", "Ownership
+ *  interest: 49%"); null where no single percentage under 100 is stated AS a
+ *  share. A percentage counts only where the words right after it — or,
+ *  where those name nothing, the words right before it in its clause — name
+ *  an ownership share and no return, rate or occupancy; a bare "49%" names
+ *  nothing and is withheld, and so is a range ("49–51%"). */
 export function parseSharePct(text: string | null | undefined): number | null {
-  const t = (text ?? "").replace(/,/g, "");
-  const hits = [...t.matchAll(/(\d{1,2}(?:\.\d+)?)\s*(?:%|percent\b|per cent\b)/gi)].map((m) => Number(m[1]));
-  const valid = [...new Set(hits.filter((n) => Number.isFinite(n) && n > 0 && n < 100))];
-  // Two different percentages ("a 49% LP interest and a 2% GP interest") is
-  // not one share: withheld rather than picked.
+  const t = text ?? "";
+  const hits = [...t.matchAll(PCT_MENTION)].map((m, i, all) => {
+    const start = m.index ?? 0;
+    const end = start + m[0].length;
+    // Up to the next percentage, and the point where this one's clause ends
+    // inside that stretch (-1: it runs to the next percentage).
+    const upTo = i + 1 < all.length ? (all[i + 1].index ?? t.length) : t.length;
+    const tail = t.slice(end, upTo);
+    return { n: Number(m[1]), start, end, tail, cut: tail.search(WORDS_AFTER_END) };
+  });
+  const shares = hits.flatMap((h, i) => {
+    if (!Number.isFinite(h.n) || !(h.n > 0) || !(h.n < 100)) return [];
+    // A range is no one share.
+    if (/\d\s*%?\s*(?:[-–—]|\bto)\s*$/i.test(t.slice(0, h.start)) || /^\s*(?:[-–—]|to\b)\s*\d/i.test(t.slice(h.end))) return [];
+    const after = h.cut >= 0 ? h.tail.slice(0, h.cut) : h.tail;
+    // The words before it are the ones after the previous percentage's own
+    // clause ended — never that percentage's words ("a 90% stake (10%
+    // retained by the sponsor)" is one share, not two).
+    const prev = i > 0 ? hits[i - 1] : null;
+    const lead = !prev ? t.slice(0, h.start) : prev.cut >= 0 ? prev.tail.slice(prev.cut) : "";
+    const clauseStart = [...lead.matchAll(WORDS_BEFORE_START)].at(-1);
+    const before = clauseStart ? lead.slice((clauseStart.index ?? 0) + clauseStart[0].length) : lead;
+    return (readShareWords(after) ?? readShareWords(before)) === "share" ? [h.n] : [];
+  });
+  const valid = [...new Set(shares)];
+  // Two different shares ("a 49% LP interest and a 2% GP interest") is not
+  // one share: withheld rather than picked.
   return valid.length === 1 ? valid[0] : null;
 }
 
 /** The minimum the price readers need: the kind, and a partial interest's
- *  share where one percentage is stated. An extraction saved before the
- *  interest was read is fee simple. */
+ *  share where one percentage is stated as the share (`parseSharePct`). An
+ *  extraction saved before the interest was read is fee simple. */
 export function interestOf(ex: ExtractionResult | null | undefined): { kind: InterestKind; sharePct: number | null } {
   const kind = ex?.interest?.kind ?? "fee_simple";
   return { kind, sharePct: kind === "partial_interest" ? parseSharePct(ex?.interest?.share) : null };

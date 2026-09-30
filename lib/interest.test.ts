@@ -54,6 +54,58 @@ describe("parseSharePct — a partial interest's share, off the OM's own words",
     expect(parseSharePct(undefined)).toBeNull();
   });
 
+  it("reads only a percentage its own words call an ownership share — never a return, a rate or an occupancy", () => {
+    // The bug: any lone percentage was the share, so a $15M preferred-equity
+    // price grossed up to $125M on its 12% preferred return.
+    expect(parseSharePct("Preferred equity, 12% preferred return")).toBeNull();
+    expect(parseSharePct("a 49% tenant-in-common interest")).toBe(49);
+    expect(parseSharePct("a 90% interest in the partnership with an 8% preferred return")).toBe(90);
+    // Each kind of ownership share, by its own words, after the figure or
+    // before it in its clause.
+    expect(parseSharePct("a 51% membership interest in the owning LLC")).toBe(51);
+    expect(parseSharePct("49% of the LLC")).toBe(49);
+    expect(parseSharePct("a 25% ownership stake")).toBe(25);
+    expect(parseSharePct("a 33.3% undivided tenancy in common")).toBe(33.3);
+    expect(parseSharePct("Ownership interest: 49%")).toBe(49);
+    expect(parseSharePct("TIC interest (49%)")).toBe(49);
+    expect(parseSharePct("a 49% interest in the fee simple")).toBe(49);
+    // A return, a pref, a rate, a coupon, a yield, a cap, an IRR, a fee, a
+    // promote or an occupancy is never the share, whatever sits beside it.
+    for (const text of [
+      "8% pref",
+      "Preferred return of 8%",
+      "5.25% interest rate",
+      "a 6.5% coupon",
+      "7% current yield",
+      "a 5.5% cap",
+      "15% IRR",
+      "2% acquisition fee",
+      "a 20% promote",
+      "20% carried interest",
+      "95% occupied",
+      "a 12% preferred equity interest",
+    ]) {
+      expect(parseSharePct(text), text).toBeNull();
+    }
+    // The non-share percentages beside a share drop out, and the share stands.
+    expect(parseSharePct("a 49% LP interest; 8% preferred return; 20% promote over a 12% IRR")).toBe(49);
+    expect(parseSharePct("a 49% interest in a property that is 95% leased")).toBe(49);
+    expect(parseSharePct("a 90% stake (10% retained by the sponsor)")).toBe(90);
+    // A percentage that names nothing, or a range, is no share.
+    expect(parseSharePct("49%")).toBeNull();
+    expect(parseSharePct("a 49%–51% interest")).toBeNull();
+    // Two different shares remain two: withheld.
+    expect(parseSharePct("a 49% LP interest (the sponsor keeps a 51% GP interest)")).toBeNull();
+  });
+
+  it("a preferred-equity price is never grossed up on its return", () => {
+    const pref = ex(interest({ kind: "partial_interest", share: "Preferred equity, 12% preferred return" }));
+    expect(interestOf(pref)).toEqual({ kind: "partial_interest", sharePct: null });
+    const r = readInterest(pref, 15_000_000)!;
+    expect(r.impliedWhole).toBeNull();
+    expect(r.headline).toContain("states no single percentage for it");
+  });
+
   it("interestOf reads an older extraction as fee simple, and a share only on a partial interest", () => {
     expect(interestOf(ex(undefined))).toEqual({ kind: "fee_simple", sharePct: null });
     expect(interestOf(null)).toEqual({ kind: "fee_simple", sharePct: null });
