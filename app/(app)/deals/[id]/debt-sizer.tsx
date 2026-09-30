@@ -13,6 +13,7 @@ import {
 } from "@/lib/deal-strategy";
 import { ConstructionDebtPanel } from "./construction-debt-panel";
 import type { UnderwritingModel } from "@/lib/model/types";
+import { statedModelRate } from "@/lib/model/stated-rate";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { DealRateSeeds, RateSeed } from "@/lib/debt-index";
@@ -165,10 +166,15 @@ function deriveSeed(
   const plausible = (noi: number | null, price: number | null) =>
     noi != null && noi > 0 && (price == null || noi / price < IMPLIED_CAP_CEILING) ? noi : null;
   if (model?.inputs) {
-    const price = model.inputs.purchasePrice || null;
+    // A note's or the land's price is no property loan's basis (#415), and
+    // the model's price is not the building's where the interest is either.
+    const modelPrice = model.inputs.purchasePrice || null;
+    const price = buildingPriceOf(extraction, modelPrice) == null ? null : modelPrice;
     // A loan the documents state outranks the day's index: a term sheet's
-    // rate is a quote, and a quote beats a benchmark.
-    const stated = model.inputs.loan?.ratePct ?? null;
+    // rate is a quote, and a quote beats a benchmark. The first-draft model
+    // carries a rate whether or not a document states one, so only a rate a
+    // document states is taken as the quote (lib/model/stated-rate).
+    const stated = statedModelRate(model);
     return {
       price,
       noi: plausible(model.cashFlow?.[0]?.noi ?? null, price),
@@ -422,10 +428,10 @@ export function DebtSizer({
       <div className="border-t border-line p-5">
         <p className="text-sm text-muted">
           {seed.seededFrom === "model"
-            ? "No AI here — seeded from your model."
+            ? "The arithmetic here is code; its figures start from the first-draft model's."
             : seed.seededFrom === "extraction"
-              ? "No AI here — seeded from the OM extraction."
-              : "No AI here — enter the deal's figures."}
+              ? "The arithmetic here is code; its figures start from the OM's."
+              : "The arithmetic here is code — enter the deal's figures."}
         </p>
 
         {omTerms.length > 0 && (
