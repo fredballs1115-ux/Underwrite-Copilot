@@ -34,6 +34,35 @@ const clip = (s, n = ROW_CLIP) => (s.length > n ? `${s.slice(0, n)}…` : s);
 // shows the shape; overridable for a deeper look.
 const SHEET_ROWS = Number(process.env.PROBE_SHEET_ROWS ?? "12");
 
+/** How deep a JSON document is walked, and how many paths are printed. */
+const JSON_DEPTH = Number(process.env.PROBE_JSON_DEPTH ?? "6");
+const JSON_PATHS = Number(process.env.PROBE_JSON_PATHS ?? "300");
+
+function parseJson(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Every path of a JSON document to `JSON_DEPTH`: an object's keys, an
+ *  array's length and its first element's shape, a scalar's value. */
+function describeJson(value, path = "$", depth = 0, out = []) {
+  if (out.length >= JSON_PATHS) return out;
+  if (Array.isArray(value)) {
+    out.push(`${path}: array[${value.length}]`);
+    if (value.length > 0 && depth < JSON_DEPTH) describeJson(value[0], `${path}[0]`, depth + 1, out);
+  } else if (value && typeof value === "object") {
+    const keys = Object.keys(value);
+    out.push(`${path}: {${keys.length} key${keys.length === 1 ? "" : "s"}}`);
+    if (depth < JSON_DEPTH) for (const k of keys) describeJson(value[k], `${path}.${k}`, depth + 1, out);
+  } else {
+    out.push(`${path}: ${clip(JSON.stringify(value) ?? String(value), 160)}`);
+  }
+  return out;
+}
+
 /** A cell as the row line prints it: a date as ISO, a formula by its
  *  result, a rich-text run by its text, a blank as nothing. */
 function cellText(v) {
@@ -123,6 +152,17 @@ for (const url of urls) {
     const unique = Array.from(new Set(links));
     console.log(`  an HTML page; ${unique.length} link(s) to a data file${unique.length ? ":" : ""}`);
     for (const l of unique.slice(0, 25)) console.log(`    ${clip(l, 200)}`);
+    continue;
+  }
+  // A JSON response is one long line, and its first 2,000 characters say
+  // little about its shape: walk it instead, printing every path with an
+  // array's length and a scalar's value, so a service is designed against
+  // what it returns (the Census geocoder's layers, for one).
+  const json = /json/i.test(type) || /^\s*[[{]/.test(text) ? parseJson(text) : undefined;
+  if (json !== undefined) {
+    const paths = describeJson(json);
+    console.log(`  JSON · ${paths.length} path(s)${paths.length >= JSON_PATHS ? ` (the first ${JSON_PATHS})` : ""}:`);
+    for (const p of paths) console.log(`    ${p}`);
     continue;
   }
   console.log(`  header: ${clip(lines[0], HEADER_CLIP)}`);
