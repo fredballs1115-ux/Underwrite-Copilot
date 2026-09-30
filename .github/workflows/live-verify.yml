@@ -384,11 +384,13 @@ jobs:
           # The ids come from the table the site actually serves, read out of
           # the source rather than listed here, so a market added to
           # lib/skyline.ts is probed the next run without touching this file.
-          ids=$(node -e 'const s=require("fs").readFileSync("lib/skyline.ts","utf8");for(const m of s.matchAll(/^  ([a-z_]+): \{$/gm))console.log(m[1])')
+          # A metro area's key is quoted with a colon ("cbsa:39300", #472):
+          # read too, and asked for percent-encoded, as the cards ask.
+          ids=$(node -e 'const s=require("fs").readFileSync("lib/skyline.ts","utf8");for(const m of s.matchAll(/^  (?:([a-z_]+)|"(cbsa:\d{5})"): \{$/gm))console.log(m[1]??m[2])')
           for id in $ids; do
             # Ask at the width a page actually renders, so the byte counts
             # here are comparable to the Commons probe's above.
-            if probe_img "$id" "https://underwrite-copilot.onrender.com/api/imagery/skyline/$id?w=1600"; then
+            if probe_img "$id" "https://underwrite-copilot.onrender.com/api/imagery/skyline/${id/:/%3A}?w=1600"; then
               live=$((live+1))
             else
               dead=$((dead+1))

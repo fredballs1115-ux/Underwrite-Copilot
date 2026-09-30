@@ -1248,6 +1248,12 @@
       "queries": [
         "Providence skyline panorama",
         "Providence downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Providence RI skyline.jpg",
+          "note": "Providence, RI — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36750289515)."
+        }
       ]
     },
     {
@@ -1268,6 +1274,12 @@
       "queries": [
         "Milwaukee skyline panorama",
         "Milwaukee downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Milwaukee Skyline Looking Southeast Towards Lake Michigan From Northwest by Isaac Rowlett.jpg",
+          "note": "Milwaukee, WI — Bfkenney, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36750289515)."
+        }
       ]
     },
     {
@@ -1288,6 +1300,12 @@
       "queries": [
         "Oklahoma City skyline panorama",
         "Oklahoma City downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Oklahoma City skyline from drone.jpg",
+          "note": "Oklahoma City, OK — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36751888862)."
+        }
       ]
     },
     {
@@ -1308,6 +1326,12 @@
       "queries": [
         "Louisville skyline panorama",
         "Louisville downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Panorama de Louisville.jpg",
+          "note": "Louisville, KY — Anindya Chakraborty, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36750289515)."
+        }
       ]
     },
     {
@@ -1328,6 +1352,12 @@
       "queries": [
         "Memphis skyline panorama",
         "Memphis downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Skyline of Memphis, TN.jpg",
+          "note": "Memphis, TN — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36750289515)."
+        }
       ]
     },
     {
@@ -1368,6 +1398,12 @@
       "queries": [
         "Hartford skyline panorama",
         "Hartford downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Hartford, CT skyline (cropped).jpg",
+          "note": "Hartford, CT — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36750496544)."
+        }
       ]
     },
     {
@@ -1388,6 +1424,12 @@
       "queries": [
         "Buffalo skyline panorama",
         "Buffalo downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Buffalo, NY skyline.jpg",
+          "note": "Buffalo, NY — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36752030741)."
+        }
       ]
     },
     {
@@ -1408,6 +1450,12 @@
       "queries": [
         "New Orleans skyline panorama",
         "New Orleans downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "New Orleans from the Air September 2019 - Central Business District Skyline (cropped).jpg",
+          "note": "New Orleans, LA — George Bannister, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36752856482)."
+        }
       ]
     },
     {
@@ -1428,6 +1476,12 @@
       "queries": [
         "Tucson skyline panorama",
         "Tucson downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "View of Tucson from Sentinel Peak 2.jpg",
+          "note": "Tucson, AZ — John Diebolt, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 36750496544)."
+        }
       ]
     },
     {
@@ -1448,6 +1502,12 @@
       "queries": [
         "Tulsa skyline panorama",
         "Tulsa downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Tulsa skyline aerial, April 2023.jpg",
+          "note": "Tulsa, OK — Nils Huenerfuerst, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36752971792)."
+        }
       ]
     },
     {
@@ -1468,6 +1528,12 @@
       "queries": [
         "Honolulu skyline panorama",
         "Honolulu downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "2022 Views from Diamond Head 02.jpg",
+          "note": "Honolulu, HI — Farragutful, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36750858237)."
+        }
       ]
     },
     {
@@ -1488,6 +1554,12 @@
       "queries": [
         "Omaha skyline panorama",
         "Omaha downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "City of Omaha, Nebraska Skyline on the Missouri River (30899969517).jpg",
+          "note": "Omaha, NE — Tony Webster from Minneapolis, Minnesota, United States, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36750858237)."
+        }
       ]
     },
     {
@@ -1508,6 +1580,12 @@
       "queries": [
         "Stamford skyline panorama",
         "Stamford downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Bridgeport, Connecticut downtown.jpg",
+          "note": "Bridgeport, CT — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36750858237)."
+        }
       ]
     },
     {
@@ -1528,6 +1606,12 @@
       "queries": [
         "Grand Rapids skyline panorama",
         "Grand Rapids downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Grand Rapids, Michigan skyline May 2022.jpg",
+          "note": "Grand Rapids, MI — WMrapids, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 36750858237)."
+        }
       ]
     },
     {
@@ -1568,6 +1652,12 @@
       "queries": [
         "Greenville skyline panorama",
         "Greenville downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "2024-4-12-Falls Park Waterfall Greenville South Carolina by Yousef AbdulHusain.jpg",
+          "note": "Greenville, SC — CantoV, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36750858237)."
+        }
       ]
     },
     {
@@ -1588,6 +1678,12 @@
       "queries": [
         "Albuquerque skyline panorama",
         "Albuquerque downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Albuquerque, New Mexico skyline.jpg",
+          "note": "Albuquerque, NM — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36753099586)."
+        }
       ]
     },
     {
@@ -1608,6 +1704,12 @@
       "queries": [
         "Boise skyline panorama",
         "Boise downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Boise, Idaho.jpg",
+          "note": "Boise, ID — Jyoni Shuler, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36751130861)."
+        }
       ]
     },
     {
@@ -1628,6 +1730,12 @@
       "queries": [
         "Charleston skyline panorama",
         "Charleston downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Rainbow Row Panorama.jpg",
+          "note": "Charleston, SC — Something Original, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36751130861)."
+        }
       ]
     },
     {
@@ -1648,6 +1756,12 @@
       "queries": [
         "Knoxville skyline panorama",
         "Knoxville downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Knoxville Skyline from Marriott - panoramio.jpg",
+          "note": "Knoxville, TN — Bohao Zhao, CC BY 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36751130861)."
+        }
       ]
     },
     {
@@ -1668,6 +1782,12 @@
       "queries": [
         "Des Moines skyline panorama",
         "Des Moines downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Skyline downtown Des Moines.jpg",
+          "note": "Des Moines, IA — BarbaraLN, CC BY-SA 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36751130861)."
+        }
       ]
     },
     {

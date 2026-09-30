@@ -63,7 +63,16 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params;
+  // A metro area's key carries a colon ("cbsa:39300", #472) and arrives
+  // percent-encoded from lib/market-picture; decoded here whether or not the
+  // framework has, since no key contains a "%" of its own.
+  const { id: raw } = await params;
+  let id = raw;
+  try {
+    id = decodeURIComponent(raw);
+  } catch {
+    // a malformed escape is no key in the table
+  }
   const shot = skylineFor(id);
   // No verified photograph for this market — the caller falls back to the
   // overhead frame. Never a guess, never a placeholder.

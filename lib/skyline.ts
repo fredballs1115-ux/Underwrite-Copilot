@@ -488,6 +488,191 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "vlasta2",
     license: "CC BY 2.0",
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+  },  // ── Metro areas the site reads no figures for (#472) ──────────────────────
+  // Keyed by the metro area's Census code (`areaSkylineId`), each reached
+  // through a deal's county (lib/market-picture) — a card and the deal page,
+  // never a /market band. Chosen by eye from skyline-sheet runs on
+  // 2026-09-30, each file, credit and licence copied from the run's
+  // index.json, and judged through the card's and the deal page's crops.
+  // Albuquerque, NM: skyline-sheet run 36753099586 — the article's lead image, whole in every crop.
+  "cbsa:10740": {
+    file: "Albuquerque, New Mexico skyline.jpg",
+    place: "Downtown Albuquerque from above",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Albuquerque, NM",
+  },
+  // Boise, ID: skyline-sheet run 36751130861 — the article's lead image, whole in every crop.
+  "cbsa:14260": {
+    file: "Boise, Idaho.jpg",
+    place: "Downtown Boise at golden hour under the snow-dusted foothills",
+    credit: "Jyoni Shuler",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Boise, ID",
+  },
+  // Bridgeport, CT: skyline-sheet run 36750858237 — the principal city's lead image, whole in every crop.
+  "cbsa:14860": {
+    file: "Bridgeport, Connecticut downtown.jpg",
+    place: "Downtown Bridgeport and its harbor from the air",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Bridgeport, CT",
+  },
+  // Buffalo, NY: skyline-sheet run 36752030741 — the one usable frame of fourteen; the band would clip Seneca One's top.
+  "cbsa:15380": {
+    file: "Buffalo, NY skyline.jpg",
+    place: "Downtown Buffalo from above, its ballpark and City Hall",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Buffalo, NY",
+  },
+  // Charleston, SC: skyline-sheet run 36751130861 — the picture the city is known by; the credit is the name the runner printed, without the talk-page link printed after it.
+  "cbsa:16700": {
+    file: "Rainbow Row Panorama.jpg",
+    place: "Rainbow Row's pastel houses, Charleston",
+    credit: "Something Original",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Charleston, SC",
+  },
+  // Des Moines, IA: skyline-sheet run 36751130861 — whole in every crop, where the article's lead lost 801 Grand's crown.
+  "cbsa:19780": {
+    file: "Skyline downtown Des Moines.jpg",
+    place: "Downtown Des Moines through the arch of the Center Street footbridge",
+    credit: "BarbaraLN",
+    license: "CC BY-SA 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0",
+    name: "Des Moines, IA",
+  },
+  // Grand Rapids, MI: skyline-sheet run 36750858237 — blue hour with the lit bridge, sharp and whole.
+  "cbsa:24340": {
+    file: "Grand Rapids, Michigan skyline May 2022.jpg",
+    place: "Downtown Grand Rapids over the Grand River at dusk",
+    credit: "WMrapids",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    name: "Grand Rapids, MI",
+  },
+  // Greenville, SC: skyline-sheet run 36750858237 — the picture the city is known by and its only usable file; credited as Commons names the author (the filename names Yousef AbdulHusain).
+  "cbsa:24860": {
+    file: "2024-4-12-Falls Park Waterfall Greenville South Carolina by Yousef AbdulHusain.jpg",
+    place: "The waterfall in Falls Park, downtown Greenville",
+    credit: "CantoV",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Greenville, SC",
+  },
+  // Hartford, CT: skyline-sheet run 36750496544 — the article's lead image, whole in every crop.
+  "cbsa:25540": {
+    file: "Hartford, CT skyline (cropped).jpg",
+    place: "Downtown Hartford and the State Capitol's gold dome in autumn",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Hartford, CT",
+  },
+  // Knoxville, TN: skyline-sheet run 36751130861 — keeps the Sunsphere, where the alternative was grey and lost it.
+  "cbsa:28940": {
+    file: "Knoxville Skyline from Marriott - panoramio.jpg",
+    place: "Downtown Knoxville and the Sunsphere in evening light",
+    credit: "Bohao Zhao",
+    license: "CC BY 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/3.0",
+    name: "Knoxville, TN",
+  },
+  // Louisville, KY: skyline-sheet run 36750289515 — whole in every crop; the night lead is 1415px wide.
+  "cbsa:31140": {
+    file: "Panorama de Louisville.jpg",
+    place: "Downtown Louisville across the Ohio River",
+    credit: "Anindya Chakraborty",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Louisville, KY",
+  },
+  // Memphis, TN: skyline-sheet run 36750289515 — the article's lead image, whole in every crop.
+  "cbsa:32820": {
+    file: "Skyline of Memphis, TN.jpg",
+    place: "Downtown Memphis along the Mississippi River",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Memphis, TN",
+  },
+  // Milwaukee, WI: skyline-sheet run 36750289515 — the one frame that keeps every tower whole; credited as Commons names the author (the filename names Isaac Rowlett).
+  "cbsa:33340": {
+    file: "Milwaukee Skyline Looking Southeast Towards Lake Michigan From Northwest by Isaac Rowlett.jpg",
+    place: "Downtown Milwaukee and Lake Michigan, looking southeast from the northwest side",
+    credit: "Bfkenney",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Milwaukee, WI",
+  },
+  // New Orleans, LA: skyline-sheet run 36752856482 — the frame that keeps the towers is a 1704x558 phone panorama.
+  "cbsa:35380": {
+    file: "New Orleans from the Air September 2019 - Central Business District Skyline (cropped).jpg",
+    place: "The Central Business District of New Orleans from the air, the Mississippi behind",
+    credit: "George Bannister",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "New Orleans, LA",
+  },
+  // Oklahoma City, OK: skyline-sheet run 36751888862 — the sharpest frame; the Devon Tower is whole on the card (a strip-safe alternative carries a burned-in watermark).
+  "cbsa:36420": {
+    file: "Oklahoma City skyline from drone.jpg",
+    place: "Downtown Oklahoma City and the Devon Tower, from a drone",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Oklahoma City, OK",
+  },
+  // Omaha, NE: skyline-sheet run 36750858237 — the article's lead image, at ground level, whole in every crop.
+  "cbsa:36540": {
+    file: "City of Omaha, Nebraska Skyline on the Missouri River (30899969517).jpg",
+    place: "Downtown Omaha across the Missouri River from Council Bluffs",
+    credit: "Tony Webster from Minneapolis, Minnesota, United States",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Omaha, NE",
+  },
+  // Providence, RI: skyline-sheet run 36750289515 — the article's lead image; the river, bridge and skyline stay whole in every crop.
+  "cbsa:39300": {
+    file: "Providence RI skyline.jpg",
+    place: "Downtown Providence beyond the Providence River Bridge",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Providence, RI",
+  },
+  // Tucson, AZ: skyline-sheet run 36750496544 — the article's lead image, whole in every crop.
+  "cbsa:46060": {
+    file: "View of Tucson from Sentinel Peak 2.jpg",
+    place: "Downtown Tucson from Sentinel Peak, the mountains behind",
+    credit: "John Diebolt",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Tucson, AZ",
+  },
+  // Tulsa, OK: skyline-sheet run 36752971792 — whole in every crop, where a ground-level frame cut the BOK Tower.
+  "cbsa:46140": {
+    file: "Tulsa skyline aerial, April 2023.jpg",
+    place: "Downtown Tulsa from the air",
+    credit: "Nils Huenerfuerst",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Tulsa, OK",
+  },
+  // Honolulu, HI: skyline-sheet run 36750858237 — the article's lead image, whole in every crop.
+  "cbsa:46520": {
+    file: "2022 Views from Diamond Head 02.jpg",
+    place: "Waikiki and Honolulu along the shore, from Diamond Head",
+    credit: "Farragutful",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Honolulu, HI",
   },
 };
 
