@@ -18,7 +18,10 @@ import type { BoardMarket } from "./sector-jobs-board";
  * row and is not listed twice (`shared`); a metro whose read lacks the
  * apartment figure is listed after the ranked ones with its all-homes
  * change, never ranked on a different measure; nothing renders until the
- * monthly pull has written a row. Zillow's condition for the data is the
+ * monthly pull has written a row. The board is one month's — the newest any
+ * read is of, named in its header — and a metro whose read is of an older
+ * month (the pull missed its row this time) is left off rather than ranked
+ * under a month it is not of. Zillow's condition for the data is the
  * credit, which is part of the note and not the page's to forget.
  */
 export function RentBoard({
@@ -30,18 +33,22 @@ export function RentBoard({
   /** `liveZoriAll(names)`, keyed by the market's name */
   reads: ReadonlyMap<string, ZoriRead | null>;
 }) {
-  const rows = markets.flatMap((market) => {
+  const read = markets.flatMap((market) => {
     const z = reads.get(market.name);
     return z && !z.shared ? [{ market, z }] : [];
   });
+  // The board's month: the newest any read is of. Each read's figures are
+  // all of its own month (lib/zori), so a read of another month is left off
+  // whole rather than said under this one.
+  const newest = read.map((x) => x.z.asOf).sort().at(-1) ?? null;
+  const rows = read.filter((x) => x.z.asOf === newest);
   const ranked = rows
     .filter((x): x is typeof x & { z: ZoriRead & { mfrYoyPct: number } } => x.z.mfrYoyPct !== null && Number.isFinite(x.z.mfrYoyPct))
     .sort((a, b) => b.z.mfrYoyPct - a.z.mfrYoyPct);
-  if (ranked.length === 0) return null;
+  if (!newest || ranked.length === 0) return null;
   const unranked = rows.filter((x) => !ranked.includes(x as (typeof ranked)[number]));
   const widest = Math.max(0.5, ...ranked.map((x) => Math.abs(x.z.mfrYoyPct)));
   const half = (v: number) => `${Math.min(50, (Math.abs(v) / widest) * 50)}%`;
-  const newest = ranked.map((x) => x.z.asOf).sort().at(-1) ?? ranked[0].z.asOf;
   const signed = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)}%`;
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5" data-qa="rent-board">

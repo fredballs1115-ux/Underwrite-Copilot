@@ -419,8 +419,8 @@ async function liveMarketFromDb(
       return liveMarketBrief({
         metro: market,
         rates: readMetroRates(market.id, rateRows, now),
-        zori: zoriFor(bench, market.name),
-        realtor: realtorFor(bench, market.name),
+        zori: zoriFor(bench, market.name, now),
+        realtor: realtorFor(bench, market.name, now),
         now,
         national: withNational ? national : undefined,
         assetClass,

@@ -6,9 +6,9 @@ import {
   type SectorJobsMetric,
   type SeriesSource,
 } from "@/lib/live-rates";
-import { monthOf, type ZoriRead } from "@/lib/zori";
+import { monthOf, zillowFresh, type ZoriRead } from "@/lib/zori";
 import { metroSupply, type MetroSupply } from "@/lib/metro-supply";
-import { HOTNESS_METROS, type RealtorRead } from "@/lib/realtor";
+import { HOTNESS_METROS, realtorFresh, type RealtorRead } from "@/lib/realtor";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { isDataMetro, isStateMarket } from "@/lib/market-match";
 import { placedByClause, type CountyPlacedBy } from "@/lib/placed-by";
@@ -438,8 +438,12 @@ function rateLine(r: LiveRate, sector: SectorJobs | null, supply: MetroSupply | 
   }
 }
 
-function zoriLine(z: ZoriRead | null): Said | null {
-  if (!z) return null;
+/** Zillow's figures, one line under the month they are all of (lib/zori
+ *  reads each only where its own row is of the rent's month) — and only
+ *  while that month is current on the brief's day, the same limit the read
+ *  and the feeds card use, so a read made on another day cannot say one. */
+function zoriLine(z: ZoriRead | null, now: Date): Said | null {
+  if (!z || !zillowFresh(z.asOf, now)) return null;
   const parts = [
     `Asking rent, all home types: $${whole(z.rent)}/mo${z.yoyPct !== null ? `, ${signed(z.yoyPct)}% from a year ago` : ""}`,
   ];
@@ -459,8 +463,12 @@ function zoriLine(z: ZoriRead | null): Said | null {
   return { line: `${parts.join("; ")} (${monthOf(z.asOf)}; Zillow Research — listings, before concessions)`, figures };
 }
 
-function realtorLine(m: RealtorRead | null): Said | null {
-  if (!m) return null;
+/** Realtor.com's figures, one line under the inventory's month — the
+ *  hotness rank, from a file of its own that can be a month behind, under
+ *  its own month where that differs — each only while current on the
+ *  brief's day. */
+function realtorLine(m: RealtorRead | null, now: Date): Said | null {
+  if (!m || !realtorFresh(m.asOf, now)) return null;
   const parts = [
     `median list price $${whole(m.medianListPrice)}${m.medianListPriceYoyPct !== null ? ` (${signed(m.medianListPriceYoyPct)}% from a year ago)` : ""}`,
   ];
@@ -476,15 +484,18 @@ function realtorLine(m: RealtorRead | null): Said | null {
     figures.push({ key: "rdc_days_on_market", label: "Median days on market", value: m.daysOnMarket, unit: "days", asOf: m.asOf });
   }
   if (m.direction) parts.push(`${m.direction} on both flow figures`);
-  if (m.hotness) {
+  const h = m.hotness && realtorFresh(m.hotness.asOf, now) ? m.hotness : null;
+  if (h) {
+    // The line's month is the inventory's; a rank of another month says its own.
+    const ownMonth = h.asOf !== m.asOf ? ` for ${monthOf(h.asOf)}` : "";
     parts.push(
-      `hotness rank ${m.hotness.rank} of ${HOTNESS_METROS} metros${
-        m.hotness.move && m.hotness.move.direction !== "unchanged"
-          ? ` (${m.hotness.move.places > 0 ? m.hotness.move.places : -m.hotness.move.places} places ${m.hotness.move.direction} than a year ago)`
+      `hotness rank ${h.rank} of ${HOTNESS_METROS} metros${ownMonth}${
+        h.move && h.move.direction !== "unchanged"
+          ? ` (${h.move.places > 0 ? h.move.places : -h.move.places} places ${h.move.direction} than a year ago)`
           : ""
       }`,
     );
-    figures.push({ key: "rdc_hotness_rank", label: "Hotness rank", value: m.hotness.rank, unit: "rank", asOf: m.hotness.asOf });
+    figures.push({ key: "rdc_hotness_rank", label: "Hotness rank", value: h.rank, unit: "rank", asOf: h.asOf });
   }
   return { line: `For-sale market: ${parts.join(", ")} (${monthOf(m.asOf)}; Realtor.com — list prices are asks, not sales)`, figures };
 }
@@ -620,9 +631,9 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
     const s = rateLine(r, sector, supply);
     if (s) said.push(s);
   }
-  const z = zoriLine(input.zori);
+  const z = zoriLine(input.zori, input.now);
   if (z) said.push(z);
-  const m = realtorLine(input.realtor);
+  const m = realtorLine(input.realtor, input.now);
   if (m) said.push(m);
   // Everything after this point is national, and every surface says how
   // many: "each the metro's" over a block that ends with the 10-year was

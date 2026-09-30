@@ -3,8 +3,8 @@ import metros from "@/data/research/metros.json";
 import { ageDays, readMetroRates, readRates, type RateRow } from "./live-rates";
 import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
 import { FEEDS, REALTOR_FRESH_DAYS, SAMPLE_METRO, ZILLOW_FRESH_DAYS, feedHealth, feedStatusWord } from "./feed-health";
-import type { ZoriRead } from "./zori";
-import type { RealtorRead } from "./realtor";
+import { zillowFileMonths, type BenchRow, type FileMonth } from "./zori";
+import { realtorFileMonths } from "./realtor";
 
 const DC_ROWS: RateRow[] = [
   { series_id: "WASH911URN", obs_date: "2026-07-01", value: 3.4 },
@@ -19,15 +19,24 @@ const DC_ROWS: RateRow[] = [
 // What the two monthly pulls hold on the fixture's day (Sep 21): Zillow's
 // pull ran on the 20th and wrote August, dated its last day; Realtor.com's
 // ran on the 8th and wrote August too, dated its first day. September's
-// figure from Realtor.com does not exist until Oct 8.
-const zori = { asOf: "2026-08-31" } as ZoriRead;
-const realtor = { asOf: "2026-08-01" } as RealtorRead;
+// figure from Realtor.com does not exist until Oct 8. Each file is read by
+// its lead row, as the data-health page reads them.
+const bench = (metric: string, as_of: string): BenchRow => ({ metric, metro: SAMPLE_METRO.name, low: 1, as_of, note: null });
+const BENCH: BenchRow[] = [
+  bench("zori_rent", "2026-08-31"),
+  bench("zori_mfr_rent", "2026-08-31"),
+  bench("zhvi", "2026-08-31"),
+  bench("rdc_median_list_price", "2026-08-01"),
+  bench("rdc_hotness_rank", "2026-08-01"),
+];
+const zillow = zillowFileMonths(BENCH, SAMPLE_METRO.name);
+const realtor = realtorFileMonths(BENCH, SAMPLE_METRO.name);
 
 const health = (now = FIXTURE_NOW) =>
   feedHealth({
     rates: readRates(REAL_ROWS, now),
     metro: readMetroRates(SAMPLE_METRO.id, DC_ROWS, now),
-    zori,
+    zillow,
     realtor,
     now,
   });
@@ -59,8 +68,8 @@ describe("feedHealth — each feed judged on its own cadence, the stale series n
   });
 
   it("Zillow and Realtor.com are judged on their own month's cadence", () => {
-    expect(byId.zillow).toMatchObject({ fresh: true, newest: "2026-08-31", ageDays: 21, seriesTotal: 1 });
-    expect(byId.realtor).toMatchObject({ fresh: true, newest: "2026-08-01", ageDays: 51 });
+    expect(byId.zillow).toMatchObject({ fresh: true, newest: "2026-08-31", ageDays: 21, seriesFresh: 3, seriesTotal: 3, stale: [] });
+    expect(byId.realtor).toMatchObject({ fresh: true, newest: "2026-08-01", ageDays: 51, seriesFresh: 2, seriesTotal: 2, stale: [] });
     // Realtor.com dates a month its first day and Zillow its last, so the
     // same month's figure is thirty-odd days older on Realtor.com's clock.
     expect(REALTOR_FRESH_DAYS).toBeGreaterThan(ZILLOW_FRESH_DAYS);
@@ -91,10 +100,28 @@ describe("feedHealth — each feed judged on its own cadence, the stale series n
     // figure on Sep 30 (60 days old) is current until its successor lands on
     // Oct 8, and stale within the week after a missed pull.
     const onDay = (day: string) =>
-      feedHealth({ rates: [], metro: [], zori: null, realtor, now: new Date(`${day}T12:00:00Z`) }).find((s) => s.spec.id === "realtor")!;
+      feedHealth({ rates: [], metro: [], zillow: [], realtor, now: new Date(`${day}T12:00:00Z`) }).find((s) => s.spec.id === "realtor")!;
     expect(onDay("2026-09-30")).toMatchObject({ fresh: true, ageDays: 60 });
     expect(onDay("2026-10-08")).toMatchObject({ fresh: true, ageDays: 68 });
-    expect(onDay("2026-10-15")).toMatchObject({ fresh: false, stale: ["median list price"] });
+    expect(onDay("2026-10-15")).toMatchObject({ fresh: false, stale: ["inventory (2026-08-01)", "hotness rank (2026-08-01)"] });
+  });
+
+  it("judges each of a monthly pull's files on its own, and names the one a dead file left behind", () => {
+    // The apartment file has failed since June and the hotness history never
+    // wrote: the all-homes rent and the inventory are current beside them.
+    const rows = BENCH.filter((r) => r.metric !== "rdc_hotness_rank").map((r) => (r.metric === "zori_mfr_rent" ? { ...r, as_of: "2026-06-30" } : r));
+    const s = Object.fromEntries(
+      feedHealth({
+        rates: [],
+        metro: [],
+        zillow: zillowFileMonths(rows, SAMPLE_METRO.name),
+        realtor: realtorFileMonths(rows, SAMPLE_METRO.name),
+        now: FIXTURE_NOW,
+      }).map((x) => [x.spec.id, x]),
+    );
+    expect(s.zillow).toMatchObject({ fresh: false, newest: "2026-08-31", ageDays: 21, seriesFresh: 2, seriesTotal: 3, stale: ["apartment asking rent (2026-06-30)"] });
+    expect(s.realtor).toMatchObject({ fresh: false, newest: "2026-08-01", seriesFresh: 1, seriesTotal: 2, stale: ["hotness rank (no rows)"] });
+    expect(feedStatusWord(s.zillow)).toBe("stale");
   });
 
   it("a dead daily pull shows as stale on the daily row while the monthly rows stay current — the steward's whole-table check cannot see this", () => {
@@ -108,7 +135,10 @@ describe("feedHealth — each feed judged on its own cadence, the stale series n
   });
 
   it("a feed with no rows says so, never current", () => {
-    const empty = feedHealth({ rates: [], metro: [], zori: null, realtor: null, now: FIXTURE_NOW });
+    const empty = feedHealth({ rates: [], metro: [], zillow: [], realtor: [], now: FIXTURE_NOW });
+    // A file list with no rows in any file is no rows too, never current.
+    const none: FileMonth[] = [{ label: "asking rent", asOf: null }];
+    expect(feedHealth({ rates: [], metro: [], zillow: none, realtor: [], now: FIXTURE_NOW }).find((s) => s.spec.id === "zillow")?.fresh).toBeNull();
     for (const s of empty) {
       expect(s.fresh).toBeNull();
       expect(s.newest).toBeNull();
@@ -124,8 +154,8 @@ describe("feedHealth — each feed judged on its own cadence, the stale series n
         readRates(REAL_ROWS.filter((r) => r.series_id === "DGS10"), new Date("2026-10-05T12:00:00Z")),
       ),
       metro: [],
-      zori: null,
-      realtor: null,
+      zillow: [],
+      realtor: [],
       now: FIXTURE_NOW,
     });
     const daily = partly.find((s) => s.spec.id === "fred_daily")!;

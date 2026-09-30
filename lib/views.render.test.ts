@@ -3641,7 +3641,9 @@ describe("a metro's for-sale market, from Realtor.com", () => {
     { metric: "rdc_views_per_listing_vs_us", metro: "Washington DC", low: 0.649, as_of: "2026-08-01", note: null },
     { metric: "rdc_days_on_market_vs_us", metro: "Washington DC", low: -17, as_of: "2026-08-01", note: null },
   ];
-  const html = render(React.createElement(RealtorLine, { r: realtorFor(rows, "Washington DC") }));
+  // Read on a day August's figures are current (the pull of Sep 8 wrote them).
+  const read = new Date("2026-09-23T12:00:00Z");
+  const html = render(React.createElement(RealtorLine, { r: realtorFor(rows, "Washington DC", read) }));
   const text = visibleText(html);
 
   it("prints the hotness rank, its move the right way round, and its two parts against the U.S.", () => {
@@ -3652,7 +3654,7 @@ describe("a metro's for-sale market, from Realtor.com", () => {
     expect(text).toContain("ranks the 300 largest metros");
     // A rank that climbed, a market that sells slower, the same month said once.
     const hotter = visibleText(render(React.createElement(RealtorLine, {
-      r: realtorFor(rows.map((x) => (x.metric === "rdc_hotness_rank" ? { ...x, low: 120 } : x.metric === "rdc_days_on_market_vs_us" ? { ...x, low: 9 } : x)), "Washington DC"),
+      r: realtorFor(rows.map((x) => (x.metric === "rdc_hotness_rank" ? { ...x, low: 120 } : x.metric === "rdc_days_on_market_vs_us" ? { ...x, low: 9 } : x)), "Washington DC", read),
     })));
     expect(hotter).toContain("Hotness #120 of 300 metros");
     expect(hotter).toContain("22 places hotter than a year ago");
@@ -3680,11 +3682,11 @@ describe("a metro's for-sale market, from Realtor.com", () => {
     expect(text).toContain("what sellers are asking, not what buyers paid");
     // Fewer listings, faster to sell: tightening. And one of each: no call.
     const tight = visibleText(render(React.createElement(RealtorLine, {
-      r: realtorFor(rows.map((x) => (x.metric.endsWith("_yoy") && x.metric !== "rdc_median_list_price_yoy" ? { ...x, low: -3 } : x)), "Washington DC"),
+      r: realtorFor(rows.map((x) => (x.metric.endsWith("_yoy") && x.metric !== "rdc_median_list_price_yoy" ? { ...x, low: -3 } : x)), "Washington DC", read),
     })));
     expect(tight).toContain("the for-sale market is tightening");
     const mixed = visibleText(render(React.createElement(RealtorLine, {
-      r: realtorFor(rows.map((x) => (x.metric === "rdc_days_on_market_yoy" ? { ...x, low: -3 } : x)), "Washington DC"),
+      r: realtorFor(rows.map((x) => (x.metric === "rdc_days_on_market_yoy" ? { ...x, low: -3 } : x)), "Washington DC", read),
     })));
     expect(mixed).toContain("not clearly loosening or tightening");
     expect(mixed).not.toContain("is loosening");
@@ -3692,7 +3694,7 @@ describe("a metro's for-sale market, from Realtor.com", () => {
 
   it("renders nothing with no figure, and only what the pull had", () => {
     expect(render(React.createElement(RealtorLine, { r: null }))).not.toContain("For sale");
-    const priceOnly = visibleText(render(React.createElement(RealtorLine, { r: realtorFor(rows.slice(0, 2), "Washington DC") })));
+    const priceOnly = visibleText(render(React.createElement(RealtorLine, { r: realtorFor(rows.slice(0, 2), "Washington DC", read) })));
     expect(priceOnly).toContain("$565,000");
     expect(priceOnly).not.toContain("active listings");
     expect(priceOnly).not.toContain("loosening");
@@ -4970,7 +4972,9 @@ describe("RentBoard — where apartment asking rents are moving, every metro are
     row("Pittsburgh PA", "zori_rent", 1469), row("Pittsburgh PA", "zori_rent_yoy", 3.4), row("Pittsburgh PA", "zori_mfr_rent", 1384), row("Pittsburgh PA", "zori_mfr_rent_yoy", 3.4), row("Pittsburgh PA", "zhvi", 232122),
     row("Detroit MI", "zori_rent", 1524), row("Detroit MI", "zori_rent_yoy", 3.8),
   ];
-  const reads = new Map(markets.map((m) => [m.name, zoriFor(rows, m.name)]));
+  // Read on a day August's figures are current (the pull of Sep 20 wrote them).
+  const read = new Date("2026-09-23T12:00:00Z");
+  const reads = new Map(markets.map((m) => [m.name, zoriFor(rows, m.name, read)]));
   const html = render(React.createElement(RentBoard, { markets, reads }));
   const text = visibleText(html);
 
@@ -4994,6 +4998,19 @@ describe("RentBoard — where apartment asking rents are moving, every metro are
     expect(html).toContain('href="https://www.zillow.com/research/data/"');
     expect(a11yIssues(html), "rent board").toEqual([]);
     expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("ranks one month's figures: a metro the pull missed this time is left off, never ranked under a month it is not of", () => {
+    // The August file carried no row for Pittsburgh, so July's stand — still
+    // current on the 23rd, and not August's.
+    const july = rows.map((r) => (r.metro === "Pittsburgh PA" ? { ...r, as_of: "2026-07-31" } : r));
+    const board = visibleText(render(React.createElement(RentBoard, { markets, reads: new Map(markets.map((m) => [m.name, zoriFor(july, m.name, read)])) })));
+    expect(board).toContain("2 metro areas ranked, fastest first · Aug 2026");
+    expect(board).toContain("San Francisco");
+    expect(board).not.toContain("Pittsburgh PA");
+    // And a board read past the figures' cadence is no board at all.
+    const late = new Map(markets.map((m) => [m.name, zoriFor(rows, m.name, new Date("2026-10-30T12:00:00Z"))]));
+    expect(render(React.createElement(RentBoard, { markets, reads: late }))).not.toContain("Where apartment asking rents");
   });
 
   it("renders nothing until a row exists", () => {

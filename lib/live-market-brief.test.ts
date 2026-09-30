@@ -107,6 +107,35 @@ describe("liveMarketBrief — the metro's published figures, dated and sourced, 
     );
   });
 
+  it("says Zillow's and Realtor.com's figures only while current on the brief's day — the limits the feeds card judges the pulls by", () => {
+    const rates = readMetroRates("dc", DC_ROWS, NOW);
+    const on = (day: string) =>
+      liveMarketBrief({ metro: { id: "dc", name: "Washington, DC" }, rates, zori: ZORI, realtor: REALTOR, now: new Date(`${day}T12:00:00Z`) })!;
+    const has = (b: { lines: string[] }, start: string) => b.lines.some((l) => l.startsWith(start));
+    // Zillow's August (Aug 31) is current through Oct 25; Realtor.com's (Aug 1) through Oct 13.
+    expect(has(on("2026-10-13"), "Asking rent")).toBe(true);
+    expect(has(on("2026-10-13"), "For-sale market")).toBe(true);
+    expect(has(on("2026-10-14"), "For-sale market")).toBe(false);
+    expect(has(on("2026-10-25"), "Asking rent")).toBe(true);
+    expect(has(on("2026-10-26"), "Asking rent")).toBe(false);
+    expect(on("2026-10-26").figures.some((f) => f.key.startsWith("zori") || f.key.startsWith("rdc"))).toBe(false);
+  });
+
+  it("says the hotness rank under its own month where its file is a month behind the inventory's, and not past its cadence", () => {
+    const july = { ...REALTOR, hotness: { ...REALTOR.hotness!, asOf: "2026-07-01" } };
+    const input = { metro: { id: "dc", name: "Washington, DC" }, rates: [], zori: null, realtor: july };
+    const early = liveMarketBrief({ ...input, now: new Date("2026-09-10T12:00:00Z") })!;
+    expect(early.lines).toEqual([
+      "For-sale market: median list price $599,000 (-1.2% from a year ago), 12,400 active listings (+14.3%), median 41 days on market (+12.5%), loosening on both flow figures, hotness rank 40 of 300 metros for Jul 2026 (12 places cooler than a year ago) (Aug 2026; Realtor.com — list prices are asks, not sales)",
+    ]);
+    expect(early.figures.find((f) => f.key === "rdc_hotness_rank")?.asOf).toBe("2026-07-01");
+    // July's rank was due to be replaced on Sep 8: on Sep 23 the inventory is said and the rank is not.
+    const late = liveMarketBrief({ ...input, now: NOW })!;
+    expect(late.lines[0]).toContain("median list price $599,000");
+    expect(late.lines[0]).not.toContain("hotness");
+    expect(late.figures.some((f) => f.key === "rdc_hotness_rank")).toBe(false);
+  });
+
   it("the same figures are kept as values, keyed and dated, for a later screen to compare against", () => {
     const byKey = Object.fromEntries(brief.figures.map((f) => [f.key, f]));
     expect(byKey.unemployment).toEqual({ key: "unemployment", label: "Unemployment", value: 3.4, unit: "pts", asOf: "2026-07-01" });

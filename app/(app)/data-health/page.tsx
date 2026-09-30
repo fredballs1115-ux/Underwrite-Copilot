@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { hoursSince } from "@/lib/research";
 import { liveMetroRates, liveRates } from "@/lib/live-rates-read";
-import { liveZori } from "@/lib/zori-read";
-import { liveRealtor } from "@/lib/realtor-read";
+import { liveZillowFiles } from "@/lib/zori-read";
+import { liveRealtorFiles } from "@/lib/realtor-read";
 import { SAMPLE_METRO, SAMPLE_STATE, feedHealth, type FeedStatus } from "@/lib/feed-health";
 import { CostCard, type UsageRow } from "./cost-card";
 import { FeedsCard } from "./feeds-card";
@@ -137,20 +137,22 @@ export default async function DataHealthPage() {
   }
 
   // What each feed last wrote (lib/feed-health): the same cached reads the
-  // public pages draw from, judged feed by feed on each one's own cadence.
+  // public pages draw from, judged feed by feed on each one's own cadence —
+  // Zillow's and Realtor.com's file by file, current or not, since the
+  // pages' reads leave a stale figure out and the card must see it.
   // A read that fails leaves an empty card that says so.
   let feeds: FeedStatus[] = [];
   try {
     const now = new Date();
-    const [rates, metro, state, zori, realtor] = await Promise.all([
+    const [rates, metro, state, zillow, realtor] = await Promise.all([
       liveRates(now),
       liveMetroRates(SAMPLE_METRO.id, now),
       // The states' series, judged on one state's rows under its market id.
       liveMetroRates(SAMPLE_STATE.id, now),
-      liveZori(SAMPLE_METRO.name),
-      liveRealtor(SAMPLE_METRO.name),
+      liveZillowFiles(SAMPLE_METRO.name),
+      liveRealtorFiles(SAMPLE_METRO.name),
     ]);
-    feeds = feedHealth({ rates, metro, state, zori, realtor, now });
+    feeds = feedHealth({ rates, metro, state, zillow, realtor, now });
   } catch (err) {
     console.warn("feed health unavailable:", err instanceof Error ? err.message : err);
   }
