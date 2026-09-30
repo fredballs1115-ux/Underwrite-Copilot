@@ -90,3 +90,58 @@ export function metroView(id: string): MetroView | null {
 /** Rough continental-US bounds, incl. Alaska/Hawaii headroom — a coordinate
  *  outside these is a typo, and the test treats it as one. */
 export const US_BOUNDS = { minLat: 18, maxLat: 72, minLng: -180, maxLng: -66 };
+
+/**
+ * Every frame, width × height, the overhead route draws (the security review
+ * of 2026-09-30): the sizes the site's own pages ask for — CityPhoto's
+ * `width` × `height`, and twice that where a tile offers a dense screen its
+ * 2x — and nothing else. Any other size is snapped to the nearest of these
+ * rather than refused, so a page cached before a size changed still gets its
+ * picture, and USGS is asked for a market at most once a frame per process
+ * whatever sizes a caller types. A new size on a page belongs here too; the
+ * imagery routes' test holds the pages' sizes to this list.
+ */
+export const METRO_FRAMES: readonly (readonly [number, number])[] = [
+  [480, 360], // the coverage gallery's 4:3 tile (app/markets-gallery)…
+  [960, 720], // …and its 2x
+  [480, 192], // a submarket card's strip (app/market/submarket-cards)…
+  [960, 384], // …and its 2x
+  [1400, 420], // /tools' band
+  [1400, 480], // a market's own band (MarketBand)
+  [1400, 600], // a page's opening band (PlaceBand)
+  [1400, 900], // the homepage's hero and the sign-in page
+  [1200, 630], // a market page's link preview (lib/og-card)
+  [1600, 900], // the largest frame, live-verify's AERIALS probe
+];
+
+/** The frame a request that names no size is drawn at: the gallery's tile. */
+export const METRO_FRAME_DEFAULT: readonly [number, number] = [480, 360];
+
+/**
+ * A requested size as the overhead route draws it: the listed frame nearest
+ * in both proportion and size (the sum of the two sides' log ratios), the
+ * larger on a tie so a picture is never softer than asked. A missing or
+ * unreadable side is the default frame's — `Number(null)` is 0, which is
+ * finite, and a request with no `?w=` once came back 96px wide.
+ */
+export function metroFrame(
+  rawW: number | string | null | undefined,
+  rawH: number | string | null | undefined,
+): readonly [number, number] {
+  const side = (raw: number | string | null | undefined, fallback: number): number => {
+    const n = typeof raw === "number" ? raw : raw == null || raw.trim() === "" ? Number.NaN : Number(raw);
+    return Number.isFinite(n) ? Math.min(10_000, Math.max(1, n)) : fallback;
+  };
+  const w = side(rawW, METRO_FRAME_DEFAULT[0]);
+  const h = side(rawH, METRO_FRAME_DEFAULT[1]);
+  let best = METRO_FRAMES[0];
+  let bestD = Number.POSITIVE_INFINITY;
+  for (const f of METRO_FRAMES) {
+    const d = Math.abs(Math.log(f[0] / w)) + Math.abs(Math.log(f[1] / h));
+    if (d < bestD - 1e-9 || (Math.abs(d - bestD) <= 1e-9 && f[0] * f[1] > best[0] * best[1])) {
+      best = f;
+      bestD = d;
+    }
+  }
+  return best;
+}

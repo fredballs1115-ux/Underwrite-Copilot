@@ -18,7 +18,7 @@
 // been through live-verify's SKYLINE probe yet.
 
 import { NextResponse } from "next/server";
-import { SKYLINE_WIDTH, headerSafe, skylineFor } from "@/lib/skyline";
+import { headerSafe, skylineFor, skylineWidth } from "@/lib/skyline";
 import { fetchSkylinePhoto } from "@/lib/skyline-fetch";
 
 // The fetch from Commons and this process's bounded copy of each photograph
@@ -45,20 +45,6 @@ function imageHeaders(type: string, credit: string): HeadersInit {
   };
 }
 
-function clampWidth(raw: string | null): number {
-  // A MISSING width is the default, not the floor. `Number(null)` and
-  // `Number("")` are both 0 — finite — so the finite test alone never fired
-  // for the one case it was written for, and a request with no `?w=` came
-  // back at the 320px minimum: a thumbnail behind a full-width band.
-  // Nothing rendered wrong, because CityPhoto always passes a width; it is
-  // anyone hitting the route directly who got the wrong picture, which is
-  // how live-verify's PHOTOGRAPHS step found it.
-  if (raw === null || raw.trim() === "") return SKYLINE_WIDTH.default;
-  const n = Number(raw);
-  if (!Number.isFinite(n)) return SKYLINE_WIDTH.default;
-  return Math.min(SKYLINE_WIDTH.max, Math.max(SKYLINE_WIDTH.min, Math.round(n)));
-}
-
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -78,7 +64,11 @@ export async function GET(
   // overhead frame. Never a guess, never a placeholder.
   if (!shot) return new NextResponse(null, { status: 404 });
 
-  const width = clampWidth(new URL(req.url).searchParams.get("w"));
+  // Only the widths the site's own pages ask for are served (SKYLINE_WIDTHS);
+  // any other is snapped to the nearest rather than refused, so a public
+  // route cannot be made to fetch and encode a new file per request, and a
+  // missing width is the default rather than the smallest (skylineWidth).
+  const width = skylineWidth(new URL(req.url).searchParams.get("w"));
   const credit = `Wikimedia Commons · ${shot.credit} · ${shot.license}`;
 
   const photo = await fetchSkylinePhoto(id, width);

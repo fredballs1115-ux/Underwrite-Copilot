@@ -3,6 +3,7 @@ import {
   SKYLINES,
   SKYLINE_SRCSET,
   SKYLINE_WIDTH,
+  SKYLINE_WIDTHS,
   commonsPage,
   commonsUrl,
   creditLine,
@@ -12,6 +13,7 @@ import {
   skylineFor,
   skylineSrcSet,
   skylineTag,
+  skylineWidth,
 } from "./skyline";
 import { gluedWords } from "./render-lint";
 import metrosSeed from "@/data/research/metros.json";
@@ -129,6 +131,30 @@ describe("the Commons URLs", () => {
     expect(set.split(", ")).toEqual(
       SKYLINE_SRCSET.map((w) => `/api/imagery/skyline/pittsburgh?w=${w}&v=${tag} ${w}w`),
     );
+  });
+
+  it("serves only the widths the pages ask for, snapping any other to the nearest (the security review, 2026-09-30)", () => {
+    // The srcset's steps and the route's default and ceiling are all served
+    // as asked, and each is inside the range Commons is asked within.
+    for (const w of [...SKYLINE_SRCSET, SKYLINE_WIDTH.default, SKYLINE_WIDTH.max]) expect(SKYLINE_WIDTHS).toContain(w);
+    for (const w of SKYLINE_WIDTHS) {
+      expect(skylineWidth(w)).toBe(w);
+      expect(skylineWidth(String(w))).toBe(w);
+      expect(w).toBeGreaterThanOrEqual(SKYLINE_WIDTH.min);
+      expect(w).toBeLessThanOrEqual(SKYLINE_WIDTH.max);
+    }
+    expect(skylineWidth(1234)).toBe(1400);
+    expect(skylineWidth("1599")).toBe(1600);
+    expect(skylineWidth(700)).toBe(480);
+    // A tie goes to the larger, so a picture is never softer than asked.
+    expect(skylineWidth(720)).toBe(960);
+    expect(skylineWidth(99_999)).toBe(2400);
+    expect(skylineWidth(-5)).toBe(480);
+    // A missing or unreadable width is the default, never the smallest.
+    for (const raw of [null, undefined, "", "  ", "abc", Number.NaN]) expect(skylineWidth(raw)).toBe(SKYLINE_WIDTH.default);
+    // However many widths a caller types, the route serves the handful.
+    const served = new Set(Array.from({ length: 5_000 }, (_, i) => skylineWidth(i)));
+    expect([...served].sort((a, b) => a - b)).toEqual([...SKYLINE_WIDTHS]);
   });
 
   it("escapes a name on the way into the file's own page", () => {

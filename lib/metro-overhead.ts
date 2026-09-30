@@ -2,7 +2,8 @@ import "server-only";
 import { usgsAerialUrl } from "@/lib/basemaps";
 import { finishAerial } from "@/lib/aerial-finish";
 import { frameZoom } from "@/lib/imagery-plan";
-import { METRO_FRAME_METRES, metroView } from "@/lib/metro-imagery";
+import { METRO_FRAME_METRES, metroFrame, metroView } from "@/lib/metro-imagery";
+import { RunGate } from "@/lib/anthropic/run-gate";
 
 /**
  * How long the USGS export may take. It was 10 seconds, and on the evening
@@ -44,6 +45,18 @@ function remember(key: string, got: { bytes: Buffer; type: string }) {
   }
 }
 
+/**
+ * How many exports this process asks USGS for at once, and how long an ask
+ * waits for a turn (the security review of 2026-09-30) — the flood frames'
+ * two (lib/flood-map). The route is public, and each frame is a slow export
+ * and a sharp pass: with the frames bounded to the pages' own sizes
+ * (`METRO_FRAMES`) and each asked once, a burst beyond two is the queue's to
+ * hold. An ask that finds no turn in time is a failure, kept by nobody.
+ */
+export const OVERHEAD_IN_FLIGHT = 2;
+const OVERHEAD_TURN_WAIT_MS = 30_000;
+const turns = new RunGate(() => OVERHEAD_IN_FLIGHT);
+
 /** Forget every held overhead (tests). */
 export function forgetOverheads(): void {
   memory.clear();
@@ -56,15 +69,18 @@ export function forgetOverheads(): void {
  * public pages fall back to where a market has no photograph — for the
  * metro overhead route and the link preview's card (#436), one fetch for
  * both. Public domain, so it needs no credit beyond the line each surface
- * prints. Null for an unknown market or any failure, never a guess.
+ * prints. Null for an unknown market or any failure, never a guess. The size
+ * is snapped to the frames the pages ask for (`metroFrame`), so no caller
+ * widens what this process fetches and holds.
  */
 export async function fetchMetroOverhead(
   id: string,
-  width: number,
-  height: number,
+  askedWidth: number,
+  askedHeight: number,
 ): Promise<{ bytes: Buffer; type: string } | null> {
   const view = metroView(id);
   if (!view) return null;
+  const [width, height] = metroFrame(askedWidth, askedHeight);
   const key = `${id}:${width}x${height}`;
   const hit = memory.get(key);
   if (hit) {
@@ -76,42 +92,48 @@ export async function fetchMetroOverhead(
   if (running) return running;
 
   const work = (async () => {
-    const url = usgsAerialUrl({
-      center: { lat: view.lat, lng: view.lng },
-      zoom: frameZoom({
-        widthPx: width,
-        lat: view.lat,
-        precision: "area",
-        source: "aerial",
-        frameMetres: METRO_FRAME_METRES,
-      }),
-      width,
-      height,
-    });
-
-    let img: Response;
+    const release = await turns.acquireWithin(OVERHEAD_TURN_WAIT_MS);
+    if (!release) return null;
     try {
-      img = await fetch(url, { signal: AbortSignal.timeout(OVERHEAD_TIMEOUT_MS) });
-    } catch {
-      return null;
-    }
-    const type = img.headers.get("content-type") ?? "";
-    // The ArcGIS export endpoint answers 200 with a JSON error body when it
-    // dislikes a request, so content-type is the real success test.
-    if (!img.ok || !img.body || !type.startsWith("image/")) return null;
+      const url = usgsAerialUrl({
+        center: { lat: view.lat, lng: view.lng },
+        zoom: frameZoom({
+          widthPx: width,
+          lat: view.lat,
+          precision: "area",
+          source: "aerial",
+          frameMetres: METRO_FRAME_METRES,
+        }),
+        width,
+        height,
+      });
 
-    // The same finish every building's overhead gets (#429); the plain export
-    // where the finish fails.
-    const raw = Buffer.from(await img.arrayBuffer());
-    if (raw.byteLength === 0) return null;
-    let got: { bytes: Buffer; type: string };
-    try {
-      got = { bytes: await finishAerial(raw), type: "image/jpeg" };
-    } catch {
-      got = { bytes: raw, type };
+      let img: Response;
+      try {
+        img = await fetch(url, { signal: AbortSignal.timeout(OVERHEAD_TIMEOUT_MS) });
+      } catch {
+        return null;
+      }
+      const type = img.headers.get("content-type") ?? "";
+      // The ArcGIS export endpoint answers 200 with a JSON error body when it
+      // dislikes a request, so content-type is the real success test.
+      if (!img.ok || !img.body || !type.startsWith("image/")) return null;
+
+      // The same finish every building's overhead gets (#429); the plain export
+      // where the finish fails.
+      const raw = Buffer.from(await img.arrayBuffer());
+      if (raw.byteLength === 0) return null;
+      let got: { bytes: Buffer; type: string };
+      try {
+        got = { bytes: await finishAerial(raw), type: "image/jpeg" };
+      } catch {
+        got = { bytes: raw, type };
+      }
+      remember(key, got);
+      return got;
+    } finally {
+      release();
     }
-    remember(key, got);
-    return got;
   })();
   pending.set(key, work);
   try {

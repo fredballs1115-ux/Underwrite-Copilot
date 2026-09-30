@@ -1,6 +1,7 @@
 import "server-only";
 import sharp from "sharp";
-import { commonsUrl, skylineFor } from "@/lib/skyline";
+import { commonsUrl, skylineFor, skylineWidth } from "@/lib/skyline";
+import { RunGate } from "@/lib/anthropic/run-gate";
 
 // A covered market's photograph, fetched from Wikimedia Commons and held in
 // this process: one copy of the fetch for the skyline route that pages draw
@@ -41,6 +42,27 @@ const MAX_BYTES = 1_400_000;
 const MAX_TOTAL_BYTES = 8_000_000;
 const memory = new Map<string, { body: ArrayBuffer; type: string }>();
 let heldBytes = 0;
+/** One fetch per photograph at a time: a second ask waits on the first. */
+const pending = new Map<string, Promise<{ body: ArrayBuffer; type: string } | null>>();
+
+/**
+ * How many photographs this process asks Commons for at once, and how long
+ * an ask waits for a turn (the security review of 2026-09-30). The route is
+ * public, and each fetch is a download and a sharp pass: four at once lets a
+ * cold process's gallery of eighteen fill in a few rounds, and asks Commons —
+ * which answers an un-paced sweep with 429s — a few at a time. An ask that
+ * finds no turn in time is a failure, kept by nobody.
+ */
+export const COMMONS_IN_FLIGHT = 4;
+const COMMONS_TURN_WAIT_MS = 30_000;
+const turns = new RunGate(() => COMMONS_IN_FLIGHT);
+
+/** Forget every held photograph (tests). */
+export function forgetSkylinePhotos(): void {
+  memory.clear();
+  pending.clear();
+  heldBytes = 0;
+}
 
 function forget(key: string) {
   const gone = memory.get(key);
@@ -93,18 +115,20 @@ export async function lighten(body: ArrayBuffer, type: string): Promise<{ body: 
 }
 
 /**
- * The market's photograph at `width`, from this process's copy or from
- * Commons; null for a market with no verified file, or any failure — never
- * a guess. Commons answers a missing file with an HTML page, so the
- * content-type is the real success test.
+ * The market's photograph at `width` — snapped to a width the route serves
+ * (`skylineWidth`), so no caller widens what this process fetches and holds
+ * — from this process's copy or from Commons; null for a market with no
+ * verified file, or any failure — never a guess. Commons answers a missing
+ * file with an HTML page, so the content-type is the real success test.
  */
 export async function fetchSkylinePhoto(
   id: string,
-  width: number,
+  askedWidth: number,
 ): Promise<{ body: ArrayBuffer; type: string } | null> {
   const shot = skylineFor(id);
   if (!shot) return null;
 
+  const width = skylineWidth(askedWidth);
   const key = `${id}:${width}`;
   const hit = memory.get(key);
   if (hit) {
@@ -113,26 +137,42 @@ export async function fetchSkylinePhoto(
     remember(key, hit.body, hit.type);
     return hit;
   }
+  const running = pending.get(key);
+  if (running) return running;
 
-  let img: Response;
+  const work = (async (): Promise<{ body: ArrayBuffer; type: string } | null> => {
+    const release = await turns.acquireWithin(COMMONS_TURN_WAIT_MS);
+    if (!release) return null;
+    try {
+      let img: Response;
+      try {
+        img = await fetch(commonsUrl(shot.file, width), {
+          headers: { "user-agent": UA, accept: "image/*" },
+          redirect: "follow",
+          signal: AbortSignal.timeout(12_000),
+        });
+      } catch {
+        return null;
+      }
+      const type = img.headers.get("content-type") ?? "";
+      if (!img.ok || !type.startsWith("image/")) return null;
+
+      // Read the body rather than streaming it through: the bytes have to be in
+      // hand to be cached, and a market photograph is small enough that holding
+      // one briefly costs less than fetching it again for the next reader.
+      const raw = await img.arrayBuffer();
+      if (raw.byteLength === 0) return null;
+      const light = await lighten(raw, type);
+      remember(key, light.body, light.type);
+      return light;
+    } finally {
+      release();
+    }
+  })();
+  pending.set(key, work);
   try {
-    img = await fetch(commonsUrl(shot.file, width), {
-      headers: { "user-agent": UA, accept: "image/*" },
-      redirect: "follow",
-      signal: AbortSignal.timeout(12_000),
-    });
-  } catch {
-    return null;
+    return await work;
+  } finally {
+    pending.delete(key);
   }
-  const type = img.headers.get("content-type") ?? "";
-  if (!img.ok || !type.startsWith("image/")) return null;
-
-  // Read the body rather than streaming it through: the bytes have to be in
-  // hand to be cached, and a market photograph is small enough that holding
-  // one briefly costs less than fetching it again for the next reader.
-  const raw = await img.arrayBuffer();
-  if (raw.byteLength === 0) return null;
-  const light = await lighten(raw, type);
-  remember(key, light.body, light.type);
-  return light;
 }

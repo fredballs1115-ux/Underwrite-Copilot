@@ -1171,8 +1171,10 @@ export function hasSkyline(id: string): boolean {
 }
 
 /**
- * The widths the route will serve. A request for anything else is clamped,
- * so a caller cannot ask Commons for a 12000px render of every tile.
+ * The range Commons is ever asked within, so no caller can ask it for a
+ * 12000px render of every tile, and the width a request that names none is
+ * served at. The widths the route actually serves are `SKYLINE_WIDTHS`
+ * (below), each inside this range.
  */
 export const SKYLINE_WIDTH = { min: 320, max: 2400, default: 1600 } as const;
 
@@ -1228,6 +1230,37 @@ export function skylineTag(id: string): string {
  * across at 1440, which 1400 had stretched twice over.
  */
 export const SKYLINE_SRCSET = [480, 960, 1600, 2400] as const;
+
+/**
+ * Every width the skyline route serves (the security review of 2026-09-30):
+ * the srcset's steps above, the one-file widths a page asks for beside them
+ * (CityPhoto's `width`: 480 for a tile, 1400 for a band) and a card's
+ * (lib/market-picture: 1600, or 2400 for a wide panorama) — and nothing
+ * else. Any other width is snapped to the nearest of these rather than
+ * refused, so a page cached before a width changed still gets its picture,
+ * and Commons is asked for a market at most once a width per process
+ * whatever widths a caller types.
+ */
+export const SKYLINE_WIDTHS = [480, 960, 1400, 1600, 2400] as const;
+
+/**
+ * A requested width as the route serves it: the nearest of
+ * `SKYLINE_WIDTHS`, the larger on a tie so a picture is never softer than
+ * asked. A MISSING width is the default, not the smallest: `Number(null)`
+ * and `Number("")` are both 0, which is finite, and a request with no `?w=`
+ * once came back a thumbnail behind a full-width band.
+ */
+export function skylineWidth(raw: number | string | null | undefined): number {
+  const n = typeof raw === "number" ? raw : raw == null || raw.trim() === "" ? Number.NaN : Number(raw);
+  if (!Number.isFinite(n)) return SKYLINE_WIDTH.default;
+  let best: number = SKYLINE_WIDTHS[0];
+  for (const w of SKYLINE_WIDTHS) {
+    const d = Math.abs(w - n);
+    const bestD = Math.abs(best - n);
+    if (d < bestD || (d === bestD && w > best)) best = w;
+  }
+  return best;
+}
 
 /** A market's skyline as an `<img srcset>`: one candidate a width, each
  *  carrying the photograph's cache token. */
