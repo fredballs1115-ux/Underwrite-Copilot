@@ -7,7 +7,7 @@ import { describe, it, expect } from "vitest";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { MemoDocument, basePosition, buildMemoData } from "./memo-document";
-import { pdfFillCountOf, pdfTextOf } from "./pdf-text-of";
+import { pdfFillCountOf, pdfPageTextsOf, pdfTextOf } from "./pdf-text-of";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
 import type { DealRow } from "@/lib/deals";
@@ -675,6 +675,129 @@ describe("MemoDocument (redesigned)", () => {
     // Still one page, with the footer band now reserved.
     expect((withBars.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length).toBe(1);
   }, 45000);
+
+  it("a memo too long for one page flows to a second headed with the deal's name, and never cuts a card, a heading or the call's flips across the break", async () => {
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 3", basis: "na" });
+    const checks = evaluateBuyBox(
+      SAMPLE_DEAL.asset_class,
+      { assetClass: SAMPLE_DEAL.extraction.assetClass, market: SAMPLE_DEAL.extraction.market, metrics: SAMPLE_DEAL.extraction.metrics },
+      SAMPLE_DEMO_BOX,
+    );
+    const base = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    };
+    const render = async (
+      deal: Record<string, unknown>,
+      overrides: string[] | null = null,
+      opts: { checks?: typeof checks; cover?: boolean } = {},
+    ) =>
+      pdfPageTextsOf(
+        await renderToBuffer(
+          React.createElement(MemoDocument, {
+            data: buildMemoData(
+              deal as unknown as DealRow,
+              "September 30, 2026",
+              opts.checks ?? checks,
+              null,
+              overrides,
+              opts.cover ? { dataUri: TINY_PNG_DATA_URI, credit: "From the offering memorandum" } : null,
+            ),
+          }) as unknown as Parameters<typeof renderToBuffer>[0],
+        ),
+      ).map((t) => t.replace(/\s+/g, " "));
+    const onePage = (pages: string[], ...parts: string[]) =>
+      pages.some((p) => parts.every((part) => p.includes(part)));
+
+    // The ordinary sample, its buy box included: one page, no continuation.
+    const sample = await render(base);
+    expect(sample).toHaveLength(1);
+    expect(sample[0]).not.toContain("continued");
+
+    // The sample with an analyst's override: the override's section moves
+    // whole to page two, which says whose memo it is.
+    const overridden = await render(base, ["Rent growth check dismissed: the renovated comps support 4% for two years (analyst)"]);
+    expect(overridden).toHaveLength(2);
+    expect(overridden[0]).not.toContain("screening memo, continued");
+    expect(overridden[1]).toMatch(/^Sample — The Maddox at Brewerytown — screening memo, continued /);
+    expect(onePage(overridden, "SUBMARKET CHECKS OVERRIDDEN", "Rent growth check dismissed")).toBe(true);
+
+    // Lines under the title push the break down into the screen's cards:
+    // two fixtures, measured so that without the guards the first cuts the
+    // call's flips from their label and the second cuts each deal-killer
+    // card from its "breaks if".
+    const screen = SAMPLE_DEAL.verdict.screen!;
+    const wideBox = evaluateBuyBox(
+      SAMPLE_DEAL.asset_class,
+      { assetClass: SAMPLE_DEAL.extraction.assetClass, market: SAMPLE_DEAL.extraction.market, metrics: SAMPLE_DEAL.extraction.metrics },
+      { ...SAMPLE_DEMO_BOX, markets: "Philadelphia, Pittsburgh", priceMaxM: 60, maxPerUnitK: 250, sfMin: 150000 } as typeof SAMPLE_DEMO_BOX,
+    );
+    const crowd = (name: string, hotel: boolean) => ({
+      ...base,
+      name,
+      verdict: {
+        ...SAMPLE_DEAL.verdict,
+        reason:
+          "The going-in basis is rich for a receivership sale and the returns lean on an aggressive exit, a rent ramp the LIHTC limits cap, and an assumable HUD loan whose rate advantage mostly sits in the price. Worth a closer look only if the receiver moves on price or the ramp is de-risked.",
+      },
+      extraction: {
+        ...SAMPLE_DEAL.extraction,
+        affordable: { programs: ["lihtc", "section8"], summary: "", agreement: "", assistance: "", tiers: [], page: "" },
+        sale: { method: "receivership", terms: "", condition: "As-is", page: "" },
+        ...(hotel ? { hotel: { brand: "Courtyard by Marriott", franchise: "", management: "", encumbrance: "management", pip: "", page: "" } } : {}),
+        metrics: [
+          ...SAMPLE_DEAL.extraction.metrics,
+          row("Restricted units", "186"),
+          row("Units under HAP contract", "82"),
+          row("Affordability expiration", "December 31, 2054"),
+          row("Assumable loan balance", "$30,000,000"),
+          row("Assumable loan rate", "3.45%"),
+          row("Assumable loan maturity", "March 31, 2031"),
+          row("Phase I ESA date", "June 2019"),
+          row("Phase I ESA findings", "One REC: former dry cleaner"),
+          row("Units to renovate", "192"),
+          row("Renovation cost per unit", "$15,000"),
+          row("Renovation premium", "$250"),
+          ...(hotel ? [row("PIP cost", "$4,200,000"), row("Franchise expiration", "June 30, 2034")] : []),
+          row("Tax abatement", "PILOT agreement"),
+          row("Tax abatement expiration", "2031"),
+          row("Abated real estate taxes", "$70,000"),
+          row("Unabated real estate taxes", "$520,000"),
+        ],
+      },
+      site_flags: { status: "ok", tractGeoid: null, opportunityZone: null, flood: { zone: "AE", subtype: null, isHighRisk: true }, retrievedAt: "2026-09-25T00:00:00Z", note: "" },
+    });
+    const flipsAtBreak = await render(crowd("Riverside Gardens Apartments (Receivership Sale)", false), null, { checks: wideBox, cover: true });
+    const killersAtBreak = await render(
+      crowd("Riverside Gardens Apartments and Townhomes at the Brewerytown Riverfront (Receivership Sale)", true),
+      null,
+      { checks: wideBox, cover: true },
+    );
+    for (const pages of [flipsAtBreak, killersAtBreak]) {
+      expect(pages.length).toBeGreaterThanOrEqual(2);
+      expect(pages[0]).not.toContain("screening memo, continued");
+      for (const p of pages.slice(1)) expect(p).toMatch(/^Riverside Gardens Apartments .*\(Receivership Sale\) — screening memo, continued /);
+      // Each deal-killer card whole on one page: its name and its "breaks if".
+      screen.dealKillers.forEach((k, i) => {
+        const name = `${i + 1}. ${{ basis: "Basis", exit: "Exit", debt: "Debt" }[k.lever]}`;
+        expect(onePage(pages, name, k.risk.slice(0, 30)), name).toBe(true);
+      });
+      // The call's flips whole on one page: the label, the three calls, the notes.
+      expect(onePage(pages, "WHERE THE CALL FLIPS", "CONSERVATIVE", "SPONSOR", ...screen.sensitivity.map((sc) => sc.note.slice(0, 30)))).toBe(true);
+      // The risks and the next steps travel together.
+      expect(onePage(pages, "TOP RISKS", "NEXT STEPS", ...SAMPLE_DEAL.verdict.topRisks.slice(0, 2).map((r) => r.slice(0, 30)))).toBe(true);
+    }
+    // The guards moved what they guard to the next page, where each fixture
+    // was measured to break.
+    expect(flipsAtBreak[1]).toMatch(/screening memo, continued WHERE THE CALL FLIPS/);
+    expect(killersAtBreak[1]).toMatch(/screening memo, continued 1\. Basis/);
+  }, 60000);
 
   it("labels a market flag's typical range as the rule of thumb it is, as the deal page and the report do", async () => {
     // A verdict without the pre-model screen keeps the comp & market flags.

@@ -919,6 +919,17 @@ const s = StyleSheet.create({
   },
   footerText: { fontSize: 7.5, color: C.muted },
   footerLeft: { flex: 1, paddingRight: 12 },
+  // The continuation pages' heading, inside the page's top padding.
+  continued: {
+    position: "absolute",
+    top: 11,
+    left: 44,
+    right: 44,
+    fontSize: 7.5,
+    lineHeight: 1,
+    fontFamily: "Helvetica-Bold",
+    color: C.muted,
+  },
   poweredBy: {
     position: "absolute",
     bottom: 13,
@@ -932,13 +943,17 @@ const s = StyleSheet.create({
 
 function Section({
   title,
+  keep = false,
   children,
 }: {
   title: string;
+  /** a short section moves to the next page whole rather than leave its
+   *  heading at the foot of this one (a memo too long for one page) */
+  keep?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <View style={s.section}>
+    <View style={s.section} wrap={!keep}>
       <View style={s.sectionTitleRow}>
         <View style={s.sectionTick} />
         <Text style={s.sectionTitle}>{title}</Text>
@@ -968,6 +983,15 @@ export function MemoPage({ data }: { data: MemoData }) {
   const branded = !!(b && (b.firmName || b.logoDataUri || b.footerText));
   return (
     <Page size="LETTER" style={s.page}>
+        {/* A memo that cannot fit one page flows to a second, which had no
+            heading: a sheet read on its own did not say whose it was. Every
+            page after the first carries the deal's name, in the top
+            padding so page one's layout does not move. */}
+        <Text
+          fixed
+          style={s.continued}
+          render={({ pageNumber }) => (pageNumber > 1 ? `${data.name} — screening memo, continued` : "")}
+        />
         {/* The masthead: brand and date, the rule, the title and its chip —
             and, when there is one, the cover aerial at the far right spanning
             all three rows. It borrows the height the masthead already spends,
@@ -1169,8 +1193,11 @@ export function MemoPage({ data }: { data: MemoData }) {
               );
             })}
 
+            {/* A memo that cannot fit one page flows to a second; a card
+                is never cut across the break, so the row of three moves
+                whole, and so does the scenario block under it. */}
             {data.dealKillers.length > 0 && (
-              <View style={s.killersRow}>
+              <View style={s.killersRow} wrap={false}>
                 {data.dealKillers.map((k, i) => (
                   <View key={i} style={s.killerCard}>
                     <Text style={s.killerName}>
@@ -1186,7 +1213,7 @@ export function MemoPage({ data }: { data: MemoData }) {
             )}
 
             {data.sensitivity.length > 0 && (
-              <View style={s.sensBlock}>
+              <View style={s.sensBlock} wrap={false}>
                 <Text style={s.sensLabel}>Where the call flips</Text>
                 <View style={s.sensRow}>
                   {data.sensitivity.map((sc, i) => (
@@ -1218,7 +1245,7 @@ export function MemoPage({ data }: { data: MemoData }) {
         )}
 
         {data.keyTerms.length > 0 && (
-          <Section title="Key terms">
+          <Section title="Key terms" keep>
             <View style={s.termsWrap}>
               {data.keyTerms.map((t, i) => (
                 <View key={i} style={s.term}>
@@ -1232,7 +1259,7 @@ export function MemoPage({ data }: { data: MemoData }) {
         )}
 
         {(data.topRisks.length > 0 || data.nextSteps.length > 0) && (
-          <View style={s.twoCol}>
+          <View style={s.twoCol} wrap={false}>
             {data.topRisks.length > 0 && (
               <View style={s.col}>
                 <Text style={s.sectionTitle}>Top risks</Text>
@@ -1259,7 +1286,7 @@ export function MemoPage({ data }: { data: MemoData }) {
         )}
 
         {data.challenges.length > 0 && (
-          <Section title="Headline challenges">
+          <Section title="Headline challenges" keep>
             {data.challenges.map((c, i) => (
               <View key={i} style={s.challenge}>
                 <View style={s.chHead}>
@@ -1280,7 +1307,7 @@ export function MemoPage({ data }: { data: MemoData }) {
         )}
 
         {data.overrides.length > 0 && (
-          <Section title="Submarket checks overridden">
+          <Section title="Submarket checks overridden" keep>
             {data.overrides.map((o, i) => (
               <View key={i} style={s.flagRow}>
                 <Text style={s.flagTag}>Override</Text>
@@ -1291,7 +1318,7 @@ export function MemoPage({ data }: { data: MemoData }) {
         )}
 
         {data.flags.length > 0 && (
-          <Section title="Comp & market flags">
+          <Section title="Comp & market flags" keep>
             {data.flags.map((f, i) => (
               <View key={i} style={s.flagRow}>
                 <Text style={s.flagTag}>{f.label}</Text>
