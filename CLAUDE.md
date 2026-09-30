@@ -4242,7 +4242,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   under the export date, the deal page and the shared screen date the call.
   The deal page, the list, the memo and report routes and the shared screen
   all read it there — never decide "is this result current" anywhere else.
-  In-process runs heartbeat
+  A deal keeps ONE `analysis_jobs` row that every run claims again
+  (`claimJob`), so the claim restamps its `created_at` with the claim's
+  moment: the worker's oldest-first queue orders a re-screen by when it was
+  asked for, and the deal page's progress clock counts from the run's start
+  (`lib/run-clock.ts`, read in an effect, so a reload mid-screen never reads
+  0:00; a start over `MAX_RUN_MS` back is a row stamped before the restamp,
+  and the page's own moment stands in). In-process runs heartbeat
   the job row; a Files-API copy of an OM is released when its run ends
   (`releaseOmSource`); one web process runs at most `ANALYSIS_CONCURRENCY`
   (default two) screens at once (`lib/anthropic/run-gate.ts` — the claim is
@@ -4275,7 +4281,17 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   is the boundary; never call the client directly, and mint paths with the
   helpers there. Migration 0034 asserts the same shapes at the row.
   `lib/rls-policies.test.ts` lints the migrations: no write policy may be a
-  bare `true` without a column grant behind it.
+  bare `true` without a column grant behind it. **A page never signs a
+  link at render** (#479): a signed URL lasts an hour, so a page left open
+  handed the reader the storage host's expiry error. The OM opens through
+  `/api/deals/[id]/om` (`lib/om-link`), and a file added with a note, a
+  source document and a BOV citation through `/api/deals/[id]/file?p=`
+  (`dealFileLinkFor` in `lib/deal-file-link`, pure): each signs at the
+  click and answers 302, never cached, and the file route signs only a
+  path of this deal's own supplement or document shape that the deal's
+  own records list (a `deals.supplements` file entry, a `deal_documents`
+  row), read under the reader's session. The account page's logo is the
+  one signed-at-render image, since it loads with the page.
 - DB schema: `supabase/migrations/`
 
 ## Conventions

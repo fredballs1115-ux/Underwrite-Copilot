@@ -3,6 +3,18 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "Files that open whenever you click them",
+      "blurb": "A file added with a note, a BOV's page citation and each source document now open through a link signed at the moment you click it. Before, these links were signed when the page loaded and expired an hour later, so a deal page left open showed the storage host's error. The Documents tab also has a View link beside each rent roll, T-12 or BOV, where it listed the file's name alone.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "The pipeline, a little quicker",
+      "blurb": "The pipeline sorts by when offers are due, soonest first, and deals with no deadline go last. Choosing a PDF for a new deal fills the name from the file, as the batch upload does, and never replaces a name you typed. On a phone, the first tap on a map pin shows the deal's card and a second tap opens it. The compare table leaves out a row that is blank for every deal compared. A screen's clock counts from when the run began, so reloading the page mid-screen no longer resets it to 0:00.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-30",
       "title": "A re-screen never mixes two runs",
       "blurb": "A screen writes the terms first and the verdict last, so for the minutes a deal was being screened again it held the new run's terms beside the last run's call, and the memo, the full report and a shared link printed the two as one screen. They now wait for the new verdict, the way they already did after a failed run; a shared link says the sender is re-screening and marks the comp and market reads the run has not reached; the deal page marks each result still from the previous screen and draws the call in its header as the previous one; and the pipeline card, row, CSV and meeting workbook say Re-screening, with the list refreshing until the run finishes. A comp search or a model build is not a screen and leaves the call alone. Every verdict now carries the day it was written: the memo and the report's first page print it under the export date, and the deal page and the shared screen date the call.",
       "href": "/deals"
