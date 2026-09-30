@@ -1,7 +1,7 @@
 import Link from "next/link";
 import metrosSeed from "@/data/research/metros.json";
 import { METRO_VIEWS } from "@/lib/metro-imagery";
-import { MARKET_COUNT, metroFact } from "./markets-marquee";
+import { MARKET_COUNT, metroFact, researchAsOf } from "./markets-marquee";
 import { CityPhoto } from "./city-photo";
 import { OVERHEAD_GRID_CREDIT, galleryCredit, hasSkyline } from "@/lib/skyline";
 
@@ -17,7 +17,8 @@ import { OVERHEAD_GRID_CREDIT, galleryCredit, hasSkyline } from "@/lib/skyline";
  *
  * Every tile is a real USGS frame of that market's business district (see
  * lib/metro-imagery for why USGS is sharp at this scale and needs no key),
- * carrying the same live research fact the marquee shows, and linking to the
+ * carrying the same research fact the marquee shows, with the research
+ * file's own date for it (dated research, not a feed), and linking to the
  * same market brief. It is navigation with a picture on it, not decoration.
  *
  * A tile whose image 404s still renders: the name and the fact are the
@@ -28,10 +29,12 @@ export function MarketsGallery() {
   const items = (metrosSeed.metros ?? [])
     .map((m, i) => {
       const entry = m as { id: string; name: string; region?: string };
+      const fact = metroFact(m, i);
       return {
         id: entry.id,
         name: entry.name,
-        fact: metroFact(m, i) ?? entry.region ?? "covered market",
+        fact: fact?.text ?? entry.region ?? "covered market",
+        asOf: fact?.asOf ?? null,
         place: METRO_VIEWS[entry.id]?.place ?? null,
       };
     })
@@ -91,6 +94,11 @@ export function MarketsGallery() {
                 <p className="mt-0.5 font-mono text-[11px] leading-snug text-white/80">
                   {m.fact}
                 </p>
+                {m.asOf && (
+                  <p className="mt-0.5 text-[10px] leading-snug text-white/80" data-qa="fact-date">
+                    {researchAsOf(m.asOf)}
+                  </p>
+                )}
               </div>
             </Link>
           </li>
