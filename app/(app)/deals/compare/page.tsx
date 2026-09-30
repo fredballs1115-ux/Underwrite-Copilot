@@ -15,6 +15,7 @@ import { benchmark30 } from "@/lib/debt-index";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { seedBenchmarks } from "@/lib/research-data";
+import { asOfLabel } from "@/lib/research";
 import { findPriceMetric, inferStrategy, isPlanDeal, noiFigures } from "@/lib/deal-strategy";
 import { bannerSources } from "@/lib/deal-banner";
 import { floodCell, siteFlagsStale, type SiteFlagsResult } from "@/lib/site-flags/core";
@@ -270,7 +271,7 @@ export default async function ComparePage({
       {bench30 && cols.some((c) => c.leverage) && (
         <p className="text-xs leading-relaxed text-muted">
           Leverage row: each deal&apos;s going-in cap against the 30-yr fixed
-          ({bench30.value}%, {bench30.source}, as of {bench30.asOf}) — an
+          ({bench30.value}%, {bench30.source}, {asOfLabel(bench30.asOf)}) — an
           owner-occupier benchmark; investor debt usually prices above it, so
           a thin spread here is thinner in practice.
         </p>

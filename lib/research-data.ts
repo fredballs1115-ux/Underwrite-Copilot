@@ -177,7 +177,9 @@ export function seedBenchmarks(): Benchmark[] {
       m as { sector_snapshot?: Record<string, SnapshotBlock | string> | null }
     ).sector_snapshot;
     if (!snap) continue;
-    const snapAsOf = typeof snap.as_of === "string" ? snap.as_of : "2026-08-25";
+    // The snapshot's own date, or none: an empty `as_of` reads "undated"
+    // (lib/research `asOfLabel`), never a date the file does not state.
+    const snapAsOf = typeof snap.as_of === "string" ? snap.as_of : "";
     for (const [sector, blk] of Object.entries(snap)) {
       if (sector === "as_of" || typeof blk === "string" || !blk) continue;
       const base = {
@@ -256,7 +258,7 @@ export function seedBenchmarks(): Benchmark[] {
         high: Math.round(r.high * 10000) / 100,
         unit: "pct",
         source: r.sources?.[0] ?? "",
-        as_of: doc.as_of ?? "2026-08-21",
+        as_of: doc.as_of ?? "",
         status: (r.status as Benchmark["status"]) ?? "sourced",
         note: [r.tier, r.note].filter(Boolean).join(" — "),
       });
@@ -273,7 +275,7 @@ export function seedBenchmarks(): Benchmark[] {
       high: pmms.value,
       unit: "pct",
       source: pmms.sources?.[0] ?? "",
-      as_of: pmms.as_of ?? "2026-08-20",
+      as_of: pmms.as_of ?? "",
       status: (pmms.status as Benchmark["status"]) ?? "sourced",
       note: pmms.note ?? null,
     });

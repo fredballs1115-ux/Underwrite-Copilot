@@ -10,6 +10,7 @@
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
+  asOfLabel,
   evaluateRules,
   isStale,
   vsRange,
@@ -148,7 +149,10 @@ function SourceLink({
   status: string;
 }) {
   const meta = STATUS_META[status] ?? STATUS_META.sourced;
-  const stale = isStale(asOf);
+  // A figure whose file states no date is undated — flagged in the stale
+  // tone, but never given a date it does not have.
+  const undated = !(typeof asOf === "string" && asOf.trim());
+  const stale = undated || isStale(asOf);
   // Audit gate: a link the audit script has verified DEAD renders as plain
   // text — the user never gets handed a clickable 404. Unaudited links render
   // normally (never audited ≠ dead).
@@ -158,10 +162,10 @@ function SourceLink({
       <span className={`rounded px-1.5 py-px font-medium ${meta.cls}`}>{meta.label}</span>
       {stale && (
         <span className="rounded bg-amber-500/10 px-1.5 py-px font-medium text-amber-600">
-          stale · {asOf}
+          {undated ? "undated" : `stale · ${asOf}`}
         </span>
       )}
-      {!stale && <span>as of {asOf}</span>}
+      {!stale && <span>{asOfLabel(asOf)}</span>}
       {source &&
         (audited === false ? (
           <span title={source}>source on file — link unavailable</span>
@@ -413,7 +417,7 @@ export async function ResearchPanel({
           </div>
           <p className="mt-1 text-xs leading-relaxed text-muted">
             {leverage.label} — going-in cap {capPct}% vs {bench30.value}% (
-            {bench30.source}, as of {bench30.asOf}). The benchmark is an
+            {bench30.source}, {asOfLabel(bench30.asOf)}). The benchmark is an
             owner-occupier rate; investor debt usually prices above it, so a
             thin spread here is thinner in practice.
           </p>

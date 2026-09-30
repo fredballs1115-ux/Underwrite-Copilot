@@ -31,6 +31,7 @@ import { ZoriLine } from "./zori-line";
 import { liveRealtor } from "@/lib/realtor-read";
 import { RealtorLine } from "./realtor-line";
 import { mergeBenchmarks, seedBenchmarks, seedRules } from "@/lib/research-data";
+import { asOfLabel } from "@/lib/research";
 import { linkOk } from "@/lib/link-audit";
 import { assetClassLabel } from "@/lib/asset-class";
 import { looseValue, SECTORS } from "@/lib/research-sectors";
@@ -1302,7 +1303,7 @@ function SectorExplorer({ selected }: { selected?: string }) {
           Every asset class, researched
         </h2>
         <span className="text-[11px] text-muted">
-          as of {doc.as_of ?? "2026-08-21"} · ranges, never single numbers
+          {`${asOfLabel(doc.as_of)} · ranges, never single numbers`}
         </span>
       </div>
       <div className="mt-3 flex flex-wrap gap-1.5">
