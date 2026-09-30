@@ -1,4 +1,5 @@
 import { ZORI_CREDIT, ZORI_SOURCE_URL, monthOf, type ZoriRead } from "@/lib/zori";
+import { fmrLabel } from "@/lib/fmr";
 
 /**
  * What landlords are asking this month, beside HUD's fair market rent — the
@@ -25,19 +26,25 @@ import { ZORI_CREDIT, ZORI_SOURCE_URL, monthOf, type ZoriRead } from "@/lib/zori
  * rent well above the FMR is the ordinary case in a tight market and says
  * nothing about a building — it says which figure an underwrite should not
  * mistake for the other.
+ *
+ * The fair market rent comes with the fiscal year its research block states
+ * (lib/fmr `fmrTwoBed`), and the bar and the sentence name that year: a
+ * figure for one year is not the next year's.
  */
-export function ZoriLine({ z, fmr2br }: { z: ZoriRead | null; fmr2br: number | null }) {
+export function ZoriLine({ z, fmr2br }: { z: ZoriRead | null; fmr2br: { rent: number; fy: number } | null }) {
   if (!z) return null;
-  const top = Math.max(z.rent, z.mfrRent ?? 0, fmr2br ?? 0);
+  const hud = fmr2br?.rent ?? null;
+  const top = Math.max(z.rent, z.mfrRent ?? 0, hud ?? 0);
   const width = (v: number) => `${Math.max(6, Math.round((v / top) * 100))}%`;
-  const gapPct = fmr2br ? Math.round(((z.rent - fmr2br) / fmr2br) * 1000) / 10 : null;
+  const gapPct = hud ? Math.round(((z.rent - hud) / hud) * 1000) / 10 : null;
   const mfrGapPct =
     z.mfrRent !== null && z.rent > 0 ? Math.round(((z.mfrRent - z.rent) / z.rent) * 1000) / 10 : null;
 
   // One string, so React puts no separators inside a sentence live-verify greps.
   const sentence =
-    (gapPct !== null
-      ? "Two different measures on one scale, and neither is the other: the asking rent is this month's listings of every type and size of home, before concessions; HUD's fair market rent is a yearly figure for a two-bedroom, utilities included. " +
+    (gapPct !== null && fmr2br
+      ? "Two different measures on one scale, and neither is the other: the asking rent is this month's listings of every type and size of home, before concessions; " +
+        `HUD's ${fmrLabel(fmr2br.fy)} fair market rent is a yearly figure for a two-bedroom, utilities included. ` +
         `The asking rent reads ${Math.abs(gapPct).toFixed(1)}% ${gapPct >= 0 ? "above" : "below"} it, a gap between the two measures and not a premium over what HUD pays.`
       : "The asking rent is this month's listings of every type and size of home, before concessions.") +
     (z.shared ? " The asking rent is the metro area's, shared across the MSA." : "") +
@@ -93,7 +100,7 @@ export function ZoriLine({ z, fmr2br }: { z: ZoriRead | null; fmr2br: number | n
             <Bar label="Apartments" value={z.mfrRent} width={width(z.mfrRent)} tone="bg-brand" />
           )}
           <Bar label="All homes" value={z.rent} width={width(z.rent)} tone={z.mfrRent !== null ? "bg-brand/70" : "bg-brand"} />
-          <Bar label="HUD 2BR" value={fmr2br} width={width(fmr2br)} tone="bg-brand/40" />
+          <Bar label={`HUD ${fmrLabel(fmr2br.fy)} 2BR`} value={fmr2br.rent} width={width(fmr2br.rent)} tone="bg-brand/40" />
         </div>
       )}
       <p className="mt-1 text-[11px] leading-relaxed text-muted">{sentence}</p>
@@ -116,7 +123,8 @@ function Change({ pct }: { pct: number | null }) {
 function Bar({ label, value, width, tone }: { label: string; value: number; width: string; tone: string }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="w-16 shrink-0 text-[10px] font-medium text-muted">{label}</span>
+      {/* Wide enough for the HUD bar's label, fiscal year and all, on one line. */}
+      <span className="w-24 shrink-0 text-[10px] font-medium text-muted">{label}</span>
       <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-faint">
         <div className={`h-full rounded-full ${tone}`} style={{ width }} data-bar="zori" />
       </div>

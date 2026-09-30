@@ -17,6 +17,7 @@ import seniorSeed from "@/data/research/senior_housing.json";
 import mhcSeed from "@/data/research/manufactured_housing.json";
 import specialtySeed from "@/data/research/specialty.json";
 import type { Benchmark, RegulatoryRule, RuleSubject } from "@/lib/research";
+import { fmrBenchmarkRows, fmrOf, newestFmrOnly, type Fmr } from "@/lib/fmr";
 
 export function seedRules(): RegulatoryRule[] {
   return (rulesSeed.rules as unknown as RegulatoryRule[]).filter(
@@ -173,48 +174,13 @@ export function seedBenchmarks(): Benchmark[] {
       }
     }
   }
-  const fmr = multifamilySeed.supply_demand?.rents_fy2026_hud_fmr_dc_area;
-  if (fmr?.value) {
-    for (const [br, v] of Object.entries(fmr.value)) {
-      if (typeof v === "number") {
-        out.push({
-          sector: "multifamily",
-          metro: "Washington DC area",
-          metric: `hud_fmr_fy2026_${br}`,
-          low: v,
-          high: v,
-          unit: "usd_month",
-          source: fmr.sources?.[0] ?? "",
-          // as_of = when WE verified it. The FY effective window lives in the
-          // note — stamping the effective date made current-law FY2026 rents
-          // wear a stale badge.
-          as_of: "2026-08-24",
-          status: (fmr.status as Benchmark["status"]) ?? "sourced",
-          note: ["FY2026, effective 2025-10-01 through 2026-09-30", fmr.note].filter(Boolean).join(". "),
-        });
-      }
-    }
-  }
-  // Metro-level FY2026 FMRs from metros.json (DC-area rows already come from
-  // multifamily.json above — skip its metro to avoid near-duplicate rows).
-  for (const m of metrosSeed.metros ?? []) {
-    if (m.id === "dc") continue;
-    const fmr = m.fmr_fy2026 as { "2br"?: number | null; status?: string; sources?: string[]; note?: string } | undefined;
-    if (typeof fmr?.["2br"] === "number") {
-      out.push({
-        sector: "multifamily",
-        metro: m.name,
-        metric: "hud_fmr_fy2026_2br",
-        low: fmr["2br"],
-        high: fmr["2br"],
-        unit: "usd_month",
-        source: fmr.sources?.[0] ?? "",
-        as_of: "2026-08-24",
-        status: (fmr.status as Benchmark["status"]) ?? "sourced",
-        note: ["FY2026, effective 2025-10-01 through 2026-09-30", fmr.note].filter(Boolean).join(". "),
-      });
-    }
-  }
+  // HUD's fair market rents, a row a bedroom: the Washington area's from
+  // multifamily.json's block, every other metro's from its metros.json
+  // entry — through lib/fmr's one builder, which scripts/seed-research.mjs
+  // and scripts/fetch-fmr.mjs write the table with too. The fiscal year is
+  // the block's own, in the metric and the note; `as_of` is the day the
+  // figures were read, never the day they take effect.
+  out.push(...fmrBenchmarkRows(metrosSeed, multifamilySeed));
 
   // Per-metro sector snapshots (office / industrial / multifamily
   // fundamentals from brokerage research, two-source bar) — one benchmark
@@ -344,12 +310,15 @@ export function seedBenchmarks(): Benchmark[] {
 }
 
 /** Merge DB benchmark rows over the checked-in seeds (DB wins per key) —
- *  shared by the deal panel and the market page so both tell the same story. */
+ *  shared by the deal panel and the market page so both tell the same story.
+ *  A fair market rent of an older fiscal year than the newest present — a
+ *  database row still keyed to last year beside the file's this year — is
+ *  left out (lib/fmr `newestFmrOnly`), never shown as current. */
 export function mergeBenchmarks(dbRows: Benchmark[] | null | undefined): Benchmark[] {
   const key = (b: Benchmark) => `${b.sector}|${b.metro}|${b.metric}`;
   const byKey = new Map(seedBenchmarks().map((b) => [key(b), b]));
   for (const b of dbRows ?? []) byKey.set(key(b), b);
-  return [...byKey.values()];
+  return newestFmrOnly([...byKey.values()]);
 }
 
 /** Benchmarks relevant to one deal. Matched by covered-market NAME first —
@@ -357,8 +326,9 @@ export function mergeBenchmarks(dbRows: Benchmark[] | null | undefined): Benchma
  *  string as the fallback for labels the market matcher doesn't know. Prefix
  *  match on purpose: seed labels carry suffixes ("Baltimore MD",
  *  "Washington DC area"). DMV suburbs get their OWN rows (each entry in
- *  metros.json carries the DC-HMFA FY2026 FMR, DCHA-confirmed metro-wide),
- *  so they no longer need to borrow the "Washington DC area" rows. */
+ *  metros.json carries the Washington HUD area's figures, metro-wide), so
+ *  they no longer need to borrow the "Washington DC area" rows. Only the
+ *  newest fiscal year's fair market rents come back, whatever was passed. */
 export function benchmarksForDeal(
   benchmarks: Benchmark[],
   city?: string | null,
@@ -366,11 +336,18 @@ export function benchmarksForDeal(
 ): Benchmark[] {
   const c = (city ?? "").trim().toLowerCase();
   const m = (metroName ?? "").trim().toLowerCase();
-  return benchmarks.filter((b) => {
+  return newestFmrOnly(benchmarks).filter((b) => {
     if (!b.metro) return false;
     const label = b.metro.toLowerCase();
     return (!!c && label.startsWith(c)) || (!!m && label.startsWith(m));
   });
+}
+
+/** A covered metro's fair market rent, by its metros.json id — the one
+ *  reader (lib/fmr `fmrOf`) over the research file's entry; null where the
+ *  metro or its block is not on file. */
+export function metroFmr(id: string): Fmr | null {
+  return fmrOf((metrosSeed.metros ?? []).find((m) => m.id === id));
 }
 
 /** The buyer profile the rules evaluate against until a real setting exists.

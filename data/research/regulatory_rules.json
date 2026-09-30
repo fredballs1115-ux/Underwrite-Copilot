@@ -559,7 +559,7 @@
   "Carolinas/GA/FL landlord-tenant regimes + preemption statutes — not yet screened (preemption widely reported but not primary-confirmed this pass)",
   "Baltimore City Code Art. 13 licensing text direct fetch (currently on People's Law Library authority)",
   "DC TOPA single-family and 2-4 unit tier timelines verbatim (§§ 42-3404.09-.11)",
-  "FY2026 2BR FMRs for Chicago/LA/SF/Seattle/Boston/Dallas metro areas - aggregator figures conflicted, did not meet the 2-source bar (huduser pull queued); NYC $2,910 confirmed by two independent republishers",
+  "HUD fair market rents are read from HUD's own yearly FMR file for every covered metro (metros.json `fmr` blocks); the HUD API pull that keeps them current without an edit (scripts/fetch-fmr.mjs) waits on a HUD API token",
   "FL 166.043 statute text direct pull (currently one practitioner source)",
   "Rolling exemption windows (CA 15yr / WA 12yr) encoded as building ages (building_age_years_lt) read against the current year, so they advance on their own; the read is to the year built, not the certificate-of-occupancy date the statutes count from",
   "SCOPE NOTE (2026-08-22, per direction): rules for jurisdictions outside the 15 covered markets were REMOVED from the product (recoverable in git history). The screener says 'no rules on file - unscreened, not unregulated' outside the covered set."

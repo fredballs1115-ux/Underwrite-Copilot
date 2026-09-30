@@ -3173,11 +3173,13 @@ describe("a metro's asking rent, against the FMR", () => {
     homeValueYoyPct: null,
     priceToRentYears: null,
   };
-  const html = render(React.createElement(ZoriLine, { z, fmr2br: 2100 }));
+  // HUD's two-bedroom figure with the fiscal year its research block names.
+  const hud = { rent: 2100, fy: 2027 };
+  const html = render(React.createElement(ZoriLine, { z, fmr2br: hud }));
   const text = visibleText(html);
   // With the two further files: the apartment rent and the home value.
   const full = { ...z, mfrRent: 2150, mfrYoyPct: 1.1, homeValue: 612_300, homeValueYoyPct: -0.4, priceToRentYears: 21.2 };
-  const fullHtml = render(React.createElement(ZoriLine, { z: full, fmr2br: 2100 }));
+  const fullHtml = render(React.createElement(ZoriLine, { z: full, fmr2br: hud }));
   const fullText = visibleText(fullHtml);
 
   it("prints the asking rent, its change, its month and Zillow's credit", () => {
@@ -3192,13 +3194,19 @@ describe("a metro's asking rent, against the FMR", () => {
 
   it("draws the asking rent beside the 2BR fair market rent on one scale, and says they are two measures", () => {
     expect((html.match(/data-bar="zori"/g) ?? []).length).toBe(2);
-    expect(text).toContain("HUD 2BR");
+    // The HUD bar and the sentence name the fiscal year the block states.
+    expect(text).toContain("HUD FY2027 2BR");
+    expect(text).toContain("HUD's FY2027 fair market rent is a yearly figure for a two-bedroom, utilities included.");
+    // …and follow the data, never a year typed on the page.
+    const next = visibleText(render(React.createElement(ZoriLine, { z, fmr2br: { rent: 2100, fy: 2028 } })));
+    expect(next).toContain("HUD FY2028 2BR");
+    expect(next).not.toContain("FY2027");
     // Zillow's asking rent (every size of home, before concessions) and HUD's
     // two-bedroom FMR (a yearly figure, utilities included) are different
     // measures: the gap is said as one, never as a premium over what HUD pays.
     expect(text).toContain("Two different measures on one scale");
     // live-verify's #364 marker greps this phrase on /market.
-    expect(renderToString(React.createElement(ZoriLine, { z, fmr2br: 2100 }))).toContain("neither is the other");
+    expect(renderToString(React.createElement(ZoriLine, { z, fmr2br: hud }))).toContain("neither is the other");
     expect(text).toContain("before concessions");
     expect(text).toContain("utilities included");
     // (2412 − 2100) / 2100 = 14.857…%
@@ -3236,14 +3244,14 @@ describe("a metro's asking rent, against the FMR", () => {
     expect(out).toContain("shared across the MSA");
     // No FMR to draw against: no bars, no gap sentence, and no word about a
     // fair market rent the line does not show.
-    expect(out).not.toContain("HUD 2BR");
+    expect(out).not.toContain("HUD FY");
     expect(out).not.toContain("above it");
     expect(out).not.toContain("fair market rent");
     expect(out).toContain("The asking rent is this month's listings of every type and size of home, before concessions.");
   });
 
   it("renders nothing with no figure", () => {
-    expect(render(React.createElement(ZoriLine, { z: null, fmr2br: 2100 }))).not.toContain("Asking rent");
+    expect(render(React.createElement(ZoriLine, { z: null, fmr2br: hud }))).not.toContain("Asking rent");
   });
 
   it("reads clean and names everything", () => {

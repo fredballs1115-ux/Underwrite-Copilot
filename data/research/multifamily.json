@@ -107,23 +107,26 @@
         "exact-phrase snippet confirmation across independent queries, July 2026"
       ]
     },
-    "rents_fy2026_hud_fmr_dc_area": {
+    "rents_hud_fmr_dc_area": {
+      "fy": 2027,
+      "effective": "2026-10-01",
+      "area": "Washington-Arlington-Alexandria, DC-VA-MD HUD Metro FMR Area",
       "value": {
-        "0br": 1953,
-        "1br": 2015,
-        "2br": 2246,
-        "3br": 2835,
-        "4br": null
+        "0br": 2111,
+        "1br": 2204,
+        "2br": 2438,
+        "3br": 3107,
+        "4br": 3658
       },
       "unit": "usd_month",
-      "yoy_2br": "-2.9% (FY2025 metro 2BR was $2,314)",
       "status": "verified",
       "sources": [
-        "https://www.dchousing.org/api/files/board/610.pdf (DCHA Resolution 25-31 — FY2026 payment standards at 187% of FMR)",
-        "https://usrentprices.com/rent-prices/washington-dc (FY2026 HUD FMR republisher)",
-        "https://plainrent.com/states/district-of-columbia (FY2026 HUD FMR republisher)"
+        "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+        "https://web.archive.org/web/20260922234125id_/https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+        "https://www.federalregister.gov/d/2026-17891"
       ],
-      "note": "PRIMARY-CONFIRMED 2026-08-24 via DCHA Resolution 25-31: the Board's FY2026 payment standards are exactly 187% of FMR and every bedroom reverses onto these values ($4,200/1.87 = $2,246 2BR; $3,652/1.87 = $1,953; $3,768/1.87 = $2,015; $5,301/1.87 = $2,835) — these are the metro-wide HMFA FMRs, not ZIP averages. Mandatory SAFMR zone (ZIP-level rents govern vouchers). 4BR FY2026 not found (FY2025 was $3,413 — prior vintage, do not substitute). DCHA payment standard at 187% of FMR — material Section 8 upside in DC proper."
+      "as_of": "2026-09-30",
+      "note": "The Washington HUD area's metro-wide figures, not ZIP averages. Mandatory Small Area FMR zone: ZIP-level rents govern vouchers. Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
     }
   },
   "debt_terms": {
@@ -219,7 +222,7 @@
   "gaps": [
     "Cap-rate series for the 2-4 unit segment (no primary source verified)",
     "ACS B25024 per-city stock counts (API 403-blocked; re-fetch in progress)",
-    "FY2026 SAFMR dollar values by ZIP (huduser.gov blocked; FY2026 system existence verified 3-0, values pending)",
+    "Small Area FMR dollar values by ZIP for FY2027 (not yet read; huduser.gov does not serve the runner)",
     "CY2026 FHA loan limits by unit count for DC metro (ML 2025-23 values unconfirmed)",
     "Fannie Mae 5%-down owner-occupant 2-4 unit policy parameters (unconfirmed this pass)",
     "5-50 unit walk-up tier: no pricing/debt data gathered yet (commercial financing tier queued)",

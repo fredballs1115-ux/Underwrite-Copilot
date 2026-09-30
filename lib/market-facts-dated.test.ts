@@ -23,8 +23,12 @@ describe("the covered markets' research facts, dated from the research file", ()
     expect(fact.text).toMatch(/ vac/);
     const undated = { sector_snapshot: { office: { vacancy_pct: 12.5 } }, rule_ids: ["a"] };
     expect(metroFact(undated, 0)).toEqual({ text: "Office 12.5% vac · 1 rule on file", asOf: null });
-    const fmrOnly = { fmr_fy2026: { "2br": 1810 } };
-    expect(metroFact(fmrOnly, 0)).toEqual({ text: "FY2026 2BR FMR $1,810/mo", asOf: null });
+    // The fiscal year is the block's own (lib/fmr), never one typed on the page.
+    const block = { fy: 2027, effective: "2026-10-01", area: "Philadelphia-Camden-Wilmington, PA-NJ-DE-MD MSA", "2br": 1860 };
+    expect(metroFact({ fmr: block }, 0)).toEqual({ text: "FY2027 2BR FMR $1,860/mo", asOf: null });
+    expect(metroFact({ fmr: { ...block, fy: 2028, effective: "2027-10-01", "2br": 1900 } }, 0)?.text).toBe("FY2028 2BR FMR $1,900/mo");
+    // A block that names no year prints no rent: the rules count alone.
+    expect(metroFact({ fmr: { "2br": 1860 }, rule_ids: ["a"] }, 0)).toEqual({ text: "1 rule on file", asOf: null });
     expect(researchAsOf("2026-08-25")).toBe(`as of ${datedLong("2026-08-25")}`);
   });
 

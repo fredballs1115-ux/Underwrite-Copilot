@@ -9,7 +9,8 @@ import { buildingSfRow, evaluateBuyBox, findGoingInCap, parsePct } from "@/lib/c
 import { benchmark30 } from "@/lib/debt-index";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
-import { seedBenchmarks, twoToFourMedian } from "@/lib/research-data";
+import { metroFmr, seedBenchmarks, twoToFourMedian } from "@/lib/research-data";
+import { fmrLabel } from "@/lib/fmr";
 import { monthOf } from "@/lib/zori";
 import { sectorLeaderboard } from "@/lib/sector-leaderboard";
 import { sampleLegal } from "@/lib/sample-legal";
@@ -246,6 +247,10 @@ export default async function DemoPage() {
   // The 2–4 unit median with the month it is for and its change, read from
   // the research file (Redfin's single-month median) rather than typed here.
   const phillyMedian = twoToFourMedian("philadelphia_pa");
+  // HUD's two-bedroom fair market rent with the fiscal year its research
+  // block names (lib/fmr), never a figure or a year typed on the page.
+  const phillyFmr = metroFmr("philadelphia");
+  const phillyFmr2br = phillyFmr?.rents["2br"] ?? null;
   const band = (metric: string): string | null => {
     const r = phillyRows.find((b) => b.metric === metric);
     if (!r || typeof r.low !== "number") return null;
@@ -462,8 +467,9 @@ export default async function DemoPage() {
 
       {/* The research layer — real rules + real data behind the sample's
           jurisdiction (site-polish 2). Everything here is genuine: the rule
-          is verified against the statute, the FMR is the published FY2026
-          figure, and signed-in samples pull live recorded sales. */}
+          is verified against the statute, the FMR is HUD's published figure
+          for the fiscal year its research block names, and signed-in
+          samples pull live recorded sales. */}
       <section className="border-t border-line">
         <div className="mx-auto max-w-5xl px-6 py-12">
           <p className="text-xs font-medium uppercase tracking-wider text-muted">
@@ -502,10 +508,14 @@ export default async function DemoPage() {
                 Real benchmarks for this submarket
               </p>
               <dl className="mt-2 grid grid-cols-2 gap-3">
-                <div>
-                  <dt className="text-[11px] text-muted">FY2026 2BR fair market rent</dt>
-                  <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums">$1,810/mo</dd>
-                </div>
+                {phillyFmr && phillyFmr2br !== null && (
+                  <div>
+                    <dt className="text-[11px] text-muted">{`${fmrLabel(phillyFmr.fy)} 2BR fair market rent`}</dt>
+                    <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums">
+                      {`$${phillyFmr2br.toLocaleString("en-US")}/mo`}
+                    </dd>
+                  </div>
+                )}
                 {phillyMedian && (
                   <div>
                     <dt className="text-[11px] text-muted">

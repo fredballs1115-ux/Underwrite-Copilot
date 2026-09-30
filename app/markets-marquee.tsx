@@ -1,6 +1,7 @@
 import Link from "next/link";
 import metrosSeed from "@/data/research/metros.json";
 import { datedLong } from "@/lib/debt-index";
+import { fmrLabel, fmrOf } from "@/lib/fmr";
 
 // Server-component module only: it pulls a research seed JSON, which must
 // never ride into a client bundle. Shared by the homepage, /why, and /demo
@@ -17,7 +18,8 @@ export const MARKET_COUNT = new Set(
 
 /** The strongest honest fact string for a metro — its leading ASSET-CLASS
  *  read (office / industrial / multifamily / retail, same derivation as the
- *  pulse tiles) plus the rules-on-file count; the FY2026 FMR is the fallback
+ *  pulse tiles) plus the rules-on-file count; HUD's two-bedroom fair market
+ *  rent, with the fiscal year its block states (lib/fmr), is the fallback
  *  only when no sector read exists yet. `rotate` varies which sector leads,
  *  so a strip of many metros shows a mix instead of an all-office wall.
  *  Shared by the marquee and the homepage's gallery so the two surfaces can
@@ -37,8 +39,9 @@ const SECTOR_LABEL: Record<string, string> = {
 export interface MetroFact {
   text: string;
   /** the research file's own date for the figure in `text` — the sector
-   *  snapshot's `as_of`; null where the text dates itself (the FY2026 FMR),
-   *  carries no figure (the rules count alone) or the file states none */
+   *  snapshot's `as_of`; null where the text dates itself (a fair market
+   *  rent names its fiscal year), carries no figure (the rules count alone)
+   *  or the file states none */
   asOf: string | null;
 }
 
@@ -50,7 +53,6 @@ export function researchAsOf(asOf: string): string {
 export function metroFact(m: unknown, rotate = 0): MetroFact | null {
   const entry = m as {
     rule_ids?: string[];
-    fmr_fy2026?: { "2br"?: number | null };
     sector_snapshot?: Record<
       string,
       {
@@ -86,10 +88,12 @@ export function metroFact(m: unknown, rotate = 0): MetroFact | null {
     };
   }
 
-  // The FMR is read from the file's FY2026 block, so the text names its year.
-  const fmr = entry.fmr_fy2026?.["2br"];
+  // The FMR through the one reader, so the text names the year its block
+  // states — never a year typed here.
+  const fmr = fmrOf(m);
+  const twoBed = fmr?.rents["2br"] ?? null;
   const parts = [
-    typeof fmr === "number" ? `FY2026 2BR FMR $${fmr.toLocaleString()}/mo` : null,
+    fmr && twoBed !== null ? `${fmrLabel(fmr.fy)} 2BR FMR $${twoBed.toLocaleString("en-US")}/mo` : null,
     rulesPart,
   ].filter((x): x is string => x !== null);
   return parts.length ? { text: parts.join(" · "), asOf: null } : null;

@@ -31,6 +31,8 @@ import { ZoriLine } from "./zori-line";
 import { liveRealtor } from "@/lib/realtor-read";
 import { RealtorLine } from "./realtor-line";
 import { mergeBenchmarks, seedBenchmarks, seedRules } from "@/lib/research-data";
+import { DC_AREA_METRO, FMR_BEDS, fmrEffectiveOf, fmrLabel, fmrOf, fmrTwoBed, readFmrMetric } from "@/lib/fmr";
+import { datedLong } from "@/lib/debt-index";
 import { asOfLabel } from "@/lib/research";
 import { linkOk } from "@/lib/link-audit";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -42,18 +44,12 @@ import {
   sectorLeaderboard,
   type SnapBlock,
 } from "@/lib/sector-leaderboard";
-import { CopyCite } from "./copy-cite";
 import { SubmarketsPanel } from "./submarkets-panel";
+import { MarketCompare } from "./market-compare";
+import { COMPARE_METROS } from "./compare-metros";
 import { Fold } from "./fold";
-import {
-  MarketCompare,
-  type CompareMetro,
-  type CompareSector,
-} from "./market-compare";
+import { FmrRow } from "./fmr-row";
 
-// The compare tool's compact per-metro facts, derived once from the research
-// layer — FMR row, rule count, comps-feed state. Serializable: it crosses the
-// server → client boundary as props.
 /** "By asset type" — the metro's sector fundamentals from the research
  *  layer's snapshot blocks: vacancy (a spread when trackers diverge — the
  *  divergence is shown, never averaged), asking rent, and cap-rate bands,
@@ -198,62 +194,6 @@ function SectorSnapshotPanel({
     </div>
   );
 }
-
-const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) => {
-  const fmr = (m as { fmr_fy2026?: CompareMetro["fmr"] | null }).fmr_fy2026 ?? {};
-  const beds: CompareMetro["fmr"] = { status: fmr.status };
-  for (const k of ["0br", "1br", "2br", "3br"] as const) {
-    const v = fmr[k];
-    if (typeof v === "number") beds[k] = v;
-  }
-  // Sector fundamentals for the compare table, from the same snapshot blocks
-  // the "By asset type" panel renders — nulls simply produce no entry.
-  const snap = (m as { sector_snapshot?: Record<string, unknown> | null })
-    .sector_snapshot;
-  let sectors: CompareMetro["sectors"];
-  if (snap) {
-    sectors = {};
-    for (const sec of ["office", "industrial", "multifamily", "retail"] as const) {
-      const blk = snap[sec] as
-        | {
-            vacancy_pct?: number | null;
-            vacancy_pct_low?: number | null;
-            vacancy_pct_high?: number | null;
-            asking_rent_psf?: number | null;
-            cap_rate_low_pct?: number | null;
-            cap_rate_high_pct?: number | null;
-          }
-        | undefined;
-      if (!blk) continue;
-      const s: CompareSector = {};
-      const vLow = blk.vacancy_pct ?? blk.vacancy_pct_low;
-      const vHigh = blk.vacancy_pct ?? blk.vacancy_pct_high ?? vLow;
-      if (typeof vLow === "number") {
-        s.vLow = vLow;
-        if (typeof vHigh === "number") s.vHigh = vHigh;
-      }
-      if (typeof blk.asking_rent_psf === "number") s.rent = blk.asking_rent_psf;
-      if (
-        typeof blk.cap_rate_low_pct === "number" &&
-        typeof blk.cap_rate_high_pct === "number"
-      ) {
-        s.capLow = blk.cap_rate_low_pct;
-        s.capHigh = blk.cap_rate_high_pct;
-      }
-      if (Object.keys(s).length > 0) sectors[sec] = s;
-    }
-  }
-  return {
-    id: m.id,
-    name: m.name,
-    region: (m as { region?: string }).region ?? "More markets",
-    fmr: beds,
-    sectors,
-    ruleCount: ((m as { rule_ids?: string[] }).rule_ids ?? []).length,
-    compsLive:
-      typeof m.comps_provider === "string" && m.comps_provider !== "discovery",
-  };
-});
 
 // Each metro and sector page names itself (#430): its own title, what it
 // holds, and itself as canonical — forty-odd pages had gone out as one.
@@ -415,7 +355,8 @@ export default async function MarketDataPage({
 
 // ── Mid-Atlantic market table (research build) ───────────────────────────────
 // The seeded + DB-merged benchmarks as one table: 2-4 unit medians, monthly
-// sales, and active listings per metro, plus the DC-area FY2026 FMR row —
+// sales, and active listings per metro, plus the DC area's fair market rents
+// (the newest fiscal year on file, named from the rows' own metric) —
 // visible from day one (it doesn't depend on the user's own screens), every
 // row with provenance. Recorded-sales COVERAGE for auto-comps is stated
 // from the provider registry so it can't drift.
@@ -438,12 +379,21 @@ async function MidAtlanticTable() {
   );
   const metros = [...new Set(mf.map((b) => b.metro))].filter(
     (m) =>
-      m !== "Washington DC area" &&
+      m !== DC_AREA_METRO &&
       coveredCities.has(m.split(",")[0].trim().toLowerCase())
   );
   const get = (metro: string, metric: string) =>
     mf.find((b) => b.metro === metro && b.metric === metric);
-  const fmr = mf.filter((b) => b.metro === "Washington DC area");
+  // The Washington area's fair market rents, bedroom by bedroom, each read
+  // through lib/fmr's metric reader — one fiscal year, since the merge keeps
+  // only the newest — so the line names the year its rows are for.
+  const dcFmr = mf
+    .flatMap((b) => {
+      const m = readFmrMetric(b.metric);
+      return b.metro === DC_AREA_METRO && m && typeof b.low === "number" ? [{ b, low: b.low, ...m }] : [];
+    })
+    .sort((x, y) => FMR_BEDS.indexOf(x.bed) - FMR_BEDS.indexOf(y.bed));
+  const dcEffective = fmrEffectiveOf(dcFmr[0]?.b.note);
   const priceRows = metros
     .map((m) => ({ metro: m, price: get(m, "median_sale_price_2_4_unit"), sales: get(m, "monthly_sales_2_4_unit"), listings: get(m, "active_listings_2_4_unit") }))
     .filter((r) => r.price)
@@ -494,16 +444,26 @@ async function MidAtlanticTable() {
           </tbody>
         </table>
       </div>
-      {fmr.length > 0 && (
+      {dcFmr.length > 0 && (
         <p className="mt-3 border-t border-line pt-2 text-xs text-muted">
-          DC-area FY2026 HUD fair-market rents:{" "}
-          {fmr
-            .map(
-              (b) =>
-                `${b.metric.replace("hud_fmr_fy2026_", "").toUpperCase()} $${(b.low ?? 0).toLocaleString()}`
-            )
-            .join(" · ")}{" "}
-          <span className="text-[11px]">(sourced; verify against the HUD schedule)</span>
+          {`DC-area ${fmrLabel(dcFmr[0].fy)} HUD fair market rents${dcEffective ? `, effective ${datedLong(dcEffective)}` : ""}: `}
+          {dcFmr.map((r) => `${r.bed.toUpperCase()} $${r.low.toLocaleString("en-US")}`).join(" · ")}{" "}
+          <span className="text-[11px]">
+            {`(${dcFmr[0].b.status})`}
+            {dcFmr[0].b.source && linkOk(dcFmr[0].b.source) !== false && (
+              <>
+                {" "}
+                <a
+                  href={dcFmr[0].b.source}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline decoration-dotted underline-offset-2 hover:text-ink"
+                >
+                  source
+                </a>
+              </>
+            )}
+          </span>
         </p>
       )}
       <p className="mt-2 text-[11px] leading-relaxed text-muted">
@@ -592,6 +552,12 @@ function MetroChips({ active }: { active: string }) {
   );
 }
 
+/** Today as an ISO day — read here, outside the render, since it reads the
+ *  clock; the fair market rent row says a year past its end has ended. */
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 async function MetroExplorer({ selected }: { selected?: string }) {
   const metros = metrosSeed.metros ?? [];
   // A metro area read without a brief (#404) gets its own page body: the
@@ -655,22 +621,10 @@ async function MetroExplorer({ selected }: { selected?: string }) {
   // The for-sale market this month (Realtor.com's inventory, monthly) —
   // the demand side an apartment underwrite is quietly assuming.
   const realtor = await liveRealtor(active.name);
-  const fmr = active.fmr_fy2026 as {
-    "0br"?: number | null;
-    "1br"?: number | null;
-    "2br"?: number | null;
-    "3br"?: number | null;
-    range?: [number, number];
-    status?: string;
-    note?: string;
-    sources?: string[];
-  } | null;
-  // Full bedroom row where the research carries one (LA's Federal-Register
-  // revision, SF's housing-authority sheet, Newark's NJ-Treasury table) —
-  // 2BR stays the emphasized headline everywhere.
-  const fmrBeds = (["0br", "1br", "2br", "3br"] as const)
-    .map((k) => ({ label: k.toUpperCase(), value: fmr?.[k] }))
-    .filter((b): b is { label: string; value: number } => typeof b.value === "number");
+  // HUD's fair market rent through the one reader (lib/fmr): the fiscal
+  // year, the day it takes effect and HUD's name for the area are the
+  // block's own, so the row cannot print one year's rents as another's.
+  const fmr = fmrOf(active);
   const providers = Object.fromEntries(PROVIDERS.map((p) => [p.id, p]));
   const compsLine =
     active.comps_provider === null
@@ -733,97 +687,9 @@ async function MetroExplorer({ selected }: { selected?: string }) {
           metroRates={live}
         />
 
-        {typeof fmr?.["2br"] === "number" ? (
-          <div className="text-sm">
-            <span className="text-[11px] uppercase tracking-wide text-muted">
-              FY2026 fair market rent
-            </span>{" "}
-            {fmrBeds.map((b, i) => (
-              <span key={b.label}>
-                {i > 0 && <span className="text-muted"> · </span>}
-                <span className="text-muted">{b.label}</span>{" "}
-                <span
-                  className={`font-mono tabular-nums ${
-                    b.label === "2BR" ? "font-semibold" : "text-muted"
-                  }`}
-                >
-                  ${b.value.toLocaleString()}
-                </span>
-              </span>
-            ))}
-            <span className="text-muted">/mo</span>
-            <span
-              className={`ml-2 rounded px-1.5 py-px align-middle text-[10px] font-medium ${
-                fmr.status === "verified"
-                  ? "bg-emerald-500/10 text-emerald-600"
-                  : "bg-brand/10 text-brand"
-              }`}
-            >
-              {fmr.status ?? "sourced"}
-            </span>
-            {fmr.range && (
-              <span className="text-xs text-muted">
-                {" "}
-                (payment-standard range ${fmr.range[0].toLocaleString()}–$
-                {fmr.range[1].toLocaleString()})
-              </span>
-            )}
-            {fmr.sources?.[0] && (
-              <a
-                href={fmr.sources[0]}
-                target="_blank"
-                rel="noreferrer"
-                className="ml-2 text-[11px] text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
-              >
-                source
-              </a>
-            )}
-            {/* Bedroom ladder, drawn — widths scale to the real dollars in
-                the row above (aria-hidden: the numbers already read as text). */}
-            {fmrBeds.length >= 2 && (
-              <div className="mt-2 max-w-md space-y-1" aria-hidden>
-                {fmrBeds.map((b) => {
-                  const max = Math.max(...fmrBeds.map((x) => x.value));
-                  const w = Math.max(8, Math.round((b.value / max) * 100));
-                  return (
-                    <div key={b.label} className="flex items-center gap-2">
-                      <span className="w-7 shrink-0 text-[10px] font-medium text-muted">
-                        {b.label}
-                      </span>
-                      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-faint">
-                        <div
-                          className={`h-full rounded-full transition-[width] duration-500 ${
-                            b.label === "2BR" ? "bg-brand" : "bg-brand/40"
-                          }`}
-                          style={{ width: `${w}%` }}
-                        />
-                      </div>
-                      <span className="w-14 shrink-0 text-right font-mono text-[10px] tabular-nums text-muted">
-                        ${b.value.toLocaleString()}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            <CopyCite
-              text={`${active.name} — FY2026 2BR fair market rent $${fmr["2br"].toLocaleString()}/mo (${fmr.status ?? "sourced"}${fmr.sources?.[0] ? `; source: ${fmr.sources[0]}` : ""}) · via Underwrite Copilot market brief`}
-            />
-            {fmr.note && (
-              <Fold
-                text={fmr.note}
-                className="mt-1 text-[11px] leading-relaxed text-muted"
-              />
-            )}
-          </div>
-        ) : (
-          <p className="text-xs text-muted">
-            FY2026 FMR for this metro: not yet confirmed —{" "}
-            {fmr?.note ?? "queued in the research gaps."}
-          </p>
-        )}
+        <FmrRow name={active.name} fmr={fmr} today={todayIso()} />
 
-        <ZoriLine z={zori} fmr2br={typeof fmr?.["2br"] === "number" ? fmr["2br"] : null} />
+        <ZoriLine z={zori} fmr2br={fmrTwoBed(fmr)} />
 
         <RealtorLine r={realtor} />
 

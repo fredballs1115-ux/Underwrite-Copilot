@@ -7,17 +7,21 @@ import { describe, expect, it } from "vitest";
 import {
   benchmarksForDeal,
   fmtBenchValue,
+  mergeBenchmarks,
   mergeRules,
+  metroFmr,
   seedBenchmarks,
   seedRules,
   twoToFourMedian,
 } from "@/lib/research-data";
-import type { RegulatoryRule } from "@/lib/research";
+import type { Benchmark, RegulatoryRule } from "@/lib/research";
 import { monthOf } from "@/lib/zori";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { metroForAddress } from "@/lib/market-match";
+import { DC_AREA_METRO, FMR_BEDS, fmrBenchmarkRows, fmrBlock, fmrOf, readFmrMetric } from "@/lib/fmr";
 import metrosSeed from "@/data/research/metros.json";
+import multifamilySeed from "@/data/research/multifamily.json";
 
 const seeds = seedBenchmarks();
 
@@ -28,9 +32,8 @@ describe("benchmarksForDeal", () => {
     // …the market matcher closes the gap.
     const metro = metroForAddress({ city: "Brooklyn", state: "NY" });
     const rows = benchmarksForDeal(seeds, "Brooklyn", metro?.name);
-    expect(rows.some((b) => b.metro === "New York City" && b.metric === "hud_fmr_fy2026_2br")).toBe(
-      true
-    );
+    const nyc2br = rows.find((b) => b.metro === "New York City" && b.metric === "hud_fmr_fy2027_2br");
+    expect(nyc2br?.low).toBe(2971);
   });
 
   it("a county-only DC address still reaches the DC-area FMR rows", () => {
@@ -39,11 +42,13 @@ describe("benchmarksForDeal", () => {
     expect(rows.some((b) => b.metro === "Washington DC area")).toBe(true);
   });
 
-  it("DMV suburbs do NOT inherit the DC-proper FMR (unverified for counties)", () => {
+  it("DMV suburbs do NOT inherit the DC-proper rows — they carry their own", () => {
     const metro = metroForAddress({ city: "Bethesda", state: "MD" });
     expect(metro?.id).toBe("montgomery_county");
     const rows = benchmarksForDeal(seeds, "Bethesda", metro?.name);
     expect(rows.some((b) => b.metro === "Washington DC area")).toBe(false);
+    // The county's own rows: the Washington HUD area's figures.
+    expect(rows.find((b) => b.metric === "hud_fmr_fy2027_2br")).toMatchObject({ metro: "Montgomery County MD", low: 2438 });
   });
 
   it("Philadelphia proper gets both the city sales rows and the FMR row", () => {
@@ -167,8 +172,115 @@ describe("fmtBenchValue", () => {
   });
   it("keeps dollars for sale medians and FMRs, dash for missing", () => {
     expect(fmtBenchValue("median_sale_price_2_4_unit", 450000, 520000)).toBe("$450,000–$520,000");
-    expect(fmtBenchValue("hud_fmr_fy2026_2br", 2044, 2044)).toBe("$2,044");
+    expect(fmtBenchValue("hud_fmr_fy2027_2br", 2044, 2044)).toBe("$2,044");
     expect(fmtBenchValue("median_sale_price_2_4_unit", null, null)).toBe("—");
+  });
+});
+
+describe("HUD's fair market rents — the year in the data, the newest year only", () => {
+  const metros = metrosSeed.metros as { id: string; name: string }[];
+
+  it("every covered metro carries a block the one reader reads: HUD's year, its day, its area, five bedrooms", () => {
+    expect(metros.length).toBeGreaterThan(0);
+    for (const m of metros) {
+      const fmr = fmrOf(m);
+      expect(fmr, m.id).not.toBeNull();
+      expect(fmr!.status, m.id).toBe("verified");
+      expect(fmr!.asOf, m.id).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(fmr!.sources[0], m.id).toMatch(/^https:\/\/www\.huduser\.gov\//);
+      for (const bed of FMR_BEDS) expect(fmr!.rents[bed], `${m.id} ${bed}`).toBeGreaterThan(0);
+      // No key names a fiscal year: the year is the block's own field.
+      expect(Object.keys(m).filter((k) => /fy_?20\d\d/i.test(k)), m.id).toEqual([]);
+    }
+    expect(Object.keys(multifamilySeed.supply_demand).filter((k) => /fy_?20\d\d/i.test(k))).toEqual([]);
+  });
+
+  it("pins the figures HUD's own file states, where the old ones were wrong or missing", () => {
+    // Baltimore's and Seattle's two-bedroom and the Washington area's four
+    // had been a republisher's figure, a gap and a gap.
+    expect(metroFmr("baltimore")?.rents["2br"]).toBe(2006);
+    expect(metroFmr("seattle")?.rents["2br"]).toBe(2549);
+    expect(metroFmr("dc")?.rents["4br"]).toBe(3658);
+    expect(metroFmr("atlanta")?.area).toBe("Atlanta-Sandy Springs-Roswell, GA HUD Metro FMR Area");
+    expect(metroFmr("philadelphia")).toMatchObject({ fy: 2027, effective: "2026-10-01", rents: { "2br": 1860 } });
+    expect(metroFmr("nowhere")).toBeNull();
+  });
+
+  it("the four DMV jurisdictions and multifamily.json's block are one HUD area, figure for figure", () => {
+    const block = fmrBlock(multifamilySeed.supply_demand.rents_hud_fmr_dc_area)!;
+    expect(block).not.toBeNull();
+    for (const id of ["dc", "pg_county", "montgomery_county", "nova"]) {
+      const fmr = metroFmr(id)!;
+      expect({ fy: fmr.fy, effective: fmr.effective, area: fmr.area, rents: fmr.rents }, id).toEqual({
+        fy: block.fy,
+        effective: block.effective,
+        area: block.area,
+        rents: block.rents,
+      });
+    }
+  });
+
+  it("the seeds write lib/fmr's rows — the ones scripts/seed-research.mjs and the FMR pull write", () => {
+    const fmrSeeds = seeds.filter((b) => readFmrMetric(b.metric));
+    expect(fmrSeeds).toEqual(fmrBenchmarkRows(metrosSeed, multifamilySeed));
+    // The Washington area's under its table label, every other metro under
+    // its own name, five bedrooms each.
+    expect(fmrSeeds).toHaveLength(metros.length * FMR_BEDS.length);
+    expect(fmrSeeds.filter((b) => b.metro === DC_AREA_METRO)).toHaveLength(FMR_BEDS.length);
+    expect(fmrSeeds.some((b) => b.metro === "Washington DC")).toBe(false);
+    // The two scripts build rows through the same functions and never name
+    // a metric (or a year) themselves.
+    const seedScript = readFileSync(join(process.cwd(), "scripts/seed-research.mjs"), "utf8");
+    expect(seedScript).toContain("fmrBenchmarkRows(metrosDoc, mf)");
+    const pull = readFileSync(join(process.cwd(), "scripts/fetch-fmr.mjs"), "utf8");
+    expect(pull).toContain("fmrRows(");
+    expect(pull).toContain("fmrMetroLabel(entry)");
+    for (const src of [seedScript, pull]) expect(src).not.toMatch(/hud_fmr_fy|(?<![a-z])fy ?20\d\d/i);
+  });
+
+  it("an older fiscal year merged in from the database is never shown as current", () => {
+    const old = (metro: string, bed: string, low: number): Benchmark => ({
+      sector: "multifamily",
+      metro,
+      metric: `hud_fmr_fy2026_${bed}`,
+      low,
+      high: low,
+      unit: "usd_month",
+      source: "https://www.dchousing.org/api/files/board/610.pdf",
+      as_of: "2026-08-21",
+      status: "verified",
+      note: null,
+    });
+    // What the table may still hold: last year's seed under the Washington
+    // area's label (a 4BR this year's file has too), and a row from an older
+    // pull under the metro's own name.
+    const stale = [old(DC_AREA_METRO, "2br", 2246), old(DC_AREA_METRO, "4br", 3413), old("Washington DC", "2br", 2246), old("Baltimore MD", "2br", 1943)];
+    const merged = mergeBenchmarks(stale);
+    expect(merged.filter((b) => readFmrMetric(b.metric)?.fy === 2026)).toEqual([]);
+    expect(merged.find((b) => b.metro === DC_AREA_METRO && b.metric === "hud_fmr_fy2027_2br")?.low).toBe(2438);
+    expect(merged.find((b) => b.metro === DC_AREA_METRO && b.metric === "hud_fmr_fy2027_4br")?.low).toBe(3658);
+    // A deal's own rows, whatever was handed in.
+    const dcDeal = benchmarksForDeal([...seeds, ...stale], "Washington", "Washington DC");
+    const years = dcDeal.flatMap((b) => {
+      const m = readFmrMetric(b.metric);
+      return m ? [m.fy] : [];
+    });
+    expect(years.length).toBe(FMR_BEDS.length);
+    expect(new Set(years)).toEqual(new Set([2027]));
+  });
+
+  it("a database row of the newest year replaces the file's figure of the same key", () => {
+    const seed = seeds.find((b) => b.metro === "Baltimore MD" && b.metric === "hud_fmr_fy2027_2br")!;
+    const pulled = { ...seed, low: 2010, high: 2010, source: "https://www.huduser.gov/portal/dataset/fmr-api.html" };
+    const merged = mergeBenchmarks([pulled]).filter((b) => b.metro === "Baltimore MD" && b.metric === "hud_fmr_fy2027_2br");
+    expect(merged).toEqual([pulled]);
+  });
+
+  it("the demo prints Philadelphia's from the file, never a figure or a year typed", () => {
+    const demo = readFileSync(join(process.cwd(), "app/demo/page.tsx"), "utf8");
+    expect(demo).toContain('metroFmr("philadelphia")');
+    expect(demo).not.toContain("$1,810");
+    expect(demo).not.toContain("$1,860");
   });
 });
 

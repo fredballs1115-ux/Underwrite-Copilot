@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { FMR_BEDS, fmrLabel, type FmrBed } from "@/lib/fmr";
 
 // Compact, serializable per-metro facts the server derives from the research
 // layer (metros.json) — this component only arranges them. Bars share ONE
@@ -18,7 +19,10 @@ export type CompareMetro = {
   id: string;
   name: string;
   region: string;
-  fmr: Partial<Record<"0br" | "1br" | "2br" | "3br", number>> & {
+  /** HUD's fair market rent through lib/fmr's reader: each bedroom it
+   *  states, the fiscal year its block names and its status */
+  fmr: Partial<Record<FmrBed, number>> & {
+    fy?: number;
     status?: string;
   };
   sectors?: Partial<
@@ -46,17 +50,19 @@ function sectorCell(s: CompareSector | undefined): string {
   return extras.length > 0 ? `${v} · ${extras.join(" · ")}` : v;
 }
 
-const BEDS = ["0br", "1br", "2br", "3br"] as const;
+/** "FY… fair market rent" with the year the block states; no year typed. */
+function fmrHeading(m: CompareMetro): string {
+  return typeof m.fmr.fy === "number" ? `${fmrLabel(m.fmr.fy)} fair market rent` : "Fair market rent";
+}
 
 function Ladder({ m, max }: { m: CompareMetro; max: number }) {
-  const rows = BEDS.map((b) => ({ label: b.toUpperCase(), value: m.fmr[b] })).filter(
+  const rows = FMR_BEDS.map((b) => ({ label: b.toUpperCase(), value: m.fmr[b] })).filter(
     (r): r is { label: string; value: number } => typeof r.value === "number",
   );
   if (rows.length === 0) {
     return (
       <p className="mt-2 text-[11px] leading-relaxed text-muted">
-        FY2026 FMR not yet confirmed for this metro — an honest gap, never an
-        estimate.
+        {`${fmrHeading(m)} not yet confirmed for this metro — an honest gap, never an estimate.`}
       </p>
     );
   }
@@ -123,10 +129,12 @@ export function MarketCompare({ metros }: { metros: CompareMetro[] }) {
   // One shared scale — the tallest bar across BOTH metros is 100%.
   const max = Math.max(
     1,
-    ...[a, b].flatMap((m) => BEDS.map((k) => m.fmr[k] ?? 0)),
+    ...[a, b].flatMap((m) => FMR_BEDS.map((k) => m.fmr[k] ?? 0)),
   );
+  // Two figures of one fiscal year only: a spread across two years is the
+  // year's change as much as the markets'.
   const spread =
-    typeof a.fmr["2br"] === "number" && typeof b.fmr["2br"] === "number"
+    typeof a.fmr["2br"] === "number" && typeof b.fmr["2br"] === "number" && a.fmr.fy === b.fmr.fy
       ? a.fmr["2br"] - b.fmr["2br"]
       : null;
 
@@ -150,7 +158,7 @@ export function MarketCompare({ metros }: { metros: CompareMetro[] }) {
           <div key={label} className="rounded-xl border border-line bg-paper p-4">
             <Picker metros={metros} value={m.id} onChange={set} label={label} />
             <p className="mt-2 text-[10px] uppercase tracking-wide text-muted">
-              FY2026 fair market rent
+              {fmrHeading(m)}
               {m.fmr.status && (
                 <span
                   className={`ml-1.5 rounded px-1.5 py-px text-[9px] font-medium normal-case tracking-normal ${

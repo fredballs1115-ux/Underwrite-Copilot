@@ -18,7 +18,7 @@ const ROWS: BenchRow[] = [
     as_of: "2026-08-31",
     note: "Zillow Observed Rent Index (ZORI), all homes, smoothed, Washington, DC metro area, month ending 2026-08-31 — the Washington, DC metro area's figure, shared with the MSA. Data: Zillow Research.",
   },
-  { metric: "hud_fmr_fy2026_2br", metro: "Washington DC", low: 2100, as_of: "2026-09-03", note: null },
+  { metric: "hud_fmr_fy2027_2br", metro: "Washington DC area", low: 2438, as_of: "2026-09-30", note: null },
 ];
 
 /** The two further files' rows, as the same pull writes them. */

@@ -5,17 +5,23 @@
     {
       "id": "dc",
       "name": "Washington DC",
-      "fmr_fy2026": {
-        "2br": 2246,
-        "0br": 1953,
-        "1br": 2015,
-        "3br": 2835,
+      "fmr": {
+        "fy": 2027,
+        "effective": "2026-10-01",
+        "area": "Washington-Arlington-Alexandria, DC-VA-MD HUD Metro FMR Area",
+        "0br": 2111,
+        "1br": 2204,
+        "2br": 2438,
+        "3br": 3107,
+        "4br": 3658,
         "status": "verified",
         "sources": [
-          "https://www.dchousing.org/api/files/board/610.pdf",
-          "https://usrentprices.com/rent-prices/washington-dc"
+          "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://web.archive.org/web/20260922234125id_/https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://www.federalregister.gov/d/2026-17891"
         ],
-        "note": "Washington-Arlington-Alexandria DC-VA-MD HMFA. Primary-confirmed via DCHA Resolution 25-31 (read 2026-08-24): the Board's FY2026 payment standards are exactly 187% of FMR, and every bedroom reverses onto these values — $4,200/1.87 = $2,246 (2BR), $3,652/1.87 = $1,953, $3,768/1.87 = $2,015, $5,301/1.87 = $2,835. Mandatory SAFMR zone (ZIP-level rents govern vouchers)."
+        "as_of": "2026-09-30",
+        "note": "Mandatory Small Area FMR zone: ZIP-level rents govern vouchers. Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22). Calvert County, MD is a HUD area of its own, not part of this one."
       },
       "market_notes": {
         "value": "Pre-1976 rowhouse-flat stock rent-stabilized unless natural-person exemption applies; post-1975 buildings exempt; TOPA largely gone for 2-4s under Law 26-80.",
@@ -83,14 +89,23 @@
     {
       "id": "pg_county",
       "name": "Prince George's County MD",
-      "fmr_fy2026": {
-        "2br": 2246,
-        "status": "sourced",
+      "fmr": {
+        "fy": 2027,
+        "effective": "2026-10-01",
+        "area": "Washington-Arlington-Alexandria, DC-VA-MD HUD Metro FMR Area",
+        "0br": 2111,
+        "1br": 2204,
+        "2br": 2438,
+        "3br": 3107,
+        "4br": 3658,
+        "status": "verified",
         "sources": [
-          "https://usrentprices.com/rent-prices/washington-dc",
-          "https://plainrent.com/states/district-of-columbia"
+          "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://web.archive.org/web/20260922234125id_/https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://www.federalregister.gov/d/2026-17891"
         ],
-        "note": "Part of the Washington-Arlington-Alexandria DC-VA-MD HUD Metro FMR Area — the metro-wide FY2026 2BR ($2,246, see the DC entry) applies here. ZIP-level SAFMRs govern vouchers (FY2026 per-ZIP values still pending huduser pull). FY2026 boundary change: Calvert County MD was removed from the DC HMFA (FR 2025-16060)."
+        "as_of": "2026-09-30",
+        "note": "The Washington HUD area's metro-wide figures, shared by every jurisdiction in it. ZIP-level Small Area FMRs govern vouchers; per-ZIP values are not on file. Calvert County, MD is a HUD area of its own (2BR $1,890), not part of this one. Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
       },
       "market_notes": {
         "value": "Inside-Beltway towns (Mount Rainier, Hyattsville, Brentwood, Capitol Heights) hold the county's 2-4 unit stock; PRSA caps increases at lesser of 6% or CPI-U+3% with the natural-person ≤5-unit exemption (no domicile condition per county FAQ).",
@@ -145,14 +160,23 @@
     {
       "id": "montgomery_county",
       "name": "Montgomery County MD",
-      "fmr_fy2026": {
-        "2br": 2246,
-        "status": "sourced",
+      "fmr": {
+        "fy": 2027,
+        "effective": "2026-10-01",
+        "area": "Washington-Arlington-Alexandria, DC-VA-MD HUD Metro FMR Area",
+        "0br": 2111,
+        "1br": 2204,
+        "2br": 2438,
+        "3br": 3107,
+        "4br": 3658,
+        "status": "verified",
         "sources": [
-          "https://usrentprices.com/rent-prices/washington-dc",
-          "https://plainrent.com/states/district-of-columbia"
+          "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://web.archive.org/web/20260922234125id_/https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://www.federalregister.gov/d/2026-17891"
         ],
-        "note": "Part of the Washington-Arlington-Alexandria DC-VA-MD HUD Metro FMR Area — the metro-wide FY2026 2BR ($2,246, see the DC entry) applies here; ZIP-level SAFMRs govern vouchers (per-ZIP values pending)."
+        "as_of": "2026-09-30",
+        "note": "The Washington HUD area's metro-wide figures, shared by every jurisdiction in it. ZIP-level Small Area FMRs govern vouchers; per-ZIP values are not on file. Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
       },
       "market_notes": {
         "value": "County rent stabilization (CPI+3% capped 6%) with building-age and small-owner exemptions; Takoma Park layers its OWN stricter regime (all 2+ unit rentals, no small-owner exemption, FY2027 allowance 3.0%).",
@@ -204,14 +228,23 @@
     {
       "id": "nova",
       "name": "Northern Virginia",
-      "fmr_fy2026": {
-        "2br": 2246,
-        "status": "sourced",
+      "fmr": {
+        "fy": 2027,
+        "effective": "2026-10-01",
+        "area": "Washington-Arlington-Alexandria, DC-VA-MD HUD Metro FMR Area",
+        "0br": 2111,
+        "1br": 2204,
+        "2br": 2438,
+        "3br": 3107,
+        "4br": 3658,
+        "status": "verified",
         "sources": [
-          "https://usrentprices.com/rent-prices/washington-dc",
-          "https://plainrent.com/states/district-of-columbia"
+          "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://web.archive.org/web/20260922234125id_/https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://www.federalregister.gov/d/2026-17891"
         ],
-        "note": "Part of the Washington-Arlington-Alexandria DC-VA-MD HUD Metro FMR Area — the metro-wide FY2026 2BR ($2,246, see the DC entry) applies here. SAFMR zone (Prince William confirmed a SAFMR jurisdiction, 3-0); per-ZIP values pending."
+        "as_of": "2026-09-30",
+        "note": "The Washington HUD area's metro-wide figures, shared by every jurisdiction in it. A Small Area FMR zone (Prince William confirmed a SAFMR jurisdiction, 3-0); per-ZIP values are not on file. Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
       },
       "market_notes": {
         "value": "No rent control anywhere in Virginia (Dillon-Rule absence of grant; enabling bills keep failing). Near-zero on-market 2-4 unit inventory — Prince William read '0 Homes' for duplex/triplex in July 2026; off-market sourcing (tax-delinquency pipeline) is the entry. Fairfax/Arlington comps staged in discovery mode.",
@@ -266,17 +299,23 @@
     {
       "id": "baltimore",
       "name": "Baltimore MD",
-      "fmr_fy2026": {
-        "2br": 1943,
-        "range": [
-          1749,
-          2137
-        ],
-        "status": "sourced",
+      "fmr": {
+        "fy": 2027,
+        "effective": "2026-10-01",
+        "area": "Baltimore-Columbia-Towson, MD MSA",
+        "0br": 1523,
+        "1br": 1625,
+        "2br": 2006,
+        "3br": 2509,
+        "4br": 2789,
+        "status": "verified",
         "sources": [
-          "https://hellosection8.com/fair_market_rents/hud-metro12580m12580.html"
+          "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://web.archive.org/web/20260922234125id_/https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://www.federalregister.gov/d/2026-17891"
         ],
-        "note": "Baltimore-Columbia-Towson MSA; range brackets are the 90/110% payment-standard structure."
+        "as_of": "2026-09-30",
+        "note": "Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
       },
       "market_notes": {
         "value": "Q1 2026 metro multifamily volume +53.1% YoY to $367M — strongest quarter since 2022. No rent cap in the city, but license-before-rent (unlicensed = no right to collect) and the code-violation rent freeze invert the value-add sequence: license, cure, then reposition.",
@@ -342,14 +381,23 @@
     {
       "id": "richmond",
       "name": "Richmond VA",
-      "fmr_fy2026": {
-        "2br": 1655,
-        "status": "sourced",
+      "fmr": {
+        "fy": 2027,
+        "effective": "2026-10-01",
+        "area": "Richmond, VA HUD Metro FMR Area",
+        "0br": 1456,
+        "1br": 1517,
+        "2br": 1651,
+        "3br": 2039,
+        "4br": 2499,
+        "status": "verified",
         "sources": [
-          "https://gerarent.com/",
-          "https://www.rentdata.org/richmond-va-msa/2025"
+          "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://web.archive.org/web/20260922234125id_/https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://www.federalregister.gov/d/2026-17891"
         ],
-        "note": "Richmond, VA HUD Metro FMR Area, per GeraRent's HUD-FY2026 area pages (search-surfaced; exact page URL not captured — same republisher matched HUD exactly for Dallas). A -3.3% year from FY2025's $1,711 (rentdata.org), within HUD's 10% annual decrease bound. Beware conflation: 'Richmond County VA' (Northern Neck, ~$1,157) is a different area."
+        "as_of": "2026-09-30",
+        "note": "Richmond County, VA (the Northern Neck) is a different HUD area; never read one for the other. Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
       },
       "market_notes": {
         "value": "Institutional multifamily YTD median $129,500/unit (Q1 2026, skewed by one high-vacancy trade; $180,700/unit excluding it) amid elevated supply with steady vacancy. No rent control (VA). City open-data comp feed queued in county_data_sources.json.",
@@ -416,14 +464,23 @@
     {
       "id": "norfolk_hampton_roads",
       "name": "Norfolk / Hampton Roads VA",
-      "fmr_fy2026": {
-        "2br": 1713,
-        "status": "sourced",
+      "fmr": {
+        "fy": 2027,
+        "effective": "2026-10-01",
+        "area": "Virginia Beach-Norfolk-Newport News, VA-NC HUD Metro FMR Area",
+        "0br": 1470,
+        "1br": 1488,
+        "2br": 1667,
+        "3br": 2298,
+        "4br": 2710,
+        "status": "verified",
         "sources": [
-          "https://plainrent.com/counties/newport-news-city-va",
-          "https://www.ushousingdata.com/fair-market-rents/norfolk-city-va"
+          "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://web.archive.org/web/20260922234125id_/https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://www.federalregister.gov/d/2026-17891"
         ],
-        "note": "Virginia Beach-Norfolk-Newport News VA-NC HMFA (one HMFA across Hampton Roads; city pages mirror it). $1,713 per PlainRent's FY2026 Newport News page — trajectory-consistent with FY2025 $1,696 (USHousingData, Norfolk) and FY2024 $1,493 (RentData)."
+        "as_of": "2026-09-30",
+        "note": "One HUD area across Hampton Roads. Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
       },
       "market_notes": {
         "value": "No rent control (VA). Military-demand rental base; screened for stock/pricing in a future pass — currently the thinnest data of the eight metros.",
@@ -488,13 +545,23 @@
     {
       "id": "philadelphia",
       "name": "Philadelphia PA",
-      "fmr_fy2026": {
-        "2br": 1810,
-        "status": "sourced",
+      "fmr": {
+        "fy": 2027,
+        "effective": "2026-10-01",
+        "area": "Philadelphia-Camden-Wilmington, PA-NJ-DE-MD MSA",
+        "0br": 1438,
+        "1br": 1558,
+        "2br": 1860,
+        "3br": 2216,
+        "4br": 2445,
+        "status": "verified",
         "sources": [
-          "https://voucherready.com/articles/rent-and-payment-standards/hud-fair-market-rents-2026-news"
+          "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://web.archive.org/web/20260922234125id_/https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://www.federalregister.gov/d/2026-17891"
         ],
-        "note": "Philadelphia-Camden-Wilmington MSA, effective 2025-10-01 through 2026-09-30."
+        "as_of": "2026-09-30",
+        "note": "One HUD area across Philadelphia, Camden and Wilmington. Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
       },
       "market_notes": {
         "value": "The deepest accessible 2-4 unit market on the coast: $363,500 May 2026 median (+6.9% YoY), 366 active listings (Redfin), ~1,075 multi-family listings on Homes.com (July 2026). No rent control (PA); § 9-811 eviction diversion adds a verified 30-day pre-filing step. Auto-comps live via OPA. Wilmington DE sits inside the Philadelphia orbit: no rent control at any level in Delaware (New Castle comps staged in discovery).",
@@ -557,16 +624,23 @@
     {
       "id": "newark_jc",
       "name": "Newark / Jersey City",
-      "fmr_fy2026": {
-        "2br": 2205,
-        "0br": 1612,
-        "1br": 1822,
-        "3br": 2761,
+      "fmr": {
+        "fy": 2027,
+        "effective": "2026-10-01",
+        "area": "Newark, NJ HUD Metro FMR Area",
+        "0br": 1637,
+        "1br": 1850,
+        "2br": 2233,
+        "3br": 2785,
+        "4br": 3188,
         "status": "verified",
         "sources": [
-          "https://www.nj.gov/treasury/njombudsman/documents/pdf/FY2026FairMarketRentDocumentationSystem.pdf"
+          "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://web.archive.org/web/20260922234125id_/https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://www.federalregister.gov/d/2026-17891"
         ],
-        "note": "Newark NJ HMFA row (Essex-side of this market), from HUD's FY2026 FMR documentation system as republished by NJ Treasury (primary, full table read 2026-08-24). Jersey City NJ HMFA (Hudson County) prices separately: 2BR $2,763 (same document). The same table re-confirms Philadelphia-Camden-Wilmington 2BR $1,810."
+        "as_of": "2026-09-30",
+        "note": "The Newark side of this market (HUD's Essex County row). Jersey City, NJ HUD Metro FMR Area (Hudson County) is a separate HUD area: 0BR $2,462 · 1BR $2,514 · 2BR $2,792 · 3BR $3,392 · 4BR $3,976. Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
       },
       "market_notes": {
         "value": "The two big screened NJ rent-control cities split exactly on the small-building question: Jersey City exempts EVERY 1-4 unit property regardless of occupancy (5+ built pre-1987 is controlled); Newark exempts 1-4 family ONLY when owner-occupied. Statewide, ~100 other NJ ordinances remain unscreened - check before offer. NJ MOD-IV property rolls are statewide (provider wired for parcels).",
@@ -634,14 +708,23 @@
     {
       "id": "nyc",
       "name": "New York City",
-      "fmr_fy2026": {
-        "2br": 2910,
-        "status": "sourced",
+      "fmr": {
+        "fy": 2027,
+        "effective": "2026-10-01",
+        "area": "New York, NY HUD Metro FMR Area",
+        "0br": 2593,
+        "1br": 2729,
+        "2br": 2971,
+        "3br": 3760,
+        "4br": 4121,
+        "status": "verified",
         "sources": [
-          "https://tenanture.com/fair-market-rent/ny",
-          "https://usrentprices.com/rent-prices/new-york-ny"
+          "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://web.archive.org/web/20260922234125id_/https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://www.federalregister.gov/d/2026-17891"
         ],
-        "note": "Confirmed by two independent republishers; huduser primary pull queued to upgrade to verified."
+        "as_of": "2026-09-30",
+        "note": "Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
       },
       "market_notes": {
         "value": "The small-building path through NYC: rent stabilization requires 6+ units built pre-1974, so 2-4 unit product trades UNregulated on rent - but Good Cause Eviction (2024) applies citywide unless the owner holds <=10 units statewide or owner-occupies a <=10-unit building. Deed history via ACRIS; DOF Rolling Sales lacks coordinates (BBL join to PLUTO documented in ingestion_sources.md).",
@@ -712,13 +795,23 @@
     {
       "id": "boston",
       "name": "Boston",
-      "fmr_fy2026": {
-        "2br": 2941,
-        "status": "sourced",
+      "fmr": {
+        "fy": 2027,
+        "effective": "2026-10-01",
+        "area": "Boston-Cambridge-Quincy, MA-NH HUD Metro FMR Area",
+        "0br": 2440,
+        "1br": 2518,
+        "2br": 3008,
+        "3br": 3584,
+        "4br": 3953,
+        "status": "verified",
         "sources": [
-          "https://www.huduser.gov/portal/datasets/fmr/fmrs/FY2026_code/2026summary.odn"
+          "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://web.archive.org/web/20260922234125id_/https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://www.federalregister.gov/d/2026-17891"
         ],
-        "note": "Boston-Cambridge-Quincy MA-NH HMFA; figure surfaced via search excerpts of HUD's FY2026 FMR documentation system (direct huduser fetch blocked from this environment — the linked query system is the primary). FY2026 for this HMFA is built on 2024 local survey data per FR 2025-16060."
+        "as_of": "2026-09-30",
+        "note": "Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
       },
       "market_notes": {
         "value": "Rent control banned statewide since 1994 (Question 9); a 2026 ballot revival was blocked by the SJC but the pressure campaign continues - a genuine watch item. Property Assessment roll published yearly on data.boston.gov (CKAN).",
@@ -786,13 +879,23 @@
     {
       "id": "chicago",
       "name": "Chicago",
-      "fmr_fy2026": {
-        "2br": 1781,
-        "status": "sourced",
+      "fmr": {
+        "fy": 2027,
+        "effective": "2026-10-01",
+        "area": "Chicago-Joliet-Naperville, IL HUD Metro FMR Area",
+        "0br": 1678,
+        "1br": 1780,
+        "2br": 2011,
+        "3br": 2586,
+        "4br": 2954,
+        "status": "verified",
         "sources": [
-          "https://www.huduser.gov/portal/datasets/fmr/fmrs/FY2026_code/2026summary.odn"
+          "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://web.archive.org/web/20260922234125id_/https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://www.federalregister.gov/d/2026-17891"
         ],
-        "note": "Chicago-Joliet-Naperville IL HUD Metro FMR Area; figure surfaced via search excerpts of HUD's FY2026 FMR documentation system (direct huduser fetch blocked from this environment — the linked query system is the primary)."
+        "as_of": "2026-09-30",
+        "note": "Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
       },
       "market_notes": {
         "value": "No rent control anywhere in Illinois (Preemption Act 1997, repeal attempts keep failing). Chicago's RLTO is the real compliance load - and owner-occupied buildings of <=6 units are exempt from most of it, which fits a house-hacked 2-4 unit purchase exactly. Cook County parcel + sales data on Socrata (documented).",
@@ -863,16 +966,23 @@
     {
       "id": "los_angeles",
       "name": "Los Angeles",
-      "fmr_fy2026": {
-        "2br": 2903,
-        "0br": 2079,
-        "1br": 2328,
-        "3br": 3681,
+      "fmr": {
+        "fy": 2027,
+        "effective": "2026-10-01",
+        "area": "Los Angeles-Long Beach-Glendale, CA HUD Metro FMR Area",
+        "0br": 2151,
+        "1br": 2402,
+        "2br": 2964,
+        "3br": 3760,
+        "4br": 4208,
         "status": "verified",
         "sources": [
-          "https://www.govinfo.gov/content/pkg/FR-2026-04-21/pdf/2026-07741.pdf"
+          "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://web.archive.org/web/20260922234125id_/https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://www.federalregister.gov/d/2026-17891"
         ],
-        "note": "Los Angeles-Long Beach-Glendale CA HMFA — REVISED FY2026 FMRs (Federal Register Vol. 91 No. 76, Doc 2026-07741, Apr 21 2026), effective 2026-05-21; supersedes the Oct 2025 schedule for this area (primary, read 2026-08-24)."
+        "as_of": "2026-09-30",
+        "note": "Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
       },
       "market_notes": {
         "value": "Two regimes stack: the city RSO (2+ units built on/before Oct 1, 1978 - caps, just-cause, relocation fees) and AB 1482 statewide for everything the RSO misses (5%+CPI max 10%, 15-year new-construction exemption, owner-occupied duplex exemption). A pre-1979 fourplex here is regulated stock - underwrite the cap, not pro-forma rents. County assessor roll ~2.4M parcels (plan-size driver).",
@@ -939,16 +1049,23 @@
     {
       "id": "san_francisco",
       "name": "San Francisco",
-      "fmr_fy2026": {
-        "2br": 3604,
-        "0br": 2485,
-        "1br": 2977,
-        "3br": 4604,
+      "fmr": {
+        "fy": 2027,
+        "effective": "2026-10-01",
+        "area": "San Francisco, CA HUD Metro FMR Area",
+        "0br": 2574,
+        "1br": 3003,
+        "2br": 3697,
+        "3br": 4832,
+        "4br": 5439,
         "status": "verified",
         "sources": [
-          "https://sfha.org/files/documents/Payment%20Standards%202026.pdf"
+          "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://web.archive.org/web/20260922234125id_/https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://www.federalregister.gov/d/2026-17891"
         ],
-        "note": "San Francisco HMFA. FY26 HUD FMR row from the SF Housing Authority's 2026 Payment Standards sheet (revised 2025-10-23; primary, read 2026-08-24) — SFHA payment standard is 110% of FMR ($3,964 for a 2BR). Aggregator figures ($2,850 / $3,174) were rejected as conflations; the 2-source bar caught them."
+        "as_of": "2026-09-30",
+        "note": "Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
       },
       "market_notes": {
         "value": "Two regimes stack: the SF Rent Ordinance (essentially all residential built before June 13, 1979 - Rent Board caps + just-cause; post-1979 stock exempt from the caps but, since 2024, covered by just-cause anyway) and AB 1482 statewide for the rest. Pre-1979 SF multifamily is regulated stock - underwrite the allowed increase, not pro-forma rents. Secured assessor roll on data.sfgov.org (Socrata).",
@@ -1011,11 +1128,23 @@
     {
       "id": "seattle",
       "name": "Seattle",
-      "fmr_fy2026": {
-        "2br": null,
-        "status": "unverified_not_found",
-        "sources": [],
-        "note": "FY2026 metro 2BR still unverified — TWO conflations caught and rejected (2026-08-24): the widely-quoted $2,501 is Seattle's average market rent, not the FMR; and a $2,100 '2BR FMR' on an aggregator's Tacoma comparison fails plausibility against FY2025's $2,671 (Seattle-Bellevue HMFA, King/Snohomish, USHousingData) — a 21% drop, likely a SAFMR ZIP-tier quoted as the metro figure. Mandatory SAFMR area — ZIP bands roughly $1,700-$3,000. huduser/KCHA/SHA primary pull queued; never estimated."
+      "fmr": {
+        "fy": 2027,
+        "effective": "2026-10-01",
+        "area": "Seattle-Bellevue, WA HUD Metro FMR Area",
+        "0br": 2091,
+        "1br": 2180,
+        "2br": 2549,
+        "3br": 3324,
+        "4br": 3954,
+        "status": "verified",
+        "sources": [
+          "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://web.archive.org/web/20260922234125id_/https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://www.federalregister.gov/d/2026-17891"
+        ],
+        "as_of": "2026-09-30",
+        "note": "Mandatory Small Area FMR area: ZIP-level rents govern vouchers; per-ZIP values are not on file. Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
       },
       "market_notes": {
         "value": "Washington's 2025 HB 1217 now caps increases statewide (lesser of 7%+CPI or 10%; 9.683% for 2026) with a 12-year new-construction exemption - Seattle adds landlord regulations (JumpStart-era rules) but no separate city rent cap. King County publishes a dedicated real-property SALES file: the easiest comps win in the West.",
@@ -1080,13 +1209,23 @@
     {
       "id": "miami",
       "name": "Miami",
-      "fmr_fy2026": {
-        "2br": 2436,
-        "status": "sourced",
+      "fmr": {
+        "fy": 2027,
+        "effective": "2026-10-01",
+        "area": "Miami-Miami Beach-Kendall, FL HUD Metro FMR Area",
+        "0br": 1953,
+        "1br": 2121,
+        "2br": 2564,
+        "3br": 3277,
+        "4br": 3749,
+        "status": "verified",
         "sources": [
-          "https://www.huduser.gov/portal/datasets/fmr/fmr2026/FY2026_FMR_Schedule.pdf"
+          "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://web.archive.org/web/20260922234125id_/https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://www.federalregister.gov/d/2026-17891"
         ],
-        "note": "Miami-Miami Beach-Kendall FL HMFA; quoted from HUD's official FY2026 FMR schedule via search excerpt (the schedule PDF refuses non-browser fetches from this environment). Nearby ZIP-level SAFMR $2,440 (33233) is consistent."
+        "as_of": "2026-09-30",
+        "note": "Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
       },
       "market_notes": {
         "value": "Florida preempts local rent control (Fla. Stat. 166.043) - market-rate increases statewide. Miami-Dade open data hub carries parcels + sales (documented).",
@@ -1154,13 +1293,23 @@
     {
       "id": "atlanta",
       "name": "Atlanta",
-      "fmr_fy2026": {
-        "2br": 1820,
-        "status": "sourced",
+      "fmr": {
+        "fy": 2027,
+        "effective": "2026-10-01",
+        "area": "Atlanta-Sandy Springs-Roswell, GA HUD Metro FMR Area",
+        "0br": 1554,
+        "1br": 1619,
+        "2br": 1762,
+        "3br": 2099,
+        "4br": 2493,
+        "status": "verified",
         "sources": [
-          "https://www.huduser.gov/portal/datasets/fmr/fmr2026/FY2026_FMR_Schedule.pdf"
+          "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://web.archive.org/web/20260922234125id_/https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://www.federalregister.gov/d/2026-17891"
         ],
-        "note": "Atlanta-Sandy Springs-Roswell GA MSA; quoted from HUD's official FY2026 FMR schedule via search excerpt (the schedule PDF refuses non-browser fetches from this environment)."
+        "as_of": "2026-09-30",
+        "note": "Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
       },
       "market_notes": {
         "value": "Georgia has barred local rent regulation since 1984 (O.C.G.A. 44-7-19) - no caps in Atlanta or anywhere in the state. Fulton County assessor GIS hub documented for bulk parcels.",
@@ -1226,14 +1375,23 @@
     {
       "id": "dallas",
       "name": "Dallas-Fort Worth",
-      "fmr_fy2026": {
-        "2br": 1931,
-        "status": "sourced",
+      "fmr": {
+        "fy": 2027,
+        "effective": "2026-10-01",
+        "area": "Dallas, TX HUD Metro FMR Area",
+        "0br": 1491,
+        "1br": 1536,
+        "2br": 1807,
+        "3br": 2275,
+        "4br": 2892,
+        "status": "verified",
         "sources": [
-          "https://gerarent.com/us-rents/dallas-tx-hud-metro-fmr-area",
-          "https://rentlimits.com/areas/4808599999"
+          "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://web.archive.org/web/20260922234125id_/https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx",
+          "https://www.federalregister.gov/d/2026-17891"
         ],
-        "note": "Dallas, TX HUD Metro FMR Area (two independent republishers agree; HUD-FY2026-attributed). Fort Worth-Arlington-Grapevine TX HMFA prices separately and is not yet on file. ZIP-level SAFMRs span roughly $1,520-$2,900 across the metroplex."
+        "as_of": "2026-09-30",
+        "note": "Fort Worth-Arlington, TX HUD Metro FMR Area (Johnson, Parker and Tarrant counties) is a separate HUD area: 0BR $1,461 · 1BR $1,481 · 2BR $1,745 · 3BR $2,284 · 4BR $2,866. Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
       },
       "market_notes": {
         "value": "Texas permits rent control only under a governor-approved disaster declaration (Local Gov't Code 214.902) - never invoked in modern practice; increases uncapped. DCAD publishes full certified rolls as downloads.",
