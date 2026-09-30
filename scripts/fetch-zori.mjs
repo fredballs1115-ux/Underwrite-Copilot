@@ -42,6 +42,11 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { createRequire } from "node:module";
+// The one list of what this pull writes (plain Node strips its types): the
+// read asks for exactly these, and the nightly steward leaves every one of
+// them alone, so a metric outside it would be read by nothing and
+// "re-verified" — overwritten — by a web search.
+import { ZILLOW_METRICS } from "../lib/feed-rows.ts";
 
 const require = createRequire(import.meta.url);
 
@@ -75,6 +80,16 @@ const FILES = [
     say: (v) => `$${Math.round(v).toLocaleString("en-US")}`,
   },
 ];
+
+// A metric the list does not name stops the pull here, dry run or not.
+for (const f of FILES) {
+  for (const metric of [f.metric, f.yoyMetric]) {
+    if (!ZILLOW_METRICS.includes(metric)) {
+      console.error(`${f.kind}: metric "${metric}" is not in lib/feed-rows ZILLOW_METRICS; add it there before this pull writes it`);
+      process.exit(1);
+    }
+  }
+}
 
 const dryRun = process.env.DRY_RUN === "1";
 const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;

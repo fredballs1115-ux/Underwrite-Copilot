@@ -115,19 +115,11 @@ export const HOTNESS_METROS = 300;
 export const REALTOR_CREDIT = "Data: Realtor.com";
 export const REALTOR_SOURCE_URL = "https://www.realtor.com/research/data/";
 
-/** The metrics the pull writes and this reads — one list, so the read cannot ask for a row the pull does not write. */
-export const REALTOR_METRICS = [
-  "rdc_median_list_price",
-  "rdc_median_list_price_yoy",
-  "rdc_active_listings",
-  "rdc_active_listings_yoy",
-  "rdc_days_on_market",
-  "rdc_days_on_market_yoy",
-  "rdc_hotness_rank",
-  "rdc_hotness_rank_prior",
-  "rdc_views_per_listing_vs_us",
-  "rdc_days_on_market_vs_us",
-] as const;
+/** The metrics the pull writes and this reads — one list, so the read cannot
+ *  ask for a row the pull does not write, the pull refuses to write one it
+ *  does not name, and the steward leaves every one of them alone
+ *  (lib/feed-rows, which the pull and the steward load under plain Node). */
+export { REALTOR_METRICS } from "@/lib/feed-rows";
 
 /** The move between two ranks, said the right way round: a rank that
  *  fell from 142 to 154 is 12 places COOLER. Null without both. */

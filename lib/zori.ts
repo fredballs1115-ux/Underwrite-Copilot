@@ -101,15 +101,11 @@ export interface ZoriRead {
 export const ZORI_CREDIT = "Data: Zillow Research";
 export const ZORI_SOURCE_URL = "https://www.zillow.com/research/data/";
 
-/** The metrics the pull writes and this reads — one list, so the read cannot ask for a row the pull does not write. */
-export const ZILLOW_METRICS = [
-  "zori_rent",
-  "zori_rent_yoy",
-  "zori_mfr_rent",
-  "zori_mfr_rent_yoy",
-  "zhvi",
-  "zhvi_yoy",
-] as const;
+/** The metrics the pull writes and this reads — one list, so the read cannot
+ *  ask for a row the pull does not write, the pull refuses to write one it
+ *  does not name, and the steward leaves every one of them alone
+ *  (lib/feed-rows, which the pull and the steward load under plain Node). */
+export { ZILLOW_METRICS } from "@/lib/feed-rows";
 
 /**
  * A row's figure, read only where the row is of `month` — the month the

@@ -45,6 +45,11 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { createRequire } from "node:module";
+// The one list of what this pull writes (plain Node strips its types): the
+// read asks for exactly these, and the nightly steward leaves every one of
+// them alone, so a metric outside it would be read by nothing and
+// "re-verified" — overwritten — by a web search.
+import { REALTOR_METRICS } from "../lib/feed-rows.ts";
 
 const require = createRequire(import.meta.url);
 
@@ -98,6 +103,22 @@ const COLUMNS = [
   { col: "active_listing_count", yy: "active_listing_count_yy", metric: "rdc_active_listings", unit: "count", say: (v) => `${Math.round(v).toLocaleString("en-US")} listings` },
   { col: "median_days_on_market", yy: "median_days_on_market_yy", metric: "rdc_days_on_market", unit: "count", say: (v) => `${Math.round(v)} days` },
 ];
+
+/** The hotness file's rows, by metric: the rank, the rank the same month a
+ *  year earlier, and its two parts against the U.S. */
+const HOTNESS_METRICS = {
+  rank: "rdc_hotness_rank",
+  prior: "rdc_hotness_rank_prior",
+  views: "rdc_views_per_listing_vs_us",
+  dom: "rdc_days_on_market_vs_us",
+};
+// A metric the list does not name stops the pull here, dry run or not.
+for (const metric of [...COLUMNS.flatMap((c) => [c.metric, `${c.metric}_yoy`]), ...Object.values(HOTNESS_METRICS)]) {
+  if (!REALTOR_METRICS.includes(metric)) {
+    console.error(`metric "${metric}" is not in lib/feed-rows REALTOR_METRICS; add it there before this pull writes it`);
+    process.exit(1);
+  }
+}
 
 /** The units the benchmarks table accepts — migration 0023's check, which
  *  Postgres enforces on the real run and a dry run never reaches (the first
@@ -274,7 +295,7 @@ try {
     const views = Number(c[hix("page_view_count_per_property_vs_us")]);
     const dom = Number(c[hix("median_dom_vs_us")]);
     out.push({
-      sector: "multifamily", metro: m.name, metric: "rdc_hotness_rank",
+      sector: "multifamily", metro: m.name, metric: HOTNESS_METRICS.rank,
       low: rank, high: rank, unit: "count",
       source: SOURCE, as_of: hAsOf, status: "verified",
       note: `Realtor.com hotness rank of the ${HOTNESS_METROS} largest metros, ${title} metro area, ${hMonthName}${where}.${credit}`,
@@ -282,7 +303,7 @@ try {
     const said = [`#${rank} of ${HOTNESS_METROS}`];
     if (Number.isInteger(priorRank) && priorRank >= 1) {
       out.push({
-        sector: "multifamily", metro: m.name, metric: "rdc_hotness_rank_prior",
+        sector: "multifamily", metro: m.name, metric: HOTNESS_METRICS.prior,
         low: priorRank, high: priorRank, unit: "count",
         source: SOURCE, as_of: priorAsOf, status: "verified",
         note: `Realtor.com hotness rank a year earlier, ${title} metro area, ${prior.slice(0, 4)}-${prior.slice(4, 6)}.${credit}`,
@@ -296,7 +317,7 @@ try {
     if (Number.isFinite(views) && views > 0) {
       const ratio = Math.round(views * 1000) / 1000;
       out.push({
-        sector: "multifamily", metro: m.name, metric: "rdc_views_per_listing_vs_us",
+        sector: "multifamily", metro: m.name, metric: HOTNESS_METRICS.views,
         low: ratio, high: ratio, unit: "ratio",
         source: SOURCE, as_of: hAsOf, status: "verified",
         note: `Realtor.com listing views per property as a ratio to the U.S., ${title} metro area, ${hMonthName}.${credit}`,
@@ -306,7 +327,7 @@ try {
     if (Number.isFinite(dom)) {
       const days = Math.round(dom);
       out.push({
-        sector: "multifamily", metro: m.name, metric: "rdc_days_on_market_vs_us",
+        sector: "multifamily", metro: m.name, metric: HOTNESS_METRICS.dom,
         low: days, high: days, unit: "count",
         source: SOURCE, as_of: hAsOf, status: "verified",
         note: `Realtor.com median days on market against the U.S., in days, ${title} metro area, ${hMonthName}.${credit}`,
