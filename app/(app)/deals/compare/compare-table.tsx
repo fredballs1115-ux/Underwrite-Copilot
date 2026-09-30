@@ -104,6 +104,11 @@ export type Col = {
   /** a student building's pre-leasing ("Pre-leased 87%, +5 pts y/y" —
    *  lib/student-housing `studentHousingTag`, #468); absent otherwise */
   student?: string | null;
+  /** a manufactured-housing park's lot rent against the market's and its
+   *  private utilities ("Lot rent $430 vs $525 mkt, Private water & sewer"
+   *  — lib/manufactured-housing `manufacturedHousingTag`, #470); absent
+   *  otherwise */
+  mh?: string | null;
   /** what a hotel is sold with ("Mgmt encumbered, PIP $35k/key" —
    *  lib/hotel-deal `hotelTag`, #455); absent on anything but a hotel */
   hotel?: string | null;
@@ -246,6 +251,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     { label: "Broker", get: (c) => c.broker || "—" },
     // A student building's leasing for the coming year (#468).
     { label: "Pre-leasing", get: (c) => c.student || "—" },
+    // A manufactured-housing park's lot rent and utilities (#470): every
+    // part of the read, since the table has the width a card does not.
+    { label: "Manufactured housing", get: (c) => c.mh || "—" },
     // A conversion and a stabilized building are not the same kind of thing,
     // and a side-by-side that hides that compares apples to plans.
     { label: "Deal type", get: (c) => c.strategy ?? "—" },

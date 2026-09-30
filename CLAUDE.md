@@ -787,6 +787,54 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   basis is the all-in cost. `TileStat`'s `sub` draws it under the price
   (`data-qa="tile-sub"`); the list row's price tooltip and the CSV's
   "Basis" column carry it too.
+- A manufactured-housing park (#470): the extraction labels a park's
+  figures as rows of their own, each only as stated — "Pads" (never with
+  the RV sites in it), "Occupied pads", "Lot rent" (the average monthly
+  rent in place), "Market lot rent", "Park-owned homes", "Tenant-owned
+  homes", "Park-owned home rent" (home and lot together), "Water and
+  sewer", "Utility billing", "Age restriction", "RV sites" and "Rent
+  control" — and `lib/manufactured-housing.ts` (pure) reads them
+  (`readManufacturedHousing`; null unless the class is a park or a lot
+  rent sits beside pads or park-owned homes, and null where only the pads
+  and the occupancy are stated, which the key terms carry already). Six
+  rules: **the lot is the asset** (a park-owned home is occupancy the park
+  bought — the share of the pads and "as much as" the share of the
+  occupancy, since a vacant one is on a pad too; its rent above its lot's
+  is the home's income, "up to" across every one of them); **the gap to
+  market is the upside and closes slowly** (a month, a share and a year
+  across the occupied pads; a market range read at its LOW end, the
+  smaller gap; an in-place range is no average, `monthlyRentOf`); **a
+  vacant pad needs a home**; **a private utility is the park's to run**
+  (`readUtilities`: the water and the sewer apart, from words that name a
+  source — "well maintained" is no well, a negated source is dropped,
+  and the park's own wins where the words name both; `billingOf` reads
+  who pays, the park's words first so "not billed back" is the park's);
+  **an age restriction is a narrower pool, kept by a rule** (a 55+ park
+  keeps the Fair Housing Act's exemption only while at least 80% of its
+  occupied homes have a resident 55 or older); **a blank is null** ("0" or
+  "None" park-owned homes is a stated none, not a blank). The model is
+  untouched: `mhModelLine` (`meta.mh.read`) says the gap closed by the sale
+  at the model's exit cap and that the model reads no market rent, that it
+  capitalises the homes' rent with the lots' at one cap, and that its
+  reserve is a default, never a figure for a private system. Where it
+  shows: the deal context and the challenger (`mhNote`, beside MH_TRAPS),
+  `app/manufactured-housing-panel.tsx` (`ManufacturedHousingPanel`, pure:
+  `data-bar="mh-resident"` / `mh-park` the homes on one track of the pads
+  with `mh-occupied` today's occupancy dashed, `mh-lot-rent` against
+  `mh-market` (a range `mh-market-range`) and `mh-home-rent` the home's
+  part above the lot, a tile each `data-mh`) on the deal page and the
+  shared screen, the key terms (`mhTermRows`), the pipeline row, card and
+  CSV's "Manufactured housing" column and the meeting workbook's price
+  note (`manufacturedHousingTag`: "Lot rent $430 vs $525 mkt, Private
+  water & sewer", two parts; every part on the compare table's row; a
+  private system in the warning tone), the memo under its title
+  (`mhShortLine`), the workbook's cover ("The park", `meta.mh`) and the
+  report's caveat (`buildReportData`'s twenty-third argument). Two fixes
+  ride with it: `unitCountRow` (lib/criteria) counts a park by its pads
+  where it states RV sites too, whichever row comes first — every per-pad
+  figure divided by the RV sites before — and a park or a build-to-rent
+  portfolio wears a drawing of homes as its cover (`COVER_ART.homes`,
+  lib/deal-cover-art), never the apartment block.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`

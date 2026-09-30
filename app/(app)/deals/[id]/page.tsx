@@ -16,6 +16,8 @@ import { SingleTenantPanel } from "@/app/single-tenant-panel";
 import { HotelPanel } from "@/app/hotel-panel";
 import { StudentHousingPanel } from "@/app/student-housing-panel";
 import { readStudentHousing } from "@/lib/student-housing";
+import { ManufacturedHousingPanel } from "@/app/manufactured-housing-panel";
+import { readManufacturedHousing } from "@/lib/manufactured-housing";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { ValueAddPanel } from "@/app/value-add-panel";
@@ -1258,6 +1260,11 @@ export default async function DealPage({
           modelLine={derived?.meta.student?.read ?? ""}
           modelOccupancyPct={derived ? Math.round((1 - derived.inputs.vacancyPct) * 1000) / 10 : null}
         />
+        {/* A manufactured-housing park (#470): whose homes stand on the pads,
+            the lot rent against the memorandum's market, the water and
+            sewer, and what the model does with each
+            (lib/manufactured-housing). */}
+        <ManufacturedHousingPanel park={readManufacturedHousing(extraction)} modelLine={derived?.meta.mh?.read ?? ""} />
         {/* What the third-party reports found (#465): a tile a report, the
             Phase I's age against the 180-day and one-year marks, the PML
             against the lenders' 20%, and what the model does with the

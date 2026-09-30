@@ -261,6 +261,28 @@ describe("dealContextFor — a student building (#468)", () => {
   });
 });
 
+describe("dealContextFor — a manufactured-housing park (#470)", () => {
+  it("says whose homes stand on the pads, the lot rent against the market's and the water and sewer, each as stated", () => {
+    const park: ExtractionResult = {
+      dealName: "Shady Pines",
+      assetClass: "manufactured_housing",
+      metrics: [
+        m("Asking price", "$9,300,000"),
+        m("Pads", "150"),
+        m("Occupied pads", "132"),
+        m("Park-owned homes", "18"),
+        m("Lot rent", "$430"),
+        m("Market lot rent", "$525"),
+        m("Water and sewer", "Private well and septic"),
+      ],
+    };
+    const ctx = dealContextFor(park)!;
+    expect(ctx).toContain("Manufactured housing: It has 150 pads at $62,000 a pad, 132 occupied (88%); 18 carry a home the park owns");
+    expect(ctx).toContain("The average lot rent is $430 a month against the memorandum's market $525");
+    expect(ctx).toContain("The water and sewer are the park's own (as stated: Private well and septic)");
+  });
+});
+
 describe("dealContextFor — the third-party reports (#465)", () => {
   it("says what the reports found, report by report, each as stated", () => {
     const reported: ExtractionResult = {

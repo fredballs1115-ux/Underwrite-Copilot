@@ -54,6 +54,7 @@ import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { assetClassLabel } from "@/lib/asset-class";
 import { readSiteReports, siteReportsModelLine, siteReportsShortLine } from "@/lib/site-reports";
 import { readStudentHousing, studentModelLine, studentShortLine } from "@/lib/student-housing";
+import { mhModelLine, mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { allInPct, debtRateNote, type DebtIndex, type RateSeed } from "@/lib/debt-index";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { UnderwriteInputs } from "./engine";
@@ -155,6 +156,11 @@ export interface WorkbookMeta {
    *  and walk to campus in a line, then the model's vacancy against the
    *  beds still to sign. Absent on anything else. */
   student?: { line: string; read: string } | null;
+  /** a manufactured-housing park (lib/manufactured-housing, #470): its
+   *  pads, lot rent, homes and utilities in a line, then what the model
+   *  does with the gap to market, the park-owned homes and a private
+   *  system. Absent on anything else. */
+  mh?: { line: string; read: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -293,6 +299,15 @@ function studentMeta(extraction: ExtractionResult | null, inputs: UnderwriteInpu
   const r = readStudentHousing(extraction);
   if (!r) return null;
   return { line: studentShortLine(r), read: studentModelLine(r, { vacancyPct: inputs.vacancyPct * 100 }) };
+}
+
+/** The cover's lines about a manufactured-housing park (#470): the read,
+ *  then what the model does with the lot rent's gap to market, the
+ *  park-owned homes' income and a private water or sewer system. */
+function mhMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["mh"] {
+  const r = readManufacturedHousing(extraction);
+  if (!r) return null;
+  return { line: mhShortLine(r), read: mhModelLine(r, { rentGrowthPct: inputs.rentGrowthPct, exitCapPct: inputs.exitCapPct }) };
 }
 
 /** The cover's lines about a multi-tenant property's listed tenants
@@ -858,6 +873,7 @@ export function deriveUnderwriteInputs(
           }
         : null,
       student: studentMeta(extraction, inputs),
+      mh: mhMeta(extraction, inputs),
       sale: saleFloor ? { line: saleShortLine(saleFloor), read: saleCeilingRead(extraction, inputs) } : null,
       hotel: hotelRead
         ? {

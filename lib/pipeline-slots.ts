@@ -23,6 +23,7 @@ import { sellerFinancingTag } from "@/lib/seller-financing";
 import { siteReportsTag } from "@/lib/site-reports";
 import { brokerageOf } from "@/lib/offering";
 import { studentHousingTag } from "@/lib/student-housing";
+import { manufacturedHousingTag } from "@/lib/manufactured-housing";
 
 export interface PipelineSlots {
   /** the going-in cap as the OM states it — null on a plan deal, which has
@@ -85,6 +86,11 @@ export interface PipelineSlots {
    *  "Drive-to campus" (lib/student-housing `studentHousingTag`, #468);
    *  absent or null on anything else */
   student?: string | null;
+  /** a manufactured-housing park's lot rent against the market's and what
+   *  it runs — "Lot rent $430 vs $525 mkt, Private water & sewer"
+   *  (lib/manufactured-housing `manufacturedHousingTag`, #470); absent or
+   *  null on anything else */
+  mh?: string | null;
   /** the price by the class's own basis, as a listing card shows it —
    *  "$274k/unit", "$200k/key", "$212/SF" (`basisTag`, #469); absent or
    *  null on a plan deal, a note, the land, a share with no stated
@@ -191,6 +197,9 @@ export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | nu
     broker: brokerageOf(extraction),
     // A student building's pre-leasing against last year's (#468).
     student: studentHousingTag(extraction),
+    // A park's lot rent against the market's, and its private utilities
+    // (#470).
+    mh: manufacturedHousingTag(extraction),
     // The price by the unit or the foot, as a listing card shows it (#469).
     basis: basisTag(extraction, strategy.kind),
   };

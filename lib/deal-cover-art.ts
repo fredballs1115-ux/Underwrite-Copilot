@@ -10,7 +10,7 @@
 // the asset-class table (lib/deal-cover reads the class; this only draws).
 
 /** What the line art draws: the building types a pipeline holds. */
-export type CoverKind = "housing" | "office" | "industrial" | "retail" | "hotel" | "storage" | "land" | "building";
+export type CoverKind = "housing" | "homes" | "office" | "industrial" | "retail" | "hotel" | "storage" | "land" | "building";
 
 /** A grid of window panes: `cols` × `rows` of `w` × `h` from (x, y), a
  *  pitch apart, leaving out the panes an entrance takes ("col,row"). */
@@ -27,7 +27,9 @@ function panes(x: number, y: number, w: number, h: number, cols: number, rows: n
 /**
  * One drawing per building type on a 64-unit square, each standing on the
  * same ground line so the covers read as one set: an apartment block under
- * its parapet, pane by pane, with its entrance; an office tower's curtain
+ * its parapet, pane by pane, with its entrance; a house beside a
+ * manufactured home, long and low on its skirting, for the classes that
+ * are homes rather than apartments (#470); an office tower's curtain
  * wall beside a low wing; a warehouse with three dock doors; a storefront
  * under its striped awning; a hotel with its rooftop sign and entrance
  * canopy; a row of storage doors; a staked parcel with a flag; and a plain
@@ -35,6 +37,7 @@ function panes(x: number, y: number, w: number, h: number, cols: number, rows: n
  */
 export const COVER_ART: Record<CoverKind, string> = {
   housing: `M4 58h56M12 58V14h40v44M10 14h44${panes(17, 19, 6, 5, 3, 4, 12, 10, ["1,3"])}M28 58V48h8v10`,
+  homes: `M4 58h56M8 58V36h22v22M5 37l14-13 14 13M16 58v-9h6v9${panes(11, 40, 4, 4, 2, 1, 12, 0)}M36 55V43h22v12H36M34 43.5l13-4.5 13 4.5M45 55v-8h4v8${panes(38, 46, 3, 3.5, 2, 1, 15, 0)}M39 55v3M55 55v3`,
   office:
     "M4 58h56M18 58V6h24v52M26 6v52M34 6v52M18 16h24M18 26h24M18 36h24M18 46h24M42 58V30h14v28M42 38h14M42 46h14M49 30v28",
   industrial:

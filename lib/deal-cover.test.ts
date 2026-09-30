@@ -22,6 +22,10 @@ describe("a deal's cover (#442)", () => {
   it("draws each building type a pipeline holds, and a plain building for the rest", () => {
     expect(coverKindFor("multifamily")).toBe("housing");
     expect(coverKindFor("student_housing")).toBe("housing");
+    // A park and a build-to-rent portfolio are homes, not an apartment block (#470).
+    expect(coverKindFor("manufactured_housing")).toBe("homes");
+    expect(coverKindFor("mobile home park")).toBe("homes");
+    expect(coverKindFor("sfr_btr")).toBe("homes");
     expect(coverKindFor("office")).toBe("office");
     expect(coverKindFor("medical_office")).toBe("office");
     expect(coverKindFor("industrial")).toBe("industrial");

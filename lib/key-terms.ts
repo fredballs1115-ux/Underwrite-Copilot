@@ -28,6 +28,7 @@ import { taxAbatementTermRows } from "./tax-abatement";
 import { sellerFinancingTermRows } from "./seller-financing";
 import { siteReportTermRows } from "./site-reports";
 import { studentTermRows } from "./student-housing";
+import { mhTermRows } from "./manufactured-housing";
 
 export interface KeyTermMetric {
   label: string;
@@ -105,6 +106,9 @@ export function keyTermRows<M extends KeyTermMetric>(
   // A student building (#468): the pre-leasing and last year's, the walk to
   // campus and the rent per bed.
   for (const row of studentTermRows(rows)) lead(row);
+  // A manufactured-housing park (#470): the lot rent and the market's, the
+  // park-owned homes, the water and sewer and the age restriction.
+  for (const row of mhTermRows(rows)) lead(row);
   const rest = rows.filter((m) => !head.includes(m));
   return [...head, ...rest.filter((m) => m.flagged), ...rest.filter((m) => !m.flagged)].slice(0, limit);
 }

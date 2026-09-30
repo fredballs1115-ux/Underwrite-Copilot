@@ -50,10 +50,12 @@ export const COVER_TONES: readonly (readonly [string, string])[] = [
 /** Which drawing a class gets. */
 const KIND_BY_CLASS: Record<string, CoverKind> = {
   multifamily: "housing",
-  sfr_btr: "housing",
+  // A scattered-site or build-to-rent portfolio and a park are homes, not
+  // an apartment block (#470).
+  sfr_btr: "homes",
   student_housing: "housing",
   senior_housing: "housing",
-  manufactured_housing: "housing",
+  manufactured_housing: "homes",
   office: "office",
   medical_office: "office",
   mixed_use: "office",

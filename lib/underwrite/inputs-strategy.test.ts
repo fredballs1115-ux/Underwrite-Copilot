@@ -426,6 +426,36 @@ describe("deriveUnderwriteInputs — a student building's pre-leasing against th
   });
 });
 
+describe("deriveUnderwriteInputs — a manufactured-housing park's gap to market, homes and utilities (#470)", () => {
+  it("says the read in a line and what the model does with the gap, the park's homes and a private system", () => {
+    const m = deriveUnderwriteInputs(
+      ex(
+        [
+          metric("Asking price", "$9,300,000"),
+          metric("NOI (in-place)", "$560,000"),
+          metric("Pads", "150"),
+          metric("Occupied pads", "132"),
+          metric("Lot rent", "$430"),
+          metric("Market lot rent", "$525"),
+          metric("Park-owned homes", "18"),
+          metric("Water and sewer", "Private well and septic"),
+        ],
+        { assetClass: "manufactured_housing" },
+      ),
+      "fallback",
+    );
+    expect(m.meta.mh?.line).toBe(
+      "Manufactured housing: 150 pads at $62k a pad, 88% occupied; lot rent $430 (market $525); 18 park-owned homes (12%); private water & sewer",
+    );
+    expect(m.meta.mh?.read).toContain("Closed by the sale, the gap to the memorandum's market lot rent is $150k a year of income");
+    expect(m.meta.mh?.read).toContain(`at the model's ${(m.inputs.exitCapPct * 100).toFixed(2)}% exit cap`);
+    expect(m.meta.mh?.read).toContain("It capitalises the whole income at one exit cap, the park-owned homes' rent with the lots'.");
+    expect(m.meta.mh?.read).toContain("Its reserve is the class's screening default, not a figure for the park's own water and sewer.");
+    // Anything else carries none.
+    expect(deriveUnderwriteInputs(ex([metric("Asking price", "$20,000,000"), metric("Units", "240")]), "fallback").meta.mh).toBeNull();
+  });
+});
+
 describe("deriveUnderwriteInputs — the PCA's immediate repairs are capital at closing (#465)", () => {
   const base = [metric("Asking price", "$42,000,000"), metric("NOI (in-place)", "$2,520,000"), metric("Units", "240")];
 

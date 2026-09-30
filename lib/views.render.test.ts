@@ -6036,3 +6036,119 @@ describe("ShareView — a student building (#468)", () => {
     expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, assetClass: SAMPLE_DEAL.asset_class, extraction: SAMPLE_DEAL.extraction }))).not.toContain("student-housing-panel");
   });
 });
+
+import { ManufacturedHousingPanel } from "@/app/manufactured-housing-panel";
+import { mhModelLine, readManufacturedHousing } from "@/lib/manufactured-housing";
+
+describe("ManufacturedHousingPanel (#470) — whose homes stand on the pads, the lot rent against the market's, the water and sewer", () => {
+  const row = (label: string, value: string, page = "p. 4") => ({ label, value, flagged: false, page, basis: "na" as const });
+  const park = (metrics: ReturnType<typeof row>[]) =>
+    ({ dealName: "Shady Pines", assetClass: "manufactured_housing", totalPages: 40, metrics: [row("Asking price", "$9,300,000", "p. 2"), ...metrics] }) as unknown as ExtractionResult;
+
+  it("draws the pads, the rents on one scale and a tile a fact, then the model's read", () => {
+    const r = readManufacturedHousing(
+      park([
+        row("Pads", "150"),
+        row("Occupied pads", "132"),
+        row("Tenant-owned homes", "114"),
+        row("Park-owned homes", "18"),
+        row("Lot rent", "$430"),
+        row("Market lot rent", "$500 - $550 per month"),
+        row("Park-owned home rent", "$895"),
+        row("Water and sewer", "Private well and septic"),
+        row("Utility billing", "Included in lot rent"),
+        row("Age restriction", "55+"),
+        row("RV sites", "24"),
+        row("Rent control", "None"),
+      ]),
+    )!;
+    const html = render(React.createElement(ManufacturedHousingPanel, { park: r, modelLine: mhModelLine(r, { rentGrowthPct: 0.03, exitCapPct: 0.06 }) }));
+    dumpView("manufactured-housing-panel", html);
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="mh-panel"');
+    expect(text).toContain("150 pads, 88% occupied");
+    for (const bar of ["mh-resident", "mh-park", "mh-occupied", "mh-lot-rent", "mh-market", "mh-market-range", "mh-home-rent"]) {
+      expect(html.match(new RegExp(`data-bar="${bar}"`, "g")), bar).toHaveLength(1);
+    }
+    expect(text).toContain("114 homes their residents own (76%)");
+    expect(text).toContain("18 homes the park owns (12%)");
+    expect(text).toContain("18 vacant pads");
+    expect(text).toContain("The memorandum's market $500 ($70 under, 16.3%)");
+    expect(text).toContain("A park-owned home $895 a month: $465 of it the home's, above the lot's");
+    for (const key of ["price-pad", "utilities", "billing", "age", "rv", "rent-control"]) expect(html).toContain(`data-mh="${key}"`);
+    expect(text).toContain("Private water & sewer");
+    expect(text).toContain("The park pays");
+    expect(text).toContain("Not regulated");
+    expect(text).toContain("so closing the gap is in none of its returns");
+    expect(a11yIssues(html), "park panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("draws no picture it has no figure for, and nothing on anything else", () => {
+    const r = readManufacturedHousing(park([row("Pads", "80"), row("Water and sewer", "City water and sewer")]))!;
+    const html = render(React.createElement(ManufacturedHousingPanel, { park: r }));
+    const text = visibleText(html);
+    expect(text).toContain("Public water & sewer");
+    expect(html).not.toContain('data-qa="mh-pads"');
+    expect(html).not.toContain('data-qa="mh-rent"');
+    expect(renderToStaticMarkup(React.createElement(ManufacturedHousingPanel, { park: null }))).toBe("");
+  });
+});
+
+describe("ShareView — a manufactured-housing park (#470)", () => {
+  it("draws the park and leads the key terms with its lot rent, and nothing on the sample", () => {
+    const withPark = {
+      ...SAMPLE_DEAL.extraction,
+      assetClass: "manufactured_housing",
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Pads", value: "150", flagged: false, page: "", basis: "na" as const },
+        { label: "Lot rent", value: "$430", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Water and sewer", value: "City water; septic", flagged: false, page: "", basis: "na" as const },
+      ],
+    };
+    const props = {
+      dealName: SAMPLE_DEAL.name,
+      assetClass: "manufactured_housing",
+      expiresAt: "2026-09-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: withPark }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="mh-panel"');
+    expect(text).toContain("Public water, private sewer");
+    expect(text).toContain("Lot rent $430 a month");
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, assetClass: SAMPLE_DEAL.asset_class, extraction: SAMPLE_DEAL.extraction }))).not.toContain("mh-panel");
+  });
+});
+
+describe("Pipeline — a manufactured-housing park's tag (#470)", () => {
+  const park = card({
+    id: "m",
+    name: "Shady Pines Community",
+    assetClass: "manufactured_housing",
+    verdict: "caution",
+    slots: { cap: "7.2%", price: "$9,300,000", yoc: null, mh: "Lot rent $430 vs $525 mkt, Private water & sewer", basis: "$62k/pad" },
+    market: "Lancaster, PA",
+    coveredMarket: null,
+  });
+  const props = { errorMessage: null, notice: null, onboarding: { hasBuyBox: true, sampleId: null, hasRealDeal: true }, billing: BILLING };
+
+  it("says the lot rent against the market's on the row and the card, a private system in the warning tone", () => {
+    for (const initialView of ["list", "cards"] as const) {
+      const html = render(React.createElement(Pipeline, { ...props, deals: withThumbs([park]), initialView }));
+      const text = visibleText(html);
+      expect(text, initialView).toContain("Lot rent $430 vs $525 mkt, Private water & sewer");
+      const tag = html.match(/<span[^>]*title="Lot rent \$430 vs \$525 mkt, Private water &amp; sewer:[^"]*"[^>]*>/)?.[0] ?? "";
+      expect(tag, initialView).toContain("text-caution");
+      expect(gluedWords(text), initialView).toEqual([]);
+      expect(a11yIssues(html), initialView).toEqual([]);
+    }
+  });
+});
