@@ -509,7 +509,7 @@ export default async function DemoPage() {
             </div>
             <div className="rounded-xl border border-line bg-surface p-4">
               <p className="text-[11px] uppercase tracking-wide text-muted">
-                Published benchmarks · Philadelphia-wide, not the submarket&apos;s
+                Published benchmarks · wider than the submarket
               </p>
               <dl className="mt-2 grid grid-cols-2 gap-3">
                 {phillyFmr && phillyFmr2br !== null && (
@@ -518,6 +518,9 @@ export default async function DemoPage() {
                     <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums">
                       {`$${phillyFmr2br.toLocaleString("en-US")}/mo`}
                     </dd>
+                    {/* HUD's area is four states wide, not the city's: named, since the
+                        box's heading can only say the figures are wider than the submarket. */}
+                    <dd className="mt-0.5 text-[10px] leading-snug text-muted">{phillyFmr.area}</dd>
                   </div>
                 )}
                 {phillyMedian && (

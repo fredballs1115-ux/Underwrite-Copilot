@@ -88,10 +88,12 @@ export const HERO_WORDS_TOP = "pt-[18rem] sm:pt-[22rem] lg:pt-24";
 
 /**
  * The hero's scrim from `lg` up, left to right across the band (0–1 of its
- * width), with the scrim's alpha at each: dark behind the words' column,
- * which never passes 49% of the width at any screen (the 72rem container's
- * left half), clearing across the sample card's column to the photograph
- * at the right. The "band" gradient stays under it for the stats row.
+ * width), with the scrim's alpha at each: dark behind the words' column
+ * (the 72rem container's left half, which ends just short of the band's
+ * middle — past 49% of its width only on screens wider than about 2,160px,
+ * still under the 0.92 plateau), clearing across the sample card's column
+ * to the photograph at the right. The "band" gradient stays under it for
+ * the stats row.
  */
 export const HERO_SIDE_SCRIM: ReadonlyArray<{ at: number; alpha: number }> = [
   { at: 0, alpha: 0.94 },

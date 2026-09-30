@@ -400,7 +400,11 @@ function DebtSizer() {
   const [noi, setNoi] = useShared("noi", "1,200,000");
   const [rate, setRate] = useShared("r", "6.5");
   const [amort, setAmort] = useShared("am", "30");
-  const [io, setIo] = useState(false);
+  // The interest-only box travels in the link too (the audit of 2026-09-30:
+  // a sizing sent as a URL dropped it): "1" while ticked, the seed otherwise.
+  const [ioFlag, setIoFlag] = useShared("io", "0");
+  const io = ioFlag === "1";
+  const setIo = (on: boolean) => setIoFlag(on ? "1" : "0");
   const [ltv, setLtv] = useShared("ltv", "65");
   const [dscr, setDscr] = useShared("dscr", "1.25");
   const [dy, setDy] = useShared("dy", "9");

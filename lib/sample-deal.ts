@@ -347,7 +347,7 @@ const comps: BrokerCompsResult = {
     },
   ],
   redFlags: [
-    "Two of three sale comps sit in stronger submarkets, inflating the implied basis.",
+    "One of three sale comps, Vue at Girard, is a newer asset in a stronger submarket, inflating the implied basis.",
     "A weaker $238k/unit trade 0.8 mi away was omitted from the set.",
   ],
   summary:
