@@ -51,6 +51,7 @@ import {
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { assetClassLabel } from "@/lib/asset-class";
+import { readSiteReports, siteReportsModelLine, siteReportsShortLine } from "@/lib/site-reports";
 import { allInPct, debtRateNote, type DebtIndex, type RateSeed } from "@/lib/debt-index";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { UnderwriteInputs } from "./engine";
@@ -144,6 +145,10 @@ export interface WorkbookMeta {
    *  one line, then where it ends against this model's sale and the
    *  step-up at its exit cap; absent where none is stated */
   taxAbatement?: { line: string; read: string } | null;
+  /** what the third-party reports found (lib/site-reports, #465): the
+   *  reports in one line, then what this model does with the immediate
+   *  repairs; absent where the memorandum cites none */
+  siteReports?: { line: string; read: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -585,7 +590,16 @@ export function deriveUnderwriteInputs(
   // including it — never the two added.
   const hotelRead = readHotelDeal(extraction);
   const pipCapital = !budgetRead && hotelRead?.pipTotal != null && hotelRead.pipTotal > 0 ? hotelRead.pipTotal : null;
-  const capitalBudget = budgetRead?.budget ?? pipCapital ?? 0;
+  // The property condition report's immediate repairs (#465): work the
+  // building needs now, capital at closing. Carried where the memorandum
+  // states no other budget and no PIP; a stated budget or PIP is read as
+  // including them — never the two added.
+  const reportsRead = readSiteReports(extraction);
+  const repairsCapital =
+    !budgetRead && pipCapital == null && reportsRead?.pca?.immediate != null && reportsRead.pca.immediate > 0
+      ? reportsRead.pca.immediate
+      : null;
+  const capitalBudget = budgetRead?.budget ?? pipCapital ?? repairsCapital ?? 0;
 
   // Unit count, same precedence as occupancy: rent-roll actual first, then
   // the OM's stated metric through the shared count reader (a whole number
@@ -752,6 +766,13 @@ export function deriveUnderwriteInputs(
       } — spent in year 1 in this annual model; the OM's own timeline may run longer`,
       budgetRead.page,
     );
+  } else if (repairsCapital != null) {
+    mark(
+      "capitalImprovementsYr1",
+      "extracted",
+      "PCA immediate repairs — the property condition report's work the building needs now, as stated — spent in year 1 in this annual model; a lender may escrow them at closing",
+      reportsRead?.page || undefined,
+    );
   } else if (pipCapital != null) {
     mark(
       "capitalImprovementsYr1",
@@ -807,6 +828,12 @@ export function deriveUnderwriteInputs(
       roster: rosterMeta(extraction, inputs),
       valueAdd: valueAddMeta(extraction, inputs),
       taxAbatement: taxAbatementMeta(extraction, inputs),
+      siteReports: reportsRead
+        ? {
+            line: siteReportsShortLine(reportsRead),
+            read: siteReportsModelLine(reportsRead, { capitalYr1: capitalBudget, capitalIsRepairs: repairsCapital != null }),
+          }
+        : null,
       sale: saleFloor ? { line: saleShortLine(saleFloor), read: saleCeilingRead(extraction, inputs) } : null,
       hotel: hotelRead
         ? {

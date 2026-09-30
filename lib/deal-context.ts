@@ -13,6 +13,7 @@ import { readRoster, rosterContextLine } from "@/lib/tenant-roster";
 import { readValueAdd, valueAddContextLine } from "@/lib/value-add";
 import { readTaxAbatement, taxAbatementContextLine } from "@/lib/tax-abatement";
 import { readSellerFinancing, sellerFinancingContextLine } from "@/lib/seller-financing";
+import { readSiteReports, siteReportsContextLine } from "@/lib/site-reports";
 import { portfolioContextLine, readPortfolio } from "@/lib/portfolio";
 
 const compact = (n: number): string =>
@@ -72,6 +73,9 @@ export function dealContextFor(
   // A note the seller offers to carry (#462): its terms, and what its value
   // turns on — never its rate alone.
   const sellerNote = readSellerFinancing(extraction, null);
+  // What the third-party reports found (#465): the Phase I, the immediate
+  // repairs, the seismic PML and the zoning — each a lender's condition.
+  const reports = readSiteReports(extraction);
   // FEMA's flood zone at the building, where the site lookup has answered
   // by the time the step runs (#426): a Special Flood Hazard Area is a
   // premium in the expense line and a lender's condition.
@@ -87,6 +91,7 @@ export function dealContextFor(
     ...(valueAdd ? [valueAddContextLine(valueAdd)] : []),
     ...(abatement ? [taxAbatementContextLine(abatement)] : []),
     ...(hotel ? [hotelContextLine(hotel)] : []),
+    ...(reports ? [siteReportsContextLine(reports)] : []),
     ...(flood ? [flood] : []),
   ];
   const tail = [...(portfolio ? [portfolioContextLine(portfolio)] : [])];

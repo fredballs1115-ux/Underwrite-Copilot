@@ -45,6 +45,7 @@ import { readRoster, rosterNote } from "@/lib/tenant-roster";
 import { readValueAdd, valueAddNote } from "@/lib/value-add";
 import { readTaxAbatement, taxAbatementNote } from "@/lib/tax-abatement";
 import { readSellerFinancing, sellerFinancingNote } from "@/lib/seller-financing";
+import { readSiteReports, siteReportsNote } from "@/lib/site-reports";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { countyOf, placeDeal } from "@/lib/market-county";
@@ -895,6 +896,12 @@ async function runAnalysisSteps(
         // a lender's sale — the sale's traps by name.
         const sale = readSale(ex);
         if (sale) notes.push(saleNote(sale));
+
+        // What the third-party reports found (#465): reliance, the Phase
+        // I's age and findings, the immediate repairs, the reserves, the
+        // seismic PML and the zoning — the site-report traps by name.
+        const reports = readSiteReports(ex);
+        if (reports) notes.push(siteReportsNote(reports));
 
         if (flagged.length) {
           notes.push(

@@ -57,6 +57,7 @@ import { readSale, saleShortLine } from "@/lib/sale-terms";
 import { readRoster, rosterShortLine } from "@/lib/tenant-roster";
 import { readValueAdd, valueAddShortLine } from "@/lib/value-add";
 import { readTaxAbatement, taxAbatementShortLine } from "@/lib/tax-abatement";
+import { readSiteReports, siteReportsShortLine } from "@/lib/site-reports";
 import type { AssumableView } from "@/lib/assumable-debt";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
 import { exitMoney, type LeaseholdExitView } from "@/lib/leasehold-exit";
@@ -785,6 +786,11 @@ export interface ReportInput {
    *  (lib/seller-financing `sellerFinancingView`, #462); null where none is
    *  offered */
   sellerNote?: AssumableView | null;
+  /** what the third-party reports found, and what the model does with the
+   *  immediate repairs (lib/site-reports via the derived model's
+   *  `meta.siteReports`, #465) — printed over the grids; absent where the
+   *  caller built no model, and then the line prints alone */
+  siteReports?: { line: string; read: string } | null;
   /** FEMA's flood map at the building (lib/flood-map `floodMapFor`, #427):
    *  the composite, FEMA's key and the zone sentence; null for no page */
   floodMap?: FloodMapView | null;
@@ -816,6 +822,7 @@ export function buildReportData(
   valueAdd?: { line: string; read: string } | null,
   taxAbatement?: { line: string; read: string } | null,
   sellerNote?: AssumableView | null,
+  siteReports?: { line: string; read: string } | null,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
@@ -832,6 +839,7 @@ export function buildReportData(
     valueAdd: valueAdd ?? null,
     taxAbatement: taxAbatement ?? null,
     sellerNote: sellerNote ?? null,
+    siteReports: siteReports ?? null,
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
@@ -1128,6 +1136,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // A property-tax abatement (#461), the same way.
   const abatementRead = readTaxAbatement(extraction);
   const taxAbatement = input.taxAbatement ?? (abatementRead ? { line: taxAbatementShortLine(abatementRead), read: "" } : null);
+  // What the third-party reports found (#465), the same way.
+  const reportsRead = readSiteReports(extraction);
+  const siteReports = input.siteReports ?? (reportsRead ? { line: siteReportsShortLine(reportsRead), read: "" } : null);
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
@@ -1330,6 +1341,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           {!sensitivity && <SingleTenantCaveat lease={roster} />}
           {!sensitivity && <SingleTenantCaveat lease={valueAdd} />}
           {!sensitivity && <SingleTenantCaveat lease={taxAbatement} />}
+          {!sensitivity && <SingleTenantCaveat lease={siteReports} />}
           {!sensitivity && <AssumptionsBlock read={modelVsMarket} />}
           {!sensitivity && <AssumableBlock view={input.assumable} />}
           {!sensitivity && <AssumableBlock view={input.sellerNote} />}
@@ -1371,6 +1383,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           <SingleTenantCaveat lease={roster} />
           <SingleTenantCaveat lease={valueAdd} />
           <SingleTenantCaveat lease={taxAbatement} />
+          <SingleTenantCaveat lease={siteReports} />
 
           <HeatGrid
             axisLabel="EXIT CAP"

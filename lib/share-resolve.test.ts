@@ -10,7 +10,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 const TOKEN = "0f6f2d4e-1b2c-4d5e-8f90-a1b2c3d4e5f6";
 const NOW = Date.parse("2026-09-08T16:00:00Z");
-const LATER = "2026-09-30T12:00:00Z";
+// A good link's expiry. The resolver's own tests pass NOW, but the aerial
+// and picture routes read the real clock, so this must lie past any day the
+// suite runs on: it was noon on 2026-09-30, and every run after that noon
+// read the good link as expired.
+const LATER = "2099-09-30T12:00:00Z";
 const EARLIER = "2026-09-01T12:00:00Z";
 
 type Row = Record<string, unknown>;

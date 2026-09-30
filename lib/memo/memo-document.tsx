@@ -38,6 +38,7 @@ import { readRoster, rosterShortLine } from "@/lib/tenant-roster";
 import { readValueAdd, valueAddShortLine } from "@/lib/value-add";
 import { readTaxAbatement, taxAbatementShortLine } from "@/lib/tax-abatement";
 import { readSellerFinancing, sellerFinancingLine } from "@/lib/seller-financing";
+import { readSiteReports, siteReportsShortLine } from "@/lib/site-reports";
 import { floodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -174,6 +175,13 @@ function sellerNoteLineFor(extraction: ExtractionResult | null): string {
 /** A property-tax abatement (lib/tax-abatement, #461), in one line for the
  *  memo's header: the program, when it ends and the step-up. "" where the
  *  memorandum states none. */
+/** What the third-party reports found (lib/site-reports, #465), in one
+ *  line for the memo's header. "" where the memorandum cites none. */
+function siteReportsLineFor(extraction: ExtractionResult | null): string {
+  const r = readSiteReports(extraction);
+  return r ? siteReportsShortLine(r) : "";
+}
+
 function taxAbatementLineFor(extraction: ExtractionResult | null): string {
   const r = readTaxAbatement(extraction);
   return r ? taxAbatementShortLine(r) : "";
@@ -241,6 +249,9 @@ export type MemoData = {
   /** a note the seller offers to carry (lib/seller-financing, #462), in
    *  one line; "" where none is offered */
   sellerNoteLine?: string;
+  /** what the third-party reports found (lib/site-reports, #465), in one
+   *  line; "" where the memorandum cites none */
+  siteReportsLine?: string;
   /** FEMA's flood zone at the building (lib/site-flags `floodShortLine`,
    *  #426) — a Special Flood Hazard Area or a drawn hazard; "" for minimal
    *  hazard, no digital map or a lookup that has not answered */
@@ -493,6 +504,7 @@ export function buildMemoData(
     valueAddLine: pdfSafe(valueAddLineFor(extraction ?? null)),
     taxAbatementLine: pdfSafe(taxAbatementLineFor(extraction ?? null)),
     sellerNoteLine: pdfSafe(sellerNoteLineFor(extraction ?? null)),
+    siteReportsLine: pdfSafe(siteReportsLineFor(extraction ?? null)),
     floodLine: pdfSafe(floodLineFor(deal)),
     dateStr,
     verdictWord: vmeta?.word ?? null,
@@ -956,6 +968,9 @@ export function MemoPage({ data }: { data: MemoData }) {
             {/* A property-tax abatement (#461): when it ends and what the
                 owner pays more once it does. */}
             {data.taxAbatementLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.taxAbatementLine}</Text>}
+            {/* What the third-party reports found (#465): the Phase I, the
+                immediate repairs, the seismic PML and the zoning. */}
+            {data.siteReportsLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.siteReportsLine}</Text>}
             {/* What a hotel is sold with (#455): the flag, the encumbrance,
                 the PIP and the franchise's end. */}
             {data.hotelLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.hotelLine}</Text>}

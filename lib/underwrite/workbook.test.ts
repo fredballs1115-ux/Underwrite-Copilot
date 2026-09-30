@@ -876,6 +876,30 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The value-add program")).toThrow();
   });
 
+  it("the third-party reports (#465): what they found, then what the model does with the immediate repairs", async () => {
+    const reported = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        metrics: [
+          ...extraction.metrics,
+          { label: "Phase I ESA findings", value: "No RECs", flagged: false, page: "p. 9" },
+          { label: "PCA immediate repairs", value: "$630,000", flagged: false, page: "p. 9" },
+          { label: "Seismic PML", value: "14%", flagged: false, page: "p. 9" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(reported));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The reports");
+    expect(String(cover.getCell(r, 3).value)).toBe(
+      "Reports: Phase I, no recognized environmental conditions; PCA immediate repairs $630,000; seismic PML 14%",
+    );
+    expect(String(cover.getCell(r + 1, 3).value)).toMatch(/immediate repairs/);
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The reports")).toThrow();
+  });
+
   it("a tax abatement (#461): the abatement, then where it ends against the model's sale and the step-up at its exit cap", async () => {
     const abated = deriveUnderwriteInputs(
       {

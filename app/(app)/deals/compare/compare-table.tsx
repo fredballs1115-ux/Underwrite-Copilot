@@ -94,6 +94,10 @@ export type Col = {
    *  lib/seller-financing `sellerFinancingTag`, #462); absent where none
    *  is offered */
   sellerNote?: string | null;
+  /** what the third-party reports found ("Phase I: REC", "PML 24%" —
+   *  lib/site-reports `siteReportsTag`, #465); absent where there is
+   *  nothing to flag */
+  reports?: string | null;
   /** what a hotel is sold with ("Mgmt encumbered, PIP $35k/key" —
    *  lib/hotel-deal `hotelTag`, #455); absent on anything but a hotel */
   hotel?: string | null;
@@ -229,6 +233,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     { label: "Seller financing", get: (c) => c.sellerNote || "—" },
     { label: "Hotel", get: (c) => c.hotel || "—" },
     { label: "Sale", get: (c) => c.sale || "—" },
+    // What the Phase I, the PCA, the seismic and the zoning reports found
+    // (#465): the most serious finding, else a dash.
+    { label: "Reports", get: (c) => c.reports || "—" },
     // A conversion and a stabilized building are not the same kind of thing,
     // and a side-by-side that hides that compares apples to plans.
     { label: "Deal type", get: (c) => c.strategy ?? "—" },

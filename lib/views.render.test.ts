@@ -5801,3 +5801,96 @@ describe("the deal's own pages head with the building (#464)", () => {
     expect(a11yIssues(html)).toEqual([]);
   });
 });
+
+// ── What the third-party reports found (#465) ───────────────────────────────
+import { SiteReportsPanel } from "@/app/site-reports-panel";
+import { readSiteReports, siteReportsModelLine } from "@/lib/site-reports";
+
+describe("SiteReportsPanel — a tile a report, the Phase I's age and the PML against the lenders' lines", () => {
+  const AS_OF = new Date(Date.UTC(2026, 8, 30));
+  const row = (label: string, value: string, page = "p. 48") => ({ label, value, flagged: false, page, basis: "na" as const });
+  const reported = (metrics: ReturnType<typeof row>[]) =>
+    ({ dealName: "Harbor Point", assetClass: "multifamily", totalPages: 80, metrics: [row("Asking price", "$42,000,000", "p. 2"), ...metrics] }) as unknown as ExtractionResult;
+
+  it("draws each report in the tone of what it found, the Phase I's age against 180 days and a year, and the PML against 20%", () => {
+    const r = readSiteReports(
+      reported([
+        row("Phase I ESA date", "November 2024"),
+        row("Phase I ESA findings", "One REC: former dry cleaner on the adjacent parcel"),
+        row("Phase II ESA", "Recommended; not completed"),
+        row("PCA immediate repairs", "$630,000"),
+        row("Seismic PML", "24%"),
+        row("Zoning conformance", "Legal non-conforming (density)"),
+      ]),
+      AS_OF,
+    )!;
+    const modelLine = siteReportsModelLine(r, { capitalYr1: 630_000, capitalIsRepairs: true });
+    const html = render(React.createElement(SiteReportsPanel, { reports: r, modelLine }));
+    dumpView("site-reports-panel", html);
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="site-reports-panel"');
+    expect(text).toContain("Third-party reports");
+    expect(text).toContain("Findings to price");
+    // A tile a report, each saying what it found.
+    for (const key of ["phase-i", "phase-ii", "pca", "pml", "zoning"]) expect(html).toContain(`data-report="${key}"`);
+    expect(text).toContain("REC");
+    expect(text).toContain("Dated Nov 2024");
+    expect(text).toContain("$630,000");
+    expect(text).toContain("1.5% of the price");
+    expect(text).toContain("24%");
+    expect(text).toContain("Legal non-conforming");
+    // The Phase I's age against the two lines the purchase is held to.
+    expect(html.match(/data-bar="esa-age"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="esa-180"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="esa-year"/g)).toHaveLength(1);
+    expect(text).toContain("22 months");
+    // The PML against the lenders' 20%.
+    expect(html.match(/data-bar="pml"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="pml-line"/g)).toHaveLength(1);
+    expect(text).toContain("20%: most lenders ask for earthquake insurance or a retrofit at or above it");
+    expect(text).toContain("The model carries the PCA's $630,000 of immediate repairs");
+    expect(a11yIssues(html), "site reports panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("a clean set says nothing is flagged, draws no line it has no figure for, and nothing without a report", () => {
+    const r = readSiteReports(reported([row("Phase I ESA findings", "No RECs"), row("Zoning conformance", "Legal conforming")]), AS_OF)!;
+    const html = render(React.createElement(SiteReportsPanel, { reports: r }));
+    const text = visibleText(html);
+    expect(text).toContain("Nothing flagged");
+    expect(html).not.toContain('data-bar="esa-age"');
+    expect(html).not.toContain('data-bar="pml"');
+    expect(render(React.createElement(SiteReportsPanel, { reports: readSiteReports(reported([]), AS_OF) }))).toBe(render(React.createElement(React.Fragment)));
+  });
+});
+
+describe("ShareView — the third-party reports (#465)", () => {
+  it("draws what the reports found and leads the key terms with it, and nothing on the sample", () => {
+    const withReports = {
+      ...SAMPLE_DEAL.extraction,
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Phase I ESA findings", value: "One REC: former dry cleaner", flagged: false, page: "", basis: "na" as const },
+        { label: "Seismic PML", value: "24%", flagged: false, page: "", basis: "na" as const },
+      ],
+    };
+    const props = {
+      dealName: SAMPLE_DEAL.name,
+      assetClass: SAMPLE_DEAL.asset_class,
+      expiresAt: "2026-09-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: withReports }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="site-reports-panel"');
+    expect(text).toContain("The seller's Phase I found a recognized environmental condition");
+    expect(text).toContain("Phase I ESA findings");
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }))).not.toContain("site-reports-panel");
+  });
+});
