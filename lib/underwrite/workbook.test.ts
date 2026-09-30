@@ -828,6 +828,29 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "Affordability")).toThrow();
   });
 
+  it("a hotel (#455): what it is sold with, then the PIP against the model's capital line", async () => {
+    const withHotel = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        assetClass: "hospitality_str",
+        hotel: { brand: "Courtyard by Marriott", franchise: "", management: "", encumbrance: "unencumbered", pip: "", page: "" },
+        metrics: [
+          ...extraction.metrics.filter((m) => !/^(units|keys)$/i.test(m.label)),
+          { label: "Keys", value: "120", flagged: false, page: "p. 2" },
+          { label: "PIP cost", value: "$4,200,000", flagged: false, page: "p. 6" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(withHotel));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The hotel");
+    expect(String(cover.getCell(r, 3).value)).toBe("Hotel: flagged Courtyard by Marriott, sold unencumbered; PIP $4.2M ($35k a key)");
+    expect(String(cover.getCell(r + 1, 3).value)).toContain("The model carries the $4.2M PIP as its first year's capital");
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The hotel")).toThrow();
+  });
+
   it("a single tenant (#454): the lease, then the years left at the sale and its increases against the Rent Growth input", async () => {
     const leased = deriveUnderwriteInputs(
       {

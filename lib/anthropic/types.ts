@@ -160,7 +160,39 @@ export interface ExtractionResult {
    *  and a blank tenant on a multi-tenant or vacant property. Read by
    *  lib/single-tenant. */
   singleTenant?: ExtractedSingleTenant;
+  /** WHAT A HOTEL IS SOLD WITH (#455): its flag, its franchise, its
+   *  management and whether the sale is encumbered by them, and the brand's
+   *  property improvement plan — as the OM states them. Absent on an
+   *  extraction saved before it was read, and blank on anything but a
+   *  hotel. Read by lib/hotel-deal. */
+  hotel?: ExtractedHotel;
   metrics: ExtractedMetric[];
+}
+
+/** What a hotel's sale is subject to (#455): free of its brand and its
+ *  manager, or encumbered by either or both. */
+export type HotelEncumbrance = "unencumbered" | "brand" | "management" | "brand_and_management" | "unknown";
+
+/** A hotel's contracts, as the OM states them — every field a string, ""
+ *  where it states none. The figures (the PIP, the agreements' ends, ADR,
+ *  RevPAR, the index, the FF&E reserve) are rows of their own. */
+export interface ExtractedHotel {
+  /** the flag as the OM names it ("Courtyard by Marriott"), or
+   *  "Independent" where it says the hotel carries none */
+  brand: string;
+  /** the franchise or license agreement as stated — its term, its end,
+   *  whether it transfers to the buyer */
+  franchise: string;
+  /** the management arrangement as stated — brand-managed, a third-party
+   *  manager, owner-operated; the agreement's term and how it ends */
+  management: string;
+  /** what the sale is subject to */
+  encumbrance: HotelEncumbrance;
+  /** the brand's property improvement plan as stated — the renovation it
+   *  requires on the change of ownership, its cost and timing */
+  pip: string;
+  /** the OM's page for them */
+  page: string;
 }
 
 /** The one lease a single-tenant property is (#454), as the OM states it —

@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "Hotels, read with their flag, manager and PIP",
+      "href": "/deals",
+      "blurb": "A hotel is now read for what it is sold with: its brand, whether the sale is encumbered by the franchise or the management agreement, when each agreement ends, and the brand's property improvement plan. The deal page stacks the PIP on the price for the basis a key, draws both agreements' years left against the model's five-year sale, and checks that the memorandum's ADR times occupancy ties to its RevPAR, with the RevPAR index against its competitive set. Where the memorandum states a PIP and no other capital budget, the model now carries it as first-year capital; where it states both, the budget is read as including it. The pipeline, the memo, the report, the workbook and the compare table carry it too, and the assumption review checks the hotel's contract traps by name."
+    },
+    {
+      "date": "2026-09-30",
       "title": "Single-tenant deals, read as one lease",
       "href": "/deals",
       "blurb": "When one tenant leases the whole property — a net lease, a build-to-suit, a sale-leaseback — the screen now reads the lease itself: the tenant and who guarantees the rent, any credit rating the memorandum states, when the lease ends, the renewal options after it, any early termination right, and the rent's stated increases. The deal page draws the years left today and at the model's five-year sale, with the tenant's options dashed after the term, and sets the lease's own increases against the model's rent growth, saying what to enter to run the model on the lease. A lease that ends inside the hold is said to, and an early termination date is read as the lease's end. The pipeline, the memo, the report, the workbook and the compare table carry it too, and the assumption review checks the single-tenant traps by name."

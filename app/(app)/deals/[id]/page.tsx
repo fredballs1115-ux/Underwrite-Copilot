@@ -13,8 +13,10 @@ import { PortfolioCard } from "@/app/portfolio-card";
 import { InterestPanel } from "@/app/interest-panel";
 import { AffordablePanel } from "@/app/affordable-panel";
 import { SingleTenantPanel } from "@/app/single-tenant-panel";
+import { HotelPanel } from "@/app/hotel-panel";
 import { readAffordable } from "@/lib/affordable";
 import { readSingleTenant } from "@/lib/single-tenant";
+import { readHotelDeal } from "@/lib/hotel-deal";
 import { withArticle } from "@/lib/article";
 import { interestTag, readInterest } from "@/lib/interest";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
@@ -1164,6 +1166,14 @@ export default async function DealPage({
                 }
               : null
           }
+        />
+        {/* What a hotel is sold with (#455): the flag, the manager, the
+            encumbrance and the PIP — the basis a key with the PIP on top,
+            the agreements' clocks against the model's sale, the rooms. */}
+        <HotelPanel
+          hotel={readHotelDeal(extraction)}
+          holdYears={derived ? derived.inputs.holdMonths / 12 : null}
+          modelLine={derived?.meta.hotel?.read ?? ""}
         />
         <PlausibilityPanel findings={plausibility} strategy={strategy} />
         <PlanSensitivity plan={plan} refCap={refCap} />

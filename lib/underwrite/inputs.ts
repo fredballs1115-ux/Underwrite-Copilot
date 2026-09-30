@@ -19,6 +19,7 @@ import { assumableLine, assumableSentence, readAssumable } from "@/lib/assumable
 import { leaseholdBasisLine, leaseholdExitSentence, leaseholdLenderLine, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
 import { readSingleTenant, singleTenantModelLine, singleTenantShortLine } from "@/lib/single-tenant";
+import { hotelModelLine, hotelShortLine, readHotelDeal } from "@/lib/hotel-deal";
 import {
   buildingSfRow,
   findGoingInCap,
@@ -108,6 +109,12 @@ export interface WorkbookMeta {
    *  left at its sale or the lease ending inside its hold, then the lease's
    *  increases against its rent growth; absent on anything else */
   singleTenant?: { line: string; read: string } | null;
+  /** what a hotel is sold with (lib/hotel-deal, #455): the flag, the
+   *  encumbrance, the PIP and the franchise's end in one line, then what
+   *  they mean for this model — the PIP against its capital line, a flag
+   *  ending inside its hold, a manager outlasting its sale; absent on
+   *  anything but a hotel */
+  hotel?: { line: string; read: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -468,7 +475,13 @@ export function deriveUnderwriteInputs(
   const budgetRead =
     capitalBudgetFromMetrics(metrics, statedPrice, !priceIsLand) ??
     budgetFromText(extraction?.strategy?.capitalBudget, statedPrice, !priceIsLand);
-  const capitalBudget = budgetRead?.budget ?? 0;
+  // A hotel's PIP (#455): the brand's required renovation is the buyer's
+  // capital. Where the memorandum states a PIP and no other capital budget
+  // the model carries it; where it states both, the budget is read as
+  // including it — never the two added.
+  const hotelRead = readHotelDeal(extraction);
+  const pipCapital = !budgetRead && hotelRead?.pipTotal != null && hotelRead.pipTotal > 0 ? hotelRead.pipTotal : null;
+  const capitalBudget = budgetRead?.budget ?? pipCapital ?? 0;
 
   // Unit count, same precedence as occupancy: rent-roll actual first, then
   // the OM's stated metric through the shared count reader (a whole number
@@ -633,6 +646,13 @@ export function deriveUnderwriteInputs(
       } — spent in year 1 in this annual model; the OM's own timeline may run longer`,
       budgetRead.page,
     );
+  } else if (pipCapital != null) {
+    mark(
+      "capitalImprovementsYr1",
+      "extracted",
+      "PIP cost — the brand's property improvement plan, as stated — spent in year 1 in this annual model; the brand's own schedule, and the rooms out of order while it runs, may differ",
+      hotelRead?.pipPage || undefined,
+    );
   } else {
     mark(
       "capitalImprovementsYr1",
@@ -677,6 +697,12 @@ export function deriveUnderwriteInputs(
       leasehold: leaseholdMeta(extraction, inputs),
       affordable: affordableMeta(extraction),
       singleTenant: singleTenantMeta(extraction, inputs),
+      hotel: hotelRead
+        ? {
+            line: hotelShortLine(hotelRead),
+            read: hotelModelLine(hotelRead, { holdMonths: inputs.holdMonths, capitalYr1: capitalBudget, capitalIsPip: pipCapital != null }),
+          }
+        : null,
       // Rent-roll actual occupancy outranks the OM's stated figure.
       occupancyPct: rrOcc ?? (occPct != null ? occPct / 100 : null),
       rsf,

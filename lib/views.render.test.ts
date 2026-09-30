@@ -88,7 +88,8 @@ const CARDS: DealCard[] = [
   card({ id: "p", name: "Strip District Lofts", verdict: "pass", stage: "screening", fit: "near", score: 60, mandateVerdict: "WATCH", slots: { cap: "6.4%", price: "$18,000,000", yoc: null, debt: "Assumable 3.45%" }, market: "Strip District, Pittsburgh, PA", coveredMarket: null, readMarket: "Pittsburgh PA" }),
   card({ id: "d", name: "Tysons Corner Plaza", assetClass: "office", verdict: "pass_on", stage: "dead", fit: "outside", score: 18, mandateVerdict: "PASS", slots: { cap: "8.1%", price: "$60,000,000", yoc: null }, market: "Tysons, VA", coveredMarket: "Northern Virginia" }),
   card({ id: "e", name: "Logan Square Retail", assetClass: "retail", verdict: null, stage: "screening", jobStatus: "running", slots: { cap: null, price: "$12,500,000", yoc: null }, market: "Chicago, IL", coveredMarket: "Chicago", hasAddress: false }),
-  card({ id: "f", name: "I-95 Logistics Center", assetClass: "industrial", verdict: null, stage: "screening", jobStatus: "failed", market: "Newark, NJ", coveredMarket: "Northern New Jersey" }),
+  // A hotel sold encumbered by its manager, with the brand's PIP (#455).
+  card({ id: "f", name: "Courtyard Newark Airport", assetClass: "hospitality_str", verdict: null, stage: "screening", jobStatus: "failed", slots: { cap: null, price: null, yoc: null, hotel: "Mgmt encumbered, PIP $35k/key" }, market: "Newark, NJ", coveredMarket: "Northern New Jersey" }),
   // A 49% LP interest: the row says what the price buys beside the figure.
   card({ id: "g", name: "Harbor View Apartments", verdict: "caution", stage: "underwriting", addedBy: "Jordan Lee", fit: "fits", score: 79, mandateVerdict: "PURSUE", slots: { cap: "5.9%", price: "$41,250,000", yoc: null, interest: "49% share" }, market: "Baltimore, MD", coveredMarket: "Baltimore" }),
   card({ id: "h", name: "Sample — The Maddox at Brewerytown", verdict: "caution", stage: "screening", fit: "near", score: 71, mandateVerdict: "WATCH", slots: { cap: "5.6%", price: "$68,000,000", yoc: null }, market: "Brewerytown, Philadelphia, PA", coveredMarket: "Philadelphia" }),
@@ -232,6 +233,9 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // (#454); a multi-tenant deal says nothing.
     expect((text.match(/Single tenant, 6 yrs left/g) ?? []).length).toBe(4);
     expect(html).toContain("Single tenant, 6 yrs left: one lease is the whole income");
+    // What a hotel is sold with, at every width too (#455).
+    expect((text.match(/Mgmt encumbered, PIP \$35k\/key/g) ?? []).length).toBe(4);
+    expect(html).toContain("Mgmt encumbered, PIP $35k/key: what the hotel is sold with");
   });
 
   it("draws the pipeline as photograph-led cards by default: the building's picture, the call over it, the three figures (#428)", () => {
@@ -348,6 +352,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect((text.match(/Assumable 3\.45%/g) ?? []).length).toBe(1);
     expect((text.match(/LIHTC, 75% restricted/g) ?? []).length).toBe(1);
     expect((text.match(/Single tenant, 6 yrs left/g) ?? []).length).toBe(1);
+    expect((text.match(/Mgmt encumbered, PIP \$35k\/key/g) ?? []).length).toBe(1);
     // The three figures a pipeline is read by; a plan deal's yield on cost
     // takes the cap's slot under its own label.
     expect(text).toContain("$68.0M");
@@ -5082,5 +5087,104 @@ describe("ShareView — a single tenant's lease under the title (#454)", () => {
     expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }))).not.toContain(
       "single-tenant-panel",
     );
+  });
+});
+
+// ── What a hotel is sold with (#455) ──────────────────────────────────────
+import { HotelPanel } from "@/app/hotel-panel";
+import { readHotelDeal } from "@/lib/hotel-deal";
+
+describe("HotelPanel — what a hotel is sold with, drawn", () => {
+  const AS_OF = new Date(Date.UTC(2026, 8, 30));
+  const row = (label: string, value: string, page = "p. 6") => ({ label, value, flagged: false, page, basis: "na" as const });
+  const courtyard = (over: Partial<NonNullable<ExtractionResult["hotel"]>> = {}, metrics?: ExtractionResult["metrics"]) =>
+    ({
+      dealName: "Courtyard Nashville Downtown",
+      assetClass: "hospitality_str",
+      totalPages: 40,
+      hotel: { brand: "Courtyard by Marriott", franchise: "", management: "A regional operator; the agreement survives the sale", encumbrance: "management", pip: "", page: "p. 6", ...over },
+      metrics: metrics ?? [
+        row("Asking price", "$26,000,000", "p. 2"),
+        row("Keys", "120", "p. 2"),
+        row("PIP cost", "$4,200,000"),
+        row("Franchise expiration", "June 30, 2034"),
+        row("Management agreement expiration", "2031"),
+        row("ADR", "$189.50"),
+        row("Occupancy", "74.0%"),
+        row("RevPAR", "$140.23"),
+        row("RevPAR index", "92.4"),
+      ],
+    }) as ExtractionResult;
+
+  it("draws the basis a key with the PIP on top, the two clocks against the model's sale, and the rooms", () => {
+    const html = render(
+      React.createElement(HotelPanel, {
+        hotel: readHotelDeal(courtyard(), AS_OF),
+        holdYears: 5,
+        modelLine: "The model carries the $4.2M PIP as its first year's capital, so its returns pay for it.",
+      }),
+    );
+    const text = visibleText(html);
+    expect(text).toContain("Hotel");
+    expect(text).toContain("Courtyard by Marriott");
+    expect(text).toContain("Encumbered by management");
+    // The basis: $216.7k a key of price and $35k of PIP on one bar.
+    expect(html.match(/data-bar="hotel-price"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="hotel-pip"/g)).toHaveLength(1);
+    expect(text).toContain("$251.7k all-in");
+    expect(text).toContain("The price, $216.7k a key");
+    expect(text).toContain("The PIP, $35k a key");
+    // The clocks, each with the model's sale marked.
+    expect(html.match(/data-bar="hotel-clock"/g)).toHaveLength(2);
+    expect(html.match(/data-bar="hotel-hold"/g)).toHaveLength(2);
+    expect(text).toContain("to Jun 2034 · 7.8 years");
+    expect(text).toContain("2031 · 5.3 years");
+    expect(text).toContain("The line is the model's sale, 5 years out");
+    // The rooms: the equation, and the index against 100.
+    // The equation is six inline runs; read as one line of text.
+    expect(text.replace(/\s+/g, " ")).toContain("ADR $189.50 × occupancy 74.0% = RevPAR $140.23");
+    expect(html.match(/data-bar="hotel-index"/g)).toHaveLength(1);
+    expect(text).toContain("92 against 100");
+    expect(text).toContain("The management as stated: A regional operator; the agreement survives the sale");
+    expect(text).toContain("The model carries the $4.2M PIP as its first year's capital");
+    expect(a11yIssues(html), "hotel panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("marks a RevPAR that does not tie in the warning tone; nothing at all on anything but a hotel", () => {
+    const off = courtyard({}, [row("Keys", "120"), row("ADR", "$189.50"), row("Occupancy", "74%"), row("RevPAR", "$155.00")]);
+    const html = render(React.createElement(HotelPanel, { hotel: readHotelDeal(off, AS_OF) }));
+    expect(visibleText(html).replace(/\s+/g, " ")).toContain("= RevPAR $140.23 — the memorandum says $155.00");
+    expect(html).toContain("text-kill");
+    const blank = courtyard({ brand: "", management: "", encumbrance: "unknown" }, [row("Units", "240")]);
+    expect(render(React.createElement(HotelPanel, { hotel: readHotelDeal(blank, AS_OF) }))).toBe(render(React.createElement(React.Fragment)));
+  });
+});
+
+describe("ShareView — what a hotel is sold with, under the title (#455)", () => {
+  it("draws the hotel, and nothing on the sample", () => {
+    const hotelEx = {
+      ...SAMPLE_DEAL.extraction,
+      hotel: { brand: "Courtyard by Marriott", franchise: "", management: "", encumbrance: "unencumbered" as const, pip: "", page: "" },
+      metrics: [...SAMPLE_DEAL.extraction.metrics, { label: "PIP cost", value: "$4,200,000", flagged: false, page: "", basis: "na" as const }],
+    };
+    const props = {
+      dealName: SAMPLE_DEAL.name,
+      assetClass: SAMPLE_DEAL.asset_class,
+      expiresAt: "2026-09-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: hotelEx }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="hotel-panel"');
+    expect(text).toContain("It is sold unencumbered — free of its brand and its management — so the buyer chooses both.");
+    expect(text).toContain("PIP cost");
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }))).not.toContain("hotel-panel");
   });
 });

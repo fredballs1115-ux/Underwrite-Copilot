@@ -229,6 +229,37 @@ describe("MemoDocument (redesigned)", () => {
     expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).singleTenantLine).toBe("");
   }, 30000);
 
+  it("says what a hotel is sold with under the title (#455), and nothing on the sample", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      hotel: { brand: "Courtyard by Marriott", franchise: "", management: "", encumbrance: "management", pip: "", page: "" },
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "PIP cost", value: "$4,200,000", flagged: false, page: "p. 6", basis: "na" },
+        { label: "Franchise expiration", value: "June 30, 2034", flagged: false, page: "p. 6", basis: "na" },
+      ],
+    };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "September 30, 2026", []);
+    expect(data.hotelLine).toMatch(/^Hotel: flagged Courtyard by Marriott, sold encumbered by management; PIP \$4\.2M \(\$[\d.]+k a unit\); the franchise ends Jun 2034$/);
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Hotel: flagged Courtyard by Marriott, sold encumbered by management; PIP $4.2M");
+    expect((buf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length).toBe(1);
+    expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).hotelLine).toBe("");
+  }, 30000);
+
   it("the cover aerial prints on page one, and the memo is still one page", async () => {
     const deal = {
       name: SAMPLE_DEAL.name,

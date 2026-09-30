@@ -12,6 +12,7 @@ import { interestTag } from "@/lib/interest";
 import { assumableTag } from "@/lib/assumable-debt";
 import { affordableTag } from "@/lib/affordable";
 import { singleTenantTag } from "@/lib/single-tenant";
+import { hotelTag } from "@/lib/hotel-deal";
 
 export interface PipelineSlots {
   /** the going-in cap as the OM states it — null on a plan deal, which has
@@ -37,6 +38,10 @@ export interface PipelineSlots {
    *  "Single tenant, may leave in 4 yrs" (lib/single-tenant
    *  `singleTenantTag`, #454); absent or null otherwise */
   tenancy?: string | null;
+  /** what a hotel is sold with — "Mgmt encumbered, PIP $35k/key",
+   *  "Unencumbered", "Independent" (lib/hotel-deal `hotelTag`, #455);
+   *  absent or null on anything but a hotel */
+  hotel?: string | null;
 }
 
 /**
@@ -93,5 +98,7 @@ export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | nu
     affordable: affordableTag(extraction),
     // One lease is the whole income: the row says how long it has left.
     tenancy: singleTenantTag(extraction),
+    // A hotel's contracts and its PIP change what the price buys.
+    hotel: hotelTag(extraction),
   };
 }
