@@ -1,10 +1,10 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { analysisReadyEmail } from "@/lib/email-template";
-import { buyBoxCheckSource, evaluateBuyBox } from "@/lib/criteria";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { inferStrategy } from "@/lib/deal-strategy";
-import type { ExtractionResult, VerdictResult } from "@/lib/anthropic/types";
+import { buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
+import { addressUpgrade, type StructuredAddress } from "@/lib/address";
+import type { ExtractionResult, FirstSignal, VerdictResult } from "@/lib/anthropic/types";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { ensureDealPicture, pictureMayBeInMemorandum } from "@/lib/deal-picture";
 import { emailPictureUrl } from "@/lib/email-picture";
@@ -76,7 +76,8 @@ export async function sendEmail(
  * One email per completed analysis: deal name, buy-box verdict, link to the
  * report. Fully best-effort — reads the owner's toggle (default ON, including
  * on a pre-0014 schema where the column doesn't exist yet), derives the same
- * buy-box chip the deal header shows, and swallows every failure.
+ * buy-box chip the deal header shows (lib/buy-box-chip, from the same
+ * inputs), and swallows every failure.
  */
 export async function notifyAnalysisReady(
   admin: SupabaseClient,
@@ -86,7 +87,9 @@ export async function notifyAnalysisReady(
   try {
     const { data: deal } = await admin
       .from("deals")
-      .select("name, user_id, team_id, asset_class, extraction, verdict, is_sample, photo, om_storage_path")
+      .select(
+        "name, user_id, team_id, asset_class, extraction, first_signal, address, verdict, is_sample, photo, om_storage_path",
+      )
       .eq("id", dealId)
       .maybeSingle();
     if (!deal || deal.is_sample) return;
@@ -115,7 +118,11 @@ export async function notifyAnalysisReady(
     const to = userRes?.user?.email;
     if (!to) return;
 
-    // Same buy-box chip the deal header derives.
+    // The deal header's own chip (lib/buy-box-chip): the same box, the same
+    // source — the extraction, the first signal, the address the page reads
+    // — and the same fold, the mandate-fit score leading, so the email's
+    // chip never disagrees with the page it links to. The page shows no chip
+    // without a box; the email says so.
     let buyBoxLabel = "Buy box unverified";
     try {
       const box = await getBuyBoxForDeal(
@@ -123,20 +130,17 @@ export async function notifyAnalysisReady(
         (deal.team_id as string) ?? null,
       );
       if (box) {
-        // The same source and the same inferred kind the deal header judges,
-        // so the email's chip never disagrees with the page it links to.
-        const extraction = (deal.extraction as ExtractionResult) ?? null;
-        const source = buyBoxCheckSource(extraction, null, null, inferStrategy(extraction).kind);
-        const checks = source
-          ? evaluateBuyBox((deal.asset_class as string) ?? "auto", source, box)
-          : [];
-        buyBoxLabel = checks.some((c) => c.status === "miss")
-          ? "Outside buy box"
-          : checks.some((c) => c.status === "near")
-            ? "Near buy box"
-            : checks.length > 0 && checks.every((c) => c.status === "pass")
-              ? "Fits buy box"
-              : "Buy box unverified";
+        const extraction = (deal.extraction as ExtractionResult | null) ?? null;
+        const firstSignal = (deal.first_signal as FirstSignal | null) ?? null;
+        // The page's address: the row's, read from the memorandum or the
+        // typed line exactly as the page reads it (#441).
+        const address =
+          addressUpgrade(deal.address, extraction) ?? (deal.address as StructuredAddress | null) ?? null;
+        buyBoxLabel = buyBoxRead(
+          deal.asset_class as string,
+          dealCheckSource(extraction, firstSignal, address),
+          box,
+        ).chip.label;
       } else {
         buyBoxLabel = "No buy box set";
       }

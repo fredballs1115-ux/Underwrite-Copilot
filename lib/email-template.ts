@@ -10,7 +10,9 @@ export interface AnalysisReadyEmailInput {
   verdictLabel: string;
   /** hex for the verdict accent, e.g. "#1b7a5e" */
   verdictColor: string;
-  /** "Fits buy box" | "Near buy box" | "Outside buy box" | "Buy box unverified" */
+  /** the deal header's buy-box chip (lib/buy-box-chip): "Fit 82 · Pursue",
+   *  "Fit 61 · Outside box", "Fits buy box", "Near buy box", "Outside buy
+   *  box", "Buy box unverified" — or "No buy box set" */
   buyBoxLabel: string;
   /** one-line verdict reason ("" to omit) */
   reason: string;

@@ -91,8 +91,9 @@ import { parseDealNotes, parseDealQa } from "@/lib/deals";
 import { deriveInternalComps } from "@/lib/internal-comps";
 import { buildComps, marketMemoryFor } from "@/lib/market-memory";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource, type BuyBoxCheck } from "@/lib/criteria";
-import { scoreMandateFit, type MandateScore, type MandateVerdict } from "@/lib/mandate";
+import { type BuyBoxCheck } from "@/lib/criteria";
+import { type MandateScore } from "@/lib/mandate";
+import { buyBoxRead, dealCheckSource, type BuyBoxChipTone } from "@/lib/buy-box-chip";
 import { OM_NOI_BASIS_LABEL, compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import {
   IMPLIED_CAP_CEILING,
@@ -451,22 +452,15 @@ export default async function DealPage({
   // The kind rides along as the page infers it (extraction + first signal),
   // so the buy box judges a development's land cost and keeps a plan
   // deal's "no going-in cap" reading — the same read the summary bar makes.
-  const checkSource = buyBoxCheckSource(
-    extraction,
-    firstSignal,
-    dealAddress,
-    inferStrategy(extraction, firstSignal).kind,
-  );
-  const buyBoxChecks: BuyBoxCheck[] = buyBox
-    ? evaluateBuyBox(deal.asset_class, checkSource, buyBox)
-    : [];
+  // lib/buy-box-chip is the one read the screen-complete email makes too,
+  // so its chip never disagrees with this page's.
+  const checkSource = dealCheckSource(extraction, firstSignal, dealAddress);
+  const boxRead = buyBox ? buyBoxRead(deal.asset_class, checkSource, buyBox) : null;
+  const buyBoxChecks: BuyBoxCheck[] = boxRead?.checks ?? [];
   // The single 0–100 mandate-fit read (Feature 4) — same evidence as the
   // per-criterion checks above, rolled into one number and a PURSUE/WATCH/PASS
   // call. Null until there's a box AND something checkable against it.
-  const mandate: MandateScore | null =
-    buyBox && checkSource
-      ? scoreMandateFit(deal.asset_class, checkSource, buyBox)
-      : null;
+  const mandate: MandateScore | null = boxRead?.mandate ?? null;
 
   // Site flags (flood zone / Opportunity Zone / census tract): same stored-
   // result + backfill-on-render protocol as public comps below. The column
@@ -915,39 +909,18 @@ export default async function DealPage({
       ])
     : Promise.resolve(VENDORED_LEGEND);
 
-  // The buy-box call as one chip. When there's a numeric mandate-fit score,
-  // it leads — "Buy box 82 · Pursue", coloured by the PURSUE/WATCH/PASS call.
-  // Otherwise the older fold (Outside / Near / Fits) stands in.
-  const MANDATE_PILL: Record<MandateVerdict, string> = {
-    PURSUE: "bg-pass/10 text-pass",
-    WATCH: "bg-caution/10 text-caution",
-    PASS: "bg-kill/10 text-kill",
+  // The buy-box call as one chip (lib/buy-box-chip's `buyBoxChip`: the
+  // mandate-fit score leads — "Fit 82 · Pursue" — unless a hard "outside"
+  // fold wins, and the older fold stands in without a score), toned here.
+  const CHIP_CLS: Record<BuyBoxChipTone, string> = {
+    pass: "bg-pass/10 text-pass",
+    caution: "bg-caution/10 text-caution",
+    kill: "bg-kill/10 text-kill",
+    muted: "bg-faint text-muted",
   };
-  // The fold covers ALL criteria (incl. the price band / per-unit cap, which
-  // the 0–100 score deliberately doesn't weigh). A deal outside the box on one
-  // of those must never show a green Pursue — so a hard "outside" fold wins the
-  // chip even when the scored dimensions look strong.
-  const buyBoxFold = buyBox ? foldBuyBoxChecks(buyBoxChecks) : null;
-  const buyBoxChip = !buyBox
-    ? null
-    : mandate?.score != null && mandate.verdict
-      ? buyBoxFold === "outside" && mandate.verdict !== "PASS"
-        ? {
-            label: `Fit ${mandate.score} · Outside box`,
-            cls: "bg-kill/10 text-kill",
-          }
-        : {
-            label: `Fit ${mandate.score} · ${mandate.verdict === "PURSUE" ? "Pursue" : mandate.verdict === "WATCH" ? "Watch" : "Pass"}`,
-            cls: MANDATE_PILL[mandate.verdict],
-          }
-      : buyBoxChecks.some((c) => c.status === "miss")
-        ? { label: "Outside buy box", cls: "bg-kill/10 text-kill" }
-        : buyBoxChecks.some((c) => c.status === "near")
-          ? { label: "Near buy box", cls: "bg-caution/10 text-caution" }
-          : buyBoxChecks.length > 0 &&
-              buyBoxChecks.every((c) => c.status === "pass")
-            ? { label: "Fits buy box", cls: "bg-pass/10 text-pass" }
-            : { label: "Buy box unverified", cls: "bg-faint text-muted" };
+  const buyBoxChip = boxRead
+    ? { label: boxRead.chip.label, cls: CHIP_CLS[boxRead.chip.tone] }
+    : null;
 
   const addressLine =
     extraction?.address ||
